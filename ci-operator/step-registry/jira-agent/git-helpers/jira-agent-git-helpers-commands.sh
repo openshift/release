@@ -24,10 +24,37 @@ cat > "${SHARED_DIR}/git-helpers.sh" << 'HEREDOC_EOF'
 GITHUB_APP_CREDS_DIR="/var/run/claude-code-service-account"
 DEFAULT_BRANCH="${JIRA_AGENT_DEFAULT_BRANCH:-main}"
 
+_configure_git_credentials() {
+  local token_variable="${1:-GITHUB_TOKEN}"
+  # Keep the protocol field and token in one printf argument; extra arguments repeat printf's format.
+  local helper="!f() { printf '%s\n' 'username=x-access-token'; printf '%s\n' \"pass\"\"word=\$(printenv ${token_variable})\"; }; f"
+  git config --global credential.helper "$helper"
+}
+
+_github_curl() {
+  local was_tracing=false rc github_token auth_header
+  [[ $- == *x* ]] && was_tracing=true
+  set +x
+  github_token=$(printenv GITHUB_TOKEN)
+  if [ -z "$github_token" ]; then
+    echo "ERROR: GITHUB_TOKEN is not set" >&2
+    rc=1
+  else
+    auth_header="$(printf '%s%s' 'Authorization: ' 'Bearer ')${github_token}"
+    if curl -H "$auth_header" "$@"; then
+      rc=0
+    else
+      rc=$?
+    fi
+  fi
+  $was_tracing && set -x || true
+  return $rc
+}
+
 # ── PAT mode ──────────────────────────────────────────────────────────────────
 
 # Load a classic PAT from the credential secret.
-# Sets: GITHUB_TOKEN_PAT
+# Sets: GITHUB_TOKEN_PAT, GITHUB_TOKEN, GH_TOKEN
 # Requires: JIRA_AGENT_PAT_KEY
 _load_pat_credentials() {
   echo "Loading GitHub PAT credentials..."
@@ -51,8 +78,9 @@ _load_pat_credentials() {
   fi
 
   # PAT mode uses a single token for everything (push + PR creation)
-  git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_PAT}; }; f"
   export GITHUB_TOKEN="$GITHUB_TOKEN_PAT"
+  export GH_TOKEN="$GITHUB_TOKEN_PAT"
+  _configure_git_credentials GITHUB_TOKEN
   echo "PAT configured for git and GitHub CLI"
 
   $_was_tracing && set -x || true
@@ -80,8 +108,7 @@ ensure_fork_exists() {
   echo "Checking if fork ${fork_org}/${repo_name} exists..."
 
   local http_code
-  http_code=$(curl -s -o /dev/null -w "%{http_code}" \
-    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  http_code=$(_github_curl -s -o /dev/null -w "%{http_code}" \
     -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/${fork_org}/${repo_name}")
 
@@ -90,9 +117,8 @@ ensure_fork_exists() {
   else
     echo "Fork not found (HTTP ${http_code}). Creating fork of ${upstream_repo}..."
     local fork_response
-    fork_response=$(curl -s -X POST \
+    fork_response=$(_github_curl -s -X POST \
       --connect-timeout 10 --max-time 30 \
-      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
       -H "Accept: application/vnd.github+json" \
       "https://api.github.com/repos/${upstream_repo}/forks" \
       -d "{\"default_branch_only\":true}")
@@ -110,8 +136,7 @@ ensure_fork_exists() {
     local max_wait=120
     local waited=0
     while [ $waited -lt $max_wait ]; do
-      http_code=$(curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+      http_code=$(_github_curl -s -o /dev/null -w "%{http_code}" \
         -H "Accept: application/vnd.github+json" \
         "https://api.github.com/repos/${fork_org}/${repo_name}")
       if [ "$http_code" = "200" ]; then
@@ -239,7 +264,7 @@ load_github_app_credentials() {
 }
 
 # Generate initial GitHub App tokens and configure git credentials.
-# Sets: GITHUB_TOKEN_FORK, GITHUB_TOKEN_UPSTREAM, GITHUB_TOKEN (exported)
+# Sets: GITHUB_TOKEN_FORK, GITHUB_TOKEN_UPSTREAM, GITHUB_TOKEN, GH_TOKEN (exported)
 # Requires: INSTALLATION_ID_FORK, INSTALLATION_ID_UPSTREAM, generate_github_token()
 generate_and_configure_tokens() {
   echo "Generating GitHub App tokens..."
@@ -248,7 +273,7 @@ generate_and_configure_tokens() {
   set +x
 
   echo "Generating GitHub App token for fork..."
-  GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
+  export GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
   if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
     echo "ERROR: Failed to generate GitHub App token for fork"
     $_was_tracing && set -x || true
@@ -265,8 +290,9 @@ generate_and_configure_tokens() {
   fi
   echo "Upstream token generated successfully"
 
-  git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
+  _configure_git_credentials GITHUB_TOKEN_FORK
   export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
+  export GH_TOKEN="$GITHUB_TOKEN_UPSTREAM"
   echo "GitHub App tokens configured successfully"
 
   $_was_tracing && set -x || true
@@ -298,8 +324,8 @@ refresh_fork_token() {
   local _new_token
   if _new_token=$(generate_github_token "$INSTALLATION_ID_FORK") \
     && [ -n "$_new_token" ] && [ "$_new_token" != "null" ]; then
-    GITHUB_TOKEN_FORK="$_new_token"
-    git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
+    export GITHUB_TOKEN_FORK="$_new_token"
+    _configure_git_credentials GITHUB_TOKEN_FORK
     echo "Fork token refreshed"
   else
     echo "ERROR: Failed to refresh GitHub App token for fork — continuing with previous token"
@@ -307,7 +333,7 @@ refresh_fork_token() {
   $_was_tracing && set -x || true
 }
 
-# Refresh the upstream GitHub App token and update GITHUB_TOKEN.
+# Refresh the upstream GitHub App token and update GitHub CLI/API credentials.
 # No-op in PAT mode.
 refresh_upstream_token() {
   if [ "${JIRA_AGENT_AUTH_MODE:-app}" = "pat" ]; then
@@ -321,6 +347,7 @@ refresh_upstream_token() {
     && [ -n "$_new_token" ] && [ "$_new_token" != "null" ]; then
     GITHUB_TOKEN_UPSTREAM="$_new_token"
     export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
+    export GH_TOKEN="$GITHUB_TOKEN_UPSTREAM"
     echo "Upstream token refreshed"
   else
     echo "ERROR: Failed to refresh GitHub App token for upstream — continuing with previous token"
