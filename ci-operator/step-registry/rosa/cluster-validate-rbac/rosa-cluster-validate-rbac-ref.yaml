@@ -1,0 +1,20 @@
+ref:
+  as: rosa-cluster-validate-rbac
+  from: cli
+  grace_period: 1m0s
+  commands: rosa-cluster-validate-rbac-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 2m0s
+  documentation: |-
+    Validates RBAC health on a leased ROSA cluster before running e2e tests.
+
+    Checks that the kubeconfig from the checkout step is functional and
+    that dedicated-admins group permissions are working (via oc auth can-i
+    impersonation). When the rbac-permissions-operator is broken, tests
+    time out waiting for permissions — this step fails fast instead.
+
+    Must run after rosa-cluster-lease-checkout which writes the kubeconfig
+    to SHARED_DIR.
