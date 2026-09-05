@@ -1,0 +1,46 @@
+ref:
+  as: sandboxed-containers-operator-testsuites-kata-upstream
+  from: src
+  cli: latest
+  commands: sandboxed-containers-operator-testsuites-kata-upstream-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 45m0s
+  grace_period: 10m0s
+  # Environment variables follow the TESTS_<SUITE_NAME>_<PARAMETER> convention
+  # shared by all OSC test suites (see the testsuites AGENTS.md).
+  env:
+  - name: TESTS_KATA_UPSTREAM_ENABLE
+    default: "false"
+    documentation: |-
+      Enable-gate for the upstream Kata Containers test suite (skip-by-default).
+      "true"        -> the step runs the tests.
+      "false"/unset -> the step writes a skipped JUnit and exits 0.
+  - name: TESTS_KATA_UPSTREAM_PROFILE
+    default: "full"
+    documentation: |-
+      Test profile/suite passed to the runner via -t/--test. One of
+      sanity|pods|workloads|resources|volumes|networking|full, or a single
+      .bats file name.
+  - name: TESTS_KATA_UPSTREAM_REPO
+    default: ""
+    documentation: |-
+      Kata Containers tests repository passed to the runner via --tests-repo.
+      Empty uses the runner default (https://github.com/openshift/kata-containers).
+  - name: TESTS_KATA_UPSTREAM_REPO_REF
+    default: ""
+    documentation: |-
+      Branch or tag of the tests repository passed to the runner via
+      --tests-repo-ref. Empty uses the runner default (main).
+  documentation: |-
+    Run the upstream Kata Containers e2e tests against a cluster that already
+    has the Sandboxed Containers Operator deployed.
+
+    The step clones the openshift/sandboxed-containers-operator repository
+    (devel branch) to obtain test/e2e/run_upstream_tests.sh and executes it.
+    It runs on the src image (which provides git) with oc injected via cli;
+    tools the runner needs that are still missing (bats, yq, jq, envsubst) are
+    installed on-demand. Per-suite JUnit results are copied to the artifacts
+    directory so prow indexes them.
