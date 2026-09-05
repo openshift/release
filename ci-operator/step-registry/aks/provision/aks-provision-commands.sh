@@ -2,6 +2,78 @@
 
 set -euo pipefail
 
+# Azure CLI does not consistently retry DNS and lower-level transport failures.
+# Keep direct retries scoped to safe repeats. AKS and node-pool creates remain
+# single-shot because repeating them after an ambiguous response is unsafe.
+# BEGIN AZURE CLI RETRY HELPER
+AZURE_CLI_TRANSIENT_ERROR_PATTERN='NameResolutionError|Temporary failure in name resolution|Name or service not known|Failed to resolve|Could not resolve host|requests\.exceptions\.(ConnectionError|ConnectTimeout|ReadTimeout)|urllib3\.exceptions\.(NewConnectionError|ConnectTimeoutError|ReadTimeoutError)|RemoteDisconnected|Connection (reset|aborted|refused)|connect(ion)?[^:]* timed out|Read timed out|TLS handshake timeout|network is unreachable'
+
+run_az_with_retry() {
+  local operation="$1"
+  shift
+
+  local max_attempts=4
+  local delay=5
+  local max_delay=20
+  local attempt=1
+  local rc=0
+  local capture_dir
+  capture_dir="$(mktemp -d)"
+
+  while true; do
+    : >"${capture_dir}/stdout"
+    : >"${capture_dir}/stderr"
+
+    if "$@" >"${capture_dir}/stdout" 2>"${capture_dir}/stderr"; then
+      cat "${capture_dir}/stdout"
+      if [[ -s "${capture_dir}/stderr" ]]; then
+        printf 'Azure CLI %s completed with status 0; command diagnostics suppressed\n' "${operation}" >&2
+      fi
+      rm -rf "${capture_dir}"
+      return 0
+    else
+      rc=$?
+    fi
+
+    # Keep failed output private: stdout must not satisfy a caller's command
+    # substitution, while stderr is used only for quiet retry classification.
+
+    if ((rc >= 128 && rc <= 192)); then
+      printf 'Azure CLI %s ended with status %d\n' "${operation}" "${rc}" >&2
+      rm -rf "${capture_dir}"
+      return "${rc}"
+    fi
+
+    if ! grep -Eiq "${AZURE_CLI_TRANSIENT_ERROR_PATTERN}" "${capture_dir}/stderr"; then
+      printf 'Azure CLI %s failed with non-retryable status %d\n' "${operation}" "${rc}" >&2
+      rm -rf "${capture_dir}"
+      return "${rc}"
+    fi
+
+    if ((attempt >= max_attempts)); then
+      printf 'Azure CLI %s failed after %d attempts with transient status %d\n' "${operation}" "${max_attempts}" "${rc}" >&2
+      rm -rf "${capture_dir}"
+      return "${rc}"
+    fi
+
+    printf 'Azure CLI %s hit transient status %d (attempt %d/%d); retrying in %ds\n' "${operation}" "${rc}" "${attempt}" "${max_attempts}" "${delay}" >&2
+    if sleep "${delay}"; then
+      :
+    else
+      rc=$?
+      printf 'Azure CLI %s retry wait ended with status %d\n' "${operation}" "${rc}" >&2
+      rm -rf "${capture_dir}"
+      return "${rc}"
+    fi
+    attempt=$((attempt + 1))
+    delay=$((delay * 2))
+    if ((delay > max_delay)); then
+      delay="${max_delay}"
+    fi
+  done
+}
+# END AZURE CLI RETRY HELPER
+
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
     AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
@@ -27,7 +99,7 @@ if [[ "${ENABLE_NAP:-}" == "true" ]]; then
 fi
 
 az --version
-az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+run_az_with_retry "login" az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
 set -x
 
@@ -49,7 +121,7 @@ fi
 
 echo "Creating resource group for the aks cluster"
 RESOURCEGROUP="${RESOURCE_NAME_PREFIX}-aks-rg"
-az group create --name "$RESOURCEGROUP" --location "$AZURE_LOCATION"
+run_az_with_retry "resource group creation" az group create --name "$RESOURCEGROUP" --location "$AZURE_LOCATION"
 echo "$RESOURCEGROUP" > "${SHARED_DIR}/resourcegroup_aks"
 
 echo "Building up the aks create command"
@@ -82,7 +154,7 @@ fi
 if [[ -n "$AKS_K8S_VERSION" ]]; then
     AKS_CREATE_COMMAND+=(--kubernetes-version "$AKS_K8S_VERSION")
 elif [[ "$USE_LATEST_K8S_VERSION" == "true" ]]; then
-    K8S_LATEST_VERSION=$(az aks get-versions --location "${AZURE_LOCATION}" --output json --query 'max(orchestrators[?isPreview==`null`].orchestratorVersion)')
+    K8S_LATEST_VERSION=$(run_az_with_retry "AKS version lookup" az aks get-versions --location "${AZURE_LOCATION}" --output json --query 'max(orchestrators[?isPreview==`null`].orchestratorVersion)')
     AKS_CREATE_COMMAND+=(--kubernetes-version "$K8S_LATEST_VERSION")
 fi
 
@@ -98,7 +170,7 @@ echo "Creating AKS cluster"
 eval "${AKS_CREATE_COMMAND[*]}"
 
 echo "Waiting for AKS cluster to be ready"
-az aks wait --created --name "$CLUSTER" --resource-group "$RESOURCEGROUP" --interval 30
+run_az_with_retry "AKS readiness wait" az aks wait --created --name "$CLUSTER" --resource-group "$RESOURCEGROUP" --interval 30
 
 if [[ "${ENABLE_NAP:-}" == "true" ]]; then
     echo "NAP is enabled, skipping manual zone-specific node pool creation"
@@ -144,9 +216,9 @@ fi
 echo "Saving cluster info"
 echo "$CLUSTER" > "${SHARED_DIR}/cluster-name"
 if [[ $AKS_ADDONS == *azure-keyvault-secrets-provider* ]]; then
-    az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.clientId -r > "${SHARED_DIR}/aks_keyvault_secrets_provider_client_id"
+    run_az_with_retry "AKS cluster lookup" az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.clientId -r > "${SHARED_DIR}/aks_keyvault_secrets_provider_client_id"
     # Grant MI required permissions to the KV which will be created in the same RG as the AKS cluster
-    AKS_KV_SECRETS_PROVIDER_OBJECT_ID="$(az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.objectId -r)"
+    AKS_KV_SECRETS_PROVIDER_OBJECT_ID="$(run_az_with_retry "AKS cluster lookup" az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.objectId -r)"
     echo "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" > "${SHARED_DIR}/kv-object-id"
 fi
 
@@ -164,7 +236,7 @@ fi
 echo "Getting kubeconfig to the AKS cluster"
 # shellcheck disable=SC2034
 KUBECONFIG="${SHARED_DIR}/kubeconfig"
-eval "${AKS_GET_CREDS_COMMAND[*]}"
+run_az_with_retry "AKS credential retrieval" "${AKS_GET_CREDS_COMMAND[@]}"
 
 if [[ "${ENABLE_NAP:-}" == "true" ]]; then
     echo "Configuring NAP Karpenter resources"
