@@ -1,0 +1,32 @@
+ref:
+  as: interop-opp-skip-ratio-gate
+  from: cli
+  grace_period: 30s
+  commands: interop-opp-skip-ratio-gate-commands.sh
+  timeout: 5m
+  env:
+  - name: SKIP_RATIO_THRESHOLD
+    default: "0.10"
+    documentation: |-
+      Maximum allowed skip ratio (skipped / total). If the overall skip
+      ratio exceeds this threshold and FAIL_ON_BREACH is true, the step
+      fails. Default 0.10 = 10%.
+  - name: JUNIT_DIR
+    default: ""
+    documentation: |-
+      Directory containing JUnit XML files to analyze. Falls back to
+      ${ARTIFACT_DIR} if empty.
+  - name: FAIL_ON_BREACH
+    default: "true"
+    documentation: |-
+      Set to "false" for advisory-only mode (logs the ratio but does
+      not fail the step).
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Scans JUnit XML files in JUNIT_DIR (or ARTIFACT_DIR) and computes
+    the overall skip ratio. Fails the step if the ratio exceeds
+    SKIP_RATIO_THRESHOLD. Produces a summary JUnit XML in ARTIFACT_DIR
+    for Prow/Sippy consumption. Uses only Python stdlib.

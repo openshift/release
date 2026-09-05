@@ -50,47 +50,75 @@ for ns in "${quayNamespacesArr[@]}"; do
 done
 [[ "${quayFound}" == "false" ]] && : "Warning: no QuayRegistry found in namespaces: ${quayNamespacesArr[*]}"
 
-typeset -a secondaryPoliciesArr=(
-  policy-acs
-  policy-acs-monitor-certs
-  policy-acs-operator-central
-  policy-acs-sync-resources
-  policy-advanced-managed-cluster-security
-  policy-advanced-managed-cluster-status
-  policy-compliance-operator-install
-  policy-config-quay
-  policy-hub-quay-bridge
-  policy-install-quay
-  policy-observability-operator
-  policy-observability-storage
-  policy-observability-storage-status
-  policy-odf
-  policy-odf-cluster
-  policy-odf-noobaa
-  policy-odf-status
-  policy-quay-bridge
-  policy-quay-status
-)
+# ── SKIP_POLICIES handling ──────────────────────────────────────────
+# SKIP_POLICIES: comma-separated policy names to exclude from the
+# compliance wait.  Empty (default) means wait for ALL policies.
+# Non-existent policy names produce a warning, not a failure.
+typeset -a skipPoliciesArr=()
+if [[ -n "${SKIP_POLICIES:-}" ]]; then
+  IFS=',' read -ra skipPoliciesArr <<< "${SKIP_POLICIES}"
+  printf '[%s] SKIP_POLICIES set — will skip %d polic(ies):\n' \
+    "$(date -u +%FT%TZ)" "${#skipPoliciesArr[@]}"
+  for p in "${skipPoliciesArr[@]}"; do
+    printf '  - %s\n' "${p}"
+  done
+fi
 
-if [[ "${IGNORE_SECONDARY_POLICIES}" == "true" ]]; then
-  typeset criticalPolicies=''
-  criticalPolicies=$(oc get policies -n policies -o name | sed -E "/$(IFS='|'; echo "${secondaryPoliciesArr[*]}")/d")
+# Write the full skip manifest for auditing / artifact collection
+{
+  printf '# skip-policies manifest — generated %s\n' "$(date -u +%FT%TZ)"
+  printf '# SKIP_POLICIES=%s\n' "${SKIP_POLICIES:-}"
+  printf '# Total policies to skip: %d\n' "${#skipPoliciesArr[@]}"
+  for p in "${skipPoliciesArr[@]}"; do
+    printf '%s\n' "${p}"
+  done
+} > "${ARTIFACT_DIR}/skip-policies.txt"
 
-  if [[ -n "${criticalPolicies}" ]]; then
-    if ! echo "${criticalPolicies}" |
+if (( ${#skipPoliciesArr[@]} > 0 )); then
+  # Validate that skip-listed policies actually exist in the cluster
+  typeset allPolicies=""
+  allPolicies="$(oc get policies -n policies -o name 2>/dev/null)" || true
+  for p in "${skipPoliciesArr[@]}"; do
+    if ! echo "${allPolicies}" | grep -q "/${p}$"; then
+      printf '[%s] WARNING: policy "%s" from SKIP_POLICIES not found in cluster (ignoring)\n' \
+        "$(date -u +%FT%TZ)" "${p}"
+    fi
+  done
+
+  # Build a regex to filter out skipped policies
+  typeset skipRegex=""
+  skipRegex="$(IFS='|'; echo "${skipPoliciesArr[*]}")"
+  # Fetch the full policy list first — fail hard if oc cannot reach the cluster
+  typeset policyList=""
+  policyList="$(oc get policies -n policies -o name)" || {
+    printf '[%s] ERROR: failed to list policies in namespace "policies"\n' \
+      "$(date -u +%FT%TZ)" >&2
+    exit 1
+  }
+  # Filter out skipped policies (grep no-match is tolerated via || true)
+  typeset applyPolicies=""
+  applyPolicies="$(printf '%s\n' "${policyList}" | grep -Ev "/(${skipRegex})$")" || true
+
+  if [[ -n "${applyPolicies}" ]]; then
+    printf '[%s] Waiting for %d non-skipped polic(ies) to become Compliant…\n' \
+      "$(date -u +%FT%TZ)" "$(echo "${applyPolicies}" | wc -l)"
+    if ! echo "${applyPolicies}" |
       xargs oc wait -n policies \
         --for jsonpath='{.status.compliant}'=Compliant \
         --timeout=40m; then
-      : "Critical policies failed to become compliant:"
-      oc get policies -n policies --ignore-not-found | sed -E "/$(IFS='|'; echo "${secondaryPoliciesArr[*]}")/d"
+      : "Non-skipped policies failed to become compliant:"
+      oc get policies -n policies --ignore-not-found | grep -Ev "/(${skipRegex})$"
       oc get policies -n policies --ignore-not-found -o yaml
       oc describe policies --all -n policies
       exit 1
     fi
   else
-    : "All policies are secondary (ignored), no critical policies to wait for"
+    printf '[%s] All policies are in the skip list — no policies to wait for\n' \
+      "$(date -u +%FT%TZ)"
   fi
 else
+  printf '[%s] No policies to skip — waiting for ALL policies to become Compliant…\n' \
+    "$(date -u +%FT%TZ)"
   if ! oc wait policies --all -n policies \
     --for jsonpath='{.status.compliant}'=Compliant \
     --timeout=40m; then
