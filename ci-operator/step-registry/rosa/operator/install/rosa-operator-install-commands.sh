@@ -6,13 +6,30 @@ set -o pipefail
 
 collect_operator_logs() {
     local ns="${OPERATOR_NAMESPACE:-openshift-${OPERATOR_NAME:-unknown}}"
-    if [[ -n "${ARTIFACT_DIR:-}" ]] && oc get namespace "${ns}" &>/dev/null; then
-        for deploy in $(oc get deployment -n "${ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
-            oc logs "deployment/${deploy}" -n "${ns}" --all-containers --tail=500 \
-                > "${ARTIFACT_DIR}/${deploy}-logs.txt" 2>&1 || true
-        done
-        oc get events -n "${ns}" --sort-by='.lastTimestamp' \
-            > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
+    if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+        if oc get namespace "${ns}" &>/dev/null; then
+            for deploy in $(oc get deployment -n "${ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
+                oc logs "deployment/${deploy}" -n "${ns}" --all-containers --tail=500 \
+                    > "${ARTIFACT_DIR}/${deploy}-logs.txt" 2>&1 || true
+            done
+            oc get events -n "${ns}" --sort-by='.lastTimestamp' \
+                > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
+        fi
+
+        # PKO controller diagnostics — essential for diagnosing
+        # ClusterPackage reconciliation failures
+        oc get pods -n openshift-package-operator -o wide \
+            > "${ARTIFACT_DIR}/pko-pods.txt" 2>&1 || true
+        oc logs deployment/package-operator -n openshift-package-operator --tail=200 \
+            > "${ARTIFACT_DIR}/pko-controller-logs.txt" 2>&1 || true
+        oc get events -n openshift-package-operator --sort-by='.lastTimestamp' \
+            > "${ARTIFACT_DIR}/pko-namespace-events.txt" 2>&1 || true
+        # ClusterPackage and ClusterObjectSet status
+        local cp_name="${CLUSTER_PACKAGE_NAME:-${OPERATOR_NAME:-unknown}-e2e-test}"
+        oc describe clusterpackage "${cp_name}" \
+            > "${ARTIFACT_DIR}/clusterpackage-describe.txt" 2>&1 || true
+        oc get clusterobjectset -o wide 2>/dev/null | grep "${OPERATOR_NAME:-}" \
+            > "${ARTIFACT_DIR}/clusterobjectsets.txt" 2>&1 || true
     fi
     # Collect PKO diagnostics for debugging ClusterPackage reconciliation issues
     if [[ -n "${ARTIFACT_DIR:-}" ]]; then
@@ -114,7 +131,10 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
     log "Recording PKO restart baseline timestamp: ${PKO_RESTART_BASELINE}"
 
     oc rollout restart deployment -n openshift-package-operator 2>/dev/null || true
-    oc rollout status deployment -n openshift-package-operator --timeout=120s 2>/dev/null || true
+    if ! oc rollout status deployment/package-operator -n openshift-package-operator --timeout=120s 2>/dev/null; then
+        log "WARNING: PKO rollout status check failed — controller may not be ready"
+        oc get pods -n openshift-package-operator -o wide 2>/dev/null || true
+    fi
     log "PKO restarted with CI pull secret"
 
     # PKO readiness gate: verify PKO controllers are actively reconciling
@@ -329,6 +349,30 @@ if [[ -n "${SHARED_DIR:-}" ]]; then
     echo "${CLUSTER_PACKAGE_NAME}" > "${SHARED_DIR}/operator-e2e-clusterpackage"
     echo "${OPERATOR_NAMESPACE}" > "${SHARED_DIR}/operator-e2e-namespace"
 fi
+
+# Wait for PKO to start processing the ClusterPackage.
+# A non-empty .status.revision indicates PKO has seen and begun
+# reconciling the package.  This catches cases where PKO is not
+# operational after restart (leader election pending, informer
+# sync incomplete, or crash-looping).
+log "Waiting for ClusterPackage ${CLUSTER_PACKAGE_NAME} to be processed by PKO..."
+for i in $(seq 1 24); do
+    CP_REVISION=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" \
+        -o jsonpath='{.status.revision}' 2>/dev/null || true)
+    if [[ -n "${CP_REVISION}" ]]; then
+        log "ClusterPackage revision: ${CP_REVISION} — PKO is reconciling"
+        break
+    fi
+    if [[ $i -eq 24 ]]; then
+        log "ERROR: ClusterPackage ${CLUSTER_PACKAGE_NAME} has no .status after 2 minutes — PKO may not be reconciling"
+        log "PKO controller status:"
+        oc get pods -n openshift-package-operator -o wide 2>/dev/null || true
+        oc logs deployment/package-operator -n openshift-package-operator --tail=50 2>/dev/null || true
+        oc describe clusterpackage "${CLUSTER_PACKAGE_NAME}" 2>/dev/null || true
+        exit 1
+    fi
+    sleep 5
+done
 
 # Wait for PKO to reconcile and create the deployment
 log "Waiting for deployment ${OPERATOR_DEPLOYMENT_NAME} to exist..."
