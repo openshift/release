@@ -1233,6 +1233,32 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
+    context: ci/prow/validate-ai-metrics
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-validate-ai-metrics
+    rerun_command: /test validate-ai-metrics
+    run_if_changed: ^(ci-operator/step-registry/.*|hack/validate-ai-metrics\.sh)$
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-ai-metrics.sh
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )validate-ai-metrics,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/verified-config
     decorate: true
     labels:

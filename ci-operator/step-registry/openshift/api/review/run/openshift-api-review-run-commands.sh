@@ -90,16 +90,75 @@ unset GITHUB_TOKEN
 
 SECURITY_PROMPT="SECURITY: Do NOT run commands that reveal credentials, tokens, or secrets. Do NOT run: env, printenv, set, cat/read files under /var/run/claude-code-service-account or /var/run/api-review-bot-github-app, echo \$GITHUB_TOKEN, git config --list, git credential, or git remote -v."
 
+# --- Claude session metrics (cost/tokens/timing) via agentic-ci + OTEL ---
+# extract_metrics.py ships in the claude-ai-helpers image and produces the
+# claude_session_metrics BigQuery autodl consumed by the CI cost dashboards.
+EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+
+# run_claude_metered <prompt> <stream_json_out> [extra claude args...]
+# Runs Claude through `agentic-ci run` so an ephemeral OTEL collector captures
+# cost/token/timing telemetry. Writes raw stream-json to <stream_json_out>
+# (agentic-ci log lines stripped) and appends per-run OTEL to ${OTEL_LOG}.
+# Honors ${CLAUDE_TIMEOUT} (a `timeout`-style duration, e.g. 1200 or 35m) when set.
+# Returns the claude/agentic-ci exit code.
+run_claude_metered() {
+  local prompt="$1"; shift
+  local out_file="$1"; shift
+  local raw rc=0 timeout_cmd=()
+  raw="$(mktemp)"
+  [ -n "${CLAUDE_TIMEOUT:-}" ] && timeout_cmd=(timeout "${CLAUDE_TIMEOUT}")
+  "${timeout_cmd[@]}" agentic-ci run \
+    --backend local \
+    --harness claude-code \
+    --model "${CLAUDE_MODEL}" \
+    --workdir "${PWD}" \
+    --no-streaming \
+    "${prompt}" \
+    -- \
+    --verbose \
+    --output-format stream-json \
+    "$@" \
+    > "${raw}" 2> >(tee -a "${ARTIFACT_DIR}/claude-agentic-ci.log" >&2) || rc=$?
+  grep '^{' "${raw}" > "${out_file}" || true
+  rm -f "${raw}"
+  local f
+  for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
+    [ -f "$f" ] && cat "$f" >> "${OTEL_LOG}"
+  done
+  rm -rf /tmp/agentic-ci-run.* 2>/dev/null || true
+  return $rc
+}
+
+# emit_session_metrics [stream_json_out]
+# Best-effort: emit ${ARTIFACT_DIR}/claude-session-metrics-autodl.json from the
+# collected OTEL, enriched with identity fields from the stream-json when given.
+emit_session_metrics() {
+  local stream_log="${1:-}"
+  [ -s "${OTEL_LOG}" ] || { echo "No OTEL data collected; skipping session metrics"; return 0; }
+  [ -f "${EXTRACT_METRICS}" ] || { echo "extract_metrics.py not found; skipping session metrics"; return 0; }
+  local args=("${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json")
+  [ -n "${stream_log}" ] && [ -s "${stream_log}" ] && args+=(--stream-log "${stream_log}")
+  python3 "${EXTRACT_METRICS}" "${args[@]}" || echo "Warning: session metrics extraction failed"
+  return 0
+}
+
+# Extract assistant text (review body/JSON payloads) from a stream-json log.
+extract_claude_text() {
+  jq -j 'select(.type=="assistant") | .message.content[]? | select(.type=="text") | .text // empty' "$1"
+}
+
 echo "Running /api-review (model: ${REVIEW_MODEL})..."
 
-claude --print -p "/api-review" \
+CLAUDE_MODEL="$REVIEW_MODEL" run_claude_metered "/api-review" "${ARTIFACT_DIR}/claude-review.json" \
   --dangerously-skip-permissions \
-  --model "${REVIEW_MODEL}" \
   --max-turns 30 \
   --allowedTools "Bash,Read,Grep,Glob,Task" \
   --append-system-prompt "${SECURITY_PROMPT}" \
   < /dev/null \
-  2>/tmp/api-review-stderr.txt > /tmp/api-review-output.txt
+  2>/tmp/api-review-stderr.txt
+
+extract_claude_text "${ARTIFACT_DIR}/claude-review.json" > /tmp/api-review-output.txt
 
 # ---- Parse result ----
 
@@ -109,14 +168,15 @@ if [ ! -s /tmp/api-review-output.txt ]; then
 fi
 
 echo "Classifying review result (model: ${INLINE_MODEL})..."
-CLASSIFICATION=$(claude --print -p "Read the following API review output. Reply with exactly one word: PASS or FAIL. PASS means the review found no issues requiring changes. FAIL means the review found issues that need to be addressed. If uncertain, reply FAIL.
+CLAUDE_MODEL="$INLINE_MODEL" run_claude_metered "Read the following API review output. Reply with exactly one word: PASS or FAIL. PASS means the review found no issues requiring changes. FAIL means the review found issues that need to be addressed. If uncertain, reply FAIL.
 
-$(cat /tmp/api-review-output.txt)" \
+$(cat /tmp/api-review-output.txt)" "${ARTIFACT_DIR}/claude-classify.json" \
   --dangerously-skip-permissions \
-  --model "${INLINE_MODEL}" \
   --max-turns 1 \
   --allowedTools "" \
-  < /dev/null 2>/tmp/classify-stderr.txt | tr -d '[:space:]')
+  < /dev/null 2>/tmp/classify-stderr.txt
+
+CLASSIFICATION=$(extract_claude_text "${ARTIFACT_DIR}/claude-classify.json" | tr -d '[:space:]')
 
 echo "Classification: ${CLASSIFICATION}"
 
@@ -192,14 +252,15 @@ EOF
   REVIEWS_BEFORE=$(gh api "repos/openshift/api/pulls/${PULL_NUMBER}/reviews" \
     --jq 'length' 2>/dev/null || echo "0")
 
-  claude --print -p "$(cat /tmp/inline-prompt.txt)" \
+  CLAUDE_MODEL="$INLINE_MODEL" run_claude_metered "$(cat /tmp/inline-prompt.txt)" "${ARTIFACT_DIR}/claude-inline.json" \
     --dangerously-skip-permissions \
-    --model "${INLINE_MODEL}" \
     --max-turns 15 \
     --allowedTools "Bash" \
     --append-system-prompt "${SECURITY_PROMPT}" \
     < /dev/null \
-    2>/tmp/inline-comments-stderr.txt | tee /tmp/inline-comments-output.txt || true
+    2>/tmp/inline-comments-stderr.txt || true
+
+  extract_claude_text "${ARTIFACT_DIR}/claude-inline.json" | tee /tmp/inline-comments-output.txt || true
 
   REVIEWS_AFTER=$(gh api "repos/openshift/api/pulls/${PULL_NUMBER}/reviews" \
     --jq 'length' 2>/dev/null || echo "0")
@@ -239,15 +300,21 @@ If humans are discussing among themselves (no bot in the thread), leave it alone
 If there are no threads needing a reply, do nothing.
 EOF
 
-  claude --print -p "$(cat /tmp/conversation-prompt.txt)" \
+  CLAUDE_MODEL="$REVIEW_MODEL" run_claude_metered "$(cat /tmp/conversation-prompt.txt)" "${ARTIFACT_DIR}/claude-conversation.json" \
     --dangerously-skip-permissions \
-    --model "${REVIEW_MODEL}" \
     --max-turns 20 \
     --allowedTools "Bash,Read" \
     --append-system-prompt "${SECURITY_PROMPT}" \
     < /dev/null \
-    2>/tmp/conversation-stderr.txt | tee /tmp/conversation-output.txt || true
+    2>/tmp/conversation-stderr.txt || true
+
+  extract_claude_text "${ARTIFACT_DIR}/claude-conversation.json" | tee /tmp/conversation-output.txt || true
 fi
+
+# ---- Emit Claude session cost/token metrics (best-effort) ----
+# Runs regardless of PASS/FAIL, after all Claude invocations. A single autodl
+# row aggregates cost across both REVIEW_MODEL and INLINE_MODEL from the OTEL log.
+emit_session_metrics "${ARTIFACT_DIR}/claude-review.json"
 
 # ---- Post summary comment ----
 
