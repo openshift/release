@@ -236,3 +236,135 @@ case "${CLOUD_PROVIDER}" in
     ${EXTRA_ARGS}
     ;;
 esac
+
+# --- HyperShift Operator image verification ---
+# Disable xtrace for the entire verification block so that raw image pullspecs
+# and imageIDs (which may contain internal registry hostnames) are never logged
+# via set -x. Only safe digest-only values reach stdout and public artifacts.
+[[ $- == *x* ]] && _XTRACE_WAS_ON=true || _XTRACE_WAS_ON=false
+set +x
+
+# Helper: extract a sha256 digest from an image reference or runtime imageID.
+# Handles two common formats:
+#   - pullspec with digest: "registry/repo@sha256:abc…"
+#   - CRI-O / runtime imageID: "docker://sha256:abc…"
+# Returns "sha256:…", "tag-only", or "unavailable" — never a raw pullspec.
+_safe_digest() {
+  local ref="$1"
+  if [[ "${ref}" == *@sha256:* ]]; then
+    # docker-pullable://registry/repo@sha256:… or registry/repo@sha256:…
+    echo "${ref##*@}"
+  elif [[ "${ref}" == docker://sha256:* ]]; then
+    # CRI-O runtime imageID: docker://sha256:…
+    echo "${ref#docker://}"
+  elif [[ "${ref}" == "unavailable" ]]; then
+    echo "unavailable"
+  else
+    echo "tag-only"
+  fi
+}
+
+# Helper: extract a sha256 digest from a raw image reference for comparison.
+# Like _safe_digest but also handles the docker:// prefix for digest extraction.
+_extract_digest() {
+  local ref="$1"
+  if [[ "${ref}" == *@sha256:* ]]; then
+    echo "${ref##*@}"
+  elif [[ "${ref}" == docker://sha256:* ]]; then
+    echo "${ref#docker://}"
+  else
+    echo "${ref}"
+  fi
+}
+
+# Persist the resolved operator image for downstream steps (inter-step only;
+# SHARED_DIR is not uploaded as a public Prow artifact).
+echo "${OPERATOR_IMAGE}" > "${SHARED_DIR}/hypershift-operator-image"
+# Write only the safe digest to the public artifact directory.
+_safe_digest "${OPERATOR_IMAGE}" > "${ARTIFACT_DIR}/hypershift-operator-image.txt"
+
+# Query the actual deployed operator from the management cluster.
+# Prefer the explicit management_cluster_kubeconfig written by the nested-management-cluster
+# setup chain; fall back to the default KUBECONFIG (covers 2-tier root-management-cluster
+# workflows where management_cluster_kubeconfig does not exist).
+VERIFY_KUBECONFIG="${KUBECONFIG:-}"
+if [[ -f "${SHARED_DIR}/management_cluster_kubeconfig" ]]; then
+  VERIFY_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+fi
+
+DEPLOYED_IMAGE="unavailable"
+POD_IMAGE_ID="unavailable"
+
+if [[ -n "${VERIFY_KUBECONFIG}" ]] && [[ -f "${VERIFY_KUBECONFIG}" ]]; then
+  # Select the "operator" container by name (not positional index) to avoid reading
+  # a sidecar when container ordering varies.
+  DEPLOYED_IMAGE=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get deployment -n hypershift operator \
+    -o jsonpath='{.spec.template.spec.containers[?(@.name=="operator")].image}' 2>/dev/null) || DEPLOYED_IMAGE="unavailable"
+  # Select the newest Running operator pod by creation time and read the "operator"
+  # container's imageID by name. During a deployment rollout the newest Running pod
+  # belongs to the current ReplicaSet revision; sorting by creationTimestamp avoids
+  # reading a stale imageID from an old-revision pod that has not yet terminated.
+  # Pending, completed, or terminating pods are excluded by the phase filter.
+  POD_IMAGE_ID=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get pods -n hypershift -l app=operator \
+    --field-selector=status.phase=Running --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{range .items[*]}{.status.containerStatuses[?(@.name=="operator")].imageID}{"\n"}{end}' 2>/dev/null \
+    | tail -1) || POD_IMAGE_ID="unavailable"
+  # Normalize empty oc output (exit 0 with no matching jsonpath result) to "unavailable".
+  [[ -z "${DEPLOYED_IMAGE}" ]] && DEPLOYED_IMAGE="unavailable"
+  [[ -z "${POD_IMAGE_ID}" ]] && POD_IMAGE_ID="unavailable"
+fi
+
+# Write a structured verification artifact with safe digest-only data.
+# Raw pullspecs are kept in memory for comparison but never written to logs or artifacts.
+OVERRIDE_SUPPLIED="false"
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_SUPPLIED="true"
+fi
+
+INTENDED_SAFE=$(_safe_digest "${OPERATOR_IMAGE}")
+DEPLOYED_SAFE=$(_safe_digest "${DEPLOYED_IMAGE}")
+POD_SAFE=$(_safe_digest "${POD_IMAGE_ID}")
+
+cat > "${ARTIFACT_DIR}/hypershift-operator-image-verification.json" <<VERIFY_EOF
+{
+  "intended_digest": "${INTENDED_SAFE}",
+  "deployed_digest": "${DEPLOYED_SAFE}",
+  "pod_digest": "${POD_SAFE}",
+  "override_supplied": ${OVERRIDE_SUPPLIED}
+}
+VERIFY_EOF
+
+echo "INFO: HyperShift Operator image verification artifact written"
+echo "  Intended: ${INTENDED_SAFE}"
+echo "  Deployed: ${DEPLOYED_SAFE}"
+echo "  Pod: ${POD_SAFE}"
+
+# When an explicit override was supplied, verify the deployment converged to the
+# intended image by comparing immutable sha256 digests. A mismatch means the
+# operator rollout did not pick up the override — fail the step so the CI signal
+# is clear. This only fires on the opt-in override path; ordinary e2e jobs that
+# use the default pipeline image are unaffected.
+if [[ "${OVERRIDE_SUPPLIED}" == "true" ]] && [[ "${POD_IMAGE_ID}" != "unavailable" ]]; then
+  # Extract sha256 digest from the pod's imageID.
+  # Handles both "docker-pullable://…@sha256:abc" and "docker://sha256:abc".
+  DEPLOYED_DIGEST=$(_extract_digest "${POD_IMAGE_ID}")
+  # Extract sha256 digest from the intended override image if it contains one.
+  INTENDED_DIGEST=$(_extract_digest "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}")
+
+  if [[ "${INTENDED_DIGEST}" == sha256:* ]] && [[ "${DEPLOYED_DIGEST}" == sha256:* ]]; then
+    if [[ "${INTENDED_DIGEST}" != "${DEPLOYED_DIGEST}" ]]; then
+      echo "ERROR: HyperShift Operator image digest mismatch"
+      echo "  Intended digest: ${INTENDED_DIGEST}"
+      echo "  Deployed digest: ${DEPLOYED_DIGEST}"
+      # Restore xtrace before exiting so post-step cleanup is visible.
+      ${_XTRACE_WAS_ON} && set -x
+      exit 1
+    else
+      echo "INFO: HyperShift Operator image digest verified"
+      echo "  Digest: ${DEPLOYED_DIGEST}"
+    fi
+  fi
+fi
+
+# Restore xtrace to its previous state.
+${_XTRACE_WAS_ON} && set -x
