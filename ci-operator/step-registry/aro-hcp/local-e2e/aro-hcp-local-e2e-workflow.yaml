@@ -23,6 +23,16 @@ workflow:
       - ref: aro-hcp-gather-observability
       - ref: aro-hcp-gather-snapshot
       - ref: aro-hcp-deprovision-environment
+      - ref: aro-hcp-deprovision-cleanup-sweeper
       - ref: aro-hcp-lease-release
   documentation: |-
     The local ARO HCP e2e workflow starts an ARO HCP environment and runs the full end-to-end suite against it.
+
+    Each provisioned environment creates a fresh AKS cluster whose kubelet/pull
+    identity is granted AcrPull (and related Key Vault) role assignments on the
+    shared dev ACR/Key Vault. aro-hcp-deprovision-environment deletes the
+    environment's own resource group but cannot remove those role assignments,
+    since they're scoped to the shared ACR/Key Vault, not the deleted resource
+    group. aro-hcp-deprovision-cleanup-sweeper runs immediately after to purge
+    the now-orphaned role assignments left behind by this run, rather than
+    waiting on the hourly periodic sweep.

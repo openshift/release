@@ -10,7 +10,12 @@ workflow:
       - ref: aro-hcp-gather-provision-failure
       - ref: aro-hcp-gather-visualization
       - ref: aro-hcp-deprovision-environment
+      - ref: aro-hcp-deprovision-cleanup-sweeper
   documentation: |-
     Provision healthcheck workflow. Provisions the latest published main-branch
     service images to validate regional health without executing the E2E test
-    suite. Used as a periodic probe per active region.
+    suite. Used as a periodic probe per active region. aro-hcp-deprovision-environment
+    deletes the environment's own resource group but cannot remove the AcrPull/Key
+    Vault role assignments its AKS cluster's kubelet identity was granted on the
+    shared dev ACR/Key Vault (those live at a different scope); aro-hcp-deprovision-cleanup-sweeper
+    purges the now-orphaned role assignments left behind by this run.

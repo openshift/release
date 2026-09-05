@@ -23,9 +23,14 @@ workflow:
       - ref: aro-hcp-gather-observability
       - ref: aro-hcp-gather-snapshot
       - ref: aro-hcp-deprovision-environment
+      - ref: aro-hcp-deprovision-cleanup-sweeper
       - ref: aro-hcp-lease-release
   documentation: |-
     Acquire runtime leases, provision a main-branch baseline via
     aro-hcp-provision-from-main (ACR images from images-push), run
     upgrade/in-place on the PR head with OVERRIDE_CONFIG_FILE built from PR
-    pipeline images and hypershift config.
+    pipeline images and hypershift config. aro-hcp-deprovision-environment
+    deletes the environment's own resource group but cannot remove the AcrPull/Key
+    Vault role assignments its AKS cluster's kubelet identity was granted on the
+    shared dev ACR/Key Vault (those live at a different scope); aro-hcp-deprovision-cleanup-sweeper
+    purges the now-orphaned role assignments left behind by this run.
