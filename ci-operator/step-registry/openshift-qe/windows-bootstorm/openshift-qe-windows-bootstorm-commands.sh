@@ -40,18 +40,29 @@ echo "Waiting for nodes and MachineConfigPool to stabilize after day2 steps..."
 max_wait=900
 interval=20
 elapsed=0
+stabilized=false
 while [ $elapsed -lt $max_wait ]; do
-    not_ready=$(oc get nodes --no-headers 2>/dev/null | grep -cv " Ready" || true)
-    mcp_updating=$(oc get mcp worker -o jsonpath='{.status.conditions[?(@.type=="Updating")].status}' 2>/dev/null || echo "Unknown")
-    mcp_degraded=$(oc get mcp worker -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}' 2>/dev/null || echo "Unknown")
-    if [ "$not_ready" -eq 0 ] && [ "$mcp_updating" != "True" ] && [ "$mcp_degraded" != "True" ]; then
+    if ! nodes=$(oc get nodes --no-headers 2>/dev/null); then
+        sleep $interval
+        elapsed=$((elapsed + interval))
+        continue
+    fi
+    not_ready=$(grep -cv " Ready" <<< "$nodes" || true)
+    mcp_updating=$(oc get mcp worker -o jsonpath='{.status.conditions[?(@.type=="Updating")].status}' 2>/dev/null || echo "")
+    mcp_degraded=$(oc get mcp worker -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}' 2>/dev/null || echo "")
+    if [ "$not_ready" -eq 0 ] && [ "$mcp_updating" = "False" ] && [ "$mcp_degraded" = "False" ]; then
         echo "All nodes Ready, worker MCP stable"
+        stabilized=true
         break
     fi
     echo "Stabilizing... (not_ready=$not_ready, MCP updating=$mcp_updating, degraded=$mcp_degraded) [${elapsed}s/${max_wait}s]"
     sleep $interval
     elapsed=$((elapsed + interval))
 done
+if [ "$stabilized" = "false" ]; then
+    echo "ERROR: Cluster did not stabilize within ${max_wait}s"
+    exit 1
+fi
 
 export WORKLOAD=windows-bootstorm
 export KUBE_BURNER_VERSION="${KUBE_BURNER_VERSION}"
