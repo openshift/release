@@ -36,6 +36,23 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
+echo "Waiting for nodes and MachineConfigPool to stabilize after day2 steps..."
+max_wait=900
+interval=20
+elapsed=0
+while [ $elapsed -lt $max_wait ]; do
+    not_ready=$(oc get nodes --no-headers 2>/dev/null | grep -cv " Ready" || true)
+    mcp_updating=$(oc get mcp worker -o jsonpath='{.status.conditions[?(@.type=="Updating")].status}' 2>/dev/null || echo "Unknown")
+    mcp_degraded=$(oc get mcp worker -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}' 2>/dev/null || echo "Unknown")
+    if [ "$not_ready" -eq 0 ] && [ "$mcp_updating" != "True" ] && [ "$mcp_degraded" != "True" ]; then
+        echo "All nodes Ready, worker MCP stable"
+        break
+    fi
+    echo "Stabilizing... (not_ready=$not_ready, MCP updating=$mcp_updating, degraded=$mcp_degraded) [${elapsed}s/${max_wait}s]"
+    sleep $interval
+    elapsed=$((elapsed + interval))
+done
+
 export WORKLOAD=windows-bootstorm
 export KUBE_BURNER_VERSION="${KUBE_BURNER_VERSION}"
 
