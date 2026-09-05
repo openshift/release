@@ -180,6 +180,25 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
+      DEPENDS_ON_CANDIDATES: |-
+        openshift/velero RELATED_IMAGE_VELERO Dockerfile.ubi
+        openshift/openshift-velero-plugin RELATED_IMAGE_OPENSHIFT_VELERO_PLUGIN
+        openshift/velero-plugin-for-aws RELATED_IMAGE_VELERO_PLUGIN_FOR_AWS Dockerfile.ubi
+        openshift/velero-plugin-for-legacy-aws RELATED_IMAGE_VELERO_PLUGIN_FOR_LEGACY_AWS Dockerfile.ubi
+        openshift/velero-plugin-for-microsoft-azure RELATED_IMAGE_VELERO_PLUGIN_FOR_MICROSOFT_AZURE Dockerfile.ubi
+        openshift/velero-plugin-for-gcp RELATED_IMAGE_VELERO_PLUGIN_FOR_GCP Dockerfile.ubi
+        migtools/kubevirt-velero-plugin RELATED_IMAGE_KUBEVIRT_VELERO_PLUGIN Dockerfile.ubi
+        openshift/hypershift-oadp-plugin RELATED_IMAGE_HYPERSHIFT_VELERO_PLUGIN
+        openshift/oadp-must-gather RELATED_IMAGE_MUSTGATHER
+        migtools/oadp-non-admin RELATED_IMAGE_NON_ADMIN_CONTROLLER
+        migtools/oadp-vm-file-restore RELATED_IMAGE_VM_FILE_RESTORE_CONTROLLER
+        migtools/oadp-vm-file-restore RELATED_IMAGE_VM_FILE_RESTORE_ACCESS
+        migtools/oadp-vm-file-restore RELATED_IMAGE_VM_FILE_RESTORE_SSH Containerfile
+        migtools/filebrowser RELATED_IMAGE_VM_FILE_RESTORE_BROWSER Containerfile
+        migtools/oadp-cli RELATED_IMAGE_CONSOLE_CLI_DOWNLOAD Containerfile.download
+        migtools/oadp-vmdp RELATED_IMAGE_VMDP_CLI_DOWNLOAD Containerfile.download
+        migtools/kubevirt-datamover-controller RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER
+        migtools/kubevirt-datamover-plugin RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN
       OADP_BRANCH: oadp-1.6
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-adp
@@ -188,7 +207,12 @@ tests:
       TEST_NAME: e2e-test-aws
     post:
     - ref: oadp-analyze-e2e-failure
+    pre:
+    - chain: ipi-aws-pre
+    - ref: optional-operators-subscribe
+    - ref: oadp-depends-on-build
     test:
+    - ref: oadp-apply-depends-on-images
     - as: e2e
       cli: latest
       commands: make test-e2e
