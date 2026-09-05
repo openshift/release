@@ -7,6 +7,11 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
 prowgen:
   disable_sparse_checkout: true
 releases:
@@ -34,7 +39,7 @@ tests:
     report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
       {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
       <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
+  restrict_network_access: true
   steps:
     cluster_profile: azure-qe
     env:
@@ -44,7 +49,7 @@ tests:
       CUSTOM_AZURE_REGION: eastus
       ENABLE_MUST_GATHER: "true"
       INITDATA: ""
-      INSTALL_KATA_RPM: "true"
+      INSTALL_KATA_RPM: "false"
       KATA_RPM_VERSION: 3.31.0-4.rhaos4.19.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
@@ -52,10 +57,10 @@ tests:
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: sig-kata.*Kata Namespace check
       TEST_SKELETON_ENABLE: "false"
-      TEST_SKELETON2_ENABLE: "false"
       TEST_TIMEOUT: "90"
+      TESTS_OSC_ENABLE: "true"
       TRUSTEE_URL: ""
     workflow: sandboxed-containers-operator-e2e-azure
   timeout: 24h0m0s
@@ -92,7 +97,7 @@ tests:
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: sig-kata.*Kata Namespace check
       TEST_TIMEOUT: "90"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: peer-pods
@@ -171,7 +176,7 @@ tests:
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: sig-kata.*Kata Namespace check
       TEST_TIMEOUT: "90"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: peer-pods
@@ -249,7 +254,7 @@ tests:
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: sig-kata.*Kata Namespace check
       TEST_TIMEOUT: "90"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: peer-pods
