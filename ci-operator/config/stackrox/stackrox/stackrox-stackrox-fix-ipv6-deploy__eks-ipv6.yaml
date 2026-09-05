@@ -1,0 +1,30 @@
+base_images:
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-latest
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-ui-test-stable
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- always_run: false
+  as: qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      NETWORK_STACK: ipv6
+      TEST_SUITE: eks-qa-e2e-tests
+    workflow: stackrox-automation-flavors-eks-e2e
+zz_generated_metadata:
+  branch: fix-ipv6-deploy
+  org: stackrox
+  repo: stackrox
+  variant: eks-ipv6

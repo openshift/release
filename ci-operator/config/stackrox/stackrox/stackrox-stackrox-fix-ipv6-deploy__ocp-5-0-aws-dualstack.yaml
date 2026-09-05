@@ -1,0 +1,42 @@
+base_images:
+  ocp-4:
+    name: automation-flavors
+    namespace: stackrox
+    tag: openshift-4-latest
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-ui-test-stable
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- always_run: false
+  as: dual-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      CLOUD_PROVIDER: aws
+      NETWORK_STACK: dual
+      OCP_VERSION: ocp-dev-preview/candidate-5.0
+      TEST_SUITE: ocp-qa-e2e-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+- always_run: false
+  as: dual-ipv6-primary-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      CLOUD_PROVIDER: aws
+      NETWORK_STACK: dual-ipv6-primary
+      OCP_VERSION: ocp-dev-preview/candidate-5.0
+      TEST_SUITE: ocp-qa-e2e-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+zz_generated_metadata:
+  branch: fix-ipv6-deploy
+  org: stackrox
+  repo: stackrox
+  variant: ocp-5-0-aws-dualstack
