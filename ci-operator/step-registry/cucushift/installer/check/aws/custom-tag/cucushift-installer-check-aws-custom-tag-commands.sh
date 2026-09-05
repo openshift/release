@@ -57,7 +57,7 @@ propagate_tags=$(yq-go r "${CONFIG}" 'platform.aws.propagateUserTags')
 install_config_tags=${ARTIFACT_DIR}/install_config_tags.json
 yq-go r "${CONFIG}" platform.aws.userTags -j | jq 'to_entries[] | {(.key):(.value|tostring)}' | jq -s 'add' | jq 'to_entries | sort_by(.key)' > ${install_config_tags}
 
-if [[ ${propagate_tags} == "true" ]]; then
+if [[ "${propagate_tags}" == "true" ]]; then
   cluster_inf_tags=${ARTIFACT_DIR}/cluster_inf_tags.json
   oc get infrastructures.config.openshift.io -o json | jq -r '.items[].status.platformStatus.aws.resourceTags | sort_by(.key)' > ${cluster_inf_tags}
   
@@ -128,6 +128,16 @@ function check_resource() {
     fi
 }
 
+# Detect a pre-existing (BYO) VPC: subnets are supplied in the install-config.
+# In that case the VPC and its network resources are created outside the installer 
+# and are never tagged with the cluster userTags, so they can not be checked.
+byo_vpc="no"
+if [[ -n "$(yq-go r "${CONFIG}" 'platform.aws.subnets')" \
+   || -n "$(yq-go r "${CONFIG}" 'platform.aws.vpc.subnets')" ]]; then
+  byo_vpc="yes"
+  echo "INFO: pre-existing (BYO) VPC detected; skipping tag checks for VPC-owned network resources."
+fi
+
 check_resource ".*instance/i-.*"
 check_resource ".*network-interface/eni-.*"
 check_resource ".*security-group/sg-.*"
@@ -135,14 +145,24 @@ check_resource ".*volume/vol-.*"
 check_resource ".*loadbalancer/net/${INFRA_ID}-ext/.*"
 check_resource ".*loadbalancer/net/${INFRA_ID}-int/.*"
 
-check_resource ".*elastic-ip/eipalloc-.*"
-check_resource ".*internet-gateway/igw-.*"
-check_resource ".*loadbalancer/[0-9a-z]{32}"
-check_resource ".*natgateway/nat-.*"
-check_resource ".*route-table/rtb-.*"
-check_resource ".*subnet/subnet-.*"
-check_resource ".*vpc-endpoint/vpce-.*"
-check_resource ".*vpc/vpc-.*"
+# Operator-managed resources (e.g. the ingress "router-default" Classic ELB)
+# only receive the userTags when propagateUserTags is enabled in the install-config.
+if [[ "${propagate_tags}" == "true" ]]; then
+  check_resource ".*loadbalancer/[0-9a-z]{32}"
+fi
+
+# The following resources are owned by the VPC. With a BYO VPC they are
+# provisioned (and tagged) outside the installer, so only check them when the
+# installer created the VPC itself.
+if [[ "${byo_vpc}" == "no" ]]; then
+  check_resource ".*elastic-ip/eipalloc-.*"
+  check_resource ".*internet-gateway/igw-.*"
+  check_resource ".*natgateway/nat-.*"
+  check_resource ".*route-table/rtb-.*"
+  check_resource ".*subnet/subnet-.*"
+  check_resource ".*vpc-endpoint/vpce-.*"
+  check_resource ".*vpc/vpc-.*"
+fi
 
 # # Bootstrap
 # # 4.15-
