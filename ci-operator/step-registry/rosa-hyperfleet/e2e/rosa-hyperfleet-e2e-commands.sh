@@ -46,6 +46,19 @@ else
   export E2E_REPO="${DEFAULT_E2E_REPO}"
 fi
 
+# Same auto-detection for rosa-hyperfleet-zoa (ZOA e2e tests live in the zoa repo)
+if [[ -n "${ROSA_REGIONAL_ZOA_REF:-}" ]]; then
+  export ZOA_REF="${ROSA_REGIONAL_ZOA_REF}"
+  export ZOA_REPO="${ROSA_REGIONAL_ZOA_REPO:-https://github.com/openshift-online/rosa-hyperfleet-zoa.git}"
+elif [[ "${REPO_NAME:-}" == "rosa-hyperfleet-zoa" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+  ZOA_REPO=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+  export ZOA_REPO
+  export ZOA_REF="${PULL_HEAD_REF}"
+  echo "Auto-detected from ${REPO_NAME} PR #${PULL_NUMBER}:"
+  echo "  ZOA_REPO=${ZOA_REPO}"
+  echo "  ZOA_REF=${ZOA_REF}"
+fi
+
 # ---------------------------------------------------------------------------
 # 3. Run e2e tests
 # ---------------------------------------------------------------------------
