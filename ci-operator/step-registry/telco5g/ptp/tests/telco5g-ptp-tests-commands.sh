@@ -16,15 +16,30 @@ set -o pipefail
 # to the release you are testing against (e.g. "4.22", "5.0").
 export T5CI_VERSION="${T5CI_VERSION:-5.0}"
 
+# --- cloud-event-proxy (CEP) build/deploy method (version-dependent) ---
+# 5.1+ : CEPv2 is built from linuxptp-daemon/Dockerfile.cep and deployed via the
+#        EVENT_PROXY_IMAGE env var (the standalone cloud-event-proxy repo is gone).
+# <5.1 : CEPv1 is built from the standalone cloud-event-proxy repo and deployed
+#        via the SIDECAR_EVENT_IMAGE env var.
+USE_CEPV2=false
+if [[ "$(printf '%s\n%s\n' "5.1" "$T5CI_VERSION" | sort -V | head -1)" == "5.1" ]]; then
+  USE_CEPV2=true
+fi
+export USE_CEPV2
+
 # --- Source repos and branches ---
+# TODO(cepv2): upstream runs temporarily target the sebsoto/ptp-operator fork
+# branch to test the CEPv2 changes before they merge upstream. After testing,
+# revert PTP_REPO, TEST_REPO and their branches back to
+# k8snetworkplumbingwg/ptp-operator main.
 # Test code: repo and branch for the conformance test suite
-export TEST_REPO="${TEST_REPO:-https://github.com/k8snetworkplumbingwg/ptp-operator.git}"
-export TEST_BRANCH="${TEST_BRANCH:-main}"
+export TEST_REPO="${TEST_REPO:-https://github.com/sebsoto/ptp-operator.git}"
+export TEST_BRANCH="${TEST_BRANCH:-cloudEventProxyEventTesting}"
 
 # Product under test: repo and branch for the operator being deployed
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
-  export PTP_REPO="${PTP_REPO:-https://github.com/k8snetworkplumbingwg/ptp-operator.git}"
-  export PTP_UNDER_TEST_BRANCH="${PTP_UNDER_TEST_BRANCH:-main}"
+  export PTP_REPO="${PTP_REPO:-https://github.com/sebsoto/ptp-operator.git}"
+  export PTP_UNDER_TEST_BRANCH="${PTP_UNDER_TEST_BRANCH:-cloudEventProxyEventTesting}"
   export DAEMON_REPO="${DAEMON_REPO:-https://github.com/k8snetworkplumbingwg/linuxptp-daemon.git}"
   export CEP_REPO="${CEP_REPO:-https://github.com/redhat-cne/cloud-event-proxy.git}"
 else
@@ -125,14 +140,12 @@ export SIDECAR_IMG="SIDECAR_IMAGE"
 
 export T5CI_VERSION="T5CI_VERSION_VAL"
 export USE_UPSTREAM="USE_UPSTREAM_VAL"
+export USE_CEPV2="USE_CEPV2_VAL"
 
-# run latest release on upstream main branch
-if [[ "${USE_UPSTREAM:-false}" == "true" ]]; then
-  echo "Running on upstream main branch"
-  git clone --single-branch --branch main PTP_REPO_URL
-else
-  git clone --single-branch --branch OPERATOR_VERSION PTP_REPO_URL
-fi
+# Clone the operator under test (OPERATOR_VERSION = PTP_UNDER_TEST_BRANCH: the
+# fork/upstream branch for upstream runs, or release-<version> for downstream).
+echo "Cloning ptp-operator branch OPERATOR_VERSION"
+git clone --single-branch --branch OPERATOR_VERSION PTP_REPO_URL
 cd ptp-operator
 # OCPBUGS-52327 fix build due to libresolv.so link error
 sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
@@ -166,14 +179,24 @@ cd linuxptp-daemon
 # hack/build-image.sh unconditionally overwrites IMG from these two vars.
 IMAGE_TAG_BASE="${DAEMON_IMG%:*}" VERSION="${DAEMON_IMG##*:}" make image
 podman push ${DAEMON_IMG} --tls-verify=false
-cd ..
 
-echo "Running on main branch of cloud-event-proxy"
-git clone --single-branch --branch main CEP_REPO_URL
-cd cloud-event-proxy
-IMG=${SIDECAR_IMG} make podman-build
-podman push ${SIDECAR_IMG} --tls-verify=false
-cd ..
+if [[ "${USE_CEPV2:-false}" == "true" ]]; then
+  # 5.1+: cloud-event-proxy (CEPv2) is built from linuxptp-daemon/Dockerfile.cep;
+  # there is no longer a standalone cloud-event-proxy repo.
+  echo "Building cloud-event-proxy (CEPv2) from linuxptp-daemon/Dockerfile.cep"
+  podman build -t "${SIDECAR_IMG}" -f Dockerfile.cep .
+  podman push ${SIDECAR_IMG} --tls-verify=false
+  cd ..
+else
+  cd ..
+  # <5.1: cloud-event-proxy (CEPv1) is built from its standalone repo.
+  echo "Running on main branch of cloud-event-proxy"
+  git clone --single-branch --branch main CEP_REPO_URL
+  cd cloud-event-proxy
+  IMG=${SIDECAR_IMG} make podman-build
+  podman push ${SIDECAR_IMG} --tls-verify=false
+  cd ..
+fi
 BUILDSCRIPT
 }
 
@@ -305,6 +328,7 @@ build_images() {
   jobdefinition=$(sed "s#SIDECAR_IMAGE#${SIDECAR_IMG}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#USE_UPSTREAM_VAL#${T5CI_DEPLOY_UPSTREAM:-false}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#USE_CEPV2_VAL#${USE_CEPV2:-false}#" <<<"$jobdefinition")
 
   echo "$jobdefinition"
   echo "$jobdefinition" | oc apply -f -
@@ -471,10 +495,19 @@ grep -r "imagePullPolicy: IfNotPresent" --files-with-matches | awk '{print  "sed
 
 # deploy ptp-operator
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
-  make deploy \
-    IMG=${IMG} \
-    LINUXPTP_DAEMON_IMAGE=${DAEMON_IMG} \
-    SIDECAR_EVENT_IMAGE=${SIDECAR_IMG}
+  if [[ "${USE_CEPV2:-false}" == "true" ]]; then
+    # 5.1+: setting EVENT_PROXY_IMAGE signals the operator to deploy CEPv2
+    # (and to not deploy CEPv1).
+    make deploy \
+      IMG=${IMG} \
+      LINUXPTP_DAEMON_IMAGE=${DAEMON_IMG} \
+      EVENT_PROXY_IMAGE=${SIDECAR_IMG}
+  else
+    make deploy \
+      IMG=${IMG} \
+      LINUXPTP_DAEMON_IMAGE=${DAEMON_IMG} \
+      SIDECAR_EVENT_IMAGE=${SIDECAR_IMG}
+  fi
 else
   make deploy IMG=${IMG}
 fi
