@@ -85,6 +85,10 @@ function gather_odf_debug_info() {
 }
 
 function run_ocs_must_gather() {
+  if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+      echo "WARNING: ARTIFACT_DIR unset, skipping ODF debug collection"
+      return
+  fi
   local image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}"
   oc adm must-gather \
     --image="${image}" \
