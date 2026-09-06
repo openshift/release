@@ -171,7 +171,8 @@ function test_hub_cluster_deployment {
   echo "************ telcov10n Test Hub deployment ************"
 
   set -x
-  diff -u ${KUBECONFIG} ${hub_kubeconfig} || \
+  # diff command is not available in the container using cmp instead
+   sha256sum ${KUBECONFIG} ${hub_kubeconfig} || \
     ( echo "Wrong KUBECONFIG file retreived!!! Exiting..." && exit 1 )
   set +x
 
