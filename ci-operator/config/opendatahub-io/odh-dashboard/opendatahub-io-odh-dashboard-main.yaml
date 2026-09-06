@@ -36,6 +36,9 @@ images:
     dockerfile_path: ./packages/notebooks/Dockerfile.workspace
     to: odh-mod-arch-notebooks-image
   - context_dir: .
+    dockerfile_path: ./packages/data-connect-hub/Dockerfile.workspace
+    to: odh-mod-arch-data-connect-hub-image
+  - context_dir: .
     dockerfile_path: ./distributions/core-bff/Dockerfile.workspace
     to: odh-core-bff-image
   - context_dir: .
@@ -226,6 +229,23 @@ tests:
       SOURCE_IMAGE_REF: odh-mod-arch-notebooks-image
     env:
       IMAGE_REPO: odh-mod-arch-notebooks
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-data-connect-hub-pr-image-mirror
+  run_if_changed: ^packages/data-connect-hub/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-data-connect-hub-image
+    env:
+      IMAGE_REPO: odh-mod-arch-data-connect-hub
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-data-connect-hub-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-data-connect-hub-image
+    env:
+      IMAGE_REPO: odh-mod-arch-data-connect-hub
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-core-bff-pr-image-mirror
