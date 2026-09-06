@@ -755,7 +755,12 @@ DisableClusterImagePolicySignatureEnforcement() {
     : "Disabling ClusterImagePolicy signature enforcement on spoke ${clusterName}"
     currentOverrides="$(oc --kubeconfig="${kubeconfig}" get clusterversion version -o json |
         jq -c '.spec.overrides // []')"
-    if jq -e '.[] | select(.kind=="ClusterImagePolicy" and .unmanaged==true)' \
+    if jq -e '.[] | select(
+            .group=="config.openshift.io" and
+            .kind=="ClusterImagePolicy" and
+            .name=="openshift" and
+            .namespace=="" and
+            .unmanaged==true)' \
             <<<"${currentOverrides}" >/dev/null; then
         : "ClusterImagePolicy already unmanaged on ${clusterName}"
         return 0
@@ -767,7 +772,12 @@ DisableClusterImagePolicySignatureEnforcement() {
         '{"spec":{"overrides":$overrides}}')"
     oc --kubeconfig="${kubeconfig}" patch clusterversion version --type merge \
         -p "${patchPayload}" 1>/dev/null
-    if ! jq -e '.spec.overrides[] | select(.kind=="ClusterImagePolicy" and .unmanaged==true)' \
+    if ! jq -e '.spec.overrides[] | select(
+            .group=="config.openshift.io" and
+            .kind=="ClusterImagePolicy" and
+            .name=="openshift" and
+            .namespace=="" and
+            .unmanaged==true)' \
             <<<"$(oc --kubeconfig="${kubeconfig}" get clusterversion version -o json)" \
             >/dev/null; then
         : "Failed to verify CVO override for ClusterImagePolicy on spoke ${clusterName}"
