@@ -91,8 +91,8 @@ function run_ocs_must_gather() {
     --dest-dir="${ARTIFACT_DIR}/ocs_must_gather" || true
 }
 
-trap '
-  exit_code=$?
+function on_exit() {
+  local exit_code=$?
   set +e
   gather_odf_debug_info
   if (( exit_code != 0 )); then
@@ -100,7 +100,8 @@ trap '
     run_ocs_must_gather
   fi
   exit "${exit_code}"
-' EXIT
+}
+trap on_exit EXIT
 
 # Move into a tmp folder with write access
 pushd /tmp
