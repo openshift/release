@@ -97,7 +97,12 @@ function CollectExitArtifacts () {
     true
 }
 
-trap '{( CollectExitArtifacts; true )}' EXIT
+_propagate_junit () {
+    mkdir -p "${SHARED_DIR}/junit"
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+}
+
+trap '{( CollectExitArtifacts; _propagate_junit; true )}' EXIT
 
 # ---------------------------------------------------------------------------
 # Check 1: ODF Ceph RGW infrastructure ready
@@ -653,3 +658,4 @@ function Main () {
 }
 
 Main "$@"
+
