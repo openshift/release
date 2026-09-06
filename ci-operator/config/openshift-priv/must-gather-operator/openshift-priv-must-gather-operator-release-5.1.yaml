@@ -264,12 +264,21 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- as: periodic-oape-review-handler
+  cron: '@yearly'
+  steps:
+    env:
+      REHEARSAL_TARGET_OWNER: openshift-priv
+      REHEARSAL_TARGET_REPO: must-gather-operator
+      REHEARSAL_TARGET_PR: "403"
+    test:
+    - ref: oape-review-handler
 - always_run: false
   as: oape-review-handler
   optional: true
+  skip_if_only_changed: .*
   steps:
-    test:
-    - ref: oape-review-handler
+    workflow: oape-review-handler-trigger
 - always_run: false
   as: address-review-comments
   optional: true

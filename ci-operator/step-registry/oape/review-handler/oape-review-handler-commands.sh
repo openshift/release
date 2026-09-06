@@ -1,20 +1,33 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "[setup] Starting oape-review-handler for ${REPO_OWNER}/${REPO_NAME} PR#${PULL_NUMBER}"
-
-# --- Rehearsal redirect (release context) ---
-# pj-rehearse runs against openshift/release, not the target repo.
-# Redirect before auth so the GitHub App lookup targets the correct repo.
-if [[ "${REPO_NAME}" == "release" && "${REPO_OWNER}" == "openshift" ]]; then
-  echo "[setup] Detected openshift/release context — switching to test target"
-  export REPO_OWNER="openshift"
-  export REPO_NAME="must-gather-operator"
-  export PULL_NUMBER="${REHEARSAL_TARGET_PR:-385}"
-  echo "[setup] Testing against ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER}"
+# Gangway override: periodic worker receives PR number from trigger presubmit.
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OAPE_REVIEW_HANDLER_TARGET_PR:-}" ]]; then
+  export PULL_NUMBER="${MULTISTAGE_PARAM_OVERRIDE_OAPE_REVIEW_HANDLER_TARGET_PR}"
 fi
 
-# --- GitHub auth: App token with GITHUB_TOKEN fallback ---
+echo "[setup] Starting oape-review-handler for ${REPO_OWNER}/${REPO_NAME} PR#${PULL_NUMBER:-unknown}"
+
+REHEARSING=false
+[[ "${JOB_NAME:-}" == rehearse-* ]] && REHEARSING=true
+
+# pj-rehearse runs against openshift/release, not the target operator repo.
+if [[ "${REHEARSING}" == "true" && "${REPO_NAME}" == "release" && "${REPO_OWNER}" == "openshift" && -n "${REHEARSAL_TARGET_REPO:-}" ]]; then
+  echo "[setup] Detected openshift/release context — switching to rehearsal target"
+  export REPO_OWNER="${REHEARSAL_TARGET_OWNER:-openshift}"
+  export REPO_NAME="${REHEARSAL_TARGET_REPO}"
+  if [[ -n "${REHEARSAL_TARGET_PR:-}" ]]; then
+    export PULL_NUMBER="${REHEARSAL_TARGET_PR}"
+  fi
+  echo "[setup] Testing against ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER:-unknown}"
+fi
+
+if [[ -z "${PULL_NUMBER:-}" ]]; then
+  echo "[setup] ERROR: PULL_NUMBER not set. Trigger via Gangway or run as a presubmit." >&2
+  exit 1
+fi
+
+# GitHub auth: App token with GITHUB_TOKEN fallback
 # Disable tracing due to JWT / token handling
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
@@ -61,25 +74,24 @@ if [[ "$USE_APP_TOKEN" != "true" ]]; then
 fi
 $WAS_TRACING && set -x
 
-# --- Rehearsal redirect (invalid PR on must-gather-operator) ---
-# Catches the case where pj-rehearse sets REPO_NAME=must-gather-operator but
-# PULL_NUMBER is the release PR number (e.g. 81200, which doesn't exist on MGO).
-if [[ "${REPO_OWNER}" == "openshift" && "${REPO_NAME}" == "must-gather-operator" && -n "${PULL_NUMBER:-}" ]]; then
-  if ! gh pr view "${PULL_NUMBER}" --repo openshift/must-gather-operator --json number >/dev/null 2>&1; then
-    echo "[setup] PR #${PULL_NUMBER} not found on must-gather-operator — using rehearsal target"
-    export PULL_NUMBER="${REHEARSAL_TARGET_PR:-385}"
+# pj-rehearse may set PULL_NUMBER to the release PR; fall back to rehearsal target.
+if [[ "${REHEARSING}" == "true" ]] && ! gh pr view "${PULL_NUMBER}" --repo "${REPO_OWNER}/${REPO_NAME}" --json number >/dev/null 2>&1; then
+  if [[ -n "${REHEARSAL_TARGET_PR:-}" ]]; then
+    echo "[setup] PR #${PULL_NUMBER} not found on ${REPO_OWNER}/${REPO_NAME} — using rehearsal target"
+    export PULL_NUMBER="${REHEARSAL_TARGET_PR}"
     echo "[setup] Testing against ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER}"
+  else
+    echo "[setup] ERROR: PR #${PULL_NUMBER} not found on ${REPO_OWNER}/${REPO_NAME}" >&2
+    exit 1
   fi
 fi
 
-# --- GCP auth for Claude (Vertex AI) ---
 export GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS:-/var/run/claude-code-service-account/google-token}"
 export CLAUDE_CODE_USE_VERTEX="1"
 export CLOUD_ML_REGION="${CLOUD_ML_REGION:-global}"
 export ANTHROPIC_VERTEX_PROJECT_ID="${ANTHROPIC_VERTEX_PROJECT_ID:-openshift-ci-prow-agents}"
 export CLAUDE_MODEL="${CLAUDE_MODEL:-claude-opus-4-6}"
 
-# --- Run review handler ---
 export PR_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}"
 export PLUGINS_DIR="/plugins/oape/skills"
 
