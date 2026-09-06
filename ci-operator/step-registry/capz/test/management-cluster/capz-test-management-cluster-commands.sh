@@ -27,5 +27,14 @@ fi
 export TEST_RESULTS_DIR="${ARTIFACT_DIR}"
 script -e -q -c "make _management_cluster RESULTS_DIR=\"${ARTIFACT_DIR}\"" /dev/null
 
+# Increase ASO controller log verbosity when requested
+if [[ -n "${ASO_LOG_LEVEL:-}" ]]; then
+  echo "Patching ASO controller manager log level to ${ASO_LOG_LEVEL}"
+  kubectl --kubeconfig="${USE_KUBECONFIG}" patch deployment azureserviceoperator-controller-manager -n capz-system \
+    --type=json -p "[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/0/args/-\",\"value\":\"--v=${ASO_LOG_LEVEL}\"}]"
+  kubectl --kubeconfig="${USE_KUBECONFIG}" rollout restart deployment/azureserviceoperator-controller-manager -n capz-system
+  kubectl --kubeconfig="${USE_KUBECONFIG}" rollout status deployment/azureserviceoperator-controller-manager -n capz-system --timeout=120s
+fi
+
 # Copy JUnit XMLs to SHARED_DIR for cross-step summary aggregation
 cp "${ARTIFACT_DIR}"/junit-*.xml "${SHARED_DIR}/" 2>/dev/null || true
