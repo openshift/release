@@ -20,6 +20,7 @@ git clone --depth 1 --branch "${branch}" "${repository}" /root/openperouter
 EOFSOURCE
 
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
+sleep 5h
 ssh "${SSHOPTS[@]}" "root@${IP}" bash -s << 'EOFDEPLOY'
 set -euo pipefail
 cd /root/dev-scripts
@@ -77,6 +78,10 @@ echo "All openperouter pods are running and ready"
 
 bash /root/openperouter/openshift/e2e/setup-clab.sh
 
+
+
+###
+sleep 5h
 cd /root/openperouter
 CONTAINER_RUNTIME=podman make e2etests TEST_ARGS="--nodelink-config=$(pwd)/openshift/e2e/nodelink.json --frrk8s-namespace=openshift-frr-k8s \
 --openperouter-namespace=openshift-openperouter-system" KUBECONFIG_PATH=$KUBECONFIG \
