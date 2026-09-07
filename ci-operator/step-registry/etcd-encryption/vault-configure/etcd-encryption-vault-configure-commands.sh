@@ -5,9 +5,6 @@ set -o pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-# In dev mode, Vault is already initialized and unsealed with root token "root"
-ROOT_TOKEN="root"
-
 # Configure a Vault instance for KMS encryption.
 # Args: $1 = namespace, $2 = KMS key name, $3 = pod name
 configure_vault() {
@@ -15,6 +12,10 @@ configure_vault() {
   local key_name="$2"
   local pod_name="$3"
   local service_name="${pod_name%-0}"
+
+  # Root token from the install step's `vault operator init`.
+  local ROOT_TOKEN
+  ROOT_TOKEN="$(oc get secret vault-root-token -n "${namespace}" -o jsonpath='{.data.token}' | base64 -d)"
 
   echo ""
   echo "========================================="
