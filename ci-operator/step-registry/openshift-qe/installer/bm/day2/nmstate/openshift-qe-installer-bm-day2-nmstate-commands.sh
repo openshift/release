@@ -73,6 +73,17 @@ dump_nmstate_olm() {
   oc get catalogsource -n openshift-marketplace || true
 }
 
+dump_nmstate_runtime() {
+  echo "=== NMState runtime diagnostics ==="
+  oc get nodes -o wide || true
+  oc get nodes --show-labels || true
+  oc get nmstate -n "${NMSTATE_NS}" -o yaml || true
+  oc get ds,deploy,pods -n "${NMSTATE_NS}" -o wide || true
+  oc describe ds/nmstate-handler -n "${NMSTATE_NS}" || true
+  oc get events -n "${NMSTATE_NS}" --sort-by='.lastTimestamp' || true
+  oc get pods -n "${NMSTATE_NS}" --field-selector=status.phase!=Running -o yaml || true
+}
+
 # Wait for the operator CSV (fail fast if the catalog has no matching package)
 WAIT_TIMEOUT_SEC=600
 elapsed=0
@@ -100,25 +111,34 @@ until oc get crd nmstates.nmstate.io >/dev/null 2>&1; do
   elapsed=$((elapsed + 10))
 done
 
+# Handlers are only required on workers. Virt jobs set INFRA=true, which
+# relabels two workers as infra-only; waiting on those nodes (plus masters)
+# previously timed out at 7/9 ready. NNCPs also select workers.
 cat << EOF | oc apply -f -
 apiVersion: nmstate.io/v1
 kind: NMState
 metadata:
   name: nmstate
   namespace: ${NMSTATE_NS}
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
 EOF
 
 elapsed=0
 until oc get ds -n "${NMSTATE_NS}" nmstate-handler >/dev/null 2>&1; do
   if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SEC}" ]; then
     echo "Timed out waiting for nmstate-handler DaemonSet"
-    oc get nmstate -n "${NMSTATE_NS}" -o yaml || true
-    oc get pods -n "${NMSTATE_NS}" || true
+    dump_nmstate_runtime
     exit 1
   fi
   echo "Waiting for nmstate-handler DaemonSet (${elapsed}s/${WAIT_TIMEOUT_SEC}s)"
   sleep 10
   elapsed=$((elapsed + 10))
 done
-oc rollout status ds/nmstate-handler -n "${NMSTATE_NS}" --timeout=10m
-oc get pods -n "${NMSTATE_NS}"
+if ! oc rollout status ds/nmstate-handler -n "${NMSTATE_NS}" --timeout=10m; then
+  echo "nmstate-handler DaemonSet failed to roll out"
+  dump_nmstate_runtime
+  exit 1
+fi
+oc get pods -n "${NMSTATE_NS}" -o wide
