@@ -18,14 +18,39 @@ fi
 oc config view
 oc projects
 
-CNV_AVAILABLE=$(oc get hyperconverged -n openshift-cnv kubevirt-hyperconverged -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || echo "False")
+CNV_NS="openshift-cnv"
+CNV_CATALOG="cnv-nightly-catalog-source"
+CNV_CHANNEL="nightly-${CNV_VERSION}"
+WAIT_TIMEOUT_SEC=600
+
+dump_cnv_catalog() {
+  echo "=== CNV catalog diagnostics ==="
+  oc get catalogsource "${CNV_CATALOG}" -n openshift-marketplace -o yaml || true
+  oc get pods -n openshift-marketplace -o wide || true
+  oc describe pods -n openshift-marketplace -l "olm.catalogSource=${CNV_CATALOG}" || true
+  oc get packagemanifest -l "catalog=${CNV_CATALOG}" -n openshift-marketplace || true
+  oc get packagemanifest kubevirt-hyperconverged -n openshift-marketplace -o yaml || true
+  oc get events -n openshift-marketplace --sort-by='.lastTimestamp' | tail -80 || true
+}
+
+dump_cnv_olm() {
+  echo "=== CNV OLM diagnostics ==="
+  oc get subscription,installplan,csv -n "${CNV_NS}" || true
+  oc get events -n "${CNV_NS}" --sort-by='.lastTimestamp' | tail -80 || true
+}
+
+get_starting_csv() {
+  oc get packagemanifest -l "catalog=${CNV_CATALOG}" -n openshift-marketplace -o jsonpath="{$.items[?(@.metadata.name=='kubevirt-hyperconverged')].status.channels[?(@.name==\"${CNV_CHANNEL}\")].currentCSV}" 2>/dev/null || true
+}
+
+CNV_AVAILABLE=$(oc get hyperconverged -n "${CNV_NS}" kubevirt-hyperconverged -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || echo "False")
 if [ "$CNV_AVAILABLE" != "True" ]; then
   # Install the CNV operator
   cat << EOF| oc apply -f -
   apiVersion: operators.coreos.com/v1alpha1
   kind: CatalogSource
   metadata:
-    name: cnv-nightly-catalog-source
+    name: ${CNV_CATALOG}
     namespace: openshift-marketplace
   spec:
     sourceType: grpc
@@ -37,15 +62,33 @@ if [ "$CNV_AVAILABLE" != "True" ]; then
         interval: 8h
 EOF
 
-  sleep 30
+  echo "Waiting for CatalogSource ${CNV_CATALOG} to become READY"
+  if ! oc wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY catalogsource/"${CNV_CATALOG}" -n openshift-marketplace --timeout="${WAIT_TIMEOUT_SEC}s"; then
+    echo "CatalogSource ${CNV_CATALOG} did not become READY"
+    dump_cnv_catalog
+    exit 1
+  fi
 
-  STARTING_CSV=$(oc get packagemanifest -l catalog=cnv-nightly-catalog-source -n openshift-marketplace -o jsonpath="{$.items[?(@.metadata.name=='kubevirt-hyperconverged')].status.channels[?(@.name==\"nightly-${CNV_VERSION}\")].currentCSV}")
+  elapsed=0
+  STARTING_CSV="$(get_starting_csv)"
+  until [ -n "${STARTING_CSV}" ]; do
+    if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SEC}" ]; then
+      echo "Timed out waiting for kubevirt-hyperconverged currentCSV on channel ${CNV_CHANNEL}"
+      dump_cnv_catalog
+      exit 1
+    fi
+    echo "Waiting for packagemanifest kubevirt-hyperconverged channel ${CNV_CHANNEL} (${elapsed}s/${WAIT_TIMEOUT_SEC}s)"
+    sleep 10
+    elapsed=$((elapsed + 10))
+    STARTING_CSV="$(get_starting_csv)"
+  done
+  echo "Using startingCSV ${STARTING_CSV} from channel ${CNV_CHANNEL}"
 
   cat << EOF| oc apply -f -
   apiVersion: v1
   kind: Namespace
   metadata:
-      name: openshift-cnv
+      name: ${CNV_NS}
 EOF
 
   cat << EOF| oc apply -f -
@@ -53,10 +96,10 @@ EOF
   kind: OperatorGroup
   metadata:
       name: kubevirt-hyperconverged-group
-      namespace: openshift-cnv
+      namespace: ${CNV_NS}
   spec:
       targetNamespaces:
-      - openshift-cnv
+      - ${CNV_NS}
 EOF
 
   cat << EOF| oc apply -f -
@@ -64,31 +107,55 @@ EOF
   kind: Subscription
   metadata:
       name: hco-operatorhub
-      namespace: openshift-cnv
+      namespace: ${CNV_NS}
   spec:
-      source: cnv-nightly-catalog-source
+      source: ${CNV_CATALOG}
       sourceNamespace: openshift-marketplace
       name: kubevirt-hyperconverged
       startingCSV: ${STARTING_CSV}
-      channel: "nightly-${CNV_VERSION}"
+      channel: "${CNV_CHANNEL}"
 EOF
 
-  until oc get csv -n openshift-cnv $STARTING_CSV ; do  sleep 5; done
-  oc wait --timeout=300s -n openshift-cnv csv $STARTING_CSV --for=jsonpath='{.status.phase}'=Succeeded
+  elapsed=0
+  until oc get csv -n "${CNV_NS}" "${STARTING_CSV}" >/dev/null 2>&1; do
+    if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SEC}" ]; then
+      echo "Timed out waiting for CSV ${STARTING_CSV}"
+      dump_cnv_catalog
+      dump_cnv_olm
+      exit 1
+    fi
+    echo "Waiting for CSV ${STARTING_CSV} (${elapsed}s/${WAIT_TIMEOUT_SEC}s)"
+    sleep 10
+    elapsed=$((elapsed + 10))
+  done
+  if ! oc wait --timeout=300s -n "${CNV_NS}" csv "${STARTING_CSV}" --for=jsonpath='{.status.phase}'=Succeeded; then
+    echo "CSV ${STARTING_CSV} did not reach Succeeded"
+    dump_cnv_olm
+    exit 1
+  fi
 
   cat << EOF| oc apply -f -
   apiVersion: hco.kubevirt.io/v1beta1
   kind: HyperConverged
   metadata:
     name: kubevirt-hyperconverged
-    namespace: openshift-cnv
-  Spec: {}
+    namespace: ${CNV_NS}
+  spec: {}
 EOF
 
   sleep 20
 
-  oc wait --timeout=300s -n openshift-cnv csv $STARTING_CSV --for=jsonpath='{.status.phase}'=Succeeded
-  oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+  if ! oc wait --timeout=300s -n "${CNV_NS}" csv "${STARTING_CSV}" --for=jsonpath='{.status.phase}'=Succeeded; then
+    echo "CSV ${STARTING_CSV} did not stay Succeeded after HyperConverged create"
+    dump_cnv_olm
+    exit 1
+  fi
+  if ! oc wait hyperconverged -n "${CNV_NS}" kubevirt-hyperconverged --for=condition=Available --timeout=15m; then
+    echo "HyperConverged kubevirt-hyperconverged did not become Available"
+    dump_cnv_olm
+    oc get hyperconverged -n "${CNV_NS}" kubevirt-hyperconverged -o yaml || true
+    exit 1
+  fi
 fi
 
 if [ -n "$TUNING_POLICY" ]; then
