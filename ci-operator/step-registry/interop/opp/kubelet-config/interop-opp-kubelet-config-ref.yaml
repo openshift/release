@@ -1,0 +1,25 @@
+ref:
+  as: interop-opp-kubelet-config
+  best_effort: true
+  commands: interop-opp-kubelet-config-commands.sh
+  documentation: |-
+    Applies a KubeletConfig CR to lower ephemeral-storage eviction
+    thresholds on worker nodes.  The default kubelet eviction hard
+    threshold (10% of nodefs) fires prematurely on RHCOS because the
+    root filesystem is ~23 GiB regardless of the EBS volume size
+    (OCPBUGS-15087).  This step sets evictionHard to 5% and
+    evictionSoft to 10% for both nodefs and imagefs, then waits for
+    the worker MachineConfigPool rollout to complete.
+  env:
+  - default: "1200"
+    documentation: |-
+      Maximum seconds to wait for the worker MachineConfigPool to
+      finish rolling out the new KubeletConfig.  Default 20 minutes.
+    name: MCP_TIMEOUT
+  from: cli
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 30m0s

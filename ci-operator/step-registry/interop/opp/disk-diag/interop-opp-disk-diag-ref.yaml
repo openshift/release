@@ -1,17 +1,19 @@
 ref:
   as: interop-opp-disk-diag
-  from: cli
   best_effort: true
-  grace_period: 5m0s
   commands: interop-opp-disk-diag-commands.sh
-  timeout: 10m0s
+  documentation: |-
+    Captures disk layout diagnostics from cluster nodes to investigate
+    RHCOS root filesystem expansion and ephemeral-storage eviction
+    issues.  Uses only unprivileged oc commands (no oc debug).
+    Collects node capacity/allocatable ephemeral-storage, resource
+    usage (oc adm top nodes), pressure conditions, KubeletConfig CRs,
+    MachineConfigPool status, and eviction events.
+    Best-effort -- never fails the chain.
+  from: cli
+  grace_period: 5m0s
   resources:
     requests:
       cpu: 100m
       memory: 200Mi
-  documentation: |-
-    Captures disk layout diagnostics from a worker node to investigate
-    RHCOS root filesystem expansion issues.  Collects lsblk, df -h,
-    ignition-ostree-growfs.service status and journal, du -sh of key
-    directories (/var/lib/containers, /var/log/pods, /var/lib/kubelet),
-    and KubeletConfiguration.  Best-effort — never fails the chain.
+  timeout: 10m0s
