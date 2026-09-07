@@ -248,3 +248,12 @@ if "proxy" in data:
     data["proxy"] = "redacted"
 print(yaml.dump(data))
 ' "$INSTALL_CONFIG" > "${ARTIFACT_DIR}/install-config.yaml"
+
+echo "Install-config OpenStack DNS/LB settings:"
+yq --yaml-output '
+  .featureSet,
+  .platform.openstack.dnsRecordsType,
+  .platform.openstack.loadBalancer,
+  .platform.openstack.apiVIP,
+  .platform.openstack.ingressVIP
+' "$INSTALL_CONFIG"
