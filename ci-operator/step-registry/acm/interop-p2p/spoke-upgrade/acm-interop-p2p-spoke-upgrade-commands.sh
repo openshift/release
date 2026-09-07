@@ -47,6 +47,16 @@ PatchAdminAcksForUpgrade() {
             --type merge \
             -p "$(jq -cn --arg k "${ackKey}" '{data: {($k): "true"}}')" \
             || : "admin-acks-upgrades patch skipped (ConfigMap may not exist on this cluster)"
+    elif grep -q "cluster version overrides" <<<"${upgradeableMsg}"; then
+        # CVO blocks minor/major upgrades when spec.overrides is non-empty.
+        # Clear all overrides so the CVO can transition to Completed after the upgrade.
+        # This is safe here because overrides are only set during provisioning
+        # (e.g. by DisableClusterImagePolicySignatureEnforcement) and are no longer
+        # needed once the spoke is registered and we are about to upgrade it.
+        : "Upgradeable blocked by spec.overrides — clearing before minor upgrade"
+        oc --kubeconfig="${kubeconfig}" patch clusterversion version --type merge \
+            -p '{"spec":{"overrides":null}}'
+        : "Overrides cleared; cluster should now be Upgradeable"
     else
         : "No admin-ack key in Upgradeable condition; skipping patch"
     fi
