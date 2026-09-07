@@ -10,9 +10,8 @@ set -euo pipefail
 #   - Authorino cluster-trust-bundle + Vault tools-vault (Phase 2 credential injection)
 #   - Authorino/OIDC dataplane-ready soft-wait patch
 #   - Authorino follow-ups: dinosaur /dinosaurs wait, Keycloak 26 UMA _id,
-#     MockServer cache settle, gateway/identical-hostname dataplane wait
+#     MockServer cache settle, gateway AuthPolicy wait (test-local, not autouse)
 #   - dnspython zone queries via kuadrant-coredns (DNSRecord A lookup)
-#   - Ignore data_plane_tracing (wasm/Jaeger spans); control-plane tracing still runs
 #   - protobuf==6.32.1 pin (broken s390x upb ≥6.33.0)
 #   - CFSSL ensure (baked in Dockerfile.s390x; fallback download if missing)
 #   - CoreDNS getaddrinfo plugin + UI ignore
@@ -429,10 +428,15 @@ PATCH_EOF
 # 2a3. Authorino s390x follow-ups (applied in-Job onto the baked testsuite).
 #     deny_email: first dinosaur test fail-opens because unauth /get is not a
 #       readiness signal (path-conditional AuthPolicy); poll /dinosaurs instead.
-#     UMA: Keycloak 26 resource_set?uri= returns objects; .body[0] is not an id.
-#     cache: Authorino metadata GET races MockServer 201 (test_cached 500).
-#     gateway / identical-hostnames: same wasm fail-open as deny_email.
+#     UMA: Keycloak 26 resource_set body is object/_id; http.send 4xx must not
+#       500 Authorino (raise_error:false + _id extraction).
+#     cache: retry first /get while Authorino metadata HTTP returns 500.
+#     gateway AuthPolicy: wait for 401 in that test only — do not autouse client()
+#       on gateway/conftest.py (negative DNS/TLS tests never create a cert).
+#     identical-hostnames: same wasm fail-open as deny_email.
 #     control-plane update: retry until a new reconcile span appears.
+#     dataplane tracing: send x-request-id (OCP Istio omits it on the response).
+#     DNSRecord delegate=false: retry A lookup until CoreDNS has the record.
 # ---------------------------------------------------------------------------
 AUTHORINO_FIXES_PY="${WORK_DIR}/authorino-s390x-fixes.py"
 cat > "${AUTHORINO_FIXES_PY}" <<'PY'
@@ -497,7 +501,7 @@ def patch_uma() -> None:
         print("SKIP uma test file missing")
         return
     text = path.read_text()
-    if f"{MARKER}: uma" in text:
+    if f"{MARKER}: uma-http-raise" in text:
         print("SKIP uma already patched")
         return
     needle = "resource_id := http.send("
@@ -510,73 +514,81 @@ def patch_uma() -> None:
         print("WARN uma .body[0] not found")
         return
     end += len(".body[0]")
-    old = text[start:end]
+    inner = text[start + len(needle) : end].replace(".body[0]", "", 1)
+    inner = inner.replace(
+        '"method":"get", "headers":',
+        '"method":"get","raise_error":false, "headers":',
+        1,
+    )
     new = (
-        old.replace("resource_id :=", "r :=", 1)
+        "uma_lookup := http.send("
+        + inner
         + "\n# "
         + MARKER
-        + ": uma — Keycloak 26 returns resource objects, not id strings\n"
-        + "resource_id := r._id {{ is_object(r) }}\n"
-        + "resource_id := r {{ is_string(r) }}"
+        + ": uma-http-raise — Keycloak 26 body is object/_id; 4xx must not 500 Authorino\n"
+        "r := object.get(uma_lookup, \"body\", [])\n"
+        "resource_id := r[0]._id {{ is_array(r); is_object(r[0]) }}\n"
+        "resource_id := r[0] {{ is_array(r); is_string(r[0]) }}\n"
+        "resource_id := r._id {{ is_object(r) }}"
     )
-    _write(path, text[:start] + new + text[end:], "uma resource_id")
+    text = text[:start] + new + text[end:]
+    if 'default rpt = ""' in text and "default resource_id" not in text:
+        text = text.replace('default rpt = ""', 'default rpt = ""\ndefault resource_id = ""', 1)
+    _write(path, text, "uma raise_error + resource_id")
 
 
 def patch_cache() -> None:
-    path = Path("testsuite/tests/singlecluster/authorino/caching/metadata/conftest.py")
+    path = Path("testsuite/tests/singlecluster/authorino/caching/metadata/test_caching.py")
     if not path.exists():
-        print("SKIP cache conftest missing")
+        print("SKIP cache test missing")
         return
     text = path.read_text()
     if f"{MARKER}: cache" in text:
         print("SKIP cache already patched")
         return
-    old = "    return mockserver.create_template_expectation(module_label, mustache_template)\n"
-    new = (
-        "    created = mockserver.create_template_expectation(module_label, mustache_template)\n"
-        "    import time\n"
-        "    time.sleep(2)  # s390x-authorino-fix: cache — metadata GET races MockServer 201\n"
-        "    return created\n"
-    )
+    old = """    response1 = client.get("/get", auth=auth)
+    assert response1.status_code == 200
+"""
+    new = """    import time
+    deadline = time.time() + 60
+    response1 = client.get("/get", auth=auth)
+    # s390x-authorino-fix: cache — Authorino metadata HTTP 500 until MockServer expectation is live
+    while response1.status_code == 500 and time.time() < deadline:
+        time.sleep(1)
+        response1 = client.get("/get", auth=auth)
+    assert response1.status_code == 200
+"""
     if old not in text:
-        print("WARN cache create_template_expectation return not found")
+        print("WARN cache first-request assert not found")
         return
-    _write(path, text.replace(old, new, 1), "cache expectation settle")
+    _write(path, text.replace(old, new, 1), "cache retry 500")
 
 
 def patch_gateway() -> None:
-    path = Path("testsuite/tests/singlecluster/gateway/conftest.py")
+    path = Path("testsuite/tests/singlecluster/gateway/test_authpolicy_attached_gateway.py")
     if not path.exists():
-        print("SKIP gateway conftest missing")
+        print("SKIP gateway authpolicy test missing")
         return
     text = path.read_text()
     if f"{MARKER}: gateway" in text:
         print("SKIP gateway already patched")
         return
-    text += '''
-
-# s390x-authorino-fix: gateway
-@pytest.fixture(scope="module", autouse=True)
-def wait_for_auth_dataplane(commit, client):  # pylint: disable=unused-argument
-    """Wait until gateway-attached AuthPolicy denies unauthenticated /get."""
-    import logging
-    import time
-
-    logger = logging.getLogger(__name__)
+    old = """    response = client.get("/get")
+    assert response.status_code == 401
+"""
+    new = """    import time
     deadline = time.time() + 60
-    ready = False
-    while time.time() < deadline:
-        try:
-            if client.get("/get").status_code in (401, 403):
-                ready = True
-                break
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
+    response = client.get("/get")
+    # s390x-authorino-fix: gateway — wait here only; do not autouse client() on gateway/conftest
+    while response.status_code != 401 and time.time() < deadline:
         time.sleep(1)
-    if not ready:
-        logger.warning("Gateway AuthPolicy dataplane not denying unauth /get within 60s; continuing")
-'''
-    _write(path, text, "gateway dataplane wait")
+        response = client.get("/get")
+    assert response.status_code == 401
+"""
+    if old not in text:
+        print("WARN gateway unauth 401 assert not found")
+        return
+    _write(path, text.replace(old, new, 1), "gateway AuthPolicy 401 wait")
 
 
 def patch_identical_hostnames() -> None:
@@ -647,6 +659,142 @@ def patch_control_plane_update() -> None:
     _write(path, text.replace(old, new, 1), "control_plane update wait")
 
 
+def patch_dataplane_tracing() -> None:
+    files = [
+        Path("testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing.py"),
+        Path(
+            "testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing_rate_limit_only.py"
+        ),
+    ]
+    helper = '''
+# s390x-authorino-fix: dataplane-trace-id — OCP Istio often omits x-request-id on the response
+def _s390x_trace_headers():
+    rid = os.urandom(16).hex()
+    return rid, {
+        "Traceparent": f"00-{os.urandom(16).hex()}-{os.urandom(8).hex()}-01",
+        "x-request-id": rid,
+    }
+
+'''
+    for path in files:
+        if not path.exists():
+            print(f"SKIP {path} missing")
+            continue
+        text = path.read_text()
+        if f"{MARKER}: dataplane-trace-id" in text:
+            print(f"SKIP {path.name} already patched")
+            continue
+        if "def _s390x_trace_headers" not in text:
+            needle = "pytestmark ="
+            idx = text.find(needle)
+            if idx < 0:
+                print(f"WARN {path.name} pytestmark not found")
+                continue
+            nl = text.find("\n", idx)
+            text = text[: nl + 1] + helper + text[nl + 1 :]
+        old_ids = '''    response_200 = client.get(
+        "/get", auth=auth, headers={"Traceparent": f"00-{os.urandom(16).hex()}-{os.urandom(8).hex()}-01"}
+    )
+    assert response_200.status_code == 200
+
+    responses = client.get_many("/get", 2, auth=auth)
+    responses.assert_all(200)
+
+    response_429 = client.get(
+        "/get", auth=auth, headers={"Traceparent": f"00-{os.urandom(16).hex()}-{os.urandom(8).hex()}-01"}
+    )
+    assert response_429.status_code == 429
+
+    return (
+        response_200.headers.get("x-request-id"),
+        response_429.headers.get("x-request-id"),
+    )
+'''
+        new_ids = '''    rid_200, headers_200 = _s390x_trace_headers()
+    response_200 = client.get("/get", auth=auth, headers=headers_200)
+    assert response_200.status_code == 200
+
+    responses = client.get_many("/get", 2, auth=auth)
+    responses.assert_all(200)
+
+    rid_429, headers_429 = _s390x_trace_headers()
+    response_429 = client.get("/get", auth=auth, headers=headers_429)
+    assert response_429.status_code == 429
+
+    return (
+        response_200.headers.get("x-request-id") or rid_200,
+        response_429.headers.get("x-request-id") or rid_429,
+    )
+'''
+        if old_ids in text:
+            text = text.replace(old_ids, new_ids, 1)
+        old_401 = '''    response_401 = client.get("/get", headers={"Traceparent": f"00-{os.urandom(16).hex()}-{os.urandom(8).hex()}-01"})
+    assert response_401.status_code == 401
+
+    request_id = response_401.headers.get("x-request-id")
+'''
+        new_401 = '''    rid_401, headers_401 = _s390x_trace_headers()
+    response_401 = client.get("/get", headers=headers_401)
+    assert response_401.status_code == 401
+
+    request_id = response_401.headers.get("x-request-id") or rid_401
+'''
+        if old_401 in text:
+            text = text.replace(old_401, new_401, 1)
+        old_rl = '''    response_429 = client.get("/get", headers={"Traceparent": f"00-{os.urandom(16).hex()}-{os.urandom(8).hex()}-01"})
+    assert response_429.status_code == 429
+
+    request_id = response_429.headers.get("x-request-id")
+'''
+        new_rl = '''    rid_429, headers_429 = _s390x_trace_headers()
+    response_429 = client.get("/get", headers=headers_429)
+    assert response_429.status_code == 429
+
+    request_id = response_429.headers.get("x-request-id") or rid_429
+'''
+        if old_rl in text:
+            text = text.replace(old_rl, new_rl, 1)
+        _write(path, text, f"dataplane tracing ids ({path.name})")
+
+
+def patch_dns_delegate() -> None:
+    path = Path(
+        "testsuite/tests/singlecluster/gateway/dnspolicy/test_dnsrecord_delegate_false.py"
+    )
+    if not path.exists():
+        print("SKIP dns delegate test missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: dns-delegate" in text:
+        print("SKIP dns delegate already patched")
+        return
+    old = '''    answers = dns.resolver.resolve(hostname.hostname, "A")
+    resolved_ip = answers[0].to_text()
+    assert resolved_ip == TEST_IP, f"Expected {TEST_IP}, got {resolved_ip}"
+'''
+    new = '''    import time
+    deadline = time.time() + 60
+    answers = None
+    last_exc = None
+    # s390x-authorino-fix: dns-delegate — DNSRecord Ready is ahead of CoreDNS answering A
+    while time.time() < deadline:
+        try:
+            answers = dns.resolver.resolve(hostname.hostname, "A")
+            break
+        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN) as exc:
+            last_exc = exc
+            time.sleep(2)
+    if answers is None:
+        raise last_exc
+    resolved_ip = answers[0].to_text()
+    assert resolved_ip == TEST_IP, f"Expected {TEST_IP}, got {resolved_ip}"
+'''
+    if old not in text:
+        print("WARN dns delegate resolve not found")
+        return
+    _write(path, text.replace(old, new, 1), "dns delegate A retry")
+
+
 if __name__ == "__main__":
     patch_dinosaur()
     patch_uma()
@@ -654,6 +802,8 @@ if __name__ == "__main__":
     patch_gateway()
     patch_identical_hostnames()
     patch_control_plane_update()
+    patch_dataplane_tracing()
+    patch_dns_delegate()
 PY
 
 # ---------------------------------------------------------------------------
@@ -883,11 +1033,11 @@ PY
 # newer lock entry. Re-pin pyproject+lock in the Job before make so sync stays
 # on 6.32.1.
 PROTOBUF_PIN="${PROTOBUF_PIN:-6.32.1}"
-# Ignore UI: the s390x testsuite image omits Playwright; collecting
+# Ignore UI only: the s390x testsuite image omits Playwright; collecting
 # singlecluster/ui still imports conftest and fails make with ModuleNotFoundError.
-# Ignore UI (no Playwright in the s390x image) and data-plane tracing (Jaeger
-# wasm spans are not ready on this cluster; control-plane tracing still runs).
-PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -vv --tb=short --ignore=testsuite/tests/singlecluster/ui --ignore=testsuite/tests/singlecluster/tracing/data_plane_tracing"
+# Those UI tests are outside the 450-collected / 10-skip kuadrant suite.
+# Do not --ignore tracing or other suites — failures stay visible in JUnit.
+PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -vv --tb=short --ignore=testsuite/tests/singlecluster/ui"
 
 # Normalize optional flags (default false when unset).
 RUN_SMOKE="${RUN_SMOKE:-true}"
