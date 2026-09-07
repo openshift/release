@@ -31,10 +31,14 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 OSC_INSTALL=${OSC_INSTALL:-false}
 OSC_NAMESPACE=${OSC_NAMESPACE:-openshift-sandboxed-containers-operator}
 CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE:-}
+if [[ -z "${CATALOG_SOURCE_IMAGE}" && -f "${SHARED_DIR}/catalog-source-image" ]]; then
+  CATALOG_SOURCE_IMAGE=$(cat "${SHARED_DIR}/catalog-source-image")
+fi
 OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
 ENABLEPEERPODS=${ENABLEPEERPODS:-false}
 WORKLOAD_TO_TEST=${WORKLOAD_TO_TEST:-kata}
+USE_OLMV1=${USE_OLMV1:-false}
 OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
 
 OC_RETRY_COUNT=${OC_RETRY_COUNT:-3}
@@ -53,11 +57,24 @@ if ! command -v helm &> /dev/null; then
   exit 1
 fi
 
+# OLM v1 requires OpenShift 4.22+
+if [[ "${USE_OLMV1}" == "true" ]]; then
+  OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || echo "")
+  OCP_MAJOR=$(echo "${OCP_VERSION}" | cut -d. -f1)
+  OCP_MINOR=$(echo "${OCP_VERSION}" | cut -d. -f2)
+  if [[ -n "${OCP_MAJOR}" && -n "${OCP_MINOR}" ]] && \
+     [[ ${OCP_MAJOR} -lt 4 || ( ${OCP_MAJOR} -eq 4 && ${OCP_MINOR} -lt 22 ) ]]; then
+    echo ">>> ERROR: OLM v1 requires OpenShift 4.22 or newer (detected: ${OCP_VERSION})"
+    exit 1
+  fi
+fi
+
 # Show configuration
 echo ">>> OSC charts: ${OSC_CHARTS_REPO} (ref: ${OSC_CHARTS_REF})"
 echo ">>> Namespace: ${OSC_NAMESPACE}"
 echo ">>> Workload: ${WORKLOAD_TO_TEST}"
 echo ">>> Peer-pods: ${ENABLEPEERPODS}"
+echo ">>> OLM v1: ${USE_OLMV1}"
 if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
   echo ">>> Catalog source: ${OSC_DEV_CATALOG_NAME} (image: ${CATALOG_SOURCE_IMAGE})"
 else
@@ -309,6 +326,15 @@ function render_osc_operator_chart() {
     helm_args+=("--set" "dev.enabled=false")
   fi
 
+  if [[ "${USE_OLMV1}" == "true" ]]; then
+    if [[ -z "${CATALOG_SOURCE_IMAGE}" ]]; then
+      echo ">>> ERROR: USE_OLMV1=true requires CATALOG_SOURCE_IMAGE to be set" >&2
+      return 1
+    fi
+    helm_args+=("--set" "olmv1.enabled=true" "--set" "dev.image=${CATALOG_SOURCE_IMAGE}")
+    echo ">>> Helm: olmv1.enabled=true, dev.image=${CATALOG_SOURCE_IMAGE}" >&2
+  fi
+
   local helm_output
   if ! helm_output=$(helm template "${helm_args[@]}"); then
     echo ">>> ERROR: helm template failed" >&2
@@ -462,7 +488,7 @@ function install_osc_operator() {
   fi
 }
 
-function wait_for_operator() {
+function wait_for_operator_olmv0() {
   # Stage 0: Wait for ALL CatalogSources to be READY (600s)
   echo ">>> Waiting for all CatalogSources to be READY..."
   local all_catalogs_ready=false
@@ -538,6 +564,32 @@ function wait_for_operator() {
   local csv_name
   csv_name=$(oc get csv -n "${OSC_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
   echo ">>> CSV ${csv_name} is Succeeded"
+}
+
+function wait_for_operator_olmv1() {
+  # Stage 1: Wait for ClusterCatalog to be Serving (300s)
+  if ! wait_until "ClusterCatalog ${OSC_DEV_CATALOG_NAME} Serving" 300 10 \
+    "[[ \"\$(oc get clustercatalog '${OSC_DEV_CATALOG_NAME}' -o jsonpath='{.status.conditions[?(@.type==\"Serving\")].status}' 2>/dev/null)\" == \"True\" ]]"; then
+    echo ">>> ERROR: ClusterCatalog ${OSC_DEV_CATALOG_NAME} not ready" >&2
+    oc get clustercatalog "${OSC_DEV_CATALOG_NAME}" -o yaml || true
+    return 1
+  fi
+
+  # Stage 2: Wait for ClusterExtension Installed (600s)
+  if ! wait_until "ClusterExtension sandboxed-containers Installed" 600 10 \
+    "[[ \"\$(oc get clusterextension sandboxed-containers -o jsonpath='{.status.conditions[?(@.type==\"Installed\")].status}' 2>/dev/null)\" == \"True\" ]]"; then
+    echo ">>> ERROR: ClusterExtension not installed" >&2
+    oc get clusterextension sandboxed-containers -o yaml || true
+    return 1
+  fi
+}
+
+function wait_for_operator() {
+  if [[ "${USE_OLMV1}" == "true" ]]; then
+    wait_for_operator_olmv1
+  else
+    wait_for_operator_olmv0
+  fi
 
   # Stage 5: Wait for controller-manager Deployment to be Available (900s)
   if ! wait_until "controller-manager deployment Available" 900 5 \
@@ -739,6 +791,7 @@ echo "========================================="
 echo ">>> OSC Operator Installation"
 echo ">>> Workload: ${WORKLOAD_TO_TEST}"
 echo ">>> Peer-pods: ${ENABLEPEERPODS}"
+echo ">>> OLM v1: ${USE_OLMV1}"
 echo "========================================="
 
 # Phase 1: Set up CatalogSource (if Pre-GA)
