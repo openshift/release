@@ -44,6 +44,35 @@ function set_hub_cluster_kubeconfig {
   oc_hub="oc --kubeconfig ${hub_kubeconfig}"
 }
 
+function setup_socks5_proxy_via_aux_host {
+
+  # The lab publishes the '*.apps' wildcard at the internal ingress VIP, which is only
+  # routable from inside the lab network. AUX_HOST sits on that network and serves its
+  # DNS zone, so tunnel through it and let the proxy resolve names remotely (socks5h).
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    echo "************ telcov10n Using the SOCKS5 proxy given by the job config ************"
+    return
+  fi
+
+  echo "************ telcov10n Open a SOCKS5 tunnel through AUX_HOST ************"
+
+  ssh -f -N -D "127.0.0.1:${SOCKS5_LOCAL_PORT}" \
+    -o ExitOnForwardFailure=yes \
+    "${SSHOPTS[@]}" "root@${AUX_HOST}"
+
+  for ((attempts = 0 ; attempts < 10 ; attempts++)); do
+    if timeout 5 bash -c "> /dev/tcp/127.0.0.1/${SOCKS5_LOCAL_PORT}" 2>/dev/null; then
+      export SOCKS5_PROXY="socks5h://127.0.0.1:${SOCKS5_LOCAL_PORT}"
+      echo "SOCKS5 tunnel listening on 127.0.0.1:${SOCKS5_LOCAL_PORT}"
+      return
+    fi
+    sleep 3
+  done
+
+  echo "[FAIL] The SOCKS5 tunnel through ${AUX_HOST} did not come up..."
+  exit 1
+}
+
 ##############################################################################################################
 # Test results
 ##############################################################################################################
@@ -190,6 +219,7 @@ function main {
   append_pr_tag_cluster_profile_artifacts
   get_hub_cluster_profile_artifacts
   set_hub_cluster_kubeconfig
+  setup_socks5_proxy_via_aux_host
   assert_expected_resources_are_available
   assert_console_is_available
   test_hub_cluster_deployment
