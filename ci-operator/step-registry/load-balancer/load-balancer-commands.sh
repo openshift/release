@@ -157,9 +157,22 @@ EOF
 cp "${WORK_DIR}/vars.yaml" "${ARTIFACT_DIR}/vars.yaml"
 
 echo "Installing Ansible collections"
-ansible-galaxy install emilienm.routed_lb,1.0.1
+retry_cmd() {
+    local attempt
+    for attempt in 1 2 3; do
+        if "$@"; then
+            return 0
+        fi
+        if [[ "$attempt" == 3 ]]; then
+            return 1
+        fi
+        echo "Command failed, retrying ($attempt/3): $*"
+        sleep 10
+    done
+}
+retry_cmd ansible-galaxy install emilienm.routed_lb,1.0.1
 # Ultimately, dependencies should be deployed by routed_lb, once it'll be converted to a collection.
-ansible-galaxy collection install ansible.posix ansible.utils
+retry_cmd ansible-galaxy collection install ansible.posix ansible.utils
 
 echo "Running Ansible playbook"
 ansible-playbook -i "${WORK_DIR}/inventory.yaml" -e "@$WORK_DIR/vars.yaml" "${WORK_DIR}/playbook.yaml"
