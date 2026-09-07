@@ -184,7 +184,123 @@ function copyArtifacts {
       mv "${file}" "${ARTIFACT_DIR}/junit_$(basename "${file}")"
     fi
   done
+  # Playwright records each skip reason as <property name="skip" value="..."> but
+  # leaves the <skipped> element empty. Prow's junit lens shows a skip reason only
+  # from the skipped element's message attribute, so copy the property value there.
+  # python3 is not in the ubi9 nodejs-minimal runner image, so this uses awk.
+  # Best-effort: never fail the EXIT trap.
+  for xml in "${ARTIFACT_DIR}"/junit_*.xml; do
+    [[ -f "${xml}" ]] || continue
+    awk '
+      /<testcase/ { hasskip = 0; skipval = "" }
+      /<property name="skip" value="/ {
+        v = $0
+        sub(/^.*<property name="skip" value="/, "", v)
+        sub(/">[ \t]*$/, "", v)
+        hasskip = 1
+        skipval = v
+      }
+      /^[ \t]*<skipped>[ \t]*$/ {
+        if (hasskip) {
+          match($0, /^[ \t]*/)
+          indent = substr($0, 1, RLENGTH)
+          print indent "<skipped message=\"" skipval "\">"
+          hasskip = 0
+          next
+        }
+      }
+      { print }
+    ' "${xml}" > "${xml}.tmp" && mv "${xml}.tmp" "${xml}" || rm -f "${xml}.tmp"
+  done || true
+  # A passing testcase with a -retry<N>/ ATTACHMENT in <system-out> was retried; Prow's
+  # junit lens flags flaky only when a name+classname has both a passed and a failed entry,
+  # so tag it flaky and emit a matching failed twin. Idempotent; awk only.
+  for xml in "${ARTIFACT_DIR}"/junit_*.xml; do
+    [[ -f "${xml}" ]] || continue
+    awk '
+      /<testcase/ && !buffering {
+        buffering = 1; n = 0
+        isretry = 0; hasfailure = 0; hasflaky = 0; hasprops = 0; inserted = 0
+        insysout = 0; tag = ""; tagdone = 0; tagendidx = 0
+      }
+      buffering {
+        buf[n++] = $0
+        if (!tagdone) { tag = (tag == "" ? $0 : tag " " $0); if ($0 ~ />/) { tagdone = 1; tagendidx = n - 1 } }
+        if ($0 ~ /<system-out/) insysout = 1
+        if (insysout && $0 ~ /\[\[ATTACHMENT\|.*-retry[0-9]+\//) isretry = 1
+        if ($0 ~ /<\/system-out>/) insysout = 0
+        if ($0 ~ /<failure/ || $0 ~ /<error/) hasfailure = 1
+        if ($0 ~ /<property name="flaky"/) hasflaky = 1
+        if ($0 ~ /<properties>/) hasprops = 1
+        if ($0 ~ /<\/testcase>/) {
+          addflaky = (isretry && !hasfailure && !hasflaky)
+          if (addflaky && hasprops) {
+            for (i = 0; i < n; i++) {
+              if (!inserted && buf[i] ~ /<\/properties>/) {
+                print "<property name=\"flaky\" value=\"true\"/>"
+                inserted = 1
+              }
+              print buf[i]
+            }
+          } else if (addflaky) {
+            for (i = 0; i <= tagendidx; i++) print buf[i]
+            print "<properties>"
+            print "<property name=\"flaky\" value=\"true\"/>"
+            print "</properties>"
+            for (i = tagendidx + 1; i < n; i++) print buf[i]
+          } else {
+            for (i = 0; i < n; i++) print buf[i]
+          }
+          if (addflaky) {
+            name = ""; cls = ""
+            if (match(tag, /[ \t]name="[^"]*"/)) {
+              name = substr(tag, RSTART, RLENGTH); sub(/^[ \t]name="/, "", name); sub(/"$/, "", name)
+            }
+            if (match(tag, /[ \t]classname="[^"]*"/)) {
+              cls = substr(tag, RSTART, RLENGTH); sub(/^[ \t]classname="/, "", cls); sub(/"$/, "", cls)
+            }
+            if (name != "" && cls != "")
+              print "<testcase name=\"" name "\" classname=\"" cls "\" time=\"0\"><failure message=\"flaky: passed on retry\"></failure></testcase>"
+          }
+          buffering = 0
+        }
+        next
+      }
+      { print }
+    ' "${xml}" > "${xml}.tmp" && mv "${xml}.tmp" "${xml}" || rm -f "${xml}.tmp"
+  done || true
   cp -r "${src}"/playwright-report/* "${ARTIFACT_DIR}/" 2>/dev/null || true
+  # Prow's html lens renders any artifact matching custom-link-*.html inline near
+  # the top of the Spyglass job page. The Playwright HTML report copied above only
+  # shows up buried in the artifact tree, so surface a direct link to it. Compose
+  # the GCS URL the same way hypershift-analyze-e2e-failure does. Only write the
+  # link when index.html actually landed so it is never dead; default every CI var
+  # with :- so a missing var in a local run cannot abort this EXIT trap.
+  if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
+    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results"
+    local gcs_path
+    if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
+      gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"
+    else
+      gcs_path="logs/${JOB_NAME:-}/${BUILD_ID:-}"
+    fi
+    local report_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}/quay-test-e2e/artifacts"
+    cat > "${ARTIFACT_DIR}/custom-link-playwright-report.html" << EOF || true
+<html>
+<head>
+<title>Playwright report</title>
+<style>
+a { display:inline-block; padding:5px 20px; margin:10px; border:2px solid #4E9AF1; border-radius:1em; text-decoration:none; color:#FFFFFF !important; background-color:#4E9AF1; }
+</style>
+</head>
+<body>
+<a target="_blank" href="${report_base}/index.html">Playwright HTML report</a>
+</body>
+</html>
+EOF
+  else
+    echo "No index.html in ${ARTIFACT_DIR}; skipping custom-link-playwright-report.html"
+  fi
   gatherBuilderDiagnostics || true
 }
 trap copyArtifacts EXIT
@@ -277,6 +393,6 @@ pushd "${PLAYWRIGHT_WORKDIR}"
 npx playwright test \
   "${GREP_INVERT_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
-  --reporter=junit,html,json \
+  --reporter=list,junit,html,json \
   2>&1 | tee "${ARTIFACT_DIR}/playwright-output.log"
 popd

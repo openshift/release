@@ -58,10 +58,16 @@ tests:
           - admin
         GLOBAL_READONLY_SUPER_USERS:
           - readonly
+        FEATURE_OTEL_TRACING: true
+        OTEL_CONFIG:
+          service_name: quay
+          sample_rate: 1.0
+          endpoint: http://jaeger.quay-enterprise.svc.cluster.local:4318/v1/traces
       QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22
       QUAY_OPERATOR_CHANNEL: stable-3.18
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
     post:
+    - ref: quay-gather-jaeger-traces
     - ref: quay-deprovision
     - chain: ipi-aws-post
     test:
@@ -69,6 +75,7 @@ tests:
     - ref: quay-provisioning-tls
     - ref: quay-provisioning-builder
     - ref: quay-deploy-mailpit
+    - ref: quay-deploy-jaeger
     - ref: quay-deploy-aws-s3
     - ref: quay-test-e2e
     workflow: ipi-aws

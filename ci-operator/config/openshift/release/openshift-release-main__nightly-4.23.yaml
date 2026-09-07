@@ -1099,12 +1099,43 @@ tests:
     - error
     report_template: |
       :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  shard_count: 2
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-serial
   timeout: 6h0m0s
+- as: e2e-vsphere-ovn-zones-techpreview
+  cron: 15 5 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere-zones
+- as: e2e-vsphere-ovn-zones-techpreview-serial
+  cron: 15 7 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  shard_count: 2
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-rhcos10-techpreview-serial
   cron: 31,46 4,20 * * *
   steps:
