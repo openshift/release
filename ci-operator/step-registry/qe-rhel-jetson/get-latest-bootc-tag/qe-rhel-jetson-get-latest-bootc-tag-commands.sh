@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Fetch the actual latest tag from Quay for a bootc image
 # This is necessary because the :latest tag isn't always updated automatically
+# NOTE: Filters for version-formatted tags with timestamps (e.g., 6.2.2_5.14.0-687.31.1_072926085921)
 
 BOOTC_IMAGE_BASE="${BOOTC_IMAGE_BASE:-quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-98-bootc}"
 
