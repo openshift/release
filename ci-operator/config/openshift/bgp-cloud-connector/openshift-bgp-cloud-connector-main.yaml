@@ -141,17 +141,17 @@ tests:
       commands: |
         set -euo pipefail
 
-        oc create namespace openshift-cudn-bgp-routing --dry-run=client -o yaml | oc apply -f -
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
 
         # The CSV supports OwnNamespace and SingleNamespace only. The
         # manager scopes no caches, so it watches cluster-wide either
         # way.
-        operator-sdk run bundle -n openshift-cudn-bgp-routing --timeout=10m \
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
           --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
 
-        oc -n openshift-cudn-bgp-routing wait --for=condition=Available \
-          deployment/openshift-cudn-bgp-routing-controller-manager --timeout=5m
-        oc -n openshift-cudn-bgp-routing get csv
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
       dependencies:
       - env: OO_BUNDLE
         name: bgp-cloud-connector-bundle
