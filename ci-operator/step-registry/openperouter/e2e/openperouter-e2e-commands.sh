@@ -21,85 +21,18 @@ EOFSOURCE
 
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
 
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -s << 'EOFDEPLOY'
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s << 'RUNTESTS'
 set -euo pipefail
 cd /root/dev-scripts
 source common.sh
 source ocp_install_env.sh
 export KUBECONFIG="/root/dev-scripts/ocp/${CLUSTER_NAME}/auth/kubeconfig"
 
-echo "=== Setup extra networks ==="
+export CONFIG=/root/dev-scripts/config_root.sh
 
-CONFIG=/root/dev-scripts/config_root.sh \
-bash /root/openperouter/openshift/e2e/setup_extra_networks.sh
+bash /root/openperouter/openshift/e2e/deploy.sh
+bash /root/openperouter/openshift/e2e/run_tests.sh
 
-echo "=== Deploy frrk8s ==="
-
-bash /root/openperouter/openshift/e2e/deploy_frrk8s.sh
-
-echo "=== Enable routing ==="
-
-bash/root/openperouter/openshift/e2e/enable_routing.sh
-
-
-# Ensure namespace is privileged (router pods need host networking + nsenter)
-oc label --overwrite ns openshift-openperouter-system \
-  pod-security.kubernetes.io/enforce=privileged \
-  pod-security.kubernetes.io/audit=privileged \
-  pod-security.kubernetes.io/warn=privileged
-
-# Create OpenPERouter CR
-cat <<'EOF' | oc apply -f -
-apiVersion: network.openperouter.io/v1alpha1
-kind: OpenPERouter
-metadata:
-  name: openperouter
-  namespace: openshift-openperouter-system
-spec:
-  logLevel: debug
-EOF
-
-# Wait for controller and router daemonsets to be created and rolled out
-for ds in controller router; do
-  echo "Waiting for daemonset $ds to be created..."
-  deadline=$((SECONDS + 300))
-  until oc get daemonset "$ds" -n openshift-openperouter-system &>/dev/null; do
-    if (( SECONDS >= deadline )); then
-      echo "ERROR: Timed out waiting for daemonset $ds"
-      exit 1
-    fi
-    sleep 5
-  done
-  oc rollout status daemonset/"$ds" -n openshift-openperouter-system --timeout=300s
-done
-
-echo "=== Deploy verification ==="
-oc get pods -n openshift-openperouter-system -o wide
-oc get daemonset -n openshift-openperouter-system
-
-# Verify all pods are Running and Ready
-NOT_READY=$(oc get pods -n openshift-openperouter-system --no-headers | grep -v "Completed" | grep -v "1/1\|2/2\|3/3\|4/4\|5/5" || true)
-if [ -n "$NOT_READY" ]; then
-  echo "ERROR: Some pods are not fully ready:"
-  echo "$NOT_READY"
-  exit 1
-fi
-
-echo "All openperouter pods are running and ready"
-
-echo "=== Setup CLAB ==="
-bash /root/openperouter/openshift/e2e/setup-clab.sh
-
-
-
-echo "=== Run e2e tests ==="
-
-cd /root/openperouter
-CONTAINER_RUNTIME=podman make e2etests TEST_ARGS="--nodelink-config=$(pwd)/openshift/e2e/nodelink.json --frrk8s-namespace=openshift-frr-k8s \
---openperouter-namespace=openshift-openperouter-system" KUBECONFIG_PATH=$KUBECONFIG \
-GINKGO_ARGS="--label-filter='systemdmode' --skip='editing the underlay parameters|auto-recover when the named netns is deleted|Webhook|Unnumbered' --focus='Baseline'"
-
-
-EOFDEPLOY
+RUNTESTS
 
 
