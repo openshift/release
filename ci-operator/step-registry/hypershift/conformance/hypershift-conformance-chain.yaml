@@ -66,7 +66,11 @@ chain:
         if [ -s "${SHARED_DIR}/mgmt_kubeconfig" ] ; then
           export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
         fi
-        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        if [[ -f "${SHARED_DIR}/cluster-name" ]]; then
+          export CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
+        else
+          export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        fi
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
         export HYPERSHIFT_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
