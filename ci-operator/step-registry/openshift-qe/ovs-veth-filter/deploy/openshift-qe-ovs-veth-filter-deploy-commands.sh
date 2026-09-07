@@ -83,6 +83,7 @@ oc set env daemonset/ovs-veth-filter -n "${namespace}" \
     --containers=profiler \
     "OVS_PERF_NODES=${perf_nodes_csv}" \
     "OVS_PERF_DURATION_SECONDS=${OVS_PERF_DURATION_SECONDS}" \
+    "OVS_PERF_ROTATE_SECONDS=${OVS_PERF_ROTATE_SECONDS}" \
     "OVS_PERF_FREQUENCY=${OVS_PERF_FREQUENCY}" \
     "OVS_PERF_STACK_BYTES=${OVS_PERF_STACK_BYTES}"
 oc rollout status daemonset/ovs-veth-filter -n "${namespace}" --timeout=20m

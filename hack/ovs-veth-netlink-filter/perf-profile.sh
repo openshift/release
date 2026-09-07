@@ -9,6 +9,7 @@ stop_file=$run_dir/perf.stop-requested
 : "${NODE_NAME:?NODE_NAME must be set}"
 : "${OVS_PERF_NODES:=}"
 : "${OVS_PERF_DURATION_SECONDS:=2700}"
+: "${OVS_PERF_ROTATE_SECONDS:=30}"
 : "${OVS_PERF_FREQUENCY:=19}"
 : "${OVS_PERF_STACK_BYTES:=2048}"
 
@@ -23,13 +24,15 @@ case ",$OVS_PERF_NODES," in
         ;;
 esac
 
-for value in "$OVS_PERF_DURATION_SECONDS" "$OVS_PERF_FREQUENCY" \
+for value in "$OVS_PERF_DURATION_SECONDS" "$OVS_PERF_ROTATE_SECONDS" \
+    "$OVS_PERF_FREQUENCY" \
     "$OVS_PERF_STACK_BYTES"; do
     if [[ ! $value =~ ^[1-9][0-9]*$ ]]; then
         echo "invalid positive perf setting: $value" >&2
         exit 1
     fi
 done
+max_files=$((OVS_PERF_DURATION_SECONDS / OVS_PERF_ROTATE_SECONDS + 2))
 
 while true; do
     ovs_pid=$(pidof ovs-vswitchd 2>/dev/null | awk '{ print $1 }')
@@ -66,12 +69,16 @@ trap 'exit 0' INT TERM
     echo "perf_event_paranoid=$(cat /proc/sys/kernel/perf_event_paranoid)"
     echo "started_epoch=$started"
     echo "duration_seconds=$OVS_PERF_DURATION_SECONDS"
+    echo "rotate_seconds=$OVS_PERF_ROTATE_SECONDS"
+    echo "max_files=$max_files"
     echo "frequency_hz=$OVS_PERF_FREQUENCY"
     echo "call_graph=dwarf,$OVS_PERF_STACK_BYTES"
 } > "$meta_file"
 
 perf record -e cpu-clock -F "$OVS_PERF_FREQUENCY" \
     --call-graph "dwarf,$OVS_PERF_STACK_BYTES" -p "$ovs_pid" \
+    -T --switch-output="${OVS_PERF_ROTATE_SECONDS}s" \
+    --switch-max-files "$max_files" --timestamp-filename \
     -o "$data_file" -- sleep "$OVS_PERF_DURATION_SECONDS" \
     > "$log_file" 2>&1 &
 perf_pid=$!
@@ -101,7 +108,11 @@ fi
     echo "finished_epoch=$(date +%s)"
     echo "perf_exit_status=$status"
     echo "stopped_by_gather=$stopped_by_gather"
-    echo "perf_data_bytes=$(stat -c %s "$data_file" 2>/dev/null || echo 0)"
+    echo "perf_data_files=$(find "$output_dir" -maxdepth 1 -type f \
+        -name "$(basename "$data_file").*" | wc -l)"
+    echo "perf_data_bytes=$(find "$output_dir" -maxdepth 1 -type f \
+        -name "$(basename "$data_file").*" -printf '%s\n' | \
+        awk '{ total += $1 } END { print total + 0 }')"
 } >> "$meta_file"
 cat "$log_file"
 echo "perf recording finished on $NODE_NAME with status $status"

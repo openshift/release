@@ -47,7 +47,9 @@ The profiler sidecar uses the same privileged, host-PID DaemonSet as the BPF
 filter. The deploy step chooses one worker per availability zone before filling
 the remaining slots in node-name order. On those workers it records the host-
 visible `ovs-vswitchd` with the software `cpu-clock` event at 19 Hz for at most
-45 minutes. DWARF call graphs use a 2 KiB stack snapshot, which was sufficient
+45 minutes, rotating to a timestamped data file every 30 seconds so the files
+overlapping workload group 2 can be isolated precisely. DWARF call graphs use
+a 2 KiB stack snapshot, which was sufficient
 to resolve OVS and kernel netlink stacks in a loaded cluster rehearsal without
 the much larger artifacts produced by the default 8 KiB snapshot. The gather
 step interrupts any recording still active after an early workload failure,

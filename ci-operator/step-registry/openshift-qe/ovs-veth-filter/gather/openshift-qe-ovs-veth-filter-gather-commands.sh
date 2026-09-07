@@ -40,6 +40,11 @@ for pod in $(oc get pods -n "${namespace}" -l app=ovs-veth-filter \
         bpftool -j map dump pinned /sys/fs/bpf/ovs_veth_netlink_filter/maps/stats \
         > "${ARTIFACT_DIR}/bpf-stats-${node}.json" 2>&1
 
+    if [[ ! -f "${SHARED_DIR}/ovs-perf-profile-nodes.txt" ]] || \
+       ! grep -Fxq "${node}" "${SHARED_DIR}/ovs-perf-profile-nodes.txt"; then
+        continue
+    fi
+
     # A failed workload can enter post steps before the bounded recording ends.
     # Interrupt perf and wait for its parent script to finalize perf.data.
     oc exec -n "${namespace}" "${pod}" -c profiler -- bash -c '
@@ -56,39 +61,44 @@ for pod in $(oc get pods -n "${namespace}" -l app=ovs-veth-filter \
         fi
     ' || echo "Could not stop an active perf recording on ${node}" >&2
 
-    for data_file in $(oc exec -n "${namespace}" "${pod}" -c profiler -- \
-        find /var/tmp/ovs-veth-filter-perf -maxdepth 1 -type f \
-        -name "ovs-perf-${node}-*.data" -printf '%f\n' 2>/dev/null); do
+    remote_dir=/var/tmp/ovs-veth-filter-perf
+    echo "Rendering timestamped perf chunks from ${node}"
+    oc exec -n "${namespace}" "${pod}" -c profiler -- bash -c '
+        set -o pipefail
+        node=$1
         remote_dir=/var/tmp/ovs-veth-filter-perf
-        artifact_base=${data_file%.data}
-        echo "Collecting perf recording ${data_file} from ${node}"
-        oc exec -n "${namespace}" "${pod}" -c profiler -- bash -c '
-            set -o pipefail
-            data_file=$1
-            report_file=${data_file%.data}.report.txt
-            ovs_pid=$(pidof ovs-vswitchd 2>/dev/null | awk "{ print \$1 }")
-            failed=0
+        ovs_pid=$(pidof ovs-vswitchd 2>/dev/null | awk "{ print \$1 }")
+        failed=0
+        found=0
+        while IFS= read -r -d "" data_file; do
+            found=1
+            echo "Rendering $(basename "$data_file")"
             perf report --stdio --no-children --call-graph none \
                 --sort comm,dso,symbol --percent-limit 0.1 \
                 --symfs "/proc/${ovs_pid}/root" --kallsyms /proc/kallsyms \
-                -i "$data_file" > "$report_file" 2>&1 || failed=1
+                -i "$data_file" > "${data_file}.report.txt" 2>&1 || failed=1
             perf script --symfs "/proc/${ovs_pid}/root" \
                 --kallsyms /proc/kallsyms -i "$data_file" 2>/dev/null \
-                | gzip -1 > "${data_file%.data}.script.txt.gz" || failed=1
-            exit "$failed"
-        ' -- "${remote_dir}/${data_file}" || \
-            echo "Failed to render one or more perf views for ${data_file}" >&2
-        for suffix in data meta log report.txt script.txt.gz; do
-            remote_file=${remote_dir}/${artifact_base}.${suffix}
-            if oc exec -n "${namespace}" "${pod}" -c profiler -- \
-                test -f "${remote_file}"; then
-                oc cp -n "${namespace}" -c profiler \
-                    "${pod}:${remote_file}" \
-                    "${ARTIFACT_DIR}/${artifact_base}.${suffix}" || \
-                    echo "Failed to copy ${remote_file}" >&2
-            fi
-        done
-    done
+                | gzip -1 > "${data_file}.script.txt.gz" || failed=1
+        done < <(find "$remote_dir" -maxdepth 1 -type f \
+            \( -name "ovs-perf-${node}-*.data" \
+            -o -name "ovs-perf-${node}-*.data.*" \) \
+            ! -name "*.report.txt" ! -name "*.script.txt.gz" \
+            -print0 | sort -z)
+        if ((found == 0)); then
+            echo "No perf data chunks found for ${node}" >&2
+            exit 1
+        fi
+        exit "$failed"
+    ' -- "${node}" || \
+        echo "Failed to render one or more perf views for ${node}" >&2
+
+    artifact_node_dir=${ARTIFACT_DIR}/ovs-perf-${node}
+    mkdir -p "${artifact_node_dir}"
+    echo "Collecting all perf chunks from ${node} into ${artifact_node_dir}"
+    oc cp -n "${namespace}" -c profiler \
+        "${pod}:${remote_dir}/." "${artifact_node_dir}/" || \
+        echo "Failed to copy perf artifacts from ${node}" >&2
 done
 
 for pod in $(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
