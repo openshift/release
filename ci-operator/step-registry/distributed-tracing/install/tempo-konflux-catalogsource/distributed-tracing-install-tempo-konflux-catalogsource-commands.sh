@@ -164,7 +164,7 @@ create_catalog_sources() {
 
 	# since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
 	# details: https://issues.redhat.com/browse/OCPBUGS-31427
-	if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
+	if [[ ${kube_major} -gt 1 || ( ${kube_major} -eq 1 && ${kube_minor} -gt 27 ) ]]; then
 		echo "the index image as the initContainer cache image"
 		cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
