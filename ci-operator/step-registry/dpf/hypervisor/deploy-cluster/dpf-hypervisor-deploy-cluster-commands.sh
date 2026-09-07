@@ -167,6 +167,9 @@ else
   exit 1
 fi
 
+echo "Copying .env from hypervisor to artifacts..."
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env ${ARTIFACT_DIR}/.env || echo "WARNING: Failed to copy .env to artifacts"
+
 echo "Create logs dir on the remote host"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "mkdir -p ${REMOTE_LOGS_DIR}; cd ${REMOTE_LOGS_DIR}; pwd"; then
   echo "Logs directory created successfully at ${REMOTE_LOGS_DIR}"
