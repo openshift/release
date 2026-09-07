@@ -120,9 +120,17 @@ for dev in "${devices[@]}"; do
   fi
 done
 
-echo "Injecting static IP assignments to eth2 (Internal interface)..."
-if [ "${ipv4_enabled}" == "true" ]; then
-  if { [ "${LOAD_BALANCER_TYPE:-cluster-managed}" == "user-managed" ] || [ "${AGENT_PLATFORM_TYPE:-}" == "none" ]; }; then
+# User-managed / platform-none HAProxy owns the VIPs. Cluster-managed IPI must
+# not bind bootstrap (.80.N / ::3:N) or cluster VIPs (.81/.82).
+if [ "${LOAD_BALANCER_TYPE:-cluster-managed}" == "user-managed" ] || [ "${AGENT_PLATFORM_TYPE:-}" == "none" ]; then
+  use_static_internal_ip=true
+else
+  use_static_internal_ip=false
+fi
+
+if [ "${use_static_internal_ip}" == "true" ]; then
+  echo "Injecting static VIP assignments to eth2 (user-managed / platform-none)..."
+  if [ "${ipv4_enabled}" == "true" ]; then
     if [ "${DISCONNECTED}" == "true" ]; then
       nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "$INTERNAL_API_IPV4"/22 dev eth2
       echo "Disconnected environment: Adding Ingress IP address to eth2 as alias..."
@@ -130,14 +138,8 @@ if [ "${ipv4_enabled}" == "true" ]; then
     else
       nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "$INTERNAL_INGRESS_IPV4"/22 dev eth2
     fi
-  else
-    # Required for internal communication, uses a separate IP to avoid conflicts with VIPs or node IPs.
-    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${INTERNAL_API_IPV4/.81./.80.}"/22 dev eth2
-    echo "Skipping assignment of IPv4 VIPs to eth2 because the load balancer is cluster-managed."
   fi
-fi
-if [ "${ipv6_enabled}" == "true" ]; then
-  if { [ "${LOAD_BALANCER_TYPE:-cluster-managed}" == "user-managed" ] || [ "${AGENT_PLATFORM_TYPE:-}" == "none" ]; }; then
+  if [ "${ipv6_enabled}" == "true" ]; then
     if [ "${DISCONNECTED}" == "true" ]; then
       nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "$INTERNAL_API_IPV6"/64 dev eth2
       echo "Disconnected environment: Adding Ingress IPv6 address to eth2 as alias..."
@@ -145,10 +147,28 @@ if [ "${ipv6_enabled}" == "true" ]; then
     else
       nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "$INTERNAL_INGRESS_IPV6"/64 dev eth2
     fi
-  else
-    # Required for internal communication, uses a separate IP to avoid conflicts with VIPs or node IPs.
-    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${INTERNAL_API_IPV6/::1/::3}"/64 dev eth2
-    echo "Skipping assignment of IPv6 VIPs to eth2 because the load balancer is cluster-managed."
+  fi
+else
+  # Cluster-managed IPI: HAProxy is only a client of the VIPs. Lab IPv4 DHCP is
+  # static-only (dhcp-range=192.168.80.0,static), so eth2 cannot lease an address.
+  # Do not bind .80.N / ::3:N (bootstrap) or .81/.82 (cluster VIPs). Host IDs in
+  # this lab are <= 133; last-octet+100 stays in the /22 and off that range.
+  echo "Injecting cluster-managed HAProxy eth2 addresses (not VIP, not bootstrap)..."
+  if [ "${ipv4_enabled}" == "true" ]; then
+    vip_last_octet="${INTERNAL_API_IPV4##*.}"
+    haproxy_int_v4="192.168.80.$((vip_last_octet + 100))"
+    if [ $((vip_last_octet + 100)) -gt 254 ]; then
+      echo "Cannot derive HAProxy internal IPv4 from API VIP ${INTERNAL_API_IPV4}: last octet + 100 overflows."
+      exit 1
+    fi
+    echo "Adding ${haproxy_int_v4}/22 on eth2 (API VIP last octet ${vip_last_octet} + 100)"
+    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${haproxy_int_v4}"/22 dev eth2
+  fi
+  if [ "${ipv6_enabled}" == "true" ]; then
+    # API VIP is ::1:N, ingress ::2:N, bootstrap ::3:N. Use ::4:N for HAProxy.
+    haproxy_int_v6="${INTERNAL_API_IPV6/::1:/::4:}"
+    echo "Adding ${haproxy_int_v6}/64 on eth2"
+    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${haproxy_int_v6}"/64 dev eth2
   fi
 fi
 nsenter -t "$CONTAINER_PID" -n /sbin/ip link set eth2 up
