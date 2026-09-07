@@ -10,8 +10,8 @@
 # default 10 % threshold (~2.3 GiB) fires prematurely.
 #
 # This step sets:
-#   evictionHard:  nodefs.available=5%, imagefs.available=5%
-#   evictionSoft:  nodefs.available=10%, imagefs.available=10%
+#   evictionHard:  nodefs.available=500Mi, imagefs.available=500Mi
+#   evictionSoft:  nodefs.available=1Gi,   imagefs.available=1Gi
 #   evictionSoftGracePeriod: 1m for both
 #
 # After applying the CR it waits for the worker MachineConfigPool to
@@ -43,11 +43,11 @@ metadata:
 spec:
   kubeletConfig:
     evictionHard:
-      imagefs.available: "5%"
-      nodefs.available: "5%"
+      imagefs.available: "500Mi"
+      nodefs.available: "500Mi"
     evictionSoft:
-      imagefs.available: "10%"
-      nodefs.available: "10%"
+      imagefs.available: "1Gi"
+      nodefs.available: "1Gi"
     evictionSoftGracePeriod:
       imagefs.available: "1m"
       nodefs.available: "1m"
