@@ -98,8 +98,9 @@ echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 echo "[INFO] Set OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY to true for nightly payload"
 export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
 
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.build05.ci.openshift.org/ci-ln-tr36k52/release:latest"
-export MULTI_RELEASE_IMAGE="registry.build05.ci.openshift.org/ci-ln-tr36k52/release:latest"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release-nightly@sha256:2dea29e23c2ba871f195fafbb34fd0a60ee0c8af7e10f93e804181f1a9a74a7"
+export MULTI_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release-nightly@sha256:2dea29e23c2ba871f195fafbb34fd0a60ee0c8af7e10f93e804181f1a9a74a7e
+"
 
 # The extraction may be done from the release-multi-latest image, so that we can extract the openshift-baremetal-install
 # based on the runner architecture. We might need to change this in the future if we want to ship different versions of
