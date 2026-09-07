@@ -59,26 +59,16 @@ echo "Total tags fetched: $(echo "${ALL_TAGS}" | jq 'length')"
 # - Exclude metadata tags (.att, .sig, .sbom, .src, .dockerfile, .git, .customscript, .prefetch)
 # - Exclude build pipeline tags (*-build-images, *-on-push-*, *-on-pull-request-*)
 # - Exclude plain numeric tags (git commit hashes like 090326141439)
-VALID_TAGS=$(echo "${ALL_TAGS}" | \
+
+LATEST_TAG=$(echo "${ALL_TAGS}" | \
   jq -r '
     map(select(
-      (.name | test("^sha256-") | not) and
-      (.name | test("\\.(att|sig|sbom|src|dockerfile|git|customscript|prefetch)$") | not) and
-      (.name | test("-build-images$") | not) and
-      (.name | test("-on-(push|pull-request)-") | not) and
-      (.name | test("^[0-9]+$") | not) and
-      (.name | test("[0-9]+\\.[0-9]+"))
+      .name | test("^[0-9]+\\.[0-9]+.*_[0-9]{12}$")
     )) |
-    sort_by(.last_modified) |
-    reverse
+    max_by(.start_ts) |
+    .name
   ')
-
-echo "Valid bootc image tags found: $(echo "${VALID_TAGS}" | jq 'length')"
-echo "Top 5 valid tags (newest first):"
-echo "${VALID_TAGS}" | jq -r '.[0:5] | .[] | "  - \(.name) (modified: \(.last_modified))"'
-
-LATEST_TAG=$(echo "${VALID_TAGS}" | jq -r '.[0].name')
-
+  
 if [[ -z "${LATEST_TAG}" || "${LATEST_TAG}" == "null" ]]; then
   echo "ERROR: Failed to fetch latest tag from Quay API"
   echo "Total tags fetched: $(echo "${ALL_TAGS}" | jq 'length')"
