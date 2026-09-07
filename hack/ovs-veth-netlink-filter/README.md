@@ -29,8 +29,8 @@ The post-test step saves these artifacts before cluster teardown:
   kernel read failures at key 6, and mixed/non-veth batches at key 7;
 - per-node OVS coverage before and after the CUDN workload;
 - bounded `ovs-vswitchd` perf recordings, metadata, logs, compact symbol
-  reports, and compressed symbolized callchains from four zone-spread workers
-  (`ovs-perf-*`);
+  reports, and compressed symbolized callchains from four zone-spread workers,
+  packaged as one `ovs-perf-<node>.tar.gz` archive per worker;
 - DaemonSet resources and logs;
 - the Network ClusterOperator state.
 

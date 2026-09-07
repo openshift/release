@@ -93,12 +93,13 @@ for pod in $(oc get pods -n "${namespace}" -l app=ovs-veth-filter \
     ' -- "${node}" || \
         echo "Failed to render one or more perf views for ${node}" >&2
 
-    artifact_node_dir=${ARTIFACT_DIR}/ovs-perf-${node}
-    mkdir -p "${artifact_node_dir}"
-    echo "Collecting all perf chunks from ${node} into ${artifact_node_dir}"
-    oc cp -n "${namespace}" -c profiler \
-        "${pod}:${remote_dir}/." "${artifact_node_dir}/" || \
-        echo "Failed to copy perf artifacts from ${node}" >&2
+    artifact_archive=${ARTIFACT_DIR}/ovs-perf-${node}.tar.gz
+    echo "Collecting all perf chunks from ${node} into ${artifact_archive}"
+    oc exec -n "${namespace}" "${pod}" -c profiler -- \
+        tar -C "${remote_dir}" -czf - . > "${artifact_archive}" || {
+        rm -f "${artifact_archive}"
+        echo "Failed to archive perf artifacts from ${node}" >&2
+    }
 done
 
 for pod in $(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
