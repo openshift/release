@@ -306,6 +306,46 @@ function render_osc_operator_chart() {
     helm_args+=("--set" "dev.enabled=false")
   fi
 
+  local identity_mode
+  identity_mode=$(oc get configmap osc-config -n default -o jsonpath='{.data.identityMode}' 2>/dev/null || echo "cco")
+
+  if [[ "${identity_mode}" == "sts" ]]; then
+    local provider
+    provider=$(get_cloud_provider)
+
+    case "${provider}" in
+      azure)
+        local client_id tenant_id subscription_id
+        client_id=$(oc_with_retry oc get configmap osc-identity -n default -o jsonpath='{.data.clientId}')
+        tenant_id=$(oc_with_retry oc get configmap osc-identity -n default -o jsonpath='{.data.tenantId}')
+        subscription_id=$(oc_with_retry oc get configmap osc-identity -n default -o jsonpath='{.data.subscriptionId}')
+
+        if [[ -z "${client_id}" || -z "${tenant_id}" || -z "${subscription_id}" ]]; then
+          echo ">>> ERROR: osc-identity ConfigMap missing required fields" >&2
+          return 1
+        fi
+
+        helm_args+=("--set-json" "subscription.config.env=[{\"name\":\"CLIENTID\",\"value\":\"${client_id}\"},{\"name\":\"TENANTID\",\"value\":\"${tenant_id}\"},{\"name\":\"SUBSCRIPTIONID\",\"value\":\"${subscription_id}\"}]")
+        echo ">>> Helm: STS/Azure subscription env vars injected (CLIENTID=${client_id})" >&2
+        ;;
+      aws)
+        if [[ ! -s "${SHARED_DIR}/osc-irsa-role-arn" ]]; then
+          echo ">>> ERROR: ${SHARED_DIR}/osc-irsa-role-arn not found" >&2
+          return 1
+        fi
+
+        local role_arn
+        role_arn=$(cat "${SHARED_DIR}/osc-irsa-role-arn")
+
+        helm_args+=("--set-json" "subscription.config.env=[{\"name\":\"ROLEARN\",\"value\":\"${role_arn}\"}]")
+        echo ">>> Helm: STS/AWS subscription env vars injected (ROLEARN=${role_arn})" >&2
+        ;;
+      *)
+        echo ">>> WARNING: STS mode not implemented for provider: ${provider}" >&2
+        ;;
+    esac
+  fi
+
   local helm_output
   if ! helm_output=$(helm template "${helm_args[@]}"); then
     echo ">>> ERROR: helm template failed" >&2
@@ -423,6 +463,29 @@ function render_osc_operands_chart() {
   echo "$helm_output"
 }
 
+function setup_sts_secrets() {
+  local identity_mode
+  identity_mode=$(oc get configmap osc-config -n default -o jsonpath='{.data.identityMode}' 2>/dev/null || echo "cco")
+
+  if [[ "${identity_mode}" != "sts" ]]; then
+    return 0
+  fi
+
+  local provider
+  provider=$(get_cloud_provider)
+
+  if [[ "${provider}" == "aws" ]] && [[ -s "${SHARED_DIR}/osc-irsa-role-arn" ]]; then
+    local role_arn
+    role_arn=$(cat "${SHARED_DIR}/osc-irsa-role-arn")
+
+    echo ">>> Creating peer-pods-image-creation-secret with IRSA credentials"
+    oc_with_retry oc create secret generic peer-pods-image-creation-secret \
+      --from-literal=AWS_ROLE_ARN="${role_arn}" \
+      --from-literal=AWS_WEB_IDENTITY_TOKEN_FILE="/var/run/secrets/openshift/serviceaccount/token" \
+      -n "${OSC_NAMESPACE}"
+  fi
+}
+
 function install_osc_operator() {
   local charts_dir="$1"
 
@@ -430,6 +493,8 @@ function install_osc_operator() {
 
   echo ">>> Creating namespace ${OSC_NAMESPACE}"
   oc create namespace "${OSC_NAMESPACE}" 2>/dev/null || true
+
+  setup_sts_secrets
 
   local operator_yaml="${SCRATCH}/operator-manifests.yaml"
   if ! render_osc_operator_chart "${charts_dir}" > "${operator_yaml}"; then
