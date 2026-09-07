@@ -20,7 +20,7 @@ git clone --depth 1 --branch "${branch}" "${repository}" /root/openperouter
 EOFSOURCE
 
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
-sleep 5h
+
 ssh "${SSHOPTS[@]}" "root@${IP}" bash -s << 'EOFDEPLOY'
 set -euo pipefail
 cd /root/dev-scripts
@@ -28,8 +28,19 @@ source common.sh
 source ocp_install_env.sh
 export KUBECONFIG="/root/dev-scripts/ocp/${CLUSTER_NAME}/auth/kubeconfig"
 
+echo "=== Setup extra networks ==="
+
 CONFIG=/root/dev-scripts/config_root.sh \
-  /root/openperouter/openshift/e2e/setup_extra_networks.sh
+bash /root/openperouter/openshift/e2e/setup_extra_networks.sh
+
+echo "=== Deploy frrk8s ==="
+
+bash /root/openperouter/openshift/e2e/deploy_frrk8s.sh
+
+echo "=== Enable routing ==="
+
+bash/root/openperouter/openshift/e2e/enable_routing.sh
+
 
 # Ensure namespace is privileged (router pods need host networking + nsenter)
 oc label --overwrite ns openshift-openperouter-system \
@@ -76,12 +87,13 @@ fi
 
 echo "All openperouter pods are running and ready"
 
+echo "=== Setup CLAB ==="
 bash /root/openperouter/openshift/e2e/setup-clab.sh
 
 
 
-###
-sleep 5h
+echo "=== Run e2e tests ==="
+
 cd /root/openperouter
 CONTAINER_RUNTIME=podman make e2etests TEST_ARGS="--nodelink-config=$(pwd)/openshift/e2e/nodelink.json --frrk8s-namespace=openshift-frr-k8s \
 --openperouter-namespace=openshift-openperouter-system" KUBECONFIG_PATH=$KUBECONFIG \
