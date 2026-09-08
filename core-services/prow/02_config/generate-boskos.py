@@ -410,6 +410,10 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
+    # Orange zone (OZ) VPN heterogeneous: s390x control plane + ARM64 workers (akvmocp03)
+    'libvirt-s390x-vpn-arm64-quota-slice': {
+        'libvirt-s390x-arm64-0-0': 1
+    },
     'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-s390x-vpn-oz-quota-slice': {},
     'libvirt-s390x-vpn-hcp-quota-slice': {},
