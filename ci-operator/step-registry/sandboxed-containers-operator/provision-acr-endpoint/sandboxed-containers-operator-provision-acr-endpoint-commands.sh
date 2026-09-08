@@ -26,6 +26,14 @@ ACR_RG="${ACR_RESOURCE_GROUP:-osc-ci-mirror-rg}"
 ACR_NAME="${ACR_NAME:-osccimirror}"
 ACR_LOCATION="${ACR_LOCATION:-eastus}"
 
+# ACR_NAME/ACR_RG are shared across all Azure restricted-network jobs
+# running concurrently (cheaper/faster than one ACR per run - Premium SKU
+# takes minutes to provision). That means multiple jobs can race on the
+# "does it exist yet?" check below and all decide to create it at once;
+# Azure accepts the first `az acr create` and rejects the rest with
+# "Conflict: Another operation is in progress". Treat that specific
+# error as "another job is creating it concurrently" and wait for it to
+# finish instead of failing.
 if az acr show --name "${ACR_NAME}" --resource-group "${ACR_RG}" &>/dev/null; then
     echo "ACR ${ACR_NAME} already exists"
     az acr update --name "${ACR_NAME}" --resource-group "${ACR_RG}" --admin-enabled true --sku Premium --anonymous-pull-enabled false --output none
@@ -34,12 +42,37 @@ else
     az group create --name "${ACR_RG}" --location "${ACR_LOCATION}" --output none
 
     echo "Creating ACR ${ACR_NAME}..."
-    az acr create \
+    set +o errexit
+    create_output=$(az acr create \
         --resource-group "${ACR_RG}" \
         --name "${ACR_NAME}" \
         --sku Premium \
         --admin-enabled true \
-        --output none
+        --output none 2>&1)
+    create_rc=$?
+    set -o errexit
+
+    if [[ ${create_rc} -ne 0 ]]; then
+        if echo "${create_output}" | grep -q "Another operation is in progress"; then
+            echo "Another job is already creating ${ACR_NAME}, waiting for it to become ready..."
+            for i in {1..30}; do
+                sleep 20
+                state=$(az acr show --name "${ACR_NAME}" --resource-group "${ACR_RG}" --query provisioningState -o tsv 2>/dev/null || echo "")
+                if [[ "${state}" == "Succeeded" ]]; then
+                    echo "ACR ${ACR_NAME} is ready (created by another job)"
+                    break
+                fi
+                echo "  still waiting (${i}/30, state=${state:-not found yet})..."
+            done
+            if [[ "${state:-}" != "Succeeded" ]]; then
+                echo "ERROR: ACR ${ACR_NAME} did not become ready after 10 minutes"
+                exit 1
+            fi
+        else
+            echo "${create_output}"
+            exit "${create_rc}"
+        fi
+    fi
 
     az acr update --name "${ACR_NAME}" --resource-group "${ACR_RG}" --anonymous-pull-enabled false --output none
 fi
