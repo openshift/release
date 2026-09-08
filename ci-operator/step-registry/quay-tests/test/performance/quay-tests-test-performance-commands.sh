@@ -26,7 +26,7 @@ curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
   --data-raw '{
         "name": "'"${quay_perf_organization}"'",
         "email": "testperf@testperf.com"
-    }' -k
+    }'
 
 oc new-project "$quay_perf_namespace"
 oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_namespace":default
@@ -66,7 +66,7 @@ metadata:
   labels:
     quay-perf-test-component: redis
 spec:
-  replicas: 1 
+  replicas: 1
   selector:
     matchLabels:
       quay-perf-test-component: redis
@@ -167,7 +167,7 @@ fi
 
 sleep 120 #wait pod start
 
-# Fetch UUID,JOB_START etc required data to dashboard 
+# Fetch UUID,JOB_START etc required data to dashboard
 TEST_UUID=$(oc logs "$quayperf_pod_name" -n "${quay_perf_namespace}" | grep 'test_uuid' | sed -n 's/^.*test_uuid=\s*\(\S*\).*$/\1/p')
 echo "job start: $start_time"
 
@@ -197,6 +197,6 @@ export CONCURRENCY
 export PUSH_PULL_NUMBERS
 export ADDITIONAL_PARAMS
 
-# Invoke index.sh to send data to dashboad http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/ 
+# Invoke index.sh to send data to dashboad http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
 source utility/e2e-benchmarking.sh || true
 echo "Quay performance test finised"
