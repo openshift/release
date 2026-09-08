@@ -56,7 +56,7 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.17"
+      name: "4.22"
       namespace: ocp
   latest-4-22:
     integration:
@@ -131,8 +131,6 @@ tests:
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
   steps:
     cluster_profile: aws-stackrox
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
     env:
       BASE_DOMAIN: perfscale.rox.systems
       COMPUTE_NODE_TYPE: m5.2xlarge
@@ -140,24 +138,13 @@ tests:
       SCAN_NAMESPACE: openshift-compliance
       SCANNER_NAMESPACE: openshift-compliance
     post:
-    - chain: gather-network
-    - chain: gather-core-dump
     - chain: ipi-deprovision
     pre:
     - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - ref: ipi-install-rbac
-    - ref: openshift-cluster-bot-rbac
-    - ref: ipi-install-hosted-loki
-    - ref: ipi-install-install-cli-4-22
-    - ref: ipi-install-times-collection
-    - ref: nodes-readiness
-    - ref: multiarch-validate-nodes
-    - ref: openshift-tests-extension-admission-crd-install
-    - ref: tls-13
+    - chain: ipi-install
     test:
     - as: test
-      cli: latest-4-22
+      cli: latest
       commands: make e2e-deployment
       dependencies:
       - env: IMAGE_FROM_CI
