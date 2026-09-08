@@ -1,0 +1,33 @@
+ref:
+  as: p2p-cnv-upgrade-survival-check
+  from: cli
+  commands: p2p-cnv-upgrade-survival-check-commands.sh
+  timeout: 10m0s
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Verify that CNV test VirtualMachines survived the OCP cluster upgrade.
+
+    This step checks all VMs created by p2p-create-migration-test-vm and confirms:
+    - VM resource still exists
+    - VMI (running instance) is present and in Running phase
+
+    Requires p2p-create-migration-test-vm to have run first (creates test-vm-1 .. test-vm-N).
+    Target kubeconfig: ${SHARED_DIR}/managed-cluster-kubeconfig (spoke cluster).
+
+    Env vars consumed:
+      CNV_TEST_VM_COUNT      - number of VMs to verify (default: 1, must match creation count)
+      CNV_TEST_VM_NAMESPACE  - namespace containing the test VMs (default: vm-migration-test)
+
+  env:
+  - name: CNV_TEST_VM_COUNT
+    default: "1"
+    documentation: |-
+      Number of test VMs to verify. Must match CNV_TEST_VM_COUNT from p2p-create-migration-test-vm.
+      When > 1, verifies test-vm-1 through test-vm-N.
+  - name: CNV_TEST_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Namespace containing the test VMs (must match CNV_TEST_VM_NAMESPACE from creation step).

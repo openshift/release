@@ -103,6 +103,9 @@ tests:
       CNV_POLICY_UPGRADE_APPROVAL: Manual
       CNV_SOURCE: production
       CNV_TARGET_MAJOR_MINOR: "4.22"
+      CNV_TEST_VM_COUNT: "5"
+      CNV_TEST_VM_IMAGE_TYPE: cirros
+      CNV_TEST_VM_STORAGE_CLASS: ocs-storagecluster-ceph-rbd-virtualization
       COMPUTE_NODE_TYPE: m6a.4xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       DR__RP__CR_COMP_NAME: lp-interop--ACM-Virt
@@ -119,6 +122,8 @@ tests:
               {"step": "acm-interop-p2p-spoke-upgrade-prehealthcheck", "failure_type": "all"     , "classification": "Spoke Pre-Upgrade Health Check"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "acm-interop-p2p-spoke-upgrade"         , "failure_type": "all"          , "classification": "Spoke OCP Upgrade"                               , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "acm-interop-p2p-spoke-upgrade-healthcheck", "failure_type": "all"        , "classification": "Spoke Post-Upgrade Health Check"                 , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "p2p-create-migration-test-vm"            , "failure_type": "all"          , "classification": "CNV VM Creation for Upgrade Test"                , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default"], "jira_component": ["CNV Virt-Cluster"]},
+              {"step": "p2p-cnv-upgrade-survival-check"          , "failure_type": "all"          , "classification": "CNV VM Survival Check After OCP Upgrade"        , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default"], "jira_component": ["CNV Virt-Cluster"]},
               {"step": "interop-opp-product-upgrade-acm"        , "failure_type": "all"          , "classification": "ACM Operator Upgrade"                                 , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "*openshift-virtualization-upgrade-prep"  , "failure_type": "all"          , "classification": "CNV Upgrade Prep Failure"  , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default"]                                                                                    , "jira_component": ["CNV Virt-Cluster"]},
               {"step": "*openshift-virtualization-upgrade-tests" , "failure_type": "test_failure" , "classification": "CNV Tests Failure"         , "group": { "name" : "lp-tests", "priority" : 3}, "jira_additional_labels": ["!default", "interop-tests"], "jira_assignee": "kbidarka@redhat.com", "jira_component": ["CNV Virt-Cluster"]},
@@ -182,12 +187,14 @@ tests:
     - ref: acm-fetch-managed-clusters
     - ref: p2p-install-odf-spokes
     - ref: p2p-acm-cnv-install-policy
+    - ref: p2p-create-migration-test-vm
     - ref: cucushift-upgrade-prehealthcheck
     - ref: acm-interop-p2p-cluster-upgrade
     - ref: cucushift-upgrade-healthcheck
     - ref: acm-interop-p2p-spoke-upgrade-prehealthcheck
     - ref: acm-interop-p2p-spoke-upgrade
     - ref: acm-interop-p2p-spoke-upgrade-healthcheck
+    - ref: p2p-cnv-upgrade-survival-check
     - ref: interop-opp-product-upgrade-acm
     - ref: interop-tests-openshift-virtualization-upgrade-prep
     - ref: interop-tests-openshift-virtualization-upgrade-tests

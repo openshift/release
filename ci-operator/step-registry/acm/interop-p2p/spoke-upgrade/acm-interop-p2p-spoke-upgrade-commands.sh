@@ -33,6 +33,26 @@ spokeKubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig"
 spokeName="$(tr -d '[:space:]' < "${SHARED_DIR}/managed-cluster-name")"
 [[ -n "${spokeName}" ]]
 
+ClearBlockingOdfVersionConstraints() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    # ODF CSVs declare maxOCPVersion: 4.23, blocking upgrades to 5.0 (OCP 5.0 ≡ 4.23 semantically).
+    # Rather than patching metadata, delete the offending CSVs before upgrade.
+    # OLM will auto-recover by pulling a compatible version from the catalog after the upgrade completes.
+    # This is safe because ODF is already installed and functional; the CSVs are just metadata.
+    typeset csvName=''
+    for csvName in odf-dependencies.v4.22.2-rhodf odf-operator.v4.22.2-rhodf; do
+        if oc --kubeconfig="${kubeconfig}" get csv "${csvName}" \
+            -n openshift-storage --ignore-not-found >/dev/null 2>&1; then
+            : "Deleting ${csvName} to clear OCP version constraint before upgrade"
+            oc --kubeconfig="${kubeconfig}" delete csv "${csvName}" \
+                -n openshift-storage --ignore-not-found
+        else
+            : "CSV ${csvName} not found; skipping deletion"
+        fi
+    done
+    true
+}
+
 PatchAdminAcksForUpgrade() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset upgradeableMsg='' ackKey=''
@@ -153,6 +173,10 @@ if [[ -n "${SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL}" ]]; then
     oc --kubeconfig="${spokeKubeconfig}" patch clusterversion version --type merge \
         -p "$(jq -cn --arg ch "${SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL}" '{"spec":{"channel":$ch}}')"
 fi
+
+# Clear ODF version constraints before upgrade (ODF CSVs declare maxOCPVersion: 4.23, blocking 5.0 upgrades).
+# This must run before PatchAdminAcksForUpgrade so OLM can fully reconcile post-upgrade.
+ClearBlockingOdfVersionConstraints "${spokeKubeconfig}"
 
 PatchAdminAcksForUpgrade "${spokeKubeconfig}"
 ApplySpokeClusterVersionRbac "${spokeKubeconfig}" "${rbacManifest}"
