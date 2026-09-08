@@ -21,6 +21,8 @@ EOFSOURCE
 
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
 
+sleep 5h
+
 ssh "${SSHOPTS[@]}" "root@${IP}" bash /dev/stdin << 'RUNTESTS'
 set -euo pipefail
 cd /root/dev-scripts
