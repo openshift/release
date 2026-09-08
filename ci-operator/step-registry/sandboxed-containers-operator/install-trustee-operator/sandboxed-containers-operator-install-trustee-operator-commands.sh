@@ -27,6 +27,10 @@
 
 set -euo pipefail
 
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 #========================================
 # Configuration
 #========================================
@@ -222,6 +226,13 @@ function render_trustee_operator_chart() {
     )
     echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, dev.enabled=false" >&2
     echo ">>> Note: Using existing 'redhat-operators' CatalogSource" >&2
+  fi
+
+  if [[ "${RESTRICTED_NETWORK:-}" == "yes" ]]; then
+    # Our own mirror-operator step already created IDMS/ITMS pointing to the
+    # mirror registry; the chart's copies point to quay.io and would conflict.
+    helm_args+=("--set" "dev.createMirrorSets=false")
+    echo ">>> Restricted network: dev.createMirrorSets=false" >&2
   fi
 
   # Render the chart and capture output for debugging
