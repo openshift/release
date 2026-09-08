@@ -205,6 +205,78 @@ EOF
   return 0
 }
 
+# After workers join: clear OVN port security on all passthrough localnet LSPs (EgressIP
+# SNAT) and enable forwarding on secondary virtio NICs inside guest ovn-kube-node pods.
+configure_localnet_multi_egress_prereqs() {
+  local multi_ns="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  local network_count="${LOCALNET_MULTI_NETWORK_COUNT:-4}"
+  local nested_kc="${SHARED_DIR}/nested_kubeconfig"
+  local running_count node ovn_pod lsp lsps ovn_ready ovn_node_pod i
+
+  if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
+    discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
+    if ! discover_ovn_container_names "${discovery_pod}"; then
+      echo "ERROR: Failed to discover OVN container names" >&2
+      return 1
+    fi
+  fi
+
+  echo "Waiting for ${HYPERSHIFT_NODE_COUNT} worker VMIs before egress interface setup..."
+  for _ in $(seq 1 60); do
+    running_count=$(oc get vmi -n "${multi_ns}" --no-headers 2>/dev/null | grep -c Running || true)
+    if [[ "${running_count}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+      echo "All ${running_count} worker VMIs are running"
+      break
+    fi
+    echo "Waiting for VMIs... (${running_count}/${HYPERSHIFT_NODE_COUNT} running)"
+    sleep 10
+  done
+
+  echo "Clearing port security on localnet-multi VM LSPs..."
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}')
+    [[ -z "${ovn_pod}" ]] && continue
+    lsps=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl --bare --columns=name find Logical_Switch_Port \
+        external_ids:namespace="${multi_ns}" \
+        external_ids:k8s.ovn.org/topology=localnet 2>/dev/null || true)
+    for lsp in ${lsps}; do
+      [[ -z "${lsp}" ]] && continue
+      oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+        ovn-nbctl clear Logical_Switch_Port "${lsp}" port_security 2>/dev/null || true
+      echo "Cleared port security on ${lsp} (hypervisor ${node})"
+    done
+  done
+
+  if [[ ! -f "${nested_kc}" ]]; then
+    echo "WARNING: Nested kubeconfig not found at ${nested_kc}; skipping secondary NIC forwarding"
+    return 0
+  fi
+
+  echo "Waiting for guest OVN node pods..."
+  for _ in $(seq 1 60); do
+    ovn_ready=$(KUBECONFIG="${nested_kc}" oc get pods -n openshift-ovn-kubernetes \
+      -l app=ovnkube-node --no-headers 2>/dev/null | grep -c Running || true)
+    if [[ "${ovn_ready}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+      echo "All ${ovn_ready} guest OVN node pods are running"
+      break
+    fi
+    echo "Waiting for guest OVN node pods... (${ovn_ready}/${HYPERSHIFT_NODE_COUNT} running)"
+    sleep 10
+  done
+
+  echo "Enabling IP forwarding on secondary guest NICs enp2s0..enp${network_count}s0..."
+  for ovn_node_pod in $(KUBECONFIG="${nested_kc}" oc get pods -n openshift-ovn-kubernetes \
+    -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    for i in $(seq 2 "${network_count}"); do
+      KUBECONFIG="${nested_kc}" oc exec -n openshift-ovn-kubernetes "${ovn_node_pod}" \
+        -c "${OVN_OVS_CONTAINER}" -- sysctl -w "net.ipv4.conf.enp${i}s0.forwarding=1" 2>/dev/null || true
+    done
+    echo "Enabled secondary NIC forwarding on guest ${ovn_node_pod}"
+  done
+}
+
 # Workers on localnet-multi can reach ignition/API via ostestbm DHCP, but kubelet may
 # fail first boot when node-sizing.env is not ready and crio is still inactive. Poll
 # worker VMIs over localnet-1 SSH and start crio/kubelet until the NodePool is Ready.
@@ -384,10 +456,10 @@ EOF
   elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
     # Multi-Network Localnet Architecture:
     # VMs get LOCALNET_MULTI_NETWORK_COUNT localnet interfaces with --attach-default-network=false
-    # (no pod network). enp1s0 → localnet-1 (physnet:br-ex) is a subnets-less passthrough:
-    # OVN does not run IPAM/DHCP; DHCP passes through to libvirt dnsmasq on ostestbm (192.168.111.1).
-    # enp2s0.. → localnet-2..N (physnet2..physnetN:br-ex) with OVN IPAM subnets (no gateway).
-    # Guest OVN picks enp1s0 as br-ex (default route via libvirt) → EgressIP SNAT works natively.
+    # (no pod network). Every localnet NAD (localnet-1..N) is subnets-less L2 passthrough to br-ex;
+    # OVN does not run IPAM/DHCP. Each virtio NIC (enp1s0..enpNs0) gets IPv4 via ostestbm
+    # libvirt dnsmasq (192.168.111.1, pool .100-.240). Guest OVN uses enp1s0 as br-ex for the
+    # default route; enp2s0.. carry additional addresses on the same L2 segment.
 
     ns="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
     NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
@@ -405,14 +477,6 @@ EOF
         echo "ERROR: Failed to discover OVN container names" >&2
         exit 1
       fi
-    fi
-
-    # Subnets apply to secondary NADs (localnet-2..N) only; primary localnet-1 has no subnets.
-    IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
-    SECONDARY_NETWORK_COUNT=$((NETWORK_COUNT - 1))
-    if [[ ${SECONDARY_NETWORK_COUNT} -gt 0 && ${#SUBNETS[@]} -lt ${SECONDARY_NETWORK_COUNT} ]]; then
-      echo "ERROR: LOCALNET_MULTI_SUBNETS has ${#SUBNETS[@]} entries but ${SECONDARY_NETWORK_COUNT} secondary networks need subnets"
-      exit 1
     fi
 
     # Add physnet2..physnetN bridge-mappings on all nodes.
@@ -459,12 +523,15 @@ EOF
       done
     fi
 
-    # Create localnet NADs: localnet-1 uses physnet (no subnets), localnet-2 uses physnet2, etc.
+    # Create localnet NADs: all subnets-less passthrough (physnet/physnet2..N → br-ex).
     for i in $(seq 1 "${NETWORK_COUNT}"); do
       NAD_NAME="localnet-${i}"
       if [[ ${i} -eq 1 ]]; then
         PHYSNET_NAME="physnet"
-        oc apply -f - <<EOF
+      else
+        PHYSNET_NAME="physnet${i}"
+      fi
+      oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
@@ -479,28 +546,7 @@ spec:
       "netAttachDefName": "${ns}/${NAD_NAME}"
   }'
 EOF
-        echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:br-ex, subnets-less passthrough → libvirt DHCP)"
-      else
-        PHYSNET_NAME="physnet${i}"
-        SUBNET="${SUBNETS[$((i - 2))]}"
-        oc apply -f - <<EOF
-apiVersion: "k8s.cni.cncf.io/v1"
-kind: NetworkAttachmentDefinition
-metadata:
-  name: ${NAD_NAME}
-  namespace: ${ns}
-spec:
-  config: '{
-      "cniVersion": "0.3.1",
-      "name": "${PHYSNET_NAME}",
-      "type": "ovn-k8s-cni-overlay",
-      "topology": "localnet",
-      "netAttachDefName": "${ns}/${NAD_NAME}",
-      "subnets": "${SUBNET}"
-  }'
-EOF
-        echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:br-ex, subnet ${SUBNET})"
-      fi
+      echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:br-ex, subnets-less passthrough → ostestbm DHCP)"
     done
 
     EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false"
@@ -620,6 +666,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   echo "Waiting for NodePool to become Ready"
   oc wait --timeout="${LOCALNET_MULTI_NODEPOOL_READY_TIMEOUT:-45m}" \
     --for=condition=Ready --namespace="${CLUSTER_NAMESPACE_PREFIX}" "nodepool/${CLUSTER_NAME}"
+  configure_localnet_multi_egress_prereqs
 fi
 
 # OVN-Kubernetes assigns IPs to localnet ports via IPAM but does not create
@@ -782,18 +829,12 @@ IPECHO_EOF
   echo "ip-echo localnet IP: ${IPECHO_LOCALNET_IP}:80"
   echo "${IPECHO_LOCALNET_IP}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
 elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
-  # Deploy ip-echo on a secondary subnetted localnet for EgressIP source-IP verification.
-  # Primary localnet-1 is behind libvirt NAT; a secondary OVN-subnetted NAD gives a known
-  # routable IP so the observed source is the EgressIP, not the NAT address.
-  IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
+  # Deploy ip-echo on a secondary passthrough localnet (default localnet-2) for EgressIP
+  # source-IP verification on a separate virtio segment from the guest primary NIC.
   IPECHO_NET_INDEX="${LOCALNET_MULTI_IPECHO_LOCALNET_INDEX:-2}"
-  if [[ ${IPECHO_NET_INDEX} -lt 2 ]]; then
-    echo "ERROR: LOCALNET_MULTI_IPECHO_LOCALNET_INDEX must be >= 2 (primary localnet is DHCP passthrough)" >&2
-    exit 1
-  fi
   NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
-  if [[ ${IPECHO_NET_INDEX} -gt ${NETWORK_COUNT} ]]; then
-    echo "ERROR: LOCALNET_MULTI_IPECHO_LOCALNET_INDEX=${IPECHO_NET_INDEX} exceeds LOCALNET_MULTI_NETWORK_COUNT=${NETWORK_COUNT}" >&2
+  if [[ ${IPECHO_NET_INDEX} -lt 1 || ${IPECHO_NET_INDEX} -gt ${NETWORK_COUNT} ]]; then
+    echo "ERROR: LOCALNET_MULTI_IPECHO_LOCALNET_INDEX=${IPECHO_NET_INDEX} must be between 1 and ${NETWORK_COUNT}" >&2
     exit 1
   fi
   IPECHO_NAD="localnet-${IPECHO_NET_INDEX}"
@@ -802,9 +843,8 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   else
     IPECHO_PHYSNET="physnet${IPECHO_NET_INDEX}"
   fi
-  IPECHO_SUBNET="${SUBNETS[$((IPECHO_NET_INDEX - 2))]}"
   IPECHO_NAMESPACE="egressip-ipecho-${CLUSTER_NAME}"
-  echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE} on ${IPECHO_NAD} (${IPECHO_SUBNET})..."
+  echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE} on ${IPECHO_NAD} (ostestbm DHCP)..."
   oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
   oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
 
@@ -820,8 +860,7 @@ spec:
       "name": "${IPECHO_PHYSNET}",
       "type": "ovn-k8s-cni-overlay",
       "topology": "localnet",
-      "netAttachDefName": "${IPECHO_NAMESPACE}/${IPECHO_NAD}",
-      "subnets": "${IPECHO_SUBNET}"
+      "netAttachDefName": "${IPECHO_NAMESPACE}/${IPECHO_NAD}"
   }'
 IPECHO_NAD_EOF
 
@@ -834,6 +873,23 @@ metadata:
   annotations:
     k8s.v1.cni.cncf.io/networks: ${IPECHO_NAD}
 spec:
+  initContainers:
+  - name: dhcp-localnet
+    image: registry.redhat.io/rhel9/support-tools:latest
+    command:
+    - /bin/bash
+    - -c
+    - |
+      set -euo pipefail
+      for _ in $(seq 1 60); do
+        ip link show net1 &>/dev/null && break
+        sleep 1
+      done
+      ip link set dev net1 up
+      dhclient -1 -v net1
+      ip -4 addr show dev net1
+    securityContext:
+      runAsUser: 0
   containers:
   - name: ip-echo
     image: quay.io/openshifttest/ip-echo:1.2.0
@@ -852,7 +908,15 @@ IPECHO_EOF
 
   IPECHO_LOCALNET_IP=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" \
     -o jsonpath='{.metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}' | \
-    python3 -c "import sys,json; nets=json.loads(sys.stdin.read()); [print(n['ips'][0]) for n in nets if 'localnet' in n.get('name','')]")
+    python3 -c "import sys,json; nets=json.loads(sys.stdin.read() or '[]'); ips=[n['ips'][0] for n in nets if 'localnet' in n.get('name','') and n.get('ips')]; print(ips[0] if ips else '')" 2>/dev/null || true)
+  if [[ -z "${IPECHO_LOCALNET_IP}" ]]; then
+    IPECHO_LOCALNET_IP=$(oc exec -n "${IPECHO_NAMESPACE}" egressip-ipecho -c ip-echo -- \
+      bash -c "ip -4 -o addr show dev net1 2>/dev/null | awk '{print \$4}' | cut -d/ -f1" 2>/dev/null || true)
+  fi
+  if [[ -z "${IPECHO_LOCALNET_IP}" ]]; then
+    echo "ERROR: could not determine ip-echo localnet IP on ${IPECHO_NAD}" >&2
+    exit 1
+  fi
   echo "ip-echo localnet IP: ${IPECHO_LOCALNET_IP}:80"
   echo "${IPECHO_LOCALNET_IP}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
 fi
