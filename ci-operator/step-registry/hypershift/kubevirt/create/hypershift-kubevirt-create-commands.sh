@@ -829,10 +829,12 @@ IPECHO_EOF
   echo "ip-echo localnet IP: ${IPECHO_LOCALNET_IP}:80"
   echo "${IPECHO_LOCALNET_IP}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
 elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
-  # Deploy ip-echo on a secondary passthrough localnet (default localnet-2) for EgressIP
-  # source-IP verification on a separate virtio segment from the guest primary NIC.
+  # Deploy ip-echo on a passthrough localnet (default localnet-2) for EgressIP source-IP
+  # verification. Passthrough NADs have no OVN IPAM; use a static Multus IP on net1 instead
+  # of DHCP (avoids dhclient/NET_ADMIN in an init container on the mgmt cluster).
   IPECHO_NET_INDEX="${LOCALNET_MULTI_IPECHO_LOCALNET_INDEX:-2}"
   NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
+  IPECHO_STATIC_IP="${LOCALNET_MULTI_IPECHO_STATIC_IP:-192.168.111.250/24}"
   if [[ ${IPECHO_NET_INDEX} -lt 1 || ${IPECHO_NET_INDEX} -gt ${NETWORK_COUNT} ]]; then
     echo "ERROR: LOCALNET_MULTI_IPECHO_LOCALNET_INDEX=${IPECHO_NET_INDEX} must be between 1 and ${NETWORK_COUNT}" >&2
     exit 1
@@ -844,7 +846,7 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
     IPECHO_PHYSNET="physnet${IPECHO_NET_INDEX}"
   fi
   IPECHO_NAMESPACE="egressip-ipecho-${CLUSTER_NAME}"
-  echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE} on ${IPECHO_NAD} (ostestbm DHCP)..."
+  echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE} on ${IPECHO_NAD} (static ${IPECHO_STATIC_IP})..."
   oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
   oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
 
@@ -871,25 +873,13 @@ metadata:
   name: egressip-ipecho
   namespace: ${IPECHO_NAMESPACE}
   annotations:
-    k8s.v1.cni.cncf.io/networks: ${IPECHO_NAD}
+    k8s.v1.cni.cncf.io/networks: |-
+      [{
+        "name": "${IPECHO_NAD}",
+        "interface": "net1",
+        "ips": ["${IPECHO_STATIC_IP}"]
+      }]
 spec:
-  initContainers:
-  - name: dhcp-localnet
-    image: registry.redhat.io/rhel9/support-tools:latest
-    command:
-    - /bin/bash
-    - -c
-    - |
-      set -euo pipefail
-      for _ in \$(seq 1 60); do
-        ip link show net1 &>/dev/null && break
-        sleep 1
-      done
-      ip link set dev net1 up
-      dhclient -1 -v net1
-      ip -4 addr show dev net1
-    securityContext:
-      runAsUser: 0
   containers:
   - name: ip-echo
     image: quay.io/openshifttest/ip-echo:1.2.0
@@ -906,12 +896,13 @@ IPECHO_EOF
   echo "Waiting for ip-echo pod to be ready..."
   oc wait --for=condition=Ready pod/egressip-ipecho -n "${IPECHO_NAMESPACE}" --timeout=120s
 
-  IPECHO_LOCALNET_IP=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" \
+  IPECHO_LOCALNET_IP="${IPECHO_STATIC_IP%%/*}"
+  observed_ip=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" \
     -o jsonpath='{.metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}' | \
     python3 -c "import sys,json; nets=json.loads(sys.stdin.read() or '[]'); ips=[n['ips'][0] for n in nets if 'localnet' in n.get('name','') and n.get('ips')]; print(ips[0] if ips else '')" 2>/dev/null || true)
-  if [[ -z "${IPECHO_LOCALNET_IP}" ]]; then
-    IPECHO_LOCALNET_IP=$(oc exec -n "${IPECHO_NAMESPACE}" egressip-ipecho -c ip-echo -- \
-      bash -c "ip -4 -o addr show dev net1 2>/dev/null | awk '{print \$4}' | cut -d/ -f1" 2>/dev/null || true)
+  if [[ -n "${observed_ip}" && "${observed_ip}" != "${IPECHO_LOCALNET_IP}" ]]; then
+    echo "WARNING: ip-echo network-status IP ${observed_ip} differs from configured ${IPECHO_LOCALNET_IP}" >&2
+    IPECHO_LOCALNET_IP="${observed_ip}"
   fi
   if [[ -z "${IPECHO_LOCALNET_IP}" ]]; then
     echo "ERROR: could not determine ip-echo localnet IP on ${IPECHO_NAD}" >&2
