@@ -127,7 +127,26 @@ if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
     exit 1
   fi
 
-  if ! gcloud auth print-identity-token >/dev/null; then
+  # A newly-created service-account key can take a short time to propagate to
+  # the IAM Credentials identity-token endpoint even after activation succeeds.
+  # Retry with exponential backoff so transient propagation failures do not
+  # fail the entire lifecycle step.
+  MAX_ID_TOKEN_ATTEMPTS=6
+  id_token_verified=false
+  for ((attempt = 1; attempt <= MAX_ID_TOKEN_ATTEMPTS; attempt++)); do
+    if gcloud auth print-identity-token >/dev/null; then
+      id_token_verified=true
+      break
+    fi
+
+    if (( attempt < MAX_ID_TOKEN_ATTEMPTS )); then
+      wait_seconds=$((5 << (attempt - 1)))
+      echo "Identity token generation failed; retrying in ${wait_seconds}s (attempt ${attempt}/${MAX_ID_TOKEN_ATTEMPTS})..."
+      sleep "${wait_seconds}"
+    fi
+  done
+
+  if [[ "${id_token_verified}" != true ]]; then
     echo "ERROR: Failed to generate an identity token for ${E2E_HC_SUBMITTER_SA}"
     exit 1
   fi
