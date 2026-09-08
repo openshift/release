@@ -1,31 +1,27 @@
+binary_build_commands: make build
 build_root:
   from_repository: true
 images:
   items:
-  - dockerfile_path: Dockerfile.assisted_installer_agent
-    to: assisted-installer-agent
+  - dockerfile_path: Dockerfile
+    to: cluster-api-provider-agent
 promotion:
   to:
   - name: "5.0"
     namespace: stolostron
-releases:
-  latest:
-    integration:
-      name: "5.0"
-      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: publish
+- as: mce-publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: assisted-installer-agent
+      SOURCE_IMAGE_REF: cluster-api-provider-agent
     env:
-      IMAGE_REPO: assisted-installer-agent
+      IMAGE_REPO: cluster-api-provider-agent
       OSCI_ENV_CONFIG: |
         OSCI_PUBLISH_DELAY=0
         OSCI_PIPELINE_PRODUCT_PREFIX=backplane
@@ -34,7 +30,7 @@ tests:
       RELEASE_REF: backplane-5.0
     workflow: ocm-ci-manifest-update
 zz_generated_metadata:
-  branch: release-ocm-5.0
+  branch: backplane-5.0
   org: openshift
-  repo: assisted-installer-agent
+  repo: cluster-api-provider-agent
   variant: mce
