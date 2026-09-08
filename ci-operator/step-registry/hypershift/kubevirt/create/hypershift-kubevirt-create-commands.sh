@@ -881,7 +881,7 @@ spec:
     - -c
     - |
       set -euo pipefail
-      for _ in $(seq 1 60); do
+      for _ in \$(seq 1 60); do
         ip link show net1 &>/dev/null && break
         sleep 1
       done
