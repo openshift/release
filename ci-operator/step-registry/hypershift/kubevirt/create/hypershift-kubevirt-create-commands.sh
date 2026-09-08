@@ -205,6 +205,48 @@ EOF
   return 0
 }
 
+# Pick a Ready mgmt node without DiskPressure for the ip-echo pod. The blanket
+# operator:Exists toleration would allow scheduling onto disk-pressured nodes and
+# immediate eviction. Optional args: space-separated node names to skip on retry.
+select_ipecho_node() {
+  local exclude_nodes="${1:-}"
+  if ! oc get nodes -o json | python3 -c "
+import json, sys
+exclude = set(filter(None, '''${exclude_nodes}'''.split()))
+for node in json.load(sys.stdin)['items']:
+    name = node['metadata']['name']
+    if name in exclude:
+        continue
+    conditions = {c['type']: c['status'] for c in node.get('status', {}).get('conditions', [])}
+    if conditions.get('Ready') != 'True':
+        continue
+    if conditions.get('DiskPressure') == 'True':
+        continue
+    print(name)
+    sys.exit(0)
+print('ERROR: no Ready node without DiskPressure for ip-echo', file=sys.stderr)
+sys.exit(1)
+"; then
+    return 1
+  fi
+}
+
+wait_for_ipecho_pod() {
+  local namespace="${1}"
+  local timeout_sec="${2:-120}"
+  local phase reason
+
+  if oc wait --for=condition=Ready pod/egressip-ipecho -n "${namespace}" --timeout="${timeout_sec}s"; then
+    return 0
+  fi
+
+  phase=$(oc get pod egressip-ipecho -n "${namespace}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+  reason=$(oc get pod egressip-ipecho -n "${namespace}" -o jsonpath='{.status.reason}' 2>/dev/null || true)
+  echo "ip-echo pod not Ready (phase=${phase}, reason=${reason})" >&2
+  oc describe pod egressip-ipecho -n "${namespace}" 2>&1 | tail -20 >&2 || true
+  return 1
+}
+
 # After workers join: clear OVN port security on all passthrough localnet LSPs (EgressIP
 # SNAT) and enable forwarding on secondary virtio NICs inside guest ovn-kube-node pods.
 configure_localnet_multi_egress_prereqs() {
@@ -798,6 +840,13 @@ spec:
   }'
 IPECHO_NAD_EOF
 
+  IPECHO_TRIED_NODES=""
+  for attempt in 1 2 3; do
+    IPECHO_NODE=$(select_ipecho_node "${IPECHO_TRIED_NODES}") || exit 1
+    IPECHO_TRIED_NODES="${IPECHO_TRIED_NODES} ${IPECHO_NODE}"
+    echo "Scheduling ip-echo on node ${IPECHO_NODE} (attempt ${attempt})"
+    oc delete pod egressip-ipecho -n "${IPECHO_NAMESPACE}" --ignore-not-found --force --grace-period=0 2>/dev/null || true
+
   oc apply -f - <<IPECHO_EOF
 apiVersion: v1
 kind: Pod
@@ -807,6 +856,7 @@ metadata:
   annotations:
     k8s.v1.cni.cncf.io/networks: localnet-network
 spec:
+  nodeName: ${IPECHO_NODE}
   containers:
   - name: ip-echo
     image: quay.io/openshifttest/ip-echo:1.2.0
@@ -817,11 +867,27 @@ spec:
       runAsUser: 0
   restartPolicy: Always
   tolerations:
-  - operator: Exists
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
 IPECHO_EOF
 
-  echo "Waiting for ip-echo pod to be ready..."
-  oc wait --for=condition=Ready pod/egressip-ipecho -n "${IPECHO_NAMESPACE}" --timeout=120s
+    if wait_for_ipecho_pod "${IPECHO_NAMESPACE}" 120; then
+      break
+    fi
+    reason=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" -o jsonpath='{.status.reason}' 2>/dev/null || true)
+    if [[ "${reason}" != "Evicted" ]]; then
+      exit 1
+    fi
+    echo "ip-echo evicted from ${IPECHO_NODE}, will retry on another node" >&2
+  done
+  if ! oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
+    echo "ERROR: ip-echo pod failed to become Ready after retries" >&2
+    exit 1
+  fi
 
   IPECHO_LOCALNET_IP=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" \
     -o jsonpath='{.metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}' | \
@@ -866,6 +932,13 @@ spec:
   }'
 IPECHO_NAD_EOF
 
+  IPECHO_TRIED_NODES=""
+  for attempt in 1 2 3; do
+    IPECHO_NODE=$(select_ipecho_node "${IPECHO_TRIED_NODES}") || exit 1
+    IPECHO_TRIED_NODES="${IPECHO_TRIED_NODES} ${IPECHO_NODE}"
+    echo "Scheduling ip-echo on node ${IPECHO_NODE} (attempt ${attempt})"
+    oc delete pod egressip-ipecho -n "${IPECHO_NAMESPACE}" --ignore-not-found --force --grace-period=0 2>/dev/null || true
+
   oc apply -f - <<IPECHO_EOF
 apiVersion: v1
 kind: Pod
@@ -880,6 +953,7 @@ metadata:
         "ips": ["${IPECHO_STATIC_IP}"]
       }]
 spec:
+  nodeName: ${IPECHO_NODE}
   containers:
   - name: ip-echo
     image: quay.io/openshifttest/ip-echo:1.2.0
@@ -890,11 +964,27 @@ spec:
       runAsUser: 0
   restartPolicy: Always
   tolerations:
-  - operator: Exists
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
 IPECHO_EOF
 
-  echo "Waiting for ip-echo pod to be ready..."
-  oc wait --for=condition=Ready pod/egressip-ipecho -n "${IPECHO_NAMESPACE}" --timeout=120s
+    if wait_for_ipecho_pod "${IPECHO_NAMESPACE}" 120; then
+      break
+    fi
+    reason=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" -o jsonpath='{.status.reason}' 2>/dev/null || true)
+    if [[ "${reason}" != "Evicted" ]]; then
+      exit 1
+    fi
+    echo "ip-echo evicted from ${IPECHO_NODE}, will retry on another node" >&2
+  done
+  if ! oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
+    echo "ERROR: ip-echo pod failed to become Ready after retries" >&2
+    exit 1
+  fi
 
   IPECHO_LOCALNET_IP="${IPECHO_STATIC_IP%%/*}"
   observed_ip=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" \
