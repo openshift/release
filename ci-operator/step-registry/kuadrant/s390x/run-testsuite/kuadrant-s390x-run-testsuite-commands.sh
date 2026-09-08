@@ -429,10 +429,12 @@ PATCH_EOF
 #     deny_email: first dinosaur test fail-opens because unauth /get is not a
 #       readiness signal (path-conditional AuthPolicy); poll /dinosaurs instead.
 #     UMA: Keycloak 26 resource_set body is object/_id; http.send 4xx must not
-#       500 Authorino (raise_error:false + _id extraction).
-#     cache: retry first /get while Authorino metadata HTTP returns 500.
+#       500 Authorino (raise_error:false + _id extraction). Empty rpt must not
+#       jwt.decode (Authorino 500 on first UMA request).
+#     cache: warmup /get until 200, then assert two GETs add zero MockServer hits.
 #     gateway AuthPolicy: wait for 401 in that test only — do not autouse client()
 #       on gateway/conftest.py (negative DNS/TLS tests never create a cert).
+#     sectionName HTTPRoute AuthPolicy and AuthPolicy retarget: same wasm wait.
 #     identical-hostnames: same wasm fail-open as deny_email.
 #     control-plane update: retry until a new reconcile span appears.
 #     dataplane tracing: send x-request-id (OCP Istio omits it on the response).
@@ -537,31 +539,88 @@ def patch_uma() -> None:
     _write(path, text, "uma raise_error + resource_id")
 
 
+def patch_uma_eval() -> None:
+    path = Path(
+        "testsuite/tests/singlecluster/authorino/authorization/opa/test_authorization_services.py"
+    )
+    if not path.exists():
+        print("SKIP uma eval test file missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: uma-allow" in text:
+        print("SKIP uma eval already patched")
+        return
+    text = text.replace(
+        '"method": "post","headers":{{"Content-Type":"application/x-www-form-urlencoded"}',
+        '"method": "post","raise_error":false,"headers":{{"Content-Type":"application/x-www-form-urlencoded"}',
+    )
+    text = text.replace(
+        '"method":"post","headers":{{"Authorization":',
+        '"method":"post","raise_error":false,"headers":{{"Authorization":',
+    )
+    old = """allow {{
+  permissions := object.get(io.jwt.decode(rpt)[1], "authorization", {{ "permissions": [] }}).permissions
+"""
+    new = """allow {{
+  # s390x-authorino-fix: uma-allow — empty rpt must not jwt.decode (Authorino 500)
+  rpt != ""
+  permissions := object.get(io.jwt.decode(rpt)[1], "authorization", {{ "permissions": [] }}).permissions
+"""
+    if old not in text:
+        print("WARN uma allow block not found")
+        return
+    _write(path, text.replace(old, new, 1), "uma raise_error posts + empty rpt guard")
+
+
 def patch_cache() -> None:
     path = Path("testsuite/tests/singlecluster/authorino/caching/metadata/test_caching.py")
     if not path.exists():
         print("SKIP cache test missing")
         return
     text = path.read_text()
-    if f"{MARKER}: cache" in text:
+    if f"{MARKER}: cache-warmup" in text:
         print("SKIP cache already patched")
         return
     old = """    response1 = client.get("/get", auth=auth)
     assert response1.status_code == 200
+    data = extract_response(response1)[module_label]["uuid"] % None
+    assert data is not None
+
+    response2 = client.get("/get", auth=auth)
+    assert response2.status_code == 200
+    cached_data = extract_response(response2)[module_label]["uuid"] % None
+    assert cached_data is not None
+
+    assert data == cached_data
+    assert len(mockserver.retrieve_requests(module_label)) == 1
 """
     new = """    import time
     deadline = time.time() + 60
-    response1 = client.get("/get", auth=auth)
-    # s390x-authorino-fix: cache — Authorino metadata HTTP 500 until MockServer expectation is live
-    while response1.status_code == 500 and time.time() < deadline:
+    warm = client.get("/get", auth=auth)
+    # s390x-authorino-fix: cache-warmup — 500 retries must not count as cache misses
+    while warm.status_code == 500 and time.time() < deadline:
         time.sleep(1)
-        response1 = client.get("/get", auth=auth)
+        warm = client.get("/get", auth=auth)
+    assert warm.status_code == 200
+    hits_after_warmup = len(mockserver.retrieve_requests(module_label))
+
+    response1 = client.get("/get", auth=auth)
     assert response1.status_code == 200
+    data = extract_response(response1)[module_label]["uuid"] % None
+    assert data is not None
+
+    response2 = client.get("/get", auth=auth)
+    assert response2.status_code == 200
+    cached_data = extract_response(response2)[module_label]["uuid"] % None
+    assert cached_data is not None
+
+    assert data == cached_data
+    assert len(mockserver.retrieve_requests(module_label)) == hits_after_warmup
 """
     if old not in text:
-        print("WARN cache first-request assert not found")
+        print("WARN cache measured-pair block not found")
         return
-    _write(path, text.replace(old, new, 1), "cache retry 500")
+    _write(path, text.replace(old, new, 1), "cache warmup then zero extra hits")
 
 
 def patch_gateway() -> None:
@@ -589,6 +648,76 @@ def patch_gateway() -> None:
         print("WARN gateway unauth 401 assert not found")
         return
     _write(path, text.replace(old, new, 1), "gateway AuthPolicy 401 wait")
+
+
+def patch_section_route_auth() -> None:
+    path = Path(
+        "testsuite/tests/singlecluster/gateway/authpolicy/test_authpolicy_section_targeting_http_route.py"
+    )
+    if not path.exists():
+        print("SKIP section-route auth test missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: section-route" in text:
+        print("SKIP section-route already patched")
+        return
+    old = """    # The '/get' path is handled by the targeted 'rule-1' and should require authentication.
+    response = client.get("/get")
+    assert response.status_code == 401
+"""
+    new = """    # The '/get' path is handled by the targeted 'rule-1' and should require authentication.
+    import time
+    deadline = time.time() + 60
+    response = client.get("/get")
+    # s390x-authorino-fix: section-route — sectionName AuthPolicy fail-opens until wasm catches up
+    while response.status_code != 401 and time.time() < deadline:
+        time.sleep(1)
+        response = client.get("/get")
+    assert response.status_code == 401
+"""
+    if old not in text:
+        print("WARN section-route unauth /get assert not found")
+        return
+    _write(path, text.replace(old, new, 1), "sectionName HTTPRoute 401 wait")
+
+
+def patch_authpolicy_retarget() -> None:
+    path = Path(
+        "testsuite/tests/singlecluster/gateway/reconciliation/change_targetref/test_update_authpolicy_target_ref.py"
+    )
+    if not path.exists():
+        print("SKIP authpolicy retarget test missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: auth-retarget" in text:
+        print("SKIP auth-retarget already patched")
+        return
+    old = """    change_target_ref(authorization, gateway2)
+
+    assert gateway.wait_until(lambda obj: not obj.is_affected_by(authorization))
+    assert gateway2.wait_until(lambda obj: obj.is_affected_by(authorization))
+
+    response = client2.get("/get", auth=auth)
+    assert response.status_code == 200
+"""
+    new = """    change_target_ref(authorization, gateway2)
+
+    assert gateway.wait_until(lambda obj: not obj.is_affected_by(authorization))
+    assert gateway2.wait_until(lambda obj: obj.is_affected_by(authorization))
+
+    import time
+    deadline = time.time() + 60
+    response = client2.get("/get", auth=auth)
+    # s390x-authorino-fix: auth-retarget — CR affected-by is ahead of gateway2 wasm (503)
+    while response.status_code != 200 and time.time() < deadline:
+        time.sleep(1)
+        response = client2.get("/get", auth=auth)
+    assert response.status_code == 200
+"""
+    if old not in text:
+        print("WARN authpolicy retarget client2 200 assert not found")
+        return
+    _write(path, text.replace(old, new, 1), "AuthPolicy retarget dataplane wait")
 
 
 def patch_identical_hostnames() -> None:
@@ -798,8 +927,11 @@ def patch_dns_delegate() -> None:
 if __name__ == "__main__":
     patch_dinosaur()
     patch_uma()
+    patch_uma_eval()
     patch_cache()
     patch_gateway()
+    patch_section_route_auth()
+    patch_authpolicy_retarget()
     patch_identical_hostnames()
     patch_control_plane_update()
     patch_dataplane_tracing()
