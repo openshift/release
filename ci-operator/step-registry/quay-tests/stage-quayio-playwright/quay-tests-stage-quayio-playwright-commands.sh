@@ -33,6 +33,7 @@ $WAS_TRACING && set -x
 export PLAYWRIGHT_BASE_URL="https://stage.quay.io"
 export REACT_QUAY_APP_API_URL="https://stage.quay.io"
 export QUAY_API_TOKEN
+export QUAY_BEARER_AUTH=1
 export QUAY_USER
 export QUAY_PASSWORD
 export PLAYWRIGHT_SKIP_WEBSERVER=1
