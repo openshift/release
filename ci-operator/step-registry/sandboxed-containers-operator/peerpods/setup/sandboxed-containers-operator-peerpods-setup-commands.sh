@@ -8,9 +8,14 @@ fi
 # Switch to a directory with rw permission
 cd /tmp || exit 1
 
-# Create the parameters configmap file in the shared directory so that others steps
-# can reference it.
-PP_CONFIGM_PATH="${SHARED_DIR:-$(pwd)}/peerpods-param-cm.yaml"
+OSC_NAMESPACE="${OSC_NAMESPACE:-openshift-sandboxed-containers-operator}"
+
+# Path for the peer-pods-cm manifest written to SHARED_DIR
+PP_CONFIGM_PATH="${SHARED_DIR:-$(pwd)}/peer-pods-cm.yaml"
+
+# Compute DISABLECVM: false for coco (confidential VMs needed), true otherwise
+DISABLECVM="true"
+[[ "${WORKLOAD_TO_TEST:-peer-pods}" == "coco" ]] && DISABLECVM="false"
 
 handle_aws() {
     local AWS_REGION
@@ -26,24 +31,13 @@ handle_aws() {
     AWS_SECRET_ACCESS_KEY="$(jq -r .data.aws_secret_access_key aws-creds.json | base64 -d)"
     export AWS_SECRET_ACCESS_KEY
 
-    cat<<-EOF > ./auth.json
-    {
-      "aws": {
-        "aws_access_key_id": "${AWS_ACCESS_KEY_ID}",
-        "aws_secret_access_key": "${AWS_SECRET_ACCESS_KEY}"
-      }
-    }
-EOF
-
-    oc create secret generic peerpods-param-secret --from-file=./auth.json -n default
-
     INSTANCE_ID=$(oc get nodes -l 'node-role.kubernetes.io/worker' -o jsonpath='{.items[0].spec.providerID}' | sed 's#[^ ]*/##g')
     AWS_REGION=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.aws.region}')
     AWS_SUBNET_ID=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].SubnetId' --region "${AWS_REGION}" --output text)
     AWS_VPC_ID=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].VpcId' --region "${AWS_REGION}" --output text)
     AWS_SG_IDS=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].SecurityGroups[*].GroupId' --region "${AWS_REGION}" --output text | tr ' \t' ',')
 
-    # Opening ports
+    # Opening ports for peer-pods VXLAN and CAA
     for AWS_SG_ID in ${AWS_SG_IDS/,/ }; do
         aws ec2 authorize-security-group-ingress \
             --group-id "${AWS_SG_ID}" --protocol tcp --port 15150 \
@@ -55,14 +49,28 @@ EOF
             --no-paginate
     done
 
+    # Write cloud params to SHARED_DIR for install-osc-operator to pass to Helm
+    cat > "${SHARED_DIR}/peerpods-params.env" <<EOF
+PP_CLOUD_PROVIDER=aws
+PP_AWS_REGION=${AWS_REGION}
+PP_AWS_SUBNET_ID=${AWS_SUBNET_ID}
+PP_AWS_VPC_ID=${AWS_VPC_ID}
+PP_AWS_SG_IDS=${AWS_SG_IDS}
+PP_VXLAN_PORT=9000
+PP_PODVM_INSTANCE_TYPE=t3.medium
+PP_PODVM_INSTANCE_TYPES=${PODVM_INSTANCE_TYPES}
+PP_PROXY_TIMEOUT=30m
+EOF
+
     cat <<-EOF > "${PP_CONFIGM_PATH}"
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: peerpods-param-cm
-      namespace: default
+      name: peer-pods-cm
+      namespace: ${OSC_NAMESPACE}
     data:
       CLOUD_PROVIDER: "aws"
+      DISABLECVM: "${DISABLECVM}"
       AWS_REGION: "${AWS_REGION}"
       AWS_SUBNET_ID: "${AWS_SUBNET_ID}"
       AWS_VPC_ID: "${AWS_VPC_ID}"
@@ -74,9 +82,7 @@ EOF
 EOF
 }
 
-# Create a SSH keys pair. The public key is exported and later set in
-# the peerpods-param-cm.
-#
+# Create a SSH key pair. The public key is exported and later set in peer-pods-cm.
 create_ssh_key() {
 
     # The following was copied from the ipi-config-sshkey step
@@ -128,7 +134,6 @@ handle_azure() {
     ###############################
     # Disable security to allow e2e
     ###############################
-    # Disable security
     oc adm policy add-scc-to-group privileged system:authenticated system:serviceaccounts
     oc adm policy add-scc-to-group anyuid system:authenticated system:serviceaccounts
     oc label --overwrite ns default pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/warn=baseline pod-security.kubernetes.io/audit=baseline
@@ -182,7 +187,6 @@ handle_azure() {
     AZURE_NSG_ID=$(az network nsg list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[].{Id:id}" --output tsv)
 
     # Downstream version generates podvm, no need to peer to eastus
-    # (keeping the PP_* variables to be close to upstream setup)
     PP_REGION="${AZURE_REGION}"
     PP_RESOURCE_GROUP="${AZURE_RESOURCE_GROUP}"
     PP_VNET_NAME="${AZURE_VNET_NAME}"
@@ -190,7 +194,7 @@ handle_azure() {
     PP_SUBNET_ID="${AZURE_SUBNET_ID}"
     PP_NSG_ID="${AZURE_NSG_ID}"
 
-    # Peer-pod requires gateway
+    # Peer-pod requires NAT gateway for egress
     az network public-ip create \
         --resource-group "${MANAGEMENT_RESOURCE_GROUP}" \
         --name MyPublicIP \
@@ -249,15 +253,30 @@ handle_azure() {
         echo "Peer-pods workload: using VM size ${PP_INSTANCE_SIZE} in region ${PP_REGION}"
     fi
 
-    # Creating peerpods-param-cm config map with all the cloud params needed for test case execution
+    # Write cloud params to SHARED_DIR for install-osc-operator to pass to Helm
+    cat > "${SHARED_DIR}/peerpods-params.env" <<EOF
+PP_CLOUD_PROVIDER=azure
+PP_AZURE_REGION=${PP_REGION}
+PP_AZURE_RESOURCE_GROUP=${PP_RESOURCE_GROUP}
+PP_AZURE_SUBNET_ID=${PP_SUBNET_ID}
+PP_AZURE_NSG_ID=${PP_NSG_ID}
+PP_AZURE_INSTANCE_SIZE=${PP_INSTANCE_SIZE}
+PP_AZURE_INSTANCE_SIZES=${PP_INSTANCE_SIZES}
+PP_AZURE_SSH_KEY_PUB=${PP_SSH_KEY_PUB}
+PP_VXLAN_PORT=9000
+PP_PROXY_TIMEOUT=30m
+EOF
+
+    # Creating peer-pods-cm config map with all the cloud params needed for test case execution
     cat <<- EOF > "${PP_CONFIGM_PATH}"
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: peerpods-param-cm
-      namespace: default
+      name: peer-pods-cm
+      namespace: ${OSC_NAMESPACE}
     data:
       CLOUD_PROVIDER: "azure"
+      DISABLECVM: "${DISABLECVM}"
       VXLAN_PORT: "9000"
       AZURE_INSTANCE_SIZE: "${PP_INSTANCE_SIZE}"
       AZURE_INSTANCE_SIZES: ${PP_INSTANCE_SIZES}
@@ -268,18 +287,10 @@ handle_azure() {
       AZURE_REGION: "${PP_REGION}"
       PROXY_TIMEOUT: "30m"
 EOF
-
-    if [[ -z "${AZURE_AUTH_LOCATION}" ]]; then
-        AZURE_AUTH_LOCATION="${PWD}/osServicePrincipal.json"
-        echo "{ \"clientId\": \"$AZURE_CLIENT_ID\", \"clientSecret\": \"$AZURE_CLIENT_SECRET\", \"tenantId\": \"$AZURE_TENANT_ID\" }" | \
-            jq > "${AZURE_AUTH_LOCATION}"
-    fi
-    # Creating peerpods-param-secret with the keys needed for test case execution
-    oc create secret generic peerpods-param-secret --from-file="${AZURE_AUTH_LOCATION}" -n default
 }
 
 provider="$(oc get infrastructure -n cluster -o json | jq '.items[].status.platformStatus.type'  | awk '{print tolower($0)}' | tr -d '"')"
-echo "Creating peerpods-param-cm for ${provider}"
+echo "Creating peer-pods-cm for ${provider}"
 case $provider in
     aws)
         handle_aws ;;
@@ -290,4 +301,7 @@ case $provider in
         exit 1 ;;
 esac
 
-oc create -f "${PP_CONFIGM_PATH}"
+echo "Creating namespace ${OSC_NAMESPACE}"
+oc create namespace "${OSC_NAMESPACE}" 2>/dev/null || true
+
+oc apply -f "${PP_CONFIGM_PATH}"

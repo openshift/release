@@ -355,52 +355,55 @@ function render_osc_operands_chart() {
     # Generate SSH keys via the chart's Makefile (ed25519, into files/ for .Files.Get)
     make -C "${operands_chart}" ssh-keys >&2
 
-    # Read cloud config from peerpods-param-cm (created by peerpods-param-cm step)
-    local cm_data
-    cm_data=$(oc get configmap peerpods-param-cm -n default -o json 2>/dev/null || echo "")
-    if [[ -n "${cm_data}" ]]; then
-      echo ">>> Reading cloud config from peerpods-param-cm" >&2
+    # Read cloud config from SHARED_DIR (written by peerpods-setup step)
+    local peerpods_env="${SHARED_DIR}/peerpods-params.env"
+    if [[ -f "${peerpods_env}" ]]; then
+      echo ">>> Reading cloud config from ${peerpods_env}" >&2
+      # shellcheck source=/dev/null
+      source "${peerpods_env}"
 
       # Extract common values
       local vxlan_port proxy_timeout
-      vxlan_port=$(echo "${cm_data}" | jq -r '.data.VXLAN_PORT // ""')
-      proxy_timeout=$(echo "${cm_data}" | jq -r '.data.PROXY_TIMEOUT // ""')
+      vxlan_port="${PP_VXLAN_PORT:-}"
+      proxy_timeout="${PP_PROXY_TIMEOUT:-}"
       [[ -n "${vxlan_port}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.VXLAN_PORT=${vxlan_port}")
       [[ -n "${proxy_timeout}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.PROXY_TIMEOUT=${proxy_timeout}")
 
       case "${provider}" in
         azure)
-          local azure_subnet_id azure_nsg_id azure_resource_group azure_region azure_instance_size
-          azure_subnet_id=$(echo "${cm_data}" | jq -r '.data.AZURE_SUBNET_ID // ""')
-          azure_nsg_id=$(echo "${cm_data}" | jq -r '.data.AZURE_NSG_ID // ""')
-          azure_resource_group=$(echo "${cm_data}" | jq -r '.data.AZURE_RESOURCE_GROUP // ""')
-          azure_region=$(echo "${cm_data}" | jq -r '.data.AZURE_REGION // ""')
-          azure_instance_size=$(echo "${cm_data}" | jq -r '.data.AZURE_INSTANCE_SIZE // ""')
+          local azure_subnet_id azure_nsg_id azure_resource_group azure_region azure_instance_size azure_ssh_key_pub
+          azure_subnet_id="${PP_AZURE_SUBNET_ID:-}"
+          azure_nsg_id="${PP_AZURE_NSG_ID:-}"
+          azure_resource_group="${PP_AZURE_RESOURCE_GROUP:-}"
+          azure_region="${PP_AZURE_REGION:-}"
+          azure_instance_size="${PP_AZURE_INSTANCE_SIZE:-}"
+          azure_ssh_key_pub="${PP_AZURE_SSH_KEY_PUB:-}"
           [[ -n "${azure_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_SUBNET_ID=${azure_subnet_id}")
           [[ -n "${azure_nsg_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_NSG_ID=${azure_nsg_id}")
           [[ -n "${azure_resource_group}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_RESOURCE_GROUP=${azure_resource_group}")
           [[ -n "${azure_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_REGION=${azure_region}")
           [[ -n "${azure_instance_size}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZE=${azure_instance_size}") || true
+          [[ -n "${azure_ssh_key_pub}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_SSH_KEY_PUB=${azure_ssh_key_pub}") || true
           ;;
         aws)
           local aws_region aws_subnet_id aws_vpc_id aws_sg_ids podvm_instance_type
-          aws_region=$(echo "${cm_data}" | jq -r '.data.AWS_REGION // ""')
-          aws_subnet_id=$(echo "${cm_data}" | jq -r '.data.AWS_SUBNET_ID // ""')
-          aws_vpc_id=$(echo "${cm_data}" | jq -r '.data.AWS_VPC_ID // ""')
-          aws_sg_ids=$(echo "${cm_data}" | jq -r '.data.AWS_SG_IDS // ""')
-          podvm_instance_type=$(echo "${cm_data}" | jq -r '.data.PODVM_INSTANCE_TYPE // ""')
+          aws_region="${PP_AWS_REGION:-}"
+          aws_subnet_id="${PP_AWS_SUBNET_ID:-}"
+          aws_vpc_id="${PP_AWS_VPC_ID:-}"
+          aws_sg_ids="${PP_AWS_SG_IDS:-}"
+          podvm_instance_type="${PP_PODVM_INSTANCE_TYPE:-}"
           [[ -n "${aws_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_REGION=${aws_region}")
           [[ -n "${aws_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SUBNET_ID=${aws_subnet_id}")
           [[ -n "${aws_vpc_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_VPC_ID=${aws_vpc_id}")
-          [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids}")
+          [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids//,/\\,}")
           [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}") || true
           ;;
         gcp)
           local gcp_project_id gcp_zone gcp_network gcp_machine_type
-          gcp_project_id=$(echo "${cm_data}" | jq -r '.data.GCP_PROJECT_ID // ""')
-          gcp_zone=$(echo "${cm_data}" | jq -r '.data.GCP_ZONE // ""')
-          gcp_network=$(echo "${cm_data}" | jq -r '.data.GCP_NETWORK // ""')
-          gcp_machine_type=$(echo "${cm_data}" | jq -r '.data.GCP_MACHINE_TYPE // ""')
+          gcp_project_id="${PP_GCP_PROJECT_ID:-}"
+          gcp_zone="${PP_GCP_ZONE:-}"
+          gcp_network="${PP_GCP_NETWORK:-}"
+          gcp_machine_type="${PP_GCP_MACHINE_TYPE:-}"
           [[ -n "${gcp_project_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_PROJECT_ID=${gcp_project_id}")
           [[ -n "${gcp_zone}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_ZONE=${gcp_zone}")
           [[ -n "${gcp_network}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_NETWORK=${gcp_network}")
@@ -408,7 +411,7 @@ function render_osc_operands_chart() {
           ;;
       esac
     else
-      echo ">>> WARNING: peerpods-param-cm not found in default namespace" >&2
+      echo ">>> WARNING: ${peerpods_env} not found, skipping peer-pods cloud config" >&2
     fi
   else
     helm_args+=("--set" "peerpods.enabled=false")
@@ -557,94 +560,6 @@ function install_osc_operands() {
   oc_with_retry oc apply -f "${operands_yaml}"
 }
 
-function create_peer_pods_secret() {
-  echo ">>> Creating peer-pods-secret in ${OSC_NAMESPACE}"
-
-  # Check if secret already exists
-  if oc get secret peer-pods-secret -n "${OSC_NAMESPACE}" &>/dev/null; then
-    echo ">>> peer-pods-secret already exists, skipping"
-    return 0
-  fi
-
-  # Detect identity mode from osc-config or default to manual
-  local identity_mode
-  identity_mode=$(oc get configmap osc-config -n default -o jsonpath='{.data.identityMode}' 2>/dev/null || echo "manual")
-
-  case "${identity_mode}" in
-    cco)
-      echo ">>> Identity mode: cco (Cloud Credential Operator handles credentials)"
-      return 0
-      ;;
-    sts)
-      echo ">>> Identity mode: sts (credentials via subscription environment)"
-      return 0
-      ;;
-    manual|*)
-      echo ">>> Identity mode: manual (copying credentials from peerpods-param-secret)"
-      ;;
-  esac
-
-  # Read peerpods-param-secret from default namespace
-  if ! oc get secret peerpods-param-secret -n default &>/dev/null; then
-    echo ">>> WARNING: peerpods-param-secret not found in default namespace"
-    return 0
-  fi
-
-  local provider
-  provider=$(get_cloud_provider)
-
-  case "${provider}" in
-    azure)
-      # Extract Azure service principal credentials
-      local sp_json
-      sp_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.osServicePrincipal\.json}' 2>/dev/null || echo "")
-      if [[ -z "${sp_json}" ]]; then
-        # Try auth.json format
-        sp_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.auth\.json}' 2>/dev/null || echo "")
-      fi
-
-      if [[ -n "${sp_json}" ]]; then
-        local decoded
-        decoded=$(echo "${sp_json}" | base64 -d)
-        local client_id client_secret tenant_id
-        client_id=$(echo "${decoded}" | jq -r '.clientId // .azure.azure_client_id // ""')
-        client_secret=$(echo "${decoded}" | jq -r '.clientSecret // .azure.azure_client_secret // ""')
-        tenant_id=$(echo "${decoded}" | jq -r '.tenantId // .azure.azure_tenant_id // ""')
-
-        local subscription_id
-        subscription_id=$(oc get secret azure-credentials -n kube-system -o jsonpath='{.data.azure_subscription_id}' 2>/dev/null | base64 -d || echo "")
-
-        set +x
-        oc_with_retry oc create secret generic peer-pods-secret \
-          -n "${OSC_NAMESPACE}" \
-          --from-literal="AZURE_CLIENT_ID=${client_id}" \
-          --from-literal="AZURE_CLIENT_SECRET=${client_secret}" \
-          --from-literal="AZURE_TENANT_ID=${tenant_id}" \
-          --from-literal="AZURE_SUBSCRIPTION_ID=${subscription_id}"
-      else
-        echo ">>> WARNING: Could not extract Azure credentials from peerpods-param-secret"
-      fi
-      ;;
-    aws)
-      # Extract AWS credentials
-      local auth_json
-      auth_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.auth\.json}' 2>/dev/null || echo "")
-      if [[ -n "${auth_json}" ]]; then
-        echo "${auth_json}" | base64 -d > "${SCRATCH}/auth.json"
-        oc_with_retry oc create secret generic peer-pods-secret \
-          -n "${OSC_NAMESPACE}" \
-          --from-file="${SCRATCH}/auth.json"
-        rm -f "${SCRATCH}/auth.json"
-      else
-        echo ">>> WARNING: Could not extract AWS credentials from peerpods-param-secret"
-      fi
-      ;;
-    *)
-      echo ">>> WARNING: peer-pods-secret creation not implemented for provider: ${provider}"
-      ;;
-  esac
-}
-
 function wait_for_kataconfig() {
   echo ">>> Waiting for KataConfig to be ready (this may take up to 2 hours for node reboots)"
 
@@ -734,10 +649,6 @@ install_osc_operator "${CHARTS_DIR}"
 wait_for_operator
 
 # Phase 4: Install operands
-if [[ "${ENABLEPEERPODS}" == "true" ]]; then
-  create_peer_pods_secret
-fi
-
 install_osc_operands "${CHARTS_DIR}"
 wait_for_kataconfig
 
