@@ -158,16 +158,16 @@ cp "${WORK_DIR}/vars.yaml" "${ARTIFACT_DIR}/vars.yaml"
 
 echo "Installing Ansible collections"
 retry_cmd() {
-    local attempt
-    for attempt in 1 2 3; do
+    local attempt max_attempts=5
+    for attempt in $(seq 1 "$max_attempts"); do
         if "$@"; then
             return 0
         fi
-        if [[ "$attempt" == 3 ]]; then
+        if [[ "$attempt" == "$max_attempts" ]]; then
             return 1
         fi
-        echo "Command failed, retrying ($attempt/3): $*"
-        sleep 10
+        echo "Command failed, retrying ($attempt/$max_attempts): $*"
+        sleep 30
     done
 }
 retry_cmd ansible-galaxy install emilienm.routed_lb,1.0.1
