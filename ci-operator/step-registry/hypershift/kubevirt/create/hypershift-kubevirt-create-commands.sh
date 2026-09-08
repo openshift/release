@@ -252,41 +252,19 @@ if [[ "${CNI_PROVIDER}" == "cilium" ]]; then
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: virt-launcher-override
+  name: virt-launcher-egress
   namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
   endpointSelector:
     matchLabels:
       k8s:kubevirt.io: virt-launcher
   egress:
-    # In pure Kubernetes semantics, 0.0.0.0/0 excluding the Pod and Service CIDRs would include 192.168.111.4. However, Cilium classifies this peer as the
+    # In pure Kubernetes semantics, 0.0.0.0/0 excluding the Pod and Service CIDRs
+    # would include 192.168.111.4. However, Cilium classifies this peer as the
     # host identity. CIDR/ipBlock rules do not match Cilium-managed host identities.
-    # Cilium documents this limitation.
     - toEntities:
         - world
         - host
-    # Same-namespace selected pods.
-    - toEndpoints:
-        - matchLabels:
-            k8s:kubevirt.io: virt-launcher
-        - matchLabels:
-            k8s:hypershift.openshift.io/control-plane-component: kube-apiserver
-        - matchLabels:
-            k8s:hypershift.openshift.io/control-plane-component: oauth-openshift
-        - matchLabels:
-            k8s:app: ignition-server-proxy
-    # Cross-namespace selected pods.
-    - toEndpoints:
-        - matchLabels:
-            k8s:io.kubernetes.pod.namespace: openshift-ingress
-            k8s:ingresscontroller.operator.openshift.io/deployment-ingresscontroller: default
-    - toServices:
-        - k8sService:
-            serviceName: dns-default
-            namespace: openshift-dns
-  ingress:
-  - fromEntities:
-      - all
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
