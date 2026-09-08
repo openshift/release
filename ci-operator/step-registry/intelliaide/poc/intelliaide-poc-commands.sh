@@ -46,20 +46,42 @@ echo "=== Phase 1: Intelliaide-style GCP token acquisition ==="
 
 python3 <<'PYEOF'
 import os
+import subprocess
 import sys
 
-try:
-    import google.auth
-    import google.auth.transport.requests
-except ImportError:
-    print("Installing google-auth for Intelliaide-compatible ADC check...")
-    import subprocess
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "-q", "google-auth"],
-        stdout=subprocess.DEVNULL,
-    )
-    import google.auth
-    import google.auth.transport.requests
+PYDEPS = "/tmp/intelliaide-poc-pydeps"
+
+
+def load_google_auth():
+    try:
+        import google.auth
+        import google.auth.transport.requests
+        return google.auth, google.auth.transport.requests
+    except ImportError:
+        print("Installing google-auth into isolated path for Intelliaide-compatible ADC check...")
+        os.makedirs(PYDEPS, exist_ok=True)
+        subprocess.check_call(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "-q",
+                "--disable-pip-version-check",
+                "--target",
+                PYDEPS,
+                "google-auth",
+                "requests",
+            ],
+        )
+        if PYDEPS not in sys.path:
+            sys.path.insert(0, PYDEPS)
+        import google.auth
+        import google.auth.transport.requests
+        return google.auth, google.auth.transport.requests
+
+
+google_auth, google_requests = load_google_auth()
 
 creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
 if not creds_path or not os.path.isfile(creds_path):
@@ -67,8 +89,8 @@ if not creds_path or not os.path.isfile(creds_path):
     sys.exit(1)
 
 scopes = ["https://www.googleapis.com/auth/cloud-platform"]
-credentials, project = google.auth.default(scopes=scopes)
-credentials.refresh(google.auth.transport.requests.Request())
+credentials, project = google_auth.default(scopes=scopes)
+credentials.refresh(google_requests.Request())
 if not credentials.token:
     print("ERROR: google-auth returned empty token")
     sys.exit(1)
