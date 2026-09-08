@@ -10,7 +10,7 @@
 # Uses only unprivileged oc commands (no node debug sessions).
 # ---------------------------------------------------------------------------
 
-set -uo pipefail
+set -uo pipefail; shopt -s inherit_errexit
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"

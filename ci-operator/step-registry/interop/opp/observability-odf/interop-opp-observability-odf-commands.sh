@@ -97,6 +97,7 @@ function CollectExitArtifacts () {
     true
 }
 
+# shellcheck disable=SC2317
 _propagate_junit () {
     mkdir -p "${SHARED_DIR}/junit"
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true

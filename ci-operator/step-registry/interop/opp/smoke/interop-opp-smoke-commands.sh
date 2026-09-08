@@ -1,6 +1,5 @@
 #!/bin/bash
-set -euxo pipefail
-shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
 # OPP post-upgrade smoke tests

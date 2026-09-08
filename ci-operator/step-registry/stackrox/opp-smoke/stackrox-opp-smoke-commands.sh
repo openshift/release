@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+# shellcheck disable=SC2317
 _propagate_junit () {
     mkdir -p "${SHARED_DIR}/junit"
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
@@ -43,7 +44,7 @@ cd /tmp/stackrox/qa-tests-backend/src/main/proto
 typeset target=''
 for link in api internalapi storage test tools; do
     if [[ -L "${link}" ]]; then
-        target=$(readlink -f "${link}")
+        target="$(readlink -f "${link}")"
         rm "${link}"
         cp -r "${target}" "${link}"
     fi

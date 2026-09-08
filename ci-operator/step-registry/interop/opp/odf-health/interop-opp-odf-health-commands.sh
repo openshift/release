@@ -100,6 +100,7 @@ function CollectExitArtifacts () {
     true
 }
 
+# shellcheck disable=SC2317
 _propagate_junit () {
     mkdir -p "${SHARED_DIR}/junit"
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
@@ -433,7 +434,7 @@ EOF
     typeset s3Result=""
     typeset -i podWait=$(( NOOBAA_S3_TIMEOUT + 60 ))
     typeset xtrace=""
-    [[ "$-" == *x* ]] && xtrace="set -x" || xtrace="set +x"
+    [[ "${-}" == *x* ]] && xtrace="set -x" || xtrace="set +x"
     set +x
     if echo "${podManifest}" | oc apply -f -; then
         ${xtrace}

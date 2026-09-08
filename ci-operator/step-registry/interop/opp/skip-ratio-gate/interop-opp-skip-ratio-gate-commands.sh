@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -euo pipefail; shopt -s inherit_errexit
 
 # Wrapper: exec into a pure-stdlib Python script that scans JUnit XML
 # files, computes the overall skip ratio, and optionally fails the step

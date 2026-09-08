@@ -1,13 +1,14 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+# shellcheck disable=SC2317
 _propagate_junit () {
     mkdir -p "${SHARED_DIR}/junit"
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 trap _propagate_junit EXIT
 
-if [ "${MAP_TESTS}" = "true" ]; then
+if [[ "${MAP_TESTS}" = "true" ]]; then
     eval "$(
         typeset -a _fURL=()
         type -t wget 1>/dev/null && _fURL=(wget --timeout=30 -qO-) || _fURL=(curl --connect-timeout 10 --max-time 30 -fsSL)
@@ -29,12 +30,12 @@ typeset secretsDir="/tmp/secrets"
 
 # Get the creds from ACMQE CI vault and run the automation on pre-exisiting HUB
 SKIP_OCP_DEPLOY="false"
-if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
-    echo "------------ Skipping OCP Deploy = $SKIP_OCP_DEPLOY ------------"
-    cp ${secretsDir}/ci/kubeconfig $SHARED_DIR/kubeconfig
-    cp ${secretsDir}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
-    cp ${secretsDir}/ci/metadata $SHARED_DIR/metadata.json
-fi 
+if [[ "${SKIP_OCP_DEPLOY}" == "true" ]]; then
+    echo "------------ Skipping OCP Deploy = ${SKIP_OCP_DEPLOY} ------------"
+    cp "${secretsDir}/ci/kubeconfig" "${SHARED_DIR}/kubeconfig"
+    cp "${secretsDir}/ci/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
+    cp "${secretsDir}/ci/metadata" "${SHARED_DIR}/metadata.json"
+fi
 
 : Copy kubeconfig to default location for kubectl/oc
 mkdir -p ~/.kube
@@ -79,8 +80,8 @@ if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 fi
 
 : Copy the test cases results to an external directory
-cp -r tests/pkg/tests $ARTIFACT_DIR/
+cp -r tests/pkg/tests "${ARTIFACT_DIR}/"
 
-mv $ARTIFACT_DIR/tests/results.xml $ARTIFACT_DIR/tests/junit_results.xml
+mv "${ARTIFACT_DIR}/tests/results.xml" "${ARTIFACT_DIR}/tests/junit_results.xml"
 
 true

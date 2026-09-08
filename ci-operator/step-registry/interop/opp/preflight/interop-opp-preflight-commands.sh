@@ -23,6 +23,7 @@ mkdir -p "${REPORT_DIR}"
 typeset -i CHECKS_FAILED=0
 typeset -i EXIT_CODE=0
 
+# shellcheck disable=SC2317
 function DebugOnExit () {
     if (( EXIT_CODE != 0 )); then
         : "### DEBUG: Pre-flight failure diagnostics ###"
