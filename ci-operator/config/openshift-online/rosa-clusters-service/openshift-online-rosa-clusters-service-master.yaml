@@ -38,12 +38,18 @@ resources:
       cpu: "3"
       memory: 6Gi
 tests:
-- as: pr-check-check-coverage
+- as: pr-check-unit
+  commands: unset GOFLAGS && make test
+  container:
+    from: src
+- always_run: false
+  as: pr-check-check-coverage
   commands: |
     set -x
     ./pr_check.sh --check-coverage
   container:
     from: golang-plus
+  optional: true
   restrict_network_access: false
 - as: pr-check-check-migrations
   commands: |
