@@ -1,0 +1,26 @@
+workflow:
+  as: hypershift-mce-power-clusterbot
+  documentation: |-
+    The hypershift-mce-power-clusterbot workflow provisions an ephemeral HyperShift Agent cluster
+    on Power (ppc64le) workers for use with cluster-bot. It provisions the management cluster on AWS
+    via MCE, creates the hosted cluster and Power workers, then waits for user interaction before
+    cleaning up. No conformance tests are run; the test step is replaced with clusterbot-wait.
+  steps:
+    pre:
+      - ref: ingress-aws-nlb-manifest
+      - chain: ipi-aws-pre
+      - ref: hypershift-mce-install
+      - ref: hypershift-mce-conf-os-images
+      - chain: hypershift-mce-power-create
+    test:
+      - ref: clusterbot-wait
+    post:
+      - ref: hypershift-mce-dump
+      - ref: hypershift-mce-power-destroy
+      - chain: ipi-aws-post
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      CLUSTERS_NAMESPACE: "local-cluster"
+      IS_HETEROGENEOUS: "no"
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
