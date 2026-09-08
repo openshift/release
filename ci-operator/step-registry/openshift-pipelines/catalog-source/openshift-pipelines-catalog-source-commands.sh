@@ -6,8 +6,9 @@ if [[ -z "${CATALOG_INDEX_IMAGE:-}" ]]; then
     exit 1
 fi
 
+# Step 1: Apply ImageDigestMirrorSet
 echo "Creating ImageDigestMirrorSet for OpenShift Pipelines..."
-oc apply -f - <<EOF
+oc --request-timeout=30s apply -f - <<EOF
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
 metadata:
@@ -22,6 +23,7 @@ spec:
     - quay.io/openshift-pipeline
 EOF
 
+# Step 2: Wait for MachineConfigPool to settle after IDMS apply
 echo "Waiting for MachineConfigPool to finish updating after IDMS apply..."
 for i in $(seq 1 60); do
     UPDATING=$(oc --request-timeout=12s get mcp worker \
@@ -52,9 +54,10 @@ for i in $(seq 1 60); do
     sleep 10
 done
 
+# Step 3: Create CatalogSource (after IDMS is active on nodes)
 echo "Creating CatalogSource '${CATALOG_SOURCE_NAME}' with index image: ${CATALOG_INDEX_IMAGE}"
 
-oc apply -f - <<EOF
+oc --request-timeout=30s apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -69,6 +72,7 @@ spec:
     securityContextConfig: restricted
 EOF
 
+# Step 4: Wait for CatalogSource to become READY
 echo "Waiting for CatalogSource '${CATALOG_SOURCE_NAME}' to become READY..."
 for i in $(seq 1 60); do
     STATE=$(oc --request-timeout=12s get catalogsource "${CATALOG_SOURCE_NAME}" \
@@ -83,12 +87,21 @@ for i in $(seq 1 60); do
 done
 
 echo "ERROR: CatalogSource '${CATALOG_SOURCE_NAME}' did not become READY within 5 minutes"
-echo "CatalogSource status:"
-oc --request-timeout=12s get catalogsource "${CATALOG_SOURCE_NAME}" -n openshift-marketplace \
-    -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true
 echo ""
-echo "CatalogSource conditions:"
-oc --request-timeout=12s get catalogsource "${CATALOG_SOURCE_NAME}" -n openshift-marketplace \
-    -o jsonpath='{.status.conditions[*].message}' 2>/dev/null || true
+echo "--- CatalogSource status ---"
+oc --request-timeout=12s get catalogsource "${CATALOG_SOURCE_NAME}" -n openshift-marketplace -o yaml 2>/dev/null || true
+echo ""
+echo "--- CatalogSource pod status ---"
+oc --request-timeout=12s get pods -n openshift-marketplace -l "olm.catalogSource=${CATALOG_SOURCE_NAME}" -o wide 2>/dev/null || true
+echo ""
+echo "--- CatalogSource pod logs ---"
+POD=$(oc --request-timeout=12s get pods -n openshift-marketplace -l "olm.catalogSource=${CATALOG_SOURCE_NAME}" \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [[ -n "${POD}" ]]; then
+    oc --request-timeout=12s logs "${POD}" -n openshift-marketplace --tail=50 2>/dev/null || true
+fi
+echo ""
+echo "--- Events in openshift-marketplace ---"
+oc --request-timeout=12s get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>/dev/null | tail -20 || true
 echo ""
 exit 1
