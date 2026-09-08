@@ -1,0 +1,33 @@
+ref:
+  as: qe-rhel-jetson-bootc-switch
+  from: qe-rhel-jetson
+  commands: qe-rhel-jetson-bootc-switch-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: qe-rhel-jetson-jetson-ssh-key
+      mount_path: /var/run/secrets/jetson-ssh-key
+  env:
+    - name: JETSON_HOSTNAME
+      default: "10.26.2.85"
+      documentation: IP address of the target Jetson device
+    - name: BOOTC_IMAGE
+      default: ""
+      documentation: Full bootc image reference (base:tag) to switch to
+    - name: JUMPHOST
+      default: ""
+      documentation: Optional SSH jumphost to reach the Jetson device
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 1h0m0s
+  documentation: |-
+    Switch the bootc image on a Jetson device that is already running bootc,
+    using the beaker/ansible/bootc_switch.yml playbook from the qe-rhel-jetson repo.
+
+    Runs: bootc switch <BOOTC_IMAGE> on the target device, then reboots and verifies.
+    Uses skip_registry_login=true — suitable for public images (quay.io).
+
+    Required secrets in test-credentials namespace:
+      - qe-rhel-jetson-jetson-ssh-key: SSH private key (key: id_rsa)

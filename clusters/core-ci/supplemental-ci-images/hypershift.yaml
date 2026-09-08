@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
+      openshift.io/description: Published Images for HyperShift
+      openshift.io/display-name: HyperShift CI
+    name: hypershift
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    annotations: {}
+    name: hypershift-operator
+    namespace: hypershift
+  spec:
+    lookupPolicy:
+      local: false
+    tags:
+      - annotations: null
+        from:
+          kind: DockerImage
+          name: quay-proxy.ci.openshift.org/openshift/ci:hypershift_hypershift-operator_latest
+        importPolicy:
+          scheduled: true
+        name: latest
+        referencePolicy:
+          type: Source

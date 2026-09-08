@@ -1,0 +1,42 @@
+ref:
+  as: cucushift-hypershift-extended-capacity-reservation-create
+  commands: cucushift-hypershift-extended-capacity-reservation-create-commands.sh
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-awscreds
+    name: hypershift-ci-jobs-awscreds
+    namespace: test-credentials
+  env:
+  - name: CAPACITY_BLOCKS_INSTANCE_TYPE
+    default: "p4d.24xlarge"
+    documentation: "Instance type for the capacity reservation capacity blocks."
+  - name: CP_INSTANCES_NUMBER
+    default: "1"
+    documentation: "Specifies the number of capacity reservation instances"
+  - name: NODEPOOL_CAPACITY_RESERVATION
+    default: ""
+    documentation: "Create nodepool using capacity reservation, the ci support vaule is OnDemand, CapacityBlocks"
+  - name: HYPERSHIFT_AWS_REGION
+    default: "us-east-1"
+  - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+    default: "false"
+    documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
+  - name: NODEPOOL_CAPACITY_RESERVATION_ZONE
+    default: "us-east-1a"
+    documentation: Specifies the AWS AZs to create the capacity reservation instances."
+  - name: ON_DEMAND_INSTANCE_TYPE
+    default: "m5.large"
+    documentation: "Instance type for the capacity reservation on-demand."
+  - name: OPERATING_SYSTEM
+    default: "Linux/UNIX"
+    documentation: "Capacity reservation operating system."
+  documentation: |-
+    This step to create capacity reservation, so we can use the capacity reservation to create nodepool.
+    Capacity blocks for GPU usage is very expensive, please keep careful to test it.

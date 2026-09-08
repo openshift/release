@@ -1,0 +1,54 @@
+base_images:
+  os-min9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.tools
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/debug-tools/_output
+    to: debug-tools
+promotion:
+  to:
+  - name: debug-tools
+    namespace: ocp-kni
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 150m
+      memory: 250Mi
+tests:
+- as: ci-unit
+  commands: make test-unit
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
+- as: ci-e2e-test
+  commands: make ci-job-e2e
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: debug-tools

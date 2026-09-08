@@ -1,0 +1,44 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: dev-infrastructure/openshift-ci/Dockerfile
+    from: src
+    to: aro-hcp-e2e-base-ci
+  run_if_changed: ^(dev-infrastructure/openshift-ci/Dockerfile$|\.bingo/|\.ci-operator\.yaml$)
+promotion:
+  to:
+  - name: aro-hcp-ci-images
+    namespace: aro-hcp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: "3"
+      memory: 4Gi
+  aro-hcp-e2e-tools:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: "8"
+      memory: 8Gi
+tests:
+- as: go-smoke-test
+  commands: |
+    set -euo pipefail
+    d=$(mktemp -d)
+    cd "$d"
+    go mod init smoke.example.com/nonroot
+    printf '%s\n' 'package main' 'func main() {}' > main.go
+    go build -o /dev/null .
+    go test .
+    echo "Go GOMODCACHE=$(go env GOMODCACHE) GOCACHE=$(go env GOCACHE) OK"
+  container:
+    from: aro-hcp-e2e-base-ci
+  run_if_changed: ^(dev-infrastructure/openshift-ci/Dockerfile$|\.ci-operator\.yaml$)
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: baseimage-generator

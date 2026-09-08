@@ -1,0 +1,38 @@
+workflow:
+  as: baremetalds-e2e-bgp-vip-metallb
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+        NUM_WORKERS=2
+        ENABLE_BGP_TOR=true
+        BGP_VIP_MANAGEMENT=true
+      FEATURE_SET: DevPreviewNoUpgrade
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - chain: baremetalds-ofcir-pre
+      - ref: baremetalds-e2e-bgp-vip-metallb-pre
+    test:
+      - ref: baremetalds-e2e-bgp-vip-verify
+      - ref: baremetalds-e2e-bgp-vip-metallb-verify
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    Coexistence lane for BGP-based VIP management (enhancement 1982) and a
+    day-2 MetalLB operator in BGP mode. Installs a baremetal IPI cluster via
+    dev-scripts with BGP_VIP_MANAGEMENT=true, then installs the MetalLB
+    operator day-2 (OLM when the catalog carries it, upstream manifests
+    otherwise) configured in frr-k8s-external mode against the cluster's
+    openshift-frr-k8s instance and peering with the same top-of-rack FRR
+    speaker that serves the VIPs. Verification asserts the VIP acceptance
+    criteria still hold and that MetalLB's FRRConfigurations merged into the
+    existing ToR neighbor (no session duplication or flap) with the
+    LoadBalancer service IP advertised from every node and reachable over
+    the BGP path. The cluster is dual-stack (IP_STACK=v4v6): the
+    LoadBalancer service is PreferDualStack, receives one IP per family
+    from per-family pools, and both are advertised and exercised. No
+    conformance suite: MetalLB's own e2e machinery needs source checkouts
+    and would drown the coexistence signal.

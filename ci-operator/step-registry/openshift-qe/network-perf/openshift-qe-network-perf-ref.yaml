@@ -1,0 +1,64 @@
+ref:
+  as: openshift-qe-network-perf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: NETPERF_VERSION
+    default: "default"
+    documentation: |-
+      Override the k8s netperf
+  - name: VM
+    default: "false"
+    documentation:
+      To run netperf on VMs
+  - name: USE_VIRTCTL
+    default: "true"
+    documentation:
+      To use virtctl to connect to the VM, instead of ssh
+  - name: TOLERANCE
+    default: "90"
+    documentation: |-
+      Tolerance of delta from hostNetwork to podNetwork - single stream
+  - name: EXTERNAL_SERVER_ADDRESS
+    default: ""
+    documentation: |-
+      External netserver address hosted on bastion node
+  - name: ES_METADATA_INDEX
+    default: "perf_scale_ci"
+    documentation: |-
+      Elasticsearch metadata index
+  - name: LOCAL
+    default: "false"
+    documentation: |-
+      Run network performance tests with Server-Pods/Client-Pods on the same Node
+  - name: WORKLOAD
+    default: "full-run.yaml"
+    documentation: |-
+      The workload to run, defaults to full-run.yaml
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additonal metadata to the fingerprint
+  - name: CLEAN_UP
+    default: "true"
+    documentation: |-
+      Clean up the test namespace before and after the test. Defaults to true.
+  commands: openshift-qe-network-perf-commands.sh
+  timeout: 4h
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale network-perf workload in the deployed cluster

@@ -1,0 +1,51 @@
+ref:
+  as: monitoring-plugin-tests-ols-ui
+  from_image:
+    name: cypress-base
+    namespace: ci
+    tag: latest
+  commands: monitoring-plugin-tests-ols-ui-commands.sh
+  timeout: 1h0m0s
+  grace_period: 60s
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+    limits:
+      memory: 6Gi
+  credentials:
+  - mount_path: /var/run/bedrock
+    name: bedrock-obsinta-ci
+    namespace: test-credentials
+  env:
+  - name: CYPRESS_COO_NAMESPACE
+    default: ""
+    documentation: "Namespace where Cluster Observability Operator is installed."
+  - name: OLS_NAMESPACE
+    default: "openshift-lightspeed"
+    documentation: "Namespace where the OpenShift Lightspeed operator is installed."
+  - name: OLS_BEDROCK_MODEL
+    default: "anthropic.claude-opus-4-6-v1"
+    documentation: "AWS Bedrock model id to configure as the OLS default model."
+  - name: OLS_BEDROCK_URL
+    default: "https://bedrock-runtime.us-east-1.amazonaws.com"
+    documentation: "AWS Bedrock endpoint URL. Encodes the AWS region (default: us-east-1)."
+  - name: MONITORING_PLUGIN_BRANCH
+    default: "main"
+    documentation: "Branch of the monitoring-plugin repository to clone and test."
+  - name: CYPRESS_SESSION
+    default: "true"
+    documentation: "Enable Cypress session reuse for faster test execution."
+  - name: CYPRESS_DEBUG
+    default: "false"
+    documentation: "Enable Cypress debug logging in headless mode."
+  documentation: |-
+    The monitoring-plugin-tests-ols-ui step configures OpenShift Lightspeed (OLS) with an
+    AWS Bedrock LLM provider and runs the monitoring-plugin Cypress tests tagged @ols
+    (COO-LightSpeed show_timeseries integration).
+
+    Prerequisites: the Cluster Observability Operator and the OpenShift Lightspeed operator
+    must already be installed (e.g. via the preceding install-operators step). This step
+    creates the llmcreds secret (AWS Bedrock IAM credentials mounted from the
+    bedrock-obsinta-ci vault secret) and the OLSConfig CR, waits for OLS to become ready,
+    clones the monitoring-plugin repository at runtime and runs the @ols Cypress suite.

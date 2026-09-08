@@ -1,0 +1,144 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocm-fvt-periodic-cs-rosa-hcp-autonode-integration-main
+  capabilities:
+  - nested-podman
+  cron: 0 8 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_EXTRA_ENVS: DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-autonode-integration-main
+      OCM_FVT_OCM_ENV: integration
+    post:
+    - chain: rosa-gather-hcp-diagnostics
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-scale-integration-main
+  capabilities:
+  - nested-podman
+  cron: 0 8 * * *
+  nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_EXTRA_ENVS: DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-backup-scale-integration-main
+      OCM_FVT_OCM_ENV: integration
+    post:
+    - chain: rosa-gather-hcp-diagnostics
+    test:
+    - ref: rosa-e2e-ocm-fvt
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-cp-up-ip-integration-main
+  capabilities:
+  - nested-podman
+  cron: 0 8 * * *
+  nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_EXTRA_ENVS: DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-backup-cp-up-ip-integration-main
+      OCM_FVT_OCM_ENV: integration
+    post:
+    - chain: rosa-gather-hcp-diagnostics
+    test:
+    - ref: rosa-e2e-ocm-fvt
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-cpupzfin-integration-main
+  capabilities:
+  - nested-podman
+  cron: 0 8 * * *
+  nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_EXTRA_ENVS: DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-backup-cpupzfin-integration-main
+      OCM_FVT_OCM_ENV: integration
+    post:
+    - chain: rosa-gather-hcp-diagnostics
+    test:
+    - ref: rosa-e2e-ocm-fvt
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-rest-integration-main
+  capabilities:
+  - nested-podman
+  cron: 0 8 * * *
+  nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_EXTRA_ENVS: DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-backup-rest-integration-main
+      OCM_FVT_OCM_ENV: integration
+    post:
+    - chain: rosa-gather-hcp-diagnostics
+    test:
+    - ref: rosa-e2e-ocm-fvt
+- as: ocm-fvt-periodic-cs-rosa-hcp-ad-integration-regional-main
+  capabilities:
+  - nested-podman
+  cron: 0 8 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-ad-integration-regional-main
+      OCM_FVT_OCM_ENV: integration
+    post:
+    - chain: rosa-gather-hcp-diagnostics
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-e2e
+  variant: ocm-fvt-rosa-hcp-integration

@@ -1,0 +1,73 @@
+ref:
+  as: p2p-mtv-register-providers
+  from: cli
+  commands: p2p-mtv-register-providers-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Register ACM managed spoke clusters as MTV OpenShift Providers on the hub.
+
+    For each spoke: wait for ManagedCluster Available, push MTV service-account RBAC via
+    ACM ManifestWork, read spoke API URL and admin kubeconfig from Hive ClusterDeployment
+    secrets on the hub, mint token+cacert, create Provider secret and forklift Provider CR
+    in openshift-mtv, and wait until Ready.
+
+    Requires p2p-mtv-additional-config (ForkliftController) and install-operators (mtv-operator) on
+    the hub. Hub kubeconfig is KUBECONFIG from ci-operator.
+
+    Spoke discovery (first match wins):
+    - MTV_SPOKE_CLUSTER_NAMES (comma-separated ManagedCluster names on hub), with optional
+      MTV_PROVIDER_NAMES (comma-separated Provider CR names; defaults to cluster names).
+    - Else SHARED_DIR: single spoke uses managed-cluster-name; MTV_SPOKE_CLUSTER_COUNT>1 uses
+      managed-cluster-name-N files from acm-interop-p2p-cluster-install. MTV_PROVIDER_NAMES
+      may override Provider CR names (e.g. spoke-1,spoke-2) while cluster names come from
+      SHARED_DIR.
+
+    Publishes ${ARTIFACT_DIR}/mtv-providers-status.txt (oc get providers, no secrets).
+  env:
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV operator and Provider CRs live.
+  - name: MTV_PROVIDER_SA_NAME
+    default: "mtv-provider-sa"
+    documentation: ServiceAccount name created on each spoke for provider authentication.
+  - name: MTV_MANIFESTWORK_NAME
+    default: "mtv-provider-prereq"
+    documentation: ManifestWork name applied in each managed-cluster namespace on the hub.
+  - name: MTV_TOKEN_DURATION
+    default: "24h"
+    documentation: Duration passed to oc create token for the MTV provider service account.
+  - name: MTV_PROVIDER_READY_TIMEOUT
+    default: "15m"
+    documentation: Timeout for oc wait provider/<name> --for=condition=Ready.
+  - name: MTV_MANIFESTWORK_TIMEOUT
+    default: "10m"
+    documentation: Timeout for each ManifestWork Applied/Available wait.
+  - name: MTV_MANAGED_CLUSTER_WAIT_TIMEOUT
+    default: "10m"
+    documentation: Timeout for ManagedCluster Available wait per spoke.
+  - name: MTV_SPOKE_CLUSTER_COUNT
+    default: "1"
+    documentation: |-
+      Number of spokes when using SHARED_DIR discovery (managed-cluster-name-N files).
+      Ignored when MTV_SPOKE_CLUSTER_NAMES is set.
+  - name: MTV_SPOKE_CLUSTER_NAMES
+    default: ""
+    documentation: |-
+      Comma-separated ACM ManagedCluster names (hub namespaces), e.g.
+      acm-spoke-abc12-1,acm-spoke-abc12-2. Preferred when names are known explicitly.
+  - name: MTV_PROVIDER_NAMES
+    default: ""
+    documentation: |-
+      Comma-separated MTV Provider CR names aligned with spokes, e.g. spoke-1,spoke-2.
+      With MTV_SPOKE_CLUSTER_NAMES defaults to cluster names; with SHARED_DIR multi-spoke
+      defaults to managed-cluster-name-N unless this is set.
+  - name: MTV_PROVIDER_NAME
+    default: ""
+    documentation: |-
+      Provider CR name when MTV_SPOKE_CLUSTER_COUNT=1 and using SHARED_DIR/managed-cluster-name.
+      Defaults to the managed cluster name when empty.

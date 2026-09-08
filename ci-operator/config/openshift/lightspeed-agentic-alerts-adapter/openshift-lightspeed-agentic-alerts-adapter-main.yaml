@@ -1,0 +1,54 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: lightspeed-agentic-alerts-adapter
+promotion:
+  to:
+  - namespace: osa
+    tag: latest
+    tag_by_commit: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 2Gi
+tests:
+- as: unit
+  commands: GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: lint
+  commands: GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache GOLANGCI_LINT_CACHE=/tmp/.cache
+    make lint
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- always_run: true
+  as: e2e-integration
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: lightspeed-agentic-alerts-adapter
+    workflow: generic-claim
+  timeout: 3h30m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: lightspeed-agentic-alerts-adapter

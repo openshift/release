@@ -1,0 +1,87 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: ci-monitoring
+  namespace: ci-monitoring
+  labels:
+    dashboards: "ci-monitoring"
+spec:
+  route:
+    spec:
+      host: grafana-ci-monitoring.apps.core.ci.devcluster.openshift.com
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
+      port:
+        targetPort: 3000
+      to:
+        kind: Service
+        name: ci-monitoring-service
+  config:
+    log:
+      mode: "console"
+      level: "warn"
+    server:
+      root_url: "https://grafana-ci-monitoring.apps.core.ci.devcluster.openshift.com"
+    users:
+      viewers_can_edit: "false"
+    auth:
+      disable_login_form: "true"
+      disable_signout_menu: "false"
+    auth.generic_oauth:
+      enabled: "true"
+      name: "Red Hat SSO"
+      client_id: "${GF_AUTH_GENERIC_OAUTH_CLIENT_ID}"
+      client_secret: "${GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}"
+      scopes: "openid email profile groups"
+      auth_url: "https://idp.ci.openshift.org/auth"
+      token_url: "https://idp.ci.openshift.org/token"
+      api_url: "https://idp.ci.openshift.org/userinfo"
+      role_attribute_path: "contains(groups[*], 'test-platform-ci-admins') && 'Admin' || 'Viewer'"
+      role_attribute_strict: "true"
+  deployment:
+    spec:
+      template:
+        spec:
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 90
+                preference:
+                  matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                    - arm64
+          containers:
+          - name: grafana
+            env:
+            - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-dex-credentials
+                  key: client-id
+            - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-dex-credentials
+                  key: client-secret
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: thanos-query
+  namespace: ci-monitoring
+spec:
+  datasource:
+    name: thanos-query
+    access: proxy
+    editable: false
+    isDefault: true
+    type: prometheus
+    url: http://thanos-query-frontend-ci-query.ci-monitoring.svc.cluster.local:9090
+    jsonData:
+      timeInterval: 30s
+  instanceSelector:
+    matchLabels:
+      dashboards: "ci-monitoring"

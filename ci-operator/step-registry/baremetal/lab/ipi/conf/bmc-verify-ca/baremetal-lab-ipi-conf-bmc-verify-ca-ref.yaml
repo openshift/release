@@ -1,0 +1,28 @@
+ref:
+  as: baremetal-lab-ipi-conf-bmc-verify-ca
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: baremetal-lab-ipi-conf-bmc-verify-ca-commands.sh
+  grace_period: 1200
+  resources:
+    requests:
+      cpu: '1'
+      memory: 256Mi
+  env:
+    - name: BMC_VERIFY_CA
+      default: "false"
+  documentation: |-
+    This step generates and uploads SSL certificates to BMC controllers (iLO/iDRAC)
+    via Redfish API to enable bmcVerifyCA configuration for secure BMC communication.
+
+    The step performs the following operations:
+    1. Generates a CA certificate for BMC verification
+    2. Creates individual certificates for each BMC controller from hosts.yaml
+    3. Uploads certificates to BMCs using Redfish API (supports HPE iLO and Dell iDRAC)
+    4. Verifies certificate installation
+    5. Creates a patch file with the CA certificate for install-config.yaml
+
+    The generated CA certificate is stored in SHARED_DIR and can be referenced
+    in the install-config.yaml using the bmcVerifyCA field.

@@ -1,0 +1,54 @@
+ref:
+  as: ipi-conf-debug-kdump-configure-logs
+  from: cli
+  commands: ipi-conf-debug-kdump-configure-logs-commands.sh
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  env:
+  - name: APPLY_NODE_ROLE
+    default: "worker"
+    documentation: |-
+      The node role to configure kdump logs on.
+  - name: ARCH
+    default: amd64
+    documentation: |-
+      This parameter is a safety net to protect deployments from setting arch-specific arguments.
+  - name: BUTANE_RELEASE
+    default: "4.15.0"
+    documentation: |-
+      You can read up on upgrading butane here (https://coreos.github.io/butane/upgrading-openshift/).
+      In general it's safe to stick to 4.15.0 unless this is upgraded to use a feature from a newer release.
+  - name: KDUMP_COMMANDLINE_REMOVE
+    default: "hugepages hugepagesz slub_debug quiet log_buf_len swiotlb"
+    documentation: |-
+      List of kargs to remove in crashkernel.
+  - name: KDUMP_COMMANDLINE_APPEND
+    default: "irqpoll nr_cpus=1 reset_devices cgroup_disable=memory mce=off numa=off udev.children-max=2 panic=10 rootflags=nofail acpi_no_memhotplug transparent_hugepage=never nokaslr novmcoredd hest_disable"
+    documentation: |-
+      List of kargs to append in crashkernel.
+  - name: KDUMP_KEXEC_ARGS
+    default: "--dt-no-old-root -s"
+    documentation: |-
+      Args used when kdump kexecs into the crash kernel.
+
+      The --dt-no-old-root argument is used for arm64 and ppc64le clusters. If it's present
+      on amd64 and s390x, it will be filtered out based on the ARCH input parameter.
+      Otherwise, an error would be thrown into /var/log/kdump.log and stdout would just
+      print a usage statement in the kdump service log.
+  - name: KDUMP_IMG
+    default: "vmlinuz"
+    documentation: |-
+      Kdump image.
+  - name: LOG_PATH
+    default: "/var/crash"
+    documentation: |-
+      The directory where the kdump logs should be output to.
+  - name: CRASH_KERNEL_MEMORY
+    default: "256M"
+    documentation: |-
+      The amount of memory to reserve for the crash kernel. Requirements differ per arch.
+      Try `$ kdumpctl estimate` to get a breakdown for your node.
+  documentation: |-
+    The kdump-configure-logs step applies the kdump machine configuration to cluster nodes.

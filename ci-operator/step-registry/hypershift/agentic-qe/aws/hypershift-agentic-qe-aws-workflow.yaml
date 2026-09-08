@@ -1,0 +1,36 @@
+workflow:
+  as: hypershift-agentic-qe-aws
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    test:
+    - ref: hypershift-agentic-qe-process
+    post:
+    - ref: hypershift-agentic-qe-report
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster
+  documentation: |-
+    HyperShift Agent QE workflow for AI-driven test plan execution.
+
+    This workflow provisions a management cluster with HyperShift operator
+    installed from the PR under test, creates a HostedCluster, then uses
+    Claude to execute test plans from the test-plan/ directory against
+    the live environment.
+
+    Pre phase:
+    1. Provisions a nested management cluster via IPI
+    2. Installs the HyperShift operator built from the PR
+    3. Creates a HostedCluster with the PR payload via hypershift CLI
+
+    Test phase:
+    1. Discovers test plan files changed/added by the PR
+    2. Runs Claude to execute each test plan against the HostedCluster
+
+    Post phase:
+    1. Dumps cluster artifacts for debugging
+    2. Destroys the HostedCluster via hypershift CLI
+    3. Destroys the management cluster infrastructure

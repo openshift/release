@@ -1,0 +1,1 @@
+../../test/teardown/capz-test-teardown-commands.sh

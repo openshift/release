@@ -1,0 +1,37 @@
+workflow:
+  as: hypershift-aws-reqserving-e2e
+  documentation: |-
+    The HyperShift aws reqserving e2e workflow executes tests against a standalone
+    OCP cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/CONTROLPLANE
+  
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      ZONES_COUNT: "3"
+      CONTROL_PLANE_INSTANCE_TYPE: "m6i.xlarge"
+      COMPUTE_NODE_TYPE: "m6i.xlarge"
+      COMPUTE_NODE_REPLICAS: "3"
+      CONTROL_PLANE_REPLICAS: "3"
+      ADD_ZONES: "yes"
+      AWS_ALLOWED_REGIONS: "us-east-1 us-east-2 us-west-2"
+    pre:
+    - chain: ipi-conf-aws
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: sandboxed-containers-operator-aws-region-override
+    - chain: ipi-install
+    test:
+    - ref: hypershift-aws-run-reqserving-e2e
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post

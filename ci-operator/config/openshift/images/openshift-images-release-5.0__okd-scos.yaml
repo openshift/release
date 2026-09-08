@@ -1,0 +1,77 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.26-openshift-5.0:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.0
+  ocp_builder_stream10:
+    name: builder
+    namespace: ocp
+    tag: stream10
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.0
+images:
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: base/Dockerfile.rhel10
+    from: pre-repo-base-stream10
+    to: base-stream10
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: base/Dockerfile.rhel9
+    from: pre-repo-base-stream9
+    inputs:
+      ocp_builder_stream10:
+        as:
+        - builder
+        - registry.ci.openshift.org/ocp/5.0:base-rhel9
+    to: base-stream9
+  - build_args:
+    - name: TAGS
+      value: scos
+    context_dir: ipfailover/keepalived
+    dockerfile_path: Dockerfile
+    from: base-stream9
+    inputs:
+      ocp_builder_rhel-9-golang-1.26-openshift-5.0:
+        as:
+        - test-extension-builder
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0
+    to: keepalived-ipfailover
+promotion:
+  to:
+  - name: scos-5.0
+    namespace: origin
+raw_steps:
+- pipeline_image_cache_step:
+    commands: "\ncat << EOF > /etc/yum.repos.d/art.repo\n[rhel-10-server-ose]\nid
+      = rhel-10-server-ose\nname = rhel-10-server-ose\nbaseurl = http://base-5-0-rhel10.ocp.svc/rhel-10-server-ose\nenabled
+      = 1\ngpgcheck = 0\nsslverify = false\nskip_if_unavailable = true\n\nEOF\n        "
+    from: ocp_builder_stream10
+    to: pre-repo-base-stream10
+- pipeline_image_cache_step:
+    commands: "\ncat << EOF > /etc/yum.repos.d/art.repo\n[rhel-9-server-ose]\nid =
+      rhel-9-server-ose\nname = rhel-9-server-ose\nbaseurl = http://base-5-0-rhel9.ocp.svc/rhel-9-server-ose\nenabled
+      = 1\ngpgcheck = 0\nsslverify = false\nskip_if_unavailable = true\n\nEOF\n        "
+    from: ocp_builder_stream10
+    to: pre-repo-base-stream9
+releases:
+  latest:
+    integration:
+      name: scos-5.0
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift
+  repo: images
+  variant: okd-scos

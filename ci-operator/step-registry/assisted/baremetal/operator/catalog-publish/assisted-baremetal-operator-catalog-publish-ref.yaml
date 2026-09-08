@@ -1,0 +1,64 @@
+ref:
+  as: assisted-baremetal-operator-catalog-publish
+  from: assisted-service-publish-index
+  cli: latest
+  commands: assisted-baremetal-operator-catalog-publish-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+  - mount_path: /secrets/docker
+    name: edge-infrastructure-quay-push
+    namespace: test-credentials
+  env:
+  - name: SECRETS_PATH
+    default: /secrets
+    documentation: |-
+      The directory where credentials will be mounted.
+  - name: REGISTRY_SECRET
+    default: docker
+    documentation: |-
+      The name of the kube secret that contains the docker/config.json.
+  - name: REGISTRY_SECRET_FILE
+    default: config.json
+    documentation: |-
+      The name of the file in REGISTRY_SECRET with the contents of
+      the .docker/config.json file.
+  - name: REGISTRY_HOST
+    default: quay.io
+    documentation: |-
+      The hostname (and port) of the destination registry.
+  - name: REGISTRY_ORG
+    default: edge-infrastructure
+    documentation: |-
+      The organization of the destination image reference.
+  - name: REGISTRY_CATALOG_REPOSITORY_NAME
+    default: assisted-service-index
+    documentation: |-
+      The destination image repository for the catalog.
+  - name: REGISTRY_CATALOG_REPOSITORY_TAG
+    default: latest
+    documentation: |-
+      The destination image repository tag for the catalog.
+  - name: REGISTRY_BUNDLE_REPOSITORY_NAME
+    default: assisted-service-operator-bundle
+    documentation: |-
+      The destination image repository for the bundle.
+  - name: REGISTRY_BUNDLE_REPOSITORY_TAG
+    default: latest
+    documentation: |-
+      The destination image repository tag for the bundle.
+  - name: OPERATOR_MANIFESTS_TAG_TO_PIN
+    default: latest
+    documentation: |-
+      The tag that we should search for and pin in the operator's manifests
+      before building the bundle
+  - name: OPM_BASE_IMAGE
+    default: quay.io/operator-framework/opm:latest
+    documentation: |-
+      The base image to use to package the catalog.
+  timeout: 60m0s
+  grace_period: 1m0s
+  documentation: |-
+    Mirror the CI operator catalog to quay.io

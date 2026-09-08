@@ -1,0 +1,33 @@
+ref:
+  as: agent-qe-nutanix-conf
+  from_image:
+    namespace: ci
+    name: "agent-qe-base"
+    tag: latest
+  grace_period: 10m
+  commands: agent-qe-nutanix-conf-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+    - namespace: test-credentials
+      name: registry-pull-credentials
+      mount_path: /var/run/vault/secrets
+    - namespace: test-credentials
+      name: nutanix-pc
+      mount_path: /var/run/vault/nutanix
+  env:
+    - name: MASTERS
+      default: "3"
+      documentation: ""
+    - name: WORKERS
+      default: "0"
+      documentation: ""
+    - name: BASE_DOMAIN
+      default: nutanix-ci.devcluster.openshift.com
+      documentation: |-
+        A FQDN is used for baseDomain variable in install configuration.
+  documentation: >-
+    The agent-qe-nutanix-conf step will generate the agent-config.yaml to deploy a Nutanix agent based installation (ABI).
+    This file is copied to the shared directory for future consumption.

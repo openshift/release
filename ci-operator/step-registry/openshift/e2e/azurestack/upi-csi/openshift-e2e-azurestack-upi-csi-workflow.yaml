@@ -1,0 +1,20 @@
+workflow:
+  as: openshift-e2e-azurestack-upi-csi
+  steps:
+    pre:
+    - chain: upi-azurestack-pre
+    - ref: storage-conf-csi-azure-disk
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-obj-check
+    - chain: gather-core-dump
+    - chain: upi-azurestack-post
+    env:
+      TEST_CSI_DRIVER_MANIFEST: manifest-azure-disk.yaml
+      TEST_SUITE: openshift/csi
+      # Our AzureStack env is very slow. "8" was too high and tests timed out randomly.
+      TEST_ARGS: --max-parallel-tests 4
+  documentation: |-
+    The Openshift E2E AzureStack `csi` workflow executes the `openshift/csi` end-to-end test suite on Azure Disk CSI driver on Azure Stack.

@@ -1,0 +1,45 @@
+ref:
+  as: quay-tests-libvirt-s390x-provision-nfs-csi
+  cli: latest
+  from: dev-scripts
+  commands: quay-tests-libvirt-s390x-provision-nfs-csi-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 30m0s
+  credentials:
+    - mount_path: /etc/hypershift-agent-ibmz-credentials
+      name: hypershift-agent-ibmz-credentials
+      namespace: test-credentials
+    - mount_path: /etc/ocp-addons
+      name: ocp-addons-key
+      namespace: test-credentials
+  env:
+  - name: OCP_ADDON_CREDENTIALS
+    default: /etc/ocp-addons
+  - name: CSI_PROVISIONER_GIT_URL_FILE
+    default: /etc/ocp-addons/csi-provisioner-git-url
+  - name: CSI_PROVISIONER_GIT_KEY
+    default: csi_provisioner_git_key
+  - name: CSI_PROVISIONER_CLONE_DIR
+    default: ocp-tools
+    documentation: |-
+      Local directory name created by git clone inside the CI pod workdir
+      (${ARTIFACT_DIR}/csi-provisioner-clone/<this-name>). Not a path on the LPAR.
+  - name: CSI_PROVISIONER_SCRIPT_DIR
+    default: bash
+  - name: CSI_PROVISIONER_SCRIPT_NAME
+    default: csi-provisioner.sh
+  - name: CSI_PROVISIONER_STORAGE_CLASS
+    default: crc-csi-hostpath-provisioner
+    documentation: |-
+      StorageClass created by csi-provisioner.sh. Annotated as default when the
+      upstream script does not set storageclass.kubernetes.io/is-default-class.
+  documentation: |-
+    Ensures a default StorageClass exists on libvirt s390x clusters by cloning a git
+    repository using SSH credentials from the ocp-addons-key secret (mounted at
+    /etc/ocp-addons) and running bash/csi-provisioner.sh. The ocp-tools repo stores
+    CSI YAML under csi/ at the repo root; the step links bash/csi to that directory
+    before executing the script. Expected secret keys: csi-provisioner-git-url,
+    csi_provisioner_git_key, and CSI_PROVISIONER_GIT_BRANCH. Override via env if needed.

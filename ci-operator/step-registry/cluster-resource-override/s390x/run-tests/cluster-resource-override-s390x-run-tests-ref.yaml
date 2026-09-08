@@ -1,0 +1,28 @@
+ref:
+  as: cluster-resource-override-s390x-run-tests
+  from: src
+  cli: latest
+  commands: cluster-resource-override-s390x-run-tests-commands.sh
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 60m0s
+  env:
+  - name: CRO_NAMESPACE
+    default: "openshift-cluster-resource-override"
+    documentation: |-
+      Namespace where the ClusterResourceOverride operator is installed. Must match
+      OPERATOR_NAMESPACE expected by make e2e (default openshift-cluster-resource-override).
+  - name: E2E_SKIP
+    default: "TestUpgradePre|TestUpgradePost|TestResourceOverrideExemptNamespace"
+    documentation: |-
+      Regex passed to go test -skip. Defaults to skipping upgrade-only tests that
+      require the dedicated pre/post upgrade flow, and TestResourceOverrideExemptNamespace
+      until ART ships an operator build that creates ValidatingAdmissionPolicy
+      resourceoverride-exempt-namespace (landed on main after CSV 202608041944).
+  documentation: |-
+    Runs the ClusterResourceOverride admission operator Go e2e suite from this
+    repository (make e2e / ./test/e2e/...) against the operator already installed
+    on the s390x cluster. Skips upgrade-only tests by default.

@@ -1,0 +1,86 @@
+ref:
+  as: p2p-install-odf-hub
+  from: cli
+  commands: p2p-install-odf-hub-commands.sh
+  timeout: 3h0m0s
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Install ODF on the ACM hub cluster using the redhat-operators catalog (direct OLM path).
+
+    Targets the hub cluster via ${KUBECONFIG}. Creates the openshift-storage namespace,
+    removes any conflicting OperatorGroup, resolves the startingCSV from packagemanifest,
+    creates the ODF Subscription (subscription.operators.coreos.com to avoid ambiguity with
+    ACM subscriptions on hub), waits for CSV Succeeded and ocs-operator deployment, labels
+    worker nodes, creates a StorageCluster (lean profile — hub workers are m6a.4xlarge and
+    ODF is used for ACM/GRC storage, not heavy data workloads), then waits for CephCluster
+    and NooBaa Ready. Annotates ODF_HUB_DEFAULT_STORAGE_CLASS (ocs-storagecluster-ceph-rbd)
+    as cluster default; CNV is never on the hub so the virt SC is never created and is not
+    used here.
+
+    Writes diagnostics to ${ARTIFACT_DIR}/odf-hub/ on failure and on success.
+
+    TODO: Replace this direct OLM subscription approach with an ACM OperatorPolicy/ConfigurationPolicy
+    based installation targeting local-cluster so that ODF on the hub is managed declaratively
+    through ACM's policy engine (see stolostron/policy-collection OPP policy set for reference).
+  env:
+  - name: ODF_OPERATOR_CHANNEL
+    default: "stable-4.21"
+    documentation: ODF operator Subscription channel (e.g. stable-4.21, stable-4.22).
+  - name: ODF_BACKEND_STORAGE_CLASS
+    default: "gp3-csi"
+    documentation: AWS EBS StorageClass for OSD PVCs on hub workers.
+  - name: ODF_VOLUME_SIZE
+    default: "70Gi"
+    documentation: |-
+      OSD device PVC size per storageDeviceSet. Hub uses m6a.4xlarge workers (same as the
+      OPP stolostron/policy-collection jobs which use 100Gi). 70Gi gives ~70Gi usable
+      (3-way replication on gp3-csi) — sufficient for ACM observability/GRC/ALC test workloads.
+  - name: ODF_INSTALL_NAMESPACE
+    default: "openshift-storage"
+    documentation: Namespace for ODF operator and StorageCluster on the hub.
+  - name: ODF_STORAGE_CLUSTER_NAME
+    default: "ocs-storagecluster"
+    documentation: StorageCluster metadata.name on the hub.
+  - name: ODF_SUBSCRIPTION_NAME
+    default: "odf-operator"
+    documentation: ODF Subscription metadata.name.
+  - name: ODF_HUB_DEFAULT_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd"
+    documentation: |-
+      StorageClass annotated as cluster default after hub ODF install. Must be a SC that ODF
+      creates unconditionally. Do NOT use ocs-storagecluster-ceph-rbd-virtualization here —
+      CNV is never installed on the hub so that SC never exists.
+      Intentionally separate from ODF_DEFAULT_STORAGE_CLASS (used by p2p-install-odf-spokes
+      and p2p-acm-cnv-install-policy for the spoke virt SC) to avoid job-level collisions.
+  - name: ODF_HUB_SNAPSHOT_CLASS
+    default: "ocs-storagecluster-rbdplugin-snapclass"
+    documentation: VolumeSnapshotClass annotated as default after hub ODF install.
+  - name: ODF_PACKAGE_MANIFEST_POLL_INTERVAL_SECONDS
+    default: "10"
+    documentation: Sleep between packagemanifest startingCSV polls.
+  - name: ODF_PACKAGE_MANIFEST_POLL_TIMEOUT_SECONDS
+    default: "300"
+    documentation: |-
+      Max seconds to resolve startingCSV from packagemanifest (30 x 10s).
+      The redhat-operators catalog may take 2-4 min to fully sync after ACM MCH completes;
+      300s ensures we obtain a pinned startingCSV rather than silently falling back to latest.
+  - name: ODF_CSV_POLL_INTERVAL_SECONDS
+    default: "10"
+    documentation: Sleep between installedCSV/Succeeded polls.
+  - name: ODF_CSV_POLL_TIMEOUT_SECONDS
+    default: "900"
+    documentation: Max seconds to wait for ODF CSV Succeeded (15 min).
+  - name: ODF_OCS_OPERATOR_BUFFER_SECONDS
+    default: "300"
+    documentation: |-
+      Max seconds to wait for ocs-operator Deployment to be created after CSV Succeeded
+      (used as --timeout for oc wait --for=create). In ODF 4.21, ocs-operator is initialized
+      by odf-operator after CSV reaches Succeeded; image pulls and pod scheduling on a fresh
+      cluster mean 90s was too short — 300s is a safe margin.
+  - name: ODF_STORAGECLUSTER_POLL_TIMEOUT_SECONDS
+    default: "5400"
+    documentation: Max seconds to wait for StorageCluster and NooBaa Ready (90 min).

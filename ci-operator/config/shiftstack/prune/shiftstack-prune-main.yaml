@@ -1,0 +1,30 @@
+binary_build_commands: go build -o /bin/prune .
+build_root:
+  from_repository: true
+promotion:
+  to:
+  - additional_images:
+      prune: bin
+    name: tooling
+    namespace: shiftstack
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: go-fmt
+  commands: if [ "$(go fmt ./... | tee /dev/stderr | wc -l)" -gt 0 ]; then exit 1;
+    fi
+  container:
+    from: src
+- as: go-vet
+  commands: go vet ./...
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: shiftstack
+  repo: prune

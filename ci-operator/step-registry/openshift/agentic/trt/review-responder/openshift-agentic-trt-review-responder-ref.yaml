@@ -1,0 +1,47 @@
+ref:
+  as: openshift-agentic-trt-review-responder
+  from: agentic-dev
+  commands: openshift-agentic-trt-review-responder-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: sa-claude-openshift-ci
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: trt-agent-gh-app
+    mount_path: /var/run/github-token
+  env:
+  - name: UPSTREAM_REPO
+  - name: FORK_REPO
+  - name: SETUP_SCRIPT
+    default: "hack/agentic_setup.sh"
+  - name: ALLOWED_TOOLS
+    default: "Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate TodoWrite ToolSearch"
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "openshift-ci-prow-agents"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/google-token"
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+  - name: GATE_MODEL
+    default: "claude-haiku-4-5"
+  nested_podman: true
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 3h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Polls every 5 minutes until at least 6 iterations have passed AND
+    3 consecutive idle iterations occur. A small-model gate runs the
+    has-review-work skill. COMMENT_WORK=yes invokes address-review-pr;
+    CI_WORK=yes invokes address-ci-failures.
+    A short CI/security block matching jira-solver is prepended;
+    repo-specific .agentic/followup-config.md is appended last on the
+    review worker. Credential-dumping shell tools are disallowed. Bash
+    pushes after the worker(s) finish. Reads PR number from SHARED_DIR
+    (written by jira-solver or pr-followup).
