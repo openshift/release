@@ -137,23 +137,23 @@ if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
     mirror_konflux
 
     default_catsrc_image="quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
-    if [[ "${CATALOG_SOURCE_IMAGE}" = "${default_catsrc_image}:latest" ]]; then
+    if [[ "${CATALOG_SOURCE_IMAGE:-}" = "${default_catsrc_image}:latest" ]]; then
       catsrc_image_tag=$(latest_catsrc_image_tag)
       CATALOG_SOURCE_IMAGE="${default_catsrc_image}:${catsrc_image_tag}"
       echo "Resolved :latest to tag: ${catsrc_image_tag}"
     else
-      echo "Using provided catalog image: ${CATALOG_SOURCE_IMAGE}"
+      echo "Using provided catalog image: ${CATALOG_SOURCE_IMAGE:-}"
     fi
 
-    create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
+    create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE:-}"
     wait_for_catsrc "${CATALOG_SOURCE_NAME}"
 
-    echo "CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE}" > "${SHARED_DIR}/catalog-source-image.env"
+    echo "CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE:-}" > "${SHARED_DIR}/catalog-source-image.env"
     echo "Saved resolved CATALOG_SOURCE_IMAGE to ${SHARED_DIR}/catalog-source-image.env"
   fi
 else
-  if [[ -n "$CATALOG_SOURCE_IMAGE" ]]; then
-    echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA ($CATALOG_SOURCE_IMAGE)"
+  if [[ -n "${CATALOG_SOURCE_IMAGE:-}" ]]; then
+    echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA (${CATALOG_SOURCE_IMAGE})"
     exit 1
   fi
 fi
