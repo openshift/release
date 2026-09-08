@@ -1,3 +1,12 @@
+base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.15"
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -57,6 +66,19 @@ tests:
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
+- as: regression-clusterinfra-ibmcloud-ipi-mapi
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      BASE_DOMAIN: ci-ibmcloud.devcluster.openshift.com
+      E2E_RUN_TAGS: '@mapi'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
+      TEST_SCENARIOS: Cluster_Infrastructure MAPI
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
