@@ -2,7 +2,7 @@ ref:
   as: hypershift-kubevirt-create
   from: hypershift-operator
   grace_period: 5m0s
-  timeout: 1h
+  timeout: 1h30m
   cli: latest
   env:
     - name: HYPERSHIFT_NODE_COUNT
@@ -86,6 +86,23 @@ ref:
       documentation: |-
         Secondary localnet index (2..N) for the ip-echo EgressIP probe pod. Must not be
         the primary passthrough localnet (index 1), which is behind libvirt NAT.
+    - name: LOCALNET_MULTI_ENABLE_KUBELET_BOOTSTRAP_ASSIST
+      default: "true"
+      documentation: |-
+        When true and ATTACH_DEFAULT_NETWORK=localnet-multi, SSH to worker VMIs on
+        localnet-1 and start crio/kubelet if inactive until the NodePool is Ready.
+    - name: LOCALNET_MULTI_KUBELET_BOOTSTRAP_TIMEOUT
+      default: "2700"
+      documentation: |-
+        Seconds to poll worker VMIs and start crio/kubelet before failing the create step.
+    - name: LOCALNET_MULTI_NODEPOOL_READY_TIMEOUT
+      default: "45m"
+      documentation: |-
+        Maximum time to wait for the NodePool Ready condition after HostedCluster Available.
+    - name: LOCALNET_MULTI_SSH_POD_IMAGE
+      default: "registry.redhat.io/rhel9/support-tools:latest"
+      documentation: |-
+        Image for localnet-multi kubelet bootstrap SSH pods. Must include an ssh client.
   commands: hypershift-kubevirt-create-commands.sh
   resources:
     requests:

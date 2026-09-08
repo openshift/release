@@ -79,6 +79,190 @@ discover_ovn_container_names() {
   return 0
 }
 
+localnet_multi_label_namespace_privileged() {
+  local multi_ns="$1"
+
+  oc label namespace "${multi_ns}" \
+    pod-security.kubernetes.io/enforce=privileged \
+    pod-security.kubernetes.io/audit=privileged \
+    pod-security.kubernetes.io/warn=privileged \
+    security.openshift.io/scc.podSecurityLabelSync=false --overwrite 2>/dev/null || true
+}
+
+localnet_multi_prepare_ssh_key_secret() {
+  local multi_ns="$1"
+  local ssh_key_secret="${CLUSTER_NAME}-ssh-key"
+
+  if ! oc get secret -n "${CLUSTER_NAMESPACE_PREFIX}" "${ssh_key_secret}" &>/dev/null; then
+    echo "WARNING: SSH key secret ${ssh_key_secret} not found" >&2
+    return 1
+  fi
+
+  oc get secret -n "${CLUSTER_NAMESPACE_PREFIX}" "${ssh_key_secret}" -o json \
+    | python3 -c "import sys,json; s=json.load(sys.stdin); s['metadata']={'name':s['metadata']['name'],'namespace':'${multi_ns}'}; print(json.dumps(s))" \
+    | oc apply -f - 2>/dev/null || true
+  return 0
+}
+
+localnet_multi_vmi_primary_ipv4() {
+  local multi_ns="$1"
+  local vmi="$2"
+
+  oc get vmi -n "${multi_ns}" "${vmi}" -o json | python3 -c '
+import json
+import re
+import sys
+
+vmi = json.load(sys.stdin)
+for iface in vmi.get("status", {}).get("interfaces", []):
+    ip = iface.get("ipAddress", "")
+    if re.match(r"^\d+\.\d+\.\d+\.\d+", ip):
+        print(ip.split()[0])
+        sys.exit(0)
+sys.exit(1)
+' 2>/dev/null || true
+}
+
+localnet_multi_ensure_bootstrap_ssh_pods() {
+  local multi_ns="$1"
+  local node pod_name ssh_image
+
+  ssh_image="${LOCALNET_MULTI_SSH_POD_IMAGE:-registry.redhat.io/rhel9/support-tools:latest}"
+  for node in $(oc get pods -n "${multi_ns}" -l kubevirt.io=virt-launcher \
+    -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' 2>/dev/null | sort -u); do
+    [[ -z "${node}" ]] && continue
+    pod_name="kubelet-bootstrap-${node//./-}"
+    if oc get pod -n "${multi_ns}" "${pod_name}" &>/dev/null; then
+      continue
+    fi
+    cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${pod_name}
+  namespace: ${multi_ns}
+  annotations:
+    k8s.v1.cni.cncf.io/networks: localnet-1
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: ${node}
+  restartPolicy: Never
+  volumes:
+  - name: ssh-key
+    secret:
+      secretName: ${CLUSTER_NAME}-ssh-key
+      defaultMode: 384
+  containers:
+  - name: ssh
+    image: ${ssh_image}
+    command: ["sleep", "3600"]
+    securityContext:
+      runAsUser: 0
+    volumeMounts:
+    - name: ssh-key
+      mountPath: /ssh
+EOF
+  done
+
+  for node in $(oc get pods -n "${multi_ns}" -l kubevirt.io=virt-launcher \
+    -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' 2>/dev/null | sort -u); do
+    [[ -z "${node}" ]] && continue
+    pod_name="kubelet-bootstrap-${node//./-}"
+    oc wait pod/"${pod_name}" -n "${multi_ns}" --for=condition=Ready --timeout=180s 2>/dev/null || {
+      echo "WARNING: bootstrap SSH pod ${pod_name} not Ready on node ${node}" >&2
+      return 1
+    }
+  done
+  return 0
+}
+
+localnet_multi_start_guest_kubelet_if_needed() {
+  local multi_ns="$1"
+  local node="$2"
+  local vmi_ip="$3"
+  local vmi="$4"
+  local pod_name="kubelet-bootstrap-${node//./-}"
+
+  if ! oc exec -n "${multi_ns}" "${pod_name}" -c ssh -- bash -s -- "${vmi_ip}" "${vmi}" <<'EOF'
+vmi_ip="$1"
+vmi="$2"
+KEY=/ssh/id_rsa
+[[ -f "$KEY" ]] || KEY=/ssh/id_ed25519
+chmod 600 "$KEY"
+status=$(ssh -i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 \
+  "core@${vmi_ip}" systemctl is-active kubelet 2>/dev/null || echo inactive)
+if [[ "$status" == "active" ]]; then
+  exit 0
+fi
+echo "Starting crio and kubelet on ${vmi} (${vmi_ip})..."
+ssh -i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+  "core@${vmi_ip}" 'sudo systemctl start crio && sudo systemctl start kubelet'
+EOF
+  then
+    echo "WARNING: kubelet bootstrap SSH failed for ${vmi} (${vmi_ip})" >&2
+    return 1
+  fi
+  return 0
+}
+
+# Workers on localnet-multi can reach ignition/API via ostestbm DHCP, but kubelet may
+# fail first boot when node-sizing.env is not ready and crio is still inactive. Poll
+# worker VMIs over localnet-1 SSH and start crio/kubelet until the NodePool is Ready.
+ensure_localnet_multi_worker_kubelet_started() {
+  local multi_ns="$1"
+  local deadline running_count vmi vmi_ip vmi_node
+
+  if [[ "${LOCALNET_MULTI_ENABLE_KUBELET_BOOTSTRAP_ASSIST:-true}" != "true" ]]; then
+    echo "Skipping localnet-multi kubelet bootstrap assist (LOCALNET_MULTI_ENABLE_KUBELET_BOOTSTRAP_ASSIST=false)"
+    return 0
+  fi
+
+  deadline=$(($(date +%s) + ${LOCALNET_MULTI_KUBELET_BOOTSTRAP_TIMEOUT:-2700}))
+  echo "Ensuring localnet-multi worker kubelet/crio are running (timeout ${LOCALNET_MULTI_KUBELET_BOOTSTRAP_TIMEOUT:-2700}s)..."
+
+  localnet_multi_label_namespace_privileged "${multi_ns}"
+  if ! localnet_multi_prepare_ssh_key_secret "${multi_ns}"; then
+    return 1
+  fi
+
+  while [[ $(date +%s) -lt ${deadline} ]]; do
+    if oc get nodepool "${CLUSTER_NAME}" -n "${CLUSTER_NAMESPACE_PREFIX}" \
+      -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
+      echo "NodePool is Ready"
+      for pod in $(oc get pods -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+        [[ "${pod}" == kubelet-bootstrap-* ]] && oc delete pod -n "${multi_ns}" "${pod}" --ignore-not-found 2>/dev/null || true
+      done
+      return 0
+    fi
+
+    running_count=$(oc get vmi -n "${multi_ns}" --no-headers 2>/dev/null \
+      | awk '$3 ~ /Running/ {count++} END {print count+0}')
+    if [[ ${running_count} -lt ${HYPERSHIFT_NODE_COUNT} ]]; then
+      echo "Waiting for worker VMIs... (${running_count}/${HYPERSHIFT_NODE_COUNT} running)"
+      sleep 15
+      continue
+    fi
+
+    if ! localnet_multi_ensure_bootstrap_ssh_pods "${multi_ns}"; then
+      sleep 15
+      continue
+    fi
+
+    for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+      vmi_ip=$(localnet_multi_vmi_primary_ipv4 "${multi_ns}" "${vmi}")
+      vmi_node=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.nodeName}' 2>/dev/null || true)
+      [[ -z "${vmi_ip}" || -z "${vmi_node}" ]] && continue
+      localnet_multi_start_guest_kubelet_if_needed "${multi_ns}" "${vmi_node}" "${vmi_ip}" "${vmi}" || true
+    done
+
+    echo "NodePool not Ready yet; retrying kubelet bootstrap assist in 30s..."
+    sleep 30
+  done
+
+  echo "ERROR: timed out waiting for NodePool Ready during kubelet bootstrap assist" >&2
+  return 1
+}
+
 if [[ ! -f $HCP_CLI ]]; then
   # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
   HCP_CLI="/usr/bin/hypershift"
@@ -426,6 +610,17 @@ echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
+
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
+  MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  ensure_localnet_multi_worker_kubelet_started "${MULTI_NAMESPACE}" || {
+    echo "ERROR: localnet-multi worker kubelet bootstrap failed" >&2
+    exit 1
+  }
+  echo "Waiting for NodePool to become Ready"
+  oc wait --timeout="${LOCALNET_MULTI_NODEPOOL_READY_TIMEOUT:-45m}" \
+    --for=condition=Ready --namespace="${CLUSTER_NAMESPACE_PREFIX}" "nodepool/${CLUSTER_NAME}"
+fi
 
 # OVN-Kubernetes assigns IPs to localnet ports via IPAM but does not create
 # DHCP_Options entries, so the VMs never receive the assigned IP via DHCP.

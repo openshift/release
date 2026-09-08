@@ -80,7 +80,7 @@ echo "Waiting for nested cluster's node count to reach the desired replicas coun
 if [[ -n "${HYPERSHIFT_KUBEVIRT_NODE_JOIN_TIMEOUT:-}" ]]; then
   NODE_JOIN_TIMEOUT_SECONDS="${HYPERSHIFT_KUBEVIRT_NODE_JOIN_TIMEOUT}"
 elif [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-multi" ]]; then
-  # localnet-multi workers bootstrap slower (OVN DHCP, guest routing, MCD pull).
+  # localnet-multi workers bootstrap slower (ostestbm DHCP, kubelet/crio first-boot race, guest CNI).
   NODE_JOIN_TIMEOUT_SECONDS=3600
 else
   NODE_JOIN_TIMEOUT_SECONDS=1800
