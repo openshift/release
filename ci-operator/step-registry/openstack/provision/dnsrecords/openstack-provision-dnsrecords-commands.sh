@@ -21,8 +21,6 @@ fi
 
 TMP_DIR=$(mktemp -d)
 
-echo "DNS records step: CONFIG_TYPE=${CONFIG_TYPE:-<unset>} BASE_DOMAIN=${BASE_DOMAIN}"
-
 if [ -f "${SHARED_DIR}/CLUSTER_NAME" ]; then
   CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 else
@@ -56,8 +54,6 @@ if [ -f "${SHARED_DIR}/API_IP" ]; then
     echo "Creating API-INT DNS $API_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN"
     jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "api-int.'${CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${API_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${API_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api_int.json"
     cp "${TMP_DIR}/dns_api_int.json" "${SHARED_DIR}/dns_up.json"
-  else
-    echo "Skipping API-INT DNS record (CONFIG_TYPE does not contain externallb)"
   fi
 fi
 
@@ -123,6 +119,4 @@ if [[ -s "${SHARED_DIR}/HIVE_FIP_API" && -s "${SHARED_DIR}/HIVE_FIP_INGRESS" && 
 fi
 
 cp "${SHARED_DIR}/dns_up.json" "${ARTIFACT_DIR}/"
-echo "Route53 change batch:"
-cat "${SHARED_DIR}/dns_up.json"
 aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch "file://${SHARED_DIR}/dns_up.json"
