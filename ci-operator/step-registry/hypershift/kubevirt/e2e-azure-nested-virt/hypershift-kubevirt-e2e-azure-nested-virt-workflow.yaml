@@ -1,0 +1,40 @@
+workflow:
+  as: hypershift-kubevirt-e2e-azure-nested-virt
+  documentation: |-
+    Sets up Azure hosted cluster as management infrastructure for KubeVirt guest clusters.
+
+    This workflow creates an ephemeral nested Azure hosted cluster on the HyperShift root
+    management cluster, installs KubeVirt with Premium SSD v2 storage, and runs reduced
+    e2e tests for KubeVirt-backed hosted clusters.
+
+    Architecture: Root Azure cluster → Nested Azure Hosted Cluster (management) → KubeVirt VMs (guest clusters)
+
+    This is the Azure equivalent of e2e-kubevirt-aws-ovn-reduced, but uses a nested hosted
+    cluster instead of IPI-provisioned infrastructure. Key differences:
+    - Uses Azure Premium SSD v2 for better IOPS performance (3000 IOPS baseline vs 120 for v1)
+    - Leverages existing Azure hosted cluster infrastructure pattern
+    - External control plane (hosted), no masters schedulable configuration needed
+    - Cleaner resource lifecycle (ephemeral nested cluster per job)
+
+    The workflow uses the existing hypershift-setup-nested-management-cluster chain which
+    already supports Azure, making this implementation simpler than expected.
+  steps:
+    env:
+      CLOUD_PROVIDER: "Azure"
+      AZURE_SELF_MANAGED: "true"
+      HYPERSHIFT_NODE_COUNT: "3"
+      HYPERSHIFT_INSTANCE_TYPE: Standard_D16s_v5
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      AZURE_STORAGE_SKU: PremiumV2_LRS
+      AZURE_DEFAULT_IOPS: "3000"
+      AZURE_DEFAULT_THROUGHPUT: "125"
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-kubevirt-install-azure-hostedcluster
+    - ref: hypershift-install
+    test:
+    - chain: hypershift-kubevirt-run-e2e-local
+    post:
+    - chain: hypershift-destroy-nested-management-cluster
