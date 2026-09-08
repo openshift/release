@@ -3,6 +3,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: cli
+  release-tests-ginkgo-base:
+    name: openshift-pipelines-release-tests-ginkgo
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -12,7 +16,8 @@ images:
   items:
   - context_dir: .
     dockerfile_path: Dockerfile
-    to: openshift-pipelines-ginkgo-runner
+    from: release-tests-ginkgo-base
+    to: openshift-pipelines-runner
 releases:
   latest:
     release:
@@ -24,7 +29,7 @@ resources:
     limits:
       memory: 4Gi
     requests:
-      cpu: 100m
+      cpu: 500m
       memory: 200Mi
 tests:
 - as: openshift-pipelines-e2e-ginkgo
@@ -32,7 +37,7 @@ tests:
     cluster_profile: aws-osp-qe
     env:
       BASE_DOMAIN: psi.ospqa.com
-      CATALOG_INDEX_IMAGE: quay.io/openshift-pipeline/pipelines-index-4.22:next
+      CATALOG_INDEX_IMAGE: quay.io/openshift-pipeline/pipelines-index-4.22:nightly
       CATALOG_SOURCE_NAME: custom-operators
     test:
     - ref: openshift-pipelines-catalog-source
