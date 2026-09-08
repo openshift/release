@@ -1,0 +1,44 @@
+ref:
+  as: intelliaide-poc
+  from: claude-ai-helpers
+  commands: intelliaide-poc-commands.sh
+  env:
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+    documentation: |-
+      Enable Vertex AI for Claude Code LLM smoke test (Phase 2).
+  - name: CLOUD_ML_REGION
+    default: "global"
+    documentation: |-
+      Google Cloud region for Vertex AI.
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "openshift-ci-prow-agents"
+    documentation: |-
+      Google Cloud project ID for Vertex AI authentication.
+      Confirm with the OpenShift CI team if this differs for sa-claude-openshift-ci.
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/google-token"
+    documentation: |-
+      Default path to the GCP service account JSON key. The commands script
+      also tries token and claude-prow keys if google-token is absent.
+  - name: INTELLIAIDE_POC_MODEL
+    default: "claude-sonnet-4-6"
+    documentation: |-
+      Claude model used for the optional Phase 2 LLM smoke test.
+  credentials:
+  - namespace: test-credentials
+    name: sa-claude-openshift-ci
+    mount_path: /var/run/claude-code-service-account
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  timeout: 15m0s
+  grace_period: 1m0s
+  documentation: |-
+    Proof-of-concept step for Intelliaide agent runs in OpenShift Prow CI.
+    Phase 1 verifies Intelliaide-compatible GCP ADC authentication using the
+    shared sa-claude-openshift-ci credential (google-auth, same path as
+    Version_V1/Main-program/llm_rca_agent.py auth_type=gcloud).
+    Phase 2 optionally sends a minimal Claude Code prompt via Vertex AI.
+    Never prints credential contents to logs.
