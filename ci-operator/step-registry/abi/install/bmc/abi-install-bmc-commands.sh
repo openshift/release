@@ -20,13 +20,22 @@ export XDG_CONFIG_HOME=/tmp/abi/.config # Used by `bw`.
 export XDG_CACHE_HOME=/tmp/abi/.cache   # Used by `openshift-install agent create image`.
 
 eval "$(
-    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
 )"
 eval "$(
-    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/Vault--BitWarden--UploadAttachment.sh"
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/Vault--BitWarden.sh"
 )"
 eval "$(
-    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
 )"; EnsureReqs yq chisel bw
 
 typeset ocpABIcfg="${CLUSTER_PROFILE_DIR}/${OCP__ABI__CFG_FN}"; [ -r "${ocpABIcfg}" ]
@@ -273,8 +282,8 @@ sshEOF
 
 # Chisel basic auth (disable `xtrace` while reading secrets).
 set +x
-chiselCrdUsr="$(cat "/var/run/secrets/chisel/chisel-usr--${OCP__ABI__TEAM_NAME}")"
-chiselCrdPwd="$(cat "/var/run/secrets/chisel/chisel-pwd--${OCP__ABI__TEAM_NAME}")"
+chiselCrdUsr="$(0< "/var/run/secrets/chisel/chisel-usr--${OCP__ABI__TEAM_NAME}")"
+chiselCrdPwd="$(0< "/var/run/secrets/chisel/chisel-pwd--${OCP__ABI__TEAM_NAME}")"
 set -x
 
 trap 'HandleSIGCHLD' CHLD
@@ -593,8 +602,19 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 [ -f "${KUBECONFIG}" ]
 
 # Upload `KUBECONFIG` to BitWarden.
-[ -z "${BW__OBJ_NAME}" ] || Vault--BitWarden--UploadAttachment \
-    "${BW__OBJ_NAME}" /var/run/secrets/vault--bit-warden/SvcAcc-RW "${KUBECONFIG}"
+[ -z "${BW__OBJ_NAME}" ] || {
+    Vault--BitWarden--UploadAttachment \
+        "${BW__OBJ_NAME}" /var/run/secrets/vault--bit-warden/SvcAcc-RW \
+        "${OCP__ABI__CLUSTER_DIR}/auth/kubeconfig"
+    Vault--BitWarden--UpdateCustomField \
+        "${BW__OBJ_NAME}" /var/run/secrets/vault--bit-warden/SvcAcc-RW \
+        cred.OCP <(
+            jq -cnj \
+                --arg usr kubeadmin \
+                --rawfile pwd <(set +x; printf '%s' "$(0< "${OCP__ABI__CLUSTER_DIR}/auth/kubeadmin-password")") \
+                '{usr: $usr, pwd: $pwd}'
+        )
+}
 
 # Ensure Nodes readiness before Day-2 customization.
 oc wait node --all --for=condition=Ready --timeout=300s
