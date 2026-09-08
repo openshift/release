@@ -430,57 +430,163 @@ TFRC
   # module level clears child resources, then we remove any remaining
   # top-level resources (data sources).
   log "  Clearing all resources from state..."
+  local state_resources
+  if ! state_resources=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>>"${LOG}"); then
+    log "  ERROR: Could not read TFC state; refusing force-delete"
+    CLEANUP_FAILED=1
+    return 0
+  fi
   local resource_count
-  resource_count=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | wc -l | tr -d ' ')
-  resource_count=${resource_count:-0}
+  resource_count=0
+  if [[ -n "${state_resources}" ]]; then
+    resource_count=$(printf '%s\n' "${state_resources}" | wc -l | tr -d ' ')
+  fi
+  local state_rm_succeeded=true
 
   if [[ ${resource_count} -eq 0 ]]; then
     log "  State is already empty"
   else
     log "  Removing ${resource_count} resources..."
-    # Bulk remove: modules + data sources in one call (~3 seconds)
-    # Discover top-level modules, data sources, and resources, then remove at
-    # the highest address level for speed (~3s for 400+ resources vs minutes
-    # for individual removal).
-    local addresses
-    addresses=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | \
-      sed -n -E \
-        -e 's/^(module\.[^.]+)\..*/\1/p' \
-        -e 's/^(data\.[^.]+\.[^.]+)(\[.*\])?$/\1/p' \
-        -e 's/^([^.[:space:]]+\.[^.[:space:]]+)(\[.*\])?$/\1/p' | \
-      sort -u)
-    if [[ -n "${addresses}" ]]; then
-      log "  Removing: ${addresses//$'\n'/, }"
-      if ! printf '%s\n' "${addresses}" | \
-        xargs /tmp/terraform -chdir="${tf_dir}" state rm -no-color >>"${LOG}" 2>&1; then
-        log "  ERROR: terraform state rm failed; workspace may not be safe-deletable"
+    # Remove top-level modules in one bulk operation. This is intentionally
+    # the fast path: removing a module address removes all of its children
+    # without making one backend request per resource.
+    local module_addresses
+    module_addresses=$(printf '%s\n' "${state_resources}" | \
+      sed -n -E 's/^(module\.[^.]+)\..*/\1/p' | sort -u)
+    if [[ -n "${module_addresses}" ]]; then
+      log "  Removing modules: ${module_addresses//$'\n'/, }"
+      local -a module_address_list
+      mapfile -t module_address_list < <(printf '%s\n' "${module_addresses}")
+      if ! printf '%s\0' "${module_address_list[@]}" | \
+        xargs -0 -r -n 100 /tmp/terraform -chdir="${tf_dir}" state rm -no-color >>"${LOG}" 2>&1; then
+        log "  WARNING: module-level state removal was incomplete; sweeping exact addresses"
+      fi
+    fi
+
+    # The module fast path does not cover top-level resources or data sources,
+    # and it may leave unusual indexed addresses behind. Re-read state and
+    # remove every remaining address exactly, preserving quoted keys.
+    local state_after_modules
+    if ! state_after_modules=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>>"${LOG}"); then
+      log "  ERROR: Could not read TFC state after module removal"
+      state_rm_succeeded=false
+      CLEANUP_FAILED=1
+    elif [[ -n "${state_after_modules}" ]]; then
+      local -a remaining_addresses
+      mapfile -t remaining_addresses < <(printf '%s\n' "${state_after_modules}")
+      log "  Sweeping ${#remaining_addresses[@]} remaining exact state address(es)..."
+      if ! printf '%s\0' "${remaining_addresses[@]}" | \
+        xargs -0 -r -n 100 /tmp/terraform -chdir="${tf_dir}" state rm -no-color >>"${LOG}" 2>&1; then
+        log "  ERROR: exact state sweep failed; workspace may not be safe-deletable"
+        state_rm_succeeded=false
         CLEANUP_FAILED=1
       fi
     fi
   fi
 
-  # Safe-delete the workspace (should succeed with 0 resources)
+  # The state version created by `terraform state rm` is committed
+  # asynchronously by HCP Terraform. Give the backend time to report an empty
+  # state before attempting safe-delete. This also catches resources that
+  # could not be removed.
+  local state_empty=false
+  local state_after_rm
+  local state_attempt
+  for state_attempt in {1..12}; do
+    if state_after_rm=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>>"${LOG}"); then
+      if [[ -z "${state_after_rm}" ]]; then
+        state_empty=true
+        break
+      fi
+      log "  TFC state still contains resources after removal (attempt ${state_attempt}/12)"
+    else
+      log "  WARNING: Could not verify TFC state after removal (attempt ${state_attempt}/12)"
+    fi
+    sleep 5
+  done
+
+  if [[ "${state_rm_succeeded}" != "true" || "${state_empty}" != "true" ]]; then
+    log "  ERROR: TFC state is not empty; refusing force-delete"
+    log "  Workspace: https://app.terraform.io/app/${tfc_org}/workspaces/${workspace_name}"
+    CLEANUP_FAILED=1
+    return 0
+  fi
+
+  # Safe-delete may still briefly return 409 while the empty state version
+  # propagates through HCP Terraform. Retry with bounded backoff before using
+  # the force-delete endpoint as a last resort.
   log "  Deleting workspace..."
   local http_code
+  local delete_attempt
+  local safe_delete_succeeded=false
+  local safe_delete_conflict=false
+  for delete_attempt in {1..6}; do
+    if http_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+      --max-time 30 \
+      --connect-timeout 10 \
+      --header "Authorization: Bearer ${tfc_token}" \
+      --header "Content-Type: application/vnd.api+json" \
+      --request POST \
+      "https://app.terraform.io/api/v2/workspaces/${workspace_id}/actions/safe-delete" 2>>"${LOG}"); then
+      if [[ "${http_code}" == "204" || "${http_code}" == "200" || "${http_code}" == "404" ]]; then
+        safe_delete_succeeded=true
+        break
+      fi
+      if [[ "${http_code}" == "409" ]]; then
+        safe_delete_conflict=true
+        log "  Workspace state is still propagating (safe-delete HTTP 409, attempt ${delete_attempt}/6)"
+      else
+        safe_delete_conflict=false
+        log "  ERROR: Could not safe-delete TFC workspace (HTTP ${http_code})"
+        break
+      fi
+    else
+      safe_delete_conflict=false
+      log "  ERROR: TFC workspace safe-delete request failed"
+      break
+    fi
+    if [[ ${delete_attempt} -lt 6 ]]; then
+      sleep $((5 * (2 ** (delete_attempt - 1))))
+    fi
+  done
+
+  if [[ "${safe_delete_succeeded}" == "true" ]]; then
+    log "  TFC workspace deleted: ${workspace_name}"
+    return 0
+  fi
+
+  if [[ "${safe_delete_conflict}" != "true" ]]; then
+    log "  ERROR: TFC workspace safe-delete did not return a retryable conflict"
+    log "  Workspace: https://app.terraform.io/app/${tfc_org}/workspaces/${workspace_name}"
+    CLEANUP_FAILED=1
+    return 0
+  fi
+
+  # We have already deleted the GCP projects and verified that the remote
+  # state is empty. Force-delete only in this narrow case; unlike safe-delete,
+  # this endpoint requires org-owner/workspace-admin permission and does not
+  # destroy managed infrastructure.
+  log "  WARNING: safe-delete did not complete; attempting force-delete"
   if http_code=$(curl -sS -o /dev/null -w "%{http_code}" \
     --max-time 30 \
     --connect-timeout 10 \
     --header "Authorization: Bearer ${tfc_token}" \
     --header "Content-Type: application/vnd.api+json" \
-    --request POST \
-    "https://app.terraform.io/api/v2/workspaces/${workspace_id}/actions/safe-delete" 2>>"${LOG}"); then
-    if [[ "${http_code}" == "204" || "${http_code}" == "200" ]]; then
+    --request DELETE \
+    "https://app.terraform.io/api/v2/workspaces/${workspace_id}" 2>>"${LOG}"); then
+    if [[ "${http_code}" == "204" || "${http_code}" == "200" || "${http_code}" == "404" ]]; then
       log "  TFC workspace deleted: ${workspace_name}"
+      return 0
+    fi
+    if [[ "${http_code}" == "403" ]]; then
+      log "  ERROR: TFC force-delete is not permitted for this token (HTTP 403)"
     else
-      log "  ERROR: Could not delete TFC workspace (HTTP ${http_code})"
-      log "  Workspace: https://app.terraform.io/app/${tfc_org}/workspaces/${workspace_name}"
-      CLEANUP_FAILED=1
+      log "  ERROR: Could not force-delete TFC workspace (HTTP ${http_code})"
     fi
   else
-    log "  ERROR: TFC workspace deletion request failed; manual cleanup may be needed"
-    log "  Workspace: https://app.terraform.io/app/${tfc_org}/workspaces/${workspace_name}"
-    CLEANUP_FAILED=1
+    log "  ERROR: TFC workspace force-delete request failed"
   fi
+  log "  Workspace: https://app.terraform.io/app/${tfc_org}/workspaces/${workspace_name}"
+  CLEANUP_FAILED=1
 }
 
 # ========================================================================
