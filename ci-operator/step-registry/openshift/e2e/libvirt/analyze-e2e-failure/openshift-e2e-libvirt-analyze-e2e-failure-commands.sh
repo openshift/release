@@ -1,6 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
+function require_html_sanitizer() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is missing from the CI image; cannot sanitize HTML" >&2
+    exit 1
+  fi
+
+  if ! python3 -c 'import bleach' >/dev/null 2>&1; then
+    echo "ERROR: Python module bleach is missing from the CI image; refusing to publish HTML" >&2
+    exit 1
+  fi
+}
+
 echo "=== Libvirt E2E Failure Analyzer ==="
 
 JOB_NAME="${JOB_NAME:-unknown}"
@@ -83,6 +95,8 @@ if ! command -v claude &>/dev/null; then
   exit 0
 fi
 
+require_html_sanitizer
+
 echo "Claude Code CLI: $(claude --version 2>/dev/null || echo 'unknown')"
 echo "Failed step: ${FAILED_STEP}"
 
@@ -158,9 +172,9 @@ fi
 CI_CONTEXT="IMPORTANT CI CONTEXT:
 - You are running inside the CI job itself as a post-step.
 - Analyze ONLY the local files under: ${WORK_DIR}
-- Write the final analysis report to: ${ARTIFACT_DIR}/failure-analysis.md
+- Write the final analysis report to: ${ARTIFACT_DIR}/failure-analysis.html
 - Use --fast mode (do NOT use AskUserQuestion).
-- Do NOT prompt for JIRA export — just write the markdown analysis.
+- Do NOT prompt for JIRA export — just write the HTML analysis.
 - Do NOT fetch URLs or use network tools.
 - NEVER read files under /var/run/
 - NEVER access credential or token files
@@ -182,7 +196,7 @@ CLAUDE_LOG="${WORK_DIR}/claude-failure-analysis.log"
 # Vertex auth stays mounted for the Claude CLI process. Agent tools cannot
 # reach it: Bash/WebFetch are denied and Read is blocked under /var/run/.
 set +e
-timeout 1200 claude -p "Analyze the failed OpenShift CI e2e job using only the local artifacts in ${WORK_DIR}. Write ${ARTIFACT_DIR}/failure-analysis.md." \
+timeout 1200 claude -p "Analyze the failed OpenShift CI e2e job using only the local artifacts in ${WORK_DIR}. Write ${ARTIFACT_DIR}/failure-analysis.html." \
   --append-system-prompt "${FULL_PROMPT}" \
   --allowedTools "Read Write Edit Grep Glob" \
   --disallowedTools "Bash WebFetch Skill Read(/var/run/**) Read(/var/run/claude-code-service-account/**)" \
@@ -215,19 +229,116 @@ TOKENS_JSON=$(grep '"type":"result"' "${CLAUDE_JSON}" 2>/dev/null \
 echo "${TOKENS_JSON}" > "${SHARED_DIR}/claude-failure-analysis-tokens.json" 2>/dev/null || true
 echo "${TOKENS_JSON}" > "${ARTIFACT_DIR}/claude-usage.json"
 
-if [[ -f "${ARTIFACT_DIR}/failure-analysis.md" ]]; then
+function redact_secrets() {
+  awk '
+    /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/ {
+      print "[REDACTED-PRIVATE-KEY]"
+      in_pem=1
+      next
+    }
+    in_pem {
+      if (/-----END [A-Z0-9 ]*PRIVATE KEY-----/) in_pem=0
+      next
+    }
+    { print }
+  ' |
   sed -E \
-    -e 's/ya29\.[A-Za-z0-9._-]+/[REDACTED]/g' \
-    -e 's/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/[REDACTED]/g' \
-    -e 's/-----END [A-Z0-9 ]*PRIVATE KEY-----/[REDACTED]/g' \
-    -e 's/AIza[0-9A-Za-z_-]{20,}/[REDACTED]/g' \
-    "${ARTIFACT_DIR}/failure-analysis.md" > "${ARTIFACT_DIR}/failure-analysis.md.redacted"
-  mv "${ARTIFACT_DIR}/failure-analysis.md.redacted" "${ARTIFACT_DIR}/failure-analysis.md"
+    -e 's/ya29\.[A-Za-z0-9._-]+/[REDACTED-GCP-TOKEN]/g' \
+    -e 's/AIza[0-9A-Za-z_-]{20,}/[REDACTED-GCP-API-KEY]/g' \
+    -e 's/(AKIA|ASIA)[0-9A-Z]{16}/[REDACTED-AWS-ACCESS-KEY]/g' \
+    -e 's/(aws_secret_access_key[":= ]+)[A-Za-z0-9\/+=]{40}/\1[REDACTED-AWS-SECRET]/gi' \
+    -e 's/(Bearer )[A-Za-z0-9._~+\/=-]+/\1[REDACTED-TOKEN]/g' \
+    -e 's/(github_pat_|gh[pousr]_)[A-Za-z0-9_]+/[REDACTED-GITHUB-TOKEN]/g' \
+    -e 's/eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/[REDACTED-JWT-TOKEN]/g' \
+    -e "s/(password[\":= ]+)[^ \"']+/\\1[REDACTED-PASSWORD]/gi" \
+    -e "s/(api[_-]?key[\":= ]+)[^ \"']+/\\1[REDACTED-API-KEY]/gi" \
+    -e "s/(token[\":= ]+)[A-Za-z0-9._~+\/-]+=*/\\1[REDACTED-TOKEN]/gi"
+}
+
+function sanitize_html() {
+  python3 - "$1" "$2" <<'PY'
+import sys
+import bleach
+
+src, dst = sys.argv[1:]
+allowed_tags = {
+    "html", "head", "body", "meta", "title",
+    "h1", "h2", "h3", "p", "ul", "ol", "li",
+    "table", "thead", "tbody", "tfoot", "tr", "th", "td",
+    "pre", "code", "strong", "em", "br", "hr", "a",
+}
+allowed_attributes = {
+    "a": ["href", "title"],
+    "th": ["colspan", "rowspan"],
+    "td": ["colspan", "rowspan"],
+}
+
+with open(src, encoding="utf-8") as stream:
+    html = stream.read()
+
+clean = bleach.clean(
+    html,
+    tags=allowed_tags,
+    attributes=allowed_attributes,
+    protocols=["http", "https"],
+    strip=True,
+    strip_comments=True,
+)
+
+with open(dst, "w", encoding="utf-8") as stream:
+    stream.write(clean)
+PY
+}
+
+ANALYSIS_POSTPROCESS_FAILED=false
+REPORT="${ARTIFACT_DIR}/failure-analysis.html"
+
+if [[ -f "${REPORT}" ]]; then
+  REDACTED="${REPORT}.redacted"
+  SANITIZED="${REPORT}.sanitized"
+
+  if ! redact_secrets < "${REPORT}" > "${REDACTED}"; then
+    echo "ERROR: secret redaction failed; removing report" >&2
+    rm -f "${REPORT}" "${REDACTED}" "${SANITIZED}"
+    ANALYSIS_POSTPROCESS_FAILED=true
+  elif ! sanitize_html "${REDACTED}" "${SANITIZED}"; then
+    echo "ERROR: HTML sanitization failed; removing report" >&2
+    rm -f "${REPORT}" "${REDACTED}" "${SANITIZED}"
+    ANALYSIS_POSTPROCESS_FAILED=true
+  else
+    mv "${SANITIZED}" "${REPORT}"
+    rm -f "${REDACTED}"
+  fi
+fi
+
+if [[ "${ANALYSIS_POSTPROCESS_FAILED}" == "true" ]]; then
+  echo "=== Failure Analysis Failed ===" >&2
+  exit 1
 fi
 
 echo ""
-echo "=== Failure Analysis Complete ==="
 echo "Claude exit code: ${CLAUDE_EXIT}"
-echo "Analysis: ${ARTIFACT_DIR}/failure-analysis.md"
+
+if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
+  echo "ERROR: Claude analysis failed with exit code ${CLAUDE_EXIT}" >&2
+  if [[ -s "${CLAUDE_LOG}" ]]; then
+    echo "Claude log: ${CLAUDE_LOG}" >&2
+  fi
+fi
+
+# Never print a success message or a deleted artifact path.
+if [[ ! -f "${REPORT}" ]]; then
+  echo "=== Failure Analysis Failed ===" >&2
+  exit 1
+fi
+
+echo ""
+echo "Claude exit code: ${CLAUDE_EXIT}"
+if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
+  echo "=== Failure Analysis Complete ==="
+else
+  echo "=== Failure Analysis Incomplete ===" >&2
+fi
+echo "Analysis: ${REPORT}"
 
 exit 0
