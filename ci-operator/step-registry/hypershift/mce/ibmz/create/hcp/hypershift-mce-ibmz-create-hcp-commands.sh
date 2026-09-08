@@ -144,6 +144,7 @@ fi
 COREOS_STREAM_JSON="${COREOS_STREAM_DIR}/coreos-stream.json"
 if ! oc image extract "${MACHINE_OS_IMAGE}" \
   --path="/coreos/coreos-stream.json:${COREOS_STREAM_DIR}" \
+  --registry-config=/etc/ci-pull-credentials/.dockerconfigjson \
   --filter-by-os=linux/amd64 \
   --confirm; then
   echo "Failed to extract /coreos/coreos-stream.json from ${MACHINE_OS_IMAGE}" >&2
