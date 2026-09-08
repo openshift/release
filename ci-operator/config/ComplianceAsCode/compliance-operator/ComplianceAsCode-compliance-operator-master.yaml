@@ -134,9 +134,6 @@ tests:
     env:
       BASE_DOMAIN: perfscale.rox.systems
       COMPUTE_NODE_TYPE: m5.2xlarge
-      PQC_CHECK: "true"
-      SCAN_NAMESPACE: openshift-compliance
-      SCANNER_NAMESPACE: openshift-compliance
     post:
     - chain: ipi-deprovision
     pre:
@@ -145,7 +142,122 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-deployment
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+
+        # Run deployment tests first (creates openshift-compliance namespace)
+        make e2e-deployment
+
+        # Run TLS scanner after deployment completes
+        echo "=== Running TLS Scanner ==="
+        export NAMESPACE="openshift-compliance"
+        export SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
+
+        echo "TLS scanner target: openshift-compliance namespace"
+        echo "PQC readiness mode: enabled"
+
+        # Grant permissions for scanner
+        oc adm policy add-cluster-role-to-user cluster-admin -z default -n "${NAMESPACE}"
+        sleep 5
+
+        # Create scanner pod
+        cat <<EOF | oc create -f -
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: tls-scanner
+          namespace: ${NAMESPACE}
+        spec:
+          serviceAccountName: default
+          restartPolicy: Never
+          containers:
+          - name: scanner
+            image: ${SCANNER_IMAGE}
+            command:
+            - /bin/bash
+            - -c
+            - |
+              mkdir -p /results
+              /usr/local/bin/tls-scanner -j 4 \
+                --all-pods \
+                --namespace-filter openshift-compliance \
+                --pqc-check \
+                --json-file /results/results.json \
+                --csv-file /results/results.csv \
+                --junit-file /results/junit_tls_scan.xml \
+                --log-file /results/scan.log 2>&1 | tee /results/output.log
+              SCAN_EXIT_CODE=\${PIPESTATUS[0]}
+              echo "Scan complete. Exit code: \${SCAN_EXIT_CODE}" | tee -a /results/output.log
+              touch /results/scan.done
+              sleep 60
+              exit \${SCAN_EXIT_CODE}
+            resources:
+              requests:
+                cpu: "4"
+                memory: 4Gi
+              limits:
+                cpu: "4"
+                memory: 4Gi
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 65532
+              capabilities:
+                drop:
+                - ALL
+              seccompProfile:
+                type: RuntimeDefault
+            volumeMounts:
+            - name: results
+              mountPath: /results
+          volumes:
+          - name: results
+            emptyDir: {}
+        EOF
+
+        # Wait for scanner to start
+        echo "Waiting for scanner pod to start..."
+        oc wait --for=condition=Ready pod/tls-scanner -n "${NAMESPACE}" --timeout=5m
+
+        # Stream logs
+        oc logs -f pod/tls-scanner -n "${NAMESPACE}" &
+        LOGS_PID=$!
+
+        # Wait for completion
+        echo "Waiting for scan to complete..."
+        while true; do
+          if oc exec pod/tls-scanner -n "${NAMESPACE}" -- test -f /results/scan.done 2>/dev/null; then
+            break
+          fi
+          phase=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+          if [[ "$phase" == "Succeeded" || "$phase" == "Failed" ]]; then
+            break
+          fi
+          sleep 10
+        done
+
+        # Copy results
+        echo "Copying scan results..."
+        mkdir -p "${ARTIFACT_DIR}/tls-scanner"
+        oc cp "${NAMESPACE}/tls-scanner:/results/." "${ARTIFACT_DIR}/tls-scanner/" || echo "Warning: Failed to copy artifacts"
+
+        if [[ -f "${ARTIFACT_DIR}/tls-scanner/junit_tls_scan.xml" ]]; then
+          cp "${ARTIFACT_DIR}/tls-scanner/junit_tls_scan.xml" "${ARTIFACT_DIR}/junit_tls_scan.xml"
+          echo "JUnit results copied for Spyglass"
+        fi
+
+        wait $LOGS_PID 2>/dev/null || true
+
+        # Check exit status
+        pod_exit_code=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "1")
+        echo "=== TLS Scanner Complete (namespace: openshift-compliance) ==="
+        if [[ "$pod_exit_code" == "0" ]]; then
+          echo "Result: PASSED"
+        else
+          echo "Result: FAILED"
+          exit "${pod_exit_code}"
+        fi
       dependencies:
       - env: IMAGE_FROM_CI
         name: compliance-operator
@@ -153,11 +265,12 @@ tests:
         name: testcontent
       - env: OPENSCAP_IMAGE_FROM_CI
         name: testopenscap
+      - env: PULL_SPEC_TLS_SCANNER_TOOL
+        name: tls-scanner-tool
       from: src
       resources:
         requests:
           cpu: 100m
-    - ref: tls-scanner-run
 - always_run: false
   as: e2e-aws-scan-config
   optional: true
