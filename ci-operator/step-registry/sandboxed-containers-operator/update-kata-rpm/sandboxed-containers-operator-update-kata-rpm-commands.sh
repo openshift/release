@@ -2,6 +2,10 @@
 #
 # Download, copy and install the kata-containers RPM on each worker node.
 
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -36,7 +40,7 @@ brew_auth=${BREW_AUTH:-"$(oc get -n openshift-config secret/pull-secret -ojson  
 
 echo "Download the RPM from Brew"
 err=0
-output="$(curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${kata_rpm_build_url}" 2>&1)" || err=$?
+output="$(curl --noproxy '*' -L -k -o kata-containers.rpm -u "${brew_auth}" "${kata_rpm_build_url}" 2>&1)" || err=$?
 if [ $err -ne 0 ]; then
     echo "ERROR: curl error ${err} trying to get ${kata_rpm_build_url}"
     echo "ERROR: ${output}"

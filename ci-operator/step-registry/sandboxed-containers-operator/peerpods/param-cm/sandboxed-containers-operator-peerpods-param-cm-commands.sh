@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if [ "$ENABLEPEERPODS" != "true" ]; then
     echo "skip as ENABLEPEERPODS is not true"
     exit 0
@@ -161,6 +165,10 @@ handle_azure() {
         AZURE_CLIENT_SECRET="$(jq -r .data.azure_client_secret azure_credentials.json|base64 -d)"
         AZURE_TENANT_ID="$(jq -r .data.azure_tenant_id azure_credentials.json|base64 -d)"
         rm -f azure_credentials.json
+    elif [[ -f "${SHARED_DIR}/resourcegroup" ]]; then
+        # Disconnected IPI: VNet lives in the network resource group, not
+        # the cluster resource group.
+        MANAGEMENT_RESOURCE_GROUP="$(cat "${SHARED_DIR}/resourcegroup")"
     else
         MANAGEMENT_RESOURCE_GROUP="$AZURE_RESOURCE_GROUP"
     fi
@@ -190,7 +198,11 @@ handle_azure() {
     PP_SUBNET_ID="${AZURE_SUBNET_ID}"
     PP_NSG_ID="${AZURE_NSG_ID}"
 
-    # Peer-pod requires gateway
+    # Peer-pod requires a gateway for outbound access. In restricted network,
+    # peer-pod VMs still need outbound to reach the mirror registry (e.g. over
+    # a private endpoint / AzureCloud service tag), so the NAT gateway is not
+    # skipped here — only the direct-internet path differs, not the need for
+    # a gateway.
     az network public-ip create \
         --resource-group "${MANAGEMENT_RESOURCE_GROUP}" \
         --name MyPublicIP \
@@ -249,6 +261,11 @@ handle_azure() {
         echo "Peer-pods workload: using VM size ${PP_INSTANCE_SIZE} in region ${PP_REGION}"
     fi
 
+    # Restricted network: podvm boot takes longer over the mirror/proxy path,
+    # give CAA more time before it gives up waiting for the VM to come up.
+    AZURE_PROXY_TIMEOUT="30m"
+    [[ "${RESTRICTED_NETWORK:-}" == "yes" ]] && AZURE_PROXY_TIMEOUT="2h"
+
     # Creating peerpods-param-cm config map with all the cloud params needed for test case execution
     cat <<- EOF > "${PP_CONFIGM_PATH}"
     apiVersion: v1
@@ -266,7 +283,7 @@ handle_azure() {
       AZURE_NSG_ID: "${PP_NSG_ID}"
       AZURE_RESOURCE_GROUP: "${PP_RESOURCE_GROUP}"
       AZURE_REGION: "${PP_REGION}"
-      PROXY_TIMEOUT: "30m"
+      PROXY_TIMEOUT: "${AZURE_PROXY_TIMEOUT}"
 EOF
 
     if [[ -z "${AZURE_AUTH_LOCATION}" ]]; then

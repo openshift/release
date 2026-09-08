@@ -27,6 +27,10 @@
 
 set -euo pipefail
 
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 #========================================
 # Configuration
 #========================================
@@ -222,6 +226,13 @@ function render_trustee_operator_chart() {
     )
     echo ">>> Helm parameters: namespaceOverride=${TRUSTEE_NAMESPACE}, dev.enabled=false" >&2
     echo ">>> Note: Using existing 'redhat-operators' CatalogSource" >&2
+  fi
+
+  if [[ "${RESTRICTED_NETWORK:-}" == "yes" ]]; then
+    # Our own mirror-operator step already created IDMS/ITMS pointing to the
+    # mirror registry; the chart's copies point to quay.io and would conflict.
+    helm_args+=("--set" "dev.createMirrorSets=false")
+    echo ">>> Restricted network: dev.createMirrorSets=false" >&2
   fi
 
   # Render the chart and capture output for debugging
@@ -506,6 +517,52 @@ PUBKEY
   fi
 }
 
+# Publish the mirror registry credential as a KBS resource, so guest-pull
+# (kata-cc/CDH) can authenticate to the mirror instead of relying on
+# anonymous pull, which the mirror registry no longer allows.
+# Exposed at kbs:///default/${ACR_KBS_SECRET_NAME}/auth.json
+ACR_KBS_SECRET_NAME="acr-registry-auth"
+function register_acr_kbs_secret() {
+  if [[ ! -f "${SHARED_DIR}/acr_registry_creds" || ! -f "${SHARED_DIR}/mirror_registry_url" ]]; then
+    echo ">>> No ACR mirror credentials found, skipping registry auth KBS resource"
+    return 0
+  fi
+
+  local mirror_host acr_user acr_password acr_auth auth_json_path
+  mirror_host=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+  acr_user=$(cut -d: -f1 < "${SHARED_DIR}/acr_registry_creds")
+  acr_password=$(cut -d: -f2 < "${SHARED_DIR}/acr_registry_creds")
+  acr_auth=$(printf '%s:%s' "${acr_user}" "${acr_password}" | base64 -w 0)
+  auth_json_path="${SCRATCH}/acr-auth.json"
+  jq -n --arg host "${mirror_host}" --arg auth "${acr_auth}" \
+    '{auths: {($host): {auth: $auth}}}' > "${auth_json_path}"
+
+  echo ">>> Creating secret ${ACR_KBS_SECRET_NAME} in ${TRUSTEE_NAMESPACE}"
+  oc create secret generic "${ACR_KBS_SECRET_NAME}" \
+    -n "${TRUSTEE_NAMESPACE}" \
+    --from-file=auth.json="${auth_json_path}" \
+    --dry-run=client -o yaml | oc apply -f -
+
+  local cr_name
+  cr_name=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ -z "${cr_name}" ]]; then
+    echo ">>> WARN: No KbsConfig found — secret created but not patched into CR"
+    return 0
+  fi
+
+  local existing
+  existing=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" "${cr_name}" \
+    -o jsonpath='{.spec.kbsSecretResources}' 2>/dev/null || echo "")
+
+  if echo "${existing}" | grep -q "${ACR_KBS_SECRET_NAME}"; then
+    echo ">>> ${ACR_KBS_SECRET_NAME} already in kbsSecretResources — skipping patch"
+  else
+    echo ">>> Patching KbsConfig ${cr_name} to register ${ACR_KBS_SECRET_NAME}"
+    oc patch kbsconfig -n "${TRUSTEE_NAMESPACE}" "${cr_name}" --type=json \
+      -p="[{\"op\":\"add\",\"path\":\"/spec/kbsSecretResources/-\",\"value\":\"${ACR_KBS_SECRET_NAME}\"}]"
+  fi
+}
+
 # Wait for operand deployments to become available
 function wait_for_operands() {
   sleep 10
@@ -661,6 +718,11 @@ function create_initdata() {
 
   local initdata_file="${SCRATCH}/initdata.toml"
 
+  local registry_auth_uri_line=""
+  if [[ -f "${SHARED_DIR}/acr_registry_creds" ]]; then
+    registry_auth_uri_line="authenticated_registry_credentials_uri = \"kbs:///default/${ACR_KBS_SECRET_NAME}/auth.json\""
+  fi
+
   cat > "${initdata_file}" <<EOF
 algorithm = "sha256"
 version = "0.1.0"
@@ -687,6 +749,7 @@ kbs_cert = """${tls_cert}"""
 
 [image]
 image_security_policy = '${policy_json}'
+${registry_auth_uri_line}
 '''
 
 "policy.rego" = '''
@@ -998,6 +1061,7 @@ install_trustee_operator "${CHARTS_DIR}"
 wait_for_operator
 install_trustee_operands "${CHARTS_DIR}"
 register_kbs_secret
+register_acr_kbs_secret
 wait_for_operands
 
 # Configure and verify
