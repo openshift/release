@@ -43,11 +43,13 @@ trap copy_artifacts EXIT TERM INT
 git config --global url."https://github.com/".insteadOf "git@github.com:"
 
 # -----------------------------------------------------------------------
-# Configure GitHub credentials for marketplace access
+# Install the Security plugin from the marketplace.
 #
-# rosa-claude-plugins requires openshift-online org membership to read,
-# so an authenticated identity is required here — see ONBOARDING.md for
-# how to provision GITHUB_PAT_PATH's underlying secret.
+# rosa-claude-plugins requires openshift-online org membership to read, so
+# an authenticated identity is needed for this one step — see ONBOARDING.md
+# for how to provision GITHUB_PAT_PATH's underlying secret. The credential
+# is removed immediately after install (below); nothing past this point
+# needs GitHub access.
 # -----------------------------------------------------------------------
 echo ""
 echo "=== Loading GitHub credentials ==="
@@ -83,6 +85,18 @@ echo "=== Installing plugins ==="
 claude plugin marketplace add openshift-online/rosa-claude-plugins
 claude plugin install security@rosa-claude-plugins
 echo "Plugins installed."
+
+# This step always installs the latest security plugin from main -- it's a
+# scan/audit, not a release dependency, so there's no version to pin. Record
+# which commit was actually used so a run can be audited after the fact
+# without needing to track versions by hand.
+ROSA_CLAUDE_PLUGINS_SHA=$(git ls-remote https://github.com/openshift-online/rosa-claude-plugins.git main | cut -f1)
+echo "rosa-claude-plugins revision: ${ROSA_CLAUDE_PLUGINS_SHA}"
+echo "${ROSA_CLAUDE_PLUGINS_SHA}" > "${ARTIFACT_DIR}/rosa-claude-plugins-revision.txt"
+
+# Credential removed since no longer required.
+git config --global --unset credential.helper
+unset GITHUB_TOKEN
 
 # -----------------------------------------------------------------------
 # Build the prompt based on scan mode
