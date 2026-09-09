@@ -5,9 +5,6 @@ set -o pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-# In dev mode, Vault is already initialized and unsealed with root token "root"
-ROOT_TOKEN="root"
-
 # Configure a Vault instance for KMS encryption.
 # Args: $1 = namespace, $2 = KMS key name, $3 = pod name
 configure_vault() {
@@ -15,6 +12,13 @@ configure_vault() {
   local key_name="$2"
   local pod_name="$3"
   local service_name="${pod_name%-0}"
+
+  # Root token from the install step's `vault operator init`.
+  local ROOT_TOKEN
+  ROOT_TOKEN="$(oc get secret vault-root-token -n "${namespace}" -o jsonpath='{.data.token}' | base64 -d)"
+
+  # Vault CLI runs inside the pod against the local TLS listener during setup.
+  local vault_exec_env="VAULT_ADDR=https://127.0.0.1:8200 VAULT_SKIP_VERIFY=true"
 
   echo ""
   echo "========================================="
@@ -31,27 +35,27 @@ configure_vault() {
   # Create the Vault Enterprise namespace used by the KMS plugin
   echo "Creating Vault Enterprise namespace '${VAULT_ENTERPRISE_NS}'..."
   oc exec "${pod_name}" -n "${namespace}" -- \
-    env VAULT_TOKEN="${ROOT_TOKEN}" vault namespace create "${VAULT_ENTERPRISE_NS}"
+    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault namespace create "${VAULT_ENTERPRISE_NS}"
 
   # Enable transit secret engine
   echo "Enabling transit secret engine..."
   oc exec "${pod_name}" -n "${namespace}" -- \
-    env VAULT_TOKEN="${ROOT_TOKEN}" vault secrets enable -namespace="${VAULT_ENTERPRISE_NS}" -path=transit transit
+    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault secrets enable -namespace="${VAULT_ENTERPRISE_NS}" -path=transit transit
 
   # Create encryption key
   echo "Creating transit encryption key..."
   oc exec "${pod_name}" -n "${namespace}" -- \
-    env VAULT_TOKEN="${ROOT_TOKEN}" vault write -namespace="${VAULT_ENTERPRISE_NS}" -f "transit/keys/${key_name}"
+    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault write -namespace="${VAULT_ENTERPRISE_NS}" -f "transit/keys/${key_name}"
 
   # Enable AppRole auth
   echo "Enabling AppRole authentication..."
   oc exec "${pod_name}" -n "${namespace}" -- \
-    env VAULT_TOKEN="${ROOT_TOKEN}" vault auth enable -namespace="${VAULT_ENTERPRISE_NS}" approle
+    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault auth enable -namespace="${VAULT_ENTERPRISE_NS}" approle
 
   # Create KMS policy
   echo "Creating KMS policy..."
   oc exec "${pod_name}" -n "${namespace}" -- \
-    sh -c "VAULT_TOKEN=${ROOT_TOKEN} vault policy write -namespace=${VAULT_ENTERPRISE_NS} kms-policy - <<POLICY
+    sh -c "${vault_exec_env} VAULT_TOKEN=${ROOT_TOKEN} vault policy write -namespace=${VAULT_ENTERPRISE_NS} kms-policy - <<POLICY
 path \"transit/encrypt/${key_name}\" {
   capabilities = [\"update\"]
 }
@@ -69,7 +73,7 @@ POLICY"
   # Create AppRole role
   echo "Creating AppRole role..."
   oc exec "${pod_name}" -n "${namespace}" -- \
-    env VAULT_TOKEN="${ROOT_TOKEN}" vault write -namespace="${VAULT_ENTERPRISE_NS}" auth/approle/role/kms-plugin \
+    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault write -namespace="${VAULT_ENTERPRISE_NS}" auth/approle/role/kms-plugin \
       token_policies=kms-policy \
       token_ttl=1h \
       token_max_ttl=4h
@@ -77,9 +81,9 @@ POLICY"
   # Get AppRole credentials
   echo "Retrieving AppRole credentials..."
   ROLE_ID=$(oc exec "${pod_name}" -n "${namespace}" -- \
-    env VAULT_TOKEN="${ROOT_TOKEN}" vault read -namespace="${VAULT_ENTERPRISE_NS}" -field=role_id auth/approle/role/kms-plugin/role-id)
+    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault read -namespace="${VAULT_ENTERPRISE_NS}" -field=role_id auth/approle/role/kms-plugin/role-id)
   SECRET_ID=$(oc exec "${pod_name}" -n "${namespace}" -- \
-    env VAULT_TOKEN="${ROOT_TOKEN}" vault write -namespace="${VAULT_ENTERPRISE_NS}" -field=secret_id -f auth/approle/role/kms-plugin/secret-id)
+    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault write -namespace="${VAULT_ENTERPRISE_NS}" -field=secret_id -f auth/approle/role/kms-plugin/secret-id)
 
   # Create vault-credentials secret
   echo "Creating vault-credentials secret..."

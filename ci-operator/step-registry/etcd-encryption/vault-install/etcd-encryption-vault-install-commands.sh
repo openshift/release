@@ -202,42 +202,90 @@ install_vault() {
   echo ""
 
   local vault_api_addr="https://${release_name}.${namespace}.svc:8200"
+  local serving_cert="${release_name}-serving-cert"
+  local vault_service_fqdn="${release_name}.${namespace}.svc"
 
-  # Install Vault via Helm with dev mode and TLS enabled
-  echo "Installing Vault Enterprise ${VAULT_ENTERPRISE_IMAGE} in dev mode with TLS..."
+  # service-CA serving cert: its CA is stable across restarts, so vault-ca-bundle never drifts.
+  echo "Installing Vault Enterprise ${VAULT_ENTERPRISE_IMAGE} with service-CA TLS..."
   helm upgrade --install "${release_name}" "${VAULT_CHART_ARCHIVE}" \
     --namespace "${namespace}" \
     --version "${VAULT_CHART_VERSION}" \
     --set global.enabled=true \
     --set global.openshift=true \
     --set global.tlsDisable=false \
-    --set server.dev.enabled=true \
+    --set server.standalone.enabled=true \
+    --set server.dataStorage.enabled=false \
     --set server.image.repository="${VAULT_IMAGE_REPOSITORY}" \
     --set server.image.tag="${VAULT_VERSION}" \
     --set injector.enabled=false \
     --set 'server.extraEnvironmentVars.VAULT_DISABLE_USER_LOCKOUT=true' \
-    --set 'server.extraEnvironmentVars.VAULT_CACERT=/var/run/tls/vault-ca.pem' \
     --set "server.extraEnvironmentVars.VAULT_API_ADDR=${vault_api_addr}" \
     --set "server.enterpriseLicense.secretName=${VAULT_LICENSE_SECRET_NAME}" \
     --set "server.enterpriseLicense.secretKey=license" \
-    --set "server.extraArgs=-dev-tls -dev-tls-cert-dir=/var/run/tls -dev-tls-san=${release_name} -dev-tls-san=${release_name}.${namespace}.svc" \
-    --set 'server.volumes[0].name=tls' \
-    --set-json 'server.volumes[0].emptyDir={}' \
+    --set "server.volumes[0].name=tls" \
+    --set "server.volumes[0].secret.secretName=${serving_cert}" \
     --set 'server.volumeMounts[0].name=tls' \
     --set 'server.volumeMounts[0].mountPath=/var/run/tls' \
-    --wait \
+    --set-string $'server.standalone.config=listener "tcp" {\n  address = "[::]:8200"\n  tls_cert_file = "/var/run/tls/tls.crt"\n  tls_key_file = "/var/run/tls/tls.key"\n}\nstorage "inmem" {}' \
     --timeout 10m
 
-  # Helm wait passes even when vault pod is 0/1 Running, so wait for ready condition
-  echo "Waiting for Vault pod to be ready..."
+  # Chart 0.28.1 copies server.service.annotations onto both the client Service
+  # and vault-internal. Annotate only the client Service so the serving cert is
+  # valid for vault.vault-kms.svc, which is what the KMS tests connect to.
+  echo "Requesting service-CA serving certificate for ${vault_service_fqdn}..."
+  oc annotate service "${release_name}" -n "${namespace}" \
+    "service.beta.openshift.io/serving-cert-secret-name=${serving_cert}" --overwrite
+
+  echo "Waiting for serving certificate secret ${serving_cert}..."
+  local attempt=0
+  until oc get secret "${serving_cert}" -n "${namespace}" >/dev/null 2>&1; do
+    attempt=$((attempt + 1))
+    if [[ "${attempt}" -ge 60 ]]; then
+      echo "Timed out waiting for serving certificate secret ${serving_cert}"
+      exit 1
+    fi
+    sleep 5
+  done
+
+  echo "Waiting for serving certificate to include ${vault_service_fqdn}..."
+  attempt=0
+  until oc get secret "${serving_cert}" -n "${namespace}" -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -text 2>/dev/null | grep -Fq "${vault_service_fqdn}"; do
+    attempt=$((attempt + 1))
+    if [[ "${attempt}" -ge 60 ]]; then
+      echo "Timed out waiting for serving certificate SAN ${vault_service_fqdn}"
+      oc get secret "${serving_cert}" -n "${namespace}" -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -text || true
+      exit 1
+    fi
+    sleep 5
+  done
+
+  echo "Restarting Vault pod to load serving certificate..."
+  oc delete pod "${pod_name}" -n "${namespace}" --wait=false
+  oc wait --for=jsonpath='{.status.phase}'=Running "pod/${pod_name}" -n "${namespace}" --timeout=5m
+
+  # Standalone Vault starts sealed: init + unseal once it is up.
+  echo "Initializing and unsealing Vault..."
+  local init_json
+  init_json="$(oc exec "${pod_name}" -n "${namespace}" -- vault operator init -tls-skip-verify -key-shares=1 -key-threshold=1 -format=json)"
+  oc exec "${pod_name}" -n "${namespace}" -- vault operator unseal -tls-skip-verify "$(jq -r '.unseal_keys_b64[0]' <<<"${init_json}")" >/dev/null
+  oc create secret generic vault-root-token --from-literal=token="$(jq -r '.root_token' <<<"${init_json}")" -n "${namespace}"
   oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
 
-  # Extract CA certificate from Vault pod
-  echo ""
-  echo "Extracting CA certificate from Vault pod..."
+  # Publish the stable service-CA bundle as the trust anchor.
+  echo "Waiting for service-CA bundle ConfigMap..."
+  attempt=0
+  until oc get configmap openshift-service-ca.crt -n "${namespace}" >/dev/null 2>&1; do
+    attempt=$((attempt + 1))
+    if [[ "${attempt}" -ge 60 ]]; then
+      echo "Timed out waiting for openshift-service-ca.crt ConfigMap in ${namespace}"
+      exit 1
+    fi
+    sleep 5
+  done
+
   CA_CERT_TMP="/tmp/vault-ca-${namespace}.pem"
-  oc exec "${pod_name}" -n "${namespace}" -- cat /var/run/tls/vault-ca.pem > "${CA_CERT_TMP}"
-  echo "  ✓ CA certificate extracted"
+  oc get configmap openshift-service-ca.crt -n "${namespace}" -o jsonpath='{.data.service-ca\.crt}' > "${CA_CERT_TMP}"
+  echo "  ✓ service-CA bundle extracted"
 
   # Create or update ConfigMap with CA certificate in openshift-config
   echo ""
@@ -261,8 +309,9 @@ install_vault() {
   echo "  - Image: ${VAULT_ENTERPRISE_IMAGE}"
   echo "  - Service: https://${release_name}.${namespace}.svc:8200"
   echo "  - Pod: ${pod_name} (Ready)"
-  echo "  - TLS: Enabled (dev mode with auto-generated certificates)"
-  echo "  - TLS CA: /var/run/tls/vault-ca.pem (inside pod)"
+  echo "  - TLS: Enabled (OpenShift service-CA serving certificate)"
+  echo "  - TLS cert: /var/run/tls/tls.crt (inside pod)"
+  echo "  - TLS SAN: ${vault_service_fqdn}"
   echo "  - Enterprise License: Configured"
   echo "  - CA ConfigMap: ${ca_configmap} (openshift-config namespace)"
   echo ""
