@@ -1,0 +1,88 @@
+ref:
+  as: openshift-qe-maas-gateway-perf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-maas-gateway-perf-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OPERATOR_TYPE
+    default: "odh"
+    documentation: |-
+      MaaS operator type to deploy. Either "odh" for Open Data Hub or "rhoai" for Red Hat OpenShift AI.
+  - name: PROVIDERS
+    default: "gpt-4o-openai,claude-sonnet-anthropic"
+    documentation: |-
+      Comma-separated list of provider model names to benchmark.
+      Available: gpt-4o-openai, gpt-4o-azure, gpt-4o-bedrock, claude-sonnet-anthropic, claude-sonnet-vertex
+  - name: PAYLOAD_SIZES
+    default: "small,medium"
+    documentation: |-
+      Comma-separated payload sizes. Available: small(32/64), medium(256/512), large(1024/1024), very-large(2048/2048)
+  - name: CONCURRENCY_LEVELS
+    default: "8,32,64,128,512"
+    documentation: |-
+      Comma-separated concurrency levels for benchmark runs.
+  - name: BENCHMARK_DURATION
+    default: "90"
+    documentation: |-
+      Duration in seconds for each benchmark run.
+  - name: SAMPLES
+    default: "3"
+    documentation: |-
+      Number of benchmark samples per configuration.
+  - name: PARALLELISM
+    default: "1"
+    documentation: |-
+      Number of parallel benchmark jobs to run.
+  - name: WARMUP
+    default: "30"
+    documentation: |-
+      Warmup duration in seconds (discarded from results).
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e-benchmarking version/tag to clone.
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube-burner-ocp version.
+  - name: MAAS_REF
+    default: "v0.2.1"
+    documentation: |-
+      MaaS release tag to deploy. Pin to a stable release for reproducibility.
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: ES_HOST
+    default: ""
+    documentation: |-
+      Override elasticsearch host.
+  - name: EXTRA_FLAGS
+    default: "--timeout=10h"
+    documentation: |-
+      Extra flags passed directly to the kube-burner-ocp command.
+      Example: "--timeout=10h" to override the default 4h timeout.
+  - name: DEPLOY_EXTRA_ARGS
+    default: ""
+    documentation: |-
+      Extra arguments passed to the MaaS deploy.sh script.
+      Example: "--channel fast-3.x" to use a pre-release operator channel.
+  documentation: >-
+    This step deploys the full MaaS AI Gateway platform from scratch
+    (including ODH/RHOAI operator, cert-manager, LWS, Kuadrant/RHCL,
+    PostgreSQL, Gateway, and DataScienceCluster) via the MaaS deploy.sh
+    script, then runs GuideLLM A/B performance benchmarks measuring
+    gateway overhead. No separate operator install step is needed.
+    OPERATOR_TYPE controls whether ODH or RHOAI gets installed.
+  timeout: 12h
