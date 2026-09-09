@@ -444,6 +444,17 @@ function install_osc_operator() {
   oc apply -f "${operator_yaml}" --dry-run=client -o name || true
 
   oc_with_retry oc apply -f "${operator_yaml}"
+
+  # Workaround: the Helm chart may render osc-operator-dev-catalog even when
+  # dev.enabled=false (chart bug). If we are not using a custom catalog, delete
+  # it so the Stage 0 "all catalogs READY" wait does not time out on a catalog
+  # that has no valid image.
+  if [[ -z "${CATALOG_SOURCE_IMAGE}" ]]; then
+    if oc get catalogsource -n openshift-marketplace "${OSC_DEV_CATALOG_NAME}" >/dev/null 2>&1; then
+      echo ">>> Removing spurious ${OSC_DEV_CATALOG_NAME} (CATALOG_SOURCE_IMAGE is empty, using redhat-operators)"
+      oc delete catalogsource -n openshift-marketplace "${OSC_DEV_CATALOG_NAME}" --ignore-not-found || true
+    fi
+  fi
 }
 
 function wait_for_operator() {
