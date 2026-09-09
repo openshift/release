@@ -74,6 +74,13 @@ fi
 
 case "${AGENT_HARNESS}" in
     claude-code)
+        # Fable requires a newer Claude Code version than the stable channel
+        # provides. agentic-ci's Claude harness executes "claude" from PATH,
+        # so put a same-named shim first while leaving /usr/bin/claude untouched.
+        CLAUDE_LATEST_BIN_DIR="${TMPDIR:-/tmp}/claude-latest-bin"
+        mkdir -p "${CLAUDE_LATEST_BIN_DIR}"
+        ln -sf "$(command -v claude-latest)" "${CLAUDE_LATEST_BIN_DIR}/claude"
+        export PATH="${CLAUDE_LATEST_BIN_DIR}:${PATH}"
         AGENT_DISPLAY_NAME="Claude"
         AGENT_MODEL="${CLAUDE_MODEL}"
         if [[ -n "${AGENT_EFFORT}" ]]; then
