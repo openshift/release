@@ -1,0 +1,29 @@
+ref:
+  as: agent-qe-baremetal-install-ove-disconnected-mirror-validation-images
+  from_image:
+    namespace: ci
+    name: tests-private-base
+    tag: latest
+  cli: latest
+  grace_period: 10m
+  timeout: 1h0m0s
+  commands: agent-qe-baremetal-install-ove-disconnected-mirror-validation-images-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: ci-pull-credentials
+    mount_path: /var/run/secrets/ci-pull-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: TARGET_NAMESPACE
+    default: openshift-cnv
+    documentation: |-
+      Namespace where CNV (OpenShift Virtualization) is installed.
+  documentation: |-
+    Mirror all images required by ocp-virt-validation-checkup to the
+    cluster's internal image registry so the checkup can run on
+    disconnected clusters. Creates ImageTagMirrorSet and
+    ImageDigestMirrorSet resources and waits for MachineConfigPool
+    rollout.
