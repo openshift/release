@@ -1,0 +1,104 @@
+base_images:
+  assisted-service-scripts:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  test-bin:
+    name: "5.0"
+    namespace: ocp
+    tag: hypershift-tests
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "5.0"
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-v2-agent-connected-ipv4-metal
+  capabilities:
+  - intranet
+  cron: 0 6 * * 2
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        WORKER_MEMORY=24576
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+        NUM_WORKERS=4
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      MCE_VERSION: "2.17"
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+    test:
+    - chain: hypershift-mce-agent-e2e-v2
+    workflow: hypershift-mce-agent-metal3-conformance
+- as: e2e-v2-agent-connected-dualstack-metal
+  capabilities:
+  - intranet
+  cron: 0 6 * * 3
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=4
+        MASTER_MEMORY=32768
+        WORKER_MEMORY=32768
+        WORKER_VCPU=16
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      IP_STACK: v4v6
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      MCE_VERSION: "2.17"
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+    test:
+    - ref: hypershift-mce-agent-custom-ingress-operator
+    - chain: hypershift-mce-agent-e2e-v2
+    workflow: hypershift-mce-agent-metal3-conformance
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: hypershift
+  variant: periodics-mce
