@@ -146,11 +146,17 @@ tests:
         #!/bin/bash
         set -euo pipefail
 
-        # Run deployment tests first (creates openshift-compliance namespace)
+        # Run deployment tests first (creates, tests, and cleans up openshift-compliance namespace)
         export TEST_OPERATOR_NAMESPACE="openshift-compliance"
         make e2e-deployment
 
-        # Wait for compliance-operator deployment to be ready
+        # Redeploy compliance-operator for TLS scanning (deployment test cleaned up everything)
+        echo "Redeploying compliance-operator for TLS scanning..."
+        export GOFLAGS=""
+        export NAMESPACE=openshift-compliance
+        make deploy
+
+        # Wait for deployment to be ready
         echo "Waiting for compliance-operator deployment to be ready..."
         oc wait --for=condition=Available deployment/compliance-operator -n openshift-compliance --timeout=10m
 
