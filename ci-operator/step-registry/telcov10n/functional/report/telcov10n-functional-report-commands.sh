@@ -2,7 +2,16 @@
 set -e
 set -o pipefail
 
-ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
+ECO_CI_CD_BASE="/eco-ci-cd"
+
+if [[ -n "${ECO_CI_CD_FORK_URL:-}" ]]; then
+  echo "Using eco-ci-cd fork: ${ECO_CI_CD_FORK_URL} branch: ${ECO_CI_CD_FORK_BRANCH:-main}"
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" "${ECO_CI_CD_FORK_URL}" /tmp/eco-ci-cd-fork-reporter
+  ln -s /eco-ci-cd/collections /tmp/eco-ci-cd-fork-reporter/collections
+  ECO_CI_CD_BASE="/tmp/eco-ci-cd-fork-reporter"
+fi
+
+ECO_CI_CD_INVENTORY_PATH="${ECO_CI_CD_BASE}/inventories/cnf"
 
 echo "Checking if the job should be skipped..."
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
@@ -51,7 +60,7 @@ if ! compgen -G "${SHARED_DIR}/*polarion*.xml" > /dev/null 2>&1; then
   UPLOAD_SHARED_DIR=""
 else
   echo "Reports found in SHARED_DIR"
-  for f in "${SHARED_DIR}"/*polarion*.xml; do
+  for f in "${SHARED_DIR}"/polarion_*.xml; do
     if [[ -f "$f" ]]; then
       filename=$(basename "$f" | sed 's/^polarion_//')
       cp "$f" "/tmp/reports/${filename}"
@@ -76,7 +85,7 @@ else
   UPLOAD_SHARED_DIR="${SHARED_DIR}"
 fi
 
-cd /eco-ci-cd
+cd "${ECO_CI_CD_BASE}"
 
 METRICS_FILE="/tmp/metrics/metrics.txt"
 
@@ -105,4 +114,5 @@ SHARED_DIR="${UPLOAD_SHARED_DIR}" ansible-playbook ./playbooks/upload-report.yam
     reporter_launch_name='${REPORTER_LAUNCH_NAME}' \
     upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \
     report_portal_url_filename='${REPORTPORTAL_FILES}' \
-    reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"
+    reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}' \
+    cnf_polarion_converter_url='${CNF_POLARION_CONVERTER_URL:-}'"
