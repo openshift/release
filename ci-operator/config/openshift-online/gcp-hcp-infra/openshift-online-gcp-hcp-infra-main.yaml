@@ -1,3 +1,8 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.26-openshift-4.23:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
 binary_build_commands: make terraform-init
 build_root:
   image_stream_tag:
@@ -98,6 +103,11 @@ tests:
     UV_NO_PROGRESS=true && make check-generated-files
   container:
     from: src
+- as: gitops-promoter-test
+  commands: make gitops-promoter-test
+  container:
+    clone: true
+    from: ocp_builder_rhel-9-golang-1.26-openshift-4.23
 - always_run: false
   as: e2e-platform
   steps:
