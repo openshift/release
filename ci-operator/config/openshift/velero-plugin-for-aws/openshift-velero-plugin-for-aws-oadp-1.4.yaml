@@ -1,3 +1,12 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  test-oadp-operator:
+    name: oadp-operator-e2e-tests
+    namespace: konveyor
+    tag: oadp-1.4
 build_root:
   image_stream_tag:
     name: builder
@@ -13,6 +22,12 @@ promotion:
   to:
   - name: velero-plugin-for-aws
     namespace: konveyor
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -20,6 +35,130 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-test-aws
+  run_if_changed: (\.go|\.ya?ml|\.sh)$|^go\.(mod|sum)$|^Makefile$|^Dockerfile.*$|^\.dockerignore$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      DEPENDS_ON_CANDIDATES: |-
+        openshift/velero RELATED_IMAGE_VELERO Dockerfile.ubi
+        openshift/velero-plugin-for-legacy-aws RELATED_IMAGE_VELERO_PLUGIN_FOR_LEGACY_AWS Dockerfile.ubi
+        openshift/openshift-velero-plugin RELATED_IMAGE_OPENSHIFT_VELERO_PLUGIN
+        openshift/oadp-operator MANAGER_IMAGE
+      OADP_BRANCH: oadp-1.4
+      OO_BUNDLE: quay-proxy.ci.openshift.org/openshift/ci:konveyor_oadp-operator-bundle_oadp-1.4
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_INSTALL_TIMEOUT_MINUTES: "25"
+      OO_MIRROR_TO_CLUSTER_REGISTRY: "true"
+      OO_PSA_ENFORCE_PRIVILEGED: "true"
+      TEST_NAME: e2e-test-aws
+    post:
+    - ref: oadp-analyze-e2e-failure
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: oadp-operator-sdk-bundle-image
+    test:
+    - ref: oadp-depends-on-build
+    - as: set-related-image
+      cli: latest
+      commands: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        SUBS=$(oc get subscription -n "${OO_INSTALL_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}')
+        if [ -z "${SUBS}" ]; then
+          echo "No Subscription found in namespace ${OO_INSTALL_NAMESPACE}" >&2
+          exit 1
+        fi
+        if [ "$(echo "${SUBS}" | wc -w)" -gt 1 ]; then
+          echo "Multiple Subscriptions found in ${OO_INSTALL_NAMESPACE}: ${SUBS}" >&2
+          exit 1
+        fi
+        SUB="${SUBS}"
+        echo "Discovered Subscription: ${SUB}"
+        # See migtools/kubevirt-datamover-controller's set-related-image step
+        # for the full rationale on Subscription.spec.config.env vs. patching
+        # the Deployment directly, and on the MANAGER_IMAGE sentinel used for
+        # a resolved openshift/oadp-operator Depends-On (reconcile-logic-level
+        # PRs only, not RBAC/CSV/CRD changes -- see openshift/oadp-operator#2389).
+        ALL_ENV_LINES="RELATED_IMAGE_VELERO_PLUGIN_FOR_AWS ${AWS_PLUGIN_IMAGE}"
+        if [ -s "${SHARED_DIR}/depends-on-images.txt" ]; then
+          ALL_ENV_LINES="${ALL_ENV_LINES}
+        $(cat "${SHARED_DIR}/depends-on-images.txt")"
+        fi
+        MANAGER_IMAGE_VALUE=""
+        SUBSCRIPTION_ENV_LINES=""
+        while read -r ENV_NAME ENV_VALUE; do
+          [ -z "${ENV_NAME}" ] && continue
+          if [ "${ENV_NAME}" = "MANAGER_IMAGE" ]; then
+            MANAGER_IMAGE_VALUE="${ENV_VALUE}"
+          else
+            SUBSCRIPTION_ENV_LINES="${SUBSCRIPTION_ENV_LINES}
+        ${ENV_NAME} ${ENV_VALUE}"
+          fi
+        done <<< "${ALL_ENV_LINES}"
+        ALL_ENV_LINES="${SUBSCRIPTION_ENV_LINES}"
+        ENTRIES=()
+        while read -r ENV_NAME ENV_VALUE; do
+          [ -z "${ENV_NAME}" ] && continue
+          ENTRIES+=("{\"name\":\"${ENV_NAME}\",\"value\":\"${ENV_VALUE}\"}")
+        done <<< "${ALL_ENV_LINES}"
+        JOINED=$(IFS=,; echo "${ENTRIES[*]}")
+        PATCH=$(printf '{"spec":{"config":{"env":[%s]}}}' "${JOINED}")
+        oc patch subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" --type merge -p "${PATCH}"
+        echo "Waiting for Deployment to observe:"
+        while read -r ENV_NAME _; do
+          [ -n "${ENV_NAME}" ] && echo "  ${ENV_NAME}"
+        done <<< "${ALL_ENV_LINES}"
+        for _ in $(seq 1 60); do
+          ALL_OK=true
+          while read -r ENV_NAME ENV_VALUE; do
+            [ -z "${ENV_NAME}" ] && continue
+            CURRENT=$(oc get deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" -o jsonpath="{.spec.template.spec.containers[?(@.name==\"manager\")].env[?(@.name==\"${ENV_NAME}\")].value}" 2>/dev/null || true)
+            [ "${CURRENT}" != "${ENV_VALUE}" ] && ALL_OK=false
+          done <<< "${ALL_ENV_LINES}"
+          [ "${ALL_OK}" = "true" ] && break
+          sleep 5
+        done
+        if [ "${ALL_OK}" != "true" ]; then
+          echo "Timed out waiting for Deployment spec to reflect the Subscription.spec.config.env override" >&2
+          oc get subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/subscription-${SUB}.yaml" || true
+          oc get csv -n "${OO_INSTALL_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/csvs.yaml" || true
+          oc get deployment -n "${OO_INSTALL_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/deployments.yaml" || true
+          exit 1
+        fi
+        oc rollout status deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" --timeout=180s
+        if [ -n "${MANAGER_IMAGE_VALUE}" ]; then
+          echo "Depends-On resolved an oadp-operator PR -- patching the manager Deployment's own container image directly (not a RELATED_IMAGE_* env var, since oadp-operator itself isn't a related-image in this job's context)"
+          oc set image "deployment/openshift-adp-controller-manager" "manager=${MANAGER_IMAGE_VALUE}" -n "${OO_INSTALL_NAMESPACE}"
+          oc rollout status deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" --timeout=180s
+        fi
+      dependencies:
+      - env: AWS_PLUGIN_IMAGE
+        name: velero-plugin-for-aws-oadp-1.4
+      env:
+      - name: OO_INSTALL_NAMESPACE
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: e2e
+      cli: latest
+      commands: make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
 zz_generated_metadata:
   branch: oadp-1.4
   org: openshift
