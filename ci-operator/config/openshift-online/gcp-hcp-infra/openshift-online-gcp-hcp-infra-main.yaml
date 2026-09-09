@@ -84,6 +84,50 @@ tests:
         requests:
           cpu: "8"
           memory: 4Gi
+- as: terraform-plan
+  run_if_changed: '^terraform/(config/(global|region|management-cluster)/(integration|stage)/|config/service/(integration|stage)/|modules/|metadata/|workflows/|dashboards/)'
+  steps:
+    test:
+    - as: plan
+      commands: |
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() {
+          if [ "$1" = "get" ]; then
+            host="" proto=""
+            while IFS= read -r line; do
+              [ -z "$line" ] && break
+              case "$line" in
+                host=*) host="${line#host=}" ;;
+                protocol=*) proto="${line#protocol=}" ;;
+              esac
+            done
+            if [ "$proto" = "https" ] && [ "$host" = "github.com" ]; then
+              echo "username=x-access-token"
+              echo "password=$(cat /etc/github-private/oauth)"
+            else
+              exit 1
+            fi
+          fi
+        }; f'
+        umask 077
+        cat > "$HOME/.terraformrc" <<TFRC
+        credentials "app.terraform.io" {
+          token = "$(cat /etc/terraform-cloud/token)"
+        }
+        TFRC
+        make terraform-plan-speculative
+      credentials:
+      - mount_path: /etc/github-private
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      - mount_path: /etc/terraform-cloud
+        name: tfcloud-ci-secret
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: "8"
+          memory: 4Gi
 - as: check-orphan-modules
   commands: make check-orphan-modules
   container:
