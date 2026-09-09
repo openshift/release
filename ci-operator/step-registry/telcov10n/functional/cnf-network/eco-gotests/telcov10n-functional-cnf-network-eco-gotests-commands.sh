@@ -2,8 +2,17 @@
 set -e
 set -o pipefail
 
-ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
 PROJECT_DIR="/tmp"
+ECO_CI_CD_BASE="/eco-ci-cd"
+
+if [[ -n "${ECO_CI_CD_FORK_URL:-}" ]]; then
+  echo "Using eco-ci-cd fork: ${ECO_CI_CD_FORK_URL} branch: ${ECO_CI_CD_FORK_BRANCH:-main}"
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" "${ECO_CI_CD_FORK_URL}" /tmp/eco-ci-cd-fork
+  ln -s /eco-ci-cd/collections /tmp/eco-ci-cd-fork/collections
+  ECO_CI_CD_BASE="/tmp/eco-ci-cd-fork"
+fi
+
+ECO_CI_CD_INVENTORY_PATH="${ECO_CI_CD_BASE}/inventories/cnf"
 
 echo "Checking if the job should be skipped..."
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
@@ -70,7 +79,7 @@ echo "Show eco-gotests environment variables"
 echo "${ECO_GOTESTS_ENV_VARS}"
 
 echo "Setup test script"
-cd /eco-ci-cd
+cd "${ECO_CI_CD_BASE}"
 
 # shellcheck disable=SC2154
 ansible-playbook ./playbooks/deploy-run-eco-gotests.yaml -i ./inventories/cnf/switch-config.yaml \
@@ -91,7 +100,14 @@ ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=
 echo "Gather artifacts from bastion"
 # shellcheck disable=SC2154
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/eco_gotests/report/*.xml "${ARTIFACT_DIR}/junit_eco_gotests/"
+
+echo "Rename eco-gotests suite on bastion"
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
+  "${BASTION_USER}@${BASTION_IP}" \
+  "sed -i 's/name=\"Aggregated Report\"/name=\"eco-gotests\"/' /tmp/eco_gotests/report/report_testrun.xml 2>/dev/null || true"
 rm -rf "${PROJECT_DIR}/temp_ssh_key"
 
-echo "Store polarion report for reporter step"
-mv "${ARTIFACT_DIR}/junit_eco_gotests/report_testrun.xml" "${SHARED_DIR}/report_testrun.xml"
+echo "Stage eco-gotests reports on bastion for reporter step"
+ansible-playbook ./playbooks/cnf/stage-eco-gotests-junit-reports.yaml \
+  -i ./inventories/cnf/switch-config.yaml \
+  --extra-vars "src_dir=/tmp/eco_gotests/report shared_dir=${SHARED_DIR}"

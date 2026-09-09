@@ -51,7 +51,7 @@ if ! compgen -G "${SHARED_DIR}/*polarion*.xml" > /dev/null 2>&1; then
   UPLOAD_SHARED_DIR=""
 else
   echo "Reports found in SHARED_DIR"
-  for f in "${SHARED_DIR}"/*polarion*.xml; do
+  for f in "${SHARED_DIR}"/polarion_*.xml; do
     if [[ -f "$f" ]]; then
       filename=$(basename "$f" | sed 's/^polarion_//')
       cp "$f" "/tmp/reports/${filename}"
@@ -94,15 +94,31 @@ if [[ -f "${METRICS_FILE}" ]]; then
   echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
 fi
 
-echo "Uploading reports to Polarion and Report Portal"
-SHARED_DIR="${UPLOAD_SHARED_DIR}" ansible-playbook ./playbooks/upload-report.yaml \
-  -i ./inventories/cnf/switch-config.yaml \
-  --extra-vars "kubeconfig=${KUBECONFIG} \
-    reporter_template_name='${REPORTER_TEMPLATE_NAME}' \
-    processed_report_dir=${POLARION_REPORT_DIR} \
-    junit_report_dir=${JUNIT_REPORT_DIR} \
-    reports_directory=/tmp/upload \
-    reporter_launch_name='${REPORTER_LAUNCH_NAME}' \
-    upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \
-    report_portal_url_filename='${REPORTPORTAL_FILES}' \
-    reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"
+if [[ -z "${ECO_GOTESTS_JUNIT_BASTION_DIR:-}" ]]; then
+  echo "Uploading reports to Polarion and Report Portal"
+  SHARED_DIR="${UPLOAD_SHARED_DIR}" ansible-playbook ./playbooks/upload-report.yaml \
+    -i ./inventories/cnf/switch-config.yaml \
+    --extra-vars "kubeconfig=${KUBECONFIG} \
+      reporter_template_name='${REPORTER_TEMPLATE_NAME}' \
+      processed_report_dir=${POLARION_REPORT_DIR} \
+      junit_report_dir=${JUNIT_REPORT_DIR} \
+      reports_directory=/tmp/upload \
+      reporter_launch_name='${REPORTER_LAUNCH_NAME}' \
+      upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \
+      report_portal_url_filename='${REPORTPORTAL_FILES}' \
+      reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"
+else
+  echo "Uploading bastion-local reports to Polarion and Report Portal (consolidated launch)"
+  SHARED_DIR="" ansible-playbook ./playbooks/upload-report.yaml \
+    -i ./inventories/cnf/switch-config.yaml \
+    --extra-vars "kubeconfig=${KUBECONFIG} \
+      reporter_template_name='${REPORTER_TEMPLATE_NAME}' \
+      processed_report_dir=${ECO_GOTESTS_JUNIT_BASTION_DIR%/*}/polarion \
+      polarion_only_report_dir=${ECO_GOTESTS_JUNIT_BASTION_DIR%/*}/polarion_only \
+      junit_report_dir=${ECO_GOTESTS_JUNIT_BASTION_DIR} \
+      reports_directory=/tmp/upload \
+      reporter_launch_name='${REPORTER_LAUNCH_NAME}' \
+      upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \
+      report_portal_url_filename='${REPORTPORTAL_FILES}' \
+      reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"
+fi
