@@ -163,6 +163,32 @@ setup_packet_cluster() {
   fi
 }
 
+wait_until() {
+  local desc="$1"
+  local attempts="$2"
+  local interval="$3"
+  shift 3
+  local i=0
+  until "$@"; do
+    i=$((i + 1))
+    if [[ "${i}" -ge "${attempts}" ]]; then
+      echo "Timed out waiting for ${desc}"
+      return 1
+    fi
+    sleep "${interval}"
+  done
+}
+
+VAULT_SECRET_UNSEAL_KEY_PATH="/vault/secrets/unseal/unseal-key"
+
+vault_exec() {
+  local namespace="$1"
+  local pod_name="$2"
+  shift 2
+  oc exec -c vault "${pod_name}" -n "${namespace}" -- \
+    env VAULT_ADDR=https://127.0.0.1:8200 VAULT_SKIP_VERIFY=true "$@"
+}
+
 # Prepare the namespace, SCC, and license secret for a Vault instance.
 # Must run before setup_packet_cluster() to avoid proxy interference.
 # Args: $1 = namespace, $2 = Helm release name
@@ -170,19 +196,132 @@ setup_vault_namespace() {
   local namespace="$1"
   local release_name="$2"
 
-  # Create namespace
   echo "Creating namespace ${namespace}..."
-  oc create namespace "${namespace}"
+  oc create namespace "${namespace}" --dry-run=client -o yaml | oc apply -f -
 
-  # Add restricted SCC for Vault service account
   echo "Adding restricted SCC for Vault service account..."
   oc adm policy add-scc-to-user restricted -z "${release_name}" -n "${namespace}"
 
-  # Create Vault license secret from mounted credential
   echo "Creating Vault license secret from mounted credential..."
   oc create secret generic "${VAULT_LICENSE_SECRET_NAME}" \
     --from-file=license=/var/run/vault/tests-private-account/kms-vault-license \
-    -n "${namespace}"
+    -n "${namespace}" \
+    --dry-run=client -o yaml | oc apply -f -
+}
+
+store_vault_init_secrets() {
+  local namespace="$1"
+  local init_json="$2"
+
+  # Disable tracing due to password handling
+  local WAS_TRACING=false
+  [[ $- == *x* ]] && WAS_TRACING=true
+  set +x
+  local unseal_key root_token
+  unseal_key="$(jq -r '.unseal_keys_b64[0]' <<<"${init_json}")"
+  root_token="$(jq -r '.root_token' <<<"${init_json}")"
+  oc create secret generic vault-unseal-key \
+    --from-literal=unseal-key="${unseal_key}" \
+    -n "${namespace}" \
+    --dry-run=client -o yaml | oc apply -f -
+  oc create secret generic vault-root-token \
+    --from-literal=token="${root_token}" \
+    -n "${namespace}" \
+    --dry-run=client -o yaml | oc apply -f -
+  unset unseal_key root_token
+  if [[ "${WAS_TRACING}" == true ]]; then
+    set -x
+  fi
+}
+
+unseal_vault() {
+  local namespace="$1"
+  local pod_name="$2"
+
+  vault_exec "${namespace}" "${pod_name}" sh -c \
+    "test -s '${VAULT_SECRET_UNSEAL_KEY_PATH}' && vault operator unseal \"\$(cat '${VAULT_SECRET_UNSEAL_KEY_PATH}')\" >/dev/null"
+}
+
+wait_for_mounted_secret() {
+  local namespace="$1"
+  local pod_name="$2"
+  local secret_path="$3"
+
+  wait_until "mounted secret at ${secret_path}" 60 2 \
+    vault_exec "${namespace}" "${pod_name}" test -s "${secret_path}"
+}
+
+wait_for_vault_listener() {
+  local namespace="$1"
+  local pod_name="$2"
+  local i=0
+  local status_rc=0
+
+  echo "Waiting for Vault listener on ${pod_name}..."
+  while true; do
+    set +e
+    vault_exec "${namespace}" "${pod_name}" vault status >/dev/null 2>&1
+    status_rc=$?
+    set -e
+    # 0 = unsealed, 2 = sealed; both mean the TLS listener is up.
+    if [[ "${status_rc}" -eq 0 || "${status_rc}" -eq 2 ]]; then
+      return 0
+    fi
+    i=$((i + 1))
+    if [[ "${i}" -ge 60 ]]; then
+      echo "Timed out waiting for Vault listener on ${pod_name}"
+      oc logs -c vault "${pod_name}" -n "${namespace}" --tail=50 || true
+      return 1
+    fi
+    sleep 5
+  done
+}
+
+initialize_or_unseal_vault() {
+  local namespace="$1"
+  local pod_name="$2"
+  local status_rc=0
+
+  wait_for_vault_listener "${namespace}" "${pod_name}"
+
+  set +e
+  vault_exec "${namespace}" "${pod_name}" vault status >/dev/null 2>&1
+  status_rc=$?
+  set -e
+
+  if [[ "${status_rc}" -eq 0 ]]; then
+    echo "Vault is already unsealed"
+    if ! oc get secret vault-root-token -n "${namespace}" >/dev/null 2>&1; then
+      echo "Error: Vault is unsealed but vault-root-token secret is missing"
+      exit 1
+    fi
+    return 0
+  fi
+
+  if oc get secret vault-unseal-key -n "${namespace}" >/dev/null 2>&1; then
+    if ! oc get secret vault-root-token -n "${namespace}" >/dev/null 2>&1; then
+      echo "Error: vault-unseal-key exists but vault-root-token secret is missing"
+      exit 1
+    fi
+    echo "Unsealing Vault with stored key..."
+    wait_for_mounted_secret "${namespace}" "${pod_name}" "${VAULT_SECRET_UNSEAL_KEY_PATH}"
+    unseal_vault "${namespace}" "${pod_name}"
+    return 0
+  fi
+
+  echo "Initializing Vault..."
+  local was_tracing=false
+  [[ $- == *x* ]] && was_tracing=true
+  set +x
+  local init_json
+  init_json="$(vault_exec "${namespace}" "${pod_name}" vault operator init -key-shares=1 -key-threshold=1 -format=json)"
+  store_vault_init_secrets "${namespace}" "${init_json}"
+  unset init_json
+  if [[ "${was_tracing}" == true ]]; then
+    set -x
+  fi
+  wait_for_mounted_secret "${namespace}" "${pod_name}" "${VAULT_SECRET_UNSEAL_KEY_PATH}"
+  unseal_vault "${namespace}" "${pod_name}"
 }
 
 # Install a Vault Enterprise instance in the given namespace.
@@ -204,29 +343,97 @@ install_vault() {
   local vault_api_addr="https://${release_name}.${namespace}.svc:8200"
   local serving_cert="${release_name}-serving-cert"
   local vault_service_fqdn="${release_name}.${namespace}.svc"
+  local values_file="/tmp/vault-values-${namespace}.yaml"
+  local vault_image="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
+
+  cat > "${values_file}" <<EOF
+global:
+  enabled: true
+  openshift: true
+  tlsDisable: false
+injector:
+  enabled: false
+server:
+  image:
+    repository: ${VAULT_IMAGE_REPOSITORY}
+    tag: "${VAULT_VERSION}"
+  standalone:
+    enabled: true
+    config: |
+      listener "tcp" {
+        address = "[::]:8200"
+        tls_cert_file = "/var/run/tls/tls.crt"
+        tls_key_file = "/var/run/tls/tls.key"
+      }
+      storage "file" {
+        path = "/vault/data"
+      }
+  dataStorage:
+    enabled: true
+    size: 1Gi
+  ha:
+    apiAddr: "${vault_api_addr}"
+  extraEnvironmentVars:
+    VAULT_DISABLE_USER_LOCKOUT: "true"
+  enterpriseLicense:
+    secretName: ${VAULT_LICENSE_SECRET_NAME}
+    secretKey: license
+  volumes:
+    - name: tls
+      secret:
+        secretName: ${serving_cert}
+    - name: unseal-key
+      secret:
+        secretName: vault-unseal-key
+        optional: true
+    - name: root-token
+      secret:
+        secretName: vault-root-token
+        optional: true
+  volumeMounts:
+    - name: tls
+      mountPath: /var/run/tls
+    - name: unseal-key
+      mountPath: /vault/secrets/unseal
+      readOnly: true
+    - name: root-token
+      mountPath: /vault/secrets/root
+      readOnly: true
+  extraContainers:
+    - name: auto-unseal
+      image: ${vault_image}
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: VAULT_ADDR
+          value: https://127.0.0.1:8200
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+      command:
+        - /bin/sh
+        - -ec
+        - |
+          while true; do
+            if [ -s /vault/unseal/unseal-key ]; then
+              vault operator unseal -tls-skip-verify "\$(cat /vault/unseal/unseal-key)" >/dev/null 2>&1 || true
+            fi
+            sleep 5
+          done
+      volumeMounts:
+        - name: unseal-key
+          mountPath: /vault/unseal
+          readOnly: true
+EOF
 
   # service-CA serving cert: its CA is stable across restarts, so vault-ca-bundle never drifts.
-  echo "Installing Vault Enterprise ${VAULT_ENTERPRISE_IMAGE} with service-CA TLS..."
+  # File storage on a PVC keeps the transit mount across pod restarts; the sidecar unseals
+  # using vault-unseal-key whenever the process comes back sealed.
+  echo "Installing Vault Enterprise ${VAULT_ENTERPRISE_IMAGE} with service-CA TLS and persistent storage..."
   helm upgrade --install "${release_name}" "${VAULT_CHART_ARCHIVE}" \
     --namespace "${namespace}" \
     --version "${VAULT_CHART_VERSION}" \
-    --set global.enabled=true \
-    --set global.openshift=true \
-    --set global.tlsDisable=false \
-    --set server.standalone.enabled=true \
-    --set server.dataStorage.enabled=false \
-    --set server.image.repository="${VAULT_IMAGE_REPOSITORY}" \
-    --set server.image.tag="${VAULT_VERSION}" \
-    --set injector.enabled=false \
-    --set 'server.extraEnvironmentVars.VAULT_DISABLE_USER_LOCKOUT=true' \
-    --set "server.extraEnvironmentVars.VAULT_API_ADDR=${vault_api_addr}" \
-    --set "server.enterpriseLicense.secretName=${VAULT_LICENSE_SECRET_NAME}" \
-    --set "server.enterpriseLicense.secretKey=license" \
-    --set "server.volumes[0].name=tls" \
-    --set "server.volumes[0].secret.secretName=${serving_cert}" \
-    --set 'server.volumeMounts[0].name=tls' \
-    --set 'server.volumeMounts[0].mountPath=/var/run/tls' \
-    --set-string $'server.standalone.config=listener "tcp" {\n  address = "[::]:8200"\n  tls_cert_file = "/var/run/tls/tls.crt"\n  tls_key_file = "/var/run/tls/tls.key"\n}\nstorage "inmem" {}' \
+    -f "${values_file}" \
     --timeout 10m
 
   # Chart 0.28.1 copies server.service.annotations onto both the client Service
@@ -237,54 +444,55 @@ install_vault() {
     "service.beta.openshift.io/serving-cert-secret-name=${serving_cert}" --overwrite
 
   echo "Waiting for serving certificate secret ${serving_cert}..."
-  local attempt=0
-  until oc get secret "${serving_cert}" -n "${namespace}" >/dev/null 2>&1; do
-    attempt=$((attempt + 1))
-    if [[ "${attempt}" -ge 60 ]]; then
-      echo "Timed out waiting for serving certificate secret ${serving_cert}"
-      exit 1
-    fi
-    sleep 5
-  done
+  wait_until "serving certificate secret ${serving_cert}" 60 5 \
+    oc get secret "${serving_cert}" -n "${namespace}"
+
+  serving_cert_has_san() {
+    oc get secret "${serving_cert}" -n "${namespace}" -o jsonpath='{.data.tls\.crt}' \
+      | base64 -d \
+      | openssl x509 -noout -text 2>/dev/null \
+      | grep -Fq "${vault_service_fqdn}"
+  }
 
   echo "Waiting for serving certificate to include ${vault_service_fqdn}..."
-  attempt=0
-  until oc get secret "${serving_cert}" -n "${namespace}" -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -text 2>/dev/null | grep -Fq "${vault_service_fqdn}"; do
-    attempt=$((attempt + 1))
-    if [[ "${attempt}" -ge 60 ]]; then
-      echo "Timed out waiting for serving certificate SAN ${vault_service_fqdn}"
-      oc get secret "${serving_cert}" -n "${namespace}" -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -text || true
-      exit 1
-    fi
-    sleep 5
-  done
+  if ! wait_until "serving certificate SAN ${vault_service_fqdn}" 60 5 serving_cert_has_san; then
+    oc get secret "${serving_cert}" -n "${namespace}" -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -text || true
+    exit 1
+  fi
 
-  echo "Restarting Vault pod to load serving certificate..."
-  oc delete pod "${pod_name}" -n "${namespace}" --wait=false
-  oc wait --for=jsonpath='{.status.phase}'=Running "pod/${pod_name}" -n "${namespace}" --timeout=5m
+  # Do not delete the pod to "pick up" the cert. The TLS secret is a required
+  # volume, so the pod stays pending until the cert exists and then starts once
+  # with the correct SAN already mounted.
+  echo "Waiting for persistent volume claim data-${pod_name}..."
+  wait_until "pvc data-${pod_name}" 60 5 oc get "pvc/data-${pod_name}" -n "${namespace}"
+  if ! oc wait --for=jsonpath='{.status.phase}'=Bound "pvc/data-${pod_name}" -n "${namespace}" --timeout=10m; then
+    echo "PVC data-${pod_name} did not bind"
+    oc get storageclass || true
+    oc describe "pvc/data-${pod_name}" -n "${namespace}" || true
+    exit 1
+  fi
 
-  # Standalone Vault starts sealed: init + unseal once it is up.
+  echo "Waiting for Vault pod to be Running..."
+  oc wait --for=jsonpath='{.status.phase}'=Running "pod/${pod_name}" -n "${namespace}" --timeout=10m
+
   echo "Initializing and unsealing Vault..."
-  local init_json
-  init_json="$(oc exec "${pod_name}" -n "${namespace}" -- vault operator init -tls-skip-verify -key-shares=1 -key-threshold=1 -format=json)"
-  oc exec "${pod_name}" -n "${namespace}" -- vault operator unseal -tls-skip-verify "$(jq -r '.unseal_keys_b64[0]' <<<"${init_json}")" >/dev/null
-  oc create secret generic vault-root-token --from-literal=token="$(jq -r '.root_token' <<<"${init_json}")" -n "${namespace}"
+  initialize_or_unseal_vault "${namespace}" "${pod_name}"
   oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
 
   # Publish the stable service-CA bundle as the trust anchor.
   echo "Waiting for service-CA bundle ConfigMap..."
-  attempt=0
-  until oc get configmap openshift-service-ca.crt -n "${namespace}" >/dev/null 2>&1; do
-    attempt=$((attempt + 1))
-    if [[ "${attempt}" -ge 60 ]]; then
-      echo "Timed out waiting for openshift-service-ca.crt ConfigMap in ${namespace}"
-      exit 1
-    fi
-    sleep 5
-  done
+  service_ca_bundle_ready() {
+    [[ -n "$(oc get configmap openshift-service-ca.crt -n "${namespace}" \
+      -o jsonpath='{.data.service-ca\.crt}' 2>/dev/null)" ]]
+  }
+  wait_until "service-ca.crt data in ${namespace}" 60 5 service_ca_bundle_ready
 
   CA_CERT_TMP="/tmp/vault-ca-${namespace}.pem"
   oc get configmap openshift-service-ca.crt -n "${namespace}" -o jsonpath='{.data.service-ca\.crt}' > "${CA_CERT_TMP}"
+  if [[ ! -s "${CA_CERT_TMP}" ]]; then
+    echo "Error: extracted service-CA bundle is empty"
+    exit 1
+  fi
   echo "  ✓ service-CA bundle extracted"
 
   # Create or update ConfigMap with CA certificate in openshift-config
@@ -312,6 +520,8 @@ install_vault() {
   echo "  - TLS: Enabled (OpenShift service-CA serving certificate)"
   echo "  - TLS cert: /var/run/tls/tls.crt (inside pod)"
   echo "  - TLS SAN: ${vault_service_fqdn}"
+  echo "  - Storage: file backend on pvc/data-${pod_name} (transit keys persist across restarts)"
+  echo "  - Auto-unseal sidecar using vault-unseal-key secret"
   echo "  - Enterprise License: Configured"
   echo "  - CA ConfigMap: ${ca_configmap} (openshift-config namespace)"
   echo ""
