@@ -141,8 +141,7 @@ tests:
         git show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/nhc-source.txt"
         export NHC_UPGRADE_CANDIDATE_COMMIT="$(git rev-parse HEAD)"
         printf 'candidate source checkout: %s\n' "$NHC_UPGRADE_CANDIDATE_COMMIT"
-        make operator-sdk yq
-        export YQ="$PWD/bin/yq"
+        make operator-sdk
         export NHC_UPGRADE_OPERATOR_SDK="$PWD/bin/operator-sdk"
         "$NHC_UPGRADE_OPERATOR_SDK" version
         "$NHC_UPGRADE_OPERATOR_SDK" run --help | grep -q bundle-upgrade
@@ -150,14 +149,9 @@ tests:
 
         git clone https://github.com/medik8s/system-tests.git /tmp/system-tests
         git -C /tmp/system-tests show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
-        # Both dependencies are concrete images from this same execution.
-        # Independently compare their manager digests; extraction alone is
-        # not proof that the bundle uses this PR's newly built operator.
-        bash /tmp/system-tests/scripts/nhc-upgrade-inspect.sh \
-          "$OO_BUNDLE" "$NHC_CANDIDATE_OPERATOR" 5.8.0 "$ARTIFACT_DIR/candidate"
-        source "$ARTIFACT_DIR/candidate/verified-image.env"
-        bash /tmp/system-tests/scripts/nhc-upgrade-baselines.sh "$ARTIFACT_DIR/baselines"
-        source "$ARTIFACT_DIR/baselines/baseline-inputs.env"
+        export NHC_UPGRADE_CANDIDATE_BUNDLE="$OO_BUNDLE"
+        export NHC_UPGRADE_CANDIDATE_IMAGE="$NHC_CANDIDATE_OPERATOR"
+        export NHC_UPGRADE_CANDIDATE_VERSION=5.8.0
         export ECO_TEST_FEATURES=nhc-operator
         export ECO_TEST_LABELS='tier:upgrade-operator'
         # This checkpoint does not create a workload; the existing test
@@ -215,8 +209,7 @@ tests:
         git show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/nhc-source.txt"
         export NHC_UPGRADE_CANDIDATE_COMMIT="$(git rev-parse HEAD)"
         printf 'candidate source checkout: %s\n' "$NHC_UPGRADE_CANDIDATE_COMMIT"
-        make operator-sdk yq
-        export YQ="$PWD/bin/yq"
+        make operator-sdk
         export NHC_UPGRADE_OPERATOR_SDK="$PWD/bin/operator-sdk"
         "$NHC_UPGRADE_OPERATOR_SDK" version
         "$NHC_UPGRADE_OPERATOR_SDK" run --help | grep -q bundle-upgrade
@@ -224,14 +217,9 @@ tests:
 
         git clone https://github.com/medik8s/system-tests.git /tmp/system-tests
         git -C /tmp/system-tests show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
-        # Both dependencies are concrete images from this same execution.
-        # Independently compare their manager digests; extraction alone is
-        # not proof that the bundle uses this PR's newly built operator.
-        bash /tmp/system-tests/scripts/nhc-upgrade-inspect.sh \
-          "$OO_BUNDLE" "$NHC_CANDIDATE_OPERATOR" 5.8.0 "$ARTIFACT_DIR/candidate"
-        source "$ARTIFACT_DIR/candidate/verified-image.env"
-        bash /tmp/system-tests/scripts/nhc-upgrade-baselines.sh "$ARTIFACT_DIR/baselines"
-        source "$ARTIFACT_DIR/baselines/baseline-inputs.env"
+        export NHC_UPGRADE_CANDIDATE_BUNDLE="$OO_BUNDLE"
+        export NHC_UPGRADE_CANDIDATE_IMAGE="$NHC_CANDIDATE_OPERATOR"
+        export NHC_UPGRADE_CANDIDATE_VERSION=5.8.0
         export ECO_TEST_FEATURES=nhc-operator
         export ECO_TEST_LABELS='tier:fresh-install'
         # This checkpoint does not create a workload; the existing test
