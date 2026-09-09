@@ -1,0 +1,65 @@
+ref:
+  as: hypershift-kubevirt-install-azure-hostedcluster
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  env:
+  - name: CNV_SUBSCRIPTION_SOURCE
+    default: "redhat-operators"
+    documentation: |
+      Subscription source for kubevirt. Use 'redhat-operators' for stable
+      releases or 'cnv-prerelease-catalog-source' for pre-release builds.
+  - name: CNV_SUBSCRIPTION_CHANNEL
+    default: "stable"
+    documentation: |
+      Subscription channel for kubevirt operator. Default is 'stable'.
+  - name: AZURE_STORAGE_SKU
+    default: "PremiumV2_LRS"
+    documentation: |
+      Azure storage SKU for the managed-csi storage class. Options:
+      - PremiumV2_LRS: Premium SSD v2 (configurable IOPS, recommended)
+      - Premium_LRS: Premium SSD v1 (fixed IOPS based on size)
+  - name: AZURE_DEFAULT_IOPS
+    default: "3000"
+    documentation: |
+      Default IOPS for Premium SSD v2 storage class. Only applies when
+      AZURE_STORAGE_SKU=PremiumV2_LRS. Default is 3000 IOPS.
+  - name: AZURE_DEFAULT_THROUGHPUT
+    default: "125"
+    documentation: |
+      Default throughput (MB/s) for Premium SSD v2 storage class. Only
+      applies when AZURE_STORAGE_SKU=PremiumV2_LRS. Default is 125 MB/s.
+  - name: INSTALL_VM_CONSOLE_LOGGER
+    default: "false"
+    documentation: |
+      Install VM console logger for debugging VM boot issues. Default is 'false'.
+      WARNING: When enabled, VM console output (which may contain passwords or
+      tokens) will be captured in pod logs. Only enable for controlled debugging.
+  - name: BREW_IMAGE_REGISTRY_USERNAME
+    default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+  - name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+    default: /var/run/cnv-ci-brew-pull-secret/token
+  commands: hypershift-kubevirt-install-azure-hostedcluster-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - mount_path: /etc/cnv-nightly-pull-credentials
+    name: openshift-cnv-quay-credentials
+    namespace: test-credentials
+  - mount_path: /var/run/cnv-ci-brew-pull-secret
+    name: cnv-ci-brew-pull-secret
+    namespace: test-credentials
+  documentation: |-
+    Install KubeVirt (CNV) operator on an Azure hosted cluster management infrastructure.
+
+    This step is specifically designed for Azure hosted clusters (not IPI clusters).
+    Key differences from the standard install:
+    - Uses Azure Premium SSD v2 storage by default (higher IOPS for smaller disks)
+    - Patches StorageProfile to support both Block and Filesystem volumeModes
+    - Pins CPU model to Broadwell for Azure compatibility
+    - Skips masters schedulable configuration (hosted clusters have external control plane)
+
+    The management cluster kubeconfig is expected at ${SHARED_DIR}/management_cluster_kubeconfig,
+    which is provided by the hypershift-setup-nested-management-cluster chain.

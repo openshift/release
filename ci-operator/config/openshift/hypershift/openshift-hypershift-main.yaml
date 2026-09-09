@@ -511,6 +511,48 @@ tests:
       ODF_BACKEND_STORAGE_CLASS: managed-csi
     workflow: hypershift-kubevirt-e2e-azure
 - always_run: false
+  as: e2e-kubevirt-azure-nested-virt-ovn
+  capabilities:
+  - arm64
+  optional: true
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  steps:
+    cluster_profile: hypershift-azure
+    env:
+      AZURE_DEFAULT_IOPS: "3000"
+      AZURE_DEFAULT_THROUGHPUT: "125"
+      AZURE_STORAGE_SKU: PremiumV2_LRS
+      CLOUD_PROVIDER: Azure
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      E2E_TEST_REGEX: ^TestCreateCluster$|TestAutoscaling
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
+      ETCD_STORAGE_CLASS: managed-csi-premium-v2
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      HYPERSHIFT_INSTANCE_TYPE: Standard_D16s_v5
+      HYPERSHIFT_NODE_COUNT: "3"
+    workflow: hypershift-kubevirt-e2e-azure-nested-virt
+- as: periodic-e2e-kubevirt-azure-nested-virt-ovn
+  capabilities:
+  - arm64
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: hypershift-azure
+    env:
+      AZURE_DEFAULT_IOPS: "3000"
+      AZURE_DEFAULT_THROUGHPUT: "125"
+      AZURE_STORAGE_SKU: PremiumV2_LRS
+      CLOUD_PROVIDER: Azure
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      E2E_TEST_REGEX: ^TestCreateCluster$|TestAutoscaling
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
+      ETCD_STORAGE_CLASS: managed-csi-premium-v2
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      HYPERSHIFT_INSTANCE_TYPE: Standard_D16s_v5
+      HYPERSHIFT_NODE_COUNT: "3"
+    workflow: hypershift-kubevirt-e2e-azure-nested-virt
+- always_run: false
   as: e2e-aws-metrics
   capabilities:
   - arm64
