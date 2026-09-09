@@ -1,0 +1,110 @@
+ref:
+  as: p2p-mtv-create-hub-spoke-maps
+  from: cli
+  commands: p2p-mtv-create-hub-spoke-maps-commands.sh
+  timeout: 2h0m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Create MTV NetworkMap and StorageMap for bi-directional migration on the ACM hub.
+    Supports hub↔spoke and spoke↔spoke topologies.
+
+    Timeout budget: 2×WaitProviderReady(MTV_HS_PROVIDER_READY_TIMEOUT=15m) + 4×WaitMapReady(MTV_HS_MAP_READY_TIMEOUT=15m)
+    = 90m worst-case; 2h covers that with 30m overhead.
+
+    Env var resolution (generalized names take precedence, fall back to legacy hub/spoke names):
+      Forward maps: MTV_SRC_PROVIDER (→ MTV_HS_HUB_PROVIDER), MTV_DST_PROVIDER (→ MTV_HS_SPOKE_PROVIDER),
+                    MTV_FWD_NETWORK_MAP (→ MTV_HS_HUB_TO_SPOKE_NETWORK_MAP), etc.
+      Reverse maps: MTV_REV_SRC_PROVIDER (→ MTV_HS_SPOKE_PROVIDER), MTV_REV_DST_PROVIDER (→ MTV_HS_HUB_PROVIDER),
+                    MTV_REV_NETWORK_MAP (→ MTV_HS_SPOKE_TO_HUB_NETWORK_MAP), etc.
+
+    Hub kubeconfig is KUBECONFIG from ci-operator (MTV management plane).
+    Writes ${ARTIFACT_DIR}/mtv-hub-spoke-maps-status.txt.
+  env:
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV operator and map CRs live.
+  - name: MTV_SRC_PROVIDER
+    default: ""
+    documentation: |-
+      Topology-agnostic source provider name for the forward direction. When set, overrides
+      MTV_HS_HUB_PROVIDER. Use for spoke-spoke topologies to name the spoke-1 provider.
+  - name: MTV_DST_PROVIDER
+    default: ""
+    documentation: |-
+      Topology-agnostic destination provider name for the forward direction. When set, overrides
+      MTV_HS_SPOKE_PROVIDER. Use for spoke-spoke topologies to name the spoke-2 provider.
+  - name: MTV_FWD_NETWORK_MAP
+    default: ""
+    documentation: Forward-direction NetworkMap name. Overrides MTV_HS_HUB_TO_SPOKE_NETWORK_MAP when set.
+  - name: MTV_FWD_STORAGE_MAP
+    default: ""
+    documentation: Forward-direction StorageMap name. Overrides MTV_HS_HUB_TO_SPOKE_STORAGE_MAP when set.
+  - name: MTV_REV_SRC_PROVIDER
+    default: ""
+    documentation: Reverse-direction source provider name. Overrides MTV_HS_SPOKE_PROVIDER when set.
+  - name: MTV_REV_DST_PROVIDER
+    default: ""
+    documentation: Reverse-direction destination provider name. Overrides MTV_HS_HUB_PROVIDER when set.
+  - name: MTV_REV_NETWORK_MAP
+    default: ""
+    documentation: Reverse-direction NetworkMap name. Overrides MTV_HS_SPOKE_TO_HUB_NETWORK_MAP when set.
+  - name: MTV_REV_STORAGE_MAP
+    default: ""
+    documentation: Reverse-direction StorageMap name. Overrides MTV_HS_SPOKE_TO_HUB_STORAGE_MAP when set.
+  - name: MTV_SRC_STORAGE_NAME
+    default: ""
+    documentation: Source storage class name for forward StorageMap. Overrides MTV_HS_HUB_STORAGE_NAME when set.
+  - name: MTV_DST_STORAGE_CLASS
+    default: ""
+    documentation: Destination storage class name for forward StorageMap. Overrides MTV_HS_SPOKE_STORAGE_CLASS when set.
+  - name: MTV_DST_STORAGE_NAME
+    default: ""
+    documentation: Source storage class name for reverse StorageMap. Overrides MTV_HS_SPOKE_STORAGE_NAME when set.
+  - name: MTV_SRC_STORAGE_CLASS
+    default: ""
+    documentation: Destination storage class name for reverse StorageMap. Overrides MTV_HS_HUB_STORAGE_CLASS when set.
+  - name: MTV_HS_HUB_PROVIDER
+    default: "host"
+    documentation: |-
+      MTV Provider CR name for the hub cluster (legacy name; use MTV_SRC_PROVIDER for spoke-spoke topologies).
+      MTV auto-creates a "host" provider representing the local hub at install time.
+  - name: MTV_HS_SPOKE_PROVIDER
+    default: "spoke-1"
+    documentation: MTV Provider CR name for the spoke cluster (legacy; use MTV_DST_PROVIDER for spoke-spoke).
+  - name: MTV_HS_HUB_TO_SPOKE_NETWORK_MAP
+    default: "hub-to-spoke-network-map"
+    documentation: NetworkMap metadata.name for the forward direction (legacy; use MTV_FWD_NETWORK_MAP).
+  - name: MTV_HS_HUB_TO_SPOKE_STORAGE_MAP
+    default: "hub-to-spoke-storage-map"
+    documentation: StorageMap metadata.name for the forward direction (legacy; use MTV_FWD_STORAGE_MAP).
+  - name: MTV_HS_HUB_STORAGE_NAME
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: ODF StorageClass name on the source cluster for forward StorageMap (legacy; use MTV_SRC_STORAGE_NAME).
+  - name: MTV_HS_SPOKE_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: Destination StorageClass for forward StorageMap (legacy; use MTV_DST_STORAGE_CLASS).
+  - name: MTV_HS_SPOKE_TO_HUB_NETWORK_MAP
+    default: "spoke-to-hub-network-map"
+    documentation: NetworkMap metadata.name for the reverse direction (legacy; use MTV_REV_NETWORK_MAP).
+  - name: MTV_HS_SPOKE_TO_HUB_STORAGE_MAP
+    default: "spoke-to-hub-storage-map"
+    documentation: StorageMap metadata.name for the reverse direction (legacy; use MTV_REV_STORAGE_MAP).
+  - name: MTV_HS_SPOKE_STORAGE_NAME
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: ODF StorageClass name on the source cluster for reverse StorageMap (legacy; use MTV_DST_STORAGE_NAME).
+  - name: MTV_HS_HUB_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: Destination StorageClass for reverse StorageMap (legacy; use MTV_SRC_STORAGE_CLASS).
+  - name: MTV_HS_PROVIDER_READY_TIMEOUT
+    default: "15m"
+    documentation: Timeout for oc wait provider/<name> --for=condition=Ready before map creation.
+  - name: MTV_HS_MAP_READY_TIMEOUT
+    default: "15m"
+    documentation: Timeout for NetworkMap/StorageMap Ready waits.
+  - name: MTV_HS_SKIP_INVENTORY_REFRESH
+    default: "false"
+    documentation: Set to "true" to skip forklift.konveyor.io/inventory-refresh annotation on providers.

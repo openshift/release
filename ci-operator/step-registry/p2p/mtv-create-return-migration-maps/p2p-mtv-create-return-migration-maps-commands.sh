@@ -78,7 +78,7 @@ function ApplyNetworkMap () {
                     destination: {name: $dstProv, namespace: $ns}
                 }
             }
-        }' | oc apply -f -
+        }' | oc create -f - --dry-run=client -o yaml --save-config | oc apply -f -
     true
 }
 
@@ -106,7 +106,7 @@ function ApplyStorageMap () {
                     destination: {name: $dstProv, namespace: $ns}
                 }
             }
-        }' | oc apply -f -
+        }' | oc create -f - --dry-run=client -o yaml --save-config | oc apply -f -
     true
 }
 
