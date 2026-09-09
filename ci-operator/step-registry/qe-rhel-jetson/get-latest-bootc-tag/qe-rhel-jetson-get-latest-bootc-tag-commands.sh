@@ -50,10 +50,25 @@ while [[ ${PAGE} -le ${MAX_PAGES} ]]; do
   PAGE=$((PAGE + 1))
 done
 
-# Filter out metadata tags (.att, .sig, .sbom, .src, .dockerfile) and sort by last_modified
-LATEST_TAG=$(echo "${ALL_TAGS}" | \
-  jq -r 'map(select(.name | test("\\.(att|sig|sbom|src|dockerfile)$") | not)) | sort_by(.last_modified) | reverse | .[0].name')
+echo "=== Tag Filtering Debug ==="
+echo "Total tags fetched: $(echo "${ALL_TAGS}" | jq 'length')"
 
+# Filter to only valid bootc image tags:
+# - Must contain version numbers (match pattern with digits and dots/underscores)
+# - Exclude SHA256 tags (sha256-*)
+# - Exclude metadata tags (.att, .sig, .sbom, .src, .dockerfile, .git, .customscript, .prefetch)
+# - Exclude build pipeline tags (*-build-images, *-on-push-*, *-on-pull-request-*)
+# - Exclude plain numeric tags (git commit hashes like 090326141439)
+
+LATEST_TAG=$(echo "${ALL_TAGS}" | \
+  jq -r '
+    map(select(
+      .name | test("^[0-9]+\\.[0-9]+.*_[0-9]{12}$")
+    )) |
+    max_by(.start_ts) |
+    .name
+  ')
+  
 if [[ -z "${LATEST_TAG}" || "${LATEST_TAG}" == "null" ]]; then
   echo "ERROR: Failed to fetch latest tag from Quay API"
   echo "Total tags fetched: $(echo "${ALL_TAGS}" | jq 'length')"

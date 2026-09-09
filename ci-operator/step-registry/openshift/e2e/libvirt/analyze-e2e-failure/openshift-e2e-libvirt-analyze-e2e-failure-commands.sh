@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+if [[ "${LIBVIRT_E2E_FAILURE_ANALYSIS_ENABLED:-false}" != "true" ]]; then
+  echo "Libvirt E2E failure analysis disabled (set LIBVIRT_E2E_FAILURE_ANALYSIS_ENABLED=true to enable)."
+  exit 0
+fi
+
 echo "=== Libvirt E2E Failure Analyzer ==="
 
 JOB_NAME="${JOB_NAME:-unknown}"
