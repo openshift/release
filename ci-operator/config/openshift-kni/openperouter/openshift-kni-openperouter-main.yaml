@@ -1,3 +1,12 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -9,7 +18,8 @@ images:
   items:
   - dockerfile_path: Dockerfile.openshift
     to: openperouter-operator
-  - dockerfile_path: operator/bundle.Dockerfile.openshift
+  - context_dir: operator
+    dockerfile_path: bundle.Dockerfile
     to: openperouter-operator-bundle
   - build_args:
     - name: BASE_IMAGE
@@ -19,10 +29,11 @@ images:
 operator:
   bundles:
   - as: operator-bundle
-    dockerfile_path: operator/bundle.Dockerfile.openshift
+    context_dir: operator
+    dockerfile_path: bundle.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/redhat-user-workloads/telco-5g-tenant/openperouter-operator-[\d].*
+  - pullspec: quay.io/openperouter/router:main
     with: pipeline:openperouter-operator
 promotion:
   to:
@@ -47,6 +58,27 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: openperouter-e2e-metal
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        EXTRA_NETWORK_NAMES="toswitch1 toswitch2"
+        TOSWITCH1_NETWORK_SUBNET_V4='192.168.11.0/24'
+        TOSWITCH1_NETWORK_SUBNET_V6='2001:db8:11::/64'
+        TOSWITCH2_NETWORK_SUBNET_V4='192.168.12.0/24'
+        TOSWITCH2_NETWORK_SUBNET_V6='2001:db8:12::/64'
+        NUM_WORKERS=2
+        ENABLE_LOCAL_REGISTRY=true
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-openperouter-system
+    workflow: baremetalds-openperouter-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-kni

@@ -1,0 +1,22 @@
+workflow:
+  as: baremetalds-openperouter-e2e
+  steps:
+    pre:
+      - ref: ofcir-acquire
+      - ref: ipi-install-rbac
+      - ref: baremetalds-devscripts-ibm
+      - ref: baremetalds-devscripts-proxy
+      - ref: ipi-install-hosted-loki
+      - ref: rhcos-conf-osstream
+      - ref: baremetalds-openperouter-e2e-iptables
+      - ref: baremetalds-devscripts-setup
+    test:
+      - ref: optional-operators-operator-sdk
+      - ref: baremetalds-openperouter-e2e-test
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    Deploy OpenPerOuter on a baremetal OCP cluster and verify all components
+    come up healthy. Uses firewalld REJECT (tcp-reset) rules on the dev-scripts
+    host to keep the bootstrap gather from stalling on routed toswitch IPv6
+    addresses.
