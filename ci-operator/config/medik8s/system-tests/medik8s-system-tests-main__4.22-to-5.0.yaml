@@ -37,14 +37,15 @@ tests:
       ECO_TEST_FEATURES: nhc-operator
       ECO_TEST_LABELS: tier:upgrade-cluster
       MEDIK8S_OPERATOR_PACKAGE: node-healthcheck-operator
-      MEDIK8S_SKIP_DOWNSTREAM_OPERATOR_UPGRADE: "true"
-      SYSTEM_TESTS_REPOSITORY: https://github.com/JonahSussman/medik8s-system-tests.git
-      SYSTEM_TESTS_REVISION: c03ba2cde939da7c150d967ac28ef2608c98020e
+      OCP_VERSION: "50"
+      SKIP_IDMS: "true"
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre-stableinitial
     test:
+    - ref: medik8s-lib
+    - ref: medik8s-catalogsource
     - ref: ssh-bastion
     - as: run-nhc-cluster-upgrade
       cli: latest
@@ -55,19 +56,13 @@ tests:
         mkdir -p "$ARTIFACT_DIR/provenance"
         exec > >(tee "$ARTIFACT_DIR/cluster-upgrade-step.log") 2>&1
         printf '%s\n' "${JOB_SPEC:-}" > "$ARTIFACT_DIR/provenance/job-spec.json"
-        git clone "$SYSTEM_TESTS_REPOSITORY" /tmp/system-tests
-        git -C /tmp/system-tests checkout --detach "$SYSTEM_TESTS_REVISION"
-        test "$(git -C /tmp/system-tests rev-parse HEAD)" = "$SYSTEM_TESTS_REVISION"
-        git -C /tmp/system-tests show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
+        git show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
         export WORKLOAD_IMAGE=unused-by-nhc-cluster-upgrade
-        make -C /tmp/system-tests run-tests
+        make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: MEDIK8S_OPERATOR_PACKAGE
-      - name: MEDIK8S_SKIP_DOWNSTREAM_OPERATOR_UPGRADE
-      - name: SYSTEM_TESTS_REPOSITORY
-      - name: SYSTEM_TESTS_REVISION
       from: src
       resources:
         requests:

@@ -125,8 +125,6 @@ tests:
       NHC_UPGRADE_PACKAGE: node-healthcheck-operator
       NHC_UPGRADE_SNR_BUNDLE: quay.io/medik8s/self-node-remediation-operator-bundle:v0.13.0
       NHC_UPGRADE_SNR_PACKAGE: self-node-remediation
-      SYSTEM_TESTS_REPOSITORY: https://github.com/JonahSussman/medik8s-system-tests.git
-      SYSTEM_TESTS_REVISION: c03ba2cde939da7c150d967ac28ef2608c98020e
       TEST_NAME: e2e-system-tests-nhc-operator-upgrade
       TEST_STEPS: run-nhc-operator-upgrade
     post:
@@ -155,9 +153,7 @@ tests:
         "$NHC_UPGRADE_OPERATOR_SDK" run --help | grep -q bundle-upgrade
         "$NHC_UPGRADE_OPERATOR_SDK" bundle validate "$OO_BUNDLE"
 
-        git clone "$SYSTEM_TESTS_REPOSITORY" /tmp/system-tests
-        git -C /tmp/system-tests checkout --detach "$SYSTEM_TESTS_REVISION"
-        test "$(git -C /tmp/system-tests rev-parse HEAD)" = "$SYSTEM_TESTS_REVISION"
+        git clone https://github.com/medik8s/system-tests.git /tmp/system-tests
         git -C /tmp/system-tests show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
         # Both dependencies are concrete images from this same execution.
         # Independently compare their manager digests; extraction alone is
@@ -172,7 +168,7 @@ tests:
         # This checkpoint does not create a workload; the existing test
         # framework still requires the variable during initialization.
         export WORKLOAD_IMAGE=unused-by-nhc-operator-upgrade
-        export NHC_UPGRADE_TEST_REVISION="$SYSTEM_TESTS_REVISION"
+        export NHC_UPGRADE_TEST_REVISION="$(git -C /tmp/system-tests rev-parse HEAD)"
         make -C /tmp/system-tests run-tests
       dependencies:
       - env: OO_BUNDLE
@@ -188,8 +184,6 @@ tests:
       - name: NHC_UPGRADE_SNR_BUNDLE
       - name: NHC_UPGRADE_SNR_PACKAGE
       - name: NHC_UPGRADE_NAMESPACE
-      - name: SYSTEM_TESTS_REVISION
-      - name: SYSTEM_TESTS_REPOSITORY
       from: src
       resources:
         requests:
@@ -211,8 +205,6 @@ tests:
       NHC_UPGRADE_PACKAGE: node-healthcheck-operator
       NHC_UPGRADE_SNR_BUNDLE: quay.io/medik8s/self-node-remediation-operator-bundle:v0.13.0
       NHC_UPGRADE_SNR_PACKAGE: self-node-remediation
-      SYSTEM_TESTS_REPOSITORY: https://github.com/JonahSussman/medik8s-system-tests.git
-      SYSTEM_TESTS_REVISION: c03ba2cde939da7c150d967ac28ef2608c98020e
       TEST_NAME: e2e-system-tests-nhc-fresh-install
       TEST_STEPS: run-nhc-fresh-install
     post:
@@ -241,9 +233,7 @@ tests:
         "$NHC_UPGRADE_OPERATOR_SDK" run --help | grep -q bundle-upgrade
         "$NHC_UPGRADE_OPERATOR_SDK" bundle validate "$OO_BUNDLE"
 
-        git clone "$SYSTEM_TESTS_REPOSITORY" /tmp/system-tests
-        git -C /tmp/system-tests checkout --detach "$SYSTEM_TESTS_REVISION"
-        test "$(git -C /tmp/system-tests rev-parse HEAD)" = "$SYSTEM_TESTS_REVISION"
+        git clone https://github.com/medik8s/system-tests.git /tmp/system-tests
         git -C /tmp/system-tests show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
         # Both dependencies are concrete images from this same execution.
         # Independently compare their manager digests; extraction alone is
@@ -258,7 +248,7 @@ tests:
         # This checkpoint does not create a workload; the existing test
         # framework still requires the variable during initialization.
         export WORKLOAD_IMAGE=unused-by-nhc-operator-upgrade
-        export NHC_UPGRADE_TEST_REVISION="$SYSTEM_TESTS_REVISION"
+        export NHC_UPGRADE_TEST_REVISION="$(git -C /tmp/system-tests rev-parse HEAD)"
         make -C /tmp/system-tests run-tests
       dependencies:
       - env: OO_BUNDLE
@@ -274,8 +264,6 @@ tests:
       - name: NHC_UPGRADE_SNR_BUNDLE
       - name: NHC_UPGRADE_SNR_PACKAGE
       - name: NHC_UPGRADE_NAMESPACE
-      - name: SYSTEM_TESTS_REVISION
-      - name: SYSTEM_TESTS_REPOSITORY
       from: src
       resources:
         requests:
