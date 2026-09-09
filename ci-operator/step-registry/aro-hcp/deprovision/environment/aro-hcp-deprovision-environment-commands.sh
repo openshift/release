@@ -24,4 +24,5 @@ make -o tooling/templatize/templatize cleanup-entrypoint/Region \
   DEPLOY_ENV="${DEPLOY_ENV}" \
   OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}" \
   CLEANUP_DRY_RUN=false \
-  CLEANUP_WAIT=false
+  CLEANUP_WAIT=true \
+  EXTRA_ARGS=--retire-owned-role-assignments
