@@ -10,17 +10,38 @@ ref:
   env:
   - name: MAISTRA_NAMESPACE
     documentation: |-
-      The namespace where the test pod is running
-  - name: MAISTRA_SC_POD
+      Namespace where the scorecard Job and workdir PVC run
+  - name: MAISTRA_BUILDER_IMAGE
     documentation: |-
-      The name of the test pod where scorecard tests will be executed
+      Builder image for the scorecard Job container
+  - name: MAISTRA_WORKDIR_PVC
+    default: "maistra-workdir"
+    documentation: |-
+      PVC name prepared by servicemesh-common-prepare-job-workdir (mounted at /work)
+  - name: MAISTRA_KUBECONFIG_SECRET
+    default: "ci-kubeconfig"
+    documentation: |-
+      Secret name prepared by servicemesh-common-prepare-job-workdir
+  - name: SCORECARD_JOB_NAME
+    default: "sail-scorecard"
+    documentation: |-
+      Name of the batch/v1 Job that runs scorecard tests
+  - name: MAISTRA_JOB_WAIT_TIMEOUT
+    default: "100m"
+    documentation: |-
+      Timeout passed to oc wait --for=condition=complete for the scorecard Job
+  - name: MAISTRA_JOB_TTL_SECONDS
+    default: "3600"
+    documentation: |-
+      ttlSecondsAfterFinished so the Job pod remains for log/artifact collection
   - name: XDG_CACHE_HOME
     documentation: |-
       Cache directory for build tools
   - name: SCORECARD_COMMAND
-    default: "OCP=true make test.scorecard"
+    default: "make test.scorecard"
     documentation: |-
-      The make command to execute for scorecard tests
+      The make command to execute for scorecard tests (OCP=true is set via Job env)
   documentation: |-
-    Executes sail operator scorecard tests inside a test pod. 
-    Requires the source code and kubeconfig to be already copied to the test pod (use servicemesh-sail-operator-copy-src first).
+    Executes sail operator scorecard tests as a batch/v1 Job on the cluster under
+    test. Requires servicemesh-common-prepare-job-workdir to have created the
+    workdir PVC (source at /work) and kubeconfig Secret.
