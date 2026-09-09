@@ -149,6 +149,10 @@ tests:
         # Run deployment tests first (creates openshift-compliance namespace)
         make e2e-deployment
 
+        # Wait for compliance-operator deployment to be ready
+        echo "Waiting for compliance-operator deployment to be ready..."
+        oc wait --for=condition=Available deployment/compliance-operator -n openshift-compliance --timeout=10m
+
         # Run TLS scanner after deployment completes
         echo "=== Running TLS Scanner ==="
         export NAMESPACE="openshift-compliance"
