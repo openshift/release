@@ -13,12 +13,64 @@ configure_vault() {
   local pod_name="$3"
   local service_name="${pod_name%-0}"
 
-  # Root token from the install step's `vault operator init`.
+  # Disable tracing due to password handling
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
   local ROOT_TOKEN
   ROOT_TOKEN="$(oc get secret vault-root-token -n "${namespace}" -o jsonpath='{.data.token}' | base64 -d)"
+  $WAS_TRACING && set -x
 
-  # Vault CLI runs inside the pod against the local TLS listener during setup.
-  local vault_exec_env="VAULT_ADDR=https://127.0.0.1:8200 VAULT_SKIP_VERIFY=true"
+  vault_cli() {
+    oc exec -c vault "${pod_name}" -n "${namespace}" -- \
+      env VAULT_ADDR=https://127.0.0.1:8200 VAULT_SKIP_VERIFY=true VAULT_TOKEN="${ROOT_TOKEN}" \
+      vault "$@"
+  }
+
+  vault_cli_ok_if_exists() {
+    local out rc
+    set +e
+    out="$(vault_cli "$@" 2>&1)"
+    rc=$?
+    set -e
+    if [[ "${rc}" -eq 0 ]]; then
+      printf '%s\n' "${out}"
+      return 0
+    fi
+    if printf '%s\n' "${out}" | grep -qiE 'already exists|already in use|path is already'; then
+      echo "Already configured, continuing"
+      return 0
+    fi
+    printf '%s\n' "${out}"
+    return "${rc}"
+  }
+
+  unseal_vault_if_needed() {
+    local status_rc=0
+    set +e
+    oc exec -c vault "${pod_name}" -n "${namespace}" -- \
+      env VAULT_ADDR=https://127.0.0.1:8200 VAULT_SKIP_VERIFY=true \
+      vault status >/dev/null 2>&1
+    status_rc=$?
+    set -e
+    if [[ "${status_rc}" -eq 0 ]]; then
+      return 0
+    fi
+    if [[ "${status_rc}" -ne 2 ]]; then
+      echo "vault status failed with exit code ${status_rc}"
+      return "${status_rc}"
+    fi
+
+    echo "Vault is sealed; unsealing with stored key..."
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
+    local unseal_key
+    unseal_key="$(oc get secret vault-unseal-key -n "${namespace}" -o jsonpath='{.data.unseal-key}' | base64 -d)"
+    oc exec -c vault "${pod_name}" -n "${namespace}" -- \
+      env VAULT_ADDR=https://127.0.0.1:8200 VAULT_SKIP_VERIFY=true \
+      vault operator unseal "${unseal_key}" >/dev/null
+    unset unseal_key
+    $WAS_TRACING && set -x
+  }
 
   echo ""
   echo "========================================="
@@ -32,30 +84,23 @@ configure_vault() {
   echo "Configuring Vault for KMS..."
   echo ""
 
-  # Create the Vault Enterprise namespace used by the KMS plugin
+  unseal_vault_if_needed
+
   echo "Creating Vault Enterprise namespace '${VAULT_ENTERPRISE_NS}'..."
-  oc exec "${pod_name}" -n "${namespace}" -- \
-    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault namespace create "${VAULT_ENTERPRISE_NS}"
+  vault_cli_ok_if_exists namespace create "${VAULT_ENTERPRISE_NS}"
 
-  # Enable transit secret engine
   echo "Enabling transit secret engine..."
-  oc exec "${pod_name}" -n "${namespace}" -- \
-    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault secrets enable -namespace="${VAULT_ENTERPRISE_NS}" -path=transit transit
+  vault_cli_ok_if_exists secrets enable -namespace="${VAULT_ENTERPRISE_NS}" -path=transit transit
 
-  # Create encryption key
   echo "Creating transit encryption key..."
-  oc exec "${pod_name}" -n "${namespace}" -- \
-    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault write -namespace="${VAULT_ENTERPRISE_NS}" -f "transit/keys/${key_name}"
+  vault_cli_ok_if_exists write -namespace="${VAULT_ENTERPRISE_NS}" -f "transit/keys/${key_name}"
 
-  # Enable AppRole auth
   echo "Enabling AppRole authentication..."
-  oc exec "${pod_name}" -n "${namespace}" -- \
-    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault auth enable -namespace="${VAULT_ENTERPRISE_NS}" approle
+  vault_cli_ok_if_exists auth enable -namespace="${VAULT_ENTERPRISE_NS}" approle
 
-  # Create KMS policy
   echo "Creating KMS policy..."
-  oc exec "${pod_name}" -n "${namespace}" -- \
-    sh -c "${vault_exec_env} VAULT_TOKEN=${ROOT_TOKEN} vault policy write -namespace=${VAULT_ENTERPRISE_NS} kms-policy - <<POLICY
+  oc exec -c vault "${pod_name}" -n "${namespace}" -- \
+    sh -c "VAULT_ADDR=https://127.0.0.1:8200 VAULT_SKIP_VERIFY=true VAULT_TOKEN=${ROOT_TOKEN} vault policy write -namespace=${VAULT_ENTERPRISE_NS} kms-policy - <<POLICY
 path \"transit/encrypt/${key_name}\" {
   capabilities = [\"update\"]
 }
@@ -70,28 +115,23 @@ path \"sys/license/status\" {
 }
 POLICY"
 
-  # Create AppRole role
   echo "Creating AppRole role..."
-  oc exec "${pod_name}" -n "${namespace}" -- \
-    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault write -namespace="${VAULT_ENTERPRISE_NS}" auth/approle/role/kms-plugin \
-      token_policies=kms-policy \
-      token_ttl=1h \
-      token_max_ttl=4h
+  vault_cli write -namespace="${VAULT_ENTERPRISE_NS}" auth/approle/role/kms-plugin \
+    token_policies=kms-policy \
+    token_ttl=1h \
+    token_max_ttl=4h
 
-  # Get AppRole credentials
   echo "Retrieving AppRole credentials..."
-  ROLE_ID=$(oc exec "${pod_name}" -n "${namespace}" -- \
-    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault read -namespace="${VAULT_ENTERPRISE_NS}" -field=role_id auth/approle/role/kms-plugin/role-id)
-  SECRET_ID=$(oc exec "${pod_name}" -n "${namespace}" -- \
-    env ${vault_exec_env} VAULT_TOKEN="${ROOT_TOKEN}" vault write -namespace="${VAULT_ENTERPRISE_NS}" -field=secret_id -f auth/approle/role/kms-plugin/secret-id)
+  ROLE_ID=$(vault_cli read -namespace="${VAULT_ENTERPRISE_NS}" -field=role_id auth/approle/role/kms-plugin/role-id)
+  SECRET_ID=$(vault_cli write -namespace="${VAULT_ENTERPRISE_NS}" -field=secret_id -f auth/approle/role/kms-plugin/secret-id)
 
-  # Create vault-credentials secret
   echo "Creating vault-credentials secret..."
   oc create secret generic vault-credentials \
     --from-literal=role-id="${ROLE_ID}" \
     --from-literal=secret-id="${SECRET_ID}" \
     --from-literal=root-token="${ROOT_TOKEN}" \
-    -n "${namespace}"
+    -n "${namespace}" \
+    --dry-run=client -o yaml | oc apply -f -
 
   echo "Vault credentials saved to vault-credentials secret"
 
