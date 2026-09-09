@@ -20,7 +20,6 @@ git clone --depth 1 --branch "${branch}" "${repository}" /root/openperouter
 EOFSOURCE
 
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
-
 ssh "${SSHOPTS[@]}" "root@${IP}" bash /dev/stdin << 'RUNTESTS'
 set -xeo pipefail
 cd /root/dev-scripts
@@ -33,6 +32,9 @@ export CONFIG=/root/dev-scripts/config_root.sh
 
 echo "Kernel release: $(uname -r)"
 echo "Kernel version: $(uname -v)"
+
+
+unset DOCKER_HOST
 
 bash /root/openperouter/openshift/e2e/deploy.sh </dev/null
 bash /root/openperouter/openshift/e2e/run_tests.sh </dev/null
