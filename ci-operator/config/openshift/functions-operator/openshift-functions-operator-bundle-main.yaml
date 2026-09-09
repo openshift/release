@@ -42,6 +42,18 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     test:
+    - as: apply-mirror-set
+      cli: latest
+      commands: |
+        oc apply -f .tekton/images-mirror-set.yaml
+        # Phase 1: Wait for MCP to START updating (proves MCO picked up the change)
+        oc wait mcp master worker --for='condition=Updating=True' --timeout=1m
+        # Phase 2: Wait for MCP to FINISH updating
+        oc wait mcp master worker --for='condition=Updated=True' --timeout=15m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: install
       cli: latest
       commands: |
