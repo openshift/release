@@ -2,8 +2,17 @@
 set -e
 set -o pipefail
 
-ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
 PROJECT_DIR="/tmp"
+ECO_CI_CD_BASE="/eco-ci-cd"
+
+if [[ -n "${ECO_CI_CD_FORK_URL:-}" ]]; then
+  echo "Using eco-ci-cd fork: ${ECO_CI_CD_FORK_URL} branch: ${ECO_CI_CD_FORK_BRANCH:-main}"
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" "${ECO_CI_CD_FORK_URL}" /tmp/eco-ci-cd-fork
+  ln -s /eco-ci-cd/collections /tmp/eco-ci-cd-fork/collections
+  ECO_CI_CD_BASE="/tmp/eco-ci-cd-fork"
+fi
+
+ECO_CI_CD_INVENTORY_PATH="${ECO_CI_CD_BASE}/inventories/cnf"
 
 echo "Checking if the job should be skipped..."
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
@@ -70,11 +79,11 @@ echo "Show eco-gotests environment variables"
 echo "${ECO_GOTESTS_ENV_VARS}"
 
 echo "Setup test script"
-cd /eco-ci-cd
+cd "${ECO_CI_CD_BASE}"
 
 # shellcheck disable=SC2154
 ansible-playbook ./playbooks/deploy-run-eco-gotests.yaml -i ./inventories/cnf/switch-config.yaml \
-    --extra-vars "features=${FEATURES} labels=${LABELS} \
+    --extra-vars "features=${FEATURES} labels=${LABELS} enable_junit_report=true \
     kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig additional_test_env_variables='${ECO_GOTESTS_ENV_VARS}'"
 
 echo "Set bastion ssh configuration"
