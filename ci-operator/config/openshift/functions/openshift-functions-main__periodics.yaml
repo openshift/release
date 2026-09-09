@@ -1,0 +1,50 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 10 12 * * 1-5
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        rebasebot --source https://github.com/knative/func:main \
+                  --dest openshift/functions:main \
+                  --rebase openshift/functions:rebase-bot-main \
+                  --github-app-id 3938801 \
+                  --github-app-key /secrets/rebasebot/openshift-rebasebot-key \
+                  --github-cloner-id 3938801 \
+                  --github-cloner-key /secrets/rebasebot/openshift-rebasebot-key \
+                  --git-username "openshift-rebasebot[bot]" \
+                  --git-email 289950310+openshift-rebasebot[bot]@users.noreply.github.com \
+                  --tag-policy=none \
+                  --post-rebase-hook git:dest/main:hack/openshift/post-rebase-hook.sh \
+                  --title-prefix UPSTREAM-SYNC
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
+        namespace: test-credentials
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: functions
+  variant: periodics

@@ -1,0 +1,395 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.18
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: dpf-ci
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- as: daily-e2e-doca4
+  capabilities:
+  - intranet
+  cron: 30 0 * * *
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca4
+    test:
+    - ref: dpf-hypervisor-deploy-cluster
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+    - ref: dpf-hypervisor-network-tests
+    - ref: openshift-qe-node-density-cni
+  timeout: 6h0m0s
+- always_run: false
+  as: deploy-cluster-doca8
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca8
+    test:
+    - ref: dpf-hypervisor-deploy-cluster
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+  timeout: 6h0m0s
+- always_run: false
+  as: deploy-cluster-doca4
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca4
+    test:
+    - ref: dpf-hypervisor-deploy-cluster
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+  timeout: 6h0m0s
+- always_run: false
+  as: sanity-doca8
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca8
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+  timeout: 2h0m0s
+- always_run: false
+  as: sanity-doca4
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca4
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+  timeout: 2h0m0s
+- always_run: false
+  as: upgrade-management
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    test:
+    - ref: dpf-hypervisor-upgrade-management
+  timeout: 2h0m0s
+- always_run: false
+  as: upgrade-management-doca4
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca4
+    test:
+    - ref: dpf-hypervisor-upgrade-management
+  timeout: 2h0m0s
+- always_run: false
+  as: network-doca8
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca8
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+    - ref: dpf-hypervisor-network-tests
+  timeout: 2h0m0s
+- always_run: false
+  as: network-doca4
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca4
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+    - ref: dpf-hypervisor-network-tests
+  timeout: 2h0m0s
+- always_run: false
+  as: conformance-doca8
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca8
+    env:
+      TEST_SKIPS: |-
+        NetworkSegmentation\(DPF clusters dont support UDN yet, pods on DPU host get device ID must be provided with UserDefinedPrimaryNetworks\)\{0\}
+        should have a runbook_url\(issue in LVMS which we depend on\)\{0\}
+        should have description and summary\(issue in NFD which we depend on\)\{0\}
+        alerts in firing state\(issue in MetalLB which we depend on\)\{0\}
+        Baremetal platform should have\(control-plane BMHs are stub objects from the assisted installer with no BMC address, issue with any assisted-installed cluster not just DPF, not interesting\)\{0\}
+        annotated correctly for\(openshift-gitops,nfd,storage namespaces missing annotations, not our problem\)\{0\}
+        cluster infrastructure should be configured correctly\(also missing annotations in dependency operators, not our problem\)\{0\}
+        must have stable versions\(unstable CRD versions in dependency operators, not our problem\)\{0\}
+        should have subresource.status\(HyperShift dependency CRD missing subresource.status, not our problem\)\{0\}
+        Managed cluster should ensure control plane pods do not run in best-effort QoS\(dependency operators csr-auto-approver, nfd, metallb running in best-effort QoS, not our problem\)\{0\}
+        Managed cluster should ensure platform components have system-\* priority class\(dependency operator pods with empty priority class, not our problem\)\{0\}
+        Managed cluster should set requests but not limits\(OVN webhook injects VF limits on platform DaemonSets, kubernetes requires limits==requests for extended resources so this is unavoidable, the convention targets CPU/memory throttling/OOM but VF limits are discrete device counts not a throttling risk, test gap not a real violation, also gitops sets limits and metallb speaker missing requests\)\{0\}
+        Managed cluster should only include cluster daemonsets that have maxUnavailable\(nfd-worker, speaker, vg-manager use maxUnavailable=1 instead of percentage-based update strategy, dependency operator issue, not our problem\)\{0\}
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-setup-image-registry
+    - ref: openshift-e2e-test
+  timeout: 7h0m0s
+- always_run: false
+  as: conformance-doca4
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca4
+    env:
+      TEST_SKIPS: |-
+        NetworkSegmentation\(DPF clusters dont support UDN yet, pods on DPU host get device ID must be provided with UserDefinedPrimaryNetworks\)\{0\}
+        should have a runbook_url\(issue in LVMS which we depend on\)\{0\}
+        should have description and summary\(issue in NFD which we depend on\)\{0\}
+        alerts in firing state\(issue in MetalLB which we depend on\)\{0\}
+        Baremetal platform should have\(control-plane BMHs are stub objects from the assisted installer with no BMC address, issue with any assisted-installed cluster not just DPF, not interesting\)\{0\}
+        annotated correctly for\(openshift-gitops,nfd,storage namespaces missing annotations, not our problem\)\{0\}
+        cluster infrastructure should be configured correctly\(also missing annotations in dependency operators, not our problem\)\{0\}
+        must have stable versions\(unstable CRD versions in dependency operators, not our problem\)\{0\}
+        should have subresource.status\(HyperShift dependency CRD missing subresource.status, not our problem\)\{0\}
+        Managed cluster should ensure control plane pods do not run in best-effort QoS\(dependency operators csr-auto-approver, nfd, metallb running in best-effort QoS, not our problem\)\{0\}
+        Managed cluster should ensure platform components have system-\* priority class\(dependency operator pods with empty priority class, not our problem\)\{0\}
+        Managed cluster should set requests but not limits\(OVN webhook injects VF limits on platform DaemonSets, kubernetes requires limits==requests for extended resources so this is unavoidable, the convention targets CPU/memory throttling/OOM but VF limits are discrete device counts not a throttling risk, test gap not a real violation, also gitops sets limits and metallb speaker missing requests\)\{0\}
+        Managed cluster should only include cluster daemonsets that have maxUnavailable\(nfd-worker, speaker, vg-manager use maxUnavailable=1 instead of percentage-based update strategy, dependency operator issue, not our problem\)\{0\}
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-setup-image-registry
+    - ref: openshift-e2e-test
+  timeout: 7h0m0s
+- always_run: false
+  as: scale-doca8
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca8
+    env:
+      ENABLE_LOCAL_INDEX: "true"
+      HYPERSHIFT_MGMT_CLUSTER: "true"
+      ND_CNI_EXTRA_FLAGS: --selector node-role.kubernetes.io/worker-dpu=
+      POD_READY_THRESHOLD: 60000ms
+      PODS_PER_NODE: "60"
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+    - ref: openshift-qe-node-density-cni
+- always_run: false
+  as: scale-doca4
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca4
+    env:
+      ENABLE_LOCAL_INDEX: "true"
+      HYPERSHIFT_MGMT_CLUSTER: "true"
+      ND_CNI_EXTRA_FLAGS: --selector node-role.kubernetes.io/worker-dpu=
+      POD_READY_THRESHOLD: 60000ms
+      PODS_PER_NODE: "60"
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+    - ref: openshift-qe-node-density-cni
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: openshift-dpf

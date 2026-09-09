@@ -1,0 +1,46 @@
+base_images:
+  openstack-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: openstack-installer
+  openstack-tests:
+    name: "5.1"
+    namespace: ocp
+    tag: openstack-tests
+releases:
+  initial:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 5.1.0-0
+        upper: 5.1001.0-0
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.1"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-openstack-ovn-upgrade
+  minimum_interval: 168h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE: ci.m1.xlarge
+      TEST_ARGS: --disable-monitor=termination-message-policy
+      TEST_TYPE: upgrade-conformance
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
+    workflow: openshift-upgrade-openstack
+zz_generated_metadata:
+  branch: release-5.1
+  org: shiftstack
+  repo: ci
+  variant: upgrade-from-stable-4.22

@@ -1,0 +1,40 @@
+ref:
+  as: oape-review-handler
+  from_image:
+    namespace: oape
+    name: ai-e2e-agent
+    tag: review-handler-agent
+  commands: oape-review-handler-commands.sh
+  env:
+  - name: CLOUD_ML_REGION
+    default: "global"
+    documentation: |-
+      Google Cloud region for Vertex AI.
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "openshift-ci-prow-agents"
+    documentation: |-
+      Google Cloud project ID for Vertex AI authentication.
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/google-token"
+    documentation: |-
+      Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+    documentation: |-
+      Claude model to use for processing PR review comments.
+  credentials:
+  - mount_path: /var/run/claude-code-service-account
+    name: sa-claude-openshift-ci
+    namespace: test-credentials
+  - mount_path: /var/run/github-app
+    name: openshift-app-platform-shift-github-bot
+    namespace: test-credentials
+  timeout: 1h0m0s
+  resources:
+    requests:
+      cpu: "1"
+      memory: 500Mi
+  documentation: |-
+    Fetch unresolved PR review threads and apply AI-assisted fixes or replies
+    via the oape review-handler. Requires GCP Vertex AI credentials and a
+    GitHub App installation for the target repository.

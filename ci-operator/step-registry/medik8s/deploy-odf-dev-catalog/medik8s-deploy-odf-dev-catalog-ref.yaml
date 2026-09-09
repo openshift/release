@@ -1,0 +1,49 @@
+ref:
+  as: medik8s-deploy-odf-dev-catalog
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: medik8s-deploy-odf-dev-catalog-commands.sh
+  grace_period: 10m
+  timeout: 3h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+    - namespace: test-credentials
+      name: odf-quay-credentials
+      mount_path: /tmp/secrets/odf-quay-credentials
+  documentation: |-
+    Deploy ODF from the dev catalog for pre-GA OCP versions.
+    Installs ODF from quay.io/rhceph-dev/ocs-registry using the
+    specified version and channel, creates a StorageCluster, and
+    sets ocs-storagecluster-ceph-rbd as the default storage class.
+    GA channel availability: stable-4.22 ~Jul 9, 2026;
+    stable-4.23 ~Nov 11, 2026.
+  env:
+  - name: ODF_CATALOG_IMAGE
+    documentation: |-
+      The ODF catalog image to use. Defaults to the dev catalog
+      at quay.io/rhceph-dev/ocs-registry. Override to use a GA
+      catalog when the stable channel becomes available.
+    default: ""
+  - name: ODF_VERSION_MAJOR_MINOR
+    documentation: The ODF major.minor version (used in catalog image tag when ODF_CATALOG_IMAGE is empty)
+    default: "4.23"
+  - name: ODF_OPERATOR_CHANNEL
+    documentation: The ODF operator subscription channel
+    default: "stable-4.23"
+  - name: ODF_SUBSCRIPTION_NAME
+    documentation: The ODF subscription name
+    default: "odf-operator"
+  - name: ODF_STORAGE_CLUSTER_NAME
+    documentation: The ODF StorageCluster name
+    default: "ocs-storagecluster"
+  - name: ODF_BACKEND_STORAGE_CLASS
+    documentation: The backend storage class for ODF PVCs
+    default: "gp2-csi"
+  - name: ODF_VOLUME_SIZE
+    documentation: The size of each ODF volume in Gi
+    default: "50"

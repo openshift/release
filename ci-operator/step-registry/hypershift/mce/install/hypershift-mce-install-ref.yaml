@@ -1,0 +1,62 @@
+ref:
+  as: hypershift-mce-install
+  from: upi-installer
+  grace_period: 5m0s
+  timeout: 60m0s
+  cli: latest
+  env:
+  - name: MCE_VERSION
+    default: "2.4"
+    documentation: "version of the mce.(2.6, 2.7, 2.8, 2.9, 2.10)"
+  - name: USE_KONFLUX_CATALOG
+    default: "false"
+    documentation: "Use Konflux image for HyperShift Operator instead of the default quay.io/acm-d"
+  - name: OVERRIDE_HO_IMAGE
+    default: ""
+    documentation: |-
+      Override the HyperShift operator image. If the default is an empty string, this will not override. 
+      E.g: quay.io/hypershift/hypershift-operator:latest (connected)
+      E.g: virthost.ostest.test.metalkube.org:6001/hypershift/hypershift-operator:latest (disconnected)
+  - name: DISCONNECTED
+    default: "false"
+    documentation: Should we work on top of a disconnected environment
+  - name: MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION
+    documentation: |-
+      Optional. Used to override MCE_VERSION, with higher priority than MCE_VERSION.
+      When using the Gangway API, pass it as:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION": "2.6"
+        }
+      }
+    default: ""
+  - name: MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HO_IMAGE
+    documentation: |-
+      Optional. Used to override OVERRIDE_HO_IMAGE, with higher priority than OVERRIDE_HO_IMAGE.
+      When using the Gangway API, pass it as:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HO_IMAGE": "quay.io/hypershift/hypershift-operator:latest"
+        }
+      }
+    default: ""
+  commands: hypershift-mce-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - mount_path: /etc/hypershift-pool-aws-credentials
+    name: hypershift-pool-aws-credentials
+    namespace: test-credentials
+  - mount_path: /etc/acm-d-mce-quay-pull-credentials
+    name: acm-d-mce-quay-credentials
+    namespace: test-credentials
+  documentation: |-
+    install mce operator. doc: https://github.com/stolostron/deploy/blob/master/multiclusterengine/README.md
+
+    If you want to use this step in a disconnected environment, the following configurations are required:
+    - ref: enable-qe-catalogsource-baremetalds-proxy-server
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: hypershift-mce-install
+    and set MCE_USE_QE_CATALOG = "true"

@@ -1,0 +1,43 @@
+ref:
+  as: rosa-e2e-gather-cluster-diagnostics
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: cli
+  commands: rosa-e2e-gather-cluster-diagnostics-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 10m0s
+  grace_period: 30s
+  credentials:
+  - namespace: ci
+    name: cs-qe-credentials
+    mount_path: /usr/local/cs-qe-credentials
+  env:
+  - name: GATHER_OCM_ENV
+    default: "staging"
+    documentation: |-
+      OCM environment for login. Determines the OCM API URL.
+      Valid values: staging, production, integration.
+  - name: GATHER_BACKPLANE_PROXY_URL
+    default: "http://squid.corp.redhat.com:3128"
+    documentation: |-
+      Corp proxy URL for ocm-backplane from the build farm.
+  - name: GATHER_OCM_CLI_VERSION
+    default: "1.0.15"
+    documentation: |-
+      ocm CLI version to install (no v prefix).
+  - name: GATHER_BACKPLANE_CLI_VERSION
+    default: "0.11.0"
+    documentation: |-
+      ocm-backplane CLI version to install (no v prefix).
+  documentation: |-
+    Collects cluster-level diagnostics (oauth-apiserver logs, etcd logs,
+    pod status snapshots) from OSD/ROSA test clusters after test execution.
+    Writes output to ARTIFACT_DIR/cluster-diagnostics/ for post-mortem
+    analysis of oauth-apiserver HTTP 500 errors and etcd race conditions.
+    Reads cluster ID from SHARED_DIR/cluster-id. Exits 0 on all failures
+    so it never blocks job completion when used with best_effort: true.
+    Requires cs-qe-credentials for OCM/backplane login.

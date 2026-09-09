@@ -1,0 +1,26 @@
+ref:
+  as: redhat-appstudio-operator-overlay-e2e
+  cli: latest
+  commands: redhat-appstudio-operator-overlay-e2e-commands.sh
+  credentials:
+  - mount_path: /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe
+    name: konflux-ci-secrets-new
+    namespace: test-credentials
+  documentation: |-
+    Runs konflux-ci conformance tests after development-operator overlay install.
+    Clones infra-deployments (including PR content) and runs run-e2e.sh via OVERLAY_E2E_SCRIPT_NAME.
+    Uses the same CI image as the install step (task-runner + Go 1.26).
+  env:
+  - default: run-e2e.sh
+    documentation: Phase script under openshift-overlay-e2e (install.sh or run-e2e.sh)
+    name: OVERLAY_E2E_SCRIPT_NAME
+  - default: upstream-konflux
+    documentation: Ginkgo label filter for selecting which tests to run
+    name: GINKGO_LABEL_FILTER
+  from: konflux-overlay-install
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 2h0m0s

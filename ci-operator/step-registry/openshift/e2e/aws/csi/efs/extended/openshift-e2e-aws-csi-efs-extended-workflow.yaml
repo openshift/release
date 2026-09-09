@@ -1,0 +1,17 @@
+workflow:
+  as: openshift-e2e-aws-csi-efs-extended
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-provision
+    - chain: storage-conf-csi-optional-aws-efs
+    test:
+    - ref: openshift-extended-test
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-deprovision
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_SCENARIOS: '\[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]'
+      TEST_FILTERS: "~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;~LSO&;STORAGE&"
+      FORCE_SUCCESS_EXIT: "no"
+  documentation: |-
+    The Openshift E2E AWS EFS CSI extended workflow executes the `openshift csi extended end-to-end test suite` on AWS EFS CSI driver and operator.

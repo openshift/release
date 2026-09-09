@@ -1,0 +1,68 @@
+ref:
+  as: openshift-e2e-libvirt-analyze-e2e-failure
+  from_image:
+    namespace: ci
+    name: claude-ai-helpers
+    tag: latest
+  best_effort: true
+  commands: openshift-e2e-libvirt-analyze-e2e-failure-commands.sh
+  timeout: 35m0s
+  grace_period: 30s
+  env:
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+    documentation: |-
+      Enable Vertex AI for Claude Code.
+  - name: CLOUD_ML_REGION
+    default: "global"
+    documentation: |-
+      Google Cloud region for Vertex AI.
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "openshift-ci-prow-agents"
+    documentation: |-
+      Google Cloud project ID for Vertex AI authentication.
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/google-token"
+    documentation: |-
+      Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+    documentation: |-
+      Claude model to use for test failure analysis.
+  - name: TEST_NAME
+    default: ""
+    documentation: |-
+      ci-operator test name (as: field), used to build the GCS artifact path.
+      When empty, derived from JOB_NAME (the ocp-* or e2e-* suffix).
+  - name: TEST_STEPS
+    default: "openshift-e2e-libvirt-test upi-install-libvirt"
+    documentation: |-
+      Space-separated inner step names to poll for finished.json.
+  - name: SYSTEM_PROMPT
+    default: |-
+      LIBVIRT CONTEXT:
+      - These jobs install OpenShift on IBM Z (s390x) or IBM Power (ppc64le) KVM guests via UPI libvirt.
+      - Workflows: openshift-e2e-libvirt-vpn, openshift-e2e-libvirt-vpn-fips, openshift-e2e-libvirt-upi, openshift-e2e-libvirt-upi-fips.
+      - Z uses cluster profile libvirt-s390x-vpn. Power uses libvirt-ppc64le-s2s.
+      - Install steps: upi-conf-libvirt, upi-install-libvirt. Test step: openshift-e2e-libvirt-test.
+      - Prefer evidence from junit, install logs, node journals, and MachineConfigs over speculation.
+    documentation: |-
+      Platform-specific context appended to the analyzer system prompt.
+      Override this in consuming workflows (for example PowerVC) instead of forking the step.
+      The script always prepends CI/runtime context (artifact dir, prow URL, credential restrictions).
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  credentials:
+  - namespace: test-credentials
+    name: sa-claude-openshift-ci
+    mount_path: /var/run/claude-code-service-account
+  documentation: |-
+    Post-step that uses Claude to analyze libvirt e2e failures (IBM Z VPN and Power UPI).
+    Uses the existing CI Vertex service account; no per-user API key is required.
+    Only runs when a listed test/install step failed. On success, exits early.
+    The wrapper downloads a bounded artifact set; Claude is not given Bash or WebFetch.
+    Produces ARTIFACT_DIR/failure-analysis.md and ARTIFACT_DIR/claude-usage.json.
+    The verbose Claude transcript is not uploaded.
+    Other platforms can reuse this step by overriding SYSTEM_PROMPT and TEST_STEPS.

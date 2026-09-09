@@ -1,0 +1,57 @@
+binary_build_commands: make manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.21
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-unit
+  commands: |
+    unset GOFLAGS
+    make test-unit
+  container:
+    from: src
+- as: test-e2e
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test-e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: test-integration
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test-integration
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        make test-integration
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: 3scale
+  repo: 3scale-operator

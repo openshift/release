@@ -1,0 +1,29 @@
+ref:
+  as: aro-hcp-deprovision-tracked-resource-groups
+  best_effort: true
+  from: aro-hcp-e2e-tests
+  commands: aro-hcp-deprovision-tracked-resource-groups-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  credentials:
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+  env:
+    - name: VAULT_SECRET_PROFILE
+      default: "dev"
+      documentation: |-
+        Selects which environment's cluster secrets to use.
+    - name: CLEANUP_MODE
+      default: "no-rp"
+      documentation: |-
+        Cleanup mode passed to the CLI. Defaults to "no-rp" because clusters
+        may be in broken states that the RP cannot cleanly handle.
+  timeout: 15m
+  documentation: |-
+    Best-effort cleanup of resource groups tracked during the e2e test step.
+    Reads tracked-resource-group_* marker files from SHARED_DIR and deletes
+    the corresponding Azure resource groups, reducing role assignment pressure
+    between job completion and the periodic expired-resource-group cleanup.

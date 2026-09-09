@@ -1,0 +1,53 @@
+ref:
+  as: p2p-mtv-create-migration-maps
+  from: cli
+  commands: p2p-mtv-create-migration-maps-commands.sh
+  timeout: 30m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Create MTV NetworkMap (pod→pod) and StorageMap between two registered OpenShift providers
+    on the hub. Run after p2p-mtv-register-providers and after ODF is Available on both spokes;
+    creating StorageMap too early causes StorageRefNotValid.
+
+    Forklift StorageMap source uses spec.map[].source.name (StorageClass name on source provider
+    inventory). Destination uses storageClass only.
+
+    Annotates both providers for inventory refresh (unless MTV_SKIP_INVENTORY_REFRESH=true),
+    applies maps, waits for Ready, and writes ${ARTIFACT_DIR}/mtv-migration-maps-status.txt.
+
+    Hub kubeconfig is KUBECONFIG from ci-operator.
+  env:
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV operator and map CRs live.
+  - name: MTV_SOURCE_PROVIDER
+    default: "spoke-1"
+    documentation: Source MTV Provider CR name (migration origin).
+  - name: MTV_DESTINATION_PROVIDER
+    default: "spoke-2"
+    documentation: Destination MTV Provider CR name (migration target).
+  - name: MTV_NETWORK_MAP_NAME
+    default: "spoke-network-map"
+    documentation: NetworkMap metadata.name.
+  - name: MTV_STORAGE_MAP_NAME
+    default: "spoke-storage-map"
+    documentation: StorageMap metadata.name.
+  - name: MTV_SOURCE_STORAGE_NAME
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: StorageClass name on the source spoke (spec.map[].source.name).
+  - name: MTV_DESTINATION_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: Destination StorageClass name (spec.map[].destination.storageClass).
+  - name: MTV_PROVIDER_READY_TIMEOUT
+    default: "15m"
+    documentation: Timeout for oc wait provider/<name> --for=condition=Ready.
+  - name: MTV_MAP_READY_TIMEOUT
+    default: "15m"
+    documentation: Timeout for NetworkMap/StorageMap Ready waits.
+  - name: MTV_SKIP_INVENTORY_REFRESH
+    default: "false"
+    documentation: Set to "true" to skip forklift.konveyor.io/inventory-refresh annotation.

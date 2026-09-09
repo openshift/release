@@ -1,0 +1,76 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  annotations:
+    reason: >-
+      Fixes for bare-metal UPI nodes in build11:
+      1) Sets br-ex MTU to 9004 on every boot so OVN-Kubernetes can use the cluster-wide
+         jumbo-frame MTU of 8901 (physical interfaces on these nodes default to 1500).
+      2) Overrides AWS-specific systemd units with no-ops that succeed immediately on
+         non-AWS nodes (masking is not used because the MCO on-disk validator rejects
+         symlinks when the rendered config from 00-worker expects regular files).
+      3) Removes the cloud-provider uninitialized taint that the kubelet adds at startup
+         (since the AWS cloud controller manager cannot initialise bare-metal nodes).
+  labels:
+    machineconfiguration.openshift.io/role: worker-upi
+  name: 99-worker-upi-baremetal-fixes
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - path: /usr/local/bin/fix-baremetal-upi
+        mode: 0755
+        contents:
+          source: data:text/plain;charset=utf-8;base64,IyEvYmluL2Jhc2gKc2V0IC1ldW8gcGlwZWZhaWwKCiMgLS0tIEZpeCBici1leCBNVFUgLS0tCiMgV2FpdCBmb3IgYnItZXggdG8gYXBwZWFyICh1cCB0byAyIG1pbnV0ZXMpCmZvciBpIGluICQoc2VxIDEgNjApOyBkbwogIGlmIG92cy12c2N0bCBwb3J0LXRvLWJyIGJyLWV4ICY+L2Rldi9udWxsOyB0aGVuCiAgICBicmVhawogIGZpCiAgc2xlZXAgMgpkb25lCm92cy12c2N0bCBzZXQgaW50IGJyLWV4IG10dV9yZXF1ZXN0PTkwMDQKZWNobyAiYnItZXggTVRVIHNldCB0byA5MDA0IgoKIyAtLS0gUmVtb3ZlIGNsb3VkLXByb3ZpZGVyIHVuaW5pdGlhbGl6ZWQgdGFpbnQgLS0tCk5PREU9IiQoaG9zdG5hbWUpIgpLVUJFQ09ORklHPSIvdmFyL2xpYi9rdWJlbGV0L2t1YmVjb25maWciCk9DPSIvdXNyL2Jpbi9vYyIKaWYgWyAhIC14ICIkT0MiIF07IHRoZW4KICBPQz0iL3Vzci9sb2NhbC9iaW4vb2MiCmZpCgojIFdhaXQgZm9yIG5vZGUgdG8gYmUgcmVnaXN0ZXJlZCAodXAgdG8gMTAgbWludXRlcykKZm9yIGkgaW4gJChzZXEgMSAxMjApOyBkbwogIGlmICIkT0MiIC0ta3ViZWNvbmZpZz0iJEtVQkVDT05GSUciIGdldCBub2RlICIkTk9ERSIgJj4vZGV2L251bGw7IHRoZW4KICAgIGJyZWFrCiAgZmkKICBzbGVlcCA1CmRvbmUKCiIkT0MiIC0ta3ViZWNvbmZpZz0iJEtVQkVDT05GSUciIGFkbSB0YWludCBub2RlICIkTk9ERSIgbm9kZS5jbG91ZHByb3ZpZGVyLmt1YmVybmV0ZXMuaW8vdW5pbml0aWFsaXplZDpOb1NjaGVkdWxlLSAyPi9kZXYvbnVsbCB8fCB0cnVlCmVjaG8gIlJlbW92ZWQgdW5pbml0aWFsaXplZCB0YWludCBmcm9tICR7Tk9ERX0iCg==
+    systemd:
+      units:
+      # --- Combined MTU fix + taint removal on every boot ---
+      - name: fix-baremetal-upi.service
+        enabled: true
+        contents: |
+          [Unit]
+          Description=Fix bare-metal UPI node (MTU + cloud-provider taint)
+          After=openvswitch.service ovs-configuration.service kubelet.service crio.service
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/usr/local/bin/fix-baremetal-upi
+          [Install]
+          WantedBy=multi-user.target
+      # --- Override AWS-specific units with no-ops (cannot mask due to MCO validator) ---
+      - name: aws-kubelet-providerid.service
+        enabled: true
+        contents: |
+          [Unit]
+          Description=AWS kubelet provider ID (no-op on bare metal)
+          ConditionPathExists=/run/metadata/afterburn
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/true
+          [Install]
+          WantedBy=network-online.target
+      - name: aws-kubelet-nodename.service
+        enabled: true
+        contents: |
+          [Unit]
+          Description=AWS kubelet node name (no-op on bare metal)
+          ConditionPathExists=/run/metadata/afterburn
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/true
+          [Install]
+          WantedBy=network-online.target
+      - name: aws-update-dns.service
+        enabled: false
+        contents: |
+          [Unit]
+          Description=AWS DNS update (no-op on bare metal)
+          ConditionPathExists=/run/metadata/afterburn
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/bin/true
+          [Install]
+          RequiredBy=kubelet-dependencies.target

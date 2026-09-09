@@ -1,0 +1,1 @@
+../servicemesh-sail-operator-deploy-controlplane-commands.sh

@@ -1,0 +1,77 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  stolostron_builder_go1.26-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.26-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.26-linux
+images:
+  items:
+  - dockerfile_path: build/Dockerfile.rhtap
+    from: base
+    inputs:
+      stolostron_builder_go1.26-linux:
+        as:
+        - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.26
+    optional: true
+    to: dynamic-scoring-controller
+  - dockerfile_path: build/Dockerfile.addon.rhtap
+    from: base
+    inputs:
+      stolostron_builder_go1.26-linux:
+        as:
+        - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.26
+    optional: true
+    to: dynamic-scoring-addon
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: sonarcloud
+  commands: |
+    export HOME="/tmp"
+    make setup-envtest
+    export ENVTEST_K8S_VERSION=$(go list -m -f '{{ .Version }}' k8s.io/api | awk -F'[v.]' '{printf "1.%d", $3}')
+    export KUBEBUILDER_ASSETS=$(./bin/setup-envtest use "${ENVTEST_K8S_VERSION}" --bin-dir ./bin -p path)
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonarcloud-postsubmit
+  commands: |
+    export HOME="/tmp"
+    make setup-envtest
+    export ENVTEST_K8S_VERSION=$(go list -m -f '{{ .Version }}' k8s.io/api | awk -F'[v.]' '{printf "1.%d", $3}')
+    export KUBEBUILDER_ASSETS=$(./bin/setup-envtest use "${ENVTEST_K8S_VERSION}" --bin-dir ./bin -p path)
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: release-5.1
+    workflow: ocm-ci-fastforward
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: dynamic-scoring-framework

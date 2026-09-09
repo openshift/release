@@ -1,0 +1,89 @@
+ref:
+  as: rosa-e2e-ocm-fvt-longrunning
+  from: nested-podman
+  commands: rosa-e2e-ocm-fvt-longrunning-commands.sh
+  nested_podman: true
+  timeout: 12h0m0s
+  grace_period: 30s
+  credentials:
+  - namespace: ci
+    name: cs-qe-credentials
+    mount_path: /usr/local/cs-qe-credentials
+  - namespace: ci
+    name: osdfm-qe-credentials
+    mount_path: /usr/local/osdfm-qe-credentials
+  - namespace: ci
+    name: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: OCM_FVT_JOB_NAME
+    documentation: |-
+      Required ocmtest --job name (e.g. cs-rosa-hcp-ad-staging-main).
+  - name: OCM_FVT_SERVICE
+    default: "cms"
+    documentation: |-
+      ocmtest --service: cms (default) or osdfm.
+  - name: OCM_FVT_REPORT_JIRA
+    default: "true"
+    documentation: |-
+      Enable Jira reporting (--reportJiraTicket, ENABLE_JIRA_REPORTING).
+  - name: OCM_FVT_OCM_ENV
+    default: ""
+    documentation: |-
+      OCM env override (e.g. integration). Empty uses ocmtest default (staging).
+  - name: OCM_FVT_EXTRA_ENVS
+    default: ""
+    documentation: |-
+      Newline-separated KEY=VALUE pairs injected into the podman container.
+  - name: OCM_FVT_GCP_CREDS
+    default: "false"
+    documentation: |-
+      Mount osd-ccs-admin.json for OSD GCP tests.
+  - name: OCM_FVT_USE_BACKPLANE
+    default: "false"
+    documentation: |-
+      Prow-only: backplane login to Hive for osdfm AAO kubeconfig.
+      False when Tekton/Jenkins supply vault or a mounted kubeconfig.
+  - name: OCM_FVT_BACKPLANE_CLUSTER_ID
+    default: "1g268u7pp694gj152nj16me4sv615lpv"
+    documentation: |-
+      Hive cluster id (default hivei01ue1). Override per env for stage/prod gating.
+  - name: OCM_FVT_APPSRE_BACKPLANE_CLUSTER_ID
+    default: "19mjrthsfn66bm22m574v2v1gt9a8r4q"
+    documentation: |-
+      AppSRE cluster for Prom port-forward (default app-sre-stage-01).
+      Override for prod osdfm gating.
+  - name: OCM_FVT_BACKPLANE_CREDENTIALS_DIR
+    default: "/usr/local/rosa-clusters-service-sandbox"
+    documentation: |-
+      Dir with backplane_client_id/secret (mounted by this ref).
+  - name: OCM_FVT_BACKPLANE_OCM_URL
+    default: "https://api.openshift.com"
+    documentation: |-
+      OCM API for ocm login before backplane (Hive clusters use production API).
+  - name: OCM_FVT_BACKPLANE_PROXY_URL
+    default: "http://squid.corp.redhat.com:3128"
+    documentation: |-
+      Corp proxy for backplane from the build farm.
+  - name: OCM_FVT_BACKPLANE_ELEVATE_REASON
+    default: "https://issues.redhat.com/browse/ROSAENG-62717"
+    documentation: |-
+      Audit reason passed to ocm-backplane elevate.
+  - name: OCM_FVT_OCM_CLI_VERSION
+    default: "1.0.15"
+    documentation: |-
+      ocm CLI version (no v prefix). Keep in sync with rosa-clusters-service build/backplane.py.
+  - name: OCM_FVT_BACKPLANE_CLI_VERSION
+    default: "0.11.0"
+    documentation: |-
+      ocm-backplane CLI version (no v prefix).
+  - name: OCM_FVT_OC_VERSION
+    default: "stable"
+    documentation: |-
+      oc client version (stable or e.g. 4.19.0).
+  documentation: |-
+    Same as rosa-e2e-ocm-fvt with 12h timeout and osdfm/backplane credential mounts.

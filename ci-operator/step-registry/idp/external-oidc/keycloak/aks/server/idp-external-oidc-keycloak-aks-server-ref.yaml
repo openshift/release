@@ -1,0 +1,32 @@
+ref:
+  as: idp-external-oidc-keycloak-aks-server
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  commands: idp-external-oidc-keycloak-aks-server-commands.sh
+  env:
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: "ci.azure.devcluster.openshift.com"
+    documentation: "A base domain for the keycloak server's dns record."
+  - name: DNS_ZONE_RG_NAME
+    default: "os4-common"
+    documentation: "The Azure resource group containing the DNS zone for HYPERSHIFT_BASE_DOMAIN. Defaults to os4-common where ci.azure.devcluster.openshift.com is hosted."
+  - name: OIDC_SECRET_MANAGED_BY_CUSTOMER
+    default: "false"
+    documentation: "The external oidc secret can be managed by customer, if set to true, this secret need created in hosted cluster openshift-config ns."
+  - name: USE_HYPERSHIFT_AZURE_CREDS
+    default: "false"
+    documentation: "If true, use hypershift azure credentials"
+  credentials:
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      name: hypershift-ci-jobs-azurecreds
+      namespace: test-credentials
+  grace_period: 10m0s
+  timeout: 45m0s
+  resources:
+    requests:
+      cpu: 300m
+      memory: 200Mi
+  documentation: |-
+    Set up a Keycloak server including setting up clients, creating test users, create record et al

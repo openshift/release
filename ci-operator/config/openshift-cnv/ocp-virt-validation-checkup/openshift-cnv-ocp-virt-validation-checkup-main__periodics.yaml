@@ -1,0 +1,145 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 600Mi
+tests:
+- as: e2e-azure
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: azure-virtualization
+    env:
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+      ODF_BACKEND_STORAGE_CLASS: managed-csi
+      ODF_OPERATOR_CHANNEL: stable-4.21
+      OPERATORS: |
+        [
+            {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}
+        ]
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: install-operators
+    - as: install-cnv
+      cli: latest
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/master -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make update_pull_secret set_imagedigestmirrorset deploy_cnv
+        oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{"op": "add", "path": "/spec/defaultCPUModel", "value": "Broadwell"}]'
+      credentials:
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      - mount_path: /var/run/cnv-ci-konflux-pull-secret
+        name: konflux-pull-secret
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: openshift-virtualization+konflux_ro_bot
+        name: KONFLUX_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-konflux-pull-secret/token
+        name: KONFLUX_REGISTRY_TOKEN_PATH
+      - default: "5.0"
+        name: OCP_VERSION
+      - default: "5.0"
+        name: CNV_VERSION
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      - default: "false"
+        name: PRODUCTION_RELEASE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 1h0m0s
+    - ref: hypershift-kubevirt-install-odf
+    - as: run-validation-checkup
+      cli: latest
+      commands: |
+        export CSV_NAME=$(oc get csv -n openshift-cnv -o json | jq -r '.items[] | select(.metadata.name | startswith("kubevirt-hyperconverged")).metadata.name')
+        export OCP_VIRT_VALIDATION_IMAGE=$(oc get csv -n ${TARGET_NAMESPACE} $CSV_NAME -o json | jq -r '.spec.relatedImages[] | select(.name | contains("ocp-virt-validation-checkup")).image')
+        make ci-validate
+      env:
+      - default: "false"
+        name: DRY_RUN
+      - default: 420m
+        name: OCP_VIRT_VALIDATION_TIMEOUT
+      - default: ocs-storagecluster-ceph-rbd-virtualization
+        name: STORAGE_CLASS
+      - default: test_id:1780|test_id:1783|test_id:1513|test_id:1514
+        name: TEST_SKIPS
+      - default: "false"
+        name: ACCEPT_WINDOWS_EULA
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 7h30m0s
+    - as: run-validation-checkup-disconnected
+      cli: latest
+      commands: |
+        export REGISTRY_AUTH_FILE=/tmp/auth.json
+        oc get secret/pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > ${REGISTRY_AUTH_FILE}
+        export CSV_NAME=$(oc get csv -n openshift-cnv -o json | jq -r '.items[] | select(.metadata.name | startswith("kubevirt-hyperconverged")).metadata.name')
+        export OCP_VIRT_VALIDATION_IMAGE=$(oc get csv -n ${TARGET_NAMESPACE} $CSV_NAME -o json | jq -r '.spec.relatedImages[] | select(.name | contains("ocp-virt-validation-checkup")).image')
+        export OCP_VIRT_VALIDATION_IMAGE=$(echo "$OCP_VIRT_VALIDATION_IMAGE" | sed "s|registry.redhat.io/container-native-virtualization|quay.io/openshift-virtualization/konflux-builds/v${CNV_VERSION//./-}|")
+        make ci-validate-disconnected
+      env:
+      - default: "5.0"
+        name: CNV_VERSION
+      - default: "false"
+        name: DRY_RUN
+      - default: 540m
+        name: OCP_VIRT_VALIDATION_TIMEOUT
+      - default: ocs-storagecluster-ceph-rbd-virtualization
+        name: STORAGE_CLASS
+      - default: compute,network,storage,ssp,tier2
+        name: TEST_SUITES
+      - default: test_id:1780|test_id:1783|test_id:1513|test_id:1514
+        name: TEST_SKIPS
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 10h0m0s
+    workflow: ipi-azure
+  timeout: 19h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-cnv
+  repo: ocp-virt-validation-checkup
+  variant: periodics

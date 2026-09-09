@@ -1,0 +1,81 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: node-problem-detector
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: node-problem-detector-binary
+  spec:
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: node-problem-detector:binaries
+    source:
+      dockerfile: |
+        FROM scratch
+        RUN yum install systemd-devel -y && yum clean all
+        COPY . /go/src/k8s.io/node-problem-detector
+        RUN cd /go/src/k8s.io/node-problem-detector && \
+            make ./bin/node-problem-detector
+      git:
+        uri: https://github.com/openshift/node-problem-detector.git
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:golang-1.9
+        imageOptimizationPolicy: SkipLayers
+    successfulBuildsHistoryLimit: 1
+    triggers:
+    - type: ConfigChange
+    - type: GitHub
+      github:
+        secretReference:
+          name: github-deploymentconfig-trigger
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: node-problem-detector
+  spec:
+    failedBuildsHistoryLimit: 2
+    output:
+      pushSecret:
+        name: registry-push
+      to:
+        kind: DockerImage
+        name: docker.io/openshift/node-problem-detector:v0.15.0
+    source:
+      dockerfile: |
+        FROM        centos:7
+        MAINTAINER  Seth Jennings <sjenning@redhat.com>
+
+        COPY bin/node-problem-detector /bin/node-problem-detector
+
+        ENTRYPOINT [ "/bin/node-problem-detector" ]
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: node-problem-detector:binaries
+        paths:
+        - destinationDir: .
+          sourcePath: /go/src/k8s.io/node-problem-detector/.
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: centos:7
+        imageOptimizationPolicy: SkipLayers
+    successfulBuildsHistoryLimit: 1
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: node-problem-detector:binaries
+      type: ImageChange
+kind: List
+metadata: {}

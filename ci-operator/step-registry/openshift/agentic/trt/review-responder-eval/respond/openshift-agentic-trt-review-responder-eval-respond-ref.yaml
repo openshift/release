@@ -1,0 +1,40 @@
+ref:
+  as: openshift-agentic-trt-review-responder-eval-respond
+  from: agentic-dev
+  commands: openshift-agentic-trt-review-responder-eval-respond-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: trt-agent-gh-app
+    mount_path: /var/run/github-token
+  env:
+  - name: UPSTREAM_REPO
+    default: "openshift-trt/sippy-eval"
+  - name: FORK_REPO
+  - name: SETUP_SCRIPT
+    default: "hack/agentic_setup.sh"
+  - name: ALLOWED_TOOLS
+    default: "Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate TodoWrite ToolSearch"
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/claude-prow"
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+  nested_podman: true
+  resources:
+    requests:
+      cpu: 4000m
+      memory: 12Gi
+  timeout: 2h0m0s
+  grace_period: 2m0s
+  documentation: |-
+    Review-responder eval respond step. Clones the repo, checks out
+    the eval branch, runs the review-responder in single-pass EVAL_MODE,
+    and lets Claude address the seeded review comments.

@@ -1,0 +1,98 @@
+ref:
+  as: oadp-operator-sdk-bundle-image
+  from_image:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
+  commands: oadp-operator-sdk-bundle-image-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  env:
+  - name: USE_HOSTED_KUBECONFIG
+    documentation: When true, install the operator on the hosted cluster
+    default: "false"
+  - name: OO_INSTALL_NAMESPACE
+    documentation: The namespace into which the operator and catalog will be installed.
+  - name: OO_INSTALL_MODE
+    documentation: |-
+      The install-mode flag value of the operator-sdk run bundle command. The format is the install-mode name + list of
+      comma separated list of namespaces (for some mode type).
+      values can be:
+
+      * `OwnNamespace` - indicates that the operator can be a member of an `OperatorGroup` that selects its own namespace. Must not contain list of namespaces.
+      * `SingleNamespace=<namespace name>` - indicates that the operator can be a member of an `OperatorGroup` that selects one namespace. Must contain one and only one namespace. the namespace must be different than the `OO_INSTALL_NAMESPACE`.
+      * `MultiNamespace=<namespace name 1>[,<namespace name 2>[,...]]` - indicates that the operator can be a member of an `OperatorGroup` that selects more than one namespace. The namespace list must not be empty.
+      * `AllNamespaces` - (default) indicates that the operator can be a member of an `OperatorGroup` that selects all namespaces (target namespace set is the empty string ""). Must not contain list of namespaces.
+    default: "AllNamespaces"
+  - name: OO_INSTALL_TIMEOUT_MINUTES
+    documentation: how long (in minutes) to wait for the installation, before giving up.
+    default: "10"
+  - name: OO_SECURITY_CONTEXT
+    documentation: |-
+      Specifies the security context to use for the catalog pod created by operator-sdk.
+      Allowed: `restricted`, `legacy`. (default: `restricted`)
+    default: "restricted"
+  - name: OO_PSA_ENFORCE_PRIVILEGED
+    documentation: |-
+      When true, force pod-security.kubernetes.io/enforce=privileged on
+      OO_INSTALL_NAMESPACE regardless of its name. By default, namespaces
+      prefixed `openshift-` only get security.openshift.io/scc.podSecurityLabelSync=true
+      (PSA level derived from whatever SCCs are granted, which can lag behind
+      what operator-sdk's own internal registry pod actually needs and reject
+      it under PodSecurity "restricted"). Namespaces not prefixed `openshift-`
+      already get the explicit-privileged treatment unconditionally; this
+      flag extends that same treatment to an `openshift-*` namespace.
+    default: "false"
+  - name: OO_MIRROR_TO_CLUSTER_REGISTRY
+    documentation: |-
+      When true, mirror OO_BUNDLE into the test cluster's own internal
+      image registry first (exposing its default route, marking it as an
+      insecure registry cluster-wide, and granting anonymous pull on
+      OO_INSTALL_NAMESPACE), and install from that internal copy instead
+      of OO_BUNDLE directly. Works around a real, still only partially
+      understood failure where operator-sdk's own containerd-based bundle
+      pull cannot be given working credentials for some external
+      registries (observed against a CI registry proxy) even when the
+      exact same credential is independently confirmed valid via
+      `oc image mirror`/`oc image info`.
+
+      This is opt-in and defaults to false because it mutates
+      cluster-wide config (image registry route, insecureRegistries,
+      MachineConfigPool rollout) beyond OO_INSTALL_NAMESPACE -- only
+      enable it for a consumer that has actually hit the failure above.
+      Assumes an ephemeral, single-use test cluster; none of these
+      mutations are torn down.
+
+      Sizing job/test timeouts: enabling this adds up to ~30 minutes
+      (the MachineConfigPool rollout wait) on top of this step's own
+      grace_period and OO_INSTALL_TIMEOUT_MINUTES, before OO_BUNDLE's
+      own install even starts.
+    default: "false"
+  - name: OO_BUNDLE
+    documentation: |-
+      Specifies a non ci-bundle image
+  - name: DEPLOYMENT
+    documentation: |-
+      Deployment to be installed by the bundle.
+      Optional. If it is empty, the check will be skipped.
+    default: ""
+  - name: OO_RUN_BUNDLE_ATTEMPTS
+    documentation: |-
+      Number of times to attempt `operator-sdk run bundle` before giving
+      up, with an increasing backoff between attempts. operator-sdk spins
+      up its own opm-image-based registry pod to resolve/serve the
+      bundle, so a transient registry hiccup pulling
+      quay.io/operator-framework/opm:latest can fail the whole command
+      before it ever reaches the actual bundle install.
+    default: "3"
+  documentation: |-
+    OADP-owned fork of optional-operators-operator-sdk-non-ci-bundle-image
+    (see that ref's git history for upstream fixes worth porting back
+    manually), kept separate so KDM-specific changes here don't require
+    approval from that ref's own OWNERS. Installs an optional operator
+    from a provided non ci-bundle image, using operator-sdk, with two
+    opt-in KDM-specific behaviors (OO_MIRROR_TO_CLUSTER_REGISTRY,
+    OO_PSA_ENFORCE_PRIVILEGED).

@@ -1,0 +1,87 @@
+binary_build_commands: make all
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: build/Dockerfile
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/addon-operator-manager
+    to: addon-operator-manager
+  - dockerfile_path: build/Dockerfile.webhook
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/addon-operator-webhook
+    to: addon-operator-webhook
+  - dockerfile_path: deploy-extras/docker/api-mock.Dockerfile
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/api-mock
+    to: api-mock
+  - dockerfile_path: deploy-extras/docker/Dockerfile.src.ci
+    from: src
+    to: addon-operator-tooling
+operator:
+  bundles:
+  - as: addon-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/addon-operator:latest
+    with: addon-operator-manager
+  - pullspec: quay.io/openshift/addon-operator-webhook:latest
+    with: addon-operator-webhook
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: addon-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: addon-operator-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: unit
+  commands: make go-test
+  container:
+    from: src
+- as: precommit-check
+  commands: PRE_COMMIT_HOME=/tmp pre-commit run --all-files --show-diff-on-failure
+  container:
+    from: addon-operator-tooling
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: addon-operator

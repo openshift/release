@@ -1,0 +1,29 @@
+chain:
+  as: hypershift-azure-destroy-selfmanaged-guests
+  steps:
+  - as: destroy-guests
+    best_effort: true
+    cli: latest
+    env:
+    - name: HYPERSHIFT_AZURE_LOCATION
+      default: "centralus"
+      documentation: "Specifies the Azure location of the clusters."
+    - name: HYPERSHIFT_PLATFORM
+      default: ""
+      documentation: "The cloud platform for the self-managed clusters (e.g. azure). Set in the workflow env block."
+    commands: |-
+      set -xuo pipefail
+      export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+      export HYPERSHIFT_BINARY="${HYPERSHIFT_BINARY:-/hypershift/bin/hypershift}"
+      /hypershift/bin/destroy-guests
+    from: hypershift-tests
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 2h0m0s
+    credentials:
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+      name: hypershift-ci-jobs-self-managed-azure
+      namespace: test-credentials

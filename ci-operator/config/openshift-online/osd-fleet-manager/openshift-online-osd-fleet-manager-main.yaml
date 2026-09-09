@@ -1,0 +1,141 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/osd-fleet-manager
+      USER root
+      RUN dnf install -y git make gcc jq unzip && dnf clean all
+      RUN ln -s /usr/bin/podman /usr/bin/docker
+      RUN curl -LO https://go.dev/dl/go1.25.9.linux-amd64.tar.gz && \
+          tar -C /usr/local -xzf go1.25.9.linux-amd64.tar.gz && \
+          rm go1.25.9.linux-amd64.tar.gz
+      ENV PATH="/usr/local/go/bin:${PATH}"
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-online/osd-fleet-manager
+    to: golang-plus
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    make lint
+  container:
+    from: golang-plus
+- as: unit-test
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
+    make db/setup
+    sleep 5
+    make test
+  container:
+    from: golang-plus
+  nested_podman: true
+- as: integration-test-fedramp
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
+    make db/setup
+    sleep 5
+    make db/migrate
+    make test/integration/fedramp
+  container:
+    from: golang-plus
+  nested_podman: true
+- as: integration-test-osdfm
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
+    make db/setup
+    sleep 5
+    make db/migrate
+    make test/integration/osdfm
+  container:
+    from: golang-plus
+  nested_podman: true
+- as: coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /var/run/codecov-secret
+    name: osd-fleet-manager-codecov
+- as: publish-coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  postsubmit: true
+  secrets:
+  - mount_path: /var/run/codecov-secret
+    name: osd-fleet-manager-codecov
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: osd-fleet-manager

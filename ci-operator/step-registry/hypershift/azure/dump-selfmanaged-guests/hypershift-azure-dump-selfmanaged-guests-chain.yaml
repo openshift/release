@@ -1,0 +1,25 @@
+chain:
+  as: hypershift-azure-dump-selfmanaged-guests
+  steps:
+  - as: dump
+    cli: latest
+    env:
+    - name: HYPERSHIFT_PLATFORM
+      default: ""
+      documentation: "The cloud platform for the self-managed clusters (e.g. azure). Set in the workflow env block."
+    commands: |-
+      set -xuo pipefail
+      export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+      if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+        set +x
+        source "${SHARED_DIR}/proxy-conf.sh"
+        set -x
+      fi
+      /hypershift/bin/dump-guests --hypershift-binary=/hypershift/bin/hypershift
+    from: hypershift-tests
+    resources:
+      requests:
+        cpu: 100m
+    timeout: 15m0s
+  - ref: hypershift-debug
+  - ref: hypershift-k8sgpt

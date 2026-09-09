@@ -1,0 +1,25 @@
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+      RUN wget -qO- "https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz" | tar -xJv && \
+          mv shellcheck-stable/shellcheck /usr/local/bin/ && \
+          rm -rf shellcheck-stable && \
+          pip install --no-cache-dir yamllint
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: troubleshooting-scenarios

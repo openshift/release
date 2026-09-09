@@ -1,0 +1,35 @@
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.buildroot
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  root:
+    limits:
+      memory: 3Gi
+    requests:
+      memory: 1Gi
+  src:
+    limits:
+      memory: 3Gi
+    requests:
+      memory: 1Gi
+tests:
+- as: lint
+  commands: GOMEMLIMIT=200000000 HOME=/tmp make lint
+  container:
+    from: src
+- as: mapping
+  commands: GOMEMLIMIT=200000000 HOME=/tmp ./hack/ci-mapping.sh
+  container:
+    from: src
+- as: unit
+  commands: GOMEMLIMIT=200000000 HOME=/tmp ./hack/ci-test.sh
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ci-test-mapping
