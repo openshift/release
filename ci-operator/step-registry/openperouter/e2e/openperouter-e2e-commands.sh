@@ -20,7 +20,6 @@ git clone --depth 1 --branch "${branch}" "${repository}" /root/openperouter
 EOFSOURCE
 
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
-sleep 5h
 ssh "${SSHOPTS[@]}" "root@${IP}" bash /dev/stdin << 'RUNTESTS'
 set -xeo pipefail
 cd /root/dev-scripts
@@ -33,6 +32,8 @@ export CONFIG=/root/dev-scripts/config_root.sh
 
 echo "Kernel release: $(uname -r)"
 echo "Kernel version: $(uname -v)"
+
+sleep 5h
 
 unset DOCKER_HOST
 
