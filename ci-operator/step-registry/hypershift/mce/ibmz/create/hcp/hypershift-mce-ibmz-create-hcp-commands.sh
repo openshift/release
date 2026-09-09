@@ -154,19 +154,19 @@ if [ ! -s "${COREOS_STREAM_JSON}" ]; then
   echo "${MACHINE_OS_IMAGE} does not contain /coreos/coreos-stream.json" >&2
   exit 1
 fi
-if ! VERSION=$(jq -er '.architectures.s390x.artifacts.metal.release // empty' "${COREOS_STREAM_JSON}"); then
+if ! OS_IMAGE_VERSION=$(jq -er '.architectures.s390x.artifacts.metal.release // empty' "${COREOS_STREAM_JSON}"); then
   echo "No RHCOS metal release found for s390x in ${MACHINE_OS_IMAGE}" >&2
   exit 1
 fi
-if [ -z "${VERSION}" ]; then
+if [ -z "${OS_IMAGE_VERSION}" ]; then
   echo "No RHCOS metal release found for s390x in ${MACHINE_OS_IMAGE}" >&2
   exit 1
 fi
-if ! URL=$(jq -er '.architectures.s390x.artifacts.metal.formats.iso.disk.location // empty' "${COREOS_STREAM_JSON}"); then
+if ! OS_IMAGE_URL=$(jq -er '.architectures.s390x.artifacts.metal.formats.iso.disk.location // empty' "${COREOS_STREAM_JSON}"); then
   echo "No RHCOS metal ISO URL found for s390x in ${MACHINE_OS_IMAGE}" >&2
   exit 1
 fi
-if [ -z "${URL}" ]; then
+if [ -z "${OS_IMAGE_URL}" ]; then
   echo "No RHCOS metal ISO URL found for s390x in ${MACHINE_OS_IMAGE}" >&2
   exit 1
 fi
@@ -193,8 +193,8 @@ spec:
         storage: 10Gi
   osImages:
     - openshiftVersion: "${CLUSTER_VERSION}"
-      version: ${VERSION}
-      url: ${URL}
+      version: "${OS_IMAGE_VERSION}"
+      url: "${OS_IMAGE_URL}"
       cpuArchitecture: s390x
 EOF
 

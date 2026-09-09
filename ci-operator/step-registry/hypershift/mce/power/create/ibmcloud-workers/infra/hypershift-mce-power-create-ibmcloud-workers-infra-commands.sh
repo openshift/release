@@ -131,24 +131,24 @@ update_agentserviceconfig() {
     echo "${MACHINE_OS_IMAGE} does not contain /coreos/coreos-stream.json" >&2
     exit 1
   fi
-  if ! VERSION=$(jq -er '.architectures.x86_64.artifacts.metal.release // empty' "${COREOS_STREAM_JSON}"); then
+  if ! OS_IMAGE_VERSION=$(jq -er '.architectures.x86_64.artifacts.metal.release // empty' "${COREOS_STREAM_JSON}"); then
     echo "No RHCOS metal release found for x86_64 in ${MACHINE_OS_IMAGE}" >&2
     exit 1
   fi
-  if [ -z "${VERSION}" ]; then
+  if [ -z "${OS_IMAGE_VERSION}" ]; then
     echo "No RHCOS metal release found for x86_64 in ${MACHINE_OS_IMAGE}" >&2
     exit 1
   fi
-  if ! URL=$(jq -er '.architectures.x86_64.artifacts.metal.formats.iso.disk.location // empty' "${COREOS_STREAM_JSON}"); then
+  if ! OS_IMAGE_URL=$(jq -er '.architectures.x86_64.artifacts.metal.formats.iso.disk.location // empty' "${COREOS_STREAM_JSON}"); then
     echo "No RHCOS metal ISO URL found for x86_64 in ${MACHINE_OS_IMAGE}" >&2
     exit 1
   fi
-  if [ -z "${URL}" ]; then
+  if [ -z "${OS_IMAGE_URL}" ]; then
     echo "No RHCOS metal ISO URL found for x86_64 in ${MACHINE_OS_IMAGE}" >&2
     exit 1
   fi
   echo "$(date) Updating AgentServiceConfig"
-  oc patch AgentServiceConfig agent --type=json -p="[{\"op\": \"add\", \"path\": \"/spec/osImages/-\", \"value\": {\"openshiftVersion\": \"${CLUSTER_VERSION}\", \"version\": \"${VERSION}\", \"url\": \"${URL}\",  \"cpuArchitecture\": \"x86_64\"}}]"
+  oc patch AgentServiceConfig agent --type=json -p="[{\"op\": \"add\", \"path\": \"/spec/osImages/-\", \"value\": {\"openshiftVersion\": \"${CLUSTER_VERSION}\", \"version\": \"${OS_IMAGE_VERSION}\", \"url\": \"${OS_IMAGE_URL}\",  \"cpuArchitecture\": \"x86_64\"}}]"
   oc get AgentServiceConfig agent -o yaml
 
   oc wait --timeout=10m --for=condition=DeploymentsHealthy agentserviceconfig agent
