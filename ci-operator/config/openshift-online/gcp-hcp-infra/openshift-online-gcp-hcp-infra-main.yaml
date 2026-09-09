@@ -85,8 +85,10 @@ tests:
           cpu: "8"
           memory: 4Gi
 - as: terraform-plan
+  always_run: false
   branches:
   - ^main$
+  optional: true
   run_if_changed: '^(terraform/(config/(global|region|management-cluster|service)/|modules/|metadata/|workflows/|dashboards/)|hcp-terraform/gcp-hcp-.+/main\.tf\.json$)'
   steps:
     test:
@@ -117,7 +119,11 @@ tests:
           token = "$(cat /etc/terraform-cloud/token)"
         }
         TFRC
-        make terraform-plan-speculative
+        # Do not execute fork-controlled Makefile or planner code with
+        # credentials. The base revision is trusted, and the planner itself
+        # rejects PRs whose author is not an organization member or repo
+        # collaborator before Terraform is invoked.
+        git show "${PULL_BASE_SHA}:hack/tfc-speculative-plan.py" | python3 -
       credentials:
       - mount_path: /etc/github-private
         name: github-credentials-openshift-ci-robot-private-git-cloner
