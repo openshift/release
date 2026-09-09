@@ -1,0 +1,80 @@
+base_images:
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.22"
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- always_run: false
+  as: e2e-nhc-upgrade-4-22-to-5-0-aws
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: tier:upgrade-cluster
+      MEDIK8S_OPERATOR_PACKAGE: node-healthcheck-operator
+      MEDIK8S_SKIP_DOWNSTREAM_OPERATOR_UPGRADE: "true"
+      SYSTEM_TESTS_REPOSITORY: https://github.com/JonahSussman/medik8s-system-tests.git
+      SYSTEM_TESTS_REVISION: 7ee4bdc9f58aef74a387231d195f156004a048fb
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    test:
+    - ref: ssh-bastion
+    - as: run-nhc-cluster-upgrade
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+
+        : "${ARTIFACT_DIR:?ci-operator must collect step artifacts}"
+        mkdir -p "$ARTIFACT_DIR/provenance"
+        exec > >(tee "$ARTIFACT_DIR/cluster-upgrade-step.log") 2>&1
+        printf '%s\n' "${JOB_SPEC:-}" > "$ARTIFACT_DIR/provenance/job-spec.json"
+        git clone "$SYSTEM_TESTS_REPOSITORY" /tmp/system-tests
+        git -C /tmp/system-tests checkout --detach "$SYSTEM_TESTS_REVISION"
+        test "$(git -C /tmp/system-tests rev-parse HEAD)" = "$SYSTEM_TESTS_REVISION"
+        git -C /tmp/system-tests show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
+        export WORKLOAD_IMAGE=unused-by-nhc-cluster-upgrade
+        make -C /tmp/system-tests run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: MEDIK8S_OPERATOR_PACKAGE
+      - name: MEDIK8S_SKIP_DOWNSTREAM_OPERATOR_UPGRADE
+      - name: SYSTEM_TESTS_REPOSITORY
+      - name: SYSTEM_TESTS_REVISION
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 500Mi
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: system-tests
+  variant: 4.22-to-5.0
