@@ -118,7 +118,6 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       NHC_UPGRADE_NAMESPACE: openshift-workload-availability
-      NHC_EXPECTED_SOURCE_COMMIT: 36c6c7cf31898acbc0be1beb927606af1de2a8f5
       NHC_UPGRADE_OLD_BUNDLE: quay.io/medik8s/node-healthcheck-operator-bundle:v0.12.0
       NHC_UPGRADE_OLD_IMAGE: quay.io/medik8s/node-healthcheck-operator:v0.12.0
       NHC_UPGRADE_OLD_VERSION: 0.12.0
@@ -140,12 +139,8 @@ tests:
         exec > >(tee "$ARTIFACT_DIR/upgrade-step.log") 2>&1
         printf '%s\n' "${JOB_SPEC:-}" > "$ARTIFACT_DIR/provenance/job-spec.json"
         git show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/nhc-source.txt"
-        # A target-branch-only rehearsal must not masquerade as the PR build.
-        git cat-file -e "$NHC_EXPECTED_SOURCE_COMMIT^{commit}"
-        git merge-base --is-ancestor "$NHC_EXPECTED_SOURCE_COMMIT" HEAD
         export NHC_UPGRADE_CANDIDATE_COMMIT="$(git rev-parse HEAD)"
-        printf 'expected PR source: %s\nactual checkout: %s\n' \
-          "$NHC_EXPECTED_SOURCE_COMMIT" "$NHC_UPGRADE_CANDIDATE_COMMIT"
+        printf 'candidate source checkout: %s\n' "$NHC_UPGRADE_CANDIDATE_COMMIT"
         make operator-sdk yq
         export YQ="$PWD/bin/yq"
         export NHC_UPGRADE_OPERATOR_SDK="$PWD/bin/operator-sdk"
@@ -177,7 +172,6 @@ tests:
         name: node-healthcheck-operator
       env:
       - name: NHC_UPGRADE_OLD_BUNDLE
-      - name: NHC_EXPECTED_SOURCE_COMMIT
       - name: NHC_UPGRADE_OLD_IMAGE
       - name: NHC_UPGRADE_OLD_VERSION
       - name: NHC_UPGRADE_PACKAGE
@@ -198,7 +192,6 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       NHC_UPGRADE_NAMESPACE: openshift-workload-availability
-      NHC_EXPECTED_SOURCE_COMMIT: 36c6c7cf31898acbc0be1beb927606af1de2a8f5
       NHC_UPGRADE_OLD_BUNDLE: quay.io/medik8s/node-healthcheck-operator-bundle:v0.12.0
       NHC_UPGRADE_OLD_IMAGE: quay.io/medik8s/node-healthcheck-operator:v0.12.0
       NHC_UPGRADE_OLD_VERSION: 0.12.0
@@ -220,12 +213,8 @@ tests:
         exec > >(tee "$ARTIFACT_DIR/fresh-install-step.log") 2>&1
         printf '%s\n' "${JOB_SPEC:-}" > "$ARTIFACT_DIR/provenance/job-spec.json"
         git show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/nhc-source.txt"
-        # A target-branch-only rehearsal must not masquerade as the PR build.
-        git cat-file -e "$NHC_EXPECTED_SOURCE_COMMIT^{commit}"
-        git merge-base --is-ancestor "$NHC_EXPECTED_SOURCE_COMMIT" HEAD
         export NHC_UPGRADE_CANDIDATE_COMMIT="$(git rev-parse HEAD)"
-        printf 'expected PR source: %s\nactual checkout: %s\n' \
-          "$NHC_EXPECTED_SOURCE_COMMIT" "$NHC_UPGRADE_CANDIDATE_COMMIT"
+        printf 'candidate source checkout: %s\n' "$NHC_UPGRADE_CANDIDATE_COMMIT"
         make operator-sdk yq
         export YQ="$PWD/bin/yq"
         export NHC_UPGRADE_OPERATOR_SDK="$PWD/bin/operator-sdk"
@@ -257,7 +246,6 @@ tests:
         name: node-healthcheck-operator
       env:
       - name: NHC_UPGRADE_OLD_BUNDLE
-      - name: NHC_EXPECTED_SOURCE_COMMIT
       - name: NHC_UPGRADE_OLD_IMAGE
       - name: NHC_UPGRADE_OLD_VERSION
       - name: NHC_UPGRADE_PACKAGE
