@@ -31,7 +31,7 @@ export KUBECONFIG="/root/dev-scripts/ocp/${CLUSTER_NAME}/auth/kubeconfig"
 
 export CONFIG=/root/dev-scripts/config_root.sh
 
-bash /root/openperouter/openshift/e2e/deploy.sh
-bash /root/openperouter/openshift/e2e/run_tests.sh
+bash /root/openperouter/openshift/e2e/deploy.sh </dev/null
+bash /root/openperouter/openshift/e2e/run_tests.sh </dev/null
 
 RUNTESTS
