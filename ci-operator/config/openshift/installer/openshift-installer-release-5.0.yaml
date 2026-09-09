@@ -731,6 +731,25 @@ tests:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-resourcegroup
 - always_run: false
+  as: azure-ipi-minimal-permission
+  optional: true
+  run_if_changed: azure
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-azure
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    - ref: azure-deprovision-sp-and-custom-role
+    pre:
+    - chain: ipi-conf-azure
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+- always_run: false
   as: e2e-azure-ovn-multidisk-techpreview
   optional: true
   steps:
