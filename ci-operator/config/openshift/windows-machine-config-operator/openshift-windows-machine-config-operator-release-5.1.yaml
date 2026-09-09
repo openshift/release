@@ -105,7 +105,7 @@ tests:
 - always_run: false
   as: aws-e2e-ote
   optional: true
-  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/proxy\.go$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -116,6 +116,7 @@ tests:
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]
       TEST_SUITE: windows-machine-config-operator/all
     test:
     - as: wmco-setup-and-test
@@ -288,7 +289,7 @@ tests:
 - always_run: false
   as: vsphere-proxy-e2e-ote
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/winc\.go$
   steps:
     cluster_profile: vsphere-elastic
     dependencies:
@@ -296,6 +297,8 @@ tests:
     env:
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/proxy
     test:
     - as: wmco-setup
       cli: latest
@@ -312,30 +315,7 @@ tests:
           memory: 400Mi
       timeout: 2h15m0s
     - ref: openshift-tests-extension-setup-out-of-payload
-    - as: proxy-e2e-test-with-zero-handling
-      cli: latest
-      commands: |
-        set +e
-        openshift-tests run windows-machine-config-operator/proxy \
-          --provider vsphere \
-          --monitor=e2e-test-analyzer \
-          -o "${ARTIFACT_DIR}/e2e.log" \
-          --junit-dir "${ARTIFACT_DIR}/junit" 2>&1 | tee "${ARTIFACT_DIR}/test-run.log"
-        EXIT_CODE=$?
-
-        # If no tests found, that's expected until WMCO PR #4459 merges
-        if [ $EXIT_CODE -eq 1 ] && grep -q "no tests to run" "${ARTIFACT_DIR}/test-run.log" 2>/dev/null; then
-          echo "No proxy tests found in WMCO master yet - this is expected"
-          echo "Once WMCO PR #4459 merges, this job will find and run proxy tests"
-          exit 0
-        fi
-
-        exit $EXIT_CODE
-      from: tests
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 600Mi
+    - ref: openshift-e2e-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
   as: wicd-unit-vsphere

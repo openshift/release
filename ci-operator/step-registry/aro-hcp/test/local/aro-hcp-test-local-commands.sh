@@ -22,6 +22,8 @@ export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
 export INFRA_SUBSCRIPTION_ID; INFRA_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-${ARO_HCP_DEPLOY_ENV}-subscription-id")
 export DEPLOY_ENV="${ARO_HCP_DEPLOY_ENV}"
+export ARO_HCP_CONFIG_FILE="config/config.yaml"
+export REGION="${LOCATION}"
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 
@@ -43,7 +45,8 @@ make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 make e2e-local/run -o test/aro-hcp-tests \
   FRONTEND_ADDRESS="${FRONTEND_ADDRESS}" \
   ADMIN_API_ADDRESS="${ADMIN_API_ADDRESS}" \
-  SKIP_CERT_VERIFICATION=true
+  SKIP_CERT_VERIFICATION=true \
+  ARO_HCP_CLOUD="public"
 
 # the make target produces a junit.xml in ARTIFACT_DIR.  We want to copy to SHARED_DIR so we can create
 # direct debugging links for the individual tests that failed. Gzip it due to 3mb SHARED_DIR limit.

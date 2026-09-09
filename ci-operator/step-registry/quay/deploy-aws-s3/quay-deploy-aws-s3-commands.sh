@@ -64,8 +64,8 @@ function derive_playwright_ref() {
   authfile=$(mktemp)
   oc get secret/pull-secret -n openshift-config \
     --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
-  commit=$(oc image info "${app_img}" --registry-config="${authfile}" -o json 2>/dev/null \
-    | jq -r '.config.config.Labels["org.opencontainers.image.revision"] // .config.config.Labels["vcs-ref"] // ""' || true)
+  commit=$(oc image info "${app_img}" --filter-by-os linux/amd64 --registry-config="${authfile}" -o json \
+    | jq -r '.config.config.Labels["org.opencontainers.image.revision"] // .config.config.Labels["vcs-ref"] // ""' 2>/dev/null || true)
   rm -f "${authfile}"
   if [[ "${commit}" =~ ^[0-9a-f]{40}$ ]]; then
     echo "Derived Playwright git ref from deployed image: ${commit}" >&2

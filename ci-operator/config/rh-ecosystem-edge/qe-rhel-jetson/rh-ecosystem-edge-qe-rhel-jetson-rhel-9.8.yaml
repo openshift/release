@@ -17,7 +17,7 @@ images:
       RUN dnf install -y git jq && \
           ln -sf /usr/bin/python3.12 /usr/bin/python && \
           ln -sf /usr/bin/pip3.12 /usr/bin/pip && \
-          pip install --no-cache-dir ruff pytest PyYAML requests paramiko fabric && \
+          pip install --no-cache-dir ruff pytest pytest-xdist PyYAML requests paramiko fabric && \
           dnf clean all
       COPY --from=source /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson /workspace
       WORKDIR /workspace
@@ -44,7 +44,9 @@ tests:
   steps:
     env:
       BOOTC_IMAGE_BASE: quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-98-bootc
+      JETSON_PYTEST_WORKERS: "2"
       JUMPHOST: ""
+      RUN_SC7_WRAPPER: "0"
       TEST_SUITE: tests_suites/sanity tests_suites/cuda tests_suites/kmod tests_suites/ethernet
         tests_suites/tools tests_suites/rtc tests_suites/pcis tests_suites/usbs tests_suites/spi_i2c
         tests_suites/can_bus tests_suites/csi_camera tests_suites/display tests_suites/dla
@@ -72,7 +74,9 @@ tests:
   steps:
     env:
       BOOTC_IMAGE_BASE: quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-98-bootc
+      JETSON_PYTEST_WORKERS: "2"
       JUMPHOST: ""
+      RUN_SC7_WRAPPER: "0"
       TEST_SUITE: tests_suites/sanity tests_suites/cuda tests_suites/kmod tests_suites/ethernet
         tests_suites/tools tests_suites/rtc tests_suites/pcis tests_suites/usbs tests_suites/spi_i2c
         tests_suites/can_bus tests_suites/csi_camera tests_suites/display tests_suites/dla

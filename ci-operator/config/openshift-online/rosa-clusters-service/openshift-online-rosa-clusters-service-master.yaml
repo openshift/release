@@ -3,7 +3,6 @@ base_images:
     name: nested-podman
     namespace: ci
     tag: latest
-binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
@@ -31,19 +30,73 @@ prowgen:
   private: true
 resources:
   '*':
-    limits:
-      memory: 8Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 200m
+      memory: 768Mi
+  pr-check-aws:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  pr-check-core:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  pr-check-gcp:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  pr-check-rosa-classic:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  pr-check-rosa-hcp:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
 tests:
-- as: pr-check-check-coverage
+- as: pr-check-unit
+  commands: unset GOFLAGS && make test
+  container:
+    from: src
+- always_run: false
+  as: go-unit-coverage
   commands: |
     set -x
-    ./pr_check.sh --check-coverage
+    export GOMAXPROCS=3
+    make codecov
   container:
     from: golang-plus
-  restrict_network_access: false
+  optional: true
+  secrets:
+  - mount_path: /var/run/codecov-secret
+    name: rosa-clusters-service-codecov
+- as: lint
+  commands: make lint-all
+  container:
+    from: golang-plus
+- as: verify
+  commands: make verify
+  container:
+    from: golang-plus
+- as: py-unit
+  commands: make test-python
+  container:
+    from: golang-plus
 - as: pr-check-check-migrations
   commands: |
     git remote add origin .
@@ -59,7 +112,6 @@ tests:
     ./pr_check.sh --check-migrations
   container:
     from: golang-plus
-  restrict_network_access: false
 - as: pr-check-commit-validation
   commands: |
     git remote add origin .
@@ -75,14 +127,12 @@ tests:
     ./pr_check.sh --commit-validation
   container:
     from: golang-plus
-  restrict_network_access: false
 - as: pr-check-common-tests
   commands: |
     set -x
     ./pr_check.sh --common-tests
   container:
     from: golang-plus
-  restrict_network_access: false
 - always_run: false
   as: pr-check-rosa-hcp
   capabilities:
@@ -97,7 +147,6 @@ tests:
     from: golang-plus
   nested_podman: true
   optional: true
-  restrict_network_access: false
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
     name: rosa-clusters-service-sandbox
@@ -115,7 +164,6 @@ tests:
     from: golang-plus
   nested_podman: true
   optional: true
-  restrict_network_access: false
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
     name: rosa-clusters-service-sandbox
@@ -133,7 +181,6 @@ tests:
     from: golang-plus
   nested_podman: true
   optional: true
-  restrict_network_access: false
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
     name: rosa-clusters-service-sandbox
@@ -151,7 +198,6 @@ tests:
     from: golang-plus
   nested_podman: true
   optional: true
-  restrict_network_access: false
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
     name: rosa-clusters-service-sandbox
@@ -169,10 +215,20 @@ tests:
     from: golang-plus
   nested_podman: true
   optional: true
-  restrict_network_access: false
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
     name: rosa-clusters-service-sandbox
+- as: go-unit-publish-coverage
+  commands: |
+    set -x
+    export GOMAXPROCS=3
+    make codecov
+  container:
+    from: golang-plus
+  postsubmit: true
+  secrets:
+  - mount_path: /var/run/codecov-secret
+    name: rosa-clusters-service-codecov
 zz_generated_metadata:
   branch: master
   org: openshift-online
