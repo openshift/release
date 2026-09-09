@@ -107,6 +107,87 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: e2e-system-tests-nhc-operator-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      NHC_UPGRADE_NAMESPACE: openshift-workload-availability
+      NHC_UPGRADE_OLD_BUNDLE: quay.io/medik8s/node-healthcheck-operator-bundle:v0.12.0
+      NHC_UPGRADE_OLD_IMAGE: quay.io/medik8s/node-healthcheck-operator:v0.12.0
+      NHC_UPGRADE_OLD_VERSION: 0.12.0
+      NHC_UPGRADE_PACKAGE: node-healthcheck-operator
+      NHC_UPGRADE_SNR_BUNDLE: quay.io/medik8s/self-node-remediation-operator-bundle:v0.13.0
+      NHC_UPGRADE_SNR_PACKAGE: self-node-remediation
+      SYSTEM_TESTS_REVISION: e57bff3d4383575498d522157dc41ba485d22c7d
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - as: run-nhc-operator-upgrade
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+
+        # The candidate source and bundle dependency are built by this same
+        # ci-operator execution. OO_BUNDLE is a concrete registry pullspec,
+        # unlike the pipeline:node-healthcheck-operator build alias.
+        make operator-sdk
+        export NHC_UPGRADE_OPERATOR_SDK="$PWD/bin/operator-sdk"
+        "$NHC_UPGRADE_OPERATOR_SDK" version
+        "$NHC_UPGRADE_OPERATOR_SDK" run --help | grep -q bundle-upgrade
+        "$NHC_UPGRADE_OPERATOR_SDK" bundle validate "$OO_BUNDLE"
+
+        mkdir -p /tmp/nhc-candidate-bundle
+        oc image extract "$OO_BUNDLE" --path /manifests:/tmp/nhc-candidate-bundle/manifests \
+          --path /metadata:/tmp/nhc-candidate-bundle/metadata
+        candidate_csv=$(find /tmp/nhc-candidate-bundle/manifests -name '*clusterserviceversion.yaml' -print -quit)
+        test -n "$candidate_csv"
+        grep -q 'operators.operatorframework.io.bundle.package.v1: node-healthcheck-operator' \
+          /tmp/nhc-candidate-bundle/metadata/annotations.yaml
+        grep -q '^  version: 5.8.0$' "$candidate_csv"
+        grep -q 'olm.skipRange:' "$candidate_csv"
+        candidate_image=$(awk '$1 == "image:" && $2 ~ /node-healthcheck-operator/ { print $2; exit }' "$candidate_csv")
+        test -n "$candidate_image"
+        oc image info "$NHC_UPGRADE_OLD_BUNDLE"
+        oc image info "$NHC_UPGRADE_SNR_BUNDLE"
+        oc image info "$NHC_UPGRADE_OLD_IMAGE"
+        oc image info "$OO_BUNDLE"
+        grep -E 'RELATED_IMAGE_MUST_GATHER|image: .*node-remediation-console' "$candidate_csv" || true
+        grep -E 'replaces:|olm.skipRange:' "$candidate_csv" || true
+
+        git clone https://github.com/medik8s/system-tests.git /tmp/system-tests
+        git -C /tmp/system-tests checkout --detach "$SYSTEM_TESTS_REVISION"
+        export ECO_TEST_FEATURES=nhc-operator
+        export ECO_TEST_LABELS='tier:upgrade-operator'
+        # This checkpoint does not create a workload; the existing test
+        # framework still requires the variable during initialization.
+        export WORKLOAD_IMAGE=unused-by-nhc-operator-upgrade
+        export NHC_UPGRADE_CANDIDATE_BUNDLE="$OO_BUNDLE"
+        export NHC_UPGRADE_CANDIDATE_VERSION=5.8.0
+        export NHC_UPGRADE_CANDIDATE_IMAGE="$candidate_image"
+        export NHC_UPGRADE_CANDIDATE_COMMIT="$(git rev-parse HEAD)"
+        export NHC_UPGRADE_TEST_REVISION="$SYSTEM_TESTS_REVISION"
+        make -C /tmp/system-tests run-tests
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      env:
+      - name: NHC_UPGRADE_OLD_BUNDLE
+      - name: NHC_UPGRADE_OLD_IMAGE
+      - name: NHC_UPGRADE_OLD_VERSION
+      - name: NHC_UPGRADE_PACKAGE
+      - name: NHC_UPGRADE_SNR_BUNDLE
+      - name: NHC_UPGRADE_SNR_PACKAGE
+      - name: NHC_UPGRADE_NAMESPACE
+      - name: SYSTEM_TESTS_REVISION
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 500Mi
+    workflow: ipi-aws
 - as: tls-pqc-readiness
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
