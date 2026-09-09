@@ -19,6 +19,14 @@ chain:
         --name ${CLUSTER_NAME} \
         --cluster-grace-period 15m
 
+      # Clean up NNCP created by localnet-vlan path
+      if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
+        LOCALNET_VLAN_ID="${LOCALNET_VLAN_ID:-100}"
+        NNCP_NAME="localnet-vlan-${LOCALNET_VLAN_ID}"
+        echo "Cleaning up NNCP ${NNCP_NAME}..."
+        oc delete nncp "${NNCP_NAME}" --ignore-not-found --timeout=120s 2>/dev/null || true
+      fi
+
       echo "$(date) Finished deleting cluster"
     from: hypershift-operator
     grace_period: 5m0s

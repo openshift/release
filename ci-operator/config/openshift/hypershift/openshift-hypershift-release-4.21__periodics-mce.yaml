@@ -430,6 +430,35 @@ tests:
       CLUSTER_VERSION: "4.21"
       MCE_VERSION: "2.11"
     workflow: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt
+- as: e2e-kubevirt-metal-ovn-localnet-vlan
+  capabilities:
+  - intranet
+  cron: 0 4 1 12 *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      ATTACH_DEFAULT_NETWORK: localnet-vlan
+      LOCALNET_VLAN_ID: "100"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      MCE_VERSION: "2.11"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      REDHAT_OPERATORS_INDEX_TAG: v4.20
+    pre:
+    - ref: baremetalds-devscripts-conf-extranetwork
+    - chain: baremetalds-ofcir-pre
+    - ref: enable-qe-catalogsource
+    - ref: deploy-konflux-operator
+    - chain: hypershift-kubevirt-baremetalds-lvm
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - chain: hypershift-kubevirt-baremetalds-odf
+    - ref: operatorhub-subscribe-nmstate-operator
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-mce-install
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-kubevirt-baremetalds-proxy
+    - ref: hypershift-kubevirt-health-check
+    workflow: hypershift-mce-kubevirt-baremetalds-conformance
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

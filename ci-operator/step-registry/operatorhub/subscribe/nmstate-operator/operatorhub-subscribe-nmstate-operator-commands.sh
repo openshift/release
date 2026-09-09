@@ -90,3 +90,32 @@ if [[ "$i" == "max" ]]; then
 fi
 
 echo "successfully installed ${NMSTATE_OPERATOR_SUB_PACKAGE}"
+
+echo "Creating NMState operand CR to activate the operator..."
+oc apply -f - <<EOF
+apiVersion: nmstate.io/v1
+kind: NMState
+metadata:
+  name: nmstate
+  namespace: "${NMSTATE_OPERATOR_SUB_INSTALL_NAMESPACE}"
+EOF
+
+echo "Waiting for NMState handler pods to be ready..."
+HANDLER_RETRIES=20
+for j in $(seq "${HANDLER_RETRIES}") max; do
+  [[ "${j}" == "max" ]] && break
+  sleep 15
+  READY_PODS=$(oc get pods -n "${NMSTATE_OPERATOR_SUB_INSTALL_NAMESPACE}" -l component=kubernetes-nmstate-handler --no-headers 2>/dev/null | grep -c "Running" || true)
+  if [[ "${READY_PODS}" -gt 0 ]]; then
+    echo "NMState handler pods are running (${READY_PODS} pods)"
+    break
+  fi
+  echo "Try ${j}/${HANDLER_RETRIES}: NMState handler pods not ready yet. Checking again in 15 seconds"
+done
+
+if [[ "${j}" == "max" ]]; then
+  echo "Warning: NMState handler pods did not reach Running state"
+  oc get pods -n "${NMSTATE_OPERATOR_SUB_INSTALL_NAMESPACE}" || true
+fi
+
+echo "NMState operator and operand setup complete"
