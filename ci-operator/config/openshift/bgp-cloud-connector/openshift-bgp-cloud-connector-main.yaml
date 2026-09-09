@@ -17,6 +17,29 @@ images:
   items:
   - dockerfile_path: Dockerfile
     to: bgp-cloud-connector
+  - dockerfile_literal: |
+      FROM src
+      # The build root carries no az and there is no standalone binary to
+      # fetch, so it is installed from Microsoft's own repository, as
+      # kata-containers and stolostron/capi-tests both do.
+      #
+      # The two awkward bits are measured rather than copied. The build
+      # root wraps dnf with ART's wrapper, which ignores
+      # /etc/yum.repos.d, so the repository has to be put where the
+      # wrapper looks as well. And packages-microsoft-prod.rpm is what
+      # configures the RHEL 9 repository: pointing at the older
+      # yumrepos/azure-cli path instead yields azure-cli 2.38 from 2022,
+      # where this yields 2.90.
+      ENV ART_DNF_WRAPPER_POLICY=append
+      RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
+          dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm && \
+          if [ -d /etc/yum.repos.art/ci ]; then \
+            cp /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/ || true; \
+          fi && \
+          dnf install -y azure-cli && \
+          dnf clean all
+    from: src
+    to: azure-e2e-runner
 operator:
   bundles:
   - as: bgp-cloud-connector-bundle
@@ -57,6 +80,58 @@ tests:
   commands: make verify
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: azure-cli-image
+  commands: |
+    # Proves the image the e2e job runs in actually carries a usable az,
+    # in seconds and without a cluster. The alternative is finding out
+    # forty minutes into e2e-azure-operator, after an install has been
+    # paid for.
+    set -euo pipefail
+
+    # az keeps its config under $HOME/.azure, and a prow test container
+    # runs as a random uid whose home it does not own: without this it
+    # fails with "PermissionError: [Errno 13] Permission denied:
+    # '/.azure'" before doing anything at all. hack/azure/ci.sh points it
+    # at the run's scratch directory for the same reason.
+    AZURE_CONFIG_DIR="$(mktemp -d)"
+    export AZURE_CONFIG_DIR
+
+    az version
+
+    # The flags the scripts actually pass, rather than just the command
+    # groups. A release of az that renames one is the failure worth
+    # catching here, and a group's help would still succeed.
+    # The help is captured and then searched, rather than piped into
+    # grep -q. Piped, grep exits on its first match, az dies of SIGPIPE,
+    # and under pipefail the pipeline reports 120 -- so a flag that is
+    # present reads as missing. Measured against az 2.90.
+    check() {
+      local flag="$1"; shift
+      local help
+      if ! help="$(az "$@" --help 2>/dev/null)"; then
+        echo "MISSING: az $* (its help would not run)" >&2
+        return 1
+      fi
+      if grep -q -- "${flag}" <<<"${help}"; then
+        echo "ok: az $* ${flag}"
+      else
+        echo "MISSING: az $* ${flag}" >&2
+        return 1
+      fi
+    }
+
+    check --service-principal  login
+    check --subscription       account set
+    check --address-prefixes   network vnet update
+    check --address-prefixes   network vnet subnet create
+    check --sku                network public-ip create
+    check --hosted-subnet      network routeserver create
+    check --public-ip-address  network routeserver create
+    check --peer-ip            network routeserver peering create
+    check --peer-asn           network routeserver peering create
+  container:
+    from: azure-e2e-runner
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: fips-image-scan
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -211,7 +286,7 @@ tests:
     - as: test
       cli: latest
       commands: hack/ci-e2e-azure.sh
-      from: src
+      from: azure-e2e-runner
       grace_period: 1h0m0s
       resources:
         requests:
