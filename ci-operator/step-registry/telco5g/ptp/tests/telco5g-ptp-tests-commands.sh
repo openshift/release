@@ -18,8 +18,9 @@ export T5CI_VERSION="${T5CI_VERSION:-5.0}"
 
 # --- Source repos and branches ---
 # Test code: repo and branch for the conformance test suite
-export TEST_REPO="${TEST_REPO:-https://github.com/k8snetworkplumbingwg/ptp-operator.git}"
-export TEST_BRANCH="${TEST_BRANCH:-main}"
+# TEST only: GNSS rehearse uses bnshr/ptp-operator integrate-add-gnss
+export TEST_REPO="${TEST_REPO:-https://github.com/bnshr/ptp-operator.git}"
+export TEST_BRANCH="${TEST_BRANCH:-integrate-add-gnss}"
 
 # Product under test: repo and branch for the operator being deployed
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
@@ -58,13 +59,13 @@ else
 fi
 
 # Test modes by release:
-#   Release  | oc | bc | dualnicbc | dualnicbcha | dualfollower | tbc | tgm
-#   ---------+----+----+-----------+-------------+--------------+-----+----
-#   4.12     | Y  | Y  |           |             |              |     |
-#   4.13-4.15| Y  | Y  | Y         |             |              |     |
-#   4.16-4.18| Y  | Y  | Y         | Y           |              |     |
-#   4.19     | Y  | Y  | Y         | Y           | Y            |     | Y
-#   4.20+    | Y  | Y  | Y         | Y           | Y            | Y   | Y
+#   Release  | oc | bc | dualnicbc | dualnicbcha | dualfollower | tbc | tgm | tgmoc | tgmbc
+#   ---------+----+----+-----------+-------------+--------------+-----+-----+-------+------
+#   4.12     | Y  | Y  |           |             |              |     |     |       |
+#   4.13-4.15| Y  | Y  | Y         |             |              |     |     |       |
+#   4.16-4.18| Y  | Y  | Y         | Y           |              |     |     |       |
+#   4.19     | Y  | Y  | Y         | Y           | Y            |     | Y   | Y     | Y
+#   4.20+    | Y  | Y  | Y         | Y           | Y            | Y   | Y   | Y     | Y
 if [[ "$T5CI_VERSION" == 4.12 ]]; then
   export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:release-4.18}"
   TEST_MODES=("bc" "oc")
@@ -76,11 +77,11 @@ elif [[ "$T5CI_VERSION" =~ 4.1[6-8] ]]; then
   TEST_MODES=("dualnicbc" "dualnicbcha" "bc" "oc")
 elif [[ "$T5CI_VERSION" == 4.19 ]]; then
   export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:latest}"
-  TEST_MODES=("tgm" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+  TEST_MODES=("tgm" "tgmoc" "tgmbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
 else
   # 4.20+
   export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:latest}"
-  TEST_MODES=("tgm" "tbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+  TEST_MODES=("tgm" "tgmoc" "tgmbc" "tbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
 fi
 
 # ===========================================================================
