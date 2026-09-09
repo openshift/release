@@ -91,13 +91,24 @@ else
     echo "  GCP_REGION=${GCP_REGION}"
 fi
 
-# hosted-cluster-name may not exist if job was aborted before hosted-cluster-setup ran
-if [[ -f "${SHARED_DIR}/hosted-cluster-name" ]]; then
-    HC_CLUSTER_NAME="$(<"${SHARED_DIR}/hosted-cluster-name")"
-else
-    HC_CLUSTER_NAME=""
-    echo "WARNING: hosted-cluster-name not found - hosted cluster setup may not have completed"
-    echo "Will skip DNS cleanup but still deprovision GKE cluster and projects"
+# hosted-cluster-name contains the GCP infrastructure ID. Reconstruct it using
+# the same formula as hosted-cluster-setup if SHARED_DIR was not synchronized.
+HC_INFRA_ID=""
+if [[ -s "${SHARED_DIR}/hosted-cluster-name" ]]; then
+    HC_INFRA_ID="$(<"${SHARED_DIR}/hosted-cluster-name")"
+fi
+if [[ ! "${HC_INFRA_ID}" =~ ^ci[0-9a-f]{11}$ ]]; then
+    if [[ -n "${HC_INFRA_ID}" ]]; then
+        echo "WARNING: Invalid infrastructure ID in hosted-cluster-name: ${HC_INFRA_ID}"
+    else
+        echo "WARNING: hosted-cluster-name not found or empty"
+    fi
+    if [[ -z "${PROW_JOB_ID:-}" ]]; then
+        echo "ERROR: PROW_JOB_ID is required to reconstruct the hosted cluster infrastructure ID"
+        exit 1
+    fi
+    HC_INFRA_ID="ci$(echo -n "${PROW_JOB_ID}" | sha256sum | cut -c-11)"
+    echo "Reconstructed HC_INFRA_ID=${HC_INFRA_ID}"
 fi
 
 # Hosted Cluster project - read from SHARED_DIR or reconstruct
@@ -171,38 +182,38 @@ gcloud projects delete "${CP_PROJECT_ID}" --quiet || true
 # CI DNS config (from workflow env vars)
 EXTERNAL_DNS_GSA="external-dns@${HYPERSHIFT_GCP_CI_PROJECT}.iam.gserviceaccount.com"
 
-# Clean up DNS records from the CI zone (DNS records use the hosted cluster name)
+# Clean up DNS records from the CI zone. Delegation records contain the full
+# infrastructure ID, while API/OAuth records contain the shortened HostedCluster name.
 DNS_CLEANUP_FAILED=false
-if [[ -n "${HC_CLUSTER_NAME}" ]]; then
-  echo "Cleaning up DNS records for hosted cluster ${HC_CLUSTER_NAME}..."
-  DNS_SUFFIX="in.${HC_CLUSTER_NAME}.${HYPERSHIFT_GCP_CI_DNS_DOMAIN}."
-  if ! DNS_RECORDS=$(gcloud dns record-sets list \
-    --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
-    --project="${HYPERSHIFT_GCP_CI_PROJECT}" \
-    --filter="name ~ ${DNS_SUFFIX}" \
-    --format="csv[no-heading](name,type)"); then
-    echo "ERROR: Failed to list DNS records - check service account permissions"
-    DNS_CLEANUP_FAILED=true
-    DNS_RECORDS=""
-  fi
+echo "Cleaning up DNS records for infrastructure ID ${HC_INFRA_ID}..."
+HOSTED_CLUSTER_NAME="gcp-hc-${HC_INFRA_ID: -8}"
+if ! DNS_RECORDS=$(gcloud dns record-sets list \
+  --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
+  --project="${HYPERSHIFT_GCP_CI_PROJECT}" \
+  --filter="name ~ '${HC_INFRA_ID}|${HOSTED_CLUSTER_NAME}'" \
+  --format="csv[no-heading](name,type)"); then
+  echo "ERROR: Failed to list DNS records - check service account permissions"
+  DNS_CLEANUP_FAILED=true
+  DNS_RECORDS=""
+fi
 
-  if [[ -n "${DNS_RECORDS}" ]]; then
-    while IFS=, read -r name type; do
-      [[ -z "${name}" ]] && continue
-      echo "Deleting DNS record: ${name} ${type}"
-      if ! gcloud dns record-sets delete "${name}" \
-        --type="${type}" \
-        --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
-        --project="${HYPERSHIFT_GCP_CI_PROJECT}" --quiet; then
-        echo "ERROR: Failed to delete DNS record ${name} ${type}"
-        DNS_CLEANUP_FAILED=true
-      fi
-    done <<< "${DNS_RECORDS}"
-  else
-    echo "No DNS records found matching ${DNS_SUFFIX}"
-  fi
-else
-  echo "Skipping DNS cleanup - hosted cluster name not available"
+DNS_RECORDS_FOUND=false
+if [[ -n "${DNS_RECORDS}" ]]; then
+  while IFS=, read -r name type; do
+    [[ -z "${name}" ]] && continue
+    DNS_RECORDS_FOUND=true
+    echo "Deleting DNS record: ${name} ${type}"
+    if ! gcloud dns record-sets delete "${name}" \
+      --type="${type}" \
+      --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
+      --project="${HYPERSHIFT_GCP_CI_PROJECT}" --quiet; then
+      echo "ERROR: Failed to delete DNS record ${name} ${type}"
+      DNS_CLEANUP_FAILED=true
+    fi
+  done <<< "${DNS_RECORDS}"
+fi
+if [[ "${DNS_RECORDS_FOUND}" == "false" ]]; then
+  echo "No DNS records found for ${HC_INFRA_ID} or ${HOSTED_CLUSTER_NAME}"
 fi
 
 # Remove ExternalDNS WIF bindings
