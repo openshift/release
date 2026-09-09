@@ -11,6 +11,10 @@ base_images:
     name: tls-scanner
     namespace: tls-scanner
     tag: tls-scanner-tool
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -30,6 +34,10 @@ operator:
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.22"
   latest:
     candidate:
       architecture: amd64
@@ -110,6 +118,70 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- always_run: false
+  as: e2e-system-tests-nhc-4-22-to-5-0-pr-bundle
+  capabilities:
+  - intranet
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: medik8s-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      MEDIK8S_DIRECT_CANDIDATE_UPGRADE: "true"
+      MEDIK8S_OPERATOR_PACKAGE: node-healthcheck-operator
+      NHC_UPGRADE_NAMESPACE: openshift-workload-availability
+      NHC_UPGRADE_PACKAGE: node-healthcheck-operator
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    test:
+    - ref: medik8s-lib
+    - ref: ssh-bastion
+    - as: run-nhc-4-22-to-5-0-pr-bundle
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+
+        : "${ARTIFACT_DIR:?ci-operator must collect step artifacts}"
+        mkdir -p "$ARTIFACT_DIR/provenance"
+        exec > >(tee "$ARTIFACT_DIR/cluster-pr-bundle-upgrade-step.log") 2>&1
+        printf '%s\n' "${JOB_SPEC:-}" > "$ARTIFACT_DIR/provenance/job-spec.json"
+        git show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/nhc-source.txt"
+        export NHC_UPGRADE_CANDIDATE_COMMIT="$(git rev-parse HEAD)"
+        make operator-sdk
+        export NHC_UPGRADE_OPERATOR_SDK="$PWD/bin/operator-sdk"
+        "$NHC_UPGRADE_OPERATOR_SDK" bundle validate "$OO_BUNDLE"
+
+        git clone https://github.com/medik8s/system-tests.git /tmp/system-tests
+        git -C /tmp/system-tests show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
+        export NHC_UPGRADE_TEST_REVISION="$(git -C /tmp/system-tests rev-parse HEAD)"
+        export NHC_UPGRADE_CANDIDATE_BUNDLE="$OO_BUNDLE"
+        export NHC_UPGRADE_CANDIDATE_IMAGE="$NHC_CANDIDATE_OPERATOR"
+        export NHC_UPGRADE_CANDIDATE_VERSION=5.8.0
+        export ECO_TEST_FEATURES=nhc-operator
+        export ECO_TEST_LABELS='tier:upgrade-cluster'
+        export WORKLOAD_IMAGE=unused-by-nhc-cluster-upgrade
+        make -C /tmp/system-tests run-tests
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      - env: NHC_CANDIDATE_OPERATOR
+        name: node-healthcheck-operator
+      env:
+      - name: MEDIK8S_DIRECT_CANDIDATE_UPGRADE
+      - name: MEDIK8S_OPERATOR_PACKAGE
+      - name: NHC_UPGRADE_NAMESPACE
+      - name: NHC_UPGRADE_PACKAGE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 500Mi
 - as: e2e-system-tests-nhc-operator-upgrade
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
