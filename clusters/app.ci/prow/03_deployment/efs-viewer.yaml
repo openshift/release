@@ -1,139 +1,158 @@
-apiVersion: v1
-kind: ServiceAccount
+apiVersion: template.openshift.io/v1
+kind: Template
 metadata:
-  namespace: ci
   name: efs-viewer
-  annotations:
-    serviceaccounts.openshift.io/oauth-redirectreference.efs-viewer: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"efs-viewer"}}'
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: efs-viewer-oauth
-rules:
-- apiGroups: ["authentication.k8s.io"]
-  resources: ["tokenreviews"]
-  verbs: ["create"]
-- apiGroups: ["authorization.k8s.io"]
-  resources: ["subjectaccessreviews"]
-  verbs: ["create"]
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: efs-viewer-oauth
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: efs-viewer-oauth
-subjects:
-- kind: ServiceAccount
-  name: efs-viewer
-  namespace: ci
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  namespace: ci
-  name: efs-viewer
-  labels:
-    app: efs-viewer
-spec:
-  replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 25%
-      maxUnavailable: 25%
-  selector:
-    matchLabels:
-      app: efs-viewer
-  template:
-    metadata:
-      labels:
-        app: efs-viewer
-    spec:
-      serviceAccountName: efs-viewer
-      containers:
-      - name: efs-viewer
-        image: quay.io/prucek/testing:efs-viewer
-        imagePullPolicy: Always
-        args:
-        - --job-config-dir=/etc/jobs
-        - --port=8080
-        ports:
-        - name: http
-          containerPort: 8080
-        volumeMounts:
-        - name: job-configs
-          mountPath: /etc/jobs
-      - name: oauth-proxy
-        image: quay.io/openshift/origin-oauth-proxy:4.16
-        imagePullPolicy: IfNotPresent
-        ports:
-        - name: web
-          containerPort: 8443
-        args:
-        - -provider=openshift
-        - -https-address=:8443
-        - -http-address=
-        - -email-domain=*
-        - -upstream=http://localhost:8080
-        - -client-id=system:serviceaccount:ci:efs-viewer
-        - -openshift-ca=/etc/pki/tls/cert.pem
-        - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        - '-openshift-sar={"namespace":"ci","resource":"secrets","verb":"get"}'
-        - '-openshift-delegate-urls={"/":{"namespace":"ci","resource":"secrets","verb":"get"}}'
-        - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
-        - -cookie-samesite=none
-        - -tls-cert=/etc/tls/private/tls.crt
-        - -tls-key=/etc/tls/private/tls.key
-        volumeMounts:
-        - name: efs-viewer-tls
-          mountPath: /etc/tls/private
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "50m"
-      volumes:
-      - name: job-configs
-        persistentVolumeClaim:
-          claimName: job-configs-nfs
-      - name: efs-viewer-tls
-        secret:
-          secretName: efs-viewer-tls
----
-apiVersion: v1
-kind: Service
-metadata:
-  namespace: ci
-  name: efs-viewer
-  labels:
-    app: efs-viewer
-  annotations:
-    service.alpha.openshift.io/serving-cert-secret-name: efs-viewer-tls
-spec:
-  selector:
-    app: efs-viewer
-  ports:
-  - name: web
-    port: 443
-    targetPort: 8443
-  type: ClusterIP
----
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  namespace: ci
-  name: efs-viewer
-spec:
-  host: efs-viewer-ci.apps.ci.l2s4.p1.openshiftapps.com
-  port:
-    targetPort: web
-  tls:
-    insecureEdgeTerminationPolicy: Redirect
-    termination: reencrypt
-  to:
-    kind: Service
+  namespace: openshift
+parameters:
+- description: The session secret for the oauth-proxy cookie.
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
+objects:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    namespace: ci
     name: efs-viewer
-    weight: 100
+    annotations:
+      serviceaccounts.openshift.io/oauth-redirectreference.efs-viewer: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"efs-viewer"}}'
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: efs-viewer-oauth
+  rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["subjectaccessreviews"]
+    verbs: ["create"]
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: efs-viewer-oauth
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: efs-viewer-oauth
+  subjects:
+  - kind: ServiceAccount
+    name: efs-viewer
+    namespace: ci
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    namespace: ci
+    name: efs-viewer-session-secret
+  stringData:
+    session_secret: "${SESSION_SECRET}="
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ci
+    name: efs-viewer
+    labels:
+      app: efs-viewer
+  spec:
+    replicas: 1
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+    selector:
+      matchLabels:
+        app: efs-viewer
+    template:
+      metadata:
+        labels:
+          app: efs-viewer
+      spec:
+        serviceAccountName: efs-viewer
+        containers:
+        - name: efs-viewer
+          image: quay.io/prucek/testing:efs-viewer
+          imagePullPolicy: Always
+          args:
+          - --job-config-dir=/etc/jobs
+          - --port=8080
+          ports:
+          - name: http
+            containerPort: 8080
+          volumeMounts:
+          - name: job-configs
+            mountPath: /etc/jobs
+        - name: oauth-proxy
+          image: quay.io/openshift/origin-oauth-proxy:4.16
+          imagePullPolicy: IfNotPresent
+          ports:
+          - name: web
+            containerPort: 8443
+          args:
+          - -provider=openshift
+          - -https-address=:8443
+          - -http-address=
+          - -email-domain=*
+          - -upstream=http://localhost:8080
+          - -client-id=system:serviceaccount:ci:efs-viewer
+          - -openshift-ca=/etc/pki/tls/cert.pem
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - '-openshift-sar={"namespace":"ci","resource":"secrets","verb":"get"}'
+          - '-openshift-delegate-urls={"/":{"namespace":"ci","resource":"secrets","verb":"get"}}'
+          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -cookie-samesite=none
+          - -tls-cert=/etc/tls/private/tls.crt
+          - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+          - name: efs-viewer-tls
+            mountPath: /etc/tls/private
+          - name: session-secret
+            mountPath: /etc/proxy/secrets
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+        volumes:
+        - name: job-configs
+          persistentVolumeClaim:
+            claimName: job-configs-nfs
+        - name: efs-viewer-tls
+          secret:
+            secretName: efs-viewer-tls
+        - name: session-secret
+          secret:
+            secretName: efs-viewer-session-secret
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    name: efs-viewer
+    labels:
+      app: efs-viewer
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: efs-viewer-tls
+  spec:
+    selector:
+      app: efs-viewer
+    ports:
+    - name: web
+      port: 443
+      targetPort: 8443
+    type: ClusterIP
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    namespace: ci
+    name: efs-viewer
+  spec:
+    host: efs-viewer-ci.apps.ci.l2s4.p1.openshiftapps.com
+    port:
+      targetPort: web
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: reencrypt
+    to:
+      kind: Service
+      name: efs-viewer
+      weight: 100
