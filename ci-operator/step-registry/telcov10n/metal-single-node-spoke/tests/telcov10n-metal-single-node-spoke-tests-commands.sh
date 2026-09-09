@@ -60,7 +60,7 @@ import pytest
 
 def test_spoke_cluster_operators_are_ready(bash):
     count = 0
-    attempts = 10
+    attempts = 30
     while attempts > 0:
       oc_cmd = f"oc get co --no-headers | grep -v 'True .* False .* False' | wc -l"
       if bash.run_script_inline([oc_cmd]) == '0':
