@@ -32,12 +32,16 @@ spec:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --one-time=true
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
+          readOnly: true
       containers:
       - name: sinker
         image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20260902-ffc57790b
@@ -85,11 +89,15 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
+          readOnly: true
       volumes:
       - name: release
         emptyDir: {}
@@ -103,6 +111,9 @@ spec:
           secretName: sinker
       - name: combined-jobs
         emptyDir: {}
+      - name: sparse-checkout-config
+        configMap:
+          name: prow-jobs-sparse-checkout
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs

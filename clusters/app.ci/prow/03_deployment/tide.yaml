@@ -56,6 +56,7 @@ spec:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release
@@ -63,6 +64,9 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
+          readOnly: true
       containers:
       - name: tide
         image: quay.io/prucek/tide:sharded-queries
@@ -129,12 +133,16 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
+          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -160,6 +168,9 @@ spec:
           secretName: gce-sa-credentials-gcs-tide-publisher
       - name: combined-jobs
         emptyDir: {}
+      - name: sparse-checkout-config
+        configMap:
+          name: prow-jobs-sparse-checkout
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs

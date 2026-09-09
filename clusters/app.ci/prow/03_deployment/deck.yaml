@@ -112,6 +112,7 @@ objects:
           - --repo=https://github.com/openshift/release.git
           - --ref=main
           - --root=/tmp/git-sync
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           - --one-time=true
           - --depth=1
           - --link=release
@@ -119,6 +120,9 @@ objects:
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout-config
+            mountPath: /etc/git-sync
+            readOnly: true
         containers:
         - name: deck
           image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260902-ffc57790b
@@ -212,12 +216,16 @@ objects:
           - --ref=main
           - --period=30s
           - --root=/tmp/git-sync
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           - --max-failures=3
           - --link=release
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout-config
+            mountPath: /etc/git-sync
+            readOnly: true
           resources:
             requests:
               memory: "512Mi"
@@ -247,6 +255,9 @@ objects:
           emptyDir: {}
         - name: combined-jobs
           emptyDir: {}
+        - name: sparse-checkout-config
+          configMap:
+            name: prow-jobs-sparse-checkout
         - name: job-configs
           persistentVolumeClaim:
             claimName: job-configs-nfs
@@ -337,6 +348,7 @@ objects:
           - --repo=https://github.com/openshift/release.git
           - --ref=main
           - --root=/tmp/git-sync
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           - --one-time=true
           - --depth=1
           - --link=release
@@ -344,6 +356,9 @@ objects:
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout-config
+            mountPath: /etc/git-sync
+            readOnly: true
         containers:
         - name: git-sync
           command:
@@ -353,12 +368,16 @@ objects:
           - --ref=main
           - --period=30s
           - --root=/tmp/git-sync
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           - --max-failures=3
           - --link=release
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout-config
+            mountPath: /etc/git-sync
+            readOnly: true
           resources:
             requests:
               memory: "512Mi"
@@ -511,6 +530,9 @@ objects:
           emptyDir: {}
         - name: combined-jobs
           emptyDir: {}
+        - name: sparse-checkout-config
+          configMap:
+            name: prow-jobs-sparse-checkout
         - name: job-configs
           persistentVolumeClaim:
             claimName: job-configs-nfs
