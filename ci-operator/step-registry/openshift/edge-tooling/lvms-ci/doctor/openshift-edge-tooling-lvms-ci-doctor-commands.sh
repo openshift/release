@@ -132,6 +132,10 @@ load_secrets
 configure_claude
 
 # Use the edge-tooling source pre-installed in the image
+# TODO: Remove this once PR #289 is merged into main
+cd /tmp
+git clone https://github.com/redhat-chai-bot/openshift-eng_edge-tooling.git -b ci-doctor-hook-logs-and-structured-gaps
+EDGE_TOOLING_DIR="/tmp/openshift-eng_edge-tooling"
 SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/lvms-ci"
 cd "${SRC_DIR}"
