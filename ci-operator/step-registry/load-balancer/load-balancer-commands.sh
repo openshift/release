@@ -172,7 +172,7 @@ retry_cmd() {
 }
 retry_cmd ansible-galaxy install emilienm.routed_lb,1.0.1
 # Ultimately, dependencies should be deployed by routed_lb, once it'll be converted to a collection.
-retry_cmd ansible-galaxy collection install ansible.posix ansible.utils
+retry_cmd ansible-galaxy collection install ansible.posix:2.1.0 ansible.utils:2.12.0
 
 echo "Running Ansible playbook"
 ansible-playbook -i "${WORK_DIR}/inventory.yaml" -e "@$WORK_DIR/vars.yaml" "${WORK_DIR}/playbook.yaml"
