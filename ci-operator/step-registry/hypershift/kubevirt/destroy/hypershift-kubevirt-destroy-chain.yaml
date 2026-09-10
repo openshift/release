@@ -30,6 +30,8 @@ chain:
       if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
         LOCALNET_VLAN_ID="${LOCALNET_VLAN_ID:-100}"
         LOCALNET_VLAN_BOND="${LOCALNET_VLAN_BOND:-br-ex}"
+        LOCALNET_VLAN_GATEWAY="${LOCALNET_VLAN_GATEWAY:-192.168.112.1}"
+        LOCALNET_VLAN_SUBNET="${LOCALNET_VLAN_GATEWAY%.*}.0/24"
         LOCALNET_VLAN_DHCP_INTERFACE="${LOCALNET_VLAN_DHCP_INTERFACE:-${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}}"
         NNCP_NAME="localnet-vlan-${LOCALNET_VLAN_ID}"
         # Clean up dnsmasq on the single DHCP node (recorded during creation)
@@ -42,16 +44,32 @@ chain:
         if [[ -n "${DHCP_NODE}" ]]; then
           echo "Cleaning up ${LOCALNET_VLAN_DHCP_INTERFACE} dnsmasq on node ${DHCP_NODE}..."
           oc debug "node/${DHCP_NODE}" -n default --quiet=true -- chroot /host bash -c \
-            'set -euo pipefail; dhcp_iface="$1"; vlan_id="$2"; uplink_bond="$3"; \
+            'set -euo pipefail; dhcp_iface="$1"; vlan_id="$2"; uplink_bond="$3"; gateway="$4"; vlan_subnet="$5"; \
             pidfile="/run/localnet-vlan-${vlan_id}.pid"; conf="/etc/dnsmasq.d/localnet-vlan-${vlan_id}.conf"; \
+            unit="/etc/systemd/system/localnet-vlan-${vlan_id}.service"; \
+            systemctl disable --now "localnet-vlan-${vlan_id}.service" 2>/dev/null || true; \
+            rm -f "${unit}"; systemctl daemon-reload 2>/dev/null || true; \
             if [[ -f "${pidfile}" ]]; then kill "$(cat "${pidfile}")" 2>/dev/null || true; rm -f "${pidfile}"; fi; \
             rm -f "${conf}" "/etc/NetworkManager/dnsmasq.d/localnet-vlan-${vlan_id}.conf"; \
-            iptables -t nat -D PREROUTING -i "${dhcp_iface}" -p udp --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || true; \
-            iptables -t nat -D PREROUTING -i "${dhcp_iface}" -p tcp --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || true; \
+            for proto in udp tcp; do \
+              iptables -t nat -D PREROUTING -d "${gateway}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || true; \
+              iptables -t nat -D PREROUTING -i "${dhcp_iface}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || true; \
+            done; \
             iptables -D FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT 2>/dev/null || true; \
             iptables -D FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true; \
+            iptables -t nat -D POSTROUTING -s "${vlan_subnet}" -o "${uplink_bond}" -j MASQUERADE 2>/dev/null || true; \
             ip addr flush dev "${dhcp_iface}" 2>/dev/null || true' \
-            _ "${LOCALNET_VLAN_DHCP_INTERFACE}" "${LOCALNET_VLAN_ID}" "${LOCALNET_VLAN_BOND}" || true
+            _ "${LOCALNET_VLAN_DHCP_INTERFACE}" "${LOCALNET_VLAN_ID}" "${LOCALNET_VLAN_BOND}" \
+            "${LOCALNET_VLAN_GATEWAY}" "${LOCALNET_VLAN_SUBNET}" || true
+          for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+            [[ "${NODE}" == "${DHCP_NODE}" ]] && continue
+            oc debug "node/${NODE}" -n default --quiet=true -- chroot /host bash -c \
+              'set -euo pipefail; dhcp_iface="$1"; uplink_bond="$2"; vlan_subnet="$3"; \
+              iptables -D FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT 2>/dev/null || true; \
+              iptables -D FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true; \
+              iptables -t nat -D POSTROUTING -s "${vlan_subnet}" -o "${uplink_bond}" -j MASQUERADE 2>/dev/null || true' \
+              _ "${LOCALNET_VLAN_DHCP_INTERFACE}" "${LOCALNET_VLAN_BOND}" "${LOCALNET_VLAN_SUBNET}" 2>/dev/null || true
+          done
         fi
         echo "Cleaning up NNCP ${NNCP_NAME}..."
         oc delete nncp "${NNCP_NAME}" --ignore-not-found --timeout=120s 2>/dev/null || true
@@ -77,6 +95,9 @@ chain:
     - name: LOCALNET_VLAN_BOND
       default: br-ex
       documentation: Uplink bond for localnet-vlan cleanup during destroy.
+    - name: LOCALNET_VLAN_GATEWAY
+      default: "192.168.112.1"
+      documentation: Gateway on the VLAN segment; used to derive subnet for routing cleanup.
     - name: LOCALNET_VLAN_DHCP_INTERFACE
       default: ""
       documentation: |-

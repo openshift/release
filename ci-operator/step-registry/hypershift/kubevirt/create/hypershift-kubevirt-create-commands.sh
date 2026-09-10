@@ -172,27 +172,15 @@ clear_ovn_localnet_lsp_port_security() {
   fi
 }
 
-# Run dnsmasq on the VLAN sub-interface (e.g. br-ex.100) on each mgmt node before worker
+# Run dnsmasq on the VLAN sub-interface (e.g. br-ex.100) on a single mgmt node before worker
 # VMIs boot (localnet-vlan). br-localnet is an OVS bridge without a kernel netdev; the NNCP
 # creates br-ex.<vlan-id> as the L2 port workers attach to. DHCP/DNS must be on that segment,
 # not ostestbm br-ex (untagged 192.168.111.0/24).
-localnet_vlan_configure_br_localnet_dhcp() {
-  local cluster_name="$1"
-  local vlan_id="$2"
-  local dhcp_iface="$3"
-  local gateway="$4"
-  local dhcp_start="$5"
-  local dhcp_end="$6"
-  local ingress_vip="$7"
-  local uplink_bond="$8"
-  local base_domain
-  local node
-  local setup_b64
-
-  base_domain=$(oc get dns/cluster -o jsonpath='{.spec.baseDomain}')
-  echo "Configuring dnsmasq on ${dhcp_iface} for VLAN ${vlan_id} (cluster ${cluster_name}, DNS base ${base_domain})..."
-
-  setup_b64=$(base64 -w0 <<'SCRIPT_EOF'
+#
+# dnsmasq listens on port 5353 (CoreDNS owns *:53). Guests use DHCP option 6 -> gateway:53,
+# so PREROUTING redirects queries destined for the gateway IP to 5353.
+localnet_vlan_dnsmasq_setup_script_b64() {
+  base64 -w0 <<'SCRIPT_EOF'
 #!/bin/bash
 set -euo pipefail
 dhcp_iface="$1"
@@ -201,21 +189,18 @@ dhcp_start="$3"
 dhcp_end="$4"
 cluster_name="$5"
 base_domain="$6"
-ingress_vip="$7"
-vlan_id="$8"
-uplink_bond="$9"
+api_vip="$7"
+ingress_vip="$8"
+vlan_id="$9"
+uplink_bond="${10}"
 netmask="255.255.255.0"
 conf="/etc/dnsmasq.d/localnet-vlan-${vlan_id}.conf"
 pidfile="/run/localnet-vlan-${vlan_id}.pid"
+unit="/etc/systemd/system/localnet-vlan-${vlan_id}.service"
 
 if ! ip link show "${dhcp_iface}" &>/dev/null; then
   echo "VLAN interface ${dhcp_iface} not present on this node; skipping"
   exit 0
-fi
-
-if [[ -f "${pidfile}" ]]; then
-  kill "$(cat "${pidfile}")" 2>/dev/null || true
-  rm -f "${pidfile}"
 fi
 
 ip link set "${dhcp_iface}" up
@@ -234,8 +219,8 @@ domain-needed
 bogus-priv
 no-resolv
 server=172.30.0.10
-address=/api.${cluster_name}.${base_domain}/${ingress_vip}
-address=/api-int.${cluster_name}.${base_domain}/${ingress_vip}
+address=/api.${cluster_name}.${base_domain}/${api_vip}
+address=/api-int.${cluster_name}.${base_domain}/${api_vip}
 address=/.apps.${cluster_name}.${base_domain}/${ingress_vip}
 dhcp-range=${dhcp_start},${dhcp_end},${netmask},12h
 dhcp-option=3,${gateway}
@@ -245,45 +230,189 @@ CONF
 
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 
-iptables -t nat -C PREROUTING -i "${dhcp_iface}" -p udp --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || \
-  iptables -t nat -A PREROUTING -i "${dhcp_iface}" -p udp --dport 53 -j REDIRECT --to-ports 5353
-iptables -t nat -C PREROUTING -i "${dhcp_iface}" -p tcp --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || \
-  iptables -t nat -A PREROUTING -i "${dhcp_iface}" -p tcp --dport 53 -j REDIRECT --to-ports 5353
+for proto in udp tcp; do
+  iptables -t nat -C PREROUTING -d "${gateway}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || \
+    iptables -t nat -A PREROUTING -d "${gateway}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353
+  iptables -t nat -C PREROUTING -i "${dhcp_iface}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || \
+    iptables -t nat -A PREROUTING -i "${dhcp_iface}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353
+done
 
 iptables -C FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT 2>/dev/null || \
   iptables -A FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT
 iptables -C FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
   iptables -A FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT
 
-/usr/sbin/dnsmasq --conf-file="${conf}" --pid-file="${pidfile}"
+cat > "${unit}" <<UNIT
+[Unit]
+Description=Hypershift localnet-vlan ${vlan_id} DHCP/DNS on ${dhcp_iface}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+PIDFile=${pidfile}
+ExecStart=/usr/sbin/dnsmasq --conf-file=${conf} --pid-file=${pidfile}
+ExecStop=/bin/kill -s TERM \$MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now "localnet-vlan-${vlan_id}.service"
+
+if ! systemctl is-active --quiet "localnet-vlan-${vlan_id}.service"; then
+  echo "localnet-vlan-${vlan_id}.service failed to start"
+  systemctl status "localnet-vlan-${vlan_id}.service" --no-pager || true
+  exit 1
+fi
 
 if ! ss -ulnp | grep -q "${dhcp_iface}:67"; then
   echo "dnsmasq is not listening for DHCP on ${dhcp_iface}"
   exit 1
 fi
 
-echo "dnsmasq configured on ${dhcp_iface} (${gateway}, DHCP ${dhcp_start}-${dhcp_end})"
+echo "dnsmasq configured on ${dhcp_iface} (${gateway}, api=${api_vip}, apps=${ingress_vip}, DHCP ${dhcp_start}-${dhcp_end})"
+SCRIPT_EOF
+}
+
+# Workers live on the VLAN subnet; the API VIP is on br-ex (e.g. 192.168.111.32). Apply
+# forwarding, MASQUERADE, and rp_filter=0 on every node (VMIs may schedule anywhere).
+localnet_vlan_configure_nodes_routing() {
+  local dhcp_iface="$1"
+  local uplink_bond="$2"
+  local vlan_subnet="$3"
+  local routing_b64
+
+  routing_b64=$(base64 -w0 <<'SCRIPT_EOF'
+#!/bin/bash
+set -euo pipefail
+dhcp_iface="$1"
+uplink_bond="$2"
+vlan_subnet="$3"
+
+for dev in all "${uplink_bond}" "${dhcp_iface}"; do
+  [[ -e "/proc/sys/net/ipv4/conf/${dev}/rp_filter" ]] && echo 0 > "/proc/sys/net/ipv4/conf/${dev}/rp_filter"
+done
+
+sysctl -w net.ipv4.ip_forward=1 >/dev/null
+
+iptables -C FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT
+iptables -C FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+iptables -t nat -C POSTROUTING -s "${vlan_subnet}" -o "${uplink_bond}" -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -s "${vlan_subnet}" -o "${uplink_bond}" -j MASQUERADE
+
+echo "localnet-vlan routing configured (${vlan_subnet} via ${uplink_bond}, rp_filter=0)"
 SCRIPT_EOF
 )
+
+  echo "Configuring localnet-vlan routing on all nodes (${vlan_subnet} -> ${uplink_bond})..."
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+      "echo '${routing_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${uplink_bond}' '${vlan_subnet}'"; then
+      echo "  ${node}: routing configured"
+    else
+      echo "WARNING: failed to configure routing on ${node}" >&2
+      return 1
+    fi
+  done
+}
+
+localnet_vlan_dhcp_node() {
+  local node
+  node=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
+  if [[ -z "${node}" ]]; then
+    # Bare-metal CI clusters are often compact (masters-only); fall back to a master.
+    node=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')
+  fi
+  echo "${node}"
+}
+
+localnet_vlan_configure_br_localnet_dhcp() {
+  local cluster_name="$1"
+  local vlan_id="$2"
+  local dhcp_iface="$3"
+  local gateway="$4"
+  local dhcp_start="$5"
+  local dhcp_end="$6"
+  local api_vip="$7"
+  local ingress_vip="$8"
+  local uplink_bond="$9"
+  local base_domain
+  local node
+  local setup_b64
+
+  base_domain=$(oc get dns/cluster -o jsonpath='{.spec.baseDomain}')
+  echo "Configuring dnsmasq on ${dhcp_iface} for VLAN ${vlan_id} (cluster ${cluster_name}, DNS base ${base_domain})..."
+
+  setup_b64=$(localnet_vlan_dnsmasq_setup_script_b64)
 
   # Run dnsmasq on a single node only. The VLAN is a shared L2 segment so one
   # DHCP server serves all VMs regardless of scheduling node. Running on every
   # node would cause duplicate gateway IPs and competing DHCP leases.
-  node=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
+  node=$(localnet_vlan_dhcp_node)
   if [[ -z "${node}" ]]; then
-    echo "ERROR: no worker node found for DHCP server placement" >&2
+    echo "ERROR: no node found for DHCP server placement" >&2
     return 1
   fi
   echo "Setting up ${dhcp_iface} DHCP/DNS on node ${node} (single-node DHCP for shared VLAN)..."
   # oc debug defaults to OPENSHIFT_BUILD_NAMESPACE (ci-op-* on build cluster), which does
   # not exist on the baremetal test cluster. Always target default.
   if ! oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
-    "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
+    "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
   then
     echo "WARNING: failed to configure ${dhcp_iface} DHCP on node ${node}" >&2
     return 1
   fi
   echo "${node}" > "${SHARED_DIR}/localnet-vlan-dhcp-node"
+}
+
+# Re-write dnsmasq static records after the hosted cluster exists so api/api-int use the
+# real control-plane endpoint (MetalLB VIP), not the pre-create default.
+localnet_vlan_refresh_dnsmasq_api_dns() {
+  local cluster_name="$1"
+  local vlan_id="$2"
+  local dhcp_iface="$3"
+  local gateway="$4"
+  local dhcp_start="$5"
+  local dhcp_end="$6"
+  local ingress_vip="$7"
+  local uplink_bond="$8"
+  local api_vip="${9}"
+  local node
+  local setup_b64
+
+  if [[ -z "${api_vip}" ]]; then
+    api_vip=$(oc get hostedcluster "${cluster_name}" -n "${CLUSTER_NAMESPACE_PREFIX}" \
+      -o jsonpath='{.status.controlPlaneEndpoint.host}' 2>/dev/null || true)
+  fi
+  if [[ -z "${api_vip}" ]]; then
+    echo "WARNING: could not determine API VIP for localnet-vlan dnsmasq refresh" >&2
+    return 0
+  fi
+
+  node=""
+  if [[ -f "${SHARED_DIR}/localnet-vlan-dhcp-node" ]]; then
+    node=$(cat "${SHARED_DIR}/localnet-vlan-dhcp-node")
+  fi
+  if [[ -z "${node}" ]] || ! oc get node "${node}" &>/dev/null; then
+    node=$(localnet_vlan_dhcp_node)
+  fi
+  if [[ -z "${node}" ]]; then
+    echo "WARNING: no DHCP node for dnsmasq API refresh" >&2
+    return 0
+  fi
+
+  base_domain=$(oc get dns/cluster -o jsonpath='{.spec.baseDomain}')
+  echo "Refreshing localnet-vlan dnsmasq API DNS on ${node} (api/api-int -> ${api_vip})..."
+  setup_b64=$(localnet_vlan_dnsmasq_setup_script_b64)
+  oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+    "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'" \
+    || echo "WARNING: dnsmasq API refresh failed on ${node}" >&2
 }
 
 localnet_multi_label_namespace_privileged() {
@@ -818,7 +947,9 @@ EOF
     LOCALNET_VLAN_DHCP_RANGE_START="${LOCALNET_VLAN_DHCP_RANGE_START:-192.168.112.100}"
     LOCALNET_VLAN_DHCP_RANGE_END="${LOCALNET_VLAN_DHCP_RANGE_END:-192.168.112.240}"
     LOCALNET_VLAN_INGRESS_VIP="${LOCALNET_VLAN_INGRESS_VIP:-192.168.111.4}"
+    LOCALNET_VLAN_API_VIP="${LOCALNET_VLAN_API_VIP:-192.168.111.32}"
     LOCALNET_VLAN_DHCP_INTERFACE="${LOCALNET_VLAN_DHCP_INTERFACE:-${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}}"
+    LOCALNET_VLAN_SUBNET="${LOCALNET_VLAN_GATEWAY%.*}.0/24"
     LOCALNET_VLAN_ATTACH_DEFAULT="false"
 
     echo "Setting up localnet-vlan: VLAN ${LOCALNET_VLAN_ID}, bridge ${LOCALNET_VLAN_BRIDGE}, physnet ${LOCALNET_VLAN_PHYSNET}..."
@@ -866,10 +997,14 @@ spec:
           options:
             stp: false
           port:
+            # Untagged on br-localnet: OVN localnet NAD is subnets-less and delivers
+            # untagged L2 frames. A VLAN access tag here blocks guest DHCP/ignition.
+            # VLAN segmentation is on the physical uplink (br-ex); br-ex.<vlan-id> is
+            # the kernel netdev for dnsmasq on this segment.
             - name: ${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}
-              vlan:
-                mode: access
-                tag: ${LOCALNET_VLAN_ID}
+            # OVN-K creates this patch port once the localnet NAD exists; include it
+            # so NMState verification does not fail after the network is provisioned.
+            - name: patch-localnet.${LOCALNET_VLAN_PHYSNET#localnet-}_ovn_localnet_port-to-br-int
 NNCP_EOF
 
     echo "Waiting for NNCP localnet-vlan-${LOCALNET_VLAN_ID} to be Available..."
@@ -881,11 +1016,30 @@ NNCP_EOF
       exit 1
     fi
 
+    # NMState may still tag the br-ex.<vlan> OVS port with the VLAN ID from the
+    # interface name. OVN localnet is subnets-less/untagged; clear the tag so guest
+    # DHCP/ignition traffic reaches the kernel netdev (dnsmasq).
+    echo "Clearing OVS VLAN tag on ${LOCALNET_VLAN_DHCP_INTERFACE} ports (untagged localnet)..."
+    for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+      if oc debug "node/${NODE}" -n default --quiet=true -- chroot /host bash -c \
+        "ovs-vsctl clear port '${LOCALNET_VLAN_DHCP_INTERFACE}' tag 2>/dev/null || true"; then
+        echo "  ${NODE}: cleared VLAN tag on ${LOCALNET_VLAN_DHCP_INTERFACE}"
+      else
+        echo "WARNING: failed to clear VLAN tag on ${NODE}" >&2
+      fi
+    done
+
     localnet_vlan_configure_br_localnet_dhcp "${CLUSTER_NAME}" "${LOCALNET_VLAN_ID}" \
       "${LOCALNET_VLAN_DHCP_INTERFACE}" "${LOCALNET_VLAN_GATEWAY}" \
       "${LOCALNET_VLAN_DHCP_RANGE_START}" "${LOCALNET_VLAN_DHCP_RANGE_END}" \
-      "${LOCALNET_VLAN_INGRESS_VIP}" "${LOCALNET_VLAN_BOND}" || {
+      "${LOCALNET_VLAN_API_VIP}" "${LOCALNET_VLAN_INGRESS_VIP}" "${LOCALNET_VLAN_BOND}" || {
       echo "ERROR: ${LOCALNET_VLAN_DHCP_INTERFACE} dnsmasq configuration failed" >&2
+      exit 1
+    }
+
+    localnet_vlan_configure_nodes_routing "${LOCALNET_VLAN_DHCP_INTERFACE}" \
+      "${LOCALNET_VLAN_BOND}" "${LOCALNET_VLAN_SUBNET}" || {
+      echo "ERROR: localnet-vlan inter-subnet routing configuration failed" >&2
       exit 1
     }
 
@@ -1023,6 +1177,14 @@ oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
+if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
+  localnet_vlan_refresh_dnsmasq_api_dns "${CLUSTER_NAME}" "${LOCALNET_VLAN_ID}" \
+    "${LOCALNET_VLAN_DHCP_INTERFACE}" "${LOCALNET_VLAN_GATEWAY}" \
+    "${LOCALNET_VLAN_DHCP_RANGE_START}" "${LOCALNET_VLAN_DHCP_RANGE_END}" \
+    "${LOCALNET_VLAN_INGRESS_VIP}" "${LOCALNET_VLAN_BOND}" "" \
+    || echo "WARNING: localnet-vlan dnsmasq API refresh failed (continuing)" >&2
+fi
+
 if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
   ensure_localnet_multi_worker_kubelet_started "${MULTI_NAMESPACE}" || {
@@ -1054,6 +1216,24 @@ if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
     echo "ERROR: failed to clear port security on localnet-vlan LSPs" >&2
     exit 1
   }
+
+  _localnet_vlan_gateway="${LOCALNET_VLAN_GATEWAY:-192.168.112.1}"
+  LOCALNET_VLAN_SUBNET="${LOCALNET_VLAN_SUBNET:-${_localnet_vlan_gateway%.*}.0/24}"
+  LOCALNET_VLAN_GATEWAY_DNS="${LOCALNET_VLAN_GATEWAY:-192.168.112.1}"
+  ovn_dhcp_configured=false
+  for attempt in $(seq 1 12); do
+    if configure_ovn_localnet_lsp_dhcp "${LOCALNET_VLAN_NS}" "${LOCALNET_VLAN_SUBNET}" \
+      "${LOCALNET_VLAN_GATEWAY_DNS}" "${LOCALNET_VLAN_GATEWAY_DNS}"; then
+      ovn_dhcp_configured=true
+      break
+    fi
+    echo "OVN localnet-vlan DHCP not ready (attempt ${attempt}/12), retrying in 30s..."
+    sleep 30
+  done
+  if [[ "${ovn_dhcp_configured}" != "true" ]]; then
+    echo "ERROR: failed to configure OVN DHCP on localnet-vlan LSPs after retries" >&2
+    exit 1
+  fi
 
   echo "Waiting for NodePool to become Ready"
   oc wait --timeout="${LOCALNET_VLAN_NODEPOOL_READY_TIMEOUT:-45m}" \
