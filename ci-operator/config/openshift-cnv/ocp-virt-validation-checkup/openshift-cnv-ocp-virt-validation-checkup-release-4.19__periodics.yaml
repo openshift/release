@@ -3,6 +3,8 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.19
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -39,12 +41,12 @@ tests:
         make update_pull_secret set_imagedigestmirrorset deploy_cnv
         oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{"op": "add", "path": "/spec/defaultCPUModel", "value": "Broadwell"}]'
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
-      - mount_path: /var/run/cnv-ci-konflux-pull-secret
-        name: konflux-pull-secret
-        namespace: test-credentials
+      - collection: cnv-ci-secrets
+        group: cnv-ci-brew-pull-secret
+        mount_path: /var/run/cnv-ci-brew-pull-secret
+      - collection: virtualization-secrets
+        group: konflux-pull-secret
+        mount_path: /var/run/cnv-ci-konflux-pull-secret
       env:
       - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
         name: BREW_IMAGE_REGISTRY_USERNAME

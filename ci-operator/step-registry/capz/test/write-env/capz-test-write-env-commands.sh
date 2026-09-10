@@ -60,12 +60,54 @@ else
   echo "$RESOURCEGROUPNAME" > "$RESOURCEGROUPNAME_FILE"
 fi
 
-# Resolve MSI resource group from Boskos lease.
+# Source slot-manager runtime contract if available (DEV path).
+SLOT_ENV_FILE="${SHARED_DIR}/aro-hcp-slot.env"
+if [[ -f "${SLOT_ENV_FILE}" ]]; then
+  # shellcheck disable=SC1090
+  source "${SLOT_ENV_FILE}"
+  echo "[write-env] Sourced slot-manager env from ${SLOT_ENV_FILE}"
+  if [[ -n "${CUSTOMER_SUBSCRIPTION:-}" ]]; then
+    # CUSTOMER_SUBSCRIPTION is a subscription name; resolve to UUID via vault profile files.
+    CRED_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
+    RESOLVED_SUB_ID=""
+    for name_file in "${CRED_DIR}"/customer-*-subscription-name; do
+      [[ -f "${name_file}" ]] || continue
+      if [[ "$(cat "${name_file}")" == "${CUSTOMER_SUBSCRIPTION}" ]]; then
+        id_file="${name_file%-subscription-name}-subscription-id"
+        if [[ -f "${id_file}" ]]; then
+          RESOLVED_SUB_ID="$(cat "${id_file}")"
+        fi
+        break
+      fi
+    done
+    if [[ -n "${RESOLVED_SUB_ID}" ]]; then
+      AZURE_SUBSCRIPTION_ID="${RESOLVED_SUB_ID}"
+      echo "[write-env] AZURE_SUBSCRIPTION_ID resolved from CUSTOMER_SUBSCRIPTION"
+    else
+      echo "[write-env] ERROR: Could not resolve subscription ID for CUSTOMER_SUBSCRIPTION" >&2
+      exit 1
+    fi
+  fi
+fi
+
+# Resolve MSI resource group from LEASED_MSI_CONTAINERS (slot-manager or ci-operator lease).
+MSI_SUFFIX=""
 MSI_RESOURCEGROUPNAME="${MSI_RESOURCEGROUPNAME:-}"
 if [[ -n "${LEASED_MSI_CONTAINERS:-}" && -z "${MSI_RESOURCEGROUPNAME}" ]]; then
   read -r MSI_RESOURCEGROUPNAME _ <<< "${LEASED_MSI_CONTAINERS}"
+  # Extract MSI_SUFFIX from slot-managed container RG name
+  # (e.g. aro-hcp-msi-container-dev-shard0-04-00 → shard0-04-00).
+  if [[ "$MSI_RESOURCEGROUPNAME" =~ ^aro-hcp-msi-container-[a-z]+-(.+)$ ]]; then
+    MSI_SUFFIX="${BASH_REMATCH[1]}"
+  fi
   echo "[write-env] Using pre-existing MSI from Boskos pool: ${MSI_RESOURCEGROUPNAME}"
 fi
+
+# Resolve REGION for HCP cluster (not SELECTED_LOCATION — MSI containers
+# may be in a region that doesn't support HCPOpenShiftClusters).
+REGION="${LOCATION:-uksouth}"
+# MSI_REGION is where MSI containers live (from slot-manager or same as REGION).
+MSI_REGION="${SELECTED_LOCATION:-${REGION}}"
 
 # Resolve GOCACHE.
 GOCACHE="${GOCACHE:-/tmp/go-cache}"
@@ -110,6 +152,8 @@ export DEPLOYMENT_TIMEOUT="${DEPLOYMENT_TIMEOUT:-90m}"
 export NAME_PREFIX="${NAME_PREFIX}"
 export RESOURCEGROUPNAME="${RESOURCEGROUPNAME}"
 export MSI_RESOURCEGROUPNAME="${MSI_RESOURCEGROUPNAME}"
+export MSI_SUFFIX="${MSI_SUFFIX}"
+export MSI_REGION="${MSI_REGION}"
 export IMAGE_PULL_SECRET_B64="${IMAGE_PULL_SECRET_B64}"
 ENVEOF
 
@@ -120,3 +164,4 @@ echo "[write-env] INFRA_PROVIDER=${INFRA_PROVIDER:-aro} CAPI_USER=${CAPI_USER:-p
 echo "[write-env] REGION=${REGION:-uksouth} USE_K8S=${USE_K8S:-false} DEPLOYMENT_TIMEOUT=${DEPLOYMENT_TIMEOUT:-90m}"
 echo "[write-env] ARO_REPO_URL=${ARO_REPO_URL:-https://github.com/stolostron/cluster-api-installer.git} ARO_REPO_BRANCH=${ARO_REPO_BRANCH:-main}"
 echo "[write-env] NAME_PREFIX=${NAME_PREFIX} RESOURCEGROUPNAME=${RESOURCEGROUPNAME}"
+echo "[write-env] MSI_RESOURCEGROUPNAME=${MSI_RESOURCEGROUPNAME} MSI_SUFFIX=${MSI_SUFFIX} MSI_REGION=${MSI_REGION}"

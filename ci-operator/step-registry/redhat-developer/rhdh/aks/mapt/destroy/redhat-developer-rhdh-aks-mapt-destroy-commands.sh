@@ -29,22 +29,12 @@ set +o errexit
 # Capture both stdout and stderr to check for errors
 output=$(mapt azure aks destroy \
   --project-name "aks" \
-  --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" 2>&1)
+  --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" \
+  --force-destroy 2>&1)
 exit_code=$?
 
 # Re-enable exit on error
 set -o errexit
-
-# Check if the stack is locked
-if echo "$output" | grep -qiE "the stack is currently locked"; then
-  echo "$output"
-  echo "[WARN] ⚠️ Stack is currently locked, skipping destroy operations for ${CORRELATE_MAPT}"
-  echo "Possible reasons:"
-  echo "  a) Job was interrupted/cancelled: destroy post-step ran before create pre-step finished."
-  echo "     Cleanup will be handled by the trap in the create pre-step."
-  echo "  b) Other error occurred: infrastructure will be cleaned up by the weekly destroy-orphaned job."
-  exit 0
-fi
 
 # Check for both exit code and error patterns in output
 if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|exit status [1-9])"; then

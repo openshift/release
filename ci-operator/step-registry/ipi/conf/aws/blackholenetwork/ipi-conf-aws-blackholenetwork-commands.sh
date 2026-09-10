@@ -14,7 +14,7 @@ TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH=/tmp/install-config-blackholenetwork.yaml.patch
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 
 CLUSTER_NAME="$(yq-go r "${CONFIG}" 'metadata.name')"
 

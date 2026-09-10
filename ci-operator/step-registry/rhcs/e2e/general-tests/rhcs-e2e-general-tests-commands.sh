@@ -62,7 +62,7 @@ if [ ! -z "$RHCS_VERSION" ]; then
 fi
 
 # Define the junit name
-junitFileName="result.xml"
+junitFileName="result-junit.xml"
 
 make tools
 make install

@@ -67,6 +67,8 @@ operator:
   substitutions:
   - pullspec: quay.io/lvms_dev/lvms-operator:latest
     with: pipeline:lvm-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -109,8 +111,9 @@ tests:
   container:
     from: test-bin
   secret:
+    collection: sd-sre-secrets
+    group: lvm-operator-codecov-token
     mount_path: /tmp/secret
-    name: lvm-operator-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: post-unit-test
   commands: |
@@ -120,11 +123,13 @@ tests:
     from: test-bin
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: lvm-operator-codecov-token
     mount_path: /tmp/secret
-    name: lvm-operator-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-- as: e2e-aws-single-node
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+- always_run: false
+  as: e2e-aws-single-node
+  pipeline_skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -142,8 +147,9 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws-sno
-- as: e2e-aws
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:

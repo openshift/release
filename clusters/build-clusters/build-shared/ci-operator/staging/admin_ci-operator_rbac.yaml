@@ -6,6 +6,27 @@ metadata:
 imagePullSecrets:
 - name: registry-pull-credentials
 ---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: cluster-image-tagger
+rules:
+- apiGroups:
+  - ""
+  - image.openshift.io
+  resources:
+  - imagestreamtags
+  - imagestreams
+  - imagestreams/layers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -195,6 +216,34 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: secret-reader
+subjects:
+- kind: ServiceAccount
+  name: ci-operator
+  namespace: ci-staging
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-secret-getter-ci-operator-staging
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ci-secret-getter
+subjects:
+- kind: ServiceAccount
+  name: ci-operator
+  namespace: ci-staging
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: configmap-maintainer-ci-operator-staging
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: configmap-maintainer
 subjects:
 - kind: ServiceAccount
   name: ci-operator

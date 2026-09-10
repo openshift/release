@@ -56,6 +56,7 @@ base_images:
     namespace: ci
     tag: latest
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 releases:
@@ -112,49 +113,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-byo-subnet-ovn
-- as: aws-ipi-ovn-hypershift-mce-inplace-f60
-  cron: 11 4 5 2,4,6,8,10,12 *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --node-upgrade-type=InPlace
-      MCE_VERSION: "2.6"
-      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
-    test:
-    - chain: openshift-upgrade-qe-test-hypershift
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
-- as: aws-ipi-ovn-hypershift-mce-replace-f60
-  cron: 24 9 11 2,4,6,8,10,12 *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      MCE_VERSION: "2.6"
-      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
-    test:
-    - chain: openshift-upgrade-qe-test-hypershift
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-shared-vpc-phz-sts-fips-openldap-f60
   cron: 26 6 14 1,3,5,7,9,11 *
   steps:
@@ -360,36 +318,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones
-- as: vsphere-ipi-compact-etcd-encryption-f60
-  cron: 32 2 20 5 *
-  steps:
-    cluster_profile: vsphere-connected-2
-    env:
-      SIZE_VARIANT: compact
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-etcd-encryption
-- as: vsphere-ipi-ovn-dualstack-f60
-  cron: 23 1 5 12 *
-  steps:
-    cluster_profile: vsphere-elastic
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
-- as: vsphere-ipi-ovn-ipsec-mininal-permission-f28
-  cron: 23 6 21 2 *
-  steps:
-    cluster_profile: vsphere-connected-2
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec-minimal-permission
-- as: vsphere-ipi-static-ip-f60
-  cron: 45 5 18 10 *
-  steps:
-    cluster_profile: vsphere-connected-2
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-static-ip
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

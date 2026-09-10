@@ -39,6 +39,17 @@ spec:
         app: gpu-scheduling-webhook
         ci.openshift.io/gpu-scheduling-webhook: ""
     spec:
+      # Image ships amd64/arm64 only; avoid s390x ImagePullBackOff (empty endpoints + Fail webhook).
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - arm64
       tolerations:
       - key: node-role.kubernetes.io/infra
         operator: Exists

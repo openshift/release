@@ -1,18 +1,18 @@
 base_images:
   assisted-installer:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -20,15 +20,15 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   dev-scripts:
@@ -45,8 +45,10 @@ images:
     to: assisted-image-service-build
 promotion:
   to:
-  - name: backplane-5.0
+  - name: backplane-5.1
     namespace: edge-infrastructure
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -99,8 +101,9 @@ tests:
     clone: true
     from: assisted-image-service-build
   secret:
+    collection: edge-group
+    group: assisted-image-service-codecov-token
     mount_path: /tmp/secret
-    name: assisted-image-service-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: test-postsubmit
   commands: |
@@ -113,8 +116,9 @@ tests:
     from: assisted-image-service-build
   postsubmit: true
   secret:
+    collection: edge-group
+    group: assisted-image-service-codecov-token
     mount_path: /tmp/secret
-    name: assisted-image-service-codecov-token
 - as: e2e-metal-assisted-5-0
   capabilities:
   - intranet
@@ -154,6 +158,7 @@ tests:
 - as: e2e-ai-operator-ztp
   capabilities:
   - intranet
+  optional: true
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted

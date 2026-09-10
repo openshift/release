@@ -41,11 +41,22 @@ export LABEL_SELECTOR=$LABEL_SELECTOR
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
 
-./time-scenarios/prow_run.sh
-rc=$?
-if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
-    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
-fi
+collect_artifacts() {
+  local rc=$?
+  set +o errexit
+  # Finished running time scenario
+  if [[ "${TELEMETRY_EVENTS_BACKUP:-}" == "True" && -f /tmp/events.json ]]; then
+    cp /tmp/events.json "${ARTIFACT_DIR}/events.json"
+  fi
+  if [[ -f /tmp/report.out.pdf ]]; then
+    cp /tmp/report.out.pdf "${ARTIFACT_DIR}/kraken.report.pdf"
+  fi
+  exit "$rc"
+}
 
-echo "Finished running time scenario"
-echo "Return code: $rc"
+trap collect_artifacts EXIT
+
+set -euxo pipefail; shopt -s inherit_errexit
+
+./time-scenarios/prow_run.sh
+

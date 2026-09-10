@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 14 2,9,16,23,30 * *
   decorate: true
   decoration_config:
@@ -36,7 +36,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -69,6 +73,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -89,6 +99,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -99,7 +118,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 2 2,9,16,23,30 * *
   decorate: true
   decoration_config:
@@ -135,7 +154,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -168,6 +191,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -188,6 +217,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -198,8 +236,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
-  cron: 38 11 3,6,9,12,15,18,21,23,27,30 * *
+  cluster: build10
+  cron: '@yearly'
   decorate: true
   decoration_config:
     sparse_checkout_files:
@@ -218,7 +256,7 @@ periodics:
     ci-operator.openshift.io/variant: e2e
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-advanced-critical-high-f3
+  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-advanced-f3
   reporter_config:
     slack:
       channel: '#tf-provider-qe-ci'
@@ -234,12 +272,16 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-advanced-critical-high-f3
+      - --target=rosa-hcp-advanced-f3
       - --variant=e2e
       command:
       - ci-operator
@@ -267,104 +309,11 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
+      - mountPath: /etc/gsm-config
+        name: gsm-config
         readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build07
-  cron: 38 17 2,9,16,23,30 * *
-  decorate: true
-  decoration_config:
-    sparse_checkout_files:
-    - .ci-operator.yaml
-    - build/ci-tf-e2e.Dockerfile
-  extra_refs:
-  - base_ref: main
-    org: terraform-redhat
-    repo: terraform-provider-rhcs
-    sparse_checkout_files:
-    - .ci-operator.yaml
-    - build/ci-tf-e2e.Dockerfile
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
-    ci-operator.openshift.io/variant: e2e
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-advanced-medium-low-f7
-  reporter_config:
-    slack:
-      channel: '#tf-provider-qe-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - aborted
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :slack-yellow:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-advanced-medium-low-f7
-      - --variant=e2e
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -386,6 +335,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -396,7 +354,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 17 2,9,16,23,30 * *
   decorate: true
   decoration_config:
@@ -432,7 +390,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -465,6 +427,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -485,6 +453,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -495,7 +472,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 2 3,10,17,20,31 * *
   decorate: true
   decoration_config:
@@ -531,7 +508,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -564,6 +545,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -584,6 +571,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -594,7 +590,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 14 2,9,16,23,30 * *
   decorate: true
   decoration_config:
@@ -630,7 +626,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -663,6 +663,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -683,6 +689,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -693,7 +708,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 2 3,10,17,20,31 * *
   decorate: true
   decoration_config:
@@ -729,7 +744,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -762,6 +781,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -782,6 +807,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -792,7 +826,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 08 21 1,4,7,10,13,16,19,22,25,28 * *
   decorate: true
   decoration_config:
@@ -812,7 +846,7 @@ periodics:
     ci-operator.openshift.io/variant: e2e
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-private-critical-high-f3
+  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-private-f3
   reporter_config:
     slack:
       channel: '#tf-provider-qe-ci'
@@ -828,12 +862,16 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-private-critical-high-f3
+      - --target=rosa-hcp-private-f3
       - --variant=e2e
       command:
       - ci-operator
@@ -861,104 +899,11 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
+      - mountPath: /etc/gsm-config
+        name: gsm-config
         readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build07
-  cron: 38 2 2,9,16,23,30 * *
-  decorate: true
-  decoration_config:
-    sparse_checkout_files:
-    - .ci-operator.yaml
-    - build/ci-tf-e2e.Dockerfile
-  extra_refs:
-  - base_ref: main
-    org: terraform-redhat
-    repo: terraform-provider-rhcs
-    sparse_checkout_files:
-    - .ci-operator.yaml
-    - build/ci-tf-e2e.Dockerfile
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
-    ci-operator.openshift.io/variant: e2e
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-hcp-private-medium-low-f7
-  reporter_config:
-    slack:
-      channel: '#tf-provider-qe-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - aborted
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :slack-yellow:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-private-medium-low-f7
-      - --variant=e2e
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -980,6 +925,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -990,7 +944,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 8 2,9,16,23,30 * *
   decorate: true
   decoration_config:
@@ -1026,7 +980,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -1059,6 +1017,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -1079,6 +1043,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1089,7 +1062,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 14 2,9,16,23,30 * *
   decorate: true
   decoration_config:
@@ -1125,7 +1098,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -1158,104 +1135,11 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
+      - mountPath: /etc/gsm-config
+        name: gsm-config
         readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build07
-  cron: 38 11 3,6,9,12,15,18,21,23,27,30 * *
-  decorate: true
-  decoration_config:
-    sparse_checkout_files:
-    - .ci-operator.yaml
-    - build/ci-tf-e2e.Dockerfile
-  extra_refs:
-  - base_ref: main
-    org: terraform-redhat
-    repo: terraform-provider-rhcs
-    sparse_checkout_files:
-    - .ci-operator.yaml
-    - build/ci-tf-e2e.Dockerfile
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
-    ci-operator.openshift.io/variant: e2e
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-critical-high-f3
-  reporter_config:
-    slack:
-      channel: '#tf-provider-qe-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - aborted
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :slack-yellow:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-sts-advanced-critical-high-f3
-      - --variant=e2e
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -1277,6 +1161,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1287,7 +1180,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 6 1,8,15,22,29 * *
   decorate: true
   decoration_config:
@@ -1323,7 +1216,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -1356,6 +1253,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -1376,6 +1279,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1386,8 +1298,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
-  cron: 38 17 2,9,16,23,30 * *
+  cluster: build10
+  cron: 38 11 3,6,9,12,15,18,21,23,27,30 * *
   decorate: true
   decoration_config:
     sparse_checkout_files:
@@ -1406,7 +1318,7 @@ periodics:
     ci-operator.openshift.io/variant: e2e
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-medium-low-f7
+  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-advanced-f3
   reporter_config:
     slack:
       channel: '#tf-provider-qe-ci'
@@ -1422,12 +1334,16 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-sts-advanced-medium-low-f7
+      - --target=rosa-sts-advanced-f3
       - --variant=e2e
       command:
       - ci-operator
@@ -1455,104 +1371,11 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
+      - mountPath: /etc/gsm-config
+        name: gsm-config
         readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build07
-  cron: 08 21 1,4,7,10,13,16,19,22,25,28 * *
-  decorate: true
-  decoration_config:
-    sparse_checkout_files:
-    - .ci-operator.yaml
-    - build/ci-tf-e2e.Dockerfile
-  extra_refs:
-  - base_ref: main
-    org: terraform-redhat
-    repo: terraform-provider-rhcs
-    sparse_checkout_files:
-    - .ci-operator.yaml
-    - build/ci-tf-e2e.Dockerfile
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: oex-aws-qe
-    ci-operator.openshift.io/variant: e2e
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-critical-high-f3
-  reporter_config:
-    slack:
-      channel: '#tf-provider-qe-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - aborted
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :slack-yellow:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-sts-private-critical-high-f3
-      - --variant=e2e
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -1574,6 +1397,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1584,7 +1416,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 2 2,9,16,23,30 * *
   decorate: true
   decoration_config:
@@ -1620,7 +1452,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -1653,6 +1489,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -1673,6 +1515,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1683,8 +1534,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
-  cron: 38 2 2,9,16,23,30 * *
+  cluster: build10
+  cron: 08 21 1,4,7,10,13,16,19,22,25,28 * *
   decorate: true
   decoration_config:
     sparse_checkout_files:
@@ -1703,7 +1554,7 @@ periodics:
     ci-operator.openshift.io/variant: e2e
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-medium-low-f7
+  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-private-f3
   reporter_config:
     slack:
       channel: '#tf-provider-qe-ci'
@@ -1719,12 +1570,16 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-sts-private-medium-low-f7
+      - --target=rosa-sts-private-f3
       - --variant=e2e
       command:
       - ci-operator
@@ -1752,6 +1607,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -1772,6 +1633,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1782,7 +1652,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 26 8 1,4,7,10,13,16,19,22,25,28 * *
   decorate: true
   decoration_config:
@@ -1802,7 +1672,7 @@ periodics:
     ci-operator.openshift.io/variant: e2e
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-shared-vpc-critical-high-f3
+  name: periodic-ci-terraform-redhat-terraform-provider-rhcs-main-e2e-rosa-sts-shared-vpc-f3
   reporter_config:
     slack:
       channel: '#tf-provider-qe-ci'
@@ -1818,12 +1688,16 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-sts-shared-vpc-critical-high-f3
+      - --target=rosa-sts-shared-vpc-f3
       - --variant=e2e
       command:
       - ci-operator
@@ -1851,6 +1725,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -1871,6 +1751,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1881,7 +1770,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 8 2,9,16,23,30 * *
   decorate: true
   decoration_config:
@@ -1917,7 +1806,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -1950,6 +1843,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -1970,6 +1869,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1980,7 +1888,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 38 14 2,9,16,23,30 * *
   decorate: true
   decoration_config:
@@ -2016,7 +1924,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -2049,6 +1961,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -2069,6 +1987,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

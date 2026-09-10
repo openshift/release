@@ -6,6 +6,9 @@ set -o pipefail
 
 start_time=$SECONDS
 
+# shellcheck disable=SC1090
+source <(curl -fsSL "https://raw.githubusercontent.com/openshift-cnv/cnv-ci/refs/heads/master/hack/shared-functions.sh")
+
 # This trap will be executed when the script exits for any reason (successful, error, or signal).
 trap 'debug_on_exit' EXIT
 
@@ -38,21 +41,22 @@ debug_on_exit() {
     echo "--------------------------------------------------------------------------------"
     echo "    😴 😴 😴"
 
-    # Use file flag so loop can be interrupted by removing the file
-    touch "${lockfile}"
-    attempts=120
-    attempt_count=0
-    sleep_time=120
-    set +x
-    while [[ -f "${lockfile}" ]]; do
-        sleep "${sleep_time}"
-        ((attempt_count++))
-        if [[ ${attempt_count} -ge ${attempts} ]]; then
-            echo "Timed out waiting for lockfile to be removed."
-            break
-        fi
-    done
-    set -x
+    ### Disabled for Konflux, until we can make it customizable to only execute for manual rehearsle.
+    # # Use file flag so loop can be interrupted by removing the file
+    # touch "${lockfile}"
+    # attempts=120
+    # attempt_count=0
+    # sleep_time=120
+    # set +x
+    # while [[ -f "${lockfile}" ]]; do
+    #     sleep "${sleep_time}"
+    #     ((attempt_count++))
+    #     if [[ ${attempt_count} -ge ${attempts} ]]; then
+    #         echo "Timed out waiting for lockfile to be removed."
+    #         break
+    #     fi
+    # done
+    # set -x
   fi
 
   # exit with the original exit code.
@@ -92,27 +96,6 @@ function runMustGather() {
     mkdir -p "${MUST_GATHER_CNV_DIR}"
     oc adm must-gather --dest-dir="${MUST_GATHER_CNV_DIR}" --image="${IMAGE}" -- /usr/bin/gather --vms_details | tee "${MUST_GATHER_CNV_DIR}"/must-gather-cnv.log || true
     # tar -czf must-gather-cnv.tar.gz must-gather-cnv || true
-}
-
-function retry() {
-    local max_retries=$1; shift
-    local delay=$1; shift
-    local count=0
-
-    until "$@"; do
-        exit_code=$?
-        count=$((count + 1))
-        # shellcheck disable=SC2086
-        if [ $count -lt $max_retries ]; then
-            echo "Command failed. Attempt $count/$max_retries. Retrying in $delay seconds..."
-            # shellcheck disable=SC2086
-            sleep $delay
-        else
-            echo "Command failed after $max_retries attempts."
-            return $exit_code
-        fi
-    done
-    return 0
 }
 
 #
@@ -196,33 +179,6 @@ function cnv::reimport_datavolumes() {
   oc get pvc -n "${dvnamespace}"
 }
 
-function install_yq_if_not_exists() {
-    # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
-        echo "yq version: $cmd_yq"
-    else
-        echo "Installing yq"
-        mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    fi
-}
-
-function mapTestsForComponentReadiness() {
-
-    [[ ${MAP_TESTS:-false} != "true" ]] && return
-
-    results_file="${1}"
-    echo "Patching Tests Result File: ${results_file}"
-    if [ -f "${results_file}" ]; then
-        install_yq_if_not_exists
-        echo "Mapping Test Suite Name To: CNV-lp-interop"
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' "${results_file}"
-    fi
-}
 
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
@@ -258,6 +214,38 @@ curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 
 oc whoami --show-console
 HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
+readonly HCO_CR="${HCO_CR:-kubevirt-hyperconverged}"
+
+ARCH=$(uname -m)
+case ${ARCH} in
+  aarch64) ARCH_LABEL='ARM 64' ;;
+  s390x)   ARCH_LABEL='IBM Z' ;;
+  *)       ARCH_LABEL=${ARCH} ;;
+esac
+
+virtctl_url=$(oc get consoleclidownload "virtctl-clidownloads-${HCO_CR}" \
+  -o=jsonpath="{.spec.links[?(@.text==\"Download virtctl for Linux for ${ARCH_LABEL}\")].href}")
+
+if [[ -z "${virtctl_url}" ]]; then
+  echo "[ERROR] No ConsoleCLIDownload href for arch '${ARCH_LABEL}' (uname -m=${ARCH})." >&2
+  oc get consoleclidownload "virtctl-clidownloads-${HCO_CR}" \
+    -o jsonpath='{range .spec.links[*]}{.text}{"\t"}{.href}{"\n"}{end}' >&2 || true
+  exit 1
+fi
+
+_retries="${VIRTCTL_DOWNLOAD_WAIT_RETRIES:-40}"
+_delay="${VIRTCTL_DOWNLOAD_WAIT_DELAY:-15}"
+if ! wait_for \
+  'virtctl download URL to respond' \
+  "${_retries}" \
+  "${_delay}" \
+  virtctl_download_ready \
+  "${virtctl_url}"; then
+  echo "[ERROR] virtctl tarball not reachable: ${virtctl_url}" >&2
+  exit 1
+fi
+
+download_virtctl
 
 oc get sc # Before
 setDefaultStorageClass 'ocs-storagecluster-ceph-rbd-virtualization'

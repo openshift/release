@@ -66,6 +66,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       ipv6:
         enabled: ${ipv6_enabled}
         dhcp: ${ipv6_enabled}
+        addr-gen-mode: eui64
         auto-gateway: ${ipv6_enabled}
         auto-routes: ${ipv6_enabled}
         autoconf: ${ipv6_enabled}

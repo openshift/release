@@ -9,6 +9,8 @@ build_root:
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
       RUN dnf install -y podman
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -60,42 +62,42 @@ tests:
 
         export PROVIDER_KEY_PATH=/var/run/openai/token
         export PROVIDER=openai
-        export MODEL=gpt-3.5-turbo-1106
+        export MODEL=gpt-5.4
 
         export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
 
         tests/scripts/test-e2e-cluster-periodics.sh
       credentials:
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azureopenai-entra-id
-        name: azureopenai-entra-id
-        namespace: test-credentials
-      - mount_path: /var/run/bam
-        name: bam-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/watsonx
-        name: watsonx-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/rhaiis
-        name: rhaiis-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/vertex
-        name: vertex-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/bedrock-iam
-        name: bedrock-iam
-        namespace: test-credentials
-      - mount_path: /var/run/bedrock-iam-role
-        name: bedrock-iam-role
-        namespace: test-credentials
-      - mount_path: /var/run/insights-stage-upload-offline-token
-        name: insights-stage-upload-offline-token
-        namespace: test-credentials
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-entra-id
+        mount_path: /var/run/azureopenai-entra-id
+      - collection: openshift-lightspeed-service-creds
+        group: bam-apitoken
+        mount_path: /var/run/bam
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: watsonx-apitoken
+        mount_path: /var/run/watsonx
+      - collection: openshift-lightspeed-service-creds
+        group: rhaiis
+        mount_path: /var/run/rhaiis
+      - collection: openshift-lightspeed-service-creds
+        group: vertex-apitoken
+        mount_path: /var/run/vertex
+      - collection: openshift-lightspeed-service-creds
+        group: bedrock-apitoken
+        mount_path: /var/run/bedrock-iam
+      - collection: openshift-lightspeed-service-creds
+        group: bedrock-role-test
+        mount_path: /var/run/bedrock-iam-role
+      - collection: openshift-lightspeed-service-creds
+        group: insights-stage-upload-offline-token
+        mount_path: /var/run/insights-stage-upload-offline-token
       dependencies:
       - env: OLS_IMAGE
         name: lightspeed-service-api
@@ -104,18 +106,18 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: ols-evaluation-periodics
+- as: lseval-periodic-rhoai
   cluster_claim:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
-      variant: fips
+      region: us-east-2
+      variant: gpu
     owner: obs
     product: ocp
-    timeout: 1h0m0s
+    timeout: 3h0m0s
     version: "4.20"
-  cron: 10 8 * * *
+  cron: 10 8 * * 0
   steps:
     allow_skip_on_success: true
     post:
@@ -124,25 +126,22 @@ tests:
     - as: e2e
       cli: latest
       commands: |
-        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
         export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
-        export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
-        export VERTEX_PROVIDER_KEY_PATH=/var/run/vertex/token
+        export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/token)
+        export VLLM_API_KEY=$(cat /var/run/vllm/token)
+        export RHOAI_PROVISION=true
 
-        tests/scripts/test-evaluation.sh
+        tests/scripts/test-lseval-periodic.sh
       credentials:
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/watsonx
-        name: watsonx-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/vertex
-        name: vertex-apitoken
-        namespace: test-credentials
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: huggingface
+        mount_path: /var/run/huggingface
+      - collection: openshift-lightspeed-service-creds
+        group: vllm-apikey
+        mount_path: /var/run/vllm
       dependencies:
       - env: OLS_IMAGE
         name: lightspeed-service-api

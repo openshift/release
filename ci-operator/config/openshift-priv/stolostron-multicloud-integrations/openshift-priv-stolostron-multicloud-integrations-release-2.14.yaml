@@ -3,15 +3,11 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.24-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.24-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 canonical_go_repository: github.com/stolostron/multicloud-integrations
 images:
   items:
@@ -24,6 +20,7 @@ promotion:
     name: "2.14"
     namespace: stolostron
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 resources:
   '*':
@@ -48,8 +45,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: pr-image-mirror
   steps:
     dependencies:

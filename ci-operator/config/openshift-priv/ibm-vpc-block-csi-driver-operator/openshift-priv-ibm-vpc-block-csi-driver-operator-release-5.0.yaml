@@ -2,7 +2,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.22"
+    tag: "5.0"
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -15,21 +15,21 @@ images:
     to: ibm-vpc-block-csi-driver-operator-test
 promotion:
   to:
-  - disabled: true
-    name: 5.0-priv
-    namespace: ocp-private
+  - name: "5.0"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -70,6 +70,21 @@ tests:
     env:
       PROJECT_NAME: ibm-vpc-block-csi-driver-operator
     workflow: openshift-ci-security
+- always_run: false
+  as: tls-scanner-ibm-vpc-block
+  optional: true
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-ibmcloud-csi
 zz_generated_metadata:
   branch: release-5.0
   org: openshift-priv

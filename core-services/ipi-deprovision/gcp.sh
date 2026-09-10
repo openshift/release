@@ -57,17 +57,126 @@ function cleanup_vpc_network() {
   gcloud --project="${GCP_PROJECT}" compute networks delete "${infraID}-network" --quiet || return 1
 }
 
+function delete_service_account() {
+  local service_account="${1}"
+  echo "Deleting IAM service account ${service_account} ..."
+  gcloud iam service-accounts delete -q "${service_account}" --project="${GCP_PROJECT}"
+}
+
+function service_account_is_active() {
+  local sa_id="${1}" sa_display="${2}" active_ids_file="${3}"
+  local active_id
+  while read -r active_id; do
+    [[ -z "${active_id}" ]] && continue
+    if [[ "${sa_id}" == "${active_id}" || "${sa_id}" == "${active_id}-"* \
+      || "${sa_display}" == "${active_id}" || "${sa_display}" == "${active_id}-"* ]]; then
+      return 0
+    fi
+  done < "${active_ids_file}"
+  return 1
+}
+
+function service_account_is_prunable() {
+  local sa_id="${1}" sa_display="${2}"
+  [[ "${sa_id}" == ci-provision* || "${sa_display}" == ci-provision* ]] && return 1
+  [[ "${sa_id}" == do-not-delete-* || "${sa_display}" == do-not-delete-* ]] && return 1
+  [[ "${sa_id}" == ci-op-* || "${sa_display}" == ci-op-* ]] && return 0
+  [[ "${sa_id}" =~ ^ci-[0-9a-z]{4,}- || "${sa_display}" =~ ^ci-[0-9a-z]{4,}- ]] && return 0
+  return 1
+}
+
+function cleanup_orphaned_service_accounts() {
+  local active_ids_file sa_json_file sa_list_file sa_filter orphaned_count=0 failed=0 provisioner_email=""
+  active_ids_file="$(mktemp)"
+  sa_json_file="$(mktemp)"
+  sa_list_file="$(mktemp)"
+
+  if [[ -f "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+    provisioner_email="$(jq -r '.client_email // empty' "${GOOGLE_APPLICATION_CREDENTIALS}")"
+  fi
+
+  if ! gcloud --project="${GCP_PROJECT}" compute networks list \
+    --filter "autoCreateSubnetworks=false AND name~'ci-'" \
+    --format 'value(name)' | sed 's/-network$//' >"${active_ids_file}"; then
+    rm -f "${active_ids_file}" "${sa_json_file}" "${sa_list_file}"
+    return 1
+  fi
+
+  # Ensure we never delete SAs younger than MIN_SA_AGE_HOURS (default 12h).
+  # This protects SAs belonging to concurrent CI jobs whose VPC networks
+  # may already have been torn down but whose workloads are still running.
+  local min_sa_age_hours="${MIN_SA_AGE_HOURS:-12}"
+  # Validate: must be a positive integer between 1 and 168 (1 week)
+  if ! [[ "${min_sa_age_hours}" =~ ^[1-9][0-9]?[0-9]?$ ]] || [[ "${min_sa_age_hours}" -gt 168 ]]; then
+    echo "WARNING: invalid MIN_SA_AGE_HOURS='${MIN_SA_AGE_HOURS:-}', using default 12"
+    min_sa_age_hours=12
+  fi
+  local min_sa_age_seconds=$((10#${min_sa_age_hours} * 3600))
+  local now_seconds
+  now_seconds="$(date '+%s')"
+  local min_age_cutoff_seconds=$((now_seconds - min_sa_age_seconds))
+  # Use the more conservative (older) of the two cutoffs so SAs younger
+  # than either threshold are always kept.
+  local effective_cutoff_seconds
+  if [[ "${gce_cluster_age_cutoff_seconds}" -lt "${min_age_cutoff_seconds}" ]]; then
+    effective_cutoff_seconds="${gce_cluster_age_cutoff_seconds}"
+  else
+    effective_cutoff_seconds="${min_age_cutoff_seconds}"
+  fi
+
+  echo "pruning orphaned IAM service accounts older than ${effective_cutoff_seconds} epoch-seconds (minimum age floor: ${min_sa_age_hours}h) ..."
+  sa_filter="email~'^ci-op-.*' OR email~'^ci-[0-9a-z]{4,}-.*'"
+  if ! gcloud --project="${GCP_PROJECT}" iam service-accounts list \
+    --filter "${sa_filter}" --format=json >"${sa_json_file}"; then
+    rm -f "${active_ids_file}" "${sa_json_file}" "${sa_list_file}"
+    return 1
+  fi
+  if ! jq -r --argjson cutoff "${effective_cutoff_seconds}" \
+    '.[] | select(.createTime != null) | select((.createTime | sub("\\.[0-9]+"; "") | fromdateiso8601) < $cutoff) | [.email, (.displayName // "")] | @tsv' \
+    "${sa_json_file}" >"${sa_list_file}"; then
+    rm -f "${active_ids_file}" "${sa_json_file}" "${sa_list_file}"
+    return 1
+  fi
+
+  while IFS=$'\t' read -r sa_email sa_display; do
+    [[ -z "${sa_email}" ]] && continue
+    [[ -n "${provisioner_email}" && "${sa_email}" == "${provisioner_email}" ]] && continue
+    local sa_id="${sa_email%%@*}"
+    if ! service_account_is_prunable "${sa_id}" "${sa_display}"; then
+      continue
+    fi
+    if service_account_is_active "${sa_id}" "${sa_display}" "${active_ids_file}"; then
+      continue
+    fi
+    if delete_service_account "${sa_email}"; then
+      orphaned_count=$((orphaned_count + 1))
+    else
+      echo "Failed to delete orphaned IAM service account ${sa_email}"
+      failed=1
+    fi
+  done < "${sa_list_file}"
+  echo "deleted ${orphaned_count} orphaned IAM service account(s)"
+  rm -f "${active_ids_file}" "${sa_json_file}" "${sa_list_file}"
+  return "${failed}"
+}
+
 logdir="${ARTIFACTS}/deprovision"
 mkdir -p "${logdir}"
 
 
 gce_cluster_age_cutoff="$(TZ=":America/Los_Angeles" date --date="${CLUSTER_TTL}-8 hours" '+%Y-%m-%dT%H:%M%z')"
+gce_cluster_age_cutoff_seconds="$(TZ=":America/Los_Angeles" date --date="${CLUSTER_TTL}-8 hours" '+%s')"
 echo "deprovisioning clusters with a creationTimestamp before ${gce_cluster_age_cutoff} in GCE ..."
 export CLOUDSDK_CONFIG=/tmp/gcloudconfig
 mkdir -p "${CLOUDSDK_CONFIG}"
 gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
 
 echo "GCP project: ${GCP_PROJECT}"
+
+if [[ -n "${GCP_ORPHAN_SA_ONLY:-}" ]]; then
+  cleanup_orphaned_service_accounts
+  exit $?
+fi
 
 export FILTER="creationTimestamp.date('%Y-%m-%dT%H:%M%z')<${gce_cluster_age_cutoff} AND autoCreateSubnetworks=false AND name~'ci-'"
 for network in $( gcloud --project="${GCP_PROJECT}" compute networks list --filter "${FILTER}" --format "value(name)" ); do
@@ -142,6 +251,8 @@ for INSTANCE in $INSTANCES; do
     echo "Deleting Filestore instance $INSTANCE"
     gcloud filestore instances delete "$INSTANCE" --async --force --quiet
 done
+
+cleanup_orphaned_service_accounts
 
 WARNINGS="$(find ${clusters} -name warning -printf '%H\n' | sort)"
 if [[ -n "${WARNINGS}" ]]; then

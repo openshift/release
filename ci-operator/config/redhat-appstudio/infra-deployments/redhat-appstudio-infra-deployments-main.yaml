@@ -12,12 +12,14 @@ images:
   items:
   - dockerfile_path: components/konflux-operator/ci/openshift-overlay-e2e/Dockerfile
     to: konflux-overlay-install
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
       architecture: amd64
       channel: fast
-      version: "4.18"
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -36,7 +38,7 @@ tests:
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.19"
   optional: true
   steps:
     test:
@@ -52,8 +54,8 @@ tests:
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^infra-tools/|^openspec/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
+    version: "4.19"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^infra-tools/|^openspec/|^argo-cd-apps/.*/(.*production|staging)|^components/[^/]*-rd/|^components/[^/]+/rings/ring-[^0][^/]*/|^components/(authentication|hac-pact-broker|konflux-ci|konflux-operator|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
   steps:
     test:
     - ref: konflux-ci-install-konflux
@@ -69,9 +71,9 @@ tests:
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.19"
   optional: true
-  run_if_changed: ^components/konflux-operator/
+  run_if_changed: ^components/konflux-operator/(rings/ring-0|ci/openshift-overlay-e2e)/|^argo-cd-apps/(overlays/(development-operator|rd-dev/konflux-operator)|app-of-app-sets/development-operator)/|^hack/
   steps:
     test:
     - ref: redhat-appstudio-operator-overlay-install
@@ -86,7 +88,7 @@ tests:
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.19"
   cron: 0 1 * * *
   reporter_config:
     channel: '#infra-deployments-ci-reports'
@@ -109,7 +111,7 @@ tests:
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.19"
   optional: true
   steps:
     test:
@@ -133,7 +135,7 @@ tests:
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.19"
   cron: 0 0 * * *
   reporter_config:
     channel: '#infra-deployments-ci-reports'
@@ -150,7 +152,7 @@ tests:
     - ref: redhat-appstudio-conformance-tests
     workflow: redhat-appstudio-claim-failure-analysis
 - always_run: false
-  as: konflux-e2e-v419-optional
+  as: konflux-e2e-v420-optional
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -159,7 +161,7 @@ tests:
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.19"
+    version: "4.20"
   optional: true
   steps:
     test:
@@ -174,11 +176,12 @@ tests:
     owner: konflux
     product: ocp
     timeout: 3h0m0s
-    version: "4.17"
+    version: "4.19"
   optional: true
-  run_if_changed: ^components/disaster-recovery/.*
+  run_if_changed: ^components/(application-api|authentication|backup|build-service|cluster-secret-store|disaster-recovery|enterprise-contract|external-secrets-operator|has|image-controller|integration|pipeline-service|project-controller|release)/.*
   steps:
     test:
+    - ref: konflux-ci-install-konflux
     - ref: redhat-appstudio-konflux-disaster-recovery
     workflow: redhat-appstudio-claim-failure-analysis
 zz_generated_metadata:

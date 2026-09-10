@@ -16,9 +16,11 @@ images:
     to: aws-kms-encryption-provider
 promotion:
   to:
-  - name: 5.1-priv
-    namespace: ocp-private
+  - disabled: true
+    name: "5.1"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -30,8 +32,8 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -58,6 +60,8 @@ tests:
   as: e2e-hypershift
   steps:
     cluster_profile: hypershift-aws
+    env:
+      CI_TESTS_RUN: ^(TestCreateCluster|TestCreateClusterCustomConfig|TestUpgradeControlPlane)$
     workflow: hypershift-aws-e2e-external
 - as: verify-deps
   steps:

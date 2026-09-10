@@ -114,6 +114,9 @@ spec:
       serviceAccountName: hook
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
@@ -127,15 +130,39 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+      # Second git-sync: sparse checkout of ONLY ci-operator/jobs, feeding the
+      # /etc/jobs union (job-config-path). Kept separate from the full /var/repo
+      # checkout above so core-services never lands under --job-config-path.
+      - name: git-sync-jobs-init
+        resources:
+          requests:
+            memory: "256Mi"
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --root=/tmp/git-sync-jobs
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
+        - --one-time=true
+        - --depth=1
+        - --link=jobs
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: jobs-git
+          mountPath: /tmp/git-sync-jobs
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
+          readOnly: true
       containers:
       - name: hook
-        image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20260702-ef12e757d
+        image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20260908-104d452f4
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
         - --hmac-secret-file=/etc/github/hmac
         - --dry-run=false
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -185,12 +212,20 @@ spec:
           mountPath: /tmp
         - name: release
           mountPath: /var/repo
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: jobs-git
+          mountPath: /etc/jobs/git
+          readOnly: true
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
           readOnly: true
         resources:
           requests:
-            memory: "24Gi"
+            memory: "26Gi"
             cpu: "200m"
         livenessProbe:
           httpGet:
@@ -218,8 +253,30 @@ spec:
           mountPath: /tmp/git-sync
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "0.5"
+            memory: "512Mi"
+            cpu: "100m"
+      - name: git-sync-jobs
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync-jobs
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
+        - --max-failures=3
+        - --link=jobs
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: jobs-git
+          mountPath: /tmp/git-sync-jobs
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
+          readOnly: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
       volumes:
       - name: service-account-token
         projected:
@@ -248,3 +305,13 @@ spec:
           secretName: hook
       - name: tmp
         emptyDir: {}
+      - name: jobs-git
+        emptyDir: {}
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+      - name: sparse-checkout-config
+        configMap:
+          name: prow-jobs-sparse-checkout

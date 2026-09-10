@@ -27,9 +27,6 @@ read_profile_file() {
   fi
 }
 
-ROSA_SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
-ROSA_SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
-ROSA_TOKEN=$(read_profile_file "ocm-token")
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
@@ -38,14 +35,28 @@ else
   echo "Did not find compatible cloud provider cluster_profile"
 fi
 
-if [[ -n "${ROSA_SSO_CLIENT_ID}" && -n "${ROSA_SSO_CLIENT_SECRET}" ]]; then
-  echo "Logging into ${ROSA_LOGIN_ENV} with SSO credentials"
-  rosa login --env "${ROSA_LOGIN_ENV}" --client-id "${ROSA_SSO_CLIENT_ID}" --client-secret "${ROSA_SSO_CLIENT_SECRET}"
-elif [[ -n "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${ROSA_LOGIN_ENV} with offline token"
-  rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+CLUSTER_TYPE=""
+if [[ -f "${SHARED_DIR}/cluster-type" ]]; then
+  CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
+fi
+
+if [[ "$CLUSTER_TYPE" == "rosa" ]]; then
+  ROSA_SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+  ROSA_SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+  ROSA_TOKEN=$(read_profile_file "ocm-token")
+
+  if [[ -n "${ROSA_SSO_CLIENT_ID}" && -n "${ROSA_SSO_CLIENT_SECRET}" ]]; then
+    echo "Logging into ${ROSA_LOGIN_ENV} with SSO credentials"
+    rosa login --env "${ROSA_LOGIN_ENV}" --client-id "${ROSA_SSO_CLIENT_ID}" --client-secret "${ROSA_SSO_CLIENT_SECRET}"
+  elif [[ -n "${ROSA_TOKEN}" ]]; then
+    echo "Logging into ${ROSA_LOGIN_ENV} with offline token"
+    rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  else
+    echo "ROSA cluster detected but no credentials found for rosa login"
+    exit 1
+  fi
 else
-  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
+  echo "Non-ROSA cluster detected (cluster-type: ${CLUSTER_TYPE:-not set}), skipping rosa login"
 fi
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
@@ -74,14 +85,6 @@ wait_for_ipsec_tunnels() {
   expected_tunnels=$(( $(oc get nodes --no-headers | wc -l) - 1 ))
   echo "Expecting each ovn-ipsec-host pod to report $expected_tunnels tunnels Up"
 
-  declare -A pod_node_map
-  while IFS= read -r line; do
-    local pod node
-    pod=$(echo "$line" | awk '{print $1}')
-    node=$(echo "$line" | awk '{print $7}')
-    pod_node_map["$pod"]="$node"
-  done < <(oc get pods -n openshift-ovn-kubernetes -l app=ovn-ipsec -o wide --no-headers)
-
   declare -A wait_counts
   local status_file="${ARTIFACT_DIR}/ipsec-tunnel-status.txt"
   local deadline all_up
@@ -92,6 +95,14 @@ wait_for_ipsec_tunnels() {
 
   deadline=$(( $(date +%s) + ${IPSEC_WAIT_TIMEOUT:-600} ))
   while [[ $(date +%s) -lt $deadline ]]; do
+    # Fetch all pods on each loop, as they can respawn during initialize
+    declare -A pod_node_map
+    while IFS= read -r line; do
+      local pod node
+      pod=$(echo "$line" | awk '{print $1}')
+      node=$(echo "$line" | awk '{print $2}')
+      pod_node_map["$pod"]="$node"
+    done < <(oc get pods -n openshift-ovn-kubernetes -l app=ovn-ipsec -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName --no-headers)
     all_up=true
     : > "$status_file"
     echo "=== IPsec Tunnel Status ($(date -u)) ===" >> "$status_file"

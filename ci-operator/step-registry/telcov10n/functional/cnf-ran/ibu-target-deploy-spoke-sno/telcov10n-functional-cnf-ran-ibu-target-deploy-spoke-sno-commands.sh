@@ -33,12 +33,18 @@ KUBECONFIG_PATH="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/k
 
 cd /eco-ci-cd
 
+TARGET_SPOKE_NAME=$(echo "${TARGET_SPOKE_CLUSTER}" | tr -d "[]'\" ")
+ZTP_CLUSTERS_PATH="${VERSION}/${TARGET_SPOKE_NAME}/clusterinstance"
+ZTP_POLICIES_PATH="${VERSION}/${TARGET_SPOKE_NAME}/policygentemplate"
+
 echo "Running ZTP deployment for target SNO spoke cluster: ${TARGET_SPOKE_CLUSTER}"
+echo "ZTP clusters path: ${ZTP_CLUSTERS_PATH}"
+echo "ZTP policies path: ${ZTP_POLICIES_PATH}"
 ansible-playbook ./playbooks/ran/deploy-spoke-sno.yaml \
     -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} \
         spoke_clusters='${TARGET_SPOKE_CLUSTER}' \
         ztp_git_repo_url=${ZTP_GIT_REPO} \
-        ztp_clusters_git_path=siteconfig/${TARGET_SPOKE_VERSION} \
-        ztp_policies_git_path=policygentemplates/${TARGET_SPOKE_VERSION} \
+        ztp_clusters_git_path=${ZTP_CLUSTERS_PATH} \
+        ztp_policies_git_path=${ZTP_POLICIES_PATH} \
         ztp_git_repo_branch=${ZTP_GIT_BRANCH}"

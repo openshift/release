@@ -64,22 +64,34 @@ build_root:
   use_build_cache: true
 images:
   items:
-  - dockerfile_path: images/installer/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.ci
     to: installer
-  - dockerfile_path: images/libvirt/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/libvirt/Dockerfile.ci
     to: libvirt-installer
-  - dockerfile_path: images/installer/Dockerfile.upi.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.upi.ci
     to: upi-installer
-  - dockerfile_path: images/openstack/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/openstack/Dockerfile.ci
     from: openstack-base
     inputs:
       openstack-base:
         as:
         - registry.ci.openshift.org/ocp/4.17:base-rhel9
     to: openstack-installer
-  - dockerfile_path: images/baremetal/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/baremetal/Dockerfile.ci
     to: baremetal-installer
-  - dockerfile_literal: |
+  - capabilities:
+    - intranet
+    dockerfile_literal: |
       FROM src
       COPY oc /usr/bin/oc
       RUN ln -s /usr/bin/oc /usr/bin/kubectl
@@ -93,7 +105,9 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: src-oc
-  - dockerfile_literal: |
+  - capabilities:
+    - intranet
+    dockerfile_literal: |
       FROM src
       COPY oc /usr/bin/oc
       RUN ln -s /usr/bin/oc /usr/bin/kubectl
@@ -120,6 +134,8 @@ promotion:
     - src-oc
     name: "4.22"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -529,6 +545,32 @@ tests:
       OS_IMAGE_STREAM: rhel-10
     workflow: openshift-e2e-aws
 - always_run: false
+  as: e2e-gcd-ovn-private-techpreview
+  optional: true
+  steps:
+    cluster_profile: gcd
+    env:
+      BASE_DOMAIN: ci.gcd.devcluster.openshift.com
+      BASTION_IMAGE_NAME: fedora-coreos-41-20241122-3-0-gcp-x86-64
+      BASTION_IMAGE_PROJECT: eu0:openshift
+      BASTION_MACHINE_TYPE: c3-standard-4
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c3-standard-4
+      CONTROL_PLANE_DISK_SIZEGB: "512"
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: c3-standard-8
+      DEFAULT_MACHINE_OSIMAGE: projects/eu0:openshift/images/rhcos9
+      FEATURE_SET: TechPreviewNoUpgrade
+      PUBLISH: Internal
+      TEST_SKIPS: Ensure HTTPRoute object is created\|The HAProxy router should pass
+        the http2 tests\|The HAProxy router should pass the h2spec conformance tests\|should
+        serve a basic image on each replica with a private image\|Validate user is
+        able to extract rhel8 and rhel9 oc from the ocp payload\|regional PD should
+        store data and sync across zones\|L2 primary UDN with custom network, cluster-networked
+        pods, NodePort service\|cluster-config-operator should report complete ClusterOperator
+        status
+    workflow: openshift-e2e-gcd
+- always_run: false
   as: e2e-gcp-ovn
   pipeline_run_if_changed: (gcp|google)
   steps:
@@ -584,6 +626,12 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-secureboot
+- always_run: false
+  as: e2e-gcp-kms-encryption
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp-kms-encryption
 - always_run: false
   as: e2e-gcp-ovn-byo-vpc
   optional: true
@@ -1112,6 +1160,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
     pre:
@@ -1201,8 +1251,8 @@ tests:
         export AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
         hack/go-integration-test.sh
       credentials:
-      - mount_path: /var/secrets/registry-pull-secret
-        name: registry-pull-credentials
+      - bundle: registry-pull-credentials
+        mount_path: /var/secrets/registry-pull-secret
         namespace: test-credentials
       dependencies:
       - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
@@ -1535,6 +1585,7 @@ tests:
     - ref: go-verify-deps
 - always_run: false
   as: e2e-azure-nat-gateway-single-zone
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-azure
     env:

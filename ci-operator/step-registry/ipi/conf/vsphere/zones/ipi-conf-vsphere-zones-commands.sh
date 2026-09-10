@@ -1,4 +1,14 @@
 #!/bin/bash
+#
+# DEPRECATED: This step is no longer used by the ipi-conf-vsphere-zones chain.
+# Zone configuration is now handled dynamically by ipi-conf-vsphere-vcm-commands.sh,
+# which derives failure domain names from the VCM-managed platform.json produced by
+# ipi-conf-vsphere-check-vcm.  The number of zones is driven by the POOLS env var on
+# the ipi-conf-vsphere-zones chain, so any job can control how many failure domains
+# it uses without hardcoding zone names here.
+#
+# Jobs still referencing this step directly should migrate to the ipi-conf-vsphere-zones
+# chain with the vsphere-elastic cluster profile.
 
 set -o nounset
 set -o errexit

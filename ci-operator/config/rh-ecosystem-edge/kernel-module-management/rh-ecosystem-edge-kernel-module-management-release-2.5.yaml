@@ -2,7 +2,7 @@ base_images:
   go-builder:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
+    tag: rhel-9-golang-1.25-openshift-4.22
   operator-sdk:
     name: "4.16"
     namespace: origin
@@ -12,7 +12,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.22
+    tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
   - build_args:
@@ -93,6 +93,8 @@ promotion:
     namespace: edge-infrastructure
     tag: release-2.5
     tag_by_commit: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -116,9 +118,9 @@ tests:
         chmod +x codecov
         ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -C "${PULL_PULL_SHA}" -P "${PULL_NUMBER}" -B "${PULL_HEAD_REF}" -N "${PULL_BASE_SHA}"
       credentials:
-      - mount_path: /var/run/secrets
-        name: codecov-token
-        namespace: test-credentials
+      - collection: kernel-module-management
+        group: codecov-token
+        mount_path: /var/run/secrets
       from: src
       resources:
         requests:
@@ -134,9 +136,9 @@ tests:
         chmod +x codecov
         ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -B "${PULL_BASE_REF}" -C "${PULL_BASE_SHA}"
       credentials:
-      - mount_path: /var/run/secrets
-        name: codecov-token
-        namespace: test-credentials
+      - collection: kernel-module-management
+        group: codecov-token
+        mount_path: /var/run/secrets
       from: src
       resources:
         requests:

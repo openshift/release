@@ -103,6 +103,8 @@ base_images:
     name: "4.23"
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -226,9 +228,7 @@ tests:
   interval: 168h
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - as: e2e-metal-ipi-ovn-ipv4
   capabilities:
   - intranet
@@ -249,7 +249,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6-runc
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-serial-ipv4
   capabilities:
   - intranet
@@ -277,7 +276,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
   capabilities:
   - intranet
@@ -309,7 +307,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-upgrade
   capabilities:
   - intranet
@@ -394,7 +391,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-ipv6-runc-techpreview
   capabilities:
   - intranet
@@ -456,7 +452,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
@@ -938,12 +933,11 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
-- as: e2e-aws-ovn-installer-dualstack-ipv4-primary-techpreview
+- as: e2e-aws-ovn-installer-dualstack-ipv4-primary
   interval: 24h
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
       TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
         Secondary IP Family \[LinuxOnly\] should function for service endpoints using
@@ -952,12 +946,11 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-installer-dualstack-ipv6-primary-techpreview
+- as: e2e-aws-ovn-installer-dualstack-ipv6-primary
   interval: 24h
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
       TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
         Secondary IP Family \[LinuxOnly\] should function for service endpoints using
@@ -1004,8 +997,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiNetworks=true"]'
-      FEATURE_SET: CustomNoUpgrade
       MULTI_NIC_IPI: "true"
     workflow: openshift-e2e-vsphere
 - as: e2e-external-vsphere-ccm
@@ -1110,12 +1101,43 @@ tests:
     - error
     report_template: |
       :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  shard_count: 2
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-serial
   timeout: 6h0m0s
+- as: e2e-vsphere-ovn-zones-techpreview
+  cron: 15 5 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere-zones
+- as: e2e-vsphere-ovn-zones-techpreview-serial
+  cron: 15 7 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+  shard_count: 2
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-rhcos10-techpreview-serial
   cron: 31,46 4,20 * * *
   steps:
@@ -1213,7 +1235,7 @@ tests:
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
       ENABLE_VSPHERE_FILESHARE_TESTS: "true"
-      POOL_SELECTOR: vsphere-type=vcf9
+      POOL_SELECTOR: vsphere-type=vcf9,vsanfs=true
       TEST_SKIPS: 'Testpattern: Dynamic PV (xfs).*multiVolume.*should concurrently
         access the single volume from pods on different node\|Testpattern: Dynamic
         PV (block volmode).*multiVolume.*should concurrently access the single volume
@@ -1367,6 +1389,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       DEBUG_ENABLE_TCPDUMP: "true"
       FIPS_ENABLED: "true"
       TEST_REQUIRES_BUILDFARM_NET_ADMIN: "true"
@@ -1382,6 +1406,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_CORE_DUMP: "true"
       FIPS_ENABLED: "true"
       TEST_TYPE: upgrade-conformance
@@ -1398,6 +1424,8 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       CI_NAT_REPLACE: "false"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_CORE_DUMP: "true"
       FIPS_ENABLED: "true"
       TEST_TYPE: upgrade-conformance
@@ -1446,6 +1474,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -1829,6 +1859,8 @@ tests:
   interval: 168h
   steps:
     cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     observers:
       enable:
       - observers-resource-watch
@@ -1928,6 +1960,9 @@ tests:
   interval: 168h
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      TEST_SKIPS: \[sig-node\] Node Lifecycle should run through the lifecycle of
+        a node
     workflow: openshift-e2e-aws-cpu-partitioning
 - as: e2e-aws-ovn-single-node-one-core-serial
   interval: 168h
@@ -2555,6 +2590,8 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     observers:
       enable:
       - observers-resource-watch
@@ -2690,6 +2727,7 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
       OS_IMAGE_STREAM: rhel-10
@@ -2720,10 +2758,10 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     env:
-      COMPUTE_NODE_TYPE: n2-standard-8
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
       RT_ENABLED: "true"
+      TEST_SKIPS: regional PD should store data and sync across zones
     observers:
       enable:
       - observers-resource-watch

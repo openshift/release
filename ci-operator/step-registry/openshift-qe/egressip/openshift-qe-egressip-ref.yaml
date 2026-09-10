@@ -7,11 +7,11 @@ ref:
   cli: latest
   commands: openshift-qe-egressip-commands.sh
   credentials:
-  - namespace: test-credentials # this entry injects the custom credential
-    name: ocp-qe-perfscale-es
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
     mount_path: /secret
-  - namespace: test-credentials
-    name: ocp-perfscale-prod-es-creds
+  - collection: ocp-perfscale-cpt
+    group: ocp-perfscale-prod-es-creds
     mount_path: /prod-secret
   resources:
     requests:
@@ -47,9 +47,14 @@ ref:
     documentation: |-
       Add args for e2e-benchmarking kube-burner-ocp cmd
   - name: ITERATIONS
-    default: "10"
+    default: ""
     documentation: |-
-      Iterations of the workload
+      Override the iteration count. When empty, iterations are calculated from
+      worker count and ITERATION_MULTIPLIER.
+  - name: ITERATION_MULTIPLIER
+    default: "100"
+    documentation: |-
+      Number of iterations per worker node. Used to calculate total iterations when ITERATIONS is not set.
   - name: KUBE_BURNER_VERSION
     default: "default"
     documentation: |-

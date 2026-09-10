@@ -43,6 +43,8 @@ base_images:
     name: vsphere-python
     namespace: ci
     tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -84,7 +86,7 @@ tests:
 - as: e2e-metal-ovn-two-node-arbiter-upgrade-os-rhel10
   capabilities:
   - intranet
-  cron: '@weekly'
+  cron: 0 8 * * 1,4
   steps:
     cluster_profile: equinix-edge-enablement
     env:
@@ -118,7 +120,7 @@ tests:
 - as: e2e-metal-ovn-two-node-fencing-upgrade-os-rhel10
   capabilities:
   - intranet
-  cron: '@weekly'
+  cron: 23 11 * * 1,4
   steps:
     cluster_profile: equinix-edge-enablement
     env:
@@ -231,6 +233,21 @@ tests:
     - ref: network-flow-matrix-tests
     - ref: single-node-e2e-test
     workflow: openshift-upgrade-aws-single-node
+- as: e2e-aws-ovn-upgrade-from-stable-haproxy28
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      HAPROXY_VERSION: "2.8"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: openshift-upgrade-aws-patch-master-iam
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: main
   org: openshift

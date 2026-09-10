@@ -78,14 +78,25 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
             -l catalog=${operator_source} \
             -ojsonpath='{.items[?(.metadata.name=="'${operator_name}'")].status.defaultChannel}' 2>/dev/null || echo)
         if [[ -z "${operator_channel}" ]]; then
-            echo "ERROR: Default channel not found in '${operator_name}' packagemanifest."
+            echo "WARNING: Default channel not found in '${operator_name}' packagemanifest. Falling back to the first available channel."
+            operator_channel=$(oc get packagemanifest \
+                -l catalog=${operator_source} \
+                -ojsonpath='{.items[?(.metadata.name=="'${operator_name}'")].status.channels[0].name}' 2>/dev/null || echo)
+        fi
+        if [[ -z "${operator_channel}" ]]; then
+            echo "ERROR: No channel found in '${operator_name}' packagemanifest."
             echo "Checking if the ${operator_name} packagemanifest is available in other catalogs for debugging purpose:"
             set -x
             oc get packagemanifest "${operator_name}" || \
               echo "There is not any available packagemanifest for '${operator_name}' operator"
+            if [[ "${operator_skip_checking}" == "true" ]]; then
+                set +x
+                echo "skip_checking is set, skipping '${operator_name}' operator installation."
+                continue
+            fi
             exit 1
         else
-            echo "INFO: Default channel is ${operator_channel}"
+            echo "INFO: Using channel '${operator_channel}'"
         fi
     fi
 

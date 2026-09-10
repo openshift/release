@@ -71,12 +71,22 @@ elif [ "$platform" = "GCP" ]; then
     export ZONE
 fi
 
+collect_artifacts() {
+  local rc=$?
+  set +o errexit
+  # Finished running zone outages
+  if [[ "${TELEMETRY_EVENTS_BACKUP:-}" == "True" && -f /tmp/events.json ]]; then
+    cp /tmp/events.json "${ARTIFACT_DIR}/events.json"
+  fi
+  if [[ -f /tmp/report.out.pdf ]]; then
+    cp /tmp/report.out.pdf "${ARTIFACT_DIR}/kraken.report.pdf"
+  fi
+  exit "$rc"
+}
+
+trap collect_artifacts EXIT
+
+set -euxo pipefail; shopt -s inherit_errexit
+
 ./zone-outages/prow_run.sh
-rc=$?
 
-if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
-    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
-fi
-
-echo "Finished running zone outages"
-echo "Return code: $rc"

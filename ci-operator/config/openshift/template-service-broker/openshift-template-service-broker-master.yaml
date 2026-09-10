@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: base
 binary_build_commands: make build --warn-undefined-variables
@@ -16,17 +16,19 @@ images:
     to: template-service-broker
 promotion:
   to:
-  - name: "5.0"
+  - name: "5.1"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -51,11 +53,13 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-upgrade
+- always_run: false
+  as: e2e-aws-upgrade
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws

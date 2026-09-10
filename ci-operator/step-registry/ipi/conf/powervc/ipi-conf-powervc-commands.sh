@@ -6,8 +6,8 @@ set -o errexit
 set -o pipefail
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.4"
-readonly YQ_VERSION="v4.53.2"
+readonly POWERVC_TOOL_VERSION="v2.4.8"
+readonly YQ_VERSION="v4.53.6"
 
 # Global variables for cleanup
 BASTION_CREATED=false
@@ -50,6 +50,7 @@ function log_warning() {
 #######################################
 function cleanup_on_exit() {
 	local rc="${1:-0}"
+
 	if [[ "${rc}" -eq 0 ]]; then
 		return 0
 	fi
@@ -114,6 +115,118 @@ function validate_environment() {
 }
 
 #######################################
+# Retry a command a fixed number of times with a constant delay between
+# attempts.
+#
+# The function logs every attempt, returns immediately on the first success,
+# and emits a final error after the last failure.
+#
+# Arguments:
+#   $1 - Maximum number of attempts.
+#   $2 - Delay in seconds between attempts.
+#   $3 - Description of the operation for log messages.
+#   $@ - Command and arguments to execute after the first three parameters.
+# Returns:
+#   0 if the command succeeds within the allowed attempts.
+#   1 if the command fails on every attempt.
+#######################################
+function retry_command() {
+	local max_attempts="${1}"
+	local delay="${2}"
+	local description="${3}"
+	shift 3
+	local cmd=("$@")
+
+	local attempt=1
+	while (( attempt <= max_attempts )); do
+		log_info "Attempt ${attempt}/${max_attempts}: ${description}"
+		if "${cmd[@]}"; then
+			log_info "Success: ${description}"
+			return 0
+		fi
+
+		if (( attempt < max_attempts )); then
+			log_warning "Failed, retrying in ${delay}s..."
+			sleep "${delay}"
+		fi
+		((attempt++))
+	done
+
+	log_error "Failed after ${max_attempts} attempts: ${description}"
+	return 1
+}
+
+#######################################
+# Download a helper binary, optionally verify its SHA256 checksum, and mark it
+# executable.
+#
+# When SHA verification is enabled (the default) the function downloads both the
+# target file and its matching .sha256 file, verifies the checksum from the
+# target directory, and leaves the executable in place only when verification
+# succeeds.  When disabled the SHA download and check are skipped entirely.
+#
+# Arguments:
+#   $1 - Source URL.
+#   $2 - Destination path for the downloaded file.
+#   $3 - Human-readable description used in log messages.
+#   $4 - (optional) Whether to download and verify the SHA256 checksum.
+#        Accepts "true" or "false". Defaults to "true".
+# Returns:
+#   0 if the file is downloaded (and checksum verification passes when enabled).
+#   1 if a download fails or checksum verification fails.
+# Side Effects:
+#   Writes the file and (when enabled) checksum file at the destination path
+#   and changes the downloaded file mode.
+#######################################
+function download_tool_w_sha() {
+	local url="${1}"
+	local output="${2}"
+	local description="${3}"
+	local verify_sha="${4:-true}"
+	local rc=0
+
+	log_info "Downloading ${description} from ${url}"
+	if ! retry_command 3 5 "Download ${description}" \
+		curl --fail --location --silent \
+			--show-error --connect-timeout 30 --max-time 120 \
+			--output "${output}" "${url}"; then
+		log_error "Could not download ${url}"
+		return 1
+	fi
+
+	chmod +x "${output}"
+
+	if [[ "${verify_sha}" == "true" ]]; then
+		url="${url}.sha256"
+		output="${output}.sha256"
+		log_info "Downloading ${description} SHA256 from ${url}"
+		if ! retry_command 3 5 "Download ${description} SHA256" \
+			curl --fail --location --silent \
+				--show-error --connect-timeout 30 --max-time 120 \
+				--output "${output}" "${url}"; then
+			log_error "Could not download ${url}"
+			return 1
+		fi
+
+		pushd "$(dirname "${output}")" > /dev/null || {
+			log_error "Failed to change directory to $(dirname "${output}")"
+			return 1
+		}
+		if ! sha256sum --check "$(basename "${output}")"; then
+			log_error "sha256 sum failed verification"
+			rm -f "${output}" "${output%.sha256}"
+			popd > /dev/null || true
+			return 1
+		fi
+		popd > /dev/null || rc=$?
+	fi
+
+	log_info "Successfully installed ${description}"
+
+	return ${rc}
+}
+
+#######################################
 # Install required tools for PowerVC operations
 # Downloads and configures PowerVC-Tool, yq, and OpenStack credentials
 # Globals:
@@ -124,20 +237,25 @@ function validate_environment() {
 function install_required_tools() {
 	log_info "Installing required tools..."
 
+	local tmp_bin_dir="/tmp/bin"
+
 	cd /tmp || {
 		log_error "Failed to change directory to /tmp"
 		exit 1
 	}
 
-	HOME=/tmp
+	# Make a private directory that is only readable by us
+	HOME="$(mktemp -d /tmp/powervc-checks.XXXXXX)"
+	chmod 0700 "${HOME}"
+	echo "HOME is now ${HOME}"
 	export HOME
 
-	mkdir -p /tmp/bin || {
-		log_error "Failed to create /tmp/bin directory"
+	mkdir -p "${tmp_bin_dir}" || {
+		log_error "Failed to create ${tmp_bin_dir} directory"
 		exit 1
 	}
 
-	PATH="/tmp/bin:${PATH}"
+	PATH="${tmp_bin_dir}:${PATH}"
 	export PATH
 
 	# Install PowerVC-Tool
@@ -149,13 +267,12 @@ function install_required_tools() {
 	fi
 
 	local tool_bin="ocp-ipi-powervc-linux-${machine}"
-	local tool_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/${tool_bin}"
-
-	if ! curl --location --fail --silent --show-error --output /tmp/bin/PowerVC-Tool "${tool_url}"; then
-		log_error "Failed to download PowerVC-Tool"
+	local powervc_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/${tool_bin}"
+	if ! download_tool_w_sha "${powervc_url}" "${tmp_bin_dir}/${tool_bin}" "${tool_bin} ${POWERVC_TOOL_VERSION}"; then
+		log_error "Could not download ${powervc_url}"
 		exit 1
 	fi
-	chmod ugo+x /tmp/bin/PowerVC-Tool
+	mv "${tmp_bin_dir}/${tool_bin}" "${tmp_bin_dir}/PowerVC-Tool"
 
 	# Install yq-v4 if not present
 	log_info "Checking for yq-v4..."
@@ -168,11 +285,10 @@ function install_required_tools() {
 		yq_arch=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')
 		local yq_url="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${yq_arch}"
 
-		if ! curl --fail --location --silent --show-error "${yq_url}" -o /tmp/bin/yq-v4; then
-			log_error "Failed to download yq-v4 from ${yq_url}"
+		if ! download_tool_w_sha "${yq_url}" "${tmp_bin_dir}/yq-v4" "yq-v4 version ${YQ_VERSION}" "false"; then
+			log_error "Could not download ${yq_url}"
 			exit 1
 		fi
-		chmod +x /tmp/bin/yq-v4
 	else
 		log_info "yq-v4 already installed at ${cmd_yq}"
 	fi
@@ -194,20 +310,24 @@ function install_required_tools() {
 		exit 1
 	fi
 
-	cp "${SECRETS_DIR}/clouds.yaml" "${HOME}/.config/openstack/" || {
+	install -m 0600 "${SECRETS_DIR}/clouds.yaml" "${HOME}/.config/openstack/clouds.yaml" || {
 		log_error "Failed to copy clouds.yaml to .config/openstack/"
 		exit 1
 	}
 
-	cp "${SECRETS_DIR}/clouds.yaml" "${HOME}/" || {
+	install -m 0600 "${SECRETS_DIR}/clouds.yaml" "${HOME}/clouds.yaml" || {
 		log_error "Failed to copy clouds.yaml to HOME"
 		exit 1
 	}
 
-	cp "${SECRETS_DIR}/ocp-ci-ca.pem" "${HOME}/" || {
+	install -m 0600 "${SECRETS_DIR}/ocp-ci-ca.pem" "${HOME}/ocp-ci-ca.pem" || {
 		log_error "Failed to copy ocp-ci-ca.pem"
 		exit 1
 	}
+
+	# The cloud configuration in the secret uses hardcoded /tmp/ocp-ci-ca.pem
+	sed -i -e "s|/tmp/ocp-ci-ca.pem|${HOME}/ocp-ci-ca.pem|" "${HOME}/clouds.yaml"
+	sed -i -e "s|/tmp/ocp-ci-ca.pem|${HOME}/ocp-ci-ca.pem|" "${HOME}/.config/openstack/clouds.yaml"
 
 	# Verify all required tools are available
 	log_info "Verifying installed tools..."
@@ -302,6 +422,12 @@ function verify_rhcos_image() {
 
 	# Verify image exists in PowerVC
 	log_info "Checking if ${RHCOS_IMAGE_NAME} exists in PowerVC..."
+
+	cd ${HOME} || {
+		log_error "Failed to change directory to ${HOME}"
+		exit 1
+	}
+
 	if ! PowerVC-Tool \
 		rhcos-exists \
 		--cloud "${CLOUD}" \
@@ -401,9 +527,9 @@ EOF
 function check_powervc_alive() {
 	log_info "Checking PowerVC server connectivity..."
 
-	# Workaround: cd to /tmp as clouds.yaml is also there
-	cd /tmp/ || {
-		log_error "Failed to change directory to /tmp"
+	# Workaround: cd to ${HOME} as clouds.yaml is also there
+	cd ${HOME} || {
+		log_error "Failed to change directory to ${HOME}"
 		exit 1
 	}
 
@@ -510,6 +636,10 @@ function create_bastion() {
 	log_info "  Cloud: ${CLOUD}"
 
 	# Note: an empty --bastionRsa is for remote creation
+	cd ${HOME} || {
+		log_error "Failed to change directory to ${HOME}"
+		exit 1
+	}
 	if ! PowerVC-Tool \
 		create-bastion \
 		--cloud "${CLOUD}" \

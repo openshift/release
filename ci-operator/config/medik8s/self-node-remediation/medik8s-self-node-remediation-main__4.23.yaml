@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -19,6 +23,8 @@ operator:
   substitutions:
   - pullspec: quay.io/medik8s/self-node-remediation-operator:.*
     with: pipeline:self-node-remediation-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -44,7 +50,11 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       OPERATOR_NAMESPACE: self-node-remediation
+      OPERATOR_PACKAGE_NAME: self-node-remediation
       OPERATOR_RELEASED_VERSION: 0.13.0
+      TEST_STEPS: test-command
+    post:
+    - ref: medik8s-analyze-e2e-failure
     test:
     - as: install-last-operator-version
       cli: latest
@@ -59,6 +69,7 @@ tests:
       env:
       - name: OPERATOR_NAMESPACE
       - name: OPERATOR_RELEASED_VERSION
+      - name: OPERATOR_PACKAGE_NAME
       from: src
       resources:
         requests:
@@ -72,6 +83,7 @@ tests:
         name: self-node-remediation-bundle
       env:
       - name: OPERATOR_NAMESPACE
+      - name: OPERATOR_PACKAGE_NAME
       from: src
       resources:
         requests:

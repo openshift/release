@@ -9,7 +9,7 @@ kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ci-operator-configresolver
-  namespace: ocp-private
+  namespace: ocp-priv
 rules:
   - apiGroups:
       - image.openshift.io
@@ -22,7 +22,7 @@ kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ci-operator-configresolver
-  namespace: ocp-private
+  namespace: ocp-priv
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -157,6 +157,9 @@ spec:
               topologyKey: "kubernetes.io/hostname"
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
@@ -173,6 +176,10 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: git-sync
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
         command:
         - /git-sync
         args:
@@ -219,7 +226,7 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "2Gi"
+            memory: "3Gi"
             cpu: "200m"
       serviceAccountName: ci-operator-configresolver
       volumes:

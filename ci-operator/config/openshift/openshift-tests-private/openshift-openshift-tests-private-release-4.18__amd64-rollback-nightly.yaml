@@ -40,6 +40,7 @@ base_images:
     namespace: ci
     tag: latest
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 releases:
@@ -72,17 +73,6 @@ tests:
     - ref: cucushift-upgrade-setedge-rollback
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
-- as: aws-ipi-ovn-hypershift-inplace-f28
-  cron: 12 5 19 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --node-upgrade-type=inplace
-      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
-    test:
-    - chain: openshift-upgrade-qe-test-hypershift-rollback
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: azure-upi-f28
   cron: 4 13 29 * *
   steps:
@@ -122,19 +112,11 @@ tests:
   cluster: build01
   cron: 2 0 3 * *
   steps:
-    cluster_profile: nutanix-qe
+    cluster_profile: nutanix
     test:
     - ref: cucushift-upgrade-setedge-rollback
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
-- as: vsphere-upi-f28
-  cron: 42 2 29 * *
-  steps:
-    cluster_profile: vsphere-elastic
-    test:
-    - ref: cucushift-upgrade-setedge-rollback
-    - ref: cucushift-chainupgrade-toimage
-    workflow: cucushift-installer-rehearse-vsphere-upi
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

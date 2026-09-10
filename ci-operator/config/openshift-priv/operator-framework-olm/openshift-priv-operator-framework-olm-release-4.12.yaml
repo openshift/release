@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
     tag: base
 build_root:
   from_repository: true
@@ -21,20 +21,21 @@ promotion:
   to:
   - excluded_images:
     - ci-image
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -45,7 +46,8 @@ tests:
   commands: make verify
   container:
     from: ci-image
-- as: e2e-gcp-ovn
+- always_run: false
+  as: e2e-gcp-ovn
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
@@ -71,7 +73,8 @@ tests:
   commands: make unit/psm
   container:
     from: ci-image
-- as: e2e-gcp-olm
+- always_run: false
+  as: e2e-gcp-olm
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -103,7 +106,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-console-olm
+- always_run: false
+  as: e2e-gcp-console-olm
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -115,7 +119,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-upgrade
+- always_run: false
+  as: e2e-upgrade
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws

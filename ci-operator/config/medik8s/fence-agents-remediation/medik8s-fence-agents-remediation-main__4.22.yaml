@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   os:
     name: centos
     namespace: openshift
@@ -19,6 +23,8 @@ operator:
   substitutions:
   - pullspec: quay.io/medik8s/fence-agents-remediation-operator:.*
     with: pipeline:fence-agents-remediation
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -43,7 +49,11 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       OPERATOR_NAMESPACE: far-install
+      OPERATOR_PACKAGE_NAME: fence-agents-remediation
       OPERATOR_RELEASED_VERSION: 0.8.0
+      TEST_STEPS: test-command
+    post:
+    - ref: medik8s-analyze-e2e-failure
     test:
     - as: install-last-operator-version
       cli: latest
@@ -59,6 +69,7 @@ tests:
       env:
       - name: OPERATOR_NAMESPACE
       - name: OPERATOR_RELEASED_VERSION
+      - name: OPERATOR_PACKAGE_NAME
       from: src
       resources:
         requests:
@@ -72,6 +83,7 @@ tests:
         name: my-bundle
       env:
       - name: OPERATOR_NAMESPACE
+      - name: OPERATOR_PACKAGE_NAME
       from: src
       resources:
         requests:

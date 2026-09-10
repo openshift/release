@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 images:
   items:
   - dockerfile_path: build/Dockerfile.prow
@@ -17,6 +17,8 @@ promotion:
   to:
   - name: "5.0"
     namespace: stolostron
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -43,8 +45,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
@@ -56,8 +59,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: pr-image-mirror
   steps:
     dependencies:

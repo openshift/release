@@ -22,8 +22,6 @@ EOF
 fi
 # DNS query is blocked on s390x yellow zone for 4.9 & above
 # Also adding some loadbalancer tests that won't function on s390x
-# Ephemeral-storage limit eviction is not reliably observed on s390x libvirt CI until
-# https://issues.redhat.com/browse/OCPBUGS-81118 and https://issues.redhat.com/browse/OCPBUGS-81119 are fixed.
 if echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 9 )) { exit 0 } else {exit 1} }' && [ "${ARCH}" == "s390x" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:Disconnected] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
@@ -43,8 +41,6 @@ if echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >=
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-network] Services should be rejected for evicted pods (no endpoints exist)"
-"[sig-node] Pods Extended Pod Container lifecycle evicted pods should be terminal"
 EOF
 # List of exclude tests from conformance/parallel suite for 4.7 & 4.6
 elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
@@ -280,10 +276,32 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
 "[sig-storage] PersistentVolumes GCEPD should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
 
+# Skip tests specific to the PowerVC (IPI) ppc64le environment:
+#   - egressFirewall test is unsupported in the PowerVC network topology
+#   - Internet connectivity (IPv4) is not available from PowerVC nodes
+#   - Image registry blob-pull redirect returns 200 instead of 307 due to
+#     node resource pressure; skip until root cause is resolved
+elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 21)) { exit 0 } else {exit 1} }' || [[ "${BRANCH}" == "main" ]] || [[ "${BRANCH}" == "master" ]]) && [ "${ARCH}" == "ppc64le" ] && [ "${INSTALLER}" == "powervc" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network][Feature:EgressFirewall] egressFirewall should have no impact outside its namespace [Suite:openshift/conformance/parallel]"
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:Disconnected] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-imageregistry] Image registry [apigroup:route.openshift.io] should redirect on blob pull [apigroup:image.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity"
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should adopt matching orphans and release non-matching pods"
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should not deadlock when a pod's predecessor fails"
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should not delete PVC with OnScaledown policy if another controller owns the PVC"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs with a WhenDeleted policy"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs after adopting pod (WhenDeleted)"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs with a OnScaledown policy"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs after adopting pod (WhenScaled)"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should not delete PVCs when there is another controller"
+EOF
 # Excluding few loadbalancer tests with UDP from 4.13 and above Libvirt and PowerVS ppc64le jobs since power environment does not currently support loadbalancing UDP traffic
 # Skipping the DRA test case due to its current failure in libvirt CI. It will be re-enabled once the issue is resolved.
-elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 13))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
+elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 13)) { exit 0 } else {exit 1} }' || [[ "${BRANCH}" == "main" ]] || [[ "${BRANCH}" == "master" ]]) && [ "${ARCH}" == "ppc64le" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs"
 "[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"

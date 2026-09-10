@@ -4,6 +4,11 @@ set -e
 set -u
 set -o pipefail
 
+if [[ "${SKIP_QE_APP_REGISTRY:-false}" == "true" ]]; then
+  echo "====> SKIP_QE_APP_REGISTRY=true, skipping deploy qe catalogsource"
+  exit 0
+fi
+
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
         echo "setting the proxy"

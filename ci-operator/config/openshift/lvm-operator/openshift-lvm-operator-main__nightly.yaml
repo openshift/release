@@ -3,8 +3,8 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_5.0_base-rhel9:
-    name: "5.0"
+  ocp_5.1_base-rhel9:
+    name: "5.1"
     namespace: ocp
     tag: base-rhel9
   tls-scanner-tool:
@@ -12,40 +12,42 @@ base_images:
     namespace: tls-scanner
     tag: tls-scanner-tool
   upi-installer:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-5.0
+    tag: rhel-9-golang-1.26-openshift-5.1
 images:
   items:
   - context_dir: .
     dockerfile_path: test/integration/Dockerfile
     inputs:
-      ocp_5.0_base-rhel9:
+      ocp_5.1_base-rhel9:
         as:
         - registry.access.redhat.com/ubi9/ubi-minimal:latest
     to: lvm-operator-integration-test
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: "5.1"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: "5.1"
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: "5.1"
 resources:
   '*':
     limits:
@@ -55,12 +57,34 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-sno-qe-integration-tests
-  cron: 0 8 * * 5
+  cron: 0 8 * 7 5
   steps:
     cluster_profile: openshift-org-aws
     env:
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      SKIP_QE_APP_REGISTRY: "true"
+    test:
+    - as: lvms-sno-integration-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
+- as: e2e-aws-sno-4disks-qe-integration-tests
+  cron: 0 8 * 7 5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_DISKS_COUNT: "4"
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      SKIP_QE_APP_REGISTRY: "true"
     test:
     - as: lvms-sno-integration-test
       cli: latest
@@ -74,7 +98,7 @@ tests:
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
 - as: e2e-aws-sno-arm-qe-integration-tests
-  cron: 0 8 * * 5
+  cron: 0 8 * 7 5
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -85,6 +109,7 @@ tests:
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       OCP_ARCH: arm64
+      SKIP_QE_APP_REGISTRY: "true"
     test:
     - as: lvms-sno-integration-test
       cli: latest
@@ -98,7 +123,7 @@ tests:
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
 - as: e2e-aws-mno-qe-integration-tests
-  cron: 0 8 * * 5
+  cron: 0 8 * 7 5
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -106,6 +131,7 @@ tests:
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       SCAN_NAMESPACE: openshift-lvm-storage
+      SKIP_QE_APP_REGISTRY: "true"
     test:
     - ref: tls-scanner-run
     - as: lvms-mno-integration-test
@@ -119,8 +145,30 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+- as: e2e-aws-mno-4disks-qe-integration-tests
+  cron: 0 8 * 7 5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      EXTRA_DISKS_COUNT: "4"
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      SKIP_QE_APP_REGISTRY: "true"
+    test:
+    - as: lvms-mno-integration-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
 - as: e2e-aws-mno-arm-qe-integration-tests
-  cron: 0 8 * * 5
+  cron: 0 8 * 7 5
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -131,6 +179,7 @@ tests:
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       OCP_ARCH: arm64
+      SKIP_QE_APP_REGISTRY: "true"
     test:
     - as: lvms-mno-integration-test
       cli: latest
@@ -144,7 +193,7 @@ tests:
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
 - as: e2e-aws-disc-sno-qe-integration-tests
-  cron: 0 8 * * 5
+  cron: 0 8 * 7 5
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -166,7 +215,7 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-aws-disconnected-lvms-sno
 - as: e2e-aws-disc-mno-qe-integration-tests
-  cron: 0 8 * * 5
+  cron: 0 8 * 7 5
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -195,6 +244,7 @@ tests:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.22
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      SKIP_QE_APP_REGISTRY: "true"
     test:
     - as: lvms-mno-integration-test
       cli: latest
@@ -210,7 +260,7 @@ tests:
 - as: e2e-baremetalds-sno-dualstack-qe-integration-tests
   capabilities:
   - intranet
-  cron: 59 17 * * 5
+  cron: 59 17 * 7 5
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -218,6 +268,7 @@ tests:
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       RESERVE_BOOTSTRAP: "false"
+      SKIP_QE_APP_REGISTRY: "true"
       architecture: amd64
       masters: "1"
       workers: "0"
@@ -233,12 +284,13 @@ tests:
           memory: 200Mi
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-sno-lvms
 - as: e2e-baremetalds-mno-dualstack-qe-integration-tests
-  cron: 0 8 * * 5
+  cron: 0 8 * 7 5
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      SKIP_QE_APP_REGISTRY: "true"
     test:
     - as: lvms-mno-integration-test
       cli: latest

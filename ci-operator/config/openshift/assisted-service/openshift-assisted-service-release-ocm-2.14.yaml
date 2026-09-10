@@ -106,6 +106,8 @@ promotion:
   to:
   - name: ocm-2.14
     namespace: edge-infrastructure
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -207,8 +209,9 @@ tests:
   container:
     from: assisted-service-unit-test
   secret:
+    collection: edge-group
+    group: assisted-service-codecov-token
     mount_path: /tmp/secret
-    name: assisted-service-codecov-token
   skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test-postsubmit
   commands: |
@@ -220,8 +223,9 @@ tests:
     from: assisted-service-unit-test
   postsubmit: true
   secret:
+    collection: edge-group
+    group: assisted-service-codecov-token
     mount_path: /tmp/secret
-    name: assisted-service-codecov-token
 - as: subsystem-aws
   cluster_claim:
     architecture: amd64
@@ -367,6 +371,7 @@ tests:
 - as: e2e-ai-operator-ztp
   capabilities:
   - intranet
+  optional: true
   run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -654,6 +659,7 @@ tests:
 - as: e2e-ai-operator-disconnected-capi
   capabilities:
   - intranet
+  optional: true
   run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted

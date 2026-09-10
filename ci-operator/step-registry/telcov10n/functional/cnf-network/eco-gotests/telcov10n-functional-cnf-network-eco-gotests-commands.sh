@@ -33,7 +33,7 @@ fi
 export CLUSTER_NAME=${CLUSTER_NAME}
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
-echo Load INTERFACE_LIST,SWITCH_INTERFACES,VLAN env variablies
+echo Load INTERFACE_LIST,SWITCH_INTERFACES,VLAN,NATIVE_VLAN env variables
 if [[ -f "${SHARED_DIR}/set_ocp_net_vars.sh" ]]; then
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/set_ocp_net_vars.sh"
@@ -47,6 +47,11 @@ fi
 if [[ -n "${VLAN}" ]]; then
   echo "VLAN env var is not empty append parameters to ECO_GOTESTS_ENV_VARS"
   ECO_GOTESTS_ENV_VARS="-e ECO_CNF_CORE_NET_VLAN=${VLAN%%,*} ${ECO_GOTESTS_ENV_VARS}"
+fi
+
+if [[ -n "${NATIVE_VLAN}" ]]; then
+  echo "NATIVE_VLAN env var is not empty append parameters to ECO_GOTESTS_ENV_VARS"
+  ECO_GOTESTS_ENV_VARS="-e ECO_CNF_CORE_NET_NATIVE_VLAN=${NATIVE_VLAN} ${ECO_GOTESTS_ENV_VARS}"
 fi
 
 if [[ -n "${SWITCH_INTERFACES}" ]]; then

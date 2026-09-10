@@ -1,15 +1,15 @@
 base_images:
   base:
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
     tag: base
   cli:
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
     tag: cli
   hypershift-operator-4.11:
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
     tag: hypershift-operator
 binary_build_commands: make manager
 build_root:
@@ -104,20 +104,21 @@ promotion:
   - excluded_images:
     - capk-oc-bin-image
     - hypershift-cli-e2e
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -130,7 +131,8 @@ tests:
   commands: GOFLAGS="-mod=readonly" make test
   container:
     from: src
-- as: cluster-api-provider-kubevirt-e2e
+- always_run: false
+  as: cluster-api-provider-kubevirt-e2e
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -283,8 +285,8 @@ tests:
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
                   --e2e.platform=KubeVirt
       credentials:
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
+      - bundle: ci-pull-credentials
+        mount_path: /etc/ci-pull-credentials
         namespace: test-credentials
       dependencies:
       - env: OCP_IMAGE_LATEST

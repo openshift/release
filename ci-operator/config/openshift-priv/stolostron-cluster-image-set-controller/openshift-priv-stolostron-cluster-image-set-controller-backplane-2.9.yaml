@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 canonical_go_repository: github.com/stolostron/cluster-image-set-controller
 images:
   items:
@@ -14,6 +14,7 @@ promotion:
     name: "2.9"
     namespace: stolostron
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 resources:
   '*':
@@ -33,8 +34,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: pr-image-mirror
   steps:
     dependencies:

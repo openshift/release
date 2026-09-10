@@ -68,10 +68,23 @@ if [ "$found" = false ]; then
 fi
 
 export KUBE_VIRT_NAMESPACE=$TARGET_NAMESPACE
-./kubevirt-outage/prow_run.sh || rc=$?
-rc=$?
-if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
-    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
-fi
-echo "Finished running kubevirt outage chaos disruption"
-echo "Return code: $rc"
+
+collect_artifacts() {
+  local rc=$?
+  set +o errexit
+  # Finished running kubevirt outage chaos disruption
+  if [[ "${TELEMETRY_EVENTS_BACKUP:-}" == "True" && -f /tmp/events.json ]]; then
+    cp /tmp/events.json "${ARTIFACT_DIR}/events.json"
+  fi
+  if [[ -f /tmp/report.out.pdf ]]; then
+    cp /tmp/report.out.pdf "${ARTIFACT_DIR}/kraken.report.pdf"
+  fi
+  exit "$rc"
+}
+
+trap collect_artifacts EXIT
+
+set -euxo pipefail; shopt -s inherit_errexit
+
+./kubevirt-outage/prow_run.sh
+

@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: base
   vsphere-ci-python:
     name: vsphere-python
@@ -14,20 +14,21 @@ promotion:
   to:
   - additional_images:
       cluster-api-actuator-pkg: src
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -42,8 +43,9 @@ tests:
   commands: make lint
   container:
     from: src
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -68,8 +70,9 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
-- as: e2e-azure-operator
-  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-azure-operator
+  pipeline_skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     test:

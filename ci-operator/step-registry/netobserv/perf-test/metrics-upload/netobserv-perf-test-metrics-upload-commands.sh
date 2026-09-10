@@ -73,6 +73,7 @@ function install_requirements(){
 
 function upload_metrics(){
     install_requirements scripts/requirements.txt
+    export THANOS_VERIFY_CERTS="false"
     python scripts/nope.py --starttime "$START_TIME" --endtime "$END_TIME" --uuid "$UUID" --noo-bundle-version "$NOO_BUNDLE_VERSION"
     upload_metrics_rc=$?
     cp -r /tmp/data "$ARTIFACT_DIR"

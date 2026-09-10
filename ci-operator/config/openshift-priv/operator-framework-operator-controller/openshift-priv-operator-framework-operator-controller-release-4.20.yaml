@@ -18,20 +18,21 @@ promotion:
   to:
   - excluded_images:
     - e2e-test-registry
-    name: 4.20-priv
-    namespace: ocp-private
+    name: "4.20"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 4.20-priv
-      namespace: ocp-private
+      name: "4.20"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
-      namespace: ocp-private
+      name: "4.20"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -75,8 +76,9 @@ tests:
     fi
   container:
     from: src
-- as: openshift-e2e-aws
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+- always_run: false
+  as: openshift-e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -124,8 +126,8 @@ tests:
         cd openshift/default-catalog-consistency
         REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
       credentials:
-      - mount_path: /var/run/secrets/ci-pull-credentials
-        name: ci-pull-credentials
+      - bundle: ci-pull-credentials
+        mount_path: /var/run/secrets/ci-pull-credentials
         namespace: ci
       from: src
       resources:
@@ -154,7 +156,8 @@ tests:
       resources:
         requests:
           cpu: 100m
-- as: e2e-aws-techpreview-olmv1-ext
+- always_run: false
+  as: e2e-aws-techpreview-olmv1-ext
   steps:
     cluster_profile: openshift-org-aws
     env:

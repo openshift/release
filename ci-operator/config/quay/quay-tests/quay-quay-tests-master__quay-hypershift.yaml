@@ -21,6 +21,7 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.21-openshift-4.18
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 releases:
@@ -83,31 +84,6 @@ tests:
       HYPERSHIFT_INSTANCE_TYPE: m5.2xlarge
       QUAY_OPERATOR_CHANNEL: stable-3.14
       QUAY_VERSION: "3.14"
-    test:
-    - ref: quay-tests-deploy-quay-aws-s3
-    - ref: quay-tests-test-quay-e2e
-    - ref: quay-tests-cso-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: quay-e2e-tests-quay313-hypershift-ocp419
-  cron: 0 12 * * 3
-  reporter_config:
-    channel: '#quay-qe'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      CSO_CHANNEL: stable-3.13
-      HYPERSHIFT_INSTANCE_TYPE: m5.2xlarge
-      QUAY_OPERATOR_CHANNEL: stable-3.13
-      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-test-quay-e2e

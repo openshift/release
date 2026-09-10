@@ -13,7 +13,7 @@ then
   exit 0
 fi
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 STACK_NAME="$(cat "${SHARED_DIR}/blackholenetworkstackname")"
 
 # cleaning up after ourselves

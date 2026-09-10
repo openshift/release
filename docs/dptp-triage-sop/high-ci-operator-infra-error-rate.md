@@ -111,6 +111,11 @@ On a workstation with pull access (or from a debug pod—follow org policy), ima
 
 ```bash
 # Example only — replace with image reference from the log line
+# Prefer quay-proxy QCI floats when the log shows registry.ci ns/name:tag:
+#   registry.ci.openshift.org/origin/scos-4.16:foo
+#   → quay-proxy.ci.openshift.org/openshift/ci:origin_scos-4.16_foo
+oc image info quay-proxy.ci.openshift.org/openshift/ci:origin_scos-4.16_cluster-capi-operator
+# ART builders / ocp release digests may still use registry.ci.openshift.org
 oc image info registry.ci.openshift.org/ocp/release@sha256:...
 ```
 

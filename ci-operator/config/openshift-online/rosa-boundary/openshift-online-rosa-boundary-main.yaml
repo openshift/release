@@ -1,4 +1,8 @@
 base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   ubi-python:
     name: ubi-python-311
     namespace: ocp
@@ -23,7 +27,32 @@ images:
         - destination_dir: .
           source_path: /go/src/github.com/openshift-online/rosa-boundary
     to: lambda-test-runner
+  - dockerfile_literal: |
+      FROM nested-podman
+      USER root
+      # Install Python 3.11 and make it default via symlinks
+      # (ci-run.sh on main branch still uses hardcoded python3 commands)
+      # TODO: Remove symlinks after rosa-boundary PR merges with python3.11 detection
+      RUN dnf install -y --nodocs python3.11 python3.11-pip && \
+          dnf clean all && \
+          ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+          ln -sf /usr/bin/pip3.11 /usr/bin/pip3
+      # Create /home/user with correct permissions BEFORE copying files
+      # (nested-podman runs as UID 1000, needs writable home directory)
+      RUN mkdir -p /home/user/.config && chown -R 1000:1000 /home/user
+      COPY . /workspace/
+      # Install test dependencies using uv (matches lambda-test-runner pattern)
+      WORKDIR /workspace/rosa-boundary/tests/localstack
+      RUN pip3 install uv && uv pip install --python python3.11 --system .
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-online/rosa-boundary
+    to: localstack-test-runner
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -34,6 +63,16 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: coverage
+  commands: |
+    unset GOFLAGS
+    make codecov
+  container:
+    from: src
+  secrets:
+  - collection: rosa-boundary
+    group: codecov-secret
+    mount_path: /var/run/codecov-secret
 - as: lambda-unit-tests
   commands: |
     export UV_CACHE_DIR=/tmp/uv-cache
@@ -42,6 +81,32 @@ tests:
     uv run pytest test_handler.py -v
   container:
     from: lambda-test-runner
+- as: localstack-integration-tests
+  capabilities:
+  - nested-podman
+  commands: |
+    set -euo pipefail
+    export LOCALSTACK_AUTH_TOKEN=$(cat /etc/localstack-secret/localstack-token)
+    exec /workspace/rosa-boundary/tests/localstack/ci-run.sh
+  container:
+    from: localstack-test-runner
+  nested_podman: true
+  run_if_changed: ^(lambda/|deploy/regional/|tests/localstack/)
+  secret:
+    collection: rosa-boundary
+    group: ci
+    mount_path: /etc/localstack-secret
+- as: publish-coverage
+  commands: |
+    unset GOFLAGS
+    make codecov
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - collection: rosa-boundary
+    group: codecov-secret
+    mount_path: /var/run/codecov-secret
 zz_generated_metadata:
   branch: main
   org: openshift-online

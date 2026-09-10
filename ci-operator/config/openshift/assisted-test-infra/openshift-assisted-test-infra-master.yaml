@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
@@ -44,8 +44,10 @@ images:
     to: assisted-test-infra-internal
 promotion:
   to:
-  - name: backplane-5.0
+  - name: backplane-5.1
     namespace: edge-infrastructure
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -74,20 +76,22 @@ tests:
     make ci_ansible_lint
   container:
     from: assisted-test-infra-internal
-- as: e2e-metal-assisted-5-0
+- always_run: false
+  as: e2e-metal-assisted-5-0
   capabilities:
   - intranet
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ha-kube-api-ipv4-5-0
+- always_run: false
+  as: e2e-metal-assisted-ha-kube-api-ipv4-5-0
   capabilities:
   - intranet
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -99,11 +103,6 @@ tests:
         MAKEFILE_TARGET="test_kube_api_parallel"
         OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-sno-live-iso
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: equinix-edge-enablement
-    workflow: baremetalds-sno
 - always_run: false
   as: e2e-metal-assisted-onprem-5-0
   capabilities:
@@ -127,7 +126,7 @@ tests:
         DEPLOY_TARGET=onprem
         OPENSHIFT_VERSION=5.0
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-5-0-periodic
   capabilities:
@@ -139,7 +138,7 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=5.0
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-tpmv2-5-0
@@ -177,7 +176,7 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.16
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-16
@@ -211,7 +210,7 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.17
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-18
@@ -234,7 +233,7 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.18
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-19
@@ -257,10 +256,10 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.19
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-lvm-5-0
+  as: e2e-metal-assisted-lvm-4-22
   capabilities:
   - intranet
   optional: true
@@ -274,9 +273,9 @@ tests:
         MASTER_MEMORY=25600
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
-        OPENSHIFT_VERSION=5.0
+        OPENSHIFT_VERSION=4.22
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-lvm-5-0-periodic
+- as: e2e-metal-assisted-lvm-4-22-periodic
   capabilities:
   - intranet
   cron: 30 03 * * 0,2,4
@@ -290,9 +289,9 @@ tests:
         MASTER_MEMORY=25600
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
-        OPENSHIFT_VERSION=5.0
+        OPENSHIFT_VERSION=4.22
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-mce-5-0
@@ -369,10 +368,11 @@ tests:
       CLUSTERTYPE: assisted_large_el9
       TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-day2-5-0
+- always_run: false
+  as: e2e-metal-assisted-day2-5-0
   capabilities:
   - intranet
-  run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
+  pipeline_run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -380,10 +380,11 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-day2-sno-5-0
+- always_run: false
+  as: e2e-metal-assisted-day2-sno-5-0
   capabilities:
   - intranet
-  run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
+  pipeline_run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -406,7 +407,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=5.0
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-day2-5-0-periodic
   capabilities:
@@ -535,7 +536,7 @@ tests:
         IPv4=yes
         OPENSHIFT_VERSION=5.0
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-none-5-0
@@ -548,6 +549,7 @@ tests:
       ASSISTED_CONFIG: |
         PLATFORM=none
         OPENSHIFT_VERSION=5.0
+      TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-none-5-0-periodic
   capabilities:
@@ -610,7 +612,7 @@ tests:
         NUM_MASTERS=1
         OPENSHIFT_VERSION=5.0
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-ha-kube-api-ipv6-5-0
@@ -696,7 +698,7 @@ tests:
         STATIC_IPS=true
         OPENSHIFT_VERSION=5.0
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-bond-5-0-periodic
   capabilities:
@@ -709,15 +711,8 @@ tests:
         IS_BONDED=true
         OPENSHIFT_VERSION=5.0
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-sno-with-worker-live-iso
-  run_if_changed: .*bootstrap_in_place.*
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
 - always_run: false
   as: e2e-vsphere-assisted-5-0
   optional: true
@@ -815,7 +810,7 @@ tests:
         IPXE_BOOT=true
         OPENSHIFT_VERSION=5.0
       CLUSTERTYPE: assisted_medium_el9
-      TEST_TYPE: none
+      TEST_TYPE: minimal
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-vsphere-assisted-umn-5-0
@@ -1006,6 +1001,7 @@ tests:
   as: e2e-metal-assisted-virtualization-4-22
   capabilities:
   - intranet
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1024,6 +1020,7 @@ tests:
   as: e2e-metal-assisted-openshift-ai-4-21
   capabilities:
   - intranet
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1063,6 +1060,7 @@ tests:
   capabilities:
   - intranet
   cron: 30 12 * * 0,2,4
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1131,6 +1129,7 @@ tests:
   as: e2e-metal-assisted-vlan-5-0
   capabilities:
   - intranet
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:

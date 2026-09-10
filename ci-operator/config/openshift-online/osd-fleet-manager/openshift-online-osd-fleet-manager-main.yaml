@@ -29,6 +29,7 @@ images:
           source_path: /go/src/github.com/openshift-online/osd-fleet-manager
     to: golang-plus
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -96,6 +97,47 @@ tests:
   container:
     from: golang-plus
   nested_podman: true
+- as: coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - collection: osd-fleet-manager
+    group: codecov
+    mount_path: /var/run/codecov-secret
+- as: publish-coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  postsubmit: true
+  secrets:
+  - collection: osd-fleet-manager
+    group: codecov
+    mount_path: /var/run/codecov-secret
 zz_generated_metadata:
   branch: main
   org: openshift-online

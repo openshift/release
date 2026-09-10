@@ -204,9 +204,39 @@
     - build09
     - build10
     - build11
+    - build12
+    - build13
     - core-ci
+    - hosted-mgmt
     service_account:
     - component-monitor
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ship-status mcp-server --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1
+    name: sa.mcp-server.$(cluster).token.txt
+  item_name: ship-status-dash-mcp-server
+  params:
+    cluster:
+    - app.ci
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1
+    name: sa.$(service_account).$(cluster).token.txt
+  - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster) $(service_account)
+      ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - hosted-mgmt
+    - hosted-mgmt2
+    service_account:
+    - cluster-display
+    - github-ldap-user-group-creator
+    - hypershift-workload
+    - prow-controller-manager
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
@@ -220,12 +250,8 @@
     cluster:
     - hosted-mgmt
     service_account:
-    - cluster-display
     - clusterpool-manager
-    - github-ldap-user-group-creator
     - hive
-    - hypershift-workload
-    - prow-controller-manager
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token --namespace ci ci-monitoring --duration=2419200s --bound-object-kind=Secret
@@ -236,6 +262,7 @@
     cluster:
     - app.ci
     - hosted-mgmt
+    - hosted-mgmt2
     service_account:
     - ci-monitoring
 - fields:

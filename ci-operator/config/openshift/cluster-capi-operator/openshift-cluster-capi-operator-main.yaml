@@ -20,17 +20,19 @@ images:
     to: cluster-capi-operator
 promotion:
   to:
-  - name: "5.0"
+  - name: "5.1"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -237,12 +239,13 @@ tests:
           cpu: 100m
     workflow: openshift-e2e-azure
 - always_run: false
-  as: e2e-vsphere-capi-techpreview
+  as: e2e-vsphere-capi-customnoupgrade-migration
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
+      FEATURE_GATES: '["MachineAPIMigration=true","MachineAPIMigrationVSphere=true","ClusterAPIMachineManagement=true","ClusterAPIMachineManagementVSphere=true"]'
+      FEATURE_SET: CustomNoUpgrade
     test:
     - as: test
       commands: make e2e
@@ -290,8 +293,6 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: verify-deps
   steps:
-    env:
-      CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
 zz_generated_metadata:

@@ -22,26 +22,68 @@ set -euxo pipefail; shopt -s inherit_errexit
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 typeset -r subctlBin="/tmp/bin/subctl"
+[[ "${ACM_SPOKE_CLUSTER_COUNT}" =~ ^[1-9][0-9]*$ ]] \
+    || { : "ACM_SPOKE_CLUSTER_COUNT must be a positive decimal integer (got: '${ACM_SPOKE_CLUSTER_COUNT}')"; false; }
 typeset -i spokeCount="${ACM_SPOKE_CLUSTER_COUNT}"
 
 typeset -a spokeKubeconfigsArr=()
 typeset -a spokeNamesArr=()
 
 # ── InstallSubctl — install subctl to /tmp/bin/ ───────────────────────────────
+# Downloads directly from GitHub releases and extracts with tar -xJf.
+# Requires xz, which is pre-installed in the cli-with-git step image.
+# NOTE: InstallSubctl is duplicated in cloud-prepare and broker-join command scripts.
+# Each step runs in its own container so the binary cannot be shared via /tmp.
+# When changing this function, sync the identical copy in those two scripts.
 InstallSubctl() {
     mkdir -p /tmp/bin
-    if [[ -x "${subctlBin}" ]]; then
-        return 0
+    [[ -x "${subctlBin}" ]] && return 0
+
+    typeset version="${SUBMARINER_SUBCTL_VERSION}"
+
+    # Trusted SHA-256 digests for immutable versioned subctl linux/amd64 archives.
+    # Only vX.Y.Z releases are immutable; release-X.Y rolling branch tags are
+    # rebuilt on every branch push — SHA pinning is not meaningful for those.
+    # To add a versioned release: compute sha256sum of the .tar.xz and add an entry.
+    typeset -A _subctlDigests=(
+        # [v0.24.0]="<sha256>"
+    )
+
+    # Versioned releases (vX.Y.Z) must have a trusted digest; rolling branch
+    # tags (release-X.Y) skip digest verification by design.
+    typeset expectedSha=""
+    if [[ "${version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        expectedSha="${_subctlDigests["${version}"]:-}"
+        if [[ -z "${expectedSha}" ]]; then
+            : "SUBMARINER_SUBCTL_VERSION=${version} is a versioned release but has no trusted SHA-256 in _subctlDigests; add its SHA-256 to proceed"
+            false
+        fi
+    elif [[ "${version}" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
+        : "INFO: SUBMARINER_SUBCTL_VERSION=${version} is a rolling branch tag — SHA-256 verification skipped"
+    else
+        printf 'ERROR: SUBMARINER_SUBCTL_VERSION=%s is not a recognised format (use vX.Y.Z or release-X.Y)\n' "${version}" >&2
+        false
     fi
-    curl -Ls https://get.submariner.io | bash
-    cp "${HOME}/.local/bin/subctl" "${subctlBin}"
+
+    typeset archiveName="subctl-${version}-linux-amd64.tar.xz"
+    typeset tarUrl="https://github.com/submariner-io/subctl/releases/download/subctl-${version}/${archiveName}"
+    typeset tmpTar; tmpTar="$(mktemp /tmp/subctl-XXXXXX.tar.xz)"
+    typeset tmpDir; tmpDir="$(mktemp -d /tmp/subctl-dir-XXXXXX)"
+
+    curl -fsSL "${tarUrl}" -o "${tmpTar}"
+    [[ -n "${expectedSha}" ]] && printf '%s  %s\n' "${expectedSha}" "${tmpTar}" | sha256sum -c -
+    tar -xJf "${tmpTar}" -C "${tmpDir}"
+    typeset extracted; extracted="$(find "${tmpDir}" -maxdepth 2 -name 'subctl' -type f | head -1)"
+    [[ -n "${extracted}" ]] || { echo "ERROR: subctl binary not found in extracted archive ${tmpTar}" >&2; false; }
+    cp "${extracted}" "${subctlBin}"
     chmod +x "${subctlBin}"
-    true
+    rm -rf "${tmpDir}" "${tmpTar}"
+    [[ -x "${subctlBin}" ]]
 }
 
 # ── LoadSpokeConfig — populate spoke arrays from SHARED_DIR ───────────────────
@@ -293,21 +335,33 @@ ProbeCclmSyncPort() {
     typeset -r probeNs="submariner-cclm-probe"
     typeset probePod="cclm-sync-probe-${probeLabel}"
 
+    # Explicit || return 1: bash disables errexit inside functions called via ||.
     KUBECONFIG="${srcKubeconfig}" oc create namespace "${probeNs}" \
-        --dry-run=client -o yaml --save-config | KUBECONFIG="${srcKubeconfig}" oc apply -f - 1>/dev/null
+        --dry-run=client -o yaml --save-config | KUBECONFIG="${srcKubeconfig}" oc apply -f - 1>/dev/null \
+        || return 1
 
     # bash ships in ubi9-minimal; no extra package install needed.
+    # Capture exit code explicitly; cleanup must run even on failure.
+    typeset -i probeRc=0
     KUBECONFIG="${srcKubeconfig}" oc run "${probePod}" \
         -n "${probeNs}" \
         --rm -i --restart=Never \
         --image=registry.redhat.io/ubi9/ubi-minimal:latest \
         --command -- \
         timeout "${SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT}" bash -c "echo >/dev/tcp/${destIp}/${SUBMARINER_CCLM_SYNC_PORT}" \
-        1>/dev/null
+        1>/dev/null || probeRc=$?
 
+    # Wait for the namespace to be fully deleted (up to 30 s) so a later call with
+    # the same probe suffix does not target a Terminating namespace and fail oc run.
+    # Capture cleanup exit status and propagate it only if the probe itself succeeded,
+    # preserving a non-zero probeRc when both the probe and cleanup fail.
+    typeset -i cleanupRc=0
     KUBECONFIG="${srcKubeconfig}" oc delete namespace "${probeNs}" \
-        --ignore-not-found --wait=false 1>/dev/null &
-    true
+        --ignore-not-found --wait --timeout=30s 1>/dev/null || cleanupRc=$?
+    if (( probeRc != 0 )); then
+        return "${probeRc}"
+    fi
+    return "${cleanupRc}"
 }
 
 # ── VerifyCclmSyncPath — bidirectional sync-controller TCP reachability ───────
@@ -324,22 +378,28 @@ VerifyCclmSyncPath() {
     srcSyncIp="$(GetSyncControllerPodIp "${kcSource}")"
     tgtSyncIp="$(GetSyncControllerPodIp "${kcTarget}")"
 
-    [[ -n "${srcSyncIp}" ]] || {
-        : "No Running virt-synchronization-controller pod IP on '${srcName}'"
-        false
-    }
-    [[ -n "${tgtSyncIp}" ]] || {
-        : "No Running virt-synchronization-controller pod IP on '${tgtName}'"
-        false
-    }
+    # Use return 1 (not false) so the function exits even when errexit is disabled
+    # (bash disables errexit inside functions called through ||).
+    if [[ -z "${srcSyncIp}" ]]; then
+        : "ERROR: No Running virt-synchronization-controller pod IP on '${srcName}'"
+        return 1
+    fi
+    if [[ -z "${tgtSyncIp}" ]]; then
+        : "ERROR: No Running virt-synchronization-controller pod IP on '${tgtName}'"
+        return 1
+    fi
 
+    typeset -i cclmRc=0
     : "CCLM sync probe ${srcName} -> ${tgtName} (${tgtSyncIp}:${SUBMARINER_CCLM_SYNC_PORT})"
-    ProbeCclmSyncPort "${kcSource}" "${tgtSyncIp}" "${srcName}-to-${tgtName}"
+    ProbeCclmSyncPort "${kcSource}" "${tgtSyncIp}" "${srcName}-to-${tgtName}" || cclmRc=$?
 
     : "CCLM sync probe ${tgtName} -> ${srcName} (${srcSyncIp}:${SUBMARINER_CCLM_SYNC_PORT})"
-    ProbeCclmSyncPort "${kcTarget}" "${srcSyncIp}" "${tgtName}-to-${srcName}"
+    ProbeCclmSyncPort "${kcTarget}" "${srcSyncIp}" "${tgtName}-to-${srcName}" || {
+        typeset -i _probeRc=$?
+        (( cclmRc != 0 )) || cclmRc=${_probeRc}
+    }
 
-    true
+    return "${cclmRc}"
 }
 
 # ── VerifyConnectivity — run subctl verify between two spokes ─────────────────
@@ -352,10 +412,13 @@ VerifyConnectivity() {
     typeset ctx1="${name1}-admin"
     typeset ctx2="${name2}-admin"
 
+    # Explicit failure checks on every setup step: bash disables errexit inside
+    # functions called via ||, so failures in mktemp, oc config view, or jq
+    # pipelines would silently continue and corrupt subctl verify input.
     typeset kc1Renamed kc2Renamed mergedKc
-    kc1Renamed="$(mktemp /tmp/kc1-XXXXXX.json)"
-    kc2Renamed="$(mktemp /tmp/kc2-XXXXXX.json)"
-    mergedKc="$(mktemp /tmp/kc-merged-XXXXXX.json)"
+    kc1Renamed="$(mktemp /tmp/kc1-XXXXXX.json)"  || return 1
+    kc2Renamed="$(mktemp /tmp/kc2-XXXXXX.json)"  || { rm -f "${kc1Renamed}"; return 1; }
+    mergedKc="$(mktemp /tmp/kc-merged-XXXXXX.json)" || { rm -f "${kc1Renamed}" "${kc2Renamed}"; return 1; }
 
     KUBECONFIG="${kc1}" oc config view -o json --raw | \
         jq \
@@ -369,7 +432,8 @@ VerifyConnectivity() {
             .clusters[0].name                  = $cls |
             .users[0].name                     = $usr |
             ."current-context"                 = $ctx
-        ' > "${kc1Renamed}"
+        ' > "${kc1Renamed}" \
+        || { rm -f "${kc1Renamed}" "${kc2Renamed}" "${mergedKc}"; return 1; }
 
     KUBECONFIG="${kc2}" oc config view -o json --raw | \
         jq \
@@ -383,16 +447,23 @@ VerifyConnectivity() {
             .clusters[0].name                  = $cls |
             .users[0].name                     = $usr |
             ."current-context"                 = $ctx
-        ' > "${kc2Renamed}"
+        ' > "${kc2Renamed}" \
+        || { rm -f "${kc1Renamed}" "${kc2Renamed}" "${mergedKc}"; return 1; }
 
-    KUBECONFIG="${kc1Renamed}:${kc2Renamed}" oc config view --flatten -o json > "${mergedKc}"
+    KUBECONFIG="${kc1Renamed}:${kc2Renamed}" oc config view --flatten -o json > "${mergedKc}" \
+        || { rm -f "${kc1Renamed}" "${kc2Renamed}" "${mergedKc}"; return 1; }
 
-    KUBECONFIG="${mergedKc}" "${subctlBin}" verify \
+    # Bound subctl verify to 35m so it exits before the 45m step timeout.
+    # Without this, each failing TCP test takes ~7m and the process is killed
+    # externally before the failure handler runs.
+    # Use || rc=$? instead of relying on set -e: bash does not reliably
+    # trigger set -e on function return codes inside for-loop bodies.
+    typeset -i rc=0
+    KUBECONFIG="${mergedKc}" timeout --kill-after=30s 35m "${subctlBin}" verify \
         --context   "${ctx1}" \
         --tocontext "${ctx2}" \
         --only connectivity,service-discovery \
-        --verbose
-    typeset -i rc=$?
+        --verbose || rc=$?
 
     rm -f "${kc1Renamed}" "${kc2Renamed}" "${mergedKc}"
     return "${rc}"
@@ -436,12 +507,12 @@ typeset -i submarinerStepRc=0
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${spokeNamesArr[j]}" || exit $?
             VerifyCclmSyncPath \
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${spokeNamesArr[j]}" || exit $?
         done
     done
 

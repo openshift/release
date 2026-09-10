@@ -1,0 +1,56 @@
+workflow:
+  as: rosa-e2e-hcp-private
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      STS: "true"
+      REPLICAS: "3"
+      # Private cluster specifics: private API, private default ingress, BYO VPC.
+      ENABLE_BYOVPC: "true"
+      PRIVATE: "true"
+      PRIVATE_LINK: "true"
+    pre:
+      - ref: aws-provision-vpc-shared
+      - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+      - chain: rosa-sts-oidc-config-create
+      - ref: rosa-cluster-provision
+      - ref: rosa-cluster-wait-ready-cluster
+      - ref: rosa-cluster-notify-error
+      # The cluster API is only reachable via backplane from here on. This step
+      # writes ${SHARED_DIR}/kubeconfig and ${SHARED_DIR}/proxy-conf.sh, which the
+      # subsequent oc-based steps consume.
+      - ref: rosa-cluster-credentials-backplane
+      - ref: rosa-cluster-wait-ready-operators
+      - ref: aws-provision-tags-for-byo-vpc
+      - ref: rosa-cluster-wait-ready-hosted-cp
+      - ref: rosa-cluster-wait-ready-nodes
+      - ref: rosa-cluster-credentials-hypershift-mgmt
+    test:
+      - ref: rosa-e2e-test
+    post:
+      - ref: rosa-gap-analysis-api-resources-and-crd
+        best_effort: true
+      - ref: rosa-gap-analysis-critical-alerts
+        best_effort: true
+      - ref: rosa-gap-analysis-cluster-install-delete-metrics
+        best_effort: true
+      - chain: rosa-cluster-deprovision
+        best_effort: true
+      - chain: rosa-sts-oidc-config-delete
+        best_effort: true
+      - ref: rosa-e2e-cleanup-vpc
+        best_effort: true
+      - ref: aws-deprovision-stacks
+        best_effort: true
+      - chain: rosa-gather-hcp-diagnostics
+        best_effort: true
+  documentation: |-
+    This workflow provisions a ROSA HCP private cluster (private API, private
+    default ingress, BYO VPC) whose API server is not reachable directly from the
+    build farm. Instead of the htpasswd IDP login used by the public rosa-e2e-hcp
+    workflow, it obtains a backplane (backplane-cluster-admin) kubeconfig via the
+    rosa-cluster-credentials-backplane step, which runs after the cluster is ready
+    in OCM and before any step that talks to the cluster API. It then runs the
+    rosa-e2e managed service validation suite through that kubeconfig, writes
+    rosa-gap-analysis snapshots while the cluster is up, and tears everything down.

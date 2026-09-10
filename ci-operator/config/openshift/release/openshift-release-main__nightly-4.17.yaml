@@ -79,6 +79,8 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -181,9 +183,7 @@ tests:
   cron: 53 22 23 2 *
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - as: e2e-metal-ipi-ovn-ipv4
   capabilities:
   - intranet
@@ -493,6 +493,9 @@ tests:
       :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      MAX_VCENTERS: "1"
+      POOL_COUNT: "3"
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-upi-zones
   cron: 35 20 26 10 *
@@ -505,6 +508,9 @@ tests:
       :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      MAX_VCENTERS: "1"
+      POOL_COUNT: "3"
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-ovn-multi-vcenter
   cron: 10 21 9 2 *
@@ -850,6 +856,8 @@ tests:
   cron: 59 6 3 3 *
   steps:
     cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     observers:
       enable:
       - observers-resource-watch

@@ -1,18 +1,22 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   operator-sdk:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: windows-machine-config-operator-test
   tls-scanner-tool:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: tls-scanner-tool
 binary_build_commands: make build
@@ -23,13 +27,14 @@ images:
   items:
   - dockerfile_path: build/Dockerfile.ci
     to: windows-machine-config-operator-test
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 operator:
   bundles:
   - as: wmco-bundle
     context_dir: .
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
+    skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   substitutions:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
@@ -37,17 +42,19 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -78,16 +85,16 @@ tests:
   commands: make unit
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 - as: security
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     env:
       PROJECT_NAME: windows-machine-config-operator
     workflow: openshift-ci-security
 - always_run: false
   as: aws-e2e-operator
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -95,6 +102,41 @@ tests:
       CONTROL_PLANE_REPLICAS: "1"
     test:
     - ref: windows-e2e-operator-test
+    workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: aws-e2e-ote
+  optional: true
+  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/proxy\.go$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
   as: aws-e2e-operator-windows-server-2025
@@ -142,6 +184,7 @@ tests:
     - ref: windows-conf-operator-olmv1
 - always_run: false
   as: vsphere-disconnected-e2e-operator
+  optional: true
   skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: vsphere-dis-2
@@ -157,7 +200,7 @@ tests:
     workflow: windows-e2e-operator-test-vsphere-disconnected
 - always_run: false
   as: azure-e2e-operator
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -169,7 +212,7 @@ tests:
     workflow: ipi-azure-ovn-hybrid
 - always_run: false
   as: gcp-e2e-operator
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -257,7 +300,7 @@ tests:
     workflow: openshift-e2e-vsphere-ccm-ovn-hybrid-install
 - always_run: false
   as: azure-e2e-upgrade
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -357,6 +400,37 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
+  as: vsphere-proxy-e2e-ote
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/winc\.go$
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/proxy
+    test:
+    - as: wmco-setup
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
+- always_run: false
   as: wicd-unit-vsphere
   skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
@@ -377,8 +451,8 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: community-5.0
-      SOURCE_BRANCH: release-5.0
+      DESTINATION_BRANCH: community-5.1
+      SOURCE_BRANCH: release-5.1
     workflow: windows-ci-fastforward
 - always_run: false
   as: nutanix-e2e-operator

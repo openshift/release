@@ -9,6 +9,8 @@ build_root:
     namespace: ci
     tag: "2.4"
   use_build_cache: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -54,8 +56,9 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 - as: sync-upstream-envoy-2.4
   commands: |
     ./tools/automator-main.sh \
@@ -83,8 +86,9 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 - as: sync-upstream-istio-2.4
   commands: |
     ./tools/automator-main.sh \
@@ -113,8 +117,9 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 - as: update-istio-builder-image
   commands: |
     export NEW_IMAGE_MASTER=$(curl -sL https://raw.githubusercontent.com/istio/common-files/master/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
@@ -122,6 +127,8 @@ tests:
     export NEW_IMAGE_1_26=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.26/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
     export NEW_IMAGE_1_27=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.27/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
     export NEW_IMAGE_1_28=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.28/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
+    export NEW_IMAGE_1_30=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.30/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
+    export NEW_IMAGE_1_31=$(curl -sL https://raw.githubusercontent.com/istio/common-files/release-1.31/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
     ./tools/automator-main.sh \
     --org=openshift \
     --repo=release \
@@ -129,14 +136,15 @@ tests:
     --token-path=/creds-github/token \
     '--title=Update maistra/istio builder image' \
     --modifier=update_istio_builder_image_master \
-    '--cmd=sed -i -e "s|\(registry.istio.io/testing/build-tools\):master.*|\1:$NEW_IMAGE_MASTER|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.24.*|\1:$NEW_IMAGE_1_24|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.26.*|\1:$NEW_IMAGE_1_26|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.27.*|\1:$NEW_IMAGE_1_27|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.28.*|\1:$NEW_IMAGE_1_28|" core-services/image-mirroring/_config.yaml ci-operator/config/openshift-service-mesh/sail-operator/*' \
+    '--cmd=sed -i -e "s|\(registry.istio.io/testing/build-tools\):master.*|\1:$NEW_IMAGE_MASTER|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.24.*|\1:$NEW_IMAGE_1_24|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.26.*|\1:$NEW_IMAGE_1_26|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.27.*|\1:$NEW_IMAGE_1_27|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.28.*|\1:$NEW_IMAGE_1_28|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.30.*|\1:$NEW_IMAGE_1_30|" -e "s|\(registry.istio.io/testing/build-tools\):release-1\.31.*|\1:$NEW_IMAGE_1_31|" core-services/image-mirroring/_config.yaml ci-operator/config/openshift-service-mesh/sail-operator/*' \
     '--body=cc @jwendell, @FilipB'
   container:
     from: src
   cron: 00 05 * * 1-5
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 - as: test-infra-build-containers-2-3
   run_if_changed: ^docker/maistra-builder_2\.3\.Dockerfile|^docker/scripts
   steps:
@@ -214,9 +222,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_2.3.push"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -304,9 +312,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_2.4.push"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -394,9 +402,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_2.5.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -485,9 +493,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_2.6.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -577,9 +585,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.0.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -669,9 +677,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.1.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -761,9 +769,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.2.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -853,9 +861,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.3.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -945,9 +953,101 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.4.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: HUB
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-build-containers-3-5
+  run_if_changed: ^docker/maistra-builder_3\.5\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-3-5
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-3.5
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: test-infra-push-containers-3-5
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_3\.5\.Dockerfile|^docker/scripts
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      HUB: quay.io/maistra-dev
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-3-5
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /quay-secret/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+        make maistra-builder_3.5.push_multi"
+      credentials:
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -1037,9 +1137,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_main.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD

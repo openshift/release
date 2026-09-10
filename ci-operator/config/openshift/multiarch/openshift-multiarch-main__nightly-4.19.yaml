@@ -59,6 +59,8 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   arm64-initial:
     candidate:
@@ -408,7 +410,7 @@ tests:
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   capabilities:
   - intranet
-  cron: 0 21 * * 1,3
+  cron: 0 21 * * 1-4
   steps:
     cluster_profile: libvirt-s390x-vpn
     dependencies:
@@ -424,7 +426,7 @@ tests:
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-z
   capabilities:
   - intranet
-  cron: 0 21 * * 2,4
+  cron: 0 22 * * 1-4
   steps:
     cluster_profile: libvirt-s390x-vpn
     env:
@@ -466,7 +468,7 @@ tests:
 - as: ocp-image-ecosystem-ovn-remote-libvirt-multi-z-z
   capabilities:
   - intranet
-  cron: 0 21 * * 0
+  cron: 0 22 * * 0
   steps:
     cluster_profile: libvirt-s390x-vpn
     env:
@@ -479,7 +481,7 @@ tests:
 - as: ocp-e2e-serial-ovn-remote-libvirt-multi-z-z
   capabilities:
   - intranet
-  cron: 0 21 * * 6
+  cron: 0 22 * * 6
   steps:
     cluster_profile: libvirt-s390x-vpn
     env:
@@ -492,7 +494,7 @@ tests:
 - as: ocp-fips-ovn-remote-libvirt-multi-z-z
   capabilities:
   - intranet
-  cron: 0 22 * * 6
+  cron: 0 23 * * 6
   steps:
     cluster_profile: libvirt-s390x-vpn
     env:
@@ -507,9 +509,9 @@ tests:
 - as: ocp-e2e-ovn-remote-s2s-libvirt-ppc64le
   capabilities:
   - intranet
-  cron: 0 21 * * 1,3
+  cron: 0 21 * * 1-4
   steps:
-    cluster_profile: libvirt-ppc64le-s2s
+    cluster_profile: power-s2s
     dependencies:
       OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
     env:
@@ -518,20 +520,22 @@ tests:
       DOMAIN_MEMORY: "34816"
       ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-parallel
+      USE_EXTERNAL_DNS: "true"
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
   - intranet
-  cron: 0 21 * * 2,4
+  cron: 0 22 * * 1-4
   steps:
-    cluster_profile: libvirt-ppc64le-s2s
+    cluster_profile: power-s2s
     env:
       ARCH: ppc64le
       BRANCH: "4.19"
       DOMAIN_MEMORY: "34816"
       ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-parallel
+      USE_EXTERNAL_DNS: "true"
       USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-agent-remote-s2s-libvirt-multi-p-p
@@ -539,7 +543,7 @@ tests:
   - intranet
   cron: 0 23 * * 0
   steps:
-    cluster_profile: libvirt-ppc64le-s2s
+    cluster_profile: power-s2s
     env:
       ARCH: ppc64le
       BRANCH: "4.19"
@@ -547,45 +551,49 @@ tests:
       ETCD_DISK_SPEED: slow
       INSTALLER_TYPE: agent
       TEST_TYPE: conformance-parallel
+      USE_EXTERNAL_DNS: "true"
       USE_RAMFS: "true"
       VOLUME_CAPACITY: 120G
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-image-ecosystem-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
   - intranet
-  cron: 0 21 * * 0
+  cron: 0 22 * * 0
   steps:
-    cluster_profile: libvirt-ppc64le-s2s
+    cluster_profile: power-s2s
     env:
       ARCH: ppc64le
       BRANCH: "4.19"
       ETCD_DISK_SPEED: slow
       TEST_TYPE: image-ecosystem
+      USE_EXTERNAL_DNS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-serial-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
   - intranet
-  cron: 0 21 * * 6
+  cron: 0 22 * * 6
   steps:
-    cluster_profile: libvirt-ppc64le-s2s
+    cluster_profile: power-s2s
     env:
       ARCH: ppc64le
       BRANCH: "4.19"
       ETCD_DISK_SPEED: slow
       TEST_TYPE: conformance-serial
+      USE_EXTERNAL_DNS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-fips-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
   - intranet
-  cron: 0 22 * * 6
+  cron: 0 23 * * 6
   steps:
-    cluster_profile: libvirt-ppc64le-s2s
+    cluster_profile: power-s2s
     env:
       ARCH: ppc64le
       BRANCH: "4.19"
       ETCD_DISK_SPEED: slow
       FIPS_ENABLED: "true"
       TEST_TYPE: conformance-parallel
+      USE_EXTERNAL_DNS: "true"
     workflow: openshift-e2e-libvirt-upi-fips
 - as: ocp-e2e-ovn-powervs-capi-multi-p-p
   capabilities:
@@ -648,7 +656,7 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-a-a
   interval: 168h
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-gcp-arm64
     env:
       COMPUTE_NODE_TYPE: t2a-standard-2
       OCP_ARCH: arm64
@@ -657,7 +665,7 @@ tests:
 - as: ocp-e2e-upgrade-gcp-ovn-multi-a-a
   cron: 45 0 * * 0
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-gcp-arm64
     env:
       COMPUTE_NODE_TYPE: t2a-standard-2
       OCP_ARCH: arm64
@@ -667,7 +675,7 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-x-ax
   interval: 174h
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-gcp-arm64
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-2
@@ -692,7 +700,7 @@ tests:
 - as: ocp-e2e-gcp-ovn-multi-day-0-a-x
   interval: 180h
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-gcp-arm64
     env:
       COMPUTE_ARCH: amd64
       CONTROL_ARCH: arm64
@@ -713,7 +721,7 @@ tests:
 - as: ocp-e2e-upgrade-gcp-ovn-multi-x-ax
   cron: 28 22 * * 6
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-gcp-arm64
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-2

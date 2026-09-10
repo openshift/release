@@ -44,6 +44,8 @@ promotion:
     - '*'
     namespace: hypershift
     tag: "4.21"
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -163,7 +165,7 @@ tests:
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   capabilities:
-  - build-tmpfs
+  - arm64
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift-aws
@@ -208,7 +210,7 @@ tests:
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-upgrade-hypershift-operator
   capabilities:
-  - build-tmpfs
+  - arm64
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift-aws
@@ -217,13 +219,12 @@ tests:
       HYPERSHIFT_RELEASE_LATEST: hypershift-operator-421-latest
     env:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
-      ENABLE_SCALE_FROM_ZERO: "false"
       INSTALL_FROM_LATEST: "true"
       RUN_UPGRADE_TEST: "true"
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-override
   capabilities:
-  - build-tmpfs
+  - arm64
   run_if_changed: (/overrides\.yaml$)
   steps:
     cluster_profile: hypershift-aws
@@ -354,7 +355,7 @@ tests:
 - always_run: false
   as: reqserving-e2e-aws
   capabilities:
-  - build-tmpfs
+  - arm64
   optional: true
   steps:
     cluster_profile: openshift-org-aws

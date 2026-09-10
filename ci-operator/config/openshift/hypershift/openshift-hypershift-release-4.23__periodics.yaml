@@ -27,6 +27,8 @@ base_images:
     name: "4.23"
     namespace: ocp
     tag: upi-installer
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -153,13 +155,20 @@ tests:
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
   capabilities:
-  - build-tmpfs
+  - arm64
   cron: 0 0 1 1 *
   steps:
     cluster_profile: hypershift-aws
     env:
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-metrics
+- as: e2e-v2-aws
+  cron: 30 1,7,13,19 * * *
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+    workflow: hypershift-aws-e2e-v2
 - as: e2e-aws-ovn-conformance-serial
   cron: 0 1 * * *
   steps:
@@ -191,6 +200,8 @@ tests:
   cron: 0 3 * * *
   steps:
     cluster_profile: hypershift-aws
+    env:
+      AWS_REGION_OVERWRITE: us-east-1
     workflow: hypershift-aws-conformance-proxy
 - as: e2e-aws-upgrade
   cron: 0 */12 * * *
@@ -201,12 +212,35 @@ tests:
     env:
       CI_TESTS_RUN: ^TestUpgradeControlPlane.*
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-conformance-cilium
   minimum_interval: 168h
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance-cilium
+- as: e2e-aws-conformance-cilium-private
+  cron: 0 0 * * 0
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability
+    workflow: hypershift-aws-conformance-cilium-private
+- as: e2e-aws-conformance-calico
+  minimum_interval: 168h
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-conformance-calico
+- as: e2e-aws-conformance-calico-private
+  minimum_interval: 168h
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability
+    workflow: hypershift-aws-conformance-calico-private
 - as: e2e-aws-external-oidc
   minimum_interval: 12h
   steps:
@@ -224,31 +258,30 @@ tests:
       OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external-oidc
+- as: e2e-azure-aks-external-oidc
+  cron: 0 9 * * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: TestExternalOIDC
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-external-oidc
+- as: e2e-azure-aks-external-oidc-techpreview
+  cron: 0 20 9,18,25 * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: TestExternalOIDC
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-azure-aks-external-oidc
 - as: e2e-powervs-ovn
   cron: 0 8 * * *
   steps:
     cluster_profile: hypershift-powervs
     workflow: hypershift-powervs-e2e
-- as: e2e-ibmcloud-ovn-iks
-  cron: 0 4 * * *
-  steps:
-    env:
-      BOM_VERSION: 4.10.26_openshift
-      MANAGED_CLUSTER_TYPE: iks
-      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks.kubeconfig
-      TEST_TYPE: main
-      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
-    workflow: hypershift-ibmcloud-e2e
-- as: e2e-ibmcloud-ovn-roks
-  cron: 0 4 * * *
-  steps:
-    env:
-      BOM_VERSION: 4.11.0_openshift
-      MANAGED_CLUSTER_TYPE: openshift
-      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks.kubeconfig
-      TEST_TYPE: main
-      VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
-    workflow: hypershift-ibmcloud-e2e
 - as: e2e-kubevirt-aws-ovn-csi
   cron: 0 4 * * *
   steps:
@@ -281,7 +314,7 @@ tests:
     - ref: hypershift-hostedcluster-fips-check
     - chain: hypershift-conformance
     workflow: hypershift-azure-aks-conformance
-- as: e2e-azure-v2-self-managed
+- as: e2e-v2-azure-self-managed
   cron: 30 3 * * *
   steps:
     cluster_profile: hypershift-azure
@@ -378,7 +411,7 @@ tests:
     workflow: hypershift-openstack-nested-conformance
 - as: e2e-v2-gke
   capabilities:
-  - build-tmpfs
+  - arm64
   cron: 37 9,21 * * *
   steps:
     cluster_profile: hypershift-gcp
@@ -391,6 +424,7 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
 zz_generated_metadata:

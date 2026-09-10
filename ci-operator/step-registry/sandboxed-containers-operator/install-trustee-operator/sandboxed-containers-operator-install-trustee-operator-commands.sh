@@ -3,12 +3,8 @@
 # Install Trustee Operator for Confidential Containers (CoCo)
 #
 # This script installs and configures the Trustee operator and operands using
-# helm charts from https://github.com/confidential-devhub/charts
-#
-# NETWORK ACCESS:
-#   Preferred: Use TRUSTEE_CHARTS_IMAGE (pre-built image dependency)
-#              Works with restrict_network_access: true for rehearsals
-#   Fallback:  Fetches from GitHub (requires restrict_network_access: false)
+# helm charts cloned from TRUSTEE_CHARTS_REPO
+# Requires ci/rhdh-e2e-runner base image (provides helm, oc, git, jq).
 #
 # Environment Variables:
 #   TRUSTEE_INSTALL               - "true" to install, "false" to skip (default: false)
@@ -16,8 +12,8 @@
 #   TRUSTEE_CATALOG_SOURCE_IMAGE  - Custom catalog image (optional)
 #                                   NOTE: CatalogSource name is hardcoded to "trustee-operator-dev-catalog"
 #                                   in the helm chart and cannot be overridden
-#   IMAGE_TRUSTEE_CHARTS          - Pre-built charts image (set by ci-operator, recommended)
-#   TRUSTEE_CHARTS_REPO           - Charts repo URL (default: https://github.com/confidential-devhub/charts)
+
+#   TRUSTEE_CHARTS_REPO           - Charts repo URL
 #   TRUSTEE_CHARTS_REF            - Charts git ref (default: main)
 #   KBS_CLIENT_TAG                - kbs-client version override (optional)
 #
@@ -41,7 +37,7 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 TRUSTEE_INSTALL=${TRUSTEE_INSTALL:-false}
 TRUSTEE_NAMESPACE=${TRUSTEE_NAMESPACE:-trustee-operator-system}
 TRUSTEE_CATALOG_SOURCE_IMAGE=${TRUSTEE_CATALOG_SOURCE_IMAGE:-}
-TRUSTEE_CHARTS_REPO=${TRUSTEE_CHARTS_REPO:-https://github.com/confidential-devhub/charts}
+TRUSTEE_CHARTS_REPO=${TRUSTEE_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 TRUSTEE_CHARTS_REF=${TRUSTEE_CHARTS_REF:-main}
 
 # Early exit if installation disabled
@@ -50,10 +46,9 @@ if [[ "${TRUSTEE_INSTALL}" != "true" ]]; then
   exit 0
 fi
 
-# Check helm is available
+# Verify helm is available (pre-installed in base image)
 if ! command -v helm &> /dev/null; then
-  echo ">>> ERROR: helm is not available in the step image." >&2
-  echo ">>> Install helm in the image used by this step to keep restrict_network_access support." >&2
+  echo ">>> ERROR: helm not found in base image"
   exit 1
 fi
 
@@ -135,54 +130,29 @@ function wait_until() {
   return 1
 }
 
-# Fetch trustee helm charts (from pre-built image or GitHub)
+# Fetch trustee helm charts (from git repository)
 function fetch_trustee_charts() {
   local charts_dir="${SCRATCH}/charts"
 
-  # Option 1: Extract from pre-built container image (preferred, works with restrict_network_access: true)
-  # ci-operator provides built images via IMAGE_FORMAT and IMAGE_TRUSTEE_CHARTS env vars
-  if [[ -n "${IMAGE_TRUSTEE_CHARTS:-}" ]]; then
-    local charts_image="${IMAGE_TRUSTEE_CHARTS}"
-    echo ">>> Extracting trustee charts from pre-built image" >&2
-    echo ">>> Image: ${charts_image}" >&2
+  echo ">>> Fetching trustee charts from: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})" >&2
 
-    # Extract charts from the image
-    mkdir -p "${charts_dir}"
-    local extract_output
-    if extract_output=$(oc image extract "${charts_image}" --path /charts/:${charts_dir}/ 2>&1); then
-      echo ">>> Charts extracted from image (no network access needed)" >&2
-      echo ">>> Extracted files:" >&2
-      ls -lR "${charts_dir}" | head -50 >&2
-      # The git repo structure is: charts/trustee-operator/, so image has /charts/charts/
-      # Return the nested charts directory
-      echo "${charts_dir}/charts"
-      return 0
-    else
-      echo ">>> ERROR: Failed to extract charts from image" >&2
-      echo "$extract_output" >&2
-      echo ">>> Falling back to git clone" >&2
-    fi
-  else
-    echo ">>> IMAGE_TRUSTEE_CHARTS not set, using git clone fallback" >&2
-  fi
-
-  # Option 2: Fallback to git clone (requires restrict_network_access: false)
-  echo ">>> Fetching trustee charts from GitHub: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})" >&2
-
-  if ! command -v git &> /dev/null; then
-    echo ">>> ERROR: git command not found" >&2
-    return 1
-  fi
-
+  echo ">>> Cloning charts via git" >&2
   git clone --depth 1 --branch "${TRUSTEE_CHARTS_REF}" "${TRUSTEE_CHARTS_REPO}" "${charts_dir}"
 
   if [[ ! -d "${charts_dir}" ]]; then
     echo ">>> ERROR: Failed to clone charts repository" >&2
-    return 1
+    exit 1
   fi
 
-  echo ">>> Charts cloned from GitHub" >&2
-  echo "${charts_dir}"
+  echo ">>> Charts fetched" >&2
+  # charts are under charts/ subdirectory
+  if [[ -d "${charts_dir}/charts" ]]; then
+    echo "${charts_dir}/charts"
+  else
+    echo "${charts_dir}"
+  fi
+  return 0
+
 }
 
 # Get cluster domain from ingress config, console route, or console URL
@@ -497,6 +467,45 @@ function install_trustee_operands() {
   echo "$apply_output"
 }
 
+# Create the kbsres1 secret required by the KbsConfig controller.
+# The trustee-operands chart references kbsres1 in kbsSecretResources;
+# without it the controller refuses to create the trustee-deployment.
+function register_kbs_secret() {
+  local secret_name="kbsres1"
+
+  cat > "${SCRATCH}/cosign.pub" <<'PUBKEY'
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWT07eR1HNK3D2iqHotE0c389aSTh
+Lj0B39PXTBcJzJpkXPO82lLGQdc47V5HPWaPZ2Fc3DWyRoz1oWbnLlvQ5Q==
+-----END PUBLIC KEY-----
+PUBKEY
+
+  echo ">>> Creating secret ${secret_name} in ${TRUSTEE_NAMESPACE}"
+  oc create secret generic "${secret_name}" \
+    -n "${TRUSTEE_NAMESPACE}" \
+    --from-file=key1="${SCRATCH}/cosign.pub"
+
+  local cr_name
+  cr_name=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ -z "${cr_name}" ]]; then
+    echo ">>> WARN: No KbsConfig found — secret created but not patched into CR"
+    return 0
+  fi
+
+  # Check whether kbsres1 is already listed in kbsSecretResources
+  local existing
+  existing=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" "${cr_name}" \
+    -o jsonpath='{.spec.kbsSecretResources}' 2>/dev/null || echo "")
+
+  if echo "${existing}" | grep -q "${secret_name}"; then
+    echo ">>> ${secret_name} already in kbsSecretResources — skipping patch"
+  else
+    echo ">>> Patching KbsConfig ${cr_name} to register ${secret_name}"
+    oc patch kbsconfig -n "${TRUSTEE_NAMESPACE}" "${cr_name}" --type=json \
+      -p="[{\"op\":\"add\",\"path\":\"/spec/kbsSecretResources/-\",\"value\":\"${secret_name}\"}]"
+  fi
+}
+
 # Wait for operand deployments to become available
 function wait_for_operands() {
   sleep 10
@@ -571,8 +580,8 @@ function get_trustee_url() {
   if oc get route -n "${TRUSTEE_NAMESPACE}" &>/dev/null; then
     trustee_host=$(oc get route "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
     if [[ -n "${trustee_host}" ]]; then
-      trustee_url="http://${trustee_host}"
-      echo ">>> Trustee URL: ${trustee_url} (HTTP for test environment)"
+      trustee_url="https://${trustee_host}"
+      echo ">>> Trustee URL: ${trustee_url}"
     fi
   fi
 
@@ -581,7 +590,7 @@ function get_trustee_url() {
     trustee_ip=$(oc get svc "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
     [[ -z "${trustee_ip}" ]] && trustee_ip=$(oc get svc "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
     if [[ -n "${trustee_ip}" ]]; then
-      trustee_url="http://${trustee_ip}:${trustee_port}"
+      trustee_url="https://${trustee_ip}:${trustee_port}"
       trustee_host="${trustee_ip}"
     fi
   fi
@@ -591,7 +600,7 @@ function get_trustee_url() {
     trustee_ip=$(oc get svc "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
     if [[ -n "${trustee_ip}" ]]; then
       echo ">>> WARN: Trustee using ClusterIP only (not externally accessible)"
-      trustee_url="http://${trustee_ip}:${trustee_port}"
+      trustee_url="https://${trustee_ip}:${trustee_port}"
       trustee_host="${trustee_ip}"
     else
       echo ">>> ERROR: Cannot find Trustee KBS service in namespace ${TRUSTEE_NAMESPACE}"
@@ -629,7 +638,13 @@ function create_initdata() {
       "ghcr.io/confidential-containers/test-container-image-rs": [
         {
           "type": "sigstoreSigned",
-          "keyPath": "kbs:///default/cosign-keys/key-0"
+          "keyPath": "kbs:///default/cosign-keys/key-0",
+          "signedIdentity": {
+            "type": "matchRepository"
+          }
+        },
+        {
+          "type": "insecureAcceptAnything"
         }
       ]
     }
@@ -714,7 +729,7 @@ default UpdateEphemeralMountsRequest := true
 default UpdateInterfaceRequest := true
 default UpdateRoutesRequest := true
 default WaitProcessRequest := true
-default ExecProcessRequest := false
+default ExecProcessRequest := true
 default SetPolicyRequest := true
 default WriteStreamRequest := false
 
@@ -795,69 +810,11 @@ function map_trustee_to_kbs_client_version() {
   esac
 }
 
-# Determine kbs-client image tag (from KBS_CLIENT_TAG, trustee CSV, or auto-discover)
-function get_kbs_client_tag() {
-  # 1. Use explicit override if provided
-  if [[ -n "${KBS_CLIENT_TAG:-}" ]]; then
-    echo ">>> kbs-client tag (from KBS_CLIENT_TAG): ${KBS_CLIENT_TAG}" >&2
-    echo "${KBS_CLIENT_TAG}"
-    return 0
-  fi
-
-  # 2. Try to map from trustee operator CSV version
-  if [[ -n "${TRUSTEE_CSV_NAME:-}" ]]; then
-    # Extract version from CSV name (e.g., "trustee-operator.v1.10.0" -> "1.10.0")
-    local trustee_version
-    trustee_version=$(echo "${TRUSTEE_CSV_NAME}" | sed 's/^trustee-operator\.v//')
-
-    if [[ -n "${trustee_version}" ]]; then
-      # Try major.minor mapping first (e.g., "1.10.0" -> "1.10")
-      local trustee_minor="${trustee_version%.*}"
-      local mapped_tag
-      mapped_tag=$(map_trustee_to_kbs_client_version "${trustee_minor}")
-
-      if [[ -n "${mapped_tag}" ]]; then
-        echo ">>> kbs-client tag (mapped from trustee ${trustee_version}): ${mapped_tag}" >&2
-        echo "${mapped_tag}"
-        return 0
-      fi
-
-      # Try full version mapping if minor didn't match
-      mapped_tag=$(map_trustee_to_kbs_client_version "${trustee_version}")
-      if [[ -n "${mapped_tag}" ]]; then
-        echo ">>> kbs-client tag (mapped from trustee ${trustee_version}): ${mapped_tag}" >&2
-        echo "${mapped_tag}"
-        return 0
-      fi
-    fi
-  fi
-
-  # 3. Auto-discover latest semver tag from registry
-  local latest_tag=""
-  latest_tag=$(skopeo list-tags docker://quay.io/confidential-containers/kbs-client 2>/dev/null | \
-    jq -r '.Tags[]' | \
-    grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | \
-    sort -V | \
-    tail -1 || echo "")
-
-  if [[ -n "${latest_tag}" ]]; then
-    echo ">>> kbs-client tag (auto-discovered latest semver): ${latest_tag}" >&2
-    echo "${latest_tag}"
-    return 0
-  fi
-
-  # 4. Fallback to known-good version
-  echo ">>> WARN: Could not determine kbs-client tag, using fallback: v0.17.0" >&2
-  echo "v0.17.0"
-}
-
 # Verify Trustee KBS connectivity using kbs-client test pod
 function verify_trustee_connectivity() {
   local kbs_client_pod="kbs-client-test"
   local kbs_client_namespace="${TRUSTEE_NAMESPACE}"
-  local kbs_client_tag
-  kbs_client_tag=$(get_kbs_client_tag)
-  local kbs_client_image="quay.io/confidential-containers/kbs-client:${kbs_client_tag}"
+  local kbs_client_image="quay.io/confidential-containers/kbs-client:${KBS_CLIENT_TAG}"
 
   echo ">>> Creating kbs-client test pod (image: ${kbs_client_image})"
   get_kbs_client_manifest | \
@@ -869,26 +826,46 @@ function verify_trustee_connectivity() {
   # Wait for pod to become ready
   if ! wait_until "kbs-client pod Ready" 150 15 \
     "oc get pod/${kbs_client_pod} -n ${kbs_client_namespace} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q 'True'"; then
-    echo ">>> ERROR: kbs-client pod not ready" >&2
-    oc describe pod/${kbs_client_pod} -n ${kbs_client_namespace} || true
-    oc logs pod/${kbs_client_pod} -n ${kbs_client_namespace} || true
-    oc delete pod/${kbs_client_pod} -n ${kbs_client_namespace} --ignore-not-found=true
+    local wait_reason
+    wait_reason=$(oc get "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" \
+      -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}' 2>/dev/null || echo "")
+    if [[ "${wait_reason}" == "ErrImagePull" || "${wait_reason}" == "ImagePullBackOff" || "${wait_reason}" == "InvalidImageName" ]]; then
+      echo ">>> ERROR: kbs-client image not found: ${kbs_client_image}" >&2
+    else
+      echo ">>> ERROR: kbs-client pod not ready" >&2
+    fi
+    oc describe "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" || true
+    oc logs "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" || true
+    oc delete "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" --ignore-not-found=true
     return 1
   fi
 
-  # Get expected resource value from KbsConfig
+  # Get expected resource value from Secrets
   local expected_value=""
-  local configmap_name
-  configmap_name=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].spec.kbsConfigMapName}' 2>/dev/null || echo "")
+  expected_value=$(oc get secret/kbsres1 -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.data.key1}' 2>/dev/null || echo "")
 
-  if [[ -n "${configmap_name}" ]]; then
-    expected_value=$(oc get configmap "${configmap_name}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.data.kbsres1}' 2>/dev/null || echo "")
-  fi
-
+  # TODO: Trustee <= 1.12 has the resources specified in either kbsconfig or
+  # kbsconfig configmap. This code is kept for backward compatibility and
+  # should be removed once older versions get supported.
   if [[ -z "${expected_value}" ]]; then
-    echo ">>> WARN: Could not determine expected resource value from KbsConfig ConfigMap" >&2
-    # Fallback: check the KbsConfig resource data directly
-    expected_value=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].spec.resourceData.default.kbsres1.key1}' 2>/dev/null || echo "key1")
+    echo "WARN: Could not determine expected resource value from kbsres1 secret. Falling back to get from KbsConfig ConfigMap"
+    local configmap_name
+    configmap_name=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].spec.kbsConfigMapName}' 2>/dev/null || echo "")
+
+    if [[ -n "${configmap_name}" ]]; then
+      expected_value=$(oc get configmap "${configmap_name}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.data.kbsres1}' 2>/dev/null || echo "")
+    else
+      echo ">>> WARN: Could not determine the KbsConfig ConfigMap" >&2
+    fi
+
+    if [[ -z "${expected_value}" ]]; then
+      echo ">>> WARN: Could not determine expected resource value from KbsConfig ConfigMap. Falling back to check the KbsConfig resource data directly" >&2
+      expected_value=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].spec.resourceData.default.kbsres1.key1}' 2>/dev/null || echo "")
+      if [[ -z "${expected_value}" ]]; then
+        echo ">>> ERROR: Failed to determine the expected resource value. Cannot proceed with kbs-client connectivity test" >&2
+        return 1
+      fi
+    fi
   fi
 
   # Test KBS connectivity using RCA protocol
@@ -896,12 +873,15 @@ function verify_trustee_connectivity() {
   #   1. GET resource → 401 (no token)
   #   2. POST /auth + POST /attest (get attestation token)
   #   3. GET resource → 200 (with token)
+  # Use HTTP via in-cluster service DNS — the test pod is in the same namespace,
+  # so it can reach kbs-service directly without TLS.
+  local kbs_test_url="http://kbs-service.${kbs_client_namespace}.svc:${TRUSTEE_PORT}"
   local kbs_test_failed=false
-  echo ">>> Testing KBS connectivity: ${TRUSTEE_URL}/default/kbsres1/key1"
+  echo ">>> Testing KBS connectivity: ${kbs_test_url}/default/kbsres1/key1"
   echo ">>> Expected resource value: ${expected_value}"
 
-  if oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
-    kbs-client --url "${TRUSTEE_URL}" get-resource --path default/kbsres1/key1 \
+  if oc exec "${kbs_client_pod}" -n "${kbs_client_namespace}" -- \
+    kbs-client --url "${kbs_test_url}" get-resource --path default/kbsres1/key1 \
     > /tmp/kbs-resource.txt 2> /tmp/kbs-stderr.txt; then
 
     # Success - verify the retrieved value
@@ -911,7 +891,7 @@ function verify_trustee_connectivity() {
     echo ">>> Retrieved resource value: ${resource_value}"
 
     # Validate the retrieved value matches what was configured
-    if [[ -n "${expected_value}" ]] && [[ "${resource_value}" != "${expected_value}" ]]; then
+    if [[ "${resource_value}" != "${expected_value}" ]]; then
       echo ">>> ERROR: Resource value mismatch!"
       echo ">>>   Expected: ${expected_value}"
       echo ">>>   Retrieved: ${resource_value}"
@@ -922,7 +902,7 @@ function verify_trustee_connectivity() {
     fi
   else
     # Failure - show diagnostics
-    echo ">>> ERROR: Failed to retrieve resource from Trustee KBS at ${TRUSTEE_URL}"
+    echo ">>> ERROR: Failed to retrieve resource from Trustee KBS at ${kbs_test_url}"
 
     # Show stderr (has the actual error)
     if [[ -s /tmp/kbs-stderr.txt ]]; then
@@ -947,7 +927,7 @@ function verify_trustee_connectivity() {
       echo ">>> ERROR: Cannot connect to KBS service"
     fi
     if echo "${all_output}" | grep -q "certificate verify failed\|SSL\|TLS"; then
-      echo ">>> ERROR: SSL/TLS error - URL should be HTTP, not HTTPS (current: ${TRUSTEE_URL})"
+      echo ">>> ERROR: SSL/TLS error for: ${kbs_test_url}"
     fi
 
     kbs_test_failed=true
@@ -986,7 +966,7 @@ function verify_trustee_connectivity() {
     oc get pods -n "${TRUSTEE_NAMESPACE}" || true
   fi
 
-  oc delete pod/${kbs_client_pod} -n ${kbs_client_namespace} --ignore-not-found=true
+  oc delete "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" --ignore-not-found=true
 
   if [[ "${kbs_test_failed}" == "true" ]]; then
     echo ">>> ERROR: kbs-client connectivity test failed"
@@ -1002,9 +982,12 @@ function verify_trustee_connectivity() {
 
 echo ">>> Starting Trustee operator installation"
 
-# Fetch helm charts from GitHub
+# Fetch helm and charts from image (function runs in subshell via $(), so
+# the PATH export inside it doesn't propagate — set it here)
 CHARTS_DIR=$(fetch_trustee_charts)
 export CHARTS_DIR
+export PATH="${SCRATCH}/bin:${PATH}"
+export LD_LIBRARY_PATH="${SCRATCH}/lib:${LD_LIBRARY_PATH:-}"
 
 # Get cluster domain
 CLUSTER_DOMAIN=$(get_cluster_domain)
@@ -1014,6 +997,7 @@ export CLUSTER_DOMAIN
 install_trustee_operator "${CHARTS_DIR}"
 wait_for_operator
 install_trustee_operands "${CHARTS_DIR}"
+register_kbs_secret
 wait_for_operands
 
 # Configure and verify

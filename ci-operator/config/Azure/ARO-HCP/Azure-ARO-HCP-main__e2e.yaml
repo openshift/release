@@ -8,6 +8,8 @@ images:
   - dockerfile_path: test/Containerfile.e2e
     from: src
     to: aro-hcp-e2e-tests
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -22,6 +24,8 @@ resources:
       memory: 10Gi
 tests:
 - as: integration-e2e-parallel
+  capabilities:
+  - gcp
   max_concurrency: 4
   postsubmit: true
   reporter_config:
@@ -37,10 +41,12 @@ tests:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
       ARO_HCP_SUITE_NAME: integration/parallel
-      LOCATION: uksouth
+      LOCATION: westus3
       VAULT_SECRET_PROFILE: int-rh
     workflow: aro-hcp-persistent-e2e
 - as: stage-e2e-parallel
+  capabilities:
+  - gcp
   max_concurrency: 4
   postsubmit: true
   reporter_config:
@@ -60,6 +66,8 @@ tests:
       VAULT_SECRET_PROFILE: stg-rh
     workflow: aro-hcp-persistent-e2e
 - as: prod-e2e-parallel
+  capabilities:
+  - gcp
   max_concurrency: 4
   postsubmit: true
   reporter_config:
@@ -72,19 +80,15 @@ tests:
   run_if_changed: ^$
   steps:
     env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E,ARO HCP E2E Hosted Clusters - Prod - 00,ARO
+        HCP E2E Hosted Clusters - Prod - 01
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel
+      CLUSTER_PROFILE_DIRS: /var/run/aro-hcp-prod,/var/run/aro-hcp-prod-rh
       LOCATION: uksouth
       VAULT_SECRET_PROFILE: prod
-    leases:
-    - count: 1
-      env: ENV_QUOTA_LEASED_RESOURCE
-      resource_type: aro-hcp-prod-quota-slice
-    - count: 15
-      env: LEASED_MSI_CONTAINERS
-      resource_type: aro-hcp-test-msi-containers-prod
-    workflow: aro-hcp-e2e
+    workflow: aro-hcp-persistent-e2e
 zz_generated_metadata:
   branch: main
   org: Azure

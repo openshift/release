@@ -4,6 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--servicemesh-operator__kiali-cypress-tests-execute.xml
+    ' EXIT
+fi
+
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 export CONSOLE_URL
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
@@ -49,6 +61,8 @@ fi
 # remove v from ISTIO version if there is any
 [[ $ISTIO_SAMPLE_APP_VERSION == v* ]] && ISTIO_SAMPLE_APP_VERSION="${ISTIO_SAMPLE_APP_VERSION#v}" || ISTIO_SAMPLE_APP_VERSION="$ISTIO_SAMPLE_APP_VERSION"
 hack/istio/download-istio.sh -iv ${ISTIO_SAMPLE_APP_VERSION}
+# delete testing apps if there from previous run
+hack/istio/install-testing-demos.sh -d true || true
 # install testing apps
 hack/istio/install-testing-demos.sh -c oc -in ${ISTIO_NAMESPACE}
 # wait till all apps are ready

@@ -88,9 +88,11 @@ else
 fi
 
 # Determine OpenShift version and set sidecar selector (unified parsing)
-oc_version_minor=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null | cut -d . -f 2 || true)
+oc_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || true)
+oc_version_major=$(echo "$oc_version" | cut -d . -f 1)
+oc_version_minor=$(echo "$oc_version" | cut -d . -f 2)
 selector="sidecar=legacy"
-if [[ -n "$oc_version_minor" ]] && [[ "$oc_version_minor" -ge 16 ]]; then
+if [[ -n "$oc_version_major" ]] && { [[ "$oc_version_major" -ge 5 ]] || { [[ "$oc_version_major" -eq 4 ]] && [[ "$oc_version_minor" -ge 16 ]]; }; }; then
   selector="sidecar=native"
 fi
 

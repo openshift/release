@@ -1,10 +1,11 @@
 periodics:
 - agent: kubernetes
-  cluster: build12
+  cluster: build13
   cron: 0 2 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
+    timeout: 2h45m0s
   extra_refs:
   - base_ref: main
     org: insights-onprem
@@ -23,11 +24,15 @@ periodics:
       - error
       report_template: |-
         {{if eq .Status.State "success"}}:white_check_mark:{{else}}:x:{{end}} *Nightly (main)* — *{{.Status.State}}*
-        <{{.Status.URL}}|Logs> · <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/nightly-main/insights-onprem-cost-onprem-chart-e2e/artifacts/version_info.json|Version> · <https://reportportal-ecosystem-qe.apps.dno.ocp-hub.prod.psi.redhat.com/ui/#ecosystem-qe/launches/724|ReportPortal>
+        <{{.Status.URL}}|Logs> · <https://gcs.ci.openshift.org/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/nightly-main/insights-onprem-cost-onprem-chart-e2e/artifacts/version_info.json|Version> · <https://reportportal-ecosystem-qe.apps.dno.ocp-hub.prod.psi.redhat.com/ui/#ecosystem-qe/launches/724|ReportPortal>
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
@@ -61,6 +66,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/hive-hive-credentials
         name: hive-hive-credentials
         readOnly: true
@@ -84,6 +95,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: hive-hive-credentials
       secret:
         secretName: hive-hive-credentials
@@ -97,7 +117,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build12
+  cluster: build13
   cron: 0 0 31 2 *
   decorate: true
   decoration_config:
@@ -121,11 +141,15 @@ periodics:
       - error
       report_template: |-
         {{if eq .Status.State "success"}}:white_check_mark:{{else}}:x:{{end}} *Nightly RC* — *{{.Status.State}}*
-        <{{.Status.URL}}|Logs> · <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/nightly-rc/insights-onprem-cost-onprem-chart-e2e/artifacts/version_info.json|Version> · <https://reportportal-ecosystem-qe.apps.dno.ocp-hub.prod.psi.redhat.com/ui/#ecosystem-qe/launches/724|ReportPortal>
+        <{{.Status.URL}}|Logs> · <https://gcs.ci.openshift.org/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/nightly-rc/insights-onprem-cost-onprem-chart-e2e/artifacts/version_info.json|Version> · <https://reportportal-ecosystem-qe.apps.dno.ocp-hub.prod.psi.redhat.com/ui/#ecosystem-qe/launches/724|ReportPortal>
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
@@ -159,6 +183,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/hive-hive-credentials
         name: hive-hive-credentials
         readOnly: true
@@ -182,6 +212,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: hive-hive-credentials
       secret:
         secretName: hive-hive-credentials
@@ -195,7 +234,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build12
+  cluster: build13
   cron: 0 0 31 2 *
   decorate: true
   decoration_config:
@@ -219,11 +258,15 @@ periodics:
       - error
       report_template: |-
         {{if eq .Status.State "success"}}:white_check_mark:{{else}}:x:{{end}} *Nightly Release* — *{{.Status.State}}*
-        <{{.Status.URL}}|Logs> · <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/nightly-release/insights-onprem-cost-onprem-chart-e2e/artifacts/version_info.json|Version> · <https://reportportal-ecosystem-qe.apps.dno.ocp-hub.prod.psi.redhat.com/ui/#ecosystem-qe/launches/724|ReportPortal>
+        <{{.Status.URL}}|Logs> · <https://gcs.ci.openshift.org/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/nightly-release/insights-onprem-cost-onprem-chart-e2e/artifacts/version_info.json|Version> · <https://reportportal-ecosystem-qe.apps.dno.ocp-hub.prod.psi.redhat.com/ui/#ecosystem-qe/launches/724|ReportPortal>
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
@@ -257,6 +300,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/hive-hive-credentials
         name: hive-hive-credentials
         readOnly: true
@@ -280,6 +329,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: hive-hive-credentials
       secret:
         secretName: hive-hive-credentials

@@ -1,7 +1,21 @@
-# pylint: disable=R0902,R0903
+# pylint: disable=R0902,R0903,R0913,R0917
 
 import os
 import pathlib
+
+
+class Product:
+    def __init__(self, name, namespace_prefix, deployment_prefix, hostname_prefix, arches, has_private):
+        self.name = name
+        self.namespace_prefix = namespace_prefix
+        self.deployment_prefix = deployment_prefix
+        self.hostname_prefix = hostname_prefix
+        self.arches = arches
+        self.has_private = has_private
+
+    @property
+    def privacy_modes(self):
+        return (False, True) if self.has_private else (False,)
 
 
 class RCPaths:
@@ -55,6 +69,10 @@ class Config:
         self.scos_releases = self._get_scos_releases()
         self.rpc_release_namespace = "ocp"
 
+        self.ocp = Product('ocp', 'ocp', 'ocp', 'openshift-release', self.arches, has_private=True)
+        self.okd = Product('okd', 'origin', 'okd', 'origin-release', ('x86_64', 'arm64'), has_private=False)
+        self.products = [self.ocp, self.okd]
+
     def _get_releases(self):
         releases = set()
 
@@ -69,6 +87,7 @@ class Config:
         # These can be removed once the corresponding periodics files exist.
         releases.add('4.23')
         releases.add('5.0')
+        releases.add('5.1')
 
         return sorted(releases)  # Glob does not provide any guarantees on ordering, so force an order by sorting.
 
@@ -105,34 +124,34 @@ class Config:
 
 
 class Context:
-    def __init__(self, config, arch, private):
+    def __init__(self, config, arch, private, product):
         self.config = config
         self.arch = arch
         self.private = private
+        self.product = product
 
         self.suffix = config.get_suffix(arch, private)
         self.art_suffix = config.get_art_suffix(arch, private)
-        self.jobs_namespace = f'ci-release{self.suffix}'
-        self.rc_hostname = f'openshift-release{self.suffix}'
-        self.rc_temp_hostname = f'openshift-release{self.suffix}-temp'
-        self.hostname_artifacts = f'openshift-release-artifacts{self.suffix}'
-        self.secret_name_tls = f'release-controller{self.suffix}-tls'
-        self.secret_name_tls_api = f'release-controller-api{self.suffix}-tls'
-        self.is_namespace = f'ocp{self.suffix}'
-        self.rc_serviceaccount_name = f'release-controller-{self.is_namespace}'
 
-        self.rc_service_name = f'release-controller-{self.is_namespace}'
-        self.rc_api_service_name = f'release-controller-api-{self.is_namespace}'
+        self.is_namespace = f'{product.namespace_prefix}{self.suffix}'
+        self.jobs_namespace = f'ci-release{self.suffix}'
+
+        rc_name = f'{product.deployment_prefix}{self.suffix}'
+        self.rc_deployment_name = rc_name
+        self.rc_serviceaccount_name = f'release-controller-{rc_name}'
+        self.rc_service_name = f'release-controller-{rc_name}'
+        self.rc_api_service_name = f'release-controller-api-{rc_name}'
         self.rc_route_name = self.rc_service_name
 
-        # Routes on the api.ci cluster
-        # files-cache
-        self.fc_api_url = f'{self.hostname_artifacts}.{self.config.rc_release_domain}'
+        self.rc_hostname = f'{product.hostname_prefix}{self.suffix}'
+        self.rc_temp_hostname = f'{product.hostname_prefix}{self.suffix}-temp'
+        self.hostname_artifacts = f'{product.hostname_prefix}-artifacts{self.suffix}'
 
-        # Routes on the app.ci cluster
-        # release-controller
+        self.secret_name_tls = f'release-controller{self.suffix}-tls'
+        self.secret_name_tls_api = f'release-controller-api{self.suffix}-tls'
+
+        self.fc_api_url = f'{self.hostname_artifacts}.{self.config.rc_release_domain}'
         self.rc_app_url = f'{self.rc_hostname}.{self.config.rc_deployment_domain}'
-        # files-cache
         self.fc_app_url = f'{self.hostname_artifacts}.{self.config.rc_deployment_domain}'
 
     def get_supported_architecture_name(self):

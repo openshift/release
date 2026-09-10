@@ -2,10 +2,12 @@ presubmits:
   openshift/assisted-installer-agent:
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     branches:
     - ^release-ocm-2\.12$
     - ^release-ocm-2\.12-
-    cluster: build09
+    cluster: build07
     context: ci/prow/e2e-ai-operator-ztp
     decorate: true
     decoration_config:
@@ -21,12 +23,16 @@ presubmits:
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-agent-release-ocm-2.12-e2e-ai-operator-ztp
+    optional: true
     rerun_command: /test e2e-ai-operator-ztp
-    skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -58,6 +64,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -78,6 +90,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -93,7 +114,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.12$
     - ^release-ocm-2\.12-
-    cluster: build12
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -152,7 +173,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.12$
     - ^release-ocm-2\.12-
-    cluster: build12
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -220,7 +241,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.12$
     - ^release-ocm-2\.12-
-    cluster: build12
+    cluster: build05
     context: ci/prow/mce-images
     decorate: true
     decoration_config:
@@ -276,10 +297,12 @@ presubmits:
     trigger: (?m)^/test( | .* )mce-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     branches:
     - ^release-ocm-2\.12$
     - ^release-ocm-2\.12-
-    cluster: build09
+    cluster: build07
     context: ci/prow/subsystem-test
     decorate: true
     decoration_config:
@@ -296,11 +319,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-agent-release-ocm-2.12-subsystem-test
     rerun_command: /test subsystem-test
-    skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -332,6 +358,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -352,6 +384,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -367,7 +408,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.12$
     - ^release-ocm-2\.12-
-    cluster: build12
+    cluster: build05
     context: ci/prow/unit-test
     decorate: true
     decoration_config:
@@ -385,10 +426,13 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/assisted-installer-agent-codecov-token
         - --target=unit-test
         command:
         - ci-operator
@@ -407,11 +451,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/assisted-installer-agent-codecov-token
-          name: assisted-installer-agent-codecov-token
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -424,9 +471,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: assisted-installer-agent-codecov-token
-        secret:
-          secretName: assisted-installer-agent-codecov-token
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

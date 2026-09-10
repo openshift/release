@@ -4,8 +4,8 @@ base_images:
     namespace: ci
     tag: latest
   cli:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: cli
   dev-scripts:
     name: test
@@ -36,8 +36,8 @@ promotion:
   to:
   - excluded_images:
     - hypershift-operator-pr
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
   - additional_images:
       hypershift-operator: hypershift-operator-pr
     disabled: true
@@ -46,6 +46,7 @@ promotion:
     namespace: hypershift
     tag: "4.22"
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -63,8 +64,8 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest-417:
     candidate:
       product: ocp
@@ -178,7 +179,7 @@ tests:
 - always_run: false
   as: e2e-aws
   capabilities:
-  - build-tmpfs
+  - arm64
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-aws
@@ -302,7 +303,7 @@ tests:
 - always_run: false
   as: e2e-aws-upgrade-hypershift-operator
   capabilities:
-  - build-tmpfs
+  - arm64
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-aws
@@ -316,7 +317,7 @@ tests:
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-override
   capabilities:
-  - build-tmpfs
+  - arm64
   run_if_changed: (/overrides\.yaml$)
   steps:
     cluster_profile: hypershift-aws
@@ -328,7 +329,7 @@ tests:
 - always_run: false
   as: e2e-aws-4-21
   capabilities:
-  - build-tmpfs
+  - arm64
   pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift-aws
@@ -417,6 +418,27 @@ tests:
   steps:
     cluster_profile: hypershift-aks
     workflow: hypershift-azure-aks-conformance
+- always_run: false
+  as: e2e-azure-aks-external-oidc
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: TestExternalOIDC
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-external-oidc
+- always_run: false
+  as: e2e-azure-aks-external-oidc-techpreview
+  optional: true
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: TestExternalOIDC
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-azure-aks-external-oidc
 - as: security
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
@@ -449,19 +471,13 @@ tests:
 - always_run: false
   as: reqserving-e2e-aws
   capabilities:
-  - build-tmpfs
+  - arm64
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-421
     workflow: hypershift-aws-reqserving-e2e
-- always_run: false
-  as: address-review-comments
-  optional: true
-  skip_if_only_changed: .*
-  steps:
-    workflow: hypershift-review-agent-trigger
 zz_generated_metadata:
   branch: release-4.22
   org: openshift-priv

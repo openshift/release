@@ -24,9 +24,10 @@ images:
     to: search-mcp-server
 promotion:
   to:
-  - disabled: true
-    name: "0.1"
+  - name: "0.1"
     namespace: stolostron
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -45,7 +46,7 @@ tests:
       SOURCE_IMAGE_REF: search-mcp-server
     env:
       IMAGE_REPO: search-mcp-server
-      IMAGE_TAG: v0.1.0
+      IMAGE_TAG: v0.1.1
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: test-unit
@@ -69,9 +70,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -86,8 +87,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -97,8 +99,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 zz_generated_metadata:
   branch: release-0.1
   org: stolostron

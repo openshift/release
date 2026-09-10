@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: base
 binary_build_commands: make build
 build_root:
@@ -16,20 +16,22 @@ images:
     to: service-catalog
 promotion:
   to:
-  - name: 5.1-priv
-    namespace: ocp-private
+  - disabled: true
+    name: "5.1"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -41,7 +43,8 @@ tests:
   commands: JUNIT_REPORT=1 hack/test-go.sh
   container:
     from: test-bin
-- as: e2e-aws-operator
+- always_run: false
+  as: e2e-aws-operator
   steps:
     cluster_profile: openshift-org-aws
     test:

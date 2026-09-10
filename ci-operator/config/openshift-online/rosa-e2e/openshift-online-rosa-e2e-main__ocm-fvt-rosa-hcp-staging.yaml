@@ -8,6 +8,8 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -33,6 +35,25 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-ad-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-ad-ocp5-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 7 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-ad-ocp5-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -49,6 +70,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-amd64-upgrade-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -65,6 +87,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-zero-egress-upgrade-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -81,6 +104,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-shared-vpc-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -97,6 +121,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-pl-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -113,6 +138,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-adobe-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -129,11 +155,34 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-y-upgrade-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
     - ref: rosa-e2e-ocm-fvt
   timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-nx-y-upgrade-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 0 31 2 *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_EXTRA_ENVS: |-
+        CLUSTER_PROFILE=rosa-hcp-y-upg
+        UPGRADE_DISTANCE=4
+        UPGRADE_TARGET_CHANNEL=candidate
+        UPGRADE_TARGET_VERSION=4.22.6
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-nx-y-upgrade-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt-longrunning
+  timeout: 12h0m0s
 - as: ocm-fvt-periodic-cs-rosa-hcp-arm-staging-main
   capabilities:
   - nested-podman
@@ -145,6 +194,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-arm-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -161,6 +211,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-amd64-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -177,6 +228,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-autonode-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -190,9 +242,11 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_BACKPLANE_CREDS: "true"
       OCM_FVT_JOB_NAME: cs-hcp-e2e-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -209,6 +263,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-zero-egress-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -225,6 +280,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-upgrade-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -233,7 +289,7 @@ tests:
 - as: ocm-fvt-periodic-cs-sanity-staging-main
   capabilities:
   - nested-podman
-  cron: 0 0 31 2 *
+  cron: 0 3 * * *
   nested_podman: true
   steps:
     allow_best_effort_post_steps: true
@@ -241,6 +297,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-sanity-staging
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -257,6 +314,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-sanity-jira-staging
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -273,6 +331,7 @@ tests:
       OCM_FVT_JOB_NAME: cs-rosa-hcp-access-request-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
     pre:
     - ref: rosa-e2e-record-start-time
     test:

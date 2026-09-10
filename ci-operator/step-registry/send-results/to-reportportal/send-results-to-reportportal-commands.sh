@@ -74,7 +74,7 @@ DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configurati
 if [[ "$DECK_NAME" = 'test-platform-results' ]]
 then
   PROWCI='https://prow.ci.openshift.org'
-  PROWWEB='https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com'
+  PROWWEB='https://gcs.ci.openshift.org'
 elif [[ "$DECK_NAME" = 'qe-private-deck' ]]
 then
   PROWCI='https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com'

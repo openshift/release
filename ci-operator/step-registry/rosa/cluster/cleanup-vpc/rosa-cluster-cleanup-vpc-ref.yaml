@@ -1,0 +1,21 @@
+ref:
+  as: rosa-cluster-cleanup-vpc
+  from: rosa-aws-cli
+  grace_period: 10m
+  timeout: 15m
+  commands: rosa-cluster-cleanup-vpc-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: REGION
+    default: ""
+    documentation: |-
+      AWS region override. Defaults to LEASED_RESOURCE.
+  documentation: |-
+    Safety-net cleanup for ROSA-managed VPCs (non-BYOVPC). Finds orphaned VPC
+    resources by cluster tag after rosa delete cluster, and force-deletes NAT
+    Gateways, Elastic IPs, ENIs, subnets, route tables, IGWs, and security
+    groups. Prevents quota exhaustion from leaked resources when cluster
+    deletion fails.

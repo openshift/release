@@ -14,7 +14,7 @@ To run the OBSERVABILITY interop tests defined in the step [acm-tests-alc-ref](.
 
 ## Process
 
-- This ref runs a [script from product QE's repo](https://github.com/stolostron/application-ui-test/blob/release-2.7/execute_alc_interop_commands.sh) that kicks off Cypress tests where we create, update and delete applications such as GitOps, APP, Helm etc.
+- This ref runs `./start.sh alc` from the `console-e2e` image (`stolostron/console-e2e`) to kick off Playwright ALC tests where we create, update and delete applications such as GitOps, APP, Helm etc.
 
 ## Requirements
 

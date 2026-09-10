@@ -1,28 +1,32 @@
 base_images:
   assisted-image-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -40,12 +44,12 @@ base_images:
     namespace: ci
     tag: latest
   ocp_base-rhel9:
-    name: 4.23-priv
-    namespace: ocp-private
+    name: "4.23"
+    namespace: ocp-priv
     tag: base-rhel9
   ocp_cli:
-    name: 4.23-priv
-    namespace: ocp-private
+    name: "4.23"
+    namespace: ocp-priv
     tag: cli
   shellcheck:
     name: shellcheck
@@ -69,22 +73,49 @@ build_root:
 canonical_go_repository: github.com/openshift/installer
 images:
   items:
-  - dockerfile_path: images/installer/Dockerfile.ci
+  - build_args:
+    - name: BUILD_VERSION
+      value: 4.23.0-ci
+    capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.ci
     to: installer
-  - dockerfile_path: images/libvirt/Dockerfile.ci
+  - build_args:
+    - name: BUILD_VERSION
+      value: 4.23.0-ci
+    capabilities:
+    - intranet
+    dockerfile_path: images/libvirt/Dockerfile.ci
     to: libvirt-installer
-  - dockerfile_path: images/installer/Dockerfile.upi.ci
+  - build_args:
+    - name: BUILD_VERSION
+      value: 4.23.0-ci
+    capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.upi.ci
     to: upi-installer
-  - dockerfile_path: images/openstack/Dockerfile.ci
+  - build_args:
+    - name: BUILD_VERSION
+      value: 4.23.0-ci
+    capabilities:
+    - intranet
+    dockerfile_path: images/openstack/Dockerfile.ci
     from: openstack-base
     inputs:
       openstack-base:
         as:
         - registry.ci.openshift.org/ocp/4.17:base-rhel9
     to: openstack-installer
-  - dockerfile_path: images/baremetal/Dockerfile.ci
+  - build_args:
+    - name: BUILD_VERSION
+      value: 4.23.0-ci
+    capabilities:
+    - intranet
+    dockerfile_path: images/baremetal/Dockerfile.ci
     to: baremetal-installer
-  - dockerfile_literal: |
+  - capabilities:
+    - intranet
+    dockerfile_literal: |
       FROM src
       COPY oc /usr/bin/oc
       RUN ln -s /usr/bin/oc /usr/bin/kubectl
@@ -98,7 +129,9 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: src-oc
-  - dockerfile_literal: |
+  - capabilities:
+    - intranet
+    dockerfile_literal: |
       FROM src
       COPY oc /usr/bin/oc
       RUN ln -s /usr/bin/oc /usr/bin/kubectl
@@ -123,9 +156,10 @@ promotion:
   to:
   - excluded_images:
     - src-oc
-    name: 4.23-priv
-    namespace: ocp-private
+    name: "4.23"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 raw_steps:
 - pipeline_image_cache_step:
@@ -136,13 +170,13 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
   multi-latest:
     candidate:
       architecture: multi
@@ -309,26 +343,24 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 - always_run: false
-  as: e2e-aws-ovn-dualstack-ipv4-primary-techpreview
+  as: e2e-aws-ovn-dualstack-ipv4-primary
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
       TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
         Secondary IP Family \[LinuxOnly\] should function for service endpoints using
         hostNetwork'
     workflow: openshift-e2e-aws
 - always_run: false
-  as: e2e-aws-ovn-dualstack-ipv6-primary-techpreview
+  as: e2e-aws-ovn-dualstack-ipv6-primary
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
       TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
         Secondary IP Family \[LinuxOnly\] should function for service endpoints using
@@ -536,6 +568,31 @@ tests:
       OS_IMAGE_STREAM: rhel-10
     workflow: openshift-e2e-aws
 - always_run: false
+  as: e2e-gcd-ovn-private-techpreview
+  optional: true
+  steps:
+    cluster_profile: gcd
+    env:
+      BASE_DOMAIN: ci.gcd.devcluster.openshift.com
+      BASTION_IMAGE_NAME: fedora-coreos-41-20241122-3-0-gcp-x86-64
+      BASTION_IMAGE_PROJECT: eu0:openshift
+      BASTION_MACHINE_TYPE: c3-standard-4
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c3-standard-4
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: c3-standard-8
+      DEFAULT_MACHINE_OSIMAGE: projects/eu0:openshift/images/rhcos10
+      FEATURE_SET: TechPreviewNoUpgrade
+      PUBLISH: Internal
+      TEST_SKIPS: Ensure HTTPRoute object is created\|The HAProxy router should pass
+        the http2 tests\|The HAProxy router should pass the h2spec conformance tests\|should
+        serve a basic image on each replica with a private image\|Validate user is
+        able to extract rhel8 and rhel9 oc from the ocp payload\|regional PD should
+        store data and sync across zones\|L2 primary UDN with custom network, cluster-networked
+        pods, NodePort service\|cluster-config-operator should report complete ClusterOperator
+        status
+    workflow: openshift-e2e-gcd
+- always_run: false
   as: e2e-gcp-ovn
   pipeline_run_if_changed: (gcp|google)
   steps:
@@ -591,6 +648,12 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-secureboot
+- always_run: false
+  as: e2e-gcp-kms-encryption
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp-kms-encryption
 - always_run: false
   as: e2e-gcp-ovn-byo-vpc
   optional: true
@@ -817,6 +880,38 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
+- always_run: false
+  as: e2e-metal-ipi-bgp-vip
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-bgp-vip
+- always_run: false
+  as: e2e-metal-ipi-bgp-vip-ovn-bgp
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-bgp-vip-ovn-bgp
+- always_run: false
+  as: e2e-metal-ipi-bgp-vip-metallb
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-bgp-vip-metallb
+- always_run: false
+  as: e2e-metal-ipi-bgp-vip-ovn-bgp-metallb
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-bgp-vip-ovn-bgp-metallb
 - always_run: false
   as: e2e-metal-ipi-ovn-swapped-hosts
   capabilities:
@@ -1119,6 +1214,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
     pre:
@@ -1208,8 +1305,8 @@ tests:
         export AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
         hack/go-integration-test.sh
       credentials:
-      - mount_path: /var/secrets/registry-pull-secret
-        name: registry-pull-credentials
+      - bundle: registry-pull-credentials
+        mount_path: /var/secrets/registry-pull-secret
         namespace: test-credentials
       dependencies:
       - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
@@ -1543,6 +1640,7 @@ tests:
     - ref: go-verify-deps
 - always_run: false
   as: e2e-azure-nat-gateway-single-zone
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-azure
     env:

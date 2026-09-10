@@ -1,6 +1,8 @@
 ref:
   as: upi-install-libvirt
   from: libvirt-installer
+  # Inject oc for images that omit it (e.g. ocp/4.15:libvirt-installer).
+  cli: latest
   grace_period: 30m
   commands: upi-install-libvirt-commands.sh
   env:
@@ -46,4 +48,8 @@ ref:
     - name: "release:latest"
       env: OPENSHIFT_INSTALL_TARGET
   documentation: >-
-    The UPI libvirt install step runs the openshift-install in order to bring up an OpenShift cluster via a remote libvirt configuration with a fixed load balancer.
+    Runs openshift-install and creates guests on a remote libvirt hypervisor.
+    4.16+ and non-s390x keep the historical virt-install/qemu-img path.
+    s390x-only fallbacks when those tools are missing: virsh define/start and
+    virsh vol-resize. On s390x, ETCD_DISK_SPEED=slow is skipped when BRANCH is
+    known < 4.16.

@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 4.13-priv
-    namespace: ocp-private
+    name: "4.13"
+    namespace: ocp-priv
     tag: base
   dev-scripts:
     name: test
@@ -20,20 +20,21 @@ images:
     to: insights-operator
 promotion:
   to:
-  - name: 4.13-priv
-    namespace: ocp-private
+  - name: "4.13"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -49,18 +50,21 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+- always_run: false
+  as: e2e
+  pipeline_skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
-- as: e2e-agnostic-upgrade
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+- always_run: false
+  as: e2e-agnostic-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-- as: insights-operator-e2e-tests
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+- always_run: false
+  as: insights-operator-e2e-tests
+  pipeline_skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: openshift-org-gcp
     pre:
@@ -71,9 +75,9 @@ tests:
       cli: latest
       commands: pytest.sh -m "not ui"
       credentials:
-      - mount_path: /secrets
-        name: insights-qa
-        namespace: test-credentials
+      - collection: insights-qa
+        group: pull-secret
+        mount_path: /secrets
       from: insights-operator-tests
       resources:
         requests:

@@ -7,7 +7,7 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.21"
-binary_build_commands: make build BUILD_TAGS=clusterapi
+binary_build_commands: make build BUILD_TAGS=clusterapi,openshift
 build_root:
   from_repository: true
 canonical_go_repository: k8s.io/autoscaler
@@ -20,20 +20,22 @@ images:
     to: vertical-pod-autoscaler
 promotion:
   to:
-  - name: 5.1-priv
-    namespace: ocp-private
+  - disabled: true
+    name: "5.1"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -55,7 +57,7 @@ resources:
     requests:
       cpu: "2"
       memory: 8Gi
-test_binary_build_commands: OS_GOFLAGS='-race' make build BUILD_TAGS=clusterapi
+test_binary_build_commands: OS_GOFLAGS='-race' make build BUILD_TAGS=clusterapi,openshift
 tests:
 - as: unit
   commands: JUNIT_REPORT=1 GO111MODULE=auto hack/test-go.sh
@@ -79,20 +81,22 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
-- as: e2e-aws
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
     cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -105,8 +109,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -119,14 +123,15 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-hypershift
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-hypershift
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -140,8 +145,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -154,8 +159,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -168,8 +173,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -182,8 +187,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -196,8 +201,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m

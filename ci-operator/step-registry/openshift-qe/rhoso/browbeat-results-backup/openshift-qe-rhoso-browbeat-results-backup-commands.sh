@@ -6,7 +6,7 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
-bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion 2>/dev/null || cat ${SHARED_DIR}/bastion)
 build_id="${BUILD_ID:-unknown}"
 nfs_host=$(cat ${CLUSTER_PROFILE_DIR}/nfs_host)
 nfs_path=$(cat ${CLUSTER_PROFILE_DIR}/nfs_path)
@@ -21,6 +21,7 @@ set -x
 ssh root@${bastion} "
   set -o errexit
   set -o pipefail
+  dnf install -y nfs-utils
   if mount | grep -qE \"^${nfs_host}:${nfs_path} on /mnt/ \"; then
     echo \"NFS already mounted\"
   else

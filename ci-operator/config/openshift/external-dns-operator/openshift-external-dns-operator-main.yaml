@@ -17,6 +17,8 @@ operator:
   substitutions:
   - pullspec: quay.io/openshift/origin-external-dns-operator:latest
     with: pipeline:external-dns-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -45,9 +47,10 @@ tests:
     make test
   container:
     from: src
-  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -72,8 +75,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-gcp-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -98,8 +102,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-azure-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-azure-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -124,8 +129,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: e2e-azure-infoblox-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-azure-infoblox-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -149,16 +155,16 @@ tests:
         export INFOBLOX_CONFIG_DIR=/var/run/infoblox-credentials
         make test-e2e
       credentials:
-      - mount_path: /var/run/infoblox-credentials
-        name: infoblox-credentials
-        namespace: test-credentials
+      - collection: external-dns-operator-infoblox-credentials
+        group: openshift-edo
+        mount_path: /var/run/infoblox-credentials
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-azure
 - as: e2e-aws-shared-vpc-phz-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-qe
     env:

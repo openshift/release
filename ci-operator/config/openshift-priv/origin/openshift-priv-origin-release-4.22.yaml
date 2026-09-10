@@ -20,8 +20,8 @@ base_images:
     namespace: ci
     tag: latest
   tools:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: tools
 binary_build_commands: make build
 build_root:
@@ -36,9 +36,10 @@ images:
     to: hello-openshift
 promotion:
   to:
-  - name: 4.22-priv
-    namespace: ocp-private
+  - name: "4.22"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 raw_steps:
 - pipeline_image_cache_step:
@@ -49,13 +50,13 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   nightly-arm64:
     candidate:
       architecture: arm64
@@ -105,6 +106,7 @@ tests:
     - ref: go-verify-deps
 - always_run: false
   as: e2e-gcp-ovn
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-gcp
     observers:
@@ -254,6 +256,7 @@ tests:
     workflow: openshift-e2e-aws-image-registry
 - always_run: false
   as: e2e-gcp-ovn-upgrade
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-gcp
     observers:
@@ -271,6 +274,7 @@ tests:
     workflow: openshift-upgrade-gcp-ovn-rt
 - always_run: false
   as: e2e-gcp-csi
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-gcp
     observers:
@@ -317,6 +321,7 @@ tests:
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-ovn-serial
+  pipeline_run_if_changed: ^$
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
@@ -368,6 +373,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-serial-ipsec
 - always_run: false
   as: e2e-aws-csi
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -399,9 +405,12 @@ tests:
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-aws-ovn-fips
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_REQUIRES_BUILDFARM_NET_ADMIN: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -566,9 +575,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
@@ -824,6 +831,7 @@ tests:
     workflow: upi-vsphere-platform-external-ccm
 - always_run: false
   as: e2e-aws-ovn-microshift
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -833,6 +841,7 @@ tests:
     workflow: openshift-microshift-e2e-origin-conformance
 - always_run: false
   as: e2e-aws-ovn-microshift-serial
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-aws
     env:

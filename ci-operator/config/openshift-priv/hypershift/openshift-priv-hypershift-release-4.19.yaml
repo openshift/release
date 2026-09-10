@@ -1,7 +1,7 @@
 base_images:
   cli:
-    name: 4.19-priv
-    namespace: ocp-private
+    name: "4.19"
+    namespace: ocp-priv
     tag: cli
   dev-scripts:
     name: test
@@ -32,8 +32,8 @@ promotion:
   to:
   - excluded_images:
     - hypershift-operator-pr
-    name: 4.19-priv
-    namespace: ocp-private
+    name: "4.19"
+    namespace: ocp-priv
   - additional_images:
       hypershift-operator: hypershift-operator-pr
     disabled: true
@@ -42,6 +42,7 @@ promotion:
     namespace: hypershift
     tag: "4.19"
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -58,8 +59,8 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp-priv
   latest-415:
     candidate:
       product: ocp
@@ -147,7 +148,7 @@ tests:
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   capabilities:
-  - build-tmpfs
+  - arm64
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
     cluster_profile: hypershift-aws
@@ -187,7 +188,7 @@ tests:
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-upgrade-hypershift-operator
   capabilities:
-  - build-tmpfs
+  - arm64
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
     cluster_profile: hypershift-aws
@@ -196,13 +197,12 @@ tests:
       HYPERSHIFT_RELEASE_LATEST: hypershift-operator-419-latest
     env:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
-      ENABLE_SCALE_FROM_ZERO: "false"
       INSTALL_FROM_LATEST: "true"
       RUN_UPGRADE_TEST: "true"
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-override
   capabilities:
-  - build-tmpfs
+  - arm64
   run_if_changed: (/overrides\.yaml$)
   steps:
     cluster_profile: hypershift-aws

@@ -30,7 +30,7 @@ data:
         - url: "https://thanos-receive.core.ci.devcluster.openshift.com:19291/api/v1/receive"
           queueConfig:
             maxShards: 200
-            sampleAgeLimit: 10m
+            sampleAgeLimit: 3m
           tlsConfig:
             ca:
               secret:
@@ -43,6 +43,10 @@ data:
             keySecret:
               name: thanos-remote-write-tls
               key: client.key
+          writeRelabelConfigs:
+          - sourceLabels: [__name__]
+            regex: '.*_bucket'
+            action: drop
       nodeSelector:
         node-role.kubernetes.io/infra: ""
       tolerations:

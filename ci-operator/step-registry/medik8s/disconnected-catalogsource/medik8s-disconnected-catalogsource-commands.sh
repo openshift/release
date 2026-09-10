@@ -11,9 +11,15 @@ declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-catalog}"
 declare IDMS_NAME="${IDMS_NAME:-medik8s-disconnected}"
 declare OCP_VERSION="${FBC_OCP_VERSION:-${OCP_VERSION:-}}"
 declare GIT_REF="${GIT_REF:-main}"
-declare FBC_COMMIT_SHA="${FBC_COMMIT_SHA:-}"
+declare FBC_COMMIT_SHA="${MULTISTAGE_PARAM_OVERRIDE_FBC_COMMIT_SHA:-${FBC_COMMIT_SHA:-}}"
 # shellcheck disable=SC2034 # used by medik8s-lib.sh verify_fbc_image()
 declare FBC_SHA_PINNED="${FBC_COMMIT_SHA:+true}"
+if [[ ! -s "${SHARED_DIR}/workload_image" ]]; then
+    echo "ERROR: workload_image not found in SHARED_DIR." >&2
+    echo "Include the medik8s-lib ref before this step." >&2
+    exit 1
+fi
+WORKLOAD_IMAGE=$(sed 's/:[^/]*$//' "${SHARED_DIR}/workload_image")
 declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation}"
 
 collect_artifacts() {
@@ -69,9 +75,15 @@ configure_host_pull_secret() {
 
 install_oc_mirror() {
     log "Installing oc-mirror..."
+    CGWURL="https://mirror.openshift.com/pub/cgw"
+    ARCH=$(uname -m)
+    case ${ARCH} in
+        x86_64) ARCH="amd64" ;;
+        aarch64) ARCH="arm64" ;;
+    esac
     curl -sSLf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 120 \
         -o /tmp/oc-mirror.tar.gz \
-        "https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz"
+        "${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
     tar -xzf /tmp/oc-mirror.tar.gz -C /tmp && chmod +x /tmp/oc-mirror
     rm -f /tmp/oc-mirror.tar.gz
     log "oc-mirror installed"
@@ -87,16 +99,19 @@ create_registries_conf() {
     gitlab_fetch "$idms_url" "$idms_file" || exit 1
 
     awk '
-        /^[[:space:]]*- mirrors:/ { in_mirrors=1; got_mirror=0 }
-        in_mirrors && /^[[:space:]]*- quay\.io/ && !got_mirror {
-            gsub(/^[[:space:]]*- /, "", $0); mirror=$0; got_mirror=1
+        /^[[:space:]]*- mirrors:/ { in_mirrors=1; mc=0 }
+        in_mirrors && /^[[:space:]]*- quay\.io/ {
+            gsub(/^[[:space:]]*- /, "", $0); m[mc++]=$0
         }
         /^[[:space:]]*source:/ {
             source=$NF; in_mirrors=0
-            if (mirror != "" && source != "") {
-                printf "[[registry]]\n  location = \"%s\"\n  insecure = true\n  blocked = false\n  mirror-by-digest-only = false\n  [[registry.mirror]]\n      location = \"%s\"\n      insecure = true\n\n", source, mirror
+            if (mc > 0 && source != "") {
+                printf "[[registry]]\n  location = \"%s\"\n  insecure = true\n  blocked = false\n  mirror-by-digest-only = false\n", source
+                for (i=0; i<mc; i++)
+                    printf "  [[registry.mirror]]\n      location = \"%s\"\n      insecure = true\n", m[i]
+                printf "\n"
             }
-            mirror=""
+            mc=0
         }
     ' "$idms_file" > "$registries_conf"
 
@@ -130,6 +145,8 @@ mirror_catalog_and_operators() {
 apiVersion: mirror.openshift.io/v2alpha1
 kind: ImageSetConfiguration
 mirror:
+  additionalImages:
+  - name: ${WORKLOAD_IMAGE}:latest
   operators:
   - catalog: ${fbc_image}
     packages:
@@ -178,8 +195,8 @@ EOF
     log "Mirroring complete"
 }
 
-create_idms_disconnected() {
-    log "Creating IDMS for disconnected environment..."
+create_mirror_sets_disconnected() {
+    log "Creating image mirror sets for disconnected environment..."
 
     local idms_file="${TMP_DIR}/idms-source.yaml"
     if [[ ! -f "$idms_file" ]]; then
@@ -215,6 +232,32 @@ create_idms_disconnected() {
         log "ERROR: oc-mirror IDMS not found at ${ocmirror_idms}"
         exit 1
     fi
+
+    # Apply oc-mirror generated ITMS for tag-based image pulls (additionalImages).
+    # oc-mirror knows the exact mirror path it pushed tags to; our custom ITMS
+    # below may use a different path convention.
+    local ocmirror_itms="${TMP_DIR}/working-dir/cluster-resources/itms-oc-mirror.yaml"
+    if [[ -f "$ocmirror_itms" ]]; then
+        log "Applying oc-mirror generated ITMS (tag-based mirror mappings)..."
+        oc apply -f "$ocmirror_itms"
+    else
+        log "WARNING: oc-mirror ITMS not found at ${ocmirror_itms}, relying on custom ITMS only"
+    fi
+
+    # Apply ITMS for workload image (ubi-minimal used for eviction verification).
+    # SBR init Job ITMS is handled separately by medik8s-sbr-nfs-bastion step.
+    log "Applying ITMS for test workload image..."
+    oc apply -f - <<ITMS_EOF
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: medik8s-workload-image
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/${WORKLOAD_IMAGE#*/}
+    source: ${WORKLOAD_IMAGE}
+ITMS_EOF
 
     # Resume MCPs — single consolidated rollout with only the correct IDMS.
     log "Resuming MCPs to trigger MCO rollout..."
@@ -300,7 +343,7 @@ main() {
     configure_host_pull_secret
     install_oc_mirror
     mirror_catalog_and_operators
-    create_idms_disconnected
+    create_mirror_sets_disconnected
     ensure_marketplace
     create_catalogsource
     # shellcheck disable=SC2034 # used by medik8s-lib.sh wait_for_catalogsource()

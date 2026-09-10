@@ -8,7 +8,7 @@ base_images:
     namespace: ci
     tag: latest
   cli:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: cli
   tests-private:
@@ -16,7 +16,7 @@ base_images:
     namespace: ci
     tag: latest
   upi-installer:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: upi-installer
 binary_build_commands: make go-mod-tidy;make all
@@ -24,7 +24,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.23
+    tag: rhel-9-golang-1.26-openshift-5.0
 images:
   items:
   - dockerfile_literal: |
@@ -56,9 +56,10 @@ promotion:
   - excluded_images:
     - tests-private-ui
     - tests-private-pr
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 releases:
@@ -67,12 +68,12 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: "5.1"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: "5.1"
 resources:
   '*':
     limits:
@@ -150,7 +151,7 @@ tests:
 - always_run: false
   as: e2e-console
   optional: true
-  run_if_changed: frontend/tests/.*.cy.ts
+  pipeline_run_if_changed: frontend/tests/.*.cy.ts
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -250,7 +251,7 @@ tests:
 - as: nutanix-ipi-ovn-winc-f7
   cron: 1 15 9,16,23,30 * *
   steps:
-    cluster_profile: nutanix-qe
+    cluster_profile: nutanix
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&

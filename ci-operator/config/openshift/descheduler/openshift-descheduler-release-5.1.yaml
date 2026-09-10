@@ -8,8 +8,11 @@ images:
     to: descheduler
 promotion:
   to:
-  - name: "5.1"
+  - disabled: true
+    name: "5.1"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -31,6 +34,18 @@ tests:
   commands: go test ./pkg/...
   container:
     from: test-bin
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: security
   optional: true
   steps:

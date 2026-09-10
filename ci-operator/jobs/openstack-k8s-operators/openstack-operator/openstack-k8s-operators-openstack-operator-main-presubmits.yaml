@@ -1,11 +1,11 @@
 presubmits:
   openstack-k8s-operators/openstack-operator:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/functional
     decorate: true
     decoration_config:
@@ -16,6 +16,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-openstack-operator-main-functional
     rerun_command: /test functional
+    skip_if_only_changed: ^(\.github/.*|renovate.json|.*\.md|tests?/kuttl/.*|OWNERS.*|LICENSE.*|zuul.d/.*)$
     spec:
       containers:
       - args:
@@ -69,7 +70,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -126,7 +127,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/openstack-operator-build-deploy
     decorate: true
     decoration_config:
@@ -140,7 +141,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
@@ -173,6 +178,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
           readOnly: true
@@ -196,6 +207,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -214,8 +234,8 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
-    context: ci/prow/openstack-operator-build-deploy-kuttl-4-18
+    cluster: build08
+    context: ci/prow/openstack-operator-build-deploy-kuttl-4-20
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -223,19 +243,23 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openstack-k8s-operators-openstack-operator-main-openstack-operator-build-deploy-kuttl-4-18
-    rerun_command: /test openstack-operator-build-deploy-kuttl-4-18
-    skip_if_only_changed: ^renovate.json|^README.md
+    name: pull-ci-openstack-k8s-operators-openstack-operator-main-openstack-operator-build-deploy-kuttl-4-20
+    rerun_command: /test openstack-operator-build-deploy-kuttl-4-20
+    skip_if_only_changed: ^(\.github/.*|renovate.json|.*\.md|tests?/functional/.*|OWNERS.*|LICENSE.*|zuul.d/.*)$
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=openstack-operator-build-deploy-kuttl-4-18
+        - --target=openstack-operator-build-deploy-kuttl-4-20
         command:
         - ci-operator
         env:
@@ -262,6 +286,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
           readOnly: true
@@ -285,6 +315,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -297,13 +336,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )openstack-operator-build-deploy-kuttl-4-18,?($|\s.*)
+    trigger: (?m)^/test( | .* )openstack-operator-build-deploy-kuttl-4-20,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/openstack-operator-build-deploy-tempest
     decorate: true
     decoration_config:
@@ -318,7 +357,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
@@ -351,6 +394,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
           readOnly: true
@@ -374,6 +423,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -392,7 +450,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/precommit-check
     decorate: true
     decoration_config:

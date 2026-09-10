@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.18"
+    name: "4.20"
     namespace: ocp
     tag: cli
   opm-builder:
@@ -32,6 +32,8 @@ images:
       RUN pip3 install pre-commit
     from: src
     to: openstack-operator-ci-pre-commit
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -48,6 +50,7 @@ tests:
     make test GINKGO_ARGS='--no-color'
   container:
     from: src
+  skip_if_only_changed: ^(\.github/.*|renovate.json|.*\.md|tests?/kuttl/.*|OWNERS.*|LICENSE.*|zuul.d/.*)$
 - always_run: false
   as: test-operator-build-deploy
   cluster_claim:
@@ -56,7 +59,7 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.20"
   optional: true
   steps:
     env:

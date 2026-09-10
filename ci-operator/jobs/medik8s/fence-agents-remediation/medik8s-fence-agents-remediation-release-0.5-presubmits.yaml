@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.16-ci-bundle-my-bundle
     decorate: true
     decoration_config:
@@ -65,7 +65,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.16-images
     decorate: true
     decoration_config:
@@ -125,7 +125,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build07
+    cluster: build10
     context: ci/prow/4.16-openshift-e2e
     decorate: true
     decoration_config:
@@ -145,7 +145,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -178,6 +182,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -198,6 +208,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -213,7 +232,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.16-test
     decorate: true
     decoration_config:
@@ -282,7 +301,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.17-ci-bundle-my-bundle
     decorate: true
     decoration_config:
@@ -342,7 +361,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.17-images
     decorate: true
     decoration_config:
@@ -402,7 +421,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build07
+    cluster: build10
     context: ci/prow/4.17-openshift-e2e
     decorate: true
     decoration_config:
@@ -422,7 +441,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -455,6 +478,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -475,6 +504,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -490,7 +528,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.17-test
     decorate: true
     decoration_config:
@@ -559,7 +597,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.18-ci-bundle-my-bundle
     decorate: true
     decoration_config:
@@ -619,7 +657,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.18-images
     decorate: true
     decoration_config:
@@ -679,7 +717,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build07
+    cluster: build10
     context: ci/prow/4.18-openshift-e2e
     decorate: true
     decoration_config:
@@ -699,7 +737,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -732,6 +774,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -752,6 +800,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -767,7 +824,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.18-test
     decorate: true
     decoration_config:
@@ -836,7 +893,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.19-ci-bundle-my-bundle
     decorate: true
     decoration_config:
@@ -896,7 +953,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.19-images
     decorate: true
     decoration_config:
@@ -956,7 +1013,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build07
+    cluster: build10
     context: ci/prow/4.19-openshift-e2e
     decorate: true
     decoration_config:
@@ -976,7 +1033,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1009,6 +1070,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1029,6 +1096,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1044,7 +1120,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.19-test
     decorate: true
     decoration_config:
@@ -1113,7 +1189,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.20-ci-bundle-my-bundle
     decorate: true
     decoration_config:
@@ -1173,7 +1249,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.20-images
     decorate: true
     decoration_config:
@@ -1233,7 +1309,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build07
+    cluster: build10
     context: ci/prow/4.20-openshift-e2e
     decorate: true
     decoration_config:
@@ -1253,7 +1329,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1286,6 +1366,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1306,6 +1392,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1321,7 +1416,7 @@ presubmits:
     branches:
     - ^release-0\.5$
     - ^release-0\.5-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.20-test
     decorate: true
     decoration_config:

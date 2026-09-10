@@ -38,6 +38,8 @@ promotion:
     - testopenscap
     name: "4.17"
     namespace: ComplianceAsCode
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   arm64-latest:
     candidate:
@@ -54,6 +56,11 @@ releases:
       include_built_images: true
       name: "4.17"
       namespace: ocp
+  latest-4-22:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -124,6 +131,8 @@ tests:
   optional: true
   steps:
     cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
     env:
       BASE_DOMAIN: perfscale.rox.systems
     test:
@@ -153,6 +162,75 @@ tests:
     - as: test
       cli: latest
       commands: make e2e-scan-config
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-tailoring
+  optional: true
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-tailoring
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-parsing
+  optional: true
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-parsing
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-cel
+  optional: true
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-cel
       dependencies:
       - env: IMAGE_FROM_CI
         name: compliance-operator

@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 images:
   items:
   - dockerfile_path: Dockerfile
@@ -11,6 +11,8 @@ promotion:
   to:
   - name: "2.17"
     namespace: stolostron
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -28,23 +30,27 @@ tests:
   commands: |
     export SELF="make -f Makefile.prow"
     export HOME="/tmp"
+    go clean -cache -modcache
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
     export HOME="/tmp"
+    go clean -cache -modcache
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: publish
   postsubmit: true
   steps:
@@ -62,9 +68,9 @@ tests:
         export OSCI_COMPONENT_VERSION="2.17.0"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

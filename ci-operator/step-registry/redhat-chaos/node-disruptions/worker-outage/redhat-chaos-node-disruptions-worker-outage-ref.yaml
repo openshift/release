@@ -5,15 +5,15 @@ ref:
     name: prow-scripts
     tag: latest
   commands: redhat-chaos-node-disruptions-worker-outage-commands.sh
+  grace_period: 10m
   credentials:
   - namespace: test-credentials
-    name: cluster-secrets-aws-chaos
+    bundle: cluster-secrets-aws-chaos
     mount_path: /secret/telemetry
-  - namespace: test-credentials
-    name: chaos-es-creds
+  - bundle: chaos-es-creds
     mount_path: /secret/es
-  - namespace: test-credentials
-    name: devqe-secrets
+  - collection: openshift-qe
+    group: vsphere-devqe
     mount_path: /var/run/vault/devqe-secrets
   env:
     - name: CHAOS_TEAM_NAME
@@ -82,6 +82,8 @@ ref:
       default: "False"
     - name: ES_RUN_TAG
       default: ""
+    - name: JUNIT_TESTCASE
+      default: '[Jira:"Node / Kubelet"] node disruption worker outage'
   resources:
     requests:
       cpu: 100m

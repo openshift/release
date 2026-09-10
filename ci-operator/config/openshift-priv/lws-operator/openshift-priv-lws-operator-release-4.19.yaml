@@ -12,9 +12,10 @@ images:
     to: lws-operator
 promotion:
   to:
-  - name: 4.19-priv
-    namespace: ocp-private
+  - name: "4.19"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 resources:
   '*':
@@ -22,8 +23,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.19-priv
-  namespace: ocp-private
+  name: "4.19"
+  namespace: ocp-priv
 tests:
 - as: verify
   commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
@@ -54,8 +55,9 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
-- as: e2e-aws-operator
-  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -72,8 +74,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-operand
-  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+- always_run: false
+  as: e2e-aws-operand
+  pipeline_skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
     cluster_profile: openshift-org-aws
     test:

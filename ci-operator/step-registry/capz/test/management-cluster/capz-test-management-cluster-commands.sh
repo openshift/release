@@ -10,6 +10,7 @@ export USE_KUBECONFIG="${SHARED_DIR}/kubeconfig"
 if [[ -f "${SHARED_DIR}/dev_endpoint" ]]; then
   DEV_ENDPOINT=$(cat "${SHARED_DIR}/dev_endpoint")
   export DEV_ENDPOINT
+  export ARO_NULL_PROVISIONING=true
   echo "DEV_ENDPOINT loaded: ${DEV_ENDPOINT}"
 fi
 

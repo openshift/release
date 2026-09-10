@@ -7,8 +7,8 @@ ref:
   commands: redhat-performance-backstage-performance-xl-commands.sh
   credentials:
     - mount_path: /usr/local/ci-secrets/backstage-performance
-      name: backstage-performance
-      namespace: test-credentials
+      group: backstage-performance
+      collection: backstage-performance
   env:
     - name: SCENARIO
       default: ""
@@ -70,6 +70,12 @@ ref:
     - name: RHDH_NODEJS_MAX_HEAP_SIZE
       default: ""
       documentation: Maximum heap size for RHDH's Node.js process
+    - name: LDAP_SCHEDULE_TIMEOUT_MINUTES
+      default: "50"
+      documentation: LDAP schedule timeout in minutes
+    - name: RHDH_RESOURCES_EPHEMERAL_STORAGE_LIMITS
+      default: "5Gi"
+      documentation: Ephemeral storage limits set on RHDH pod(s) (default is 5Gi)
     - name: ENSURE_CATALOG_POPULATION_TIMEOUT
       default: "3600"
       documentation: Ensure catalog population timeout in seconds
@@ -85,15 +91,21 @@ ref:
     - name: OPENSEARCH_INDEX
       default: "rhdh-performance.ci-default"
       documentation: OpenSearch index to upload results to (default is rhdh-performance.ci-default)
+    - name: PERFORM_REGRESSION
+      default: "false"
+      documentation: If enabled, the latest RHDH opensearch run results will be compared against historical results to detect performance regressions.
     - name: RHDH_INSTALL_METHOD
       default: helm
       documentation: RHDH install method (one of 'helm', 'olm')
     - name: ENABLE_RBAC
-      default: "false"
+      default: "true"
       documentation: Enable RBAC plugin in RHDH
     - name: ENABLE_ORCHESTRATOR
       default: "false"
       documentation: Enable Orchestrator plugin in RHDH
+    - name: RBAC_POLICY
+      default: "all_groups_admin_inherited"
+      documentation: Define the RBAC policy configuration in RHDH
     - name: ENABLE_PROFILING
       default: "false"
       documentation: Enable RHDH's CPU and memory profiling (using NodeJS built-in profilers)
@@ -103,6 +115,9 @@ ref:
     - name: CATALOG_TAB_N_COUNT
       default: "0"
       documentation: How many catalog_tab_n dynamic plugins is installed for UI
+    - name: LOCUST_WORKER_MEMORY_LIMIT
+      default: "2Gi"
+      documentation: "Memory limit set on Locust worker Pods (default is 2Gi)"
   from: backstage-performance-runner
   resources:
     requests:

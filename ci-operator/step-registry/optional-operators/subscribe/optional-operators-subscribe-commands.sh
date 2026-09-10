@@ -75,12 +75,18 @@ create_catalogsource () {
     CATSRC=""
     IS_CATSRC_CREATED=${IS_CATSRC_CREATED:-false}
     if [ "$IS_CATSRC_CREATED" = false ] ; then
+        CS_REQUIRED_SCC="anyuid"
+        if echo "$CS_PODCONFIG" | grep -q "securityContextConfig: restricted"; then
+            CS_REQUIRED_SCC="restricted-v2"
+        fi
         CS_MANIFEST=$(cat <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
   $CS_NAMESTANZA
   namespace: $CS_NAMESPACE
+  annotations:
+    openshift.io/required-scc: $CS_REQUIRED_SCC
 spec:
   sourceType: grpc
   image: "$OO_INDEX"
@@ -285,8 +291,10 @@ fi
 #   featureSet: TechPreviewNoUpgrade
 # So, add "securityContextConfig: restricted" since OCP 4.12
 CS_PODCONFIG=""
-OCP_MINOR_VERSION=$(oc version | grep "Server Version" | cut -d '.' -f2)
-if [ "$OCP_MINOR_VERSION" -gt "11" ]; then
+OCP_VERSION=$(oc version | grep "Server Version" | cut -d ':' -f2 | xargs)
+OCP_MAJOR_VERSION=$(echo "$OCP_VERSION" | cut -d '.' -f1)
+OCP_MINOR_VERSION=$(echo "$OCP_VERSION" | cut -d '.' -f2)
+if [ "$OCP_MAJOR_VERSION" -ge "5" ] || { [ "$OCP_MAJOR_VERSION" -eq "4" ] && [ "$OCP_MINOR_VERSION" -gt "11" ]; }; then
   CS_PODCONFIG=$(cat <<EOF
   grpcPodConfig:
     securityContextConfig: restricted

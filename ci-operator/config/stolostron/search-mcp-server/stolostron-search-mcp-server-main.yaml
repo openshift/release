@@ -16,8 +16,10 @@ images:
     to: search-mcp-server
 promotion:
   to:
-  - name: "0.1"
+  - name: "0.2"
     namespace: stolostron
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -36,7 +38,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-0.1
+      DESTINATION_BRANCH: release-0.2
     workflow: ocm-ci-fastforward
 - as: lint
   commands: |
@@ -57,8 +59,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -68,8 +71,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 zz_generated_metadata:
   branch: main
   org: stolostron

@@ -7,6 +7,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -21,6 +25,8 @@ images:
         as:
         - registry.access.redhat.com/ubi9/ubi-minimal:latest
     to: lvm-operator-integration-test
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -47,7 +53,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-sno-qe-integration-tests
-  cron: 0 8 * * 1
+  cron: 0 8 1,15 * *
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -66,7 +72,7 @@ tests:
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
 - as: e2e-aws-sno-arm-qe-integration-tests
-  cron: 0 8 * * 1
+  cron: 0 8 1,15 * *
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -90,7 +96,7 @@ tests:
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
 - as: e2e-aws-mno-qe-integration-tests
-  cron: 0 8 * * 1
+  cron: 0 8 1,15 * *
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -109,7 +115,7 @@ tests:
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
 - as: e2e-aws-mno-arm-qe-integration-tests
-  cron: 0 8 * * 1
+  cron: 0 8 1,15 * *
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -132,10 +138,54 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+- as: e2e-aws-disc-sno-qe-integration-tests
+  cron: 0 8 1,15 * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+    test:
+    - as: lvms-sno-integration-test
+      cli: latest
+      commands: |
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: openshift-e2e-aws-disconnected-lvms-sno
+- as: e2e-aws-disc-mno-qe-integration-tests
+  cron: 0 8 1,15 * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+    test:
+    - as: lvms-mno-integration-test
+      cli: latest
+      commands: |
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: openshift-e2e-aws-disconnected-lvms-mno
 - as: e2e-baremetalds-sno-dualstack-qe-integration-tests
   capabilities:
   - intranet
-  cron: 59 17 * * 1
+  cron: 0 8 1,15 7 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -158,7 +208,7 @@ tests:
           memory: 200Mi
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-sno-lvms
 - as: e2e-baremetalds-mno-dualstack-qe-integration-tests
-  cron: 0 8 * * 1
+  cron: 0 8 1,15 7 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:

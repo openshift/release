@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
     tag: base
 binary_build_commands: make build
 build_root:
@@ -20,20 +20,21 @@ promotion:
   to:
   - excluded_images:
     - oc-mirror-integration
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -64,12 +65,12 @@ tests:
     - as: test-integration-delete
       commands: cd test/integration && make ci-delete
       credentials:
-      - mount_path: /etc/ci/aws-creds
-        name: oc-mirror-ci-aws-creds
-        namespace: test-credentials
-      - mount_path: /etc/ci/pull-secret
-        name: oc-mirror-ci-pull-secret
-        namespace: test-credentials
+      - collection: oc-mirror
+        group: aws_creds
+        mount_path: /etc/ci/aws-creds
+      - collection: oc-mirror
+        group: pull_secret
+        mount_path: /etc/ci/pull-secret
       from: oc-mirror-integration
       grace_period: 30m0s
       resources:
@@ -84,12 +85,12 @@ tests:
     - as: test-integration
       commands: cd test/integration && make ci
       credentials:
-      - mount_path: /etc/ci/aws-creds
-        name: oc-mirror-ci-aws-creds
-        namespace: test-credentials
-      - mount_path: /etc/ci/pull-secret
-        name: oc-mirror-ci-pull-secret
-        namespace: test-credentials
+      - collection: oc-mirror
+        group: aws_creds
+        mount_path: /etc/ci/aws-creds
+      - collection: oc-mirror
+        group: pull_secret
+        mount_path: /etc/ci/pull-secret
       from: oc-mirror-integration
       resources:
         limits:

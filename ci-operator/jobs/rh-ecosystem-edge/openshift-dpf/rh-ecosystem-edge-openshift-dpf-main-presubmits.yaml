@@ -5,18 +5,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
-    context: ci/prow/deploy-cluster
+    cluster: build09
+    context: ci/prow/conformance-doca4
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Containerfile
-      timeout: 6h0m0s
+      timeout: 7h0m0s
     labels:
       capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-deploy-cluster
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-conformance-doca4
     reporter_config:
       slack:
         channel: '#wg-nvidia-dpf-ci'
@@ -25,24 +27,27 @@ presubmits:
         - failure
         - error
         - aborted
-        report_template: |
-          {{if eq .Status.State "success"}}
-            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{else}}
-            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-            {{if eq .Status.State "aborted"}}
-              The job was aborted, check for orphaned cloud resources.
-            {{end}}
-          {{end}}
-    rerun_command: /test deploy-cluster
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test conformance-doca4
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=deploy-cluster
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=conformance-doca4
         command:
         - ci-operator
         env:
@@ -63,8 +68,17 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -83,6 +97,18 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -92,13 +118,606 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(deploy-cluster|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(conformance-doca4|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/conformance-doca8
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+      timeout: 7h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-conformance-doca8
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test conformance-doca8
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=conformance-doca8
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(conformance-doca8|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/deploy-cluster-doca4
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+      timeout: 6h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca4
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-deploy-cluster-doca4
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test deploy-cluster-doca4
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=deploy-cluster-doca4
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(deploy-cluster-doca4|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/deploy-cluster-doca8
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+      timeout: 6h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-deploy-cluster-doca8
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test deploy-cluster-doca8
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=deploy-cluster-doca8
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(deploy-cluster-doca8|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/e2e
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-e2e
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test e2e
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(e2e|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/e2e-doca4
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca4
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-e2e-doca4
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test e2e-doca4
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-doca4
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(e2e-doca4|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -154,8 +773,8 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
-    context: ci/prow/network-tests
+    cluster: build09
+    context: ci/prow/network-doca4
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -163,9 +782,11 @@ presubmits:
       timeout: 2h0m0s
     labels:
       capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-network-tests
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-network-doca4
     reporter_config:
       slack:
         channel: '#wg-nvidia-dpf-ci'
@@ -174,24 +795,27 @@ presubmits:
         - failure
         - error
         - aborted
-        report_template: |
-          {{if eq .Status.State "success"}}
-            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{else}}
-            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-            {{if eq .Status.State "aborted"}}
-              The job was aborted, check for orphaned cloud resources.
-            {{end}}
-          {{end}}
-    rerun_command: /test network-tests
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test network-doca4
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=network-tests
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=network-doca4
         command:
         - ci-operator
         env:
@@ -212,8 +836,17 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -232,6 +865,18 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -241,14 +886,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(network-tests|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(network-doca4|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build07
-    context: ci/prow/sanity
+    cluster: build09
+    context: ci/prow/network-doca8
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -256,9 +901,11 @@ presubmits:
       timeout: 2h0m0s
     labels:
       capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-sanity
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-network-doca8
     reporter_config:
       slack:
         channel: '#wg-nvidia-dpf-ci'
@@ -267,24 +914,27 @@ presubmits:
         - failure
         - error
         - aborted
-        report_template: |
-          {{if eq .Status.State "success"}}
-            :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-          {{else}}
-            :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
-            {{if eq .Status.State "aborted"}}
-              The job was aborted, check for orphaned cloud resources.
-            {{end}}
-          {{end}}
-    rerun_command: /test sanity
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test network-doca8
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=sanity
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=network-doca8
         command:
         - ci-operator
         env:
@@ -305,8 +955,17 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -325,6 +984,18 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -334,4 +1005,1017 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(sanity|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(network-doca8|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/nightly-4.22-deploy-cluster-doca4
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+      timeout: 6h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca4
+      ci-operator.openshift.io/variant: nightly-4.22
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-nightly-4.22-deploy-cluster-doca4
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test nightly-4.22-deploy-cluster-doca4
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=deploy-cluster-doca4
+        - --variant=nightly-4.22
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(nightly-4.22-deploy-cluster-doca4|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/nightly-4.22-deploy-cluster-doca8
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+      timeout: 6h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
+      ci-operator.openshift.io/variant: nightly-4.22
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-nightly-4.22-deploy-cluster-doca8
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test nightly-4.22-deploy-cluster-doca8
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=deploy-cluster-doca8
+        - --variant=nightly-4.22
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(nightly-4.22-deploy-cluster-doca8|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/nightly-4.22-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+    labels:
+      ci-operator.openshift.io/variant: nightly-4.22
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-nightly-4.22-images
+    rerun_command: /test nightly-4.22-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=nightly-4.22
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )nightly-4.22-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/sanity-doca4
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+      timeout: 2h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca4
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-sanity-doca4
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test sanity-doca4
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=sanity-doca4
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(sanity-doca4|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/sanity-doca8
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+      timeout: 2h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-sanity-doca8
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test sanity-doca8
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=sanity-doca8
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(sanity-doca8|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/scale-doca4
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca4
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-scale-doca4
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test scale-doca4
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=scale-doca4
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(scale-doca4|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/scale-doca8
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-scale-doca8
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test scale-doca8
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=scale-doca8
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(scale-doca8|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/upgrade-management
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+      timeout: 2h0m0s
+    labels:
+      capability/intranet: intranet
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-upgrade-management
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test upgrade-management
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=upgrade-management
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(upgrade-management|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/upgrade-management-doca4
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+      timeout: 2h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca4
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-main-upgrade-management-doca4
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test upgrade-management-doca4
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=upgrade-management-doca4
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(upgrade-management-doca4|remaining-required),?($|\s.*)

@@ -11,6 +11,8 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: upi-installer
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -338,10 +340,10 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-network-dynamic-ipv6
-- as: baremetal-sno-agent-ipv6-dynamic-f7
+- as: baremetal-sno-agent-ipv6-dynamic-disc-f7
   capabilities:
   - intranet
-  cron: 39 0 4,11,18,25 * *
+  cron: 39 18 4,11,18,25 * *
   reporter_config:
     channel: '#team-qe-agent-prow'
     job_states_to_report:
@@ -354,31 +356,10 @@ tests:
     env:
       AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "true"
       RESERVE_BOOTSTRAP: "false"
       architecture: amd64
       masters: "1"
-      workers: "0"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: baremetal-lab-agent-install-network-dynamic-ipv6
-- as: baremetal-compact-agent-ipv6-dynamic-f7
-  capabilities:
-  - intranet
-  cron: 49 22 4,11,18,25 * *
-  reporter_config:
-    channel: '#team-qe-agent-prow'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> <!subteam^S07UT7GM17W> Please check
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      masters: "3"
       workers: "0"
     test:
     - chain: cucushift-installer-check-cluster-health
@@ -773,7 +754,7 @@ tests:
   cluster: build01
   cron: 7 16 19 * *
   steps:
-    cluster_profile: nutanix-qe
+    cluster_profile: nutanix
     env:
       MASTERS: "1"
     test:
@@ -783,7 +764,7 @@ tests:
   cluster: build01
   cron: 23 14 29 * *
   steps:
-    cluster_profile: nutanix-qe
+    cluster_profile: nutanix
     env:
       FIPS_ENABLED: "true"
     test:
@@ -793,7 +774,7 @@ tests:
   cluster: build01
   cron: 46 7 2 * *
   steps:
-    cluster_profile: nutanix-qe
+    cluster_profile: nutanix
     env:
       WORKERS: "2"
     test:

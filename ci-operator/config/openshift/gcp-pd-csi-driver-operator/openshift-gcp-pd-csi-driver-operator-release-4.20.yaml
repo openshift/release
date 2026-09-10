@@ -16,6 +16,8 @@ promotion:
   to:
   - name: "4.20"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -44,11 +46,13 @@ tests:
     make verify
   container:
     from: src
-- as: e2e-gcp
+- always_run: false
+  as: e2e-gcp
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-csi
+- always_run: false
+  as: e2e-gcp-csi
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-csi
@@ -66,7 +70,8 @@ tests:
     env:
       COMPUTE_NODE_TYPE: n4-standard-4
     workflow: openshift-e2e-gcp-csi-custom-worker
-- as: e2e-gcp-ovn-upgrade
+- always_run: false
+  as: e2e-gcp-ovn-upgrade
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp-ovn
@@ -78,6 +83,12 @@ tests:
     env:
       TEST_SCENARIOS: \[CSI-Driver\]|\[GKE-PD-CSI\]|\[GKE-PD-CSI-Driver-Operator\]
     workflow: openshift-e2e-gcp-csi-extended
+- always_run: false
+  as: e2e-gcp-csi-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity-persistent-disk
 - as: verify-deps
   steps:
     test:

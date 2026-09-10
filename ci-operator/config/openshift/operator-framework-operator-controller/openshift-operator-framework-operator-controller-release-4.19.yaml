@@ -19,6 +19,8 @@ promotion:
     - e2e-test-registry
     name: "4.19"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -72,8 +74,9 @@ tests:
     fi
   container:
     from: src
-- as: openshift-e2e-aws
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+- always_run: false
+  as: openshift-e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -119,8 +122,8 @@ tests:
         cd openshift/default-catalog-consistency
         REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
       credentials:
-      - mount_path: /var/run/secrets/ci-pull-credentials
-        name: ci-pull-credentials
+      - bundle: ci-pull-credentials
+        mount_path: /var/run/secrets/ci-pull-credentials
         namespace: ci
       from: src
       resources:

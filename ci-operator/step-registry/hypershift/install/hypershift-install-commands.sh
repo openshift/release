@@ -6,24 +6,69 @@ EXTRA_ARGS=""
 HCP_CLI="bin/hypershift"
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 
-if [[ $HO_MULTI == "true" ]]; then
-  OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
-  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-  mkdir /tmp/hs-cli
-  oc image extract quay.io/acm-d/rhtap-hypershift-operator:latest --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
-  chmod +x /tmp/hs-cli/hypershift
-  HCP_CLI="/tmp/hs-cli/hypershift"
-elif [[ $INSTALL_FROM_LATEST == "true" ]]; then
-  # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
-  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-  mkdir /tmp/hs-cli
-  oc image extract $HYPERSHIFT_RELEASE_LATEST --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
-  chmod +x /tmp/hs-cli/hypershift
-  HCP_CLI="/tmp/hs-cli/hypershift"
+extract_hcp_cli() {
+  local image=$1
+  local cli_dir
+  cli_dir="$(mktemp -d "${TMPDIR:-/tmp}/hs-cli.XXXXXX")"
+  oc image extract "${image}" --path "/usr/bin/hypershift:${cli_dir}" \
+    --registry-config=/etc/ci-pull-credentials/.dockerconfigjson \
+    --filter-by-os="linux/amd64" --confirm
+  chmod +x "${cli_dir}/hypershift"
+  HCP_CLI="${cli_dir}/hypershift"
+}
+
+# Gangway does not strip the MULTISTAGE_PARAM_OVERRIDE_ prefix, so the HO release
+# controller passes the image via the prefixed variable and we copy it here.
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE="${MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
 fi
+
+OVERRIDE_COUNT=0
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+if [[ "${HO_MULTI}" == "true" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+if [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+
+if [[ ${OVERRIDE_COUNT} -gt 1 ]]; then
+  echo "WARNING: Multiple image override flags are set. Precedence (highest to lowest):"
+  echo "  1. OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE"
+  echo "  2. HO_MULTI"
+  echo "  3. INSTALL_FROM_LATEST"
+fi
+
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  echo "WARNING: Overriding OPERATOR_IMAGE"
+  echo "  Default: ${HYPERSHIFT_RELEASE_LATEST}"
+  echo "  Override: ${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+  OPERATOR_IMAGE="${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+elif [[ "${HO_MULTI}" == "true" ]]; then
+  # extract_hcp_cli uses --filter-by-os=linux/amd64 because the step container is always amd64
+  echo "WARNING: Using ACM downstream multi-arch operator image (CI pipeline builds amd64 only)"
+  echo "  Default: ${HYPERSHIFT_RELEASE_LATEST}"
+  echo "  Override: quay.io/acm-d/rhtap-hypershift-operator:latest"
+  OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+elif [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
+  # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
+  echo "WARNING: Extracting hcp CLI from dependency image instead of step container"
+  echo "  Image: ${OPERATOR_IMAGE}"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+fi
+
+INSTALL_HELP=$("${HCP_CLI}" install --help 2>&1 || true)
 
 if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
+fi
+
+if [ "${ENABLE_STANDALONE_KARPENTER_OPERATOR}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --enable-standalone-karpenter-operator"
 fi
 
 if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
@@ -57,14 +102,13 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
 fi
 
 OCP_VERSION="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$' | grep -oE '^[0-9]+\.[0-9]+')"
-EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/${OCP_VERSION}:cluster-api-provider-kubevirt"
+if echo "${INSTALL_HELP}" | grep -q -- '--additional-operator-env-vars'; then
+  EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=quay-proxy.ci.openshift.org/openshift/ci:ocp_${OCP_VERSION}_cluster-api-provider-kubevirt"
+fi
 
 case "${CLOUD_PROVIDER}" in
   AWS)
-    # Some jobs (e.g. upgrade-hypershift-operator) install from a release-tagged
-    # HyperShift image, not main. New CLI flags must be gated behind toggles so
-    # older operator versions that lack those flags are not broken.
-    if [ "${ENABLE_SCALE_FROM_ZERO}" == "true" ]; then
+    if echo "${INSTALL_HELP}" | grep -q -- '--scale-from-zero-provider'; then
       EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-provider aws --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials"
     fi
 
@@ -149,18 +193,37 @@ case "${CLOUD_PROVIDER}" in
   HYPERSHIFT_CI_PROJECT="$(<"${SHARED_DIR}/hypershift-ci-project")"
   HYPERSHIFT_CI_DNS_DOMAIN="$(<"${SHARED_DIR}/hypershift-ci-dns-domain")"
 
+  # Shared install flags, reused for both the feature-detection render below
+  # and the real install so they can never drift apart.
+  CMD_ARGS=(
+    --hypershift-image="${OPERATOR_IMAGE}"
+    --external-dns-provider=google
+    --external-dns-domain-filter="${HYPERSHIFT_CI_DNS_DOMAIN}"
+    --external-dns-google-project="${HYPERSHIFT_CI_PROJECT}"
+    --private-platform=GCP
+    --gcp-project="${GCP_PROJECT_ID}"
+    --gcp-region="${GCP_REGION_VALUE}"
+    --platform-monitoring=All
+    --enable-ci-debug-output
+    --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
+  )
+
+  # Older hypershift branches don't bundle the DNSEndpoint CRD (openshift/hypershift#9433).
+  # Detect via the operator's own render output instead of branching on version,
+  # so behavior always tracks what install would actually do.
+  # Captured separately from the grep so a failed render (as opposed to a
+  # successful render simply missing the CRD) surfaces as a hard failure
+  # instead of silently falling through to the manual-apply branch.
+  RENDERED_CRDS="$("${HCP_CLI}" install render --outputs=crds "${CMD_ARGS[@]}")"
+  if ! echo "${RENDERED_CRDS}" | grep -q 'name: dnsendpoints.externaldns.k8s.io'; then
+    echo "DNSEndpoint CRD not bundled by this hypershift version, installing manually..."
+    # Pinned to the commit tagged v0.15.0 (immutable, unlike the mutable tag ref).
+    oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/bf70e3f0acbfbf2fce0bc71a4ca2fd6850de4903/docs/contributing/crd-source/crd-manifest.yaml
+  fi
+
   # Install HyperShift operator
   # The --pull-secret flag creates the pull-secret in the hypershift namespace
-  "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-  --external-dns-provider=google \
-  --external-dns-domain-filter="${HYPERSHIFT_CI_DNS_DOMAIN}" \
-  --external-dns-google-project="${HYPERSHIFT_CI_PROJECT}" \
-  --private-platform=GCP \
-  --gcp-project="${GCP_PROJECT_ID}" \
-  --gcp-region="${GCP_REGION_VALUE}" \
-  --platform-monitoring=All \
-  --enable-ci-debug-output \
-  --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+  "${HCP_CLI}" install "${CMD_ARGS[@]}" \
   --wait-until-available \
   ${EXTRA_ARGS}     ;;
 

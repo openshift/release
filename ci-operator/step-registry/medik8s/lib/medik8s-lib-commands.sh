@@ -6,7 +6,7 @@ cat <<'MEDIK8S_LIB_EOF' > "${SHARED_DIR}/medik8s-lib.sh"
 # Written by the medik8s-lib ref step; do not edit directly.
 #
 # Required caller variables per function:
-#   resolve_commit_sha: GIT_REF, FBC_COMMIT_SHA (in/out)
+#   resolve_commit_sha: OCP_VERSION, FBC_COMMIT_SHA (in/out), FBC_SHA_PINNED (in/out)
 #   verify_fbc_image:   OCP_VERSION, FBC_COMMIT_SHA, FBC_SHA_PINNED
 #   wait_for_mcp_rollout: (none - takes argument)
 #   ensure_marketplace: (none)
@@ -62,72 +62,58 @@ set_proxy() {
 
 resolve_commit_sha() {
     if [[ -n "$FBC_COMMIT_SHA" ]]; then
+        FBC_SHA_PINNED="true"
         log "Using provided FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
         return 0
     fi
 
-    local encoded_ref
-    encoded_ref=$(jq -rn --arg ref "$GIT_REF" '$ref | @uri') || encoded_ref="$GIT_REF"
+    FBC_SHA_PINNED="false"
 
-    log "Resolving latest commit from ${GITLAB_PROJECT_NAME} ${GIT_REF} ref..."
-    local tmp_commit
-    tmp_commit=$(mktemp)
-    gitlab_fetch "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" "$tmp_commit" || {
-        rm -f "$tmp_commit"
-        exit 1
-    }
-    FBC_COMMIT_SHA=$(jq -r .id "$tmp_commit")
-    rm -f "$tmp_commit"
-
-    if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
-        log "ERROR: Failed to parse commit SHA from GitLab API response"
+    if [[ ! "${OCP_VERSION:-}" =~ ^[0-9]{2,4}$ ]]; then
+        log "ERROR: OCP_VERSION must be a 2-4 digit string (e.g., '422' for OCP 4.22), got: '${OCP_VERSION:-}'"
         exit 1
     fi
 
-    log "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
+    local image_name="${FBC_IMAGE_PREFIX}-${OCP_VERSION}"
+    log "Resolving latest active FBC image for ${image_name} from Quay..."
+
+    local quay_response
+    if ! quay_response=$(curl -sSf --retry 3 --retry-delay 2 \
+        --connect-timeout 10 --max-time 30 \
+        "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=50&onlyActiveTags=true" 2>&1); then
+        log "ERROR: Quay API request failed for ${image_name}: ${quay_response}"
+        exit 1
+    fi
+
+    FBC_COMMIT_SHA=$(echo "$quay_response" \
+        | jq -r '[.tags[] | select(.name | test("^[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty')
+
+    if [[ -z "$FBC_COMMIT_SHA" ]]; then
+        log "ERROR: No active SHA tag found for ${image_name} on Quay"
+        exit 1
+    fi
+
+    log "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA (from Quay active tags)"
 }
 
 verify_fbc_image() {
     local image_name="${FBC_IMAGE_PREFIX}-${OCP_VERSION}"
-    local fbc_image="${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
-    log "Verifying FBC image exists: $fbc_image"
 
-    local manifest_status
-    manifest_status=$(curl -sS -o /dev/null -w '%{http_code}' \
-        --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
-        "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_COMMIT_SHA}" \
-        -H "Accept: application/vnd.oci.image.index.v1+json" || true)
-
-    if [[ "$manifest_status" == "404" ]]; then
-        if [[ "$FBC_SHA_PINNED" == "true" ]]; then
-            log "ERROR: Pinned FBC image not found: ${fbc_image}"
-            log "The explicitly provided FBC_COMMIT_SHA does not have a corresponding image on Quay"
+    if [[ "${FBC_SHA_PINNED:-}" == "true" ]]; then
+        local fbc_image="${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
+        log "Verifying pinned FBC image: $fbc_image"
+        local manifest_status
+        manifest_status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
+            "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_COMMIT_SHA}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json" || true)
+        if [[ "$manifest_status" != "200" ]]; then
+            log "ERROR: Pinned FBC image not found (HTTP ${manifest_status})"
             exit 1
         fi
-
-        log "WARNING: FBC image not found for commit ${FBC_COMMIT_SHA} (HTTP 404)"
-        log "Falling back to listing available tags..."
-
-        local fallback_tag
-        fallback_tag=$(curl -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
-            "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=50&onlyActiveTags=true" 2>/dev/null \
-            | jq -r '.tags[].name' \
-            | grep -E '^[0-9a-f]{40}$' \
-            | tail -1) || true
-
-        if [[ -n "$fallback_tag" ]]; then
-            log "Using fallback tag (arbitrary valid commit): $fallback_tag"
-            FBC_COMMIT_SHA="$fallback_tag"
-        else
-            log "ERROR: No valid FBC image tags found"
-            exit 1
-        fi
-    elif [[ "$manifest_status" != "200" ]]; then
-        log "ERROR: Failed to verify FBC image manifest (HTTP ${manifest_status})"
-        exit 1
     fi
 
-    log "FBC image verified: ${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
+    log "Using FBC image: ${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
 }
 
 wait_for_mcp_rollout() {
@@ -213,5 +199,10 @@ wait_for_catalogsource() {
     return 1
 }
 MEDIK8S_LIB_EOF
+
+# Single source of truth for the workload image used by all medik8s E2E
+# destructive tests (connected, disconnected, upgrade). Change HERE to
+# update the image for all environments in one place.
+echo "registry.access.redhat.com/ubi9/ubi-minimal:latest" > "${SHARED_DIR}/workload_image"
 
 echo "medik8s-lib.sh written to ${SHARED_DIR}"

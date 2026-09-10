@@ -261,7 +261,9 @@ fi
 deploy_frr_external_container vrf_neighbors
 
 # apply FRR-K8s overrides to enable debug logging
-oc create namespace openshift-frr-k8s
+# (idempotent: the namespace may already exist when frr-k8s is pre-deployed,
+# e.g. by BGP-based VIP management static pods)
+oc create namespace openshift-frr-k8s --dry-run=client -o yaml | oc apply -f -
 oc apply -f - <<EOF
 kind: ConfigMap
 apiVersion: v1
@@ -274,6 +276,22 @@ EOF
 
 # enable route advertisement with FRR
 oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+
+# The RouteAdvertisements CRD is created by CNO while reconciling the
+# routeAdvertisements enablement. On clusters where frr-k8s is already
+# deployed (e.g. BGP-based VIP management) the daemonset rollout waits below
+# return immediately, so wait for the CRD explicitly (and before a possible
+# FRR_IMAGE managementState=Unmanaged transition stops CNO reconciliation).
+echo "Waiting for the RouteAdvertisements CRD..."
+crd_deadline=$((SECONDS + 600))
+until oc wait --for condition=Established crd/routeadvertisements.k8s.ovn.org --timeout 10s &> /dev/null; do
+  if (( SECONDS >= crd_deadline )); then
+    oc get crd/routeadvertisements.k8s.ovn.org -o yaml || true
+    echo "Timed out waiting for routeadvertisements.k8s.ovn.org" >&2
+    exit 1
+  fi
+  sleep 5
+done
 
 echo "Waiting for daemonset 'frr-k8s' to be created..."
 until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do

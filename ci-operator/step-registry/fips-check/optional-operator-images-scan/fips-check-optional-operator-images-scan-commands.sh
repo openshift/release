@@ -139,7 +139,7 @@ for package in ${package_list}; do
         for image_url in ${image_list}; do
             echo "###test result for image '$image_url' is:" >> $csv_test_result
             ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no -o LogLevel=ERROR ${BASTION_SSH_USER}@${BASTION_IP} \
-                "sudo podman run --rm --privileged -v /tmp/tmp/:/root/:ro registry.ci.openshift.org/ci/check-payload scan operator --spec $image_url" >> ${csv_test_result} 2>&1 || true
+                "sudo podman run --rm --privileged -v /tmp/tmp/:/root/:ro quay-proxy.ci.openshift.org/openshift/ci:ci_check-payload_latest scan operator --spec $image_url" >> ${csv_test_result} 2>&1 || true
         done
         echo "$(cat ${csv_test_result})" >> ${scan_result_full_log}
         # summarize scan results from csv_test_result file

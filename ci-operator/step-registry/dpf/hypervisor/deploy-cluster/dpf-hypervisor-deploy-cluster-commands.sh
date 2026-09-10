@@ -6,15 +6,17 @@ echo "Testing SHARED_DIR" > ${SHARED_DIR}/testing.txt
 ls -ltra ${SHARED_DIR}
 cat ${SHARED_DIR}/testing.txt
 
+CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
+
 # Configuration
-REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
+REMOTE_HOST=$(cat ${CLUSTER_PROFILE_DIR}/remote-host)
 echo "Remote host: ${REMOTE_HOST}"
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
 # Prepare SSH key from Vault (add trailing newline if missing)
 echo "Configuring SSH private key..."
-cat /var/run/dpf-ci/private-key | base64 -d > /tmp/id_rsa
+cat ${CLUSTER_PROFILE_DIR}/private-key | base64 -d > /tmp/id_rsa
 echo "" >> /tmp/id_rsa
 chmod 600 /tmp/id_rsa
 
@@ -35,11 +37,7 @@ else
   exit 1
 fi
 
-# Bypassing env vars set in prepare-environment for now
-# This needs to be main branch
-OPENSHIFT_DPF_BRANCH="main"
 OPENSHIFT_DPF_GITHUB_REPO_URL="https://github.com/rh-ecosystem-edge/openshift-dpf.git"
-CLUSTER_NAME="doca8"
 REMOTE_MAIN_WORK_DIR="/root/${CLUSTER_NAME}/ci"
 
 # Check if target bastion is in maintenance mode
@@ -49,7 +47,7 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f /root/${CLUSTER_NAME}/pause"; th
 fi
 
 # store last openshift-dpf install dir on hypervisor
-REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
+REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
 echo "Deploying OpenShift cluster with DPF on host ${REMOTE_HOST}"
 echo "Remote Main Working directory on hypervisor: ${REMOTE_MAIN_WORK_DIR}"
@@ -96,7 +94,7 @@ if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; the
   if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; \
     git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}; \
     git checkout pr-${PULL_NUMBER}; \
-    git rebase ${OPENSHIFT_DPF_BRANCH}"; then
+    git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
     echo "Successfully checked out PR #${PULL_NUMBER}"
   else
     echo "ERROR: Failed to checkout PR #${PULL_NUMBER}"
@@ -148,7 +146,11 @@ fi
 echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hypervisor"
 
 echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
+# Pass the CI release payload (resolved by ci-operator from the releases.latest config)
+PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
+echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
+  cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
   pwd; \
   env; \
@@ -181,6 +183,9 @@ else
   echo "ERROR: Failed to update KUBECONFIG variable in .env file"
   exit 1
 fi
+
+echo "Copying .env from hypervisor to artifacts..."
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env ${ARTIFACT_DIR}/.env || echo "WARNING: Failed to copy .env to artifacts"
 
 
 # SSH session to hypervisor

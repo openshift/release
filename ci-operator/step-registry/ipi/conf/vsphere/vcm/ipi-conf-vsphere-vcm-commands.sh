@@ -131,6 +131,40 @@ else
   echo "$(date -u --rfc-3339=seconds) - unable to determine version stream, assuming this is master"
 fi
 
+# Derive zone names dynamically from the failure domains provisioned by the VCM check step.
+# The number of zones in each pool's zones list is capped to match the replica count for
+# that pool type: control-plane gets CONTROL_PLANE_REPLICAS zones, compute gets
+# COMPUTE_NODE_REPLICAS zones.  This ensures each node lands in a distinct failure domain
+# without over- or under-specifying zones relative to the replica count.
+# Zones are sliced from the head of the failureDomains list (the order written by check-vcm).
+CP_ZONES_BLOCK=""
+W_ZONES_BLOCK=""
+if [[ -f "${SHARED_DIR}/platform.json" ]]; then
+  fd_count=$(jq '.failureDomains | length' "${SHARED_DIR}/platform.json")
+  if [[ "${fd_count}" -gt 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - found ${fd_count} failure domain(s) in platform.json, generating per-pool zones blocks"
+
+    # Control-plane: take the first min(CONTROL_PLANE_REPLICAS, fd_count) failure domains
+    cp_zone_count=$(( CONTROL_PLANE_REPLICAS < fd_count ? CONTROL_PLANE_REPLICAS : fd_count ))
+    CP_ZONES_YAML=$(jq -r --argjson n "${cp_zone_count}" \
+      '.failureDomains[:$n][].name | "      - \(.)"' "${SHARED_DIR}/platform.json")
+    CP_ZONES_BLOCK="
+      zones:
+${CP_ZONES_YAML}"
+
+    # Compute: take the first min(COMPUTE_NODE_REPLICAS, fd_count) failure domains
+    w_zone_count=$(( COMPUTE_NODE_REPLICAS < fd_count ? COMPUTE_NODE_REPLICAS : fd_count ))
+    W_ZONES_YAML=$(jq -r --argjson n "${w_zone_count}" \
+      '.failureDomains[:$n][].name | "      - \(.)"' "${SHARED_DIR}/platform.json")
+    W_ZONES_BLOCK="
+      zones:
+${W_ZONES_YAML}"
+
+    echo "$(date -u --rfc-3339=seconds) - control-plane zones (${cp_zone_count}): ${CP_ZONES_YAML//$'\n'/ }"
+    echo "$(date -u --rfc-3339=seconds) - compute zones (${w_zone_count}): ${W_ZONES_YAML//$'\n'/ }"
+  fi
+fi
+
 # Creating platform config for 4.12+
 # Add node resource configs
 SPEC_CONFIG="/var/run/vault/vsphere-ibmcloud-config/vm-specs.json"
@@ -138,12 +172,12 @@ CP_PLATFORM="platform:
     vsphere:
       cpus: $(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
       coresPerSocket: $(jq -r '.spec.controlplane.coresPerSocket' ${SPEC_CONFIG})
-      memoryMB: $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})"
+      memoryMB: $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})${CP_ZONES_BLOCK}"
 W_PLATFORM="platform:
     vsphere:
       cpus: $(jq -r '.spec.compute.cpus' ${SPEC_CONFIG})
       coresPerSocket: $(jq -r '.spec.compute.coresPerSocket' ${SPEC_CONFIG})
-      memoryMB: $(jq -r '.spec.compute.memoryMB' ${SPEC_CONFIG})"
+      memoryMB: $(jq -r '.spec.compute.memoryMB' ${SPEC_CONFIG})${W_ZONES_BLOCK}"
 
 # Add additional disks
 if [ -n "${ADDITIONAL_DISK}" ]; then
@@ -191,7 +225,7 @@ if [ ${OCP_VERSION} -lt 411 ]; then
   platform:
     vsphere:
       osDisk:
-        diskSizeGB: 120
+        diskSizeGB: 120${CP_ZONES_BLOCK}
 compute:
 - name: worker
   replicas: ${COMPUTE_NODE_REPLICAS}
@@ -201,7 +235,7 @@ compute:
       coresPerSocket: 1
       memoryMB: 16384
       osDisk:
-        diskSizeGB: 120"
+        diskSizeGB: 120${W_ZONES_BLOCK}"
 else
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
@@ -223,7 +257,7 @@ if [[ "${SIZE_VARIANT}" == "compact" ]]; then
       cpus: 8
       memoryMB: 32768
       osDisk:
-        diskSizeGB: 120
+        diskSizeGB: 120${CP_ZONES_BLOCK}
 compute:
 - name: worker
   replicas: 0"

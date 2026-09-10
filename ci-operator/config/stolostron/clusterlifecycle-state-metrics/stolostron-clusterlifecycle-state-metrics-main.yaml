@@ -19,6 +19,8 @@ images:
   - dockerfile_path: build/Dockerfile.coverage.prow
     from: clusterlifecycle-state-metrics
     to: clusterlifecycle-state-metrics-coverage
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -48,8 +50,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export HOME="/tmp"
@@ -62,8 +65,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: check
   commands: make check
   container:
@@ -86,12 +90,6 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-5.0
-    workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main
   org: stolostron

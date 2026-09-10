@@ -87,6 +87,8 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -150,9 +152,7 @@ tests:
   cron: 7 10 15 6 *
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - as: e2e-metal-ipi-ovn-ipv4
   capabilities:
   - intranet
@@ -411,6 +411,9 @@ tests:
       :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      MAX_VCENTERS: "1"
+      POOL_COUNT: "3"
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-upi-zones
   cron: 21 15 24 6 *
@@ -423,6 +426,9 @@ tests:
       :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      MAX_VCENTERS: "1"
+      POOL_COUNT: "3"
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-ipi-ovn-cgroupsv1
   cron: 34 8 15 2 *
@@ -709,9 +715,9 @@ tests:
         cd /tmp/cnv-ci
         make deploy_test
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
+      - collection: cnv-ci-secrets
+        group: cnv-ci-brew-pull-secret
+        mount_path: /var/run/cnv-ci-brew-pull-secret
       env:
       - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
         name: BREW_IMAGE_REGISTRY_USERNAME
@@ -749,9 +755,9 @@ tests:
         cd /tmp/cnv-ci
         make upgrade_test
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
+      - collection: cnv-ci-secrets
+        group: cnv-ci-brew-pull-secret
+        mount_path: /var/run/cnv-ci-brew-pull-secret
       env:
       - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
         name: BREW_IMAGE_REGISTRY_USERNAME
@@ -868,6 +874,8 @@ tests:
   cron: 37 23 1 4 *
   steps:
     cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     observers:
       enable:
       - observers-resource-watch

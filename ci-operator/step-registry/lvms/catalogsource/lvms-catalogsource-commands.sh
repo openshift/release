@@ -96,8 +96,96 @@ fi
 # lvms-operator exists in Konflux catalogsource index image by default in all versions
 LVM_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
 
+declare -r QUAY_API="https://quay.io/api/v1"
+declare -r QUAY_REPO="redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog"
+
+resolve_snapshot_to_digest() {
+	local snapshot="$1"
+
+	local version_prefix date_str time_str
+	version_prefix=$(echo "${snapshot}" | grep -oP 'lvm-operator-catalog-\d+-\d+')
+	date_str=$(echo "${snapshot}" | grep -oP '\d{8}(?=-\d{6}-)')
+	time_str=$(echo "${snapshot}" | grep -oP '(?<=\d{8}-)\d{6}')
+
+	if [[ -z "${version_prefix}" || -z "${date_str}" || -z "${time_str}" ]]; then
+		echo "Cannot parse snapshot name: ${snapshot}" >&2
+		return 1
+	fi
+
+	local snap_year snap_month snap_day snap_hour snap_min snap_sec snap_epoch
+	snap_year=${date_str:0:4}
+	snap_month=${date_str:4:2}
+	snap_day=${date_str:6:2}
+	snap_hour=${time_str:0:2}
+	snap_min=${time_str:2:2}
+	snap_sec=${time_str:4:2}
+	snap_epoch=$(date -d "${snap_year}-${snap_month}-${snap_day}T${snap_hour}:${snap_min}:${snap_sec}Z" +%s 2>/dev/null || echo 0)
+
+	local version_dot
+	version_dot=$(echo "${version_prefix}" | sed 's/lvm-operator-catalog-//; s/-/./')
+
+	local tags_json
+	tags_json=$(curl -sSL --connect-timeout 10 --max-time 30 \
+		"${QUAY_API}/repository/${QUAY_REPO}/tag/?limit=50&filter_tag_name=like:v${version_dot}-")
+
+	local result
+	result=$(echo "${tags_json}" | jq -r --arg snap_epoch "${snap_epoch}" --arg vpfx "v${version_dot}-" '
+		[.tags[]
+		 | select(.name | startswith($vpfx))
+		 | select(.name | test("^v[0-9]+\\.[0-9]+-[a-f0-9]{40}$"))
+		 | select(.last_modified != null and .last_modified != "")
+		 | .tag_epoch = (.last_modified | strptime("%a, %d %b %Y %H:%M:%S %z") | mktime)
+		 | .abs_delta = ((.tag_epoch - ($snap_epoch | tonumber)) | fabs)
+		] | sort_by(.abs_delta) | .[0] // empty |
+		[.name, .manifest_digest] | @tsv
+	')
+
+	if [[ -z "${result}" ]]; then
+		echo "No matching quay tag found for snapshot ${snapshot}" >&2
+		return 1
+	fi
+
+	local tag_name digest
+	tag_name=$(echo "${result}" | cut -f1)
+	digest=$(echo "${result}" | cut -f2)
+
+	echo "Resolved: ${snapshot} → ${tag_name} (${digest})" >&2
+	echo "${digest}"
+}
+
+# Z-stream presubmit: resolve catalog image from PR content
+if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
+	if [[ -z "${PULL_NUMBER:-}" ]]; then
+		echo "ERROR: ZSTREAM_VERSION is set but PULL_NUMBER is not available"
+		exit 1
+	fi
+	echo "Resolving z-stream catalog image for version ${ZSTREAM_VERSION} from PR #${PULL_NUMBER}"
+
+	catalog_prefix="lvm-operator-catalog-$(echo "${ZSTREAM_VERSION}" | tr '.' '-')"
+
+	pr_files=$(curl -sSL --connect-timeout 10 --max-time 30 \
+		"https://api.github.com/repos/openshift/lvm-operator/pulls/${PULL_NUMBER}/files")
+	snapshot=$(echo "${pr_files}" | jq -r \
+		'[.[] | select(.filename | contains("catalog")) | .patch // ""] | join("\n")' \
+		| grep -oP "(?<=snapshot: )${catalog_prefix}\S*" | head -1)
+
+	if [[ -z "${snapshot}" ]]; then
+		echo "ERROR: No catalog snapshot found for ${ZSTREAM_VERSION} in PR #${PULL_NUMBER}"
+		exit 1
+	fi
+	echo "Found snapshot: ${snapshot}"
+
+	digest=$(resolve_snapshot_to_digest "${snapshot}")
+	if [[ -z "${digest}" ]]; then
+		echo "ERROR: Failed to resolve snapshot ${snapshot} to a quay.io digest"
+		exit 1
+	fi
+
+	LVM_INDEX_IMAGE="quay.io/${QUAY_REPO}@${digest}"
+	echo "Resolved z-stream catalog image: ${LVM_INDEX_IMAGE}"
+
 # Allow overriding the LVM_INDEX_IMAGE with the Gangway API
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE:-}" ]]; then
+elif [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE:-}" ]]; then
   LVM_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE}
 fi
 
@@ -205,6 +293,9 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog
     source: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/openshift4/ose-kube-rbac-proxy
+    source: registry.redhat.io/openshift4/ose-kube-rbac-proxy
 EOF
 
 	if [ $? -ne 0 ]; then
@@ -239,11 +330,8 @@ function mirror_test_images {
 	echo "Pre-mirroring test dependency images to mirror registry (port 5000)"
 
 	local new_pull_secret="/tmp/mirror-pull-secret.json"
-	local registry_cred
-	registry_cred=$(head -n 1 "$MIRROR_REGISTRY_CREDS" | base64 -w 0)
-
-	jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" \
-		'.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+	jq -s '.[0] * {auths: (.[0].auths * .[1].auths)}' \
+		"${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/new-dockerconfigjson > "${new_pull_secret}"
 
 	local image="registry.redhat.io/rhel8/support-tools:latest=${MIRROR_REGISTRY_HOST}/rhel8/support-tools:latest"
 	local retries=0
@@ -261,6 +349,19 @@ function mirror_test_images {
 	done
 
 	echo "Successfully mirrored support-tools image to ${MIRROR_REGISTRY_HOST}"
+
+	local index_image="${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
+	local manifests_dir="/tmp/lvms-catalog-manifests"
+	mkdir -p "${manifests_dir}"
+	echo "Mirroring LVMS catalog images from ${index_image} to ${MIRROR_REGISTRY_HOST}"
+	oc adm catalog mirror "${index_image}" "${MIRROR_REGISTRY_HOST}" \
+		--insecure=true -a "${new_pull_secret}" \
+		--index-filter-by-os="linux/${OCP_ARCH:-amd64}" \
+		--manifests-only=false \
+		--to-manifests="${manifests_dir}" || {
+		echo "WARNING: Failed to mirror LVMS catalog images, operator dependencies may fail to pull"
+	}
+
 	rm -f "${new_pull_secret}"
 	return 0
 }
@@ -486,8 +587,26 @@ function main {
 		return 1
 	}
 
-	# Support hypershift config guest cluster's idms
-	oc get ImageDigestMirrorSet -oyaml >/tmp/mgmt_idms.yaml && yq-go r /tmp/mgmt_idms.yaml 'items[*].spec.imageDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
+	# Support hypershift config guest cluster's idms (non-fatal if yq-go is unavailable)
+	oc get ImageDigestMirrorSet -oyaml >/tmp/mgmt_idms.yaml && yq-go r /tmp/mgmt_idms.yaml 'items[*].spec.imageDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml || true
+
+	# Extract source commit from catalog image for z-stream integration test builds.
+	# Only needed when ZSTREAM_VERSION is set — non-z-stream tests use pre-built images.
+	if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
+		local commit
+		local commit image_info_flags=""
+		if [[ "$DISCONNECTED" == "true" ]]; then
+			image_info_flags="--insecure -a /tmp/new-dockerconfigjson"
+		fi
+		commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+			| jq -r '.config.config.Labels["vcs-ref"]')
+		if [[ -z "${commit}" || "${commit}" == "null" ]]; then
+			echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
+			return 1
+		fi
+		echo -n "${commit}" > "${SHARED_DIR}/lvm_source_commit"
+	fi
+
 	return 0
 }
 

@@ -12,7 +12,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.21
+    tag: rhel-9-release-golang-1.26-openshift-4.23
 images:
   items:
   - dockerfile_literal: |
@@ -26,11 +26,13 @@ images:
     dockerfile_path: Dockerfile
     from: ubi9-minimal-entitled
     to: hive
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|renovate\.json|OWNERS|PROJECT|LICENSE)$
 promotion:
   to:
   - name: hive-v4.0
     namespace: openshift
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -56,12 +58,12 @@ tests:
   commands: GO_COMPLIANCE_INFO=0 make test
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|renovate\.json|OWNERS|PROJECT|LICENSE)$
 - as: verify
   commands: GO_COMPLIANCE_INFO=0 make verify
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|renovate\.json|OWNERS|PROJECT|LICENSE)$
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -70,8 +72,9 @@ tests:
     from: src
   run_if_changed: \.go$
   secret:
+    collection: hive
+    group: hive-codecov-token
     mount_path: /tmp/secret
-    name: hive-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -80,14 +83,15 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: hive
+    group: hive-codecov-token
     mount_path: /tmp/secret
-    name: hive-codecov-token
-- as: security
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
+- as: snyk
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
-      SNYK_CODE_ADDITIONAL_ARGS: -d --severity-threshold=high
-      SNYK_DEPS_ADDITIONAL_ARGS: -d
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
       SNYK_ENABLE_DEPS_SCAN: "true"
     workflow: openshift-ci-security
 - as: e2e
@@ -101,7 +105,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.21"
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -118,11 +122,11 @@ tests:
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e
       credentials:
-      - mount_path: /tmp/secret/hiveci-aws-creds
-        name: hiveci-aws-creds
-        namespace: test-credentials
-      - mount_path: /tmp/secret/pull-secret
-        name: ci-pull-credentials
+      - collection: hive
+        group: aws-ci-creds
+        mount_path: /tmp/secret/hiveci-aws-creds
+      - bundle: ci-pull-credentials
+        mount_path: /tmp/secret/pull-secret
         namespace: test-credentials
       dependencies:
       - env: HIVE_IMAGE
@@ -146,7 +150,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.21"
-  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|renovate\.json|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -165,11 +169,11 @@ tests:
         export USE_MANAGED_DNS=false
         GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e-pool
       credentials:
-      - mount_path: /tmp/secret/hiveci-aws-creds
-        name: hiveci-aws-creds
-        namespace: test-credentials
-      - mount_path: /tmp/secret/pull-secret
-        name: ci-pull-credentials
+      - collection: hive
+        group: aws-ci-creds
+        mount_path: /tmp/secret/hiveci-aws-creds
+      - bundle: ci-pull-credentials
+        mount_path: /tmp/secret/pull-secret
         namespace: test-credentials
       dependencies:
       - env: HIVE_IMAGE
@@ -182,8 +186,9 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: e2e-gcp
-  run_if_changed: gcp
+- always_run: false
+  as: e2e-gcp
+  pipeline_run_if_changed: gcp
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -202,8 +207,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-azure
-  run_if_changed: azure
+- always_run: false
+  as: e2e-azure
+  pipeline_run_if_changed: azure
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -248,9 +254,9 @@ tests:
 
         GO_COMPLIANCE_INFO=0 CLOUD=vsphere make test-e2e
       credentials:
-      - mount_path: /var/run/vault/vsphere-ibmcloud-ci
-        name: vsphere-ibmcloud-ci
-        namespace: test-credentials
+      - collection: vsphere
+        group: ibmcloud/ci
+        mount_path: /var/run/vault/vsphere-ibmcloud-ci
       dependencies:
       - env: HIVE_IMAGE
         name: hive

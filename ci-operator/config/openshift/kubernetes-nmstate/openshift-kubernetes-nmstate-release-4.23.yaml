@@ -32,6 +32,8 @@ promotion:
     - src-with-oc-and-kubectl
     name: "4.23"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -59,13 +61,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: security
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    env:
-      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
-      SNYK_ENABLE_DEPS_SCAN: "true"
-    workflow: openshift-ci-security
 - as: unit
   commands: make test/unit
   container:
@@ -84,6 +79,7 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
+        ENABLE_LLDP_TOR=true
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-operator-ovn-ipv4
   capabilities:

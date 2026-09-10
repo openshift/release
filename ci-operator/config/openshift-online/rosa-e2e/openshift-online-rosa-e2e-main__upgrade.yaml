@@ -11,15 +11,17 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+  rosa-e2e:
+    name: rosa-e2e
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
-images:
-  items:
-  - dockerfile_path: Containerfile
-    to: rosa-e2e
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -29,7 +31,7 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -101,13 +103,13 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
       LABEL_FILTER: Platform:HCP
-      MULTI_AZ: "false"
+      MULTI_AZ: "true"
       OCM_LOGIN_ENV: staging
       REGION: us-west-2
-      REPLICAS: "2"
+      REPLICAS: "3"
       UPGRADE_CHANNEL_PREFIX: candidate
       VERSION_OFFSET_FROM_LATEST: "3"
-      ZONES_COUNT: "1"
+      ZONES_COUNT: "3"
     test:
     - ref: rosa-cluster-upgrade-hcp
     - ref: rosa-cluster-upgrade-machinepool
@@ -123,13 +125,13 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
       LABEL_FILTER: Platform:HCP
-      MULTI_AZ: "false"
+      MULTI_AZ: "true"
       OCM_LOGIN_ENV: staging
       REGION: us-west-2
-      REPLICAS: "2"
+      REPLICAS: "3"
       UPGRADE_CHANNEL_PREFIX: candidate
       VERSION_OFFSET_FROM_LATEST: "2"
-      ZONES_COUNT: "1"
+      ZONES_COUNT: "3"
     test:
     - ref: rosa-cluster-upgrade-hcp
     - ref: rosa-cluster-upgrade-machinepool
@@ -145,13 +147,13 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
       LABEL_FILTER: Platform:HCP
-      MULTI_AZ: "false"
+      MULTI_AZ: "true"
       OCM_LOGIN_ENV: staging
       REGION: us-west-2
-      REPLICAS: "2"
+      REPLICAS: "3"
       UPGRADE_CHANNEL_PREFIX: candidate
       VERSION_OFFSET_FROM_LATEST: "1"
-      ZONES_COUNT: "1"
+      ZONES_COUNT: "3"
     test:
     - ref: rosa-cluster-upgrade-hcp
     - ref: rosa-cluster-upgrade-machinepool

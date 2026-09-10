@@ -1,0 +1,29 @@
+workflow:
+  as: telcov10n-system-telco-kpis-candidate-tests
+  steps:
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    - chain: telcov10n-system-telco-kpis-spoke-deployment
+    - ref: telcov10n-system-telco-kpis-mirror-ran-test-images
+    test:
+    - ref: telcov10n-system-telco-kpis-collect-node-info
+    - ref: telcov10n-system-telco-kpis-tests-run-ztp-ai-deployment-time-test
+    - ref: telcov10n-system-telco-kpis-tests-run-bios-validation-test
+    - ref: telcov10n-system-telco-kpis-tests-run-oslat-test
+    - ref: telcov10n-system-telco-kpis-tests-run-cyclictest-test
+    - ref: telcov10n-system-telco-kpis-tests-run-ptp-test
+    - ref: telcov10n-system-telco-kpis-tests-run-cpu-util-test
+    - ref: telcov10n-system-telco-kpis-tests-run-reboot-test
+    - ref: telcov10n-system-telco-kpis-tests-run-rfc2544-test
+    - ref: telcov10n-system-telco-kpis-tests-run-rds-compare-test
+    post:
+    - chain: telcov10n-system-telco-kpis-reporting
+  documentation: |-
+    Runs the full telco-kpis candidate test pipeline. Assumes hub cluster is
+    already deployed by a separate infra job. Deploys spoke cluster via ZTP,
+    mirrors RAN test images, then executes all KPI tests: node-info collection,
+    ZTP AI deployment time, BIOS validation, oslat, cyclictest, PTP, CPU
+    utilization, reboot, RFC2544 throughput/latency, and RDS comparison.
+    Post-test reporting uploads to Polarion/TestRail.
+    Per-job INFRA_SETTINGS must provide spoke_lockdown_uri, lockdown_uri,
+    and ztp_git_branch.

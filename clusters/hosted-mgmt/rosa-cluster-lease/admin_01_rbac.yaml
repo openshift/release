@@ -43,3 +43,34 @@ subjects:
 - kind: ServiceAccount
   name: rosa-cluster-lease-manager
   namespace: rosa-cluster-lease
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rosa-cluster-lease-editor
+  namespace: rosa-cluster-lease
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+  - update
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rosa-cluster-lease-admin
+  namespace: rosa-cluster-lease
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rosa-cluster-lease-editor
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: hp-sre-rosa-ci

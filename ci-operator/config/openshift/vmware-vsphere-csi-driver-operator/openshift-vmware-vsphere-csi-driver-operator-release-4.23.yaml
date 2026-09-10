@@ -2,7 +2,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.22"
+    tag: "5.0"
   virtctl:
     name: "4.23"
     namespace: ocp
@@ -20,6 +20,8 @@ promotion:
   to:
   - name: "4.23"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -46,11 +48,13 @@ tests:
   commands: make verify
   container:
     from: src
-- as: e2e-vsphere
+- always_run: false
+  as: e2e-vsphere
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-operator-test
+- always_run: false
+  as: e2e-vsphere-operator-test
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -63,7 +67,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-vsphere
-- as: e2e-vsphere-csi
+- always_run: false
+  as: e2e-vsphere-csi
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-csi
@@ -87,7 +92,8 @@ tests:
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
     workflow: openshift-e2e-vsphere-csi-hybrid
-- as: e2e-vsphere-ovn-upgrade
+- always_run: false
+  as: e2e-vsphere-ovn-upgrade
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-upgrade-vsphere
@@ -99,7 +105,8 @@ tests:
     env:
       TEST_SCENARIOS: \[CSI-Driver\]|\[vSphere CSI Driver\]|\[vSphere-CSI-Driver-Operator\]
     workflow: openshift-e2e-vsphere-csi-extended
-- as: e2e-vsphere-csi-vcf9
+- always_run: false
+  as: e2e-vsphere-csi-vcf9
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -122,6 +129,21 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
+- always_run: false
+  as: tls-scanner-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "2"
+      SCANNER_MEMORY: 2Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-vsphere
 zz_generated_metadata:
   branch: release-4.23
   org: openshift

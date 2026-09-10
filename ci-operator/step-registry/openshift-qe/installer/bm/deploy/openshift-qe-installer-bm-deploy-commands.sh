@@ -6,12 +6,15 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
-target_bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
 
 # Check if target bastion is in maintenance mode
-if ssh ${SSH_ARGS} -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p root@${bastion}" root@${target_bastion} 'test -f /root/pause'; then
-  echo "The cluster is on maintenance mode. Remove the file /root/pause in the bastion host when the maintenance is over"
-  exit 1
+if [[ ! -f "${SHARED_DIR}/assignment_id" ]]; then
+  target_bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+  # Check if target bastion is in maintenance mode
+  if ssh ${SSH_ARGS} -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p root@${bastion}" root@${target_bastion} 'test -f /root/pause'; then
+    echo "The cluster is on maintenance mode. Remove the file /root/pause in the bastion host when the maintenance is over"
+    exit 1
+  fi
 fi
 
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
@@ -76,6 +79,7 @@ sed -i "s|^smcipmitool_url:$|smcipmitool_url: \"file:///root/smcipmitool.tar.gz\
 # Variables with defaults that need overriding
 sed -i "s/^public_vlan: .*/public_vlan: $PUBLIC_VLAN/" /tmp/all.yml
 sed -i "s/^enable_fips: .*/enable_fips: $FIPS/" /tmp/all.yml
+sed -i "s/^enable_techpreview: .*/enable_techpreview: $ENABLE_TECHPREVIEW/" /tmp/all.yml
 
 # Variables NOT in sample — append
 cat <<EOF >>/tmp/all.yml
@@ -85,6 +89,22 @@ payload_url: "${RELEASE_IMAGE_LATEST}"
 image_type: "minimal-iso"
 reset_idrac: $RESET_IDRAC
 EOF
+
+# Append HOST PREFIX if set
+if [[ -n "${HOST_PREFIX}" ]]; then
+  cat <<EOF >>/tmp/all.yml
+cluster_network_host_prefix: [${HOST_PREFIX}]
+EOF
+fi
+
+# Append ocp_inventory_override if enabled
+if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
+   OCP_INVENTORY_PATH=$(cat ${CLUSTER_PROFILE_DIR}/ocp_inventory_path)
+   export OCP_INVENTORY_PATH
+   cat <<EOF >>/tmp/all.yml
+ocp_inventory_override: "${OCP_INVENTORY_PATH}"
+EOF
+fi
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
   echo "Private network deployment"
@@ -105,7 +125,7 @@ cleanup_ssh() {
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
-bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion 2>/dev/null || cat ${SHARED_DIR}/bastion)
 
 # Generate a random port between 10000-32767 for SOCKS proxy (avoid ephemeral port range 32768-60999)
 SOCKS_PORT=$((RANDOM % 22768 + 10000))
@@ -219,8 +239,14 @@ cat /tmp/all.yml
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
 # Copy the ssh key to the bastion host
-OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
-bastion2=$(curl -sSk $OCPINV | jq -r ".nodes[0].name")
+if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
+   scp -q ${SSH_ARGS} root@${bastion}:${OCP_INVENTORY_PATH} /tmp/inventory_${LAB_CLOUD}.json
+   OCPINV=/tmp/inventory_${LAB_CLOUD}.json
+   bastion2=$(jq -r ".nodes[0].name" $OCPINV)
+else
+   OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+   bastion2=$(curl -sSk $OCPINV | jq -r ".nodes[0].name")
+fi
 ssh ${SSH_ARGS} root@${bastion} "
    ssh-keygen -R ${bastion2}
    sshpass -p $LOGIN ssh-copy-id -o StrictHostKeyChecking=no root@${bastion2}

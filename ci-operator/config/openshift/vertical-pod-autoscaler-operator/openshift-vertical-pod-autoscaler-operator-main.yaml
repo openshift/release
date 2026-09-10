@@ -4,13 +4,17 @@ base_images:
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: vertical-pod-autoscaler-operator-bundle
   previous-vpa-operator:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: vertical-pod-autoscaler-operator
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   ubi-python-311:
     name: ubi-python-311
     namespace: ocp
@@ -46,17 +50,19 @@ promotion:
   to:
   - additional_images:
       vertical-pod-autoscaler-operator-bundle: vertical-pod-autoscaler-operator-bundle
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   multilatest:
     release:
@@ -106,8 +112,9 @@ tests:
     env:
       PROJECT_NAME: vertical-pod-autoscaler-operator
     workflow: openshift-ci-security
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -131,10 +138,18 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-olm
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-olm
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-vertical-pod-autoscaler
+      SCANNER_CPU_LIMIT: 500m
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 1Gi
+      SCANNER_MEM_REQUEST: 1Gi
     test:
     - as: install
       cli: latest
@@ -156,9 +171,11 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - ref: tls-scanner-run
     workflow: ipi-aws
-- as: e2e-aws-upgrade
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-upgrade
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -211,8 +228,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-operator-components
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator-components
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -250,8 +268,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-operator-actuation
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator-actuation
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     test:

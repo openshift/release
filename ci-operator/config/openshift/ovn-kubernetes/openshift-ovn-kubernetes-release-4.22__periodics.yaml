@@ -21,6 +21,8 @@ base_images:
     tag: upi-installer
 build_root:
   from_repository: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -60,16 +62,6 @@ tests:
     env:
       ENABLE_DEBUG_CONSOLE: "true"
       ENABLE_DEBUG_CONSOLE_GATHER: "true"
-    workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
-- always_run: false
-  as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
-  capabilities:
-  - intranet
-  cron: 0 5 * * *
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
 - always_run: false
   as: e2e-metal-ipi-ovn-bgp-virt-dualstack
@@ -113,6 +105,15 @@ tests:
     env:
       CNV_PRERELEASE_LATEST_CHANNEL: "false"
     workflow: baremetalds-e2e-ovn-bgp-virt-ipv4
+- as: branch-sync
+  cron: 0 * * * *
+  steps:
+    env:
+      REPO: openshift/ovn-kubernetes
+      SOURCE_BRANCH: release-5.0
+      TARGET_BRANCH: release-4.22
+    test:
+    - ref: github-branch-sync
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

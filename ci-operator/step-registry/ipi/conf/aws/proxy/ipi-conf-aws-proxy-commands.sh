@@ -239,7 +239,7 @@ TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-PROXY_IMAGE=registry.ci.openshift.org/origin/4.5:egress-http-proxy
+PROXY_IMAGE=quay.io/openshifttest/squid-proxy:multiarch
 
 PROXY_NAME="$(yq-go r "${CONFIG}" 'metadata.name')"
 REGION="$(yq-go r "${CONFIG}" 'platform.aws.region')"

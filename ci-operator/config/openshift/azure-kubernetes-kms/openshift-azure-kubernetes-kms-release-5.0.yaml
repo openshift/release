@@ -3,6 +3,10 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -15,9 +19,10 @@ images:
     to: azure-kms-encryption-provider
 promotion:
   to:
-  - disabled: true
-    name: "5.0"
+  - name: "5.0"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -50,8 +55,11 @@ tests:
 - always_run: false
   as: e2e-hypershift
   steps:
-    cluster_profile: hypershift-aws
-    workflow: hypershift-aws-e2e-external
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: ^(TestCreateCluster|TestCreateClusterCustomConfig|TestUpgradeControlPlane)$
+    workflow: hypershift-azure-aks-e2e
 - as: verify-deps
   steps:
     env:

@@ -8,7 +8,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 canonical_go_repository: github.com/stolostron/submariner-addon
 images:
   items:
@@ -16,17 +16,18 @@ images:
     from: base
     to: submariner-addon
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 4.20-priv
-      namespace: ocp-private
+      name: "4.20"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
-      namespace: ocp-private
+      name: "4.20"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -64,9 +65,9 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow sonar/go/prow
       credentials:
-      - mount_path: /etc/sonarcloud/
-        name: acm-sonarcloud-token
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-sonarcloud-token
+        mount_path: /etc/sonarcloud/
       from: src
       resources:
         requests:

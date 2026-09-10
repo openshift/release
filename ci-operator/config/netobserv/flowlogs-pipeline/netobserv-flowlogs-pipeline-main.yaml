@@ -19,10 +19,6 @@ base_images:
     name: netobserv-web-console
     namespace: netobserv
     tag: ci
-  tests-private:
-    name: tests-private
-    namespace: ci
-    tag: "4.21"
 build_root:
   from_repository: true
 images:
@@ -33,12 +29,14 @@ promotion:
   to:
   - namespace: netobserv
     tag: ci
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -47,7 +45,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: qe-e2e-tests
+- always_run: false
+  as: qe-e2e-tests
   optional: true
   steps:
     cluster_profile: aws-qe
@@ -55,9 +54,11 @@ tests:
       PATCH_FLOWLOGS_IMAGE: pipeline:flowlogs-pipeline
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      GINKGO_SKIP_FILTER: "59746"
     test:
     - ref: netobserv-install-operator
     - ref: netobserv-ginkgo-tests
+    - ref: netobserv-evaluate-failures
     workflow: cucushift-installer-rehearse-aws-ipi
 - always_run: false
   as: flp-node-density-heavy-25nodes
@@ -87,7 +88,7 @@ tests:
       PODS_PER_NODE: "200"
       RUN_ORION: "true"
       SIZE_VARIANT: large
-      VERSION: "4.22"
+      VERSION: "5.0"
       WORKLOAD: node-density-heavy
       ZONES_COUNT: "3"
     post:

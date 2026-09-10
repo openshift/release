@@ -24,8 +24,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: base
   dev-scripts:
     name: test
@@ -36,36 +36,52 @@ base_images:
     namespace: ci
     tag: v1.48.0
   ocp_cli:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: cli
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
 images:
   items:
-  - dockerfile_path: images/installer/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.ci
     from: base
     to: installer
-  - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer-artifacts/Dockerfile.rhel
     from: installer
     to: installer-artifacts
-  - dockerfile_path: images/libvirt/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/libvirt/Dockerfile.ci
     from: base
     to: libvirt-installer
-  - dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
     from: base
     to: upi-installer
-  - dockerfile_path: images/openstack/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/openstack/Dockerfile.ci
     from: base
     to: openstack-installer
-  - dockerfile_path: images/baremetal/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/baremetal/Dockerfile.ci
     from: base
     to: baremetal-installer
-  - dockerfile_path: images/installer/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.ci
     from: base
     to: ovirt-installer
-  - dockerfile_literal: |
+  - capabilities:
+    - intranet
+    dockerfile_literal: |
       FROM src
       COPY oc /usr/bin/oc
       RUN ln -s /usr/bin/oc /usr/bin/kubectl
@@ -83,20 +99,21 @@ promotion:
   to:
   - excluded_images:
     - src-oc
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
 resources:
   '*':
     requests:

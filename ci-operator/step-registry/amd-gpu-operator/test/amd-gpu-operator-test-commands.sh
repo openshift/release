@@ -1,9 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# Construct cluster API hostname from environment variables
-CLUSTER_API_HOST="api.${CLUSTER_NAME}.${CLUSTER_DOMAIN}"
-
 # Setup SSH key
 cp /var/run/amd-ci/id_rsa /tmp/id_rsa
 chmod 600 /tmp/id_rsa
@@ -39,8 +36,9 @@ fi
 scp "root@${REMOTE_HOST}:/root/kubeconfig" /tmp/kubeconfig
 
 # Rewrite kubeconfig to use localhost (via SSH tunnel)
-sed -i "s|https://${API_IP}:6443|https://127.0.0.1:6443|g" /tmp/kubeconfig
-sed -i "s|https://${CLUSTER_API_HOST}:6443|https://127.0.0.1:6443|g" /tmp/kubeconfig
+# Use a regex to match any server URL — handles both IP-based and hostname-based
+# entries, including snapshot-modified cluster names (e.g. ocp-419)
+sed -i 's|server: https://.*:6443|server: https://127.0.0.1:6443|g' /tmp/kubeconfig
 sed -i '/certificate-authority-data:/d' /tmp/kubeconfig
 sed -i '/server: https:\/\/127.0.0.1:6443/a\    insecure-skip-tls-verify: true' /tmp/kubeconfig
 

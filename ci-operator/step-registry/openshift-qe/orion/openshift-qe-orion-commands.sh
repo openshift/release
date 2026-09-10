@@ -51,7 +51,7 @@ case "$ES_TYPE" in
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-    if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]]; then
+    if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]] && [[ -z "${PULL_NUMBER:-}" ]]; then
         JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
         JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
         JIRA_URL=https://redhat.atlassian.net/
@@ -97,11 +97,28 @@ if ! curl -fsSL --fail --retry 8 --retry-all-errors https://github.com/cloud-bul
 fi
 chmod +x ocp-metadata
 CLUSTER_METADATA=$(./ocp-metadata)
+
+# HCP clusters have no visible master nodes, so ocp-metadata omits masterNodesType
+# and masterNodesCount. Inject defaults so Orion Jinja templates don't fail.
+if ! echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.stdin); d['masterNodesType']" 2>/dev/null; then
+    CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "
+import sys, json
+d = json.load(sys.stdin)
+d.setdefault('masterNodesType', '')
+d.setdefault('masterNodesCount', 0)
+json.dump(d, sys.stdout, separators=(',', ':'))
+")
+fi
+
 EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 
 # Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
-    ORION_CONFIG="examples/${ORION_WORKLOAD_TYPE}.yaml"
+    ORION_PREFIX=""
+    if echo "${CLUSTER_METADATA}" | jq -e '.clusterType == "rosa-hcp"' &>/dev/null; then
+        ORION_PREFIX="rosa-hcp-"
+    fi
+    ORION_CONFIG="examples/${ORION_PREFIX}${ORION_WORKLOAD_TYPE}.yaml"
 fi
 
 export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"
@@ -300,36 +317,6 @@ process_change_point
 
 cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 
-# Experimental: run orion with original e-divisive binary (safe block, never breaks main execution)
-(
-    EXP_DIR="/tmp/orion-original-edivisive"
-    rm -rf "$EXP_DIR"
-    mkdir -p "$EXP_DIR"
-    pushd "$EXP_DIR"
-    python -m virtualenv ./venv_exp
-    source ./venv_exp/bin/activate
-
-    cp -a /tmp/orion ./orion
-    pushd orion
-    git fetch origin orig-edivisive-exp
-    git checkout FETCH_HEAD
-
-    pip install -q --retries "$MAX_RETRIES" -r requirements.txt
-    pip install -q --retries "$MAX_RETRIES" .
-
-    echo "Running experimental orion (original e-divisive)..."
-    # Strip JIRA flags for experimental run
-    EXTRA_FLAGS_NO_JIRA="${EXTRA_FLAGS//" --jira-ack --jira-auto-create"/}"
-    orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS_NO_JIRA} --viz | tee orion-exp-output.txt || true
-
-    # Copy all results except .xml files into the experimental artifacts subdirectory
-    mkdir -p "$ARTIFACT_DIR/orion-original-edivisive"
-    cp *.csv *.json *.txt *.html "$ARTIFACT_DIR/orion-original-edivisive/" 2>/dev/null || true
-    deactivate
-    popd
-    popd
-    echo "Experimental orion run complete."
-) || echo "Experimental orion block failed, continuing."
 
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."

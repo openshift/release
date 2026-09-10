@@ -59,6 +59,8 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   arm64-initial:
     candidate:
@@ -301,55 +303,58 @@ tests:
     workflow: openshift-e2e-azure-ovn
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   capabilities:
-  - sshd-bastion
-  cron: 0 0 24 12 *
+  - intranet
+  cron: 0 0 16 1 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.12"
       BUTANE_RELEASE: 4.12.0
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-image-ecosystem-ovn-remote-libvirt-s390x
   capabilities:
-  - sshd-bastion
-  cron: 0 0 27 12 *
+  - intranet
+  cron: 0 0 18 1 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.12"
       BUTANE_RELEASE: 4.12.0
       TEST_TYPE: image-ecosystem
-    workflow: openshift-e2e-libvirt
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-e2e-serial-ovn-remote-libvirt-s390x
   capabilities:
-  - sshd-bastion
-  cron: 0 0 29 12 *
+  - intranet
+  cron: 0 0 19 1 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.12"
       BUTANE_RELEASE: 4.12.0
       TEST_TYPE: conformance-serial
-    workflow: openshift-e2e-libvirt
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn
 - as: ocp-fips-ovn-remote-libvirt-s390x
   capabilities:
-  - sshd-bastion
-  cron: 0 0 30 12 *
+  - intranet
+  cron: 0 0 20 1 *
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.12"
@@ -357,14 +362,12 @@ tests:
       FIPS_ENABLED: "true"
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    pre:
-    - chain: ipi-libvirt-pre
-    - ref: fips-check
-    workflow: openshift-e2e-libvirt
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn-fips
 - as: ocp-e2e-ovn-remote-s2s-libvirt-ppc64le
   capabilities:
   - power-s2s-dns
-  cron: 0 0 24 12 *
+  cron: 0 0 16 1 *
   steps:
     cluster_profile: libvirt-ppc64le-s2s
     dependencies:
@@ -378,7 +381,7 @@ tests:
 - as: ocp-image-ecosystem-ovn-remote-s2s-libvirt-ppc64le
   capabilities:
   - power-s2s-dns
-  cron: 0 0 27 12 *
+  cron: 0 0 18 1 *
   steps:
     cluster_profile: libvirt-ppc64le-s2s
     dependencies:
@@ -392,7 +395,7 @@ tests:
 - as: ocp-e2e-serial-ovn-remote-s2s-libvirt-ppc64le
   capabilities:
   - power-s2s-dns
-  cron: 0 0 29 12 *
+  cron: 0 0 19 1 *
   steps:
     cluster_profile: libvirt-ppc64le-s2s
     dependencies:
@@ -406,7 +409,7 @@ tests:
 - as: ocp-fips-ovn-remote-s2s-libvirt-ppc64le
   capabilities:
   - power-s2s-dns
-  cron: 0 0 30 12 *
+  cron: 0 0 20 1 *
   steps:
     cluster_profile: libvirt-ppc64le-s2s
     dependencies:

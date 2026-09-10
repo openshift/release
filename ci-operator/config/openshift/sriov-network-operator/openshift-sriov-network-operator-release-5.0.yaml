@@ -70,12 +70,12 @@ operator:
     with: pipeline:sriov-network-metrics-exporter
 promotion:
   to:
-  - disabled: true
-    name: sriov-5.0
+  - name: sriov-5.0
     namespace: origin
-  - disabled: true
-    name: "5.0"
+  - name: "5.0"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -112,7 +112,8 @@ tests:
   commands: CLUSTER_TYPE=openshift make test-cmd
   container:
     from: src
-- as: operator-e2e
+- always_run: false
+  as: operator-e2e
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -121,7 +122,7 @@ tests:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
       OO_PACKAGE: sriov-network-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: start-sriov-operator
       cli: latest
@@ -191,7 +192,7 @@ tests:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
       OO_PACKAGE: sriov-network-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_TARGET_NAMESPACES: '!all'
       T5CI_JOB_TYPE: sriov
       T5CI_VERSION: "4.17"
     test:
@@ -259,7 +260,7 @@ tests:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
       OO_PACKAGE: sriov-network-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_TARGET_NAMESPACES: '!all'
       T5CI_JOB_TYPE: sno-ztp-cnftests
       T5CI_VERSION: "4.20"
     test:
@@ -319,7 +320,7 @@ tests:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
       OO_PACKAGE: sriov-network-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_TARGET_NAMESPACES: '!all'
     post:
     - chain: gather
     - ref: telco5g-delete-interface

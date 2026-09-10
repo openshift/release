@@ -19,6 +19,11 @@ AZURE_OIDC_ISSUER_URL="$(<"${AZURE_OIDC_ISSUER_URL_LOCATION}" jq -r .oidcIssuerU
 AZURE_KMS_INFO_LOCATION="/etc/hypershift-ci-jobs-azurecreds/aks-kms-info.json"
 AKS_KMS_KEY="$(jq -r '."aks-kms-key"' "${AZURE_KMS_INFO_LOCATION}")"
 AKS_KMS_CREDENTIALS_SECRET="$(jq -r '."aks-kms-credentials-secret"' "${AZURE_KMS_INFO_LOCATION}")"
+HIDE_AZURE_KMS_KEY="false"
+if [[ -s "${SHARED_DIR}/azure_managed_hsm_key_id" ]]; then
+  AKS_KMS_KEY="$(<"${SHARED_DIR}/azure_managed_hsm_key_id")"
+  HIDE_AZURE_KMS_KEY="true"
+fi
 
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
@@ -145,6 +150,10 @@ if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
   esac
 fi
 
+if [[ "${HIDE_AZURE_KMS_KEY}" == "true" ]]; then
+  set +x
+fi
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
@@ -164,11 +173,16 @@ hack/ci-test-e2e.sh -test.v \
     ${MI_ARGS:-} \
     ${DP_ARGS:-} \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
-  --e2e.azure-encryption-key-id=${AKS_KMS_KEY} \
+  --e2e.azure-encryption-key-id="${AKS_KMS_KEY}" \
   --e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET} \
   ${MARKETPLACE_IMAGE_PARAMS} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" \
   ${ADDITIONAL_PULL_SECRET_PARAMS:-} &
-wait $!
+e2e_pid=$!
+
+if [[ "${HIDE_AZURE_KMS_KEY}" == "true" ]]; then
+  set -x
+fi
+wait "${e2e_pid}"

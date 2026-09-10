@@ -4,24 +4,27 @@ ref:
   commands: aro-hcp-lease-acquire-commands.sh
   grace_period: 15s
   credentials:
-    - namespace: test-credentials
-      name: cluster-secrets-aro-hcp-dev
+    - collection: hcm-aro
+      group: aro-hcp-dev
       mount_path: /var/run/aro-hcp-dev
-    - namespace: test-credentials
-      name: cluster-secrets-aro-hcp-int
+    - collection: hcm-aro
+      group: aro-hcp-int
       mount_path: /var/run/aro-hcp-int
-    - namespace: test-credentials
-      name: cluster-secrets-aro-hcp-int-rh
+    - collection: hcm-aro
+      group: aro-hcp-int-rh
       mount_path: /var/run/aro-hcp-int-rh
-    - namespace: test-credentials
-      name: cluster-secrets-aro-hcp-stg
+    - collection: hcm-aro
+      group: aro-hcp-stg
       mount_path: /var/run/aro-hcp-stg
-    - namespace: test-credentials
-      name: cluster-secrets-aro-hcp-stg-rh
+    - collection: hcm-aro
+      group: aro-hcp-stg-rh
       mount_path: /var/run/aro-hcp-stg-rh
-    - namespace: test-credentials
-      name: cluster-secrets-aro-hcp-prod
+    - collection: hcm-aro
+      group: aro-hcp-prod
       mount_path: /var/run/aro-hcp-prod
+    - collection: hcm-aro
+      group: aro-hcp-prod-rh
+      mount_path: /var/run/aro-hcp-prod-rh
   resources:
     requests:
       cpu: 10m
@@ -31,6 +34,15 @@ ref:
       default: "dev"
       documentation: |-
         Selects which environment's cluster secrets to use (dev, int, stg, prod).
+    - name: CLUSTER_PROFILE_DIRS
+      default: ""
+      documentation: |-
+        Optional comma-separated list of cluster profile dirs the leased
+        subscription's owning tenant/service-principal may be resolved across.
+        Used by cross-tenant gating jobs that lease slots living in more than
+        one Azure tenant (for example the RH-tenant prod subs plus the MSFT
+        Test-Tenant prod sub). When unset, `slot-manager acquire` falls back to
+        the single `CLUSTER_PROFILE_DIR` derived from `VAULT_SECRET_PROFILE`.
     - name: ALLOWED_SUBSCRIPTIONS
       default: ""
       documentation: |-
@@ -47,6 +59,14 @@ ref:
       documentation: |-
         Highest-precedence concrete location override for the runtime slot.
         When set, it takes precedence over `ALLOWED_LOCATIONS`.
+    - name: MULTISTAGE_PARAM_OVERRIDE_ALLOWED_SUBSCRIPTIONS
+      default: ""
+      documentation: |-
+        Highest-precedence override for `ALLOWED_SUBSCRIPTIONS`, injected via the
+        Gangway API (prow-job-executor `--environment-variable`). When set, it
+        takes precedence over `ALLOWED_SUBSCRIPTIONS`. Enables per-invocation or
+        per-region cross-tenant runs (RH-tenant PROD subs vs. MSFT Test-Tenant
+        sub) without changing the job's baseline `ALLOWED_SUBSCRIPTIONS`.
     - name: ARO_HCP_DEPLOY_ENV
       default: ""
       documentation: Config environment name (ci00, ci01, int, stg, prod).

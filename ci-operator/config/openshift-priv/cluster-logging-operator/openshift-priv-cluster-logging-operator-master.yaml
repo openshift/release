@@ -1,4 +1,8 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   log-file-metric-exporter:
     name: 6.y
     namespace: logging
@@ -19,23 +23,20 @@ base_images:
     name: 5.y
     namespace: logging
     tag: loki-operator-src
-  ubi9-minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "9"
+  operator-sdk:
+    name: "4.21"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   image_stream_tag:
-    name: builder-priv
-    namespace: ocp-private
-    tag: rhel-9-golang-1.25-openshift-4.21
+    name: builder
+    namespace: ocp-priv
+    tag: rhel-9-golang-1.26-openshift-4.23
 canonical_go_repository: github.com/openshift/cluster-logging-operator
 images:
   items:
-  - from: ubi9-minimal
+  - dockerfile_path: Dockerfile
     to: cluster-logging-operator
-  - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-    from: ubi9-minimal
-    to: cluster-logging-operator-registry
   - dockerfile_literal: |
       FROM src
       COPY --from=loki-operator-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
@@ -57,6 +58,7 @@ operator:
   bundles:
   - as: cluster-logging-operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/openshift-logging/cluster-logging-operator.*
     with: pipeline:cluster-logging-operator
@@ -74,9 +76,10 @@ promotion:
   - additional_images:
       cluster-logging-operator-bundle: cluster-logging-operator-bundle
     disabled: true
-    name: "6.6"
+    name: "6.7"
     namespace: logging
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   latest:
@@ -97,7 +100,7 @@ tests:
   commands: ARTIFACTS_DIR=${ARTIFACT_DIR} make coverage
   container:
     from: src
-- as: e2e-target
+- as: e2e-using-bundle
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -109,17 +112,15 @@ tests:
     version: "4.21"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
+    dependencies:
+      OO_BUNDLE: cluster-logging-operator-bundle
+    env:
+      OO_INSTALL_NAMESPACE: openshift-logging
     test:
     - as: test
       cli: latest
-      commands: export GOFLAGS=-mod=mod ; export PATH=/go/bin:$PATH ; FAKE_HOME_DIR=/tmp/home
-        LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
+      commands: make test-e2e-from-ci-bundle IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
       dependencies:
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator
       - env: IMAGE_LOGGING_VECTOR
         name: pipeline:logging-vector
       - env: IMAGE_LOGGING_EVENTROUTER
@@ -133,43 +134,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: generic-claim
-- as: e2e-using-bundle
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-logging
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.21"
-  optional: true
-  skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
-  steps:
-    dependencies:
-      OO_INDEX: ci-index-cluster-logging-operator-bundle
-    env:
-      OO_CHANNEL: stable-6.6
-      OO_INSTALL_NAMESPACE: openshift-logging
-      OO_PACKAGE: cluster-logging
-      OO_TARGET_NAMESPACES: '!all'
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        GOFLAGS=-mod=mod NO_COLOR=1 go test -v -timeout=90m \
-        -ginkgo.v -ginkgo.trace -ginkgo.poll-progress-after=600s \
-        -ginkgo.poll-progress-interval=30s ./test/e2e/...
-      dependencies:
-      - env: RELATED_IMAGE_VECTOR
-        name: pipeline:logging-vector
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: optional-operators-ci-generic-claim
+    workflow: optional-operators-ci-operator-sdk-generic-claim
 - as: functional-target
   cluster_claim:
     architecture: amd64
@@ -188,8 +153,6 @@ tests:
       commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs make
         test-functional ARTIFACT_DIR=${ARTIFACT_DIR}
       dependencies:
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
         name: pipeline:cluster-logging-operator
       - env: IMAGE_LOGGING_VECTOR

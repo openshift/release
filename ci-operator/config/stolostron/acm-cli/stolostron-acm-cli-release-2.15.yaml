@@ -19,6 +19,7 @@ promotion:
     namespace: stolostron
 prowgen:
   disable_sparse_checkout: true
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -26,6 +27,8 @@ resources:
       memory: 200Mi
 tests:
 - as: publish
+  capabilities:
+  - arm64
   postsubmit: true
   steps:
     dependencies:
@@ -40,9 +43,9 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

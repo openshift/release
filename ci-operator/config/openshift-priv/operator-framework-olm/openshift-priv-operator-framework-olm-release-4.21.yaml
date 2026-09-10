@@ -16,20 +16,21 @@ promotion:
   to:
   - excluded_images:
     - ci-image
-    name: 4.21-priv
-    namespace: ocp-private
+    name: "4.21"
+    namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
     integration:
-      name: 4.21-priv
-      namespace: ocp-private
+      name: "4.21"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.21-priv
-      namespace: ocp-private
+      name: "4.21"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -40,8 +41,9 @@ tests:
   commands: make verify
   container:
     from: ci-image
-- as: e2e-gcp-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+- always_run: false
+  as: e2e-gcp-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
@@ -67,8 +69,9 @@ tests:
   commands: make unit/psm
   container:
     from: ci-image
-- as: e2e-gcp-olm
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
+- always_run: false
+  as: e2e-gcp-olm
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -110,8 +113,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-console-olm
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
+- always_run: false
+  as: e2e-gcp-console-olm
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -123,8 +127,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+- always_run: false
+  as: e2e-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
@@ -148,7 +153,8 @@ tests:
       resources:
         requests:
           cpu: 100m
-- as: e2e-aws-olmv0-ext
+- always_run: false
+  as: e2e-aws-olmv0-ext
   steps:
     cluster_profile: openshift-org-aws
     env:

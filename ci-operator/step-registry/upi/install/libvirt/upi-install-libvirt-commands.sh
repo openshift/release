@@ -57,6 +57,12 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
   export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
+# Fail early if oc is missing (cli: latest injects it for ≤4.15 images).
+if ! command -v oc >/dev/null 2>&1; then
+  echo "ERROR: oc not found in PATH (needed to extract openshift-install from the payload)." >&2
+  exit 1
+fi
+
 # download openshift-install from the payload
 echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
@@ -72,6 +78,80 @@ OCPINSTALL="${INSTALL_DIR}/openshift-install"
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
+
+RHCOS_RESIZED_LOCALLY=true
+
+# Returns true when BRANCH is a numeric OCP version older than 4.16.
+# Used only for s390x ≤4.15 etcd gating. Non-numeric/unset returns false.
+branch_known_older_than_4_16() {
+  local branch="${BRANCH:-}"
+  branch="${branch#release-}"
+  if [[ -z "${branch}" || ! "${branch}" =~ ^[0-9]+(\.[0-9]+)*([.-].*)?$ ]]; then
+    return 1
+  fi
+  echo "${branch}" | awk -F. '{
+    major=$1+0; minor=$2+0;
+    if (major < 4 || (major == 4 && minor < 16)) exit 0;
+    exit 1
+  }'
+}
+
+# Write s390x guest domain XML for the virsh fallback (no virt-install).
+# Only used for IBM Z ≤4.15 images that lack virt-install.
+write_upi_domain_xml() {
+  local name=$1
+  local mac=$2
+  local ign_vol=$3
+  local xml=$4
+  local uuid
+
+  if [[ -r /proc/sys/kernel/random/uuid ]]; then
+    uuid=$(cat /proc/sys/kernel/random/uuid)
+  else
+    uuid=$(python3 -c 'import uuid; print(uuid.uuid4())')
+  fi
+
+  {
+    echo "<domain type='kvm'>"
+    echo "  <name>${name}</name>"
+    echo "  <uuid>${uuid}</uuid>"
+    echo "  <memory unit='MiB'>${DOMAIN_MEMORY}</memory>"
+    echo "  <currentMemory unit='MiB'>${DOMAIN_MEMORY}</currentMemory>"
+    echo "  <vcpu placement='static'>${DOMAIN_VCPUS}</vcpu>"
+    echo "  <os>"
+    echo "    <type arch='s390x' machine='s390-ccw-virtio'>hvm</type>"
+    echo "    <boot dev='hd'/>"
+    echo "  </os>"
+    echo "  <clock offset='utc'/>"
+    echo "  <on_poweroff>destroy</on_poweroff>"
+    echo "  <on_reboot>restart</on_reboot>"
+    echo "  <on_crash>destroy</on_crash>"
+    echo "  <devices>"
+    echo "    <disk type='volume' device='disk'>"
+    echo "      <driver name='qemu' type='qcow2'/>"
+    echo "      <source pool='${POOL_NAME}' volume='${name}-volume'/>"
+    echo "      <target dev='vda' bus='virtio'/>"
+    echo "    </disk>"
+    echo "    <disk type='volume' device='disk'>"
+    echo "      <driver name='qemu' type='raw'/>"
+    echo "      <source pool='${POOL_NAME}' volume='${ign_vol}'/>"
+    echo "      <target dev='vdb' bus='virtio'/>"
+    echo "      <readonly/>"
+    echo "      <serial>ignition</serial>"
+    echo "      <startupPolicy>optional</startupPolicy>"
+    echo "    </disk>"
+    echo "    <interface type='network'>"
+    echo "      <mac address='${mac}'/>"
+    echo "      <source network='${CLUSTER_NAME}'/>"
+    echo "      <model type='virtio'/>"
+    echo "    </interface>"
+    echo "    <console type='pty'>"
+    echo "      <target type='sclp' port='0'/>"
+    echo "    </console>"
+    echo "  </devices>"
+    echo "</domain>"
+  } > "${xml}"
+}
 
 # Only create the storage pool if there isn't one already...
 if [[ $(${VIRSH} pool-list | grep ${POOL_NAME}) ]]; then
@@ -245,9 +325,16 @@ else
         exit 1
       fi
     fi
-    # Resize the rhcos image to match the volume capacity
-    echo "Resizing rhcos image to match volume capacity..."
-    qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
+    # Resize the rhcos image to match the volume capacity.
+    # s390x ≤4.15 may lack qemu-img; otherwise keep the historical path.
+    if [[ "${ARCH}" == "s390x" ]] && ! command -v qemu-img >/dev/null 2>&1; then
+      echo "WARNING: qemu-img unavailable; uploading image as-is (will virsh vol-resize to ${VOLUME_CAPACITY})"
+      RHCOS_RESIZED_LOCALLY=false
+    else
+      echo "Resizing rhcos image to match volume capacity..."
+      qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
+      RHCOS_RESIZED_LOCALLY=true
+    fi
 
     # Create the new source volume
     echo "Creating source volume..."
@@ -263,6 +350,14 @@ else
       --vol ${VOLUME_NAME} \
       --pool ${POOL_NAME} \
       ${INSTALL_DIR}/${VOLUME_NAME}
+
+    # s390x-only: if local qemu-img was unavailable, resize on the hypervisor.
+    if [[ "${ARCH}" == "s390x" && "${RHCOS_RESIZED_LOCALLY}" != "true" ]]; then
+      if ! ${VIRSH} vol-resize --pool "${POOL_NAME}" "${VOLUME_NAME}" "${VOLUME_CAPACITY}"; then
+        echo "ERROR: virsh vol-resize failed for ${VOLUME_NAME}; cannot reach capacity ${VOLUME_CAPACITY} without qemu-img" >&2
+        exit 1
+      fi
+    fi
   fi
 
   # Generate manifests for cluster modifications
@@ -451,18 +546,31 @@ create_node () {
     clone_volume ${NAME}-volume
 
     echo "Creating ${NAME} vm..."
-    virt-install \
-      --connect ${LIBVIRT_CONNECTION} \
-      --name ${NAME} \
-      --memory ${DOMAIN_MEMORY} \
-      --vcpus ${DOMAIN_VCPUS} \
-      --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
-      --disk="vol=${POOL_NAME}/${NAME}-volume" \
-      --osinfo ${VIRT_INSTALL_OSINFO} \
-      --graphics=none \
-      --import \
-      --noautoconsole \
-      --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+    # Historical path when virt-install exists (4.16+ / non-s390x).
+    # s390x ≤4.15 images may lack virt-install; use virsh there only.
+    if [[ "${ARCH}" == "s390x" ]] && ! command -v virt-install >/dev/null 2>&1; then
+      echo "virt-install not found; defining s390x guest ${NAME} with virsh"
+      DOMAIN_XML="${INSTALL_DIR}/${NAME}.xml"
+      write_upi_domain_xml "${NAME}" "${MAC_ADDRESS}" "${IGNITION_VOLUME}" "${DOMAIN_XML}"
+      ${VIRSH} destroy "${NAME}" >/dev/null 2>&1 || true
+      ${VIRSH} undefine "${NAME}" >/dev/null 2>&1 || true
+      ${VIRSH} define "${DOMAIN_XML}"
+      ${VIRSH} start "${NAME}"
+      ${VIRSH} autostart "${NAME}" || true
+    else
+      virt-install \
+        --connect ${LIBVIRT_CONNECTION} \
+        --name ${NAME} \
+        --memory ${DOMAIN_MEMORY} \
+        --vcpus ${DOMAIN_VCPUS} \
+        --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
+        --disk="vol=${POOL_NAME}/${NAME}-volume" \
+        --osinfo ${VIRT_INSTALL_OSINFO} \
+        --graphics=none \
+        --import \
+        --noautoconsole \
+        --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+    fi
   fi
 }
 
@@ -575,21 +683,25 @@ for i in {1..30}; do
   sleep 15
 done
 
-# Patch etcd for allowing slower disks
+# Patch etcd for slower disks. On s390x, skip when BRANCH is known < 4.16 (API unavailable).
 if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
-  echo "Patching etcd cluster operator..."
-  oc patch etcd cluster --type=merge --patch '{"spec":{"controlPlaneHardwareSpeed":"Slower"}}'
-  for i in {1..30}; do
-    ETCD_CO_AVAILABLE=$(oc get co etcd | grep etcd | awk '{print $3}')
-    if [[ "${ETCD_CO_AVAILABLE}" == "True" ]]; then
-      echo "Patched successfully!"
-      break
+  if [[ "${ARCH}" == "s390x" ]] && branch_known_older_than_4_16; then
+    echo "Skipping etcd controlPlaneHardwareSpeed patch: BRANCH=${BRANCH} is older than 4.16"
+  else
+    echo "Patching etcd cluster operator..."
+    oc patch etcd cluster --type=merge --patch '{"spec":{"controlPlaneHardwareSpeed":"Slower"}}'
+    for i in {1..30}; do
+      ETCD_CO_AVAILABLE=$(oc get co etcd | grep etcd | awk '{print $3}')
+      if [[ "${ETCD_CO_AVAILABLE}" == "True" ]]; then
+        echo "Patched successfully!"
+        break
+      fi
+      sleep 15
+    done
+    if [[ "${ETCD_CO_AVAILABLE}" != "True" ]]; then
+      echo "Etcd patch failed..."
+      exit 1
     fi
-    sleep 15
-  done
-  if [[ "${ETCD_CO_AVAILABLE}" != "True" ]]; then
-    echo "Etcd patch failed..."
-    exit 1
   fi
 fi
 

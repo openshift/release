@@ -1,0 +1,244 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/rosa-clusters-service
+      USER root
+      RUN dnf install -y git go make jq python3 python3-pip skopeo wget xz
+      RUN dnf clean all
+      RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xzf - -C /usr/local/bin oc
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-online/rosa-clusters-service
+    to: golang-plus
+prowgen:
+  enable_secrets_store_csi_driver: true
+  expose: true
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 768Mi
+  pr-check-aws:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  pr-check-core:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  pr-check-gcp:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  pr-check-rosa-classic:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  pr-check-rosa-hcp:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+tests:
+- as: go-unit-coverage
+  commands: |
+    set -x
+    export GOMAXPROCS=3
+    make codecov
+    test_status=$?
+    artifact_dir="${ARTIFACT_DIR:-.}"
+    if [ -f junit.xml ]; then
+      cp junit.xml "${artifact_dir}/junit-go-unit-coverage.xml" 2>/dev/null || true
+      echo "Saved junit report to ${artifact_dir}/junit-go-unit-coverage.xml"
+    fi
+    exit $test_status
+  container:
+    from: golang-plus
+  secrets:
+  - collection: rosa-clusters-service
+    group: codecov
+    mount_path: /var/run/codecov-secret
+- as: lint
+  commands: make lint-all
+  container:
+    from: golang-plus
+- as: verify
+  commands: make verify
+  container:
+    from: golang-plus
+- as: py-unit
+  commands: make test-python
+  container:
+    from: golang-plus
+- as: pr-check-check-migrations
+  commands: |
+    git remote add origin .
+    echo "PULL_BASE_SHA=${PULL_BASE_SHA}"
+    echo "PULL_PULL_SHA=${PULL_PULL_SHA}"
+    if git cat-file -e ${PULL_BASE_SHA} 2>/dev/null; then
+      git update-ref refs/remotes/origin/master ${PULL_BASE_SHA}
+    else
+      echo "PULL_BASE_SHA not found in repo, falling back to HEAD~1"
+      git update-ref refs/remotes/origin/master HEAD~1
+    fi
+    set -x
+    ./pr_check.sh --check-migrations
+  container:
+    from: golang-plus
+- as: pr-check-commit-validation
+  commands: |
+    git remote add origin .
+    echo "PULL_BASE_SHA=${PULL_BASE_SHA}"
+    echo "PULL_PULL_SHA=${PULL_PULL_SHA}"
+    if git cat-file -e ${PULL_BASE_SHA} 2>/dev/null; then
+      git update-ref refs/remotes/origin/master ${PULL_BASE_SHA}
+    else
+      echo "PULL_BASE_SHA not found in repo, falling back to HEAD~1"
+      git update-ref refs/remotes/origin/master HEAD~1
+    fi
+    set -x
+    ./pr_check.sh --commit-validation
+  container:
+    from: golang-plus
+- as: pr-check-common-tests
+  commands: |
+    set -x
+    ./pr_check.sh --common-tests
+  container:
+    from: golang-plus
+- always_run: false
+  as: pr-check-rosa-hcp
+  capabilities:
+  - intranet
+  - nested-podman
+  cluster: build05
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --rosa-hcp
+  container:
+    from: golang-plus
+  nested_podman: true
+  optional: true
+  secrets:
+  - collection: rosa-clusters-service
+    group: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
+- always_run: false
+  as: pr-check-aws
+  capabilities:
+  - intranet
+  - nested-podman
+  cluster: build05
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --aws
+  container:
+    from: golang-plus
+  nested_podman: true
+  optional: true
+  secrets:
+  - collection: rosa-clusters-service
+    group: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
+- always_run: false
+  as: pr-check-gcp
+  capabilities:
+  - intranet
+  - nested-podman
+  cluster: build05
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --gcp
+  container:
+    from: golang-plus
+  nested_podman: true
+  optional: true
+  secrets:
+  - collection: rosa-clusters-service
+    group: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
+- always_run: false
+  as: pr-check-rosa-classic
+  capabilities:
+  - intranet
+  - nested-podman
+  cluster: build05
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --rosa-classic
+  container:
+    from: golang-plus
+  nested_podman: true
+  optional: true
+  secrets:
+  - collection: rosa-clusters-service
+    group: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
+- always_run: false
+  as: pr-check-core
+  capabilities:
+  - intranet
+  - nested-podman
+  cluster: build05
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --core
+  container:
+    from: golang-plus
+  nested_podman: true
+  optional: true
+  secrets:
+  - collection: rosa-clusters-service
+    group: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
+- as: go-unit-publish-coverage
+  commands: |
+    set -x
+    export GOMAXPROCS=3
+    make codecov
+  container:
+    from: golang-plus
+  postsubmit: true
+  secrets:
+  - collection: rosa-clusters-service
+    group: codecov
+    mount_path: /var/run/codecov-secret
+zz_generated_metadata:
+  branch: master
+  org: openshift-online
+  repo: rosa-clusters-service

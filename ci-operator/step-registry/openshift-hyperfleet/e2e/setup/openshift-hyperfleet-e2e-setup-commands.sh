@@ -58,6 +58,19 @@ export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}
 export SENTINEL_IMAGE_REPO="${SENTINEL_IMAGE_REPO:-ci/hyperfleet-sentinel}"
 export SENTINEL_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG:-latest}"
 
+# Enable JWT authentication for the API
+export JWT_AUTH_ENABLED="${JWT_AUTH_ENABLED:-true}"
+
+# When JWT is enabled, discover the actual OIDC issuer URL from the cluster.
+# GKE uses a GCP-specific issuer (container.googleapis.com/v1/projects/...),
+# not kubernetes.default.svc.cluster.local, so we must detect it at runtime.
+if [[ "${JWT_AUTH_ENABLED}" == "true" ]]; then
+  OIDC_ISSUER_URL=$(kubectl get --raw /.well-known/openid-configuration | jq -r '.issuer')
+  OIDC_JWKS_URL="${OIDC_ISSUER_URL}/jwks"
+  export OIDC_ISSUER_URL OIDC_JWKS_URL
+  log "OIDC issuer discovered: ${OIDC_ISSUER_URL}"
+fi
+
 # Install hyperfleet components via infra repo
 # Will inherit all exported values here
 git clone --depth 1 "https://github.com/openshift-hyperfleet/hyperfleet-infra.git" /tmp/hyperfleet-infra
@@ -83,9 +96,9 @@ done
 log "SUCCESS: All pods are Running and deployment is healthy"
 
 
-API_EXTERNAL_IP=$(kubectl get svc hyperfleet-api -n $NAMESPACE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-if [[ -z "${API_EXTERNAL_IP}" ]]; then
-  log "ERROR: Failed to resolve Hyperfleet API external IP. Is the LoadBalancer ready?"
+GATEWAY_EXTERNAL_IP=$(kubectl get svc hyperfleet-gateway -n $NAMESPACE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+if [[ -z "${GATEWAY_EXTERNAL_IP}" ]]; then
+  log "ERROR: Failed to resolve Hyperfleet Gateway external IP. Is the LoadBalancer ready?"
   exit 1
 fi
 
@@ -95,7 +108,7 @@ if [[ -z "${MAESTRO_EXTERNAL_IP}" ]]; then
   exit 1
 fi
 
-export HYPERFLEET_API_URL=http://${API_EXTERNAL_IP}:8000
+export HYPERFLEET_API_URL=http://${GATEWAY_EXTERNAL_IP}:8000
 echo "${HYPERFLEET_API_URL}" > "${SHARED_DIR}/hyperfleet_api_url"
 
 export MAESTRO_URL=http://${MAESTRO_EXTERNAL_IP}:8000
@@ -110,8 +123,11 @@ wait_for_api() {
 
   log "=== Waiting for ${name} to become accessible at ${url} ==="
   for attempt in $(seq 1 "$max_attempts"); do
-    if curl -sf --connect-timeout 5 --max-time 10 -X GET "${url}" > /dev/null 2>&1; then
-      log "SUCCESS: ${name} is accessible (attempt ${attempt}/${max_attempts})"
+    # Accept 200 (no auth) or 401 (JWT enabled) as proof the API is up
+    local http_code
+    http_code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 -X GET "${url}" 2>/dev/null || echo "000")
+    if [[ "${http_code}" =~ ^(200|401|403)$ ]]; then
+      log "SUCCESS: ${name} is accessible (HTTP ${http_code}, attempt ${attempt}/${max_attempts})"
       return 0
     fi
     if [ "$attempt" -lt "$max_attempts" ]; then

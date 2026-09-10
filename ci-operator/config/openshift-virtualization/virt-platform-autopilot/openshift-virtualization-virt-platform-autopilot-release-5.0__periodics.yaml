@@ -3,6 +3,8 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.26-openshift-5.0
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -21,15 +23,23 @@ tests:
   cron: 0 6 * * 1-5
   steps:
     cluster_profile: azure-virtualization
-    dependency_overrides:
-      OCP_CLI_JQ_LATEST: quay.io/openshift/ci:ocp_cli-jq_latest
     env:
       BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       OPERATORS: |
         [
-          {"name": "cluster-kube-descheduler-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-kube-descheduler-operator", "target_namespaces": "openshift-kube-descheduler-operator", "operator_group": "descheduler-og"},
-          {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator", "target_namespaces": "", "operator_group": "coo-og"}
+          {"name": "mtv-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-mtv", "target_namespaces": "openshift-mtv", "operator_group": "mtv-og", "skip_checking": "true"},
+          {"name": "kubernetes-nmstate-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-nmstate", "target_namespaces": "openshift-nmstate", "operator_group": "nmstate-og", "skip_checking": "true"},
+          {"name": "metallb-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "metallb-system", "target_namespaces": "", "operator_group": "metallb-og", "skip_checking": "true"},
+          {"name": "cluster-kube-descheduler-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-kube-descheduler-operator", "target_namespaces": "openshift-kube-descheduler-operator", "operator_group": "descheduler-og", "skip_checking": "true"},
+          {"name": "numaresources-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-numaresources", "target_namespaces": "openshift-numaresources", "operator_group": "numaresources-og", "skip_checking": "true"},
+          {"name": "node-maintenance-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators", "skip_checking": "true"},
+          {"name": "node-healthcheck-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators", "skip_checking": "true"},
+          {"name": "fence-agents-remediation", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators", "skip_checking": "true"},
+          {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-cluster-observability-operator", "target_namespaces": "", "operator_group": "coo-og", "skip_checking": "true"},
+          {"name": "loki-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators-redhat", "target_namespaces": "", "operator_group": "loki-og", "skip_checking": "true"},
+          {"name": "cluster-logging", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-logging", "target_namespaces": "openshift-logging", "operator_group": "logging-og", "skip_checking": "true"},
+          {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group": "oadp-og", "skip_checking": "true"}
         ]
     observers:
       enable:
@@ -46,12 +56,12 @@ tests:
         oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{"op": "add", "path": "/spec/defaultCPUModel", "value": "Broadwell"}]'
         oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=merge -p='{"metadata":{"annotations":{"platform.kubevirt.io/autopilot":"true"}}}'
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
-      - mount_path: /var/run/cnv-ci-konflux-pull-secret
-        name: konflux-pull-secret
-        namespace: test-credentials
+      - collection: cnv-ci-secrets
+        group: cnv-ci-brew-pull-secret
+        mount_path: /var/run/cnv-ci-brew-pull-secret
+      - collection: virtualization-secrets
+        group: konflux-pull-secret
+        mount_path: /var/run/cnv-ci-konflux-pull-secret
       env:
       - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
         name: BREW_IMAGE_REGISTRY_USERNAME

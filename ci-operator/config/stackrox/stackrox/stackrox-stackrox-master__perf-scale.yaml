@@ -8,6 +8,8 @@ build_root:
     name: apollo-ci
     namespace: stackrox
     tag: stackrox-ui-test-0.5.2
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -41,9 +43,9 @@ tests:
       CD_V2_EXTRA_FLAGS: --churn-duration=20m --timeout=8h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
       COMPUTE_NODE_REPLICAS: "24"
       PODS_PER_NODE: "240"
-      ROX_SCANNER_V4_ENABLED: "true"
+      ROXIE_VERSION: 0.4.5
       SCANNER_V4_MATCHER_READINESS: vulnerability
-      SCANNER_V4_MATCHER_READINESS_MAX_WAIT: "3600"
+      SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST: nvd,manual
       TEST_SUITE: ocp-perf-scale-tests
       USER_TAGS: |
         TicketId 382
@@ -60,7 +62,7 @@ tests:
     - chain: ipi-conf-aws
     - chain: ipi-install
     - chain: create-infra-move-ingress-monitoring-registry
-    - ref: stackrox-install-helm
+    - ref: stackrox-install-roxie
     test:
     - chain: stackrox-perfscale
   timeout: 14h0m0s
