@@ -1,0 +1,37 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-oz
+  documentation: |-
+    Workflow that provisions a single ephemeral OpenShift SNO management cluster on
+    libvirt and deploys a HyperShift KubeVirt hosted cluster on top of it. Both the
+    HCP control plane pods and the KubeVirt worker VMs run on the same management
+    cluster — there is no separate external infrastructure cluster.
+    MCE, the virt operator, HPP, and MetalLB are installed on the management cluster
+    before the hosted cluster is created.
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      CONTROL_COUNT: "3"
+      COMPUTE_COUNT: "2"
+      CNV_SUBSCRIPTION_SOURCE: 'redhat-operators'
+      DOMAIN_MEMORY: "65536"   # 64 GiB; applies to both mgmt and infra cluster VMs
+      DOMAIN_VCPUS: "16"       # 16 vCPUs; applies to both mgmt SNO and infra cluster VMs
+      VOLUME_CAPACITY: "200G"  # 200 GB root disk for both mgmt SNO and infra cluster VMs
+    pre:
+    # ── Management cluster (SNO: 3 control, 0 compute) ───────────────────
+    - chain: hypershift-mce-ibmz-create-s390xmgmt-oz
+
+    # ── Operator installs ─────────────────────────────────────────────────
+    # MCE, virt, HPP, MetalLB on mgmt cluster (default $KUBECONFIG → mgmt)
+    - chain: hypershift-mce-ibmz-install-operators-mgmt
+    
+    # ── HCP virt external infra cluster creation ─────────────────────────────────────────────────
+    - ref: hypershift-mce-ibmz-create-hcpvirt-oz
+
+    test:
+    #- ref: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra-test-print
+    - chain: hypershift-conformance
+
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
