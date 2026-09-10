@@ -17,6 +17,8 @@ build_root:
           yum clean all && rm -rf /var/cache/dnf/*
       ENV XDG_DATA_HOME=/.local
       WORKDIR pelorus
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -51,12 +53,12 @@ tests:
         export TOKEN=$(cat /var/run/konveyor/pelorus/pelorus-github/TOKEN)
         make e2e-tests
       credentials:
-      - mount_path: /var/run/konveyor/pelorus/pelorus-github
-        name: pelorus-github-secret
-        namespace: test-credentials
-      - mount_path: /var/run/konveyor/pelorus/pelorus-s3amazon
-        name: pelorus-s3amazon-secret
-        namespace: test-credentials
+      - collection: konveyor
+        group: pelorus/pelorus-github
+        mount_path: /var/run/konveyor/pelorus/pelorus-github
+      - collection: konveyor
+        group: pelorus/s3amazon
+        mount_path: /var/run/konveyor/pelorus/pelorus-s3amazon
       from: src
       resources:
         requests:

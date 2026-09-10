@@ -4,6 +4,8 @@ images:
   items:
   - dockerfile_path: build/Dockerfile
     to: unused
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -19,8 +21,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: ocm-agent-codecov-token
     mount_path: /tmp/secret
-    name: ocm-agent-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -29,8 +32,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: ocm-agent-codecov-token
     mount_path: /tmp/secret
-    name: ocm-agent-codecov-token
 - as: lint
   commands: GOLANGCI_LINT_CACHE=/tmp make lint
   container:

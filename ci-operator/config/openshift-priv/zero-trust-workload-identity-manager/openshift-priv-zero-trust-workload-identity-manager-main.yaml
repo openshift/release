@@ -30,6 +30,7 @@ operator:
   - pullspec: openshift.io/zero-trust-workload-identity-manager:latest
     with: pipeline:zero-trust-workload-identity-manager
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -293,8 +294,8 @@ tests:
         echo "=== Cluster B is ready ==="
         oc get clusterversion
       credentials:
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
+      - bundle: ci-pull-credentials
+        mount_path: /etc/ci-pull-credentials
         namespace: test-credentials
       dependencies:
       - env: RELEASE_IMAGE_LATEST
@@ -368,9 +369,9 @@ tests:
       cli: latest
       commands: hack/e2e-coverage.sh collect
       credentials:
-      - mount_path: /var/run/secrets/codecov
-        name: ztwim-codecov-token
-        namespace: test-credentials
+      - collection: ztwim-ci-secrets
+        group: codecov-token
+        mount_path: /var/run/secrets/codecov
       from: src
       resources:
         requests:
