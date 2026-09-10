@@ -35,6 +35,15 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'gcp' ]]; then
 fi
 
 if [[ "$QUAY_STORAGE_PROVIDER" == 'azure' ]]; then
+    # The deploy step keeps Azure service-principal credentials out of the
+    # archived Terraform files. Restore them from the mounted credential for
+    # terraform destroy; this script does not enable command tracing.
+    ARM_SUBSCRIPTION_ID=$(cat /var/run/quay-qe-azure-secret/subscription_id)
+    ARM_TENANT_ID=$(cat /var/run/quay-qe-azure-secret/tenant_id)
+    ARM_CLIENT_SECRET=$(cat /var/run/quay-qe-azure-secret/client_secret)
+    ARM_CLIENT_ID=$(cat /var/run/quay-qe-azure-secret/client_id)
+    export ARM_SUBSCRIPTION_ID ARM_TENANT_ID ARM_CLIENT_SECRET ARM_CLIENT_ID
+
     mkdir -p QUAY_AZURE && cd QUAY_AZURE
     cp ${SHARED_DIR}/terraform.tgz .
     tar -xzvf terraform.tgz && ls
