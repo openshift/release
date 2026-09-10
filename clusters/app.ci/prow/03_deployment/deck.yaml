@@ -112,6 +112,7 @@ objects:
           - --repo=https://github.com/openshift/release.git
           - --ref=main
           - --root=/tmp/git-sync
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           - --one-time=true
           - --depth=1
           - --link=release
@@ -119,6 +120,9 @@ objects:
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout-config
+            mountPath: /etc/git-sync
+            readOnly: true
         containers:
         - name: deck
           image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260908-104d452f4
@@ -135,7 +139,7 @@ objects:
           - --tide-url=http://tide/
           - --hook-url=http://hook-apps:8888/plugin-help
           - --oauth-url=/github-login
-          - --job-config-path=/var/repo/release/ci-operator/jobs
+          - --job-config-path=/etc/jobs
           - --spyglass=true
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
@@ -192,6 +196,14 @@ objects:
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
+          - name: combined-jobs
+            mountPath: /etc/jobs
+          - name: job-configs
+            mountPath: /etc/jobs/efs
+            readOnly: true
+          - name: release
+            mountPath: /etc/jobs/release
+            readOnly: true
           resources:
             requests:
               memory: "28Gi"
@@ -204,12 +216,16 @@ objects:
           - --ref=main
           - --period=30s
           - --root=/tmp/git-sync
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           - --max-failures=3
           - --link=release
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout-config
+            mountPath: /etc/git-sync
+            readOnly: true
           resources:
             requests:
               memory: "512Mi"
@@ -237,6 +253,14 @@ objects:
             secretName: cookie
         - name: release
           emptyDir: {}
+        - name: combined-jobs
+          emptyDir: {}
+        - name: sparse-checkout-config
+          configMap:
+            name: prow-jobs-sparse-checkout
+        - name: job-configs
+          persistentVolumeClaim:
+            claimName: job-configs-nfs
         - name: build-farm-credentials
           secret:
             secretName: deck
@@ -324,6 +348,7 @@ objects:
           - --repo=https://github.com/openshift/release.git
           - --ref=main
           - --root=/tmp/git-sync
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           - --one-time=true
           - --depth=1
           - --link=release
@@ -331,6 +356,9 @@ objects:
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout-config
+            mountPath: /etc/git-sync
+            readOnly: true
         containers:
         - name: git-sync
           command:
@@ -340,12 +368,16 @@ objects:
           - --ref=main
           - --period=30s
           - --root=/tmp/git-sync
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           - --max-failures=3
           - --link=release
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout-config
+            mountPath: /etc/git-sync
+            readOnly: true
           resources:
             requests:
               memory: "512Mi"
@@ -393,7 +425,7 @@ objects:
           - --oauth-url=/github-login
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
-          - --job-config-path=/var/repo/release/ci-operator/jobs
+          - --job-config-path=/etc/jobs
           - --tide-url=http://tide/
           - --hook-url=http://hook-apps:8888/plugin-help
           - --hidden-only=true
@@ -455,6 +487,14 @@ objects:
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
+          - name: combined-jobs
+            mountPath: /etc/jobs
+          - name: job-configs
+            mountPath: /etc/jobs/efs
+            readOnly: true
+          - name: release
+            mountPath: /etc/jobs/release
+            readOnly: true
           resources:
             requests:
               memory: "20Gi"
@@ -488,6 +528,14 @@ objects:
             secretName: deck-internal-tls
         - name: release
           emptyDir: {}
+        - name: combined-jobs
+          emptyDir: {}
+        - name: sparse-checkout-config
+          configMap:
+            name: prow-jobs-sparse-checkout
+        - name: job-configs
+          persistentVolumeClaim:
+            claimName: job-configs-nfs
         - name: build-farm-credentials
           secret:
             secretName: deck
