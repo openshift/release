@@ -53,7 +53,6 @@ spec:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
-        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release
@@ -61,9 +60,6 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
-        - name: sparse-checkout-config
-          mountPath: /etc/git-sync
-          readOnly: true
       containers:
       - name: crier
         image: us-docker.pkg.dev/k8s-infra-prow/images/crier:v20260908-104d452f4
@@ -71,7 +67,7 @@ spec:
         - --github-workers=30
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
-        - --job-config-path=/etc/jobs
+        - --job-config-path=/var/repo/release/ci-operator/jobs
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -111,14 +107,6 @@ spec:
         - name: service-account
           mountPath: /etc/service-account
           readOnly: true
-        - name: combined-jobs
-          mountPath: /etc/jobs
-        - name: job-configs
-          mountPath: /etc/jobs/efs
-          readOnly: true
-        - name: release
-          mountPath: /etc/jobs/release
-          readOnly: true
         resources:
           requests:
             memory: "21Gi"
@@ -131,16 +119,12 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
-        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
-        - name: sparse-checkout-config
-          mountPath: /etc/git-sync
-          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -168,11 +152,3 @@ spec:
       - name: service-account
         secret:
           secretName: gce-sa-credentials-gcs-crier-publisher
-      - name: combined-jobs
-        emptyDir: {}
-      - name: sparse-checkout-config
-        configMap:
-          name: prow-jobs-sparse-checkout
-      - name: job-configs
-        persistentVolumeClaim:
-          claimName: job-configs-nfs
