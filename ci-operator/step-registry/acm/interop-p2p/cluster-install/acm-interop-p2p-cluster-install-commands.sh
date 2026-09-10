@@ -733,66 +733,6 @@ ExtractClusterCredentials() {
 }
 
 #=====================
-# Function: DisableClusterImagePolicySignatureEnforcement
-#=====================
-# Patches the spoke's ClusterVersion to mark the 'openshift'
-# ClusterImagePolicy as unmanaged, preventing Sigstore signature
-# enforcement on unsigned nightly images.
-#
-# Nightly builds are intentionally not Sigstore-signed by ART.
-# Starting with 4.21 the 'openshift' ClusterImagePolicy requires
-# Sigstore signatures on quay.io/openshift-release-dev/ocp-v4.0-art-dev
-# payload images. Without this patch, spoke upgrades to nightly builds
-# fail with "A signature was required, but no signature exists".
-# See OCPBUGS-114622.
-#
-# Arguments:
-#   $1 - kubeconfig: Path to the spoke cluster kubeconfig
-#   $2 - clusterName: Name of the spoke cluster (for logging)
-#
-DisableClusterImagePolicySignatureEnforcement() {
-    typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset clusterName="${1:?}"; (($#)) && shift
-
-    : "Disabling ClusterImagePolicy signature enforcement on spoke ${clusterName}"
-
-    typeset currentOverrides
-    currentOverrides="$(oc --kubeconfig="${kubeconfig}" get clusterversion version -o json |
-        jq -c '.spec.overrides // []')"
-
-    typeset newOverrides
-    newOverrides="$(jq -c '. + [{
-        "group":     "config.openshift.io",
-        "kind":      "ClusterImagePolicy",
-        "name":      "openshift",
-        "namespace": "",
-        "unmanaged": true
-    }]' <<<"${currentOverrides}")"
-
-    # Build the patch payload in a variable assignment so jq failure
-    # propagates via errexit (command substitution in a command argument
-    # does not propagate errors even with inherit_errexit).
-    typeset patchPayload
-    patchPayload="$(jq -cn --argjson overrides "${newOverrides}" \
-        '{"spec":{"overrides":$overrides}}')"
-
-    oc --kubeconfig="${kubeconfig}" patch clusterversion version --type merge \
-        -p "${patchPayload}" 1>/dev/null
-
-    # Verify the override was applied.
-    typeset appliedUnmanaged
-    appliedUnmanaged="$(oc --kubeconfig="${kubeconfig}" get clusterversion version \
-        -o jsonpath='{.spec.overrides[?(@.kind=="ClusterImagePolicy")].unmanaged}')"
-    if [[ "${appliedUnmanaged}" != *"true"* ]]; then
-        : "Failed to verify CVO override for ClusterImagePolicy on spoke ${clusterName}"
-        return 1
-    fi
-
-    : "ClusterImagePolicy signature enforcement disabled on spoke ${clusterName}"
-    true
-}
-
-#=====================
 # Main execution: Create all clusters
 #=====================
 # The installation process has three phases:
@@ -832,17 +772,6 @@ for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     idx=$((i + 1))
     ExtractClusterCredentials "${clusterNamesArr[i]}" "${idx}"
 done
-
-# Phase 4: Disable ClusterImagePolicy signature enforcement on spokes
-# Only needed when installing with unsigned nightly images.
-if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}" == "true" ]]; then
-    for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
-        idx=$((i + 1))
-        DisableClusterImagePolicySignatureEnforcement \
-            "${SHARED_DIR}/managed-cluster-kubeconfig-${idx}" \
-            "${clusterNamesArr[i]}"
-    done
-fi
 
 # Create symlinks for backward compatibility with single-cluster workflows
 # This allows existing steps that expect 'managed-cluster-kubeconfig' to work
