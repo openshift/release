@@ -62,6 +62,7 @@ operator:
   - pullspec: quay.io/jetstack/trust-manager:.*
     with: pipeline:cert-manager-trust-manager
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   latest:
@@ -160,9 +161,9 @@ tests:
       cli: latest
       commands: hack/e2e-coverage.sh collect
       credentials:
-      - mount_path: /var/run/secrets/codecov
-        name: cert-manager-operator-codecov-token
-        namespace: test-credentials
+      - collection: cert-manager-operator-ci-secrets
+        group: codecov-token
+        mount_path: /var/run/secrets/codecov
       from: src
       resources:
         requests:
@@ -472,12 +473,6 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: optional-operators-ci-operator-sdk-aws
-- always_run: false
-  as: address-review-comments
-  optional: true
-  skip_if_only_changed: .*
-  steps:
-    workflow: cert-manager-review-agent-trigger
 zz_generated_metadata:
   branch: master
   org: openshift-priv

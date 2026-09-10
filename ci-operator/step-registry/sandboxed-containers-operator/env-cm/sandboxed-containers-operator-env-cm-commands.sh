@@ -29,7 +29,7 @@ data:
   enablePeerPods: "${ENABLEPEERPODS}"
   mustgatherimage: "${MUST_GATHER_IMAGE}"
   workloadImage: "${WORKLOAD_IMAGE}"
-  installKataRPM: "${INSTALL_KATA_RPM}"
+  installKataRPM: "false"
   workloadToTest: "${WORKLOAD_TO_TEST}"
 EOF
 

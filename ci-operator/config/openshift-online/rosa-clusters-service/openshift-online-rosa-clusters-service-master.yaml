@@ -26,6 +26,7 @@ images:
           source_path: /go/src/github.com/openshift-online/rosa-clusters-service
     to: golang-plus
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -69,22 +70,24 @@ resources:
       cpu: "3"
       memory: 6Gi
 tests:
-- as: pr-check-unit
-  commands: unset GOFLAGS && make test
-  container:
-    from: src
-- always_run: false
-  as: go-unit-coverage
+- as: go-unit-coverage
   commands: |
     set -x
     export GOMAXPROCS=3
     make codecov
+    test_status=$?
+    artifact_dir="${ARTIFACT_DIR:-.}"
+    if [ -f junit.xml ]; then
+      cp junit.xml "${artifact_dir}/junit-go-unit-coverage.xml" 2>/dev/null || true
+      echo "Saved junit report to ${artifact_dir}/junit-go-unit-coverage.xml"
+    fi
+    exit $test_status
   container:
     from: golang-plus
-  optional: true
   secrets:
-  - mount_path: /var/run/codecov-secret
-    name: rosa-clusters-service-codecov
+  - collection: rosa-clusters-service
+    group: codecov
+    mount_path: /var/run/codecov-secret
 - as: lint
   commands: make lint-all
   container:
@@ -148,8 +151,9 @@ tests:
   nested_podman: true
   optional: true
   secrets:
-  - mount_path: /usr/local/rosa-clusters-service-sandbox
-    name: rosa-clusters-service-sandbox
+  - collection: rosa-clusters-service
+    group: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
 - always_run: false
   as: pr-check-aws
   capabilities:
@@ -165,8 +169,9 @@ tests:
   nested_podman: true
   optional: true
   secrets:
-  - mount_path: /usr/local/rosa-clusters-service-sandbox
-    name: rosa-clusters-service-sandbox
+  - collection: rosa-clusters-service
+    group: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
 - always_run: false
   as: pr-check-gcp
   capabilities:
@@ -182,8 +187,9 @@ tests:
   nested_podman: true
   optional: true
   secrets:
-  - mount_path: /usr/local/rosa-clusters-service-sandbox
-    name: rosa-clusters-service-sandbox
+  - collection: rosa-clusters-service
+    group: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
 - always_run: false
   as: pr-check-rosa-classic
   capabilities:
@@ -199,8 +205,9 @@ tests:
   nested_podman: true
   optional: true
   secrets:
-  - mount_path: /usr/local/rosa-clusters-service-sandbox
-    name: rosa-clusters-service-sandbox
+  - collection: rosa-clusters-service
+    group: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
 - always_run: false
   as: pr-check-core
   capabilities:
@@ -216,8 +223,9 @@ tests:
   nested_podman: true
   optional: true
   secrets:
-  - mount_path: /usr/local/rosa-clusters-service-sandbox
-    name: rosa-clusters-service-sandbox
+  - collection: rosa-clusters-service
+    group: rosa-clusters-service-sandbox
+    mount_path: /usr/local/rosa-clusters-service-sandbox
 - as: go-unit-publish-coverage
   commands: |
     set -x
@@ -227,8 +235,9 @@ tests:
     from: golang-plus
   postsubmit: true
   secrets:
-  - mount_path: /var/run/codecov-secret
-    name: rosa-clusters-service-codecov
+  - collection: rosa-clusters-service
+    group: codecov
+    mount_path: /var/run/codecov-secret
 zz_generated_metadata:
   branch: master
   org: openshift-online

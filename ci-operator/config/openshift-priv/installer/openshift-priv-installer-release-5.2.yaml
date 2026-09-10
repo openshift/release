@@ -144,6 +144,7 @@ promotion:
     name: "5.2"
     namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 raw_steps:
 - pipeline_image_cache_step:
@@ -1290,8 +1291,8 @@ tests:
         export AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
         hack/go-integration-test.sh
       credentials:
-      - mount_path: /var/secrets/registry-pull-secret
-        name: registry-pull-credentials
+      - bundle: registry-pull-credentials
+        mount_path: /var/secrets/registry-pull-secret
         namespace: test-credentials
       dependencies:
       - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
@@ -1670,12 +1671,6 @@ tests:
       CONTROL_PLANE_AMI: ami-0b78302f83217d149
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
-- always_run: false
-  as: address-review-comments
-  optional: true
-  skip_if_only_changed: .*
-  steps:
-    workflow: installer-review-agent-trigger
 zz_generated_metadata:
   branch: release-5.2
   org: openshift-priv
