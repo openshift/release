@@ -52,6 +52,7 @@ images:
           source_path: /go/src/github.com/openshift-online/rosa-boundary
     to: localstack-test-runner
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -69,8 +70,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /var/run/codecov-secret
-    name: rosa-boundary-codecov
+  - collection: rosa-boundary
+    group: codecov-secret
+    mount_path: /var/run/codecov-secret
 - as: lambda-unit-tests
   commands: |
     export UV_CACHE_DIR=/tmp/uv-cache
@@ -91,8 +93,9 @@ tests:
   nested_podman: true
   run_if_changed: ^(lambda/|deploy/regional/|tests/localstack/)
   secret:
+    collection: rosa-boundary
+    group: ci
     mount_path: /etc/localstack-secret
-    name: localstack-token
 - as: publish-coverage
   commands: |
     unset GOFLAGS
@@ -101,8 +104,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /var/run/codecov-secret
-    name: rosa-boundary-codecov
+  - collection: rosa-boundary
+    group: codecov-secret
+    mount_path: /var/run/codecov-secret
 zz_generated_metadata:
   branch: main
   org: openshift-online

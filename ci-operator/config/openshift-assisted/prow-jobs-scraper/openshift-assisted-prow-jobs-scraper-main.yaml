@@ -5,6 +5,8 @@ build_root:
       FROM registry.access.redhat.com/ubi9/python-311:latest
       # Ensure user is root for Prow to checkout the sources
       USER 0:0
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -22,8 +24,9 @@ tests:
   container:
     from: test-bin
   secret:
+    collection: edge-group
+    group: prow-jobs-scraper-codecov-token
     mount_path: /tmp/secret
-    name: prow-jobs-scraper-codecov-token
 - as: unit-tests-postsubmit
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -32,8 +35,9 @@ tests:
     from: test-bin
   postsubmit: true
   secret:
+    collection: edge-group
+    group: prow-jobs-scraper-codecov-token
     mount_path: /tmp/secret
-    name: prow-jobs-scraper-codecov-token
 - as: lint
   commands: make lint
   container:

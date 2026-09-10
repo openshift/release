@@ -48,6 +48,7 @@ build_root:
       ENV PATH="/opt/google-cloud-sdk/bin:${PATH}" \
           USE_GKE_GCLOUD_AUTH_PLUGIN=True
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -111,9 +112,9 @@ tests:
           gsutil rm -r "gs://hyperfleet-terraform-state/ci/infra/${CI_ID}" || true
         fi
       credentials:
-      - mount_path: /var/run/hyperfleet-e2e
-        name: hyperfleet-e2e
-        namespace: test-credentials
+      - collection: hyperfleet
+        group: hyperfleet-e2e
+        mount_path: /var/run/hyperfleet-e2e
       from: src
       resources:
         requests:
@@ -154,9 +155,9 @@ tests:
           TF_ENV="ci-${CI_ID}" \
           AUTO_APPROVE=true
       credentials:
-      - mount_path: /var/run/hyperfleet-e2e
-        name: hyperfleet-e2e
-        namespace: test-credentials
+      - collection: hyperfleet
+        group: hyperfleet-e2e
+        mount_path: /var/run/hyperfleet-e2e
       from: src
       resources:
         requests:

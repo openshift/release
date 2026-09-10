@@ -6,6 +6,7 @@ images:
     to: rosa-clients
   skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json)$|^(?:docs|\.github|\.tekton)(?:/|$)
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -48,8 +49,9 @@ tests:
   container:
     from: rosa-clients
   secret:
+    collection: rosa
+    group: rosa-codecov-token
     mount_path: /tmp/secret
-    name: rosa-codecov-token
   skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json)$|^(?:docs|\.github|\.tekton)(?:/|$)
 - as: publish-coverage
   commands: |
@@ -59,8 +61,9 @@ tests:
     from: rosa-clients
   postsubmit: true
   secret:
+    collection: rosa
+    group: rosa-codecov-token
     mount_path: /tmp/secret
-    name: rosa-codecov-token
 - as: security
   optional: true
   skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json)$|^(?:docs|\.github|\.tekton)(?:/|$)
