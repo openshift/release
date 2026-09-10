@@ -1,0 +1,155 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: pod-scaler
+  namespace: ci-monitoring
+  labels:
+    dashboards: ci-monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: ci-monitoring
+  json: |
+    {
+      "title": "Pod Scaler",
+      "uid": "dptp-pod-scaler-savings",
+      "timezone": "utc",
+      "schemaVersion": 38,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-24h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster",
+            "type": "query",
+            "datasource": "thanos-query",
+            "query": "label_values(pod_scaler_authoritative_decrease_total, clusterName)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "allValue": ".*"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Potential allocated memory savings if dry-run limits applied (GiB/hr)",
+          "description": "Sum of memory limit/request deltas recorded at admission (dry_run), not measured usage.",
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_savings_memory_bytes_total{mode=\"dry_run\",clusterName=~\"$cluster\"}[1h])) * 3600 / 1024^3",
+              "legendFormat": "dry_run"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none", "decimals": 2 } }
+        },
+        {
+          "type": "timeseries",
+          "title": "Applied decreases / sec by resource",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_decrease_total{mode=\"applied\",clusterName=~\"$cluster\"}[5m])) by (resource)",
+              "legendFormat": "{{resource}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Dry-run decreases / sec by resource",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_decrease_total{mode=\"dry_run\",clusterName=~\"$cluster\"}[5m])) by (resource)",
+              "legendFormat": "{{resource}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Applied allocated CPU savings (millicores / hr) by workload_type and resource",
+          "description": "Request/limit delta at admission, not CPU time consumed.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_savings_cpu_millicores_total{mode=\"applied\",clusterName=~\"$cluster\"}[1h])) by (workload_type, resource) * 3600",
+              "legendFormat": "{{workload_type}} {{resource}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Applied allocated memory savings (GiB / hr) by workload_type and resource",
+          "description": "Request/limit delta at admission, not bytes touched at runtime.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_savings_memory_bytes_total{mode=\"applied\",clusterName=~\"$cluster\"}[1h])) by (workload_type, resource) * 3600 / 1024^3",
+              "legendFormat": "{{workload_type}} {{resource}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Mean reduction ratio (applied)",
+          "description": "Uses histogram _sum/_count (bucket series are dropped by build-cluster remote write).",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_reduction_ratio_sum{mode=\"applied\",clusterName=~\"$cluster\"}[1h])) by (resource) / sum(rate(pod_scaler_authoritative_reduction_ratio_count{mode=\"applied\",clusterName=~\"$cluster\"}[1h])) by (resource)",
+              "legendFormat": "{{resource}}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percentunit" } }
+        },
+        {
+          "type": "table",
+          "title": "24h applied decreases by workload_type and resource",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(increase(pod_scaler_authoritative_decrease_total{mode=\"applied\",clusterName=~\"$cluster\"}[24h])) by (workload_type, resource, reduction_capped)",
+              "format": "table",
+              "instant": true
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "CI OOM terminations (1h increase, context)",
+          "description": "kube-state-metrics from build clusters; correlate with scaler rollouts manually — not causal.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_terminations_reason_total{reason=\"OOMKilled\",namespace=~\"ci-op-.*\",clusterName=~\"$cluster\"}[1h])) by (clusterName)",
+              "legendFormat": "{{clusterName}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "CI CPU throttle ratio (context)",
+          "description": "High throttle after request cuts may indicate under-provisioning.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_cfs_throttled_seconds_total{namespace=~\"ci-op-.*\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m])) by (clusterName) / sum(rate(container_cpu_usage_seconds_total{namespace=~\"ci-op-.*\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m])) by (clusterName)",
+              "legendFormat": "{{clusterName}}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percentunit" } }
+        }
+      ]
+    }
