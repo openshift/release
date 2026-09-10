@@ -79,6 +79,190 @@ discover_ovn_container_names() {
   return 0
 }
 
+# Attach OVN DHCP_Options to each passthrough localnet LSP and clear port_security.
+# For subnets-less NADs (L2 passthrough), OVN's DHCP responder leases from the
+# DHCP_Options cidr. For NADs with "subnets" (OVN IPAM), the same call hands out
+# the pre-assigned address. Either way, VMs do not receive an IP until this runs.
+configure_ovn_localnet_lsp_dhcp() {
+  local target_ns="$1"
+  local subnet_cidr="$2"
+  local router_ip="$3"
+  local dns_server="${4:-}"
+  local node ovn_pod lsps lsp dhcp_uuid dhcp_opts
+
+  if [[ -z "${OVN_NBDB_CONTAINER:-}" ]]; then
+    discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
+    if ! discover_ovn_container_names "${discovery_pod}"; then
+      echo "ERROR: Failed to discover OVN container names" >&2
+      return 1
+    fi
+  fi
+
+  if [[ -n "${dns_server}" ]]; then
+    dhcp_opts='"lease_time"="3500" "router"="'"${router_ip}"'" "server_id"="'"${router_ip}"'" "server_mac"="c0:ff:ee:00:00:01" "dns_server"="'"${dns_server}"'"'
+  else
+    dhcp_opts='"lease_time"="3500" "router"="'"${router_ip}"'" "server_id"="'"${router_ip}"'" "server_mac"="c0:ff:ee:00:00:01"'
+  fi
+
+  echo "Configuring OVN DHCP (${subnet_cidr}) on localnet LSPs in ${target_ns}..."
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}')
+    [[ -z "${ovn_pod}" ]] && continue
+    lsps=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl --bare --columns=name find Logical_Switch_Port \
+        external_ids:namespace="${target_ns}" \
+        external_ids:k8s.ovn.org/topology=localnet 2>/dev/null || true)
+    for lsp in ${lsps}; do
+      [[ -z "${lsp}" ]] && continue
+      dhcp_uuid=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+        ovn-nbctl create DHCP_Options cidr="${subnet_cidr}" \
+        options="${dhcp_opts}" 2>/dev/null)
+      oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+        ovn-nbctl lsp-set-dhcpv4-options "${lsp}" "${dhcp_uuid}" 2>/dev/null
+      oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+        ovn-nbctl clear Logical_Switch_Port "${lsp}" port_security 2>/dev/null || true
+      echo "Configured OVN DHCP and cleared port security on ${lsp} (node ${node})"
+    done
+  done
+}
+
+# Clear port_security on passthrough localnet LSPs (EgressIP SNAT egress).
+clear_ovn_localnet_lsp_port_security() {
+  local target_ns="$1"
+  local node ovn_pod lsps lsp
+
+  if [[ -z "${OVN_NBDB_CONTAINER:-}" ]]; then
+    discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
+    if ! discover_ovn_container_names "${discovery_pod}"; then
+      echo "ERROR: Failed to discover OVN container names" >&2
+      return 1
+    fi
+  fi
+
+  echo "Clearing port security on localnet LSPs in ${target_ns}..."
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}')
+    [[ -z "${ovn_pod}" ]] && continue
+    lsps=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl --bare --columns=name find Logical_Switch_Port \
+        external_ids:namespace="${target_ns}" \
+        external_ids:k8s.ovn.org/topology=localnet 2>/dev/null || true)
+    for lsp in ${lsps}; do
+      [[ -z "${lsp}" ]] && continue
+      oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+        ovn-nbctl clear Logical_Switch_Port "${lsp}" port_security 2>/dev/null || true
+      echo "Cleared port security on ${lsp} (node ${node})"
+    done
+  done
+}
+
+# Run dnsmasq on the VLAN sub-interface (e.g. br-ex.100) on each mgmt node before worker
+# VMIs boot (localnet-vlan). br-localnet is an OVS bridge without a kernel netdev; the NNCP
+# creates br-ex.<vlan-id> as the L2 port workers attach to. DHCP/DNS must be on that segment,
+# not ostestbm br-ex (untagged 192.168.111.0/24).
+localnet_vlan_configure_br_localnet_dhcp() {
+  local cluster_name="$1"
+  local vlan_id="$2"
+  local dhcp_iface="$3"
+  local gateway="$4"
+  local dhcp_start="$5"
+  local dhcp_end="$6"
+  local ingress_vip="$7"
+  local uplink_bond="$8"
+  local base_domain
+  local node
+  local setup_b64
+
+  base_domain=$(oc get dns/cluster -o jsonpath='{.spec.baseDomain}')
+  echo "Configuring dnsmasq on ${dhcp_iface} for VLAN ${vlan_id} (cluster ${cluster_name}, DNS base ${base_domain})..."
+
+  setup_b64=$(base64 -w0 <<'SCRIPT_EOF'
+#!/bin/bash
+set -euo pipefail
+dhcp_iface="$1"
+gateway="$2"
+dhcp_start="$3"
+dhcp_end="$4"
+cluster_name="$5"
+base_domain="$6"
+ingress_vip="$7"
+vlan_id="$8"
+uplink_bond="$9"
+netmask="255.255.255.0"
+conf="/etc/dnsmasq.d/localnet-vlan-${vlan_id}.conf"
+pidfile="/run/localnet-vlan-${vlan_id}.pid"
+
+if ! ip link show "${dhcp_iface}" &>/dev/null; then
+  echo "VLAN interface ${dhcp_iface} not present on this node; skipping"
+  exit 0
+fi
+
+if [[ -f "${pidfile}" ]]; then
+  kill "$(cat "${pidfile}")" 2>/dev/null || true
+  rm -f "${pidfile}"
+fi
+
+ip link set "${dhcp_iface}" up
+if ! ip addr show dev "${dhcp_iface}" | grep -q "inet ${gateway}/"; then
+  ip addr add "${gateway}/24" dev "${dhcp_iface}"
+fi
+
+mkdir -p /etc/dnsmasq.d
+cat > "${conf}" <<CONF
+interface=${dhcp_iface}
+bind-interfaces
+except-interface=lo
+port=5353
+listen-address=${gateway}
+domain-needed
+bogus-priv
+no-resolv
+server=172.30.0.10
+address=/api.${cluster_name}.${base_domain}/${ingress_vip}
+address=/api-int.${cluster_name}.${base_domain}/${ingress_vip}
+address=/.apps.${cluster_name}.${base_domain}/${ingress_vip}
+dhcp-range=${dhcp_start},${dhcp_end},${netmask},12h
+dhcp-option=3,${gateway}
+dhcp-option=6,${gateway}
+log-dhcp
+CONF
+
+sysctl -w net.ipv4.ip_forward=1 >/dev/null
+
+iptables -t nat -C PREROUTING -i "${dhcp_iface}" -p udp --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || \
+  iptables -t nat -A PREROUTING -i "${dhcp_iface}" -p udp --dport 53 -j REDIRECT --to-ports 5353
+iptables -t nat -C PREROUTING -i "${dhcp_iface}" -p tcp --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || \
+  iptables -t nat -A PREROUTING -i "${dhcp_iface}" -p tcp --dport 53 -j REDIRECT --to-ports 5353
+
+iptables -C FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT
+iptables -C FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+/usr/sbin/dnsmasq --conf-file="${conf}" --pid-file="${pidfile}"
+
+if ! ss -ulnp | grep -q "${dhcp_iface}:67"; then
+  echo "dnsmasq is not listening for DHCP on ${dhcp_iface}"
+  exit 1
+fi
+
+echo "dnsmasq configured on ${dhcp_iface} (${gateway}, DHCP ${dhcp_start}-${dhcp_end})"
+SCRIPT_EOF
+)
+
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    echo "Setting up ${dhcp_iface} DHCP/DNS on node ${node}..."
+    if ! oc debug "node/${node}" --quiet=true -- chroot /host bash -c \
+      "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
+    then
+      echo "WARNING: failed to configure ${dhcp_iface} DHCP on node ${node}" >&2
+      return 1
+    fi
+  done
+}
+
 localnet_multi_label_namespace_privileged() {
   local multi_ns="$1"
 
@@ -597,19 +781,21 @@ EOF
     done
   elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-vlan" ]]; then
     # Localnet with VLAN: VMs connect to a tagged VLAN via a dedicated OVS bridge.
-    # Unlike plain "localnet" (which reuses physnet:br-ex with OVN IPAM), this path:
-    #   - Creates a separate OVS bridge mapped to a VLAN sub-interface on the bond
-    #   - NAD has no subnet (L2 passthrough) — IPs come from external DHCP/IPAM
-    #   - No OVN port security or DHCP options
-    #   - attach-default-network=false — VMs connect only via localnet VLAN (no pod network)
-    # This matches the MAPFRE-style architecture where each hosted cluster gets its
-    # own routable /24 VLAN with external infrastructure managing IP allocation.
+    #   - NNCP creates br-localnet + VLAN sub-interface and OVN bridge-mapping
+    #   - dnsmasq on br-ex.<vlan-id> (per node) serves DHCP/DNS before workers boot
+    #   - NAD is subnets-less L2 passthrough (no OVN IPAM)
+    #   - attach-default-network=false — workers use only the localnet VLAN NIC
 
     ns="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
     LOCALNET_VLAN_ID="${LOCALNET_VLAN_ID:-100}"
     LOCALNET_VLAN_BRIDGE="${LOCALNET_VLAN_BRIDGE:-br-localnet}"
     LOCALNET_VLAN_PHYSNET="${LOCALNET_VLAN_PHYSNET:-localnet-physnet}"
     LOCALNET_VLAN_BOND="${LOCALNET_VLAN_BOND:-br-ex}"
+    LOCALNET_VLAN_GATEWAY="${LOCALNET_VLAN_GATEWAY:-192.168.112.1}"
+    LOCALNET_VLAN_DHCP_RANGE_START="${LOCALNET_VLAN_DHCP_RANGE_START:-192.168.112.100}"
+    LOCALNET_VLAN_DHCP_RANGE_END="${LOCALNET_VLAN_DHCP_RANGE_END:-192.168.112.240}"
+    LOCALNET_VLAN_INGRESS_VIP="${LOCALNET_VLAN_INGRESS_VIP:-192.168.111.4}"
+    LOCALNET_VLAN_DHCP_INTERFACE="${LOCALNET_VLAN_DHCP_INTERFACE:-${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}}"
     LOCALNET_VLAN_ATTACH_DEFAULT="false"
 
     echo "Setting up localnet-vlan: VLAN ${LOCALNET_VLAN_ID}, bridge ${LOCALNET_VLAN_BRIDGE}, physnet ${LOCALNET_VLAN_PHYSNET}..."
@@ -642,7 +828,7 @@ metadata:
   name: localnet-vlan-${LOCALNET_VLAN_ID}
 spec:
   nodeSelector:
-    node-role.kubernetes.io/worker: ""
+    kubernetes.io/os: linux
   desiredState:
     ovn:
       bridge-mappings:
@@ -670,9 +856,17 @@ NNCP_EOF
       oc get nncp "localnet-vlan-${LOCALNET_VLAN_ID}" -o yaml 2>/dev/null || true
     fi
 
+    localnet_vlan_configure_br_localnet_dhcp "${CLUSTER_NAME}" "${LOCALNET_VLAN_ID}" \
+      "${LOCALNET_VLAN_DHCP_INTERFACE}" "${LOCALNET_VLAN_GATEWAY}" \
+      "${LOCALNET_VLAN_DHCP_RANGE_START}" "${LOCALNET_VLAN_DHCP_RANGE_END}" \
+      "${LOCALNET_VLAN_INGRESS_VIP}" "${LOCALNET_VLAN_BOND}" || {
+      echo "ERROR: ${LOCALNET_VLAN_DHCP_INTERFACE} dnsmasq configuration failed" >&2
+      exit 1
+    }
+
     # Verify bridge-mappings include the new physnet on all nodes
     echo "Verifying bridge-mappings on all nodes..."
-    for NODE in $(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[*].metadata.name}'); do
+    for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
       OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
         --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
       [[ -z "${OVN_POD}" ]] && continue
@@ -681,8 +875,7 @@ NNCP_EOF
       echo "  ${NODE}: ${MAPPINGS}"
     done
 
-    # Create localnet NAD without subnet (L2 passthrough to the VLAN).
-    # External DHCP/IPAM on the VLAN assigns IPs to guest VMs.
+    # Create subnets-less localnet NAD (L2 passthrough to the VLAN; DHCP on br-localnet).
     oc apply -f - <<NAD_EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
@@ -699,7 +892,7 @@ spec:
       "vlanID": ${LOCALNET_VLAN_ID}
   }'
 NAD_EOF
-    echo "Created NAD localnet-vlan (${LOCALNET_VLAN_PHYSNET}:${LOCALNET_VLAN_BRIDGE}, VLAN ${LOCALNET_VLAN_ID}, subnets-less L2 passthrough)"
+    echo "Created NAD localnet-vlan (${LOCALNET_VLAN_PHYSNET}:${LOCALNET_VLAN_BRIDGE}, VLAN ${LOCALNET_VLAN_ID}, subnets-less passthrough)"
 
     EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=${LOCALNET_VLAN_ATTACH_DEFAULT} --additional-network name:${ns}/localnet-vlan"
   else
@@ -818,93 +1011,37 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   configure_localnet_multi_egress_prereqs
 fi
 
-# Localnet-VLAN post-creation: clear OVN port security on localnet LSPs so
-# EgressIP-SNATed packets (source IP != VM localnet IP) can exit, and enable
-# IP forwarding on the secondary NIC (enp2s0) inside guest VMs for return traffic.
+# Localnet-VLAN post-creation: clear port security for EgressIP (DHCP is on br-localnet pre-boot).
 if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
   LOCALNET_VLAN_NS="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
-  NESTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-
-  if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
-    discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
-    if ! discover_ovn_container_names "${discovery_pod}"; then
-      echo "ERROR: Failed to discover OVN container names" >&2
-      exit 1
-    fi
-  fi
 
   echo "Waiting for ${HYPERSHIFT_NODE_COUNT} worker VMIs to be running..."
   for _ in $(seq 1 60); do
     running_count=$(oc get vmi -n "${LOCALNET_VLAN_NS}" --no-headers 2>/dev/null | grep -c Running || true)
     if [[ "${running_count}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
-      echo "All ${running_count} VMIs are running"
+      echo "All ${running_count} worker VMIs are running"
       break
     fi
     echo "Waiting for VMIs... (${running_count}/${HYPERSHIFT_NODE_COUNT} running)"
     sleep 10
   done
 
-  echo "Clearing port security on localnet-vlan VM LSPs..."
-  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
-    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
-      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}')
-    [[ -z "${ovn_pod}" ]] && continue
-    lsps=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
-      ovn-nbctl --bare --columns=name find Logical_Switch_Port \
-        external_ids:namespace="${LOCALNET_VLAN_NS}" \
-        external_ids:k8s.ovn.org/topology=localnet 2>/dev/null || true)
-    for lsp in ${lsps}; do
-      [[ -z "${lsp}" ]] && continue
-      oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
-        ovn-nbctl clear Logical_Switch_Port "${lsp}" port_security 2>/dev/null || true
-      echo "Cleared port security on ${lsp} (node ${node})"
-    done
-  done
+  clear_ovn_localnet_lsp_port_security "${LOCALNET_VLAN_NS}" || {
+    echo "ERROR: failed to clear port security on localnet-vlan LSPs" >&2
+    exit 1
+  }
 
-  if [[ -f "${NESTED_KUBECONFIG}" ]]; then
-    echo "Waiting for guest OVN node pods..."
-    for _ in $(seq 1 60); do
-      ovn_ready=$(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
-        -l app=ovnkube-node --no-headers 2>/dev/null | grep -c Running || true)
-      if [[ "${ovn_ready}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
-        echo "All ${ovn_ready} guest OVN node pods are running"
-        break
-      fi
-      echo "Waiting for guest OVN node pods... (${ovn_ready}/${HYPERSHIFT_NODE_COUNT} running)"
-      sleep 10
-    done
+  echo "Waiting for NodePool to become Ready"
+  oc wait --timeout="${LOCALNET_VLAN_NODEPOOL_READY_TIMEOUT:-45m}" \
+    --for=condition=Ready --namespace="${CLUSTER_NAMESPACE_PREFIX}" "nodepool/${CLUSTER_NAME}"
 
-    echo "Enabling IP forwarding on enp2s0 for all hosted cluster nodes..."
-    for ovn_node_pod in $(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
-      -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-      KUBECONFIG="${NESTED_KUBECONFIG}" oc exec -n openshift-ovn-kubernetes "${ovn_node_pod}" \
-        -c "${OVN_OVS_CONTAINER}" -- sysctl -w net.ipv4.conf.enp2s0.forwarding=1 2>/dev/null || true
-      echo "Enabled enp2s0 forwarding on guest ${ovn_node_pod}"
-    done
-  else
-    echo "WARNING: Nested kubeconfig not found at ${NESTED_KUBECONFIG}; skipping enp2s0 forwarding"
-  fi
   echo "Localnet-VLAN post-creation setup complete"
 fi
 
-# OVN-Kubernetes assigns IPs to localnet ports via IPAM but does not create
-# DHCP_Options entries, so the VMs never receive the assigned IP via DHCP.
-# This block creates DHCP options in each per-node nbdb and attaches them to
-# the localnet logical switch ports so that OVN's built-in DHCP responder
-# hands out the IPs to the VMs.
 if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
   LOCALNET_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
   LOCALNET_SUBNET="192.168.223.0/24"
-
-  # Discover OVN container names before first oc exec usage
-  if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
-    # Get first ovnkube-node pod for container discovery
-    discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
-    if ! discover_ovn_container_names "${discovery_pod}"; then
-      echo "ERROR: Failed to discover OVN container names" >&2
-      exit 1
-    fi
-  fi
+  LOCALNET_GATEWAY="192.168.223.1"
 
   echo "Waiting for VMIs to be running..."
   for _ in $(seq 1 60); do
@@ -918,37 +1055,10 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
     sleep 10
   done
 
-  echo "Configuring OVN DHCP for localnet interfaces..."
-  for VMI in $(oc get vmi -n "${LOCALNET_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}'); do
-    NODE=$(oc get vmi -n "${LOCALNET_NAMESPACE}" "${VMI}" -o jsonpath='{.status.nodeName}')
-    OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
-      --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
-
-    LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
-      ovn-nbctl --columns=name --bare find Logical_Switch_Port \
-      "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null)
-
-    if [[ -z "${LSP_NAME}" ]]; then
-      echo "WARNING: No localnet LSP found on node ${NODE} for VMI ${VMI}"
-      continue
-    fi
-
-    DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
-      ovn-nbctl create DHCP_Options cidr="${LOCALNET_SUBNET}" \
-      options='"lease_time"="3500" "router"="192.168.223.1" "server_id"="192.168.223.1" "server_mac"="c0:ff:ee:00:00:01"' \
-      2>/dev/null)
-
-    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
-      ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
-
-    # Clear port security on the VM's localnet port so EgressIP-SNATed packets
-    # can exit the management cluster's OVN. Without this, OVN drops packets
-    # whose source IP is the EgressIP (not the VM's assigned localnet IP).
-    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
-      ovn-nbctl clear Logical_Switch_Port "${LSP_NAME}" port_security 2>/dev/null
-
-    echo "Configured DHCP and cleared port security for VMI ${VMI} on node ${NODE}"
-  done
+  configure_ovn_localnet_lsp_dhcp "${LOCALNET_NAMESPACE}" "${LOCALNET_SUBNET}" "${LOCALNET_GATEWAY}" || {
+    echo "ERROR: OVN DHCP configuration failed for localnet" >&2
+    exit 1
+  }
   echo "OVN DHCP and port security configuration complete for localnet interfaces"
 
   # Enable IP forwarding on enp2s0 (the secondary/localnet NIC) inside each
