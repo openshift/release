@@ -1,0 +1,132 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: conc-builds-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-conc-builds
+    - chain: openshift-qe-run-api-apf-customized-flowcontrol
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: compact-cp-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-installer-aws-compact
+- always_run: false
+  as: router-perf-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-router-perf
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: control-plane-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CDV2_ITERATION_MULTIPLIER: "9"
+      COMPUTE_NODE_REPLICAS: "3"
+      ENABLE_LAYER_3: "false"
+      UDN_ITERATION_MULTIPLIER: "24"
+    test:
+    - chain: openshift-qe-control-plane
+    - chain: cucushift-installer-check-cluster-health
+    - ref: capi-conf-apply-feature-gate
+    - ref: capi-migration-check
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: node-density-cni-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: ocpbugs-76596-ct-flush-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BURST_POD_COUNT: "200"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      CT_ENTRIES_PER_ZONE: "125000"
+      KB_PODS_PER_NODE: "200"
+      MAX_PODS: "500"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-set-max-pods
+    - ref: openshift-qe-ocpbugs-76596-ct-flush
+    workflow: openshift-qe-installer-aws
+  timeout: 3h0m0s
+- always_run: false
+  as: ocpbugs-76596-ct-flush-fixed-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BURST_POD_COUNT: "200"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      CT_ENTRIES_PER_ZONE: "125000"
+      EXPECTED_STALLS: "5"
+      EXPECTED_TIMEOUTS: "0"
+      KB_PODS_PER_NODE: "200"
+      KERNEL_RPM_BASE_URL: https://artifacts.internal.cki-project.org/arr-cki-prod-internal-artifacts/internal-artifacts/2805618071/build_x86_64/16205700033/artifacts
+      KERNEL_VERSION: 5.14.0-570.137.1.7193_2805617742.el9_6
+      MAX_PODS: "500"
+      OVS_RPM_BASE_URL: https://download.devel.redhat.com/brewroot/work/tasks/8175/71708175
+      OVS_VERSION: 3.5.2-73.el9fdp.rhel247088.1.1
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-set-max-pods
+    - ref: openshift-qe-ocpbugs-76596-ct-flush-install-fix
+    - ref: openshift-qe-ocpbugs-76596-ct-flush
+    workflow: openshift-qe-installer-aws
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-perfscale
+  variant: aws-4.20-nightly-x86
