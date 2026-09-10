@@ -46,9 +46,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    collection: ocm-secrets
+  - collection: ocm-secrets
     group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
@@ -59,9 +59,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    collection: ocm-secrets
+  - collection: ocm-secrets
     group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: pr-image-mirror
   steps:
     dependencies:
@@ -120,15 +120,15 @@ tests:
         export VERSION_TAG=latest
         ./run-prow-e2e.sh
       credentials:
-      - mount_path: /etc/ocm-mgdsvcs-e2e-test
+      - collection: ocm-mgdsvcs-secrets
         group: ocm-mgdsvcs-e2e-test
-        collection: ocm-mgdsvcs-secrets
-      - mount_path: /etc/ocm-mgdsvcs-clusterpool
+        mount_path: /etc/ocm-mgdsvcs-e2e-test
+      - collection: ocm-mgdsvcs-secrets
         group: ocm-mgdsvcs-clusterpool
-        collection: ocm-mgdsvcs-secrets
-      - mount_path: /etc/acm-cicd-quay-pull
+        mount_path: /etc/ocm-mgdsvcs-clusterpool
+      - collection: ocm-secrets
         group: acm-cicd-quay-pull
-        collection: ocm-secrets
+        mount_path: /etc/acm-cicd-quay-pull
       from: idp-mgmt-operator-e2e-tests
       resources:
         requests:

@@ -70,9 +70,9 @@ tests:
     from: src
   run_if_changed: \.go$
   secret:
-    mount_path: /tmp/secret
     collection: hive
     group: hive-codecov-token
+    mount_path: /tmp/secret
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -81,9 +81,9 @@ tests:
     from: src
   postsubmit: true
   secret:
-    mount_path: /tmp/secret
     collection: hive
     group: hive-codecov-token
+    mount_path: /tmp/secret
 - as: snyk
   optional: true
   skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|renovate\.json|OWNERS|PROJECT|LICENSE)$
@@ -120,11 +120,11 @@ tests:
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e
       credentials:
-      - mount_path: /tmp/secret/hiveci-aws-creds
+      - collection: hive
         group: aws-ci-creds
-        collection: hive
-      - mount_path: /tmp/secret/pull-secret
-        bundle: ci-pull-credentials
+        mount_path: /tmp/secret/hiveci-aws-creds
+      - bundle: ci-pull-credentials
+        mount_path: /tmp/secret/pull-secret
         namespace: test-credentials
       dependencies:
       - env: HIVE_IMAGE
@@ -167,11 +167,11 @@ tests:
         export USE_MANAGED_DNS=false
         GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e-pool
       credentials:
-      - mount_path: /tmp/secret/hiveci-aws-creds
+      - collection: hive
         group: aws-ci-creds
-        collection: hive
-      - mount_path: /tmp/secret/pull-secret
-        bundle: ci-pull-credentials
+        mount_path: /tmp/secret/hiveci-aws-creds
+      - bundle: ci-pull-credentials
+        mount_path: /tmp/secret/pull-secret
         namespace: test-credentials
       dependencies:
       - env: HIVE_IMAGE
@@ -252,9 +252,9 @@ tests:
 
         GO_COMPLIANCE_INFO=0 CLOUD=vsphere make test-e2e
       credentials:
-      - mount_path: /var/run/vault/vsphere-ibmcloud-ci
+      - collection: vsphere
         group: ibmcloud/ci
-        collection: vsphere
+        mount_path: /var/run/vault/vsphere-ibmcloud-ci
       dependencies:
       - env: HIVE_IMAGE
         name: hive
