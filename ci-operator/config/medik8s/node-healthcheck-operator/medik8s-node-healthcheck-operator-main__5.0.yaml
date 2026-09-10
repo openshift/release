@@ -7,6 +7,10 @@ base_images:
     name: claude-ai-helpers
     namespace: ci
     tag: latest
+  operator-sdk:
+    name: "4.22"
+    namespace: origin
+    tag: operator-sdk
   tls-scanner-tool:
     name: tls-scanner
     namespace: tls-scanner
@@ -155,9 +159,8 @@ tests:
         printf '%s\n' "${JOB_SPEC:-}" > "$ARTIFACT_DIR/provenance/job-spec.json"
         git show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/nhc-source.txt"
         export NHC_UPGRADE_CANDIDATE_COMMIT="$(git rev-parse HEAD)"
-        make operator-sdk
-        export NHC_UPGRADE_OPERATOR_SDK="$PWD/bin/operator-sdk"
-        "$NHC_UPGRADE_OPERATOR_SDK" bundle validate "$OO_BUNDLE"
+        export NHC_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
+        operator-sdk bundle validate "$OO_BUNDLE"
 
         git clone "$SYSTEM_TESTS_REPOSITORY" /tmp/system-tests
         git -C /tmp/system-tests checkout "$SYSTEM_TESTS_REVISION"
@@ -182,7 +185,7 @@ tests:
       - name: NHC_UPGRADE_PACKAGE
       - name: SYSTEM_TESTS_REPOSITORY
       - name: SYSTEM_TESTS_REVISION
-      from: src
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
@@ -220,11 +223,8 @@ tests:
         git show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/nhc-source.txt"
         export NHC_UPGRADE_CANDIDATE_COMMIT="$(git rev-parse HEAD)"
         printf 'candidate source checkout: %s\n' "$NHC_UPGRADE_CANDIDATE_COMMIT"
-        make operator-sdk
-        export NHC_UPGRADE_OPERATOR_SDK="$PWD/bin/operator-sdk"
-        "$NHC_UPGRADE_OPERATOR_SDK" version
-        "$NHC_UPGRADE_OPERATOR_SDK" run --help | grep -q bundle-upgrade
-        "$NHC_UPGRADE_OPERATOR_SDK" bundle validate "$OO_BUNDLE"
+        export NHC_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
+        operator-sdk bundle validate "$OO_BUNDLE"
 
         git clone "$SYSTEM_TESTS_REPOSITORY" /tmp/system-tests
         git -C /tmp/system-tests checkout "$SYSTEM_TESTS_REVISION"
@@ -254,7 +254,7 @@ tests:
       - name: NHC_UPGRADE_NAMESPACE
       - name: SYSTEM_TESTS_REPOSITORY
       - name: SYSTEM_TESTS_REVISION
-      from: src
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
@@ -293,11 +293,8 @@ tests:
         git show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/nhc-source.txt"
         export NHC_UPGRADE_CANDIDATE_COMMIT="$(git rev-parse HEAD)"
         printf 'candidate source checkout: %s\n' "$NHC_UPGRADE_CANDIDATE_COMMIT"
-        make operator-sdk
-        export NHC_UPGRADE_OPERATOR_SDK="$PWD/bin/operator-sdk"
-        "$NHC_UPGRADE_OPERATOR_SDK" version
-        "$NHC_UPGRADE_OPERATOR_SDK" run --help | grep -q bundle-upgrade
-        "$NHC_UPGRADE_OPERATOR_SDK" bundle validate "$OO_BUNDLE"
+        export NHC_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
+        operator-sdk bundle validate "$OO_BUNDLE"
 
         git clone "$SYSTEM_TESTS_REPOSITORY" /tmp/system-tests
         git -C /tmp/system-tests checkout "$SYSTEM_TESTS_REVISION"
@@ -327,7 +324,7 @@ tests:
       - name: NHC_UPGRADE_NAMESPACE
       - name: SYSTEM_TESTS_REPOSITORY
       - name: SYSTEM_TESTS_REVISION
-      from: src
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
