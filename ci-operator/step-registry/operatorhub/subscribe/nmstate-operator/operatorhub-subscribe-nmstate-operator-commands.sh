@@ -91,6 +91,24 @@ fi
 
 echo "successfully installed ${NMSTATE_OPERATOR_SUB_PACKAGE}"
 
+echo "Waiting for nmstates.nmstate.io CRD to be established..."
+CRD_RETRIES=30
+for k in $(seq "${CRD_RETRIES}") max; do
+  [[ "${k}" == "max" ]] && break
+  if [[ "$(oc get crd nmstates.nmstate.io -o jsonpath='{.status.conditions[?(@.type=="Established")].status}' 2>/dev/null || true)" == "True" ]]; then
+    echo "nmstates.nmstate.io CRD is established"
+    break
+  fi
+  echo "Try ${k}/${CRD_RETRIES}: nmstates.nmstate.io CRD not established yet. Checking again in 30 seconds"
+  sleep 30
+done
+
+if [[ "${k}" == "max" ]]; then
+  echo "Error: nmstates.nmstate.io CRD was not established"
+  oc get crd nmstates.nmstate.io -o yaml 2>/dev/null || echo "CRD nmstates.nmstate.io not found"
+  exit 1
+fi
+
 echo "Creating NMState operand CR to activate the operator..."
 oc apply -f - <<EOF
 apiVersion: nmstate.io/v1
