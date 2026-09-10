@@ -131,10 +131,12 @@ tests:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
-      MEDIK8S_DIRECT_CANDIDATE_UPGRADE: "true"
+      MEDIK8S_UPGRADE_TO_PR_BUNDLE: "true"
       MEDIK8S_OPERATOR_PACKAGE: node-healthcheck-operator
       NHC_UPGRADE_NAMESPACE: openshift-workload-availability
       NHC_UPGRADE_PACKAGE: node-healthcheck-operator
+      SYSTEM_TESTS_REPOSITORY: https://github.com/JonahSussman/medik8s-system-tests.git
+      SYSTEM_TESTS_REVISION: 39f1663f891f50c915c7dea3af2d1a97bd499fb2
     post:
     - chain: ipi-aws-post
     pre:
@@ -157,7 +159,8 @@ tests:
         export NHC_UPGRADE_OPERATOR_SDK="$PWD/bin/operator-sdk"
         "$NHC_UPGRADE_OPERATOR_SDK" bundle validate "$OO_BUNDLE"
 
-        git clone https://github.com/medik8s/system-tests.git /tmp/system-tests
+        git clone "$SYSTEM_TESTS_REPOSITORY" /tmp/system-tests
+        git -C /tmp/system-tests checkout "$SYSTEM_TESTS_REVISION"
         git -C /tmp/system-tests show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
         export NHC_UPGRADE_TEST_REVISION="$(git -C /tmp/system-tests rev-parse HEAD)"
         export NHC_UPGRADE_CANDIDATE_BUNDLE="$OO_BUNDLE"
@@ -173,10 +176,12 @@ tests:
       - env: NHC_CANDIDATE_OPERATOR
         name: node-healthcheck-operator
       env:
-      - name: MEDIK8S_DIRECT_CANDIDATE_UPGRADE
+      - name: MEDIK8S_UPGRADE_TO_PR_BUNDLE
       - name: MEDIK8S_OPERATOR_PACKAGE
       - name: NHC_UPGRADE_NAMESPACE
       - name: NHC_UPGRADE_PACKAGE
+      - name: SYSTEM_TESTS_REPOSITORY
+      - name: SYSTEM_TESTS_REVISION
       from: src
       resources:
         requests:
@@ -196,6 +201,8 @@ tests:
       NHC_UPGRADE_PACKAGE: node-healthcheck-operator
       NHC_UPGRADE_SNR_BUNDLE: quay.io/medik8s/self-node-remediation-operator-bundle:v0.13.0
       NHC_UPGRADE_SNR_PACKAGE: self-node-remediation
+      SYSTEM_TESTS_REPOSITORY: https://github.com/JonahSussman/medik8s-system-tests.git
+      SYSTEM_TESTS_REVISION: 39f1663f891f50c915c7dea3af2d1a97bd499fb2
       TEST_NAME: e2e-system-tests-nhc-operator-upgrade
       TEST_STEPS: run-nhc-operator-upgrade
     post:
@@ -219,7 +226,8 @@ tests:
         "$NHC_UPGRADE_OPERATOR_SDK" run --help | grep -q bundle-upgrade
         "$NHC_UPGRADE_OPERATOR_SDK" bundle validate "$OO_BUNDLE"
 
-        git clone https://github.com/medik8s/system-tests.git /tmp/system-tests
+        git clone "$SYSTEM_TESTS_REPOSITORY" /tmp/system-tests
+        git -C /tmp/system-tests checkout "$SYSTEM_TESTS_REVISION"
         git -C /tmp/system-tests show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
         export NHC_UPGRADE_CANDIDATE_BUNDLE="$OO_BUNDLE"
         export NHC_UPGRADE_CANDIDATE_IMAGE="$NHC_CANDIDATE_OPERATOR"
@@ -244,6 +252,8 @@ tests:
       - name: NHC_UPGRADE_SNR_BUNDLE
       - name: NHC_UPGRADE_SNR_PACKAGE
       - name: NHC_UPGRADE_NAMESPACE
+      - name: SYSTEM_TESTS_REPOSITORY
+      - name: SYSTEM_TESTS_REVISION
       from: src
       resources:
         requests:
@@ -264,6 +274,8 @@ tests:
       NHC_UPGRADE_PACKAGE: node-healthcheck-operator
       NHC_UPGRADE_SNR_BUNDLE: quay.io/medik8s/self-node-remediation-operator-bundle:v0.13.0
       NHC_UPGRADE_SNR_PACKAGE: self-node-remediation
+      SYSTEM_TESTS_REPOSITORY: https://github.com/JonahSussman/medik8s-system-tests.git
+      SYSTEM_TESTS_REVISION: 39f1663f891f50c915c7dea3af2d1a97bd499fb2
       TEST_NAME: e2e-system-tests-nhc-fresh-install
       TEST_STEPS: run-nhc-fresh-install
     post:
@@ -287,7 +299,8 @@ tests:
         "$NHC_UPGRADE_OPERATOR_SDK" run --help | grep -q bundle-upgrade
         "$NHC_UPGRADE_OPERATOR_SDK" bundle validate "$OO_BUNDLE"
 
-        git clone https://github.com/medik8s/system-tests.git /tmp/system-tests
+        git clone "$SYSTEM_TESTS_REPOSITORY" /tmp/system-tests
+        git -C /tmp/system-tests checkout "$SYSTEM_TESTS_REVISION"
         git -C /tmp/system-tests show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
         export NHC_UPGRADE_CANDIDATE_BUNDLE="$OO_BUNDLE"
         export NHC_UPGRADE_CANDIDATE_IMAGE="$NHC_CANDIDATE_OPERATOR"
@@ -312,6 +325,8 @@ tests:
       - name: NHC_UPGRADE_SNR_BUNDLE
       - name: NHC_UPGRADE_SNR_PACKAGE
       - name: NHC_UPGRADE_NAMESPACE
+      - name: SYSTEM_TESTS_REPOSITORY
+      - name: SYSTEM_TESTS_REVISION
       from: src
       resources:
         requests:
