@@ -1,0 +1,56 @@
+ref:
+  as: acm-interop-p2p-spoke-upgrade-node-debug
+  documentation: |-
+    Post-step: collect spoke node OS-upgrade diagnostics mapped to the four known
+    rpm-ostree rebase timeout root causes.
+
+    Always exits 0 — must not mask the real test failure.
+    Skips gracefully if managed-cluster-kubeconfig is absent.
+
+    Root cause coverage:
+      Cause 1 — Image download after drain (OCPBUGS-87861)
+        MCO does not pre-cache the RHCOS image; download starts only after drain.
+        → rpm-ostreed-journal.txt: pull start time vs timeout
+      Cause 2 — Network / registry connectivity (quay.io)
+        Firewall, proxy, TLS, or interface failure halts the pivot.
+        MachineConfigDaemonPivotError alert fires if pivot exceeds ~2m.
+        → network-check.txt, rpm-ostreed-journal.txt
+      Cause 3 — DNS race condition (OCPBUGS-43406)
+        CoreDNS static pod update collides with rpm-ostree rebase.
+        → dns-journal.txt, coredns-pods.txt, resolv-conf.txt
+      Cause 4 — DBUS / rpm-ostreed stuck (OCPBUGS-7248)
+        Stuck rpm-ostreed or DBUS timeout → "Transaction in progress".
+        → dbus-journal.txt, rpm-ostree-status.txt, mcd-force-flag.txt
+
+    Stuck node detection: nodes where currentConfig annotation != desiredConfig,
+    or nodes in Ready,SchedulingDisabled state.
+
+    Artifacts: ${ARTIFACT_DIR}/spoke-node-upgrade-debug/
+      cluster-level:
+        nodes-wide.txt, machineconfigpools.txt, machineconfigs.txt
+        mco-operator-logs.txt, mco-pods.txt
+        node-mc-annotations.txt   (currentConfig vs desiredConfig diff table)
+        coredns-pods.txt, coredns-configmap.txt
+      per stuck node (node-<name>/):
+        describe.txt
+        rpm-ostreed-journal.txt   (Cause 1+2)
+        dbus-journal.txt          (Cause 4)
+        machine-config-daemon-journal.txt
+        dns-journal.txt, resolv-conf.txt  (Cause 3)
+        kubelet-journal.txt
+        mcd-pod-logs.txt          ("Failed to update OS after retries")
+        rpm-ostree-status.txt     (Cause 4: current state via exec)
+        mcd-force-flag.txt        (Cause 4: /run/machine-config-daemon-force)
+        network-check.txt         (Cause 2: quay.io curl from node)
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  commands: acm-interop-p2p-spoke-upgrade-node-debug-commands.sh
+  timeout: 30m
+  grace_period: 5m
+  cli: latest
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
