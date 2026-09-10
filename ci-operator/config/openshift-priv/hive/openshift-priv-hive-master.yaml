@@ -75,7 +75,8 @@ tests:
   run_if_changed: \.go$
   secret:
     mount_path: /tmp/secret
-    name: hive-codecov-token
+    collection: hive
+    group: hive-codecov-token
 - as: snyk
   optional: true
   skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|renovate\.json|OWNERS|PROJECT|LICENSE)$
@@ -113,10 +114,10 @@ tests:
         GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e
       credentials:
       - mount_path: /tmp/secret/hiveci-aws-creds
-        name: hiveci-aws-creds
-        namespace: test-credentials
+        group: aws-ci-creds
+        collection: hive
       - mount_path: /tmp/secret/pull-secret
-        name: ci-pull-credentials
+        bundle: ci-pull-credentials
         namespace: test-credentials
       dependencies:
       - env: HIVE_IMAGE
@@ -160,10 +161,10 @@ tests:
         GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e-pool
       credentials:
       - mount_path: /tmp/secret/hiveci-aws-creds
-        name: hiveci-aws-creds
-        namespace: test-credentials
+        group: aws-ci-creds
+        collection: hive
       - mount_path: /tmp/secret/pull-secret
-        name: ci-pull-credentials
+        bundle: ci-pull-credentials
         namespace: test-credentials
       dependencies:
       - env: HIVE_IMAGE
@@ -245,8 +246,8 @@ tests:
         GO_COMPLIANCE_INFO=0 CLOUD=vsphere make test-e2e
       credentials:
       - mount_path: /var/run/vault/vsphere-ibmcloud-ci
-        name: vsphere-ibmcloud-ci
-        namespace: test-credentials
+        group: ibmcloud/ci
+        collection: vsphere
       dependencies:
       - env: HIVE_IMAGE
         name: hive
