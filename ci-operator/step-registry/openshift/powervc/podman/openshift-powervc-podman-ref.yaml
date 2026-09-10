@@ -1,0 +1,26 @@
+ref:
+  as: openshift-powervc-podman
+  from: nested-podman
+  commands: openshift-powervc-podman-commands.sh
+  nested_podman: true
+  grace_period: 60m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: powervc-creds
+    mount_path: /var/run/powervc-ipi-cicd-secrets/powervc-creds
+  env:
+  - name: CLOUD
+    default: "ocp-ci"
+    documentation: |-
+      The name of the cloud in the clouds.yaml file.
+  documentation: >-
+    Uploads the RHCOS images required for OpenShift IPI installs on PowerVC.
+    Running in a nested-podman sandbox, the step downloads the IBM PowerVC
+    helper binaries (ocp-ipi-powervc/UploadRhcos), installs the OpenStack and
+    quay.io credentials from the mounted powervc-creds secret, generates and
+    populates pvcctl's config.yaml, and then runs UploadRhcos to upload any
+    missing RHCOS images for the supported OpenShift releases and RHEL versions.
