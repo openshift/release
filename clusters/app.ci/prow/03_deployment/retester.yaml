@@ -65,7 +65,6 @@ spec:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
-        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release
@@ -74,9 +73,6 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
-        - name: sparse-checkout-config
-          mountPath: /etc/git-sync
-          readOnly: true
       containers:
       - image: quay-proxy.ci.openshift.org/openshift/ci:ci_retester_latest
         name: retester
@@ -92,7 +88,7 @@ spec:
         - --github-graphql-endpoint=http://ghproxy/graphql
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
-        - --job-config-path=/etc/jobs
+        - --job-config-path=/var/repo/release/ci-operator/jobs
         - --cache-file=/cache/backoff
         - --cache-file-on-s3=true
         - --config-file=/etc/retester/_config.yaml
@@ -127,14 +123,6 @@ spec:
         - name: config
           mountPath: /etc/retester
           readOnly: true
-        - name: combined-jobs
-          mountPath: /etc/jobs
-        - name: job-configs
-          mountPath: /etc/jobs/efs
-          readOnly: true
-        - name: release
-          mountPath: /etc/jobs/release
-          readOnly: true
         resources:
           requests:
             memory: "5Gi"
@@ -147,7 +135,6 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
-        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --max-failures=3
         - --link=release
         - --sync-timeout=300s
@@ -156,9 +143,6 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
-        - name: sparse-checkout-config
-          mountPath: /etc/git-sync
-          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -175,11 +159,3 @@ spec:
       - name: config
         configMap:
           name: retester-config
-      - name: combined-jobs
-        emptyDir: {}
-      - name: sparse-checkout-config
-        configMap:
-          name: prow-jobs-sparse-checkout
-      - name: job-configs
-        persistentVolumeClaim:
-          claimName: job-configs-nfs
