@@ -803,10 +803,10 @@ EOF
       EXTRA_ARGS="${EXTRA_ARGS} --additional-network name:${ns}/localnet-${i}"
     done
   elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-vlan" ]]; then
-    # Localnet with VLAN: VMs connect to a tagged VLAN via a dedicated OVS bridge.
-    #   - NNCP creates br-localnet + VLAN sub-interface and OVN bridge-mapping
+    # Localnet with VLAN: tagging is applied once at the host via NNCP (access port on
+    # ${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}). OVN NAD is subnets-less L2 passthrough
+    # with no vlanID — do not stack OVN VLAN tagging on top of the NNCP sub-interface.
     #   - dnsmasq on br-ex.<vlan-id> (per node) serves DHCP/DNS before workers boot
-    #   - NAD is subnets-less L2 passthrough (no OVN IPAM)
     #   - attach-default-network=false — workers use only the localnet VLAN NIC
 
     ns="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
@@ -877,6 +877,8 @@ NNCP_EOF
       --for=condition=Available --timeout=300s 2>/dev/null; then
       echo "WARNING: NNCP not Available after 300s, checking status..."
       oc get nncp "localnet-vlan-${LOCALNET_VLAN_ID}" -o yaml 2>/dev/null || true
+      echo "ERROR: NNCP localnet-vlan-${LOCALNET_VLAN_ID} is not Available; aborting cluster creation" >&2
+      exit 1
     fi
 
     localnet_vlan_configure_br_localnet_dhcp "${CLUSTER_NAME}" "${LOCALNET_VLAN_ID}" \
@@ -898,7 +900,7 @@ NNCP_EOF
       echo "  ${NODE}: ${MAPPINGS}"
     done
 
-    # Create subnets-less localnet NAD (L2 passthrough to the VLAN; DHCP on ${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}).
+    # Create subnets-less localnet NAD (untagged L2 passthrough; VLAN already on NNCP port).
     oc apply -f - <<NAD_EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
@@ -911,11 +913,10 @@ spec:
       "name": "${LOCALNET_VLAN_PHYSNET}",
       "type": "ovn-k8s-cni-overlay",
       "topology": "localnet",
-      "netAttachDefName": "${ns}/localnet-vlan",
-      "vlanID": ${LOCALNET_VLAN_ID}
+      "netAttachDefName": "${ns}/localnet-vlan"
   }'
 NAD_EOF
-    echo "Created NAD localnet-vlan (${LOCALNET_VLAN_PHYSNET}:${LOCALNET_VLAN_BRIDGE}, VLAN ${LOCALNET_VLAN_ID}, subnets-less passthrough)"
+    echo "Created NAD localnet-vlan (${LOCALNET_VLAN_PHYSNET}:${LOCALNET_VLAN_BRIDGE}, subnets-less passthrough to NNCP VLAN ${LOCALNET_VLAN_ID})"
 
     EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=${LOCALNET_VLAN_ATTACH_DEFAULT} --additional-network name:${ns}/localnet-vlan"
   else
