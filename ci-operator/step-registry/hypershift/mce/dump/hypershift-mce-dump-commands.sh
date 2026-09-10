@@ -15,14 +15,14 @@ fi
 DUMP_GUEST_CLUSTER=${DUMP_GUEST_CLUSTER:-"true"}
 HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -o jsonpath="{.items[?(@.metadata.name=='${CLUSTER_NAME}')].metadata.namespace}" 2>/dev/null || true)
 if [[ -z "${HOSTED_CLUSTER_NS}" ]]; then
-  HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+  read -r HOSTED_CLUSTER_NS CLUSTER_NAME < <(oc get hostedcluster -A -o jsonpath='{.items[0].metadata.namespace}{" "}{.items[0].metadata.name}' 2>/dev/null || true)
 fi
-if [[ -z "${HOSTED_CLUSTER_NS}" ]]; then
-  echo "No HostedCluster found for ${CLUSTER_NAME}; skipping cluster dump"
+if [[ -z "${HOSTED_CLUSTER_NS}" || -z "${CLUSTER_NAME}" ]]; then
+  echo "No HostedCluster found; skipping cluster dump"
   exit 0
 fi
 EXTRA_ARGS=""
-PLATFORM_TYPE=$(oc get hostedclusters -n "${HOSTED_CLUSTER_NS}" "${CLUSTER_NAME}" -ojsonpath="{.spec.platform.type}" 2>/dev/null || true)
+PLATFORM_TYPE=$(oc get hostedclusters -n "${HOSTED_CLUSTER_NS}" "${CLUSTER_NAME}" -o jsonpath="{.spec.platform.type}" 2>/dev/null || true)
 if [[ "${PLATFORM_TYPE}" == "Agent" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --agent-namespace local-cluster-${CLUSTER_NAME}"
 fi
