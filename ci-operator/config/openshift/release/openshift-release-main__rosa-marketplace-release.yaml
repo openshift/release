@@ -1,0 +1,31 @@
+base_images:
+  cli:
+    name: "5.1"
+    namespace: ocp
+    tag: cli
+external_images:
+  rosa-marketplace-release-generator:
+    name: rosa-marketplace-release-generator
+    namespace: app-sre
+    registry: quay.io
+    tag: 4b04bb4
+resources:
+  '*':
+    requests:
+      cpu: 10m
+      memory: 100Mi
+tests:
+- as: rosa-marketplace-release-detect
+  interval: 4h
+  steps:
+    env:
+      MARKETPLACE_PUBLISH_ENABLED: "false"
+      TARGET_OCP_Y_STREAM: "5.2"
+    test:
+    - ref: rosa-marketplace-release-detect
+    - ref: rosa-marketplace-release-publish
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: rosa-marketplace-release

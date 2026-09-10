@@ -1,0 +1,44 @@
+ref:
+  as: rosa-marketplace-release-detect
+  from: cli
+  cli: latest
+  grace_period: 1m
+  commands: rosa-marketplace-release-detect-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: TARGET_OCP_Y_STREAM
+    documentation: Major.minor OCP y-stream to detect, for example 5.2.
+  - name: RELEASE_CONTROLLER_API
+    default: https://amd64.ocp.releases.ci.openshift.org
+    documentation: Base URL for the release-controller API.
+  - name: RELEASE_CONTROLLER_RETRIES
+    default: "3"
+    documentation: Maximum attempts for transient release-controller API failures.
+  - name: RELEASE_CONTROLLER_RETRY_DELAY_SECONDS
+    default: "2"
+    documentation: Initial delay for exponential backoff between release-controller API attempts.
+  - name: RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS
+    default: "30"
+    documentation: Maximum delay for exponential backoff between release-controller API attempts.
+  - name: RELEASE_CONTROLLER_MAX_RESPONSE_BYTES
+    default: "10485760"
+    documentation: Maximum accepted response size in bytes for each release-controller API request.
+  - name: RELEASE_PAYLOAD_AUTH_FILE
+    default: /etc/pull-secret/.dockerconfigjson
+    documentation: Registry auth file used to extract openshift-install from the selected payload.
+  - name: RHCOS_AWS_REGION
+    default: us-east-1
+    documentation: AWS region whose installer-provided RHCOS AMI must be present.
+  credentials:
+  - namespace: test-credentials
+    name: ci-pull-credentials
+    mount_path: /etc/pull-secret
+  documentation: |-
+    Detects a configured OCP nightly y-stream and selects the first payload whose
+    phase proves that an update payload image was built (Ready, Accepted, or
+    Rejected). It extracts openshift-install from that payload, records the
+    x86_64 RHCOS version and regional AWS AMI, and writes a ready/wait state plus
+    values to SHARED_DIR for a subsequent Marketplace release step.
