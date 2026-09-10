@@ -81,6 +81,11 @@ releases:
       product: ocp
       stream: ci
       version: "4.19"
+  latest-amd64:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.20"
   n1minor:
     candidate:
       product: ocp
@@ -159,6 +164,22 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-nested
+- always_run: false
+  as: e2e-aws-backport
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-pr
+      OCP_IMAGE_LATEST: release:latest-amd64
+      OCP_IMAGE_N1: release:latest-amd64
+      OCP_IMAGE_N2: release:latest-amd64
+      OCP_IMAGE_N3: release:latest-amd64
+      OCP_IMAGE_N4: release:latest-amd64
+    env:
+      CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
+      INSTALL_FROM_LATEST: "true"
     workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-aws-minimal
