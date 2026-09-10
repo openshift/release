@@ -275,7 +275,9 @@ SCRIPT_EOF
     return 1
   fi
   echo "Setting up ${dhcp_iface} DHCP/DNS on node ${node} (single-node DHCP for shared VLAN)..."
-  if ! oc debug "node/${node}" --quiet=true -- chroot /host bash -c \
+  # oc debug defaults to OPENSHIFT_BUILD_NAMESPACE (ci-op-* on build cluster), which does
+  # not exist on the baremetal test cluster. Always target default.
+  if ! oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
     "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
   then
     echo "WARNING: failed to configure ${dhcp_iface} DHCP on node ${node}" >&2
