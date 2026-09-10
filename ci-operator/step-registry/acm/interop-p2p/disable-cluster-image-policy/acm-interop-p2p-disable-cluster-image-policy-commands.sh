@@ -16,7 +16,6 @@ eval "$(
 
 if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY}" != "true" ]]; then
     : "OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY is not true; skipping"
-    true
     exit 0
 fi
 
