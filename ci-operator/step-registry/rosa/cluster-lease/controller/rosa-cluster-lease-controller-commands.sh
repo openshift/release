@@ -266,7 +266,7 @@ provision_sts_cluster() {
 delete_cluster() {
     local cluster_id="$1" type="$2"
     if [[ "${type}" == "osd-gcp" || "${type}" == "osd-aws" ]]; then
-        ocm delete "/api/clusters_mgmt/v1/clusters/${cluster_id}" || true
+        ocm delete "/api/clusters_mgmt/v1/clusters/${cluster_id}"
     else
         local cluster_desc roles_prefix oidc_config_id describe_attempt
         for describe_attempt in $(seq 1 5); do
