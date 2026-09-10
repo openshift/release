@@ -50,7 +50,6 @@ spec:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
-        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release
@@ -58,9 +57,6 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
-        - name: sparse-checkout-config
-          mountPath: /etc/git-sync
-          readOnly: true
       containers:
       - name: prow-controller-manager
         image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260908-104d452f4
@@ -68,7 +64,7 @@ spec:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
         - --dry-run=false
-        - --job-config-path=/etc/jobs
+        - --job-config-path=/var/repo/release/ci-operator/jobs
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -102,14 +98,6 @@ spec:
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
           readOnly: true
-        - name: combined-jobs
-          mountPath: /etc/jobs
-        - name: job-configs
-          mountPath: /etc/jobs/efs
-          readOnly: true
-        - name: release
-          mountPath: /etc/jobs/release
-          readOnly: true
         resources:
           requests:
             memory: "16Gi"
@@ -122,16 +110,12 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
-        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
-        - name: sparse-checkout-config
-          mountPath: /etc/git-sync
-          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -153,11 +137,3 @@ spec:
       - name: build-farm-credentials
         secret:
           secretName: prow-controller-manager
-      - name: combined-jobs
-        emptyDir: {}
-      - name: sparse-checkout-config
-        configMap:
-          name: prow-jobs-sparse-checkout
-      - name: job-configs
-        persistentVolumeClaim:
-          claimName: job-configs-nfs

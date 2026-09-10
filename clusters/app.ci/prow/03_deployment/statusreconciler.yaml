@@ -31,7 +31,6 @@ spec:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
-        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release
@@ -39,9 +38,6 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
-        - name: sparse-checkout-config
-          mountPath: /etc/git-sync
-          readOnly: true
       containers:
       - name: statusreconciler
         image: us-docker.pkg.dev/k8s-infra-prow/images/status-reconciler:v20260908-104d452f4
@@ -58,7 +54,7 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
-        - --job-config-path=/etc/jobs
+        - --job-config-path=/var/repo/release/ci-operator/jobs
         - --projected-token-file=/var/sa-token/token
         env:
         - name: GITHUB_APP_ID
@@ -80,14 +76,6 @@ spec:
           readOnly: true
         - name: release
           mountPath: /var/repo
-        - name: combined-jobs
-          mountPath: /etc/jobs
-        - name: job-configs
-          mountPath: /etc/jobs/efs
-          readOnly: true
-        - name: release
-          mountPath: /etc/jobs/release
-          readOnly: true
         resources:
           requests:
             memory: "34Gi"
@@ -100,16 +88,12 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
-        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
-        - name: sparse-checkout-config
-          mountPath: /etc/git-sync
-          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -128,11 +112,3 @@ spec:
           name: config
       - name: release
         emptyDir: {}
-      - name: combined-jobs
-        emptyDir: {}
-      - name: sparse-checkout-config
-        configMap:
-          name: prow-jobs-sparse-checkout
-      - name: job-configs
-        persistentVolumeClaim:
-          claimName: job-configs-nfs
