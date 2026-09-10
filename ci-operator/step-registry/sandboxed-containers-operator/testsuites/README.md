@@ -39,10 +39,9 @@ Design decisions that follow from that intent:
 
 **Scope** is deliberately limited to `ci-operator/**/sandboxed-containers-operator/`.
 
-`kata-upstream` is the first **real** suite in the chain (the upstream Kata
-Containers e2e tests). `skeleton2` is a DEMO/template suite that, when enabled,
-always succeeds; it is disabled by default (see below) and serves as the copy-paste
-pattern new suites follow.
+`kata-upstream` runs the upstream Kata Containers e2e tests. `osc` runs the
+OSC golang (Ginkgo v2) e2e tests from
+`openshift/sandboxed-containers-operator` `test/e2e`.
 
 ## Why POST (and not `test:`)
 
@@ -67,12 +66,12 @@ Non-blocking behaviour requires **both**:
 testsuites/
 ├── README.md                                              (this file)
 ├── sandboxed-containers-operator-testsuites-chain.yaml    (the POST chain)
-├── kata-upstream/                                         (real suite -- upstream Kata e2e)
+├── kata-upstream/                                         (upstream Kata Containers e2e tests)
 │   ├── ...-kata-upstream-ref.yaml
 │   └── ...-kata-upstream-commands.sh
-└── skeleton2/                                             (DEMO/template suite -- always succeeds)
-    ├── ...-skeleton2-ref.yaml
-    └── ...-skeleton2-commands.sh
+└── osc/                                                   (OSC downstream e2e tests)
+    ├── ...-osc-ref.yaml
+    └── ...-osc-commands.sh
 ```
 
 ## Enable convention
@@ -85,21 +84,11 @@ Each suite is gated by `TESTS_<SUITE_NAME>_ENABLE`, **skip-by-default**:
 Every suite writes a JUnit file to `${ARTIFACT_DIR}/junit_<name>.xml` in **both**
 the run and skip paths, so Prow always ingests a result.
 
-## The `skeleton2` step is a DEMO — disabled by default
+## Suites in the chain
 
-`skeleton2` is a **demonstration/template** suite, not a real test. It exists to
-prove the non-blocking wiring end-to-end and to serve as a copy-paste template for
-real suites. It is **disabled by default** (`TESTS_SKELETON2_ENABLE` defaults to
-`"false"` in its ref), so in normal jobs it just logs the value and exits 0.
-
-| Step        | When enabled (`TESTS_SKELETON2_ENABLE=true`)          | JUnit                         |
-|-------------|-------------------------------------------------------|-------------------------------|
-| `skeleton2` | **Always succeeds** (exit 0)                          | passing `junit_skeleton2.xml` |
-
-Because `skeleton2` runs after `kata-upstream` in the chain and always passes, it
-also demonstrates the key behaviour: a later suite still runs and passes even when
-an earlier suite failed, and the post phase continues through must-gather and
-deprovision. Because it is a demo, do **not** enable it on production periodics.
+| Step        | What it does                                                      | JUnit                    |
+|-------------|-------------------------------------------------------------------|--------------------------|
+| `osc`       | When enabled, runs the OSC golang (Ginkgo v2) e2e tests (`go test` over `test/e2e`) and publishes their JUnit. Disabled by default. | `junit_osc.xml` (or `junit_osc_skip.xml` when skipped) |
 
 ## Wiring into a workflow
 
@@ -117,7 +106,7 @@ workflow:
       ...
 ```
 
-## Adding a real suite
+## Adding a suite
 
 1. Create a step directory under `testsuites/` (e.g. `testsuites/<suite>/`) with a
    `...-<suite>-ref.yaml` (env `TESTS_<SUITE_NAME>_ENABLE`, default `"false"`;
