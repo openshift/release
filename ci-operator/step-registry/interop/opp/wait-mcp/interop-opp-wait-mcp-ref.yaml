@@ -1,25 +1,6 @@
 ref:
   as: interop-opp-wait-mcp
-  from: cli
   commands: interop-opp-wait-mcp-commands.sh
-  timeout: 4500s
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-  env:
-  - name: MCP_SETTLE_DELAY
-    default: "90"
-    documentation: Seconds to wait before first poll, allowing MachineConfig rendering to propagate
-  - name: MCP_WAIT_TIMEOUT
-    default: "3600"
-    documentation: Max seconds to wait for all non-paused MCPs to stabilize (default 60 min)
-  - name: MCP_CONSECUTIVE_CHECKS
-    default: "3"
-    documentation: Number of consecutive clean polls required before declaring stable
-  - name: MCP_MAX_UNAVAILABLE
-    default: "3"
-    documentation: Patch worker MCP maxUnavailable to parallelize node rollout (default 3 nodes at a time)
   documentation: |-
     Waits for all non-paused MachineConfigPools to reach a stable state,
     then asserts all ClusterOperators are healthy and all nodes are Ready.
@@ -44,3 +25,22 @@ ref:
     - UPDATING (oscillating): Hard failure. Ready count is not progressing,
       suggesting nodes may be cycling due to conflicting configurations.
     - UNKNOWN: Hard failure. Could not determine MCP state at timeout.
+  env:
+  - default: "3"
+    documentation: Number of consecutive clean polls required before declaring stable
+    name: MCP_CONSECUTIVE_CHECKS
+  - default: "3"
+    documentation: Patch worker MCP maxUnavailable to parallelize node rollout (default 3 nodes at a time)
+    name: MCP_MAX_UNAVAILABLE
+  - default: "90"
+    documentation: Seconds to wait before first poll, allowing MachineConfig rendering to propagate
+    name: MCP_SETTLE_DELAY
+  - default: "3600"
+    documentation: Max seconds to wait for all non-paused MCPs to stabilize (default 60 min)
+    name: MCP_WAIT_TIMEOUT
+  from: cli
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  timeout: 4500s
