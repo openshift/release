@@ -32,6 +32,7 @@ images:
           source_path: /go/src/github.com/openshift-online/rosa-service-log
     to: golang-plus
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -61,8 +62,9 @@ tests:
   container:
     from: golang-plus
   secrets:
-  - mount_path: /opt/app-root/osl-secrets
-    name: openshift-online-osl-secrets
+  - collection: rosa-service-log
+    group: osl
+    mount_path: /opt/app-root/osl-secrets
 - as: unit
   capabilities:
   - nested-podman
@@ -91,8 +93,9 @@ tests:
     from: golang-plus
   nested_podman: true
   secrets:
-  - mount_path: /opt/app-root/osl-secrets
-    name: openshift-online-osl-secrets
+  - collection: rosa-service-log
+    group: osl
+    mount_path: /opt/app-root/osl-secrets
 - as: integration
   capabilities:
   - nested-podman
@@ -121,8 +124,9 @@ tests:
     from: golang-plus
   nested_podman: true
   secrets:
-  - mount_path: /opt/app-root/osl-secrets
-    name: openshift-online-osl-secrets
+  - collection: rosa-service-log
+    group: osl
+    mount_path: /opt/app-root/osl-secrets
 - as: coverage
   capabilities:
   - nested-podman
@@ -151,10 +155,12 @@ tests:
     from: golang-plus
   nested_podman: true
   secrets:
-  - mount_path: /opt/app-root/osl-secrets
-    name: openshift-online-osl-secrets
-  - mount_path: /var/run/codecov-secret
-    name: rosa-service-log-codecov
+  - collection: rosa-service-log
+    group: osl
+    mount_path: /opt/app-root/osl-secrets
+  - collection: rosa-service-log
+    group: codecov
+    mount_path: /var/run/codecov-secret
 - as: publish-coverage
   capabilities:
   - nested-podman
@@ -184,10 +190,12 @@ tests:
   nested_podman: true
   postsubmit: true
   secrets:
-  - mount_path: /opt/app-root/osl-secrets
-    name: openshift-online-osl-secrets
-  - mount_path: /var/run/codecov-secret
-    name: rosa-service-log-codecov
+  - collection: rosa-service-log
+    group: osl
+    mount_path: /opt/app-root/osl-secrets
+  - collection: rosa-service-log
+    group: codecov
+    mount_path: /var/run/codecov-secret
 zz_generated_metadata:
   branch: master
   org: openshift-online
