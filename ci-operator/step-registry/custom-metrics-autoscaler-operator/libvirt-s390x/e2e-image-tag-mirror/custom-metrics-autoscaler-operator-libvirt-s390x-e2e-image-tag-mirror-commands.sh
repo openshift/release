@@ -48,22 +48,11 @@ spec:
     - quay.io/meghagaur/tests-rabbitmq
 EOF
 
-wait_for_mcp_rollout() {
-  local pool=$1
-  echo "Waiting for MachineConfigPool/${pool} to start updating after ImageTagMirrorSet apply..."
-  if ! oc wait "machineconfigpool/${pool}" --for=condition=Updating=True --timeout=7m; then
-    echo "MachineConfigPool/${pool} did not start updating within 7m; ImageTagMirrorSet may not have been reconciled."
-    exit 1
-  fi
-  echo "MachineConfigPool/${pool} is updating. Waiting for rollout to complete..."
-  if ! oc wait "machineconfigpool/${pool}" --for=condition=Updated=True --for=condition=Degraded=False --timeout=20m; then
-    echo "MachineConfigPool/${pool} rollout did not complete within 20m."
-    exit 1
-  fi
-}
-
 for pool in master worker; do
-  wait_for_mcp_rollout "${pool}"
+  echo "Waiting for MachineConfigPool/${pool} to start updating..."
+  oc wait "machineconfigpool/${pool}" --for=condition=Updating=True --timeout=10m
+  echo "MachineConfigPool/${pool} is updating, waiting for completion..."
+  oc wait "machineconfigpool/${pool}" --for=condition=Updated=True --for=condition=Degraded=False --timeout=60m
 done
 
 echo "ImageTagMirrorSet ${ITMS_NAME} rollout completed."
