@@ -1,0 +1,197 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Test harness operator and UI
+    openshift.io/display-name: Test Harness
+  name: test-harness
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-harness-operator
+  namespace: test-harness
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.test-harness-ui: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"test-harness-ui"}}'
+  name: test-harness-ui
+  namespace: test-harness
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-harness-operator
+  namespace: test-harness
+rules:
+- apiGroups:
+  - harness.testharness.io
+  resources:
+  - reliabilitytests
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - harness.testharness.io
+  resources:
+  - reliabilitytests/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - harness.testharness.io
+  resources:
+  - reliabilitytests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-harness-operator
+  namespace: test-harness
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: test-harness-operator
+subjects:
+- kind: ServiceAccount
+  name: test-harness-operator
+  namespace: test-harness
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-harness-ui
+  namespace: test-harness
+rules:
+- apiGroups:
+  - harness.testharness.io
+  resources:
+  - reliabilitytests
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-harness-ui
+  namespace: test-harness
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: test-harness-ui
+subjects:
+- kind: ServiceAccount
+  name: test-harness-ui
+  namespace: test-harness
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test-harness-ui-oauth
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: test-harness-ui-oauth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: test-harness-ui-oauth
+subjects:
+- kind: ServiceAccount
+  name: test-harness-ui
+  namespace: test-harness
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-harness-ui-access
+  namespace: test-harness
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  resourceNames:
+  - test-harness-ui
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-harness-ui-access
+  namespace: test-harness
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: test-harness-ui-access
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: test-platform-ci-admins
