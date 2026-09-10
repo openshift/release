@@ -882,7 +882,11 @@ else
                 continue
             fi
 
-            REGISTERED_EPOCH=$(date -d "${REGISTERED_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${REGISTERED_AT}" +%s 2>/dev/null || echo "0")
+            REGISTERED_EPOCH=$(date -d "${REGISTERED_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${REGISTERED_AT}" +%s 2>/dev/null || true)
+            if [[ -z "${REGISTERED_EPOCH}" || "${REGISTERED_EPOCH}" == "0" ]]; then
+                log "WARNING: ${CM_NAME} has unparseable registered-at '${REGISTERED_AT}', skipping refresh check"
+                continue
+            fi
             AGE_SECONDS=$(( NOW_EPOCH - REGISTERED_EPOCH ))
             AGE_HOURS=$(( AGE_SECONDS / 3600 ))
 
@@ -905,7 +909,10 @@ else
                 CLUSTER_TYPE=$(echo "${CM}" | jq -r '.metadata.labels["rosa-cluster-lease/type"] // "classic-sts"')
                 ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
-                delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}" || log "WARNING: delete_cluster failed for ${CM_NAME}, removing ConfigMap anyway"
+                if ! delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}"; then
+                    log "WARNING: delete_cluster failed for ${CM_NAME}, preserving ConfigMap"
+                    continue
+                fi
                 lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" || true
 
                 REFRESH_COUNT=$((REFRESH_COUNT + 1))
