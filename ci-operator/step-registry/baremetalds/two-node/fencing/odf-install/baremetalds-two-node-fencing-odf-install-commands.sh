@@ -433,7 +433,7 @@ oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster" \
     -n "${ODF_INSTALL_NAMESPACE}" --for=condition='Available' --timeout='30m'
 
 # Enable Ceph toolbox for diagnostics
-oc patch OCSInitialization ocsinit -n openshift-storage \
+oc patch storagecluster ocs-storagecluster -n openshift-storage \
     --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
 echo "Waiting for Ceph toolbox pod..."
 for ((i=1; i <= 30; i++)); do
