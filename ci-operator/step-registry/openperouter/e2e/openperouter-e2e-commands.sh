@@ -33,11 +33,12 @@ export CONFIG=/root/dev-scripts/config_root.sh
 echo "Kernel release: $(uname -r)"
 echo "Kernel version: $(uname -v)"
 
-sleep 5h
 
 unset DOCKER_HOST
 
 bash /root/openperouter/openshift/e2e/deploy.sh </dev/null
+sleep 5h
+
 bash /root/openperouter/openshift/e2e/run_tests.sh </dev/null
 
 RUNTESTS
