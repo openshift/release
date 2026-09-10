@@ -198,6 +198,7 @@ if [[ "${OCM_FVT_BACKPLANE_CREDS:-false}" == "true" ]]; then
   if [[ -f /usr/local/cs-qe-credentials/backplane_client_secret ]]; then
     echo "BACKPLANE_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/backplane_client_secret)" >> "${podman_env_file}"
   fi
+  echo "HTTPS_PROXY=$(cat /usr/local/cs-qe-credentials/backplane_proxy_url)" >> "${podman_env_file}"
 fi
 
 osdfm_qe_creds_dir=/usr/local/osdfm-qe-credentials

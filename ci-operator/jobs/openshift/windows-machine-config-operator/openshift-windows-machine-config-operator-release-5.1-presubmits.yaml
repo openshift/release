@@ -2,90 +2,8 @@ presubmits:
   openshift/windows-machine-config-operator:
   - agent: kubernetes
     always_run: false
-    branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build08
-    context: ci/prow/address-review-comments
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - build/Dockerfile.ci
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-windows-machine-config-operator-release-5.1-address-review-comments
-    optional: true
-    rerun_command: /test address-review-comments
-    skip_if_only_changed: .*
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=address-review-comments
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )address-review-comments,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
@@ -103,11 +21,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-windows-machine-config-operator-release-5.1-aws-e2e-operator
     rerun_command: /test aws-e2e-operator
-    skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -139,6 +60,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -159,6 +86,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -171,6 +107,8 @@ presubmits:
     trigger: (?m)^/test( | .* )aws-e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/proxy\.go$
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
@@ -189,11 +127,14 @@ presubmits:
     name: pull-ci-openshift-windows-machine-config-operator-release-5.1-aws-e2e-ote
     optional: true
     rerun_command: /test aws-e2e-ote
-    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -225,6 +166,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -245,6 +192,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -257,6 +213,8 @@ presubmits:
     trigger: (?m)^/test( | .* )aws-e2e-ote,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
@@ -274,11 +232,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-windows-machine-config-operator-release-5.1-azure-e2e-operator
     rerun_command: /test azure-e2e-operator
-    skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -310,6 +271,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -330,6 +297,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -342,6 +318,8 @@ presubmits:
     trigger: (?m)^/test( | .* )azure-e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
@@ -359,11 +337,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-windows-machine-config-operator-release-5.1-azure-e2e-upgrade
     rerun_command: /test azure-e2e-upgrade
-    skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -395,6 +376,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -415,6 +402,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -485,6 +481,8 @@ presubmits:
     trigger: (?m)^/test( | .* )ci-bundle-wmco-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
@@ -502,11 +500,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-windows-machine-config-operator-release-5.1-gcp-e2e-operator
     rerun_command: /test gcp-e2e-operator
-    skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -538,6 +539,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -558,6 +565,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -717,7 +733,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -749,6 +769,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -769,6 +795,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -802,7 +837,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -834,6 +873,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -854,6 +899,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -885,7 +939,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -917,6 +975,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -937,6 +1001,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -970,7 +1043,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1002,6 +1079,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1022,6 +1105,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1122,7 +1214,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1154,6 +1250,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1174,6 +1276,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1207,7 +1318,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1239,6 +1354,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1259,6 +1380,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1292,7 +1422,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1324,6 +1458,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1344,6 +1484,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1354,6 +1503,111 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )vsphere-proxy-e2e-operator,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5\.1$
+    - ^release-5\.1-
+    cluster: vsphere02
+    context: ci/prow/vsphere-proxy-e2e-ote
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - build/Dockerfile.ci
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-windows-machine-config-operator-release-5.1-vsphere-proxy-e2e-ote
+    optional: true
+    rerun_command: /test vsphere-proxy-e2e-ote
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/winc\.go$
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=vsphere-proxy-e2e-ote
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )vsphere-proxy-e2e-ote,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1377,7 +1631,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1409,6 +1667,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1429,6 +1693,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

@@ -9,29 +9,99 @@ source "$LEASE_PROXY_CLIENT_SH"
 create_cluster_install_lease_handle=''
 destroy_cluster_install_lease_handle=''
 
+function retry-ipi-install-command() {
+    local description="${1}"
+    shift
+    local max_attempts=3
+    local attempt
+    local attempt_output
+    local delay
+
+    for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+        if attempt_output="$("$@")"; then
+            if ! printf '%s' "${attempt_output}"; then
+                echo "WARNING: Failed to emit output from successful ${description}" >&2
+                return 1
+            fi
+            return 0
+        fi
+        attempt_output=''
+
+        if (( attempt == max_attempts )); then
+            echo "WARNING: ${description} failed after ${max_attempts} attempts" >&2
+            return 1
+        fi
+
+        delay=$((2 ** attempt))
+        echo "WARNING: ${description} failed (attempt ${attempt}/${max_attempts}); retrying in ${delay}s" >&2
+        sleep "${delay}"
+    done
+}
+
+function clear-cluster-version-channel() {
+    local cvo_manifest="${1}"
+
+    echo "Cluster cannot query OpenShift Update Service (OSUS/Cincinnati)"
+    echo "Clearing the channel"
+    if ! sed -i '/^  channel:/d' "${cvo_manifest}"; then
+        echo "WARNING: Failed to clear the OpenShift Update Service channel; continuing with cluster installation" >&2
+    fi
+    return 0
+}
+
+function get-release-info() {
+    # Bound each registry, authentication, or network lookup while allowing the retry helper to handle timeouts.
+    local -r release_info_timeout=2m
+    timeout --foreground "${release_info_timeout}" oc adm release info "$@"
+}
+
+function get-release-info-version-without-jsonpath() {
+    local release_image="${1}"
+    local pull_secret="${2}"
+    get-release-info "${release_image}" -a "${pull_secret}" | grep -oP '(?<=^  Version:  ).*$'
+}
+
+function get-release-info-architecture-without-jsonpath() {
+    local release_image="${1}"
+    local pull_secret="${2}"
+    get-release-info "${release_image}" -a "${pull_secret}" | grep '^OS/Arch: ' | cut -d/ -f3
+}
+
 function set-cluster-version-spec-update-service() {
+    local -r cvo_manifest="${dir}/manifests/cvo-overrides.yaml"
     local payload_version
     local jsonpath_flag
 
-    if oc adm release info --help | grep "\-\-output=" -A 1 | grep -q jsonpath; then
+    if [[ ! -f "${cvo_manifest}" ]]; then
+        echo "No CVO overrides file found, will not configure OpenShift Update Service"
+        return
+    fi
+
+    if oc adm release info --help | grep -A 1 -- "--output=" | grep -q jsonpath; then
         jsonpath_flag=true
     else
         echo "this oc does not support jsonpath output"
-        oc adm release info --help | grep "\-o, \-\-output=" -A 1
+        oc adm release info --help | grep -A 1 -- "-o, --output=" || true
         jsonpath_flag=false
     fi
 
     if [[ "${jsonpath_flag}" == "true" ]]; then
-        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.metadata.version}")"
+        if ! payload_version="$(retry-ipi-install-command "Release payload version lookup" get-release-info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.metadata.version}")"; then
+            clear-cluster-version-channel "${cvo_manifest}"
+            return
+        fi
     else
-        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$')"
+        if ! payload_version="$(retry-ipi-install-command "Release payload version lookup" get-release-info-version-without-jsonpath "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" "${CLUSTER_PROFILE_DIR}/pull-secret")"; then
+            clear-cluster-version-channel "${cvo_manifest}"
+            return
+        fi
     fi
-    echo "Release payload version: ${payload_version}"
-
-    if [[ ! -f ${dir}/manifests/cvo-overrides.yaml ]]; then
-        echo "No CVO overrides file found, will not configure OpenShift Update Service"
+    if [[ -z "${payload_version}" ]]; then
+        echo "WARNING: Release payload version lookup returned an empty result; falling back to no OpenShift Update Service channel" >&2
+        clear-cluster-version-channel "${cvo_manifest}"
         return
     fi
+    echo "Release payload version: ${payload_version}"
 
     # Using OSUS in upgrade jobs would be tricky (we would need to know the channel with both versions)
     # and the use case has little benefits (not many jobs that update between two released versions)
@@ -43,8 +113,7 @@ function set-cluster-version-spec-update-service() {
     if [[ -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]] &&
        [[ "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" != "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
         echo "This is likely an upgrade job (OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE differs from nonempty OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE)"
-        echo "Cluster cannot query OpenShift Update Service (OSUS/Cincinnati), cleaning the channel"
-        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        clear-cluster-version-channel "${cvo_manifest}"
         return
     fi
 
@@ -52,13 +121,22 @@ function set-cluster-version-spec-update-service() {
     # and fall back to manifest-declared architecture
     local payload_arch
     if [[ "${jsonpath_flag}" == "true" ]]; then
-        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
+        if ! payload_arch="$(retry-ipi-install-command "Release payload metadata architecture lookup" get-release-info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"; then
+            clear-cluster-version-channel "${cvo_manifest}"
+            return
+        fi
         if [[ -z "${payload_arch}" ]]; then
             echo 'Payload architecture not found in .metadata.metadata["release.openshift.io/architecture"], using .config.architecture'
-            payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.config.architecture}")"
+            if ! payload_arch="$(retry-ipi-install-command "Release payload config architecture lookup" get-release-info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.config.architecture}")"; then
+                clear-cluster-version-channel "${cvo_manifest}"
+                return
+            fi
         fi
     else
-        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep "^OS/Arch: " | cut -d/ -f3)"
+        if ! payload_arch="$(retry-ipi-install-command "Release payload architecture lookup" get-release-info-architecture-without-jsonpath "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" "${CLUSTER_PROFILE_DIR}/pull-secret")"; then
+            clear-cluster-version-channel "${cvo_manifest}"
+            return
+        fi
     fi
     local payload_arch_param
     if [[ -n "${payload_arch}" ]]; then
@@ -71,9 +149,9 @@ function set-cluster-version-spec-update-service() {
 
 
     local channel
-    if ! channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${dir}/manifests/cvo-overrides.yaml")"; then
+    if ! channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${cvo_manifest}")"; then
         echo "No known OCP channel found in CVO manifest, clearing the channel"
-        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        clear-cluster-version-channel "${cvo_manifest}"
         return
     fi
 
@@ -87,19 +165,26 @@ function set-cluster-version-spec-update-service() {
     # If the version is known to OSUS, it is safe for the CI cluster to query it, so we will query the integration OSUS
     # instance maintained by OTA team. Otherwise, the cluster would trip the CannotRetrieveUpdates alert, so we need
     # to clear the channel to make the cluster *not* query any OSUS instance.
+    local graph
+    local -r osus_url="https://api.integration.openshift.com/api/upgrades_info/graph"
     local query
-    query="https://api.integration.openshift.com/api/upgrades_info/graph?channel=${candidate_channel}${payload_arch_param}"
+    query="${osus_url}?channel=${candidate_channel}${payload_arch_param}"
     echo "Querying $query for version ${payload_version}"
-    if curl --silent "$query" | grep --quiet '"version":"'"$payload_version"'"'; then
+    if ! graph="$(retry-ipi-install-command "OpenShift Update Service query" curl --fail --silent --show-error --connect-timeout 10 --max-time 30 "${query}")"; then
+        clear-cluster-version-channel "${cvo_manifest}"
+        return
+    fi
+    if grep --quiet '"version":"'"${payload_version}"'"' <<< "${graph}"; then
         echo "Version ${payload_version} is available in ${candidate_channel}, cluster can query OpenShift Update Service (OSUS/Cincinnati)"
-        echo "Setting channel to $candidate_channel and upstream to https://api.integration.openshift.com/api/upgrades_info/graph "
-        sed -i "s|^  channel: .*|  channel: $candidate_channel|" "${dir}/manifests/cvo-overrides.yaml"
-        echo '  upstream: https://api.integration.openshift.com/api/upgrades_info/graph' >> "${dir}/manifests/cvo-overrides.yaml"
+        echo "Setting channel to ${candidate_channel} and upstream to ${osus_url} "
+        if ! sed -i "s|^  channel: .*|  channel: ${candidate_channel}|" "${cvo_manifest}" ||
+           ! echo "  upstream: ${osus_url}" >> "${cvo_manifest}"; then
+            echo "WARNING: Failed to configure OpenShift Update Service; falling back to no channel" >&2
+            clear-cluster-version-channel "${cvo_manifest}"
+        fi
     else
         echo "Version ${payload_version} is not available in ${candidate_channel}"
-        echo "Cluster cannot query OpenShift Update Service (OSUS/Cincinnati)"
-        echo "Clearing the channel"
-        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        clear-cluster-version-channel "${cvo_manifest}"
     fi
 }
 
@@ -466,18 +551,60 @@ EOF
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
-function get_yq() {
-  if [ ! -f /tmp/yq ]; then
-    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
-    -o /tmp/yq && chmod +x /tmp/yq || exit 1
+function is_yq_usable() {
+  if [[ ! -x /tmp/yq ]]; then
+    return 1
   fi
+
+  /tmp/yq --version 2>/dev/null | grep -Eq '^yq version 3\.'
+}
+
+function get_yq() {
+  local yq_download=/tmp/yq.download
+
+  if is_yq_usable; then
+    return 0
+  fi
+
+  if [[ -e /tmp/yq || -L /tmp/yq ]]; then
+    echo "WARNING: Removing an unusable cached yq binary" >&2
+    if ! rm -f /tmp/yq; then
+      echo "WARNING: Failed to remove the unusable cached yq binary" >&2
+      return 1
+    fi
+  fi
+
+  if ! rm -f "${yq_download}"; then
+    echo "WARNING: Failed to remove stale yq download ${yq_download}" >&2
+    return 1
+  fi
+  if ! retry-ipi-install-command "yq download" curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
+    "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(get_arch)" -o "${yq_download}"; then
+    rm -f "${yq_download}" || echo "WARNING: Failed to clean up ${yq_download}" >&2
+    return 1
+  fi
+  if ! chmod +x "${yq_download}" || ! mv "${yq_download}" /tmp/yq; then
+    echo "WARNING: Failed to finalize the yq download" >&2
+    rm -f "${yq_download}" || echo "WARNING: Failed to clean up ${yq_download}" >&2
+    return 1
+  fi
+  if ! is_yq_usable; then
+    echo "WARNING: Downloaded yq binary failed its version check" >&2
+    rm -f /tmp/yq "${yq_download}" || echo "WARNING: Failed to clean up the unusable yq download" >&2
+    return 1
+  fi
+
+  return 0
 }
 
 # inject_boot_diagnostics is an azure specific function for enabling boot diagnostics on Azure workers.
 function inject_boot_diagnostics() {
   local dir=${1}
 
-  get_yq
+  if ! get_yq; then
+    echo "WARNING: yq is unavailable; skipping the optional Azure boot diagnostics configuration" >&2
+    return 0
+  fi
 
   PATCH="${SHARED_DIR}/machinesets-boot-diagnostics.yaml.patch"
   cat > "${PATCH}" << EOF
@@ -506,7 +633,10 @@ function inject_spot_instance_config() {
   local dir=${1}
   local mtype=${2}
 
-  get_yq
+  if ! get_yq; then
+    echo "WARNING: yq is unavailable; skipping the optional ${mtype} spot instance configuration" >&2
+    return 0
+  fi
 
   # Find manifest files
   local manifests=

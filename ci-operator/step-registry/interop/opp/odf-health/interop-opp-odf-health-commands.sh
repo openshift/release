@@ -11,8 +11,14 @@ set -euxo pipefail; shopt -s inherit_errexit
 # Produces JUnit XML consumed by Prow / Sippy / TestGrid.
 # ---------------------------------------------------------------------------
 
-ODF_NAMESPACE="${ODF_NAMESPACE:-openshift-storage}"
-NOOBAA_S3_TIMEOUT="${NOOBAA_S3_TIMEOUT:-30}"
+typeset ODF_NAMESPACE="${ODF_NAMESPACE:-openshift-storage}"
+typeset NOOBAA_S3_TIMEOUT="${NOOBAA_S3_TIMEOUT:-30}"
+typeset ODF_READY_TIMEOUT="${ODF_READY_TIMEOUT:-720}"
+typeset -ri MAX_ODF_READY_TIMEOUT=780
+if (( ODF_READY_TIMEOUT > MAX_ODF_READY_TIMEOUT )); then
+    printf '%s\n' "Warning: ODF_READY_TIMEOUT=${ODF_READY_TIMEOUT} exceeds maximum ${MAX_ODF_READY_TIMEOUT}s; clamping" >&2
+    ODF_READY_TIMEOUT="${MAX_ODF_READY_TIMEOUT}"
+fi
 
 typeset junitFile="${ARTIFACT_DIR}/junit_odf_health.xml"
 
@@ -421,7 +427,11 @@ EOF
 
     typeset s3Result=""
     typeset -i podWait=$(( NOOBAA_S3_TIMEOUT + 60 ))
+    typeset xtrace=""
+    [[ "$-" == *x* ]] && xtrace="set -x" || xtrace="set +x"
+    set +x
     if echo "${podManifest}" | oc apply -f -; then
+        ${xtrace}
         if ! oc wait pod "${podName}" -n "${ODF_NAMESPACE}" \
             --for=jsonpath='{.status.phase}'=Succeeded \
             --timeout="${podWait}s" 2>/dev/null; then
@@ -430,6 +440,8 @@ EOF
             oc describe pod "${podName}" -n "${ODF_NAMESPACE}" || true
         fi
         s3Result="$(oc logs "${podName}" -n "${ODF_NAMESPACE}" 2>/dev/null || echo "")"
+    else
+        ${xtrace}
     fi
 
     oc delete pod "${podName}" -n "${ODF_NAMESPACE}" --ignore-not-found=true --wait=false 2>/dev/null || true
@@ -485,9 +497,60 @@ print(d['items'][0].get('status',{}).get('ceph',{}).get('health','unknown') if d
 }
 
 # ---------------------------------------------------------------------------
-# Main
+# Wait for ODF subsystems to reach Ready (handles vSphere slow convergence)
 # ---------------------------------------------------------------------------
 
+function WaitForOdfReady () {
+    typeset -i timeout="${ODF_READY_TIMEOUT}"
+    typeset -i deadline=$(( SECONDS + timeout ))
+    typeset -i pollInterval=15
+
+    : "Waiting up to ${timeout}s for StorageCluster and NooBaa to reach Ready..."
+
+    typeset scPhase="" nbPhase=""
+    while (( SECONDS < deadline )); do
+        typeset -i remaining=$(( deadline - SECONDS ))
+        (( remaining < 1 )) && remaining=1
+
+        scPhase="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json --request-timeout="${remaining}s" 2>/dev/null | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+print(d['items'][0]['status'].get('phase','') if d.get('items') else '')
+" 2>/dev/null)" || scPhase=""
+
+        remaining=$(( deadline - SECONDS ))
+        (( remaining < 1 )) && remaining=1
+
+        nbPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json --request-timeout="${remaining}s" 2>/dev/null | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+print(d['items'][0]['status'].get('phase','') if d.get('items') else '')
+" 2>/dev/null)" || nbPhase=""
+
+        typeset -i elapsed=$(( SECONDS - (deadline - timeout) ))
+
+        if [[ "${scPhase}" == "Ready" && "${nbPhase}" == "Ready" ]]; then
+            : "ODF ready after ${elapsed}s (StorageCluster=Ready, NooBaa=Ready)"
+            return 0
+        fi
+
+        if [[ "${scPhase}" == "Ready" && -z "${nbPhase}" ]]; then
+            : "StorageCluster Ready, no NooBaa deployed (acceptable)"
+            return 0
+        fi
+
+        : "Waiting... StorageCluster=${scPhase:-unknown}, NooBaa=${nbPhase:-unknown} (${elapsed}/${timeout}s)"
+        sleep "${pollInterval}"
+    done
+
+    typeset -i elapsed=$(( SECONDS - (deadline - timeout) ))
+    : "ODF did not reach Ready within ${elapsed}s (StorageCluster=${scPhase:-unknown}, NooBaa=${nbPhase:-unknown})"
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# Main: probe ODF installation, wait for readiness, run health checks
+# ---------------------------------------------------------------------------
+
+# Returns 0 if ODF/OCS CSV exists in ODF_NAMESPACE, 1 if absent, 2 on error.
 function CheckOdfInstalled () {
     if ! oc get namespace "${ODF_NAMESPACE}" >/dev/null 2>&1; then
         return 1
@@ -544,6 +607,10 @@ function Main () {
         WriteJunit
         : "ODF Health Check: ALL SKIPPED (ODF not installed)"
         exit 0
+    fi
+
+    if ! WaitForOdfReady; then
+        : "ODF subsystems did not converge within ${ODF_READY_TIMEOUT}s; running checks to capture current state"
     fi
 
     CheckOdfCsv          || true

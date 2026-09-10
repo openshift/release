@@ -67,6 +67,10 @@ if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
 fi
 
+if [ "${ENABLE_STANDALONE_KARPENTER_OPERATOR}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --enable-standalone-karpenter-operator"
+fi
+
 if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-defaulting-webhook=true"
 fi
@@ -189,18 +193,37 @@ case "${CLOUD_PROVIDER}" in
   HYPERSHIFT_CI_PROJECT="$(<"${SHARED_DIR}/hypershift-ci-project")"
   HYPERSHIFT_CI_DNS_DOMAIN="$(<"${SHARED_DIR}/hypershift-ci-dns-domain")"
 
+  # Shared install flags, reused for both the feature-detection render below
+  # and the real install so they can never drift apart.
+  CMD_ARGS=(
+    --hypershift-image="${OPERATOR_IMAGE}"
+    --external-dns-provider=google
+    --external-dns-domain-filter="${HYPERSHIFT_CI_DNS_DOMAIN}"
+    --external-dns-google-project="${HYPERSHIFT_CI_PROJECT}"
+    --private-platform=GCP
+    --gcp-project="${GCP_PROJECT_ID}"
+    --gcp-region="${GCP_REGION_VALUE}"
+    --platform-monitoring=All
+    --enable-ci-debug-output
+    --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
+  )
+
+  # Older hypershift branches don't bundle the DNSEndpoint CRD (openshift/hypershift#9433).
+  # Detect via the operator's own render output instead of branching on version,
+  # so behavior always tracks what install would actually do.
+  # Captured separately from the grep so a failed render (as opposed to a
+  # successful render simply missing the CRD) surfaces as a hard failure
+  # instead of silently falling through to the manual-apply branch.
+  RENDERED_CRDS="$("${HCP_CLI}" install render --outputs=crds "${CMD_ARGS[@]}")"
+  if ! echo "${RENDERED_CRDS}" | grep -q 'name: dnsendpoints.externaldns.k8s.io'; then
+    echo "DNSEndpoint CRD not bundled by this hypershift version, installing manually..."
+    # Pinned to the commit tagged v0.15.0 (immutable, unlike the mutable tag ref).
+    oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/bf70e3f0acbfbf2fce0bc71a4ca2fd6850de4903/docs/contributing/crd-source/crd-manifest.yaml
+  fi
+
   # Install HyperShift operator
   # The --pull-secret flag creates the pull-secret in the hypershift namespace
-  "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-  --external-dns-provider=google \
-  --external-dns-domain-filter="${HYPERSHIFT_CI_DNS_DOMAIN}" \
-  --external-dns-google-project="${HYPERSHIFT_CI_PROJECT}" \
-  --private-platform=GCP \
-  --gcp-project="${GCP_PROJECT_ID}" \
-  --gcp-region="${GCP_REGION_VALUE}" \
-  --platform-monitoring=All \
-  --enable-ci-debug-output \
-  --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+  "${HCP_CLI}" install "${CMD_ARGS[@]}" \
   --wait-until-available \
   ${EXTRA_ARGS}     ;;
 

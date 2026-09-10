@@ -35,6 +35,8 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: upi-installer
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -171,7 +173,7 @@ tests:
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
   capabilities:
-  - build-tmpfs
+  - arm64
   cron: 0 0 1 1 *
   steps:
     cluster_profile: hypershift-aws
@@ -220,7 +222,7 @@ tests:
     - chain: hypershift-conformance
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance-techpreview
-  cron: '@weekly'
+  cron: '@daily'
   reporter_config:
     channel: '#forum-ocp-splat-alerts-aws'
     job_states_to_report:
@@ -480,7 +482,7 @@ tests:
     workflow: hypershift-openstack-nested-conformance
 - as: e2e-v2-gke
   capabilities:
-  - build-tmpfs
+  - arm64
   cron: 37 9,21 * * *
   steps:
     cluster_profile: hypershift-gcp
@@ -493,6 +495,7 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
 - as: e2e-v2-aws-techpreview-osimagestream

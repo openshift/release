@@ -32,6 +32,7 @@ spec:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release
@@ -39,23 +40,32 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
+          readOnly: true
       containers:
       - name: horologium
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs
         - --projected-token-file=/var/sa-token/token
         - --dry-run=false
-        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260826-b9f26284d
+        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260908-104d452f4
         volumeMounts:
         - name: service-account-token
           mountPath: /var/sa-token
         - name: config
           mountPath: /etc/config
           readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
         - name: release
-          mountPath: /var/repo
+          mountPath: /etc/jobs/git
+          readOnly: true
         resources:
           requests:
             memory: "21Gi"
@@ -68,12 +78,16 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
+          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -89,3 +103,11 @@ spec:
           name: config
       - name: release
         emptyDir: {}
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+      - name: sparse-checkout-config
+        configMap:
+          name: prow-jobs-sparse-checkout

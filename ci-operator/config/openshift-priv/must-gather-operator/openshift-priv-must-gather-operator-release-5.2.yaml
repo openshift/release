@@ -46,6 +46,7 @@ promotion:
   - name: "5.2"
     namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -57,12 +58,6 @@ releases:
       include_built_images: true
       name: "5.2"
       namespace: ocp-priv
-  multi-latest:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "5.2"
 resources:
   '*':
     limits:
@@ -85,8 +80,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: must-gather-operator-codecov-token
     mount_path: /tmp/secret
-    name: must-gather-operator-codecov-token
 - as: lint
   commands: make lint
   container:
@@ -126,9 +122,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
@@ -150,9 +146,9 @@ tests:
       cli: latest
       commands: hack/e2e-coverage.sh collect
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/ci-secrets
-        name: must-gather-operator-codecov-token
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: ci-secrets
+        mount_path: /var/run/secrets/must-gather-operator/ci-secrets
       from: src
       resources:
         requests:
@@ -189,9 +185,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
@@ -226,9 +222,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
@@ -261,9 +257,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
@@ -275,12 +271,6 @@ tests:
   steps:
     test:
     - ref: oape-review-handler
-- always_run: false
-  as: address-review-comments
-  optional: true
-  skip_if_only_changed: .*
-  steps:
-    workflow: must-gather-review-agent-trigger
 - always_run: false
   as: tls-scanner
   optional: true
@@ -305,9 +295,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:

@@ -128,6 +128,8 @@ operator:
     with: velero-plugin-for-microsoft-azure
   - pullspec: quay.io/konveyor/velero:latest
     with: velero
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -163,9 +165,9 @@ tests:
       cli: latest
       commands: make TEST_CLI=true test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:
@@ -193,9 +195,9 @@ tests:
       cli: latest
       commands: make test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:
@@ -231,9 +233,9 @@ tests:
       cli: latest
       commands: make test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:
@@ -241,7 +243,7 @@ tests:
           memory: 512Mi
     workflow: optional-operators-ci-aws
 - always_run: false
-  as: e2e-test-kubevirt-aws
+  as: virt-nokdm-e2e-test-aws
   run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
   steps:
     cluster_profile: openshift-org-aws
@@ -253,24 +255,54 @@ tests:
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
-      TEST_NAME: e2e-test-kubevirt-aws
+      TEST_NAME: virt-nokdm-e2e-test-aws
     post:
     - ref: oadp-analyze-e2e-failure
     test:
     - as: e2e
       cli: latest
-      commands: make TEST_VIRT=true test-e2e
+      commands: make TEST_VIRT=true TEST_VIRT_KDM=false test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:
           cpu: 1000m
           memory: 512Mi
     workflow: optional-operators-ci-aws
-- as: e2e-test-kubevirt-aws-periodic
+- always_run: false
+  as: virt-kdm-e2e-test-aws
+  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OADP_BRANCH: oadp-dev
+      OO_CHANNEL: dev
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      TEST_NAME: virt-kdm-e2e-test-aws
+    post:
+    - ref: oadp-analyze-e2e-failure
+    test:
+    - as: e2e
+      cli: latest
+      commands: make TEST_VIRT_KDM=true test-e2e
+      credentials:
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-aws
+- as: virt-nokdm-e2e-test-aws-periodic
   cron: 0 4 * * *
   reporter_config:
     channel: '#oadp-cicd'
@@ -291,17 +323,55 @@ tests:
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
-      TEST_NAME: e2e-test-kubevirt-aws-periodic
+      TEST_NAME: virt-nokdm-e2e-test-aws-periodic
     post:
     - ref: oadp-analyze-e2e-failure
     test:
     - as: e2e
       cli: latest
-      commands: make TEST_VIRT=true test-e2e
+      commands: make TEST_VIRT=true TEST_VIRT_KDM=false test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-aws
+- as: virt-kdm-e2e-test-aws-periodic
+  cron: 0 4 * * *
+  reporter_config:
+    channel: '#oadp-cicd'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :alert-siren: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :alert-siren: {{end}}'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OADP_BRANCH: oadp-dev
+      OO_CHANNEL: dev
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      TEST_NAME: virt-kdm-e2e-test-aws-periodic
+    post:
+    - ref: oadp-analyze-e2e-failure
+    test:
+    - as: e2e
+      cli: latest
+      commands: make TEST_VIRT_KDM=true test-e2e
+      credentials:
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:
@@ -328,9 +398,9 @@ tests:
       cli: latest
       commands: make TEST_HCP=true test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:
@@ -357,9 +427,9 @@ tests:
       cli: latest
       commands: make TEST_CLI=true test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:

@@ -86,14 +86,12 @@ echo "Inventory copied from SHARED_DIR and spoke inventory processed"
 
 echo ""
 echo "=== Step 1: Prepare IBU seed SNO and retrieve kubeconfig ==="
-SEED_VM_NAME="master-0.${CLUSTER_NAME}"
 
 cd /eco-ci-cd
 ansible-playbook playbooks/ran/ibu-prepare-spoke-sno.yml \
   -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
   --extra-vars "hub_cluster=${CLUSTER_NAME}" \
-  --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}" \
-  --extra-vars "seed_vm_name=${SEED_VM_NAME}"
+  --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}"
 
 echo ""
 echo "=== Step 2: Generate eco-gotests IBU seedgeneration script ==="
@@ -179,5 +177,5 @@ rm -f /tmp/spoke-master-ssh-key
 echo ""
 echo "=== IBU Seed Eco-Gotests Complete ==="
 echo "Seed image: ${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
-echo "Seed spoke VM has been powered off and is ready for IBU upgrade"
+echo "Seed spoke has been powered off and is ready for IBU upgrade"
 

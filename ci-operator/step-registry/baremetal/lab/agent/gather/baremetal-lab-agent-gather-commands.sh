@@ -17,21 +17,23 @@ if ! test -f "${SHARED_DIR}/host-id.txt"; then
     exit 0
 fi
 
-NODE_ZERO=$(<"${SHARED_DIR}"/cluster_name).$(<"${CLUSTER_PROFILE_DIR}"/base_domain)
-HOST_ID=$(<"${SHARED_DIR}"/host-id.txt)
+CONTAINER_NAME="haproxy-$(<"${SHARED_DIR}"/cluster_name)"
+NODE_ZERO=$(yq -r ".[0].$( [[ ${ipv4_enabled:-false} == true ]] && echo ip || echo ipv6 )" "${SHARED_DIR}/hosts.yaml")
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
   -o LogLevel=ERROR
-  -i "${CLUSTER_PROFILE_DIR}/ssh-key"
-  -p $((13000+"${HOST_ID}")))
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-echo "Trying to gather agent logs on the host ${HOST_ID}"
+echo "Trying to gather agent logs on the host ${NODE_ZERO}"
 
-if ssh "${SSHOPTS[@]}" core@access."${NODE_ZERO}" agent-gather -O >"${ARTIFACT_DIR}"/agent-gather.tar.xz; then
+if ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" \
+                         'nsenter -n -t "$(podman inspect -f '\''{{ .State.Pid }}'\'' "'"${CONTAINER_NAME}"'")" \
+                          ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR core@'"${NODE_ZERO}"' \
+                          "agent-gather -O"' >"${ARTIFACT_DIR}"/agent-gather.tar.xz; then
   echo "Agent logs have been collected and published to the artifact directory as 'agent-gather.tar.xz'"
 elif [ $? == 127 ]; then
-  echo "Skip gathering agent logs, the agent-gather script is not present on the host ${HOST_ID}."
+  echo "Skip gathering agent logs, the agent-gather script is not present on the host ${NODE_ZERO}."
 else
   echo "Failed to collect the agent logs."
 fi

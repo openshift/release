@@ -208,18 +208,77 @@ read_profile_file() {
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 ROSA_TOKEN=$(read_profile_file "ocm-token")
-if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
-  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-  ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-elif [[ -n "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
-  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-  ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+
+# DNS diagnostics for login endpoints
+log "Running DNS diagnostics for sso.redhat.com..."
+if command -v dig &>/dev/null; then
+  echo "  A records:    $(dig +short sso.redhat.com A 2>&1 || true)"
+  echo "  AAAA records: $(dig +short sso.redhat.com AAAA 2>&1 || true)"
+elif command -v getent &>/dev/null; then
+  echo "  DNS resolution (getent ahosts):"
+  getent ahosts sso.redhat.com 2>&1 || true
 else
-  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
-  exit 1
+  echo "  Note: neither dig nor getent available, skipping DNS diagnostics"
 fi
+
+# Login with retry logic for transient network errors
+LOGIN_MAX_RETRIES=3
+LOGIN_RETRY_DELAY=30
+login_exit_code=1
+login_output=""
+
+for login_attempt in $(seq 1 ${LOGIN_MAX_RETRIES}); do
+  echo "Login attempt ${login_attempt} of ${LOGIN_MAX_RETRIES}..."
+
+  set +o errexit
+  if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+    echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+    login_output=$(rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" 2>&1)
+    login_exit_code=$?
+    if [[ ${login_exit_code} -eq 0 ]]; then
+      login_output=$(ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" 2>&1)
+      login_exit_code=$?
+    fi
+  elif [[ -n "${ROSA_TOKEN}" ]]; then
+    echo "Logging into ${OCM_LOGIN_ENV} with offline token"
+    login_output=$(rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}" 2>&1)
+    login_exit_code=$?
+    if [[ ${login_exit_code} -eq 0 ]]; then
+      login_output=$(ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}" 2>&1)
+      login_exit_code=$?
+    fi
+  else
+    echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
+    exit 1
+  fi
+  set -o errexit
+
+  if [[ ${login_exit_code} -eq 0 ]]; then
+    echo "Login successful"
+    break
+  fi
+
+  # Check for transient network errors
+  if [[ "${login_output}" =~ "network is unreachable" ]] || \
+     [[ "${login_output}" =~ "connection refused" ]] || \
+     [[ "${login_output}" =~ "dial tcp" ]] || \
+     [[ "${login_output}" =~ "connection reset" ]] || \
+     [[ "${login_output}" =~ "no such host" ]]; then
+    echo "Transient network error detected: ${login_output}"
+    if [[ ${login_attempt} -lt ${LOGIN_MAX_RETRIES} ]]; then
+      echo "Retrying in ${LOGIN_RETRY_DELAY} seconds..."
+      sleep ${LOGIN_RETRY_DELAY}
+    else
+      echo "[INFRA] Login failed due to build farm network issue — not a ROSA test failure"
+      echo "${login_output}"
+      exit 1
+    fi
+  else
+    echo "Login failed with non-retryable error:"
+    echo "${login_output}"
+    exit 1
+  fi
+done
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
@@ -541,6 +600,9 @@ if [[ "$HOSTED_CP" == "true" ]]; then
     fi
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
+    if [[ -n "${ADDITIONAL_PROPERTIES:-}" ]]; then
+      HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties ${ADDITIONAL_PROPERTIES}"
+    fi
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
   fi
 

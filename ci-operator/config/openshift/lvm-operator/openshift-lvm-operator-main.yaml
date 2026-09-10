@@ -88,6 +88,8 @@ promotion:
     namespace: lvms
     tag: latest
     tag_by_commit: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -136,8 +138,9 @@ tests:
   container:
     from: test-bin
   secret:
+    collection: sd-sre-secrets
+    group: lvm-operator-codecov-token
     mount_path: /tmp/secret
-    name: lvm-operator-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: post-unit-test
   commands: |
@@ -147,8 +150,9 @@ tests:
     from: test-bin
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: lvm-operator-codecov-token
     mount_path: /tmp/secret
-    name: lvm-operator-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: e2e-aws-single-node
   cron: '@daily'
@@ -222,8 +226,9 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
-- as: e2e-aws-hypershift
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+- always_run: false
+  as: e2e-aws-hypershift
+  pipeline_skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:

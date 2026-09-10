@@ -32,6 +32,7 @@ promotion:
   - name: "5.0"
     namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -43,12 +44,6 @@ releases:
       include_built_images: true
       name: "5.0"
       namespace: ocp-priv
-  multi-latest:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "5.0"
 resources:
   '*':
     limits:
@@ -71,8 +66,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: must-gather-operator-codecov-token
     mount_path: /tmp/secret
-    name: must-gather-operator-codecov-token
 - as: lint
   commands: make lint
   container:
@@ -112,9 +108,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
@@ -149,9 +145,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
@@ -184,9 +180,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:

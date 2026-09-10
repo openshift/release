@@ -40,29 +40,72 @@ jq '. * input' "${CLUSTER_PULL_SECRETS_ORIGINAL}" "${ODF_QUAY_CREDENTIALS_FILE}"
 echo "🌊 Update pull secret in cluster"
 oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${CLUSTER_PULL_SECRETS_UPDATED}"
 
-function monitor_progress() {
-  local status=''
-  while true; do
-    echo "Checking progress..."
-    oc get "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}" -n "${ODF_INSTALL_NAMESPACE}" \
-      -o jsonpath='{range .status.conditions[*]}{@}{"\n"}{end}'
-    status=$(oc get "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}" -n openshift-storage -o jsonpath="{.status.phase}")
-    if [[ "$status" == "Ready" ]]; then
-      echo "StorageCluster is Ready"
-      return
-    fi
-    sleep 30
-  done
+function gather_odf_debug_info() {
+  if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+    echo "WARNING: ARTIFACT_DIR unset, skipping ODF debug collection"
+    return
+  fi
+  local dbg_dir="${ARTIFACT_DIR}/odf-debug"
+  mkdir -p "${dbg_dir}"
+
+  oc get storagecluster,cephcluster,noobaa,csv \
+    -n "${ODF_INSTALL_NAMESPACE}" -o wide \
+    > "${dbg_dir}/odf-resources.txt" 2>&1 || true
+  oc get subscription.operators.coreos.com "${ODF_SUBSCRIPTION_NAME}" \
+    -n "${ODF_INSTALL_NAMESPACE}" -o yaml \
+    > "${dbg_dir}/subscription.yaml" 2>&1 || true
+  oc get installplan -n "${ODF_INSTALL_NAMESPACE}" -o wide \
+    > "${dbg_dir}/installplans.txt" 2>&1 || true
+  oc describe storagecluster "${ODF_STORAGE_CLUSTER_NAME}" \
+    -n "${ODF_INSTALL_NAMESPACE}" \
+    > "${dbg_dir}/storagecluster-describe.txt" 2>&1 || true
+  oc get storagecluster "${ODF_STORAGE_CLUSTER_NAME}" \
+    -n "${ODF_INSTALL_NAMESPACE}" -o yaml \
+    > "${dbg_dir}/storagecluster.yaml" 2>&1 || true
+  oc get cephcluster -n "${ODF_INSTALL_NAMESPACE}" -o yaml \
+    > "${dbg_dir}/cephclusters.yaml" 2>&1 || true
+  oc get storageclient -n "${ODF_INSTALL_NAMESPACE}" -o wide \
+    > "${dbg_dir}/storageclient.txt" 2>&1 || true
+  oc get driver.csi.ceph.io -n "${ODF_INSTALL_NAMESPACE}" \
+    > "${dbg_dir}/csi-drivers.txt" 2>&1 || true
+  oc get storageconsumer -n "${ODF_INSTALL_NAMESPACE}" -o yaml \
+    > "${dbg_dir}/storageconsumer.yaml" 2>&1 || true
+  oc get storageclass \
+    > "${dbg_dir}/storageclasses.txt" 2>&1 || true
+  oc get pvc -n "${ODF_INSTALL_NAMESPACE}" -o wide \
+    > "${dbg_dir}/pvcs.txt" 2>&1 || true
+  oc get events -n "${ODF_INSTALL_NAMESPACE}" --sort-by=.lastTimestamp \
+    > "${dbg_dir}/events.txt" 2>&1 || true
+  oc get catalogsource/"${ODF_CATALOG_NAME}" -n openshift-marketplace -o yaml \
+    > "${dbg_dir}/catalogsource.yaml" 2>&1 || true
+  oc get pods -n openshift-marketplace -l "olm.catalogSource=${ODF_CATALOG_NAME}" -o wide \
+    > "${dbg_dir}/catalog-pods.txt" 2>&1 || true
+  oc get pods -n "${ODF_INSTALL_NAMESPACE}" -o wide \
+    > "${dbg_dir}/pods.txt" 2>&1 || true
 }
 
-function run_must_gather_on_fail() {
-  local odf_must_gather_image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}"
-  # Wait for StorageCluster to be deployed, and on fail run must gather
-  oc wait "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}"  \
-    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='30m' || \
-  oc adm must-gather --image="${odf_must_gather_image}" --dest-dir="${ARTIFACT_DIR}/ocs_must_gather"
-  # exit 1
+function run_ocs_must_gather() {
+  if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+      echo "WARNING: ARTIFACT_DIR unset, skipping ODF debug collection"
+      return
+  fi
+  local image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}"
+  oc adm must-gather \
+    --image="${image}" \
+    --dest-dir="${ARTIFACT_DIR}/ocs_must_gather" || true
 }
+
+function on_exit() {
+  local exit_code=$?
+  set +e
+  gather_odf_debug_info
+  if (( exit_code != 0 )); then
+    echo "ODF deployment failed (exit ${exit_code}); collecting must-gather..."
+    run_ocs_must_gather
+  fi
+  exit "${exit_code}"
+}
+trap on_exit EXIT
 
 # Move into a tmp folder with write access
 pushd /tmp
@@ -192,11 +235,6 @@ spec:
     replica: 3
     resources: {}
 EOF
-
-# Wait 30 sec and start monitoring the progress of the StorageCluster
-sleep 30
-monitor_progress &
-run_must_gather_on_fail &
 
 echo "⏳ Wait for StorageCluster to be deployed"
 oc wait "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}"  \

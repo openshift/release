@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | **Alert** | `pod-scaler-admission-resource-warning` |
-| **Cluster** | `app.ci` |
+| **Cluster** | `app.ci` (admission metrics); hub producer/UI on `core-ci` |
 | **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `pod-scaler-admission-resource-warning` |
 | **Severity** | `critical` |
 
@@ -30,21 +30,21 @@ From the alert or [this Console query](https://console-openshift-console.apps.ci
 
 ### 1) Confirm pod-scaler components are up
 
-Pod scaler runs in **`ci`** ([`pod-scaler.yaml`](../../clusters/app.ci/pod-scaler/pod-scaler.yaml), [`pod-scaler-ui.yaml`](../../clusters/app.ci/pod-scaler/pod-scaler-ui.yaml)):
+Hub producer and UI run on **core-ci** ([`pod-scaler.yaml`](../../clusters/core-ci/pod-scaler/pod-scaler.yaml), [`pod-scaler-ui.yaml`](../../clusters/core-ci/pod-scaler/pod-scaler-ui.yaml)):
 
 ```bash
-CTX=app.ci
+CTX=core-ci
 
 oc --context "$CTX" get deploy -n ci pod-scaler-producer pod-scaler-ui
 oc --context "$CTX" get pods -n ci -l 'component in (pod-scaler-producer,pod-scaler-ui)' -o wide
 ```
 
-If **`pod-scaler-producer`** is unhealthy, fix it **before** blaming workloads—see alerts **`pod-scaler-producer-Singleton-Down`** / **`pod-scaler-ui-Down`**.
+If **`pod-scaler-producer`** is unhealthy, fix it **before** blaming workloads—see alerts **`pod-scaler-producer-Singleton-Down`** / **`pod-scaler-ui-Down`** ([`pod-scaler-prometheusrule.yaml`](../../clusters/core-ci/ci-monitoring/pod-scaler-prometheusrule.yaml) on core-ci).
 
 ### 2) Capture admission / producer logs around the timestamp
 
 ```bash
-oc --context "$CTX" logs -n ci deploy/pod-scaler-producer --since=30m --tail=400 \
+oc --context core-ci logs -n ci deploy/pod-scaler-producer --since=30m --tail=400 \
   | grep -iE 'admission|high_determined|workload' || true
 ```
 

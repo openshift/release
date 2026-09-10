@@ -38,6 +38,7 @@ operator:
   - pullspec: quay.io/jetstack/cert-manager-cainjector:latest
     with: pipeline:cert-manager
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   latest:
@@ -90,6 +91,7 @@ tests:
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
+    - ref: merge-stage-registry-credentials
     - as: install
       cli: latest
       commands: |
@@ -132,7 +134,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-hypershift
+    workflow: optional-operators-ci-operator-sdk-hypershift-stage-registry
 zz_generated_metadata:
   branch: cert-manager-1.17
   org: openshift-priv

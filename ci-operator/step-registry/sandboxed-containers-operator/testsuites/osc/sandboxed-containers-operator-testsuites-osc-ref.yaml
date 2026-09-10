@@ -1,0 +1,41 @@
+ref:
+  as: sandboxed-containers-operator-testsuites-osc
+  from: src
+  cli: latest
+  commands: sandboxed-containers-operator-testsuites-osc-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 130m0s
+  grace_period: 10m0s
+  # Environment variables follow the TESTS_<SUITE_NAME>_<PARAMETER> convention
+  # shared by all OSC test suites (see the testsuites AGENTS.md).
+  env:
+  - name: TESTS_OSC_ENABLE
+    default: "false"
+    documentation: |-
+      Enable-gate for the OSC golang e2e suite (skip-by-default).
+      "true"        -> the step runs the tests.
+      "false"/unset -> the step writes a skipped JUnit and exits 0.
+  - name: TESTS_OSC_FOCUS
+    default: ""
+    documentation: |-
+      Ginkgo focus passed to `go test` as -ginkgo.focus (e.g. a single test ID
+      like "66108"). Empty runs the whole suite.
+  - name: TESTS_OSC_TIMEOUT
+    default: "120m"
+    documentation: |-
+      Value passed to `go test -timeout`. Must stay below the ref `timeout`
+      (130m) so the runner has time to publish results before the step is killed.
+  documentation: |-
+    Run the OSC golang (Ginkgo v2) e2e tests from the
+    openshift/sandboxed-containers-operator repository (devel branch,
+    test/e2e) against a cluster that already has the Sandboxed Containers
+    Operator installed and the osc-config configmap present (created earlier by
+    the env-cm step).
+
+    The step runs on the src image, which provides the Go toolchain and git; oc
+    is injected via cli and symlinked as kubectl. The suite is executed with
+    `go test` and emits JUnit via -ginkgo.junit-report; results are copied to
+    the artifacts directory so prow indexes them.

@@ -258,7 +258,7 @@ function CheckClusterHealth () {
     avail="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" || true
     progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')" || true
     degraded="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}')" || true
-    if [[ "${avail}" != "True" || "${progressing}" != "False" || "${degraded}" != "False" ]]; then
+    if [[ "${avail}" != "True" || ( -n "${progressing}" && "${progressing}" != "False" ) || ( -n "${degraded}" && "${degraded}" != "False" ) ]]; then
         : "CVO health check failed: Available=${avail} Progressing=${progressing} Degraded=${degraded}"
         details="${details}cvo: Available=${avail} Progressing=${progressing} Degraded=${degraded}; "
         (( failed += 1 ))

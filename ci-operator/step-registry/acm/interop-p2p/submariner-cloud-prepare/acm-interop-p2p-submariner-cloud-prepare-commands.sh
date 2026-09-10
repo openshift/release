@@ -25,11 +25,13 @@ set -euxo pipefail; shopt -s inherit_errexit
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 typeset -r subctlBin="/tmp/bin/subctl"
+[[ "${ACM_SPOKE_CLUSTER_COUNT}" =~ ^[1-9][0-9]*$ ]] \
+    || { : "ACM_SPOKE_CLUSTER_COUNT must be a positive decimal integer (got: '${ACM_SPOKE_CLUSTER_COUNT}')"; false; }
 typeset -i spokeCount="${ACM_SPOKE_CLUSTER_COUNT}"
 
 typeset awsTmpCreds=""
@@ -72,14 +74,17 @@ InstallSubctl() {
     # Versioned releases (vX.Y.Z) must have a trusted digest; rolling branch
     # tags (release-X.Y) skip digest verification by design.
     typeset expectedSha=""
-    if [[ "${version}" =~ ^v[0-9] ]]; then
+    if [[ "${version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         expectedSha="${_subctlDigests["${version}"]:-}"
         if [[ -z "${expectedSha}" ]]; then
             : "SUBMARINER_SUBCTL_VERSION=${version} is a versioned release but has no trusted SHA-256 in _subctlDigests; add its SHA-256 to proceed"
             false
         fi
+    elif [[ "${version}" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
+        : "INFO: SUBMARINER_SUBCTL_VERSION=${version} is a rolling branch tag — SHA-256 verification skipped"
     else
-        : "INFO: SUBMARINER_SUBCTL_VERSION=${version} is a rolling branch tag — SHA-256 verification skipped (artifact rebuilt on every branch push)"
+        printf 'ERROR: SUBMARINER_SUBCTL_VERSION=%s is not a recognised format (use vX.Y.Z or release-X.Y)\n' "${version}" >&2
+        false
     fi
 
     typeset archiveName="subctl-${version}-linux-amd64.tar.xz"
@@ -241,6 +246,19 @@ WaitForGatewayNode() {
 # ── Main ──────────────────────────────────────────────────────────────────────
 command -v oc 1>/dev/null
 command -v curl 1>/dev/null
+
+# Enforce minimum release-0.24: the OVN-K nftables LRP nexthop fix (PR #4126)
+# is included from release-0.24. Older rolling tags (e.g. release-0.23) still
+# require the acm-interop-p2p-submariner-snat-fix workaround which was removed
+# from the install chain. Reject them early rather than proceeding silently.
+if [[ "${SUBMARINER_SUBCTL_VERSION}" =~ ^release-([0-9]+)\.([0-9]+)$ ]]; then
+    typeset -i _majorVer="${BASH_REMATCH[1]}" _minorVer="${BASH_REMATCH[2]}"
+    if (( _majorVer == 0 && _minorVer < 24 )); then
+        printf 'ERROR: SUBMARINER_SUBCTL_VERSION=%s is older than release-0.24; the OVN-K LRP fix requires release-0.24+. Update the version or re-add acm-interop-p2p-submariner-snat-fix to the chain.\n' \
+            "${SUBMARINER_SUBCTL_VERSION}" >&2
+        false
+    fi
+fi
 
 LoadSpokeConfig
 InstallSubctl

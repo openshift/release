@@ -8,11 +8,11 @@ base_images:
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp-priv
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp-priv
     tag: windows-machine-config-operator-test
   tls-scanner-tool:
@@ -46,6 +46,7 @@ promotion:
     name: "5.2"
     namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -95,7 +96,7 @@ tests:
     workflow: openshift-ci-security
 - always_run: false
   as: aws-e2e-operator
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -107,7 +108,7 @@ tests:
 - always_run: false
   as: aws-e2e-ote
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/proxy\.go$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -118,6 +119,7 @@ tests:
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]
       TEST_SUITE: windows-machine-config-operator/all
     test:
     - as: wmco-setup-and-test
@@ -156,7 +158,7 @@ tests:
     workflow: windows-e2e-operator-test-vsphere-disconnected
 - always_run: false
   as: azure-e2e-operator
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -168,7 +170,7 @@ tests:
     workflow: ipi-azure-ovn-hybrid
 - always_run: false
   as: gcp-e2e-operator
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -188,7 +190,7 @@ tests:
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - always_run: false
   as: azure-e2e-upgrade
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -288,6 +290,37 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
+  as: vsphere-proxy-e2e-ote
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/winc\.go$
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/proxy
+    test:
+    - as: wmco-setup
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
+- always_run: false
   as: wicd-unit-vsphere
   skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
@@ -327,12 +360,6 @@ tests:
     - ref: openshift-windows-install-wmco
     - ref: tls-scanner-run
     workflow: ipi-aws-ovn-hybrid
-- always_run: false
-  as: address-review-comments
-  optional: true
-  skip_if_only_changed: .*
-  steps:
-    workflow: windows-review-agent-trigger
 zz_generated_metadata:
   branch: release-5.2
   org: openshift-priv

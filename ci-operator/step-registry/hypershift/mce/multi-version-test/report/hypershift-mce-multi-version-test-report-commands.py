@@ -18,7 +18,7 @@ SAMPLE_SPREADSHEET_ID = "1g4EFkOrcr6D4WJKo4O8bmOK7txA4ZRTfqFazHtCoM3E"
 # The tab id is available in the URL of the template tab after "gid="
 TEMPLATE_TAB_ID = "1597804194"
 TOKEN_PATH = "/secret/ga-gsheet/googlesheet-api-token"
-GCSWEB_BASE = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+GCSWEB_BASE = "https://gcs.ci.openshift.org/gcs/test-platform-results"
 TEST_STEPS = [
     "conformance-tests", "csi-conformance-tests",
     "hypershift-aws-run-e2e-external", "hypershift-aws-run-e2e-nested",
