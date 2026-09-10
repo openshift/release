@@ -104,6 +104,7 @@ configure_ovn_localnet_lsp_dhcp() {
     dhcp_opts='"lease_time"="3500" "router"="'"${router_ip}"'" "server_id"="'"${router_ip}"'" "server_mac"="c0:ff:ee:00:00:01"'
   fi
 
+  local configured=0
   echo "Configuring OVN DHCP (${subnet_cidr}) on localnet LSPs in ${target_ns}..."
   for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
     ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
@@ -123,8 +124,14 @@ configure_ovn_localnet_lsp_dhcp() {
       oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
         ovn-nbctl clear Logical_Switch_Port "${lsp}" port_security 2>/dev/null || true
       echo "Configured OVN DHCP and cleared port security on ${lsp} (node ${node})"
+      configured=$((configured + 1))
     done
   done
+
+  if [[ "${configured}" -eq 0 ]]; then
+    echo "ERROR: no localnet LSP found in ${target_ns}" >&2
+    return 1
+  fi
 }
 
 # Clear port_security on passthrough localnet LSPs (EgressIP SNAT egress).
@@ -140,6 +147,7 @@ clear_ovn_localnet_lsp_port_security() {
     fi
   fi
 
+  local configured=0
   echo "Clearing port security on localnet LSPs in ${target_ns}..."
   for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
     ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
@@ -154,8 +162,14 @@ clear_ovn_localnet_lsp_port_security() {
       oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
         ovn-nbctl clear Logical_Switch_Port "${lsp}" port_security 2>/dev/null || true
       echo "Cleared port security on ${lsp} (node ${node})"
+      configured=$((configured + 1))
     done
   done
+
+  if [[ "${configured}" -eq 0 ]]; then
+    echo "ERROR: no localnet LSP found in ${target_ns}" >&2
+    return 1
+  fi
 }
 
 # Run dnsmasq on the VLAN sub-interface (e.g. br-ex.100) on each mgmt node before worker
@@ -252,15 +266,22 @@ echo "dnsmasq configured on ${dhcp_iface} (${gateway}, DHCP ${dhcp_start}-${dhcp
 SCRIPT_EOF
 )
 
-  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
-    echo "Setting up ${dhcp_iface} DHCP/DNS on node ${node}..."
-    if ! oc debug "node/${node}" --quiet=true -- chroot /host bash -c \
-      "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
-    then
-      echo "WARNING: failed to configure ${dhcp_iface} DHCP on node ${node}" >&2
-      return 1
-    fi
-  done
+  # Run dnsmasq on a single node only. The VLAN is a shared L2 segment so one
+  # DHCP server serves all VMs regardless of scheduling node. Running on every
+  # node would cause duplicate gateway IPs and competing DHCP leases.
+  node=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
+  if [[ -z "${node}" ]]; then
+    echo "ERROR: no worker node found for DHCP server placement" >&2
+    return 1
+  fi
+  echo "Setting up ${dhcp_iface} DHCP/DNS on node ${node} (single-node DHCP for shared VLAN)..."
+  if ! oc debug "node/${node}" --quiet=true -- chroot /host bash -c \
+    "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
+  then
+    echo "WARNING: failed to configure ${dhcp_iface} DHCP on node ${node}" >&2
+    return 1
+  fi
+  echo "${node}" > "${SHARED_DIR}/localnet-vlan-dhcp-node"
 }
 
 localnet_multi_label_namespace_privileged() {
@@ -875,7 +896,7 @@ NNCP_EOF
       echo "  ${NODE}: ${MAPPINGS}"
     done
 
-    # Create subnets-less localnet NAD (L2 passthrough to the VLAN; DHCP on br-localnet).
+    # Create subnets-less localnet NAD (L2 passthrough to the VLAN; DHCP on ${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}).
     oc apply -f - <<NAD_EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition

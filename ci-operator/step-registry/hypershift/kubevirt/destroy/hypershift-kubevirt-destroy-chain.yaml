@@ -25,9 +25,16 @@ chain:
         LOCALNET_VLAN_BOND="${LOCALNET_VLAN_BOND:-br-ex}"
         LOCALNET_VLAN_DHCP_INTERFACE="${LOCALNET_VLAN_DHCP_INTERFACE:-${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}}"
         NNCP_NAME="localnet-vlan-${LOCALNET_VLAN_ID}"
-        echo "Cleaning up ${LOCALNET_VLAN_DHCP_INTERFACE} dnsmasq for VLAN ${LOCALNET_VLAN_ID}..."
-        for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-          oc debug "node/${NODE}" --quiet=true -- chroot /host bash -c \
+        # Clean up dnsmasq on the single DHCP node (recorded during creation)
+        DHCP_NODE=""
+        if [[ -f "${SHARED_DIR}/localnet-vlan-dhcp-node" ]]; then
+          DHCP_NODE=$(cat "${SHARED_DIR}/localnet-vlan-dhcp-node")
+        else
+          DHCP_NODE=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+        fi
+        if [[ -n "${DHCP_NODE}" ]]; then
+          echo "Cleaning up ${LOCALNET_VLAN_DHCP_INTERFACE} dnsmasq on node ${DHCP_NODE}..."
+          oc debug "node/${DHCP_NODE}" --quiet=true -- chroot /host bash -c \
             'set -euo pipefail; dhcp_iface="$1"; vlan_id="$2"; uplink_bond="$3"; \
             pidfile="/run/localnet-vlan-${vlan_id}.pid"; conf="/etc/dnsmasq.d/localnet-vlan-${vlan_id}.conf"; \
             if [[ -f "${pidfile}" ]]; then kill "$(cat "${pidfile}")" 2>/dev/null || true; rm -f "${pidfile}"; fi; \
@@ -38,16 +45,16 @@ chain:
             iptables -D FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true; \
             ip addr flush dev "${dhcp_iface}" 2>/dev/null || true' \
             _ "${LOCALNET_VLAN_DHCP_INTERFACE}" "${LOCALNET_VLAN_ID}" "${LOCALNET_VLAN_BOND}" || true
-        done
+        fi
         echo "Cleaning up NNCP ${NNCP_NAME}..."
         oc delete nncp "${NNCP_NAME}" --ignore-not-found --timeout=120s 2>/dev/null || true
       fi
 
       echo "$(date) Finished deleting cluster"
     from: hypershift-operator
-    grace_period: 5m0s
+    grace_period: 10m0s
     resources:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 15m0s
+    timeout: 20m0s
