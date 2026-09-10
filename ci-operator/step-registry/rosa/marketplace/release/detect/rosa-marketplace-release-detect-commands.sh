@@ -53,6 +53,10 @@ set_wait_state() {
 validate_settings() {
   [[ -n "${TARGET_OCP_Y_STREAM:-}" ]] || fail "TARGET_OCP_Y_STREAM is required"
   [[ "${TARGET_OCP_Y_STREAM}" =~ ^[0-9]+\.[0-9]+$ ]] || fail "TARGET_OCP_Y_STREAM must have major.minor form"
+  [[ "${RELEASE_CONTROLLER_API}" == https://* ]] || fail "RELEASE_CONTROLLER_API must use https://"
+  [[ "${RELEASE_CONTROLLER_API}" != *'@'* ]] || fail "RELEASE_CONTROLLER_API must not contain userinfo"
+  [[ "${RELEASE_CONTROLLER_API}" != *'?'* && "${RELEASE_CONTROLLER_API}" != *'#'* ]] \
+    || fail "RELEASE_CONTROLLER_API must not contain a query or fragment"
   [[ "${RELEASE_CONTROLLER_RETRIES}" =~ ^[1-9][0-9]*$ ]] || fail "RELEASE_CONTROLLER_RETRIES must be a positive integer"
   [[ "${RELEASE_CONTROLLER_RETRY_DELAY_SECONDS}" =~ ^[0-9]+$ ]] || fail "RELEASE_CONTROLLER_RETRY_DELAY_SECONDS must be a non-negative integer"
   [[ "${RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS}" =~ ^[1-9][0-9]*$ ]] || fail "RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS must be a positive integer"
@@ -152,15 +156,18 @@ PYTHON
 http_get() {
   local url="$1"
   local destination="$2"
+  local request_name="$3"
   local attempt=1
   local curl_rc=0
   local http_code=""
+  local response_size=0
   local retry_delay="${RELEASE_CONTROLLER_RETRY_DELAY_SECONDS}"
 
   while (( attempt <= RELEASE_CONTROLLER_RETRIES )); do
     if http_code=$("${CURL_BIN}" \
       --silent \
-      --show-error \
+      --proto '=https' \
+      --proto-redir '=https' \
       --location \
       --connect-timeout 10 \
       --max-time 30 \
@@ -171,6 +178,15 @@ http_get() {
       curl_rc=0
     else
       curl_rc=$?
+    fi
+
+    if (( curl_rc == 0 )) && [[ -f "${destination}" ]]; then
+      response_size=$(wc -c < "${destination}")
+      if (( response_size > RELEASE_CONTROLLER_MAX_RESPONSE_BYTES )); then
+        curl_rc=63
+        http_code=""
+        : > "${destination}"
+      fi
     fi
 
     if (( curl_rc == 0 )) && [[ "${http_code}" =~ ^[0-9]{3}$ ]]; then
@@ -185,10 +201,10 @@ http_get() {
     fi
 
     if (( attempt == RELEASE_CONTROLLER_RETRIES )); then
-      fail "GET ${url} failed after ${RELEASE_CONTROLLER_RETRIES} attempts (curl_rc=${curl_rc}, http_code=${http_code:-none})"
+      fail "${request_name} request failed after ${RELEASE_CONTROLLER_RETRIES} attempts (curl_rc=${curl_rc}, http_code=${http_code:-none})"
     fi
 
-    log "GET ${url} failed (attempt ${attempt}/${RELEASE_CONTROLLER_RETRIES}); retrying"
+    log "${request_name} request failed (attempt ${attempt}/${RELEASE_CONTROLLER_RETRIES}); retrying"
     if (( retry_delay > 0 )); then
       "${SLEEP_BIN}" "${retry_delay}"
       retry_delay=$((retry_delay * 2))
@@ -268,7 +284,7 @@ main() {
   write_value "${TARGET_OCP_Y_STREAM}" "${OCP_VERSION_FILE}"
   log "Checking release stream ${stream}"
 
-  http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestream/${stream}/config" "${config_file}"
+  http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestream/${stream}/config" "${config_file}" "stream-config"
   case "${HTTP_CODE}" in
     200)
       validate_stream_config "${stream}" "${config_file}"
@@ -282,7 +298,7 @@ main() {
       ;;
   esac
 
-  http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestream/${stream}/tags" "${tags_file}"
+  http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestream/${stream}/tags" "${tags_file}" "stream-tags"
   case "${HTTP_CODE}" in
     200)
       ;;

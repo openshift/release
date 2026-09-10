@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-readonly REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
 readonly DETECTOR="${REPO_ROOT}/ci-operator/step-registry/rosa/marketplace/release/detect/rosa-marketplace-release-detect-commands.sh"
 readonly PUBLISHER="${REPO_ROOT}/ci-operator/step-registry/rosa/marketplace/release/publish/rosa-marketplace-release-publish-commands.sh"
 readonly TEST_ROOT="${REPO_ROOT}/hack/rosa-marketplace-release-monitor"
@@ -27,10 +28,11 @@ run_detector() {
   local output_dir="$1"
 
   TARGET_OCP_Y_STREAM=5.2 \
-  RELEASE_CONTROLLER_API=https://release-controller.test \
+  RELEASE_CONTROLLER_API="${TEST_RELEASE_CONTROLLER_API:-https://release-controller.test}" \
   RELEASE_CONTROLLER_RETRIES="${TEST_RELEASE_CONTROLLER_RETRIES:-1}" \
   RELEASE_CONTROLLER_RETRY_DELAY_SECONDS="${TEST_RELEASE_CONTROLLER_RETRY_DELAY_SECONDS:-0}" \
   RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS="${TEST_RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS:-30}" \
+  RELEASE_CONTROLLER_MAX_RESPONSE_BYTES="${TEST_RELEASE_CONTROLLER_MAX_RESPONSE_BYTES:-10485760}" \
   SHARED_DIR="${output_dir}/shared" \
   ARTIFACT_DIR="${output_dir}/artifacts" \
   CURL_BIN="${TEST_ROOT}/mock-curl.sh" \
@@ -43,6 +45,7 @@ run_detector() {
   TEST_CONFIG_TRANSIENT_FAILURES="${TEST_CONFIG_TRANSIENT_FAILURES:-0}" \
   TEST_CONFIG_ATTEMPT_FILE="${TEST_CONFIG_ATTEMPT_FILE:-}" \
   TEST_SLEEP_ARGS_FILE="${TEST_SLEEP_ARGS_FILE:-}" \
+  TEST_EXPECTED_MAX_FILESIZE="${TEST_RELEASE_CONTROLLER_MAX_RESPONSE_BYTES:-10485760}" \
   TEST_COREOS_FIXTURE="${TEST_COREOS_FIXTURE:-${FIXTURES}/coreos-stream.json}" \
   TEST_INSTALLER_EXIT_CODE="${TEST_INSTALLER_EXIT_CODE:-0}" \
   "${DETECTOR}"
@@ -114,6 +117,55 @@ test_invalid_target_fails() {
     "${DETECTOR}"; then
     fail "invalid target unexpectedly succeeded"
   fi
+}
+
+test_insecure_release_controller_api_fails() {
+  local output_dir
+  output_dir=$(mktemp -d)
+
+  if TARGET_OCP_Y_STREAM=5.2 \
+    RELEASE_CONTROLLER_API=http://release-controller.test \
+    SHARED_DIR="${output_dir}/shared" \
+    ARTIFACT_DIR="${output_dir}/artifacts" \
+    CURL_BIN="${TEST_ROOT}/mock-curl.sh" \
+    "${DETECTOR}"; then
+    fail "insecure release-controller API unexpectedly succeeded"
+  fi
+}
+
+test_release_controller_credentials_are_not_logged() {
+  local api
+  local log_file
+  local log_output
+  local output_dir
+  local secret="do-not-log-this-secret"
+
+  for api in \
+    "https://user:${secret}@release-controller.test" \
+    "https://release-controller.test?token=${secret}"; do
+    output_dir=$(mktemp -d)
+    log_file="${output_dir}/detector.log"
+    if TEST_RELEASE_CONTROLLER_API="${api}" \
+      TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" \
+      run_detector "${output_dir}" >"${log_file}" 2>&1; then
+      fail "release-controller API containing credentials unexpectedly succeeded"
+    fi
+    log_output=$(<"${log_file}")
+    [[ "${log_output}" != *"${secret}"* ]] || fail "release-controller credentials were logged"
+  done
+}
+
+test_oversized_response_fails_before_parsing() {
+  local output_dir
+  output_dir=$(mktemp -d)
+
+  if TEST_RELEASE_CONTROLLER_MAX_RESPONSE_BYTES=1 \
+    TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" \
+    run_detector "${output_dir}"; then
+    fail "oversized release-controller response unexpectedly succeeded"
+  fi
+  [[ ! -s "${output_dir}/artifacts/rosa-marketplace-release-config.json" ]] \
+    || fail "oversized response was retained for parsing"
 }
 
 test_malformed_tags_fail() {
@@ -225,8 +277,7 @@ test_publisher_skips_wait_state() {
   printf 'wait:stream-config-unavailable\n' > "${output_dir}/shared/rosa-marketplace-release-state"
 
   SHARED_DIR="${output_dir}/shared" \
-  MARKETPLACE_GENERATOR_BIN="${TEST_ROOT}/mock-marketplace-release-generator.sh" \
-  TEST_GENERATOR_ARGS_FILE="${output_dir}/generator-args" \
+  MARKETPLACE_GENERATOR_BIN="${output_dir}/generator-is-intentionally-absent" \
   "${PUBLISHER}"
 
   [[ ! -e "${output_dir}/generator-args" ]] || fail "publisher invoked generator for a wait state"
@@ -259,8 +310,7 @@ test_publisher_ready_but_disabled() {
   printf '5.2\n' > "${output_dir}/shared/rosa-marketplace-ocp-version"
 
   SHARED_DIR="${output_dir}/shared" \
-  MARKETPLACE_GENERATOR_BIN="${TEST_ROOT}/mock-marketplace-release-generator.sh" \
-  TEST_GENERATOR_ARGS_FILE="${output_dir}/generator-args" \
+  MARKETPLACE_GENERATOR_BIN="${output_dir}/generator-is-intentionally-absent" \
   "${PUBLISHER}"
 
   [[ ! -e "${output_dir}/generator-args" ]] || fail "disabled publisher invoked generator"
@@ -330,6 +380,9 @@ test_accepted_payload_is_eligible
 test_rejected_payload_is_eligible
 test_failed_payload_waits
 test_invalid_target_fails
+test_insecure_release_controller_api_fails
+test_release_controller_credentials_are_not_logged
+test_oversized_response_fails_before_parsing
 test_malformed_tags_fail
 test_wrong_stream_name_fails
 test_missing_pullspec_fails

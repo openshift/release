@@ -39,9 +39,6 @@ main() {
   local rhcos_version
   local -a args
 
-  command -v "${MARKETPLACE_GENERATOR_BIN}" >/dev/null 2>&1 \
-    || fail "marketplace generator not found: ${MARKETPLACE_GENERATOR_BIN}"
-
   state=$(read_required_value "${STATE_FILE}")
   case "${state}" in
     wait:*)
@@ -74,6 +71,9 @@ main() {
   rhcos_version=$(read_required_value "${RHCOS_VERSION_FILE}")
   [[ "${ocp_version}" =~ ^[0-9]+\.[0-9]+$ ]] || fail "detector OCP version is invalid"
   [[ "${rhcos_version}" =~ ^[A-Za-z0-9._-]+$ ]] || fail "detector RHCOS version is invalid"
+
+  command -v "${MARKETPLACE_GENERATOR_BIN}" >/dev/null 2>&1 \
+    || fail "marketplace generator not found: ${MARKETPLACE_GENERATOR_BIN}"
 
   args=(
     release

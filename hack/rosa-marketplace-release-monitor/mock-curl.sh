@@ -15,6 +15,10 @@ while (( $# > 0 )); do
       [[ "$2" == "${TEST_EXPECTED_MAX_FILESIZE:-10485760}" ]]
       shift 2
       ;;
+    --proto|--proto-redir)
+      [[ "$2" == "=https" ]]
+      shift 2
+      ;;
     --write-out|--connect-timeout|--max-time)
       shift 2
       ;;
