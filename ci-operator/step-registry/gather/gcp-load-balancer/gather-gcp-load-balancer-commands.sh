@@ -229,7 +229,7 @@ gcloud_json "${OUTPUT_DIR}/target-tcp-proxies-list.json" \
 echo "Collecting load balancer log entries from Cloud Logging..."
 gcloud_json "${OUTPUT_DIR}/lb-log-entries.json" \
   gcloud logging read \
-  "(resource.type=\"gce_forwarding_rule\" OR resource.type=\"http_load_balancer\" OR resource.type=\"tcp_ssl_proxy_rule\" OR resource.type=\"network_tcp_ssl_proxy_rule\") ) AND resource.labels.name=~\"^${INFRA_ID}\"" \
+  "(resource.type=\"gce_forwarding_rule\" OR resource.type=\"http_load_balancer\" OR resource.type=\"tcp_ssl_proxy_rule\" OR resource.type=\"network_tcp_ssl_proxy_rule\") AND resource.labels.name=~\"^${INFRA_ID}\"" \
   --project="${PROJECT_ID}" \
   --limit=200 \
   --freshness=3h \
