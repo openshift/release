@@ -22,7 +22,11 @@ vault_dev_mode_enabled() {
   [[ -n "${CLUSTER_TYPE:-}" && "${CLUSTER_TYPE}" == equinix-ocp-metal ]]
 }
 
-VAULT_HA_REPLICAS="${VAULT_HA_REPLICAS:-3}"
+if [[ -f "${SHARED_DIR}/vault-ha-replicas" ]]; then
+  VAULT_HA_REPLICAS="$(cat "${SHARED_DIR}/vault-ha-replicas")"
+else
+  VAULT_HA_REPLICAS="${VAULT_HA_REPLICAS:-3}"
+fi
 VAULT_TLS_DIR="/vault/userconfig/vault-tls"
 VAULT_INIT_SECRET="vault-init-credentials"
 VAULT_JOIN_MAX_RETRIES="${VAULT_JOIN_MAX_RETRIES:-30}"

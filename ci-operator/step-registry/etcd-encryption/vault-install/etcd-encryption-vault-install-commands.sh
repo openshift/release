@@ -181,6 +181,23 @@ VAULT_HA_REPLICAS="${VAULT_HA_REPLICAS:-3}"
 VAULT_INIT_SECRET="vault-init-credentials"
 VAULT_INIT_PLACEHOLDER="pending"
 
+# Cap HA replicas to schedulable nodes (e.g. single-node OpenShift cannot run 3 Vault pods).
+resolve_vault_ha_replicas() {
+  local requested="${VAULT_HA_REPLICAS}"
+  local node_count
+
+  node_count="$(oc get nodes --no-headers 2>/dev/null | wc -l | tr -d '[:space:]')"
+  if [[ -z "${node_count}" || "${node_count}" -lt 1 ]]; then
+    node_count=1
+  fi
+  if [[ "${requested}" -gt "${node_count}" ]]; then
+    echo "Cluster has ${node_count} node(s); capping VAULT_HA_REPLICAS from ${requested} to ${node_count}"
+    requested="${node_count}"
+  fi
+  VAULT_HA_REPLICAS="${requested}"
+  export VAULT_HA_REPLICAS
+}
+
 # Generate a self-signed CA and server certificate for Vault TLS.
 # Args: $1 = namespace, $2 = Helm release name, $3 = replica count
 # Sets CA_CERT_TMP to the generated CA certificate path.
@@ -648,6 +665,9 @@ if vault_dev_mode_enabled; then
 else
   echo "Vault install mode: HA Raft"
   echo "false" > "${SHARED_DIR}/vault-dev-mode"
+  resolve_vault_ha_replicas
+  echo "Using VAULT_HA_REPLICAS=${VAULT_HA_REPLICAS}"
+  echo "${VAULT_HA_REPLICAS}" > "${SHARED_DIR}/vault-ha-replicas"
 fi
 
 setup_vault_namespace "${VAULT_NAMESPACE}" "vault"
