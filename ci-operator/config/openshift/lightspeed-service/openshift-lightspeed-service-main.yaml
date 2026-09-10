@@ -19,6 +19,8 @@ promotion:
   to:
   - namespace: ols
     tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -51,8 +53,9 @@ tests:
   container:
     from: src
   secret:
+    collection: openshift-lightspeed-service-creds
+    group: ols-codecov-token
     mount_path: /tmp/secret
-    name: ols-codecov-token
   skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: integration
   commands: |
@@ -61,8 +64,9 @@ tests:
   container:
     from: src
   secret:
+    collection: openshift-lightspeed-service-creds
+    group: ols-codecov-token
     mount_path: /tmp/secret
-    name: ols-codecov-token
   skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: security
   optional: true
@@ -118,36 +122,36 @@ tests:
 
         tests/scripts/test-e2e-cluster.sh
       credentials:
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azureopenai-entra-id
-        name: azureopenai-entra-id
-        namespace: test-credentials
-      - mount_path: /var/run/bam
-        name: bam-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/bedrock-iam
-        name: bedrock-iam
-        namespace: test-credentials
-      - mount_path: /var/run/bedrock-iam-role
-        name: bedrock-iam-role
-        namespace: test-credentials
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/watsonx
-        name: watsonx-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/rhaiis
-        name: rhaiis-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/vertex
-        name: vertex-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/insights-stage-upload-offline-token
-        name: insights-stage-upload-offline-token
-        namespace: test-credentials
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-entra-id
+        mount_path: /var/run/azureopenai-entra-id
+      - collection: openshift-lightspeed-service-creds
+        group: bam-apitoken
+        mount_path: /var/run/bam
+      - collection: openshift-lightspeed-service-creds
+        group: bedrock-apitoken
+        mount_path: /var/run/bedrock-iam
+      - collection: openshift-lightspeed-service-creds
+        group: bedrock-role-test
+        mount_path: /var/run/bedrock-iam-role
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: watsonx-apitoken
+        mount_path: /var/run/watsonx
+      - collection: openshift-lightspeed-service-creds
+        group: rhaiis
+        mount_path: /var/run/rhaiis
+      - collection: openshift-lightspeed-service-creds
+        group: vertex-apitoken
+        mount_path: /var/run/vertex
+      - collection: openshift-lightspeed-service-creds
+        group: insights-stage-upload-offline-token
+        mount_path: /var/run/insights-stage-upload-offline-token
       dependencies:
       - env: OLS_IMAGE
         name: lightspeed-service-api
@@ -185,21 +189,21 @@ tests:
 
         tests/scripts/test-lseval-presubmit.sh
       credentials:
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/bedrock-iam
-        name: bedrock-iam
-        namespace: test-credentials
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/watsonx
-        name: watsonx-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/vertex
-        name: vertex-apitoken
-        namespace: test-credentials
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: bedrock-apitoken
+        mount_path: /var/run/bedrock-iam
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: watsonx-apitoken
+        mount_path: /var/run/watsonx
+      - collection: openshift-lightspeed-service-creds
+        group: vertex-apitoken
+        mount_path: /var/run/vertex
       dependencies:
       - env: OLS_IMAGE
         name: lightspeed-service-api
