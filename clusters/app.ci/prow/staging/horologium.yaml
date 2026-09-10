@@ -1,3 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: ci-staging
+  name: prow-jobs-sparse-checkout
+data:
+  sparse-checkout: |
+    /ci-operator/jobs/
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -27,6 +36,7 @@ spec:
         - --repo=https://github.com/Prucek/release-staging.git
         - --ref=main
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release-staging
@@ -34,9 +44,12 @@ spec:
         volumeMounts:
         - name: git-sync
           mountPath: /tmp/git-sync
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
+          readOnly: true
       containers:
       - name: horologium
-        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260902-ffc57790b
+        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260908-104d452f4
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
@@ -61,12 +74,16 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --max-failures=3
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: git-sync
           mountPath: /tmp/git-sync
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
+          readOnly: true
         resources:
           requests:
             memory: "1Gi"
@@ -82,3 +99,6 @@ spec:
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs
+      - name: sparse-checkout-config
+        configMap:
+          name: prow-jobs-sparse-checkout

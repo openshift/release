@@ -64,6 +64,59 @@ fi
 
 echo "Claude Code CLI: $(claude --version 2>/dev/null || echo 'unknown')"
 
+# --- Claude session metrics (cost/tokens/timing) via agentic-ci + OTEL ---
+# extract_metrics.py ships in the claude-ai-helpers image and produces the
+# claude_session_metrics BigQuery autodl consumed by the CI cost dashboards.
+EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+
+# run_claude_metered <prompt> <stream_json_out> [extra claude args...]
+# Runs Claude through `agentic-ci run` so an ephemeral OTEL collector captures
+# cost/token/timing telemetry. Writes raw stream-json to <stream_json_out>
+# (agentic-ci log lines stripped) and appends per-run OTEL to ${OTEL_LOG}.
+# Honors ${CLAUDE_TIMEOUT} (a `timeout`-style duration, e.g. 1200 or 35m) when set.
+# Returns the claude/agentic-ci exit code.
+run_claude_metered() {
+  local prompt="$1"; shift
+  local out_file="$1"; shift
+  local raw rc=0 timeout_cmd=()
+  raw="$(mktemp)"
+  [ -n "${CLAUDE_TIMEOUT:-}" ] && timeout_cmd=(timeout "${CLAUDE_TIMEOUT}")
+  "${timeout_cmd[@]}" agentic-ci run \
+    --backend local \
+    --harness claude-code \
+    --model "${CLAUDE_MODEL}" \
+    --workdir "${PWD}" \
+    --no-streaming \
+    "${prompt}" \
+    -- \
+    --verbose \
+    --output-format stream-json \
+    "$@" \
+    > "${raw}" 2>>"${ARTIFACT_DIR}/claude-agentic-ci.log" || rc=$?
+  grep '^{' "${raw}" > "${out_file}" || true
+  rm -f "${raw}"
+  local f
+  for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
+    [ -f "$f" ] && cat "$f" >> "${OTEL_LOG}"
+  done
+  rm -rf /tmp/agentic-ci-run.* 2>/dev/null || true
+  return $rc
+}
+
+# emit_session_metrics [stream_json_out]
+# Best-effort: emit ${ARTIFACT_DIR}/claude-session-metrics-autodl.json from the
+# collected OTEL, enriched with identity fields from the stream-json when given.
+emit_session_metrics() {
+  local stream_log="${1:-}"
+  [ -s "${OTEL_LOG}" ] || { echo "No OTEL data collected; skipping session metrics"; return 0; }
+  [ -f "${EXTRACT_METRICS}" ] || { echo "extract_metrics.py not found; skipping session metrics"; return 0; }
+  local args=("${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json")
+  [ -n "${stream_log}" ] && [ -s "${stream_log}" ] && args+=(--stream-log "${stream_log}")
+  python3 "${EXTRACT_METRICS}" "${args[@]}" || echo "Warning: session metrics extraction failed"
+  return 0
+}
+
 # ---------------------------------------------------------------------------
 # 3. Run Claude with the pre-installed ai-helpers skill
 # ---------------------------------------------------------------------------
@@ -90,17 +143,16 @@ echo "Running Claude with /ci:prow-job-analysis skill..."
 echo ""
 
 set +e
-timeout 1200 claude -p "/ci:prow-job-analysis ${PROW_JOB_URL} --fast" \
+CLAUDE_TIMEOUT=1200 run_claude_metered "/ci:prow-job-analysis ${PROW_JOB_URL} --fast" \
+  "${ARTIFACT_DIR}/claude-output.json" \
   --append-system-prompt "$SYSTEM_PROMPT" \
   --allowedTools "Bash Read Write Edit Grep Glob WebFetch Skill" \
-  --max-turns 100 \
-  --model "$CLAUDE_MODEL" \
-  --verbose \
-  --output-format stream-json \
-  2> "${ARTIFACT_DIR}/claude-failure-analysis.log" \
-  | tee "${ARTIFACT_DIR}/claude-failure-analysis.json"
+  --max-turns 100
 CLAUDE_EXIT=$?
 set -e
+
+# Best-effort: emit claude-session-metrics-autodl.json from collected OTEL.
+emit_session_metrics "${ARTIFACT_DIR}/claude-output.json"
 
 if [[ "$CLAUDE_EXIT" -eq 124 ]]; then
   echo "Claude timed out — report may be incomplete"
@@ -110,7 +162,7 @@ fi
 # 4. Extract token usage
 # ---------------------------------------------------------------------------
 
-TOKENS_JSON=$(grep '"type":"result"' "${ARTIFACT_DIR}/claude-failure-analysis.json" 2>/dev/null \
+TOKENS_JSON=$(grep '"type":"result"' "${ARTIFACT_DIR}/claude-output.json" 2>/dev/null \
   | head -1 \
   | jq '{
       total_cost_usd: (.total_cost_usd // 0),
@@ -128,7 +180,7 @@ DURATION_S=$(printf '%.0f' "$(echo "${DURATION_MS} / 1000" | bc -l 2>/dev/null)"
 NUM_TURNS=$(echo "$TOKENS_JSON" | jq -r '.num_turns // 0')
 
 jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' \
-  "${ARTIFACT_DIR}/claude-failure-analysis.json" \
+  "${ARTIFACT_DIR}/claude-output.json" \
   > "${ARTIFACT_DIR}/claude-failure-analysis-text.txt" 2>/dev/null || true
 
 echo "$TOKENS_JSON" > "${SHARED_DIR}/claude-failure-analysis-tokens.json" 2>/dev/null || true

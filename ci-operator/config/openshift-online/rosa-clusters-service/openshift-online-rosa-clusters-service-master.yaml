@@ -69,19 +69,20 @@ resources:
       cpu: "3"
       memory: 6Gi
 tests:
-- as: pr-check-unit
-  commands: unset GOFLAGS && make test
-  container:
-    from: src
-- always_run: false
-  as: go-unit-coverage
+- as: go-unit-coverage
   commands: |
     set -x
     export GOMAXPROCS=3
     make codecov
+    test_status=$?
+    artifact_dir="${ARTIFACT_DIR:-.}"
+    if [ -f junit.xml ]; then
+      cp junit.xml "${artifact_dir}/junit-go-unit-coverage.xml" 2>/dev/null || true
+      echo "Saved junit report to ${artifact_dir}/junit-go-unit-coverage.xml"
+    fi
+    exit $test_status
   container:
     from: golang-plus
-  optional: true
   secrets:
   - mount_path: /var/run/codecov-secret
     name: rosa-clusters-service-codecov

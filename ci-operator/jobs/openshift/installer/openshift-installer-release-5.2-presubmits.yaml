@@ -1,94 +1,6 @@
 presubmits:
   openshift/installer:
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build01
-    context: ci/prow/address-review-comments
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - images/baremetal/Dockerfile.ci
-      - images/installer/Dockerfile.ci
-      - images/installer/Dockerfile.upi.ci
-      - images/libvirt/Dockerfile.ci
-      - images/openstack/Dockerfile.ci
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-5.2-address-review-comments
-    optional: true
-    rerun_command: /test address-review-comments
-    skip_if_only_changed: .*
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=address-review-comments
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )address-review-comments,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - ^release-5\.2$
@@ -166,6 +78,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -256,6 +169,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -346,6 +260,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -1450,6 +1365,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -1539,6 +1455,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-qe
       ci.openshift.io/generator: prowgen
@@ -1630,6 +1547,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -1719,6 +1637,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws-eusc
       ci-operator.openshift.io/cloud-cluster-profile: aws-eusc
       ci.openshift.io/generator: prowgen
@@ -1808,6 +1727,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -1899,6 +1819,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -1987,6 +1908,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2076,6 +1998,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2165,6 +2088,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2254,6 +2178,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2345,6 +2270,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2436,6 +2362,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2526,6 +2453,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2617,6 +2545,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2708,6 +2637,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2797,6 +2727,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2886,6 +2817,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -2975,6 +2907,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -3064,6 +2997,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-us-east-1
       ci.openshift.io/generator: prowgen
@@ -3153,6 +3087,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-us-east-1
       ci.openshift.io/generator: prowgen
@@ -3244,6 +3179,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -3333,6 +3269,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -3424,6 +3361,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -3515,6 +3453,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -3606,6 +3545,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -3695,6 +3635,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -3784,6 +3725,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -3875,6 +3817,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -3963,6 +3906,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -4052,6 +3996,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-qe
       ci.openshift.io/generator: prowgen
@@ -4141,6 +4086,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-qe
       ci.openshift.io/generator: prowgen
@@ -4232,6 +4178,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -4323,6 +4270,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -4413,6 +4361,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -4501,6 +4450,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -4590,6 +4540,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -4679,6 +4630,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -4768,6 +4720,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -4857,6 +4810,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -4948,6 +4902,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -5037,6 +4992,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -5128,6 +5084,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
@@ -5219,6 +5176,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azurestack
       ci-operator.openshift.io/cloud-cluster-profile: azurestack-dev
       ci-operator.openshift.io/cluster: build01
@@ -5311,6 +5269,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: azurestack
       ci-operator.openshift.io/cloud-cluster-profile: azurestack-dev
       ci-operator.openshift.io/cluster: build01
@@ -5401,6 +5360,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -5490,6 +5450,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -5579,6 +5540,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
@@ -5668,6 +5630,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcd
       ci.openshift.io/generator: prowgen
@@ -5759,6 +5722,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
       ci.openshift.io/generator: prowgen
@@ -5850,6 +5814,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -5941,6 +5906,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6030,6 +5996,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6121,6 +6088,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6211,6 +6179,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6300,6 +6269,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6389,6 +6359,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6478,6 +6449,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6569,6 +6541,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6659,6 +6632,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6750,6 +6724,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6839,6 +6814,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -6930,6 +6906,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -7021,6 +6998,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
       ci.openshift.io/generator: prowgen
@@ -7112,6 +7090,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -7203,6 +7182,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: ibmcloud
       ci-operator.openshift.io/cloud-cluster-profile: ibmcloud
       ci.openshift.io/generator: prowgen
@@ -8389,6 +8369,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-edge-enablement
       ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
       ci.openshift.io/generator: prowgen
@@ -8480,6 +8461,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: nutanix
       ci-operator.openshift.io/cloud-cluster-profile: nutanix
       ci-operator.openshift.io/cluster: build01
@@ -8570,6 +8552,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
@@ -8659,6 +8642,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: openstack-hwoffload
       ci-operator.openshift.io/cloud-cluster-profile: openstack-hwoffload
       ci.openshift.io/generator: prowgen
@@ -8750,6 +8734,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: openstack-hwoffload
       ci-operator.openshift.io/cloud-cluster-profile: openstack-hwoffload
       ci.openshift.io/generator: prowgen
@@ -8839,6 +8824,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: openstack-vh-mecha-central
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vh-mecha-central
       ci.openshift.io/generator: prowgen
@@ -8930,6 +8916,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: openstack-nfv
       ci-operator.openshift.io/cloud-cluster-profile: openstack-nfv
       ci.openshift.io/generator: prowgen
@@ -9021,6 +9008,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
@@ -9111,6 +9099,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: openstack-vh-mecha-central
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vh-mecha-central
       ci.openshift.io/generator: prowgen
@@ -9200,6 +9189,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: openstack-hwoffload
       ci-operator.openshift.io/cloud-cluster-profile: openstack-hwoffload
       ci.openshift.io/generator: prowgen
@@ -9380,6 +9370,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: powervs-5
       ci-operator.openshift.io/cloud-cluster-profile: powervs-5
       ci-operator.openshift.io/cluster: build01
@@ -9470,6 +9461,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -9559,6 +9551,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -9650,6 +9643,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -9741,6 +9735,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -9839,6 +9834,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -9930,6 +9926,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10021,6 +10018,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10110,6 +10108,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10199,6 +10198,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10290,6 +10290,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10381,6 +10382,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10477,6 +10479,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10568,6 +10571,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10659,6 +10663,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10748,6 +10753,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10837,6 +10843,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
@@ -10927,6 +10934,7 @@ presubmits:
       - images/openstack/Dockerfile.ci
       timeout: 6h0m0s
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -11017,6 +11025,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
@@ -11380,6 +11389,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-5.2-integration-tests
@@ -11467,6 +11477,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-5.2-integration-tests-nodejoiner
@@ -11554,6 +11565,7 @@ presubmits:
       - images/libvirt/Dockerfile.ci
       - images/openstack/Dockerfile.ci
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
