@@ -6,6 +6,13 @@ chain:
     commands: |-
       set -exuo pipefail
 
+      DEBUG_WAIT_TIMEOUT="${DEBUG_WAIT_TIMEOUT:-0}"
+      if [[ -n "${DEBUG_WAIT_TIMEOUT}" && "${DEBUG_WAIT_TIMEOUT}" != "0" ]]; then
+        echo "Debug wait: sleeping for ${DEBUG_WAIT_TIMEOUT} seconds before cluster destroy..."
+        sleep "${DEBUG_WAIT_TIMEOUT}"
+        echo "Debug wait complete."
+      fi
+
       HCP_CLI="/usr/bin/hcp"
       if [[ ! -f $HCP_CLI ]]; then
           # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
@@ -57,4 +64,26 @@ chain:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 20m0s
+    timeout: 26h0m0s
+    env:
+    - name: ATTACH_DEFAULT_NETWORK
+      default: ""
+      documentation: |-
+        Passed through from hypershift-kubevirt-create. When localnet-vlan, destroy also
+        cleans up NNCP and dnsmasq resources after cluster deletion.
+    - name: LOCALNET_VLAN_ID
+      default: "100"
+      documentation: VLAN ID for localnet-vlan cleanup during destroy.
+    - name: LOCALNET_VLAN_BOND
+      default: br-ex
+      documentation: Uplink bond for localnet-vlan cleanup during destroy.
+    - name: LOCALNET_VLAN_DHCP_INTERFACE
+      default: ""
+      documentation: |-
+        VLAN sub-interface used for dnsmasq during localnet-vlan. Defaults to
+        ${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}.
+    - name: DEBUG_WAIT_TIMEOUT
+      default: "0"
+      documentation: |-
+        Seconds to sleep before starting cluster destroy. Runs in the post phase so the
+        cluster remains available for debugging after pre or test step failures. Set to 0 to skip.
