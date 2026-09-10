@@ -74,6 +74,13 @@ tests:
     set -x
     export GOMAXPROCS=3
     make codecov
+    test_status=$?
+    artifact_dir="${ARTIFACT_DIR:-.}"
+    if [ -f junit.xml ]; then
+      cp junit.xml "${artifact_dir}/junit-go-unit-coverage.xml" 2>/dev/null || true
+      echo "Saved junit report to ${artifact_dir}/junit-go-unit-coverage.xml"
+    fi
+    exit $test_status
   container:
     from: golang-plus
   secrets:
