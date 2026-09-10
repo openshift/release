@@ -1,0 +1,94 @@
+ref:
+  as: acm-interop-p2p-submariner-addon
+  from: cli
+  commands: acm-interop-p2p-submariner-addon-commands.sh
+  timeout: 2h0m0s
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  documentation: |-
+    Install Submariner on all clusters (ACM hub + spoke clusters) via ACM's native
+    ManagedClusterAddon and SubmarinerConfig CRs. Replaces the subctl-based
+    acm-interop-p2p-submariner-cloud-prepare + acm-interop-p2p-submariner-broker-join
+    steps with a fully ACM-declarative approach.
+
+    What ACM's Submariner addon controller handles automatically (no subctl required):
+      - Cloud preparation: AWS security groups and dedicated gateway MachineSet per cluster
+      - Submariner broker deployment on the hub
+      - Cluster join for each enrolled cluster (hub + all spokes)
+      - submariner-operator, gateway DaemonSet, routeagent, lighthouse-agent, coredns install
+
+    Key difference from the subctl approach:
+      - The ACM hub (local-cluster ManagedCluster, default ClusterSet) is ALSO enrolled.
+        The subctl broker-join step only joined spokes; this step closes that gap by
+        enrolling the hub as a full Submariner cluster participant. This is required for
+        hub↔spoke pod-to-pod connectivity for CCLM migration.
+
+    What this step does:
+    1. Loads hub (local-cluster) + all spokes into the cluster list.
+    2. For each cluster: creates an AWS credentials Secret in the managed cluster
+       namespace (from CLUSTER_PROFILE_DIR/.awscred), applies SubmarinerConfig
+       (globalnetEnabled=false, one dedicated gateway, libreswan cable driver), and
+       applies ManagedClusterAddon/submariner.
+    3. Waits for ManagedClusterAddon/submariner Available on each cluster.
+    4. Asserts SubmarinerConfig.spec.globalnetEnabled=false on each cluster.
+
+    Globalnet is explicitly disabled. Spokes must have non-overlapping pod CIDRs
+    (acm-interop-p2p-cluster-install ResolveSpokeCidrs) so cross-cluster raw pod IP
+    routing works for KubeVirt CCLM sync traffic (port 9185).
+
+    AWS credentials are written to a Secret in each managed cluster namespace and
+    never to SHARED_DIR. Credential file reads are wrapped in set +x.
+
+    Follow this step with acm-interop-p2p-submariner-verify for tunnel connectivity
+    checks and CCLM sync port probing.
+  env:
+  - name: ACM_SPOKE_CLUSTER_COUNT
+    default: "2"
+    documentation: Number of ACM spoke clusters to enroll in the Submariner mesh.
+  - name: SUBMARINER_ADDON_WAIT_TIMEOUT_MINUTES
+    default: "60"
+    documentation: |-
+      Minutes to wait for each ManagedClusterAddon/submariner to reach Available condition.
+      The addon controller handles cloud prep and cluster join — this may take 30-45 min
+      on a fresh cluster due to gateway MachineSet provisioning and IPsec tunnel setup.
+  - name: SUBMARINER_AWS_CREDS_SECRET_NAME
+    default: "aws-creds-submariner"
+    documentation: |-
+      Name of the Secret created in each managed cluster namespace containing AWS credentials
+      for SubmarinerConfig cloud preparation. Same name is used for all clusters.
+  - name: SUBMARINER_GATEWAY_INSTANCE_TYPE
+    default: "m5.xlarge"
+    documentation: |-
+      AWS EC2 instance type for dedicated Submariner gateway nodes.
+      SubmarinerConfig.spec.gatewayConfig.aws.instanceType.
+  - name: SUBMARINER_GATEWAY_COUNT
+    default: "1"
+    documentation: |-
+      Number of dedicated Submariner gateway nodes per cluster.
+      SubmarinerConfig.spec.gatewayConfig.gateways.
+  - name: SUBMARINER_IPSEC_IKE_PORT
+    default: "500"
+    documentation: IPsec IKE port. SubmarinerConfig.spec.IPSecIKEPort.
+  - name: SUBMARINER_IPSEC_NATT_PORT
+    default: "4500"
+    documentation: IPsec NAT-T port. SubmarinerConfig.spec.IPSecNATTPort.
+  - name: SUBMARINER_CABLE_DRIVER
+    default: "libreswan"
+    documentation: |-
+      Submariner cable driver. SubmarinerConfig.spec.cableDriver.
+      Supported values: libreswan (default), vxlan, wireguard.
+  - name: SUBMARINER_SUBSCRIPTION_CHANNEL
+    default: "stable-0.18"
+    documentation: |-
+      OLM channel for the submariner-operator Subscription on managed clusters.
+      SubmarinerConfig.spec.subscriptionConfig.channel.
+      # TODO: verify channel name for the target Submariner/ACM version in CI.
+  - name: SUBMARINER_SUBSCRIPTION_SOURCE
+    default: "redhat-operators"
+    documentation: OLM CatalogSource for submariner-operator. SubmarinerConfig.spec.subscriptionConfig.source.
+  - name: SUBMARINER_SUBSCRIPTION_SOURCE_NAMESPACE
+    default: "openshift-marketplace"
+    documentation: Namespace of the OLM CatalogSource. SubmarinerConfig.spec.subscriptionConfig.sourceNamespace.

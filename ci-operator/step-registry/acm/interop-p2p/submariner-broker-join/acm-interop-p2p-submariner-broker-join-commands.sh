@@ -427,19 +427,41 @@ typeset -i submarinerStepRc=0
         JoinCluster "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
 
+    # Hub-spoke mode: join the hub cluster to the broker so IPsec/VXLAN tunnels
+    # are established between the hub and all spokes.  This is required for
+    # CCLM: virt-handler on each side must reach the peer virt-synchronization-
+    # controller on raw pod IPs (port 8443) across clusters.
+    # The hub already has a gateway-labeled node from cloud-prepare; use
+    # --label-gateway=false to skip subctl's interactive node-selection prompt.
+    if [[ "${SUBMARINER_VERIFY_HUB_SPOKE}" == "true" ]]; then
+        JoinCluster "${KUBECONFIG}" "hub"
+    fi
+
     for ((i = 0; i < spokeCount; i++)); do
         WaitSubmarinerReady "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
 
+    if [[ "${SUBMARINER_VERIFY_HUB_SPOKE}" == "true" ]]; then
+        WaitSubmarinerReady "${KUBECONFIG}" "hub"
+    fi
+
     for ((i = 0; i < spokeCount; i++)); do
         WaitForDnsForwardingConfigured "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
+
+    if [[ "${SUBMARINER_VERIFY_HUB_SPOKE}" == "true" ]]; then
+        WaitForDnsForwardingConfigured "${KUBECONFIG}" "hub"
+    fi
 
     for ((i = 0; i < spokeCount; i++)); do
         AssertNoGlobalnetSubnets \
             "${spokeKubeconfigsArr[i]}" \
             "${spokeNamesArr[i]}"
     done
+
+    if [[ "${SUBMARINER_VERIFY_HUB_SPOKE}" == "true" ]]; then
+        AssertNoGlobalnetSubnets "${KUBECONFIG}" "hub"
+    fi
     true
 ) || submarinerStepRc=$?
 
