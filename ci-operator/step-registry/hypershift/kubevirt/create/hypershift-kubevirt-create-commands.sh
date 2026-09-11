@@ -177,8 +177,9 @@ clear_ovn_localnet_lsp_port_security() {
 # creates br-ex.<vlan-id> as the L2 port workers attach to. DHCP/DNS must be on that segment,
 # not ostestbm br-ex (untagged 192.168.111.0/24).
 #
-# dnsmasq listens on port 5353 (CoreDNS owns *:53). Guests use DHCP option 6 -> gateway:53,
-# so PREROUTING redirects queries destined for the gateway IP to 5353.
+# dnsmasq binds DNS to br-ex.<vlan-id> only (bind-interfaces + interface=). Port 5353 is not
+# usable under systemd on RHCOS: dnsmasq_t SELinux denies non-53 ports (EACCES), while oc debug
+# runs unconfined and masks the failure. Guests use DHCP option 6 -> gateway:53 on that iface.
 localnet_vlan_dnsmasq_setup_script_b64() {
   base64 -w0 <<'SCRIPT_EOF'
 #!/bin/bash
@@ -213,7 +214,6 @@ cat > "${conf}" <<CONF
 interface=${dhcp_iface}
 bind-interfaces
 except-interface=lo
-port=5353
 listen-address=${gateway}
 domain-needed
 bogus-priv
@@ -230,13 +230,6 @@ CONF
 
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 
-for proto in udp tcp; do
-  iptables -t nat -C PREROUTING -d "${gateway}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || \
-    iptables -t nat -A PREROUTING -d "${gateway}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353
-  iptables -t nat -C PREROUTING -i "${dhcp_iface}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || \
-    iptables -t nat -A PREROUTING -i "${dhcp_iface}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353
-done
-
 iptables -C FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT 2>/dev/null || \
   iptables -A FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT
 iptables -C FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
@@ -251,6 +244,7 @@ Wants=network-online.target
 [Service]
 Type=forking
 PIDFile=${pidfile}
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_NET_ADMIN
 ExecStart=/usr/sbin/dnsmasq --conf-file=${conf} --pid-file=${pidfile}
 ExecStop=/bin/kill -s TERM \$MAINPID
 Restart=on-failure
