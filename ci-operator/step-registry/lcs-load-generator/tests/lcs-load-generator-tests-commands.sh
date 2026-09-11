@@ -12,6 +12,11 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
+# Keep time for diagnostics and artifact collection inside the ref's 24h timeout.
+STEP_START_EPOCH=$(date +%s)
+STEP_TIMEOUT_SECONDS=$((24 * 60 * 60))
+DIAGNOSTIC_GRACE_SECONDS=$((15 * 60))
+
 # ─── 1. CONFIGURATION ────────────────────────────────────────────────────────
 
 LCS_NAMESPACE="${LCS_NAMESPACE:-openshift-lightspeed}"
@@ -41,6 +46,16 @@ ES_SERVER_HOST="${ES_SERVER_HOST:-search-ocp-qe-perf-scale-test}"
 RUNTIME_TMP_DIR=$(mktemp -d)
 chmod 700 "${RUNTIME_TMP_DIR}"
 trap 'rm -rf "${RUNTIME_TMP_DIR}"' EXIT
+
+job_terminal_state() {
+  local conditions=$1
+
+  if grep -qx 'Complete=True' <<<"${conditions}"; then
+    echo "complete"
+  elif grep -qx 'Failed=True' <<<"${conditions}"; then
+    echo "failed"
+  fi
+}
 
 echo "╔══════════════════════════════════════════════════════════╗"
 echo "║  LCS Performance Test Configuration                     ║"
@@ -163,7 +178,7 @@ PYROSCOPE
 
   oc wait --for=condition=available deployment/pyroscope \
     -n "${PYROSCOPE_NAMESPACE}" --timeout=120s
-  echo "── Pyroscope ready at ${PYROSCOPE_URL} ──"
+  echo "── Pyroscope ready ──"
 fi
 
 
@@ -437,17 +452,16 @@ yaml.safe_dump_all(documents, sys.stdout, sort_keys=False)
 PYTHON
 envsubst < "${JOB_MANIFEST}" | python3 "${JOB_TRANSFORMER}" | oc apply -f -
 
-# Wait for Job to complete or fail (24h max — matches step timeout)
+# Wait for Job to complete or fail, reserving time for diagnostics.
 echo "── Waiting for Job completion ──"
-JOB_WAIT_DEADLINE=$(( $(date +%s) + 86400 ))
+JOB_WAIT_DEADLINE=$((STEP_START_EPOCH + STEP_TIMEOUT_SECONDS - DIAGNOSTIC_GRACE_SECONDS))
 JOB_FINISHED=""
 while [[ -z "${JOB_FINISHED}" ]]; do
-  SUCCEEDED=$(oc get job lcs-load-generator -n "${LCS_NAMESPACE}" -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "")
-  FAILED=$(oc get job lcs-load-generator -n "${LCS_NAMESPACE}" -o jsonpath='{.status.failed}' 2>/dev/null || echo "")
-  if [[ "${SUCCEEDED}" == "1" ]]; then
-    JOB_FINISHED="complete"
-  elif [[ -n "${FAILED}" ]] && [[ "${FAILED}" -ge 1 ]]; then
-    JOB_FINISHED="failed"
+  JOB_CONDITIONS=$(oc get job lcs-load-generator -n "${LCS_NAMESPACE}" \
+    -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' 2>/dev/null || true)
+  JOB_FINISHED=$(job_terminal_state "${JOB_CONDITIONS}")
+  if [[ -n "${JOB_FINISHED}" ]]; then
+    continue
   elif [[ $(date +%s) -ge ${JOB_WAIT_DEADLINE} ]]; then
     JOB_FINISHED="timeout"
   else
