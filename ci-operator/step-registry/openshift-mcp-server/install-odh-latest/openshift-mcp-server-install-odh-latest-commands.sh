@@ -9,7 +9,7 @@ metadata:
   name: opendatahub-operator-latest
   namespace: openshift-marketplace
 spec:
-  image: http://quay.io/rhoai/rhoai-fbc-fragment:rhoai-3.6-ea.2
+  image: quay.io/rhoai/rhoai-fbc-fragment:rhoai-3.6-ea.2
   sourceType: grpc
 ---
 apiVersion: operators.coreos.com/v1alpha1
