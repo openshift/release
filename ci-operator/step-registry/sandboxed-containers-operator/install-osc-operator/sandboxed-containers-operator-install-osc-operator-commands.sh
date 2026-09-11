@@ -567,6 +567,15 @@ function install_osc_operator() {
 }
 
 function wait_for_operator() {
+  # Workaround: helm chart creates osc-operator-dev-catalog even when dev.enabled=false (chart bug).
+  # Delete it now if we're not using a custom catalog so Stage 0 doesn't wait for a broken source.
+  if [[ -z "${CATALOG_SOURCE_IMAGE}" ]]; then
+    if oc get catalogsource -n openshift-marketplace "${OSC_DEV_CATALOG_NAME}" &>/dev/null; then
+      echo ">>> Deleting stale ${OSC_DEV_CATALOG_NAME} (no CATALOG_SOURCE_IMAGE set, chart bug workaround)"
+      oc delete catalogsource -n openshift-marketplace "${OSC_DEV_CATALOG_NAME}" --ignore-not-found
+    fi
+  fi
+
   # Stage 0: Wait for ALL CatalogSources to be READY (600s)
   echo ">>> Waiting for all CatalogSources to be READY..."
   local all_catalogs_ready=false
