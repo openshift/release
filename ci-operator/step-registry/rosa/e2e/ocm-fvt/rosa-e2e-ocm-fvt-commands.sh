@@ -272,6 +272,16 @@ env -i bash --norc --noprofile -c "
   env | grep -v '^_='
 " >> "${podman_env_file}"
 
+# SREP service account: use backplane client credentials so tests don't depend
+# on expiring offline tokens for the SREP role.
+if [[ -f /usr/local/cs-qe-credentials/backplane_client_id && -f /usr/local/cs-qe-credentials/backplane_client_secret ]]; then
+  [[ $- == *x* ]] && WAS_TRACING_SREP=true || WAS_TRACING_SREP=false
+  set +x
+  echo "SREP_CLIENT_ID=$(cat /usr/local/cs-qe-credentials/backplane_client_id)" >> "${podman_env_file}"
+  echo "SREP_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/backplane_client_secret)" >> "${podman_env_file}"
+  $WAS_TRACING_SREP && set -x
+fi
+
 podman_args=(
   --authfile /usr/local/cs-qe-credentials/.dockerconfigjson
   --env-file "${podman_env_file}"
