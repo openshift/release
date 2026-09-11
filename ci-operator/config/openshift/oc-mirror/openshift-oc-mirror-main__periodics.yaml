@@ -1,0 +1,60 @@
+base_images:
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: ocp
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-m2m-disconnected
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ADDITIONAL_TRUST_BUNDLE_POLICY: Always
+      ENABLE_IDMS: "yes"
+      MIRROR_BIN: oc-mirror
+      QE_IMAGES: "false"
+      TEST_SKIPS: \[Skipped:Disconnected\]
+      TEST_STEPS: openshift-e2e-test mirror-images-by-oc-mirror mirror-images-by-oc-mirror-conf-mirror
+        mirror-images-community-e2e-images mirror-images-qe-test-images
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
+    - ref: mirror-images-by-oc-mirror-analyze-e2e-failure
+    pre:
+    - chain: ipi-aws-pre-disconnected
+    - ref: ipi-conf-additional-ca-trust-policy
+    test:
+    - ref: mirror-images-community-e2e-images
+    - ref: mirror-images-qe-test-images
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-disconnected
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: oc-mirror
+  variant: periodics
