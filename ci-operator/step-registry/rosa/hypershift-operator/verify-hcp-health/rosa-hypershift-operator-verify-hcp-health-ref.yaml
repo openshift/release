@@ -1,8 +1,8 @@
 ref:
-  as: rosa-hypershift-operator-deploy
+  as: rosa-hypershift-operator-verify-hcp-health
   from: rosa-aws-cli
   grace_period: 10m
-  commands: rosa-hypershift-operator-deploy-commands.sh
+  commands: rosa-hypershift-operator-verify-hcp-health-commands.sh
   resources:
     requests:
       cpu: 100m
@@ -17,10 +17,8 @@ ref:
   - name: REGION
     default: "us-west-2"
     documentation: The AWS region to filter service clusters by.
-  - name: HO_VERSION_OFFSET
-    default: "0"
-    documentation: Offset from the latest RHTAP build tag. 0 = latest, 1 = latest-1, etc.
   documentation: |-
-    Deploys the latest HyperShift operator image from the RHTAP build pipeline
-    (quay.io/acm-d/rhtap-hypershift-operator) to the management cluster in the
-    specified OSDFM sector. Resolves the latest image via the Quay API.
+    Verifies that HostedClusters and NodePools remain healthy after a HyperShift
+    operator upgrade on the management cluster. Waits for HO rollout to stabilize,
+    then checks HostedCluster conditions, NodePool readiness, and pod restart counts
+    in the hypershift namespace.
