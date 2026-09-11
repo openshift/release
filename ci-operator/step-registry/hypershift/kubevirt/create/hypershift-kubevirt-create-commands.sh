@@ -367,15 +367,22 @@ done
 
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 
-iptables -C FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT 2>/dev/null || \
-  iptables -A FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT
-iptables -C FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
-  iptables -A FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT
+add_fwd() { iptables -C "$@" 2>/dev/null || iptables -A "$@"; }
+add_fwd FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT
+add_fwd FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT
+add_fwd FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -d "${vlan_subnet}" -j ACCEPT
+add_fwd FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -s "${vlan_subnet}" -j ACCEPT
+add_fwd FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -s "${vlan_subnet}" -d "${vlan_subnet}" -j ACCEPT
+add_fwd FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -s "${vlan_subnet}" -d "${vlan_subnet}" -j ACCEPT
+add_fwd FORWARD -i "${dhcp_iface}" -o "${dhcp_iface}" -s "${vlan_subnet}" -d "${vlan_subnet}" -j ACCEPT
+add_fwd FORWARD -i "${uplink_bond}" -o "${uplink_bond}" -s "${vlan_subnet}" -d "${vlan_subnet}" -j ACCEPT
 
+iptables -t nat -C POSTROUTING -s "${vlan_subnet}" -d "${vlan_subnet}" -j RETURN 2>/dev/null || \
+  iptables -t nat -I POSTROUTING 1 -s "${vlan_subnet}" -d "${vlan_subnet}" -j RETURN
 iptables -t nat -C POSTROUTING -s "${vlan_subnet}" -o "${uplink_bond}" -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -s "${vlan_subnet}" -o "${uplink_bond}" -j MASQUERADE
 
-echo "localnet-vlan routing configured (${vlan_subnet} via ${uplink_bond}, rp_filter=0)"
+echo "localnet-vlan routing configured (${vlan_subnet} via ${uplink_bond}, rp_filter=0, east-west ${vlan_subnet})"
 SCRIPT_EOF
 )
 
@@ -386,6 +393,70 @@ SCRIPT_EOF
       echo "  ${node}: routing configured"
     else
       echo "WARNING: failed to configure routing on ${node}" >&2
+      return 1
+    fi
+  done
+}
+
+# Per-node br-ex.<vlan> segments are L2 islands; guest workers on different hypervisors need
+# host /32 routes via the primary uplink (br-ex) so OVN Geneve between worker VMIs can flow.
+localnet_vlan_configure_worker_host_routes() {
+  local vmi_namespace="$1"
+  local uplink_bond="$2"
+  local vlan_subnet="$3"
+  local vlan_octets
+  local -A hypervisor_ips=()
+  local route_script_b64
+  local node
+  local vmi
+  local hypervisor
+  local gw
+  local ip
+  local route_lines=""
+
+  vlan_octets="${vlan_subnet%/*}"
+  vlan_octets="${vlan_octets%.*}"
+
+  while read -r hypervisor gw; do
+    [[ -n "${hypervisor}" && -n "${gw}" ]] && hypervisor_ips["${hypervisor}"]="${gw}"
+  done < <(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}')
+
+  for vmi in $(oc get vmi -n "${vmi_namespace}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    [[ -z "${vmi}" ]] && continue
+    hypervisor=$(oc get vmi "${vmi}" -n "${vmi_namespace}" -o jsonpath='{.status.nodeName}')
+    gw="${hypervisor_ips[${hypervisor}]:-}"
+    if [[ -z "${gw}" ]]; then
+      echo "WARNING: no mgmt InternalIP for hypervisor ${hypervisor} (VMI ${vmi})" >&2
+      continue
+    fi
+    while read -r ip; do
+      [[ -z "${ip}" ]] && continue
+      [[ "${ip}" == *:* ]] && continue
+      [[ "${ip}" == "${vlan_octets}."* ]] || continue
+      route_lines+="ip route replace ${ip}/32 via ${gw}"$'\n'
+    done < <(oc get vmi "${vmi}" -n "${vmi_namespace}" -o jsonpath='{range .status.interfaces[*]}{.ipAddress}{"\n"}{end}')
+  done
+
+  if [[ -z "${route_lines}" ]]; then
+    echo "WARNING: no worker ${vlan_subnet} addresses found in ${vmi_namespace}; skipping host /32 routes" >&2
+    return 0
+  fi
+
+  route_script_b64=$(base64 -w0 <<SCRIPT_EOF
+#!/bin/bash
+set -euo pipefail
+${route_lines}
+echo "localnet-vlan worker /32 routes installed via ${uplink_bond}"
+SCRIPT_EOF
+)
+
+  echo "Installing localnet-vlan worker /32 host routes on all nodes (${vmi_namespace})..."
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+      "echo '${route_script_b64}' | base64 -d | bash"; then
+      echo "  ${node}: worker host routes configured"
+    else
+      echo "ERROR: failed to configure worker host routes on ${node}" >&2
       return 1
     fi
   done
@@ -635,6 +706,112 @@ wait_for_ipecho_pod() {
   echo "ip-echo pod not Ready (phase=${phase}, reason=${reason})" >&2
   oc describe pod egressip-ipecho -n "${namespace}" 2>&1 | tail -20 >&2 || true
   return 1
+}
+
+# Deploy ip-echo on the mgmt cluster secondary VLAN segment (br-ex.<vlan-id> / localnet-vlan NAD)
+# for EgressIP or reachability probes. Uses a static Multus IP on the passthrough localnet NAD
+# (same physnet as guest workers); host per-node dnsmasq must already be running.
+deploy_localnet_vlan_ipecho() {
+  local physnet="$1"
+  local static_ip="$2"
+  local ipecho_namespace
+  local ipecho_localnet_ip
+  local observed_ip
+  local ipecho_node
+  local ipecho_tried_nodes
+  local attempt
+  local reason
+
+  ipecho_namespace="egressip-ipecho-${CLUSTER_NAME}"
+  echo "Deploying ip-echo in dedicated namespace ${ipecho_namespace} on localnet-vlan (static ${static_ip})..."
+  oc create namespace "${ipecho_namespace}" --dry-run=client -o yaml | oc apply -f -
+  oc label ns "${ipecho_namespace}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+
+  oc apply -f - <<IPECHO_NAD_EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: localnet-vlan
+  namespace: ${ipecho_namespace}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "${physnet}",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${ipecho_namespace}/localnet-vlan"
+  }'
+IPECHO_NAD_EOF
+
+  ipecho_tried_nodes=""
+  for attempt in 1 2 3; do
+    ipecho_node=$(select_ipecho_node "${ipecho_tried_nodes}") || return 1
+    ipecho_tried_nodes="${ipecho_tried_nodes} ${ipecho_node}"
+    echo "Scheduling ip-echo on node ${ipecho_node} (attempt ${attempt})"
+    oc delete pod egressip-ipecho -n "${ipecho_namespace}" --ignore-not-found --force --grace-period=0 2>/dev/null || true
+
+    oc apply -f - <<IPECHO_EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: egressip-ipecho
+  namespace: ${ipecho_namespace}
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |-
+      [{
+        "name": "localnet-vlan",
+        "interface": "net1",
+        "ips": ["${static_ip}"]
+      }]
+spec:
+  nodeName: ${ipecho_node}
+  containers:
+  - name: ip-echo
+    image: quay.io/openshifttest/ip-echo:1.2.0
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    securityContext:
+      runAsUser: 0
+  restartPolicy: Always
+  tolerations:
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+IPECHO_EOF
+
+    if wait_for_ipecho_pod "${ipecho_namespace}" 120; then
+      break
+    fi
+    reason=$(oc get pod egressip-ipecho -n "${ipecho_namespace}" -o jsonpath='{.status.reason}' 2>/dev/null || true)
+    if [[ "${reason}" != "Evicted" ]]; then
+      return 1
+    fi
+    echo "ip-echo evicted from ${ipecho_node}, will retry on another node" >&2
+  done
+
+  if ! oc get pod egressip-ipecho -n "${ipecho_namespace}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
+    echo "ERROR: ip-echo pod failed to become Ready after retries" >&2
+    return 1
+  fi
+
+  ipecho_localnet_ip="${static_ip%%/*}"
+  observed_ip=$(oc get pod egressip-ipecho -n "${ipecho_namespace}" \
+    -o jsonpath='{.metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}' | \
+    python3 -c "import sys,json; nets=json.loads(sys.stdin.read() or '[]'); ips=[n['ips'][0] for n in nets if 'localnet' in n.get('name','') and n.get('ips')]; print(ips[0] if ips else '')" 2>/dev/null || true)
+  if [[ -n "${observed_ip}" && "${observed_ip}" != "${ipecho_localnet_ip}" ]]; then
+    echo "WARNING: ip-echo network-status IP ${observed_ip} differs from configured ${ipecho_localnet_ip}" >&2
+    ipecho_localnet_ip="${observed_ip}"
+  fi
+  if [[ -z "${ipecho_localnet_ip}" ]]; then
+    echo "ERROR: could not determine ip-echo localnet-vlan IP" >&2
+    return 1
+  fi
+  echo "ip-echo localnet-vlan IP: ${ipecho_localnet_ip}:80"
+  echo "${ipecho_localnet_ip}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
 }
 
 # After workers join: clear OVN port security on all passthrough localnet LSPs (EgressIP
@@ -1294,6 +1471,24 @@ if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
   # Re-apply after NodePool in case any LSP was recreated during bootstrap.
   prepare_ovn_localnet_lsp_host_dhcp "${LOCALNET_VLAN_NS}" \
     || echo "WARNING: post-NodePool localnet LSP prep failed (continuing)" >&2
+
+  if [[ "${LOCALNET_VLAN_WORKER_HOST_ROUTES:-true}" == "true" ]]; then
+    localnet_vlan_configure_worker_host_routes "${LOCALNET_VLAN_NS}" \
+      "${LOCALNET_VLAN_BOND}" "${LOCALNET_VLAN_SUBNET}" || {
+      echo "ERROR: localnet-vlan worker host route configuration failed" >&2
+      exit 1
+    }
+    localnet_vlan_configure_nodes_routing "${LOCALNET_VLAN_DHCP_INTERFACE}" \
+      "${LOCALNET_VLAN_BOND}" "${LOCALNET_VLAN_SUBNET}" \
+      || echo "WARNING: post-NodePool localnet-vlan routing refresh failed (continuing)" >&2
+  fi
+
+  if [[ "${LOCALNET_VLAN_DEPLOY_IPECHO:-true}" == "true" ]]; then
+    deploy_localnet_vlan_ipecho "${LOCALNET_VLAN_PHYSNET}" "${LOCALNET_VLAN_IPECHO_STATIC_IP:-192.168.112.250/24}" || {
+      echo "ERROR: localnet-vlan ip-echo deployment failed" >&2
+      exit 1
+    }
+  fi
 
   echo "Localnet-VLAN post-creation setup complete"
 fi

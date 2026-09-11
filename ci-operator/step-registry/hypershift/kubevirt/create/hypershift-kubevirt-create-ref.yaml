@@ -131,6 +131,23 @@ ref:
         The NNCP attaches br-localnet to <bond>.<vlan-id> (secondary guest segment, e.g.
         br-ex.100 / 192.168.112.x). MASQUERADE routes worker traffic from the VLAN subnet
         through this bridge to reach the API VIP.
+    - name: LOCALNET_VLAN_WORKER_HOST_ROUTES
+      default: "true"
+      documentation: |-
+        When true and ATTACH_DEFAULT_NETWORK=localnet-vlan, after NodePool Ready install per-worker
+        /32 routes on every mgmt node (via hypervisor br-ex) and refresh east-west FORWARD/NAT so
+        guest OVN overlay works across per-node localnet VLAN segments.
+    - name: LOCALNET_VLAN_DEPLOY_IPECHO
+      default: "true"
+      documentation: |-
+        When true and ATTACH_DEFAULT_NETWORK=localnet-vlan, deploy egressip-ipecho on the mgmt
+        cluster after NodePool Ready (secondary VLAN localnet NAD, static IP). URL written to
+        ${SHARED_DIR}/kubevirt_ipecho_url for downstream EgressIP or probe tests.
+    - name: LOCALNET_VLAN_IPECHO_STATIC_IP
+      default: "192.168.112.250/24"
+      documentation: |-
+        Static IPv4 for the ip-echo pod on the localnet-vlan NAD (Multus). Must be on the VLAN
+        worker subnet (default 192.168.112.0/24) and outside the dnsmasq DHCP pool (.100-.240).
     - name: LOCALNET_MULTI_NETWORK_COUNT
       default: "2"
       documentation: "Number of localnet networks for the multi-localnet architecture. Primary (localnet-1) uses libvirt DHCP passthrough."
