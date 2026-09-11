@@ -19,6 +19,14 @@ chain:
               source "${SHARED_DIR}/proxy-conf.sh"
       fi
       oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+      if [[ -f "${SHARED_DIR}/mirror_registry_url" ]]; then
+        MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | cut -d: -f1)
+        oc create configmap registry-config \
+          --from-file="${MIRROR_REGISTRY_HOST}..5000"="${SHARED_DIR}/additional_trust_bundle" \
+          -n openshift-config
+        oc patch image.config.openshift.io/cluster --type=merge \
+          -p '{"spec":{"additionalTrustedCA":{"name":"registry-config"}}}'
+      fi
     grace_period: 5m0s
     resources:
       requests:
