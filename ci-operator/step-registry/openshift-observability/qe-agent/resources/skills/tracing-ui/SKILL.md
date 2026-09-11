@@ -1,11 +1,11 @@
 ---
 name: tracing-ui
-description: Use this skill to analyze failing CI tests for the OpenShift Distributed Tracing UI console plugin, rerun the specific failing tests (Cypress-based, junit_distributed-tracing-console-plugin* prefix), diagnose whether the failure is a product bug or a test that needs fixing, apply fixes to test source files when needed, and export results to the artifact directory. Trigger whenever $SHARED_DIR/qe-agent-context.json is present with has_test_failures=true for Tracing UI tests, or when an engineer asks to debug, rerun, or fix failing Tracing UI or console plugin QE tests.
+description: Use this skill to analyze failing CI tests for the OpenShift Distributed Tracing UI console plugin (Cypress, junit_distributed-tracing-console-plugin* prefix) - rerun them, diagnose product bug vs test issue vs job configuration, fix test files when needed, and export results. Trigger when $SHARED_DIR/qe-agent-context.json has has_test_failures=true for Tracing UI tests, or when an engineer asks to debug, rerun, or fix failing Tracing UI QE tests.
 ---
 
 # Tracing UI QE Agent — Test Failure Triage and Fix
 
-This skill drives an agentic loop that takes failing CI test results for the Distributed Tracing Console Plugin, reruns the failing tests, determines root cause (product bug vs broken test), and either fixes the test or writes a structured bug report.
+This skill reruns failing CI tests for the Distributed Tracing Console Plugin, determines the root cause, and either fixes the test, writes a bug report, or recommends a job config change.
 
 ## Test Infrastructure Overview
 
@@ -17,28 +17,22 @@ This skill drives an agentic loop that takes failing CI test results for the Dis
 
 ## Step 0 — Read Setup Context and Fetch the Step Script
 
-Read `${SHARED_DIR}/qe-agent-context.json`. The test step writes it at exit time:
+Read `${SHARED_DIR}/qe-agent-context.json`, written by the test step at exit:
 
 ```json
 {
-  "step_script_ref": "distributed-tracing/tests/tracing-ui/distributed-tracing-tests-tracing-ui-commands.sh",
+  "step_script_ref": "distributed-tracing/tests/tracing-ui/upstream/distributed-tracing-tests-tracing-ui-upstream-commands.sh",
   "has_test_failures": true,
-  "env": {}
+  "env": {
+    "CYPRESS_SKIP_TESTS": "-Lightspeed"
+  }
 }
 ```
 
-- `step_script_ref` — path relative to `ci-operator/step-registry/` in the openshift/release repo
-- `env` — runtime env var values that were injected at job time and are needed to reproduce setup (e.g. branch names, image refs); most steps have an empty `env`
+- `step_script_ref` — path relative to `ci-operator/step-registry/` in openshift/release
+- `env` — job-time env values needed to reproduce setup; `CYPRESS_SKIP_TESTS` is the job's `@cypress/grep` pattern (empty = all tests), applied to reruns in Step 3
 
-Construct the raw GitHub URL and fetch the script:
-
-```text
-https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/<step_script_ref>
-```
-
-Read the script carefully. It is divided into two logical sections:
-1. **Setup** — everything before the `npx cypress run` commands: cloning repos, `oc apply`, `kubectl create`, `npm install`, IDP/htpasswd setup, env variable setup
-2. **Test execution** — the `npx cypress run` invocations themselves
+Fetch `https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/<step_script_ref>`. Everything before the first `npx cypress run` / `npm run` is **setup** (repo clone, IDP/htpasswd, env vars, `npm install`); the rest is **test execution**.
 
 ## Step 0a — Verify Cluster Stability
 
@@ -96,50 +90,29 @@ echo "All MCPs ready — proceeding."
 
 ## Step 0b — Re-establish the Test Environment
 
-Export any env vars from the `env` field, then **run the setup section of the fetched script** — the commands up to (but not including) the first `npx cypress run` invocation.
-
-Required adaptations:
+Export the `env` vars, then run the script's setup section (up to the first `npx cypress run`) with these adaptations:
 
 | Script pattern | Adaptation |
 |---|---|
-| `cp -R /tmp/<name>` (image mount) | Replace with `git clone <repo> <dest>` — find the repo URL from the step script or the CI config |
-| `kubectl create -f <url>` (CRDs) | Use `kubectl apply -f <url>` — `create` fails if the CRD exists from the prior run |
-| `oc patch csv ...` | Skip — the operator is already patched; verify with `oc get csv -n openshift-cluster-observability-operator` |
-| `$SKIP_TESTS` block | Skip entirely — `$SKIP_TESTS` is unset in the qe-agent pod |
-| htpasswd / oauth setup | Check if the secret already exists before creating: `oc get secret htpass-secret -n openshift-config`. Skip creation if it does. Similarly, only patch oauth if the htpasswd IDP is not already configured |
+| `cp -R /tmp/<name>` (image mount) | `git clone <repo> <dest>` — repo URL from the step script or CI config |
+| `kubectl create -f <url>` (CRDs) | `kubectl apply -f <url>` — `create` fails if the CRD exists |
+| `oc patch csv ...` | Skip — already patched; verify with `oc get csv -n openshift-cluster-observability-operator` |
+| `CYPRESS_SKIP_TESTS` block | Keep it; reruns use it (Step 3) |
+| htpasswd / oauth setup | Create the secret only if `oc get secret htpass-secret -n openshift-config` fails; patch oauth only if the htpasswd IDP is missing |
+| Operator installs / OperatorGroups | Already installed by the original run — check `oc get csv -A`, do not reinstall. Check `oc get operatorgroup -n <ns>` before creating one; a second OperatorGroup fails the CSV ("csv created in namespace with multiple operatorgroups") |
 
-After setup, `cd` into the repo directory and proceed with Steps 1–6.
-
-If `qe-agent-context.json` does not exist, infer the suite from the JUnit file name prefix (`junit_distributed-tracing-console-plugin*` → Tracing UI) and skip the rerun — proceed directly to diagnosis from the JUnit content and cluster state.
+Then continue with Steps 1–6 in the cloned repo. If `qe-agent-context.json` is missing, infer the suite from the JUnit prefix, skip the rerun, and diagnose from the JUnit content and cluster state.
 
 ## Step 1 — Parse JUnit XMLs and Identify Failures
 
-Read all JUnit XML files from `${SHARED_DIR}/qe-agent-junit-*.xml` (flat files copied by the test step trap function).
-
-For each XML file, extract:
-- **Suite name** (`name` attribute on `<testsuite>`)
-- **Failed test cases**: `<testcase>` elements that contain a `<failure>` or `<error>` child
-- **Failure message**: the `message` attribute and text body of `<failure>`/`<error>`
-- **Stack trace / details**: the full text content of the failure element
-
-Group failures by suite so you process each suite's failures together.
-
-If no `${SHARED_DIR}/qe-agent-junit-*.xml` files are found, exit with a clear message — the test steps did not run or produced no results.
+Read `${SHARED_DIR}/qe-agent-junit-*.xml`. For each file extract the suite name (`<testsuite name>`), the failed `<testcase>` elements (those with a `<failure>` or `<error>` child), and the failure `message` and full text. Group failures by suite. If no files exist, exit with a clear message — the test step produced no results.
 
 ### High-failure triage: more than 5 failures total
 
-When the total number of failing test cases is more than 5, it is very likely that all failures share a single root cause (console plugin not loaded, auth failure, UI not responding, network error) rather than being independent bugs.
+More than 5 failures usually share one root cause (console plugin not loaded, auth failure, UI not responding, network error, or a failed `before` hook). Look for a common pattern: the same error string (`Cannot read properties of null`, `element not found`, `401 Unauthorized`, `plugin not enabled`), the same failing Cypress command (`cy.visit`, `cy.get`, `cy.findByText`), or tightly clustered failure times.
 
-**What to do:**
-
-1. **Look for a common pattern** across the failure messages. Common indicators:
-   - All messages contain the same error string (e.g., `Cannot read properties of null`, `element not found`, `401 Unauthorized`, `plugin not enabled`)
-   - All tests fail at the same Cypress command (e.g., `cy.visit`, `cy.get`, `cy.findByText`)
-   - Failure times are clustered tightly — the console plugin may not have loaded before tests started
-
-2. **If a clear pattern exists**: pick the **simplest failing test** as the representative case. Proceed with Steps 2–5 for that one test only, skipping the rest.
-
-3. **If no clear pattern**: the failures are likely independent. Fall back to processing each failure individually, cap at 3 tests, and note this in the summary.
+- **Clear pattern**: pick the simplest failing test as the representative and run Steps 2–5 for it only.
+- **No clear pattern**: process failures individually, cap at 3 tests, and note this in the summary.
 
 Write the pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
 
@@ -147,111 +120,73 @@ Write the pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.
 
 ## Step 2 — Locate Test Source Files
 
-The failing test name maps to a `describe` + `it` block inside `.cy.js` or `.cy.ts` files under `tests/cypress/e2e/`. Use `grep -r "<test-name>"` to locate the spec file.
-
-For Cypress tests, the key files are:
-- The spec file (`.cy.js` or `.cy.ts`) — contains the `describe`/`it` blocks and all test logic
-- `cypress.config.ts` or `cypress.json` — Cypress configuration (base URL, timeouts, etc.)
-- Page object or helper files imported by the spec
-
-Use the destination path from the fetched step script as your repo root — do not guess or scan `/tmp/` broadly.
+The repo root is the clone destination from the step script — do not scan `/tmp/` broadly. All tests are in one spec, `tests/e2e/dt-plugin-tests.cy.ts`: a single `describe` whose `before` hook installs/verifies the operators, sets up Lightspeed and creates the UIPlugin, then one `it` per capability. A `before` hook failure skips every test. Locate the `it` block with `grep -n "<test-name>"`. Supporting files under `tests/`: Cypress config, `cypress/support/` custom commands (e.g. `cy.runChainsawTest`), `views/` page objects, `fixtures/` chainsaw tests.
 
 ---
 
 ## Step 3 — Rerun the Failing Tests
 
-Rerun only the specific failing test spec, not the entire Cypress suite.
+Rerun only the failing test, selected by title with `@cypress/grep`. Each run first executes the whole `before` hook (several minutes, 15+ when installing operators), longer than the Bash tool's 10-minute timeout — use `run_in_background` and poll.
 
-### Tracing UI (Cypress) — first rerun
-
-No namespace cleanup is needed for Cypress tests (they do not create chainsaw namespaces). However, verify the console plugin is still registered and the htpasswd IDP is still active before rerunning:
+Before rerunning, inspect the RBAC test's `chainsaw-*` namespaces and `verify-traces-*` job pod logs if it failed (chainsaw runs with `--skip-delete`; the `before` hook removes them on the next run), and confirm the console plugin (Step 4 commands) and htpasswd IDP (`oc get oauth cluster -o jsonpath='{.spec.identityProviders[*].name}'`) are still in place.
 
 ```bash
-# Verify console plugin is registered
-oc get consoleplugin distributed-tracing-plugin -o jsonpath='{.status}{"\n"}' 2>/dev/null || true
-oc get consoles.operator.openshift.io cluster -o jsonpath='{.spec.plugins}{"\n"}' 2>/dev/null || true
-
-# Verify htpasswd IDP is configured
-oc get oauth cluster -o jsonpath='{.spec.identityProviders[*].name}{"\n"}' 2>/dev/null || true
+cd "<repo root>/tests"
+export NO_COLOR=1 CYPRESS_CACHE_FOLDER=/tmp/Cypress CYPRESS_SKIP_COO_INSTALL=true
+# Fresh shell: also re-export the CYPRESS_* vars from the step script setup (base URL, login, kubeconfig, Lightspeed)
+CYPRESS_SKIP_TESTS=$(jq -r '.env.CYPRESS_SKIP_TESTS // ""' "${SHARED_DIR}/qe-agent-context.json" 2>/dev/null)
+GREP="<unique part of the failing test title>"
+[[ -n "${CYPRESS_SKIP_TESTS}" ]] && GREP="${GREP}; ${CYPRESS_SKIP_TESTS}"
+RUN=1
+npx cypress run --browser chrome --headless --spec "e2e/dt-plugin-tests.cy.ts" \
+  --env grep="${GREP}",grepOmitFiltered=true \
+  --reporter junit --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_rerun_cypress_run${RUN}.xml"
 ```
 
-Then run the failing spec:
+### Selecting what to rerun
 
-```bash
-export NO_COLOR=1
-export CYPRESS_CACHE_FOLDER=/tmp/Cypress
-npx cypress run \
-  --browser chrome \
-  --headless \
-  --spec "tests/cypress/e2e/<spec-file>" \
-  --reporter junit \
-  --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_rerun_cypress_run1.xml"
-```
+- Keep `CYPRESS_SKIP_TESTS` in the grep (`;` separates patterns, `-` excludes): the `before` hook reads it too, e.g. `-Lightspeed` skips the Lightspeed install on OCP versions where Lightspeed is not published.
+- Tests are order-dependent: `Capability:RBAC` creates the Tempo instances (`chainsaw-rbac / simplst`, `chainsaw-mmo-rbac / mmo-rbac`) and traces that every later test uses except `Capability:TLSCertRotation` and `Capability:Installation`. Include it for those tests (`GREP="Capability:RBAC; Capability:TraceLimits"`), otherwise the rerun fails on `input[placeholder="Select a Tempo instance"]`.
+- For a `before` hook failure, set `GREP` to only the `CYPRESS_SKIP_TESTS` value (empty runs every test).
+- `CYPRESS_SKIP_COO_INSTALL=true` skips the OperatorHub install path (`CYPRESS_COO_UI_INSTALL`, the job default). A passing rerun does not verify an install-path fix — mark it "not re-verified" in `CHANGES.md`.
 
-After the rerun, read the fresh JUnit XML (saved to `$ARTIFACT_DIR`) to check whether the test is:
-- **Consistently failing** — same failure, same message → proceed to Step 4 (diagnose)
-- **Passed on first rerun** — possible flakiness → do not stop here; run the test 3 more times (4 total reruns) to confirm and locate where the flakiness occurs (see below)
-- **Fixed by environment reset** — only relevant if the console plugin or auth state was stale
+Read the rerun JUnit XML:
+- **Same failure** → Step 4
+- **Passed** → possible flakiness; confirm with the loop below
+- **Fixed by environment reset** — only if the console plugin or auth state was stale
 
 ### Flakiness confirmation loop
 
-If the test passes on the first rerun, run it 3 more times sequentially. Use a unique `mochaFile` per run so the XMLs don't overwrite each other:
-
-```bash
-for i in 2 3 4; do
-  npx cypress run \
-    --browser chrome \
-    --headless \
-    --spec "tests/cypress/e2e/<spec-file>" \
-    --reporter junit \
-    --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_rerun_cypress_run${i}.xml"
-done
-```
-
-After all 4 runs, count how many passed vs failed. Record the pass/fail pattern (e.g., `PFPP`, `PPFP`). Then inspect the test source:
-- Look for missing `cy.intercept()` before asserting UI state after an API call
-- Look for `cy.get()` without waiting for an element to be visible
-- Look for missing `cy.wait()` or condition-based waits before asserting dynamic content
-- Check if the test uses a fixed URL path that may have changed in the plugin
-
-If the failure is reproducible even 1 out of 4 runs, classify as `FLAKY` and proceed to Step 5c to fix it.
+Run the rerun block 3 more times with `RUN=2`, `3` and `4` (one JUnit file each) and record the pass/fail pattern (e.g. `PFPP`). Look for missing `cy.intercept()` or condition-based waits before asserting UI state, `cy.get()` without a visibility wait, or a changed URL path. A failure in even 1 of 4 runs is `FLAKY` → Step 5c.
 
 ---
 
 ## Step 4 — Diagnose: Product Bug vs Test Issue
 
-Read the failure message, rerun output, and test source files together. Then run the full operator diagnostics below before making any classification decision — the logs and resource status are the primary evidence.
+Run the diagnostics below before classifying — logs and resource status, read with the failure message and test source, are the primary evidence.
 
 ### Cluster Observability Operator Diagnostics
 
 ```bash
 # Auto-detect COO namespace (depends on install mode)
 COO_NS="$(oc get pods --all-namespaces -l app.kubernetes.io/name=observability-operator -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)"
-if [ -z "${COO_NS}" ]; then
-  COO_NS="openshift-cluster-observability-operator"
-fi
+COO_NS="${COO_NS:-openshift-cluster-observability-operator}"
 
 # Operator pod status and logs
 oc get pods -n "${COO_NS}"
-oc logs -n "${COO_NS}" deploy/observability-operator --tail=150 2>/dev/null || \
-  oc logs -n "${COO_NS}" "$(oc get pods -n "${COO_NS}" -l app.kubernetes.io/name=observability-operator -o name | head -1)" --tail=150 2>/dev/null || true
+oc logs -n "${COO_NS}" deploy/observability-operator --tail=150 2>/dev/null || true
 oc logs -n "${COO_NS}" deploy/observability-operator --previous --tail=50 2>/dev/null || true
 
-# UIPlugin CRs (controls Tracing UI console plugin registration)
-oc get uiplugins --all-namespaces -o wide 2>/dev/null || true
-oc get uiplugins --all-namespaces -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}: {.status.conditions[*].type}={.status.conditions[*].status} {.status.conditions[*].message}{"\n"}{end}' 2>/dev/null || true
-
-# MonitoringStack CRs
+# UIPlugins (cluster-scoped; control console plugin registration) and MonitoringStacks
+oc get uiplugins -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}: {.status.conditions[*].type}={.status.conditions[*].status} {.status.conditions[*].message}{"\n"}{end}' 2>/dev/null || true
 oc get monitoringstacks --all-namespaces -o wide 2>/dev/null || true
 
 # Console plugin registration status
-oc get consoleplugin distributed-tracing-plugin -o jsonpath='{.status}{"\n"}' 2>/dev/null || true
+oc get consoleplugin distributed-tracing-console-plugin -o jsonpath='{.status}{"\n"}' 2>/dev/null || true
 oc get consoles.operator.openshift.io cluster -o jsonpath='{.spec.plugins}{"\n"}' 2>/dev/null || true
 
-# Events in COO namespace
+# Events and CSV status in the COO namespace
 oc get events -n "${COO_NS}" --sort-by='.lastTimestamp' | tail -20
-
-# CSV and subscription status
 oc get csv -n "${COO_NS}" -o jsonpath='{range .items[*]}{.metadata.name}: {.status.phase} — {.status.message}{"\n"}{end}'
 ```
 
@@ -263,25 +198,35 @@ oc get crd | grep -E 'observability|uiplugin|monitoringstack'
 oc api-resources | grep observability
 ```
 
+### Operator catalog availability check
+
+The `before` hook installs COO, OpenTelemetry, Tempo and Lightspeed from `redhat-operators`. Pre-GA OCP versions may not ship all of them yet; OperatorHub then never renders the install form (`[data-test="install-operator"]` times out). Check before blaming the test or product:
+
+```bash
+oc get clusterversion version -o jsonpath='{.status.desired.version}{"\n"}'
+for pkg in cluster-observability-operator opentelemetry-product tempo-product lightspeed-operator; do
+  echo "${pkg}: $(oc get packagemanifest "${pkg}" -n openshift-marketplace -o jsonpath='{.status.catalogSource}' 2>/dev/null || echo MISSING)"
+done
+```
+
+A package missing from the catalog on a pre-GA OCP version is `JOB_CONFIG` (Step 5e): do not add catalog auto-detection or skip logic to the test (it would silently skip the capability where the operator must exist), and do not file a product bug.
+
 ### Product Bug indicators
-Classify as `PRODUCT_BUG` when the evidence shows the operator, plugin, or console itself misbehaved:
+Classify as `PRODUCT_BUG` when the operator, plugin, or console itself misbehaved:
 - COO operator pod in `CrashLoopBackOff` or `OOMKilled`
-- `UIPlugin` stuck in an error state (not caused by the test YAML)
-- Console plugin not loaded after being registered (consoleplugin status shows error)
-- API endpoint returns unexpected error codes that the test cannot control
-- Console route is inaccessible or returns 5xx errors
+- `UIPlugin` in an error state not caused by the test YAML
+- Console plugin registered but not loaded (consoleplugin status shows error)
+- API endpoints or the console route return unexpected errors or 5xx the test cannot control
 
 ### Test Issue indicators
 Classify as `TEST_ISSUE` when the test itself is wrong or stale:
-- CSS selector in `cy.get()` that no longer matches the current plugin UI (element renamed or restructured)
-- Route or URL path that changed in the console plugin between releases
-- Test references a feature flag or UI element that was removed or renamed
-- Test hardcodes a resource name or namespace that changed between releases
-- Missing `cy.intercept()` or `cy.wait()` for an async operation (network request, dynamic element)
+- Selector, route, UI element or feature flag that changed or was removed in the plugin
+- Hardcoded resource name or namespace that changed between releases
+- Missing `cy.intercept()` or `cy.wait()` for an async operation
 
 ### Cluster Instability indicators
 
-Before classifying as `CLUSTER_INSTABILITY`, rule out a tight COO reconciliation loop. Enable debug logging first:
+Before classifying as `CLUSTER_INSTABILITY`, rule out a tight COO reconciliation loop with debug logging:
 
 ```bash
 COO_NS="$(oc get pods --all-namespaces -l app.kubernetes.io/name=observability-operator \
@@ -300,30 +245,25 @@ oc logs -n "${COO_NS}" deploy/observability-operator --tail=500 \
   | grep -E '"reconcileID"|"Reconciling"|"requeue"|"error"' | head -100
 ```
 
-A reconciliation loop (same MonitoringStack reconciled >1/2s, rapid sub-second `requeue` entries) reclassifies to `PRODUCT_BUG`. Classify as `CLUSTER_INSTABILITY` only when **all four** hold: (1) MCPs were updating or COO showed probe-failure restarts correlated with MCP rollout at original run time; (2) tests pass cleanly on all 4 reruns; (3) no fixable test defect — if any selector, wait, or assertion would fail under foreseeable cluster load, that is a `TEST_ISSUE`; (4) no tight reconciliation loop confirmed above. `CLUSTER_INSTABILITY` takes precedence over `FLAKY` when all four hold. Proceed to Step 5d.
+A reconciliation loop (same MonitoringStack reconciled >1/2s, rapid sub-second `requeue` entries) is a `PRODUCT_BUG`. Classify as `CLUSTER_INSTABILITY` (Step 5d; takes precedence over `FLAKY`) only when **all four** hold: (1) MCPs were updating, or COO had probe-failure restarts correlated with the MCP rollout, at original run time; (2) all 4 reruns pass cleanly; (3) no fixable test defect — a selector, wait, or assertion that would fail under foreseeable cluster load is a `TEST_ISSUE`; (4) no tight reconciliation loop.
 
-When genuinely ambiguous, gather more cluster evidence before deciding. Explain your reasoning explicitly in the output.
+When ambiguous, gather more evidence and explain your reasoning.
 
 ---
 
 ## Step 5a — If TEST_ISSUE: Fix and Export
 
-Apply the **minimal** change to make the test correct. Edit the `.cy.js` or `.cy.ts` spec file. Common fixes:
-- Update a CSS selector to match the current plugin UI
-- Fix a changed route or API endpoint path
-- Add a `cy.wait()` for an async operation that isn't awaited
-- Fix a hardcoded resource name or namespace
+Apply the **minimal** change that makes the test correct (selector, route, wait for an async operation, hardcoded name). The tests use Cypress 15: `cy.exec()` yields `{ exitCode, stdout, stderr }` (no `code` field).
 
-After editing, copy only the changed files to `${ARTIFACT_DIR}/test-fixes/` **preserving the directory path relative to the repo root**:
+Copy only the changed files to `${ARTIFACT_DIR}/test-fixes/`, **preserving the path relative to the repo root**:
 
 ```bash
-# Example: tests/cypress/e2e/tracing.cy.js was fixed
-dest="${ARTIFACT_DIR}/test-fixes/tests/cypress/e2e"
+dest="${ARTIFACT_DIR}/test-fixes/tests/e2e"
 mkdir -p "${dest}"
-cp tests/cypress/e2e/tracing.cy.js "${dest}/"
+cp tests/e2e/dt-plugin-tests.cy.ts "${dest}/"
 ```
 
-Write a `${ARTIFACT_DIR}/test-fixes/CHANGES.md` using this structure:
+Write `${ARTIFACT_DIR}/test-fixes/CHANGES.md`:
 
 ```markdown
 > **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
@@ -340,7 +280,7 @@ Write a `${ARTIFACT_DIR}/test-fixes/CHANGES.md` using this structure:
 <what was changed, which files, what specifically>
 
 ## Files changed
-- `tests/cypress/e2e/<spec-file>.cy.js`
+- `tests/e2e/dt-plugin-tests.cy.ts`
 
 ## Verification
 Rerun result after fix: [PASS / FAIL / not re-verified]
@@ -350,7 +290,7 @@ Rerun result after fix: [PASS / FAIL / not re-verified]
 
 ## Step 5b — If PRODUCT_BUG: Write Bug Report
 
-Do not attempt to fix the plugin or operator code. Instead, write `${ARTIFACT_DIR}/bug-report.md`:
+Do not fix plugin or operator code; write `${ARTIFACT_DIR}/bug-report.md`:
 
 ````markdown
 > **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
@@ -394,20 +334,7 @@ Do not attempt to fix the plugin or operator code. Instead, write `${ARTIFACT_DI
 <Critical / Major / Minor — based on whether this blocks a release gate>
 ````
 
-After writing `bug-report.md`, also write `${ARTIFACT_DIR}/jira-payload.json` for automated Jira filing.
-Convert the bug report content to **Jira wiki notation** using these rules:
-
-| Markdown | Jira wiki notation |
-|---|---|
-| `# heading` | `h1. heading` |
-| `## heading` | `h2. heading` |
-| `### heading` | `h3. heading` |
-| `**bold**` | `*bold*` |
-| `` `code` `` | `{{code}}` |
-| ` ```text ... ``` ` | `{code:title=text}...{code}` |
-| `- item` | `* item` |
-| `1. item` | `# item` |
-| `> quote` | `bq. quote` |
+Then write `${ARTIFACT_DIR}/jira-payload.json` for automated Jira filing, converting the bug report to **Jira wiki notation**: `# `/`## `/`### ` → `h1. `/`h2. `/`h3. `, `**bold**` → `*bold*`, `` `code` `` → `{{code}}`, ` ```text ... ``` ` → `{code:title=text}...{code}`, `- item` → `* item`, `1. item` → `# item`, `> quote` → `bq. quote`.
 
 Write the JSON using `jq` for safe escaping:
 
@@ -432,34 +359,25 @@ The description must NOT contain raw credentials, tokens, passwords, or SHA-256 
 
 ## Step 5c — If FLAKY: Fix and Export
 
-Apply the minimal change that eliminates the race or timing condition. Do not suppress flakiness with blanket retries — find and fix the root cause.
-
-Common Cypress fixes:
-- Add `cy.intercept()` to wait for the relevant API call before asserting UI state
-- Use `cy.findByText(...).should('be.visible')` with a custom timeout rather than asserting immediately
-- Replace `cy.wait(<ms>)` (fixed-time sleep) with a condition-based wait when possible
-
-Example — waiting for an API response before asserting a table:
-```javascript
-cy.intercept('GET', '/api/v1/traces*').as('getTraces')
-cy.visit('/monitoring/traces')
-cy.wait('@getTraces')
-cy.findByText('No traces found').should('not.exist')
-```
-
-After editing, copy changed files to `${ARTIFACT_DIR}/test-fixes/` (same structure as Step 5a). Write `CHANGES.md` with the pass/fail pattern from the 4 reruns as evidence.
+Fix the race itself, not with blanket retries. Typical fixes: `cy.intercept()` plus `cy.wait('@alias')` before asserting UI state after an API call, `.should('be.visible')` with a timeout instead of an immediate assertion, and condition-based waits instead of `cy.wait(<ms>)`. Export the changed files and `CHANGES.md` as in Step 5a, with the 4-run pass/fail pattern as evidence.
 
 ---
 
 ## Step 5d — If CLUSTER_INSTABILITY: Write Incident Note
 
-Write `${ARTIFACT_DIR}/cluster-instability-report.md` with: a one-sentence summary; a table of affected tests (suite / test case / original duration / rerun duration); root cause (MCP updates, node evictions, COO pod restarts — include the MCP status snapshot from Step 0a); evidence (MCP output, relevant pod events); and a recommendation to rerun the CI job. Begin the report with the following banner: `> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.`
+Write `${ARTIFACT_DIR}/cluster-instability-report.md` with: a one-sentence summary; a table of affected tests (suite / test case / original duration / rerun duration); root cause (MCP updates, node evictions, COO pod restarts — include the MCP status snapshot from Step 0a); evidence (MCP output, relevant pod events); and a recommendation to rerun the CI job. Begin it with the same AI-Generated Content banner as the other reports.
+
+---
+
+## Step 5e — If JOB_CONFIG: Recommend a Job Configuration Change
+
+The test and product are fine, but the job needs something this cluster cannot provide (typically an operator not yet published for this OCP version). Do not modify the tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the missing package, OCP version and catalog evidence, and recommend the config change. For Lightspeed, add `CYPRESS_SKIP_TESTS: -Lightspeed` to the e2e `env` in `ci-operator/config/openshift/distributed-tracing-console-plugin/<variant>.yaml`; the spec then skips the Lightspeed install, setup and test. If COO, OpenTelemetry or Tempo is missing, recommend disabling or re-pointing the job instead.
 
 ---
 
 ## Step 6 — Write Analysis Summary
 
-Write `${ARTIFACT_DIR}/qe-agent-analysis.md` immediately after each test is diagnosed — do not wait until the end. Overwrite it after each subsequent test. Write partial entries for in-progress flakiness runs ("Rerun 1: PASS — confirmation in progress") and overwrite when complete. Record any deviations from the skill steps in the **Skill Improvement Recommendations** section.
+Write `${ARTIFACT_DIR}/qe-agent-analysis.md` after each diagnosis and overwrite it for later tests, with partial entries for in-progress flakiness runs ("Rerun 1: PASS — confirmation in progress"). Record deviations from the skill steps under **Skill Improvement Recommendations**.
 
 ````markdown
 > **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
@@ -475,9 +393,9 @@ Write `${ARTIFACT_DIR}/qe-agent-analysis.md` immediately after each test is diag
 <still failing / passed on rerun (flaky) / passed cleanly (cluster instability) / not rerun>
 
 ## Diagnosis
-**<PRODUCT_BUG | TEST_ISSUE | FLAKY | CLUSTER_INSTABILITY>**
+**<PRODUCT_BUG | TEST_ISSUE | FLAKY | CLUSTER_INSTABILITY | JOB_CONFIG>**
 
-<Two to three sentences explaining the reasoning. Reference specific Cypress errors, console plugin status, COO log lines, or MCP status that led to this conclusion.>
+<Two to three sentences explaining the reasoning. Reference specific Cypress errors, console plugin status, COO log lines, catalog or MCP status that led to this conclusion.>
 
 ## Rerun Summary
 | Run | Result |
@@ -493,22 +411,16 @@ Write `${ARTIFACT_DIR}/qe-agent-analysis.md` immediately after each test is diag
 <If PRODUCT_BUG>: Bug report written to `${ARTIFACT_DIR}/bug-report.md`.
 <If FLAKY>: Flaky test confirmed (pattern: <e.g. PFPP>). Fix applied to `${ARTIFACT_DIR}/test-fixes/`. See `CHANGES.md` for root cause and fix details.
 <If CLUSTER_INSTABILITY>: Incident note written to `${ARTIFACT_DIR}/cluster-instability-report.md`. Recommendation: rerun the CI job.
+<If JOB_CONFIG>: No test or product change. Recommended job config change: <exact env/config change and file>.
 
 ## Evidence Sources
 - JUnit XML: `<filename>` — failure message at line <N>
 - Operator logs: `<namespace>/<deployment>` — <relevant log excerpt>
-- Cluster state: <MCP status / CRD availability / pod status>
+- Cluster state: <MCP status / CRD or catalog availability / pod status>
 - Test source: `<file-path>` — <what was found>
 
 ## Skill Improvement Recommendations
-<!-- Record any deviation from the skill steps here — wrong commands, missing steps, steps that needed adaptation, or better approaches discovered during this run.
-Examples of what belongs here:
-- A command in the skill failed and had to be adapted (wrong flag, missing argument, changed API)
-- A diagnostic the skill did not mention turned out to be the decisive evidence
-- A step the skill prescribed was unnecessary or wasted significant time
-- The cleanup approach did not work and a different method had to be used
-- An assumption in the skill (namespace, resource name, container index) did not hold for this operator version
--->
+<!-- Record deviations from the skill steps: commands that failed and had to be adapted, decisive diagnostics the skill did not mention, steps that were unnecessary or slow, cleanup that did not work, or assumptions (namespace, resource name, container index) that did not hold. -->
 <If the skill steps were followed exactly and worked as written>: None.
 <Otherwise, one bullet per finding>:
 - **Step <N> — <short title>**: <What the skill said to do> → <What actually worked / what was wrong and why>. Suggested fix: <concrete change to the skill>.
@@ -518,10 +430,10 @@ Examples of what belongs here:
 
 ## Notes for CI context
 
-- The cluster is already provisioned and the COO and Tracing UI console plugin are already installed — do not reinstall them
-- The test repo is set up by Step 0b using commands from the fetched step script. The qe-agent runs in a fresh pod so `/tmp/` is always empty at start; Step 0b populates it
-- `$KUBECONFIG` is set and points to the test cluster; `oc`, `kubectl`, and `npm`/`npx` are available in PATH
-- Cypress screenshots and videos are binary artifacts — do **not** copy them to `$SHARED_DIR` (its 1 MiB Secret limit would be exceeded immediately). Only JUnit XML reports are safe to copy
-- All output files must go to `$ARTIFACT_DIR` (uploaded to GCS by the sidecar) or `$SHARED_DIR` (accessible to other steps)
-- **Namespace restriction**: You MUST NOT access, read, list, or modify any resources in the `kube-system` namespace. This namespace contains cloud provider credentials and platform-critical components. Do not run `oc get`, `oc describe`, `oc logs`, `kubectl`, or any other command that targets `kube-system`. If a diagnostic command defaults to all namespaces (e.g., `oc get pods -A`), filter out `kube-system` from the output before analysis
+- The cluster is already provisioned with COO and the Tracing UI console plugin installed — do not reinstall them
+- The qe-agent runs in a fresh pod, so `/tmp/` is empty at start; Step 0b clones the test repo there
+- `$KUBECONFIG` points to the test cluster; `oc`, `kubectl`, `jq` and `npm`/`npx` are in PATH
+- Do **not** copy Cypress screenshots or videos to `$SHARED_DIR` (1 MiB Secret limit); only JUnit XML is safe there. Write all output to `$ARTIFACT_DIR` (uploaded to GCS) or `$SHARED_DIR` (shared with other steps)
+- **Namespace restriction**: You MUST NOT access, read, list, or modify any resource in the `kube-system` namespace (cloud provider credentials, platform-critical components) — no `oc` or `kubectl` command may target it. Filter `kube-system` out of all-namespace output (e.g. `oc get pods -A`) before analysis
+- Do not call external APIs (Jira, GitHub API, Slack, etc.); the wrapper script handles integrations after the agent exits
 - This step runs `best_effort: true` — always exit 0 even if analysis is incomplete
