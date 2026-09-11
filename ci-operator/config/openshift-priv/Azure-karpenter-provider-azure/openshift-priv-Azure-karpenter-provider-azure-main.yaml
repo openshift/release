@@ -1,3 +1,4 @@
+binary_build_commands: make openshift-toolchain
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/Azure-karpenter-provider-azure
@@ -34,6 +35,14 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: verify
+  commands: GOLANGCI_LINT_CACHE=/tmp/.cache make openshift-verify KARPENTER_CORE_DIR=vendor/sigs.k8s.io/karpenter
+  container:
+    from: bin
+- as: unit
+  commands: make openshift-test
+  container:
+    from: bin
 zz_generated_metadata:
   branch: main
   org: openshift-priv
