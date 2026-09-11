@@ -38,13 +38,41 @@ ref:
       Azure resource ID of the podvm image for peer-pods. Required for Azure
       peer-pods workloads. Example:
       /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Compute/galleries/<gallery>/images/<image>/versions/<version>
+  - name: PODVM_AMI_ID
+    default: ""
+    documentation: |-
+      AWS AMI ID of the podvm image for peer-pods. Required for AWS peer-pods
+      workloads once an image has been built. Leave empty before image creation.
+  - name: AZURE_INSTANCE_SIZES
+    default: "Standard_B2als_v2,Standard_B2as_v2,Standard_D2as_v5,Standard_B4als_v2,Standard_D4as_v5,Standard_D8as_v5"
+    documentation: |-
+      Comma-separated list of Azure VM sizes allowed for podvm instances.
+  - name: PODVM_INSTANCE_TYPES
+    default: "t3.small,t3.medium,t3.large,t3.xlarge,t3.2xlarge,g4dn.2xlarge,g5.2xlarge,p3.2xlarge"
+    documentation: |-
+      Comma-separated list of AWS EC2 instance types allowed for podvm instances.
+  - name: PEERPODS_LIMIT_PER_NODE
+    default: "10"
+    documentation: |-
+      Maximum number of peer-pods VMs per worker node.
+  - name: TAGS
+    default: ""
+    documentation: |-
+      Comma-separated key=value tags to apply to cloud resources created for peer-pods.
+      Example: "env=ci,team=osc"
+  - name: PODVM_IMAGE_URI
+    default: ""
+    documentation: |-
+      OCI image URI for the podvm image. Used for image-building workflows.
+      Overrides the helm chart default (which is GCP-specific) to empty for
+      Azure and AWS.
   - name: ENABLEPEERPODS
     default: "false"
     documentation: |-
       When "true", enables peer-pods in KataConfig and creates peer-pods-cm
       ConfigMap with cloud provider configuration. Cloud parameters (region,
       subnet, NSG) are auto-detected from cluster infrastructure via az CLI.
-      AZURE_IMAGE_ID must be set explicitly in the job config.
+      AZURE_IMAGE_ID / PODVM_AMI_ID must be set explicitly in the job config.
   - name: WORKLOAD_TO_TEST
     default: "kata"
     documentation: |-
@@ -63,9 +91,9 @@ ref:
     operatorgroup, subscription, optional dev catalog). Phase 2 installs operands
     (KataConfig, feature gates, peer-pods-cm) and waits for KataConfig readiness.
 
-    For peer-pods and coco workloads, reads cloud config from peerpods-param-cm and
-    creates peer-pods-secret in the operator namespace. For coco, enables confidential
-    mode in osc-feature-gates.
+    For peer-pods and coco workloads, cloud parameters are auto-detected from cluster
+     infrastructure and passed to helm, which creates peer-pods-cm ConfigMap in the
+     OSC namespace. For coco, enables confidential mode in osc-feature-gates.
 
     When complete, patches osc-config ConfigMap so tests can detect the pre-installed operator.
 
