@@ -68,6 +68,16 @@ ref:
       Batch files:
         SHARED_DIR/managed-cluster-names   - one name per line
         SHARED_DIR/managed-cluster-regions - one region per line
+  - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+    default: ""
+    documentation: |-
+      When "true", install each spoke from the hub ClusterVersion desired image
+      (same unsigned payload as the hub) instead of a signed ACM catalog
+      ClusterImageSet, then mark ClusterImagePolicy unmanaged on the spoke so
+      CVO and rpm-ostree can pull unsigned nightlies. Hive does not pass this
+      installer env into the spoke install; the CVO override matches
+      openshift-e2e-test upgrade-paused on 4.20. Empty (default) keeps catalog
+      ClusterImageSet lookup and does not patch ClusterVersion.
   documentation: |-
     Provisions one or more ACM spoke clusters using Hive ClusterDeployment.
 
@@ -95,6 +105,8 @@ ref:
       ACM_SPOKE_INSTALL_TIMEOUT_MINUTES - per-cluster provisioning timeout (default: 150)
       ACM_SPOKE_CLUSTER_INITIAL_VERSION - OCP minor version for ClusterImageSet
       ACM_SPOKE_CLUSTER_COUNT           - number of spoke clusters (default: 1, max: 3)
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY - when true, spoke uses hub
+                                    payload ClusterImageSet and ClusterImagePolicy unmanaged
       MANAGED_CLUSTER_LEASED_RESOURCE   - space-separated AWS regions (one per cluster)
       SHARED_DIR                        - cross-step shared directory
       CLUSTER_PROFILE_DIR               - cluster profile with AWS creds and SSH keys
