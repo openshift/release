@@ -172,10 +172,52 @@ clear_ovn_localnet_lsp_port_security() {
   fi
 }
 
-# Run dnsmasq on the VLAN sub-interface (e.g. br-ex.100) on a single mgmt node before worker
-# VMIs boot (localnet-vlan). br-localnet is an OVS bridge without a kernel netdev; the NNCP
-# creates br-ex.<vlan-id> as the L2 port workers attach to. DHCP/DNS must be on that segment,
-# not ostestbm br-ex (untagged 192.168.111.0/24).
+# Prepare passthrough localnet LSPs for host dnsmasq on a shared VLAN L2 segment.
+# Clear OVN dhcpv4_options (OVN DHCP blocks/conflicts with host broadcasts) and
+# port_security (EgressIP SNAT egress). Run after worker virt-launcher pods exist.
+prepare_ovn_localnet_lsp_host_dhcp() {
+  local target_ns="$1"
+  local node ovn_pod lsps lsp
+
+  if [[ -z "${OVN_NBDB_CONTAINER:-}" ]]; then
+    discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
+    if ! discover_ovn_container_names "${discovery_pod}"; then
+      echo "ERROR: Failed to discover OVN container names" >&2
+      return 1
+    fi
+  fi
+
+  local configured=0
+  echo "Preparing localnet LSPs for host dnsmasq in ${target_ns} (clear OVN DHCP + port security)..."
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}')
+    [[ -z "${ovn_pod}" ]] && continue
+    lsps=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl --bare --columns=name find Logical_Switch_Port \
+        external_ids:namespace="${target_ns}" \
+        external_ids:k8s.ovn.org/topology=localnet 2>/dev/null || true)
+    for lsp in ${lsps}; do
+      [[ -z "${lsp}" ]] && continue
+      oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+        ovn-nbctl clear Logical_Switch_Port "${lsp}" dhcpv4_options 2>/dev/null || true
+      oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+        ovn-nbctl clear Logical_Switch_Port "${lsp}" port_security 2>/dev/null || true
+      echo "Prepared ${lsp} for host dnsmasq (node ${node})"
+      configured=$((configured + 1))
+    done
+  done
+
+  if [[ "${configured}" -eq 0 ]]; then
+    echo "ERROR: no localnet LSP found in ${target_ns}" >&2
+    return 1
+  fi
+}
+
+# Run dnsmasq on br-ex.<vlan-id> on ONE mgmt node before worker VMIs boot (localnet-vlan).
+# NNCP creates a kernel VLAN (br-ex.100) on br-ex on every node so VLAN traffic shares the
+# same L2 domain via the physical fabric; only the DHCP node gets 192.168.112.1/gateway.
+# br-localnet OVS bridge passes untagged guest frames to that VLAN segment.
 #
 # dnsmasq serves DHCP/DNS on br-ex.<vlan-id> (bind-interfaces + interface=). CoreDNS hostNetwork
 # owns *:53, so dnsmasq must use port 5353. Under systemd, dnsmasq_t SELinux only allows
@@ -956,10 +998,10 @@ EOF
       EXTRA_ARGS="${EXTRA_ARGS} --additional-network name:${ns}/localnet-${i}"
     done
   elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-vlan" ]]; then
-    # Localnet with VLAN: tagging is applied once at the host via NNCP (access port on
-    # ${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}). OVN NAD is subnets-less L2 passthrough
-    # with no vlanID — do not stack OVN VLAN tagging on top of the NNCP sub-interface.
-    #   - dnsmasq on br-ex.<vlan-id> (per node) serves DHCP/DNS before workers boot
+    # Localnet with VLAN: NNCP creates br-ex.<vlan-id> (kernel VLAN on br-ex) on every node
+    # for a shared 192.168.112.0/24 L2 segment across the bare-metal fabric. OVN NAD is
+    # subnets-less untagged passthrough to br-localnet (no stacked OVN vlanID).
+    #   - single host dnsmasq on one node at 192.168.112.1 serves all worker VMIs
     #   - attach-default-network=false — workers use only the localnet VLAN NIC
 
     ns="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
@@ -995,9 +1037,9 @@ EOF
       fi
     fi
 
-    # Apply NNCP to create the OVS bridge and map it to the VLAN sub-interface on
-    # each worker node. NMState creates: bond-interface.VLAN -> br-localnet, then
-    # OVN bridge-mapping: localnet-physnet:br-localnet.
+    # Apply NNCP: kernel VLAN br-ex.<id> on every node (shared L2 on the fabric) plus
+    # br-localnet OVS bridge for OVN localnet passthrough. Single host dnsmasq binds the
+    # gateway IP on the DHCP node only.
     echo "Applying NodeNetworkConfigurationPolicy for VLAN ${LOCALNET_VLAN_ID}..."
     oc apply -f - <<NNCP_EOF
 apiVersion: nmstate.io/v1
@@ -1014,6 +1056,12 @@ spec:
           bridge: ${LOCALNET_VLAN_BRIDGE}
           state: present
     interfaces:
+      - name: ${LOCALNET_VLAN_DHCP_INTERFACE}
+        type: vlan
+        state: up
+        vlan:
+          base-iface: ${LOCALNET_VLAN_BOND}
+          id: ${LOCALNET_VLAN_ID}
       - name: ${LOCALNET_VLAN_BRIDGE}
         type: ovs-bridge
         state: up
@@ -1027,10 +1075,8 @@ spec:
             stp: false
           port:
             # Untagged on br-localnet: OVN localnet NAD is subnets-less and delivers
-            # untagged L2 frames. A VLAN access tag here blocks guest DHCP/ignition.
-            # VLAN segmentation is on the physical uplink (br-ex); br-ex.<vlan-id> is
-            # the kernel netdev for dnsmasq on this segment.
-            - name: ${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}
+            # untagged L2 frames to the shared VLAN segment via br-ex.<vlan-id>.
+            - name: ${LOCALNET_VLAN_DHCP_INTERFACE}
 NNCP_EOF
 
     echo "Waiting for NNCP localnet-vlan-${LOCALNET_VLAN_ID} to be Available..."
@@ -1042,16 +1088,14 @@ NNCP_EOF
       exit 1
     fi
 
-    # NMState may still tag the br-ex.<vlan> OVS port with the VLAN ID from the
-    # interface name. OVN localnet is subnets-less/untagged; clear the tag so guest
-    # DHCP/ignition traffic reaches the kernel netdev (dnsmasq).
-    echo "Clearing OVS VLAN tag on ${LOCALNET_VLAN_DHCP_INTERFACE} ports (untagged localnet)..."
+    echo "Verifying ${LOCALNET_VLAN_DHCP_INTERFACE} VLAN interface on all nodes..."
     for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
       if oc debug "node/${NODE}" -n default --quiet=true -- chroot /host bash -c \
-        "ovs-vsctl clear port '${LOCALNET_VLAN_DHCP_INTERFACE}' tag 2>/dev/null || true"; then
-        echo "  ${NODE}: cleared VLAN tag on ${LOCALNET_VLAN_DHCP_INTERFACE}"
+        "ip link show '${LOCALNET_VLAN_DHCP_INTERFACE}' &>/dev/null"; then
+        echo "  ${NODE}: ${LOCALNET_VLAN_DHCP_INTERFACE} present"
       else
-        echo "WARNING: failed to clear VLAN tag on ${NODE}" >&2
+        echo "ERROR: ${LOCALNET_VLAN_DHCP_INTERFACE} missing on ${NODE}" >&2
+        exit 1
       fi
     done
 
@@ -1223,7 +1267,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   configure_localnet_multi_egress_prereqs
 fi
 
-# Localnet-VLAN post-creation: clear port security for EgressIP (DHCP is on br-localnet pre-boot).
+# Localnet-VLAN post-creation: prepare OVN localnet LSPs for host dnsmasq once VMIs exist.
 if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
   LOCALNET_VLAN_NS="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 
@@ -1238,32 +1282,27 @@ if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
     sleep 10
   done
 
-  clear_ovn_localnet_lsp_port_security "${LOCALNET_VLAN_NS}" || {
-    echo "ERROR: failed to clear port security on localnet-vlan LSPs" >&2
-    exit 1
-  }
-
-  _localnet_vlan_gateway="${LOCALNET_VLAN_GATEWAY:-192.168.112.1}"
-  LOCALNET_VLAN_SUBNET="${LOCALNET_VLAN_SUBNET:-${_localnet_vlan_gateway%.*}.0/24}"
-  LOCALNET_VLAN_GATEWAY_DNS="${LOCALNET_VLAN_GATEWAY:-192.168.112.1}"
-  ovn_dhcp_configured=false
+  lsp_prepared=false
   for attempt in $(seq 1 12); do
-    if configure_ovn_localnet_lsp_dhcp "${LOCALNET_VLAN_NS}" "${LOCALNET_VLAN_SUBNET}" \
-      "${LOCALNET_VLAN_GATEWAY_DNS}" "${LOCALNET_VLAN_GATEWAY_DNS}"; then
-      ovn_dhcp_configured=true
+    if prepare_ovn_localnet_lsp_host_dhcp "${LOCALNET_VLAN_NS}"; then
+      lsp_prepared=true
       break
     fi
-    echo "OVN localnet-vlan DHCP not ready (attempt ${attempt}/12), retrying in 30s..."
+    echo "localnet-vlan LSPs not ready (attempt ${attempt}/12), retrying in 30s..."
     sleep 30
   done
-  if [[ "${ovn_dhcp_configured}" != "true" ]]; then
-    echo "ERROR: failed to configure OVN DHCP on localnet-vlan LSPs after retries" >&2
+  if [[ "${lsp_prepared}" != "true" ]]; then
+    echo "ERROR: failed to prepare localnet-vlan LSPs for host dnsmasq after retries" >&2
     exit 1
   fi
 
   echo "Waiting for NodePool to become Ready"
   oc wait --timeout="${LOCALNET_VLAN_NODEPOOL_READY_TIMEOUT:-45m}" \
     --for=condition=Ready --namespace="${CLUSTER_NAMESPACE_PREFIX}" "nodepool/${CLUSTER_NAME}"
+
+  # Re-apply after NodePool in case any LSP was recreated during bootstrap.
+  prepare_ovn_localnet_lsp_host_dhcp "${LOCALNET_VLAN_NS}" \
+    || echo "WARNING: post-NodePool localnet LSP prep failed (continuing)" >&2
 
   echo "Localnet-VLAN post-creation setup complete"
 fi
