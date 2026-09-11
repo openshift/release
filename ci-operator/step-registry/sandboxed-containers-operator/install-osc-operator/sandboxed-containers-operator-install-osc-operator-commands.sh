@@ -328,36 +328,92 @@ function setup_aws_peerpods() {
 
 function setup_azure_peerpods() {
   echo ">>> Detecting Azure peer-pods configuration from cluster" >&2
-  
+
+  # Get resource group from cluster infrastructure
   local AZURE_RESOURCE_GROUP
-  
-  # Get Azure resource group
   AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
-  
   if [[ -z "${AZURE_RESOURCE_GROUP}" ]]; then
-    echo ">>> WARNING: Could not determine Azure resource group" >&2
+    echo ">>> ERROR: Could not determine Azure resource group from cluster infrastructure" >&2
     return 1
   fi
-  
-  # Query Azure for resource IDs directly from cluster infrastructure
-  local AZURE_REGION AZURE_SUBNET_ID AZURE_NSG_ID
-  AZURE_REGION=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.cloudName}')
-  
-  # Get subnet ID
-  AZURE_SUBNET_ID=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.subnet}' 2>/dev/null || echo "")
-  
-  # Get NSG ID
-  AZURE_NSG_ID=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.securityGroup}' 2>/dev/null || echo "")
-  
-  # Default instance size if not specified
-  : "${AZURE_INSTANCE_SIZE:=Standard_D2s_v3}"
+
+  # Login to Azure using credentials from the cluster secret
+  local azure_client_id azure_client_secret azure_tenant_id azure_subscription_id
+  local azure_creds
+  azure_creds=$(oc -n kube-system get secret azure-credentials -o json 2>/dev/null)
+  if [[ -z "${azure_creds}" ]] && [[ -n "${CLUSTER_PROFILE_DIR:-}" ]]; then
+    local sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+    azure_client_id=$(jq -r .clientId "${sp}")
+    azure_client_secret=$(jq -r .clientSecret "${sp}")
+    azure_tenant_id=$(jq -r .tenantId "${sp}")
+    azure_subscription_id=$(jq -r .subscriptionId "${sp}")
+  else
+    azure_client_id=$(echo "${azure_creds}" | jq -r .data.azure_client_id | base64 -d)
+    azure_client_secret=$(echo "${azure_creds}" | jq -r .data.azure_client_secret | base64 -d)
+    azure_tenant_id=$(echo "${azure_creds}" | jq -r .data.azure_tenant_id | base64 -d)
+    azure_subscription_id=$(echo "${azure_creds}" | jq -r .data.azure_subscription_id | base64 -d)
+  fi
+
+  # Temporarily disable tracing to avoid leaking credentials
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
+  az login --service-principal \
+    --username "${azure_client_id}" \
+    --password "${azure_client_secret}" \
+    --tenant "${azure_tenant_id}" --output none
+  az account set --subscription "${azure_subscription_id}"
+  $WAS_TRACING && set -x || true
+
+  # Get region from the resource group (not cloudName which is e.g. "AzurePublicCloud")
+  local AZURE_REGION
+  AZURE_REGION=$(az group show --resource-group "${AZURE_RESOURCE_GROUP}" \
+    --query location --output tsv)
+
+  # Determine management resource group (differs for ARO)
+  local mgmt_rg
+  if oc get crd clusters.aro.openshift.io &>/dev/null; then
+    mgmt_rg="$(cat "${SHARED_DIR}/resourcegroup" 2>/dev/null || echo "${AZURE_RESOURCE_GROUP}")"
+  else
+    mgmt_rg="${AZURE_RESOURCE_GROUP}"
+  fi
+
+  # Get VNet (retry up to 30s)
+  local azure_vnet_name
+  for i in {1..10}; do
+    azure_vnet_name=$(az network vnet list --resource-group "${mgmt_rg}" \
+      --query '[].name' --output tsv 2>/dev/null | head -1)
+    [[ -n "${azure_vnet_name}" ]] && break
+    sleep 3
+  done
+  if [[ -z "${azure_vnet_name}" ]]; then
+    echo ">>> ERROR: Could not find Azure VNet in resource group ${mgmt_rg}" >&2
+    return 1
+  fi
+
+  # Get worker subnet ID and NSG ID
+  local AZURE_SUBNET_ID AZURE_NSG_ID
+  AZURE_SUBNET_ID=$(az network vnet subnet list \
+    --resource-group "${mgmt_rg}" --vnet-name "${azure_vnet_name}" \
+    --query "[?contains(name,'worker')].id | [0]" --output tsv 2>/dev/null)
+  AZURE_NSG_ID=$(az network nsg list \
+    --resource-group "${AZURE_RESOURCE_GROUP}" \
+    --query '[].id | [0]' --output tsv 2>/dev/null)
+
+  # Apply defaults for values not already set
+  : "${AZURE_INSTANCE_SIZE:=Standard_B2als_v2}"
   : "${VXLAN_PORT:=9000}"
   : "${PROXY_TIMEOUT:=30m}"
-  
-  # Export environment variables (only if not already set)
-  export AZURE_RESOURCE_GROUP AZURE_SUBNET_ID AZURE_NSG_ID AZURE_REGION
-  
-  echo ">>> Azure peer-pods config detected: rg=${AZURE_RESOURCE_GROUP}, subnet=${AZURE_SUBNET_ID}, nsg=${AZURE_NSG_ID}" >&2
+
+  # Export so the helm --set-string block picks them up
+  export AZURE_RESOURCE_GROUP AZURE_REGION AZURE_SUBNET_ID AZURE_NSG_ID
+
+  echo ">>> Azure peer-pods config detected:" >&2
+  echo ">>>   AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}" >&2
+  echo ">>>   AZURE_REGION=${AZURE_REGION}" >&2
+  echo ">>>   AZURE_SUBNET_ID=${AZURE_SUBNET_ID}" >&2
+  echo ">>>   AZURE_NSG_ID=${AZURE_NSG_ID}" >&2
+  echo ">>>   AZURE_INSTANCE_SIZE=${AZURE_INSTANCE_SIZE}" >&2
+  echo ">>>   (AZURE_IMAGE_ID must be set via env var in job config)" >&2
 }
 
 function setup_gcp_peerpods() {
@@ -494,13 +550,15 @@ function render_osc_operands_chart() {
 
       case "${provider}" in
         azure)
-          local azure_subnet_id azure_nsg_id azure_resource_group azure_region azure_instance_size azure_ssh_key_pub
+          local azure_image_id azure_subnet_id azure_nsg_id azure_resource_group azure_region azure_instance_size azure_ssh_key_pub
+          azure_image_id="${AZURE_IMAGE_ID:-}"
           azure_subnet_id="${AZURE_SUBNET_ID:-}"
           azure_nsg_id="${AZURE_NSG_ID:-}"
           azure_resource_group="${AZURE_RESOURCE_GROUP:-}"
           azure_region="${AZURE_REGION:-}"
           azure_instance_size="${AZURE_INSTANCE_SIZE:-}"
           azure_ssh_key_pub="${AZURE_SSH_KEY_PUB:-}"
+          [[ -n "${azure_image_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_IMAGE_ID=${azure_image_id}")
           [[ -n "${azure_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_SUBNET_ID=${azure_subnet_id}")
           [[ -n "${azure_nsg_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_NSG_ID=${azure_nsg_id}")
           [[ -n "${azure_resource_group}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_RESOURCE_GROUP=${azure_resource_group}")
