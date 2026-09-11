@@ -1,0 +1,48 @@
+ref:
+  as: hypershift-aws-run-e2e-capi-migration
+  cli: latest
+  commands: hypershift-aws-run-e2e-capi-migration-commands.sh
+  credentials:
+    - mount_path: /etc/hypershift-pool-aws-credentials
+      name: hypershift-pool-aws-credentials
+      namespace: test-credentials
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-additional-pull-secret
+      name: hypershift-additional-pull-secret
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-kubeconfig
+      name: hypershift-ci-2
+      namespace: test-credentials
+  dependencies:
+    - env: OCP_IMAGE_LATEST
+      name: release:latest
+    - env: OCP_IMAGE_PREVIOUS
+      name: release:initial
+    - env: CI_HYPERSHIFT_OPERATOR
+      name: hypershift-operator
+  documentation: |-
+    Runs the CAPI storage version migration e2e test against a nested
+    HyperShift management cluster. This test verifies that CAPI CRD storage
+    version migration from v1beta1 to v1beta2 completes successfully.
+
+    The test is intended to run after HyperShift has been installed from
+    an older release (via INSTALL_FROM_LATEST), so that upgrading to the
+    PR-built operator triggers the automatic migration.
+  env:
+    - default: ${SHARED_DIR}/management_cluster_kubeconfig
+      name: KUBECONFIG
+    - default: ${SHARED_DIR}/management_cluster_name
+      name: MGMT_HC_NAME
+    - default: ${SHARED_DIR}/management_cluster_namespace
+      name: MGMT_HC_NAMESPACE
+    - default: /etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
+      name: MGMT_PARENT_KUBECONFIG
+  from: hypershift-tests
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 1h0m0s
