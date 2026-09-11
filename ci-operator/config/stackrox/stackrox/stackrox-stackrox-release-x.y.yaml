@@ -28,6 +28,8 @@ build_root:
     name: apollo-ci
     namespace: stackrox
     tag: stackrox-ui-test-0.5.2
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -124,12 +126,6 @@ tests:
     env:
       GKE_CLUSTER_VERSION: latest
       TEST_SUITE: gke-operator-e2e-tests
-    workflow: stackrox-stackrox-e2e-job
-- always_run: false
-  as: gke-upgrade-tests
-  optional: true
-  run_if_changed: ^(COLLECTOR_VERSION|SCANNER_VERSION|tests/upgrade/|qa-tests-backend/src/test/groovy/UpgradesTest.groovy|migrator/|image/)
-  steps:
     workflow: stackrox-stackrox-e2e-job
 - always_run: false
   as: gke-version-compatibility-tests
@@ -289,11 +285,6 @@ tests:
     env:
       GKE_CLUSTER_VERSION: latest
       TEST_SUITE: gke-operator-e2e-tests
-    workflow: stackrox-stackrox-e2e-job
-- as: merge-gke-upgrade-tests
-  max_concurrency: 6
-  postsubmit: true
-  steps:
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-version-compatibility-tests
   max_concurrency: 6

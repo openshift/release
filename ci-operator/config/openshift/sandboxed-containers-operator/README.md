@@ -40,10 +40,12 @@ usual changes to those files are::
 
 The downstream jobs use custom steps, chains and workflows hosted at [here](../../../step-registry/sandboxed-containers-operator/). Please refer to [their documentation](../../../step-registry/sandboxed-containers-operator/README.md) for further information.
 
-### Development
+## Tests
 
-On workflow change or periodic update please use the
-[create-prowjob](../../../step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh)
-command to refresh the default templates using the pre-defined defaults
-by running: ``sandboxed-containers-operator-create-prowjob-commands.sh update_templates``.
-Avoid modifying the templates directly, always use the ``update_template``!
+Currently, the test phase runs OTP.  OTP does some setup that will be moved in to steps later. Until then, leave it alone.
+
+For further tests, refer to the POST-phase test-suite chain documented in
+[the testsuites README](../../../step-registry/sandboxed-containers-operator/testsuites/README.md).
+It explains the non-blocking `sandboxed-containers-operator-testsuites` chain, the
+`TEST_<STEP_NAME>_ENABLE` convention, and the `skeleton`/`skeleton2` demo suites
+(disabled by default).

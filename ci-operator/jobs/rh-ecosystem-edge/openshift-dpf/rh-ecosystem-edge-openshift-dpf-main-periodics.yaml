@@ -19,7 +19,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca4
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rh-ecosystem-edge-openshift-dpf-main-daily-network-doca4
+  name: periodic-ci-rh-ecosystem-edge-openshift-dpf-main-daily-e2e-doca4
   reporter_config:
     slack:
       channel: '#wg-nvidia-dpf-ci'
@@ -27,23 +27,23 @@ periodics:
       - success
       - failure
       - error
-      - aborted
-      report_template: |-
-        {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
-        {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
-        {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
-        {{- if eq .Status.State "aborted" }}
-          The job was aborted, check for orphaned cloud resources.
-        {{- end }}
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=daily-network-doca4
+      - --target=daily-e2e-doca4
       command:
       - ci-operator
       env:
@@ -70,6 +70,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -90,6 +96,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

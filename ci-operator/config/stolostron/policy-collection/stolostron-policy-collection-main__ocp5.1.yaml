@@ -36,6 +36,14 @@ images:
     from: cli
     optional: true
     to: cli-with-git
+  - dockerfile_literal: |
+      FROM this-is-ignored
+      RUN dnf install -y skopeo && dnf clean all
+    from: cli
+    optional: true
+    to: cli-with-skopeo
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -51,6 +59,7 @@ tests:
 - as: interop-opp-aws
   capabilities:
   - intranet
+  cluster: build05
   cron: 0 23 31 2 *
   reporter_config:
     channel: '#opp-discussion'
@@ -66,10 +75,12 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
     env:
+      AWS_COMPUTE_VOLUME_SIZE: "500"
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FAIL_ON_BREACH: "true"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.1-lp","opp-aws-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
@@ -95,23 +106,28 @@ tests:
     - ref: ipi-conf-telemetry
     - ref: ipi-conf-aws-custom-az
     - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-rootvolume
     - ref: ipi-install-monitoringpvc
     - chain: ipi-install
-    test:
+    - ref: interop-opp-disk-diag
+    - ref: interop-opp-kubelet-config
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
+    test:
     - ref: acm-policies-openshift-plus
-    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-opp-wait-mcp
     - ref: acm-tests-clc-create
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
     - ref: interop-tests-ocs-tests
     - ref: interop-tests-opp-quay-smoke
     - ref: acm-tests-observability
+    - ref: interop-opp-skip-ratio-gate
 - as: interop-opp-vsphere
   capabilities:
   - intranet
+  cluster: vsphere02
   cron: 0 23 31 2 *
   reporter_config:
     channel: '#opp-discussion'
@@ -129,6 +145,7 @@ tests:
     env:
       COMPUTE_NODE_REPLICAS: "6"
       DISABLE_ENVIRONMENT_CHECKER: "true"
+      FAIL_ON_BREACH: "true"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.1-lp","opp-vsphere-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
@@ -143,15 +160,19 @@ tests:
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
       SIZE_VARIANT: large
-    test:
+    pre:
+    - ref: interop-opp-disk-diag
+    - ref: interop-opp-kubelet-config
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
+    test:
     - ref: acm-policies-openshift-plus
-    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-opp-wait-mcp
     - ref: interop-tests-ocs-tests
     - ref: acm-tests-observability
     - ref: acm-opp-app
+    - ref: interop-opp-skip-ratio-gate
     workflow: acm-ipi-vsphere
 zz_generated_metadata:
   branch: main

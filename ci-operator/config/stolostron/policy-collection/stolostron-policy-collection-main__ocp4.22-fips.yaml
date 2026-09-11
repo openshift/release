@@ -41,6 +41,12 @@ images:
     optional: true
     to: cli-with-git
   - dockerfile_literal: |
+      FROM this-is-ignored
+      RUN dnf install -y skopeo && dnf clean all
+    from: cli
+    optional: true
+    to: cli-with-skopeo
+  - dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/openjdk-17:1.21
       USER root
       RUN microdnf install -y git gzip && microdnf clean all
@@ -51,6 +57,8 @@ images:
           && rm -f openshift-client-linux.tar.gz
       USER 1001
     to: acs-smoke-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -66,6 +74,7 @@ tests:
 - as: interop-opp-aws
   capabilities:
   - intranet
+  cluster: build05
   cron: 0 23 31 2 *
   reporter_config:
     channel: '#opp-discussion'
@@ -81,11 +90,12 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
     env:
+      AWS_COMPUTE_VOLUME_SIZE: "500"
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
-      DR__RP__CR_COMP_NAME: lp-interop--OPP
+      FAIL_ON_BREACH: "true"
       FIPS_ENABLED: "true"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-aws-lp","opp-lp","fips"]'
@@ -94,12 +104,12 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9104
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      IGNORE_SECONDARY_POLICIES: "true"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
       QUAY_OPERATOR_CHANNEL: stable-3.17
+      SKIP_POLICIES: policy-acs,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -108,29 +118,33 @@ tests:
     - ref: acm-tests-clc-destroy
     - ref: gather-aws-console
     - chain: ipi-deprovision
-    - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues
     pre:
     - ref: ipi-conf
     - ref: ipi-conf-telemetry
     - ref: ipi-conf-aws-custom-az
     - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-rootvolume
     - ref: ipi-install-monitoringpvc
     - chain: ipi-install
-    test:
+    - ref: interop-opp-disk-diag
+    - ref: interop-opp-kubelet-config
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
+    test:
     - ref: acm-policies-openshift-plus
-    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-opp-wait-mcp
     - ref: stackrox-opp-readiness
     - ref: stackrox-opp-smoke
     - ref: acm-tests-clc-create
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
     - ref: interop-opp-odf-health
+    - ref: interop-opp-observability-odf
     - ref: interop-tests-opp-quay-smoke
     - ref: acm-tests-observability
+    - ref: interop-opp-skip-ratio-gate
 zz_generated_metadata:
   branch: main
   org: stolostron

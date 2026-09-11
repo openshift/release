@@ -26,7 +26,6 @@ DNS_FORWARD=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
 if [ "${ipv4_enabled:-false}" == "true" ]; then
   # shellcheck disable=SC2154
   DNS_FORWARD="${DNS_FORWARD}
-access.${CLUSTER_NAME} IN A ${access_ip}
 api.${CLUSTER_NAME} IN A ${api_vip}
 provisioner.${CLUSTER_NAME} IN A ${INTERNAL_NET_IP}
 api-int.${CLUSTER_NAME} IN A ${api_int}
@@ -35,7 +34,6 @@ fi
 if [ "${ipv6_enabled:-false}" == "true" ]; then
   # shellcheck disable=SC2154
   DNS_FORWARD="${DNS_FORWARD}
-access.${CLUSTER_NAME} IN AAAA ${access_ip_v6}
 provisioner.${CLUSTER_NAME} IN AAAA ${INTERNAL_NET_IPV6}
 api.${CLUSTER_NAME} IN AAAA ${api_vip_v6}
 api-int.${CLUSTER_NAME} IN AAAA ${api_int_v6}

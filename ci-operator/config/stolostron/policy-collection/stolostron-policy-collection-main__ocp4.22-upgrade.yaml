@@ -8,6 +8,8 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.22
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     release:
@@ -27,6 +29,7 @@ tests:
 - as: interop-opp-upgrade-aws
   capabilities:
   - intranet
+  cluster: build05
   cron: 0 23 31 2 *
   reporter_config:
     channel: '#opp-discussion'
@@ -45,10 +48,12 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
       ACM_SUBSCRIPTION_NAMESPACE: ocm
+      AWS_COMPUTE_VOLUME_SIZE: "500"
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FAIL_ON_BREACH: "true"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-aws-lp","opp-lp","opp-upgrade"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
@@ -59,7 +64,7 @@ tests:
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
           {"name": "rhacs-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
-          {"name": "odf-operator", "source": "redhat-operators", "channel": "stable-4.21", "install_namespace": "openshift-storage", "target_namespaces": "openshift-storage"},
+          {"name": "odf-operator", "source": "redhat-operators", "channel": "stable-4.21", "install_namespace": "openshift-storage", "target_namespaces": "openshift-storage", "operator_group": "openshift-storage-operator-group"},
           {"name": "quay-operator", "source": "redhat-operators", "channel": "stable-3.17", "install_namespace": "openshift-operators"}
         ]
       ZONES_COUNT: "3"
@@ -72,16 +77,20 @@ tests:
     - ref: ipi-conf-telemetry
     - ref: ipi-conf-aws-custom-az
     - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-rootvolume
     - ref: ipi-install-monitoringpvc
     - chain: ipi-install-stableinitial
-    test:
+    - ref: interop-opp-disk-diag
+    - ref: interop-opp-kubelet-config
     - ref: install-operators
+    test:
     - ref: interop-opp-backup
     - ref: interop-opp-preflight
     - ref: interop-opp-upgrade
     - ref: cucushift-upgrade-healthcheck
     - ref: interop-opp-product-upgrade-acm
     - ref: interop-opp-smoke
+    - ref: interop-opp-skip-ratio-gate
 zz_generated_metadata:
   branch: main
   org: stolostron

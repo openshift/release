@@ -11,6 +11,8 @@ promotion:
   to:
   - name: "4.13"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -29,7 +31,8 @@ resources:
       cpu: 1000m
       memory: 6Gi
 tests:
-- as: e2e-tests
+- always_run: false
+  as: e2e-tests
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -38,9 +41,9 @@ tests:
       commands: |
         ./test-prow-e2e.sh ${NMSTATE_UI_PLUGIN_IMG_NAME};
       credentials:
-      - mount_path: /var/run/operator-secret
-        name: operator-secret
-        namespace: test-credentials
+      - collection: console-storage-plugin
+        group: operator-secret
+        mount_path: /var/run/operator-secret
       dependencies:
       - env: NMSTATE_UI_PLUGIN_IMG_NAME
         name: nmstate-console-plugin

@@ -274,7 +274,7 @@ function ci_custom_link_report() {
     if [ "${JOB_TYPE}" == "presubmit" ]; then
         job_url_path="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
     fi
-    local -r url_prefix="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/${ARTIFACT_DIR#/logs/}/scenario-info"
+    local -r url_prefix="https://gcs.ci.openshift.org/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/${ARTIFACT_DIR#/logs/}/scenario-info"
 
     # Disable tracing and glob expansion
     set +x
@@ -566,10 +566,10 @@ function ci_custom_link_report() {
       <a class="summary-link" target="_blank" href="${url_prefix}/">
         📁 Scenarios Directory
       </a>
-      <a class="summary-link" target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-e2e-metal-tests/build-log.txt">
+      <a class="summary-link" target="_blank" href="https://gcs.ci.openshift.org/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-e2e-metal-tests/build-log.txt">
         📃 Scenarios Log
       </a>
-      <a class="summary-link" target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-infra-iso-build/build-log.txt">
+      <a class="summary-link" target="_blank" href="https://gcs.ci.openshift.org/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-infra-iso-build/build-log.txt">
         📃 Build Log
       </a>
     </div>

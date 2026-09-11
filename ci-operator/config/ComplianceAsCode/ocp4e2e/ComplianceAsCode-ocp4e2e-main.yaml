@@ -3,6 +3,8 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.22
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -19,6 +21,11 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
 - as: e2e-aws-openshift-platform-compliance
   steps:
     cluster_profile: quay-aws
@@ -103,6 +110,26 @@ tests:
         export PROFILE=moderate
         export PRODUCT=rhcos4
         make e2e-profile-remediations
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-ocp4-cis-vm-extension
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export SKIP_CONTAINER_PUSH=true
+        export PROFILE=cis-vm-extension
+        export PRODUCT=ocp4
+        export INSTALL_VIRT=true
+        export CEL_CONTENT_FILE=ocp4-cel-content.yaml
+        make e2e-profile
       from: src
       resources:
         requests:

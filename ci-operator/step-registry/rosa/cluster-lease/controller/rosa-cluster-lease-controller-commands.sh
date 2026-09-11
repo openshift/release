@@ -791,6 +791,46 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         continue
     fi
 
+    # RBAC smoke test: verify dedicated-admins group permissions are propagated.
+    # This catches broken rbac-permissions-operator before clusters are leased,
+    # preventing e2e test timeouts waiting for permissions that never arrive.
+    RBAC_KUBECONFIG=$(mktemp)
+    trap 'rm -f "${RBAC_KUBECONFIG}"' EXIT
+    RBAC_CHECK_FAILED=false
+    if ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null \
+        | jq -r '.kubeconfig // empty' > "${RBAC_KUBECONFIG}" 2>/dev/null \
+        && [[ -s "${RBAC_KUBECONFIG}" ]]; then
+        RBAC_RESULT=$(oc auth can-i create configmaps \
+            --as=dedicated-admin-check --as-group=dedicated-admins \
+            -n default \
+            --request-timeout=30s \
+            --kubeconfig="${RBAC_KUBECONFIG}" 2>&1) || true
+        if [[ "${RBAC_RESULT}" == "no" ]]; then
+            log "UNHEALTHY: ${CM_NAME} RBAC check failed - dedicated-admins cannot create configmaps"
+            RBAC_CHECK_FAILED=true
+        elif [[ "${RBAC_RESULT}" != "yes" ]]; then
+            log "WARNING: ${CM_NAME} RBAC check inconclusive (connectivity issue?), skipping"
+        fi
+    else
+        log "WARNING: ${CM_NAME} could not retrieve cluster kubeconfig for RBAC check, skipping"
+    fi
+    rm -f "${RBAC_KUBECONFIG}"
+    trap - EXIT
+
+    if [[ "${RBAC_CHECK_FAILED}" == "true" ]]; then
+        if [[ "${STATUS}" != "error" ]] && ! dry_run_guard "Would mark ${CM_NAME} as error (RBAC)"; then
+            lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                "metadata": {
+                    "labels": { "rosa-cluster-lease/status": "error" },
+                    "annotations": { "rosa-cluster-lease/error-reason": "RBAC: dedicated-admins permissions not functional", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
+                }
+            }' || true
+        fi
+        UNHEALTHY=$((UNHEALTHY + 1))
+        echo "UNHEALTHY: ${CM_NAME} (RBAC: dedicated-admins broken)" >> "${REPORT}"
+        continue
+    fi
+
     # Restore clusters that recovered from error
     if [[ "${STATUS}" == "error" ]]; then
         log "RESTORED: ${CM_NAME} is healthy again"
@@ -845,7 +885,12 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
     CLUSTER_TYPE=$(echo "${CM}" | jq -r '.metadata.labels["rosa-cluster-lease/type"] // "classic-sts"')
     ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
-    delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}"
+    ocm_check_cluster "${CLUSTER_ID}" "${CLUSTER_OCM_ENV}"
+    if [[ "${OCM_CHECK_RESULT}" == "not-found" ]]; then
+        log "${CM_NAME}: cluster already deleted from OCM, skipping delete_cluster"
+    else
+        delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}" || log "WARNING: delete_cluster failed for ${CM_NAME}, removing ConfigMap anyway"
+    fi
 
     # Remove the ConfigMap (next reconcile will provision a replacement)
     lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" || true
@@ -965,6 +1010,25 @@ done
 # ---------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------
+echo "" >> "${REPORT}"
+echo "=== Cluster Inventory ===" >> "${REPORT}"
+FINAL_CMS=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true" -o json 2>/dev/null || echo '{"items":[]}')
+FINAL_COUNT=$(echo "${FINAL_CMS}" | jq '.items | length')
+for i in $(seq 0 $((FINAL_COUNT - 1))); do
+    F_CM=$(echo "${FINAL_CMS}" | jq ".items[${i}]")
+    F_NAME=$(echo "${F_CM}" | jq -r '.metadata.name')
+    F_STATUS=$(echo "${F_CM}" | jq -r '.metadata.labels["rosa-cluster-lease/status"] // "unknown"')
+    F_ENV=$(echo "${F_CM}" | jq -r '.metadata.labels["rosa-cluster-lease/env"] // ""')
+    F_TYPE=$(echo "${F_CM}" | jq -r '.metadata.labels["rosa-cluster-lease/type"] // ""')
+    F_OPS=$(echo "${F_CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/operators"] // ""')
+    F_HOLDER=$(echo "${F_CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/holder"] // ""')
+    F_BUILD=$(echo "${F_CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/build-id"] // ""')
+    F_ACQ=$(echo "${F_CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/acquired-at"] // ""')
+    printf "  %-40s status=%-12s env=%-10s type=%s\n" "${F_NAME}" "${F_STATUS}" "${F_ENV}" "${F_TYPE}" >> "${REPORT}"
+    [[ -n "${F_OPS}" ]] && echo "    operators: ${F_OPS}" >> "${REPORT}"
+    [[ -n "${F_HOLDER}" ]] && echo "    holder: ${F_HOLDER} build=${F_BUILD} acquired=${F_ACQ}" >> "${REPORT}"
+done
+
 echo "" >> "${REPORT}"
 echo "Summary: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
 

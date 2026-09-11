@@ -22,11 +22,37 @@ fi
 
 export AZURE_TOKEN_CREDENTIALS=prod
 SUB_FILE="${CLUSTER_PROFILE_DIR}/subscription-id"
-if [[ ! -s "${SUB_FILE}" ]]; then
-  echo "No subscription-id file found at ${SUB_FILE}"
-  exit 1
+if [[ -s "${SUB_FILE}" ]]; then
+  SUBSCRIPTION_ID=$(cat "${SUB_FILE}")
+else
+  # Some cross-tenant cluster profiles (e.g. the -rh prod profiles) don't have
+  # a pre-populated subscription-id secret. Fall back to resolving it by
+  # subscription name via az, authenticating the same way aro-hcp-test-persistent
+  # already does with this profile's client-id/tenant/client-secret.
+  echo "No subscription-id file found at ${SUB_FILE}, falling back to resolving it via subscription name"
+  NAME_FILE="${CLUSTER_PROFILE_DIR}/subscription-name"
+  if [[ ! -s "${NAME_FILE}" ]]; then
+    echo "No subscription-name file found at ${NAME_FILE} either, cannot resolve subscription ID"
+    exit 1
+  fi
+
+  # Disable tracing before the subscription name (and the service-principal
+  # credentials) are read, and keep it disabled through the az calls and
+  # error handling below so neither value is ever echoed into CI logs.
+  set +o xtrace
+  SUBSCRIPTION_NAME=$(cat "${NAME_FILE}")
+  AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
+  AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
+  AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
+  az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
+  SUBSCRIPTION_ID=$(az account show --subscription "${SUBSCRIPTION_NAME}" --query id -o tsv)
+  set -o xtrace
+
+  if [[ -z "${SUBSCRIPTION_ID}" ]]; then
+    echo "Failed to resolve subscription ID for the configured subscription name"
+    exit 1
+  fi
 fi
-SUBSCRIPTION_ID=$(cat "${SUB_FILE}")
 
 START_TIME_FALLBACK_ARGS=""
 if [[ -f "${SHARED_DIR}/write-config-timestamp-rfc3339" ]]; then

@@ -17,6 +17,8 @@ base_images:
     tag: upi-installer
 build_root:
   from_repository: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -231,6 +233,7 @@ tests:
     - ref: odf-prepare-cluster
     - ref: operatorhub-subscribe-odf-operator
     - ref: odf-apply-storage-cluster
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
     - as: e2e-test
       cli: latest
       commands: |
@@ -274,6 +277,7 @@ tests:
     - ref: storage-subscribe-aws-efs-csi-driver
     - ref: storage-create-csi-aws-efs
     - ref: storage-conf-wait-for-csi-driver
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
     - as: e2e-test
       cli: latest
       commands: |
@@ -317,9 +321,12 @@ tests:
     - ref: odf-prepare-cluster
     - ref: operatorhub-subscribe-odf-operator
     - ref: odf-apply-storage-cluster
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
     - as: e2e-test
       cli: latest
-      commands: make run-tests
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
       env:
       - name: ECO_TEST_FEATURES
       from: src
@@ -357,9 +364,12 @@ tests:
     - ref: odf-prepare-cluster
     - ref: operatorhub-subscribe-odf-operator
     - ref: odf-apply-storage-cluster
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
     - as: e2e-test
       cli: latest
-      commands: make run-tests
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
       env:
       - name: ECO_TEST_FEATURES
       from: src
@@ -476,6 +486,7 @@ tests:
     - ref: odf-prepare-cluster
     - ref: operatorhub-subscribe-odf-operator
     - ref: odf-apply-storage-cluster
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
     - as: e2e-test
       cli: latest
       commands: |
@@ -590,6 +601,7 @@ tests:
     - ref: storage-subscribe-aws-efs-csi-driver
     - ref: storage-create-csi-aws-efs
     - ref: storage-conf-wait-for-csi-driver
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
     - as: e2e-test
       cli: latest
       commands: |

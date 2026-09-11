@@ -23,6 +23,7 @@ mkdir -p "${REPORT_DIR}"
 typeset -i CHECKS_FAILED=0
 typeset -i EXIT_CODE=0
 
+# shellcheck disable=SC2317
 function DebugOnExit () {
     if (( EXIT_CODE != 0 )); then
         : "### DEBUG: Pre-flight failure diagnostics ###"
@@ -73,8 +74,9 @@ OPP_COMPAT["4.18"]="advanced-cluster-management:2.13 rhacs-operator:4.7 odf-oper
 OPP_COMPAT["4.19"]="advanced-cluster-management:2.13 rhacs-operator:4.8 odf-operator:4.19 quay-operator:3.14"
 OPP_COMPAT["4.20"]="advanced-cluster-management:2.14 rhacs-operator:4.9 odf-operator:4.20 quay-operator:3.15"
 OPP_COMPAT["4.21"]="advanced-cluster-management:2.15 rhacs-operator:4.10 odf-operator:4.21 quay-operator:3.15"
-OPP_COMPAT["4.22"]="advanced-cluster-management:2.17 rhacs-operator:4.11 odf-operator:4.22 quay-operator:3.16"
-OPP_COMPAT["5.0"]="advanced-cluster-management:2.17 quay-operator:3.17"
+OPP_COMPAT["4.22"]="advanced-cluster-management:2.17 rhacs-operator:4.11 odf-operator:4.21 quay-operator:3.16"
+OPP_COMPAT["5.0"]="advanced-cluster-management:2.17 quay-operator:3.17 odf-operator:5.0 rhacs-operator:4.11"
+OPP_COMPAT["5.1"]="advanced-cluster-management:2.17 quay-operator:3.18 odf-operator:5.1 rhacs-operator:4.12"
 
 function InitReport () {
     cat > "${REPORT_FILE}" <<'EOFJSON'
@@ -258,7 +260,7 @@ function CheckClusterHealth () {
     avail="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" || true
     progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')" || true
     degraded="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}')" || true
-    if [[ "${avail}" != "True" || "${progressing}" != "False" || "${degraded}" != "False" ]]; then
+    if [[ "${avail}" != "True" || ( -n "${progressing}" && "${progressing}" != "False" ) || ( -n "${degraded}" && "${degraded}" != "False" ) ]]; then
         : "CVO health check failed: Available=${avail} Progressing=${progressing} Degraded=${degraded}"
         details="${details}cvo: Available=${avail} Progressing=${progressing} Degraded=${degraded}; "
         (( failed += 1 ))

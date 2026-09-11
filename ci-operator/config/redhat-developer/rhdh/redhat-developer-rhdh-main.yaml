@@ -47,6 +47,8 @@ images:
         - nested-podman
     to: rhdh-e2e-runner-podman
   run_if_changed: ^$
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -93,7 +95,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  cron: 0 4 * * *
+  cron: 0 4 * * MON,TUE,WED,THU,FRI
   optional: true
   presubmit: true
   reporter_config:
@@ -122,7 +124,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  cron: 0 3 * * *
+  cron: 0 3 * * WED
   max_concurrency: 1
   optional: true
   presubmit: true
@@ -152,7 +154,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.19"
-  cron: 0 5 * * TUE,THU,SAT,SUN
+  cron: 0 5 * * MON
   optional: true
   presubmit: true
   reporter_config:
@@ -183,7 +185,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.22"
-  cron: 0 1 * * TUE,THU,SAT,SUN
+  cron: 0 1 * * WED
   max_concurrency: 1
   optional: true
   presubmit: true
@@ -251,7 +253,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.21"
-  cron: 0 2 * * TUE,THU,SAT,SUN
+  cron: 0 2 * * TUE
   optional: true
   presubmit: true
   reporter_config:
@@ -273,8 +275,8 @@ tests:
     workflow: generic-claim
 - always_run: false
   as: e2e-ocp-disconnected-helm-nightly
-  cron: 0 3 31 12 *
-  max_concurrency: 4
+  cron: 0 2 * * MON,WED
+  max_concurrency: 2
   optional: true
   presubmit: true
   steps:
@@ -291,7 +293,11 @@ tests:
         app-code rhdh-003
         service-phase dev
         cost-center 726
-        scenario ocp-disconnected
+        scenario ocp-disconnected-ipi
+        origin ipi
+        architecture x86_64
+        cluster-type ocp
+        pipeline openshift-ci
     post:
     - chain: gather-core-dump
     - chain: ipi-aws-post-disconnected
@@ -304,8 +310,8 @@ tests:
   as: e2e-ocp-disconnected-operator-nightly
   capabilities:
   - nested-podman
-  cron: 0 4 31 12 *
-  max_concurrency: 4
+  cron: 0 2 * * TUE,THU
+  max_concurrency: 2
   nested_podman: true
   optional: true
   presubmit: true
@@ -323,7 +329,11 @@ tests:
         app-code rhdh-003
         service-phase dev
         cost-center 726
-        scenario ocp-disconnected
+        scenario ocp-disconnected-ipi
+        origin ipi
+        architecture x86_64
+        cluster-type ocp
+        pipeline openshift-ci
     post:
     - chain: gather-core-dump
     - chain: ipi-aws-post-disconnected
@@ -334,7 +344,7 @@ tests:
     workflow: openshift-e2e-aws-disconnected
 - always_run: false
   as: e2e-aks-helm-nightly
-  cron: 50 3 * * TUE,THU,SAT,SUN
+  cron: 50 3 * * TUE,THU
   optional: true
   presubmit: true
   reporter_config:
@@ -356,7 +366,7 @@ tests:
     workflow: redhat-developer-rhdh-aks-mapt
 - always_run: false
   as: e2e-aks-operator-nightly
-  cron: 0 4 * * TUE,THU,SAT,SUN
+  cron: 0 4 * * TUE,THU
   optional: true
   presubmit: true
   reporter_config:
@@ -378,7 +388,7 @@ tests:
     workflow: redhat-developer-rhdh-aks-mapt
 - always_run: false
   as: e2e-eks-helm-nightly
-  cron: 0 4 * * TUE,THU,SAT,SUN
+  cron: 0 4 * * TUE,THU
   optional: true
   presubmit: true
   reporter_config:
@@ -400,7 +410,7 @@ tests:
     workflow: redhat-developer-rhdh-eks-mapt
 - always_run: false
   as: e2e-eks-operator-nightly
-  cron: 0 4 * * TUE,THU,SAT,SUN
+  cron: 0 4 * * TUE,THU
   optional: true
   presubmit: true
   reporter_config:
@@ -422,7 +432,7 @@ tests:
     workflow: redhat-developer-rhdh-eks-mapt
 - always_run: false
   as: e2e-gke-helm-nightly
-  cron: 0 4 * * TUE,THU,SAT,SUN
+  cron: 0 4 * * TUE,THU
   optional: true
   presubmit: true
   reporter_config:
@@ -440,7 +450,7 @@ tests:
     - ref: redhat-developer-rhdh-gke-helm-nightly
 - always_run: false
   as: e2e-gke-operator-nightly
-  cron: 0 6 * * TUE,THU,SAT,SUN
+  cron: 0 6 * * TUE,THU
   optional: true
   presubmit: true
   reporter_config:
@@ -467,7 +477,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  cron: 0 5 * * TUE,THU,SAT,SUN
+  cron: 0 5 * * TUE,THU
   optional: true
   presubmit: true
   reporter_config:
@@ -513,7 +523,7 @@ tests:
     - ref: redhat-developer-rhdh-eks-mapt-orphaned-destroy
 - always_run: false
   as: e2e-osd-gcp-helm-nightly
-  cron: 30 7 * * TUE,THU,SAT,SUN
+  cron: 30 7 * * TUE,THU
   max_concurrency: 1
   optional: true
   presubmit: true
@@ -536,7 +546,7 @@ tests:
     workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
 - always_run: false
   as: e2e-osd-gcp-operator-nightly
-  cron: 30 5 * * TUE,THU,SAT,SUN
+  cron: 30 5 * * TUE,THU
   max_concurrency: 1
   optional: true
   presubmit: true
@@ -573,7 +583,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  cron: 0 4 * * TUE,THU,SAT,SUN
+  cron: 0 4 * * TUE,THU
   optional: true
   presubmit: true
   reporter_config:
@@ -584,8 +594,8 @@ tests:
     - error
     report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}<!subteam^S07BMJ56R8S>
       <@U08UP0REWG1> :failed: {{end}} Job *`{{.Spec.Job}}`* ended with *{{.Status.State}}*.
-      Open Report: <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-operator-auth-providers-nightly/redhat-developer-rhdh-ocp-operator-nightly/artifacts/showcase-auth-providers/index.html|nightly>
-      | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-operator-auth-providers-nightly/redhat-developer-rhdh-ocp-operator-nightly/artifacts/|Open
+      Open Report: <https://gcs.ci.openshift.org/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-operator-auth-providers-nightly/redhat-developer-rhdh-ocp-operator-nightly/artifacts/showcase-auth-providers/index.html|nightly>
+      | <https://gcs.ci.openshift.org/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-operator-auth-providers-nightly/redhat-developer-rhdh-ocp-operator-nightly/artifacts/|Open
       artifacts> | <{{.Status.URL}}|View logs>'
   steps:
     allow_skip_on_success: true
@@ -606,7 +616,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  cron: 0 4 * * TUE,THU,SAT,SUN
+  cron: 0 4 * * TUE,THU
   max_concurrency: 1
   optional: true
   presubmit: true
@@ -618,8 +628,8 @@ tests:
     - error
     report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}<!subteam^S07BMJ56R8S>
       <@U08UP0REWG1> :failed: {{end}} Job *`{{.Spec.Job}}`* ended with *{{.Status.State}}*.
-      Open Report: <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-helm-upgrade-nightly/redhat-developer-rhdh-ocp-helm-upgrade-nightly/artifacts/showcase-upgrade-nightly/index.html|nightly>
-      | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-helm-upgrade-nightly/redhat-developer-rhdh-ocp-helm-upgrade-nightly/artifacts/|Open
+      Open Report: <https://gcs.ci.openshift.org/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-helm-upgrade-nightly/redhat-developer-rhdh-ocp-helm-upgrade-nightly/artifacts/showcase-upgrade-nightly/index.html|nightly>
+      | <https://gcs.ci.openshift.org/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-helm-upgrade-nightly/redhat-developer-rhdh-ocp-helm-upgrade-nightly/artifacts/|Open
       artifacts> | <{{.Status.URL}}|View logs>'
   steps:
     allow_skip_on_success: true

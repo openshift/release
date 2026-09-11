@@ -22,6 +22,8 @@ promotion:
   to:
   - name: "5.0"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -101,34 +103,6 @@ tests:
     go mod vendor
     make generate
     go build ./...
-  container:
-    from: src
-- as: verify-hypershift-integration
-  commands: |
-    dir=$GOPATH/src/github.com/openshift/hypershift
-    if [ ! -d $dir ]; then
-      git clone https://github.com/openshift/hypershift --branch main --single-branch $dir
-    fi
-    if [ ! -d $dir/openshift-client-go ]; then
-      git clone https://github.com/openshift/client-go --branch master --single-branch $dir/openshift-client-go
-    fi
-    rm -rf $dir/vendor/github.com/openshift/api/*
-    rm -rf $dir/vendor/github.com/openshift/client-go/*
-    cp -Rf ./ $dir/openshift-api/
-    rm -rf $dir/openshift-api/vendor
-    rm -rf $dir/openshift-client-go/vendor
-    cd $dir
-    go mod edit -dropreplace github.com/openshift/api
-    go mod edit -dropreplace github.com/openshift/client-go
-    go mod edit -replace github.com/openshift/api=./openshift-api
-    go mod edit -replace github.com/openshift/client-go=./openshift-client-go
-    echo "# github.com/openshift/api => ./openshift-api" >> vendor/modules.txt
-    echo "# github.com/openshift/client-go => ./openshift-client-go" >> vendor/modules.txt
-    sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/openshift-api/" vendor/modules.txt
-    sed -i "/github.com\/openshift\/client-go v0.0.0/ s/$/ => \.\/openshift-client-go/" vendor/modules.txt
-    go mod tidy
-    go mod vendor
-    make api test-envtest-api-all
   container:
     from: src
 - always_run: false

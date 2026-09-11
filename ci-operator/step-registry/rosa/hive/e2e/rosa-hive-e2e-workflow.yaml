@@ -5,6 +5,7 @@ workflow:
       OCM_LOGIN_ENV: production
     pre:
     - ref: rosa-hive-backplane-login
+    - ref: rosa-hive-operator-install
     test:
     - ref: rosa-hive-operator-e2e
   documentation: |-
@@ -12,8 +13,13 @@ workflow:
     For hive-resident operators (certman-operator) deployed via PKO onto
     hive clusters rather than spoke ROSA/OSD clusters.
 
-    The pre step authenticates via backplane and saves the kubeconfig.
-    The test step runs the operator e2e binary against the cluster.
+    The pre steps authenticate via backplane, inject CI registry pull
+    secrets so the hive cluster can pull CI-built images, and save an
+    elevated kubeconfig for the test step.
+
+    The test step runs the operator e2e binary with backplane-cluster-admin
+    access. When OPERATOR_IMAGE is set (presubmit), the e2e binary deploys
+    the candidate. When unset (promotion gate), it tests the production operator.
 
     Requires capabilities: [intranet] and restrict_network_access: false
     in the ci-operator config for backplane proxy access.

@@ -1,3 +1,8 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.26-openshift-4.23:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
 binary_build_commands: make terraform-init
 build_root:
   image_stream_tag:
@@ -10,16 +15,21 @@ images:
   - context_dir: test
     dockerfile_path: Dockerfile.e2e
     to: gcp-hcp-e2e-tests
+  - context_dir: test
+    dockerfile_path: Dockerfile.firestore
+    to: gcp-hcp-firestore-tests
 promotion:
   to:
   - additional_images:
       gcp-hcp-e2e-tests: gcp-hcp-e2e-tests
+      gcp-hcp-firestore-tests: gcp-hcp-firestore-tests
     excluded_images:
     - '*'
     namespace: ci
     tag: latest
 prowgen:
   disable_sparse_checkout: true
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 releases:
@@ -49,12 +59,9 @@ tests:
         TFRC
         make terraform-validate
       credentials:
-      - mount_path: /etc/github-private
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        namespace: ci
-      - mount_path: /etc/terraform-cloud
-        name: tfcloud-ci-secret
-        namespace: ci
+      - collection: gcp-hcp-infra-terraform-cloud
+        group: tfcloud-token
+        mount_path: /etc/terraform-cloud
       from: src
       resources:
         requests:
@@ -74,12 +81,9 @@ tests:
         TFRC
         make terraform-test
       credentials:
-      - mount_path: /etc/github-private
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        namespace: ci
-      - mount_path: /etc/terraform-cloud
-        name: tfcloud-ci-secret
-        namespace: ci
+      - collection: gcp-hcp-infra-terraform-cloud
+        group: tfcloud-token
+        mount_path: /etc/terraform-cloud
       from: src
       resources:
         requests:
@@ -94,16 +98,39 @@ tests:
     UV_NO_PROGRESS=true && make check-generated-files
   container:
     from: src
+- as: gitops-promoter-test
+  commands: make gitops-promoter-test
+  container:
+    clone: true
+    from: ocp_builder_rhel-9-golang-1.26-openshift-4.23
 - always_run: false
   as: e2e-platform
   steps:
     cluster_profile: platform-gcp
     workflow: gcp-hcp-e2e
 - as: generate-bin
-  commands: make terraform-init
-  container:
-    from: bin
   postsubmit: true
+  steps:
+    test:
+    - as: generate
+      commands: |
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /etc/github-private/oauth)"; }; f'
+        cat > "$HOME/.terraformrc" <<TFRC
+        credentials "app.terraform.io" {
+          token = "$(cat /etc/terraform-cloud/token)"
+        }
+        TFRC
+        make terraform-init
+      credentials:
+      - collection: gcp-hcp-infra-terraform-cloud
+        group: tfcloud-token
+        mount_path: /etc/terraform-cloud
+      from: bin
+      resources:
+        requests:
+          cpu: "8"
+          memory: 4Gi
 zz_generated_metadata:
   branch: main
   org: openshift-online

@@ -6,12 +6,20 @@ set -o pipefail
 
 collect_operator_logs() {
     local ns="${OPERATOR_NAMESPACE:-openshift-${OPERATOR_NAME}}"
-    if [[ -n "${ARTIFACT_DIR:-}" ]] && oc get namespace "${ns}" &>/dev/null; then
-        for deploy in $(oc get deployment -n "${ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
-            oc logs "deployment/${deploy}" -n "${ns}" --all-containers --tail=500 \
+    local kube_cmd
+    if command -v oc &>/dev/null; then
+        kube_cmd="oc"
+    elif command -v kubectl &>/dev/null; then
+        kube_cmd="kubectl"
+    else
+        return
+    fi
+    if [[ -n "${ARTIFACT_DIR:-}" ]] && ${kube_cmd} get namespace "${ns}" &>/dev/null; then
+        for deploy in $(${kube_cmd} get deployment -n "${ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
+            ${kube_cmd} logs "deployment/${deploy}" -n "${ns}" --all-containers --tail=500 \
                 > "${ARTIFACT_DIR}/${deploy}-logs.txt" 2>&1 || true
         done
-        oc get events -n "${ns}" --sort-by='.lastTimestamp' \
+        ${kube_cmd} get events -n "${ns}" --sort-by='.lastTimestamp' \
             > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
     fi
 }
@@ -78,6 +86,25 @@ fi
 
 if [[ -n "${GINKGO_FOCUS:-}" ]]; then
     GINKGO_ARGS+=("--ginkgo.focus=${GINKGO_FOCUS}")
+fi
+
+# Export the cluster ID so operator e2e tests can identify the target cluster
+if [[ -f "${SHARED_DIR}/cluster-id" ]]; then
+    export OCM_CLUSTER_ID
+    OCM_CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
+    log "OCM_CLUSTER_ID set to ${OCM_CLUSTER_ID}"
+fi
+
+# Export OCM credentials so operator e2e tests can interact with OCM API
+if [[ -f "${CLUSTER_PROFILE_DIR}/sso-client-id" ]]; then
+    export OCM_CLIENT_ID
+    OCM_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id")
+    log "OCM_CLIENT_ID set from cluster profile"
+fi
+if [[ -f "${CLUSTER_PROFILE_DIR}/sso-client-secret" ]]; then
+    export OCM_CLIENT_SECRET
+    OCM_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret")
+    log "OCM_CLIENT_SECRET set from cluster profile"
 fi
 
 log "Running ${OPERATOR_NAME} e2e tests..."

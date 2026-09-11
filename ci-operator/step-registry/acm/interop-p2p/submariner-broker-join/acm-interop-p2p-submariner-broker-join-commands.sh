@@ -26,6 +26,8 @@ set -euxo pipefail; shopt -s inherit_errexit
 # ── Constants ─────────────────────────────────────────────────────────────────
 typeset -r subctlBin="/tmp/bin/subctl"
 typeset -r brokerInfoFile="/tmp/broker-info.subm"
+[[ "${ACM_SPOKE_CLUSTER_COUNT}" =~ ^[1-9][0-9]*$ ]] \
+    || { : "ACM_SPOKE_CLUSTER_COUNT must be a positive decimal integer (got: '${ACM_SPOKE_CLUSTER_COUNT}')"; false; }
 typeset -i spokeCount="${ACM_SPOKE_CLUSTER_COUNT}"
 typeset remediateGlobalnet="${SUBMARINER_REMEDIATE_GLOBALNET}"
 typeset -i uninstallWaitSecs="${SUBMARINER_UNINSTALL_WAIT_SECS}"
@@ -65,14 +67,17 @@ InstallSubctl() {
     # Versioned releases (vX.Y.Z) must have a trusted digest; rolling branch
     # tags (release-X.Y) skip digest verification by design.
     typeset expectedSha=""
-    if [[ "${version}" =~ ^v[0-9] ]]; then
+    if [[ "${version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         expectedSha="${_subctlDigests["${version}"]:-}"
         if [[ -z "${expectedSha}" ]]; then
             : "SUBMARINER_SUBCTL_VERSION=${version} is a versioned release but has no trusted SHA-256 in _subctlDigests; add its SHA-256 to proceed"
             false
         fi
+    elif [[ "${version}" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
+        : "INFO: SUBMARINER_SUBCTL_VERSION=${version} is a rolling branch tag — SHA-256 verification skipped"
     else
-        : "INFO: SUBMARINER_SUBCTL_VERSION=${version} is a rolling branch tag — SHA-256 verification skipped (artifact rebuilt on every branch push)"
+        printf 'ERROR: SUBMARINER_SUBCTL_VERSION=%s is not a recognised format (use vX.Y.Z or release-X.Y)\n' "${version}" >&2
+        false
     fi
 
     typeset archiveName="subctl-${version}-linux-amd64.tar.xz"
@@ -266,6 +271,7 @@ JoinCluster() {
     true
 }
 
+
 # ── WaitForObjectToExist — poll until a Kubernetes resource exists ────────────
 WaitForObjectToExist() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
@@ -406,7 +412,7 @@ command -v curl 1>/dev/null
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq yq
 
 LoadSpokeConfig

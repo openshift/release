@@ -20,7 +20,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
@@ -53,6 +57,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
           readOnly: true
@@ -76,6 +86,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -109,7 +128,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -141,6 +164,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -161,6 +190,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -247,10 +285,13 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ols-codecov-token
         - --target=integration
         command:
         - ci-operator
@@ -272,11 +313,14 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /secrets/ols-codecov-token
-          name: ols-codecov-token
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -286,12 +330,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
-      - name: ols-codecov-token
-        secret:
-          secretName: ols-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -305,7 +355,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build12
-    context: ci/prow/ols-evaluation
+    context: ci/prow/ols-lseval-presubmit
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -313,19 +363,23 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-lightspeed-service-main-ols-evaluation
-    rerun_command: /test ols-evaluation
-    run_if_changed: ^(Containerfile|tests/e2e/scripts/test-evaluation.sh|tests/e2e/scripts/utils.sh|Makefile|tests/e2e/evaluation/.*|ols/src/llms/providers/.*|ols/src/prompts/.*|ols/src/query_helpers/docs_summarizer.py|ols/src/rag_index/.*|ols/src/tools/.*|ols/utils/token_handler.py|ols/constants.py|scripts/evaluation/.*)$
+    name: pull-ci-openshift-lightspeed-service-main-ols-lseval-presubmit
+    rerun_command: /test ols-lseval-presubmit
+    run_if_changed: ^(Containerfile|Makefile|eval/.*|tests/e2e/evaluation/.*|tests/scripts/test-lseval-presubmit\.sh|tests/scripts/utils\.sh|ols/src/llms/providers/.*|ols/src/prompts/.*|ols/src/query_helpers/docs_summarizer\.py|ols/src/rag_index/.*|ols/src/tools/.*|ols/utils/token_handler\.py|ols/constants\.py)$
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ols-evaluation
+        - --target=ols-lseval-presubmit
         command:
         - ci-operator
         env:
@@ -352,6 +406,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
           readOnly: true
@@ -375,6 +435,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -387,7 +456,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ols-evaluation,?($|\s.*)
+    trigger: (?m)^/test( | .* )ols-lseval-presubmit,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -408,7 +477,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -440,6 +513,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -460,6 +539,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -555,10 +643,13 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ols-codecov-token
         - --target=unit
         command:
         - ci-operator
@@ -580,11 +671,14 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /secrets/ols-codecov-token
-          name: ols-codecov-token
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -594,12 +688,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
-      - name: ols-codecov-token
-        secret:
-          secretName: ols-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

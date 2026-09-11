@@ -14,6 +14,22 @@ collect_operator_logs() {
         oc get events -n "${ns}" --sort-by='.lastTimestamp' \
             > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
     fi
+    # Collect PKO diagnostics for debugging ClusterPackage reconciliation issues
+    if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+        local pko_ns="openshift-package-operator"
+        if oc get namespace "${pko_ns}" &>/dev/null; then
+            for deploy in $(oc get deployment -n "${pko_ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
+                oc logs "deployment/${deploy}" -n "${pko_ns}" --all-containers --tail=500 \
+                    > "${ARTIFACT_DIR}/pko-${deploy}-logs.txt" 2>&1 || true
+            done
+            oc get events -n "${pko_ns}" --sort-by='.lastTimestamp' \
+                > "${ARTIFACT_DIR}/pko-namespace-events.txt" 2>&1 || true
+        fi
+        oc get clusterpackage "${CLUSTER_PACKAGE_NAME:-}" -o yaml \
+            > "${ARTIFACT_DIR}/clusterpackage-dump.yaml" 2>/dev/null || true
+        oc get clusterobjectset -o wide \
+            > "${ARTIFACT_DIR}/clusterobjectset-list.txt" 2>/dev/null || true
+    fi
 }
 
 trap 'collect_operator_logs; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM EXIT
@@ -93,9 +109,56 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
         --type json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"ci-pull-secret"}}]' 2>/dev/null || true
     log "CI pull secret added to PKO namespace"
 
+    # Record baseline timestamp before restart so we can verify post-restart reconciliation
+    PKO_RESTART_BASELINE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    log "Recording PKO restart baseline timestamp: ${PKO_RESTART_BASELINE}"
+
     oc rollout restart deployment -n openshift-package-operator 2>/dev/null || true
     oc rollout status deployment -n openshift-package-operator --timeout=120s 2>/dev/null || true
     log "PKO restarted with CI pull secret"
+
+    # PKO readiness gate: verify PKO controllers are actively reconciling
+    # post-restart by checking that at least one existing ClusterPackage has
+    # a condition lastTransitionTime newer than our pre-restart baseline.
+    # This proves controllers are processing, not just showing stale state.
+    EXISTING_CPS=$(oc get clusterpackage --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true)
+    BASELINE_EPOCH=$(date -d "${PKO_RESTART_BASELINE}" +%s 2>/dev/null || true)
+    if [[ -n "${EXISTING_CPS}" && -n "${BASELINE_EPOCH}" ]]; then
+        log "Waiting for PKO to reconcile post-restart (baseline: ${PKO_RESTART_BASELINE})..."
+        PKO_READY=""
+        for i in $(seq 1 12); do
+            for cp in ${EXISTING_CPS}; do
+                # Get all lastTransitionTime values from status conditions
+                TIMESTAMPS=$(oc get clusterpackage "${cp}" \
+                    -o jsonpath='{.status.conditions[*].lastTransitionTime}' 2>/dev/null || true)
+                for ts in ${TIMESTAMPS}; do
+                    TS_EPOCH=$(date -d "${ts}" +%s 2>/dev/null || true)
+                    if [[ -n "${TS_EPOCH}" && "${TS_EPOCH}" -gt "${BASELINE_EPOCH}" ]]; then
+                        log "PKO is active post-restart: ClusterPackage ${cp} has condition updated at ${ts} (after baseline ${PKO_RESTART_BASELINE})"
+                        PKO_READY=1
+                        break 2
+                    fi
+                done
+            done
+            if [[ -n "${PKO_READY}" ]]; then
+                break
+            fi
+            log "  PKO readiness check attempt ${i}/12: no post-restart condition timestamps yet"
+            sleep 5
+        done
+        if [[ -z "${PKO_READY}" ]]; then
+            log "ERROR: PKO readiness could not be verified — no ClusterPackage condition was updated after restart baseline ${PKO_RESTART_BASELINE}"
+            log "ERROR: PKO controllers may not be reconciling. Check PKO pod logs for errors."
+            for cp in ${EXISTING_CPS}; do
+                oc get clusterpackage "${cp}" -o yaml 2>/dev/null || true
+            done
+            exit 1
+        fi
+    else
+        log "ERROR: PKO readiness could not be verified — no existing ClusterPackages found to validate post-restart reconciliation"
+        log "ERROR: At least one ClusterPackage must exist on the cluster for the readiness gate to confirm PKO is operational"
+        exit 1
+    fi
 
     # Add CI pull secret to the operator namespace so operator pods can pull
     # CI-built images without waiting for MCO to propagate the global secret.
@@ -105,6 +168,25 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
         --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
         --dry-run=client -o yaml | oc apply -f -
     log "CI pull secret added to operator namespace ${OPERATOR_NAMESPACE}"
+
+    # Pre-create the operator ServiceAccount with the CI pull secret BEFORE
+    # creating the ClusterPackage. Without this, PKO creates a pod using the
+    # default (un-patched) SA, causing ErrImagePull. The pod then sits in
+    # image-pull-backoff for ~3 minutes until the SA patch + pod delete in the
+    # deployment wait loop below kicks in.  By pre-creating the SA with the
+    # pull secret already attached, the first pod PKO creates can pull
+    # immediately.  The existing SA patch code in the wait loop is kept as a
+    # fallback in case PKO uses a different SA name.
+    SA_PRECREATE_NAME="${OPERATOR_DEPLOYMENT_NAME:-${OPERATOR_NAME}}"
+    log "Pre-creating ServiceAccount ${SA_PRECREATE_NAME} in ${OPERATOR_NAMESPACE} with CI pull secret"
+    oc create sa "${SA_PRECREATE_NAME}" -n "${OPERATOR_NAMESPACE}" \
+        --dry-run=client -o yaml | oc apply -f -
+    # Use strategic-merge patch so this works whether or not the SA already
+    # has an imagePullSecrets array.  JSON Patch "add" to "/imagePullSecrets/-"
+    # fails when the array does not exist; strategic merge creates it.
+    oc patch sa "${SA_PRECREATE_NAME}" -n "${OPERATOR_NAMESPACE}" \
+        --type strategic -p '{"imagePullSecrets":[{"name":"ci-pull-secret"}]}'
+    log "ServiceAccount ${SA_PRECREATE_NAME} pre-patched with CI pull secret"
 else
     log "WARNING: Could not get CI registry credentials, PKO may fail to pull images"
 fi
@@ -123,7 +205,24 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
             RESOURCE=$(oc get crd "${crd}" -o jsonpath='{.spec.names.plural}')
             GROUP=$(oc get crd "${crd}" -o jsonpath='{.spec.group}')
             log "Backing up ${RESOURCE}.${GROUP} instances"
-            oc get "${RESOURCE}.${GROUP}" -A -o yaml > "${CR_BACKUP_DIR}/${crd}.yaml" 2>/dev/null || true
+            # Back up only non-test CRs. Test CRs (names starting with "test-")
+            # are created by e2e tests and should not persist across CI runs.
+            ALL_ITEMS=$(oc get "${RESOURCE}.${GROUP}" -A --no-headers -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name 2>/dev/null || true)
+            : > "${CR_BACKUP_DIR}/${crd}.yaml"
+            while IFS= read -r line; do
+                [[ -z "${line}" ]] && continue
+                cr_ns=$(echo "${line}" | awk '{print $1}')
+                cr_name=$(echo "${line}" | awk '{print $2}')
+                if [[ "${cr_name}" == test-* ]]; then
+                    log "  Skipping test CR ${cr_name}"
+                    continue
+                fi
+                if oc get "${RESOURCE}.${GROUP}" "${cr_name}" -n "${cr_ns}" -o yaml >> "${CR_BACKUP_DIR}/${crd}.yaml" 2>/dev/null; then
+                    echo "---" >> "${CR_BACKUP_DIR}/${crd}.yaml"
+                else
+                    log "  WARNING: failed to back up ${cr_name} in ${cr_ns} (may have been deleted)"
+                fi
+            done <<< "${ALL_ITEMS}"
         fi
     done
 fi
@@ -237,6 +336,19 @@ for i in $(seq 1 30); do
     if oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
         break
     fi
+    # Poll ClusterPackage status for progress and early error detection
+    CP_PHASE=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+    if [[ -n "${CP_PHASE}" ]]; then
+        log "  ClusterPackage ${CLUSTER_PACKAGE_NAME} phase: ${CP_PHASE} (attempt ${i}/30)"
+        if [[ "${CP_PHASE}" == "Invalid" || "${CP_PHASE}" == *"Error"* ]]; then
+            log "ERROR: ClusterPackage ${CLUSTER_PACKAGE_NAME} has terminal phase: ${CP_PHASE}"
+            oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml 2>/dev/null || true
+            oc get clusterobjectset -o wide 2>/dev/null || true
+            exit 1
+        fi
+    else
+        log "  ClusterPackage ${CLUSTER_PACKAGE_NAME} phase: <not set> (attempt ${i}/30)"
+    fi
     if [[ $i -eq 30 ]]; then
         log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not found after 5 minutes"
         oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml || true
@@ -284,6 +396,51 @@ for attempt in $(seq 1 30); do
 done
 
 log "${OPERATOR_NAME} installed and ready in ${OPERATOR_NAMESPACE}"
+
+# Wait for operator CRDs to be established before restoring CRs or
+# handing off to the e2e test step.  Without this gate the API server's
+# REST mapper may not yet serve the CRD kinds, causing NoKindMatchError
+# failures in downstream steps.
+if [[ -n "${OPERATOR_CRDS:-}" ]]; then
+    IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
+    for crd in "${CRD_LIST[@]}"; do
+        crd=$(echo "${crd}" | xargs)
+        log "Waiting for CRD ${crd} to be established..."
+        if ! oc wait crd "${crd}" --for=condition=Established --timeout=60s; then
+            log "ERROR: CRD ${crd} not established after 60s"
+            oc get crd "${crd}" -o yaml 2>/dev/null || true
+            exit 1
+        fi
+    done
+    log "All operator CRDs established"
+
+    # Verify each CRD is actually served by the API server.
+    # condition=Established only means the CRD *object* has that status
+    # condition, but it does NOT guarantee the API server is serving the
+    # resource yet.  Without this check the operator (or e2e tests) can
+    # hit "the server could not find the requested resource" errors and
+    # never recover.  Poll `oc get <plural>.<group>` until the API
+    # server responds without error.
+    for crd in "${CRD_LIST[@]}"; do
+        crd=$(echo "${crd}" | xargs)
+        CRD_PLURAL=$(oc get crd "${crd}" -o jsonpath='{.spec.names.plural}')
+        CRD_GROUP=$(oc get crd "${crd}" -o jsonpath='{.spec.group}')
+        log "Verifying API server serves ${CRD_PLURAL}.${CRD_GROUP}..."
+        for i in $(seq 1 24); do
+            if oc get "${CRD_PLURAL}.${CRD_GROUP}" -A --no-headers --request-timeout=10s 2>/dev/null; then
+                break
+            fi
+            if [[ $i -eq 24 ]]; then
+                log "ERROR: CRD ${crd} established but API server not serving ${CRD_PLURAL}.${CRD_GROUP} after 120s"
+                oc get crd "${crd}" -o yaml 2>/dev/null || true
+                oc api-resources 2>/dev/null | grep -i "${CRD_PLURAL}" || true
+                exit 1
+            fi
+            sleep 5
+        done
+        log "CRD ${CRD_PLURAL}.${CRD_GROUP} is served by API server"
+    done
+fi
 
 # Restore backed-up CR instances that were deployed by SSS/MCC
 for backup in "${CR_BACKUP_DIR}"/*.yaml; do

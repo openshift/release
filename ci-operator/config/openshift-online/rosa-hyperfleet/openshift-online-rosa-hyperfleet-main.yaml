@@ -9,6 +9,8 @@ promotion:
   to:
   - namespace: ci
     tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -63,9 +65,26 @@ tests:
         export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
         ./ci/e2e-tests.sh
       credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-integration-creds
-        namespace: test-credentials
+      - collection: cluster-secrets-rosa-regional-platform-int
+        group: integration-creds
+        mount_path: /var/run/rosa-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: nightly-stage
+  cron: 0 4 * * *
+  steps:
+    test:
+    - as: e2e
+      commands: |-
+        export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
+        ./ci/e2e-tests.sh
+      credentials:
+      - collection: cluster-secrets-rosa-regional-platform-int
+        group: stage-creds
+        mount_path: /var/run/rosa-credentials
       from: src
       resources:
         requests:
@@ -82,9 +101,9 @@ tests:
         export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
         uv run --no-cache ci/ephemeral-provider/main.py --teardown-fire-and-forget
       credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-ephemeral-creds
-        namespace: test-credentials
+      - collection: cluster-secrets-rosa-regional-platform-int
+        group: ephemeral-creds
+        mount_path: /var/run/rosa-credentials
       from: src
       resources:
         requests:
@@ -99,9 +118,9 @@ tests:
         uv run --no-cache ci/ephemeral-provider/main.py \
           --save-regional-state "${SHARED_DIR}/regional-terraform-outputs.json"
       credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-ephemeral-creds
-        namespace: test-credentials
+      - collection: cluster-secrets-rosa-regional-platform-int
+        group: ephemeral-creds
+        mount_path: /var/run/rosa-credentials
       from: src
       resources:
         requests:
@@ -113,9 +132,9 @@ tests:
         export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
         ./ci/e2e-tests.sh
       credentials:
-      - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-ephemeral-creds
-        namespace: test-credentials
+      - collection: cluster-secrets-rosa-regional-platform-int
+        group: ephemeral-creds
+        mount_path: /var/run/rosa-credentials
       from: src
       resources:
         requests:

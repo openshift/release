@@ -42,6 +42,7 @@ promotion:
     namespace: hypershift
     tag: "4.19"
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -147,7 +148,7 @@ tests:
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   capabilities:
-  - build-tmpfs
+  - arm64
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
     cluster_profile: hypershift-aws
@@ -187,7 +188,7 @@ tests:
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-upgrade-hypershift-operator
   capabilities:
-  - build-tmpfs
+  - arm64
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
     cluster_profile: hypershift-aws
@@ -201,7 +202,7 @@ tests:
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-override
   capabilities:
-  - build-tmpfs
+  - arm64
   run_if_changed: (/overrides\.yaml$)
   steps:
     cluster_profile: hypershift-aws
@@ -220,8 +221,6 @@ tests:
       E2E_TEST_REGEX: ^TestCreateCluster$|TestAutoscaling
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
-      ETCD_STORAGE_CLASS: gp3-csi
-      KUBEVIRT_CSI_INFRA: gp3-csi
       RUN_EXTERNAL_INFRA_TEST: "false"
     workflow: hypershift-kubevirt-e2e-aws
 - always_run: false
@@ -234,8 +233,6 @@ tests:
       COMPUTE_NODE_TYPE: c5n.metal
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
-      ETCD_STORAGE_CLASS: gp3-csi
-      KUBEVIRT_CSI_INFRA: gp3-csi
     workflow: hypershift-kubevirt-e2e-aws
 - always_run: false
   as: e2e-kubevirt-azure-ovn

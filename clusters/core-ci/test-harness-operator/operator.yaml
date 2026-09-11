@@ -1,0 +1,36 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/matchTag: "true"
+    keel.sh/policy: force
+    keel.sh/pollSchedule: "@every 5m"
+    keel.sh/trigger: poll
+  labels:
+    app: test-harness-operator
+  name: test-harness-operator
+  namespace: test-harness
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-harness-operator
+  template:
+    metadata:
+      labels:
+        app: test-harness-operator
+    spec:
+      containers:
+      - args:
+        - --namespace=test-harness
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_test-harness-operator_test-harness-operator
+        imagePullPolicy: Always
+        name: test-harness-operator
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      serviceAccountName: test-harness-operator

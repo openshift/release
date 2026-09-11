@@ -34,6 +34,7 @@ raw_drivers_image = spec.get('driversImage', '')
 force_in_cluster = os.environ.get('ECO_HWACCEL_NEURON_IN_CLUSTER_BUILD', '').lower() == 'true'
 resolved_drivers_image = '' if force_in_cluster else (os.environ.get('ECO_HWACCEL_NEURON_DRIVERS_IMAGE', '') or raw_drivers_image)
 in_cluster_build = not bool(resolved_drivers_image)
+dra_mode = bool(os.environ.get('ECO_HWACCEL_NEURON_DRA_DRIVER_IMAGE', ''))
 
 version_source = resolved_drivers_image or raw_drivers_image
 if version_source and ':' in version_source:
@@ -48,10 +49,14 @@ mapping = {
     'ECO_HWACCEL_NEURON_SCHEDULER_IMAGE': spec.get('customSchedulerImage', ''),
     'ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE': spec.get('schedulerExtensionImage', ''),
     'ECO_HWACCEL_NEURON_NODE_METRICS_IMAGE': spec.get('nodeMetricsImage', ''),
+    'ECO_HWACCEL_NEURON_DRA_DRIVER_IMAGE': spec.get('draDriverImage', ''),
 }
 
 optional_when_in_cluster = {
     'ECO_HWACCEL_NEURON_DRIVERS_IMAGE',
+}
+dra_only = {
+    'ECO_HWACCEL_NEURON_DRA_DRIVER_IMAGE',
 }
 
 image_re = re.compile(r'^[a-zA-Z0-9._/:-]+(@sha256:[0-9a-fA-F]{64})?$')
@@ -65,6 +70,10 @@ with open(env_path, 'w') as ef:
             continue
         existing = os.environ.get(key, '')
         final = existing if existing else value
+        if not dra_mode and key in dra_only:
+            ef.write(f'export {key}=\n')
+            print(f'  {key}= (not used in this allocation mode)')
+            continue
         if not final:
             print(f'ERROR: {key} resolved to empty', file=sys.stderr)
             sys.exit(1)
@@ -76,6 +85,8 @@ with open(env_path, 'w') as ef:
     icb = 'true' if in_cluster_build else 'false'
     ef.write(f'export ECO_HWACCEL_NEURON_IN_CLUSTER_BUILD={icb}\n')
     print(f'  ECO_HWACCEL_NEURON_IN_CLUSTER_BUILD={icb}')
+    mode = 'dra' if dra_mode else 'device-plugin'
+    print(f'  allocation mode={mode}')
 "
 echo "DeviceConfig values resolved (written to SHARED_DIR/neuron-deviceconfig.env)"
 

@@ -18,9 +18,41 @@ tests:
     workflow: psalajova-test
 - as: test-gsm-secrets
   commands: |
-    echo "=== auto-discovery (collection+group, all fields) ==="
-    ls -la /var/my-secrets
-    cat /var/my-secrets/*
+    set -euo pipefail
+    # Assert that each expected mount directory exists and contains only
+    # non-empty secret files. No secret values are printed, only byte counts.
+    # Only the mount paths declared in this test's `secrets` stanza are checked,
+    # so pre-existing directories in the image (e.g. /var/adm) never affect the
+    # result.
+    assert_nonempty() {
+      local dir="$1"
+      echo "=== checking ${dir} ==="
+      if [[ ! -d "${dir}" ]]; then
+        echo "FAIL: expected mount directory ${dir} does not exist"
+        exit 1
+      fi
+      ls -la "${dir}"
+      local had_file=false f
+      # dotglob so keys like .dockerconfigjson are seen; the -f test skips the
+      # Kubernetes-internal ..data symlink and ..<timestamp> directory.
+      shopt -s nullglob dotglob
+      for f in "${dir}"/*; do
+        [[ -f "${f}" ]] || continue
+        if [[ ! -s "${f}" ]]; then
+          echo "FAIL: empty secret file ${f}"
+          exit 1
+        fi
+        echo "OK: ${f} ($(wc -c < "${f}") bytes)"
+        had_file=true
+      done
+      shopt -u nullglob dotglob
+      if ! "${had_file}"; then
+        echo "FAIL: no secret files mounted in ${dir}"
+        exit 1
+      fi
+    }
+    assert_nonempty /var/my-secrets
+    echo "all expected secret mounts validated"
   container:
     from: src
   cron: 0 0 1 1 *
@@ -30,16 +62,54 @@ tests:
     mount_path: /var/my-secrets
 - as: test-gsm-secrets-mixed
   commands: |
-    echo "=== 1. auto-discovery (collection+group) ==="
-    ls -la /var/auto-discovery
-    echo "=== 2. explicit field (collection+group+field) ==="
-    ls -la /var/explicit-field-without-as
-    echo "=== 3. explicit field with as rename ==="
-    ls -la /var/explicit-as
-    echo "=== 4. bundle sync_to_cluster:false (CSI path, multi-collection) ==="
-    ls -la /var/bundle-csi
-    echo "=== 5. bundle sync_to_cluster:true (K8s Secret path) ==="
-    ls -la /var/bundle-k8s
+    set -euo pipefail
+    # Assert that each expected mount directory exists and contains only
+    # non-empty secret files. No secret values are printed, only byte counts.
+    # Only the mount paths declared in this test's `secrets` stanza are checked,
+    # so pre-existing directories in the image (e.g. /var/adm) never affect the
+    # result.
+    assert_nonempty() {
+      local dir="$1"
+      echo "=== checking ${dir} ==="
+      if [[ ! -d "${dir}" ]]; then
+        echo "FAIL: expected mount directory ${dir} does not exist"
+        exit 1
+      fi
+      ls -la "${dir}"
+      local had_file=false f
+      # dotglob so keys like .dockerconfigjson are seen; the -f test skips the
+      # Kubernetes-internal ..data symlink and ..<timestamp> directory.
+      shopt -s nullglob dotglob
+      for f in "${dir}"/*; do
+        [[ -f "${f}" ]] || continue
+        if [[ ! -s "${f}" ]]; then
+          echo "FAIL: empty secret file ${f}"
+          exit 1
+        fi
+        echo "OK: ${f} ($(wc -c < "${f}") bytes)"
+        had_file=true
+      done
+      shopt -u nullglob dotglob
+      if ! "${had_file}"; then
+        echo "FAIL: no secret files mounted in ${dir}"
+        exit 1
+      fi
+    }
+    for mount_dir in \
+      /var/auto-discovery \
+      /var/explicit-field-without-as \
+      /var/explicit-as \
+      /var/bundle-csi \
+      /var/bundle-k8s; do
+      assert_nonempty "${mount_dir}"
+    done
+    # Validate the `as:` rename: the login field must be mounted as renamed-login.
+    if [[ ! -f /var/explicit-as/renamed-login ]]; then
+      echo "FAIL: expected renamed file /var/explicit-as/renamed-login not found"
+      exit 1
+    fi
+    echo "OK: 'as:' rename validated - /var/explicit-as/renamed-login exists"
+    echo "all expected secret mounts validated"
   container:
     from: src
   cron: 0 0 1 1 *
@@ -60,6 +130,7 @@ tests:
     mount_path: /var/bundle-csi
   - bundle: gce-sa-credentials-gcs-publisher
     mount_path: /var/bundle-k8s
+    namespace: ci
 zz_generated_metadata:
   branch: master
   org: psalajova

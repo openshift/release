@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   hypershift-oadp-plugin:
     name: hypershift-oadp-plugin
     namespace: konveyor
@@ -128,6 +132,8 @@ operator:
     with: velero-plugin-for-microsoft-azure
   - pullspec: quay.io/konveyor/velero:latest
     with: velero
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -150,18 +156,22 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
+      OADP_BRANCH: oadp-dev
       OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
+      TEST_NAME: e2e-test-cli-aws
+    post:
+    - ref: oadp-analyze-e2e-failure
     test:
     - as: e2e
       cli: latest
       commands: make TEST_CLI=true test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:
@@ -176,18 +186,22 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
+      OADP_BRANCH: oadp-dev
       OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
+      TEST_NAME: e2e-test-aws
+    post:
+    - ref: oadp-analyze-e2e-failure
     test:
     - as: e2e
       cli: latest
       commands: make test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:
@@ -210,18 +224,22 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
+      OADP_BRANCH: oadp-dev
       OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
+      TEST_NAME: e2e-test-aws-periodic
+    post:
+    - ref: oadp-analyze-e2e-failure
     test:
     - as: e2e
       cli: latest
       commands: make test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:
@@ -235,18 +253,22 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
+      OADP_BRANCH: oadp-dev
       OO_CHANNEL: dev
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
+      TEST_NAME: e2e-test-cli-aws-periodic
+    post:
+    - ref: oadp-analyze-e2e-failure
     test:
     - as: e2e
       cli: latest
       commands: make TEST_CLI=true test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator
       resources:
         requests:

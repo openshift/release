@@ -84,7 +84,6 @@ echo "Target hub inventory copied from SHARED_DIR and spoke inventory processed"
 
 # Target hub kubeconfig at the standard telcov10n path on the target bastion
 TARGET_HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
-TARGET_VM_NAME="master-0.${TARGET_CLUSTER_NAME}"
 
 echo ""
 echo "=== Step 1: Prepare IBU target SNO and retrieve kubeconfig ==="
@@ -93,8 +92,7 @@ cd /eco-ci-cd
 ansible-playbook playbooks/ran/ibu-prepare-spoke-sno.yml \
   -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
   --extra-vars "hub_cluster=${TARGET_CLUSTER_NAME}" \
-  --extra-vars "spoke_cluster=${TARGET_SPOKE_SNO}" \
-  --extra-vars "seed_vm_name=${TARGET_VM_NAME}"
+  --extra-vars "spoke_cluster=${TARGET_SPOKE_SNO}"
 
 echo ""
 echo "=== Step 2: Run eco-gotests IBU upgrade suite ==="
@@ -135,12 +133,25 @@ mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests_upgrade"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i "${PROJECT_DIR}/temp_ssh_key" \
   "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests/report/*.xml" \
-  "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"
+  "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/" || echo "No XML artifacts in eco_gotests upgrade — skipping"
 rm -f "${PROJECT_DIR}/temp_ssh_key"
 
-# Save junit XMLs to SHARED_DIR with junit_ prefix for ibu-report step
+# ibu-report sends polarion_* files to Report Portal (POLARION_REPORT_PATH)
+# and junit_* files to the Polarion converter (JUNIT_REPORT_PATH).
+echo "Store Polarion and junit reports for reporter step"
+for f in "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"report_*.xml; do
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f")
+    echo "Copying polarion report: ${filename} -> polarion_ibu_upgrade_${filename}"
+    cp "$f" "${SHARED_DIR}/polarion_ibu_upgrade_${filename}"
+  fi
+done
 for f in "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"*.xml; do
-  [[ -f "$f" ]] && cp "$f" "${SHARED_DIR}/junit_ibu_upgrade_$(basename "$f")"
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f")
+    echo "Copying junit report: ${filename} -> junit_ibu_upgrade_${filename}"
+    cp "$f" "${SHARED_DIR}/junit_ibu_upgrade_${filename}"
+  fi
 done
 
 echo ""

@@ -113,7 +113,9 @@ function copyArtifacts {
 {
   "step_script_ref": "distributed-tracing/tests/tracing-ui/integration/distributed-tracing-tests-tracing-ui-integration-commands.sh",
   "has_test_failures": ${has_failures},
-  "env": {}
+  "env": {
+    "CYPRESS_SKIP_TESTS": "${CYPRESS_SKIP_TESTS:-}"
+  }
 }
 EOF
   echo "QE agent context and ${i} JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures})"

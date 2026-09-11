@@ -148,6 +148,14 @@ setup_ansible_inventory() {
     echo "Create host_vars directory"
     mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
 
+    # Process hypervisor host variables so plays targeting [hypervisor] can resolve the real IP.
+    # No setup_direct_ssh here — group_vars/hypervisors provides the SSH key.
+    if [[ -d "${MOUNTED_HOST_INVENTORY}/common/hypervisor" ]]; then
+        echo "Process hypervisor host inventory"
+        process_inventory "${MOUNTED_HOST_INVENTORY}/common/hypervisor" \
+            /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
+    fi
+
     # Copy spoke credentials to temporary location
     mkdir -p /tmp/"${spoke_cluster}" && chmod 700 /tmp/"${spoke_cluster}"
 

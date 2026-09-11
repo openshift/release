@@ -1261,6 +1261,30 @@ is_version_gte() {
   return 1
 }
 
+# Returns 0 (skip) if REPO_MAP_PATH marks the component at $repo_url deprecated
+# with a removed_in_version <= $version, meaning the repo no longer exists on
+# that release line and should not be fast-forwarded to it.
+# Matches on the documented .repository field (full URL), not .name, since a
+# component's .name does not always match the last path segment of its
+# .repository URL (e.g. "multicluster-operators-application" vs. repository
+# ".../multicloud-operators-application").
+is_repo_deprecated_for_version() {
+  local repo_url=$1
+  local version=$2
+
+  local removed_in
+  removed_in=$(yq '.components[] | select(.repository == "'"${repo_url}"'") | select(.deprecated == true) | .removed_in_version' "${REPO_MAP_PATH}" 2>/dev/null | head -1)
+
+  if [[ -z "${removed_in}" || "${removed_in}" == "null" ]]; then
+    return 1
+  fi
+
+  if is_version_gte "${version}" "${removed_in}"; then
+    return 0
+  fi
+  return 1
+}
+
 # Repos with release-* default branch - exclude from main fast-forward
 # These are processed separately to handle non-main default branches
 # EXCLUDED_REPOS list is no longer needed - auto-detect based on default branch
@@ -1361,9 +1385,14 @@ for product in mce acm globalhub; do
       # NORMAL REPO HANDLING: default branch is main/master
       echo "INFO: Using normal fast-forward (${default_branch} → release branches)"
 
-      # Build filtered version list for this repo (excluding per-repo version skips)
+      # Build filtered version list for this repo (excluding per-repo version skips
+      # and versions where the repo is marked deprecated/removed in REPO_MAP_PATH)
       REPO_DEST_VERSIONS=""
       for version in ${DESTINATION_VERSIONS}; do
+        if is_repo_deprecated_for_version "https://github.com/${owner_repo}" "${version}"; then
+          echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (deprecated component)"
+          continue
+        fi
         if is_repo_version_skipped "${repo}" "${version}"; then
           echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (per-repo version exclusion)"
           continue
@@ -1522,6 +1551,12 @@ for product in mce acm globalhub; do
 
       # Fast-forward to destination branches and transform Tekton files
       for version in ${DESTINATION_VERSIONS}; do
+        # Check if repo is deprecated/removed as of this version
+        if is_repo_deprecated_for_version "https://github.com/${owner_repo}" "${version}"; then
+          echo "INFO: Skipping ${owner_repo} → ${repo_branch_prefix}-${version} (deprecated component)"
+          continue
+        fi
+
         # Check per-repo version exclusion
         if is_repo_version_skipped "${repo}" "${version}"; then
           echo "INFO: Skipping ${owner_repo} → ${repo_branch_prefix}-${version} (per-repo version exclusion)"

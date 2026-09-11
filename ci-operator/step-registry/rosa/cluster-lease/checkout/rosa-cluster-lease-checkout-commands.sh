@@ -30,22 +30,43 @@ lease_oc() {
 }
 
 # Build label selector
+# DIAG_SELECTOR matches all managed clusters in the pool (no status filter) for diagnostic logging.
+# SELECTOR further restricts to available clusters in exclusive mode.
+DIAG_SELECTOR="rosa-cluster-lease/managed=true,rosa-cluster-lease/type=${LEASE_TYPE}"
+if [[ -n "${LEASE_ENV}" ]]; then
+    DIAG_SELECTOR="${DIAG_SELECTOR},rosa-cluster-lease/env=${LEASE_ENV}"
+fi
+if [[ -n "${LEASE_REGION}" ]]; then
+    DIAG_SELECTOR="${DIAG_SELECTOR},rosa-cluster-lease/region=${LEASE_REGION}"
+fi
+if [[ -n "${LEASE_VERSION}" ]]; then
+    DIAG_SELECTOR="${DIAG_SELECTOR},rosa-cluster-lease/version=${LEASE_VERSION}"
+fi
+
 # When OPERATOR_NAME is set, query all managed clusters (not just available)
 # and filter by operator in-script to support concurrent use
 if [[ -n "${OPERATOR_NAME}" ]]; then
-    SELECTOR="rosa-cluster-lease/managed=true,rosa-cluster-lease/type=${LEASE_TYPE}"
+    SELECTOR="${DIAG_SELECTOR}"
 else
-    SELECTOR="rosa-cluster-lease/managed=true,rosa-cluster-lease/status=available,rosa-cluster-lease/type=${LEASE_TYPE}"
+    SELECTOR="${DIAG_SELECTOR},rosa-cluster-lease/status=available"
 fi
-if [[ -n "${LEASE_ENV}" ]]; then
-    SELECTOR="${SELECTOR},rosa-cluster-lease/env=${LEASE_ENV}"
-fi
-if [[ -n "${LEASE_REGION}" ]]; then
-    SELECTOR="${SELECTOR},rosa-cluster-lease/region=${LEASE_REGION}"
-fi
-if [[ -n "${LEASE_VERSION}" ]]; then
-    SELECTOR="${SELECTOR},rosa-cluster-lease/version=${LEASE_VERSION}"
-fi
+
+log_cluster_inventory() {
+    local clusters_json="$1"
+    local total i cm name status ops holder build_id acquired_at
+    total=$(echo "${clusters_json}" | jq '.items | length')
+    log "Cluster inventory (${total} total):"
+    for i in $(seq 0 $((total - 1))); do
+        cm=$(echo "${clusters_json}" | jq ".items[${i}]")
+        name=$(echo "${cm}" | jq -r '.metadata.name')
+        status=$(echo "${cm}" | jq -r '.metadata.labels["rosa-cluster-lease/status"] // "unknown"')
+        ops=$(echo "${cm}" | jq -r '.metadata.annotations["rosa-cluster-lease/operators"] // ""')
+        holder=$(echo "${cm}" | jq -r '.metadata.annotations["rosa-cluster-lease/holder"] // ""')
+        build_id=$(echo "${cm}" | jq -r '.metadata.annotations["rosa-cluster-lease/build-id"] // ""')
+        acquired_at=$(echo "${cm}" | jq -r '.metadata.annotations["rosa-cluster-lease/acquired-at"] // ""')
+        log "  ${name}: status=${status} ops=[${ops}] holder=${holder:-none} build=${build_id:-none} acquired=${acquired_at:-never}"
+    done
+}
 
 # Check if a cluster is eligible for this operator
 cluster_eligible() {
@@ -117,6 +138,10 @@ while true; do
             log "No eligible clusters (${TOTAL} total, all either have ${OPERATOR_NAME} running or are unhealthy). Waiting 30s..."
         else
             log "No available clusters in lease inventory. Waiting 30s..."
+        fi
+        if [[ "${ATTEMPT}" -eq 1 || $(( ATTEMPT % 10 )) -eq 0 ]]; then
+            DIAG_JSON=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "${DIAG_SELECTOR}" -o json 2>/dev/null || echo '{"items":[]}')
+            log_cluster_inventory "${DIAG_JSON}"
         fi
         sleep 30
         continue

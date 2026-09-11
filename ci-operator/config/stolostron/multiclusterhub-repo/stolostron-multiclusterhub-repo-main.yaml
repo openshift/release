@@ -18,6 +18,8 @@ promotion:
   to:
   - name: "2.7"
     namespace: stolostron
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -37,8 +39,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -47,8 +50,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: fast-forward
   postsubmit: true
   steps:
