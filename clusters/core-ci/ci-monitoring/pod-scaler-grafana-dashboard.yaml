@@ -17,139 +17,1144 @@ spec:
       "schemaVersion": 38,
       "version": 1,
       "refresh": "30s",
-      "time": { "from": "now-24h", "to": "now" },
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
       "templating": {
         "list": [
           {
             "name": "cluster",
             "type": "query",
             "datasource": "thanos-query",
-            "query": "label_values(pod_scaler_authoritative_decrease_total, clusterName)",
+            "query": "label_values(up{job=\"pod-scaler-consumer-admission\"}, clusterName)",
             "refresh": 2,
             "includeAll": true,
             "multi": true,
             "allValue": ".*"
+          },
+          {
+            "name": "namespace",
+            "type": "query",
+            "datasource": "thanos-query",
+            "query": "label_values(kube_pod_container_resource_requests{namespace=~\"ci-op-.*\"}, namespace)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "allValue": "ci-op-.*"
+          },
+          {
+            "name": "min_cpu_cores",
+            "type": "constant",
+            "query": "8",
+            "current": {
+              "text": "8",
+              "value": "8"
+            }
+          },
+          {
+            "name": "min_mem_gi",
+            "type": "constant",
+            "query": "8",
+            "current": {
+              "text": "8",
+              "value": "8"
+            }
+          },
+          {
+            "name": "mem_pressure",
+            "type": "constant",
+            "query": "0.8",
+            "current": {
+              "text": "0.8",
+              "value": "0.8"
+            }
+          },
+          {
+            "name": "spike_ratio",
+            "type": "constant",
+            "query": "3",
+            "current": {
+              "text": "3",
+              "value": "3"
+            }
           }
         ]
       },
       "panels": [
         {
+          "type": "row",
+          "title": "Admission metrics (pod_scaler_*) \u2014 applied & dry_run",
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "collapsed": false
+        },
+        {
           "type": "stat",
-          "title": "Potential allocated memory savings if dry-run limits applied (GiB/hr)",
-          "description": "Sum of memory limit/request deltas recorded at admission (dry_run), not measured usage.",
-          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+          "title": "Admission targets up",
+          "gridPos": {
+            "h": 4,
+            "w": 3,
+            "x": 0,
+            "y": 1
+          },
           "datasource": "thanos-query",
           "targets": [
             {
-              "expr": "sum(rate(pod_scaler_authoritative_savings_memory_bytes_total{mode=\"dry_run\",clusterName=~\"$cluster\"}[1h])) * 3600 / 1024^3",
-              "legendFormat": "dry_run"
+              "expr": "count(up{job=\"pod-scaler-consumer-admission\",clusterName=~\"$cluster\"} == 1)"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "none", "decimals": 2 } }
-        },
-        {
-          "type": "timeseries",
-          "title": "Applied decreases / sec by resource",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-          "datasource": "thanos-query",
-          "targets": [
-            {
-              "expr": "sum(rate(pod_scaler_authoritative_decrease_total{mode=\"applied\",clusterName=~\"$cluster\"}[5m])) by (resource)",
-              "legendFormat": "{{resource}}"
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
             }
-          ]
+          }
         },
         {
-          "type": "timeseries",
-          "title": "Dry-run decreases / sec by resource",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "type": "stat",
+          "title": "4h applied decreases",
+          "gridPos": {
+            "h": 4,
+            "w": 3,
+            "x": 3,
+            "y": 1
+          },
           "datasource": "thanos-query",
           "targets": [
             {
-              "expr": "sum(rate(pod_scaler_authoritative_decrease_total{mode=\"dry_run\",clusterName=~\"$cluster\"}[5m])) by (resource)",
-              "legendFormat": "{{resource}}"
-            }
-          ]
-        },
-        {
-          "type": "timeseries",
-          "title": "Applied allocated CPU savings (millicores / hr) by workload_type and resource",
-          "description": "Request/limit delta at admission, not CPU time consumed.",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
-          "datasource": "thanos-query",
-          "targets": [
-            {
-              "expr": "sum(rate(pod_scaler_authoritative_savings_cpu_millicores_total{mode=\"applied\",clusterName=~\"$cluster\"}[1h])) by (workload_type, resource) * 3600",
-              "legendFormat": "{{workload_type}} {{resource}}"
-            }
-          ]
-        },
-        {
-          "type": "timeseries",
-          "title": "Applied allocated memory savings (GiB / hr) by workload_type and resource",
-          "description": "Request/limit delta at admission, not bytes touched at runtime.",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
-          "datasource": "thanos-query",
-          "targets": [
-            {
-              "expr": "sum(rate(pod_scaler_authoritative_savings_memory_bytes_total{mode=\"applied\",clusterName=~\"$cluster\"}[1h])) by (workload_type, resource) * 3600 / 1024^3",
-              "legendFormat": "{{workload_type}} {{resource}}"
-            }
-          ]
-        },
-        {
-          "type": "timeseries",
-          "title": "Mean reduction ratio (applied)",
-          "description": "Uses histogram _sum/_count (bucket series are dropped by build-cluster remote write).",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
-          "datasource": "thanos-query",
-          "targets": [
-            {
-              "expr": "sum(rate(pod_scaler_authoritative_reduction_ratio_sum{mode=\"applied\",clusterName=~\"$cluster\"}[1h])) by (resource) / sum(rate(pod_scaler_authoritative_reduction_ratio_count{mode=\"applied\",clusterName=~\"$cluster\"}[1h])) by (resource)",
-              "legendFormat": "{{resource}}"
+              "expr": "sum(increase(pod_scaler_authoritative_decrease_total{mode=\"applied\",clusterName=~\"$cluster\"}[4h]))"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "percentunit" } }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "title": "4h dry-run decreases",
+          "gridPos": {
+            "h": 4,
+            "w": 3,
+            "x": 6,
+            "y": 1
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(increase(pod_scaler_authoritative_decrease_total{mode=\"dry_run\",clusterName=~\"$cluster\"}[4h]))"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "title": "4h applied mem savings (GiB)",
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 9,
+            "y": 1
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(increase(pod_scaler_authoritative_savings_memory_bytes_total{mode=\"applied\",clusterName=~\"$cluster\"}[4h])) / 1024^3"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 1
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "title": "4h dry-run mem savings (GiB)",
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 13,
+            "y": 1
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(increase(pod_scaler_authoritative_savings_memory_bytes_total{mode=\"dry_run\",clusterName=~\"$cluster\"}[4h])) / 1024^3"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 1
+            }
+          },
+          "description": "Allocated savings if dry-run limits applied"
+        },
+        {
+          "type": "stat",
+          "title": "4h applied capped",
+          "gridPos": {
+            "h": 4,
+            "w": 3,
+            "x": 17,
+            "y": 1
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(increase(pod_scaler_authoritative_decrease_total{mode=\"applied\",reduction_capped=\"true\",clusterName=~\"$cluster\"}[4h]))"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            }
+          },
+          "description": "Applied mode hit max-reduction cap"
+        },
+        {
+          "type": "stat",
+          "title": "4h dry-run capped",
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 20,
+            "y": 1
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(increase(pod_scaler_authoritative_decrease_total{mode=\"dry_run\",reduction_capped=\"true\",clusterName=~\"$cluster\"}[4h]))"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            }
+          },
+          "description": "Dry-run mode hit max-reduction cap"
+        },
+        {
+          "type": "timeseries",
+          "title": "Decreases / sec by mode and resource",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 5
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_decrease_total{clusterName=~\"$cluster\"}[5m])) by (mode, resource)",
+              "legendFormat": "{{mode}} {{resource}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Capped decreases / sec by mode and cluster",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 5
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_decrease_total{reduction_capped=\"true\",clusterName=~\"$cluster\"}[5m])) by (mode, clusterName)",
+              "legendFormat": "{{mode}} {{clusterName}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Decreases / sec by mode and cluster",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 12
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_decrease_total{clusterName=~\"$cluster\"}[5m])) by (mode, clusterName)",
+              "legendFormat": "{{mode}} {{clusterName}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Memory savings (GiB/hr) by mode and cluster",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 12
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_savings_memory_bytes_total{clusterName=~\"$cluster\"}[1h])) by (mode, clusterName) * 3600 / 1024^3",
+              "legendFormat": "{{mode}} {{clusterName}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "CPU savings (millicores/hr) by mode and cluster",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 19
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_savings_cpu_millicores_total{clusterName=~\"$cluster\"}[1h])) by (mode, clusterName) * 3600",
+              "legendFormat": "{{mode}} {{clusterName}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Mean reduction ratio by mode and resource",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 19
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(rate(pod_scaler_authoritative_reduction_ratio_sum{clusterName=~\"$cluster\"}[1h])) by (mode, resource) / sum(rate(pod_scaler_authoritative_reduction_ratio_count{clusterName=~\"$cluster\"}[1h])) by (mode, resource)",
+              "legendFormat": "{{mode}} {{resource}}"
+            }
+          ],
+          "description": "Histogram _sum/_count only",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit"
+            }
+          }
         },
         {
           "type": "table",
-          "title": "24h applied decreases by workload_type and resource",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "title": "4h decreases by mode, workload_type, resource",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 26
+          },
           "datasource": "thanos-query",
           "targets": [
             {
-              "expr": "sum(increase(pod_scaler_authoritative_decrease_total{mode=\"applied\",clusterName=~\"$cluster\"}[24h])) by (workload_type, resource, reduction_capped)",
+              "expr": "sum(increase(pod_scaler_authoritative_decrease_total{clusterName=~\"$cluster\"}[4h])) by (mode, workload_type, resource, reduction_capped)",
               "format": "table",
               "instant": true
             }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
           ]
         },
         {
-          "type": "timeseries",
-          "title": "CI OOM terminations (1h increase, context)",
-          "description": "kube-state-metrics from build clusters; correlate with scaler rollouts manually — not causal.",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "type": "table",
+          "title": "4h capped decreases by mode and workload_type",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 26
+          },
           "datasource": "thanos-query",
           "targets": [
             {
-              "expr": "sum(increase(kube_pod_container_status_terminations_reason_total{reason=\"OOMKilled\",namespace=~\"ci-op-.*\",clusterName=~\"$cluster\"}[1h])) by (clusterName)",
+              "expr": "sum(increase(pod_scaler_authoritative_decrease_total{reduction_capped=\"true\",clusterName=~\"$cluster\"}[4h])) by (mode, workload_type, resource)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
+          "description": "Scaler hit max-reduction cap"
+        },
+        {
+          "type": "table",
+          "title": "4h memory savings by mode and workload_type (GiB)",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 33
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(increase(pod_scaler_authoritative_savings_memory_bytes_total{clusterName=~\"$cluster\"}[4h])) by (mode, workload_type, resource) / 1024^3",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "title": "4h CPU savings by mode and workload_type (millicores)",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 33
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(increase(pod_scaler_authoritative_savings_cpu_millicores_total{clusterName=~\"$cluster\"}[4h])) by (mode, workload_type, resource)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "Workload culprits \u2014 requests & waste",
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 40
+          },
+          "collapsed": false
+        },
+        {
+          "type": "stat",
+          "title": "Pods: memory request >= threshold",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 41
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "count(max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > $min_mem_gi * 1024^3)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "title": "Pods: memory pressure >= threshold",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 41
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "count((max by (clusterName, namespace, pod, container) (container_memory_working_set_bytes{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}) / max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"})) >= $mem_pressure)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "title": "Pods: CPU request >= threshold",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 41
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "count(max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"cpu\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > $min_cpu_cores)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "title": "Pods: CPU usage/request > 85%",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 41
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "count(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m]) / on(clusterName, namespace, pod, container) group_left() max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"cpu\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > 0.85)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            }
+          }
+        },
+        {
+          "type": "table",
+          "title": "High memory request (>= $min_mem_gi GiB)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 45
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(40, max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > $min_mem_gi * 1024^3)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "title": "High CPU request (>= $min_cpu_cores cores)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 45
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(40, max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"cpu\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > $min_cpu_cores)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "title": "Low memory util (request >= $min_mem_gi GiB, usage/request < 20%)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 53
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(40, (max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > $min_mem_gi * 1024^3) and ((avg_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[1h]) / on(clusterName, namespace, pod, container) group_left() max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"})) < 0.2))",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "title": "Low CPU util (request >= $min_cpu_cores, usage/request < 10%)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 53
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(40, avg_over_time(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m])[1h:5m]) / on(clusterName, namespace, pod, container) group_left() max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"cpu\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) < 0.1 and max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"cpu\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > $min_cpu_cores)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "title": "Top namespaces by memory request (GiB)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 61
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(25, sum by (clusterName, namespace) (kube_pod_container_resource_requests{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) / 1024^3)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "title": "Top namespaces by CPU request (cores)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 61
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(25, sum by (clusterName, namespace) (kube_pod_container_resource_requests{resource=\"cpu\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}))",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "Resource stress & burstiness",
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 69
+          },
+          "collapsed": false
+        },
+        {
+          "type": "table",
+          "title": "High memory pressure (working_set / request >= $mem_pressure)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 70
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(40, (max by (clusterName, namespace, pod, container) (container_memory_working_set_bytes{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}) / max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"})) >= $mem_pressure)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2
+            }
+          }
+        },
+        {
+          "type": "table",
+          "title": "High CPU usage vs request (> 85%)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 70
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(40, rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m]) / on(clusterName, namespace, pod, container) group_left() max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"cpu\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > 0.85)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2
+            }
+          }
+        },
+        {
+          "type": "table",
+          "title": "Memory limit >> request (ratio > 2)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 78
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(40, max by (clusterName, namespace, pod, container) (kube_pod_container_resource_limits{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) / max by (clusterName, namespace, pod, container) (kube_pod_container_resource_requests{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > 2)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
+          "description": "Limit/request skew"
+        },
+        {
+          "type": "table",
+          "title": "Memory near limit (working_set / limit > 85%)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 78
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(40, max by (clusterName, namespace, pod, container) (container_memory_working_set_bytes{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}) / max by (clusterName, namespace, pod, container) (kube_pod_container_resource_limits{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > 0.85 and max by (clusterName, namespace, pod, container) (kube_pod_container_resource_limits{resource=\"memory\",namespace=~\"$namespace\",container!=\"\",clusterName=~\"$cluster\"}) > 0)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2
+            }
+          }
+        },
+        {
+          "type": "table",
+          "title": "CPU spikes (max/avg 1h >= $spike_ratio x)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 86
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(40, max_over_time(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m])[1h:5m]) / clamp_min(avg_over_time(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m])[1h:5m]), 0.001) >= $spike_ratio)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "title": "Memory spikes (max/avg 1h >= $spike_ratio x)",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 86
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(40, max_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[1h]) / avg_over_time(container_memory_working_set_bytes{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[1h]) >= $spike_ratio)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "Throttle, OOM & fleet context",
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 94
+          },
+          "collapsed": false
+        },
+        {
+          "type": "table",
+          "title": "Top CPU throttle ratio by pod (1h)",
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 95
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "topk(30, sum by (clusterName, namespace, pod, container) (rate(container_cpu_cfs_throttled_seconds_total{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[1h])) / clamp_min(sum by (clusterName, namespace, pod, container) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[1h])), 0.001))",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Value",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "CI OOM terminations (1h increase)",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 103
+          },
+          "datasource": "thanos-query",
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_terminations_reason_total{reason=\"OOMKilled\",namespace=~\"$namespace\",clusterName=~\"$cluster\"}[1h])) by (clusterName)",
               "legendFormat": "{{clusterName}}"
             }
           ]
         },
         {
           "type": "timeseries",
-          "title": "CI CPU throttle ratio (context)",
-          "description": "High throttle after request cuts may indicate under-provisioning.",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "title": "CI CPU throttle ratio by cluster",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 103
+          },
           "datasource": "thanos-query",
           "targets": [
             {
-              "expr": "sum(rate(container_cpu_cfs_throttled_seconds_total{namespace=~\"ci-op-.*\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m])) by (clusterName) / sum(rate(container_cpu_usage_seconds_total{namespace=~\"ci-op-.*\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m])) by (clusterName)",
+              "expr": "sum(rate(container_cpu_cfs_throttled_seconds_total{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m])) by (clusterName) / sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\",container!=\"\",container!=\"POD\",clusterName=~\"$cluster\"}[5m])) by (clusterName)",
               "legendFormat": "{{clusterName}}"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "percentunit" } }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit"
+            }
+          }
         }
       ]
     }

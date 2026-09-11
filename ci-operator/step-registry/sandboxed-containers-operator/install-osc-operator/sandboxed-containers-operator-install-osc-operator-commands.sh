@@ -370,30 +370,36 @@ function render_osc_operands_chart() {
 
       case "${provider}" in
         azure)
-          local azure_subnet_id azure_nsg_id azure_resource_group azure_region azure_instance_size
+          local azure_subnet_id azure_nsg_id azure_resource_group azure_region azure_instance_size azure_instance_sizes
           azure_subnet_id=$(echo "${cm_data}" | jq -r '.data.AZURE_SUBNET_ID // ""')
           azure_nsg_id=$(echo "${cm_data}" | jq -r '.data.AZURE_NSG_ID // ""')
           azure_resource_group=$(echo "${cm_data}" | jq -r '.data.AZURE_RESOURCE_GROUP // ""')
           azure_region=$(echo "${cm_data}" | jq -r '.data.AZURE_REGION // ""')
           azure_instance_size=$(echo "${cm_data}" | jq -r '.data.AZURE_INSTANCE_SIZE // ""')
+          azure_instance_sizes=$(echo "${cm_data}" | jq -r '.data.AZURE_INSTANCE_SIZES // ""')
           [[ -n "${azure_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_SUBNET_ID=${azure_subnet_id}")
           [[ -n "${azure_nsg_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_NSG_ID=${azure_nsg_id}")
           [[ -n "${azure_resource_group}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_RESOURCE_GROUP=${azure_resource_group}")
           [[ -n "${azure_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_REGION=${azure_region}")
-          [[ -n "${azure_instance_size}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZE=${azure_instance_size}") || true
+          [[ -n "${azure_instance_size}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZE=${azure_instance_size}")
+          # Escape commas so helm --set-string treats the list as one value.
+          [[ -n "${azure_instance_sizes}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZES=${azure_instance_sizes//,/\\,}") || true
           ;;
         aws)
-          local aws_region aws_subnet_id aws_vpc_id aws_sg_ids podvm_instance_type
+          local aws_region aws_subnet_id aws_vpc_id aws_sg_ids podvm_instance_type podvm_instance_types
           aws_region=$(echo "${cm_data}" | jq -r '.data.AWS_REGION // ""')
           aws_subnet_id=$(echo "${cm_data}" | jq -r '.data.AWS_SUBNET_ID // ""')
           aws_vpc_id=$(echo "${cm_data}" | jq -r '.data.AWS_VPC_ID // ""')
           aws_sg_ids=$(echo "${cm_data}" | jq -r '.data.AWS_SG_IDS // ""')
           podvm_instance_type=$(echo "${cm_data}" | jq -r '.data.PODVM_INSTANCE_TYPE // ""')
+          podvm_instance_types=$(echo "${cm_data}" | jq -r '.data.PODVM_INSTANCE_TYPES // ""')
           [[ -n "${aws_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_REGION=${aws_region}")
           [[ -n "${aws_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SUBNET_ID=${aws_subnet_id}")
           [[ -n "${aws_vpc_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_VPC_ID=${aws_vpc_id}")
           [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids}")
-          [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}") || true
+          [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}")
+          # Escape commas so helm --set-string treats the list as one value.
+          [[ -n "${podvm_instance_types}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPES=${podvm_instance_types//,/\\,}") || true
           ;;
         gcp)
           local gcp_project_id gcp_zone gcp_network gcp_machine_type
