@@ -23,7 +23,7 @@ MOCK_LLM_IMAGE="${MOCK_LLM_IMAGE:-quay.io/rh-ee-bbodapat/lcs-testing:mock-llm-se
 ENABLE_PYROSCOPE="${ENABLE_PYROSCOPE:-true}"
 ENABLE_MEMRAY="${ENABLE_MEMRAY:-false}"
 LCS_WORKERS="${LCS_WORKERS:-1}"
-ES_INDEX="${ES_INDEX:-lcs-perf-results}"
+ES_INDEX="${ES_BENCHMARK_INDEX:-lcs-perf-results}"
 
 LCS_PROVIDER="${LCS_PROVIDER:-openai}"
 LCS_MODEL="${LCS_MODEL:-granite-3.1-8b-instruct}"
@@ -36,11 +36,14 @@ METRIC_STEP="${METRIC_STEP:-30s}"
 PYROSCOPE_NAMESPACE="pyroscope"
 PYROSCOPE_URL="http://pyroscope.${PYROSCOPE_NAMESPACE}.svc.cluster.local:4040"
 
-# ─── Read ES credentials ───
+# ─── Read ES credentials (tracing disabled to protect secrets) ───
+[[ $- == *x* ]] && _WAS_TRACING=true || _WAS_TRACING=false
+set +x
 ES_PASSWORD=$(<"/secret/password")
 ES_USERNAME=$(<"/secret/username")
 ES_SERVER_HOST="${ES_SERVER_HOST:-search-ocp-qe-perf-scale-test}"
 ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_SERVER_HOST}"
+if $_WAS_TRACING; then set -x; fi
 
 echo "╔══════════════════════════════════════════════════════════╗"
 echo "║  LCS Performance Test Configuration                     ║"
@@ -186,7 +189,7 @@ data:
 
     ogx:
       use_as_library_client: true
-      library_client_config_path: /app/config/run.yaml
+      library_client_config_path: /app-config/run.yaml
       timeout: 120
 
     auth:
@@ -242,9 +245,9 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
               value: \"${PYROSCOPE_URL}\""
 fi
 
-MEMRAY_CMD=""
+LCS_COMMAND_OVERRIDE=""
 if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
-  MEMRAY_CMD='["memray", "run", "--output", "/mnt/profiling/memray-output.bin", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8080"]'
+  LCS_COMMAND_OVERRIDE='          command: ["memray", "run", "--output", "/mnt/profiling/memray-output.bin", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8080"]'
 fi
 
 cat <<DEPLOYMENT | oc apply -f -
@@ -269,6 +272,7 @@ spec:
       containers:
         - name: lcs
           image: ${LCS_APP_IMAGE}
+${LCS_COMMAND_OVERRIDE}
           ports:
             - containerPort: 8080
           env:
@@ -384,20 +388,35 @@ oc delete job lcs-load-generator -n "${LCS_NAMESPACE}" --ignore-not-found=true
 echo "── Applying load generator Job ──"
 envsubst < "${JOB_MANIFEST}" | oc apply -f -
 
-# Wait for Job to complete (24h max — matches step timeout)
+# Wait for Job to complete or fail (24h max — matches step timeout)
 echo "── Waiting for Job completion ──"
-oc wait --for=condition=complete job/lcs-load-generator \
-  -n "${LCS_NAMESPACE}" --timeout=86400s || {
-    echo "ERROR: Load generator Job failed or timed out"
-    echo "── Job status ──"
-    oc get job lcs-load-generator -n "${LCS_NAMESPACE}" -o yaml
-    echo "── Job pod logs ──"
-    JOB_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
-    if [[ -n "${JOB_POD}" ]]; then
-      oc logs -n "${LCS_NAMESPACE}" "${JOB_POD}" --tail=200
-    fi
-    exit 1
-  }
+JOB_WAIT_DEADLINE=$(( $(date +%s) + 86400 ))
+JOB_FINISHED=""
+while [[ -z "${JOB_FINISHED}" ]]; do
+  SUCCEEDED=$(oc get job lcs-load-generator -n "${LCS_NAMESPACE}" -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "")
+  FAILED=$(oc get job lcs-load-generator -n "${LCS_NAMESPACE}" -o jsonpath='{.status.failed}' 2>/dev/null || echo "")
+  if [[ "${SUCCEEDED}" == "1" ]]; then
+    JOB_FINISHED="complete"
+  elif [[ -n "${FAILED}" ]] && [[ "${FAILED}" -ge 1 ]]; then
+    JOB_FINISHED="failed"
+  elif [[ $(date +%s) -ge ${JOB_WAIT_DEADLINE} ]]; then
+    JOB_FINISHED="timeout"
+  else
+    sleep 30
+  fi
+done
+
+if [[ "${JOB_FINISHED}" != "complete" ]]; then
+  echo "ERROR: Load generator Job ${JOB_FINISHED}"
+  echo "── Job status ──"
+  oc describe job lcs-load-generator -n "${LCS_NAMESPACE}"
+  echo "── Job pod logs ──"
+  JOB_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
+  if [[ -n "${JOB_POD}" ]]; then
+    oc logs -n "${LCS_NAMESPACE}" "${JOB_POD}" --tail=200
+  fi
+  exit 1
+fi
 
 TEST_END_EPOCH=$(date +%s)
 TEST_DURATION_SECONDS=$((TEST_END_EPOCH - TEST_START_EPOCH))
