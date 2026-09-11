@@ -5,12 +5,18 @@ build_root:
     tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
+  - dockerfile_path: Containerfile
+    to: lcs-load-generator-base
   - dockerfile_literal: |
-      FROM quay.io/rh-ee-bbodapat/lcs-load-generator:latest
+      FROM lcs-load-generator-base
+      COPY config/ ./config/
+    from: lcs-load-generator-base
     to: lcs-load-generator-ci
 promotion:
   to:
-  - namespace: lcs-load-generator
+  - excluded_images:
+    - lcs-load-generator-base
+    namespace: lcs-load-generator
     tag: latest
 releases:
   latest:

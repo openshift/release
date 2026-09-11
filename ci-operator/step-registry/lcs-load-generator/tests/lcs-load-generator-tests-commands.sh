@@ -17,7 +17,7 @@ set -euo pipefail
 LCS_NAMESPACE="${LCS_NAMESPACE:-openshift-lightspeed}"
 NUM_USERS="${NUM_USERS:-5}"
 TEST_DURATION="${TEST_DURATION:-5m}"
-LCS_LOADGEN_IMAGE="${LCS_LOADGEN_IMAGE:-quay.io/rh-ee-bbodapat/lcs-load-generator:latest}"
+: "${LCS_LOADGEN_IMAGE:?LCS_LOADGEN_IMAGE must be injected by ci-operator}"
 LCS_APP_IMAGE="${LCS_APP_IMAGE:-quay.io/redhat-et/lightspeed-stack:dev-latest}"
 MOCK_LLM_IMAGE="${MOCK_LLM_IMAGE:-quay.io/rh-ee-bbodapat/lcs-testing:mock-llm-server}"
 ENABLE_PYROSCOPE="${ENABLE_PYROSCOPE:-true}"
@@ -36,14 +36,11 @@ METRIC_STEP="${METRIC_STEP:-30s}"
 PYROSCOPE_NAMESPACE="pyroscope"
 PYROSCOPE_URL="http://pyroscope.${PYROSCOPE_NAMESPACE}.svc.cluster.local:4040"
 
-# ─── Read ES credentials (tracing disabled to protect secrets) ───
-[[ $- == *x* ]] && _WAS_TRACING=true || _WAS_TRACING=false
-set +x
-ES_PASSWORD=$(<"/secret/password")
-ES_USERNAME=$(<"/secret/username")
 ES_SERVER_HOST="${ES_SERVER_HOST:-search-ocp-qe-perf-scale-test}"
-ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_SERVER_HOST}"
-if $_WAS_TRACING; then set -x; fi
+
+RUNTIME_TMP_DIR=$(mktemp -d)
+chmod 700 "${RUNTIME_TMP_DIR}"
+trap 'rm -rf "${RUNTIME_TMP_DIR}"' EXIT
 
 echo "╔══════════════════════════════════════════════════════════╗"
 echo "║  LCS Performance Test Configuration                     ║"
@@ -360,6 +357,14 @@ oc create secret generic kubeconfig-secret \
   --from-file=kubeconfig="${KUBECONFIG}" \
   --dry-run=client -o yaml | oc apply -f -
 
+echo "── Creating Elasticsearch connection secret ──"
+oc delete secret lcs-load-generator-es-credentials \
+  -n "${LCS_NAMESPACE}" --ignore-not-found=true
+oc create secret generic lcs-load-generator-es-credentials \
+  -n "${LCS_NAMESPACE}" \
+  --from-file=username=/secret/username \
+  --from-file=password=/secret/password
+
 
 # ─── 6. RUN LOAD TESTS ──────────────────────────────────────────────────────
 
@@ -372,7 +377,7 @@ TEST_START_EPOCH=$(date +%s)
 
 # Set env vars for envsubst in the Job manifest
 export LCS_NAMESPACE LCS_LOADGEN_IMAGE LCS_HOST LCS_TOKEN
-export LCS_PROVIDER LCS_MODEL ES_SERVER ES_INDEX
+export LCS_PROVIDER LCS_MODEL ES_INDEX ES_SERVER_HOST
 export LOCUST_USERS="${NUM_USERS}"
 export LOCUST_RUN_TIME="${TEST_DURATION}"
 export LOCUST_PROCESSES REQUEST_TIMEOUT METRIC_STEP
@@ -386,7 +391,51 @@ oc delete job lcs-load-generator -n "${LCS_NAMESPACE}" --ignore-not-found=true
 
 # Apply the Job
 echo "── Applying load generator Job ──"
-envsubst < "${JOB_MANIFEST}" | oc apply -f -
+JOB_TRANSFORMER="${RUNTIME_TMP_DIR}/transform-job.py"
+cat > "${JOB_TRANSFORMER}" <<'PYTHON'
+import os
+import shlex
+import sys
+
+import yaml
+
+documents = list(yaml.safe_load_all(sys.stdin))
+jobs = [document for document in documents if document and document.get("kind") == "Job"]
+if len(jobs) != 1:
+    raise RuntimeError(f"expected one Job document, found {len(jobs)}")
+
+container = jobs[0]["spec"]["template"]["spec"]["containers"][0]
+es_server_entries = [entry for entry in container["env"] if entry.get("name") == "ES_SERVER"]
+if len(es_server_entries) != 1:
+    raise RuntimeError(f"expected one ES_SERVER entry, found {len(es_server_entries)}")
+
+container["env"] = [entry for entry in container["env"] if entry.get("name") != "ES_SERVER"]
+container["volumeMounts"].append({
+    "name": "es-credentials",
+    "mountPath": "/var/run/lcs-es",
+    "readOnly": True,
+})
+jobs[0]["spec"]["template"]["spec"]["volumes"].append({
+    "name": "es-credentials",
+    "secret": {"secretName": "lcs-load-generator-es-credentials"},
+})
+container["command"] = ["/bin/bash", "-c"]
+server_host = shlex.quote(os.environ["ES_SERVER_HOST"])
+container["args"] = [
+    "set -o pipefail\n"
+    "ES_USERNAME=$(< /var/run/lcs-es/username)\n"
+    "ES_PASSWORD=$(< /var/run/lcs-es/password)\n"
+    f"ES_SERVER_HOST={server_host}\n"
+    "export ES_SERVER=\"https://${ES_USERNAME}:${ES_PASSWORD}@${ES_SERVER_HOST}\"\n"
+    "unset ES_USERNAME ES_PASSWORD\n"
+    "python3 ./lcs-load-generator run 2>&1 | "
+    "python3 -c 'import os,sys; secret=os.environ[\"ES_SERVER\"]; "
+    "sys.stdout.writelines(line.replace(secret, \"[REDACTED ES_SERVER]\") for line in sys.stdin)'\n"
+]
+
+yaml.safe_dump_all(documents, sys.stdout, sort_keys=False)
+PYTHON
+envsubst < "${JOB_MANIFEST}" | python3 "${JOB_TRANSFORMER}" | oc apply -f -
 
 # Wait for Job to complete or fail (24h max — matches step timeout)
 echo "── Waiting for Job completion ──"
