@@ -9,14 +9,13 @@ set -o pipefail
 APPDATA=$(mktemp -d)
 trap 'rm -rf "${APPDATA}"' EXIT
 
-# In 'tide' mode we will only check the openshift-merge-bot gh app, otherwise we will check the openshift-ci gh app and the two bots
+# In 'tide' mode we only check app access for repos with Tide configured;
+# otherwise we check openshift-ci app access and the two bots.
 app_check_mode="$2"
 app_name="openshift-ci"
 app_secret="openshift-prow-github-app"
 bot_args="--bot=openshift-merge-robot --bot=openshift-ci-robot"
 if [ "$app_check_mode" == "tide" ]; then
-  app_name="openshift-merge-bot"
-  app_secret="openshift-merge-bot"
   bot_args="" # Don't check for bots in 'tide' mode
 fi
 
