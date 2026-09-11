@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Create multiple CNV test VMs on the ACM hub and on a spoke cluster for hub↔spoke MTV live
+# Create multiple CNV test VMs on the ACM hub and on a spoke cluster for hubâ†”spoke MTV live
 # migration testing.
 #
 # Creates P2P_HS_VM_COUNT VMs on the hub (prefix P2P_HS_HUB_VM_PREFIX, using KUBECONFIG)
 # and P2P_HS_VM_COUNT VMs on the spoke (prefix P2P_HS_SPOKE_VM_PREFIX, using SHARED_DIR
-# kubeconfig). Hub VMs will be migrated hub→spoke; spoke VMs will be migrated spoke→hub.
+# kubeconfig). Hub VMs will be migrated hubâ†’spoke; spoke VMs will be migrated spokeâ†’hub.
 #
 # Both sets use ODF RWX block storage. RHEL DataSource clones require cloneStrategy=copy
 # and cdi.kubevirt.io/storage.usePopulator=false to avoid prime-* ClaimMisbound failures.
@@ -36,7 +36,7 @@ typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE}"
 typeset spokeKubeconfig=""
 typeset diagDir=""
 
-# ResolveSpokeKubeconfig — resolve spoke kubeconfig from explicit env or SHARED_DIR index.
+# ResolveSpokeKubeconfig â€” resolve spoke kubeconfig from explicit env or SHARED_DIR index.
 ResolveSpokeKubeconfig() {
     [[ -n "${SHARED_DIR}" ]]
 
@@ -53,7 +53,7 @@ ResolveSpokeKubeconfig() {
     [[ -r "${spokeKubeconfig}" ]]
 }
 
-# EnsureNamespace — idempotently create the test VM namespace on a cluster.
+# EnsureNamespace â€” idempotently create the test VM namespace on a cluster.
 EnsureNamespace() {
     typeset kc="${1:?}"
     typeset ns="${2:?}"
@@ -68,7 +68,7 @@ metadata:
 YAML
 }
 
-# EnsureStorageProfileCloneStrategyCopy — ODF virt SC needs host-assisted copy for RHEL clones.
+# EnsureStorageProfileCloneStrategyCopy â€” ODF virt SC needs host-assisted copy for RHEL clones.
 EnsureStorageProfileCloneStrategyCopy() {
     typeset kc="${1:?}"
     typeset sc="${2:?}"
@@ -90,7 +90,7 @@ EnsureStorageProfileCloneStrategyCopy() {
     fi
 }
 
-# CleanupVm — remove stale VM/DV/prime-* PVCs before recreate.
+# CleanupVm â€” remove stale VM/DV/prime-* PVCs before recreate.
 CleanupVm() {
     typeset kc="${1:?}"
     typeset vmName="${2:?}"
@@ -114,14 +114,14 @@ CleanupVm() {
             -n "${ns}" --ignore-not-found --wait=false
     done < <(oc --kubeconfig="${kc}" get pvc -n "${ns}" -o json \
         | jq -r --arg dv "${dvName}" \
-            '.items[].metadata.name | select(test("^(" + $dv + "|prime-)"))'  \
+            '.items[].metadata.name | select(test("^(" + $dv + "|prime-" + $dv + ")"))'  \
         || true)
 
     oc --kubeconfig="${kc}" wait --for=delete "datavolume/${dvName}" \
         -n "${ns}" --timeout=5m 1>/dev/null || true
 }
 
-# ApplyCirrosDataVolume — HTTP import (no DataSource clone; fast and reliable).
+# ApplyCirrosDataVolume â€” HTTP import (no DataSource clone; fast and reliable).
 ApplyCirrosDataVolume() {
     typeset kc="${1:?}"
     typeset vmName="${2:?}"
@@ -162,7 +162,7 @@ spec:
 YAML
 }
 
-# ApplyRhelDataVolume — clone from CNV DataSource (requires cloneStrategy=copy on ODF).
+# ApplyRhelDataVolume â€” clone from CNV DataSource (requires cloneStrategy=copy on ODF).
 ApplyRhelDataVolume() {
     typeset kc="${1:?}"
     typeset vmName="${2:?}"
@@ -212,7 +212,7 @@ spec:
 YAML
 }
 
-# ApplyCirrosVirtualMachine — minimal VM without cloud-init disk.
+# ApplyCirrosVirtualMachine â€” minimal VM without cloud-init disk.
 ApplyCirrosVirtualMachine() {
     typeset kc="${1:?}"
     typeset vmName="${2:?}"
@@ -275,7 +275,7 @@ YAML
     oc --kubeconfig="${kc}" get "virtualmachine/${vmName}" -n "${ns}" > /dev/null
 }
 
-# ApplyRhelVirtualMachine — RHEL VM with cloud-init (password not logged).
+# ApplyRhelVirtualMachine â€” RHEL VM with cloud-init (password not logged).
 ApplyRhelVirtualMachine() {
     typeset kc="${1:?}"
     typeset vmName="${2:?}"
@@ -284,9 +284,11 @@ ApplyRhelVirtualMachine() {
     typeset _wasTracing=false
     [[ $- == *x* ]] && _wasTracing=true
     set +x
+    typeset _vmPwd
+    _vmPwd="$(openssl rand -base64 16)"
     typeset _userData
-    _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: migration123\nchpasswd:\n  expire: false\nssh_pwauth: true\nwrite_files:\n- path: /home/cloud-user/migration-marker.txt\n  content: %s\n  permissions: "0644"\n  owner: cloud-user:cloud-user\nruncmd:\n- dnf install -y qemu-guest-agent\n- systemctl enable --now qemu-guest-agent\n- echo "VM %s is ready for migration testing" > /tmp/vm-ready.txt\n' \
-        "${vmName}" "${vmName}")"
+    _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: %s\nchpasswd:\n  expire: false\nssh_pwauth: true\nwrite_files:\n- path: /home/cloud-user/migration-marker.txt\n  content: %s\n  permissions: "0644"\n  owner: cloud-user:cloud-user\nruncmd:\n- dnf install -y qemu-guest-agent\n- systemctl enable --now qemu-guest-agent\n- echo "VM %s is ready for migration testing" > /tmp/vm-ready.txt\n' \
+        "${_vmPwd}" "${vmName}" "${vmName}")"
 
     vmName="${vmName}" DV_NAME="${dvName}" VM_NS="${ns}" \
     CLOUD_INIT_USERDATA="${_userData}" \
@@ -358,7 +360,7 @@ YAML
     oc --kubeconfig="${kc}" get "virtualmachine/${vmName}" -n "${ns}" > /dev/null
 }
 
-# WaitVmiRunning — wait for VMI object to exist then Running phase.
+# WaitVmiRunning â€” wait for VMI object to exist then Running phase.
 WaitVmiRunning() {
     typeset kc="${1:?}"
     typeset vmName="${2:?}"
@@ -381,7 +383,7 @@ WaitVmiRunning() {
         --timeout="${P2P_HS_VM_VMI_WAIT_TIMEOUT}"
 }
 
-# CreateOneVm — create DataVolume + VirtualMachine for a single test VM.
+# CreateOneVm â€” create DataVolume + VirtualMachine for a single test VM.
 CreateOneVm() {
     typeset kc="${1:?}"
     typeset vmName="${2:?}"
@@ -415,7 +417,7 @@ CreateOneVm() {
     WaitVmiRunning "${kc}" "${vmName}" "${ns}"
 }
 
-# CreateClusterVms — create all VMs for one cluster (hub or spoke).
+# CreateClusterVms â€” create all VMs for one cluster (hub or spoke).
 CreateClusterVms() {
     typeset kc="${1:?}"
     typeset vmPrefix="${2:?}"
@@ -436,7 +438,7 @@ CreateClusterVms() {
     done
 }
 
-# DumpDiagnostics — write VM/DV state on failure.
+# DumpDiagnostics â€” write VM/DV state on failure.
 DumpDiagnostics() {
     [[ -n "${ARTIFACT_DIR}" ]] || return 0
     diagDir="${ARTIFACT_DIR}/hub-spoke-vm-create-diagnostics"
@@ -467,7 +469,7 @@ DumpDiagnostics() {
         --sort-by='.lastTimestamp' > "${diagDir}/spoke-events.txt" 2>&1 || true
 }
 
-# OnError — dump diagnostics before propagating failure.
+# OnError â€” dump diagnostics before propagating failure.
 OnError() {
     typeset -i ec=$?
     DumpDiagnostics
@@ -489,9 +491,9 @@ typeset -i cclmStepRc=0
 
     ResolveSpokeKubeconfig
 
-    # Create VMs on hub (hub→spoke migration sources).
+    # Create VMs on hub (hubâ†’spoke migration sources).
     # Skipped when P2P_HS_CREATE_HUB_VMS=false, e.g. for spoke-round-trip where
-    # hub VMs are populated by the spoke→hub migration leg, not pre-created.
+    # hub VMs are populated by the spokeâ†’hub migration leg, not pre-created.
     if [[ "${P2P_HS_CREATE_HUB_VMS}" != "false" ]]; then
         CreateClusterVms \
             "${KUBECONFIG}" \
@@ -503,7 +505,7 @@ typeset -i cclmStepRc=0
             "hub"
     fi
 
-    # Create VMs on spoke (spoke→hub migration sources, or round-trip starting point).
+    # Create VMs on spoke (spokeâ†’hub migration sources, or round-trip starting point).
     CreateClusterVms \
         "${spokeKubeconfig}" \
         "${P2P_HS_SPOKE_VM_PREFIX}" \
@@ -519,7 +521,7 @@ typeset -i cclmStepRc=0
             typeset -i i
             if [[ "${P2P_HS_CREATE_HUB_VMS}" != "false" ]]; then
                 for ((i = 1; i <= vmCount; i++)); do
-                    printf '=== Hub VM %d (%s-%d) — migration source for hub→spoke ===\n' \
+                    printf '=== Hub VM %d (%s-%d) â€” migration source for hubâ†’spoke ===\n' \
                         "${i}" "${P2P_HS_HUB_VM_PREFIX}" "${i}"
                     oc --kubeconfig="${KUBECONFIG}" get \
                         "virtualmachine/${P2P_HS_HUB_VM_PREFIX}-${i}" \
@@ -528,7 +530,7 @@ typeset -i cclmStepRc=0
                 done
             fi
             for ((i = 1; i <= vmCount; i++)); do
-                printf '=== Spoke VM %d (%s-%d) — migration source for spoke→hub ===\n' \
+                printf '=== Spoke VM %d (%s-%d) â€” migration source for spokeâ†’hub ===\n' \
                     "${i}" "${P2P_HS_SPOKE_VM_PREFIX}" "${i}"
                 oc --kubeconfig="${spokeKubeconfig}" get \
                     "virtualmachine/${P2P_HS_SPOKE_VM_PREFIX}-${i}" \
