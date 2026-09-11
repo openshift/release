@@ -1,0 +1,158 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM quay.io/rh-ee-bbodapat/lcs-load-generator:latest
+    to: lcs-load-generator-ci
+promotion:
+  to:
+  - namespace: lcs-load-generator
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lcs-load-test-10users
+  cron: 0 0 * * 1
+  reporter_config:
+    channel: '#ols-perf-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANGE_POINT_REPOS: lightspeed-core/lightspeed-stack,lightspeed-core/lcs-load-generator,cloud-bulldozer/orion,openshift/release
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      ENABLE_MEMRAY: "false"
+      ENABLE_PYROSCOPE: "true"
+      ES_BENCHMARK_INDEX: lcs-perf-results
+      LOOKBACK: "180"
+      LOOKBACK_SIZE: "15"
+      NUM_USERS: "10"
+      ORION_CONFIG: examples/lcs-load-generator.yaml
+      ORION_ENVS: lcs_test_workers=10
+      ORION_REPO: https://github.com/Balatripura587/orion.git
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: "true"
+      TAG: lcs-config
+      TEST_DURATION: 5m
+      ZONES_COUNT: "3"
+    test:
+    - ref: lcs-load-generator-tests
+    - ref: openshift-qe-orion
+    workflow: openshift-qe-installer-aws
+- as: lcs-load-test-25users
+  cron: 0 6 * * 1
+  reporter_config:
+    channel: '#ols-perf-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANGE_POINT_REPOS: lightspeed-core/lightspeed-stack,lightspeed-core/lcs-load-generator,cloud-bulldozer/orion,openshift/release
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      ENABLE_MEMRAY: "false"
+      ENABLE_PYROSCOPE: "true"
+      ES_BENCHMARK_INDEX: lcs-perf-results
+      LOOKBACK: "180"
+      LOOKBACK_SIZE: "15"
+      NUM_USERS: "25"
+      ORION_CONFIG: examples/lcs-load-generator.yaml
+      ORION_ENVS: lcs_test_workers=25
+      ORION_REPO: https://github.com/Balatripura587/orion.git
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: "true"
+      TAG: lcs-config
+      TEST_DURATION: 5m
+      ZONES_COUNT: "3"
+    test:
+    - ref: lcs-load-generator-tests
+    - ref: openshift-qe-orion
+    workflow: openshift-qe-installer-aws
+- as: lcs-load-test-50users
+  cron: 0 12 * * 1
+  reporter_config:
+    channel: '#ols-perf-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANGE_POINT_REPOS: lightspeed-core/lightspeed-stack,lightspeed-core/lcs-load-generator,cloud-bulldozer/orion,openshift/release
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      ENABLE_MEMRAY: "false"
+      ENABLE_PYROSCOPE: "true"
+      ES_BENCHMARK_INDEX: lcs-perf-results
+      LOOKBACK: "180"
+      LOOKBACK_SIZE: "15"
+      NUM_USERS: "50"
+      ORION_CONFIG: examples/lcs-load-generator.yaml
+      ORION_ENVS: lcs_test_workers=50
+      ORION_REPO: https://github.com/Balatripura587/orion.git
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: "true"
+      TAG: lcs-config
+      TEST_DURATION: 5m
+      ZONES_COUNT: "3"
+    test:
+    - ref: lcs-load-generator-tests
+    - ref: openshift-qe-orion
+    workflow: openshift-qe-installer-aws
+- as: lcs-load-test-100users
+  cron: 0 18 * * 1
+  reporter_config:
+    channel: '#ols-perf-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANGE_POINT_REPOS: lightspeed-core/lightspeed-stack,lightspeed-core/lcs-load-generator,cloud-bulldozer/orion,openshift/release
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      ENABLE_MEMRAY: "false"
+      ENABLE_PYROSCOPE: "true"
+      ES_BENCHMARK_INDEX: lcs-perf-results
+      LOOKBACK: "180"
+      LOOKBACK_SIZE: "15"
+      NUM_USERS: "100"
+      ORION_CONFIG: examples/lcs-load-generator.yaml
+      ORION_ENVS: lcs_test_workers=100
+      ORION_REPO: https://github.com/Balatripura587/orion.git
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: "true"
+      TAG: lcs-config
+      TEST_DURATION: 5m
+      ZONES_COUNT: "3"
+    test:
+    - ref: lcs-load-generator-tests
+    - ref: openshift-qe-orion
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: main
+  org: lightspeed-core
+  repo: lcs-load-generator

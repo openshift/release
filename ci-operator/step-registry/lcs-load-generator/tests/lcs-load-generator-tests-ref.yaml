@@ -1,0 +1,63 @@
+ref:
+  as: lcs-load-generator-tests
+  from_image:
+    namespace: lcs-load-generator
+    name: lcs-load-generator-ci
+    tag: latest
+  cli: latest
+  timeout: 24h
+  commands: lcs-load-generator-tests-commands.sh
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: LCS_NAMESPACE
+    default: "openshift-lightspeed"
+    documentation: |-
+      Namespace where LCS is deployed.
+  - name: NUM_USERS
+    default: "5"
+    documentation: |-
+      Number of simulated concurrent Locust users.
+  - name: TEST_DURATION
+    default: "5m"
+    documentation: |-
+      Duration for each endpoint test run.
+  - name: LCS_LOADGEN_IMAGE
+    default: "quay.io/rh-ee-bbodapat/lcs-load-generator:latest"
+    documentation: |-
+      Container image for the load generator K8s Job.
+  - name: LCS_APP_IMAGE
+    default: "quay.io/redhat-et/lightspeed-stack:dev-latest"
+    documentation: |-
+      LCS application image.
+  - name: MOCK_LLM_IMAGE
+    default: "quay.io/rh-ee-bbodapat/lcs-testing:mock-llm-server"
+    documentation: |-
+      Mock LLM sidecar image.
+  - name: ENABLE_PYROSCOPE
+    default: "true"
+    documentation: |-
+      Deploy Pyroscope and enable CPU profiling.
+  - name: ENABLE_MEMRAY
+    default: "false"
+    documentation: |-
+      Enable Memray memory profiling.
+  - name: LCS_WORKERS
+    default: "1"
+    documentation: |-
+      Number of uvicorn workers for the LCS application.
+  - name: ES_INDEX
+    default: "lcs-perf-results"
+    documentation: |-
+      Elasticsearch index for load test results.
+  documentation: |-
+    This step deploys lightspeed-core (library mode) with a mock LLM
+    sidecar, runs the lcs-load-generator K8s Job for performance testing,
+    collects Prometheus metrics via kube-burner, indexes results to
+    Elasticsearch, and collects CPU/memory profiling data to artifacts.
