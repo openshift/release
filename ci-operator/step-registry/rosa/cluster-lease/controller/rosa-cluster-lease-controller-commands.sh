@@ -805,7 +805,7 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         && [[ -s "${RBAC_KUBECONFIG}" ]]; then
         RBAC_RESULT=$(oc auth can-i create configmaps \
             --as=dedicated-admin-check --as-group=dedicated-admins \
-            -n default \
+            -n dedicated-admin \
             --request-timeout=30s \
             --kubeconfig="${RBAC_KUBECONFIG}" 2>&1) || true
         if [[ "${RBAC_RESULT}" == "no" ]]; then
