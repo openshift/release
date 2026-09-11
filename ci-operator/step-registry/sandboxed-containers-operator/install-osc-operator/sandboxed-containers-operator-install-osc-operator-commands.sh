@@ -293,14 +293,13 @@ function setup_aws_peerpods() {
   export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
   
   # Get AWS region and infrastructure details from cluster
+  # Note: no 'local' on exported vars — local variables die on function return
   local INSTANCE_ID
   INSTANCE_ID=$(oc get nodes -l 'node-role.kubernetes.io/worker' -o jsonpath='{.items[0].spec.providerID}' | sed 's#[^ ]*/##g')
   
-  local AWS_REGION
   AWS_REGION=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.aws.region}')
   
   # Query AWS for networking details
-  local AWS_SUBNET_ID AWS_VPC_ID AWS_SG_IDS
   AWS_SUBNET_ID=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].SubnetId' --region "${AWS_REGION}" --output text)
   AWS_VPC_ID=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].VpcId' --region "${AWS_REGION}" --output text)
   AWS_SG_IDS=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].SecurityGroups[*].GroupId' --region "${AWS_REGION}" --output text | tr ' \t' ',')
@@ -330,7 +329,7 @@ function setup_azure_peerpods() {
   echo ">>> Detecting Azure peer-pods configuration from cluster" >&2
 
   # Get resource group from cluster infrastructure
-  local AZURE_RESOURCE_GROUP
+  # Note: no 'local' on exported vars — local variables die on function return
   AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
   if [[ -z "${AZURE_RESOURCE_GROUP}" ]]; then
     echo ">>> ERROR: Could not determine Azure resource group from cluster infrastructure" >&2
@@ -365,7 +364,6 @@ function setup_azure_peerpods() {
   $WAS_TRACING && set -x || true
 
   # Get region from the resource group (not cloudName which is e.g. "AzurePublicCloud")
-  local AZURE_REGION
   AZURE_REGION=$(az group show --resource-group "${AZURE_RESOURCE_GROUP}" \
     --query location --output tsv)
 
@@ -391,7 +389,6 @@ function setup_azure_peerpods() {
   fi
 
   # Get worker subnet ID and NSG ID
-  local AZURE_SUBNET_ID AZURE_NSG_ID
   AZURE_SUBNET_ID=$(az network vnet subnet list \
     --resource-group "${mgmt_rg}" --vnet-name "${azure_vnet_name}" \
     --query "[?contains(name,'worker')].id | [0]" --output tsv 2>/dev/null)
@@ -419,8 +416,7 @@ function setup_azure_peerpods() {
 function setup_gcp_peerpods() {
   echo ">>> Detecting GCP peer-pods configuration from cluster" >&2
   
-  local GCP_PROJECT_ID GCP_ZONE GCP_NETWORK
-  
+  # Note: no 'local' on exported vars — local variables die on function return
   # Get GCP project and network details from cluster
   GCP_PROJECT_ID=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.gcp.projectID}')
   GCP_ZONE=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.gcp.region}')
