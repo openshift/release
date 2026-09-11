@@ -1,0 +1,84 @@
+# tls-probe CI configuration.
+
+zz_generated_metadata:
+  branch: main
+  org: smith-xyz
+  repo: tls-probe
+
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  "*":
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+  # On-ramp: observe-only, optional. Mirrors tls-scanner's platform matrix.
+  # Set TLS_ADHERENCE_ENFORCE=true when signal is trusted and policy enforces.
+
+  - as: tls13-probe-aws-ovn
+    optional: true
+    steps:
+      cluster_profile: openshift-org-aws
+      env:
+        COMPUTE_NODE_TYPE: m5.2xlarge
+        PROBE_CAPTURE_DURATION: "300"
+        TLS_ADHERENCE_ENFORCE: "false"
+      test:
+        - ref: tls-probe-run
+      workflow: openshift-e2e-aws-ovn-tls-13
+
+  - as: tls13-probe-gcp-ovn
+    optional: true
+    steps:
+      cluster_profile: openshift-org-gcp
+      env:
+        COMPUTE_NODE_TYPE: n2-standard-8
+        PROBE_CAPTURE_DURATION: "300"
+        TLS_ADHERENCE_ENFORCE: "false"
+        TLS_13_ENABLE_TLS_ADHERENCE: "true"
+        TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+      test:
+        - ref: tls-13
+        - ref: tls-probe-run
+      workflow: openshift-e2e-gcp-ovn
+
+  - as: tls13-probe-azure-ovn
+    optional: true
+    steps:
+      cluster_profile: openshift-org-azure
+      env:
+        COMPUTE_NODE_TYPE: Standard_D8as_v5
+        PROBE_CAPTURE_DURATION: "300"
+        TLS_ADHERENCE_ENFORCE: "false"
+        TLS_13_ENABLE_TLS_ADHERENCE: "true"
+        TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+      test:
+        - ref: tls-13
+        - ref: tls-probe-run
+      workflow: openshift-e2e-azure-ovn
+
+  - as: tls13-probe-metal
+    optional: true
+    steps:
+      cluster_profile: equinix-ocp-metal
+      env:
+        DEVSCRIPTS_CONFIG: |
+          IP_STACK=v4
+          NETWORK_TYPE=OVNKubernetes
+        PROBE_CAPTURE_DURATION: "300"
+        TLS_ADHERENCE_ENFORCE: "false"
+        TLS_13_ENABLE_TLS_ADHERENCE: "true"
+        TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+      test:
+        - ref: tls-13
+        - ref: tls-probe-run
+      workflow: baremetalds-e2e
