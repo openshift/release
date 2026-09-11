@@ -162,14 +162,20 @@ tests:
         oc patch featuregate cluster --type=merge -p '{"spec":{"featureSet":"CustomNoUpgrade","customNoUpgrade":{"enabled":["TLSAdherence"]}}}'
         echo "Waiting for TLSAdherence to be observed in featuregate status..."
         version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
+        tls_adherence_active=false
         for i in $(seq 1 60); do
           if oc get featuregate cluster -o json | jq -e --arg v "$version" '.status.featureGates[]? | select(.version==$v) | .enabled[]?.name | select(.=="TLSAdherence")' >/dev/null 2>&1; then
             echo "TLSAdherence gate active for version $version"
+            tls_adherence_active=true
             break
           fi
           echo "  waiting for TLSAdherence gate ($i/60)..."
           sleep 15
         done
+        if [ "$tls_adherence_active" != "true" ]; then
+          echo "ERROR: TLSAdherence gate did not become active after 15 minutes"
+          exit 1
+        fi
         echo "Setting tlsAdherence to StrictAllComponents..."
         oc patch apiserver cluster --type=merge -p '{"spec":{"tlsAdherence":"StrictAllComponents"}}'
         echo "Waiting for cluster to stabilize..."
