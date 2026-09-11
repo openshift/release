@@ -11,6 +11,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: release
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   image_stream_tag:
     name: builder
@@ -52,14 +56,12 @@ releases:
       name: "4.17"
       namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.17"
-      namespace: ocp
+    release:
+      channel: stable
+      version: "4.22"
   latest-4-22:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.22"
 resources:
   '*':
@@ -126,15 +128,13 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- always_run: false
-  as: e2e-aws-deployment
-  optional: true
+- as: e2e-aws-deployment
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
   steps:
     cluster_profile: aws-stackrox
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
     env:
       BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_TYPE: m5.2xlarge
     test:
     - as: test
       cli: latest
@@ -151,6 +151,166 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-tls-scanner
+  optional: true
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_TYPE: m5.2xlarge
+    post:
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+
+        # cli:latest ships `oc`, not `kubectl` — shim it for make deploy/install.
+        ln -sf "$(command -v oc)" /tmp/kubectl && export PATH="/tmp:${PATH}"
+
+        IMG="${IMAGE_FROM_CI}" OPERATOR_IMAGE="${IMAGE_FROM_CI}" make deploy
+
+        echo "Waiting for compliance-operator deployment to be ready..."
+        oc wait --for=condition=Available deployment/compliance-operator -n openshift-compliance --timeout=10m
+
+        echo "=== Running TLS Scanner ==="
+        export NAMESPACE="openshift-compliance"
+        export SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
+
+        oc adm policy add-cluster-role-to-user cluster-admin -z default -n "${NAMESPACE}"
+        sleep 5
+
+        cat <<SCANNERPOD | oc create -f -
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: tls-scanner
+          namespace: ${NAMESPACE}
+        spec:
+          serviceAccountName: default
+          restartPolicy: Never
+          activeDeadlineSeconds: 2100
+          containers:
+          - name: scanner
+            image: ${SCANNER_IMAGE}
+            env:
+            # tls-scanner writes scratch files via os.CreateTemp("", ...) and
+            # testssl.sh's own mktemp calls, both of which resolve to \$TMPDIR
+            # (default /tmp) independent of --artifact-dir/--*-file, which are
+            # absolute paths and unaffected. Point it at the writable /results
+            # mount so readOnlyRootFilesystem below doesn't break the scan.
+            - name: TMPDIR
+              value: /results
+            command:
+            - /bin/bash
+            - -c
+            - |
+              mkdir -p /results
+              /usr/local/bin/tls-scanner -j 4 \
+                --all-pods \
+                --namespace-filter openshift-compliance \
+                --pqc-check \
+                --json-file /results/results.json \
+                --csv-file /results/results.csv \
+                --junit-file /results/junit_tls_scan.xml \
+                --log-file /results/scan.log 2>&1 | tee /results/output.log
+              SCAN_EXIT_CODE=\${PIPESTATUS[0]}
+              echo "Scan complete. Exit code: \${SCAN_EXIT_CODE}" | tee -a /results/output.log
+              touch /results/scan.done
+              sleep 60
+              exit \${SCAN_EXIT_CODE}
+            resources:
+              requests:
+                cpu: "4"
+                memory: 4Gi
+              limits:
+                cpu: "4"
+                memory: 4Gi
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 65532
+              capabilities:
+                drop:
+                - ALL
+              seccompProfile:
+                type: RuntimeDefault
+            volumeMounts:
+            - name: results
+              mountPath: /results
+          volumes:
+          - name: results
+            emptyDir: {}
+        SCANNERPOD
+
+        echo "Waiting for scanner pod to start..."
+        oc wait --for=condition=Ready pod/tls-scanner -n "${NAMESPACE}" --timeout=5m
+
+        oc logs -f pod/tls-scanner -n "${NAMESPACE}" &
+        LOGS_PID=$!
+
+        echo "Waiting for scan to complete..."
+        SCAN_TIMEOUT_SECONDS=1800
+        SCAN_ELAPSED_SECONDS=0
+        SCAN_TIMED_OUT=false
+        while true; do
+          if oc exec pod/tls-scanner -n "${NAMESPACE}" -- test -f /results/scan.done 2>/dev/null; then
+            break
+          fi
+          phase=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+          if [[ "$phase" == "Succeeded" || "$phase" == "Failed" ]]; then
+            break
+          fi
+          if (( SCAN_ELAPSED_SECONDS >= SCAN_TIMEOUT_SECONDS )); then
+            echo "Timed out after ${SCAN_TIMEOUT_SECONDS}s waiting for the scan to complete"
+            SCAN_TIMED_OUT=true
+            break
+          fi
+          sleep 10
+          SCAN_ELAPSED_SECONDS=$((SCAN_ELAPSED_SECONDS + 10))
+        done
+
+        echo "Copying scan results..."
+        mkdir -p "${ARTIFACT_DIR}/tls-scanner"
+        oc cp "${NAMESPACE}/tls-scanner:/results/." "${ARTIFACT_DIR}/tls-scanner/" || echo "Warning: Failed to copy artifacts"
+
+        if [[ -f "${ARTIFACT_DIR}/tls-scanner/junit_tls_scan.xml" ]]; then
+          cp "${ARTIFACT_DIR}/tls-scanner/junit_tls_scan.xml" "${ARTIFACT_DIR}/junit_tls_scan.xml"
+          echo "JUnit results copied for Spyglass"
+        fi
+
+        wait $LOGS_PID 2>/dev/null || true
+
+        pod_exit_code=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "1")
+        echo "=== TLS Scanner Complete (namespace: openshift-compliance) ==="
+        if [[ "$SCAN_TIMED_OUT" == "true" ]]; then
+          echo "Result: FAILED (scan did not complete within ${SCAN_TIMEOUT_SECONDS}s)"
+          exit 1
+        elif [[ "$pod_exit_code" == "0" ]]; then
+          echo "Result: PASSED"
+        else
+          echo "Result: FAILED"
+          exit "${pod_exit_code}"
+        fi
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: PULL_SPEC_TLS_SCANNER_TOOL
+        name: tls-scanner-tool
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 - always_run: false
   as: e2e-aws-scan-config
   optional: true
