@@ -65,44 +65,103 @@ mirror_vault_images() {
   local vault_enterprise_dst
   local vault_kms_src="${VAULT_KMS_PLUGIN_IMAGE}"
   local vault_kms_dst
+  local mirror_arch="${ARCHITECTURE:-amd64}"
   vault_enterprise_dst="$(resolve_image_mirror_destination "${DS_REGISTRY}/localimages/vault-enterprise" "${VAULT_ENTERPRISE_IMAGE}")"
   vault_kms_dst="$(resolve_image_mirror_destination "${DS_REGISTRY}/localimages/vault-kube-kms" "${VAULT_KMS_PLUGIN_IMAGE}")"
 
   echo "Mirroring vault images to local registry..."
   echo "  ${vault_enterprise_src} -> ${vault_enterprise_dst}"
   echo "  ${vault_kms_src} -> ${vault_kms_dst}"
+  echo "  architecture filter: linux/${mirror_arch}.*"
 
   # shellcheck disable=SC2087
   ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 set -euo pipefail
 
-MAX_RETRIES=3
-CURRENT_RETRY=1
-SUCCESS=false
+MAX_RETRIES=5
+REGISTRY_CONFIG="${DS_WORKING_DIR}/pull_secret.json"
+REGISTRY_HOST="${DS_REGISTRY}"
+OS_FILTER="linux/${mirror_arch}.*"
 
-function run-vault-image-mirror() {
-  oc image mirror --keep-manifest-list=true --registry-config ${DS_WORKING_DIR}/pull_secret.json \
-    "${vault_enterprise_src}" "${vault_enterprise_dst}" || return 1
-  oc image mirror --keep-manifest-list=true --registry-config ${DS_WORKING_DIR}/pull_secret.json \
-    "${vault_kms_src}" "${vault_kms_dst}" || return 1
+vault_image_mirror_complete() {
+  local image="\$1"
+  local verify_dir="/tmp/vault-mirror-verify-\$\$"
+  rm -rf "\${verify_dir}"
+  if oc image extract "\${image}" "\${verify_dir}" --path=/ --registry-config "\${REGISTRY_CONFIG}" >/dev/null 2>&1; then
+    rm -rf "\${verify_dir}"
+    return 0
+  fi
+  rm -rf "\${verify_dir}"
+  return 1
 }
 
-while [ \$SUCCESS = false ] && [ \$CURRENT_RETRY -le \$MAX_RETRIES ]; do
-  echo "Mirroring vault images attempt \$CURRENT_RETRY"
-  run-vault-image-mirror
-  if [ \$? -eq 0 ]; then
-    SUCCESS=true
-  else
-    echo "Mirroring vault images attempt \$CURRENT_RETRY failed. Trying again..."
-    CURRENT_RETRY=\$(( CURRENT_RETRY + 1 ))
-    sleep 5
-  fi
-done
+delete_registry_reference() {
+  local image="\$1"
+  local registry remainder repo reference manifest_digest
 
-if [ \$SUCCESS = false ]; then
-  echo "Mirroring vault images failed after \$MAX_RETRIES attempts."
-  exit 1
-fi
+  registry="\${image%%/*}"
+  remainder="\${image#*/}"
+
+  if [[ "\${remainder}" == *@* ]]; then
+    repo="\${remainder%%@*}"
+    reference="\${remainder##*@}"
+  elif [[ "\${remainder}" == *:* ]]; then
+    repo="\${remainder%%:*}"
+    reference="\${remainder##*:}"
+  else
+    return 0
+  fi
+
+  manifest_digest="\$(curl -sk -I \
+    -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+    "https://\${registry}/v2/\${repo}/manifests/\${reference}" \
+    | awk -F ': ' '/Docker-Content-Digest/ {print \$2}' | tr -d '\r')"
+
+  if [[ -n "\${manifest_digest}" ]]; then
+    echo "Removing incomplete mirror manifest \${image} (\${manifest_digest})"
+    curl -sk -X DELETE "https://\${registry}/v2/\${repo}/manifests/\${manifest_digest}" >/dev/null || true
+  fi
+}
+
+mirror_vault_image() {
+  local src="\$1"
+  local dst="\$2"
+  local label="\$3"
+  local attempt=1
+
+  if vault_image_mirror_complete "\${dst}"; then
+    echo "Skipping \${label}; destination image is already present and extractable: \${dst}"
+    return 0
+  fi
+
+  delete_registry_reference "\${dst}"
+
+  while [ "\${attempt}" -le "\${MAX_RETRIES}" ]; do
+    echo "Mirroring \${label} attempt \${attempt}/\${MAX_RETRIES}"
+    echo "  \${src} -> \${dst}"
+    if oc image mirror --registry-config "\${REGISTRY_CONFIG}" \
+      --filter-by-os="\${OS_FILTER}" "\${src}" "\${dst}"; then
+      if vault_image_mirror_complete "\${dst}"; then
+        echo "Mirrored \${label} successfully"
+        return 0
+      fi
+      echo "Mirror command succeeded but \${dst} is not extractable"
+    else
+      echo "Mirroring \${label} attempt \${attempt} failed"
+    fi
+    delete_registry_reference "\${dst}"
+    attempt=\$(( attempt + 1 ))
+    if [ "\${attempt}" -le "\${MAX_RETRIES}" ]; then
+      sleep \$(( attempt * 10 ))
+    fi
+  done
+
+  echo "Mirroring \${label} failed after \${MAX_RETRIES} attempts"
+  return 1
+}
+
+mirror_vault_image "${vault_enterprise_src}" "${vault_enterprise_dst}" "vault-enterprise"
+mirror_vault_image "${vault_kms_src}" "${vault_kms_dst}" "vault-kube-kms"
 EOF
 
   VAULT_IMAGE_REPOSITORY="${DS_REGISTRY}/localimages/vault-enterprise"
@@ -177,6 +236,111 @@ wait_until() {
     fi
     sleep "${interval}"
   done
+}
+
+VAULT_LOCAL_STORAGE_CLASS="${VAULT_LOCAL_STORAGE_CLASS:-vault-local-storage}"
+
+resolve_vault_storage_class() {
+  if [[ -n "${VAULT_STORAGE_CLASS:-}" ]]; then
+    echo "${VAULT_STORAGE_CLASS}"
+    return
+  fi
+
+  local default_sc sc_count
+  default_sc="$(oc get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}' 2>/dev/null || true)"
+  if [[ -n "${default_sc}" ]]; then
+    echo ""
+    return
+  fi
+
+  sc_count="$(oc get storageclass --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+  if [[ "${sc_count}" == "0" ]] || [[ "${CLUSTER_TYPE:-}" == "equinix-ocp-metal" ]]; then
+    echo "${VAULT_LOCAL_STORAGE_CLASS}"
+    return
+  fi
+
+  echo ""
+}
+
+pick_vault_node() {
+  local node
+  node="$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  if [[ -z "${node}" ]]; then
+    node="$(oc get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  fi
+  [[ -n "${node}" ]] || {
+    echo "Error: no schedulable nodes found for Vault local storage"
+    exit 1
+  }
+  echo "${node}"
+}
+
+ensure_vault_local_storage_class() {
+  local storage_class="$1"
+
+  if oc get storageclass "${storage_class}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "Creating manual StorageClass ${storage_class} for Vault file storage..."
+  oc apply -f - <<EOF
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ${storage_class}
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: Immediate
+reclaimPolicy: Retain
+EOF
+}
+
+ensure_vault_local_pv() {
+  local namespace="$1"
+  local release_name="$2"
+  local pod_name="$3"
+  local storage_class="$4"
+  local pvc_name="data-${pod_name}"
+  local pv_name="vault-local-${namespace}-${pod_name}"
+  local host_path="/var/lib/vault-kms/${namespace}/${release_name}"
+  local node
+
+  if oc get pv "${pv_name}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  wait_until "pvc ${pvc_name} in ${namespace}" 60 2 \
+    oc get "pvc/${pvc_name}" -n "${namespace}"
+
+  node="$(pick_vault_node)"
+  echo "Creating local PersistentVolume ${pv_name} on node ${node} for ${namespace}/${pvc_name}..."
+  oc apply -f - <<EOF
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${pv_name}
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ${storage_class}
+  volumeMode: Filesystem
+  claimRef:
+    name: ${pvc_name}
+    namespace: ${namespace}
+  hostPath:
+    path: ${host_path}
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${node}
+EOF
 }
 
 VAULT_SECRET_UNSEAL_KEY_PATH="/vault/secrets/unseal/unseal-key"
@@ -345,6 +509,28 @@ install_vault() {
   local vault_service_fqdn="${release_name}.${namespace}.svc"
   local values_file="/tmp/vault-values-${namespace}.yaml"
   local vault_image="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
+  local vault_storage_class data_storage_block
+
+  vault_storage_class="$(resolve_vault_storage_class)"
+  if [[ -n "${vault_storage_class}" ]]; then
+    echo "Using StorageClass ${vault_storage_class} for Vault file storage"
+    ensure_vault_local_storage_class "${vault_storage_class}"
+    data_storage_block="$(cat <<EOF
+  dataStorage:
+    enabled: true
+    size: 1Gi
+    storageClass: ${vault_storage_class}
+EOF
+)"
+  else
+    echo "Using cluster default StorageClass for Vault file storage"
+    data_storage_block="$(cat <<EOF
+  dataStorage:
+    enabled: true
+    size: 1Gi
+EOF
+)"
+  fi
 
   cat > "${values_file}" <<EOF
 global:
@@ -368,9 +554,7 @@ server:
       storage "file" {
         path = "/vault/data"
       }
-  dataStorage:
-    enabled: true
-    size: 1Gi
+${data_storage_block}
   ha:
     apiAddr: "${vault_api_addr}"
   extraEnvironmentVars:
@@ -435,6 +619,10 @@ EOF
     --version "${VAULT_CHART_VERSION}" \
     -f "${values_file}" \
     --timeout 10m
+
+  if [[ -n "${vault_storage_class}" ]]; then
+    ensure_vault_local_pv "${namespace}" "${release_name}" "${pod_name}" "${vault_storage_class}"
+  fi
 
   # Chart 0.28.1 copies server.service.annotations onto both the client Service
   # and vault-internal. Annotate only the client Service so the serving cert is
