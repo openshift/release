@@ -41,7 +41,7 @@ ref:
         - "false": create macvlan additional network, attach-default-network=false (macvlan only)
         - "localnet": create OVN localnet additional network, attach-default-network=true (Model 3)
         - "localnet-multi": N localnet networks (OVN CUDN-style NADs), attach-default-network=false
-        - "localnet-vlan": localnet with dedicated VLAN via NNCP (L2 passthrough, dnsmasq on <LOCALNET_VLAN_BOND>.<LOCALNET_VLAN_ID>, e.g. br-ex.100)
+        - "localnet-vlan": localnet with dedicated secondary VLAN via NNCP (L2 passthrough, per-node dnsmasq on <LOCALNET_VLAN_BOND>.<LOCALNET_VLAN_ID>, e.g. br-ex.100)
         - "": skip all additional network config (default, uses pod network - Model 1)
     - name: ETCD_STORAGE_CLASS
       default: ""
@@ -76,10 +76,11 @@ ref:
     - name: LOCALNET_VLAN_ID
       default: "100"
       documentation: |-
-        VLAN ID for the localnet-vlan path. NNCP creates a kernel VLAN (<bond>.<vlan-id>,
-        e.g. br-ex.100) on every node for a shared L2 segment and br-localnet for OVN
-        localnet passthrough. A single host dnsmasq on one node serves DHCP/DNS; NAD is
-        subnets-less untagged L2 passthrough.
+        VLAN ID for the localnet-vlan path (MAPFRE NAD 1 / primary guest VLAN). NNCP creates
+        br-localnet with untagged port to <bond>.<vlan-id> (e.g. br-ex.100) — the secondary
+        VLAN segment on each mgmt node, separate from primary ostestbm br-ex (111.x). Per-node
+        host dnsmasq and MASQUERADE serve ostestbm per-node L2 islands. NAD is subnets-less
+        untagged L2 passthrough.
     - name: LOCALNET_VLAN_GATEWAY
       default: "192.168.112.1"
       documentation: |-
@@ -126,8 +127,10 @@ ref:
     - name: LOCALNET_VLAN_BOND
       default: "br-ex"
       documentation: |-
-        Parent interface for the VLAN sub-interface in the NNCP. Typically br-ex (the OVN
-        external bridge) or a bond interface like bond0. The NNCP creates <bond>.<vlan-id>.
+        Primary OVN external bridge on the mgmt node (ostestbm: enp2s0 -> br-ex, 192.168.111.x).
+        The NNCP attaches br-localnet to <bond>.<vlan-id> (secondary guest segment, e.g.
+        br-ex.100 / 192.168.112.x). MASQUERADE routes worker traffic from the VLAN subnet
+        through this bridge to reach the API VIP.
     - name: LOCALNET_MULTI_NETWORK_COUNT
       default: "2"
       documentation: "Number of localnet networks for the multi-localnet architecture. Primary (localnet-1) uses libvirt DHCP passthrough."

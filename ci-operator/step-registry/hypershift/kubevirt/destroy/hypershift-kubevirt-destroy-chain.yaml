@@ -34,16 +34,10 @@ chain:
         LOCALNET_VLAN_SUBNET="${LOCALNET_VLAN_GATEWAY%.*}.0/24"
         LOCALNET_VLAN_DHCP_INTERFACE="${LOCALNET_VLAN_DHCP_INTERFACE:-${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}}"
         NNCP_NAME="localnet-vlan-${LOCALNET_VLAN_ID}"
-        # Clean up dnsmasq on the single DHCP node (recorded during creation)
-        DHCP_NODE=""
-        if [[ -f "${SHARED_DIR}/localnet-vlan-dhcp-node" ]]; then
-          DHCP_NODE=$(cat "${SHARED_DIR}/localnet-vlan-dhcp-node")
-        else
-          DHCP_NODE=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-        fi
-        if [[ -n "${DHCP_NODE}" ]]; then
-          echo "Cleaning up ${LOCALNET_VLAN_DHCP_INTERFACE} dnsmasq on node ${DHCP_NODE}..."
-          oc debug "node/${DHCP_NODE}" -n default --quiet=true -- chroot /host bash -c \
+        # Clean up per-node dnsmasq and MASQUERADE on every mgmt node
+        for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+          echo "Cleaning up ${LOCALNET_VLAN_DHCP_INTERFACE} dnsmasq and routing on node ${NODE}..."
+          oc debug "node/${NODE}" -n default --quiet=true -- chroot /host bash -c \
             'set -euo pipefail; dhcp_iface="$1"; vlan_id="$2"; uplink_bond="$3"; gateway="$4"; vlan_subnet="$5"; \
             pidfile="/run/localnet-vlan-${vlan_id}.pid"; conf="/etc/dnsmasq.d/localnet-vlan-${vlan_id}.conf"; \
             unit="/etc/systemd/system/localnet-vlan-${vlan_id}.service"; \
@@ -60,17 +54,8 @@ chain:
             iptables -t nat -D POSTROUTING -s "${vlan_subnet}" -o "${uplink_bond}" -j MASQUERADE 2>/dev/null || true; \
             ip addr flush dev "${dhcp_iface}" 2>/dev/null || true' \
             _ "${LOCALNET_VLAN_DHCP_INTERFACE}" "${LOCALNET_VLAN_ID}" "${LOCALNET_VLAN_BOND}" \
-            "${LOCALNET_VLAN_GATEWAY}" "${LOCALNET_VLAN_SUBNET}" || true
-          for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-            [[ "${NODE}" == "${DHCP_NODE}" ]] && continue
-            oc debug "node/${NODE}" -n default --quiet=true -- chroot /host bash -c \
-              'set -euo pipefail; dhcp_iface="$1"; uplink_bond="$2"; vlan_subnet="$3"; \
-              iptables -D FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT 2>/dev/null || true; \
-              iptables -D FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true; \
-              iptables -t nat -D POSTROUTING -s "${vlan_subnet}" -o "${uplink_bond}" -j MASQUERADE 2>/dev/null || true' \
-              _ "${LOCALNET_VLAN_DHCP_INTERFACE}" "${LOCALNET_VLAN_BOND}" "${LOCALNET_VLAN_SUBNET}" 2>/dev/null || true
-          done
-        fi
+            "${LOCALNET_VLAN_GATEWAY}" "${LOCALNET_VLAN_SUBNET}" 2>/dev/null || true
+        done
         echo "Cleaning up NNCP ${NNCP_NAME}..."
         oc delete nncp "${NNCP_NAME}" --ignore-not-found --timeout=120s 2>/dev/null || true
       fi

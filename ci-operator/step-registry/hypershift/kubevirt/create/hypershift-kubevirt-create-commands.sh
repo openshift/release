@@ -172,7 +172,7 @@ clear_ovn_localnet_lsp_port_security() {
   fi
 }
 
-# Prepare passthrough localnet LSPs for host dnsmasq on a shared VLAN L2 segment.
+# Prepare passthrough localnet LSPs for per-node host dnsmasq on the VLAN segment.
 # Clear OVN dhcpv4_options (OVN DHCP blocks/conflicts with host broadcasts) and
 # port_security (EgressIP SNAT egress). Run after worker virt-launcher pods exist.
 prepare_ovn_localnet_lsp_host_dhcp() {
@@ -214,10 +214,12 @@ prepare_ovn_localnet_lsp_host_dhcp() {
   fi
 }
 
-# Run dnsmasq on br-ex.<vlan-id> on ONE mgmt node before worker VMIs boot (localnet-vlan).
-# NNCP creates a kernel VLAN (br-ex.100) on br-ex on every node so VLAN traffic shares the
-# same L2 domain via the physical fabric; only the DHCP node gets 192.168.112.1/gateway.
-# br-localnet OVS bridge passes untagged guest frames to that VLAN segment.
+# Run dnsmasq on br-ex.<vlan-id> on EVERY mgmt node before worker VMIs boot (localnet-vlan).
+# Per MAPFRE/SERPRO design the guest primary NAD is a secondary VLAN segment (e.g. br-ex.100 /
+# 192.168.112.x) on br-localnet, separate from the primary ostestbm br-ex segment (111.x).
+# ostestbm has per-node L2 islands (no VLAN trunk on enp2s0), so each node needs its own
+# dnsmasq @ 192.168.112.1 — safe because broadcast domains do not overlap.
+# MASQUERADE on each node routes worker traffic from the VLAN segment to br-ex (API VIP).
 #
 # dnsmasq serves DHCP/DNS on br-ex.<vlan-id> (bind-interfaces + interface=). CoreDNS hostNetwork
 # owns *:53, so dnsmasq must use port 5353. Under systemd, dnsmasq_t SELinux only allows
@@ -343,8 +345,9 @@ echo "dnsmasq configured on ${dhcp_iface} (${gateway}, api=${api_vip}, apps=${in
 SCRIPT_EOF
 }
 
-# Workers live on the VLAN subnet; the API VIP is on br-ex (e.g. 192.168.111.32). Apply
-# forwarding, MASQUERADE, and rp_filter=0 on every node (VMIs may schedule anywhere).
+# Workers live on the secondary VLAN subnet (br-ex.<vlan-id>); API VIP is on primary br-ex
+# (e.g. 192.168.111.32). Apply forwarding, MASQUERADE, and rp_filter=0 on every node so
+# VMIs scheduled anywhere can reach the API via L3 SNAT through the primary uplink (br-ex).
 localnet_vlan_configure_nodes_routing() {
   local dhcp_iface="$1"
   local uplink_bond="$2"
@@ -388,16 +391,6 @@ SCRIPT_EOF
   done
 }
 
-localnet_vlan_dhcp_node() {
-  local node
-  node=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
-  if [[ -z "${node}" ]]; then
-    # Bare-metal CI clusters are often compact (masters-only); fall back to a master.
-    node=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')
-  fi
-  echo "${node}"
-}
-
 localnet_vlan_configure_br_localnet_dhcp() {
   local cluster_name="$1"
   local vlan_id="$2"
@@ -411,30 +404,35 @@ localnet_vlan_configure_br_localnet_dhcp() {
   local base_domain
   local node
   local setup_b64
+  local failed=0
 
   base_domain=$(oc get dns/cluster -o jsonpath='{.spec.baseDomain}')
-  echo "Configuring dnsmasq on ${dhcp_iface} for VLAN ${vlan_id} (cluster ${cluster_name}, DNS base ${base_domain})..."
+  echo "Configuring per-node dnsmasq on ${dhcp_iface} for VLAN ${vlan_id} (cluster ${cluster_name}, DNS base ${base_domain})..."
 
   setup_b64=$(localnet_vlan_dnsmasq_setup_script_b64)
 
-  # Run dnsmasq on a single node only. The VLAN is a shared L2 segment so one
-  # DHCP server serves all VMs regardless of scheduling node. Running on every
-  # node would cause duplicate gateway IPs and competing DHCP leases.
-  node=$(localnet_vlan_dhcp_node)
-  if [[ -z "${node}" ]]; then
-    echo "ERROR: no node found for DHCP server placement" >&2
+  # Per-node dnsmasq: ostestbm br-localnet is a per-node L2 island (secondary VLAN segment
+  # off br-ex). Same gateway IP on each node is safe — broadcast domains are isolated.
+  # Aligns with MAPFRE NAD 1 (primary guest VLAN) on mgmt localnet bridge per design doc.
+  : > "${SHARED_DIR}/localnet-vlan-dhcp-nodes"
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    echo "Setting up ${dhcp_iface} DHCP/DNS on node ${node} (per-node secondary VLAN segment)..."
+    # oc debug defaults to OPENSHIFT_BUILD_NAMESPACE (ci-op-* on build cluster), which does
+    # not exist on the baremetal test cluster. Always target default.
+    if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+      "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
+    then
+      echo "${node}" >> "${SHARED_DIR}/localnet-vlan-dhcp-nodes"
+      echo "  ${node}: dnsmasq configured on ${dhcp_iface}"
+    else
+      echo "ERROR: failed to configure ${dhcp_iface} DHCP on node ${node}" >&2
+      failed=1
+    fi
+  done
+
+  if [[ "${failed}" -ne 0 ]]; then
     return 1
   fi
-  echo "Setting up ${dhcp_iface} DHCP/DNS on node ${node} (single-node DHCP for shared VLAN)..."
-  # oc debug defaults to OPENSHIFT_BUILD_NAMESPACE (ci-op-* on build cluster), which does
-  # not exist on the baremetal test cluster. Always target default.
-  if ! oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
-    "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
-  then
-    echo "WARNING: failed to configure ${dhcp_iface} DHCP on node ${node}" >&2
-    return 1
-  fi
-  echo "${node}" > "${SHARED_DIR}/localnet-vlan-dhcp-node"
 }
 
 # Re-write dnsmasq static records after the hosted cluster exists so api/api-int use the
@@ -461,24 +459,14 @@ localnet_vlan_refresh_dnsmasq_api_dns() {
     return 0
   fi
 
-  node=""
-  if [[ -f "${SHARED_DIR}/localnet-vlan-dhcp-node" ]]; then
-    node=$(cat "${SHARED_DIR}/localnet-vlan-dhcp-node")
-  fi
-  if [[ -z "${node}" ]] || ! oc get node "${node}" &>/dev/null; then
-    node=$(localnet_vlan_dhcp_node)
-  fi
-  if [[ -z "${node}" ]]; then
-    echo "WARNING: no DHCP node for dnsmasq API refresh" >&2
-    return 0
-  fi
-
   base_domain=$(oc get dns/cluster -o jsonpath='{.spec.baseDomain}')
-  echo "Refreshing localnet-vlan dnsmasq API DNS on ${node} (api/api-int -> ${api_vip})..."
+  echo "Refreshing localnet-vlan dnsmasq API DNS on all nodes (api/api-int -> ${api_vip})..."
   setup_b64=$(localnet_vlan_dnsmasq_setup_script_b64)
-  oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
-    "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'" \
-    || echo "WARNING: dnsmasq API refresh failed on ${node}" >&2
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+      "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'" \
+      || echo "WARNING: dnsmasq API refresh failed on ${node}" >&2
+  done
 }
 
 localnet_multi_label_namespace_privileged() {
@@ -998,11 +986,13 @@ EOF
       EXTRA_ARGS="${EXTRA_ARGS} --additional-network name:${ns}/localnet-${i}"
     done
   elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-vlan" ]]; then
-    # Localnet with VLAN: NNCP creates br-ex.<vlan-id> (kernel VLAN on br-ex) on every node
-    # for a shared 192.168.112.0/24 L2 segment across the bare-metal fabric. OVN NAD is
-    # subnets-less untagged passthrough to br-localnet (no stacked OVN vlanID).
-    #   - single host dnsmasq on one node at 192.168.112.1 serves all worker VMIs
-    #   - attach-default-network=false — workers use only the localnet VLAN NIC
+    # Localnet with VLAN (MAPFRE NAD 1 / primary guest VLAN per SERPRO-SUPPORTEX--31531.md):
+    # NNCP creates br-localnet OVS bridge with untagged port to br-ex.<vlan-id> — the
+    # secondary VLAN segment (192.168.112.x) on each mgmt node, separate from primary
+    # ostestbm br-ex (192.168.111.x via enp2s0). OVN NAD is subnets-less untagged passthrough.
+    #   - per-node host dnsmasq @ 192.168.112.1 (per-node L2 islands on ostestbm)
+    #   - per-node MASQUERADE from VLAN subnet -> br-ex for API VIP reachability
+    #   - attach-default-network=false — workers use only the localnet VLAN NIC (guest sole NIC)
 
     ns="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
     LOCALNET_VLAN_ID="${LOCALNET_VLAN_ID:-100}"
@@ -1037,9 +1027,9 @@ EOF
       fi
     fi
 
-    # Apply NNCP: kernel VLAN br-ex.<id> on every node (shared L2 on the fabric) plus
-    # br-localnet OVS bridge for OVN localnet passthrough. Single host dnsmasq binds the
-    # gateway IP on the DHCP node only.
+    # Apply NNCP: br-localnet OVS bridge mapped to localnet-physnet, with untagged port to
+    # br-ex.<vlan-id> (secondary segment netdev). Do NOT create kernel 802.1Q VLAN on br-ex —
+    # OVN localnet is subnets-less/untagged and kernel VLAN breaks guest DHCP (see RCA doc).
     echo "Applying NodeNetworkConfigurationPolicy for VLAN ${LOCALNET_VLAN_ID}..."
     oc apply -f - <<NNCP_EOF
 apiVersion: nmstate.io/v1
@@ -1056,12 +1046,6 @@ spec:
           bridge: ${LOCALNET_VLAN_BRIDGE}
           state: present
     interfaces:
-      - name: ${LOCALNET_VLAN_DHCP_INTERFACE}
-        type: vlan
-        state: up
-        vlan:
-          base-iface: ${LOCALNET_VLAN_BOND}
-          id: ${LOCALNET_VLAN_ID}
       - name: ${LOCALNET_VLAN_BRIDGE}
         type: ovs-bridge
         state: up
@@ -1075,8 +1059,9 @@ spec:
             stp: false
           port:
             # Untagged on br-localnet: OVN localnet NAD is subnets-less and delivers
-            # untagged L2 frames to the shared VLAN segment via br-ex.<vlan-id>.
-            - name: ${LOCALNET_VLAN_DHCP_INTERFACE}
+            # untagged L2 frames. VLAN segmentation is on the secondary netdev (br-ex.<id>);
+            # NMState may infer a VLAN tag from the name — cleared post-NNCP below.
+            - name: ${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}
 NNCP_EOF
 
     echo "Waiting for NNCP localnet-vlan-${LOCALNET_VLAN_ID} to be Available..."
@@ -1088,14 +1073,15 @@ NNCP_EOF
       exit 1
     fi
 
-    echo "Verifying ${LOCALNET_VLAN_DHCP_INTERFACE} VLAN interface on all nodes..."
+    # NMState may tag the br-ex.<vlan> OVS port with VLAN ID from the interface name.
+    # OVN localnet is subnets-less/untagged; clear the tag so guest DHCP reaches dnsmasq.
+    echo "Clearing OVS VLAN tag on ${LOCALNET_VLAN_DHCP_INTERFACE} ports (untagged localnet)..."
     for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
       if oc debug "node/${NODE}" -n default --quiet=true -- chroot /host bash -c \
-        "ip link show '${LOCALNET_VLAN_DHCP_INTERFACE}' &>/dev/null"; then
-        echo "  ${NODE}: ${LOCALNET_VLAN_DHCP_INTERFACE} present"
+        "ovs-vsctl clear port '${LOCALNET_VLAN_DHCP_INTERFACE}' tag 2>/dev/null || true"; then
+        echo "  ${NODE}: cleared VLAN tag on ${LOCALNET_VLAN_DHCP_INTERFACE}"
       else
-        echo "ERROR: ${LOCALNET_VLAN_DHCP_INTERFACE} missing on ${NODE}" >&2
-        exit 1
+        echo "WARNING: failed to clear VLAN tag on ${NODE}" >&2
       fi
     done
 
@@ -1112,6 +1098,11 @@ NNCP_EOF
       echo "ERROR: localnet-vlan inter-subnet routing configuration failed" >&2
       exit 1
     }
+
+    echo "localnet-vlan host networking ready: secondary segment ${LOCALNET_VLAN_DHCP_INTERFACE} (${LOCALNET_VLAN_SUBNET})"
+    echo "  per-node dnsmasq @ ${LOCALNET_VLAN_GATEWAY} on ${LOCALNET_VLAN_DHCP_INTERFACE}"
+    echo "  per-node MASQUERADE ${LOCALNET_VLAN_SUBNET} -> ${LOCALNET_VLAN_BOND} (primary br-ex / API VIP ${LOCALNET_VLAN_API_VIP})"
+    echo "  guest workers: attach-default-network=false, sole NIC = OVN localnet NAD (MAPFRE NAD 1)"
 
     # Verify bridge-mappings include the new physnet on all nodes
     echo "Verifying bridge-mappings on all nodes..."
