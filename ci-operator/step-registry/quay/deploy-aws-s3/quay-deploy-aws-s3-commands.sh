@@ -10,11 +10,69 @@ if [ "${MAP_TESTS}" = "true" ]; then
         type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
         "${_fURL[@]}" \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-    )"; trap '
-        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-            ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-aws-s3__quay-tests-deploy-quay-aws-s3.xml
-    ' EXIT
+    )"
 fi
+
+# Tracks the Quay install for Sippy's quay-lifecycle suite. Empty
+# QL_INSTALL_STATUS means the install was never attempted.
+QL_INSTALL_START=""
+QL_INSTALL_STATUS=""
+QL_INSTALL_FAILURE=""
+
+# shellcheck disable=SC2329 # invoked only from write_quay_install_junit, below
+function ql_xml_escape() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e "s/'/\&apos;/g" -e 's/"/\&quot;/g'
+}
+
+# shellcheck disable=SC2329 # invoked only from on_exit, below
+function write_quay_install_junit() {
+  local exit_code="$1"
+
+  # No Subscription was ever created: an infra failure, not a Quay install attempt.
+  if [[ -z "${QL_INSTALL_START}" ]]; then
+    return 0
+  fi
+
+  # The install started but the script exited (e.g. a hard timeout kill) before
+  # it recorded a result; that is still a failure, not a skip.
+  if [[ -z "${QL_INSTALL_STATUS}" && "${exit_code}" -ne 0 ]]; then
+    QL_INSTALL_STATUS="failed"
+    QL_INSTALL_FAILURE="step exited with status ${exit_code}"
+  fi
+
+  local install_time=$(( $(date +%s) - QL_INSTALL_START ))
+  local failures=0
+  [[ "${QL_INSTALL_STATUS}" == "failed" ]] && failures=1
+
+  local tmp
+  tmp="$(mktemp "${ARTIFACT_DIR}/junit_quay_install.xml.XXXXXX")"
+  {
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+    printf '<testsuite name="quay-lifecycle" tests="1" failures="%d" skipped="0" time="%d">\n' \
+      "${failures}" "${install_time}"
+    printf '  <testcase name="[sig-quay] install should succeed" time="%d"' "${install_time}"
+    if [[ "${failures}" -eq 1 ]]; then
+      printf '>\n    <failure message="%s">%s</failure>\n  </testcase>\n' \
+        "$(ql_xml_escape "${QL_INSTALL_FAILURE}")" "$(ql_xml_escape "${QL_INSTALL_FAILURE}")"
+    else
+      printf '/>\n'
+    fi
+    echo '</testsuite>'
+  } > "${tmp}"
+  mv "${tmp}" "${ARTIFACT_DIR}/junit_quay_install.xml"
+}
+
+# shellcheck disable=SC2329 # invoked only via the EXIT trap installed below
+function on_exit() {
+  local ec=$?
+  if [ "${MAP_TESTS}" = "true" ]; then
+    LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+      ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-aws-s3__quay-tests-deploy-quay-aws-s3.xml || true
+  fi
+  write_quay_install_junit "${ec}"
+  exit "${ec}"
+}
+trap on_exit EXIT
 
 QUAY_NS="quay-enterprise"
 
@@ -200,6 +258,7 @@ spec:
   - quay-enterprise
 EOF
 
+QL_INSTALL_START="$(date +%s)"
 SUB=$(
   cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
 apiVersion: operators.coreos.com/v1alpha1
@@ -231,6 +290,8 @@ for _ in {1..60}; do
   sleep 10
 done
 if [[ "$CSV_READY" != "true" ]]; then
+  QL_INSTALL_STATUS="failed"
+  QL_INSTALL_FAILURE="Timed out waiting for Quay Operator CSV to reach Succeeded phase"
   echo "Timed out waiting for Quay Operator CSV to reach Succeeded phase" >&2
   echo "=== CSV Status ===" >&2
   oc -n quay-enterprise get csv -o wide 2>&1 || true
@@ -253,6 +314,8 @@ for _ in {1..30}; do
   sleep 5
 done
 if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+  QL_INSTALL_STATUS="failed"
+  QL_INSTALL_FAILURE="Timed out waiting for QuayRegistry CRD"
   echo "Timed out waiting for QuayRegistry CRD" >&2
   echo "=== Operator Pod Logs ===" >&2
   oc logs -n quay-enterprise -l name=quay-operator --tail=100 2>&1 || true
@@ -415,6 +478,7 @@ for i in $(seq 1 90); do
   status="$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
   if [[ "$status" == "True" ]]; then
     echo "Quay is ready (after $((i * 10))s)" >&2
+    QL_INSTALL_STATUS="passed"
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
     quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
@@ -432,6 +496,9 @@ for i in $(seq 1 90); do
 done
 
 echo "Timed out waiting for Quay to become ready" >&2
+ql_conditions="$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions}' 2>/dev/null || true)"
+QL_INSTALL_STATUS="failed"
+QL_INSTALL_FAILURE="Timed out waiting for Quay to become ready: ${ql_conditions}"
 echo "Final QuayRegistry conditions:" >&2
 print_quayregistry_conditions
 echo "Pods in ${QUAY_NS} namespace:" >&2
