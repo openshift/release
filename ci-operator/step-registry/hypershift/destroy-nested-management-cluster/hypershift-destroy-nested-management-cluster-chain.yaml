@@ -23,12 +23,16 @@ chain:
       mkdir -p "${ARTIFACT_DIR}/output"
       bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir="${ARTIFACT_DIR}/output" --name="${CLUSTER_NAME}" --namespace="${HYPERSHIFT_NAMESPACE}"
 
-      # Azure dump logs trigger leaktk/gcs-filter censoring of tarballs; skip tarring for Azure
-      # so individual files upload directly and only the sensitive ones get censored
-      if [[ "${CLOUD_PROVIDER}" != "Azure" ]]; then
-        tar -cvzf "${ARTIFACT_DIR}/artifacts.tar.gz" "${ARTIFACT_DIR}/output"
-        rm -rf "${ARTIFACT_DIR}/output"
-      fi
+      # Redact certs/keys and bearer tokens before archiving so leaktk/gcs-filter's
+      # post-upload gitleaks scan has nothing to match. Tarring keeps Prow's artifact
+      # page fast (rendering time grows with per-job file count in GCS); redacting
+      # first avoids leaktk replacing the whole tarball with a placeholder when a
+      # match is found inside it (OCPBUGS-84684, OCPBUGS-109626).
+      find "${ARTIFACT_DIR}/output" -type f -exec sed -i \
+        -e '/-----BEGIN [A-Z ]*-----/,/-----END [A-Z ]*-----/d' \
+        -e 's|bearer [A-Za-z0-9._~+/=-]\+|Bearer REDACTED|gI' {} +
+      tar -cvzf "${ARTIFACT_DIR}/artifacts.tar.gz" "${ARTIFACT_DIR}/output"
+      rm -rf "${ARTIFACT_DIR}/output"
     credentials:
     - mount_path: /etc/hypershift-kubeconfig
       name: hypershift-ci-2
