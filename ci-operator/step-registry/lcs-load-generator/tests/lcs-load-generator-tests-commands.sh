@@ -22,7 +22,7 @@ DIAGNOSTIC_GRACE_SECONDS=$((15 * 60))
 LCS_NAMESPACE="${LCS_NAMESPACE:-openshift-lightspeed}"
 NUM_USERS="${NUM_USERS:-5}"
 TEST_DURATION="${TEST_DURATION:-5m}"
-LCS_LOADGEN_IMAGE="${LCS_LOADGEN_IMAGE:-quay.io/rh-ee-bbodapat/lcs-load-generator:latest}"
+: "${LCS_LOADGEN_IMAGE:?LCS_LOADGEN_IMAGE must be injected by ci-operator}"
 LCS_APP_IMAGE="${LCS_APP_IMAGE:-quay.io/redhat-et/lightspeed-stack:dev-latest}"
 MOCK_LLM_IMAGE="${MOCK_LLM_IMAGE:-quay.io/rh-ee-bbodapat/lcs-testing:mock-llm-server}"
 ENABLE_PYROSCOPE="${ENABLE_PYROSCOPE:-true}"
@@ -400,33 +400,16 @@ export LOCUST_PROCESSES REQUEST_TIMEOUT METRIC_STEP
 # Delete any previous Job (idempotent)
 oc delete job lcs-load-generator -n "${LCS_NAMESPACE}" --ignore-not-found=true
 
-# Apply RBAC and Job manifests inline (no baked-in image required)
-echo "── Applying load generator RBAC and Job ──"
+# Apply the dedicated ServiceAccount and Job manifests inline.
+echo "── Applying load generator ServiceAccount and Job ──"
 cat <<JOBMANIFEST | oc apply -f -
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+apiVersion: v1
+kind: ServiceAccount
 metadata:
-  name: lcs-load-generator-serviceaccount
+  name: lcs-load-generator
   namespace: ${LCS_NAMESPACE}
-rules:
-  - apiGroups: ["extensions", "apps", "batch", "security.openshift.io", "policy"]
-    resources: ["deployments", "jobs", "pods", "services", "jobs/status",
-                "podsecuritypolicies", "securitycontextconstraints"]
-    verbs: ["use", "get", "list", "watch", "create", "update", "patch", "delete"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: lcs-load-generator-role
-  namespace: ${LCS_NAMESPACE}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: lcs-load-generator-serviceaccount
-subjects:
-  - kind: ServiceAccount
-    name: default
+automountServiceAccountToken: false
 ---
 apiVersion: batch/v1
 kind: Job
@@ -443,6 +426,8 @@ spec:
         app: lcs-load-generator
     spec:
       restartPolicy: Never
+      serviceAccountName: lcs-load-generator
+      automountServiceAccountToken: false
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
