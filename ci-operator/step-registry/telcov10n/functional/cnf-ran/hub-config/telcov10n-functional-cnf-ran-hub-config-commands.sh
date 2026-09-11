@@ -103,6 +103,15 @@ ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml \
   --extra-vars "kubeconfig=${KUBECONFIG_PATH}" \
   --extra-vars "{\"lvm_local_volumes\": ${LVM_LOCAL_VOLUMES}}" -vv
 
+# Deploy Alertmanager before operator install so any operator whose pods need
+# it (e.g. o-cloud-manager alarms-server) can reach it on first start.
+if [[ "${CONFIGURE_ACM_OBSERVABILITY}" == "true" ]]; then
+  echo "Configuring ACM Observability (minimal Alertmanager for alarms-server)"
+  ansible-playbook playbooks/ran/hub-sno-configure-acm-observability.yml \
+    -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
+fi
+
 echo "Configuring ACM"
 ansible-playbook playbooks/ran/hub-sno-configure-acm.yml \
   -i ./inventories/ocp-deployment/build-inventory.py \
