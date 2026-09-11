@@ -1,0 +1,130 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: test-harness-ui
+  namespace: openshift
+parameters:
+- description: The session secret for the component.
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
+- description: The namespace. Must come from a var or it will get stripped off
+  name: NAMESPACE
+  value: test-harness
+objects:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      keel.sh/matchTag: "true"
+      keel.sh/policy: force
+      keel.sh/pollSchedule: "@every 5m"
+      keel.sh/trigger: poll
+    labels:
+      app: test-harness-ui
+    name: test-harness-ui
+    namespace: ${NAMESPACE}
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: test-harness-ui
+    template:
+      metadata:
+        labels:
+          app: test-harness-ui
+      spec:
+        serviceAccountName: test-harness-ui
+        nodeSelector:
+          kubernetes.io/arch: amd64
+        containers:
+        - name: test-harness-ui
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_test-harness-operator_test-harness-ui
+          imagePullPolicy: Always
+          args:
+          - --namespace=${NAMESPACE}
+          - --addr=:8080
+          ports:
+          - name: http
+            containerPort: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+        - name: oauth-proxy
+          image: quay.io/openshift/origin-oauth-proxy:4.16
+          imagePullPolicy: IfNotPresent
+          ports:
+          - name: web
+            containerPort: 8443
+          args:
+          - -provider=openshift
+          - -https-address=:8443
+          - -http-address=
+          - -email-domain=*
+          - -upstream=http://localhost:8080
+          - -client-id=system:serviceaccount:${NAMESPACE}:test-harness-ui
+          - -openshift-ca=/etc/pki/tls/cert.pem
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - '-openshift-sar={"namespace":"${NAMESPACE}","resource":"services","name":"test-harness-ui","verb":"get"}'
+          - '-openshift-delegate-urls={"/":{"namespace":"${NAMESPACE}","resource":"services","name":"test-harness-ui","verb":"get"}}'
+          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -cookie-samesite=none
+          - -tls-cert=/etc/tls/private/tls.crt
+          - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: test-harness-ui-tls
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+        volumes:
+        - name: test-harness-ui-tls
+          secret:
+            secretName: test-harness-ui-tls
+        - name: session-secret
+          secret:
+            secretName: test-harness-ui-session-secret
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: test-harness-ui-tls
+    labels:
+      app: test-harness-ui
+    name: test-harness-ui
+    namespace: ${NAMESPACE}
+  spec:
+    ports:
+    - name: web
+      port: 443
+      targetPort: 8443
+    selector:
+      app: test-harness-ui
+    type: ClusterIP
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: test-harness-ui-session-secret
+    namespace: ${NAMESPACE}
+  stringData:
+    session_secret: "${SESSION_SECRET}="
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: test-harness-ui
+    namespace: ${NAMESPACE}
+  spec:
+    port:
+      targetPort: web
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: reencrypt
+    to:
+      kind: Service
+      name: test-harness-ui
+      weight: 100
