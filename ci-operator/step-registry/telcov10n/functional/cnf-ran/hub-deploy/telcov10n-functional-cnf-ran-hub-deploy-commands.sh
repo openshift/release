@@ -2,6 +2,7 @@
 set -e
 set -o pipefail
 
+sleep 720 
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
   echo "Detected skip.txt — skipping"
   exit 0
