@@ -994,6 +994,11 @@ spec:
         type: ovs-bridge
         state: up
         bridge:
+          # OVN-K adds patch-localnet.*_ovn_localnet_port-to-br-int after the NAD exists.
+          # Do NOT list that port under bridge.port — NM enforces a 15-char interface-name
+          # limit and apply fails (~50 char OVN patch name). Instead tolerate the patch
+          # at verification time (OKD localnet NNCP pattern).
+          allow-extra-patch-ports: true
           options:
             stp: false
           port:
@@ -1002,9 +1007,6 @@ spec:
             # VLAN segmentation is on the physical uplink (br-ex); br-ex.<vlan-id> is
             # the kernel netdev for dnsmasq on this segment.
             - name: ${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_ID}
-            # OVN-K creates this patch port once the localnet NAD exists; include it
-            # so NMState verification does not fail after the network is provisioned.
-            - name: patch-localnet.${LOCALNET_VLAN_PHYSNET#localnet-}_ovn_localnet_port-to-br-int
 NNCP_EOF
 
     echo "Waiting for NNCP localnet-vlan-${LOCALNET_VLAN_ID} to be Available..."
