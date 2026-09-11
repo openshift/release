@@ -827,7 +827,7 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
                     "labels": { "rosa-cluster-lease/status": "error" },
                     "annotations": { "rosa-cluster-lease/error-reason": "RBAC: dedicated-admins permissions not functional", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
                 }
-            }' || true
+            }'
         fi
         UNHEALTHY=$((UNHEALTHY + 1))
         echo "UNHEALTHY: ${CM_NAME} (RBAC: dedicated-admins broken)" >> "${REPORT}"
@@ -868,7 +868,7 @@ else
         REFRESH_COUNT=0
         REFRESH_REMAINING=0
 
-        AVAILABLE_CMS=$(lease_oc get configmaps -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/status=available" -o json 2>/dev/null || echo '{"items":[]}')
+        AVAILABLE_CMS=$(lease_oc get configmaps -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true,rosa-cluster-lease/status=available" -o json 2>/dev/null || echo '{"items":[]}')
         AVAILABLE_COUNT=$(echo "${AVAILABLE_CMS}" | jq '.items | length')
 
         for i in $(seq 0 $((AVAILABLE_COUNT - 1))); do
@@ -909,11 +909,14 @@ else
                 CLUSTER_TYPE=$(echo "${CM}" | jq -r '.metadata.labels["rosa-cluster-lease/type"] // "classic-sts"')
                 ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
+                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                    "metadata": { "labels": { "rosa-cluster-lease/status": "maintenance" } }
+                }'
                 if ! delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}"; then
                     log "WARNING: delete_cluster failed for ${CM_NAME}, preserving ConfigMap"
                     continue
                 fi
-                lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" || true
+                lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}"
 
                 REFRESH_COUNT=$((REFRESH_COUNT + 1))
                 log "Deleted ${CM_NAME} for refresh. Replacement will be provisioned on next reconcile."
@@ -965,11 +968,14 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
     if [[ "${OCM_CHECK_RESULT}" == "not-found" ]]; then
         log "${CM_NAME}: cluster already deleted from OCM, skipping delete_cluster"
     else
-        delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}" || log "WARNING: delete_cluster failed for ${CM_NAME}, removing ConfigMap anyway"
+        if ! delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}"; then
+            log "WARNING: delete_cluster failed for ${CM_NAME}, preserving ConfigMap"
+            continue
+        fi
     fi
 
     # Remove the ConfigMap (next reconcile will provision a replacement)
-    lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" || true
+    lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}"
     log "Deleted ${CM_NAME}. Replacement will be provisioned on next reconcile."
 done
 
