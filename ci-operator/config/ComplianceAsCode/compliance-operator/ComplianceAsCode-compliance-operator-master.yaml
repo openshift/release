@@ -68,6 +68,7 @@ releases:
   latest-5-0:
     candidate:
       product: ocp
+      relative: 1
       stream: nightly
       version: "5.0"
 resources:
@@ -195,7 +196,44 @@ tests:
         export NAMESPACE="openshift-compliance"
         export SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
 
-        oc adm policy add-cluster-role-to-user cluster-admin -z default -n "${NAMESPACE}"
+        # Least-privilege grants matching openshift/tls-scanner's own documented
+        # deploy.sh, rather than cluster-admin: read-only cluster access, the
+        # privileged SCC (the scanner probes ports as root-equivalent for
+        # process/socket introspection), and a narrow ClusterRole for the few
+        # cross-namespace calls (pods/exec, ingresscontrollers, kubeletconfigs)
+        # that cluster-reader alone doesn't cover.
+        oc adm policy add-cluster-role-to-user cluster-reader -z default -n "${NAMESPACE}"
+        oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
+
+        cat <<TLSSCANNERROLE | oc apply -f -
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: tls-scanner-cross-namespace
+        rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods/exec
+          verbs:
+          - create
+        - apiGroups:
+          - operator.openshift.io
+          resources:
+          - ingresscontrollers
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - machineconfiguration.openshift.io
+          resources:
+          - kubeletconfigs
+          verbs:
+          - get
+          - list
+        TLSSCANNERROLE
+
+        oc adm policy add-cluster-role-to-user tls-scanner-cross-namespace -z default -n "${NAMESPACE}"
         sleep 5
 
         cat <<SCANNERPOD | oc create -f -
