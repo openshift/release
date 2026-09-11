@@ -207,9 +207,18 @@ tests:
         spec:
           serviceAccountName: default
           restartPolicy: Never
+          activeDeadlineSeconds: 2100
           containers:
           - name: scanner
             image: ${SCANNER_IMAGE}
+            env:
+            # tls-scanner writes scratch files via os.CreateTemp("", ...) and
+            # testssl.sh's own mktemp calls, both of which resolve to \$TMPDIR
+            # (default /tmp) independent of --artifact-dir/--*-file, which are
+            # absolute paths and unaffected. Point it at the writable /results
+            # mount so readOnlyRootFilesystem below doesn't break the scan.
+            - name: TMPDIR
+              value: /results
             command:
             - /bin/bash
             - -c
@@ -237,6 +246,7 @@ tests:
                 memory: 4Gi
             securityContext:
               allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
               runAsNonRoot: true
               runAsUser: 65532
               capabilities:
@@ -259,6 +269,9 @@ tests:
         LOGS_PID=$!
 
         echo "Waiting for scan to complete..."
+        SCAN_TIMEOUT_SECONDS=1800
+        SCAN_ELAPSED_SECONDS=0
+        SCAN_TIMED_OUT=false
         while true; do
           if oc exec pod/tls-scanner -n "${NAMESPACE}" -- test -f /results/scan.done 2>/dev/null; then
             break
@@ -267,7 +280,13 @@ tests:
           if [[ "$phase" == "Succeeded" || "$phase" == "Failed" ]]; then
             break
           fi
+          if (( SCAN_ELAPSED_SECONDS >= SCAN_TIMEOUT_SECONDS )); then
+            echo "Timed out after ${SCAN_TIMEOUT_SECONDS}s waiting for the scan to complete"
+            SCAN_TIMED_OUT=true
+            break
+          fi
           sleep 10
+          SCAN_ELAPSED_SECONDS=$((SCAN_ELAPSED_SECONDS + 10))
         done
 
         echo "Copying scan results..."
@@ -283,7 +302,10 @@ tests:
 
         pod_exit_code=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "1")
         echo "=== TLS Scanner Complete (namespace: openshift-compliance) ==="
-        if [[ "$pod_exit_code" == "0" ]]; then
+        if [[ "$SCAN_TIMED_OUT" == "true" ]]; then
+          echo "Result: FAILED (scan did not complete within ${SCAN_TIMEOUT_SECONDS}s)"
+          exit 1
+        elif [[ "$pod_exit_code" == "0" ]]; then
           echo "Result: PASSED"
         else
           echo "Result: FAILED"
