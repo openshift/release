@@ -193,6 +193,9 @@ tests:
         echo "Waiting for compliance-operator deployment to be ready..."
         oc wait --for=condition=Available deployment/compliance-operator -n openshift-compliance --timeout=10m
 
+        echo "Compliance Operator image: ${IMAGE_FROM_CI}"
+        oc logs deployment/compliance-operator -n openshift-compliance | grep "Compliance Operator Version" || echo "Compliance Operator Version: not found in logs"
+
         echo "=== Running TLS Scanner ==="
         export NAMESPACE="openshift-compliance"
         export SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
@@ -339,7 +342,18 @@ tests:
 
         wait $LOGS_PID 2>/dev/null || true
 
-        pod_exit_code=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "1")
+        # The container does `touch scan.done; sleep 60; exit $code` internally, so
+        # scan.done can exist for up to 60s before containerStatuses[].state.terminated
+        # is actually populated. Poll for it instead of reading it once.
+        pod_exit_code=""
+        for _ in $(seq 1 18); do
+          pod_exit_code=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || true)
+          if [[ -n "$pod_exit_code" ]]; then
+            break
+          fi
+          sleep 5
+        done
+        pod_exit_code="${pod_exit_code:-1}"
         echo "=== TLS Scanner Complete (namespace: openshift-compliance) ==="
         if [[ "$SCAN_TIMED_OUT" == "true" ]]; then
           echo "Result: FAILED (scan did not complete within ${SCAN_TIMEOUT_SECONDS}s)"
