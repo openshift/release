@@ -39,7 +39,7 @@ tests:
 - as: rosa-hcp-e2e-private-staging
   capabilities:
   - intranet
-  cron: 0 2 * * *
+  cron: 0 2 * * 2,5
   restrict_network_access: false
   steps:
     allow_best_effort_post_steps: true
@@ -54,6 +54,25 @@ tests:
       REGION: us-west-2
       REPLICAS: "3"
     workflow: rosa-e2e-hcp-private
+- as: rosa-classic-sts-e2e-privatelink-staging
+  capabilities:
+  - intranet
+  cron: 0 5 * * 1,4
+  restrict_network_access: false
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_TOPOLOGY: classic
+      HOSTED_CP: "false"
+      LABEL_FILTER: Platform:Classic && !Access:MC && !Access:PublicAPI
+      MULTI_AZ: "false"
+      OCM_LOGIN_ENV: staging
+      REPLICAS: "2"
+      STS: "true"
+      ZONES_COUNT: "1"
+    workflow: rosa-e2e-classic-privatelink
 - as: rosa-hcp-e2e-staging-stable-4-19
   cron: 30 2 * * *
   steps:
