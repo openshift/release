@@ -23,7 +23,7 @@ SCRATCH_DIR="$(mktemp -d)"
 readonly SCRATCH_DIR
 readonly CAPTURES_DIR="${SCRATCH_DIR}/captures"
 readonly JUNIT_CLASSNAME="tls.probe.adherence.runtime"
-readonly SCC_NAME="tls-probe-capture"
+readonly SCC_NAME="tls-probe-capture-${NS}"  # cluster-scoped; suffix with NS so concurrent runs on a shared/long-lived cluster don't race on the same SCC
 
 # Only "${NS}" and "${NS}-"-prefixed names are accepted: create_namespace and
 # cleanup pass this straight to `oc delete namespace`, so a typo or an
