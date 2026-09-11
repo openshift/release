@@ -101,7 +101,7 @@ allowHostIPC: false
 allowHostNetwork: true
 allowHostPID: true
 allowHostPorts: false
-allowPrivilegeEscalation: true
+allowPrivilegeEscalation: false
 allowPrivilegedContainer: false
 allowedCapabilities:
 - BPF
@@ -192,7 +192,7 @@ spec:
         - --no-self-test       # suppress startup canary handshake from results
         securityContext:
           privileged: false
-          allowPrivilegeEscalation: true
+          allowPrivilegeEscalation: false
           capabilities:
             drop:
             - ALL
@@ -231,7 +231,10 @@ EOF
 
   oc rollout status daemonset/tls-probe -n "${NS}" --timeout=5m || {
     oc describe daemonset/tls-probe -n "${NS}" || true
-    oc get events -n "${NS}" --sort-by='.lastTimestamp' | tail -20 || true
+    # Sanitized: no .message/.source (can carry node names/IPs), aggregate only.
+    oc get events -n "${NS}" --sort-by='.lastTimestamp' \
+      -o custom-columns=LAST-SEEN:.lastTimestamp,TYPE:.type,REASON:.reason,OBJECT-KIND:.involvedObject.kind,COUNT:.count \
+      | tail -20 || true
     die "DaemonSet failed to roll out — probe image may not be pullable"
   }
   log "DaemonSet ready on $(oc get pods -n "${NS}" -l app.kubernetes.io/name=tls-probe --no-headers | wc -l) node(s)"
@@ -240,25 +243,30 @@ EOF
 # ── 3. capture window ─────────────────────────────────────────────────────────
 # The capture container's restartPolicy is the DaemonSet-mandated "Always", so
 # the container restarts (not "Succeeds") once `--duration` elapses and the
-# pod never reaches phase Succeeded. Poll each pod's restart count instead:
-# restartCount >= 1 means the first capture run finished and kubelet
-# restarted the container, at which point its (previous) logs hold the
-# completed capture.
+# pod never reaches phase Succeeded. Poll each pod's last-terminated exit code
+# instead of just restartCount: exitCode==0 means the capture finished
+# cleanly; any non-zero exit fails the step immediately instead of silently
+# collecting partial/garbage logs. Timing out (no pod finishing in time) also
+# fails the step rather than continuing on to write a false-pass JUnit.
 wait_for_capture() {
-  log "waiting for ${CAPTURE_SECS}s capture to complete (detected via container restart)"
+  log "waiting for ${CAPTURE_SECS}s capture to complete (detected via container exit)"
   local deadline=$(( $(date +%s) + CAPTURE_SECS + 60 ))
 
   while (( $(date +%s) < deadline )); do
-    local pending
-    pending=$(oc get pods -n "${NS}" -l app.kubernetes.io/name=tls-probe \
-      -o jsonpath='{range .items[*]}{.status.containerStatuses[0].restartCount}{"\n"}{end}' 2>/dev/null \
-      | awk '$1 < 1' | wc -l | tr -d ' ')
-    [[ "${pending:-1}" -eq 0 ]] && return 0
+    local total exit_codes bad pending
+    total=$(oc get pods -n "${NS}" -l app.kubernetes.io/name=tls-probe --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    exit_codes=$(oc get pods -n "${NS}" -l app.kubernetes.io/name=tls-probe \
+      -o jsonpath='{range .items[*]}{.status.containerStatuses[0].lastState.terminated.exitCode}{"\n"}{end}' 2>/dev/null)
+
+    bad=$(echo "${exit_codes}" | awk 'NF && $0 != "0"')
+    [[ -n "${bad}" ]] && die "capture container(s) exited non-zero: ${bad}"
+
+    pending=$(echo "${exit_codes}" | awk '$0 != "0"' | wc -l | tr -d ' ')
+    [[ "${total:-0}" -gt 0 ]] && [[ "${pending:-1}" -eq 0 ]] && return 0
     sleep 5
   done
 
-  echo "WARN: not all pods restarted after capture window; collecting available data"
-  oc get pods -n "${NS}" -o wide || true
+  die "capture window (${CAPTURE_SECS}s) elapsed without every pod completing a capture cycle"
 }
 
 # ── 4. collect JSONL ──────────────────────────────────────────────────────────
