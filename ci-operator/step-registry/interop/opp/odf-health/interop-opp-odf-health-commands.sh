@@ -290,8 +290,8 @@ EOF
             if [[ "${phase}" == "Bound" ]]; then
                 break
             fi
-            sleep 5
-            (( elapsed += 5 )) || true
+            sleep $(( remaining < 5 ? remaining : 5 ))
+            (( elapsed += remaining < 5 ? remaining : 5 )) || true
         done
 
         oc delete pvc "${pvcName}" -n "${ODF_NAMESPACE}" --wait=false 2>/dev/null || true
@@ -362,8 +362,8 @@ EOF
         if [[ "${obcPhase}" == "Bound" ]]; then
             break
         fi
-        sleep 5
-        (( elapsed += 5 )) || true
+        sleep $(( remaining < 5 ? remaining : 5 ))
+        (( elapsed += remaining < 5 ? remaining : 5 )) || true
     done
 
     if [[ "${obcPhase}" != "Bound" ]]; then
