@@ -1,6 +1,9 @@
 ref:
   as: etcd-encryption-vault-configure
-  from: cli
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
   commands: etcd-encryption-vault-configure-commands.sh
   resources:
     requests:
@@ -31,10 +34,30 @@ ref:
     documentation: |-
       Name of the transit encryption key for the second Vault instance.
       Must differ from VAULT_KMS_KEY_NAME to ensure each instance uses a distinct KEK.
+  - name: VAULT_HA_REPLICAS
+    default: "3"
+    documentation: |-
+      Number of Vault server replicas installed by etcd-encryption-vault-install.
+      Used to join follower pods to the Raft cluster. Ignored in dev mode. Prefer the
+      value written by install to SHARED_DIR when present (may be capped on small clusters).
+  - name: VAULT_DEV_MODE
+    default: ""
+    documentation: |-
+      When true, configures dev-mode Vault (root token "root", no init/unseal).
+      When false, runs HA Raft initialization. When unset, follows the mode chosen
+      by etcd-encryption-vault-install (dev on equinix-ocp-metal, HA Raft elsewhere).
   documentation: |-
-    Configures already-installed Vault instances for Kubernetes KMS encryption.
+    Initializes and configures already-installed Vault instances for Kubernetes KMS encryption.
 
     This step should run after etcd-encryption-vault-install.
+
+    On bare metal (dev mode), Vault is already initialized and unsealed; this step
+    only configures transit, AppRole, and credentials.
+
+    HA Raft initialization steps (cloud only, both primary and secondary instances):
+    - Initializes Vault on the leader pod (vault-0) if not already initialized
+    - Stores root token and unseal key in vault-init-credentials secret (replacing install-time placeholder)
+    - Unseals the leader and waits for follower pods to join Raft and auto-unseal
 
     Configuration steps (applied to both primary and secondary instances):
     - Creates Vault Enterprise namespace (${VAULT_ENTERPRISE_NS})
@@ -51,17 +74,19 @@ ref:
 
     Prerequisites:
     - Vault must be installed and pods Ready (run etcd-encryption-vault-install first)
-    - OpenShift cluster with vault-0 running in ${VAULT_NAMESPACE}
-      and vault-secondary-0 running in ${VAULT_SECONDARY_NAMESPACE}
+    - OpenShift cluster with vault-0..vault-$(VAULT_HA_REPLICAS-1) running in ${VAULT_NAMESPACE}
+      and vault-secondary-0..vault-secondary-$(VAULT_HA_REPLICAS-1) running in ${VAULT_SECONDARY_NAMESPACE}
 
     Outputs (primary):
+    - Init credentials stored in: vault-init-credentials secret (namespace: ${VAULT_NAMESPACE})
     - Credentials stored in: vault-credentials secret (namespace: ${VAULT_NAMESPACE})
       * role-id: AppRole role ID
       * secret-id: AppRole secret ID
-      * root-token: Vault root token
+      * root-token: Vault root token (generated during initialization)
 
     Outputs (secondary):
+    - Init credentials stored in: vault-init-credentials secret (namespace: ${VAULT_SECONDARY_NAMESPACE})
     - Credentials stored in: vault-credentials secret (namespace: ${VAULT_SECONDARY_NAMESPACE})
       * role-id: AppRole role ID
       * secret-id: AppRole secret ID
-      * root-token: Vault root token
+      * root-token: Vault root token (generated during initialization)
