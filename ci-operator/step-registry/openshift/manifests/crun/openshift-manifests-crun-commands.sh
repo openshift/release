@@ -4,6 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Use v2 annotation names on OCP 4.22+ where CRI-O supports them.
+# Older CRI-O hard-rejects unknown allowed_annotations, so fall back to v1.
+release_image="${RELEASE_IMAGE_INITIAL:-${RELEASE_IMAGE_LATEST}}"
+ocp_version="$(oc adm release info "${release_image}" -o jsonpath='{.metadata.version}')"
+major="${ocp_version%%.*}"; minor="${ocp_version#*.}"; minor="${minor%%.*}"
+if (( major > 4 || (major == 4 && minor >= 22) )); then
+  devices_ann="devices.crio.io"
+  linklogs_ann="link-logs.crio.io"
+else
+  devices_ann="io.kubernetes.cri-o.Devices"
+  linklogs_ann="io.kubernetes.cri-o.LinkLogs"
+fi
+
 cat > "/tmp/50-crun" << EOF
 [crio.runtime]
 default_runtime = "crun"
@@ -11,8 +24,8 @@ default_runtime = "crun"
 runtime_root = "/run/crun"
 allowed_annotations = [
 	"io.containers.trace-syscall",
-	"io.kubernetes.cri-o.Devices",
-	"io.kubernetes.cri-o.LinkLogs",
+	"${devices_ann}",
+	"${linklogs_ann}",
 ]
 EOF
 
