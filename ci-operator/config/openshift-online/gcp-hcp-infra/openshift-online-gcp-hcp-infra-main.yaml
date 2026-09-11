@@ -125,8 +125,18 @@ tests:
         # credentials. The base revision is trusted, and the planner itself
         # rejects PRs whose author is not an organization member or repo
         # collaborator before Terraform is invoked.
+        if [ "${REPO_OWNER}/${REPO_NAME}" != "openshift-online/gcp-hcp-infra" ]; then
+          echo "Skipping Prow plan: job context is not openshift-online/gcp-hcp-infra"
+          exit 0
+        fi
+        set -o pipefail
         git show "${PULL_BASE_SHA}:hack/tfc-speculative-plan.py" | python3 -
       credentials:
+      - as: oauth
+        collection: test-platform-infra
+        field: private-git-cloner
+        group: openshift-ci-robot
+        mount_path: /etc/github-private
       - collection: gcp-hcp-infra-terraform-cloud
         group: tfcloud-token
         mount_path: /etc/terraform-cloud
