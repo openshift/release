@@ -329,25 +329,17 @@ function setup_aws_peerpods() {
 function setup_azure_peerpods() {
   echo ">>> Detecting Azure peer-pods configuration from cluster" >&2
   
-  local AZURE_RESOURCE_GROUP AZURE_VNET_NAME AZURE_SUBNET_NAME AZURE_NSG_NAME
+  local AZURE_RESOURCE_GROUP
   
-  # Get Azure resource group and networking details
+  # Get Azure resource group
   AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
-  AZURE_VNET_NAME=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}')
   
   if [[ -z "${AZURE_RESOURCE_GROUP}" ]]; then
     echo ">>> WARNING: Could not determine Azure resource group" >&2
     return 1
   fi
   
-  # Derive subnet and NSG names from cluster infrastructure
-  # These follow OpenShift naming conventions: {cluster-name}-subnet, {cluster-name}-nsg
-  local cluster_infra
-  cluster_infra=$(oc get infrastructure/cluster -o jsonpath='{.status.infrastructureName}')
-  AZURE_SUBNET_NAME="${cluster_infra}-subnet"
-  AZURE_NSG_NAME="${cluster_infra}-nsg"
-  
-  # Query Azure for resource IDs
+  # Query Azure for resource IDs directly from cluster infrastructure
   local AZURE_REGION AZURE_SUBNET_ID AZURE_NSG_ID
   AZURE_REGION=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.cloudName}')
   
