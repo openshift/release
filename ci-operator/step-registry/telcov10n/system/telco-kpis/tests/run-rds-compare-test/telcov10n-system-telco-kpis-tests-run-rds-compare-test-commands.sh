@@ -1,0 +1,56 @@
+#!/bin/bash
+set -euo pipefail
+
+source "${SHARED_DIR}/telco-kpis-common-functions.sh"
+
+# if [ -f "${SHARED_DIR}/skip.txt" ]; then
+#   echo "Detected skip.txt — skipping"
+#   exit 0
+# fi
+
+export_env_vars_from_json 'rds_compare' "${TEST_SETTINGS:-}" "${TEST_SETTINGS_DEFAULTS:-}"
+setup_continue_on_fail
+setup_debug_on_fail
+
+main() {
+    echo "Running RDS compare test for spoke: ${SPOKE_CLUSTER}"
+
+    setup_ansible_inventory "${SPOKE_CLUSTER}" "${HUB_CLUSTER}"
+
+    if [[ -n "${LOCKDOWN_URI}" ]]; then
+        resolve_ocp_version_from_lockdown "${LOCKDOWN_URI}"
+    fi
+
+    SPOKE_KUBECONFIG="/tmp/${SPOKE_CLUSTER}-kubeconfig"
+
+    EFFECTIVE_REFERENCE_BRANCH="${REFERENCE_BRANCH}"
+    if [[ -z "${EFFECTIVE_REFERENCE_BRANCH}" ]]; then
+        EFFECTIVE_REFERENCE_BRANCH="release-${VERSION}"
+        echo "Auto-constructed reference branch: ${EFFECTIVE_REFERENCE_BRANCH}"
+    fi
+
+    cd /eco-ci-cd
+
+    DEBUG_FLAG=""
+    if [ "${DEBUG}" = "true" ]; then
+        DEBUG_FLAG="-vvv"
+    fi
+
+    echo "Running RDS compare (version: ${VERSION}, branch: ${EFFECTIVE_REFERENCE_BRANCH}, baseline: ${BASELINE})"
+    local rc=0
+    ansible-playbook ./playbooks/telco-kpis/run-rds-compare.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        -e spoke_cluster="${SPOKE_CLUSTER}" \
+        -e spoke_kubeconfig="${SPOKE_KUBECONFIG}" \
+        -e version="${VERSION}" \
+        -e reference_branch="${EFFECTIVE_REFERENCE_BRANCH}" \
+        -e reference_repo_url="${REFERENCE_REPO_URL}" \
+        -e metadata_relpath="${METADATA_RELPATH}" \
+        -e baseline="${BASELINE}" \
+        ${DEBUG_FLAG} || rc=$?
+
+    echo "RDS compare test completed for ${SPOKE_CLUSTER} (rc=${rc})"
+    return "${rc}"
+}
+
+main

@@ -1,0 +1,51 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibu-target-hub-deploy
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibu-target-hub-deploy-commands.sh
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: VERSION
+      default: "4.20"
+      documentation: OCP version to deploy on the target hub (the upgrade source version — the version spokes currently run and will upgrade FROM)
+    - name: TARGET_CLUSTER_NAME
+      default: "kni-qe-109"
+      documentation: BM cluster name for the IBU target hub
+    - name: DISABLE_INSIGHTS
+      default: "false"
+      documentation: Set to "true" to remove cloud.openshift.com from pull secret, disabling Insights and Telemetry
+  credentials:
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_all
+      mount_path: /var/group_variables/common/all
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_bastions
+      mount_path: /var/group_variables/common/bastions
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_hypervisors
+      mount_path: /var/group_variables/common/hypervisors
+    # kni-qe-109 (target hub)
+    - collection: telcov10n-ci
+      group: teams/ran/clusters/kni-qe-109/master0
+      mount_path: /var/host_variables/kni-qe-109/master0
+    - collection: telcov10n-ci
+      group: teams/ran/clusters/kni-qe-109/bastion--dot--kni-qe-109--dot--telco5gran--dot--eng--dot--rdu2--dot--redhat--dot--com
+      mount_path: /var/host_variables/kni-qe-109/bastion
+    - collection: telcov10n-ci
+      group: teams/ran/clusters/kni-qe-109/ansible_group_nodes
+      mount_path: /var/group_variables/kni-qe-109/nodes
+    - collection: telcov10n-ci
+      group: teams/ran/clusters/kni-qe-109/ansible_group_masters
+      mount_path: /var/group_variables/kni-qe-109/masters
+    - collection: telcov10n-ci
+      group: teams/ran/hypervisors/helix89--dot--telcoqe--dot--eng--dot--rdu2--dot--dc--dot--redhat--dot--com
+      mount_path: /var/host_variables/kni-qe-109/hypervisor
+  documentation: |-
+    Deploy IBU target hub (kni-qe-109).
+    The target hub manages the spoke clusters that will be upgraded via IBU.

@@ -1,0 +1,113 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: horologium
+  labels:
+    app: prow
+    component: horologium
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: prow
+      component: horologium
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: horologium
+    spec:
+      serviceAccountName: horologium
+      initContainers:
+      - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        - name: jobs-sparse-checkout
+          mountPath: /etc/git-sync-jobs
+          readOnly: true
+      containers:
+      - name: horologium
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --job-config-path=/etc/jobs
+        - --projected-token-file=/var/sa-token/token
+        - --dry-run=false
+        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260908-104d452f4
+        volumeMounts:
+        - name: service-account-token
+          mountPath: /var/sa-token
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: release
+          mountPath: /etc/jobs/git
+          readOnly: true
+        resources:
+          requests:
+            memory: "21Gi"
+            cpu: "150m"
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        - name: jobs-sparse-checkout
+          mountPath: /etc/git-sync-jobs
+          readOnly: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+      volumes:
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+      - name: config
+        configMap:
+          name: config
+      - name: release
+        emptyDir: {}
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+      - name: jobs-sparse-checkout
+        configMap:
+          name: prow-jobs-sparse-checkout

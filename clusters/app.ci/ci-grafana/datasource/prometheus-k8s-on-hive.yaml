@@ -1,0 +1,26 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: prometheus-k8s-on-hive
+  namespace: ci-grafana
+spec:
+  valuesFrom:
+  - targetPath: "secureJsonData.httpHeaderValue1"
+    valueFrom:
+      secretKeyRef:
+        name: "external-credentials"
+        key: "OPENSHIFT_MONITORING_CI_TOKEN_ON_HOSTED_MGMT"
+  datasource:
+    name: prometheus-k8s-on-hive
+    access: proxy
+    editable: false
+    jsonData:
+      httpHeaderName1: 'Authorization'
+      timeInterval: 5s
+    secureJsonData:
+      httpHeaderValue1: 'Bearer ${OPENSHIFT_MONITORING_CI_TOKEN_ON_HOSTED_MGMT}'
+    type: prometheus
+    url: https://thanos-querier-openshift-monitoring.apps.hosted-mgmt.ci.devcluster.openshift.com
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"

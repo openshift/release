@@ -1,0 +1,37 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibu-send-slack-notification
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibu-send-slack-notification-commands.sh
+  documentation: |-
+    Send Slack notification after IBU workflow completion. SCPs the Report Portal
+    URL from the IBU target hub (kni-qe-109) bastion and sends a notification with
+    build version, Polarion URL, and Report Portal URL.
+  timeout: 30m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: TARGET_CLUSTER_NAME
+      default: "kni-qe-109"
+      documentation: IBU target hub cluster name (bastion used to fetch Report Portal URL)
+    - name: REPORTPORTAL_FILES
+      default: ".reportportal_url_ibu"
+      documentation: Report Portal URL file(s) to fetch from the bastion (semicolon-separated)
+  credentials:
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_all
+      mount_path: /var/group_variables/common/all
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_bastions
+      mount_path: /var/group_variables/common/bastions
+    # kni-qe-109 (IBU target hub)
+    - collection: telcov10n-ci
+      group: teams/ran/clusters/kni-qe-109/bastion--dot--kni-qe-109--dot--telco5gran--dot--eng--dot--rdu2--dot--redhat--dot--com
+      mount_path: /var/host_variables/kni-qe-109/bastion
+    - collection: telcov10n-ci
+      group: teams/ran/slack-webhook-url
+      mount_path: /var/run/slack-webhook-url

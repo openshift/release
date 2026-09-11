@@ -1,0 +1,55 @@
+ref:
+  as: telcov10n-functional-cnf-ran-eco-gotests-sno-worker
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-eco-gotests-sno-worker-commands.sh
+  documentation: |-
+    Run eco-gotests on SNO spoke cluster with day-2 worker node (kni-qe-107)
+  grace_period: 10s
+  timeout: 24h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+
+  env:
+  - name: SPOKE_CLUSTER
+    default: "kni-qe-107"
+    documentation: Spoke SNO cluster name with added worker node
+  - name: HUB_CLUSTER
+    default: "kni-qe-106"
+    documentation: Hub cluster name
+  - name: ECO_GOTESTS_FEATURES
+    default: "gitopsztp deploymenttypes"
+    documentation: Space-separated list of eco-gotests features to run
+  - name: MIRROR_REGISTRY
+    default: "disconnected.registry.local:5000"
+    documentation: Disconnected mirror registry address for eco-gotests images
+
+  credentials:
+  - collection: telcov10n-ci
+    group: ansible/ansible_group_all
+    mount_path: /var/group_variables/common/all
+  - collection: telcov10n-ci
+    group: ansible/ansible_group_bastions
+    mount_path: /var/group_variables/common/bastions
+  - collection: telcov10n-ci
+    group: ansible/ansible_group_hypervisors
+    mount_path: /var/group_variables/common/hypervisors
+  - collection: telcov10n-ci
+    group: teams/ran/clusters/kni-qe-106/ansible_group_nodes
+    mount_path: /var/group_variables/kni-qe-106/nodes
+  - collection: telcov10n-ci
+    group: teams/ran/clusters/kni-qe-106/ansible_group_masters
+    mount_path: /var/group_variables/kni-qe-106/masters
+  - collection: telcov10n-ci
+    group: teams/ran/clusters/kni-qe-106/bastion--dot--kni-qe-106--dot--telcov10n--dot--eng--dot--rdu2--dot--dc--dot--redhat--dot--com
+    mount_path: /var/host_variables/kni-qe-106/bastion
+  - collection: telcov10n-ci
+    group: teams/ran/clusters/kni-qe-106/master0
+    mount_path: /var/host_variables/kni-qe-106/master0
+  - collection: telcov10n-ci
+    group: teams/ran/hypervisors/hv16--dot--telco5gran--dot--eng--dot--rdu2--dot--redhat--dot--com
+    mount_path: /var/host_variables/fthub-01/hypervisor

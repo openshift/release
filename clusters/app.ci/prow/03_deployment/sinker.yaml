@@ -1,0 +1,186 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sinker
+  namespace: ci
+  labels:
+    app: prow
+    component: sinker
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: prow
+      component: sinker
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: sinker
+    spec:
+      serviceAccountName: sinker
+      initContainers:
+      - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync-config/sparse-checkout
+        - --one-time=true
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        - name: config-sparse-checkout
+          mountPath: /etc/git-sync-config
+          readOnly: true
+      - name: git-sync-jobs-init
+        resources:
+          requests:
+            memory: "256Mi"
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --root=/tmp/git-sync-jobs
+        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
+        - --one-time=true
+        - --depth=1
+        - --link=jobs
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: jobs-git
+          mountPath: /tmp/git-sync-jobs
+        - name: jobs-sparse-checkout
+          mountPath: /etc/git-sync-jobs
+          readOnly: true
+      containers:
+      - name: sinker
+        image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20260908-104d452f4
+        args:
+        - --config-path=/var/repo/release/core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir=/var/repo/release/core-services/prow/02_config
+        - --job-config-path=/etc/jobs
+        - --projected-token-file=/var/sa-token/token
+        - --kubeconfig-dir=/etc/build-farm-credentials
+        - --kubeconfig-suffix=config
+        - --dry-run=false
+        ports:
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
+        - name: service-account-token
+          mountPath: /var/sa-token
+        - name: release
+          mountPath: /var/repo
+          readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: jobs-git
+          mountPath: /etc/jobs/git
+          readOnly: true
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        resources:
+          requests:
+            memory: "20Gi"
+            cpu: "50m"
+      - name: git-sync
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync-config/sparse-checkout
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        - name: config-sparse-checkout
+          mountPath: /etc/git-sync-config
+          readOnly: true
+      - name: git-sync-jobs
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync-jobs
+        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
+        - --max-failures=3
+        - --depth=1
+        - --link=jobs
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: jobs-git
+          mountPath: /tmp/git-sync-jobs
+        - name: jobs-sparse-checkout
+          mountPath: /etc/git-sync-jobs
+          readOnly: true
+      volumes:
+      - name: release
+        emptyDir: {}
+      - name: jobs-git
+        emptyDir: {}
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+      - name: jobs-sparse-checkout
+        configMap:
+          name: prow-jobs-sparse-checkout
+      - name: config-sparse-checkout
+        configMap:
+          name: prow-config-sparse-checkout
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+      - name: build-farm-credentials
+        secret:
+          secretName: sinker
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: sinker
+  name: sinker
+spec:
+  ports:
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app: prow
+    component: sinker

@@ -1,0 +1,58 @@
+build_root:
+  project_image:
+    dockerfile_path: ci/Containerfile
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: zoa-lambda
+  - dockerfile_path: Containerfile.runner
+    to: zoa-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: ./ci/lint.sh
+  container:
+    from: src
+- as: test
+  commands: ./ci/unit-tests.sh
+  container:
+    from: src
+- as: verify
+  commands: ./ci/verify.sh
+  container:
+    from: src
+- always_run: false
+  as: on-demand-e2e
+  steps:
+    dependencies:
+      CI_ZOA_LAMBDA_IMAGE: zoa-lambda
+      CI_ZOA_RUNNER_IMAGE: zoa-runner
+    env:
+      ROSA_REGIONAL_EXTRA_COMPONENTS: |
+        - image: CI_ZOA_LAMBDA_IMAGE
+          repo: quay.io/rrp-dev-ci/zoa-lambda
+          target: config/defaults.yaml
+          override:
+            regional_cluster:
+              zoa_lambda_image_tag: IMAGE_TAG
+              zoa_lambda_source_image: IMAGE_REPO
+        - image: CI_ZOA_RUNNER_IMAGE
+          repo: quay.io/rrp-dev-ci/zoa-runner
+          target: config/defaults.yaml
+          override:
+            regional_cluster:
+              zoa_runner_image_tag: IMAGE_TAG
+              zoa_runner_source_image: IMAGE_REPO
+    workflow: rosa-hyperfleet-ephemeral-e2e
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-hyperfleet-zoa

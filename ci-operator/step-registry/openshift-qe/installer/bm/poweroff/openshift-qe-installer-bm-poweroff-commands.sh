@@ -1,0 +1,57 @@
+#!/bin/bash
+set -o errexit
+set -o nounset
+set -o pipefail
+set -x
+
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+target_bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+
+# Check if target bastion is in maintenance mode
+if ssh ${SSH_ARGS} -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p root@${bastion}" root@${target_bastion} 'test -f /root/pause'; then
+  echo "The cluster is on maintenance mode. Remove the file /root/pause in the bastion host when the maintenance is over"
+  exit 1
+fi
+
+LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
+LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+export LAB_CLOUD
+QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
+export QUADS_INSTANCE
+
+if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
+  OCPINV=$(cat ${CLUSTER_PROFILE_DIR}/ocp_inventory_path)
+  export OCPINV
+else
+  OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+  export OCPINV
+fi
+
+cat > /tmp/poweroff.sh << 'EOF'
+echo 'Running poweroff.sh'
+if [[ "$OCP_INVENTORY_OVERRIDE" == "true" ]]; then
+  OCPINV=${OCPINV}
+  USER=$(jq -r ".nodes[0].pm_user" ${OCPINV})
+  PWD=$(jq -r ".nodes[0].pm_password" ${OCPINV})
+  for i in $(jq -r ".nodes[1:][].name" ${OCPINV}); do
+    podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD --insecure --power-off
+  done
+else
+  OCPINV=${OCPINV}
+  USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
+  PWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
+  for i in $(curl -sSk $OCPINV | jq -r ".nodes[1:][].name"); do
+    podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD --insecure --power-off
+  done
+fi
+EOF
+envsubst '${LAB_CLOUD},${QUADS_INSTANCE},${OCP_INVENTORY_OVERRIDE},${OCPINV}' < /tmp/poweroff.sh > /tmp/poweroff_updated-$LAB_CLOUD.sh
+
+scp -q ${SSH_ARGS} /tmp/poweroff_updated-$LAB_CLOUD.sh root@${bastion}:/tmp/
+
+ssh ${SSH_ARGS} root@${bastion} "
+  set -e
+  set -o pipefail
+  source /tmp/poweroff_updated-$LAB_CLOUD.sh
+"

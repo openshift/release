@@ -1,0 +1,40 @@
+presubmits:
+- name: presubmit-test-pull
+  always_run: true
+  decorate: true
+  trigger: "(?m)bundle test( please)?"
+  rerun_command: "bundle test"
+  spec:
+    shareProcessNamespace: true
+    containers:
+    - name: main
+      image: quay.io/samwalke/gobuilder:latest
+      command:
+      - /bin/sh
+      args:
+      - -c
+      - make test-prow
+    - name: connected-registry
+      image: registry:2
+      command:
+      - /bin/registry
+      - serve
+      - /etc/docker/registry/config.yml
+      ports:
+      - containerPort: 5000
+    - name: buildkitd
+      image: moby/buildkit:master-rootless
+      command:
+      - "/usr/bin/rootlesskit"
+      args:
+      - buildkitd
+      - --addr
+      - tcp://127.0.0.1:1234
+      - --oci-worker-no-process-sandbox
+      ports:
+      - containerPort: 1234
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        seLinuxOptions:
+          type: 'spc_t'

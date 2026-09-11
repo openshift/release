@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+data:
+  config.yaml: |
+    prometheusK8s:
+      externalLabels:
+        clusterName: core-ci
+      remoteWrite:
+        - url: "https://thanos-receive-router-ci-metrics.ci-monitoring.svc.cluster.local:19291/api/v1/receive"
+          queueConfig:
+            maxShards: 200
+            sampleAgeLimit: 10m
+          tlsConfig:
+            ca:
+              secret:
+                name: thanos-remote-write-tls
+                key: ca.crt
+            cert:
+              secret:
+                name: thanos-remote-write-tls
+                key: client.crt
+            keySecret:
+              name: thanos-remote-write-tls
+              key: client.key

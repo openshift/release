@@ -1,0 +1,200 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: reliabilitytests.harness.testharness.io
+spec:
+  group: harness.testharness.io
+  names:
+    kind: ReliabilityTest
+    listKind: ReliabilityTestList
+    plural: reliabilitytests
+    shortNames:
+    - rtest
+    singular: reliabilitytest
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.scenario
+      name: Scenario
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.podName
+      name: Pod
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ReliabilityTest runs a reliability-v2 scenario as a pod in the
+          cluster.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ReliabilityTestSpec defines the desired state of a reliability-v2
+              test run.
+            properties:
+              authSecretRef:
+                description: |-
+                  AuthSecretRef references a Secret in the same namespace that holds target-cluster auth
+                  files: kubeconfig, admin, and users. Mounted at /auth and passed to start.sh as -p /auth.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              clusterTopology:
+                description: ClusterTopology is set as the CLUSTER_TOPOLOGY env var
+                  (logged by start.sh).
+                type: string
+              duration:
+                default: 10m
+                description: |-
+                  Duration is how long the test should run, passed to start.sh -t
+                  such as "10m", "2d", or "7d".
+                type: string
+              folderName:
+                description: FolderName is passed to start.sh -n (output folder name).
+                type: string
+              image:
+                description: Image is the container image that runs reliability-v2.
+                minLength: 1
+                type: string
+              importDashboard:
+                description: ImportDashboard is set as the IMPORT_DASHBOARD env var
+                  for dittybopper.
+                type: string
+              infra:
+                description: Infra enables start.sh -i (install infra nodes and move
+                  components).
+                type: boolean
+              operators:
+                description: Operators is a comma-separated list passed to start.sh
+                  -o.
+                type: string
+              scenario:
+                description: |-
+                  Scenario is the reliability-v2 config file name passed to start.sh -c,
+                  e.g. reliability-small-cluster.yaml. The file must exist in the runner image.
+                minLength: 1
+                type: string
+              slack:
+                description: Slack configures Slack-related env vars consumed by start.sh.
+                properties:
+                  apiTokenSecretRef:
+                    description: APITokenSecretRef is the Secret key for SLACK_API_TOKEN.
+                    properties:
+                      key:
+                        description: The key of the secret to select from.  Must be
+                          a valid secret key.
+                        type: string
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      optional:
+                        description: Specify whether the Secret or its key must be
+                          defined
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  channel:
+                    description: Channel is set as SLACK_CHANNEL.
+                    type: string
+                  member:
+                    description: Member is set as SLACK_MEMBER.
+                    type: string
+                  webhookURLSecretRef:
+                    description: WebhookURLSecretRef is the Secret key for SLACK_WEBHOOK_URL.
+                    properties:
+                      key:
+                        description: The key of the secret to select from.  Must be
+                          a valid secret key.
+                        type: string
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      optional:
+                        description: Specify whether the Secret or its key must be
+                          defined
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                    x-kubernetes-map-type: atomic
+                type: object
+              toleranceRate:
+                description: ToleranceRate is passed to start.sh -r. Default in start.sh
+                  is 1.
+                type: string
+              upgrade:
+                description: Upgrade enables start.sh -u (upgrade the cluster every
+                  24 hours).
+                type: boolean
+            required:
+            - authSecretRef
+            - image
+            - scenario
+            type: object
+          status:
+            description: ReliabilityTestStatus defines the observed state of a ReliabilityTest.
+            properties:
+              message:
+                description: Message provides additional detail about the current
+                  phase.
+                type: string
+              phase:
+                description: Phase is a high-level summary of the test run lifecycle.
+                type: string
+              podName:
+                description: PodName is the name of the runner pod created for this
+                  test.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

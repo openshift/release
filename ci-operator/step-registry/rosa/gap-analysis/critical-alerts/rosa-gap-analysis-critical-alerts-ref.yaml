@@ -1,0 +1,34 @@
+ref:
+  as: rosa-gap-analysis-critical-alerts
+  from: rosa-aws-cli
+  grace_period: 5m
+  timeout: 15m
+  commands: rosa-gap-analysis-critical-alerts-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for OCM login.
+  - name: HOSTED_CP
+    default: "false"
+    documentation: true means Hosted Control Plane. false is Classic or OSD GCP (see CLUSTER_TOPOLOGY).
+  - name: CLUSTER_TOPOLOGY
+    default: ""
+    documentation: Distinguishes classic vs osd-gcp when HOSTED_CP is false. Ignored when HOSTED_CP is true.
+  - name: CHANNEL_GROUP
+    default: ""
+    documentation: ROSA channel group used to provision the cluster (stable, candidate, nightly).
+  - name: OPENSHIFT_VERSION
+    default: ""
+    documentation: Requested OpenShift minor version (e.g. 4.21).
+  documentation: |-
+    Writes a snapshot of live PrometheusRule alerting rules from a provisioned ROSA cluster
+    into ARTIFACT_DIR for rosa-gap-analysis Check #10. Runs in the workflow post
+    phase while the cluster is still up, before deprovision.
+    Classic: captures the single Classic cluster.
+    OSD GCP: captures the single OSD GCP cluster (no HCP/management plane).
+    HCP: captures the hosted/guest cluster (customer data plane) and the
+    management cluster (Red Hat control plane) under ARTIFACT_DIR/management/.

@@ -1,0 +1,85 @@
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# release_payload_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
+  name: release-payload-controller
+  namespace: ci
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: release-payload-controller
+  template:
+    metadata:
+      labels:
+        app: release-payload-controller
+    spec:
+      containers:
+      - command:
+        - /usr/bin/release-payload-controller
+        - start
+        - --release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml
+        - --namespace=ci
+        - -v=6
+        env:
+        - name: GOOGLE_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              key: project_id
+              name: release-payload-controller-google-credentials
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /etc/gcs/credentials.json
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-payload-controller_latest
+        imagePullPolicy: Always
+        name: controller
+        resources:
+          limits:
+            cpu: 500m
+            memory: 8Gi
+          requests:
+            cpu: 250m
+            memory: 2Gi
+        volumeMounts:
+        - mountPath: /etc/gcs
+          name: google-credentials
+        - mountPath: /etc/qualifiers-config
+          name: qualifiers-config
+          readOnly: true
+      serviceAccountName: release-payload-controller
+      volumes:
+      - name: google-credentials
+        secret:
+          defaultMode: 420
+          secretName: release-payload-controller-google-credentials
+      - configMap:
+          name: release-controller-release-qualifiers
+        name: qualifiers-config
+---
+#---------------------------------------------------------------------------------
+# release_payload_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: release-payload-controller
+  namespace: ci
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: release-payload-controller

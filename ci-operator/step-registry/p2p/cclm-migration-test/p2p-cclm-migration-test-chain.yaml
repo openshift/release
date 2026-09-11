@@ -1,0 +1,19 @@
+chain:
+  as: p2p-cclm-migration-test
+  steps:
+    - ref: p2p-create-migration-test-vm
+    - ref: p2p-mtv-execute-live-migration
+  documentation: |-
+    End-to-end CCLM migration test: create a CNV VM on spoke-1 and live-migrate it to spoke-2 via MTV.
+
+    Requires p2p-mtv-mig-config (ForkliftController, providers, network/storage maps),
+    p2p-install-odf-spokes, p2p-acm-cnv-install-policy, and acm-interop-p2p-submariner-install
+    (pod-to-pod connectivity without Globalnet).
+
+    Step 1 (p2p-create-migration-test-vm): ODF-backed RWX VM on source spoke.
+    Step 2 (p2p-mtv-execute-live-migration): CCLM preflight (sync controller, no
+    Globalnet, :9185 probe), Plan + Migration on hub, stuck-sync detection, verify VM
+    on destination.
+
+    Debug mode: set P2P_CCLM_DEBUG_MODE=true (acm-virt-ocp4.22 job) so both steps
+    log failures but exit 0, allowing acm-interop-p2p-test-poc to run for investigation.

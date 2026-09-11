@@ -1,0 +1,57 @@
+ref:
+  as: telcov10n-functional-cnf-ran-deploy-spoke-sno-day2-worker
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-deploy-spoke-sno-day2-worker-commands.sh
+  documentation: |-
+    Expand a deployed SNO spoke cluster by switching the ZTP manifests branch
+    to provision an additional worker node via ArgoCD (day 2 operation)
+  timeout: 5h
+  resources:
+    requests:
+      cpu: 100m
+  env:
+    - name: VERSION
+      default: "4.20"
+      documentation: OCP version
+    - name: CLUSTER_NAME
+      default: "kni-qe-106"
+      documentation: |-
+        Hub cluster name. Only "kni-qe-106" is supported for now, because this step
+        mounts credentials specific to that hub (kni-qe-106 nodes, masters,
+        bastion, and shared fthub-01 hypervisor).
+    - name: SPOKE_CLUSTER
+      default: ""
+      documentation: |-
+        Spoke SNO cluster name (array format, e.g. \"['kni-qe-107']\")".
+        Only one spoke cluster is currently supported.
+    - name: ZTP_GIT_BRANCH_DAY2_WORKER
+      default: "day2-worker"
+      documentation: Git branch containing the worker node definition in the SiteConfig
+  credentials:
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_all
+      mount_path: /var/group_variables/common/all
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_bastions
+      mount_path: /var/group_variables/common/bastions
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_hypervisors
+      mount_path: /var/group_variables/common/hypervisors
+    - collection: telcov10n-ci
+      group: teams/ran/clusters/kni-qe-106/ansible_group_nodes
+      mount_path: /var/group_variables/kni-qe-106/nodes
+    - collection: telcov10n-ci
+      group: teams/ran/clusters/kni-qe-106/ansible_group_masters
+      mount_path: /var/group_variables/kni-qe-106/masters
+    - collection: telcov10n-ci
+      group: teams/ran/clusters/kni-qe-106/bastion--dot--kni-qe-106--dot--telcov10n--dot--eng--dot--rdu2--dot--dc--dot--redhat--dot--com
+      mount_path: /var/host_variables/kni-qe-106/bastion
+    - collection: telcov10n-ci
+      group: teams/ran/clusters/kni-qe-106/master0
+      mount_path: /var/host_variables/kni-qe-106/master0
+    - collection: telcov10n-ci
+      group: teams/ran/hypervisors/hv16--dot--telco5gran--dot--eng--dot--rdu2--dot--redhat--dot--com
+      mount_path: /var/host_variables/fthub-01/hypervisor

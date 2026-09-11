@@ -1,0 +1,147 @@
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: chai-bot-release-manager
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chai-bot-release-manager-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-reader
+subjects:
+- kind: ServiceAccount
+  name: chai-bot-release-manager
+  namespace: ci
+---
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: chai-bot-release-manager-token
+  namespace: ci
+  annotations:
+    kubernetes.io/service-account.name: chai-bot-release-manager
+---
+# ClusterRole granting patch access to release payload resources.
+# Used by the chai-bot release manager to force-accept or force-reject
+# payloads via the force_accept_payload / force_reject_payload tools.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chai-bot-release-manager-payload-manager
+rules:
+- apiGroups: ["image.openshift.io"]
+  resources: ["imagestreamtags"]
+  verbs: ["get", "patch"]
+- apiGroups: ["release.openshift.io"]
+  resources: ["releasepayloads"]
+  verbs: ["get", "patch"]
+---
+# RoleBindings scoped to the OCP release namespaces where payloads live.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chai-bot-release-manager-payload-manager
+  namespace: ocp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chai-bot-release-manager-payload-manager
+subjects:
+- kind: ServiceAccount
+  name: chai-bot-release-manager
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chai-bot-release-manager-payload-manager
+  namespace: ocp-arm64
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chai-bot-release-manager-payload-manager
+subjects:
+- kind: ServiceAccount
+  name: chai-bot-release-manager
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chai-bot-release-manager-payload-manager
+  namespace: ocp-s390x
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chai-bot-release-manager-payload-manager
+subjects:
+- kind: ServiceAccount
+  name: chai-bot-release-manager
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chai-bot-release-manager-payload-manager
+  namespace: ocp-ppc64le
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chai-bot-release-manager-payload-manager
+subjects:
+- kind: ServiceAccount
+  name: chai-bot-release-manager
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chai-bot-release-manager-payload-manager
+  namespace: ocp-multi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chai-bot-release-manager-payload-manager
+subjects:
+- kind: ServiceAccount
+  name: chai-bot-release-manager
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chai-bot-release-manager-monitoring-read
+  namespace: openshift-monitoring
+rules:
+- apiGroups: ["monitoring.coreos.com"]
+  resources:
+  - prometheusrules
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["monitoring.coreos.com"]
+  resourceNames: ["main"]
+  resources: ["alertmanagers/api"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["services/proxy"]
+  resourceNames: ["alertmanager-main", "thanos-querier"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chai-bot-release-manager-monitoring-read
+  namespace: openshift-monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chai-bot-release-manager-monitoring-read
+subjects:
+- kind: ServiceAccount
+  name: chai-bot-release-manager
+  namespace: ci

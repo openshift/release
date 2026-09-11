@@ -1,0 +1,152 @@
+ref:
+  as: telcov10n-system-telco-kpis-tests-run-cyclictest-test
+  from: root
+  commands: telcov10n-system-telco-kpis-tests-run-cyclictest-test-commands.sh
+  timeout: 16h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: SPOKE_CLUSTER
+      default: "spree-02"
+      documentation: Spoke cluster to run test on
+    - name: HUB_CLUSTER
+      default: "kni-qe-71"
+      documentation: Hub cluster managing the spoke
+    - name: TEST_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-test configuration overrides from CI config.
+        Values here take precedence over TEST_SETTINGS_DEFAULTS.
+    - name: TEST_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "cyclictest": {
+            "skip": false,
+            "continue_on_fail": false,
+            "debug_on_fail": false,
+            "debug_timeout": "+10 min",
+            "duration": "12h",
+            "debug": false,
+            "force_pull_test_runner_image": false
+          }
+        }
+      documentation: >-
+        JSON object for per-test configuration. The "cyclictest" key supports:
+        skip (bool) - when true, skip this test entirely and exit 0;
+        continue_on_fail (bool) - when true, test failures exit 0 so the pipeline continues;
+        duration (string) - cyclictest test duration (e.g. "12h", "1h", "30m");
+        debug (string) - "true" enables Ansible -vvv verbose output;
+        force_pull_test_runner_image (bool) - when true, forces re-pull of the test-runner image from Quay.io even if already cached on the bastion.
+        Values are exported as uppercase env vars, overriding ref.yaml defaults.
+
+  credentials:
+    # Common group variables
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_all
+      mount_path: /var/group_variables/common/all
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_bastions
+      mount_path: /var/group_variables/common/bastions
+    - collection: telcov10n-ci
+      group: ansible/ansible_group_hypervisors
+      mount_path: /var/group_variables/common/hypervisors
+
+    # Spoke spree-01 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-01/master0
+      mount_path: /var/host_variables/spree-01/master0
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-01/ansible_group_masters
+      mount_path: /var/group_variables/spree-01/masters
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-01/ansible_group_nodes
+      mount_path: /var/group_variables/spree-01/nodes
+
+    # Spoke spree-02 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-02/master0
+      mount_path: /var/host_variables/spree-02/master0
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-02/ansible_group_masters
+      mount_path: /var/group_variables/spree-02/masters
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-02/ansible_group_nodes
+      mount_path: /var/group_variables/spree-02/nodes
+
+    # Spoke spree-03 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-03/master0
+      mount_path: /var/host_variables/spree-03/master0
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-03/ansible_group_masters
+      mount_path: /var/group_variables/spree-03/masters
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-03/ansible_group_nodes
+      mount_path: /var/group_variables/spree-03/nodes
+
+    # Spoke spree-04 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-04/master0
+      mount_path: /var/host_variables/spree-04/master0
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-04/ansible_group_masters
+      mount_path: /var/group_variables/spree-04/masters
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/spree-04/ansible_group_nodes
+      mount_path: /var/group_variables/spree-04/nodes
+
+    # Spoke cnfdg46 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/cnfdg46/master0
+      mount_path: /var/host_variables/cnfdg46/master0
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/cnfdg46/ansible_group_masters
+      mount_path: /var/group_variables/cnfdg46/masters
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/cnfdg46/ansible_group_nodes
+      mount_path: /var/group_variables/cnfdg46/nodes
+
+    # Spoke kni-qe-100 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/kni-qe-100/master0
+      mount_path: /var/host_variables/kni-qe-100/master0
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/kni-qe-100/ansible_group_masters
+      mount_path: /var/group_variables/kni-qe-100/masters
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/kni-qe-100/ansible_group_nodes
+      mount_path: /var/group_variables/kni-qe-100/nodes
+
+    # Hub kni-qe-70 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/kni-qe-70/bastion--dot--kni-qe-70--dot--telcov10n--dot--eng--dot--rdu2--dot--dc--dot--redhat--dot--com
+      mount_path: /var/host_variables/kni-qe-70/bastion
+
+    # Hub kni-qe-71 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/kni-qe-71/bastion--dot--kni-qe-71--dot--telcov10n--dot--eng--dot--rdu2--dot--dc--dot--redhat--dot--com
+      mount_path: /var/host_variables/kni-qe-71/bastion
+
+    # Hub dev-kpi-01 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/dev-kpi-01/bastion--dot--dev-kpi-01--dot--telcov10n--dot--eng--dot--rdu2--dot--dc--dot--redhat--dot--com
+      mount_path: /var/host_variables/dev-kpi-01/bastion
+
+    # Hub dev-kpi-02 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/dev-kpi-02/bastion--dot--dev-kpi-02--dot--telcov10n--dot--eng--dot--rdu2--dot--dc--dot--redhat--dot--com
+      mount_path: /var/host_variables/dev-kpi-02/bastion
+
+    # Hub dev-kpi-03 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/dev-kpi-03/bastion--dot--dev-kpi-03--dot--telcov10n--dot--eng--dot--rdu2--dot--dc--dot--redhat--dot--com
+      mount_path: /var/host_variables/dev-kpi-03/bastion
+
+    # Hub dev-kpi-04 credentials
+    - collection: telcov10n-ci
+      group: teams/telco-kpis/clusters/dev-kpi-04/bastion--dot--dev-kpi-04--dot--telcov10n--dot--eng--dot--rdu2--dot--dc--dot--redhat--dot--com
+      mount_path: /var/host_variables/dev-kpi-04/bastion
+  documentation: |-
+    Cyclictest latency test for telco-kpis validation.

@@ -1,0 +1,55 @@
+base_images:
+  cyborg-python:
+    name: cyborg-python
+    namespace: continuous-release-jobs
+    tag: latest
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/continuous-release-jobs/cyborg-python:latest
+      USER 0
+      RUN yum install -y diffutils jq && yum clean all \
+          && curl -fsSL -o /tmp/rg.tar.gz "https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz" \
+          && tar -xzf /tmp/rg.tar.gz -C /tmp \
+          && mv /tmp/ripgrep-14.1.1-x86_64-unknown-linux-musl/rg /usr/local/bin/rg \
+          && chmod +x /usr/local/bin/rg \
+          && rm -rf /tmp/rg.tar.gz /tmp/ripgrep-14.1.1-x86_64-unknown-linux-musl
+      COPY requirements.lock.txt requirements-dev.txt /tmp/
+      RUN pip install --no-cache-dir -r /tmp/requirements.lock.txt -r /tmp/requirements-dev.txt
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: src
+    inputs:
+      cyborg-python:
+        as:
+        - registry.access.redhat.com/ubi9/python-312
+    to: ship-help-bot
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
+  expose: true
+  private: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ship-help-bot

@@ -1,0 +1,33 @@
+ref:
+  as: rosa-operator-cleanup
+  from: rosa-aws-cli
+  best_effort: true
+  grace_period: 2m
+  commands: rosa-operator-cleanup-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 10m0s
+  env:
+  - name: OPERATOR_NAME
+    default: ""
+    documentation: Operator name used as the production ClusterPackage name for CRD ownership reset.
+  - name: OPERATOR_CRDS
+    default: ""
+    documentation: Comma-separated CRDs to clear ownership on after e2e ClusterPackage deletion.
+  - name: OPERATOR_WAIT_DEPLOYMENTS
+    default: ""
+    documentation: Comma-separated deployment names to wait for after cleanup (e.g. operands managed by the operator).
+  documentation: |-
+    Cleans up after operator e2e tests: collects operator logs as
+    artifacts, deletes the test ClusterPackage, removes stale
+    ClusterObjectSets, clears CRD ownerReferences so the production
+    ClusterPackage can re-adopt them, and waits for the production
+    operator to reconcile before returning the cluster to the pool.
+    Safe to run as best_effort in post since cleanup failure should
+    not fail the job.
+
+    Artifacts (under rosa-operator-cleanup/artifacts/ in Prow):
+      - <deployment>-logs.txt for each deployment in the operator namespace
+      - operator-namespace-events.txt for namespace events

@@ -1,0 +1,25 @@
+ref:
+  as: aks-deprovision
+  from_image:
+    namespace: ocp
+    name: "4.16"
+    tag: upi-installer
+  commands: aks-deprovision-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 30m0s
+  grace_period: 10m0s
+  env:
+  - name: USE_HYPERSHIFT_AZURE_CREDS
+    default: "false"
+    documentation: "If true, use hypershift azure credentials"
+  credentials:
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      group: ops/hypershift-ci-jobs-azurecreds
+      collection: hypershift-team
+  documentation: |-
+    This step destroys the deterministic AKS management cluster, checks its name
+    and resource group against ${SHARED_DIR}/aks-cluster-name and
+    ${SHARED_DIR}/resourcegroup_aks when available, then verifies deletion.

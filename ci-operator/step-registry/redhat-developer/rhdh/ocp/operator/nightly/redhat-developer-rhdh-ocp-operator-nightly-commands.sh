@@ -1,0 +1,1 @@
+../../helm/nightly/redhat-developer-rhdh-ocp-helm-nightly-commands.sh
