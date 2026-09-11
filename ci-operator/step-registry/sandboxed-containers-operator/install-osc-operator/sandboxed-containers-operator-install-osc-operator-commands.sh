@@ -281,6 +281,119 @@ function get_cloud_provider() {
   echo "${provider}"
 }
 
+function setup_aws_peerpods() {
+  echo ">>> Detecting AWS peer-pods configuration from cluster" >&2
+  
+  # Get AWS credentials
+  oc -n kube-system get secret aws-creds -o json > aws-creds.json || return 1
+  
+  local AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+  AWS_ACCESS_KEY_ID="$(jq -r .data.aws_access_key_id aws-creds.json | base64 -d)"
+  AWS_SECRET_ACCESS_KEY="$(jq -r .data.aws_secret_access_key aws-creds.json | base64 -d)"
+  export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+  
+  # Get AWS region and infrastructure details from cluster
+  local INSTANCE_ID
+  INSTANCE_ID=$(oc get nodes -l 'node-role.kubernetes.io/worker' -o jsonpath='{.items[0].spec.providerID}' | sed 's#[^ ]*/##g')
+  
+  local AWS_REGION
+  AWS_REGION=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.aws.region}')
+  
+  # Query AWS for networking details
+  local AWS_SUBNET_ID AWS_VPC_ID AWS_SG_IDS
+  AWS_SUBNET_ID=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].SubnetId' --region "${AWS_REGION}" --output text)
+  AWS_VPC_ID=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].VpcId' --region "${AWS_REGION}" --output text)
+  AWS_SG_IDS=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].SecurityGroups[*].GroupId' --region "${AWS_REGION}" --output text | tr ' \t' ',')
+  
+  # Open security group ports for peer-pods VXLAN and CAA
+  for AWS_SG_ID in ${AWS_SG_IDS/,/ }; do
+    aws ec2 authorize-security-group-ingress \
+        --group-id "${AWS_SG_ID}" --protocol tcp --port 15150 \
+        --source-group "${AWS_SG_ID}" --region "${AWS_REGION}" \
+        --no-paginate 2>/dev/null || true
+    aws ec2 authorize-security-group-ingress \
+        --group-id "${AWS_SG_ID}" --protocol tcp --port 9000 \
+        --source-group "${AWS_SG_ID}" --region "${AWS_REGION}" \
+        --no-paginate 2>/dev/null || true
+  done
+  
+  # Export environment variables (only if not already set)
+  export AWS_REGION AWS_SUBNET_ID AWS_VPC_ID AWS_SG_IDS
+  : "${VXLAN_PORT:=9000}"
+  : "${PODVM_INSTANCE_TYPE:=t3.medium}"
+  : "${PROXY_TIMEOUT:=30m}"
+  
+  echo ">>> AWS peer-pods config detected: region=${AWS_REGION}, subnet=${AWS_SUBNET_ID}, vpc=${AWS_VPC_ID}" >&2
+}
+
+function setup_azure_peerpods() {
+  echo ">>> Detecting Azure peer-pods configuration from cluster" >&2
+  
+  local AZURE_RESOURCE_GROUP AZURE_VNET_NAME AZURE_SUBNET_NAME AZURE_NSG_NAME
+  
+  # Get Azure resource group and networking details
+  AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
+  AZURE_VNET_NAME=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}')
+  
+  if [[ -z "${AZURE_RESOURCE_GROUP}" ]]; then
+    echo ">>> WARNING: Could not determine Azure resource group" >&2
+    return 1
+  fi
+  
+  # Derive subnet and NSG names from cluster infrastructure
+  # These follow OpenShift naming conventions: {cluster-name}-subnet, {cluster-name}-nsg
+  local cluster_infra
+  cluster_infra=$(oc get infrastructure/cluster -o jsonpath='{.status.infrastructureName}')
+  AZURE_SUBNET_NAME="${cluster_infra}-subnet"
+  AZURE_NSG_NAME="${cluster_infra}-nsg"
+  
+  # Query Azure for resource IDs
+  local AZURE_REGION AZURE_SUBNET_ID AZURE_NSG_ID
+  AZURE_REGION=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.cloudName}')
+  
+  # Get subnet ID
+  AZURE_SUBNET_ID=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.subnet}' 2>/dev/null || echo "")
+  
+  # Get NSG ID
+  AZURE_NSG_ID=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.securityGroup}' 2>/dev/null || echo "")
+  
+  # Default instance size if not specified
+  : "${AZURE_INSTANCE_SIZE:=Standard_D2s_v3}"
+  : "${VXLAN_PORT:=9000}"
+  : "${PROXY_TIMEOUT:=30m}"
+  
+  # Export environment variables (only if not already set)
+  export AZURE_RESOURCE_GROUP AZURE_SUBNET_ID AZURE_NSG_ID AZURE_REGION
+  
+  echo ">>> Azure peer-pods config detected: rg=${AZURE_RESOURCE_GROUP}, subnet=${AZURE_SUBNET_ID}, nsg=${AZURE_NSG_ID}" >&2
+}
+
+function setup_gcp_peerpods() {
+  echo ">>> Detecting GCP peer-pods configuration from cluster" >&2
+  
+  local GCP_PROJECT_ID GCP_ZONE GCP_NETWORK
+  
+  # Get GCP project and network details from cluster
+  GCP_PROJECT_ID=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.gcp.projectID}')
+  GCP_ZONE=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.gcp.region}')
+  GCP_NETWORK=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.gcp.network}')
+  
+  if [[ -z "${GCP_PROJECT_ID}" ]] || [[ -z "${GCP_ZONE}" ]]; then
+    echo ">>> WARNING: Could not determine GCP project or zone" >&2
+    return 1
+  fi
+  
+  # Default machine type if not specified
+  : "${GCP_MACHINE_TYPE:=e2-standard-4}"
+  : "${VXLAN_PORT:=9000}"
+  : "${PROXY_TIMEOUT:=30m}"
+  
+  # Export environment variables (only if not already set)
+  export GCP_PROJECT_ID GCP_ZONE GCP_NETWORK
+  
+  echo ">>> GCP peer-pods config detected: project=${GCP_PROJECT_ID}, zone=${GCP_ZONE}, network=${GCP_NETWORK}" >&2
+}
+
 function render_osc_operator_chart() {
   local charts_dir="$1"
   local operator_chart="${charts_dir}/osc-operator"
@@ -355,61 +468,79 @@ function render_osc_operands_chart() {
     # Generate SSH keys via the chart's Makefile (ed25519, into files/ for .Files.Get)
     make -C "${operands_chart}" ssh-keys >&2
 
-    # Read cloud config from peerpods-param-cm (created by peerpods-param-cm step)
-    local cm_data
-    cm_data=$(oc get configmap peerpods-param-cm -n default -o json 2>/dev/null || echo "")
-    if [[ -n "${cm_data}" ]]; then
-      echo ">>> Reading cloud config from peerpods-param-cm" >&2
+    # Detect and populate cloud configuration from cluster infrastructure
+    # Cloud setup functions export environment variables if not already set
+    case "${provider}" in
+      aws)
+        setup_aws_peerpods || echo ">>> WARNING: Failed to detect AWS peer-pods config" >&2
+        ;;
+      azure)
+        setup_azure_peerpods || echo ">>> WARNING: Failed to detect Azure peer-pods config" >&2
+        ;;
+      gcp)
+        setup_gcp_peerpods || echo ">>> WARNING: Failed to detect GCP peer-pods config" >&2
+        ;;
+      libvirt|none)
+        echo ">>> Skipping peer-pods cloud config for libvirt (local testing)" >&2
+        ;;
+      *)
+        echo ">>> WARNING: Unsupported provider for peer-pods: ${provider}" >&2
+        ;;
+    esac
+
+    # Read cloud config from environment variables
+    # Variables can come from job config, step defaults, or cloud setup functions above
+    # Helm charts will create peer-pods-cm ConfigMap with these values
+    echo ">>> Reading peer-pods cloud config from environment variables" >&2
 
       # Extract common values
       local vxlan_port proxy_timeout
-      vxlan_port=$(echo "${cm_data}" | jq -r '.data.VXLAN_PORT // ""')
-      proxy_timeout=$(echo "${cm_data}" | jq -r '.data.PROXY_TIMEOUT // ""')
+      vxlan_port="${VXLAN_PORT:-}"
+      proxy_timeout="${PROXY_TIMEOUT:-}"
       [[ -n "${vxlan_port}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.VXLAN_PORT=${vxlan_port}")
       [[ -n "${proxy_timeout}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.PROXY_TIMEOUT=${proxy_timeout}")
 
       case "${provider}" in
         azure)
-          local azure_subnet_id azure_nsg_id azure_resource_group azure_region azure_instance_size
-          azure_subnet_id=$(echo "${cm_data}" | jq -r '.data.AZURE_SUBNET_ID // ""')
-          azure_nsg_id=$(echo "${cm_data}" | jq -r '.data.AZURE_NSG_ID // ""')
-          azure_resource_group=$(echo "${cm_data}" | jq -r '.data.AZURE_RESOURCE_GROUP // ""')
-          azure_region=$(echo "${cm_data}" | jq -r '.data.AZURE_REGION // ""')
-          azure_instance_size=$(echo "${cm_data}" | jq -r '.data.AZURE_INSTANCE_SIZE // ""')
+          local azure_subnet_id azure_nsg_id azure_resource_group azure_region azure_instance_size azure_ssh_key_pub
+          azure_subnet_id="${AZURE_SUBNET_ID:-}"
+          azure_nsg_id="${AZURE_NSG_ID:-}"
+          azure_resource_group="${AZURE_RESOURCE_GROUP:-}"
+          azure_region="${AZURE_REGION:-}"
+          azure_instance_size="${AZURE_INSTANCE_SIZE:-}"
+          azure_ssh_key_pub="${AZURE_SSH_KEY_PUB:-}"
           [[ -n "${azure_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_SUBNET_ID=${azure_subnet_id}")
           [[ -n "${azure_nsg_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_NSG_ID=${azure_nsg_id}")
           [[ -n "${azure_resource_group}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_RESOURCE_GROUP=${azure_resource_group}")
           [[ -n "${azure_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_REGION=${azure_region}")
           [[ -n "${azure_instance_size}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZE=${azure_instance_size}") || true
+          [[ -n "${azure_ssh_key_pub}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_SSH_KEY_PUB=${azure_ssh_key_pub}") || true
           ;;
         aws)
           local aws_region aws_subnet_id aws_vpc_id aws_sg_ids podvm_instance_type
-          aws_region=$(echo "${cm_data}" | jq -r '.data.AWS_REGION // ""')
-          aws_subnet_id=$(echo "${cm_data}" | jq -r '.data.AWS_SUBNET_ID // ""')
-          aws_vpc_id=$(echo "${cm_data}" | jq -r '.data.AWS_VPC_ID // ""')
-          aws_sg_ids=$(echo "${cm_data}" | jq -r '.data.AWS_SG_IDS // ""')
-          podvm_instance_type=$(echo "${cm_data}" | jq -r '.data.PODVM_INSTANCE_TYPE // ""')
+          aws_region="${AWS_REGION:-}"
+          aws_subnet_id="${AWS_SUBNET_ID:-}"
+          aws_vpc_id="${AWS_VPC_ID:-}"
+          aws_sg_ids="${AWS_SG_IDS:-}"
+          podvm_instance_type="${PODVM_INSTANCE_TYPE:-}"
           [[ -n "${aws_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_REGION=${aws_region}")
           [[ -n "${aws_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SUBNET_ID=${aws_subnet_id}")
           [[ -n "${aws_vpc_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_VPC_ID=${aws_vpc_id}")
-          [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids}")
+          [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids//,/\\,}")
           [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}") || true
           ;;
         gcp)
           local gcp_project_id gcp_zone gcp_network gcp_machine_type
-          gcp_project_id=$(echo "${cm_data}" | jq -r '.data.GCP_PROJECT_ID // ""')
-          gcp_zone=$(echo "${cm_data}" | jq -r '.data.GCP_ZONE // ""')
-          gcp_network=$(echo "${cm_data}" | jq -r '.data.GCP_NETWORK // ""')
-          gcp_machine_type=$(echo "${cm_data}" | jq -r '.data.GCP_MACHINE_TYPE // ""')
+          gcp_project_id="${GCP_PROJECT_ID:-}"
+          gcp_zone="${GCP_ZONE:-}"
+          gcp_network="${GCP_NETWORK:-}"
+          gcp_machine_type="${GCP_MACHINE_TYPE:-}"
           [[ -n "${gcp_project_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_PROJECT_ID=${gcp_project_id}")
           [[ -n "${gcp_zone}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_ZONE=${gcp_zone}")
           [[ -n "${gcp_network}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_NETWORK=${gcp_network}")
           [[ -n "${gcp_machine_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_MACHINE_TYPE=${gcp_machine_type}") || true
           ;;
       esac
-    else
-      echo ">>> WARNING: peerpods-param-cm not found in default namespace" >&2
-    fi
   else
     helm_args+=("--set" "peerpods.enabled=false")
   fi
