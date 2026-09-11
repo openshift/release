@@ -443,6 +443,21 @@ spec:
         app: lcs-load-generator
     spec:
       restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/worker
+                    operator: Exists
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: lcs
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: lcs-load-generator
           image: ${LCS_LOADGEN_IMAGE}
@@ -457,8 +472,8 @@ spec:
           args:
             - |
               set -o pipefail
-              ES_USERNAME=\$(< /var/run/lcs-es/username)
-              ES_PASSWORD=\$(< /var/run/lcs-es/password)
+              ES_USERNAME=\$(python3 -c "import urllib.parse,sys; sys.stdout.write(urllib.parse.quote(\"\$(< /var/run/lcs-es/username)\", safe=''))")
+              ES_PASSWORD=\$(python3 -c "import urllib.parse,sys; sys.stdout.write(urllib.parse.quote(\"\$(< /var/run/lcs-es/password)\", safe=''))")
               export ES_SERVER="https://\${ES_USERNAME}:\${ES_PASSWORD}@${ES_SERVER_HOST}"
               unset ES_USERNAME ES_PASSWORD
               python3 ./lcs-load-generator run 2>&1 | \
@@ -498,6 +513,9 @@ spec:
             requests:
               cpu: "250m"
               memory: "256Mi"
+            limits:
+              cpu: "4"
+              memory: "4Gi"
           volumeMounts:
             - name: results
               mountPath: /results
