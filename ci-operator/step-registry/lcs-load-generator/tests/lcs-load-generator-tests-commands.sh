@@ -41,7 +41,7 @@ METRIC_STEP="${METRIC_STEP:-30s}"
 PYROSCOPE_NAMESPACE="pyroscope"
 PYROSCOPE_URL="http://pyroscope.${PYROSCOPE_NAMESPACE}.svc.cluster.local:4040"
 
-ES_SERVER_HOST="${ES_SERVER_HOST:-search-ocp-qe-perf-scale-test}"
+ES_SERVER_HOST="search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 RUNTIME_TMP_DIR=$(mktemp -d)
 chmod 700 "${RUNTIME_TMP_DIR}"
