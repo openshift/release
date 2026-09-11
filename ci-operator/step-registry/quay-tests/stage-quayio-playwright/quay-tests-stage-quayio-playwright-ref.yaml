@@ -1,0 +1,36 @@
+ref:
+  as: quay-tests-stage-quayio-playwright
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-tests-stage-quayio-playwright-commands.sh
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  timeout: 2h0m0s
+  grace_period: 15m0s
+  credentials:
+  - namespace: test-credentials
+    name: quay-qe-stagequayio-secret
+    mount_path: /var/run/quay-qe-stagequayio-secret
+  - namespace: test-credentials
+    name: quay-qe-dockerio-secret
+    mount_path: /var/run/quay-qe-dockerio-secret
+  env:
+  - name: PLAYWRIGHT_GIT_REPO
+    default: "https://github.com/deshpandevlab/quay.git"
+    documentation: |-
+      Git repository the Playwright suite is cloned from.
+      TODO: change back to https://github.com/quay/quay.git after quay PR merges.
+  - name: PLAYWRIGHT_GIT_BRANCH
+    default: "feat/stage-validation-playwright"
+    documentation: |-
+      Git ref (branch, tag, or commit SHA) for the Playwright tests.
+      TODO: change back to master after quay PR merges.
+  documentation: |-
+    Execute Quay Playwright stage-validation tests against stage.quay.io.
+    Uses a pre-provisioned bearer token from the stagequayio secret.
+    Replaces the Cypress-based quay-tests-stagequayio step.
