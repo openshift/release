@@ -154,4 +154,7 @@ annotate "ocp-ppc64le" "5-dev-preview-ppc64le" "ocp-5-dev-preview-ppc64le.json"
 annotate "ocp-arm64" "5-dev-preview-arm64" "ocp-5-dev-preview-arm64.json"
 annotate "ocp-multi" "5-dev-preview-multi" "ocp-5-dev-preview-multi.json"
 
+# HyperShift release streams
+annotate "hypershift" "hypershift-operator-main-nightly" "hcp-main.json"
+
 exit $global_failure
