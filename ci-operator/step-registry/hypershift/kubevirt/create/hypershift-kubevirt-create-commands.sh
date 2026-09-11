@@ -177,9 +177,10 @@ clear_ovn_localnet_lsp_port_security() {
 # creates br-ex.<vlan-id> as the L2 port workers attach to. DHCP/DNS must be on that segment,
 # not ostestbm br-ex (untagged 192.168.111.0/24).
 #
-# dnsmasq binds DNS to br-ex.<vlan-id> only (bind-interfaces + interface=). Port 5353 is not
-# usable under systemd on RHCOS: dnsmasq_t SELinux denies non-53 ports (EACCES), while oc debug
-# runs unconfined and masks the failure. Guests use DHCP option 6 -> gateway:53 on that iface.
+# dnsmasq serves DHCP/DNS on br-ex.<vlan-id> (bind-interfaces + interface=). CoreDNS hostNetwork
+# owns *:53, so dnsmasq must use port 5353. Under systemd, dnsmasq_t SELinux only allows
+# dns_port_t (53/853) unless 5353 is added via semanage. Guests use DHCP option 6 -> gateway:53;
+# PREROUTING redirects gateway:53 to 5353 on this netdev.
 localnet_vlan_dnsmasq_setup_script_b64() {
   base64 -w0 <<'SCRIPT_EOF'
 #!/bin/bash
@@ -214,6 +215,7 @@ cat > "${conf}" <<CONF
 interface=${dhcp_iface}
 bind-interfaces
 except-interface=lo
+port=5353
 listen-address=${gateway}
 domain-needed
 bogus-priv
@@ -229,6 +231,19 @@ log-dhcp
 CONF
 
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
+
+# Allow dnsmasq_t to bind 5353 under systemd (default policy labels 5353 as howl_port_t).
+semanage port -a -t dns_port_t -p udp 5353 2>/dev/null || \
+  semanage port -m -t dns_port_t -p udp 5353 2>/dev/null || true
+semanage port -a -t dns_port_t -p tcp 5353 2>/dev/null || \
+  semanage port -m -t dns_port_t -p tcp 5353 2>/dev/null || true
+
+for proto in udp tcp; do
+  iptables -t nat -C PREROUTING -d "${gateway}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || \
+    iptables -t nat -A PREROUTING -d "${gateway}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353
+  iptables -t nat -C PREROUTING -i "${dhcp_iface}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null || \
+    iptables -t nat -A PREROUTING -i "${dhcp_iface}" -p "${proto}" --dport 53 -j REDIRECT --to-ports 5353
+done
 
 iptables -C FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT 2>/dev/null || \
   iptables -A FORWARD -i "${dhcp_iface}" -o "${uplink_bond}" -j ACCEPT
@@ -253,17 +268,32 @@ Restart=on-failure
 WantedBy=multi-user.target
 UNIT
 
+/usr/sbin/dnsmasq --test --conf-file="${conf}"
+
+systemctl stop "localnet-vlan-${vlan_id}.service" 2>/dev/null || true
+pkill -f "localnet-vlan-${vlan_id}.conf" 2>/dev/null || true
+rm -f "${pidfile}"
+systemctl reset-failed "localnet-vlan-${vlan_id}.service" 2>/dev/null || true
+
 systemctl daemon-reload
 systemctl enable --now "localnet-vlan-${vlan_id}.service"
 
 if ! systemctl is-active --quiet "localnet-vlan-${vlan_id}.service"; then
   echo "localnet-vlan-${vlan_id}.service failed to start"
   systemctl status "localnet-vlan-${vlan_id}.service" --no-pager || true
+  journalctl -u "localnet-vlan-${vlan_id}.service" -n 20 --no-pager || true
   exit 1
 fi
 
 if ! ss -ulnp | grep -q "${dhcp_iface}:67"; then
   echo "dnsmasq is not listening for DHCP on ${dhcp_iface}"
+  journalctl -u "localnet-vlan-${vlan_id}.service" -n 20 --no-pager || true
+  exit 1
+fi
+
+if ! ss -ulnp | grep -q "${gateway}:5353"; then
+  echo "dnsmasq is not listening for DNS on ${gateway}:5353"
+  journalctl -u "localnet-vlan-${vlan_id}.service" -n 20 --no-pager || true
   exit 1
 fi
 
