@@ -20,6 +20,13 @@ ref:
         Total number of ACM spoke clusters in the job. Must equal
         CNV_EXCHANGE_KUBEVIRT_CA__SPOKE_COUNT. Consumed here only for cross-validation;
         set by the enclosing job (e.g. ACM_SPOKE_CLUSTER_COUNT: "2" for p2p).
+    - name: CNV_EXCHANGE_KUBEVIRT_CA__INCLUDE_HUB
+      default: "false"
+      documentation: |-
+        When "true", also include the hub cluster (KUBECONFIG) in the CA exchange pool.
+        Required for hub-spoke CCLM where the hub's virt-handler must trust the spoke's
+        KubeVirt CA and vice versa. Set alongside CNV_EXCHANGE_KUBEVIRT_CA__SPOKE_COUNT=1
+        for single-spoke hub-spoke jobs.
     - name: CNV_EXCHANGE_KUBEVIRT_CA__CNV_NS
       default: "openshift-cnv"
       documentation: |-
@@ -33,9 +40,9 @@ ref:
     and server trust pool.  CCLM uses mTLS over spec.sendTo (port 9185), so each
     spoke's virt-handler must trust the peer spoke's KubeVirt CA.
 
-    MTV (release-v2.11 and later) does not inject the destination CA into the
-    VirtualMachineInstance Migration object (spec.sendTo.caCert is absent from the
-    CRD schema), making this manual exchange necessary.
+    MTV 2.12.x does not inject the destination CA into the VirtualMachineInstance
+    Migration object (the spec.sendTo.caCert field is absent from the CRD schema),
+    making this manual exchange necessary.
 
     This step:
       1. Reads the kubevirt-ca ConfigMap from each spoke.
@@ -51,5 +58,6 @@ ref:
     Env vars consumed:
       CNV_EXCHANGE_KUBEVIRT_CA__SPOKE_COUNT - number of spokes (default: 2)
       ACM_SPOKE_CLUSTER_COUNT               - must equal SPOKE_COUNT (cross-validation)
+      CNV_EXCHANGE_KUBEVIRT_CA__INCLUDE_HUB - include hub KUBECONFIG (default: false)
       CNV_EXCHANGE_KUBEVIRT_CA__CNV_NS      - CNV namespace (default: openshift-cnv)
       SHARED_DIR                            - kubeconfig files for each spoke

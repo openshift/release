@@ -27,6 +27,10 @@ images:
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.22"
   latest:
     candidate:
       product: ocp
@@ -140,6 +144,47 @@ tests:
     - chain: p2p-mtv-bidir-mig-config
     - chain: p2p-cclm-bidir-migration-test
   timeout: 15h0m0s
+- as: cr--acm-virt--hub-spoke-mig--aws
+  cron: 0 1 28 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      ACM_SPOKE_CLUSTER_COUNT: "1"
+      ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.22"
+      ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
+      ACM_SPOKE_CP_TYPE: m6a.2xlarge
+      ACM_SPOKE_PULL_SECRET_FILE: pull-secret
+      ACM_SPOKE_WORKER_TYPE: c5n.metal
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      CNV_ENABLE_CCLM: "true"
+      CNV_EXCHANGE_KUBEVIRT_CA__INCLUDE_HUB: "true"
+      CNV_EXCHANGE_KUBEVIRT_CA__SPOKE_COUNT: "1"
+      CNV_HUB_INSTALL_MAJOR_MINOR: "4.22"
+      CNV_POLICY_INSTALL_MAJOR_MINOR: "4.22"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.22
+      ODF_SPOKE_OPERATOR_CHANNEL: stable-4.22
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
+          {"name": "mtv-operator", "source": "redhat-operators", "channel": "release-v2.11", "install_namespace": "openshift-mtv", "target_namespaces": "openshift-mtv", "operator_group": "openshift-mtv-operatorgroup"}
+        ]
+      SUBMARINER_RUN_SUBCTL_VERIFY: "true"
+      SUBMARINER_VERIFY_HUB_SPOKE: "true"
+      USER_TAGS: |
+        scenario acm-cnv-p2p-hub-spoke
+    leases:
+    - count: 1
+      env: LEASED_RESOURCE
+      resource_type: aws-cspi-qe-quota-slice
+    - count: 1
+      env: MANAGED_CLUSTER_LEASED_RESOURCE
+      resource_type: aws-cspi-qe-quota-slice
+    workflow: p2p-cclm-hub-spoke-infra
+  timeout: 12h0m0s
 zz_generated_metadata:
   branch: master
   org: RedHatQE
