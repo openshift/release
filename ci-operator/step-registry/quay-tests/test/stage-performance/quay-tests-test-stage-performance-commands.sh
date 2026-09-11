@@ -1,7 +1,9 @@
 #!/bin/bash
 #refer to https://github.com/quay/quay-performance-scripts
 
+set -o errexit
 set -o nounset
+set -o pipefail
 
 # 1, Prepare Quay stage-performance test environment
 QUAY_ROUTE="https://stage.quay.io"
@@ -17,7 +19,7 @@ ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
 ADDITIONAL_PARAMS=$(printf '{"quayVersion": "%s"}' "${QUAY_OPERATOR_CHANNEL}")
 
 #Create organization "perftest" and namespace "quay-perf" for Quay stage-performance test
-export quay_perf_organization="perftest"
+export quay_perf_organization="perftest-${BUILD_ID}"
 export quay_perf_namespace="quay-perf"
 
 # if quay_perf_organization already exists, skip creation
@@ -29,7 +31,7 @@ if [ "$perf_organization_exists" -eq 200 ]; then
   echo "Organization ${quay_perf_organization} already exists, skipping creation."
 else 
   # If it does not exist, create it
-  curl --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
+  curl --fail --silent --show-error --location --request POST "${QUAY_ROUTE}/api/v1/organization/" \
     --header "Content-Type: application/json" \
     --header "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
     --data-raw '{
@@ -44,6 +46,24 @@ oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_names
 # 2, Deploy Quay stage-performance test job
 
 QUAY_ROUTE=${QUAY_ROUTE#https://} #remove "https://"
+
+cleanup_repositories() {
+  echo "Cleaning up repositories in organization ${quay_perf_organization}..."
+  repos=$(curl -s -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
+    "https://$QUAY_ROUTE/api/v1/repository?namespace=${quay_perf_organization}" \
+    | jq -r '.repositories[]?.name' || true)
+
+  for repo in $repos; do
+    echo "Deleting repository: ${quay_perf_organization}/${repo}"
+    curl -s -X DELETE \
+      -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
+      "https://$QUAY_ROUTE/api/v1/repository/${quay_perf_organization}/${repo}" -o /dev/null || true
+  done
+  echo "Repository cleanup complete."
+}
+
+trap cleanup_repositories EXIT
+
 cat <<EOF | oc apply -f -
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -89,6 +109,18 @@ spec:
         imagePullPolicy: "IfNotPresent"
         ports:
         - containerPort: 6379
+        readinessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
@@ -165,11 +197,13 @@ echo "check the OCP Quay Perf Job, if it complete, go to AWS OpenSearch to gener
 
 #Wait until the quay perf testing job complete, and show the job status
 oc get job -n "$quay_perf_namespace"
-oc -n "$quay_perf_namespace" wait job/quay-perf-test-orchestrator --for=jsonpath='{.status.ready}'=0 --timeout=600s
+oc -n "$quay_perf_namespace" wait deployment/redis --for=condition=Available --timeout=600s
 
 # 3, Wait until the job complete
 
 start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+oc wait pod -l job-name=quay-perf-test-orchestrator \
+  --for=condition=PodScheduled --timeout=600s -n "$quay_perf_namespace"
 quayperf_pod_name=$(oc get pod -l job-name=quay-perf-test-orchestrator -n ${quay_perf_namespace} -o jsonpath='{.items[0].metadata.name}')
 
 if [[ -z "${quayperf_pod_name}" ]]; then
@@ -177,15 +211,27 @@ if [[ -z "${quayperf_pod_name}" ]]; then
   exit 1
 fi
 
-sleep 120 #wait pod start
+oc wait pod -l job-name=quay-perf-test-orchestrator \
+  --for=condition=Ready --timeout=600s -n "$quay_perf_namespace"
 
 # Fetch UUID,JOB_START etc required data to dashboard
-TEST_UUID=$(oc logs "$quayperf_pod_name" -n "${quay_perf_namespace}" | grep 'test_uuid' | sed -n 's/^.*test_uuid=\s*\(\S*\).*$/\1/p')
+TEST_UUID=""
+for _ in {1..30}; do
+  TEST_UUID=$(oc logs "$quayperf_pod_name" -n "${quay_perf_namespace}" 2>/dev/null \
+    | sed -n 's/^.*test_uuid=[[:space:]]*\([^[:space:]]*\).*$/\1/p' | sed -n '1p' || true)
+  if [[ -n "${TEST_UUID}" ]]; then
+    break
+  fi
+  sleep 10
+done
+if [[ -z "${TEST_UUID}" ]]; then
+  echo "Unable to obtain the performance test UUID"
+  exit 1
+fi
 echo "job start: $start_time"
 
 JOB_STATUS="Success"
-oc wait --for=condition=complete --timeout=6h job/quay-perf-test-orchestrator -n "$quay_perf_namespace"
-if [ $? -ne 0 ]; then
+if ! oc wait --for=condition=complete --timeout=6h job/quay-perf-test-orchestrator -n "$quay_perf_namespace"; then
   JOB_STATUS="Failed"
 fi
 date
@@ -210,22 +256,9 @@ export PUSH_PULL_NUMBERS
 export ADDITIONAL_PARAMS
 
 # Invoke index.sh to send data to dashboad http://dashboard.apps.sailplane.perf.lab.eng.rdu2.redhat.com/
-source utility/e2e-benchmarking.sh || true
+source utility/e2e-benchmarking.sh
 echo "Quay stage performance test finised"
 
-######################## Clean UP ##################
-# This will delete all repositories created under the test organization
-echo "Cleaning up repositories in organization ${quay_perf_organization}..."
-
-repos=$(curl -s -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
-  "https://$QUAY_ROUTE/api/v1/repository?namespace=${quay_perf_organization}" | jq -r '.repositories[].name')
-
-for repo in $repos; do
-  echo "Deleting repository: ${quay_perf_organization}/${repo}"
-  curl -s -X DELETE \
-    -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
-    "https://$QUAY_ROUTE/api/v1/repository/${quay_perf_organization}/${repo}" -o /dev/null
-done
-
-echo "Repository cleanup complete."
-
+if [[ "${JOB_STATUS}" != "Success" ]]; then
+  exit 1
+fi
