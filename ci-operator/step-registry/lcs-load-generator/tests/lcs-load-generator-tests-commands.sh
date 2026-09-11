@@ -22,7 +22,7 @@ DIAGNOSTIC_GRACE_SECONDS=$((15 * 60))
 LCS_NAMESPACE="${LCS_NAMESPACE:-openshift-lightspeed}"
 NUM_USERS="${NUM_USERS:-5}"
 TEST_DURATION="${TEST_DURATION:-5m}"
-: "${LCS_LOADGEN_IMAGE:?LCS_LOADGEN_IMAGE must be injected by ci-operator}"
+LCS_LOADGEN_IMAGE="${LCS_LOADGEN_IMAGE:-quay.io/rh-ee-bbodapat/lcs-load-generator:latest}"
 LCS_APP_IMAGE="${LCS_APP_IMAGE:-quay.io/redhat-et/lightspeed-stack:dev-latest}"
 MOCK_LLM_IMAGE="${MOCK_LLM_IMAGE:-quay.io/rh-ee-bbodapat/lcs-testing:mock-llm-server}"
 ENABLE_PYROSCOPE="${ENABLE_PYROSCOPE:-true}"
@@ -397,60 +397,127 @@ export LOCUST_USERS="${NUM_USERS}"
 export LOCUST_RUN_TIME="${TEST_DURATION}"
 export LOCUST_PROCESSES REQUEST_TIMEOUT METRIC_STEP
 
-# The Job manifest is at /opt/lcs-load-generator/config/lcs-load-generator.yaml
-# (baked into the step pod image from your Containerfile)
-JOB_MANIFEST="/opt/lcs-load-generator/config/lcs-load-generator.yaml"
-
 # Delete any previous Job (idempotent)
 oc delete job lcs-load-generator -n "${LCS_NAMESPACE}" --ignore-not-found=true
 
-# Apply the Job
-echo "── Applying load generator Job ──"
-JOB_TRANSFORMER="${RUNTIME_TMP_DIR}/transform-job.py"
-cat > "${JOB_TRANSFORMER}" <<'PYTHON'
-import os
-import shlex
-import sys
-
-import yaml
-
-documents = list(yaml.safe_load_all(sys.stdin))
-jobs = [document for document in documents if document and document.get("kind") == "Job"]
-if len(jobs) != 1:
-    raise RuntimeError(f"expected one Job document, found {len(jobs)}")
-
-container = jobs[0]["spec"]["template"]["spec"]["containers"][0]
-es_server_entries = [entry for entry in container["env"] if entry.get("name") == "ES_SERVER"]
-if len(es_server_entries) != 1:
-    raise RuntimeError(f"expected one ES_SERVER entry, found {len(es_server_entries)}")
-
-container["env"] = [entry for entry in container["env"] if entry.get("name") != "ES_SERVER"]
-container["volumeMounts"].append({
-    "name": "es-credentials",
-    "mountPath": "/var/run/lcs-es",
-    "readOnly": True,
-})
-jobs[0]["spec"]["template"]["spec"]["volumes"].append({
-    "name": "es-credentials",
-    "secret": {"secretName": "lcs-load-generator-es-credentials"},
-})
-container["command"] = ["/bin/bash", "-c"]
-server_host = shlex.quote(os.environ["ES_SERVER_HOST"])
-container["args"] = [
-    "set -o pipefail\n"
-    "ES_USERNAME=$(< /var/run/lcs-es/username)\n"
-    "ES_PASSWORD=$(< /var/run/lcs-es/password)\n"
-    f"ES_SERVER_HOST={server_host}\n"
-    "export ES_SERVER=\"https://${ES_USERNAME}:${ES_PASSWORD}@${ES_SERVER_HOST}\"\n"
-    "unset ES_USERNAME ES_PASSWORD\n"
-    "python3 ./lcs-load-generator run 2>&1 | "
-    "python3 -c 'import os,sys; secret=os.environ[\"ES_SERVER\"]; "
-    "sys.stdout.writelines(line.replace(secret, \"[REDACTED ES_SERVER]\") for line in sys.stdin)'\n"
-]
-
-yaml.safe_dump_all(documents, sys.stdout, sort_keys=False)
-PYTHON
-envsubst < "${JOB_MANIFEST}" | python3 "${JOB_TRANSFORMER}" | oc apply -f -
+# Apply RBAC and Job manifests inline (no baked-in image required)
+echo "── Applying load generator RBAC and Job ──"
+cat <<JOBMANIFEST | oc apply -f -
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: lcs-load-generator-serviceaccount
+  namespace: ${LCS_NAMESPACE}
+rules:
+  - apiGroups: ["extensions", "apps", "batch", "security.openshift.io", "policy"]
+    resources: ["deployments", "jobs", "pods", "services", "jobs/status",
+                "podsecuritypolicies", "securitycontextconstraints"]
+    verbs: ["use", "get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: lcs-load-generator-role
+  namespace: ${LCS_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: lcs-load-generator-serviceaccount
+subjects:
+  - kind: ServiceAccount
+    name: default
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: lcs-load-generator
+  namespace: ${LCS_NAMESPACE}
+  labels:
+    app: lcs-load-generator
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: lcs-load-generator
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: lcs-load-generator
+          image: ${LCS_LOADGEN_IMAGE}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -o pipefail
+              ES_USERNAME=\$(< /var/run/lcs-es/username)
+              ES_PASSWORD=\$(< /var/run/lcs-es/password)
+              export ES_SERVER="https://\${ES_USERNAME}:\${ES_PASSWORD}@${ES_SERVER_HOST}"
+              unset ES_USERNAME ES_PASSWORD
+              python3 ./lcs-load-generator run 2>&1 | \
+                python3 -c 'import os,sys; secret=os.environ["ES_SERVER"]; sys.stdout.writelines(line.replace(secret, "[REDACTED ES_SERVER]") for line in sys.stdin)'
+          env:
+            - name: KUBECONFIG
+              value: "/etc/kubeconfig/kubeconfig"
+            - name: LCS_NAMESPACE
+              value: "${LCS_NAMESPACE}"
+            - name: LCS_HOST
+              value: "${LCS_HOST}"
+            - name: LCS_TOKEN
+              value: "${LCS_TOKEN}"
+            - name: LCS_PROVIDER
+              value: "${LCS_PROVIDER}"
+            - name: LCS_MODEL
+              value: "${LCS_MODEL}"
+            - name: LOCUST_USERS
+              value: "${LOCUST_USERS}"
+            - name: LOCUST_RUN_TIME
+              value: "${LOCUST_RUN_TIME}"
+            - name: LOCUST_PROCESSES
+              value: "${LOCUST_PROCESSES}"
+            - name: TEST_UUID
+              value: ""
+            - name: REQUEST_TIMEOUT
+              value: "${REQUEST_TIMEOUT}"
+            - name: RESULTS_DIR
+              value: "/results"
+            - name: QUESTIONS_FILE
+              value: "/opt/lcs-load-generator/locust/assets/questions.yaml"
+            - name: ES_INDEX
+              value: "${ES_INDEX}"
+            - name: METRIC_STEP
+              value: "${METRIC_STEP}"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+          volumeMounts:
+            - name: results
+              mountPath: /results
+            - name: kubeconfig-volume
+              mountPath: /etc/kubeconfig
+              readOnly: true
+            - name: es-credentials
+              mountPath: /var/run/lcs-es
+              readOnly: true
+          imagePullPolicy: Always
+      volumes:
+        - name: results
+          emptyDir: {}
+        - name: kubeconfig-volume
+          secret:
+            secretName: kubeconfig-secret
+        - name: es-credentials
+          secret:
+            secretName: lcs-load-generator-es-credentials
+JOBMANIFEST
 
 # Wait for Job to complete or fail, reserving time for diagnostics.
 echo "── Waiting for Job completion ──"
