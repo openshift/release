@@ -627,11 +627,24 @@ function Main () {
     # ODF operator CSV exists, but verify a StorageCluster was
     # actually configured.  If not, ODF is installed-but-unused;
     # skip health checks instead of waiting 720s and failing.
-    typeset scCount=""
-    scCount="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json 2>/dev/null | python3 -c "
+    typeset scJson="" scCount=""
+    if ! scJson="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json 2>/dev/null)"; then
+        : "Failed to query StorageClusters in ${ODF_NAMESPACE}"
+        exit 1
+    fi
+    if [[ -z "${scJson}" ]]; then
+        : "StorageCluster query returned empty output in ${ODF_NAMESPACE}"
+        exit 1
+    fi
+    if ! scCount="$(printf '%s' "${scJson}" | python3 -c "
 import sys,json; d=json.load(sys.stdin)
-print(len(d.get('items',[])))
-")" || scCount="0"
+items=d.get('items')
+if not isinstance(items,list): raise ValueError('StorageCluster items is not a list')
+print(len(items))
+")"; then
+        : "Failed to parse StorageCluster JSON from ${ODF_NAMESPACE}"
+        exit 1
+    fi
     if (( scCount == 0 )); then
         AddResult "odf-csv-phase" "pass"
         SkipAllChecks "ODF operator installed but no StorageCluster configured in ${ODF_NAMESPACE}" \
