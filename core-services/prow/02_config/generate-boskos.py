@@ -793,7 +793,7 @@ for i in range(1, 7):
 for i in [990,1169,1166,1164,1146]:
     CONFIG['vsphere-dis-2-quota-slice']['bcr01a.dal12.{}'.format(i)] = 1
 
-for i in [871,991,1165,1154,1148,1140]:
+for i in [871,991,1165,1154,1140]:
     CONFIG['vsphere-connected-2-quota-slice']['bcr01a.dal12.{}'.format(i)] = 1
 
 for i in range(0,2):
