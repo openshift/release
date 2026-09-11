@@ -6,6 +6,26 @@ base_images:
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN git clone --depth 1 --branch main https://github.com/openshift/cluster-kube-apiserver-operator.git /go/src/github.com/openshift/cluster-kube-apiserver-operator
+      WORKDIR /go/src/github.com/openshift/cluster-kube-apiserver-operator
+      RUN rm -rf vendor/github.com/openshift/library-go && \
+          cp -a /go/src/github.com/openshift/library-go ./library-go && \
+          rm -rf ./library-go/vendor && \
+          go mod edit -dropreplace github.com/openshift/library-go && \
+          go mod edit -replace github.com/openshift/library-go=./library-go && \
+          echo "# github.com/openshift/library-go => ./library-go" >> vendor/modules.txt && \
+          sed -i "/github.com\\/openshift\\/library-go v0.0.0/ s/$/ => .\\/library-go/" vendor/modules.txt && \
+          go mod vendor && \
+          make build --warn-undefined-variables && \
+          cp cluster-kube-apiserver-operator-tests-ext /usr/bin/cluster-kube-apiserver-operator-tests-ext && \
+          gzip -f -k /usr/bin/cluster-kube-apiserver-operator-tests-ext
+      WORKDIR /tmp
+    from: src
+    to: cluster-kube-apiserver-operator-tests
 promotion:
   to:
   - name: "5.0"
@@ -55,6 +75,46 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-operator-encryption-kms
+  optional: true
+  run_if_changed: ^(pkg/operator/encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: cluster-kube-apiserver-operator-tests
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/cluster-kube-apiserver-operator-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: cluster-kube-apiserver-operator
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-operator-encryption-kms-2
+  optional: true
+  run_if_changed: ^(pkg/operator/encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: cluster-kube-apiserver-operator-tests
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/cluster-kube-apiserver-operator-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: cluster-kube-apiserver-operator
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms-2
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
     workflow: ipi-aws
 - as: e2e-monitoring
   run_if_changed: ^(pkg/operator/resource/resourceapply/monitoring.go)|^(test/e2e-monitoring)
