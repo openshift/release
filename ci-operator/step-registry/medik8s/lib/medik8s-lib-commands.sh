@@ -205,4 +205,9 @@ MEDIK8S_LIB_EOF
 # update the image for all environments in one place.
 echo "registry.access.redhat.com/ubi9/ubi-minimal:latest" > "${SHARED_DIR}/workload_image"
 
+# Injector image for SBR privileged iptables-injection pods. Must provide
+# nsenter and iptables; ubi-minimal lacks both. ubi (full) ships util-linux
+# (nsenter) and iptables. Change HERE to update all SBR injection tests.
+echo "registry.access.redhat.com/ubi9/ubi:latest" > "${SHARED_DIR}/injector_image"
+
 echo "medik8s-lib.sh written to ${SHARED_DIR}"
