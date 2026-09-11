@@ -47,6 +47,12 @@ ref:
     default: "openshift-sandboxed-containers-operator"
     documentation: |-
       The namespace where the OSC operator will be installed.
+  - name: USE_OLMV1
+    default: "false"
+    documentation: |-
+      When "true", installs the operator via OLM v1 (ClusterExtension) instead of
+      OLM v0 (Subscription). The same CATALOG_SOURCE_IMAGE is used as the FBC image
+      for the ClusterCatalog. Requires CATALOG_SOURCE_IMAGE to be set.
   documentation: |-
     If OSC_INSTALL=true, installs the OSC operator and configures the cluster for
     the target workload (kata, peer-pods, or coco) using Helm charts from OSC_CHARTS_REPO.
@@ -55,6 +61,11 @@ ref:
     Charts are cloned from OSC_CHARTS_REPO. Phase 1 installs the operator (namespace,
     operatorgroup, subscription, optional dev catalog). Phase 2 installs operands
     (KataConfig, feature gates, peer-pods-cm) and waits for KataConfig readiness.
+
+    When USE_OLMV1=true, the operator is installed via OLM v1 (ClusterCatalog +
+    ClusterExtension + installer ServiceAccount/RBAC) instead of OLM v0
+    (CatalogSource + Subscription + OperatorGroup). The same CATALOG_SOURCE_IMAGE
+    value is used as the FBC image for the ClusterCatalog.
 
     For peer-pods and coco workloads, reads cloud config from peerpods-param-cm and
     creates peer-pods-secret in the operator namespace. For coco, enables confidential
