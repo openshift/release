@@ -13,6 +13,9 @@ LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
 STALE_LEASE_HOURS="${STALE_LEASE_HOURS:-1}"
 ERROR_REPLACE_HOURS="${ERROR_REPLACE_HOURS:-1}"
+MAX_CLUSTER_AGE_HOURS="${MAX_CLUSTER_AGE_HOURS:-0}"
+REFRESH_DAY="${REFRESH_DAY:-6}"
+MAX_REFRESH_PER_RUN="${MAX_REFRESH_PER_RUN:-2}"
 DRY_RUN="${DRY_RUN:-false}"
 
 if [[ ! -f "${LEASE_HOST_KUBECONFIG}" ]]; then
@@ -263,7 +266,7 @@ provision_sts_cluster() {
 delete_cluster() {
     local cluster_id="$1" type="$2"
     if [[ "${type}" == "osd-gcp" || "${type}" == "osd-aws" ]]; then
-        ocm delete "/api/clusters_mgmt/v1/clusters/${cluster_id}" || true
+        ocm delete "/api/clusters_mgmt/v1/clusters/${cluster_id}"
     else
         local cluster_desc roles_prefix oidc_config_id describe_attempt
         for describe_attempt in $(seq 1 5); do
@@ -824,7 +827,7 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
                     "labels": { "rosa-cluster-lease/status": "error" },
                     "annotations": { "rosa-cluster-lease/error-reason": "RBAC: dedicated-admins permissions not functional", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
                 }
-            }' || true
+            }'
         fi
         UNHEALTHY=$((UNHEALTHY + 1))
         echo "UNHEALTHY: ${CM_NAME} (RBAC: dedicated-admins broken)" >> "${REPORT}"
@@ -847,6 +850,82 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
 
     HEALTHY=$((HEALTHY + 1))
 done
+
+# ---------------------------------------------------------------
+# Phase 4.5: Cluster Refresh (age-based rotation)
+# ---------------------------------------------------------------
+if [[ "${MAX_CLUSTER_AGE_HOURS}" -eq 0 ]]; then
+    log "Phase 4.5: Cluster refresh skipped (MAX_CLUSTER_AGE_HOURS=0)"
+else
+    log "Phase 4.5: Checking for clusters to refresh (max age: ${MAX_CLUSTER_AGE_HOURS}h)"
+
+    CURRENT_DAY=$(date +%u)
+    if [[ "${CURRENT_DAY}" != "${REFRESH_DAY}" ]]; then
+        log "Phase 4.5: Skipping refresh (today=${CURRENT_DAY}, refresh day=${REFRESH_DAY})"
+    else
+        log "Phase 4.5: Refresh day matched (day=${CURRENT_DAY}), scanning available clusters"
+
+        REFRESH_COUNT=0
+        REFRESH_REMAINING=0
+
+        AVAILABLE_CMS=$(lease_oc get configmaps -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true,rosa-cluster-lease/status=available" -o json 2>/dev/null || echo '{"items":[]}')
+        AVAILABLE_COUNT=$(echo "${AVAILABLE_CMS}" | jq '.items | length')
+
+        for i in $(seq 0 $((AVAILABLE_COUNT - 1))); do
+            CM=$(echo "${AVAILABLE_CMS}" | jq ".items[${i}]")
+            CM_NAME=$(echo "${CM}" | jq -r '.metadata.name')
+            CLUSTER_ID=$(echo "${CM}" | jq -r '.data["cluster-id"]')
+            REGISTERED_AT=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/registered-at"] // ""')
+
+            if [[ -z "${REGISTERED_AT}" ]]; then
+                log "WARNING: ${CM_NAME} has no registered-at annotation, skipping refresh check"
+                continue
+            fi
+
+            REGISTERED_EPOCH=$(date -d "${REGISTERED_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${REGISTERED_AT}" +%s 2>/dev/null || true)
+            if [[ -z "${REGISTERED_EPOCH}" || "${REGISTERED_EPOCH}" == "0" ]]; then
+                log "WARNING: ${CM_NAME} has unparseable registered-at '${REGISTERED_AT}', skipping refresh check"
+                continue
+            fi
+            AGE_SECONDS=$(( NOW_EPOCH - REGISTERED_EPOCH ))
+            AGE_HOURS=$(( AGE_SECONDS / 3600 ))
+
+            if [[ ${AGE_HOURS} -gt ${MAX_CLUSTER_AGE_HOURS} ]]; then
+                if [[ ${REFRESH_COUNT} -ge ${MAX_REFRESH_PER_RUN} ]]; then
+                    log "Stagger limit reached (${MAX_REFRESH_PER_RUN}), deferring remaining refreshes to next run"
+                    REFRESH_REMAINING=$((REFRESH_REMAINING + 1))
+                    continue
+                fi
+
+                log "REFRESH: Cluster ${CM_NAME} is ${AGE_HOURS}h old (max: ${MAX_CLUSTER_AGE_HOURS}), marking for replacement"
+                echo "REFRESH: ${CM_NAME} (age: ${AGE_HOURS}h, max: ${MAX_CLUSTER_AGE_HOURS}h)" >> "${REPORT}"
+
+                if dry_run_guard "Would refresh ${CM_NAME}"; then
+                    REFRESH_COUNT=$((REFRESH_COUNT + 1))
+                    continue
+                fi
+
+                CLUSTER_OCM_ENV=$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')
+                CLUSTER_TYPE=$(echo "${CM}" | jq -r '.metadata.labels["rosa-cluster-lease/type"] // "classic-sts"')
+                ocm_ensure_env "${CLUSTER_OCM_ENV}"
+
+                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                    "metadata": { "labels": { "rosa-cluster-lease/status": "maintenance" } }
+                }'
+                if ! delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}"; then
+                    log "WARNING: delete_cluster failed for ${CM_NAME}, preserving ConfigMap"
+                    continue
+                fi
+                lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}"
+
+                REFRESH_COUNT=$((REFRESH_COUNT + 1))
+                log "Deleted ${CM_NAME} for refresh. Replacement will be provisioned on next reconcile."
+            fi
+        done
+
+        log "Refreshed ${REFRESH_COUNT} clusters, ${REFRESH_REMAINING} remaining for next run"
+    fi
+fi
 
 # ---------------------------------------------------------------
 # Phase 5: Replace unhealthy clusters
@@ -889,11 +968,14 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
     if [[ "${OCM_CHECK_RESULT}" == "not-found" ]]; then
         log "${CM_NAME}: cluster already deleted from OCM, skipping delete_cluster"
     else
-        delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}" || log "WARNING: delete_cluster failed for ${CM_NAME}, removing ConfigMap anyway"
+        if ! delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}"; then
+            log "WARNING: delete_cluster failed for ${CM_NAME}, preserving ConfigMap"
+            continue
+        fi
     fi
 
     # Remove the ConfigMap (next reconcile will provision a replacement)
-    lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" || true
+    lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}"
     log "Deleted ${CM_NAME}. Replacement will be provisioned on next reconcile."
 done
 
