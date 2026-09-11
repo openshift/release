@@ -184,6 +184,24 @@ else
   exit 1
 fi
 
+# Override dpf-hcp-provisioner-operator image if a CI-built override was provided
+if [[ -f "${SHARED_DIR}/dpf-hcp-provisioner-operator-override" ]]; then
+  OVERRIDE_IMAGE=$(cat "${SHARED_DIR}/dpf-hcp-provisioner-operator-override")
+  if [[ -n "${OVERRIDE_IMAGE}" ]]; then
+    OVERRIDE_REPO="${OVERRIDE_IMAGE%:*}"
+    OVERRIDE_TAG="${OVERRIDE_IMAGE##*:}"
+    echo "Overriding dpf-hcp-provisioner-operator image: repo=${OVERRIDE_REPO} tag=${OVERRIDE_TAG}"
+    if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; \
+      sed -i 's|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_REPO=.*|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_REPO=${OVERRIDE_REPO}|' .env; \
+      sed -i 's|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_TAG=.*|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_TAG=${OVERRIDE_TAG}|' .env"; then
+      echo "dpf-hcp-provisioner-operator image override applied successfully"
+    else
+      echo "ERROR: Failed to apply dpf-hcp-provisioner-operator image override"
+      exit 1
+    fi
+  fi
+fi
+
 echo "Copying .env from hypervisor to artifacts..."
 scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env ${ARTIFACT_DIR}/.env || echo "WARNING: Failed to copy .env to artifacts"
 
