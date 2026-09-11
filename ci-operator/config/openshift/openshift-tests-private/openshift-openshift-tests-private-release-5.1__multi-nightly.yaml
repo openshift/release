@@ -3,6 +3,10 @@ base_images:
     name: "5.1"
     namespace: ocp
     tag: aws-efs-csi-operator-create-efs
+  cbo-tests:
+    name: "5.0"
+    namespace: ocp
+    tag: cluster-baremetal-operator
   cli:
     name: "5.1"
     namespace: ocp
@@ -2090,26 +2094,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
-- as: metal-ipi-ovn-ipv4-vmedia-disruptive-arm-f7
-  capabilities:
-  - intranet
-  cron: 49 18 4,11,18,25 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      DISCONNECTED: "false"
-      RESERVE_BOOTSTRAP: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      TEST_SCENARIOS: INSTALLER_DEDICATED
-      TEST_TIMEOUT: "120"
-      VENDOR: hpe
-      architecture: arm64
-      masters: "3"
-      workers: "2"
-    test:
-    - ref: openshift-extended-test-disruptive
-    workflow: baremetal-lab-ipi-virtual-media
 - as: metal-ipi-ovn-ipv4-basecap-none-arm-f28
   capabilities:
   - intranet
@@ -2945,6 +2929,32 @@ tests:
       workers: "0"
     test:
     - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
+- as: metal-ipi-ovn-ipv4-vmedia-disruptive-amd-f7
+  capabilities:
+  - intranet
+  cron: 50 23 15 * *
+  reporter_config:
+    channel: '#metal-qe-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      TEST_SUITE: cluster-baremetal-operator/disruptive
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: baremetal-lab-test-cbo-extension
     workflow: baremetal-lab-ipi-virtual-media
 - as: aws-eusc-ipi-fips-tp-arm-f7
   cron: 12 18 5,12,19,26 * *
