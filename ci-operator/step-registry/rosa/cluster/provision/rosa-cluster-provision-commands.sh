@@ -624,12 +624,20 @@ fi
 
 PRIVATE_SWITCH=""
 if [[ "$PRIVATE" == "true" ]]; then
-  PRIVATE_SWITCH="--private"
+  # Classic PrivateLink uses --private-link instead. Passing --private to an STS
+  # Classic cluster is rejected by the ROSA CLI before provisioning starts.
+  if [[ "$HOSTED_CP" == "true" ]] || [[ "$PRIVATE_LINK" != "true" ]]; then
+    PRIVATE_SWITCH="--private"
+  fi
 fi
 
 PRIVATE_LINK_SWITCH=""
 if [[ "$PRIVATE_LINK" == "true" ]]; then
-  PRIVATE_LINK_SWITCH="--default-ingress-private"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    PRIVATE_LINK_SWITCH="--default-ingress-private"
+  else
+    PRIVATE_LINK_SWITCH="--private-link"
+  fi
 
   ENABLE_BYOVPC="true"
   PRIVATE_SUBNET_ONLY="true"
@@ -668,6 +676,15 @@ if [[ "$ENABLE_BYOVPC" == "true" ]]; then
   fi
 
   if [[ "${PRIVATE_SUBNET_ONLY}" == "true" ]] ; then
+    # Classic PrivateLink only passes private subnets to the installer. Mark any
+    # public subnets in the BYO VPC as unmanaged so subnet discovery excludes
+    # them while they continue to provide NAT gateway egress.
+    if [[ "${HOSTED_CP}" != "true" ]] && [[ "${PRIVATE_LINK}" == "true" ]] && [[ -n "${PUBLIC_SUBNET_IDs}" ]]; then
+      UNUSED_PUBLIC_SUBNET_IDs=${PUBLIC_SUBNET_IDs//,/ }
+      echo "Marking unused public subnets ${PUBLIC_SUBNET_IDs} with kubernetes.io/cluster/unmanaged=true"
+      # shellcheck disable=SC2086
+      aws --region "${CLOUD_PROVIDER_REGION}" ec2 create-tags --resources ${UNUSED_PUBLIC_SUBNET_IDs} --tags Key=kubernetes.io/cluster/unmanaged,Value=true
+    fi
     SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
     record_cluster "subnets" "private_subnet_ids" ${PRIVATE_SUBNET_IDs}
   else
