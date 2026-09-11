@@ -306,6 +306,13 @@ function render_osc_operator_chart() {
     helm_args+=("--set" "dev.enabled=false")
   fi
 
+  if [[ "${RESTRICTED_NETWORK:-}" == "yes" ]]; then
+    # Our own mirror-operator step already created IDMS/ITMS pointing to the
+    # mirror registry; the chart's copies point to quay.io and would conflict.
+    helm_args+=("--set" "dev.createMirrorSets=false")
+    echo ">>> Restricted network: dev.createMirrorSets=false" >&2
+  fi
+
   local helm_output
   if ! helm_output=$(helm template "${helm_args[@]}"); then
     echo ">>> ERROR: helm template failed" >&2
