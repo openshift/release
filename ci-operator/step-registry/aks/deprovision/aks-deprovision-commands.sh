@@ -275,6 +275,28 @@ aks_cluster_absent() {
   return 0
 }
 
+verify_shared_value() {
+  local path="${1}"
+  local expected="${2}"
+  local description="${3}"
+  local value
+
+  if [[ -L "${path}" || ! -f "${path}" ]]; then
+    echo "${description} metadata at ${path} is unavailable; using the deterministic name" >&2
+    return 0
+  fi
+  value="$(<"${path}")"
+  if [[ "${value}" != "${expected}" ]]; then
+    echo "Ignoring unexpected ${description} metadata at ${path}; using the deterministic name" >&2
+  fi
+}
+
+RESOURCE_NAME_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
+CLUSTER="${RESOURCE_NAME_PREFIX}-aks-cluster"
+RESOURCEGROUP="${RESOURCE_NAME_PREFIX}-aks-rg"
+verify_shared_value "${SHARED_DIR}/aks-cluster-name" "${CLUSTER}" "AKS cluster name"
+verify_shared_value "${SHARED_DIR}/resourcegroup_aks" "${RESOURCEGROUP}" "AKS resource group"
+
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
     AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
@@ -284,35 +306,51 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
-AZURE_KEY_VAULT_INFO_LOCATION="/etc/hypershift-ci-jobs-azurecreds/keyvault-info.json"
-KV_RG_NAME="$(<"${AZURE_KEY_VAULT_INFO_LOCATION}" jq -r .keyvaultRGName)"
-
-CLUSTER="$(<"${SHARED_DIR}/cluster-name")"
-RESOURCEGROUP="$(<"${SHARED_DIR}/resourcegroup_aks")"
-AKS_KV_SECRETS_PROVIDER_OBJECT_ID="$(<"${SHARED_DIR}/kv-object-id")"
-
 az --version
 run_az_with_retry "login" az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
-# Delete role assignments before deleting the cluster. Each retry re-lists the
-# assignment IDs so a response lost after a successful delete is reconciled.
-RESOURCE_GROUP_SCOPE="/subscriptions/${AZURE_AUTH_SUBSCRIPTION_ID}/resourceGroups/${RESOURCEGROUP}"
-run_az_mutation_with_reconcile \
-  "role assignment deletion for RESOURCEGROUP" \
-  role_assignment_absent "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" "Key Vault Secrets User" "$RESOURCE_GROUP_SCOPE" -- \
-  delete_role_assignments_once "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" "Key Vault Secrets User" "$RESOURCE_GROUP_SCOPE"
-echo "Role assignment is absent for the RESOURCEGROUP."
+AKS_KV_SECRETS_PROVIDER_OBJECT_ID=""
+if [[ -f "${SHARED_DIR}/kv-object-id" && ! -L "${SHARED_DIR}/kv-object-id" ]]; then
+  SHARED_AKS_KV_SECRETS_PROVIDER_OBJECT_ID="$(<"${SHARED_DIR}/kv-object-id")"
+  if LIVE_AKS_KV_SECRETS_PROVIDER_OBJECT_ID="$(run_az_with_retry "AKS Key Vault identity lookup" az aks show --name "${CLUSTER}" --resource-group "${RESOURCEGROUP}" --query addonProfiles.azureKeyvaultSecretsProvider.identity.objectId -o tsv)" && \
+    [[ -n "${SHARED_AKS_KV_SECRETS_PROVIDER_OBJECT_ID}" && "${SHARED_AKS_KV_SECRETS_PROVIDER_OBJECT_ID}" == "${LIVE_AKS_KV_SECRETS_PROVIDER_OBJECT_ID}" ]]; then
+    AKS_KV_SECRETS_PROVIDER_OBJECT_ID="${LIVE_AKS_KV_SECRETS_PROVIDER_OBJECT_ID}"
+  else
+    echo "AKS Key Vault object ID metadata could not be verified; skipping role assignment cleanup."
+  fi
+fi
 
-KV_RESOURCE_GROUP_SCOPE="/subscriptions/${AZURE_AUTH_SUBSCRIPTION_ID}/resourceGroups/${KV_RG_NAME}"
-run_az_mutation_with_reconcile \
-  "role assignment deletion for KV_RG_NAME" \
-  role_assignment_absent "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" "Key Vault Secrets User" "$KV_RESOURCE_GROUP_SCOPE" -- \
-  delete_role_assignments_once "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" "Key Vault Secrets User" "$KV_RESOURCE_GROUP_SCOPE"
-echo "Role assignment is absent for the KV_RG_NAME."
+if [[ -n "${AKS_KV_SECRETS_PROVIDER_OBJECT_ID}" ]]; then
+  AZURE_KEY_VAULT_INFO_LOCATION="/etc/hypershift-ci-jobs-azurecreds/keyvault-info.json"
+
+  # Delete role assignments before deleting the cluster. Each retry re-lists
+  # the assignment IDs so a lost successful response is reconciled.
+  RESOURCE_GROUP_SCOPE="/subscriptions/${AZURE_AUTH_SUBSCRIPTION_ID}/resourceGroups/${RESOURCEGROUP}"
+  run_az_mutation_with_reconcile \
+    "role assignment deletion for RESOURCEGROUP" \
+    role_assignment_absent "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" "Key Vault Secrets User" "$RESOURCE_GROUP_SCOPE" -- \
+    delete_role_assignments_once "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" "Key Vault Secrets User" "$RESOURCE_GROUP_SCOPE"
+  echo "Role assignment is absent for the RESOURCEGROUP."
+
+  if [[ -f "${AZURE_KEY_VAULT_INFO_LOCATION}" && ! -L "${AZURE_KEY_VAULT_INFO_LOCATION}" ]] && \
+    KV_RG_NAME="$(jq -er '.keyvaultRGName | select(type == "string" and length > 0)' "${AZURE_KEY_VAULT_INFO_LOCATION}" 2>/dev/null)"; then
+    KV_RESOURCE_GROUP_SCOPE="/subscriptions/${AZURE_AUTH_SUBSCRIPTION_ID}/resourceGroups/${KV_RG_NAME}"
+    run_az_mutation_with_reconcile \
+      "role assignment deletion for KV_RG_NAME" \
+      role_assignment_absent "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" "Key Vault Secrets User" "$KV_RESOURCE_GROUP_SCOPE" -- \
+      delete_role_assignments_once "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" "Key Vault Secrets User" "$KV_RESOURCE_GROUP_SCOPE"
+    echo "Role assignment is absent for the KV_RG_NAME."
+  else
+    echo "AKS Key Vault resource group metadata unavailable; skipping its role assignment cleanup."
+  fi
+fi
 
 # If an AKS delete response is lost, reconcile absence. A cluster already in
 # Deleting state is waited on instead of issuing a competing delete request.
+echo "Deleting AKS management cluster ${CLUSTER} from resource group ${RESOURCEGROUP}"
 run_az_mutation_with_reconcile \
   "AKS cluster deletion" \
   aks_cluster_absent "$CLUSTER" "$RESOURCEGROUP" -- \
   az aks delete --name "$CLUSTER" --resource-group "$RESOURCEGROUP" --yes
+echo "Verifying AKS management cluster ${CLUSTER} is deleted from resource group ${RESOURCEGROUP}"
+run_az_with_retry "AKS deletion verification" az aks wait --deleted --name "$CLUSTER" --resource-group "$RESOURCEGROUP" --interval 30 --timeout 1200

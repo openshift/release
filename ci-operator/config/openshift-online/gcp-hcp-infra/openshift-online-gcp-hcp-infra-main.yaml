@@ -1,3 +1,8 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.26-openshift-4.23:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
 binary_build_commands: make terraform-init
 build_root:
   image_stream_tag:
@@ -84,6 +89,52 @@ tests:
         requests:
           cpu: "8"
           memory: 4Gi
+- always_run: false
+  as: terraform-plan
+  run_if_changed: ^(terraform/(config/(global|region|management-cluster|service)/|modules/|metadata/|workflows/|dashboards/)|hcp-terraform/gcp-hcp-.+/main\.tf\.json$)
+  steps:
+    test:
+    - as: plan
+      commands: |
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() {
+          if [ "$1" = "get" ]; then
+            host="" proto=""
+            while IFS= read -r line; do
+              [ -z "$line" ] && break
+              case "$line" in
+                host=*) host="${line#host=}" ;;
+                protocol=*) proto="${line#protocol=}" ;;
+              esac
+            done
+            if [ "$proto" = "https" ] && [ "$host" = "github.com" ]; then
+              echo "username=x-access-token"
+              echo "password=$(cat /etc/github-private/oauth)"
+            else
+              exit 1
+            fi
+          fi
+        }; f'
+        umask 077
+        cat > "$HOME/.terraformrc" <<TFRC
+        credentials "app.terraform.io" {
+          token = "$(cat /etc/terraform-cloud/token)"
+        }
+        TFRC
+        # Do not execute fork-controlled Makefile or planner code with
+        # credentials. The base revision is trusted, and the planner itself
+        # rejects PRs whose author is not an organization member or repo
+        # collaborator before Terraform is invoked.
+        git show "${PULL_BASE_SHA}:hack/tfc-speculative-plan.py" | python3 -
+      credentials:
+      - collection: gcp-hcp-infra-terraform-cloud
+        group: tfcloud-token
+        mount_path: /etc/terraform-cloud
+      from: src
+      resources:
+        requests:
+          cpu: "8"
+          memory: 4Gi
 - as: check-orphan-modules
   commands: make check-orphan-modules
   container:
@@ -93,6 +144,11 @@ tests:
     UV_NO_PROGRESS=true && make check-generated-files
   container:
     from: src
+- as: gitops-promoter-test
+  commands: make gitops-promoter-test
+  container:
+    clone: true
+    from: ocp_builder_rhel-9-golang-1.26-openshift-4.23
 - always_run: false
   as: e2e-platform
   steps:

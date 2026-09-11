@@ -170,7 +170,7 @@ tests:
   steps:
     cluster_profile: gcp-observability
     env:
-      AGENT_SKILL: MY_TEAM
+      AGENT_SKILL: my-team
       # ... other env vars
     post:
     - ref: openshift-observability-qe-agent
@@ -185,14 +185,13 @@ tests:
 
 ## Agent Skill
 
-Skills are Markdown files hosted in this step's `skills/` directory within the `openshift/release` repository:
+Skills are Markdown files hosted in this step's `resources/skills/` directory within the `openshift/release` repository, one directory per skill:
 
 ```text
-ci-operator/step-registry/openshift-observability/qe-agent/skills/
-├── OTEL.md          <- OpenTelemetry Operator (junit_otel_* tests, chainsaw)
-├── TEMPO.md         <- Tempo Operator (junit_tempo_* tests, chainsaw)
-├── TRACING_UI.md    <- Distributed Tracing Console Plugin (Cypress)
-├── DISCONNECTED.md  <- Distributed Tracing disconnected suite (chainsaw)
+ci-operator/step-registry/openshift-observability/qe-agent/resources/skills/
+├── otel/SKILL.md        <- OpenTelemetry Operator (junit_otel_* tests, chainsaw)
+├── tempo/SKILL.md       <- Tempo Operator (junit_tempo_* tests, chainsaw)
+├── tracing-ui/SKILL.md  <- Distributed Tracing Console Plugin (Cypress)
 └── OWNERS
 ```
 
@@ -200,11 +199,10 @@ Each skill is fetched at runtime from `https://raw.githubusercontent.com/openshi
 
 ### Adding a new team skill
 
-1. Create `ci-operator/step-registry/openshift-observability/qe-agent/skills/<TEAM_NAME>.md`
-2. Add your team identifier to the `OWNERS` file in `skills/`
-3. Validate the skill before submitting (see [Skill validation](#skill-validation))
-4. Open a PR to `openshift/release` — the step OWNERS review and approve it
-5. Set `AGENT_SKILL: <TEAM_NAME>` in your CI config
+1. Create `resources/skills/<name>/SKILL.md` and its `OWNERS` file (see [resources/README.md](resources/README.md#adding-a-new-skill) for the skill structure)
+2. Validate the skill before submitting (see [Skill validation](#skill-validation))
+3. Open a PR to `openshift/release` — the step OWNERS review and approve it
+4. Set `AGENT_SKILL: <name>` in your CI config
 
 Skill names must be alphanumeric (hyphens and underscores allowed). The step rejects any value that does not match `^[A-Za-z0-9_-]+$` to prevent path traversal.
 
@@ -216,8 +214,11 @@ Before submitting a new or modified skill, validate it with the following tools:
 
 ```bash
 pip install skillsaw
-skillsaw lint ci-operator/step-registry/openshift-observability/qe-agent/skills/
+cd ci-operator/step-registry/openshift-observability/qe-agent
+skillsaw lint resources/skills/<name>
 ```
+
+Skills must stay under skillsaw's default 6,000-token `context-budget` limit; see [resources/README.md](resources/README.md#skill-validation).
 
 **[Agent Eval Harness](https://github.com/opendatahub-io/agent-eval-harness)** — Evaluation framework for testing AI agent skill effectiveness. Use it to measure how well your skill performs against known test failure scenarios before deploying to CI:
 
@@ -233,8 +234,8 @@ Both tools help catch issues early — Skillsaw identifies security risks and co
 |---|---|
 | Required | Yes |
 | Format | Alphanumeric, hyphens, underscores only |
-| Resolves to | `ci-operator/step-registry/openshift-observability/qe-agent/skills/<name>.md` in `openshift/release` |
-| Example | `TEMPO` |
+| Resolves to | `ci-operator/step-registry/openshift-observability/qe-agent/resources/skills/<name>/SKILL.md` in `openshift/release` |
+| Example | `tempo` |
 
 ---
 
@@ -297,7 +298,7 @@ The agent is prohibited from accessing the `kube-system` namespace via a prompt-
 
 | Variable | Default | Description |
 |---|---|---|
-| `AGENT_SKILL` | — | Name of the skill to load from the `skills/` directory. Step is skipped if unset or the file does not exist. |
+| `AGENT_SKILL` | — | Name of the skill to load from `resources/skills/<name>/SKILL.md`. Step is skipped if unset or the file does not exist. |
 | `CLAUDE_MODEL` | `claude-opus-4-6` | Claude model used for analysis. |
 | `CLAUDE_CODE_USE_VERTEX` | `1` | Enable Google Vertex AI backend for Claude Code. |
 | `CLOUD_ML_REGION` | `global` | Google Cloud region for Vertex AI. |
@@ -319,7 +320,7 @@ The Distributed Tracing QE team (Tempo Operator, OpenTelemetry Operator, Tracing
 ```yaml
 cluster_profile: gcp-observability
 env:
-  AGENT_SKILL: TEMPO
+  AGENT_SKILL: tempo
   JIRA_PROJECT: TRACING
 post:
 - ref: openshift-observability-qe-agent
@@ -753,7 +754,7 @@ Each `qe-agent-analysis.md` includes a "Skill Improvement Recommendations" secti
 | Symptom | Cause | Resolution |
 |---|---|---|
 | "Skipping qe-agent" (no context file) | Test step did not set up the `notify_qe_agent` EXIT trap | Add the EXIT trap to your test step script (see [Setup](#setup) step 3) |
-| "Failed to fetch skill" | `AGENT_SKILL` typo or skill file not merged to main | Verify the skill name matches a file in `skills/` on the main branch |
+| "Failed to fetch skill" | `AGENT_SKILL` typo or skill file not merged to main | Verify the skill name matches a directory with a `resources/skills/<name>/SKILL.md` file on the main branch |
 | "AGENT_SKILL contains invalid characters" | Skill name has special characters | Use only alphanumeric, hyphens, and underscores |
 | Agent output incomplete (budget hit) | Complex multi-failure scenario exceeded $5 | Reduce flakiness rerun count in skill, or increase `--max-budget-usd` |
 | Agent output incomplete (timeout) | Analysis took longer than 90 minutes | Simplify the skill steps or increase `timeout` in the ref YAML |
