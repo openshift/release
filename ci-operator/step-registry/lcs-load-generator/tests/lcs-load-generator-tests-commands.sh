@@ -134,7 +134,7 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
   echo "── Deploying Pyroscope ──"
   oc create namespace "${PYROSCOPE_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
-  cat <<'PYROSCOPE' | envsubst | oc apply -f -
+  cat <<'PYROSCOPE' | envsubst | oc apply -n "${PYROSCOPE_NAMESPACE}" -f -
 ---
 apiVersion: apps/v1
 kind: Deployment
