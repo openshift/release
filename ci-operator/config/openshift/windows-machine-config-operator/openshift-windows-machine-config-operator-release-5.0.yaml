@@ -153,29 +153,26 @@ tests:
     - as: enable-tls-adherence
       cli: latest
       commands: |
+        set -euo pipefail
         echo "Enabling TLSAdherence feature gate via CustomNoUpgrade..."
-        oc patch featuregate cluster --type=merge -p '{"spec":{"featureSet":"CustomNoUpgrade","customNoUpgrade":{"enabled":["TLSAdherence"]}}}'
-        echo "Waiting for TLSAdherence to be observed in featuregate status..."
-        version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
-        tls_adherence_active=false
+        oc patch featuregate cluster --type=merge \
+          -p '{"spec":{"featureSet":"CustomNoUpgrade","customNoUpgrade":{"enabled":["TLSAdherence"]}}}'
+
+        echo "Setting tlsAdherence=StrictAllComponents (retry through the kube-apiserver rollout)..."
+        ok=false
         for i in $(seq 1 60); do
-          if oc get featuregate cluster -o json | jq -e --arg v "$version" '.status.featureGates[]? | select(.version==$v) | .enabled[]?.name | select(.=="TLSAdherence")' >/dev/null 2>&1; then
-            echo "TLSAdherence gate active for version $version"
-            tls_adherence_active=true
-            break
+          if oc patch apiserver cluster --type=merge \
+               -p '{"spec":{"tlsAdherence":"StrictAllComponents"}}' >/dev/null 2>&1 \
+             && [ "$(oc get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null)" = "StrictAllComponents" ]; then
+            ok=true; echo "tlsAdherence=StrictAllComponents accepted (iteration $i)"; break
           fi
-          echo "  waiting for TLSAdherence gate ($i/60)..."
-          sleep 15
+          echo "  waiting for apiserver schema/gate (i=$i)..."; sleep 15
         done
-        if [ "$tls_adherence_active" != "true" ]; then
-          echo "ERROR: TLSAdherence gate did not become active after 15 minutes"
-          exit 1
-        fi
-        echo "Setting tlsAdherence to StrictAllComponents..."
-        oc patch apiserver cluster --type=merge -p '{"spec":{"tlsAdherence":"StrictAllComponents"}}'
+        [ "$ok" = true ] || { echo "ERROR: tlsAdherence never accepted StrictAllComponents"; exit 1; }
+
         echo "Waiting for cluster to stabilize..."
         oc adm wait-for-stable-cluster --timeout=30m
-        echo "Verifying TLSAdherence is enabled..."
+
         oc get featuregate cluster -o jsonpath='{.spec.featureSet}' | grep -q CustomNoUpgrade
         oc get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' | grep -q StrictAllComponents
         echo "TLSAdherence enabled and verified successfully."
