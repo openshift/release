@@ -1,14 +1,10 @@
 base_images:
-  acmqe-grc-test:
-    name: "2.17"
-    namespace: acm-qe
-    tag: acmqe-grc-test
   clc-ui-e2e:
     name: "2.17"
     namespace: acm-qe
     tag: clc-ui-e2e
   cli:
-    name: "4.22"
+    name: "5.1"
     namespace: ocp
     tag: cli
   fetch-managed-clusters:
@@ -19,19 +15,19 @@ base_images:
     name: "2.17"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
-  tests-private:
-    name: tests-private
+  ocs-ci-tests:
+    name: ocs-ci-container
     namespace: ci
-    tag: "4.22"
+    tag: stable
   upi-installer:
-    name: "4.22"
+    name: "5.1"
     namespace: ocp
     tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.22
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 images:
   items:
   - dockerfile_literal: |
@@ -46,36 +42,22 @@ images:
     from: cli
     optional: true
     to: cli-with-skopeo
-  - dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9/openjdk-17:1.21
-      USER root
-      RUN microdnf install -y git gzip && microdnf clean all
-      RUN cd /tmp \
-          && curl -sLO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-4.22/openshift-client-linux.tar.gz \
-          && curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-4.22/sha256sum.txt | grep openshift-client-linux.tar.gz | sha256sum -c - \
-          && tar xzf openshift-client-linux.tar.gz -C /usr/local/bin oc kubectl \
-          && rm -f openshift-client-linux.tar.gz
-      USER 1001
-    to: acs-smoke-runner
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.1"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: interop-opp-aws
+- as: cr--full-stack--aws
   capabilities:
   - intranet
-  cluster: build05
-  cron: 0 3,15 * * *
+  cron: 0 23 31 2 *
   reporter_config:
     channel: '#opp-discussion'
     job_states_to_report:
@@ -90,24 +72,23 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
     env:
-      AWS_COMPUTE_VOLUME_SIZE: "500"
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
-      FAIL_ON_BREACH: "true"
+      DR__RP__CR_COMP_NAME: lp-interop--OPP
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-aws-lp","opp-lp"]'
-      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
-      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.1-lp","opp-aws-lp","opp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9181
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MAP_TESTS: "true"
+      ODF_VERSION_MAJOR_MINOR: "5.1"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
-      QUAY_OPERATOR_CHANNEL: stable-3.17
-      SKIP_POLICIES: policy-acs,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -116,38 +97,31 @@ tests:
     - ref: acm-tests-clc-destroy
     - ref: gather-aws-console
     - chain: ipi-deprovision
+    - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues
     pre:
     - ref: ipi-conf
     - ref: ipi-conf-telemetry
     - ref: ipi-conf-aws-custom-az
     - ref: ipi-conf-aws
-    - ref: ipi-conf-aws-rootvolume
     - ref: ipi-install-monitoringpvc
     - chain: ipi-install
-    - ref: interop-opp-disk-diag
-    - ref: interop-opp-kubelet-config
+    test:
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
-    test:
     - ref: acm-policies-openshift-plus
-    - ref: interop-opp-wait-mcp
-    - ref: stackrox-opp-readiness
-    - ref: stackrox-opp-smoke
-    - ref: acm-tests-clc-smoke
+    - chain: cucushift-installer-check-cluster-health
+    - ref: acm-tests-clc-create
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
-    - ref: interop-opp-odf-health
-    - ref: interop-opp-observability-odf
+    - ref: interop-tests-ocs-tests
     - ref: interop-tests-opp-quay-smoke
     - ref: acm-tests-observability
-    - ref: interop-opp-skip-ratio-gate
-- as: interop-opp-vsphere
+- as: cr--full-stack--vsphere
   capabilities:
   - intranet
-  cluster: vsphere02
-  cron: 0 3,15 * * *
+  cron: 0 23 31 2 *
   reporter_config:
     channel: '#opp-discussion'
     job_states_to_report:
@@ -162,47 +136,43 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: vsphere-connected-2
     env:
-      COMPUTE_NODE_REPLICAS: "3"
-      FAIL_ON_BREACH: "true"
+      COMPUTE_NODE_REPLICAS: "6"
+      DISABLE_ENVIRONMENT_CHECKER: "true"
+      DR__RP__CR_COMP_NAME: lp-interop--OPP
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-vsphere-lp","opp-lp"]'
-      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
-      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.1-lp","opp-vsphere-lp","opp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9181
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MAP_TESTS: "true"
+      ODF_VERSION_MAJOR_MINOR: "5.1"
       OPENSHIFT_REQUIRED_CORES: "72"
       OPENSHIFT_REQUIRED_MEMORY: "288"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
-      QUAY_OPERATOR_CHANNEL: stable-3.17
       SIZE_VARIANT: large
-      SKIP_POLICIES: policy-acs,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
     post:
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
     - ref: mce-must-gather
     - chain: ipi-vsphere-post
+    - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues
-    pre:
-    - chain: ipi-vsphere-pre
-    - ref: interop-opp-disk-diag
-    - ref: interop-opp-kubelet-config
+    test:
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
-    test:
     - ref: acm-policies-openshift-plus
-    - ref: interop-opp-wait-mcp
-    - ref: interop-opp-odf-health
-    - ref: interop-opp-observability-odf
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-ocs-tests
     - ref: acm-tests-observability
     - ref: acm-opp-app
-    - ref: interop-opp-skip-ratio-gate
     workflow: acm-ipi-vsphere
 zz_generated_metadata:
-  branch: main
-  org: stolostron
-  repo: policy-collection
-  variant: ocp4.22
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: opp--ocp-5.1-lpMainline-lp-interop
