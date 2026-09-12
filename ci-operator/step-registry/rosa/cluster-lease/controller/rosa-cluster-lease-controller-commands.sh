@@ -114,6 +114,7 @@ AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
     export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
 fi
+export AWS_REGION="${AWS_REGION:-us-east-1}"
 
 GCP_CREDENTIALS_FILE="${GCP_CREDENTIALS_FILE:-/etc/rosa-e2e-gcp/osd-ccs-gcp.json}"
 OSD_AWS_CREDENTIALS_DIR="${OSD_AWS_CREDENTIALS_DIR:-/etc/rosa-e2e-osd-aws}"
@@ -270,7 +271,16 @@ delete_cluster() {
     else
         local cluster_desc roles_prefix oidc_config_id describe_attempt
         for describe_attempt in $(seq 1 5); do
-            cluster_desc=$(rosa describe cluster -c "${cluster_id}" -o json 2>/dev/null || true)
+            if [[ "${describe_attempt}" -lt 5 ]]; then
+                cluster_desc=$(rosa describe cluster -c "${cluster_id}" -o json 2>/dev/null || true)
+            else
+                local describe_err="/tmp/rosa-describe-err.$$"
+                cluster_desc=$(rosa describe cluster -c "${cluster_id}" -o json 2>"${describe_err}" || true)
+                if [[ -z "${cluster_desc}" && -s "${describe_err}" ]]; then
+                    log "DEBUG: rosa describe cluster stderr: $(cat "${describe_err}")"
+                fi
+                rm -f "${describe_err}"
+            fi
             if [[ -n "${cluster_desc}" ]]; then
                 break
             fi
@@ -288,13 +298,22 @@ delete_cluster() {
         log "Waiting for cluster ${cluster_id} to be fully removed before cleaning up IAM resources..."
         local wait_attempt
         for wait_attempt in $(seq 1 60); do
-            if ! rosa describe cluster -c "${cluster_id}" &>/dev/null; then
+            ocm_check_cluster "${cluster_id}" "${CURRENT_OCM_ENV}"
+            if [[ "${OCM_CHECK_RESULT}" == "not-found" ]]; then
                 log "Cluster ${cluster_id} fully removed"
                 break
             fi
-            log "  Cluster ${cluster_id} still being removed (attempt ${wait_attempt}/60)"
+            if [[ "${OCM_CHECK_RESULT}" == "unreachable" ]]; then
+                log "WARNING: Unable to confirm removal of cluster ${cluster_id} (attempt ${wait_attempt}/60)"
+            else
+                log "  Cluster ${cluster_id} still being removed (attempt ${wait_attempt}/60)"
+            fi
             sleep 60
         done
+        if [[ "${OCM_CHECK_RESULT}" != "not-found" ]]; then
+            log "ERROR: Cluster ${cluster_id} removal was not confirmed after 60 attempts, skipping IAM cleanup"
+            return 1
+        fi
         if [[ -n "${roles_prefix}" ]]; then
             rosa delete operator-roles --prefix "${roles_prefix}" -y --mode auto || true
         fi
