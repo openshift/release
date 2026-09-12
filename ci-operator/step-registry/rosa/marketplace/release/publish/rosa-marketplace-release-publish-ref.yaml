@@ -1,0 +1,34 @@
+ref:
+  as: rosa-marketplace-release-publish
+  from: cli
+  grace_period: 1m
+  commands: rosa-marketplace-release-publish-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: MARKETPLACE_ENVIRONMENT
+    default: staging
+    documentation: Marketplace environment. This step intentionally permits staging only.
+  - name: MARKETPLACE_AWS_PROFILE
+    default: marketplacestaging
+    documentation: AWS shared-credentials profile used by the Marketplace generator.
+  - name: MARKETPLACE_PUBLISH_ENABLED
+    default: "false"
+    documentation: Explicit safety gate. The generator is never invoked while this is false.
+  - name: MARKETPLACE_DRY_RUN
+    default: "true"
+    documentation: When true, validate generator parameters without publishing a version.
+  - name: MARKETPLACE_RELEASE_TIMEOUT
+    default: 2h
+    documentation: Maximum time the generator waits for Marketplace publication.
+  documentation: |-
+    Reads the validated OCP and RHCOS values produced by
+    rosa-marketplace-release-detect and invokes the ROSA Marketplace release
+    generator for staging. It defaults to disabled and dry-run, refuses
+    production, and exits successfully without invoking the generator while
+    detection is in a lifecycle wait state. This disabled monitor runs from the
+    trusted CLI image. Before publishing is enabled, this reference must use an
+    approved immutable or protected generator image and the consuming job must
+    mount the required AWS credentials.
