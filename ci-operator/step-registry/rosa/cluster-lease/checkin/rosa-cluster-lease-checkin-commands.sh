@@ -9,7 +9,7 @@ log(){
 }
 
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
-LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
+LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/sa.rosa-cluster-lease-manager.hosted-mgmt.config"
 CLAIM_FILE="${SHARED_DIR}/lease-claim"
 
 if [[ ! -f "${CLAIM_FILE}" ]]; then

@@ -16,7 +16,7 @@ LEASE_ENV="${LEASE_ENV:-}"
 LEASE_REGION="${LEASE_REGION:-}"
 LEASE_VERSION="${LEASE_VERSION:-}"
 LEASE_CHECKOUT_TIMEOUT="${LEASE_CHECKOUT_TIMEOUT_MINUTES:-30}"
-LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
+LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/sa.rosa-cluster-lease-manager.hosted-mgmt.config"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
 OPERATOR_NAME="${OPERATOR_NAME:-}"
 

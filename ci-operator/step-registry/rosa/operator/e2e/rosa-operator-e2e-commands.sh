@@ -72,6 +72,24 @@ else
     log "oc not available, skipping cluster verification (e2e binary uses kubeconfig directly)"
 fi
 
+# Set up port-forward if requested (e.g. for services like ocm-agent that
+# need a local endpoint for e2e tests to reach the in-cluster service).
+if [[ -n "${PORT_FORWARD_SVC:-}" ]]; then
+    PF_NS="${PORT_FORWARD_SVC%%/*}"
+    PF_SVC_PORT="${PORT_FORWARD_SVC#*/}"
+    PF_SVC="${PF_SVC_PORT%%:*}"
+    PF_PORT="${PF_SVC_PORT#*:}"
+    log "Starting kubectl port-forward svc/${PF_SVC} ${PF_PORT}:${PF_PORT} -n ${PF_NS}"
+    kubectl port-forward "svc/${PF_SVC}" "${PF_PORT}:${PF_PORT}" -n "${PF_NS}" &
+    PF_PID=$!
+    sleep 3
+    if ! kill -0 "${PF_PID}" 2>/dev/null; then
+        log "ERROR: port-forward failed to start"
+        exit 1
+    fi
+    log "Port-forward running on localhost:${PF_PORT} (PID ${PF_PID})"
+fi
+
 # Disable the boilerplate runner's hardcoded JUnit path (/test-run-results/)
 # which fails with permission denied. Our --ginkgo.junit-report flag handles JUnit output.
 export DISABLE_JUNIT_REPORT=true
