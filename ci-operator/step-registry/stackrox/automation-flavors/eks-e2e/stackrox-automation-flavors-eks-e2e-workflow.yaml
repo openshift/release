@@ -5,6 +5,43 @@ workflow:
     - ref: stackrox-stackrox-begin
     - as: eks-create
       commands: |
+        # Fallback DNS workaround (build01 CoreDNS flakiness, 2026-09-11/12 batch).
+        # Keep the primary nameserver (in-cluster names + search domains) and append
+        # a public fallback last; glibc falls over on timeout/SERVFAIL only.
+        setup_fallback_dns() {
+            local target="8.8.8.8"
+            echo "=== setup_fallback_dns: before ==="
+            ls -la /etc/resolv.conf 2>&1 || true
+            readlink -f /etc/resolv.conf 2>/dev/null || true
+            cat /etc/resolv.conf 2>/dev/null || true
+            if grep -q "nameserver ${target}" /etc/resolv.conf 2>/dev/null; then
+                echo "=== setup_fallback_dns: ${target} already present, no change ==="
+                return 0
+            fi
+            if echo "nameserver ${target}" >> /etc/resolv.conf 2>/dev/null; then
+                echo "=== setup_fallback_dns: OK via in-place append ==="
+            else
+                echo "=== setup_fallback_dns: in-place append failed, trying rm+rewrite ==="
+                local pristine=/tmp/resolv.conf.pristine
+                cp /etc/resolv.conf "${pristine}" 2>/dev/null || true
+                rm -f /etc/resolv.conf 2>/dev/null || true
+                if { cat "${pristine}" 2>/dev/null; echo "nameserver ${target}"; } > /etc/resolv.conf 2>/dev/null; then
+                    echo "=== setup_fallback_dns: OK via rm+rewrite ==="
+                else
+                    echo "=== setup_fallback_dns: FAILED, leaving /etc/resolv.conf as-is ==="
+                    return 0
+                fi
+            fi
+            echo "=== setup_fallback_dns: after ==="
+            cat /etc/resolv.conf 2>/dev/null || true
+            if getent hosts quay.io >/dev/null 2>&1; then
+                echo "=== setup_fallback_dns: sanity OK (quay.io resolved) ==="
+            else
+                echo "=== setup_fallback_dns: sanity WARN (quay.io not resolvable right now) ==="
+            fi
+            return 0
+        }
+        setup_fallback_dns
         export NODE_COUNT=3
         /usr/bin/openshift-ci.sh create eks
       credentials:
