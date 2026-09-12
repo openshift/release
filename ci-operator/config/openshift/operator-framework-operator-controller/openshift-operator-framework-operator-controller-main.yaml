@@ -78,9 +78,12 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     test:
+    - ref: openshift-e2e-test-psa-check
     - as: upstream-e2e
       cli: latest
-      commands: make -C openshift test-e2e
+      commands: |
+        source "${SHARED_DIR}/cluster-debug-tools.env"
+        make -C openshift test-e2e
       from: src
       resources:
         requests:
@@ -94,9 +97,11 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
+    - ref: openshift-e2e-test-psa-check
     - as: upstream-e2e
       cli: latest
       commands: |
+        source "${SHARED_DIR}/cluster-debug-tools.env"
         make -C openshift test-e2e
       from: src
       resources:
