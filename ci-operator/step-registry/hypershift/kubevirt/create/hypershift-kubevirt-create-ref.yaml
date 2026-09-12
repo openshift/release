@@ -135,8 +135,26 @@ ref:
       default: "true"
       documentation: |-
         When true and ATTACH_DEFAULT_NETWORK=localnet-vlan, after NodePool Ready install per-worker
-        /32 routes on every mgmt node (via hypervisor br-ex) and refresh east-west FORWARD/NAT so
-        guest OVN overlay works across per-node localnet VLAN segments.
+        /32 routes on every mgmt node (remote hypervisors only; never via own br-ex on the VMI
+        host) and refresh east-west FORWARD/NAT so guest OVN overlay works across per-node
+        localnet VLAN segments.
+    - name: LOCALNET_VLAN_MGMT_POD_CIDR
+      default: ""
+      documentation: |-
+        Mgmt cluster pod network CIDR for iptables FORWARD to the guest VLAN subnet (default:
+        auto-detect from cluster network.config.openshift.io). Required so hosted kube-apiserver
+        pods can reach guest kubelets on 192.168.112.x (oc exec, e2e oc rsh).
+    - name: LOCALNET_VLAN_MGMT_SERVICE_CIDR
+      default: ""
+      documentation: |-
+        Mgmt cluster service CIDR to forward to the guest VLAN subnet (default: auto-detect from
+        network.config.openshift.io, else 172.30.0.0/16).
+    - name: LOCALNET_VLAN_MGMT_ROUTING_VIA_HOST
+      default: "true"
+      documentation: |-
+        When true, set routingViaHost on the mgmt cluster OVNKubernetes gateway so hosted control
+        plane pods use hypervisor routes (with LOCALNET_VLAN host FORWARD/NAT) to reach guest
+        worker kubelets on the VLAN subnet (oc exec, e2e oc rsh).
     - name: LOCALNET_VLAN_DEPLOY_IPECHO
       default: "true"
       documentation: |-

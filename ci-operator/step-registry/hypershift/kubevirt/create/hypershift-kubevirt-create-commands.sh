@@ -345,14 +345,63 @@ echo "dnsmasq configured on ${dhcp_iface} (${gateway}, api=${api_vip}, apps=${in
 SCRIPT_EOF
 }
 
+# Mgmt cluster SDN CIDR (hosted control plane pods) for routing to guest worker VLAN IPs.
+localnet_vlan_mgmt_cluster_pod_cidr() {
+  if [[ -n "${LOCALNET_VLAN_MGMT_POD_CIDR:-}" ]]; then
+    echo "${LOCALNET_VLAN_MGMT_POD_CIDR}"
+    return 0
+  fi
+  oc get network.config.openshift.io cluster -o jsonpath='{.status.clusterNetwork[0].cidr}' 2>/dev/null \
+    || echo "10.128.0.0/14"
+}
+
+localnet_vlan_mgmt_cluster_service_cidr() {
+  if [[ -n "${LOCALNET_VLAN_MGMT_SERVICE_CIDR:-}" ]]; then
+    echo "${LOCALNET_VLAN_MGMT_SERVICE_CIDR}"
+    return 0
+  fi
+  oc get network.config.openshift.io cluster -o jsonpath='{.status.serviceNetwork[0]}' 2>/dev/null \
+    || echo "172.30.0.0/16"
+}
+
+# Hosted control plane pods (10.128.x on mgmt) must reach guest kubelets on 192.168.112.x via
+# the hypervisor routing table (br-ex / br-ex.<vlan>). Requires routingViaHost on the mgmt cluster.
+localnet_vlan_configure_mgmt_routing_via_host() {
+  local current
+
+  if [[ "${LOCALNET_VLAN_MGMT_ROUTING_VIA_HOST:-true}" != "true" ]]; then
+    echo "Skipping mgmt routingViaHost (LOCALNET_VLAN_MGMT_ROUTING_VIA_HOST=false)"
+    return 0
+  fi
+
+  current=$(oc get network.operator cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}' 2>/dev/null || true)
+  if [[ "${current}" == "true" ]]; then
+    echo "Mgmt cluster routingViaHost already enabled"
+    return 0
+  fi
+
+  echo "Enabling routingViaHost on mgmt cluster (pod traffic uses host routes to guest VLAN)..."
+  oc patch network.operator cluster --type=merge -p \
+    '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"routingViaHost":true}}}}}'
+  echo "Waiting for ovn-kubernetes pods to roll out after routingViaHost..."
+  oc rollout status daemonset/ovnkube-node -n openshift-ovn-kubernetes --timeout=300s
+}
+
 # Workers live on the secondary VLAN subnet (br-ex.<vlan-id>); API VIP is on primary br-ex
 # (e.g. 192.168.111.32). Apply forwarding, MASQUERADE, and rp_filter=0 on every node so
 # VMIs scheduled anywhere can reach the API via L3 SNAT through the primary uplink (br-ex).
+# Also forward mgmt pod/service CIDRs to the VLAN subnet so hosted kube-apiserver pods can
+# reach guest kubelets (oc exec / e2e rsh) on 192.168.112.x:10250.
 localnet_vlan_configure_nodes_routing() {
   local dhcp_iface="$1"
   local uplink_bond="$2"
   local vlan_subnet="$3"
+  local mgmt_pod_cidr
+  local mgmt_svc_cidr
   local routing_b64
+
+  mgmt_pod_cidr=$(localnet_vlan_mgmt_cluster_pod_cidr)
+  mgmt_svc_cidr=$(localnet_vlan_mgmt_cluster_service_cidr)
 
   routing_b64=$(base64 -w0 <<'SCRIPT_EOF'
 #!/bin/bash
@@ -360,6 +409,8 @@ set -euo pipefail
 dhcp_iface="$1"
 uplink_bond="$2"
 vlan_subnet="$3"
+mgmt_pod_cidr="$4"
+mgmt_svc_cidr="$5"
 
 for dev in all "${uplink_bond}" "${dhcp_iface}"; do
   [[ -e "/proc/sys/net/ipv4/conf/${dev}/rp_filter" ]] && echo 0 > "/proc/sys/net/ipv4/conf/${dev}/rp_filter"
@@ -377,19 +428,29 @@ add_fwd FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -s "${vlan_subnet}" -d "$
 add_fwd FORWARD -i "${dhcp_iface}" -o "${dhcp_iface}" -s "${vlan_subnet}" -d "${vlan_subnet}" -j ACCEPT
 add_fwd FORWARD -i "${uplink_bond}" -o "${uplink_bond}" -s "${vlan_subnet}" -d "${vlan_subnet}" -j ACCEPT
 
+for src_cidr in "${mgmt_pod_cidr}" "${mgmt_svc_cidr}"; do
+  [[ -z "${src_cidr}" ]] && continue
+  add_fwd FORWARD -s "${src_cidr}" -d "${vlan_subnet}" -j ACCEPT
+  add_fwd FORWARD -s "${vlan_subnet}" -d "${src_cidr}" -j ACCEPT
+  add_fwd FORWARD -s "${src_cidr}" -o "${dhcp_iface}" -d "${vlan_subnet}" -j ACCEPT
+  add_fwd FORWARD -i "${dhcp_iface}" -s "${vlan_subnet}" -d "${src_cidr}" -j ACCEPT
+  add_fwd FORWARD -s "${src_cidr}" -o "${uplink_bond}" -d "${vlan_subnet}" -j ACCEPT
+  add_fwd FORWARD -i "${uplink_bond}" -o "${dhcp_iface}" -s "${src_cidr}" -d "${vlan_subnet}" -j ACCEPT
+done
+
 iptables -t nat -C POSTROUTING -s "${vlan_subnet}" -d "${vlan_subnet}" -j RETURN 2>/dev/null || \
   iptables -t nat -I POSTROUTING 1 -s "${vlan_subnet}" -d "${vlan_subnet}" -j RETURN
 iptables -t nat -C POSTROUTING -s "${vlan_subnet}" -o "${uplink_bond}" -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -s "${vlan_subnet}" -o "${uplink_bond}" -j MASQUERADE
 
-echo "localnet-vlan routing configured (${vlan_subnet} via ${uplink_bond}, rp_filter=0, east-west ${vlan_subnet})"
+echo "localnet-vlan routing configured (${vlan_subnet} via ${uplink_bond}, east-west ${vlan_subnet}, mgmt ${mgmt_pod_cidr}+${mgmt_svc_cidr} -> VLAN)"
 SCRIPT_EOF
 )
 
-  echo "Configuring localnet-vlan routing on all nodes (${vlan_subnet} -> ${uplink_bond})..."
+  echo "Configuring localnet-vlan routing on all nodes (${vlan_subnet} -> ${uplink_bond}, mgmt pod ${mgmt_pod_cidr})..."
   for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
     if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
-      "echo '${routing_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${uplink_bond}' '${vlan_subnet}'"; then
+      "echo '${routing_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${uplink_bond}' '${vlan_subnet}' '${mgmt_pod_cidr}' '${mgmt_svc_cidr}'"; then
       echo "  ${node}: routing configured"
     else
       echo "WARNING: failed to configure routing on ${node}" >&2
@@ -406,13 +467,14 @@ localnet_vlan_configure_worker_host_routes() {
   local vlan_subnet="$3"
   local vlan_octets
   local -A hypervisor_ips=()
-  local route_script_b64
+  local -A worker_routes=()
   local node
   local vmi
   local hypervisor
   local gw
   local ip
-  local route_lines=""
+  local route_script_b64
+  local node_route_lines
 
   vlan_octets="${vlan_subnet%/*}"
   vlan_octets="${vlan_octets%.*}"
@@ -433,25 +495,39 @@ localnet_vlan_configure_worker_host_routes() {
       [[ -z "${ip}" ]] && continue
       [[ "${ip}" == *:* ]] && continue
       [[ "${ip}" == "${vlan_octets}."* ]] || continue
-      route_lines+="ip route replace ${ip}/32 via ${gw}"$'\n'
+      worker_routes["${ip}"]="${hypervisor}"
     done < <(oc get vmi "${vmi}" -n "${vmi_namespace}" -o jsonpath='{range .status.interfaces[*]}{.ipAddress}{"\n"}{end}')
   done
 
-  if [[ -z "${route_lines}" ]]; then
+  if [[ ${#worker_routes[@]} -eq 0 ]]; then
     echo "WARNING: no worker ${vlan_subnet} addresses found in ${vmi_namespace}; skipping host /32 routes" >&2
     return 0
   fi
 
-  route_script_b64=$(base64 -w0 <<SCRIPT_EOF
+  echo "Installing localnet-vlan worker /32 host routes on all nodes (${vmi_namespace})..."
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    node_route_lines=""
+    for ip in "${!worker_routes[@]}"; do
+      hypervisor="${worker_routes[${ip}]}"
+      gw="${hypervisor_ips[${hypervisor}]:-}"
+      [[ -z "${gw}" ]] && continue
+      # VMIs on this hypervisor are on the local br-ex.<vlan> segment; a /32 via our own
+      # br-ex address steals traffic from br-ex.100 and breaks kubelet/API on that node.
+      if [[ "${hypervisor}" == "${node}" ]]; then
+        node_route_lines+="ip route del ${ip}/32 via ${gw} 2>/dev/null || true"$'\n'
+        continue
+      fi
+      node_route_lines+="ip route replace ${ip}/32 via ${gw}"$'\n'
+    done
+
+    route_script_b64=$(base64 -w0 <<SCRIPT_EOF
 #!/bin/bash
 set -euo pipefail
-${route_lines}
-echo "localnet-vlan worker /32 routes installed via ${uplink_bond}"
+${node_route_lines}
+echo "localnet-vlan worker /32 routes installed via ${uplink_bond} (node ${node})"
 SCRIPT_EOF
 )
 
-  echo "Installing localnet-vlan worker /32 host routes on all nodes (${vmi_namespace})..."
-  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
     if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
       "echo '${route_script_b64}' | base64 -d | bash"; then
       echo "  ${node}: worker host routes configured"
@@ -1262,6 +1338,9 @@ NNCP_EOF
       fi
     done
 
+    localnet_vlan_configure_mgmt_routing_via_host \
+      || echo "WARNING: mgmt routingViaHost configuration failed (continuing)" >&2
+
     localnet_vlan_configure_br_localnet_dhcp "${CLUSTER_NAME}" "${LOCALNET_VLAN_ID}" \
       "${LOCALNET_VLAN_DHCP_INTERFACE}" "${LOCALNET_VLAN_GATEWAY}" \
       "${LOCALNET_VLAN_DHCP_RANGE_START}" "${LOCALNET_VLAN_DHCP_RANGE_END}" \
@@ -1478,6 +1557,8 @@ if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
       echo "ERROR: localnet-vlan worker host route configuration failed" >&2
       exit 1
     }
+    localnet_vlan_configure_mgmt_routing_via_host \
+      || echo "WARNING: post-NodePool mgmt routingViaHost refresh failed (continuing)" >&2
     localnet_vlan_configure_nodes_routing "${LOCALNET_VLAN_DHCP_INTERFACE}" \
       "${LOCALNET_VLAN_BOND}" "${LOCALNET_VLAN_SUBNET}" \
       || echo "WARNING: post-NodePool localnet-vlan routing refresh failed (continuing)" >&2
