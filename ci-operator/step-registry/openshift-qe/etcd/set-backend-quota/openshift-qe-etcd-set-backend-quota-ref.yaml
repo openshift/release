@@ -1,0 +1,25 @@
+ref:
+  as: openshift-qe-etcd-set-backend-quota
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: ETCD_BACKEND_QUOTA_GIB
+    default: "8"
+    documentation: |-
+      Target etcd backend DB quota in GiB, set on spec.backendQuotaGiB of the
+      cluster Etcd CR. Valid range is 8-32. 8 is the OCP default and is treated
+      as a no-op; raise it (e.g. 16) before filling etcd beyond the 8GB default.
+  commands: openshift-qe-etcd-set-backend-quota-commands.sh
+  timeout: 1h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    Sets spec.backendQuotaGiB on the cluster Etcd CR and waits for the
+    cluster-etcd-operator to roll out the resulting new static-pod revision
+    across all control-plane nodes. No-op when the target equals the 8 GiB
+    default so it can be safely reused across DB-size variants.
