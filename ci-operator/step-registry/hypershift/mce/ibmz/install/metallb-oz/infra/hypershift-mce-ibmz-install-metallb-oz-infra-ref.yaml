@@ -1,0 +1,34 @@
+ref:
+  as: hypershift-mce-ibmz-install-metallb-oz-infra
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  env:
+  - name: INSTALL_KUBECONFIG
+    default: ""
+    documentation: |
+      Optional override for the kubeconfig path. When empty (default), the script
+      uses $SHARED_DIR/infra-kubeconfig. Env var defaults in ref YAMLs are not
+      shell-expanded, so the path is resolved at runtime in the script instead.
+  - name: METALLB_OPERATOR_SUB_SOURCE
+    default: "redhat-operators"
+    documentation: |
+      CatalogSource to check first for the metallb-operator subscription.
+      Defaults to redhat-operators (the standard built-in catalog). If
+      metallb-operator is not found there, the script automatically creates a
+      fallback CatalogSource backed by
+      registry.redhat.io/redhat/redhat-operator-index:v4.22 (accessible via
+      the brew-registry ImageContentSourcePolicy) and uses that instead.
+  commands: hypershift-mce-ibmz-install-metallb-oz-infra-commands.sh
+  credentials:
+    - mount_path: /etc/hypershift-agent-ibmz-credentials
+      name: hypershift-agent-ibmz-credentials
+      namespace: test-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Creates a MetalLB CR, IPAddressPool, and L2Advertisement on the infra cluster
+    for the OZ libvirt environment. Always targets the infra cluster by resolving
+    the kubeconfig at runtime as $SHARED_DIR/infra-kubeconfig.

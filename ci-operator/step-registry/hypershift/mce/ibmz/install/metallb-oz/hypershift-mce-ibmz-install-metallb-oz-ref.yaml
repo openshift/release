@@ -1,0 +1,34 @@
+ref:
+  as: hypershift-mce-ibmz-install-metallb-oz
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  env:
+  - name: INSTALL_KUBECONFIG
+    default: ""
+    documentation: |
+      Optional path to a kubeconfig to use for this step. When set, KUBECONFIG is
+      overridden to this value at the start of the script. Leave empty (default) to
+      use the ci-operator-injected KUBECONFIG (management cluster).
+  - name: METALLB_OPERATOR_SUB_SOURCE
+    default: "redhat-operators"
+    documentation: |
+      CatalogSource to check first for the metallb-operator subscription.
+      Defaults to redhat-operators (the standard built-in catalog). If
+      metallb-operator is not found there, the script automatically creates a
+      fallback CatalogSource backed by
+      registry.redhat.io/redhat/redhat-operator-index:v4.22 (accessible via
+      the brew-registry ImageContentSourcePolicy) and uses that instead.
+  commands: hypershift-mce-ibmz-install-metallb-oz-commands.sh
+  credentials:
+    - mount_path: /etc/hypershift-agent-ibmz-credentials
+      name: hypershift-agent-ibmz-credentials
+      namespace: test-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Creates a MetalLB CR, IPAddressPool, and L2Advertisement on the management
+    cluster for the OZ libvirt environment. Targets the management cluster by
+    default; set INSTALL_KUBECONFIG to override.
