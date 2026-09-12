@@ -42,8 +42,18 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: cclm-liv-mig-lp-interop-aws
+- as: cr--2spoke-mig--aws
   cron: 0 23 28 2 *
+  reporter_config:
+    channel: '#forum-p2p-cspi'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     dependencies:
@@ -189,4 +199,4 @@ zz_generated_metadata:
   branch: master
   org: RedHatQE
   repo: interop-testing
-  variant: acm-virt-ocp4.22-p2p
+  variant: acm-virt--cclm--ocp-4.22-lpMainline-lp-interop
