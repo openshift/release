@@ -404,8 +404,31 @@ spec:
 DEPLOYMENT
 
 echo "── Waiting for LCS readiness ──"
-oc wait --for=condition=available deployment/lcs \
-  -n "${LCS_NAMESPACE}" --timeout=300s
+if ! oc rollout status deployment/lcs -n "${LCS_NAMESPACE}" --timeout=300s; then
+  echo "ERROR: LCS deployment failed to become ready"
+  mkdir -p "${ARTIFACT_DIR}/logs"
+  {
+    echo "══════════════════════════════════════════════════════════"
+    echo "  LCS Deployment Failure Diagnostics"
+    echo "══════════════════════════════════════════════════════════"
+    echo ""
+    echo "── Pod status ──"
+    oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o wide || true
+    echo ""
+    echo "── LCS container logs ──"
+    oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c lcs --tail=100 || true
+    echo ""
+    echo "── Mock-LLM container logs ──"
+    oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c mock-llm --tail=50 || true
+    echo ""
+    echo "── Pod description ──"
+    oc describe pod -n "${LCS_NAMESPACE}" -l app=lcs || true
+    echo ""
+    echo "── Namespace events ──"
+    oc get events -n "${LCS_NAMESPACE}" --sort-by='.lastTimestamp' | tail -30 || true
+  } 2>&1 | tee "${ARTIFACT_DIR}/logs/lcs-diagnostic.log"
+  exit 1
+fi
 
 # Verify LCS is responding
 LCS_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
