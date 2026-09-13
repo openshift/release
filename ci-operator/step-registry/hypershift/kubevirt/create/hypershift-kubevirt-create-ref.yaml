@@ -2,7 +2,7 @@ ref:
   as: hypershift-kubevirt-create
   from: hypershift-operator
   grace_period: 5m0s
-  timeout: 1h
+  timeout: 2h30m
   cli: latest
   env:
     - name: HYPERSHIFT_NODE_COUNT
@@ -36,9 +36,13 @@ ref:
     - name: ATTACH_DEFAULT_NETWORK
       default: ""
       documentation: |-
-        if true, config additional network for hostedcluster and attach-default-network true;
-        if false, config additional network for hostedcluster and attach-default-network false
-        if the default empty string will skip all additional network config.
+        Controls network attachment for KubeVirt hosted cluster VMs:
+        - "true": create macvlan additional network, attach-default-network=true (dual network)
+        - "false": create macvlan additional network, attach-default-network=false (macvlan only)
+        - "localnet": create OVN localnet additional network, attach-default-network=true (Model 3)
+        - "localnet-multi": N localnet networks (OVN CUDN-style NADs), attach-default-network=false
+        - "localnet-vlan": localnet with dedicated secondary VLAN via NNCP (L2 passthrough, per-node dnsmasq on <LOCALNET_VLAN_BOND>.<LOCALNET_VLAN_ID>, e.g. br-ex.100)
+        - "": skip all additional network config (default, uses pod network - Model 1)
     - name: ETCD_STORAGE_CLASS
       default: ""
       documentation: |-
@@ -69,6 +73,137 @@ ref:
     - name: HYPERSHIFT_NP_AUTOREPAIR
       default: "false"
       documentation: "Enables machine autorepair with machine health checks."
+    - name: LOCALNET_VLAN_ID
+      default: "100"
+      documentation: |-
+        VLAN ID for the localnet-vlan path (MAPFRE NAD 1 / primary guest VLAN). NNCP creates
+        br-localnet with untagged port to <bond>.<vlan-id> (e.g. br-ex.100) — the secondary
+        VLAN segment on each mgmt node, separate from primary ostestbm br-ex (111.x). Per-node
+        host dnsmasq and MASQUERADE serve ostestbm per-node L2 islands. NAD is subnets-less
+        untagged L2 passthrough.
+    - name: LOCALNET_VLAN_GATEWAY
+      default: "192.168.112.1"
+      documentation: |-
+        Gateway/DNS address on the VLAN sub-interface and default route handed to worker
+        VMIs via dnsmasq. Must be on the VLAN segment (not 192.168.111.x br-ex).
+    - name: LOCALNET_VLAN_DHCP_RANGE_START
+      default: "192.168.112.100"
+      documentation: |-
+        Start of the dnsmasq DHCP pool on the VLAN sub-interface for localnet-vlan worker VMIs.
+    - name: LOCALNET_VLAN_DHCP_RANGE_END
+      default: "192.168.112.240"
+      documentation: |-
+        End of the dnsmasq DHCP pool on the VLAN sub-interface for localnet-vlan worker VMIs.
+    - name: LOCALNET_VLAN_API_VIP
+      default: "192.168.111.32"
+      documentation: |-
+        API VIP for static api/api-int DNS records in VLAN dnsmasq before the hosted cluster
+        exists. Refreshed from HostedCluster status.controlPlaneEndpoint.host after create.
+        Must be reachable from the VLAN worker subnet (routing/SNAT is configured on mgmt nodes).
+    - name: LOCALNET_VLAN_INGRESS_VIP
+      default: "192.168.111.4"
+      documentation: |-
+        Ingress VIP for static *.apps DNS records in VLAN dnsmasq (same role as ostestbm
+        on baremetal dev-scripts for localnet-multi). Distinct from LOCALNET_VLAN_API_VIP.
+    - name: LOCALNET_VLAN_DHCP_INTERFACE
+      default: ""
+      documentation: |-
+        Kernel netdev for dnsmasq DHCP/DNS (defaults to <LOCALNET_VLAN_BOND>.<LOCALNET_VLAN_ID>,
+        e.g. br-ex.100). br-localnet is an OVS bridge without a kernel interface.
+    - name: LOCALNET_VLAN_NODEPOOL_READY_TIMEOUT
+      default: "45m"
+      documentation: |-
+        Maximum time to wait for the NodePool Ready condition after localnet-vlan setup.
+    - name: LOCALNET_VLAN_BRIDGE
+      default: "br-localnet"
+      documentation: |-
+        OVS bridge name created by the NNCP for localnet-vlan. Must not conflict with
+        existing bridges (e.g., br-ex, br-int).
+    - name: LOCALNET_VLAN_PHYSNET
+      default: "localnet-physnet"
+      documentation: |-
+        OVN physnet name for the bridge-mapping. The NAD references this as the "name"
+        field. Must not conflict with existing physnet names (e.g., physnet).
+    - name: LOCALNET_VLAN_BOND
+      default: "br-ex"
+      documentation: |-
+        Primary OVN external bridge on the mgmt node (ostestbm: enp2s0 -> br-ex, 192.168.111.x).
+        The NNCP attaches br-localnet to <bond>.<vlan-id> (secondary guest segment, e.g.
+        br-ex.100 / 192.168.112.x). MASQUERADE routes worker traffic from the VLAN subnet
+        through this bridge to reach the API VIP.
+    - name: LOCALNET_VLAN_WORKER_HOST_ROUTES
+      default: "true"
+      documentation: |-
+        When true and ATTACH_DEFAULT_NETWORK=localnet-vlan, after NodePool Ready install per-worker
+        /32 routes on every mgmt node (remote hypervisors only; never via own br-ex on the VMI
+        host) and refresh east-west FORWARD/NAT so guest OVN overlay works across per-node
+        localnet VLAN segments.
+    - name: LOCALNET_VLAN_MGMT_POD_CIDR
+      default: ""
+      documentation: |-
+        Mgmt cluster pod network CIDR for iptables FORWARD to the guest VLAN subnet (default:
+        auto-detect from cluster network.config.openshift.io). Required so hosted kube-apiserver
+        pods can reach guest kubelets on 192.168.112.x (oc exec, e2e oc rsh).
+    - name: LOCALNET_VLAN_MGMT_SERVICE_CIDR
+      default: ""
+      documentation: |-
+        Mgmt cluster service CIDR to forward to the guest VLAN subnet (default: auto-detect from
+        network.config.openshift.io, else 172.30.0.0/16).
+    - name: LOCALNET_VLAN_MGMT_ROUTING_VIA_HOST
+      default: "true"
+      documentation: |-
+        When true, set routingViaHost on the mgmt cluster OVNKubernetes gateway so hosted control
+        plane pods use hypervisor routes (with LOCALNET_VLAN host FORWARD/NAT) to reach guest
+        worker kubelets on the VLAN subnet (oc exec, e2e oc rsh).
+    - name: LOCALNET_VLAN_DEPLOY_IPECHO
+      default: "true"
+      documentation: |-
+        When true and ATTACH_DEFAULT_NETWORK=localnet-vlan, deploy egressip-ipecho on the mgmt
+        cluster after NodePool Ready (secondary VLAN localnet NAD, static IP). URL written to
+        ${SHARED_DIR}/kubevirt_ipecho_url for downstream EgressIP or probe tests.
+    - name: LOCALNET_VLAN_IPECHO_STATIC_IP
+      default: "192.168.112.250/24"
+      documentation: |-
+        Static IPv4 for the ip-echo pod on the localnet-vlan NAD (Multus). Must be on the VLAN
+        worker subnet (default 192.168.112.0/24) and outside the dnsmasq DHCP pool (.100-.240).
+    - name: LOCALNET_MULTI_NETWORK_COUNT
+      default: "2"
+      documentation: "Number of localnet networks for the multi-localnet architecture. Primary (localnet-1) uses libvirt DHCP passthrough."
+    - name: LOCALNET_MULTI_SUBNETS
+      default: ""
+      documentation: |-
+        Deprecated; ignored when all localnet NADs use subnets-less passthrough to ostestbm.
+        Secondary virtio NICs (enp2s0..) receive DHCP from libvirt dnsmasq on 192.168.111.0/24.
+    - name: LOCALNET_MULTI_IPECHO_LOCALNET_INDEX
+      default: "2"
+      documentation: |-
+        Localnet index (1..N) for the ip-echo EgressIP probe pod. Defaults to localnet-2 so the
+        probe uses a secondary virtio segment on the ostestbm L2 (192.168.111.0/24).
+    - name: LOCALNET_MULTI_IPECHO_STATIC_IP
+      default: "192.168.111.250/24"
+      documentation: |-
+        Static IPv4 for the ip-echo pod on its localnet NAD (Multus network selection element).
+        Must be on 192.168.111.0/24 and outside the ostestbm DHCP pool (.100-.240).
+    - name: LOCALNET_MULTI_ENABLE_KUBELET_BOOTSTRAP_ASSIST
+      default: "true"
+      documentation: |-
+        When true and ATTACH_DEFAULT_NETWORK=localnet-multi, SSH to worker VMIs on
+        localnet-1 and start crio/kubelet if inactive until the NodePool is Ready.
+    - name: LOCALNET_MULTI_KUBELET_BOOTSTRAP_TIMEOUT
+      default: "2700"
+      documentation: |-
+        Seconds to poll worker VMIs and start crio/kubelet before failing the create step.
+    - name: LOCALNET_MULTI_NODEPOOL_READY_TIMEOUT
+      default: "45m"
+      documentation: |-
+        Maximum time to wait for the NodePool Ready condition after HostedCluster Available.
+        The create step timeout (2h30m) budgets cluster provisioning, the 30-minute
+        HostedCluster Available wait, and this value; kubelet bootstrap assist runs
+        within this window and does not add a separate guaranteed 45-minute allowance.
+    - name: LOCALNET_MULTI_SSH_POD_IMAGE
+      default: "registry.redhat.io/rhel9/support-tools:latest"
+      documentation: |-
+        Image for localnet-multi kubelet bootstrap SSH pods. Must include an ssh client.
   commands: hypershift-kubevirt-create-commands.sh
   resources:
     requests:
