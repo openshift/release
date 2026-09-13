@@ -2,6 +2,10 @@ build_root:
   from_repository: true
 images:
   items:
+  - dockerfile_literal: |
+      FROM quay.io/openshift-pipeline/ui-ci:latest
+      COPY test-prow-e2e.sh /usr/local/bin/test-prow-e2e.sh
+    to: playwright-runner
   - dockerfile_path: Dockerfile
     to: console-pipelines-plugin
 promotion:
@@ -44,6 +48,19 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: e2e
+  steps:
+    cluster_profile: aws-osp-qe
+    test:
+    - as: e2e
+      cli: latest
+      commands: bash /usr/local/bin/test-prow-e2e.sh
+      from: playwright-runner
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift-pipelines
