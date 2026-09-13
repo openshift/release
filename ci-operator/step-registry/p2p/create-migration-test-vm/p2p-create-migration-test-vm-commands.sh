@@ -298,9 +298,11 @@ function ApplyRhelVirtualMachine () {
     [[ $- == *x* ]] && _wasTracing=true
     set +x
     # Build cloud-init userData without exposing password in xtrace.
+    typeset _vmPwd
+    _vmPwd="$(openssl rand -base64 16)"
     typeset _userData
-    _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: migration123\nchpasswd:\n  expire: false\nssh_pwauth: true\nruncmd:\n- echo "VM %s is ready for migration testing" > /tmp/vm-ready.txt\n' \
-        "${vmName}")"
+    _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: %s\nchpasswd:\n  expire: false\nssh_pwauth: true\nwrite_files:\n- path: /home/cloud-user/migration-marker.txt\n  content: %s\n  permissions: \"0644\"\n  owner: cloud-user:cloud-user\nruncmd:\n- dnf install -y qemu-guest-agent\n- systemctl enable --now qemu-guest-agent\n- echo \"VM %s is ready for migration testing\" > /tmp/vm-ready.txt\n' \
+    "${_vmPwd}" "${vmName}" "${vmName}")"
 
     VM_NAME="${vmName}" DV_NAME="${dvName}" \
     CLOUD_INIT_USERDATA="${_userData}" \

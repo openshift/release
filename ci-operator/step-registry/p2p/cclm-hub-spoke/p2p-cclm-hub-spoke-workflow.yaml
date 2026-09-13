@@ -1,0 +1,52 @@
+workflow:
+  as: p2p-cclm-hub-spoke
+  steps:
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: p2p-install-odf-hub
+    - ref: acm-interop-p2p-cluster-install
+    - ref: acm-fetch-managed-clusters
+    - ref: p2p-install-cnv-hub
+    - ref: p2p-acm-cnv-install-policy
+    - ref: p2p-install-odf-spokes
+    - chain: acm-interop-p2p-submariner-install
+    - ref: p2p-mtv-additional-config
+    - ref: p2p-mtv-register-providers
+    - ref: p2p-cnv-exchange-kubevirt-ca
+    - chain: p2p-cclm-hub-spoke-migration-test
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: gather-aws-console
+    - ref: acm-interop-p2p-cluster-uninstall
+    - chain: ipi-deprovision
+    - ref: firewatch-report-issues
+  documentation: |-
+    End-to-end workflow for bi-directional Cross-Cluster Live Migration (CCLM)
+    between the ACM hub cluster and a managed spoke cluster using MTV (Migration
+    Toolkit for Virtualization).
+    
+    **Phase 1 (PR 1 - Infrastructure)**:
+    - Hub IPI provisioning, ACM, ODF, CNV setup
+    - Spoke provisioning via Hive/ACM
+    - Submariner pod-to-pod connectivity
+    - MTV configuration and provider registration
+    
+    **Phase 2 (PR 2 - CCLM Migration)**:
+    - Create test VMs on hub and spoke
+    - Create MTV migration maps for both directions
+    - Execute hub→spoke and spoke→hub live migrations
+    - Verify VMs running on destination clusters
+    
+    MTV runs on the hub with the host provider representing the hub cluster.
+    Spoke clusters are registered as OpenShift providers via ACM ManifestWork.
+    Submariner provides cross-cluster pod-to-pod connectivity (no Globalnet).
