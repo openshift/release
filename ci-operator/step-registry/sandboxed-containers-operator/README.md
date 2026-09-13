@@ -21,10 +21,6 @@ base_images:
     tag: upi-installer
 ```
 
-### sandboxed-containers-operator-peerpods-param-cm
-
-The [sandboxed-containers-operator-peerpods-param-cm](./peerpods/param-cm/) step creates the peerpods-param-cm configmap. Currently only Azure is supported and it will do the needed networking setup for OSC to work properly on this cloud provider.
-
 ### sandboxed-containers-operator-env-cm
 
 The [sandboxed-containers-operator-env-cm](./env-cm/) step creates the osc-config configmap which is actually used by the OSC tests in `platform-extended-tests` to control many aspects of the execution. In case this step is not reference, default values will be used by the tests.
