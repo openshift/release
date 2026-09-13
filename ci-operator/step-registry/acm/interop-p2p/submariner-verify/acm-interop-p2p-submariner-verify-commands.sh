@@ -104,14 +104,7 @@ LoadSpokeConfig() {
     true
 }
 
-if [[ "${SUBMARINER_VERIFY_HUB_SPOKE:-false}" == "true" ]]; then
-    allKubeconfigsArr=("${KUBECONFIG}" "${spokeKubeconfigsArr[@]}")
-    allNamesArr=("hub" "${spokeNamesArr[@]}")
-else
-    allKubeconfigsArr=("${spokeKubeconfigsArr[@]}")
-    allNamesArr=("${spokeNamesArr[@]}")
-fi
-typeset -i allCount=${#allKubeconfigsArr[@]}
+
 
 # ── ShowConnections — display tunnel connection status on one spoke ───────────
 ShowConnections() {
@@ -169,8 +162,8 @@ WaitForConnectionsEstablished() {
 
         : "Submariner tunnels did not reach 'connected' on all clusters within ${timeoutSecs}s"
         for ((i = 0; i < allCount; i++)); do
-+            : "Connection status on '${allNamesArr[i]}'"
-+            KUBECONFIG="${allKubeconfigsArr[i]}" "${subctlBin}" show connections || true
+            : "Connection status on '${allNamesArr[i]}'"
+            KUBECONFIG="${allKubeconfigsArr[i]}" "${subctlBin}" show connections || true
          done
         exit 1
     )
@@ -485,6 +478,15 @@ command -v curl 1>/dev/null
 
 LoadSpokeConfig
 InstallSubctl
+
+if [[ "${SUBMARINER_VERIFY_HUB_SPOKE:-false}" == "true" ]]; then
+    allKubeconfigsArr=("${KUBECONFIG}" "${spokeKubeconfigsArr[@]}")
+    allNamesArr=("hub" "${spokeNamesArr[@]}")
+else
+    allKubeconfigsArr=("${spokeKubeconfigsArr[@]}")
+    allNamesArr=("${spokeNamesArr[@]}")
+fi
+typeset -i allCount=${#allKubeconfigsArr[@]}
 
 typeset -i submarinerStepRc=0
 (
