@@ -244,7 +244,8 @@ data:
 
     ogx:
       use_as_library_client: true
-      library_client_config_path: /app-config/run.yaml
+      config:
+        profile: /app-config/run.yaml
       timeout: 120
 
     auth:
@@ -254,42 +255,73 @@ data:
       app_log_level: info
 
   run.yaml: |
-    version: v2
+    version: 2
     apis:
-      - inference
-      - safety
-      - vector_io
-      - agents
-      - tool_runtime
-      - files
+    - responses
+    - batches
+    - files
+    - inference
+    - tool_runtime
+    - conversations
+    - vector_io
     providers:
       inference:
-        - provider_id: mock-llm
-          provider_type: remote::openai
-          config:
-            url: http://localhost:11434/v1
-            api_key: fake-key
-      safety:
-        - provider_id: llama-guard
-          provider_type: inline::llama-guard
-          config: {}
-      vector_io:
-        - provider_id: faiss
-          provider_type: inline::faiss
-          config:
-            kvstore:
-              type: sqlite
-              db_path: /tmp/faiss_store.db
-      agents:
-        - provider_id: meta-reference
-          provider_type: inline::meta-reference
-          config:
-            persistence_store:
-              type: sqlite
-              db_path: /tmp/agents_store.db
-    metadata_store:
-      type: sqlite
-      db_path: /tmp/registry.db
+      - provider_id: mock-llm
+        provider_type: remote::openai
+        config:
+          url: http://localhost:11434/v1
+          api_key: fake-key
+      files:
+      - provider_id: localfs
+        provider_type: inline::localfs
+        config:
+          storage_dir: /tmp/file_uploads
+      tool_runtime:
+      - provider_id: file-search
+        provider_type: inline::rag-runtime
+        config: {}
+      responses:
+      - provider_id: builtin-responses
+        provider_type: inline::builtin
+        config:
+          persistence_store:
+            type: sqlite
+            db_path: /tmp/responses_store.db
+      batches:
+      - provider_id: builtin-batches
+        provider_type: inline::reference
+        config:
+          sqlstore:
+            type: sqlite
+            db_path: /tmp/batches_store.db
+    server:
+      port: 8321
+    storage:
+      backends:
+        kv_sqlite:
+          type: sqlite
+          db_path: /tmp/kv_store.db
+        sql_sqlite:
+          type: sqlite
+          db_path: /tmp/sql_store.db
+      stores:
+        metadata:
+          backend_id: kv_sqlite
+        inference:
+          backend_id: kv_sqlite
+        conversations:
+          backend_id: kv_sqlite
+        prompts:
+          backend_id: kv_sqlite
+        connectors:
+          backend_id: kv_sqlite
+    registered_resources:
+      models:
+      - provider_id: mock-llm
+        model_id: mock-model
+        model_type: llm
+    telemetry:
+      enabled: false
 LCS_STACK_CONFIG
 
 # 4b. Deploy LCS with mock LLM sidecar
