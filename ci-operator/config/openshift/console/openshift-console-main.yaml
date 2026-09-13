@@ -133,6 +133,27 @@ tests:
       timeout: 2h0m0s
     workflow: ipi-gcp
 - always_run: false
+  as: e2e-aws-external-oidc-console
+  optional: true
+  pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        ./test-prow-e2e.sh
+      dependencies:
+      - env: PLUGIN_PULL_SPEC
+        name: console-plugin-demo
+      from: console-playwright-runner
+      resources:
+        requests:
+          cpu: "4"
+          memory: 10Gi
+      timeout: 2h0m0s
+    workflow: idp-external-oidc-keycloak-aws
+- always_run: false
   as: e2e-cypress
   optional: true
   pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
