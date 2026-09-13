@@ -123,6 +123,15 @@ cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
+if [ "${IMAGE_POLICY_DISABLED:-true}" = "true" ]; then
+    ### Disable image policy for nightly build
+    export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
+fi
+
 ### Create manifests
 # this will be removed once AGENT-626 is done
 if [ "${LOAD_BALANCER_TYPE:-cluster-managed}" == "user-managed" ]; then
@@ -141,15 +150,6 @@ fi
 #done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
 DATA_STORAGE="/var/mnt/data-storage"
-
-if [ "${FIPS_ENABLED:-false}" = "true" ]; then
-    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
-fi
-
-if [ "${IMAGE_POLICY_DISABLED:-true}" = "true" ]; then
-    ### Disable image policy for nightly build
-    export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
-fi
 
 case "${BOOT_MODE}" in
 "iso")
