@@ -3,6 +3,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: cli
+  libvirt-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: libvirt-installer
   operand:
     name: "4.22"
     namespace: ocp
@@ -19,6 +23,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kedacore/keda-olm-operator
@@ -61,6 +69,12 @@ releases:
       include_built_images: true
       name: "4.22"
       namespace: ocp
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -116,6 +130,27 @@ tests:
     - chain: ipi-gcp-pre
     test:
     - chain: keda-e2e-cma
+- always_run: false
+  as: cma-e2e-s390x-libvirt
+  capabilities:
+  - intranet
+  cluster: build12
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.22"
+      E2E_INSTALL_KEDA: "false"
+      E2E_TEST_CONFIG: openshift-e2e.yaml
+      ETCD_DISK_SPEED: slow
+      USE_EXTERNAL_DNS: "true"
+    test:
+    - ref: custom-metrics-autoscaler-operator-libvirt-s390x-e2e-image-tag-mirror
+    - chain: keda-e2e-cma
+    workflow: custom-metrics-autoscaler-operator-libvirt-s390x
 zz_generated_metadata:
   branch: release-4.22
   org: openshift
