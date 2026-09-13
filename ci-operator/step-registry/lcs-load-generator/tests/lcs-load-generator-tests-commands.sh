@@ -154,15 +154,32 @@ spec:
       labels:
         app: pyroscope
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: pyroscope
           image: grafana/pyroscope:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 4040
           resources:
             requests:
               cpu: "250m"
               memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          volumeMounts:
+            - name: pyroscope-data
+              mountPath: /data
+      volumes:
+        - name: pyroscope-data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -177,9 +194,13 @@ spec:
       targetPort: 4040
 PYROSCOPE
 
-  oc wait --for=condition=available deployment/pyroscope \
-    -n "${PYROSCOPE_NAMESPACE}" --timeout=120s
-  echo "── Pyroscope ready ──"
+  if ! oc wait --for=condition=available deployment/pyroscope \
+    -n "${PYROSCOPE_NAMESPACE}" --timeout=120s; then
+    echo "WARN: Pyroscope failed to become ready — disabling profiling and continuing"
+    ENABLE_PYROSCOPE="false"
+  else
+    echo "── Pyroscope ready ──"
+  fi
 fi
 
 
@@ -282,9 +303,17 @@ spec:
         app: lcs
         app.kubernetes.io/name: lightspeed-core-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: lcs
           image: ${LCS_APP_IMAGE}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
 ${LCS_COMMAND_OVERRIDE}
           ports:
             - containerPort: 8080
@@ -321,6 +350,10 @@ ${LCS_COMMAND_OVERRIDE}
             timeoutSeconds: 5
         - name: mock-llm
           image: ${MOCK_LLM_IMAGE}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 11434
           resources:
