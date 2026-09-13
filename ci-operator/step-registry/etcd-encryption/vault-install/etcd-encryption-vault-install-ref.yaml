@@ -39,6 +39,12 @@ ref:
       Override at job level to trial a new plugin image.
       On baremetalds jobs the repository, mirror source, and local mirror tag are all
       derived from this value.
+  - name: VAULT_STORAGE_CLASS
+    default: ""
+    documentation: |-
+      StorageClass for the Vault file backend PVC. When unset, the cluster default
+      StorageClass is used. On equinix-ocp-metal jobs with no StorageClass, the step
+      provisions vault-local-storage with a hostPath PersistentVolume.
   documentation: |-
     Installs HashiCorp Vault Enterprise via Helm.
 
@@ -47,9 +53,13 @@ ref:
     - Adds HashiCorp Helm repository
     - Creates vault namespace with appropriate SCC (restricted)
     - Creates vault-license secret from mounted credential (if available)
-    - Mirrors Vault Enterprise and vault-kube-kms plugin images to the dev-scripts local registry on baremetalds jobs (SSH oc image mirror with retry)
+    - Mirrors Vault Enterprise and vault-kube-kms plugin images to the dev-scripts local registry on baremetalds jobs (SSH oc image mirror with per-image retry, skip-if-present, and architecture filtering)
     - Applies ImageContentSourcePolicy/vault-mirror so cluster nodes pull both images from the local mirror
-    - Installs Vault Enterprise using Helm chart
+    - Installs Vault Enterprise using Helm chart in standalone mode with file storage
+    - Provisions vault-local-storage (hostPath PV) on baremetal when no StorageClass exists
+    - Requests an OpenShift service-CA serving certificate for the client Service
+    - Initializes and unseals Vault, storing the root token and unseal key in Secrets
+    - Deploys an auto-unseal sidecar so Vault comes back unsealed after pod restarts
     - Waits for Vault pod to be ready
     - Installs a second instance in VAULT_SECONDARY_NAMESPACE
 
@@ -61,9 +71,13 @@ ref:
     Outputs:
     - Vault service available at: vault.${VAULT_NAMESPACE}.svc:8200
     - Vault pod: vault-0 (Ready state)
+    - Persistent volume: data-vault-0 (file storage for transit keys)
+    - Secrets: vault-root-token, vault-unseal-key (namespace: ${VAULT_NAMESPACE})
     - CA ConfigMap: vault-ca-bundle (openshift-config namespace)
     - Second Vault service at: vault-secondary.${VAULT_SECONDARY_NAMESPACE}.svc:8200
     - Second Vault pod: vault-secondary-0 (Ready state)
+    - Persistent volume: data-vault-secondary-0
+    - Secrets: vault-root-token, vault-unseal-key (namespace: ${VAULT_SECONDARY_NAMESPACE})
     - CA ConfigMap: vault-ca-bundle-secondary (openshift-config namespace)
 
     Next step:
