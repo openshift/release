@@ -204,6 +204,26 @@ PYROSCOPE
 fi
 
 
+# ─── 3b. CREATE QUAY PULL SECRET ─────────────────────────────────────────────
+
+QUAY_CRED_DIR="/var/run/quay-creds"
+if [[ -d "${QUAY_CRED_DIR}" && -f "${QUAY_CRED_DIR}/robot-name" && -f "${QUAY_CRED_DIR}/robot-password" ]]; then
+  QUAY_ROBOT_NAME=$(<"${QUAY_CRED_DIR}/robot-name")
+  QUAY_ROBOT_PASSWORD=$(<"${QUAY_CRED_DIR}/robot-password")
+  echo "Creating Quay pull secret in ${LCS_NAMESPACE}..."
+  oc create secret docker-registry quay-lightspeed-pull-secret \
+    --docker-server=quay.io \
+    --docker-username="${QUAY_ROBOT_NAME}" \
+    --docker-password="${QUAY_ROBOT_PASSWORD}" \
+    -n "${LCS_NAMESPACE}" \
+    --dry-run=client -o yaml | oc apply -f -
+  oc secrets link default quay-lightspeed-pull-secret --for=pull -n "${LCS_NAMESPACE}"
+  echo "Quay pull secret created and linked to default SA"
+else
+  echo "WARNING: Quay credentials not found at ${QUAY_CRED_DIR} — private images may fail to pull"
+fi
+
+
 # ─── 4. DEPLOY LCS (library mode + mock LLM sidecar) ────────────────────────
 
 echo "── Deploying lightspeed-core ──"
