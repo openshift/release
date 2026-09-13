@@ -154,9 +154,10 @@ wait_for_nodes() {
   return 1
 }
 
-echo "$(date) DEBUG SLEEP — sleeping 2 hours for live debugging before wait_for_nodes"
+# DEBUG: 2h sleep before wait_for_nodes to allow live exec into the pod for debugging
+echo "$(date) DEBUG SLEEP: sleeping 2h before wait_for_nodes to allow live debugging..."
 sleep 7200
-echo "$(date) DEBUG SLEEP — waking up, proceeding to wait_for_nodes"
+echo "$(date) DEBUG SLEEP: 2h sleep complete, proceeding to wait_for_nodes"
 
 wait_for_nodes
 
@@ -200,6 +201,11 @@ spec:
   type: LoadBalancer
 SVCEOF
 
+
+# DEBUG: 1h sleep after deploying *.apps LoadBalancer Service to allow live debugging
+echo "$(date) DEBUG SLEEP: sleeping 1h after deploying *.apps LoadBalancer Service..."
+sleep 3600
+echo "$(date) DEBUG SLEEP: 1h sleep complete, proceeding to ClusterOperator check"
 
 # --- Step 6: Wait for all guest cluster ClusterOperators to be Available and not Degraded ---
 echo "$(date) Waiting for all ClusterOperators to be Available and not Degraded"
