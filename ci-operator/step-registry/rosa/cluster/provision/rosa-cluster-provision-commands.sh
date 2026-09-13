@@ -184,7 +184,7 @@ echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
-if [[ "$HOSTED_CP" == "true" ]] && [[ ! -z "$REGION" ]]; then
+if [[ ! -z "$REGION" ]]; then
   CLOUD_PROVIDER_REGION="${REGION}"
 fi
 
