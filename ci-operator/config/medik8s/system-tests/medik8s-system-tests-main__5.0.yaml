@@ -18,6 +18,40 @@ resources:
       cpu: 500m
       memory: 1000Mi
 tests:
+- always_run: false
+  as: e2e-nhc-downstream-fresh-install-aws
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: tier:smoke
+      INSTALL_NAMESPACE: openshift-workload-availability
+      OCP_VERSION: "50"
+      OO_CHANNEL: stable
+      OPERATORS: self-node-remediation,node-healthcheck-operator
+    test:
+    - ref: medik8s-lib
+    - ref: medik8s-catalogsource
+    - ref: medik8s-operator-subscribe
+    - as: run-nhc-fresh-install-tests
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+        export WORKLOAD_IMAGE="$(cat "${SHARED_DIR}/workload_image")"
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 500Mi
+    workflow: ipi-aws
 - as: tls13-adherence-all
   cron: 0 10 * * 1
   steps:
