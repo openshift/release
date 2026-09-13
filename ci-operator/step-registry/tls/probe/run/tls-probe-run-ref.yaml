@@ -1,0 +1,44 @@
+ref:
+  as: tls-probe-run
+  from: cli
+  cli: latest
+  commands: tls-probe-run-commands.sh
+  env:
+    - name: PROBE_IMAGE
+      default: "ghcr.io/smith-xyz/tls-probe@sha256:8beefaa4040a4d49ae338b94c7d9ebbaaccefee0015214ad04c5059693e7c32d"
+      documentation: |-
+        tls-probe container image to deploy as a DaemonSet. Defaults to a pinned
+        GHCR digest (Track C: connected jobs only). Override with a promoted
+        registry.ci.openshift.org image for disconnected/airgapped jobs.
+    - name: PROBE_NAMESPACE
+      default: "tls-probe"
+      documentation: |-
+        Namespace to create for the probe DaemonSet. Must be 'tls-probe' or
+        start with 'tls-probe-'; the step deletes this namespace on every run
+        so overrides are restricted to avoid deleting an unrelated namespace.
+    - name: PROBE_CAPTURE_DURATION
+      default: "180"
+      documentation: "Seconds to capture TLS traffic before collecting results."
+    - name: TLS_ADHERENCE_ENFORCE
+      default: "false"
+      documentation: |-
+        Set to 'true' to fail CI when below-TLS-1.3 handshakes are observed and
+        the cluster TLSAdherencePolicy enforces compliance. Default is observe-only:
+        findings are recorded in JUnit but do not fail the job.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 30m0s
+  grace_period: 5m0s
+  documentation: |-
+    Deploys the tls-probe eBPF DaemonSet across all cluster nodes, captures
+    TLS handshakes for a bounded window, collects per-node JSONL, and emits
+    [OCPFeatureGate:TLSAdherence]-tagged JUnit to ARTIFACT_DIR.
+
+    The probe is a passive observer (zero added load, no synthetic connections).
+    It captures real in-cluster client negotiations including image pulls,
+    detecting downgrades and PQC gaps that active scanners cannot see.
+
+    Start with TLS_ADHERENCE_ENFORCE=false (observe-only) to gather signal before
+    gating. Set PROBE_IMAGE to a promoted registry.ci image for durable/disconnected use.
