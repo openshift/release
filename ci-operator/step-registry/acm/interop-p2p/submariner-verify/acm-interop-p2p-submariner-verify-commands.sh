@@ -30,9 +30,11 @@ typeset -r subctlBin="/tmp/bin/subctl"
 [[ "${ACM_SPOKE_CLUSTER_COUNT}" =~ ^[1-9][0-9]*$ ]] \
     || { : "ACM_SPOKE_CLUSTER_COUNT must be a positive decimal integer (got: '${ACM_SPOKE_CLUSTER_COUNT}')"; false; }
 typeset -i spokeCount="${ACM_SPOKE_CLUSTER_COUNT}"
-
+typeset -a allKubeconfigsArr=()
+typeset -a allNamesArr=()
 typeset -a spokeKubeconfigsArr=()
 typeset -a spokeNamesArr=()
+
 
 # ── InstallSubctl — install subctl to /tmp/bin/ ───────────────────────────────
 # Downloads directly from GitHub releases and extracts with tar -xJf.
@@ -102,6 +104,15 @@ LoadSpokeConfig() {
     true
 }
 
+if [[ "${SUBMARINER_VERIFY_HUB_SPOKE:-false}" == "true" ]]; then
+    allKubeconfigsArr=("${KUBECONFIG}" "${spokeKubeconfigsArr[@]}")
+    allNamesArr=("hub" "${spokeNamesArr[@]}")
+else
+    allKubeconfigsArr=("${spokeKubeconfigsArr[@]}")
+    allNamesArr=("${spokeNamesArr[@]}")
+fi
+typeset -i allCount=${#allKubeconfigsArr[@]}
+
 # ── ShowConnections — display tunnel connection status on one spoke ───────────
 ShowConnections() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
@@ -121,9 +132,9 @@ WaitForConnectionsEstablished() {
             allConnected=1
 
             typeset -i i
-            for ((i = 0; i < spokeCount; i++)); do
-                typeset kubeconfig="${spokeKubeconfigsArr[i]}"
-                typeset spokeName="${spokeNamesArr[i]}"
+            for ((i = 0; i < allCount; i++)); do
+                typeset kubeconfig="${allKubeconfigsArr[i]}"
+                typeset clusterName="${allNamesArr[i]}"
 
                 typeset -i nonConnected
                 nonConnected="$(
@@ -141,7 +152,7 @@ WaitForConnectionsEstablished() {
                     jq 'length'
                 )"
 
-                : "spoke '${spokeName}': ${totalConnections} connection(s), ${nonConnected} not yet connected (${SECONDS}/${timeoutSecs}s)"
+                : "cluster '${clusterName}': ${totalConnections} connection(s), ${nonConnected} not yet connected (${SECONDS}/${timeoutSecs}s)"
 
                 if (( nonConnected > 0 || totalConnections == 0 )); then
                     allConnected=0
@@ -156,12 +167,11 @@ WaitForConnectionsEstablished() {
             sleep "${interval}"
         done
 
-        : "Submariner tunnels did not reach 'connected' on all spokes within ${timeoutSecs}s"
-        typeset -i i
-        for ((i = 0; i < spokeCount; i++)); do
-            : "Connection status on '${spokeNamesArr[i]}'"
-            KUBECONFIG="${spokeKubeconfigsArr[i]}" "${subctlBin}" show connections || true
-        done
+        : "Submariner tunnels did not reach 'connected' on all clusters within ${timeoutSecs}s"
+        for ((i = 0; i < allCount; i++)); do
++            : "Connection status on '${allNamesArr[i]}'"
++            KUBECONFIG="${allKubeconfigsArr[i]}" "${subctlBin}" show connections || true
+         done
         exit 1
     )
     true
@@ -479,46 +489,48 @@ InstallSubctl
 typeset -i submarinerStepRc=0
 (
     typeset -i i j
-    for ((i = 0; i < spokeCount; i++)); do
-        ShowConnections "${spokeKubeconfigsArr[i]}"
+    for ((i = 0; i < allCount; i++)); do
+        : "Cluster '${allNamesArr[i]}': connections"
+        ShowConnections "${allKubeconfigsArr[i]}"
     done
 
     WaitForConnectionsEstablished 600
 
-    for ((i = 0; i < spokeCount; i++)); do
+    for ((i = 0; i < allCount; i++)); do
         AssertNoGlobalnetSubnets \
-            "${spokeKubeconfigsArr[i]}" \
-            "${spokeNamesArr[i]}"
+            "${allKubeconfigsArr[i]}" \
+            "${allNamesArr[i]}"
     done
 
-    for ((i = 0; i < spokeCount; i++)); do
-        for ((j = i + 1; j < spokeCount; j++)); do
+    for ((i = 0; i < allCount; i++)); do
+        for ((j = i + 1; j < allCount; j++)); do
             WarmUpServiceDiscovery \
-                "${spokeKubeconfigsArr[i]}" \
-                "${spokeKubeconfigsArr[j]}" \
-                "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${allKubeconfigsArr[i]}" \
+                "${allKubeconfigsArr[j]}" \
+                "${allNamesArr[i]}" \
+                "${allNamesArr[j]}"
         done
     done
 
-    for ((i = 0; i < spokeCount; i++)); do
-        for ((j = i + 1; j < spokeCount; j++)); do
+    for ((i = 0; i < allCount; i++)); do
+        for ((j = i + 1; j < allCount; j++)); do
             VerifyConnectivity \
-                "${spokeKubeconfigsArr[i]}" \
-                "${spokeKubeconfigsArr[j]}" \
-                "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}" || exit $?
+                "${allKubeconfigsArr[i]}" \
+                "${allKubeconfigsArr[j]}" \
+                "${allNamesArr[i]}" \
+                "${allNamesArr[j]}" || exit $?
             VerifyCclmSyncPath \
-                "${spokeKubeconfigsArr[i]}" \
-                "${spokeKubeconfigsArr[j]}" \
-                "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}" || exit $?
+                "${allKubeconfigsArr[i]}" \
+                "${allKubeconfigsArr[j]}" \
+                "${allNamesArr[i]}" \
+                "${allNamesArr[j]}" || exit $?
         done
     done
 
     : "Final connection status after verify"
-    for ((i = 0; i < spokeCount; i++)); do
-        ShowConnections "${spokeKubeconfigsArr[i]}"
+    for ((i = 0; i < allCount; i++)); do
+        : "Cluster '${allNamesArr[i]}': connections"
+        ShowConnections "${allKubeconfigsArr[i]}"
     done
     true
 ) || submarinerStepRc=$?
