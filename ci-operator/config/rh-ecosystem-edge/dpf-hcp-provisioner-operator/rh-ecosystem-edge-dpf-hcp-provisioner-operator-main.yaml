@@ -9,6 +9,8 @@ images:
     to: dpf-hcp-provisioner-operator
   - dockerfile_path: e2e-tests.Containerfile
     to: dpf-hcp-provisioner-operator-ci
+  - dockerfile_path: e2e-tests.Containerfile
+    to: dpf-ci
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -51,6 +53,48 @@ tests:
       BASE_DOMAIN: edge-sro.rhecoeng.com
       MACHINE_OS_URL: quay.io/eelgaev/rhcos-bfb:4.22.0-ec.2
     workflow: rh-ecosystem-edge-dpf-hcp-provisioner-operator
+- always_run: false
+  as: deploy-doca4
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: metal-dpf-doca4
+    post:
+    - ref: gather-extra
+    - ref: gather-must-gather
+    test:
+    - as: set-operator-override
+      commands: |
+        echo "${IMAGE_DPF_HCP_PROVISIONER_OPERATOR}" > "${SHARED_DIR}/dpf-hcp-provisioner-operator-override"
+        echo "Operator image override: $(cat ${SHARED_DIR}/dpf-hcp-provisioner-operator-override)"
+      dependencies:
+      - env: IMAGE_DPF_HCP_PROVISIONER_OPERATOR
+        name: dpf-hcp-provisioner-operator
+      from: dpf-ci
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: dpf-hypervisor-deploy-cluster
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
