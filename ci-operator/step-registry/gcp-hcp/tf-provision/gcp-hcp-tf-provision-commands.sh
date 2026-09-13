@@ -115,6 +115,34 @@ fi
 
 log "Template rendered to: ${RENDERED_DIR}"
 
+# --- Write predictable project IDs to SHARED_DIR early ---
+# Project IDs are deterministic from RUN_ID and REGION. Write them now so
+# the cleanup step can find and delete projects even if terraform apply fails
+# partway through. Without this, a partial apply leaves orphaned GCP projects
+# that burn money until the 24h TFC auto-destroy fires.
+REGION_CODE=$(grep "^  ${REGION}:" "${REPO_ROOT}/terraform/metadata/regions.yaml" | awk '{print $2}')
+if [[ -z "${REGION_CODE}" ]]; then
+  log "ERROR: Unknown region '${REGION}' — not found in metadata/regions.yaml"
+  exit 1
+fi
+
+REGION_PROJECT_ID="e2e-reg-${REGION_CODE}-${RUN_ID}"
+MC_PROJECT_ID="e2e-mgt-${REGION_CODE}-${RUN_ID}"
+SERVICE_PROJECT_ID="e2e-svc-${REGION_CODE}-${RUN_ID}"
+
+echo "${REGION_PROJECT_ID}" > "${SHARED_DIR}/region-project-id"
+echo "${REGION_PROJECT_ID}-gke" > "${SHARED_DIR}/region-cluster-name"
+echo "${MC_PROJECT_ID}" > "${SHARED_DIR}/mc-project-id"
+echo "${MC_PROJECT_ID}-gke" > "${SHARED_DIR}/mc-cluster-name"
+echo "${SERVICE_PROJECT_ID}" > "${SHARED_DIR}/service-project-id"
+echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
+echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
+
+log "Early SHARED_DIR outputs written (for cleanup on failure):"
+log "  Region Project:  ${REGION_PROJECT_ID}"
+log "  MC Project:      ${MC_PROJECT_ID}"
+log "  Service Project: ${SERVICE_PROJECT_ID}"
+
 # --- Configure Terraform ---
 
 cd "${RENDERED_DIR}"
@@ -200,10 +228,10 @@ import_orphaned_firestore() {
   # Check for the Firestore 409 pattern.
   # TFC remote output splits the error across multiple lines with │ prefixes,
   # so we check for both strings independently rather than on a single line.
-  if ! echo "${output}" | grep -q "Database already exists"; then
+  if ! grep -q "Database already exists" <<<"${output}"; then
     return 1
   fi
-  if ! echo "${output}" | grep -q "google_firestore_database"; then
+  if ! grep -q "google_firestore_database" <<<"${output}"; then
     return 1
   fi
 
@@ -234,7 +262,7 @@ import_orphaned_firestore() {
     local import_id="projects/${mc_project}/databases/${db_name}"
 
     # Only import if the error mentions this specific database
-    if echo "${output}" | grep -q "google_firestore_database.${db_name}"; then
+    if grep -q "google_firestore_database.${db_name}" <<<"${output}"; then
       log "Importing ${address} <- ${import_id}"
       if terraform import -no-color "${address}" "${import_id}" 2>&1 | tee -a "${LOG}"; then
         log "Successfully imported ${db_name} database"
@@ -327,12 +355,20 @@ jq -r '.management_cluster.value.project_id // empty' /tmp/tf-outputs.json > "${
 jq -r '.management_cluster.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-name"
 jq -r '.management_cluster.value.cluster_endpoint // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-endpoint"
 
-# Save metadata for deprovision step
-echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
-echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
+# HC lifecycle test outputs (explicit top-level outputs from e2e template)
+jq -r '.customer_project_id.value // .customer_project.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/customer-project-id"
+jq -r '.oidc_endpoint.value // .region.value.oidc_cdn_issuer_url // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/oidc-endpoint"
+jq -r '.service.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/service-project-id"
 
-# Validate critical outputs were written
-for output_file in region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint workspace-name run-id; do
+# Construct platform-api endpoint from terraform outputs
+# Hostname pattern: platform-api-{region}-{infra_id}.platform-ci.gcp-hcp.devshift.net
+INFRA_ID=$(jq -r '.region.value.infra_id // empty' /tmp/tf-outputs.json)
+if [[ -n "${INFRA_ID}" ]]; then
+  echo "https://platform-api-${REGION}-${INFRA_ID}.platform-ci.gcp-hcp.devshift.net" > "${SHARED_DIR}/api-endpoint"
+fi
+
+# Validate critical outputs were written (early writes + terraform outputs)
+for output_file in region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id api-endpoint oidc-endpoint workspace-name run-id; do
   if [[ ! -s "${SHARED_DIR}/${output_file}" ]]; then
     log "ERROR: Output file ${output_file} is empty or missing"
     exit 1
@@ -346,6 +382,16 @@ log "  MC Project:       $(<${SHARED_DIR}/mc-project-id)"
 log "  MC Cluster:       $(<${SHARED_DIR}/mc-cluster-name)"
 log "  TFC Workspace:    ${WORKSPACE_NAME}"
 log "  Run ID:           ${RUN_ID}"
+log "  Customer Project: $(<${SHARED_DIR}/customer-project-id)"
+if [[ -s "${SHARED_DIR}/oidc-endpoint" ]]; then
+  log "  OIDC Endpoint:    $(<${SHARED_DIR}/oidc-endpoint)"
+fi
+if [[ -s "${SHARED_DIR}/api-endpoint" ]]; then
+  log "  API Endpoint:     $(<${SHARED_DIR}/api-endpoint)"
+fi
+if [[ -s "${SHARED_DIR}/service-project-id" ]]; then
+  log "  Service Project:  $(<${SHARED_DIR}/service-project-id)"
+fi
 log ""
 log "Outputs written to SHARED_DIR for downstream steps"
 log "TFC workspace URL: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
