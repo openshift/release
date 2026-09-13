@@ -306,6 +306,13 @@ function render_osc_operator_chart() {
     helm_args+=("--set" "dev.enabled=false")
   fi
 
+  if [[ "${RESTRICTED_NETWORK:-}" == "yes" ]]; then
+    # Our own mirror-operator step already created IDMS/ITMS pointing to the
+    # mirror registry; the chart's copies point to quay.io and would conflict.
+    helm_args+=("--set" "dev.createMirrorSets=false")
+    echo ">>> Restricted network: dev.createMirrorSets=false" >&2
+  fi
+
   local helm_output
   if ! helm_output=$(helm template "${helm_args[@]}"); then
     echo ">>> ERROR: helm template failed" >&2
@@ -367,6 +374,27 @@ function render_osc_operands_chart() {
       proxy_timeout=$(echo "${cm_data}" | jq -r '.data.PROXY_TIMEOUT // ""')
       [[ -n "${vxlan_port}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.VXLAN_PORT=${vxlan_port}")
       [[ -n "${proxy_timeout}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.PROXY_TIMEOUT=${proxy_timeout}")
+
+      # TEMPORARY: the operator does not yet propagate the cluster-wide Proxy
+      # object into CAA (tracked by openshift/sandboxed-containers-operator#2839).
+      # Until that lands, wire HTTP_PROXY/HTTPS_PROXY/NO_PROXY into CAA manually
+      # via the same providersConfigs.all passthrough used for VXLAN_PORT above,
+      # so peer-pods can reach the cloud provider API in restricted-network CI.
+      # Remove this block once #2839 merges and the operator does this itself.
+      if [[ -f "${SHARED_DIR}/proxy_private_url" ]]; then
+        local caa_proxy_url caa_no_proxy cluster_no_proxy mirror_registry_host
+        caa_proxy_url=$(< "${SHARED_DIR}/proxy_private_url")
+        mirror_registry_host=""
+        [[ -f "${SHARED_DIR}/mirror_registry_url" ]] && mirror_registry_host=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+        cluster_no_proxy=$(oc get proxy/cluster -o jsonpath='{.status.noProxy}' 2>/dev/null || echo "")
+        caa_no_proxy="127.0.0.1,localhost,.cluster.local,.svc"
+        caa_no_proxy="${caa_no_proxy}${cluster_no_proxy:+,${cluster_no_proxy}}"
+        caa_no_proxy="${caa_no_proxy}${mirror_registry_host:+,${mirror_registry_host}}"
+        echo ">>> TEMP proxy propagation to CAA (remove after operator#2839): HTTP_PROXY set, NO_PROXY=${caa_no_proxy}" >&2
+        helm_args+=("--set-string" "peerpods.providersConfigs.all.HTTP_PROXY=${caa_proxy_url}")
+        helm_args+=("--set-string" "peerpods.providersConfigs.all.HTTPS_PROXY=${caa_proxy_url}")
+        helm_args+=("--set-string" "peerpods.providersConfigs.all.NO_PROXY=${caa_no_proxy}")
+      fi
 
       case "${provider}" in
         azure)
