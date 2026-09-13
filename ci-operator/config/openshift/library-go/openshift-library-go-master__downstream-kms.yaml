@@ -1,0 +1,186 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src AS builder
+      WORKDIR /go/src/github.com/openshift/cluster-authentication-operator
+      RUN git clone --depth 1 --branch master https://github.com/openshift/cluster-authentication-operator.git . && \
+          rm -rf vendor/github.com/openshift/library-go && \
+          cp -a /go/src/github.com/openshift/library-go ./library-go && \
+          rm -rf ./library-go/vendor && \
+          go mod edit -dropreplace github.com/openshift/library-go && \
+          go mod edit -replace github.com/openshift/library-go=./library-go && \
+          go mod tidy && \
+          go mod vendor
+      ARG TAGS=ocp
+      ENV GO_PACKAGE=github.com/openshift/cluster-authentication-operator
+      RUN go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=downstream-kms-test" -tags="${TAGS}" -o authentication-operator ./cmd/authentication-operator && \
+          GO_BUILD_PACKAGES=./cmd/cluster-authentication-operator-tests-ext make build --warn-undefined-variables && \
+          gzip cluster-authentication-operator-tests-ext
+
+      FROM registry.ci.openshift.org/ocp/5.0:base-rhel9
+      COPY --from=builder /go/src/github.com/openshift/cluster-authentication-operator/authentication-operator /usr/bin/
+      COPY --from=builder /go/src/github.com/openshift/cluster-authentication-operator/cluster-authentication-operator-tests-ext.gz /usr/bin/
+      COPY --from=builder /go/src/github.com/openshift/cluster-authentication-operator/manifests /manifests
+      ENTRYPOINT ["/usr/bin/authentication-operator"]
+      LABEL io.openshift.release.operator=true
+    from: src
+    to: cluster-authentication-operator
+  - dockerfile_literal: |
+      FROM src AS builder
+      WORKDIR /go/src/github.com/openshift/cluster-kube-apiserver-operator
+      RUN git clone --depth 1 --branch main https://github.com/openshift/cluster-kube-apiserver-operator.git . && \
+          rm -rf vendor/github.com/openshift/library-go && \
+          cp -a /go/src/github.com/openshift/library-go ./library-go && \
+          rm -rf ./library-go/vendor && \
+          go mod edit -dropreplace github.com/openshift/library-go && \
+          go mod edit -replace github.com/openshift/library-go=./library-go && \
+          go mod tidy && \
+          go mod vendor
+      ENV GO_PACKAGE=github.com/openshift/cluster-kube-apiserver-operator
+      RUN make build --warn-undefined-variables && \
+          gzip cluster-kube-apiserver-operator-tests-ext
+
+      FROM registry.ci.openshift.org/ocp/5.0:base-rhel9
+      COPY --from=builder /go/src/github.com/openshift/cluster-kube-apiserver-operator/bindata/bootkube/bootstrap-manifests /usr/share/bootkube/manifests/bootstrap-manifests/
+      COPY --from=builder /go/src/github.com/openshift/cluster-kube-apiserver-operator/bindata/bootkube/config /usr/share/bootkube/manifests/config/
+      COPY --from=builder /go/src/github.com/openshift/cluster-kube-apiserver-operator/bindata/bootkube/manifests /usr/share/bootkube/manifests/manifests/
+      COPY --from=builder /go/src/github.com/openshift/cluster-kube-apiserver-operator/bindata/bootkube/scc-manifests /usr/share/bootkube/manifests/manifests/
+      COPY --from=builder /go/src/github.com/openshift/cluster-kube-apiserver-operator/vendor/github.com/openshift/api/apiserver/v1/zz_generated.crd-manifests/kube-apiserver_apirequestcounts.crd.yaml /usr/share/bootkube/manifests/manifests/
+      COPY --from=builder /go/src/github.com/openshift/cluster-kube-apiserver-operator/cluster-kube-apiserver-operator /usr/bin/
+      COPY --from=builder /go/src/github.com/openshift/cluster-kube-apiserver-operator/cluster-kube-apiserver-operator-tests-ext.gz /usr/bin/
+      COPY --from=builder /go/src/github.com/openshift/cluster-kube-apiserver-operator/manifests /manifests
+      COPY --from=builder /go/src/github.com/openshift/cluster-kube-apiserver-operator/bindata/bootkube/scc-manifests /manifests
+      LABEL io.openshift.release.operator=true
+    from: src
+    to: cluster-kube-apiserver-operator
+  - dockerfile_literal: |
+      FROM src AS builder
+      WORKDIR /go/src/github.com/openshift/cluster-openshift-apiserver-operator
+      RUN git clone --depth 1 --branch main https://github.com/openshift/cluster-openshift-apiserver-operator.git . && \
+          rm -rf vendor/github.com/openshift/library-go && \
+          cp -a /go/src/github.com/openshift/library-go ./library-go && \
+          rm -rf ./library-go/vendor && \
+          go mod edit -dropreplace github.com/openshift/library-go && \
+          go mod edit -replace github.com/openshift/library-go=./library-go && \
+          go mod tidy && \
+          go mod vendor
+      RUN GODEBUG=tls13=1 make build && \
+          make tests-ext-build && \
+          gzip cluster-openshift-apiserver-operator-tests-ext
+
+      FROM registry.ci.openshift.org/ocp/5.0:base-rhel9
+      COPY --from=builder /go/src/github.com/openshift/cluster-openshift-apiserver-operator/cluster-openshift-apiserver-operator /usr/bin/
+      COPY --from=builder /go/src/github.com/openshift/cluster-openshift-apiserver-operator/cluster-openshift-apiserver-operator-tests-ext.gz /usr/bin/
+      COPY --from=builder /go/src/github.com/openshift/cluster-openshift-apiserver-operator/manifests /manifests
+      LABEL io.openshift.release.operator=true
+    from: src
+    to: cluster-openshift-apiserver-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 3Gi
+tests:
+- always_run: false
+  as: e2e-aws-cluster-authentication-operator-encryption-kms
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-authentication-operator/encryption-kms
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-cluster-authentication-operator-encryption-kms-2
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-authentication-operator/encryption-kms-2
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-cluster-kube-apiserver-operator-encryption-kms
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-cluster-kube-apiserver-operator-encryption-kms-2
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms-2
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-cluster-openshift-apiserver-operator-encryption-kms
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-openshift-apiserver-operator/encryption-kms
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-cluster-openshift-apiserver-operator-encryption-kms-2
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-openshift-apiserver-operator/encryption-kms-2
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: library-go
+  variant: downstream-kms
