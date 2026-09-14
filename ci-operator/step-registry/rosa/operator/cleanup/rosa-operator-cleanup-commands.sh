@@ -100,7 +100,7 @@ fi
 # All waits share a single 300s budget so the total time is bounded.
 if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" && -n "${OPERATOR_NAMESPACE}" ]]; then
     DEPLOY_NAME="${OPERATOR_NAME}"
-    WAIT_BUDGET=300
+    WAIT_BUDGET=600
     WAIT_START=$(date +%s)
 
     wait_remaining() {
@@ -171,6 +171,36 @@ if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" && -n "${OPERATOR_NAM
                 log "WARNING: Deployment ${deploy} did not appear within budget — cluster may self-heal"
             fi
         done
+    fi
+
+    # Phase 4: wait for the PORT_FORWARD_SVC service to exist.
+    # The cli-e2e workflow port-forwards to this service on the next run. If
+    # the operator reconciles the operand deployment but the service isn't up
+    # yet, the next run fails immediately at port-forward. Waiting here avoids
+    # returning the cluster to the pool in that state.
+    if [[ -n "${PORT_FORWARD_SVC:-}" ]]; then
+        PF_NS="${PORT_FORWARD_SVC%%/*}"
+        PF_SVC_PORT="${PORT_FORWARD_SVC#*/}"
+        PF_SVC="${PF_SVC_PORT%%:*}"
+        REMAINING=$(wait_remaining)
+        if [[ "${REMAINING}" -gt 0 ]]; then
+            log "Waiting for service ${PF_SVC} in ${PF_NS} to appear (${REMAINING}s remaining)"
+            SVC_FOUND=false
+            while [[ "$(wait_remaining)" -gt 0 ]]; do
+                if oc get svc "${PF_SVC}" -n "${PF_NS}" &>/dev/null; then
+                    SVC_FOUND=true
+                    break
+                fi
+                sleep 10
+            done
+            if [[ "${SVC_FOUND}" == "true" ]]; then
+                log "Service ${PF_SVC} is available in ${PF_NS}"
+            else
+                log "WARNING: Service ${PF_SVC} did not appear within budget — cluster may be returned in degraded state"
+            fi
+        else
+            log "WARNING: Budget exhausted before checking for service ${PF_SVC} — cluster may be returned in degraded state"
+        fi
     fi
 fi
 

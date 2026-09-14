@@ -79,6 +79,24 @@ if [[ -n "${PORT_FORWARD_SVC:-}" ]]; then
     PF_SVC_PORT="${PORT_FORWARD_SVC#*/}"
     PF_SVC="${PF_SVC_PORT%%:*}"
     PF_PORT="${PF_SVC_PORT#*:}"
+
+    # Wait for the service to exist before port-forwarding. A previous run's
+    # operator cleanup may have returned the cluster just as the operand
+    # service was coming up -- give it a short grace period rather than
+    # failing immediately.
+    SVC_WAIT=120
+    SVC_START=$(date +%s)
+    until kubectl get svc "${PF_SVC}" -n "${PF_NS}" &>/dev/null; do
+        if (( $(date +%s) - SVC_START > SVC_WAIT )); then
+            log "ERROR: Service ${PF_SVC} not found in ${PF_NS} after ${SVC_WAIT}s -- operator may not have reconciled"
+            kubectl get all -n "${PF_NS}" 2>/dev/null || true
+            kubectl get ocmagents -A 2>/dev/null || true
+            exit 1
+        fi
+        log "Waiting for service ${PF_SVC} in ${PF_NS}..."
+        sleep 10
+    done
+
     log "Starting kubectl port-forward svc/${PF_SVC} ${PF_PORT}:${PF_PORT} -n ${PF_NS}"
     kubectl port-forward "svc/${PF_SVC}" "${PF_PORT}:${PF_PORT}" -n "${PF_NS}" &
     PF_PID=$!
