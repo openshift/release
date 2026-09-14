@@ -291,6 +291,15 @@ tests:
 
         wait $LOGS_PID 2>/dev/null || true
 
+        echo "Waiting for pod to terminate..."
+        for i in {1..24}; do
+          phase=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+          if [[ "$phase" == "Succeeded" || "$phase" == "Failed" ]]; then
+            break
+          fi
+          sleep 5
+        done
+
         pod_exit_code=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "1")
         echo "=== TLS Scanner Complete (namespace: openshift-compliance) ==="
         if [[ "$SCAN_TIMED_OUT" == "true" ]]; then
