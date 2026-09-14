@@ -79,14 +79,9 @@ if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_CRDS:-}" && -n "${OPERATOR_NAM
         crd=$(echo "${crd}" | xargs)
         if oc get crd "${crd}" &>/dev/null; then
             INSTANCE=$(oc get crd "${crd}" -o jsonpath='{.metadata.labels.package-operator\.run/instance}' 2>/dev/null || true)
-            OWNER_COS=$(oc get crd "${crd}" -o jsonpath='{.metadata.ownerReferences[0].name}' 2>/dev/null || true)
-            if [[ "${INSTANCE}" == "${CLUSTER_PACKAGE_NAME}" && -n "${OWNER_COS}" ]]; then
-                # Confirm the owner COS is actually gone (not just an API error)
-                COS_CHECK=$(oc get "clusterobjectset/${OWNER_COS}" --ignore-not-found -o name 2>&1) || true
-                if [[ -z "${COS_CHECK}" ]]; then
-                    log "Clearing stale e2e ownership on CRD ${crd} (owner ${OWNER_COS} gone)"
-                    oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${OPERATOR_NAME}"'"}}}' 2>/dev/null || true
-                fi
+            if [[ "${INSTANCE}" == "${CLUSTER_PACKAGE_NAME}" ]]; then
+                log "Clearing stale e2e ownership on CRD ${crd} (test ClusterPackage deleted)"
+                oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${OPERATOR_NAME}"'"}}}' 2>/dev/null || true
             fi
         fi
     done
