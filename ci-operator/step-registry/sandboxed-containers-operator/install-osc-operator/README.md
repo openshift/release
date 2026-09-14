@@ -39,5 +39,30 @@ do not need it.
 This step expects the following to be available (created by earlier steps in the chain):
 
 - `osc-config` ConfigMap in default namespace (created by `env-cm` step)
-- `peerpods-param-cm` ConfigMap in default namespace (created by `peerpods-param-cm` step, when peer-pods enabled)
-- `peerpods-param-secret` Secret in default namespace (created by `peerpods-param-cm` step, when peer-pods enabled)
+
+For peer-pods enabled workloads, the step auto-detects cloud provider configuration from cluster infrastructure. You can override detected values by setting environment variables:
+
+**Common variables:**
+- `VXLAN_PORT` - VXLAN port (default: 9000)
+- `PROXY_TIMEOUT` - Proxy timeout (default: 30m)
+
+**Azure provider:**
+- `AZURE_SUBNET_ID` - Azure subnet ID
+- `AZURE_NSG_ID` - Azure NSG ID
+- `AZURE_RESOURCE_GROUP` - Azure resource group
+- `AZURE_REGION` - Azure region
+- `AZURE_INSTANCE_SIZE` - VM instance size (default: Standard_D2s_v3)
+- `AZURE_SSH_KEY_PUB` - SSH public key
+
+**AWS provider:**
+- `AWS_REGION` - AWS region
+- `AWS_SUBNET_ID` - AWS subnet ID
+- `AWS_VPC_ID` - AWS VPC ID
+- `AWS_SG_IDS` - AWS security group IDs
+- `PODVM_INSTANCE_TYPE` - EC2 instance type (default: t3.medium)
+
+**GCP provider:**
+- `GCP_PROJECT_ID` - GCP project ID
+- `GCP_ZONE` - GCP zone
+- `GCP_NETWORK` - GCP network
+- `GCP_MACHINE_TYPE` - GCP machine type (default: e2-standard-4)
