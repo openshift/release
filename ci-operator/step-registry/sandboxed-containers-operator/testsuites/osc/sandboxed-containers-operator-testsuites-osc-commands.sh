@@ -25,6 +25,28 @@ EOF
     exit 0
 fi
 
+# --- Sanity gate -------------------------------------------------------------
+# The sanity step writes ${SHARED_DIR}/testsuites_gate on success.
+GATE="${SHARED_DIR}/testsuites_gate"
+gate_reason=""
+if [[ ! -f "${GATE}" ]]; then
+    gate_reason="sanity gate absent: sanity suite never ran (setup/pre phase likely failed)"
+elif [[ "$(cat "${GATE}")" != "passed" ]]; then
+    gate_reason="sanity gate failed: sanity suite ran but reported '$(cat "${GATE}")'"
+fi
+if [[ -n "${gate_reason}" ]]; then
+    echo "${gate_reason}; skipping osc suite."
+    cat > "${ARTIFACT_DIR}/junit_osc_skip.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="osc" tests="1" failures="0" errors="0" skipped="1">
+  <testcase name="osc" classname="osc.testsuites.osc" time="0">
+    <skipped message="${gate_reason}"/>
+  </testcase>
+</testsuite>
+EOF
+    exit 0
+fi
+
 # --- Configuration -----------------------------------------------------------
 # The golang e2e tests live in the operator repo. We always run them from the
 # development branch.

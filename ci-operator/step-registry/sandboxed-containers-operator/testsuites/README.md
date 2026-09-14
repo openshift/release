@@ -36,6 +36,10 @@ Design decisions that follow from that intent:
   variable for a suite follows the `TESTS_<SUITE_NAME>_<PARAMETER>` convention.
 - **Every suite emits standard Prow artifacts + JUnit**, so results show up in
   Spyglass whether the suite ran, was skipped, or failed.
+- **A sanity gate guards the whole chain.** The post suites only run when a
+  `test`-phase sanity step has confirmed the environment is usable; otherwise they
+  skip instead of producing a flood of meaningless failures. See
+  [Sanity gate](#sanity-gate-test-phase) below.
 
 **Scope** is deliberately limited to `ci-operator/**/sandboxed-containers-operator/`.
 
@@ -60,12 +64,48 @@ Non-blocking behaviour requires **both**:
 > still marks the **overall job red** — it just doesn't stop the steps that follow it.
 > To keep a job green you would additionally exit 0 or use `optional_on_success`.
 
+## Sanity gate (test phase)
+
+The post suites run in `post`, which ci-operator executes **even when the `pre`
+(setup) phase failed**. Running the suites against a broken cluster yields a flood
+of failures that all say nothing useful. The **sanity gate** prevents that.
+
+`sandboxed-containers-operator-testsuites-sanity` is a **`test`-phase** step that
+runs sanity tests. On success it writes a gate file to
+`${SHARED_DIR}/testsuites_gate` with the content `passed`. Each post suite reads
+that file and decides whether to run:
+
+| Gate file                         | Meaning                                            | Post suite |
+|-----------------------------------|----------------------------------------------------|------------|
+| absent                            | sanity never ran (e.g. `pre` failed, so ci-operator skipped the whole `test:` phase) | **skips** (aborts) |
+| present, content `passed`         | sanity ran and passed                              | **runs** (if enabled) |
+| present, content != `passed`      | sanity ran but detected a problem                  | **skips** (aborts) |
+
+When a suite skips because of the gate, it still emits a skipped JUnit whose
+message carries the exact reason, so "environment was never validated" is
+distinguishable from "sanity detected a broken cluster".
+
+The gate mechanism relies on a key ci-operator behaviour: **if a `pre` step fails,
+the entire `test:` phase is skipped** and execution jumps to `post`. That is why the
+sanity step lives in `test:` — a failed setup means it never runs, the gate file is
+never written, and every post suite aborts on its own.
+
+Notes:
+
+- Its enable-gate `TESTS_SANITY_ENABLE` defaults to `"true"` (unlike the
+  skip-by-default post suites) because it is the *producer* of the gate: if it does
+  not run, no post suite runs. Set it to `"false"` only to intentionally disable all
+  post suites.
+
 ## Layout
 
 ```
 testsuites/
 ├── README.md                                              (this file)
 ├── sandboxed-containers-operator-testsuites-chain.yaml    (the POST chain)
+├── sanity/                                                (test-phase gate; writes ${SHARED_DIR}/testsuites_gate)
+│   ├── ...-sanity-ref.yaml
+│   └── ...-sanity-commands.sh
 ├── kata-upstream/                                         (upstream Kata Containers e2e tests)
 │   ├── ...-kata-upstream-ref.yaml
 │   └── ...-kata-upstream-commands.sh
@@ -104,6 +144,8 @@ workflow:
     - chain: sandboxed-containers-operator-testsuites   # runs first in post
     - ref: cucushift-installer-wait
       ...
+    test:
+    - ref: sandboxed-containers-operator-testsuites-sanity   # gate, before the main test
 ```
 
 ## Adding a suite
@@ -112,7 +154,10 @@ workflow:
    `...-<suite>-ref.yaml` (env `TESTS_<SUITE_NAME>_ENABLE`, default `"false"`;
    name all suite parameters `TESTS_<SUITE_NAME>_<PARAMETER>`) and a
    `...-<suite>-commands.sh` (default `set -euo pipefail`; write
-   `${ARTIFACT_DIR}/junit_<suite>.xml` in both the run and skip paths).
+   `${ARTIFACT_DIR}/junit_<suite>.xml` in both the run and skip paths). After the
+   enable-gate, add the sanity-gate check (skip unless
+   `${SHARED_DIR}/testsuites_gate` exists and equals `passed`) — copy it from
+   `osc/` or `kata-upstream/`.
 2. Append the ref to `sandboxed-containers-operator-testsuites-chain.yaml` with
    `best_effort: true`.
 3. Run `make update` (generates the `*.metadata.json` files) and validate with the
