@@ -158,9 +158,16 @@ if [[ -z "${QUAY_ROUTE}" ]]; then
   exit 1
 fi
 
+ROUTER_CA="$(mktemp)"
+oc -n openshift-config-managed get configmap default-ingress-cert -o jsonpath='{.data.ca-bundle.crt}' > "${ROUTER_CA}"
+if [[ ! -s "${ROUTER_CA}" ]]; then
+  echo "ERROR: could not read default-ingress-cert CA bundle" >&2
+  exit 1
+fi
+
 echo "Verifying Quay health at ${QUAY_ROUTE}..."
 for i in $(seq 1 30); do
-  HTTP_CODE=$(curl -sk -o /dev/null -w '%{http_code}' "${QUAY_ROUTE}/health/instance" || true)
+  HTTP_CODE=$(curl -s --cacert "${ROUTER_CA}" -o /dev/null -w '%{http_code}' "${QUAY_ROUTE}/health/instance" || true)
   if [[ "${HTTP_CODE}" == "200" ]]; then
     echo "Quay is healthy after custom image swap"
     exit 0
