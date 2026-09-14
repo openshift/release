@@ -15,6 +15,16 @@ export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/cl
 export CUSTOMER_SUBSCRIPTION="${CUSTOMER_SUBSCRIPTION:-$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")}"
 export AZURE_TOKEN_CREDENTIALS=prod
 
+while :
+do
+    if [ -f /tmp/dummy ]; then
+        break
+    fi
+    sleep 1s
+done
+
+exit 0
+
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 set -o xtrace
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
