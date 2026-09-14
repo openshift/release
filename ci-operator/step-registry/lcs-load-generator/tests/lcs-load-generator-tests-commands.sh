@@ -332,9 +332,9 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
               value: \"${PYROSCOPE_URL}\""
 fi
 
-LCS_COMMAND_OVERRIDE=""
+LCS_COMMAND_OVERRIDE='          command: ["python3", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml"]'
 if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
-  LCS_COMMAND_OVERRIDE='          command: ["memray", "run", "--output", "/mnt/profiling/memray-output.bin", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8080"]'
+  LCS_COMMAND_OVERRIDE='          command: ["memray", "run", "--output", "/mnt/profiling/memray-output.bin", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml"]'
 fi
 
 cat <<DEPLOYMENT | oc apply -f -
@@ -371,8 +371,6 @@ ${LCS_COMMAND_OVERRIDE}
           ports:
             - containerPort: 8080
           env:
-            - name: OLS_CONFIG_FILE
-              value: "/app-config/lightspeed-stack.yaml"
             - name: OTEL_SDK_DISABLED
               value: "true"${PYROSCOPE_ENV}
           volumeMounts:
