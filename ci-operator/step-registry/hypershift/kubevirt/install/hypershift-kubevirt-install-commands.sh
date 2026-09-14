@@ -34,11 +34,34 @@ YQ="/tmp/yq"
 curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
 chmod +x ${YQ}
 
-# Dynamically get CNV catalog image and channel that were provided to the job via gangway API
-CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
-  ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_PRERELEASE_CATALOG_IMAGE") | .value')
-CNV_SUBSCRIPTION_CHANNEL=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
-  ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value')
+# Gangway can inject CNV settings on the ProwJob; the public prowjob endpoint may require auth (HTML 403).
+read_gangway_cnv_env_from_prow() {
+  if [[ -n "${CNV_PRERELEASE_CATALOG_IMAGE:-}" ]] && [[ -n "${CNV_SUBSCRIPTION_CHANNEL:-}" ]]; then
+    return 0
+  fi
+  if [[ -z "${PROW_JOB_ID:-}" ]]; then
+    return 0
+  fi
+  local prow_job_spec=""
+  if ! prow_job_spec=$(curl -fsSL "https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}" 2>/dev/null); then
+    echo "WARN: could not fetch Prow job spec for ${PROW_JOB_ID}; using default CNV catalog settings" >&2
+    return 0
+  fi
+  if [[ "${prow_job_spec}" == *"<!DOCTYPE"* ]] || [[ "${prow_job_spec}" == *"<html"* ]]; then
+    echo "WARN: Prow job spec is not YAML (auth required?); using default CNV catalog settings" >&2
+    return 0
+  fi
+  if [[ -z "${CNV_PRERELEASE_CATALOG_IMAGE:-}" ]]; then
+    CNV_PRERELEASE_CATALOG_IMAGE=$(echo "${prow_job_spec}" | ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_PRERELEASE_CATALOG_IMAGE") | .value' - 2>/dev/null || true)
+  fi
+  if [[ -z "${CNV_SUBSCRIPTION_CHANNEL:-}" ]]; then
+    CNV_SUBSCRIPTION_CHANNEL=$(echo "${prow_job_spec}" | ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value' - 2>/dev/null || true)
+  fi
+}
+
+read_gangway_cnv_env_from_prow
+CNV_PRERELEASE_CATALOG_IMAGE="${CNV_PRERELEASE_CATALOG_IMAGE:-}"
+CNV_SUBSCRIPTION_CHANNEL="${CNV_SUBSCRIPTION_CHANNEL:-}"
 
 if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]
 then
