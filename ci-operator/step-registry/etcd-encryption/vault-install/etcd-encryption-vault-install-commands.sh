@@ -3,6 +3,20 @@ set -euo pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
+# Dev mode is used on bare metal by default (no Raft HA / init-unseal complexity).
+# Set VAULT_DEV_MODE=false on metal jobs to force HA Raft, or VAULT_DEV_MODE=true elsewhere.
+vault_dev_mode_enabled() {
+  case "${VAULT_DEV_MODE:-}" in
+    true|TRUE|yes|YES|1)
+      return 0
+      ;;
+    false|FALSE|no|NO|0)
+      return 1
+      ;;
+  esac
+  [[ -n "${CLUSTER_TYPE:-}" && "${CLUSTER_TYPE}" == equinix-ocp-metal ]]
+}
+
 resolve_image_repo() {
   local image="$1"
   if [[ "${image}" == *@* ]]; then
@@ -163,6 +177,93 @@ setup_packet_cluster() {
   fi
 }
 
+VAULT_HA_REPLICAS="${VAULT_HA_REPLICAS:-3}"
+VAULT_INIT_SECRET="vault-init-credentials"
+VAULT_INIT_PLACEHOLDER="pending"
+
+# Cap HA replicas to schedulable nodes (e.g. single-node OpenShift cannot run 3 Vault pods).
+resolve_vault_ha_replicas() {
+  local requested="${VAULT_HA_REPLICAS}"
+  local node_count
+
+  node_count="$(oc get nodes --no-headers 2>/dev/null | wc -l | tr -d '[:space:]')"
+  if [[ -z "${node_count}" || "${node_count}" -lt 1 ]]; then
+    node_count=1
+  fi
+  if [[ "${requested}" -gt "${node_count}" ]]; then
+    echo "Cluster has ${node_count} node(s); capping VAULT_HA_REPLICAS from ${requested} to ${node_count}"
+    requested="${node_count}"
+  fi
+  VAULT_HA_REPLICAS="${requested}"
+  export VAULT_HA_REPLICAS
+}
+
+# Generate a self-signed CA and server certificate for Vault TLS.
+# Args: $1 = namespace, $2 = Helm release name, $3 = replica count
+# Sets CA_CERT_TMP to the generated CA certificate path.
+generate_vault_tls() {
+  local namespace="$1"
+  local release_name="$2"
+  local replica_count="$3"
+  local tls_dir="/tmp/vault-tls-${namespace}"
+
+  rm -rf "${tls_dir}"
+  mkdir -p "${tls_dir}"
+
+  echo "Generating Vault TLS CA and server certificate..."
+  openssl req -new -newkey rsa:4096 -days 3650 -nodes -x509 \
+    -subj "/CN=Vault KMS CA" \
+    -keyout "${tls_dir}/ca.key" -out "${tls_dir}/ca.pem" \
+    >/dev/null 2>&1
+
+  openssl req -new -newkey rsa:4096 -nodes \
+    -subj "/CN=${release_name}.${namespace}.svc" \
+    -keyout "${tls_dir}/tls.key" -out "${tls_dir}/tls.csr" \
+    >/dev/null 2>&1
+
+  {
+    echo "[req]"
+    echo "distinguished_name = req_distinguished_name"
+    echo "req_extensions = v3_req"
+    echo "[req_distinguished_name]"
+    echo "[v3_req]"
+    echo "subjectAltName = @alt_names"
+    echo "[alt_names]"
+    echo "DNS.1 = ${release_name}"
+    echo "DNS.2 = ${release_name}.${namespace}.svc"
+    echo "DNS.3 = ${release_name}.${namespace}.svc.cluster.local"
+    echo "DNS.4 = ${release_name}-internal.${namespace}.svc"
+    echo "DNS.5 = ${release_name}-internal.${namespace}.svc.cluster.local"
+    echo "DNS.6 = localhost"
+    echo "IP.1 = 127.0.0.1"
+    local i
+    for i in $(seq 0 $((replica_count - 1))); do
+      echo "DNS.$((7 + i)) = ${release_name}-${i}.${release_name}-internal"
+      echo "DNS.$((7 + replica_count + i)) = ${release_name}-${i}.${release_name}-internal.${namespace}.svc"
+      echo "DNS.$((7 + 2 * replica_count + i)) = ${release_name}-${i}.${release_name}-internal.${namespace}.svc.cluster.local"
+    done
+  } > "${tls_dir}/san.cnf"
+
+  openssl x509 -req -days 3650 \
+    -in "${tls_dir}/tls.csr" \
+    -CA "${tls_dir}/ca.pem" -CAkey "${tls_dir}/ca.key" -CAcreateserial \
+    -out "${tls_dir}/tls.crt" \
+    -extensions v3_req -extfile "${tls_dir}/san.cnf" \
+    >/dev/null 2>&1
+
+  cp "${tls_dir}/ca.pem" "${tls_dir}/ca.crt"
+
+  oc create secret generic vault-tls \
+    --from-file=tls.crt="${tls_dir}/tls.crt" \
+    --from-file=tls.key="${tls_dir}/tls.key" \
+    --from-file=ca.pem="${tls_dir}/ca.pem" \
+    -n "${namespace}" \
+    --dry-run=client -o yaml | oc apply -f -
+
+  CA_CERT_TMP="${tls_dir}/ca.pem"
+  echo "  ✓ TLS secret vault-tls created in ${namespace}"
+}
+
 # Prepare the namespace, SCC, and license secret for a Vault instance.
 # Must run before setup_packet_cluster() to avoid proxy interference.
 # Args: $1 = namespace, $2 = Helm release name
@@ -183,11 +284,23 @@ setup_vault_namespace() {
   oc create secret generic "${VAULT_LICENSE_SECRET_NAME}" \
     --from-file=license=/var/run/vault/tests-private-account/kms-vault-license \
     -n "${namespace}"
+
+  if vault_dev_mode_enabled; then
+    return 0
+  fi
+
+  # Placeholder init credentials are replaced by etcd-encryption-vault-configure.
+  # The unsealer sidecar mounts this secret and waits for the real unseal key.
+  echo "Creating placeholder ${VAULT_INIT_SECRET} secret..."
+  oc create secret generic "${VAULT_INIT_SECRET}" \
+    --from-literal=root-token="${VAULT_INIT_PLACEHOLDER}" \
+    --from-literal=unseal-key="${VAULT_INIT_PLACEHOLDER}" \
+    -n "${namespace}"
 }
 
-# Install a Vault Enterprise instance in the given namespace.
+# Install a single-replica Vault Enterprise dev instance (bare metal default).
 # Args: $1 = namespace, $2 = CA ConfigMap name, $3 = Helm release name
-install_vault() {
+install_vault_dev() {
   local namespace="$1"
   local ca_configmap="$2"
   local release_name="$3"
@@ -195,49 +308,289 @@ install_vault() {
 
   echo ""
   echo "========================================="
-  echo "Vault Enterprise Installation via Helm"
+  echo "Vault Enterprise Installation via Helm (dev mode)"
   echo "========================================="
   echo "Image: ${VAULT_ENTERPRISE_IMAGE}"
   echo "Namespace: ${namespace}"
   echo ""
 
   local vault_api_addr="https://${release_name}.${namespace}.svc:8200"
+  local values_file="/tmp/vault-values-${namespace}.yaml"
+  local vault_server_image="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
+  if [[ "${VAULT_ENTERPRISE_IMAGE}" == *@* ]]; then
+    vault_server_image="${VAULT_IMAGE_REPOSITORY}@${VAULT_VERSION}"
+  fi
 
-  # Install Vault via Helm with dev mode and TLS enabled
   echo "Installing Vault Enterprise ${VAULT_ENTERPRISE_IMAGE} in dev mode with TLS..."
+  cat > "${values_file}" <<EOF
+global:
+  enabled: true
+  openshift: true
+  tlsDisable: false
+
+injector:
+  enabled: false
+
+server:
+  image:
+    repository: ${VAULT_IMAGE_REPOSITORY}
+    tag: ${VAULT_VERSION}
+  dev:
+    enabled: true
+  extraArgs: >-
+    -dev-tls
+    -dev-tls-cert-dir=/var/run/tls
+    -dev-tls-san=${release_name}
+    -dev-tls-san=${release_name}.${namespace}.svc
+  extraEnvironmentVars:
+    VAULT_DISABLE_USER_LOCKOUT: "true"
+    VAULT_CACERT: /var/run/tls/vault-ca.pem
+    VAULT_API_ADDR: ${vault_api_addr}
+  enterpriseLicense:
+    secretName: ${VAULT_LICENSE_SECRET_NAME}
+    secretKey: license
+  volumes:
+    - name: tls
+      emptyDir: {}
+  volumeMounts:
+    - name: tls
+      mountPath: /var/run/tls
+EOF
+
   helm upgrade --install "${release_name}" "${VAULT_CHART_ARCHIVE}" \
     --namespace "${namespace}" \
     --version "${VAULT_CHART_VERSION}" \
-    --set global.enabled=true \
-    --set global.openshift=true \
-    --set global.tlsDisable=false \
-    --set server.dev.enabled=true \
-    --set server.image.repository="${VAULT_IMAGE_REPOSITORY}" \
-    --set server.image.tag="${VAULT_VERSION}" \
-    --set injector.enabled=false \
-    --set 'server.extraEnvironmentVars.VAULT_DISABLE_USER_LOCKOUT=true' \
-    --set 'server.extraEnvironmentVars.VAULT_CACERT=/var/run/tls/vault-ca.pem' \
-    --set "server.extraEnvironmentVars.VAULT_API_ADDR=${vault_api_addr}" \
-    --set "server.enterpriseLicense.secretName=${VAULT_LICENSE_SECRET_NAME}" \
-    --set "server.enterpriseLicense.secretKey=license" \
-    --set "server.extraArgs=-dev-tls -dev-tls-cert-dir=/var/run/tls -dev-tls-san=${release_name} -dev-tls-san=${release_name}.${namespace}.svc" \
-    --set 'server.volumes[0].name=tls' \
-    --set-json 'server.volumes[0].emptyDir={}' \
-    --set 'server.volumeMounts[0].name=tls' \
-    --set 'server.volumeMounts[0].mountPath=/var/run/tls' \
+    -f "${values_file}" \
     --wait \
     --timeout 10m
 
-  # Helm wait passes even when vault pod is 0/1 Running, so wait for ready condition
+  if [[ "${VAULT_ENTERPRISE_IMAGE}" == *@* ]]; then
+    echo "Patching Vault StatefulSet image to digest reference ${vault_server_image}..."
+    oc set image "statefulset/${release_name}" \
+      vault="${vault_server_image}" \
+      -n "${namespace}"
+    oc rollout status "statefulset/${release_name}" -n "${namespace}" --timeout=10m
+  fi
+
   echo "Waiting for Vault pod to be ready..."
   oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
 
-  # Extract CA certificate from Vault pod
   echo ""
   echo "Extracting CA certificate from Vault pod..."
   CA_CERT_TMP="/tmp/vault-ca-${namespace}.pem"
   oc exec "${pod_name}" -n "${namespace}" -- cat /var/run/tls/vault-ca.pem > "${CA_CERT_TMP}"
   echo "  ✓ CA certificate extracted"
+
+  echo ""
+  echo "Creating ConfigMap ${ca_configmap} in openshift-config..."
+  oc create configmap "${ca_configmap}" \
+    --from-file=ca-bundle.crt="${CA_CERT_TMP}" \
+    -n openshift-config \
+    --dry-run=client -o yaml | oc apply -f -
+  echo "  ✓ ConfigMap ${ca_configmap} created/updated"
+
+  rm -f "${CA_CERT_TMP}" "${values_file}"
+
+  echo ""
+  echo "========================================="
+  echo "Vault Enterprise Installation Complete (dev mode)"
+  echo "========================================="
+  echo ""
+  echo "Summary:"
+  echo "  - Namespace: ${namespace}"
+  echo "  - Image: ${VAULT_ENTERPRISE_IMAGE}"
+  echo "  - Service: https://${release_name}.${namespace}.svc:8200"
+  echo "  - Pod: ${pod_name} (Ready)"
+  echo "  - Mode: dev (pre-initialized, root token \"root\")"
+  echo "  - TLS: Enabled (dev mode with auto-generated certificates)"
+  echo "  - TLS CA: /var/run/tls/vault-ca.pem (inside pod)"
+  echo "  - Enterprise License: Configured"
+  echo "  - CA ConfigMap: ${ca_configmap} (openshift-config namespace)"
+  echo ""
+  echo "Next step: Run etcd-encryption-vault-configure to configure Vault for KMS"
+  echo ""
+}
+
+# Install a Vault Enterprise HA Raft cluster.
+# Args: $1 = namespace, $2 = CA ConfigMap name, $3 = Helm release name
+install_vault_ha() {
+  local namespace="$1"
+  local ca_configmap="$2"
+  local release_name="$3"
+
+  echo ""
+  echo "========================================="
+  echo "Vault Enterprise Installation via Helm (HA Raft)"
+  echo "========================================="
+  echo "Image: ${VAULT_ENTERPRISE_IMAGE}"
+  echo "Namespace: ${namespace}"
+  echo ""
+
+  local vault_api_addr="https://${release_name}.${namespace}.svc:8200"
+  local values_file="/tmp/vault-values-${namespace}.yaml"
+  local vault_server_image="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
+  if [[ "${VAULT_ENTERPRISE_IMAGE}" == *@* ]]; then
+    vault_server_image="${VAULT_IMAGE_REPOSITORY}@${VAULT_VERSION}"
+  fi
+
+  generate_vault_tls "${namespace}" "${release_name}" "${VAULT_HA_REPLICAS}"
+
+  # Install Vault via Helm in HA Raft mode with TLS and persistent storage.
+  echo "Installing Vault Enterprise ${VAULT_ENTERPRISE_IMAGE} in HA Raft mode with TLS..."
+  cat > "${values_file}" <<EOF
+global:
+  enabled: true
+  openshift: true
+  tlsDisable: false
+
+injector:
+  enabled: false
+
+server:
+  image:
+    repository: ${VAULT_IMAGE_REPOSITORY}
+    tag: ${VAULT_VERSION}
+  dev:
+    enabled: false
+  standalone:
+    enabled: false
+  ha:
+    enabled: true
+    replicas: ${VAULT_HA_REPLICAS}
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = true
+
+        listener "tcp" {
+          tls_disable = 0
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+          tls_cert_file = "/vault/userconfig/vault-tls/tls.crt"
+          tls_key_file = "/vault/userconfig/vault-tls/tls.key"
+          tls_client_ca_file = "/vault/userconfig/vault-tls/ca.pem"
+        }
+
+        storage "raft" {
+          path = "/vault/data"
+          retry_join {
+            leader_api_addr = "https://${release_name}.${namespace}.svc:8200"
+            leader_tls_servername = "${release_name}.${namespace}.svc"
+            leader_ca_cert_file = "/vault/userconfig/vault-tls/ca.pem"
+            leader_client_cert_file = "/vault/userconfig/vault-tls/tls.crt"
+            leader_client_key_file = "/vault/userconfig/vault-tls/tls.key"
+          }
+        }
+
+        service_registration "kubernetes" {}
+  dataStorage:
+    enabled: true
+  tolerations:
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  readinessProbe:
+    enabled: true
+    path: "/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200"
+  enterpriseLicense:
+    secretName: ${VAULT_LICENSE_SECRET_NAME}
+    secretKey: license
+  extraEnvironmentVars:
+    VAULT_DISABLE_USER_LOCKOUT: "true"
+    VAULT_CACERT: /vault/userconfig/vault-tls/ca.pem
+    VAULT_API_ADDR: ${vault_api_addr}
+  extraVolumes:
+    - type: secret
+      name: vault-tls
+    - type: secret
+      name: ${VAULT_INIT_SECRET}
+  extraContainers:
+    - name: vault-unsealer
+      image: ${vault_server_image}
+      command:
+        - /bin/sh
+        - -c
+      args:
+        - |
+          set -u
+          export VAULT_ADDR=https://127.0.0.1:8200
+          export VAULT_CACERT=/vault/userconfig/vault-tls/ca.pem
+          UNSEAL_KEY_FILE=/vault/userconfig/${VAULT_INIT_SECRET}/unseal-key
+          PLACEHOLDER=${VAULT_INIT_PLACEHOLDER}
+          log() {
+            echo "\$(date -u +%Y-%m-%dT%H:%M:%SZ) vault-unsealer: \$*"
+          }
+          log "starting"
+          while true; do
+            if [ ! -f "\${UNSEAL_KEY_FILE}" ]; then
+              log "waiting for \${UNSEAL_KEY_FILE}"
+              sleep 10
+              continue
+            fi
+            UNSEAL_KEY=\$(tr -d '\\n' < "\${UNSEAL_KEY_FILE}")
+            if [ -z "\${UNSEAL_KEY}" ] || [ "\${UNSEAL_KEY}" = "\${PLACEHOLDER}" ]; then
+              log "waiting for real unseal key (placeholder or empty)"
+              sleep 10
+              continue
+            fi
+            STATUS_JSON=\$(vault status -format=json 2>/dev/null || true)
+            if [ -z "\${STATUS_JSON}" ]; then
+              log "vault status unavailable, retrying"
+              sleep 10
+              continue
+            fi
+            if echo "\${STATUS_JSON}" | tr -d ' \n' | grep -q '"sealed":true'; then
+              log "vault is sealed, attempting unseal"
+              if vault operator unseal "\${UNSEAL_KEY}"; then
+                log "unseal command succeeded"
+              else
+                log "unseal command failed"
+              fi
+            else
+              log "vault is already unsealed"
+            fi
+            sleep 30
+          done
+      volumeMounts:
+        - name: userconfig-vault-tls
+          mountPath: /vault/userconfig/vault-tls
+          readOnly: true
+        - name: userconfig-${VAULT_INIT_SECRET}
+          mountPath: /vault/userconfig/${VAULT_INIT_SECRET}
+          readOnly: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+EOF
+
+  helm upgrade --install "${release_name}" "${VAULT_CHART_ARCHIVE}" \
+    --namespace "${namespace}" \
+    --version "${VAULT_CHART_VERSION}" \
+    -f "${values_file}" \
+    --wait \
+    --timeout 15m
+
+  # Vault Helm 0.28.1 renders server images as repository:tag, which breaks digest pins.
+  if [[ "${VAULT_ENTERPRISE_IMAGE}" == *@* ]]; then
+    echo "Patching Vault StatefulSet images to digest reference ${vault_server_image}..."
+    oc set image "statefulset/${release_name}" \
+      vault="${vault_server_image}" \
+      vault-unsealer="${vault_server_image}" \
+      -n "${namespace}"
+    oc rollout status "statefulset/${release_name}" -n "${namespace}" --timeout=15m
+  fi
+
+  # Helm wait passes even when vault pods are 0/1 Running, so wait for ready condition.
+  echo "Waiting for Vault pods to be ready..."
+  local i
+  for i in $(seq 0 $((VAULT_HA_REPLICAS - 1))); do
+    oc wait --for=condition=ready "pod/${release_name}-${i}" -n "${namespace}" --timeout=10m
+  done
 
   # Create or update ConfigMap with CA certificate in openshift-config
   echo ""
@@ -248,8 +601,8 @@ install_vault() {
     --dry-run=client -o yaml | oc apply -f -
   echo "  ✓ ConfigMap ${ca_configmap} created/updated"
 
-  # Clean up temporary CA file
-  rm -f "${CA_CERT_TMP}"
+  # Clean up temporary TLS artifacts
+  rm -rf "/tmp/vault-tls-${namespace}" "${values_file}"
 
   echo ""
   echo "========================================="
@@ -260,14 +613,27 @@ install_vault() {
   echo "  - Namespace: ${namespace}"
   echo "  - Image: ${VAULT_ENTERPRISE_IMAGE}"
   echo "  - Service: https://${release_name}.${namespace}.svc:8200"
-  echo "  - Pod: ${pod_name} (Ready)"
-  echo "  - TLS: Enabled (dev mode with auto-generated certificates)"
-  echo "  - TLS CA: /var/run/tls/vault-ca.pem (inside pod)"
+  echo "  - HA Replicas: ${VAULT_HA_REPLICAS} (${release_name}-0..${release_name}-$((VAULT_HA_REPLICAS - 1)))"
+  echo "  - Control-plane tolerations: enabled"
+  echo "  - Storage: Raft integrated storage with PVC persistence"
+  echo "  - TLS: Enabled (self-signed CA in vault-tls secret)"
+  echo "  - TLS CA: /vault/userconfig/vault-tls/ca.pem (inside pod)"
+  echo "  - Unsealer: vault-unsealer sidecar (auto-unseals after pod restarts)"
   echo "  - Enterprise License: Configured"
   echo "  - CA ConfigMap: ${ca_configmap} (openshift-config namespace)"
   echo ""
-  echo "Next step: Run etcd-encryption-vault-configure to configure Vault for KMS"
+  echo "Next step: Run etcd-encryption-vault-configure to initialize and configure Vault for KMS"
   echo ""
+}
+
+# Install a Vault Enterprise instance in the given namespace.
+# Args: $1 = namespace, $2 = CA ConfigMap name, $3 = Helm release name
+install_vault() {
+  if vault_dev_mode_enabled; then
+    install_vault_dev "$@"
+  else
+    install_vault_ha "$@"
+  fi
 }
 
 # Vault license secret name
@@ -292,6 +658,17 @@ fi
 echo ""
 
 record_vault_images
+
+if vault_dev_mode_enabled; then
+  echo "Vault install mode: dev (bare metal default)"
+  echo "true" > "${SHARED_DIR}/vault-dev-mode"
+else
+  echo "Vault install mode: HA Raft"
+  echo "false" > "${SHARED_DIR}/vault-dev-mode"
+  resolve_vault_ha_replicas
+  echo "Using VAULT_HA_REPLICAS=${VAULT_HA_REPLICAS}"
+  echo "${VAULT_HA_REPLICAS}" > "${SHARED_DIR}/vault-ha-replicas"
+fi
 
 setup_vault_namespace "${VAULT_NAMESPACE}" "vault"
 setup_vault_namespace "${VAULT_SECONDARY_NAMESPACE}" "vault-secondary"

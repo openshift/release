@@ -39,8 +39,24 @@ ref:
       Override at job level to trial a new plugin image.
       On baremetalds jobs the repository, mirror source, and local mirror tag are all
       derived from this value.
+  - name: VAULT_HA_REPLICAS
+    default: "3"
+    documentation: |-
+      Number of Vault server replicas for HA Raft mode. Each replica gets a persistent
+      volume for integrated storage. Ignored in dev mode. Capped automatically to the
+      number of cluster nodes when lower (e.g. single-node OpenShift uses 1 replica).
+  - name: VAULT_DEV_MODE
+    default: ""
+    documentation: |-
+      When true, installs Vault in single-replica dev mode (pre-initialized, root token
+      "root"). When false, installs HA Raft mode. When unset, dev mode is enabled
+      automatically on equinix-ocp-metal (bare metal) jobs and HA Raft is used elsewhere.
   documentation: |-
     Installs HashiCorp Vault Enterprise via Helm.
+
+    On bare metal (equinix-ocp-metal), installs a single dev-mode instance with
+    auto-generated TLS. On cloud platforms, installs HA Raft with persistent storage,
+    TLS, and an unsealer sidecar.
 
     This step:
     - Installs Helm if not present
@@ -49,8 +65,10 @@ ref:
     - Creates vault-license secret from mounted credential (if available)
     - Mirrors Vault Enterprise and vault-kube-kms plugin images to the dev-scripts local registry on baremetalds jobs (SSH oc image mirror with retry)
     - Applies ImageContentSourcePolicy/vault-mirror so cluster nodes pull both images from the local mirror
-    - Installs Vault Enterprise using Helm chart
-    - Waits for Vault pod to be ready
+    - Cloud: generates self-signed TLS and installs HA Raft with persistent storage,
+      control-plane tolerations, and a vault-unsealer sidecar
+    - Bare metal: installs dev mode with auto-generated TLS (no init/unseal)
+    - Waits for Vault pod(s) to be ready
     - Installs a second instance in VAULT_SECONDARY_NAMESPACE
 
     Prerequisites:
@@ -59,11 +77,11 @@ ref:
       (automatically mounted at /var/run/vault/tests-private-account/)
 
     Outputs:
-    - Vault service available at: vault.${VAULT_NAMESPACE}.svc:8200
-    - Vault pod: vault-0 (Ready state)
+    - Vault service available at: https://vault.${VAULT_NAMESPACE}.svc:8200
+    - Vault pods: vault-0..vault-$(VAULT_HA_REPLICAS-1) (Ready state)
     - CA ConfigMap: vault-ca-bundle (openshift-config namespace)
-    - Second Vault service at: vault-secondary.${VAULT_SECONDARY_NAMESPACE}.svc:8200
-    - Second Vault pod: vault-secondary-0 (Ready state)
+    - Second Vault service at: https://vault-secondary.${VAULT_SECONDARY_NAMESPACE}.svc:8200
+    - Second Vault pods: vault-secondary-0..vault-secondary-$(VAULT_HA_REPLICAS-1) (Ready state)
     - CA ConfigMap: vault-ca-bundle-secondary (openshift-config namespace)
 
     Next step:

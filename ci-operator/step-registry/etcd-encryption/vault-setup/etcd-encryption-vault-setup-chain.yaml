@@ -13,12 +13,16 @@ chain:
     1. Installs two HashiCorp Vault Enterprise instances via Helm (vault-install step)
        - Mirrors Vault Enterprise and vault-kube-kms plugin images to dev-scripts local registry on baremetalds jobs
        - Applies ImageContentSourcePolicy/vault-mirror so kube-apiserver nodes can pull both images from the local mirror
-       - Deploys Vault in dev mode to vault-kms and vault-kms-secondary namespaces
+       - Cloud: deploys HA Raft with persistent storage, TLS, unsealer sidecar, and
+         placeholder vault-init-credentials secrets to vault-kms and vault-kms-secondary
+       - Bare metal: deploys single-replica dev mode with auto-generated TLS
        - Creates vault-license secret from mounted credentials
-       - Waits for Vault pods to be ready
+       - Waits for Vault pod(s) to be ready
        - Creates CA ConfigMaps (vault-ca-bundle and vault-ca-bundle-secondary) in openshift-config
 
-    2. Configures both Vault instances for KMS encryption (vault-configure step)
+    2. Initializes and configures both Vault instances for KMS encryption (vault-configure step)
+       - Cloud: initializes Vault, stores credentials, joins Raft followers, waits for unseal
+       - Bare metal: skips init/unseal (dev mode uses root token "root")
        - Creates Vault Enterprise namespace (default: admin)
        - Enables transit secret engine in the Enterprise namespace
        - Creates KMS encryption key in the Enterprise namespace
@@ -31,15 +35,17 @@ chain:
       containing the license file at key 'kms-vault-license'
 
     Outputs (primary instance):
-    - Vault service: vault.vault-kms.svc:8200
-    - Vault pod: vault-0 (Ready state) in vault-kms namespace
+    - Vault service: https://vault.vault-kms.svc:8200
+    - Vault pods: vault-0..vault-$(VAULT_HA_REPLICAS-1) (Ready state) in vault-kms namespace
     - CA ConfigMap: vault-ca-bundle in openshift-config namespace
+    - Init credentials secret: vault-init-credentials in vault-kms namespace
     - Credentials secret: vault-credentials in vault-kms namespace
 
     Outputs (secondary instance):
-    - Vault service: vault-secondary.vault-kms-secondary.svc:8200
-    - Vault pod: vault-secondary-0 (Ready state) in vault-kms-secondary namespace
+    - Vault service: https://vault-secondary.vault-kms-secondary.svc:8200
+    - Vault pods: vault-secondary-0..vault-secondary-$(VAULT_HA_REPLICAS-1) (Ready state) in vault-kms-secondary namespace
     - CA ConfigMap: vault-ca-bundle-secondary in openshift-config namespace
+    - Init credentials secret: vault-init-credentials in vault-kms-secondary namespace
     - Credentials secret: vault-credentials in vault-kms-secondary namespace
 
     Environment variables (inherited from vault-install step):
@@ -48,6 +54,8 @@ chain:
     - VAULT_NAMESPACE: Primary Vault namespace (default: vault-kms)
     - VAULT_SECONDARY_NAMESPACE: Secondary Vault namespace (default: vault-kms-secondary)
     - VAULT_KMS_PLUGIN_IMAGE: vault-kube-kms plugin image for encryption-kms tests and baremetal mirroring
+    - VAULT_HA_REPLICAS: Number of Vault HA replicas (default: 3, cloud only)
+    - VAULT_DEV_MODE: Force dev (true) or HA Raft (false); auto on bare metal when unset
 
     Environment variables (inherited from vault-configure step):
     - VAULT_KMS_KEY_NAME: Transit encryption key name (default: kms-key)
