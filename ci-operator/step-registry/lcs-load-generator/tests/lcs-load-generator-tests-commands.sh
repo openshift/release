@@ -736,21 +736,35 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
 
   echo "  Collecting Pyroscope profiles (${TEST_START_EPOCH} → ${TEST_END_EPOCH})"
 
+  # The test step pod runs on the build cluster, not the provisioned cluster,
+  # so cluster-internal DNS (pyroscope.pyroscope.svc) is unreachable.
+  # Use oc port-forward to tunnel through KUBECONFIG to the provisioned cluster.
+  oc port-forward -n "${PYROSCOPE_NAMESPACE}" svc/pyroscope 4040:4040 &
+  PF_PID=$!
+  # Give port-forward a moment to establish
+  sleep 3
+
+  PYROSCOPE_LOCAL="http://localhost:4040"
+
   # pprof format (importable into Go pprof tools)
-  curl -sS "${PYROSCOPE_URL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=pprof" \
+  curl -sS "${PYROSCOPE_LOCAL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=pprof" \
     -o "${PROF_DIR}/cpu-profile.pprof" || echo "WARN: Pyroscope pprof export failed"
 
   # HTML flamegraph (viewable in browser from artifacts page)
-  curl -sS "${PYROSCOPE_URL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=html" \
+  curl -sS "${PYROSCOPE_LOCAL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=html" \
     -o "${PROF_DIR}/cpu-flamegraph.html" || echo "WARN: Pyroscope HTML export failed"
 
   # Collapsed stacks (for flamegraph.pl or speedscope)
-  curl -sS "${PYROSCOPE_URL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=collapsed" \
+  curl -sS "${PYROSCOPE_LOCAL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=collapsed" \
     -o "${PROF_DIR}/cpu-collapsed.txt" || echo "WARN: Pyroscope collapsed export failed"
 
   # JSON format (for programmatic analysis)
-  curl -sS "${PYROSCOPE_URL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=json" \
+  curl -sS "${PYROSCOPE_LOCAL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=json" \
     -o "${PROF_DIR}/cpu-profile.json" || echo "WARN: Pyroscope JSON export failed"
+
+  # Clean up port-forward
+  kill "${PF_PID}" 2>/dev/null || true
+  wait "${PF_PID}" 2>/dev/null || true
 
   echo "  Pyroscope profiles saved to ${PROF_DIR}"
 fi
