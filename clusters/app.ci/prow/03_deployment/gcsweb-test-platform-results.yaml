@@ -1,0 +1,119 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gcsweb-test-platform-results
+  name: gcsweb-test-platform-results
+  namespace: ci
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      component: gcsweb-test-platform-results
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: gcsweb-test-platform-results
+    spec:
+      serviceAccountName: gcsweb-test-platform-results
+      containers:
+      - args:
+        - -b
+        - test-platform-results
+        - --gcs-credentials-file=/etc/sa/credentials.json
+        image: quay.io/openshift/ci:ci_gcsweb_latest
+        name: gcsweb-test-platform-results
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+        volumeMounts:
+        - mountPath: /etc/sa
+          name: gcs-credentials-file
+          readOnly: true
+      - args:
+        - -provider=openshift
+        - -https-address=
+        - -http-address=:4180
+        - -email-domain=*
+        - -upstream=http://localhost:8080
+        - -client-id=system:serviceaccount:ci:gcsweb-test-platform-results
+        - -openshift-ca=/etc/pki/tls/cert.pem
+        - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+        - -cookie-secret-file=/etc/proxy/secrets/session_secret
+        - -cookie-samesite=none
+        - -cookie-secure=true
+        image: quay.io/openshift/origin-oauth-proxy:4.16
+        imagePullPolicy: IfNotPresent
+        name: oauth-proxy
+        ports:
+        - containerPort: 4180
+          name: web
+        readinessProbe:
+          tcpSocket:
+            port: 4180
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        volumeMounts:
+        - mountPath: /etc/proxy/secrets
+          name: session-secret
+          readOnly: true
+      volumes:
+      - name: gcs-credentials-file
+        secret:
+          secretName: test-platform-results-viewer
+      - name: session-secret
+        secret:
+          secretName: deck-internal-session-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prow
+    component: gcsweb-test-platform-results
+  name: gcsweb-test-platform-results
+  namespace: ci
+spec:
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+    targetPort: 4180
+  selector:
+    app: prow
+    component: gcsweb-test-platform-results
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    haproxy.router.openshift.io/timeout: 1h
+  labels:
+    app: gcsweb-test-platform-results
+  name: gcsweb-test-platform-results
+  namespace: ci
+spec:
+  port:
+    targetPort: web
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: gcsweb-test-platform-results
