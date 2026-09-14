@@ -373,7 +373,11 @@ ${LCS_COMMAND_OVERRIDE}
             - containerPort: 8080
           env:
             - name: OTEL_SDK_DISABLED
-              value: "true"${PYROSCOPE_ENV}
+              value: "true"
+            - name: LIGHTSPEED_STACK_SYNTHESIZED_CONFIG_PATH
+              value: "/tmp/.generated/run.yaml"
+            - name: HOME
+              value: "/tmp"${PYROSCOPE_ENV}
           volumeMounts:
             - name: config-volume
               mountPath: /app-config
