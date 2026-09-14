@@ -100,7 +100,30 @@ cat > ${ARTIFACT_DIR}/default_assume_role_policy_doc.json <<EOF
 }
 EOF
 
-for node_type in master worker
+node_types="master worker"
+
+# Optionally create a dedicated BYO IAM role/policy for the edge compute pool
+# (AWS Local/Wavelength zones).
+if [[ "${PROVISION_EDGE_IAM_ROLE:-no}" == "yes" ]]; then
+  cat > ${ARTIFACT_DIR}/role_policy_doc_edge.json <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeInstances",
+                "ec2:DescribeRegions"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+EOF
+  node_types="${node_types} edge"
+fi
+
+for node_type in ${node_types}
 do
   policy_name="${CLUSTER_NAME}-byo-policy-${node_type}"
   role_name="${CLUSTER_NAME}-byo-role-${node_type}"
