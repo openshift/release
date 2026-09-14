@@ -113,6 +113,28 @@ function WriteJunit () {
     true
 }
 
+# Mark one or more ODF health checks as skipped and write JUnit XML.
+#
+# $1       - skip reason message
+# $2..$N   - (optional) check names to skip; defaults to all 8 checks
+#
+# Called when ODF is not installed or when no StorageCluster is configured.
+function SkipAllChecks () {
+    typeset msg="${1:-}"; (($#)) && shift
+    typeset -a names=("$@")
+    if (( ${#names[@]} == 0 )); then
+        names=("odf-csv-phase" "storagecluster-ready" "cephcluster-health"
+            "storageclasses-available" "pvc-provision-rbd" "pvc-provision-cephfs"
+            "noobaa-s3-functional" "ceph-health-detail")
+    fi
+    typeset name=""
+    for name in "${names[@]}"; do
+        AddResult "${name}" "skip" "${msg}"
+    done
+    WriteJunit
+    true
+}
+
 # shellcheck disable=SC2317,SC2329
 function CollectExitArtifacts () {
     : "Collecting ODF diagnostics..."
@@ -632,16 +654,45 @@ function Main () {
         exit 1
     fi
     if (( odfProbeResult == 1 )); then
-        typeset skipMsg="ODF is not installed (no ODF/OCS CSV in ${ODF_NAMESPACE})"
-        typeset -a checkNames=("odf-csv-phase" "storagecluster-ready" "cephcluster-health"
-            "storageclasses-available" "pvc-provision-rbd" "pvc-provision-cephfs"
-            "noobaa-s3-functional" "ceph-health-detail")
-        typeset name=""
-        for name in "${checkNames[@]}"; do
-            AddResult "${name}" "skip" "${skipMsg}"
-        done
-        WriteJunit
+        SkipAllChecks "ODF is not installed (no ODF/OCS CSV in ${ODF_NAMESPACE})"
         : "ODF Health Check: ALL SKIPPED (ODF not installed)"
+        exit 0
+    fi
+
+    # ── StorageCluster presence gate ─────────────────────────────
+    # ODF operator CSV exists, but verify a StorageCluster was
+    # actually configured.  If not, ODF is installed-but-unused;
+    # skip health checks instead of waiting 720s and failing.
+    typeset scJson="" scCount=""
+    set +x  # suppress xtrace for API response
+    if ! scJson="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json 2>/dev/null)"; then
+        set -x  # restore xtrace
+        : "Failed to query StorageClusters in ${ODF_NAMESPACE}"
+        exit 1
+    fi
+    if [[ -z "${scJson}" ]]; then
+        set -x  # restore xtrace
+        : "StorageCluster query returned empty output in ${ODF_NAMESPACE}"
+        exit 1
+    fi
+    if ! scCount="$(printf '%s' "${scJson}" | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+items=d.get('items')
+if not isinstance(items,list): raise ValueError('StorageCluster items is not a list')
+print(len(items))
+")"; then
+        set -x  # restore xtrace
+        : "Failed to parse StorageCluster JSON from ${ODF_NAMESPACE}"
+        exit 1
+    fi
+    set -x  # restore xtrace
+    if (( scCount == 0 )); then
+        AddResult "odf-csv-phase" "pass"
+        SkipAllChecks "ODF operator installed but no StorageCluster configured in ${ODF_NAMESPACE}" \
+            "storagecluster-ready" "cephcluster-health" \
+            "storageclasses-available" "pvc-provision-rbd" "pvc-provision-cephfs" \
+            "noobaa-s3-functional" "ceph-health-detail"
+        : "ODF Health Check: ALL SKIPPED (ODF operator present but no StorageCluster)"
         exit 0
     fi
 
