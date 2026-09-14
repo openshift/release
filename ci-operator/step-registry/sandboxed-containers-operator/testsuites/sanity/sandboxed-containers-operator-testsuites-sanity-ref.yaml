@@ -1,0 +1,29 @@
+ref:
+  as: sandboxed-containers-operator-testsuites-sanity
+  from: src
+  cli: latest
+  commands: sandboxed-containers-operator-testsuites-sanity-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  timeout: 30m0s
+  grace_period: 10m0s
+  env:
+  - name: TESTS_SANITY_ENABLE
+    default: "true"
+    documentation: |-
+      Enable-gate for the sanity suite. Unlike the post-phase suites (which are
+      skip-by-default), the sanity suite defaults to "true" because it is the
+      producer of the post-suite gate: when it does not run, no post suite runs.
+      "true"        -> the step runs and writes the gate file on success.
+      "false"/unset -> the step exits 0 WITHOUT writing the gate, which makes
+                       every post suite abort (skip). Turn this off only if you
+                       intentionally want to disable all post suites.
+  documentation: |-
+    Sanity gate for the OSC POST-phase test-suite chain.
+
+    Runs in the `test` phase and acts as the
+    gate for the post-phase testsuites. On success it writes
+    ${SHARED_DIR}/testsuites_gate with the content "passed"; the post suites
+    read that file and skip themselves unless it exists and equals "passed".
