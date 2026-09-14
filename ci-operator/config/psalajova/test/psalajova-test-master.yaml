@@ -13,6 +13,35 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: censor-check-container
+  commands: |
+    set -o xtrace
+    VALUE=$(cat /var/censor-check/first-secret)
+    echo "sentinel-begin ${VALUE} sentinel-end"
+  container:
+    from: src
+  secrets:
+  - collection: psalajova-first-secret
+    field: first-secret
+    group: test
+    mount_path: /var/censor-check
+- as: censor-check-multistage
+  steps:
+    test:
+    - as: print-gsm-secret
+      commands: |
+        set -o xtrace
+        VALUE=$(cat /var/censor-check/first-secret)
+        echo "sentinel-begin ${VALUE} sentinel-end"
+      credentials:
+      - collection: psalajova-first-secret
+        field: first-secret
+        group: test
+        mount_path: /var/censor-check
+      from: src
+      resources:
+        requests:
+          cpu: 10m
 - as: test-credentials
   steps:
     workflow: psalajova-test
