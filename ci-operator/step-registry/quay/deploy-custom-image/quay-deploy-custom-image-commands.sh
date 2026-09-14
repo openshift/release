@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -uo pipefail
+set -euo pipefail
 set -x
 
 NAMESPACE="quay-enterprise"
@@ -61,7 +61,7 @@ else
 fi
 
 # Find the quay-app deployment by name pattern (operator names it {registry}-quay-app)
-QUAY_DEPLOY=$(oc -n "${NAMESPACE}" get deployment -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep 'quay-app' | head -n1)
+QUAY_DEPLOY=$(oc -n "${NAMESPACE}" get deployment -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep 'quay-app' | head -n1 || true)
 if [[ -z "${QUAY_DEPLOY}" ]]; then
   echo "ERROR: Could not find quay-app deployment" >&2
   exit 1
@@ -147,7 +147,7 @@ oc -n "${NAMESPACE}" set env "deployment/${QUAY_DEPLOY}" QUAYENTRY=registry
 echo "Waiting for rollout of deployment/${QUAY_DEPLOY}..."
 if ! oc -n "${NAMESPACE}" rollout status "deployment/${QUAY_DEPLOY}" --timeout=600s; then
   echo "ERROR: Rollout of deployment/${QUAY_DEPLOY} timed out" >&2
-  collect_debug_info
+  collect_debug_info || true
   exit 1
 fi
 
@@ -170,5 +170,5 @@ for i in $(seq 1 30); do
 done
 
 echo "ERROR: Quay health check failed after image swap" >&2
-collect_debug_info
+collect_debug_info || true
 exit 1
