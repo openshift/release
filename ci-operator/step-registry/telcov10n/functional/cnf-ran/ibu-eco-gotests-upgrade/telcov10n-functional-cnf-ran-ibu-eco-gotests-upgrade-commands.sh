@@ -8,43 +8,9 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
-process_inventory() {
-    local directory="$1"
-    local dest_file="$2"
-
-    if [ -z "$directory" ]; then
-        echo "Usage: process_inventory <directory> <dest_file>"
-        return 1
-    fi
-
-    if [ ! -d "$directory" ]; then
-        echo "Error: '$directory' is not a valid directory"
-        return 1
-    fi
-
-    find "$directory" -type f | while IFS= read -r filename; do
-        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        fi
-        local content
-        content=$(cat "$filename")
-        local varname
-        varname=$(basename "${filename}")
-        # Check if content has newlines - if so, use literal block scalar (|)
-        if [[ "$content" == *$'\n'* ]]; then
-          echo "${varname}: |"
-          echo "$content" | sed 's/^/  /'
-        else
-          echo "${varname}: '${content//\'/\'\'}'"
-        fi
-    done > "${dest_file}"
-
-    echo "Processing complete. Check \"${dest_file}\""
-}
-
 OCP_DEPLOYMENT_INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 CNF_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
-MOUNTED_SPOKE_INVENTORY="/var/host_variables/${TARGET_CLUSTER_NAME}/spoke-master0"
+MOUNTED_SPOKE_INVENTORY="/var/clusters/${TARGET_CLUSTER_NAME}/spoke-master0"
 
 echo "=== IBU Upgrade eco-gotests Configuration ==="
 echo "TARGET_CLUSTER_NAME=${TARGET_CLUSTER_NAME}"
@@ -76,11 +42,11 @@ cp "${SHARED_DIR}/target-bastions"   "${CNF_INVENTORY_PATH}/group_vars/bastions.
 cp "${SHARED_DIR}/target-all"        "${CNF_INVENTORY_PATH}/group_vars/all.yaml"
 cp "${SHARED_DIR}/target-bastion"    "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml"
 
-echo "Processing target spoke SNO inventory with proper multi-line SSH key handling"
-process_inventory "${MOUNTED_SPOKE_INVENTORY}" "${CNF_INVENTORY_PATH}/host_vars/master-0.yaml"
-process_inventory "${MOUNTED_SPOKE_INVENTORY}" "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/master-0"
+echo "Installing target spoke SNO inventory for master-0"
+cp "${MOUNTED_SPOKE_INVENTORY}" "${CNF_INVENTORY_PATH}/host_vars/master-0.yaml"
+cp "${MOUNTED_SPOKE_INVENTORY}" "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/master-0"
 
-echo "Target hub inventory copied from SHARED_DIR and spoke inventory processed"
+echo "Target hub inventory copied from SHARED_DIR and spoke inventory installed"
 
 # Target hub kubeconfig at the standard telcov10n path on the target bastion
 TARGET_HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
@@ -116,11 +82,13 @@ ansible-playbook playbooks/deploy-run-eco-gotests.yaml \
 
 echo "Set bastion SSH configuration"
 PROJECT_DIR="/tmp"
-grep ansible_ssh_private_key -A 100 "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/temp_ssh_key"
-chmod 600 "${PROJECT_DIR}/temp_ssh_key"
+# The private key spans several lines in group_vars/all, take everything between the quotes
+install -m 600 /dev/null "${PROJECT_DIR}/temp_ssh_key"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${CNF_INVENTORY_PATH}/group_vars/all.yaml" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${PROJECT_DIR}/temp_ssh_key"
 
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml" | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=^ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g")
 
 echo "Run eco-gotests via SSH tunnel"
 ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 \

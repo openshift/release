@@ -12,13 +12,18 @@ echo "Failed" >> "${SHARED_DIR}/job_status.txt"
 
 PROJECT_DIR="/tmp"
 
-echo "Set bastion SSH configuration"
-cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/temp_ssh_key"
-chmod 600 "${PROJECT_DIR}/temp_ssh_key"
-trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"' EXIT
+ALL_VARS="/var/common_variables/all"
+BASTION_VARS="/var/clusters/${CLUSTER_NAME}/bastion"
 
-BASTION_IP=$(tr -d '[:space:]' < "/var/host_variables/${CLUSTER_NAME}/bastion/ansible_host")
-BASTION_USER=$(tr -d '[:space:]' < /var/group_variables/common/all/ansible_user)
+echo "Set bastion SSH configuration"
+# The private key spans several lines in the all vars, take everything between the quotes
+install -m 600 /dev/null "${PROJECT_DIR}/temp_ssh_key"
+trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"' EXIT
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${ALL_VARS}" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${PROJECT_DIR}/temp_ssh_key"
+
+BASTION_IP=$(grep -oP '(?<=^ansible_host: ).*' "${BASTION_VARS}" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=^ansible_user: ).*' "${ALL_VARS}" | sed "s/'//g")
 
 SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "${PROJECT_DIR}/temp_ssh_key")
 

@@ -33,14 +33,16 @@ ansible-playbook -vv ./playbooks/ran/deploy-two-sno-tests-script.yaml \
   --extra-vars "hub_kubeconfig=${KUBECONFIG_PATH}"
 
 PROJECT_DIR="/tmp"
+ALL_VARS="${INVENTORY_PATH}/group_vars/all"
 
 echo "Set bastion SSH configuration"
-# Read SSH key directly from vault mount (raw file, no YAML parsing needed)
-cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/temp_ssh_key"
+# The private key spans several lines in group_vars/all, take everything between the quotes
+install -m 600 /dev/null "${PROJECT_DIR}/temp_ssh_key"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${ALL_VARS}" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${PROJECT_DIR}/temp_ssh_key"
 
-chmod 600 "${PROJECT_DIR}/temp_ssh_key"
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=^ansible_user: ).*' "${ALL_VARS}" | sed "s/'//g")
 
 TEST_SUITES=(talm ztp deploymenttypes)
 
