@@ -774,14 +774,19 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
             CURRENT_VERSION=$(echo "${OCM_CHECK_RESPONSE}" | jq -r '.openshift_version // ""' 2>/dev/null || true)
             VERSION_LABEL=$(echo "${CURRENT_VERSION}" | cut -d. -f1,2)
             if ! dry_run_guard "Would restore ${CM_NAME} to available"; then
-                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                if lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                     "metadata": {
                         "labels": { "rosa-cluster-lease/status": "available", "rosa-cluster-lease/version": "'"${VERSION_LABEL}"'" }
                     },
                     "data": { "version": "'"${CURRENT_VERSION}"'" }
-                }' || true
+                }'; then
+                    echo "REFRESH RECOVERY: ${CM_NAME} (restored to available)" >> "${REPORT}"
+                else
+                    log "ERROR: Failed to restore ${CM_NAME} to available after refresh recovery"
+                fi
+            else
+                echo "REFRESH RECOVERY: ${CM_NAME} (would restore to available, dry-run)" >> "${REPORT}"
             fi
-            echo "REFRESH RECOVERY: ${CM_NAME} (restored to available)" >> "${REPORT}"
         fi
         HEALTHY=$((HEALTHY + 1))
         continue
@@ -946,9 +951,11 @@ else
                 }'
                 if ! delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}"; then
                     log "WARNING: delete_cluster failed for ${CM_NAME}, restoring to available"
-                    lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                    if ! lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                         "metadata": { "labels": { "rosa-cluster-lease/status": "available" } }
-                    }' || true
+                    }'; then
+                        log "ERROR: Failed to restore ${CM_NAME} to available after delete failure"
+                    fi
                     continue
                 fi
                 lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}"
