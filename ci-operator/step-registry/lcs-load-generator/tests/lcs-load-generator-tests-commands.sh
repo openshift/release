@@ -238,7 +238,9 @@ metadata:
   namespace: ${LCS_NAMESPACE}
 data:
   lightspeed-stack.yaml: |
+    name: Lightspeed Core Service (LCS)
     service:
+      host: 0.0.0.0
       port: 8080
       workers: ${LCS_WORKERS}
 
@@ -248,11 +250,10 @@ data:
         profile: /app-config/run.yaml
       timeout: 120
 
-    auth:
-      module: "noop"
+    user_data_collection: {}
 
-    logging_config:
-      app_log_level: info
+    authentication:
+      module: "noop"
 
   run.yaml: |
     version: 2
