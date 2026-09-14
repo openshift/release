@@ -18,6 +18,101 @@ cluster_id=$(cat "${SHARED_DIR}/cluster-id")
 
 HOLD_TIME_BEFORE_UPGRADE=${HOLD_TIME_BEFORE_UPGRADE:-"0"}
 CP_UPGRADE_TIMEOUT=${CP_UPGRADE_TIMEOUT:-"14400"}
+UPGRADE_START_EPOCH=""
+UPGRADE_START_ISO=""
+UPGRADE_FROM_VERSION=""
+
+# Capture sanitized ClusterOperator/node health before upgrade for gap-analysis Check #13.
+# Relies on Prow's ambient KUBECONFIG from SHARED_DIR/kubeconfig. Node hostnames and
+# network fields are omitted from published artifacts. Restore proxy before every return
+# so later rosa CLI calls are not stuck on the cluster proxy.
+write_pre_upgrade_snapshot() {
+  local kube="${SHARED_DIR}/kubeconfig"
+  if declare -F set_proxy >/dev/null; then
+    set_proxy
+  fi
+  if [[ ! -f "${kube}" ]]; then
+    log "No kubeconfig in SHARED_DIR; skipping pre-upgrade ClusterOperator snapshot"
+    if declare -F unset_proxy >/dev/null; then
+      unset_proxy
+    fi
+    return 0
+  fi
+  if ! oc whoami --request-timeout=30s &>/dev/null; then
+    log "WARNING: kubeconfig is not usable; skipping pre-upgrade snapshot"
+    if declare -F unset_proxy >/dev/null; then
+      unset_proxy
+    fi
+    return 0
+  fi
+  if ! mkdir -p "${ARTIFACT_DIR}"; then
+    log "WARNING: cannot create ARTIFACT_DIR; skipping pre-upgrade snapshot"
+    if declare -F unset_proxy >/dev/null; then
+      unset_proxy
+    fi
+    return 0
+  fi
+  oc get co -o wide --request-timeout=60s > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.txt" 2>/dev/null || true
+  oc get co -o json --request-timeout=60s 2>/dev/null | jq '{
+    items: [.items[] | {
+      name: .metadata.name,
+      available: (([.status.conditions[]? | select(.type=="Available") | .status] | first) // ""),
+      degraded: (([.status.conditions[]? | select(.type=="Degraded") | .status] | first) // ""),
+      progressing: (([.status.conditions[]? | select(.type=="Progressing") | .status] | first) // ""),
+      version: ((.status.versions[]? | select(.name=="operator") | .version) // "")
+    }]
+  }' > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.json" || echo '{"items":[]}' > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.json"
+  oc get nodes -o json --request-timeout=60s 2>/dev/null | jq '{
+    items: [.items[] | {
+      ready: (([.status.conditions[]? | select(.type=="Ready") | .status] | first) // ""),
+      schedulable: ((.spec.unschedulable // false) | not)
+    }]
+  }' > "${ARTIFACT_DIR}/pre-upgrade-nodes.json" || echo '{"items":[]}' > "${ARTIFACT_DIR}/pre-upgrade-nodes.json"
+  local cluster_version=""
+  cluster_version="$(oc get clusterversion version -o jsonpath='{.status.desired.version}' --request-timeout=30s 2>/dev/null || true)"
+  jq -n \
+    --arg cluster_version "${cluster_version}" \
+    --arg captured_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+    --arg phase "pre-upgrade" \
+    '{cluster_version: $cluster_version, captured_at: $captured_at, phase: $phase}' \
+    > "${ARTIFACT_DIR}/pre-upgrade-metadata.json" || true
+  log "Wrote pre-upgrade ClusterOperator snapshot for gap-analysis Check #13"
+  if declare -F unset_proxy >/dev/null; then
+    unset_proxy
+  fi
+}
+
+# Write upgrade-metrics.json with duration and the resolved target version. Best-effort;
+# does not fail the step. Prefer available_version from get_cluster_upgrade_path.
+write_upgrade_metrics() {
+  if [[ -z "${UPGRADE_START_EPOCH}" ]]; then
+    return 0
+  fi
+  local end_epoch end_iso duration
+  end_epoch="$(date +%s)"
+  end_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  duration=$((end_epoch - UPGRADE_START_EPOCH))
+  mkdir -p "${ARTIFACT_DIR}" || return 0
+  jq -n \
+    --arg start "${UPGRADE_START_ISO}" \
+    --arg end "${end_iso}" \
+    --argjson start_epoch "${UPGRADE_START_EPOCH}" \
+    --argjson end_epoch "${end_epoch}" \
+    --argjson duration_seconds "${duration}" \
+    --arg from_version "${UPGRADE_FROM_VERSION:-}" \
+    --arg to_version "${available_version:-${UPGRADED_TO_VERSION:-}}" \
+    '{
+      start: $start,
+      end: $end,
+      start_epoch: $start_epoch,
+      end_epoch: $end_epoch,
+      duration_seconds: $duration_seconds,
+      from_version: $from_version,
+      to_version: $to_version
+    }' > "${ARTIFACT_DIR}/upgrade-metrics.json" || true
+  log "Wrote upgrade-metrics.json duration_seconds=${duration}"
+}
+trap 'write_upgrade_metrics || true' EXIT
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -47,6 +142,16 @@ function set_proxy () {
         source "${SHARED_DIR}/proxy-conf.sh"
     else
         log "no proxy setting."
+    fi
+}
+
+function unset_proxy () {
+    if test -s "${SHARED_DIR}/unset-proxy.sh" ; then
+        log "unset the proxy"
+        log "source ${SHARED_DIR}/unset-proxy.sh"
+        source "${SHARED_DIR}/unset-proxy.sh"
+    else
+        log "no proxy setting found."
     fi
 }
 
@@ -182,6 +287,10 @@ if [[ "$HOSTED_CP" != "true" ]]; then
 fi
 
 init_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
+UPGRADE_FROM_VERSION="${init_version}"
+write_pre_upgrade_snapshot
+UPGRADE_START_EPOCH="$(date +%s)"
+UPGRADE_START_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 UPGRADE_CHANNEL=${UPGRADE_CHANNEL:-}
 UPGRADE_CHANNEL_PREFIX=${UPGRADE_CHANNEL_PREFIX:-candidate}

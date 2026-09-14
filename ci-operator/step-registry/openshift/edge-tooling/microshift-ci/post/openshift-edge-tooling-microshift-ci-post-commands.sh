@@ -3,10 +3,10 @@ set -euo pipefail
 set -x
 
 if [ "${JOB_TYPE:-}" = "presubmit" ]; then
-    GCSWEB_JOB_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    GCSWEB_JOB_URL="https://gcs.ci.openshift.org/gcs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
     PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
 else
-    GCSWEB_JOB_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
+    GCSWEB_JOB_URL="https://gcs.ci.openshift.org/gcs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
     PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
 fi
 

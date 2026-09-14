@@ -4,6 +4,8 @@ build_root:
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
       RUN dnf install -y podman
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -46,18 +48,18 @@ tests:
         chmod +x pipeline.sh
         ./pipeline.sh
       credentials:
-      - mount_path: /var/run/huggingface
-        name: hf-token
-        namespace: test-credentials
-      - mount_path: /var/run/vllm
-        name: vllm-api-key
-        namespace: test-credentials
-      - mount_path: /var/run/quay-aipcc-name
-        name: lcore-quay-name
-        namespace: test-credentials
-      - mount_path: /var/run/quay-aipcc-password
-        name: lcore-quay-password
-        namespace: test-credentials
+      - collection: e2e-rhoai
+        group: hf
+        mount_path: /var/run/huggingface
+      - collection: e2e-rhoai
+        group: prow-test
+        mount_path: /var/run/vllm
+      - collection: e2e-rhoai
+        group: robot-name
+        mount_path: /var/run/quay-aipcc-name
+      - collection: e2e-rhoai
+        group: robot-password
+        mount_path: /var/run/quay-aipcc-password
       from: src
       resources:
         requests:

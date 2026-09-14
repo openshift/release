@@ -3,6 +3,8 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     integration:
@@ -21,8 +23,8 @@ tests:
     job_states_to_report:
     - failure
     - error
-    report_template: PR Age Monitor detected threshold violations. <{{.Status.URL}}|View
-      logs>
+    report_template: |
+      :red_jenkins_circle: :nutanix: PR Age Monitor detected threshold violations. <{{.Status.URL}}|View logs>
   steps:
     test:
     - as: monitor
@@ -30,9 +32,9 @@ tests:
         make build
         GITHUB_TOKEN=$(cat /tmp/secret/token) ./bin/pr-monitor --config config/repos.yaml
       credentials:
-      - mount_path: /tmp/secret
-        name: ci-cluster-monitor-github-token
-        namespace: test-credentials
+      - collection: cluster-secrets-nutanix
+        group: ci-cluster-monitor-github-token
+        mount_path: /tmp/secret
       from: src
       resources:
         requests:
@@ -46,7 +48,8 @@ tests:
     job_states_to_report:
     - failure
     - error
-    report_template: VM Orphan Monitor job failed. <{{.Status.URL}}|View logs>
+    report_template: |
+      :red_jenkins_circle: :nutanix: VM Orphan Monitor job failed. <{{.Status.URL}}|View logs>
   steps:
     cluster_profile: nutanix
     test:
@@ -68,9 +71,9 @@ tests:
           --port "${prism_central_port}" \
           --cleanup
       credentials:
-      - mount_path: /tmp/nutanix-creds
-        name: nutanix-pc
-        namespace: test-credentials
+      - collection: cluster-secrets-nutanix
+        group: nutanix-pc
+        mount_path: /tmp/nutanix-creds
       from: src
       grace_period: 30s
       resources:
@@ -85,8 +88,8 @@ tests:
     job_states_to_report:
     - failure
     - error
-    report_template: Capacity Monitor alert - check logs for details. <{{.Status.URL}}|View
-      logs>
+    report_template: |
+      :red_jenkins_circle: :nutanix: Capacity Monitor alert - check logs for details. <{{.Status.URL}}|View logs>
   steps:
     cluster_profile: nutanix
     test:
@@ -107,9 +110,9 @@ tests:
           --endpoint "${prism_central_host}" \
           --port "${prism_central_port}"
       credentials:
-      - mount_path: /tmp/nutanix-creds
-        name: nutanix-pc
-        namespace: test-credentials
+      - collection: cluster-secrets-nutanix
+        group: nutanix-pc
+        mount_path: /tmp/nutanix-creds
       from: src
       grace_period: 30s
       resources:
@@ -123,8 +126,8 @@ tests:
     job_states_to_report:
     - failure
     - error
-    report_template: Job Health Monitor alert - check logs for details. <{{.Status.URL}}|View
-      logs>
+    report_template: |
+      :red_jenkins_circle: :nutanix: Job Health Monitor alert - check logs for details. <{{.Status.URL}}|View logs>
   steps:
     test:
     - as: monitor

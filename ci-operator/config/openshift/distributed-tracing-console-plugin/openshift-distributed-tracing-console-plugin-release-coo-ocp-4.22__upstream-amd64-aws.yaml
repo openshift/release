@@ -25,6 +25,8 @@ images:
   - context_dir: .
     dockerfile_path: tests/Dockerfile
     to: obs-tests-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -53,9 +55,13 @@ tests:
   steps:
     cluster_profile: azure-observability
     env:
+      AGENT_SKILL: tracing-ui
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D8s_v3
+      JIRA_PROJECT: COO
+    post:
+    - ref: openshift-observability-qe-agent
     test:
     - ref: distributed-tracing-tests-tracing-ui-upstream
     workflow: cucushift-installer-rehearse-azure-ipi

@@ -3,7 +3,7 @@ components:
   - component_slug: "prow"
     sub_component_slug: "deck"
     http_monitor:
-      url: "https://prow.ci.openshift.org/"
+      url: "https://prow.ci.openshift.org/oauth/healthz"
       code: 200
       retry_after: 4m
       severity: "Down"
@@ -77,6 +77,16 @@ components:
           duration: "5m"
           step: "30s"
           severity: "Down"
+        - query: "sum(prowjobs{job=\"prow-controller-manager\",state=\"triggered\"}) < 450"
+          failure_query: "sum by (state) (prowjobs{job=\"prow-controller-manager\"})"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(sum(prowjobs{job=\"prow-controller-manager\",state=~\"triggered|pending|running|scheduling\"}) < 500) or ((sum(prowjobs{job=\"prow-controller-manager\",state=\"triggered\"}) / clamp_min(sum(prowjobs{job=\"prow-controller-manager\",state=~\"triggered|pending|running|scheduling\"}), 1)) < 0.25)"
+          failure_query: "sum by (state) (prowjobs{job=\"prow-controller-manager\"})"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
   - component_slug: "prow"
     sub_component_slug: "tide"
     prometheus_monitor:
@@ -89,6 +99,16 @@ components:
           duration: "5m"
           step: "30s"
           severity: "Down"
+        - query: "(sum(increase(merges_sum[1h])) >= 0.25 * avg_over_time((sum(increase(merges_sum[1h])))[7d:1d])) or on() (day_of_week() < 1 or day_of_week() > 5) or on() (hour() <= 7 or hour() >= 22)"
+          failure_query: "sum(increase(merges_sum[1h]))"
+          duration: "30m"
+          step: "5m"
+          severity: "Degraded"
+        - query: "(sum(rate(merges_count[1h])) > 0) or on() (day_of_week() < 1 or day_of_week() > 5) or on() (hour() <= 7 or hour() >= 22)"
+          failure_query: "sum(increase(merges_sum[1h]))"
+          duration: "30m"
+          step: "5m"
+          severity: "Degraded"
   - component_slug: "prow"
     sub_component_slug: "gangway"
     prometheus_monitor:
@@ -104,7 +124,7 @@ components:
   - component_slug: "prow"
     sub_component_slug: "gcsweb"
     http_monitor:
-      url: "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+      url: "https://gcs.ci.openshift.org/gcs/test-platform-results"
       code: 200
       retry_after: 4m
       severity: "Down"
@@ -176,60 +196,21 @@ components:
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
-      - query: "sum(boskos_resources{type=\"aws-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"aws-quota-slice\"})"
+      - query: "sum(boskos_resources{type=\"openshift-org-aws-quota-slice\",state=\"free\"}) > 0"
+        failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-aws-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
   - component_slug: "boskos"
-    sub_component_slug: "aws-2"
+    sub_component_slug: "azure"
     prometheus_monitor:
       prometheus_location:
         cluster: "app.ci"
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
-      - query: "sum(boskos_resources{type=\"aws-2-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"aws-2-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "aws-3"
-    prometheus_monitor:
-      prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
-      queries:
-      - query: "sum(boskos_resources{type=\"aws-3-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"aws-3-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "aws-4"
-    prometheus_monitor:
-      prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
-      queries:
-      - query: "sum(boskos_resources{type=\"aws-4-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"aws-4-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "aws-5"
-    prometheus_monitor:
-      prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
-      queries:
-      - query: "sum(boskos_resources{type=\"aws-5-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"aws-5-quota-slice\"})"
+      - query: "sum(boskos_resources{type=\"openshift-org-azure-quota-slice\",state=\"free\"}) > 0"
+        failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-azure-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
@@ -241,60 +222,21 @@ components:
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
-      - query: "sum(boskos_resources{type=\"gcp-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"gcp-quota-slice\"})"
+      - query: "sum(boskos_resources{type=\"openshift-org-gcp-quota-slice\",state=\"free\"}) > 0"
+        failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-gcp-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
   - component_slug: "boskos"
-    sub_component_slug: "gcp-2"
+    sub_component_slug: "gcp-arm64"
     prometheus_monitor:
       prometheus_location:
         cluster: "app.ci"
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
-      - query: "sum(boskos_resources{type=\"gcp-openshift-gce-devel-ci-2-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"gcp-openshift-gce-devel-ci-2-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "gcp-3"
-    prometheus_monitor:
-      prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
-      queries:
-      - query: "sum(boskos_resources{type=\"gcp-3-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"gcp-3-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "azure-2"
-    prometheus_monitor:
-      prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
-      queries:
-      - query: "sum(boskos_resources{type=\"azure-2-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"azure-2-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "azure4"
-    prometheus_monitor:
-      prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
-      queries:
-      - query: "sum(boskos_resources{type=\"azure4-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"azure4-quota-slice\"})"
+      - query: "sum(boskos_resources{type=\"openshift-org-gcp-arm64-quota-slice\",state=\"free\"}) > 0"
+        failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-gcp-arm64-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"

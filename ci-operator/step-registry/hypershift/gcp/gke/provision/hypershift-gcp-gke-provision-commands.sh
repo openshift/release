@@ -152,55 +152,130 @@ gcloud container clusters create-auto "${CLUSTER_NAME}" \
     --quiet
 
 # ============================================================================
-# Step 5: Create static kubeconfig for the Control Plane cluster
+# Step 5: Create a cluster-local kubeconfig for the Control Plane cluster
 # This kubeconfig provides access to the GKE cluster where HyperShift operator
 # runs and Hosted Cluster control planes are deployed.
-# Uses embedded access token to avoid gcloud/auth-plugin in downstream steps.
-# The access token is valid for ~60 minutes, sufficient for CI jobs.
+# Google authentication is used only to bootstrap a dedicated Kubernetes
+# ServiceAccount. Downstream steps use its 12-hour TokenRequest credential and
+# do not require gcloud or an authentication plugin.
 # ============================================================================
-echo "Creating static kubeconfig with embedded access token"
+echo "Creating cluster-local kubeconfig"
 
-# Disable tracing to protect sensitive values (access token)
-set +x
+# Use a subshell function so credential variables cannot leak into the rest of
+# the step. Tracing is disabled only inside the subshell; the parent retains its
+# tracing state.
+create_cluster_local_kubeconfig() (
+  set +x
 
-CLUSTER_CA=$(gcloud container clusters describe "${CLUSTER_NAME}" \
-    --project="${CP_PROJECT_ID}" \
-    --region="${GCP_REGION}" \
-    --format="value(masterAuth.clusterCaCertificate)")
-CLUSTER_ENDPOINT=$(gcloud container clusters describe "${CLUSTER_NAME}" \
-    --project="${CP_PROJECT_ID}" \
-    --region="${GCP_REGION}" \
-    --format="value(endpoint)")
-ACCESS_TOKEN=$(gcloud auth print-access-token)
+  local cluster_ca
+  local cluster_endpoint
+  local gcp_bootstrap_token
+  local bootstrap_kubeconfig
+  local token_request_duration="12h"
+  local ci_admin_token_request
+  local ci_admin_token
+  local ci_admin_token_expiration
+  local authenticated_identity
 
-# Control Plane cluster kubeconfig - filename follows CI convention.
-# Used by hypershift-install, hypershift-gcp-run-e2e, and other steps that need
-# access to the Control Plane cluster.
-cat > "${SHARED_DIR}/kubeconfig" << EOF
+  cluster_ca=$(gcloud container clusters describe "${CLUSTER_NAME}" \
+      --project="${CP_PROJECT_ID}" \
+      --region="${GCP_REGION}" \
+      --format="value(masterAuth.clusterCaCertificate)")
+  cluster_endpoint=$(gcloud container clusters describe "${CLUSTER_NAME}" \
+      --project="${CP_PROJECT_ID}" \
+      --region="${GCP_REGION}" \
+      --format="value(endpoint)")
+  if ! gcp_bootstrap_token=$(gcloud auth print-access-token); then
+    echo "ERROR: Failed to obtain GCP OAuth bootstrap token"
+    exit 1
+  fi
+  bootstrap_kubeconfig=$(mktemp "${TMPDIR:-/tmp}/gke-bootstrap-kubeconfig.XXXXXX")
+  trap 'rm -f -- "${bootstrap_kubeconfig}"' EXIT
+
+  cat > "${bootstrap_kubeconfig}" << EOF
 apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    certificate-authority-data: ${CLUSTER_CA}
-    server: https://${CLUSTER_ENDPOINT}
+    certificate-authority-data: ${cluster_ca}
+    server: https://${cluster_endpoint}
   name: gke-control-plane-cluster
 contexts:
 - context:
     cluster: gke-control-plane-cluster
-    user: gke-control-plane-cluster
+    user: gcp-bootstrap
   name: gke-control-plane-cluster
 current-context: gke-control-plane-cluster
 users:
-- name: gke-control-plane-cluster
+- name: gcp-bootstrap
   user:
-    token: ${ACCESS_TOKEN}
+    token: ${gcp_bootstrap_token}
 EOF
+  chmod 600 "${bootstrap_kubeconfig}"
 
+  oc --kubeconfig="${bootstrap_kubeconfig}" create namespace hypershift-ci
+  oc --kubeconfig="${bootstrap_kubeconfig}" create serviceaccount ci-admin -n hypershift-ci
+  oc --kubeconfig="${bootstrap_kubeconfig}" create clusterrolebinding ci-admin \
+      --clusterrole=cluster-admin \
+      --serviceaccount=hypershift-ci:ci-admin
+
+  if ! ci_admin_token_request=$(oc --kubeconfig="${bootstrap_kubeconfig}" create token ci-admin \
+      -n hypershift-ci \
+      --duration="${token_request_duration}" \
+      -o json); then
+    echo "ERROR: Failed to create ci-admin Kubernetes ServiceAccount token"
+    exit 1
+  fi
+
+  if ! ci_admin_token=$(jq -er '.status.token | select(type == "string" and length > 0)' <<<"${ci_admin_token_request}") || \
+     ! ci_admin_token_expiration=$(jq -er '.status.expirationTimestamp | select(type == "string" and length > 0)' <<<"${ci_admin_token_request}"); then
+    echo "ERROR: Failed to parse ci-admin Kubernetes TokenRequest response"
+    exit 1
+  fi
+
+  echo "ci-admin token expiration: ${ci_admin_token_expiration}"
+
+  # Control Plane cluster kubeconfig - filename follows CI convention.
+  # Used by subsequent workflow steps that need access to the Control Plane cluster.
+  cat > "${SHARED_DIR}/kubeconfig" << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: ${cluster_ca}
+    server: https://${cluster_endpoint}
+  name: gke-control-plane-cluster
+contexts:
+- context:
+    cluster: gke-control-plane-cluster
+    user: ci-admin
+  name: gke-control-plane-cluster
+current-context: gke-control-plane-cluster
+users:
+- name: ci-admin
+  user:
+    token: ${ci_admin_token}
+EOF
+  chmod 600 "${SHARED_DIR}/kubeconfig"
+
+  if ! authenticated_identity=$(oc --kubeconfig="${SHARED_DIR}/kubeconfig" auth whoami \
+      -o jsonpath='{.status.userInfo.username}'); then
+    echo "ERROR: Failed to authenticate with the ci-admin Kubernetes ServiceAccount kubeconfig"
+    exit 1
+  fi
+  if [[ "${authenticated_identity}" != "system:serviceaccount:hypershift-ci:ci-admin" ]]; then
+    echo "ERROR: Unexpected identity for the ci-admin Kubernetes ServiceAccount kubeconfig: ${authenticated_identity}"
+    exit 1
+  fi
+  echo "Kubernetes authenticated identity: ${authenticated_identity}"
+  echo "Kubeconfig created successfully"
+
+  rm -f -- "${bootstrap_kubeconfig}"
+  trap - EXIT
+)
+
+create_cluster_local_kubeconfig
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-echo "Kubeconfig created successfully"
-
-# Re-enable tracing
-set -x
 
 # Save remaining cluster info for downstream steps
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra-id"

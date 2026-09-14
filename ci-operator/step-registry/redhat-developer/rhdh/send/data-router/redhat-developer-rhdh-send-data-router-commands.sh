@@ -59,7 +59,7 @@ get_artifacts_url() {
     echo "Warning: namespace parameter is empty" >&2
   fi
 
-  local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+  local artifacts_base_url="https://gcs.ci.openshift.org/gcs/test-platform-results"
   local artifacts_complete_url
   if [ -n "${PULL_NUMBER:-}" ]; then
     local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-}"         # e.g. "e2e-ocp-operator-nightly"

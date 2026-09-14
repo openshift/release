@@ -75,7 +75,7 @@ function ExtractUniqueCerts () {
             if [[ "${line}" == *"END CERTIFICATE"* ]]; then
                 typeset fp
                 fp="$(printf '%s\n' "${currentCert}" \
-                    | openssl x509 -noout -fingerprint -sha256 2>/dev/null || true)"
+                    | openssl x509 -noout -fingerprint -sha256)"
                 if [[ -n "${fp}" && -z "${seenArr["${fp}"]+_}" ]]; then
                     seenArr["${fp}"]=1
                     printf '%s\n' "${currentCert}"
@@ -103,13 +103,20 @@ CollectSpokeKubeconfigs
 
 # Collect each spoke's CA bundle into a dedicated temp file.
 # File paths are safe to trace; cert content stays in files, never in shell variables.
+# Disable xtrace while PEM data is in flight; restore caller's tracing state after.
 typeset -i i
+typeset _wasTracingCa=false
+if [[ $- == *x* ]]; then _wasTracingCa=true; fi
+set +x
+# --- PEM-handling region: xtrace suppressed to prevent cert content in logs ---
 for ((i = 0; i < spokeCount; i++)); do
     typeset caFile; caFile="$(mktemp /tmp/kubevirt-ca-XXXXXX.pem)"
     spokeCaFilesArr+=("${caFile}")
     GetKubevirtCaBundle "${spokeKubeconfigsArr[i]}" "${caFile}"
     [[ -s "${caFile}" ]]
 done
+# --- end PEM-handling region ---
+[[ "${_wasTracingCa}" == "true" ]] && set -x
 
 # Build a single combined PEM bundle of all unique spoke CAs into a temp file.
 combinedFile="$(mktemp /tmp/kubevirt-ca-combined-XXXXXX.pem)"
@@ -137,8 +144,8 @@ done
 if [[ -n "${ARTIFACT_DIR}" ]]; then
     mkdir -p "${ARTIFACT_DIR}"
     for ((i = 0; i < spokeCount; i++)); do
-        openssl crl2pkcs7 -nocrl -certfile "${spokeCaFilesArr[i]}" 2>/dev/null \
-            | openssl pkcs7 -print_certs -noout 2>/dev/null \
+        openssl crl2pkcs7 -nocrl -certfile "${spokeCaFilesArr[i]}" \
+            | openssl pkcs7 -print_certs -noout \
             > "${ARTIFACT_DIR}/spoke-$((i+1))-kubevirt-ca-subjects.txt" || true
     done
 fi

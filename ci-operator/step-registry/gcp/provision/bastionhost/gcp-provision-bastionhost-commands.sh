@@ -178,7 +178,7 @@ fi
 # shellcheck disable=SC2086
 gcloud ${project_option} compute firewall-rules create "${bastion_name}-ingress-allow" \
   --network "${NETWORK}" \
-  --allow tcp:22,tcp:3128,tcp:3129,tcp:5000,tcp:6001,tcp:6002,tcp:8080,tcp:873,icmp \
+  --allow tcp:22,tcp:873,tcp:3128,tcp:3129,tcp:5000,tcp:6001,tcp:6002,tcp:8080,tcp:12000-65535,udp:12000-65535,icmp \
   --target-tags="${bastion_name}"
 
 #####################################

@@ -24,6 +24,8 @@ promotion:
   to:
   - name: "5.2"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -84,6 +86,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     test:
+    - ref: merge-stage-registry-credentials
     - as: test
       cli: latest
       commands: make test-e2e
@@ -104,6 +107,7 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     test:
+    - ref: merge-stage-registry-credentials
     - as: test
       cli: latest
       commands: make test-e2e
@@ -118,6 +122,7 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     test:
+    - ref: merge-stage-registry-credentials
     - as: test
       cli: latest
       commands: make test-e2e
@@ -133,6 +138,7 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     test:
+    - ref: merge-stage-registry-credentials
     - as: test
       cli: latest
       commands: make TEST=TestGatewayAPI test-e2e
@@ -151,6 +157,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       NETWORK_TYPE: single-tenant
     test:
+    - ref: merge-stage-registry-credentials
     - as: test
       cli: latest
       commands: make TEST=TestGatewayAPI test-e2e
@@ -204,33 +211,12 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
-  as: e2e-aws-pre-release-ossm
-  optional: true
-  steps:
-    cluster_profile: openshift-org-aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export TOKEN=$(cat /var/run/nid-ossm-token/secrets/konflux-cluster-token)
-        export AUTHBREW=$(cat /var/run/nid-ossm-token/secrets/brew-secret)
-        export AUTHSTAGE=$(cat /var/run/nid-ossm-token/secrets/stage-secret)
-        make test-pre-release-ossm
-      credentials:
-      - mount_path: /var/run/nid-ossm-token/secrets
-        name: secrets
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- always_run: false
   as: e2e-aws-gatewayapi-conformance
   pipeline_run_if_changed: ^(manifests/.*|pkg/manifests/assets/gateway-api/.*|cmd/ingress-operator/.*|hack/.*|pkg/operator/controller/gateway.*/.*|vendor/github.com/istio-ecosystem/sail-operator/.*|vendor/sigs.k8s.io/gateway-api/.*|test/e2e/.*)$
   steps:
     cluster_profile: openshift-org-aws
     test:
+    - ref: merge-stage-registry-credentials
     - as: test
       cli: latest
       commands: make gatewayapi-conformance
@@ -247,6 +233,7 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
+    - ref: merge-stage-registry-credentials
     - as: test
       cli: latest
       commands: make gatewayapi-conformance
@@ -263,6 +250,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     test:
+    - ref: merge-stage-registry-credentials
     - ref: ingress-baremetalds-metallb-gatewayapi-conformance-test
     workflow: ingress-baremetalds-metallb
 - always_run: false
@@ -275,6 +263,7 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
+    - ref: merge-stage-registry-credentials
     - ref: ingress-baremetalds-metallb-gatewayapi-conformance-test
     workflow: ingress-baremetalds-metallb
 - always_run: false
@@ -283,6 +272,7 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     test:
+    - ref: merge-stage-registry-credentials
     - as: test
       cli: latest
       commands: make gatewayapi-conformance
@@ -300,6 +290,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       NETWORK_TYPE: single-tenant
     test:
+    - ref: merge-stage-registry-credentials
     - as: test
       cli: latest
       commands: make gatewayapi-conformance
@@ -426,12 +417,6 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
-- always_run: false
-  as: address-review-comments
-  optional: true
-  skip_if_only_changed: .*
-  steps:
-    workflow: ingress-review-agent-trigger
 zz_generated_metadata:
   branch: release-5.2
   org: openshift

@@ -383,9 +383,9 @@ append_report_link_to_pr() {
   local report_url=""
   if [ -n "${BUILD_ID:-}" ] && [ -n "${JOB_NAME:-}" ]; then
     if [ "${JOB_TYPE:-}" = "periodic" ]; then
-      report_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}/artifacts/periodic-jira-agent/jira-agent-report/artifacts/jira-agent-report.html"
+      report_url="https://gcs.ci.openshift.org/gcs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}/artifacts/periodic-jira-agent/jira-agent-report/artifacts/jira-agent-report.html"
     else
-      report_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/${PULL_NUMBER:-0}/${JOB_NAME}/${BUILD_ID}/artifacts/periodic-jira-agent/jira-agent-report/artifacts/jira-agent-report.html"
+      report_url="https://gcs.ci.openshift.org/gcs/test-platform-results/pr-logs/pull/openshift_release/${PULL_NUMBER:-0}/${JOB_NAME}/${BUILD_ID}/artifacts/periodic-jira-agent/jira-agent-report/artifacts/jira-agent-report.html"
     fi
   fi
 

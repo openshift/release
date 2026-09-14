@@ -9,6 +9,8 @@ build_root:
     namespace: ci
     tag: main
   use_build_cache: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -44,9 +46,9 @@ tests:
       commands: |
         GOOGLE_APPLICATION_CREDENTIALS='/maistra-secrets/service-account.json' ./ossm/ci/post-submit.sh
       credentials:
-      - mount_path: /maistra-secrets
-        name: gcs-credentials
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: gcs
+        mount_path: /maistra-secrets
       from: src
       resources:
         requests:
@@ -79,8 +81,9 @@ tests:
     report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs>'
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
   timeout: 8h0m0s
 - as: sync-upstream-ztunnel-master
   commands: |
@@ -100,8 +103,9 @@ tests:
     from: src
   cron: 00 05 * * 1-5
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 zz_generated_metadata:
   branch: master
   org: openshift-service-mesh

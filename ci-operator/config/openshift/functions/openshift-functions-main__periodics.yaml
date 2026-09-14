@@ -3,6 +3,8 @@ base_images:
     name: rebasebot
     namespace: ci
     tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -30,9 +32,9 @@ tests:
                   --post-rebase-hook git:dest/main:hack/openshift/post-rebase-hook.sh \
                   --title-prefix UPSTREAM-SYNC
       credentials:
-      - mount_path: /secrets/rebasebot
-        name: rebasebot-credentials
-        namespace: test-credentials
+      - collection: rebasebot-credentials
+        group: secret
+        mount_path: /secrets/rebasebot
       from_image:
         name: rebasebot
         namespace: ci

@@ -9,6 +9,8 @@ build_root:
     namespace: ci
     tag: "2.4"
   use_build_cache: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -54,8 +56,9 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 - as: sync-upstream-envoy-2.4
   commands: |
     ./tools/automator-main.sh \
@@ -83,8 +86,9 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 - as: sync-upstream-istio-2.4
   commands: |
     ./tools/automator-main.sh \
@@ -113,8 +117,9 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 - as: update-istio-builder-image
   commands: |
     export NEW_IMAGE_MASTER=$(curl -sL https://raw.githubusercontent.com/istio/common-files/master/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
@@ -137,8 +142,9 @@ tests:
     from: src
   cron: 00 05 * * 1-5
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 - as: test-infra-build-containers-2-3
   run_if_changed: ^docker/maistra-builder_2\.3\.Dockerfile|^docker/scripts
   steps:
@@ -216,9 +222,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_2.3.push"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -306,9 +312,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_2.4.push"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -396,9 +402,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_2.5.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -487,9 +493,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_2.6.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -579,9 +585,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.0.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -671,9 +677,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.1.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -763,9 +769,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.2.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -855,9 +861,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.3.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -947,9 +953,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.4.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -1039,9 +1045,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_3.5.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -1131,9 +1137,9 @@ tests:
         "docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
         make maistra-builder_main.push_multi"
       credentials:
-      - mount_path: /quay-secret
-        name: quay-pass
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: quay
+        mount_path: /quay-secret
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD

@@ -22,6 +22,8 @@ promotion:
   to:
   - name: cloud-resource-operator
     namespace: integr8ly
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -78,8 +80,9 @@ tests:
   container:
     from: src
   secret:
+    collection: integr8ly
+    group: cloud-resource-operator-codecov-token
     mount_path: /tmp/secret
-    name: cloud-resource-operator-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -88,8 +91,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: integr8ly
+    group: cloud-resource-operator-codecov-token
     mount_path: /tmp/secret
-    name: cloud-resource-operator-codecov-token
 - as: gosec
   commands: make gosec
   container:

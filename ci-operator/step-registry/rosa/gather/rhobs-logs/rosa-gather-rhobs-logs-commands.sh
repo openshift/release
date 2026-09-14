@@ -177,6 +177,22 @@ for stream in d.get('data',{}).get('result',[]):
         echo "  Collecting AWS VPCE Operator logs..."
         query_loki "{k8s_namespace_name=\"openshift-aws-vpce-operator\"}" \
           "${RHOBS_LOG_DIR}/aws-vpce-operator-logs.txt" 5000
+
+        # 12. Cluster-side EgressIP diagnostic state (requires guest cluster kubeconfig)
+        if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+          echo "  Collecting cluster-side EgressIP state (guest cluster)..."
+          oc --kubeconfig="${SHARED_DIR}/kubeconfig" get egressips -o yaml \
+            > "${RHOBS_LOG_DIR}/egressip-cluster-state.txt" 2>&1 || true
+
+          oc --kubeconfig="${SHARED_DIR}/kubeconfig" get nodes -l k8s.ovn.org/egress-assignable -o json 2>/dev/null | \
+            jq '.items[] | {name: .metadata.name, annotations: {ifaddr: .metadata.annotations["k8s.ovn.org/node-primary-ifaddr"], ipconfig: .metadata.annotations["cloud.network.openshift.io/egress-ipconfig"]}}' \
+            > "${RHOBS_LOG_DIR}/egressip-node-annotations.json" 2>&1 || true
+
+          oc --kubeconfig="${SHARED_DIR}/kubeconfig" get events --field-selector reason=EgressIPAssignmentError --sort-by=.lastTimestamp -A \
+            > "${RHOBS_LOG_DIR}/egressip-events.txt" 2>&1 || true
+        else
+          echo "  Skipping cluster-side EgressIP state collection (no guest cluster kubeconfig at ${SHARED_DIR}/kubeconfig)"
+        fi
       }
 
       if [[ "${NO_CLUSTER_ID}" == "true" ]]; then

@@ -1,0 +1,31 @@
+ref:
+  as: openshift-qe-installer-aws-provision-bastion
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  grace_period: 10m
+  commands: openshift-qe-installer-aws-provision-bastion-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+    - name: BASTION_INSTANCE_TYPE
+      default: ""
+      documentation: |-
+        EC2 instance type for the bastion host. Defaults to the worker node instance type.
+    - name: GO_VERSION
+      default: "1.23.4"
+      documentation: |-
+        Go version to install on the bastion for FRR demo.sh build steps.
+  documentation: >-
+    Provisions an AWS EC2 bastion for network workload tests (EVPN, UDN-BGP). The primary
+    ENI is in the public subnet (CI SSH access). A secondary ENI in the worker
+    subnet provides the private IP used for EVPN/BGP/VXLAN with OCP nodes. Uses
+    the node security group and opens TCP/179 (BGP) and UDP/4789 (VXLAN). Installs
+    bastion tools (podman via SPAL, iproute, git, oc, go) and copies kubeconfig
+    to /root/.kube/config. Writes bastion_public_address, bastion_private_address,
+    bastion_ssh_user, bastion_ssh_key, evpn-bastion-resources.json, and
+    aws-instance-ids.txt to SHARED_DIR.

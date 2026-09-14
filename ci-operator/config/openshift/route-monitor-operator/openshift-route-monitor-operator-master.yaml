@@ -29,6 +29,8 @@ images:
       ENTRYPOINT ["/usr/local/bin/manager"]
     from: src
     to: operator-coverage
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -60,8 +62,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: route-monitor-operator-codecov-token
     mount_path: /tmp/secret
-    name: route-monitor-operator-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -70,8 +73,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: route-monitor-operator-codecov-token
     mount_path: /tmp/secret
-    name: route-monitor-operator-codecov-token
 - as: lint
   commands: make lint
   container:

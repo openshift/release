@@ -25,7 +25,14 @@ export BASE_DOMAIN
 export PULL_SECRET
 export RENDEZVOUS_IP
 export PROXY_URL
-export USER_MANAGED_NETWORKING=true
+
+if [ "${LOAD_BALANCER_TYPE:-cluster-managed}" = "cluster-managed" ]; then
+  API_IP=$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
+  INGRESS_IP=$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
+  export API_IP INGRESS_IP
+else
+  export USER_MANAGED_NETWORKING=true
+fi
 
 if ! python3.11 assisted-ui/run_agent_tui.py; then
  echo "Assisted UI workflow failed."

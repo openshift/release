@@ -4,7 +4,7 @@ set -euo pipefail
 
 # This step installs prerequisites on a GKE cluster that are available
 # by default on OpenShift but required for HyperShift:
-# 1. CRDs (Prometheus operator, OpenShift Route, DNSEndpoint)
+# 1. CRDs (Prometheus operator, OpenShift Route)
 # 2. cert-manager with GKE Autopilot compatibility
 
 set -x
@@ -32,9 +32,6 @@ fetch_and_apply https://raw.githubusercontent.com/prometheus-operator/prometheus
 
 # OpenShift Route CRD (for hosted cluster ingress)
 fetch_and_apply https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml
-
-# DNSEndpoint CRD (for external-dns zone delegation)
-fetch_and_apply https://raw.githubusercontent.com/kubernetes-sigs/external-dns/v0.15.0/docs/contributing/crd-source/crd-manifest.yaml
 
 # ============================================================================
 # Step 2: Install cert-manager

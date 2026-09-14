@@ -154,9 +154,41 @@ EOF
 
 create_catalog_sources() {
 	local node_name
+	local kube_major
+	local kube_minor
 	echo "creating catalogsource: $CATALOG_SOURCE"
 
-	cat <<EOF | oc apply -f -
+	# get cluster Major.Minor version
+	kube_major=$(oc version -o json | jq -r '.serverVersion.major')
+	kube_minor=$(oc version -o json | jq -r '.serverVersion.minor' | sed 's/+$//')
+
+	# since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
+	# details: https://issues.redhat.com/browse/OCPBUGS-31427
+	if [[ ${kube_major} -gt 1 || ( ${kube_major} -eq 1 && ${kube_minor} -gt 27 ) ]]; then
+		echo "the index image as the initContainer cache image"
+		cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: $CATALOG_SOURCE
+  namespace: openshift-marketplace
+spec:
+  displayName: Tempo Konflux
+  grpcPodConfig:
+    extractContent:
+      cacheDir: /tmp/cache
+      catalogDir: /configs
+    memoryTarget: 30Mi
+  image: $DT_INDEX_IMAGE
+  publisher: OpenShift QE
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+	else
+		echo "the index image as the server image"
+		cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -171,6 +203,7 @@ spec:
     registryPoll:
       interval: 15m
 EOF
+	fi
 	local -i counter=0
 	local status=""
 	while [ $counter -lt 600 ]; do
@@ -188,6 +221,8 @@ EOF
 		run "oc get pods -o wide -n openshift-marketplace"
 		run "oc -n openshift-marketplace get catalogsource $CATALOG_SOURCE -o yaml"
 		run "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOG_SOURCE -o yaml"
+		run "oc -n openshift-marketplace logs -l olm.catalogSource=$CATALOG_SOURCE --tail=-1 --all-containers"
+		run "oc -n openshift-marketplace logs -l olm.catalogSource=$CATALOG_SOURCE --tail=-1 --all-containers --previous --ignore-errors"
 		node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE" -o=jsonpath='{.items[0].spec.nodeName}')
 		run "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
       pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"

@@ -32,16 +32,19 @@ promotion:
     namespace: ocp-kni
 prowgen:
   disable_sparse_checkout: true
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
       name: "4.12"
       namespace: ocp
+      reference_policy: Local
   latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.12"
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+      reference_policy: Local
 resources:
   '*':
     requests:
@@ -54,7 +57,6 @@ tests:
     from: src
   skip_if_only_changed: ^docs/|^hack/.*\.md$|^cnf-tests/submodules/|^ztp/resource-generator/telco-reference$|^telco5g-konflux$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
 - as: e2e-aws-ci-tests
-  skip_if_only_changed: ^ztp|^docs/|^hack/.*\.md$|^cnf-tests/submodules/|^ztp/resource-generator/telco-reference$|^telco5g-konflux$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: aws-telco
     env:

@@ -51,11 +51,22 @@ WORK_DIR=$(mktemp -d /tmp/workspace.XXXXXX)
 cp -r /workspace/. "${WORK_DIR}/"
 cd "${WORK_DIR}"
 
+# Configure pytest parallelism via pytest-xdist
+# JETSON_PYTEST_WORKERS: 0 or 1 = serial, 2+ = parallel workers
+PYTEST_ARGS="-v --junit-xml=${ARTIFACT_DIR}/junit.xml"
+if [[ "${JETSON_PYTEST_WORKERS:-0}" -gt 1 ]]; then
+    echo "=== Enabling parallel execution with ${JETSON_PYTEST_WORKERS} workers ==="
+    PYTEST_ARGS="-n ${JETSON_PYTEST_WORKERS} ${PYTEST_ARGS}"
+else
+    echo "=== Running tests serially (JETSON_PYTEST_WORKERS=${JETSON_PYTEST_WORKERS:-0}) ==="
+fi
+
 JETSON_HOST="${EFFECTIVE_HOST}" \
 JETSON_PORT="${EFFECTIVE_PORT}" \
 JETSON_USERNAME="root" \
 JETSON_KEY_PATH="${SSH_KEY}" \
-pytest ${TEST_SUITE} -v --junit-xml="${ARTIFACT_DIR}/junit.xml"
+RUN_SC7_WRAPPER="${RUN_SC7_WRAPPER:-0}" \
+pytest ${TEST_SUITE} ${PYTEST_ARGS}
 
 # Collect device logs archives for Prow artifact upload
 echo "=== Collecting device log artifacts ==="

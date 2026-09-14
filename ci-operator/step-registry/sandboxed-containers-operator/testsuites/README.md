@@ -31,18 +31,17 @@ Design decisions that follow from that intent:
 - **Suites do not block each other on pass / error / skip.** This is the whole point
   — one repository's suite failing must not prevent another's from running. Achieved
   with `best_effort` in `post` (see below).
-- **Explicit, per-suite enable gating** via `TEST_<STEP_NAME>_ENABLE`, so a job opts
+- **Explicit, per-suite enable gating** via `TESTS_<SUITE_NAME>_ENABLE`, so a job opts
   into exactly the suites it wants and everything else skips gracefully. Every ProwJob
-  variable for a suite is prefixed `TEST_<STEP_NAME>_`.
+  variable for a suite follows the `TESTS_<SUITE_NAME>_<PARAMETER>` convention.
 - **Every suite emits standard Prow artifacts + JUnit**, so results show up in
   Spyglass whether the suite ran, was skipped, or failed.
 
 **Scope** is deliberately limited to `ci-operator/**/sandboxed-containers-operator/`.
 
-`skeleton` / `skeleton2` are the reference implementation of a suite step: `skeleton`
-echoes its `TEST_SKELETON_ENABLE` value and (when enabled) exits with a failure to
-prove non-blocking; `skeleton2` runs after it and always succeeds. They are DEMOs and
-disabled by default (see below) — real suites replace them following the same pattern.
+`kata-upstream` runs the upstream Kata Containers e2e tests. `osc` runs the
+OSC golang (Ginkgo v2) e2e tests from
+`openshift/sandboxed-containers-operator` `test/e2e`.
 
 ## Why POST (and not `test:`)
 
@@ -67,17 +66,17 @@ Non-blocking behaviour requires **both**:
 testsuites/
 ├── README.md                                              (this file)
 ├── sandboxed-containers-operator-testsuites-chain.yaml    (the POST chain)
-├── skeleton/                                              (DEMO suite -- fails on purpose)
-│   ├── ...-skeleton-ref.yaml
-│   └── ...-skeleton-commands.sh
-└── skeleton2/                                             (DEMO suite -- always succeeds)
-    ├── ...-skeleton2-ref.yaml
-    └── ...-skeleton2-commands.sh
+├── kata-upstream/                                         (upstream Kata Containers e2e tests)
+│   ├── ...-kata-upstream-ref.yaml
+│   └── ...-kata-upstream-commands.sh
+└── osc/                                                   (OSC downstream e2e tests)
+    ├── ...-osc-ref.yaml
+    └── ...-osc-commands.sh
 ```
 
 ## Enable convention
 
-Each suite is gated by `TEST_<STEP_NAME>_ENABLE`, **skip-by-default**:
+Each suite is gated by `TESTS_<SUITE_NAME>_ENABLE`, **skip-by-default**:
 
 - `== "true"`  → the suite runs and logs its result.
 - `"false"` or unset → the suite logs the value and exits 0 (graceful skip).
@@ -85,23 +84,11 @@ Each suite is gated by `TEST_<STEP_NAME>_ENABLE`, **skip-by-default**:
 Every suite writes a JUnit file to `${ARTIFACT_DIR}/junit_<name>.xml` in **both**
 the run and skip paths, so Prow always ingests a result.
 
-## The `skeleton` / `skeleton2` steps are a DEMO — disabled by default
+## Suites in the chain
 
-`skeleton` and `skeleton2` are **demonstration** suites, not real tests. They exist
-to prove the non-blocking wiring end-to-end and to serve as a copy-paste template
-for real suites. They are **disabled by default** (`TEST_SKELETON_ENABLE` and
-`TEST_SKELETON2_ENABLE` default to `"false"` in their refs), so in normal jobs they
-just log the value and exit 0.
-
-| Step        | When enabled (`..._ENABLE=true`)                                   | JUnit                    |
+| Step        | What it does                                                      | JUnit                    |
 |-------------|-------------------------------------------------------------------|--------------------------|
-| `skeleton`  | **Deliberately fails** (exit 1) to show a failing suite is non-blocking | `<failure>` in `junit_skeleton.xml` |
-| `skeleton2` | **Always succeeds** (exit 0); runs after `skeleton`                | passing `junit_skeleton2.xml` |
-
-Enabling both on a job demonstrates the key behaviour: `skeleton` fails, yet
-`skeleton2` still runs and passes, and the post phase continues through must-gather
-and deprovision. Because they are demos, do **not** enable them on production
-periodics (enabling `skeleton` makes that job red every run by design).
+| `osc`       | When enabled, runs the OSC golang (Ginkgo v2) e2e tests (`go test` over `test/e2e`) and publishes their JUnit. Disabled by default. | `junit_osc.xml` (or `junit_osc_skip.xml` when skipped) |
 
 ## Wiring into a workflow
 
@@ -119,18 +106,19 @@ workflow:
       ...
 ```
 
-## Adding a real suite
+## Adding a suite
 
 1. Create a step directory under `testsuites/` (e.g. `testsuites/<suite>/`) with a
-   `...-<suite>-ref.yaml` (env `TEST_<SUITE>_ENABLE`, default `"false"`) and a
+   `...-<suite>-ref.yaml` (env `TESTS_<SUITE_NAME>_ENABLE`, default `"false"`;
+   name all suite parameters `TESTS_<SUITE_NAME>_<PARAMETER>`) and a
    `...-<suite>-commands.sh` (default `set -euo pipefail`; write
    `${ARTIFACT_DIR}/junit_<suite>.xml` in both the run and skip paths).
 2. Append the ref to `sandboxed-containers-operator-testsuites-chain.yaml` with
    `best_effort: true`.
 3. Run `make update` (generates the `*.metadata.json` files) and validate with the
    ci-operator config resolver.
-4. Enable it on the desired job(s) by setting `TEST_<SUITE>_ENABLE: "true"` in that
-   job's `steps.env`.
+4. Enable it on the desired job(s) by setting `TESTS_<SUITE_NAME>_ENABLE: "true"` in
+   that job's `steps.env`.
 
 The registry naming rule requires each `as:` name to equal its directory path
 relative to `step-registry/` with `/` replaced by `-` (e.g.

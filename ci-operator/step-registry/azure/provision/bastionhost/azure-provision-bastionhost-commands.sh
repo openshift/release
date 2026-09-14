@@ -286,7 +286,7 @@ else
     bastion_image_id=${BASTION_BOOT_IMAGE}
 fi
 
-open_port="22 873 3128 3129 5000 6001 6002"
+open_port="22 873 3128 3129 5000 6001 6002 12000-65535"
 if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
     echo "Create bastion subnet"
     bastion_nsg="${bastion_name}-nsg" bastion_subnet="${bastion_name}Subnet"

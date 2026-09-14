@@ -593,13 +593,19 @@ function main {
 	# Extract source commit from catalog image for z-stream integration test builds.
 	# Only needed when ZSTREAM_VERSION is set — non-z-stream tests use pre-built images.
 	if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
-		local commit
 		local commit image_info_flags=""
 		if [[ "$DISCONNECTED" == "true" ]]; then
 			image_info_flags="--insecure -a /tmp/new-dockerconfigjson"
 		fi
-		commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
-			| jq -r '.config.config.Labels["vcs-ref"]')
+		local attempt
+		for attempt in 1 2 3; do
+			commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+				| jq -r '.config.config.Labels["vcs-ref"]') && break
+			if [[ ${attempt} -lt 3 ]]; then
+				echo "  oc image info attempt ${attempt}/3 failed, retrying in 20s..." >&2
+				sleep 20
+			fi
+		done
 		if [[ -z "${commit}" || "${commit}" == "null" ]]; then
 			echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
 			return 1

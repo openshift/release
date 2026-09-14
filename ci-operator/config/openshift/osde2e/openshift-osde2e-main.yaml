@@ -9,6 +9,8 @@ base_images:
     tag: latest
 build_root:
   from_repository: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -57,12 +59,15 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-hypershift-credentials
-    name: osde2e-hypershift-credentials
+  - collection: osde2e-secrets
+    group: osde2e-common
+    mount_path: /usr/local/osde2e-common
+  - collection: osde2e-secrets
+    group: osde2e-credentials
+    mount_path: /usr/local/osde2e-credentials
+  - collection: osde2e-secrets
+    group: osde2e-hypershift-credentials
+    mount_path: /usr/local/osde2e-hypershift-credentials
 - as: stage-clusters-cleanup
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -75,10 +80,12 @@ tests:
     from: osde2e
   cron: 0 1 * * 0
   secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
+  - collection: osde2e-secrets
+    group: osde2e-common
+    mount_path: /usr/local/osde2e-common
+  - collection: osde2e-secrets
+    group: osde2e-credentials
+    mount_path: /usr/local/osde2e-credentials
 - as: prod-clusters-cleanup
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -91,10 +98,12 @@ tests:
     from: osde2e
   cron: 0 2 * * 0
   secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
+  - collection: osde2e-secrets
+    group: osde2e-common
+    mount_path: /usr/local/osde2e-common
+  - collection: osde2e-secrets
+    group: osde2e-credentials
+    mount_path: /usr/local/osde2e-credentials
 - as: int-clusters-cleanup
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -107,26 +116,31 @@ tests:
     from: osde2e
   cron: 0 3 * * 0
   secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
+  - collection: osde2e-secrets
+    group: osde2e-common
+    mount_path: /usr/local/osde2e-common
+  - collection: osde2e-secrets
+    group: osde2e-credentials
+    mount_path: /usr/local/osde2e-credentials
 - as: cleanup-tekton-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-tekton-copy,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --security-group --vpc --dry-run=false --send-cleanup-summary
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --security-group --vpc --secrets --dry-run=false --send-cleanup-summary
   container:
     clone: true
     from: osde2e
   cron: 0 8 * * *
   secrets:
-  - mount_path: /usr/local/osde2e-tekton-copy
-    name: osde2e-tekton-copy
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
+  - collection: osde2e-secrets
+    group: osde2e-tekton-copy
+    mount_path: /usr/local/osde2e-tekton-copy
+  - collection: osde2e-secrets
+    group: osde2e-common
+    mount_path: /usr/local/osde2e-common
+  - collection: osde2e-secrets
+    group: osde2e-credentials
+    mount_path: /usr/local/osde2e-credentials
 - as: cleanup-selfservice-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-selfservice-copy,/usr/local/osde2e-credentials"
@@ -137,12 +151,15 @@ tests:
     from: osde2e
   cron: 0 8 * * *
   secrets:
-  - mount_path: /usr/local/osde2e-selfservice-copy
-    name: osde2e-selfservice-copy
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
+  - collection: osde2e-secrets
+    group: osde2e-selfservice-copy
+    mount_path: /usr/local/osde2e-selfservice-copy
+  - collection: osde2e-secrets
+    group: osde2e-common
+    mount_path: /usr/local/osde2e-common
+  - collection: osde2e-secrets
+    group: osde2e-credentials
+    mount_path: /usr/local/osde2e-credentials
 - as: cleanup-hypershift-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-hypershift-credentials,/usr/local/osde2e-credentials"
@@ -153,26 +170,15 @@ tests:
     from: osde2e
   cron: 0 8 * * *
   secrets:
-  - mount_path: /usr/local/osde2e-hypershift-credentials
-    name: osde2e-hypershift-credentials
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-- as: cleanup-trt-aws
-  commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-trt-credentials"
-
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --ec2 --iam --s3 --elastic-ip --security-group --vpc --dry-run=false  --send-cleanup-summary
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 8 * * *
-  secrets:
-  - mount_path: /usr/local/osde2e-trt-credentials
-    name: osde2e-trt-credentials
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
+  - collection: osde2e-secrets
+    group: osde2e-hypershift-credentials
+    mount_path: /usr/local/osde2e-hypershift-credentials
+  - collection: osde2e-secrets
+    group: osde2e-common
+    mount_path: /usr/local/osde2e-common
+  - collection: osde2e-secrets
+    group: osde2e-credentials
+    mount_path: /usr/local/osde2e-credentials
 - as: cleanup-rosa-nightly
   commands: |
     export SECRET_LOCATIONS="/usr/local/rosa-e2e-prow-ci-01-osde2e"
@@ -183,8 +189,9 @@ tests:
     from: osde2e
   cron: 0 1 * * 5
   secrets:
-  - mount_path: /usr/local/rosa-e2e-prow-ci-01-osde2e
-    name: rosa-e2e-prow-ci-01-osde2e
+  - collection: rosa-e2e
+    group: rosa-e2e-prow-ci-01-osde2e
+    mount_path: /usr/local/rosa-e2e-prow-ci-01-osde2e
 zz_generated_metadata:
   branch: main
   org: openshift

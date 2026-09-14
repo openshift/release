@@ -1,28 +1,6 @@
 ref:
   as: interop-opp-odf-health
-  from: cli
-  grace_period: 30s
   commands: interop-opp-odf-health-commands.sh
-  timeout: 18m
-  env:
-  - name: ODF_NAMESPACE
-    default: "openshift-storage"
-    documentation: Namespace where ODF is installed
-  - name: NOOBAA_S3_TIMEOUT
-    default: "30"
-    documentation: Timeout in seconds for the NooBaa S3 functional check pod
-  - name: ODF_READY_TIMEOUT
-    default: "720"
-    documentation: |-
-      Seconds to wait for StorageCluster and NooBaa to reach Ready before
-      running health checks. Accommodates platforms where ODF initialization
-      is slower (e.g., vSphere). On AWS the wait exits immediately; on vSphere
-      ODF typically needs 8-12 minutes. Must not exceed step timeout minus
-      300s to preserve headroom for the health checks themselves.
-  resources:
-    requests:
-      cpu: 100m
-      memory: 200Mi
   documentation: |-
     Validates ODF health in the OPP interop cluster via a 7-point gate:
     ODF Operator CSV phase, StorageCluster readiness, CephCluster health,
@@ -33,3 +11,25 @@ ref:
     Waits for ODF subsystems to converge before checking (configurable
     via ODF_READY_TIMEOUT), then produces JUnit XML for Prow / Sippy /
     TestGrid consumption.
+  env:
+  - default: "30"
+    documentation: Timeout in seconds for the NooBaa S3 functional check pod
+    name: NOOBAA_S3_TIMEOUT
+  - default: "openshift-storage"
+    documentation: Namespace where ODF is installed
+    name: ODF_NAMESPACE
+  - default: "720"
+    documentation: |-
+      Seconds to wait for StorageCluster and NooBaa to reach Ready before
+      running health checks. Accommodates platforms where ODF initialization
+      is slower (e.g., vSphere). On AWS the wait exits immediately; on vSphere
+      ODF typically needs 8-12 minutes. Must not exceed step timeout minus
+      300s to preserve headroom for the health checks themselves.
+    name: ODF_READY_TIMEOUT
+  from: cli
+  grace_period: 30s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 18m

@@ -233,7 +233,7 @@ post_github_comment() {
     [[ -z "${GIT_PR_NUMBER:-}" ]] && return 0
     [[ -z "${VAULT_GITHUB_TEST_REPORTER_TOKEN:-}" ]] && { echo "WARNING: VAULT_GITHUB_TEST_REPORTER_TOKEN not set"; return 1; }
 
-    local gcs_base="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull"
+    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results/pr-logs/pull"
     local test_name="${JOB_NAME##*-"${RELEASE_BRANCH_NAME}"-}"
     local step_path="${gcs_base}/${GITHUB_ORG_NAME}_${GITHUB_REPOSITORY_NAME}/${GIT_PR_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${test_name}/redhat-developer-rhdh-plugin-export-overlays-ocp-helm"
 

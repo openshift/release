@@ -8,7 +8,7 @@ ref:
     requests:
       cpu: 100m
       memory: 300Mi
-  timeout: 5m0s
+  timeout: 10m0s
   env:
   - name: OPERATOR_NAME
     default: ""
@@ -16,12 +16,17 @@ ref:
   - name: OPERATOR_CRDS
     default: ""
     documentation: Comma-separated CRDs to clear ownership on after e2e ClusterPackage deletion.
+  - name: OPERATOR_WAIT_DEPLOYMENTS
+    default: ""
+    documentation: Comma-separated deployment names to wait for after cleanup (e.g. operands managed by the operator).
   documentation: |-
     Cleans up after operator e2e tests: collects operator logs as
     artifacts, deletes the test ClusterPackage, removes stale
-    ClusterObjectSets, and clears CRD ownerReferences so the
-    production ClusterPackage can re-adopt them. Safe to run as
-    best_effort in post since cleanup failure should not fail the job.
+    ClusterObjectSets, clears CRD ownerReferences so the production
+    ClusterPackage can re-adopt them, and waits for the production
+    operator to reconcile before returning the cluster to the pool.
+    Safe to run as best_effort in post since cleanup failure should
+    not fail the job.
 
     Artifacts (under rosa-operator-cleanup/artifacts/ in Prow):
       - <deployment>-logs.txt for each deployment in the operator namespace

@@ -94,3 +94,13 @@ fi
 if [ -n "$TUNING_POLICY" ]; then
   oc patch hyperconverged kubevirt-hyperconverged -n openshift-cnv --type=json -p="[{'op': 'add', 'path': '/spec/tuningPolicy', 'value': '$TUNING_POLICY'}]"
 fi
+
+# Wait for MachineConfigPool to finish rolling out any day-2 MachineConfig
+# changes created by virt-platform-autopilot (e.g. psi=1 kernel arg,
+# kubelet swap config). Without this wait, subsequent test steps may start
+# while the MCO is still draining/rebooting worker nodes, causing test pod
+# evictions and consistent failures.
+# See: https://redhat-internal.slack.com/archives/C020CKMP6CT/p1788749810927519
+echo "Waiting for worker MachineConfigPool to finish updating..."
+oc wait mcp worker --for condition=Updated --timeout=30m
+echo "Worker MachineConfigPool is updated, all nodes are ready."

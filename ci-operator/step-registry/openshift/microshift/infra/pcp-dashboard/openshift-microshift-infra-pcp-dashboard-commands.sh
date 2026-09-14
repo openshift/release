@@ -53,7 +53,7 @@ bash "${PCP_SCRIPTS}/generate-dashboard.sh" \
 # Spyglass does not execute JavaScript in custom-link HTML, so the toggle
 # provides a link to the full interactive dashboard instead.
 STEP_NAME="openshift-microshift-infra-pcp-dashboard"
-GCSWEB_BASE="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+GCSWEB_BASE="https://gcs.ci.openshift.org/gcs/test-platform-results"
 
 WORKFLOW_NAME=""
 if [ -n "${SCENARIO_GCS}" ]; then

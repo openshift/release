@@ -1474,7 +1474,7 @@ dashboard.new(
 .addPanel(
     (timeseriesPanel(
         'GraphQL (v4) Request Rate by Org',
-        description="Rate of Tide's own GraphQL (/graphql) requests through ghproxy, split by org. Org is extracted from ghproxy's token_hash label, which for GitHub App installation tokens is \"<app slug> - <org>\" (Tide authenticates as the openshift-merge-bot app, one installation token per org). Filtered to user_agent=\"tide\" because that same app/token is also used by a few other bots (pj-rehearse, auto-config-brancher, private-prow-configs-mirror) whose traffic would otherwise be mixed in. There's no metric for actual per-query GraphQL point cost, so this request rate is the closest available proxy for relative GraphQL load/cost per org.",
+        description="Rate of Tide's own GraphQL (/graphql) requests through ghproxy, split by org. Org is extracted from ghproxy's token_hash label, which for GitHub App installation tokens is \"<app slug> - <org>\" (Tide authenticates as the openshift-ci app, one installation token per org). Filtered to user_agent=\"tide\" because that same app/token is also used by other Prow components whose traffic would otherwise be mixed in. There's no metric for actual per-query GraphQL point cost, so this request rate is the closest available proxy for relative GraphQL load/cost per org.",
         unit='reqps',
         min=0,
         legendCalcs=['mean', 'last', 'max'],
@@ -1484,7 +1484,7 @@ dashboard.new(
       },
     })
     .addTarget(prometheus.target(
-        'label_replace(sum(rate(github_request_duration_count{token_hash=~"openshift-merge-bot - .*", user_agent="tide", path="/graphql"}[5m])) by (token_hash), "org", "$1", "token_hash", "openshift-merge-bot - (.*)")',
+        'label_replace(sum(rate(github_request_duration_count{token_hash=~"openshift-ci - .*", user_agent="tide", path="/graphql"}[5m])) by (token_hash), "org", "$1", "token_hash", "openshift-ci - (.*)")',
         legendFormat='{{org}}',
     )), gridPos={
     h: 12,

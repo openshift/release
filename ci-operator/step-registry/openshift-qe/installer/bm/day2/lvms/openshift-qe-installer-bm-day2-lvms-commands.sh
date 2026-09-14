@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+set -x
 
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   # shellcheck disable=SC1090
@@ -32,8 +33,9 @@ wipe_nvme() {
   local bastion=$1
   ssh ${SSH_ARGS} root@${bastion} '
     for i in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do
+      ssh -t '"${INNER_SSH_ARGS}"' core@$i "sudo vgchange -an 2>/dev/null || true; sudo vgs --noheadings -o name 2>/dev/null | while read vg; do echo y | sudo vgremove -ff \$vg 2>/dev/null || true; done" 2>/dev/null
       for j in {0..7}; do
-        ssh -t '"${INNER_SSH_ARGS}"' core@$i "test -b /dev/nvme${j}n1 && sudo sgdisk --zap-all /dev/nvme${j}n1 && sudo wipefs -a /dev/nvme${j}n1 || true" 2>/dev/null
+        ssh -t '"${INNER_SSH_ARGS}"' core@$i "test -b /dev/nvme${j}n1 && { echo y | sudo pvremove -ff /dev/nvme${j}n1 2>/dev/null || true; sudo sgdisk --zap-all /dev/nvme${j}n1 || true; sudo wipefs -a /dev/nvme${j}n1 || true; }" 2>/dev/null
       done
     done'
 }
@@ -42,8 +44,9 @@ wipe_sata() {
   local bastion=$1
   ssh ${SSH_ARGS} root@${bastion} '
     for i in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do
+      ssh -t '"${INNER_SSH_ARGS}"' core@$i "sudo vgchange -an 2>/dev/null || true; sudo vgs --noheadings -o name 2>/dev/null | while read vg; do echo y | sudo vgremove -ff \$vg 2>/dev/null || true; done" 2>/dev/null
       for d in sdb sdc sdd sde sdf sdg sdh; do
-        ssh -t '"${INNER_SSH_ARGS}"' core@$i "lsblk /dev/$d -no MOUNTPOINT 2>/dev/null | grep -q . || { sudo sgdisk --zap-all /dev/$d 2>/dev/null; sudo wipefs -a /dev/$d 2>/dev/null; } || true" 2>/dev/null
+        ssh -t '"${INNER_SSH_ARGS}"' core@$i "lsblk /dev/$d -no MOUNTPOINT 2>/dev/null | grep -q . || { echo y | sudo pvremove -ff /dev/$d 2>/dev/null || true; sudo sgdisk --zap-all /dev/$d 2>/dev/null; sudo wipefs -a /dev/$d 2>/dev/null; } || true" 2>/dev/null
       done
     done'
 }
@@ -70,7 +73,7 @@ else
 fi
 
 # Install LVMS operator
-echo "Creating catalog source for LVMS v${LVM_OPERATOR_CHANNEL}"
+echo "Creating catalog source for LVMS v${LVM_OPERATOR_VERSION}"
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -79,8 +82,8 @@ metadata:
   namespace: openshift-marketplace
 spec:
   sourceType: grpc
-  image: registry.redhat.io/redhat/redhat-operator-index:v${LVM_OPERATOR_CHANNEL}
-  displayName: LVMS Catalog v${LVM_OPERATOR_CHANNEL}
+  image: registry.redhat.io/redhat/redhat-operator-index:v${LVM_OPERATOR_VERSION}
+  displayName: LVMS Catalog v${LVM_OPERATOR_VERSION}
   publisher: Red Hat
 EOF
 
@@ -109,7 +112,7 @@ metadata:
   name: lvms-operator
   namespace: ${NAMESPACE}
 spec:
-  channel: "stable-${LVM_OPERATOR_CHANNEL}"
+  channel: "stable-${LVM_OPERATOR_VERSION}"
   installPlanApproval: Automatic
   name: lvms-operator
   source: lvms-catalog

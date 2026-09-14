@@ -4,6 +4,8 @@ images:
   items:
   - dockerfile_path: Dockerfile.ci
     to: odf-console
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -47,12 +49,12 @@ tests:
         node --version
         ./test-prow-e2e.sh ${ODF_CONSOLE_FULL_IMG_NAME}
       credentials:
-      - mount_path: /var/run/operator-secret
-        name: operator-secret
-        namespace: test-credentials
-      - mount_path: /etc/odf-console-e2e/odf-e2e-credentials
-        name: odf-e2e-credentials
-        namespace: test-credentials
+      - collection: console-storage-plugin
+        group: operator-secret
+        mount_path: /var/run/operator-secret
+      - collection: odf-console-e2e
+        group: odf-e2e-credentials
+        mount_path: /etc/odf-console-e2e/odf-e2e-credentials
       dependencies:
       - env: ODF_CONSOLE_FULL_IMG_NAME
         name: odf-console-img

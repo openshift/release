@@ -92,4 +92,86 @@ if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_CRDS:-}" && -n "${OPERATOR_NAM
     done
 fi
 
+# Wait for the production operator to reconcile after cleanup.
+# When the e2e ClusterPackage is deleted, PKO garbage-collects managed
+# resources (deployments, ServiceAccounts, etc.). The production
+# ClusterPackage then needs to re-deploy everything. We wait here so
+# the cluster is not returned to the pool in a degraded state.
+# All waits share a single 300s budget so the total time is bounded.
+if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" && -n "${OPERATOR_NAMESPACE}" ]]; then
+    DEPLOY_NAME="${OPERATOR_NAME}"
+    WAIT_BUDGET=300
+    WAIT_START=$(date +%s)
+
+    wait_remaining() {
+        local elapsed=$(( $(date +%s) - WAIT_START ))
+        local remaining=$(( WAIT_BUDGET - elapsed ))
+        echo $(( remaining > 0 ? remaining : 0 ))
+    }
+
+    # Phase 1: poll for the operator deployment to appear
+    log "Waiting for production operator deployment ${DEPLOY_NAME} to appear in ${OPERATOR_NAMESPACE} (budget: ${WAIT_BUDGET}s)"
+    DEPLOY_FOUND=false
+    while [[ "$(wait_remaining)" -gt 0 ]]; do
+        if oc get deployment "${DEPLOY_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+            DEPLOY_FOUND=true
+            break
+        fi
+        sleep 10
+    done
+
+    # Phase 2: wait for Available condition
+    if [[ "${DEPLOY_FOUND}" == "true" ]]; then
+        REMAINING=$(wait_remaining)
+        if [[ "${REMAINING}" -gt 0 ]]; then
+            log "Deployment ${DEPLOY_NAME} found, waiting for Available condition (${REMAINING}s remaining)"
+            oc wait deployment "${DEPLOY_NAME}" -n "${OPERATOR_NAMESPACE}" \
+                --for=condition=Available --timeout="${REMAINING}s" 2>/dev/null || \
+                log "WARNING: Timed out waiting for ${DEPLOY_NAME} to become Available — cluster may self-heal"
+        else
+            log "WARNING: Budget exhausted before waiting for ${DEPLOY_NAME} Available condition — cluster may self-heal"
+        fi
+    else
+        log "WARNING: Deployment ${DEPLOY_NAME} did not appear within budget — cluster may self-heal"
+    fi
+
+    # Phase 3: wait for additional deployments if specified (e.g. operands managed by the operator)
+    if [[ -n "${OPERATOR_WAIT_DEPLOYMENTS:-}" ]]; then
+        IFS=',' read -ra WAIT_DEPLOYS <<< "${OPERATOR_WAIT_DEPLOYMENTS}"
+        for deploy in "${WAIT_DEPLOYS[@]}"; do
+            deploy=$(echo "${deploy}" | xargs)
+            [[ -z "${deploy}" ]] && continue
+
+            REMAINING=$(wait_remaining)
+            if [[ "${REMAINING}" -le 0 ]]; then
+                log "WARNING: Budget exhausted, skipping wait for ${deploy} — cluster may self-heal"
+                continue
+            fi
+
+            # Poll for the deployment to exist before waiting for its condition
+            log "Waiting for deployment ${deploy} to appear in ${OPERATOR_NAMESPACE} (${REMAINING}s remaining)"
+            EXTRA_FOUND=false
+            while [[ "$(wait_remaining)" -gt 0 ]]; do
+                if oc get deployment "${deploy}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+                    EXTRA_FOUND=true
+                    break
+                fi
+                sleep 5
+            done
+
+            if [[ "${EXTRA_FOUND}" == "true" ]]; then
+                REMAINING=$(wait_remaining)
+                if [[ "${REMAINING}" -gt 0 ]]; then
+                    log "Deployment ${deploy} found, waiting for Available condition (${REMAINING}s remaining)"
+                    oc wait deployment "${deploy}" -n "${OPERATOR_NAMESPACE}" \
+                        --for=condition=Available --timeout="${REMAINING}s" 2>/dev/null || \
+                        log "WARNING: Timed out waiting for ${deploy} to become Available — cluster may self-heal"
+                fi
+            else
+                log "WARNING: Deployment ${deploy} did not appear within budget — cluster may self-heal"
+            fi
+        done
+    fi
+fi
+
 log "Cleanup complete"

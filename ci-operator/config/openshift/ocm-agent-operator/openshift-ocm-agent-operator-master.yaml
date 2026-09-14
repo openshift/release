@@ -18,6 +18,8 @@ images:
       RUN CGO_ENABLED=0 go test ./test/e2e -v -c --tags=osde2e -o /usr/local/bin/e2e.test
     from: src
     to: operator-e2e
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -44,8 +46,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: ocm-agent-operator-codecov-token
     mount_path: /tmp/secret
-    name: ocm-agent-operator-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -54,8 +57,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: ocm-agent-operator-codecov-token
     mount_path: /tmp/secret
-    name: ocm-agent-operator-codecov-token
 - as: lint
   commands: make lint
   container:

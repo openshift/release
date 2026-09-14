@@ -28,6 +28,8 @@ promotion:
     - release-base
     name: ibm-roks-4.17
     namespace: hypershift-toolkit
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -65,12 +67,12 @@ tests:
       commands: KUBECONFIG=/var/run/appci/kubeconfig GITHUB_TOKEN="$(cat /var/run/github/token)"
         make create-release
       credentials:
-      - mount_path: /var/run/github
-        name: ibm-roks-toolkit-gh-token
-        namespace: test-credentials
-      - mount_path: /var/run/appci
-        name: ibm-roks-appci-kubeconfig
-        namespace: test-credentials
+      - collection: roks-release
+        group: ibm-roks-toolkit-gh-token
+        mount_path: /var/run/github
+      - collection: roks-release
+        group: ibm-roks-app-ci-kubeconfig
+        mount_path: /var/run/appci
       from: release-base
       resources:
         requests:

@@ -60,6 +60,8 @@ operator:
   substitutions:
   - pullspec: quay.io/lvms_dev/lvms-operator:latest
     with: pipeline:lvm-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -102,8 +104,9 @@ tests:
   container:
     from: test-bin
   secret:
+    collection: sd-sre-secrets
+    group: lvm-operator-codecov-token
     mount_path: /tmp/secret
-    name: lvm-operator-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: post-unit-test
   commands: |
@@ -113,8 +116,9 @@ tests:
     from: test-bin
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: lvm-operator-codecov-token
     mount_path: /tmp/secret
-    name: lvm-operator-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - always_run: false
   as: e2e-aws-single-node

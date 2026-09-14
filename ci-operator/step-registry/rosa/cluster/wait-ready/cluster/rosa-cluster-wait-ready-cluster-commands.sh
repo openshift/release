@@ -232,6 +232,12 @@ while true; do
         log "Checking install logs for fatal errors..."
         install_log_output=$(retry_cmd 3 10 timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
         fatal_pattern=$(echo "${install_log_output}" | grep -E "ProvisionFailed|failed to create|InvalidSubnet|LimitExceeded|QuotaExceeded|InsufficientFreeAddresses|UnauthorizedAccess" || true)
+        # Filter out KMS provider x509 false positive (OCPBUGS-49661): the admin-kubeconfig CA
+        # does not trust the Let's Encrypt CA on ROSA HCP API servers, so "failed to create token
+        # for KMS provider service account" with an x509 error always fires early but is transient.
+        if [[ -n "${fatal_pattern}" ]]; then
+          fatal_pattern=$(echo "${fatal_pattern}" | grep -v -E 'kms-provider.*x509|x509.*kms-provider' || true)
+        fi
         if [[ -n "${fatal_pattern}" ]]; then
           log "ERROR: Fatal error detected in install logs:"
           log "${fatal_pattern}"

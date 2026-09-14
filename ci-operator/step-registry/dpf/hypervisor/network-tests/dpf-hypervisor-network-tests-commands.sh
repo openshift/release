@@ -55,4 +55,10 @@ export TFT_EXTERNAL_SERVER="${REMOTE_HOST}:5201"
 
 echo "=== Running DPF Kubernetes Traffic Flow Tests ==="
 echo "TFT_EXTERNAL_SERVER=${TFT_EXTERNAL_SERVER}"
-make run-traffic-flow-tests
+rc=0
+make run-traffic-flow-tests || rc=$?
+
+echo "Copying TFT config to artifacts..."
+cp repos/kubernetes-traffic-flow-tests/tft-config.yaml "${ARTIFACT_DIR}/tft-config.yaml" 2>/dev/null || echo "WARNING: TFT config file not found"
+
+exit $rc

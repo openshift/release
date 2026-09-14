@@ -128,6 +128,84 @@ if [[ -s "${ARTIFACT_DIR}/qe-agent-usage.json" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Session metrics autodl — emit the claude_session_metrics BigQuery row so this
+# step's Vertex spend is reported on the CI cost dashboards. This step runs on
+# the obs-tests-runner image (no agentic-ci / OTEL collector), so cost, tokens
+# and timing come directly from the stream-json "result" record. OTEL-only
+# fields (ttft, per-tool breakdown, skills, subagents) are left at defaults.
+# Schema matches ai-helpers extract_metrics.py's claude_session_metrics table.
+# ---------------------------------------------------------------------------
+if ! command -v jq &>/dev/null; then
+  echo "WARNING: jq is unavailable; cannot emit claude-session-metrics-autodl.json — this step's Vertex spend will be missing from the cost dashboards"
+elif [[ -s "${ARTIFACT_DIR}/qe-agent-usage.json" ]]; then
+  _ANALYZED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  jq --arg analyzed_at "${_ANALYZED_AT}" \
+     --arg fallback_model "${CLAUDE_MODEL:-claude-opus-4-6}" \
+     '
+     (.usage.input_tokens // 0)                 as $in |
+     (.usage.output_tokens // 0)                as $out |
+     (.usage.cache_read_input_tokens // 0)      as $cr |
+     (.usage.cache_creation_input_tokens // 0)  as $cc |
+     ($in + $cr + $cc)                          as $tot |
+     {
+       table_name: "claude_session_metrics",
+       schema: {
+         session_id: "string", model: "string", claude_code_version: "string",
+         permission_mode: "string", entrypoint: "string", prompt: "string",
+         plugins_loaded: "string", analyzed_at: "string",
+         duration_ms: "int64", duration_api_ms: "int64", ttft_ms: "int64",
+         num_turns: "int64", total_cost_usd: "float64",
+         input_tokens: "int64", output_tokens: "int64",
+         cache_read_input_tokens: "int64", cache_creation_input_tokens: "int64",
+         cache_hit_rate_pct: "float64", total_tool_calls: "int64",
+         tool_call_breakdown: "string", skills_invoked: "string",
+         files_written: "int64", num_thinking_blocks: "int64",
+         num_subagents: "int64", subagent_total_tool_uses: "int64",
+         subagent_total_duration_ms: "int64", is_error: "int64",
+         terminal_reason: "string", stop_reason: "string"
+       },
+       schema_mapping: null,
+       rows: [{
+         session_id: ((.session_id // "") | tostring),
+         model: ((((.modelUsage // {}) | keys | first) // $fallback_model) | tostring),
+         claude_code_version: "",
+         permission_mode: "",
+         entrypoint: "",
+         prompt: "",
+         plugins_loaded: "",
+         analyzed_at: $analyzed_at,
+         duration_ms: ((.duration_ms // 0) | tostring),
+         duration_api_ms: ((.duration_api_ms // 0) | tostring),
+         ttft_ms: "0",
+         num_turns: ((.num_turns // 0) | tostring),
+         total_cost_usd: ((.total_cost_usd // 0) | tostring),
+         input_tokens: ($in | tostring),
+         output_tokens: ($out | tostring),
+         cache_read_input_tokens: ($cr | tostring),
+         cache_creation_input_tokens: ($cc | tostring),
+         cache_hit_rate_pct: ((if $tot > 0 then ($cr / $tot) * 100 else 0 end) | tostring),
+         total_tool_calls: "0",
+         tool_call_breakdown: "{}",
+         skills_invoked: "",
+         files_written: "0",
+         num_thinking_blocks: "0",
+         num_subagents: "0",
+         subagent_total_tool_uses: "0",
+         subagent_total_duration_ms: "0",
+         is_error: (if (.is_error // false) then "1" else "0" end),
+         terminal_reason: "",
+         stop_reason: ""
+       }],
+       chunk_size: 0,
+       expiration_days: 0,
+       partition_column: ""
+     }' "${ARTIFACT_DIR}/qe-agent-usage.json" \
+     > "${ARTIFACT_DIR}/claude-session-metrics-autodl.json" 2>/dev/null \
+     && echo "Session metrics autodl → ${ARTIFACT_DIR}/claude-session-metrics-autodl.json" \
+     || echo "WARNING: failed to emit claude-session-metrics-autodl.json"
+fi
+
+# ---------------------------------------------------------------------------
 # Tool call audit log — every tool invocation Claude made (command strings,
 # file paths, search patterns). Cluster output (pod logs, events, API
 # responses) is NOT captured here. Note: Bash command strings may reference
