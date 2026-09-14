@@ -1,3 +1,8 @@
+base_images:
+  nodejs24-linux:
+    name: builder
+    namespace: stolostron
+    tag: nodejs24-linux
 binary_build_commands: make -f Makefile.prow install && make -f Makefile.prow build
 build_root:
   image_stream_tag:
@@ -8,6 +13,31 @@ images:
   items:
   - dockerfile_path: Containerfile.mce
     to: console-mce
+  # Combined Node + Go image, scoped only to this repo's own CI. Does not touch
+  # the shared stolostron/builder:nodejs24-linux tag other repos/branches depend
+  # on (see ACM-42591). Layers the Go 1.26 toolchain on top of the existing
+  # Node build root so check/unit-tests-sonarcloud can run both npm and go
+  # commands in one job.
+  - dockerfile_literal: |
+      FROM nodejs24-linux
+      USER 0
+      RUN curl -fsSL -o /tmp/go.tar.gz https://go.dev/dl/go1.26.0.linux-amd64.tar.gz && \
+          tar -C /usr/local -xzf /tmp/go.tar.gz && \
+          rm -f /tmp/go.tar.gz
+      ENV PATH="/usr/local/go/bin:${PATH}"
+      COPY src/ /go/src/github.com/stolostron/console/
+      WORKDIR /go/src/github.com/stolostron/console
+      USER 1000
+    from: nodejs24-linux
+    inputs:
+      src:
+        paths:
+        # NOTE: verify this matches ci-operator's actual source_path for this
+        # repo's "src" pipeline image before merging; written from the pattern
+        # used by ci-operator/config/stolostron/sippy but not yet run in CI.
+        - destination_dir: src
+          source_path: /go/src/github.com/stolostron/console/.
+    to: console-ci-tools
 promotion:
   to:
   - name: "5.2"
@@ -26,7 +56,7 @@ tests:
     make -f Makefile.prow install
     make -f Makefile.prow check
   container:
-    from: src
+    from: console-ci-tools
 - as: unit-tests-sonarcloud
   commands: |
     export SELF="make -f Makefile.prow"
@@ -35,7 +65,7 @@ tests:
     make -f Makefile.prow unit-tests
     make -f Makefile.prow sonar/js/prow
   container:
-    from: src
+    from: console-ci-tools
   secrets:
   - collection: ocm-secrets
     group: acm-sonarcloud-token-ci
@@ -48,7 +78,7 @@ tests:
     make -f Makefile.prow unit-tests
     make -f Makefile.prow sonar/js/prow
   container:
-    from: src
+    from: console-ci-tools
   postsubmit: true
   secrets:
   - collection: ocm-secrets
