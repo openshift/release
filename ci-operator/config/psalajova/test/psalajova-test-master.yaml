@@ -15,9 +15,14 @@ resources:
 tests:
 - as: censor-check-container
   commands: |
-    set -o xtrace
-    VALUE=$(cat /var/censor-check/first-secret)
-    echo "sentinel-begin ${VALUE} sentinel-end"
+    # Mimics openshift-qe-orion-cudn-density: xtrace echoes the assignment, the
+    # value is interpolated into a derived string, and the step exits non-zero so
+    # ci-operator copies the pod log into its own (publicly readable) build-log.txt.
+    set -x
+    VALUE=$(<"/var/censor-check/first-secret")
+    SENTINEL="https://user:${VALUE}@example.com"
+    echo "sentinel-begin ${SENTINEL} sentinel-end"
+    exit 1
   container:
     from: src
   secrets:
@@ -30,9 +35,14 @@ tests:
     test:
     - as: print-gsm-secret
       commands: |
-        set -o xtrace
-        VALUE=$(cat /var/censor-check/first-secret)
-        echo "sentinel-begin ${VALUE} sentinel-end"
+        # Mimics openshift-qe-orion-cudn-density: xtrace echoes the assignment, the
+        # value is interpolated into a derived string, and the step exits non-zero so
+        # ci-operator copies the pod log into its own (publicly readable) build-log.txt.
+        set -x
+        VALUE=$(<"/var/censor-check/first-secret")
+        SENTINEL="https://user:${VALUE}@example.com"
+        echo "sentinel-begin ${SENTINEL} sentinel-end"
+        exit 1
       credentials:
       - collection: psalajova-first-secret
         field: first-secret
