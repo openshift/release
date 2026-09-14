@@ -72,6 +72,31 @@ else
     log "oc not available, skipping cluster verification (e2e binary uses kubeconfig directly)"
 fi
 
+# Wait for the operator deployment to exist before proceeding.
+# When a Hive SyncSet applies late, the deployment may not be present yet.
+DEPLOY_NS="${OPERATOR_NAMESPACE:-openshift-${OPERATOR_NAME}}"
+DEPLOY_NAME="${OPERATOR_DEPLOYMENT_NAME:-${OPERATOR_NAME}}"
+DEPLOY_WAIT="${OPERATOR_DEPLOY_WAIT_SECONDS:-120}"
+log "Waiting up to ${DEPLOY_WAIT}s for deployment/${DEPLOY_NAME} in ${DEPLOY_NS}"
+DEPLOY_DEADLINE=$(( $(date +%s) + DEPLOY_WAIT ))
+DEPLOY_FOUND=false
+while [[ $(date +%s) -lt ${DEPLOY_DEADLINE} ]]; do
+    if kubectl get deployment "${DEPLOY_NAME}" -n "${DEPLOY_NS}" &>/dev/null; then
+        DEPLOY_FOUND=true
+        break
+    fi
+    sleep 5
+done
+if [[ "${DEPLOY_FOUND}" != "true" ]]; then
+    log "ERROR: Deployment ${DEPLOY_NAME} not found in ${DEPLOY_NS} after ${DEPLOY_WAIT}s"
+    log "Diagnostic: resources in ${DEPLOY_NS}:"
+    kubectl get all -n "${DEPLOY_NS}" 2>&1 || true
+    log "Diagnostic: events in ${DEPLOY_NS}:"
+    kubectl get events -n "${DEPLOY_NS}" --sort-by='.lastTimestamp' 2>&1 || true
+    exit 1
+fi
+log "Deployment ${DEPLOY_NAME} found in ${DEPLOY_NS}"
+
 # Set up port-forward if requested (e.g. for services like ocm-agent that
 # need a local endpoint for e2e tests to reach the in-cluster service).
 if [[ -n "${PORT_FORWARD_SVC:-}" ]]; then
