@@ -51,11 +51,15 @@ def aws_json(*args):
     return json.loads(proc.stdout)
 
 def hosted_zone_id_for(dns_name):
+    # public zone only; same name can exist as private
     wanted = dns_name if dns_name.endswith(".") else dns_name + "."
     data = aws_json("route53", "list-hosted-zones-by-name", "--dns-name", wanted)
     for zone in data.get("HostedZones", []):
-        if zone.get("Name") == wanted:
-            return zone["Id"].rsplit("/", 1)[-1]
+        if zone.get("Name") != wanted:
+            continue
+        if zone.get("Config", {}).get("PrivateZone"):
+            continue
+        return zone["Id"].rsplit("/", 1)[-1]
     return None
 
 def list_record_sets(zone_id):
@@ -84,19 +88,23 @@ def change_batch_delete(records, skip_apex_ns_soa, zone_name):
         changes.append(change)
     return changes
 
+def wait_for_change(change_id):
+    subprocess.run(
+        ["aws", "route53", "wait", "resource-record-sets-changed", "--id", change_id],
+        check=True,
+    )
+
 def submit_deletes(zone_id, changes):
     if not changes:
         return
     for i in range(0, len(changes), 100):
         batch = {"Changes": changes[i:i + 100]}
-        subprocess.run(
-            [
-                "aws", "route53", "change-resource-record-sets",
-                "--hosted-zone-id", zone_id,
-                "--change-batch", json.dumps(batch),
-            ],
-            check=True,
+        result = aws_json(
+            "route53", "change-resource-record-sets",
+            "--hosted-zone-id", zone_id,
+            "--change-batch", json.dumps(batch),
         )
+        wait_for_change(result["ChangeInfo"]["Id"])
 
 def belongs_to_cluster(name, cluster_fqdn):
     return name == cluster_fqdn or name.endswith("." + cluster_fqdn)
@@ -106,17 +114,17 @@ cluster = os.environ["CLUSTER_NAME"]
 cluster_fqdn = f"{cluster}.{base}."
 parent_fqdn = base + "."
 
-parent_id = hosted_zone_id_for(parent_fqdn)
-if not parent_id:
-    print(f"no public hosted zone found for {parent_fqdn}; nothing to clean")
-    sys.exit(0)
-
 child_id = hosted_zone_id_for(cluster_fqdn)
 if child_id:
     print(f"deleting leftover hosted zone {cluster_fqdn} ({child_id})")
     child_records = list_record_sets(child_id)
     submit_deletes(child_id, change_batch_delete(child_records, True, cluster_fqdn))
     subprocess.run(["aws", "route53", "delete-hosted-zone", "--id", child_id], check=True)
+
+parent_id = hosted_zone_id_for(parent_fqdn)
+if not parent_id:
+    print(f"no public hosted zone found for {parent_fqdn}")
+    sys.exit(0)
 
 parent_records = [
     rec for rec in list_record_sets(parent_id)
