@@ -60,6 +60,8 @@ if [[ ${FLP_CONSUMER_REPLICAS:-} ]]; then
     PARAMETERS+=" KafkaConsumerReplicas=${FLP_CONSUMER_REPLICAS}"
 fi
 
+sleep 600
+
 createFlowCollector ${PARAMETERS}
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
