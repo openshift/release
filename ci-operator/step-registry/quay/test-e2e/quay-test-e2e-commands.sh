@@ -53,7 +53,7 @@ if [[ "${PLAYWRIGHT_USE_IMAGE_TESTS}" == "true" ]]; then
   # /app is root-owned in the runner image (USER 1001, arbitrary UID on OpenShift) and
   # Playwright writes test-results/ and playwright-report/ into its cwd, so run a copy.
   echo "PLAYWRIGHT_USE_IMAGE_TESTS=true: using the suite baked into the runner image at /app"
-  rm -rf "${CLONE_DIR}"; mkdir -p "${CLONE_DIR}"
+  rm -rf "${CLONE_DIR}"; mkdir -p "${CLONE_DIR}/web"
   cp -a /app/. "${CLONE_DIR}/web/"
   PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
   PLAYWRIGHT_GIT_REF="image"
