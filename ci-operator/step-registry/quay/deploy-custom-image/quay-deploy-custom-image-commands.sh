@@ -159,7 +159,7 @@ if [[ -z "${QUAY_ROUTE}" ]]; then
 fi
 
 ROUTER_CA="$(mktemp)"
-oc -n openshift-config-managed get configmap default-ingress-cert -o jsonpath='{.data.ca-bundle.crt}' > "${ROUTER_CA}"
+oc -n openshift-config-managed get configmap default-ingress-cert -o jsonpath='{.data.ca-bundle\.crt}' > "${ROUTER_CA}"
 if [[ ! -s "${ROUTER_CA}" ]]; then
   echo "ERROR: could not read default-ingress-cert CA bundle" >&2
   exit 1
