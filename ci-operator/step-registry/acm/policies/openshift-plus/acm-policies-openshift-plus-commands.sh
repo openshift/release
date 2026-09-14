@@ -22,7 +22,7 @@ echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n p
 # racing the GitOps Subscription propagation (stolostron/policy-collection#174)
 typeset -i expectedMinPolicies=4
 typeset -i pollDeadline=$((SECONDS + 600))
-until (( $(oc get policies -n policies -o name 2>/dev/null | wc -l) >= expectedMinPolicies )); do
+until (( $(oc get policies -n policies -o json 2>/dev/null | jq '.items | length') >= expectedMinPolicies )); do
   ((SECONDS > pollDeadline)) && {
     printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
     exit 1
@@ -35,7 +35,7 @@ typeset -a quayNamespacesArr=(quay openshift-quay quay-enterprise)
 typeset quayFound=false
 typeset ns=''
 for ns in "${quayNamespacesArr[@]}"; do
-  if (($(oc get quayregistry -n "${ns}" -o name 2>/dev/null | wc -l))); then
+  if (($(oc get quayregistry -n "${ns}" -o json 2>/dev/null | jq '.items | length'))); then
     : "Found Quay Operator deployment in namespace ${ns}, waiting for ready condition"
     if ! oc wait quayregistry --all -n "${ns}" \
       --for condition=Available=True \
