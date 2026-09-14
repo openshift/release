@@ -159,15 +159,22 @@ if [[ -z "${QUAY_ROUTE}" ]]; then
 fi
 
 ROUTER_CA="$(mktemp)"
-oc -n openshift-config-managed get configmap default-ingress-cert -o jsonpath='{.data.ca-bundle\.crt}' > "${ROUTER_CA}"
+if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
+  # ENABLE_BUILD_SUPPORT sets TLS_MANAGED=false and installs this cert (leaf +
+  # self-signed rootCA appended, see provisioning-tls-commands.sh) on a
+  # passthrough route, which the default-ingress-cert CA cannot verify.
+  cp "${SHARED_DIR}/ssl.cert" "${ROUTER_CA}"
+else
+  oc -n openshift-config-managed get configmap default-ingress-cert -o jsonpath='{.data.ca-bundle\.crt}' > "${ROUTER_CA}"
+fi
 if [[ ! -s "${ROUTER_CA}" ]]; then
-  echo "ERROR: could not read default-ingress-cert CA bundle" >&2
+  echo "ERROR: could not read CA bundle for health check" >&2
   exit 1
 fi
 
 echo "Verifying Quay health at ${QUAY_ROUTE}..."
 for i in $(seq 1 30); do
-  HTTP_CODE=$(curl -s --cacert "${ROUTER_CA}" -o /dev/null -w '%{http_code}' "${QUAY_ROUTE}/health/instance" || true)
+  HTTP_CODE=$(curl -sS --cacert "${ROUTER_CA}" -o /dev/null -w '%{http_code}' "${QUAY_ROUTE}/health/instance" || true)
   if [[ "${HTTP_CODE}" == "200" ]]; then
     echo "Quay is healthy after custom image swap"
     exit 0
