@@ -21,7 +21,7 @@ objects:
       haproxy.router.openshift.io/timeout: "90s"
   spec:
     port:
-      targetPort: 4180
+      targetPort: main
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: edge
@@ -37,7 +37,7 @@ objects:
       haproxy.router.openshift.io/timeout: "90s"
   spec:
     port:
-      targetPort: 4180
+      targetPort: main
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: edge
@@ -140,8 +140,6 @@ objects:
           - -client-id=system:serviceaccount:ci:deck
           - -openshift-ca=/etc/pki/tls/cert.pem
           - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          - '-openshift-sar={"verb": "get", "group": "image.openshift.io", "resource": "imagestreams", "subresource": "layers", "namespace": "ocp-priv"}'
-          - '-openshift-delegate-urls={"/": {"verb": "get", "group": "image.openshift.io", "resource": "imagestreams", "subresource": "layers", "namespace": "ocp-priv"}}'
           - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
           - -cookie-secret-file=/etc/proxy/secrets/session_secret
           - -cookie-samesite=none
@@ -169,7 +167,7 @@ objects:
           - --oauth-url=/github-login
           - --job-config-path=/var/repo/release/ci-operator/jobs
           - --spyglass=true
-          - --gcs-credentials-file=/etc/openshift-private-viewer/credentials.json
+          - --gcs-credentials-file=/etc/test-platform-results-viewer/credentials.json
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
           - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
@@ -208,8 +206,8 @@ objects:
             readOnly: true
           - name: service-account-token
             mountPath: /var/sa-token
-          - name: openshift-private-viewer
-            mountPath: /etc/openshift-private-viewer
+          - name: test-platform-results-viewer
+            mountPath: /etc/test-platform-results-viewer
             readOnly: true
           - name: config
             mountPath: /etc/config
@@ -271,9 +269,9 @@ objects:
         - name: cookie-secret
           secret:
             secretName: cookie
-        - name: openshift-private-viewer
+        - name: test-platform-results-viewer
           secret:
-            secretName: openshift-private-viewer
+            secretName: test-platform-results-viewer
         - name: session-secret
           secret:
             secretName: deck-internal-session-secret
