@@ -8,22 +8,53 @@ set -x
 # Fix user IDs in a container
 ~/fix_uid.sh
 
-BASTION_ADDRESS="$(cat /var/run/bastion1/bastion-address)"
-VPN_URL="$(cat /var/run/bastion1/vpn-url)"
-VPN_USERNAME="$(cat /var/run/bastion1/vpn-username)"
-# For password with special characters
-VPN_PASSWORD=$(cat /var/run/bastion1/vpn-password)
+# Read a scalar out of a mounted YAML secret. A YAML parser is used rather than
+# grep+sed because stripping quotes with sed also drops apostrophes that belong
+# to the value itself (a password like 'pa''ss' would arrive as pass).
+read_yaml_key() {
+  python3 -c '
+import sys, yaml
 
-SSH_KEY_PATH=/var/run/telcov10n/ansible_ssh_private_key
+path, key = sys.argv[1], sys.argv[2]
+try:
+    with open(path) as f:
+        data = yaml.safe_load(f)
+except yaml.YAMLError:
+    # Do not print the parser error: it quotes the offending line of the secret.
+    sys.exit("Error: " + path + " is not valid YAML")
+if not isinstance(data, dict):
+    sys.exit("Error: " + path + " is empty or not a YAML mapping")
+if key not in data:
+    sys.exit("Error: " + key + " not found in " + path)
+sys.stdout.write(str(data[key]))
+' "$1" "$2"
+}
+
+# Extract the VPN/bastion credentials and SSH private key with tracing off so they never hit the build log.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+BASTION_ADDRESS="$(read_yaml_key /var/run/bastion1/secret bastion-address)" || exit 1
+VPN_URL="$(read_yaml_key /var/run/bastion1/secret vpn-url)" || exit 1
+VPN_USERNAME="$(read_yaml_key /var/run/bastion1/secret vpn-username)" || exit 1
+# For password with special characters
+VPN_PASSWORD="$(read_yaml_key /var/run/bastion1/secret vpn-password)" || exit 1
+
 SSH_KEY=~/key
 
-JUMP_SERVER_ADDRESS="$(cat /var/run/bastion1/jump-server)"
-JUMP_SERVER_USER="$(cat /var/run/telcov10n/ansible_user)"
+JUMP_SERVER_ADDRESS="$(read_yaml_key /var/run/bastion1/secret jump-server)" || exit 1
+JUMP_SERVER_USER="$(read_yaml_key /var/common_variables/ansible_group_all ansible_user)" || exit 1
 
 IFNAME=tun10
 
-cp $SSH_KEY_PATH $SSH_KEY
-chmod 600 $SSH_KEY
+# The private key spans several lines in group_vars/all, take everything between the quotes
+install -m 600 /dev/null "${SSH_KEY}"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" /var/common_variables/ansible_group_all \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${SSH_KEY}"
+if [ ! -s "${SSH_KEY}" ]; then
+  echo "Error: ansible_ssh_private_key not found in /var/common_variables/ansible_group_all" >&2
+  exit 1
+fi
+$WAS_TRACING && set -x
 
 SSHOPTS=(
   -o 'ConnectTimeout=5'
