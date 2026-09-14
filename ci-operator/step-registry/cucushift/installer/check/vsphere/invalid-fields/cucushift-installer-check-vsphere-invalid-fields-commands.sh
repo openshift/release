@@ -12,7 +12,7 @@ function run_install() {
   local ret
   echo "install-config.yaml"
   echo "-------------------"
-  grep -v "password\|username\|pullSecret\|auth" <"${dir}"/install-config.yaml
+  grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" <"${dir}"/install-config.yaml
   set +o errexit
   openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
