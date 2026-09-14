@@ -1,0 +1,51 @@
+ref:
+  as: openshift-qe-ocpbugs-76596-ct-flush-install-fix
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-ocpbugs-76596-ct-flush-install-fix-commands.sh
+  grace_period: 60s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: KERNEL_RPM_BASE_URL
+    default: ""
+    documentation: |-
+      Base URL for patched kernel RPMs (RHEL-247088 backport).
+      Example: https://artifacts.internal.cki-project.org/.../artifacts
+      Required — test will fail if not set.
+  - name: KERNEL_VERSION
+    default: "5.14.0-570.137.1.7193_2805617742.el9_6"
+    documentation: |-
+      Version string for kernel RPMs (without arch/extension).
+      Must match the files available at KERNEL_RPM_BASE_URL.
+  - name: OVS_RPM_BASE_URL
+    default: ""
+    documentation: |-
+      Base URL for patched OVS RPMs (3.5.2-73.el9fdp.rhel247088).
+      Example: https://download.devel.redhat.com/brewroot/work/tasks/8175/71708175
+      Required — test will fail if not set.
+  - name: OVS_VERSION
+    default: "3.5.2-73.el9fdp.rhel247088.1.1"
+    documentation: |-
+      Version string for OVS RPMs (without arch/extension).
+      Must match the files available at OVS_RPM_BASE_URL.
+  documentation: |-
+    Installs the OCPBUGS-76596 fix (kernel RHEL-247088 + OVS 73.rhel247088)
+    on the busiest worker node before running the fix-validation test.
+
+    Steps:
+    1. Downloads patched kernel RPMs from KERNEL_RPM_BASE_URL
+    2. Downloads patched OVS RPMs from OVS_RPM_BASE_URL
+    3. Installs kernel via rpm-ostree override replace (persists across reboots)
+    4. Reboots node and waits for Ready
+    5. Installs OVS via privileged patcher pod with /usr overlay
+    6. Verifies "Conntrack flush by zone: using CTA_FILTER_ZONE" in OVS logs
+    7. Saves target node name to SHARED_DIR for the next test step
+
+    Note: Both kernel AND OVS patches are required together.
+    The kernel provides zone-filter API; OVS probes for it at startup.
