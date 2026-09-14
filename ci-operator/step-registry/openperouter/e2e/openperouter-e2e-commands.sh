@@ -37,7 +37,6 @@ echo "Kernel version: $(uname -v)"
 unset DOCKER_HOST
 
 
-sleep 5h
 bash /root/openperouter/openshift/e2e/deploy.sh </dev/null
 bash /root/openperouter/openshift/e2e/run_tests.sh </dev/null
 
