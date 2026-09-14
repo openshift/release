@@ -19,15 +19,23 @@ VPN_URL="$(cat /var/run/bastion1/vpn_url)"
 VPN_USERNAME="$(cat /var/run/bastion1/vpn_username)"
 VPN_PASSWORD=$(cat /var/run/bastion1/vpn_password)
 
-SSH_KEY_PATH=/var/run/telcov10n/ansible_ssh_private_key
+ANSIBLE_GROUP_ALL=/var/run/telcov10n/ansible-group-all/all
 SSH_KEY=~/key
 
 JUMP_SERVER_ADDRESS="$(cat /var/run/bastion1/jump_server_address)"
-JUMP_SERVER_USERNAME="$(cat /var/run/telcov10n/ansible_user)"
+JUMP_SERVER_USERNAME="$(grep -oP "(?<=^ansible_user: ).*" "${ANSIBLE_GROUP_ALL}" | sed -e "s/^'//" -e "s/'\$//")" \
+  || { echo "Error: ansible_user not found in ${ANSIBLE_GROUP_ALL}" >&2; exit 1; }
 IFNAME=tun10
 
-cp $SSH_KEY_PATH $SSH_KEY
-chmod 600 $SSH_KEY
+# The private key spans several lines in ansible_group_all, take everything between the quotes.
+# The file is created 0600 before anything is written to it, so the key is never world-readable.
+install -m 600 /dev/null "${SSH_KEY}"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${ANSIBLE_GROUP_ALL}" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${SSH_KEY}"
+if [ ! -s "${SSH_KEY}" ]; then
+  echo "Error: ansible_ssh_private_key not found in ${ANSIBLE_GROUP_ALL}" >&2
+  exit 1
+fi
 
 SSHOPTS=(
   -o 'ConnectTimeout=5'
