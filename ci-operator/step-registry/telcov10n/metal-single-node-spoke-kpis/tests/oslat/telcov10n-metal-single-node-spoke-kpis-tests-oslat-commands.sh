@@ -9,6 +9,8 @@ echo "************ telcov10n Fix user IDs in a container ************"
 
 source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
+ANSIBLE_GROUP_ALL="/var/run/telcov10n/ansible-group-all/all"
+
 function set_spoke_cluster_kubeconfig {
 
   echo "************ telcov10n Set Spoke kubeconfig ************"
@@ -28,11 +30,15 @@ function load_env {
 
   #### SSH Private key
   export BASTION_HOST_SSH_PRI_KEY_FILE="/tmp/remote-hypervisor-ssh-privkey"
-  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key >| ${BASTION_HOST_SSH_PRI_KEY_FILE}
-  chmod 600 ${BASTION_HOST_SSH_PRI_KEY_FILE}
+  # The private key spans several lines in ansible_group_all, take everything between the
+  # quotes. Create the file 0600 up front so it is never readable by others, not even for
+  # the moment between writing it and chmod'ing it.
+  install -m 600 /dev/null "${BASTION_HOST_SSH_PRI_KEY_FILE}"
+  sed -n "/^ansible_ssh_private_key: /,/'$/p" "${ANSIBLE_GROUP_ALL}" \
+    | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'$//" >| "${BASTION_HOST_SSH_PRI_KEY_FILE}"
 
   #### Bastion user
-  BASTION_HOST_USER="$(cat /var/run/telcov10n/ansible-group-all/ansible_user)"
+  BASTION_HOST_USER="$(grep -oP '(?<=ansible_user: ).*' "${ANSIBLE_GROUP_ALL}" | sed "s/'//g")"
   export BASTION_HOST_USER
 }
 

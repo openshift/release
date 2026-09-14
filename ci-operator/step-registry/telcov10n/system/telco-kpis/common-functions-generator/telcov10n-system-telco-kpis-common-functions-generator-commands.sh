@@ -12,33 +12,31 @@ cat << 'EOF' > "${SHARED_DIR}/telco-kpis-common-functions.sh"
 # Ansible resolves ~/.ansible/tmp via /etc/passwd, not $HOME, for delegate_to: localhost tasks.
 export ANSIBLE_REMOTE_TMP=/tmp/.ansible/tmp
 
-MOUNTED_HOST_INVENTORY="/var/host_variables"
-MOUNTED_GROUP_INVENTORY="/var/group_variables"
+COMMON_VARIABLES="/var/common_variables"
+CLUSTER_VARIABLES="/var/clusters"
+HYPERVISOR_VARIABLES="/var/hypervisors"
 
 # ----------------------------------------------------------------------
 # setup_direct_ssh
 #
-# Configures direct SSH to a bastion host. Appends
-# ansible_ssh_common_args, ansible_ssh_private_key_file, and
-# ansible_remote_tmp to the host_vars file.
+# Configures direct SSH to a host. Appends ansible_ssh_common_args,
+# ansible_ssh_private_key_file, and ansible_remote_tmp to the host_vars
+# file.
 #
 # Parameters:
-#   1 - mounted_host_inventory: path to host variables mount (unused, kept for compat)
-#   2 - mounted_group_inventory: path to group variables mount
-#   3 - host_vars_file: path to host_vars file to append to
+#   1 - host_vars_file: path to host_vars file to append to
 # ----------------------------------------------------------------------
 
 setup_direct_ssh() {
-    local mounted_host_inventory="$1"
-    local mounted_group_inventory="$2"
-    local host_vars_file="$3"
+    local host_vars_file="$1"
 
     local ssh_key_file="/tmp/ssh-direct-key"
-    [[ $- == *x* ]] && local was_tracing=true || local was_tracing=false
-    set +x
-    cat "${mounted_group_inventory}/common/all/ansible_ssh_private_key" > "${ssh_key_file}"
-    $was_tracing && set -x
-    chmod 600 "${ssh_key_file}"
+    # The private key spans several lines in ansible_group_all, take everything
+    # between the quotes. Create the file 0600 up front so it is never readable
+    # by others, not even for the moment between writing it and chmod'ing it.
+    install -m 600 /dev/null "${ssh_key_file}"
+    sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${COMMON_VARIABLES}/ansible_group_all" \
+        | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${ssh_key_file}"
 
     python3 -c "
 import yaml, sys
@@ -61,52 +59,80 @@ print(yaml.dump({key: ssh_opts}, default_flow_style=False, allow_unicode=True).r
 }
 
 # ----------------------------------------------------------------------
-# process_inventory
+# install_vars
 #
-# Reads Kubernetes secret mount files from a directory and serializes
-# each as a YAML key-value pair into a destination file, using Python
-# yaml.dump for correct escaping of multi-line values and quotes.
+# Installs a single secret file from a GSM mount into the inventory.
+# Each secret under a mounted group is exposed as one file holding a
+# complete Ansible vars document, so installing it is a plain copy;
+# only the destination has to be worked out from the secret name.
 #
 # Parameters:
-#   1 - directory: source directory containing secret mount files
-#   2 - dest_file: destination file to write YAML key-value pairs
+#   1 - src: path to the mounted secret file
+#   2 - inventory_path: inventory root holding group_vars/ and host_vars/
+#   3 - allow_host_vars: "true" to also install non-group vars as host_vars
 # ----------------------------------------------------------------------
 
-process_inventory() {
-    local directory="$1"
-    local dest_file="$2"
+install_vars() {
+    local src="$1"
+    local inventory_path="$2"
+    local allow_host_vars="$3"
+    local base dest_dir name
 
-    if [ -z "$directory" ]; then
-        echo "Usage: process_inventory <directory> <dest_file>"
-        return 1
-    fi
+    base="$(basename "$src")"
+
+    case "$base" in
+        ansible_group_*)
+            dest_dir="${inventory_path}/group_vars"
+            name="${base#ansible_group_}"
+            ;;
+        *)
+            if [ "${allow_host_vars}" != "true" ]; then
+                echo "  skipped a file that is not a group var"
+                return 0
+            fi
+            dest_dir="${inventory_path}/host_vars"
+            case "$base" in
+                bastion*) name="bastion" ;;
+                *)        name="${base}" ;;
+            esac
+            ;;
+    esac
+    cp "$src" "${dest_dir}/${name}"
+}
+
+# ----------------------------------------------------------------------
+# process_mount
+#
+# Installs every secret of a mounted GSM group into the inventory.
+#
+# A missing directory is treated as "nothing to install", not an error:
+# callers pass cluster names that aren't always mounted (e.g. a sentinel
+# spoke cluster used when a step doesn't need a real one), and skipping
+# silently here matches the pre-migration behavior of guarding each
+# vault group lookup with an `-d` check.
+#
+# Parameters:
+#   1 - directory: mount path of the GSM group
+#   2 - inventory_path: inventory root holding group_vars/ and host_vars/
+#   3 - allow_host_vars: "true" to also install non-group vars as host_vars
+#   4 - name_filter: optional glob restricting which secrets are installed
+# ----------------------------------------------------------------------
+
+process_mount() {
+    local directory="$1"
+    local inventory_path="$2"
+    local allow_host_vars="$3"
+    local name_filter="${4:-*}"
 
     if [ ! -d "$directory" ]; then
-        echo "Error: '$directory' is not a valid directory"
-        return 1
+        echo "  '$directory' is not mounted, skipping"
+        return 0
     fi
 
-    : > "${dest_file}"
-
-    find "$directory" -type f | while IFS= read -r filename; do
-        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        fi
-
-        key=$(basename "${filename}")
-        python3 -c "
-import yaml
-import sys
-
-key = sys.argv[1]
-with open(sys.argv[2], 'r') as f:
-    value = f.read()
-
-print(yaml.dump({key: value}, default_flow_style=False, allow_unicode=True).rstrip())
-" "$key" "$filename" >> "${dest_file}"
-    done
-
-    echo "Processing complete. Check \"${dest_file}\""
+    # -L so that files exposed as symlinks by the secrets mount are matched as regular files
+    while IFS= read -r filename; do
+        install_vars "$filename" "${inventory_path}" "${allow_host_vars}"
+    done < <(find -L "$directory" -maxdepth 1 -type f -name "${name_filter}" ! -name '..*' | sort)
 }
 
 # ----------------------------------------------------------------------
@@ -126,70 +152,43 @@ setup_ansible_inventory() {
     local spoke_cluster="$1"
     local hub_cluster="$2"
 
+    local inventory_path="/eco-ci-cd/inventories/ocp-deployment"
+
     echo "Setting up Ansible inventory for spoke: ${spoke_cluster}, hub: ${hub_cluster}"
 
-    echo "Create group_vars directory"
-    mkdir -p /eco-ci-cd/inventories/ocp-deployment/group_vars
+    mkdir -p "${inventory_path}/group_vars" "${inventory_path}/host_vars"
 
-    # Process common group variables
-    find "${MOUNTED_GROUP_INVENTORY}/common/" -mindepth 1 -type d | while read -r dir; do
-        echo "Process common group inventory file: ${dir}"
-        process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
-    done
+    echo "Processing common group_vars"
+    process_mount "${COMMON_VARIABLES}" "${inventory_path}" false
 
-    # Process spoke-specific group variables
-    if [[ -d "${MOUNTED_GROUP_INVENTORY}/${spoke_cluster}" ]]; then
-        find "${MOUNTED_GROUP_INVENTORY}/${spoke_cluster}/" -mindepth 1 -type d | while read -r dir; do
-            echo "Process spoke group inventory file: ${dir}"
-            process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
-        done
-    fi
-
-    echo "Create host_vars directory"
-    mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
+    echo "Processing spoke vars (${spoke_cluster})"
+    process_mount "${CLUSTER_VARIABLES}/${spoke_cluster}" "${inventory_path}" true
 
     # Process hypervisor host variables so plays targeting [hypervisor] can resolve the real IP.
     # No setup_direct_ssh here — group_vars/hypervisors provides the SSH key.
-    if [[ -d "${MOUNTED_HOST_INVENTORY}/common/hypervisor" ]]; then
-        echo "Process hypervisor host inventory"
-        process_inventory "${MOUNTED_HOST_INVENTORY}/common/hypervisor" \
-            /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
+    if [[ -f "${HYPERVISOR_VARIABLES}/hypervisor" ]]; then
+        echo "Processing hypervisor vars"
+        cp "${HYPERVISOR_VARIABLES}/hypervisor" "${inventory_path}/host_vars/hypervisor"
     fi
 
-    # Copy spoke credentials to temporary location
-    mkdir -p /tmp/"${spoke_cluster}" && chmod 700 /tmp/"${spoke_cluster}"
-
-    # Copy spoke-specific credentials (master0, etc.)
-    if [[ -d "${MOUNTED_HOST_INVENTORY}/${spoke_cluster}" ]]; then
-        cp -r "${MOUNTED_HOST_INVENTORY}/${spoke_cluster}/"* /tmp/"${spoke_cluster}"/
-    fi
-    ls -l /tmp/"${spoke_cluster}"/
-
-    # Process spoke host variables
-    find /tmp/"${spoke_cluster}"/ -mindepth 1 -type d | while read -r dir; do
-        echo "Process spoke host inventory file: ${dir}"
-        process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
-    done
-
-    # Process hub host credentials and configure direct SSH.
-    if [[ -d "${MOUNTED_HOST_INVENTORY}/${hub_cluster}" ]]; then
-        for hub_host_dir in "${MOUNTED_HOST_INVENTORY}/${hub_cluster}/"*/; do
-            [[ -d "${hub_host_dir}" ]] || continue
-            local hub_host_name
-            hub_host_name=$(basename "${hub_host_dir}")
-            local hub_host_vars_file
-            hub_host_vars_file="/eco-ci-cd/inventories/ocp-deployment/host_vars/${hub_host_name}"
-
-            if [[ -f "${hub_host_vars_file}" ]] && [[ "${spoke_cluster}" != "${hub_cluster}" ]]; then
-                echo "ERROR: host_vars collision — hub '${hub_cluster}' host '${hub_host_name}' would overwrite spoke '${spoke_cluster}' host_vars"
-                return 1
-            fi
-
-            echo "Process hub host inventory: ${hub_host_name}"
-            process_inventory "${hub_host_dir}" "${hub_host_vars_file}"
-            setup_direct_ssh "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
-                "${hub_host_vars_file}"
+    if [[ "${hub_cluster}" == "${spoke_cluster}" ]]; then
+        # Spoke and hub are the same cluster, so every host of that mount is reached directly.
+        local host_vars_file
+        for host_vars_file in "${inventory_path}"/host_vars/*; do
+            [[ -f "${host_vars_file}" ]] || continue
+            [[ "$(basename "${host_vars_file}")" == "hypervisor" ]] && continue
+            setup_direct_ssh "${host_vars_file}"
         done
+    else
+        # Take only the bastion from the hub mount: installing the whole group would
+        # drop the hub's master0 on top of the spoke's host_vars of the same name.
+        echo "Processing hub bastion vars (${hub_cluster})"
+        process_mount "${CLUSTER_VARIABLES}/${hub_cluster}" "${inventory_path}" true 'bastion*'
+        if [[ ! -f "${inventory_path}/host_vars/bastion" ]]; then
+            echo "Error: no bastion vars found for hub '${hub_cluster}' in ${CLUSTER_VARIABLES}/${hub_cluster}"
+            return 1
+        fi
+        setup_direct_ssh "${inventory_path}/host_vars/bastion"
     fi
 
     echo "Ansible inventory setup complete"
@@ -209,49 +208,43 @@ setup_ansible_inventory() {
 #
 # Parameters:
 #   1 - hub_cluster: hub cluster name (e.g., kni-qe-70) — used to
-#       locate the bastion host_vars at /var/host_variables/<hub_cluster>/bastion
+#       locate the bastion secret in /var/clusters/<hub_cluster>
 # ----------------------------------------------------------------------
 
 setup_infra_inventory() {
     local hub_cluster="$1"
 
-    echo "Setting up infra inventory for hub: ${hub_cluster}"
-
     local infra_inv="/eco-ci-cd/inventories/infra"
 
-    echo "Create group_vars directory"
-    mkdir -p "${infra_inv}/group_vars"
+    echo "Setting up infra inventory for hub: ${hub_cluster}"
 
-    for group_dir in "${MOUNTED_GROUP_INVENTORY}/common/"*/; do
-        if [[ -d "${group_dir}" ]]; then
-            local group_name
-            group_name=$(basename "${group_dir}")
-            echo "Process infra group inventory: ${group_name}"
-            process_inventory "${group_dir}" "${infra_inv}/group_vars/${group_name}"
-        fi
-    done
+    mkdir -p "${infra_inv}/group_vars" "${infra_inv}/host_vars"
 
-    echo "Create host_vars directory"
-    mkdir -p "${infra_inv}/host_vars"
+    echo "Processing common group_vars"
+    process_mount "${COMMON_VARIABLES}" "${infra_inv}" false
 
-    if [[ -d "${MOUNTED_HOST_INVENTORY}/common/hypervisor" ]]; then
-        echo "Process hypervisor host inventory"
-        process_inventory "${MOUNTED_HOST_INVENTORY}/common/hypervisor" \
-            "${infra_inv}/host_vars/hypervisor"
+    if [[ -f "${HYPERVISOR_VARIABLES}/hypervisor" ]]; then
+        echo "Processing hypervisor vars"
+        cp "${HYPERVISOR_VARIABLES}/hypervisor" "${infra_inv}/host_vars/hypervisor"
     fi
 
-    if [[ -d "${MOUNTED_HOST_INVENTORY}/${hub_cluster}/bastion" ]]; then
-        echo "Process bastion host inventory for hub: ${hub_cluster}"
-        process_inventory "${MOUNTED_HOST_INVENTORY}/${hub_cluster}/bastion" \
-            "${infra_inv}/host_vars/bastion"
+    echo "Processing bastion vars for hub: ${hub_cluster}"
+    process_mount "${CLUSTER_VARIABLES}/${hub_cluster}" "${infra_inv}" true 'bastion*'
+
+    # Bastion credentials are required for SSH access to infrastructure playbooks.
+    # Fail immediately if missing to catch credential mounting errors early,
+    # rather than letting the playbook fail later with a cryptic "host not found" error.
+    if [[ ! -d "${infra_inv}/host_vars/bastion" && ! -f "${infra_inv}/host_vars/bastion" ]]; then
+        echo "Error: no bastion vars found for hub '${hub_cluster}' in ${CLUSTER_VARIABLES}/${hub_cluster}"
+        return 1
     fi
 
+    local host_vars_file
     for host_vars_file in "${infra_inv}"/host_vars/*; do
         [[ -f "${host_vars_file}" ]] || continue
         [[ "$(basename "${host_vars_file}")" == "hypervisor" ]] && continue
         echo "Configuring direct SSH for: $(basename "${host_vars_file}")"
-        setup_direct_ssh "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
-            "${host_vars_file}"
+        setup_direct_ssh "${host_vars_file}"
     done
 
     echo "Infra inventory setup complete"

@@ -9,6 +9,8 @@ echo "************ telcov10n Fix user IDs in a container ************"
 
 source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
+ANSIBLE_GROUP_ALL="/var/run/telcov10n/ansible-group-all/all"
+
 function set_spoke_cluster_kubeconfig {
 
   echo "************ telcov10n Set Spoke kubeconfig ************"
@@ -207,8 +209,10 @@ function copy_spoke_kubeconfig_to_bastion_location {
 
   local ssh_key
   ssh_key="$(mktemp)"
-  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key > ${ssh_key}
-  chmod 600 ${ssh_key}
+  chmod 600 "${ssh_key}"
+  # The private key spans several lines in ansible_group_all, take everything between the quotes
+  sed -n "/^ansible_ssh_private_key: /,/'$/p" "${ANSIBLE_GROUP_ALL}" \
+    | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'$//" > "${ssh_key}"
   setup_aux_host_ssh_access "${ssh_key}"
 
   local spoke_kubeconfig
