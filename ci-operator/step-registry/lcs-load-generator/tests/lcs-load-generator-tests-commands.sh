@@ -257,72 +257,112 @@ data:
 
   run.yaml: |
     version: 2
+    distro_name: starter
+
     apis:
     - responses
-    - batches
+    - conversations
     - files
+    - file_processors
     - inference
     - tool_runtime
-    - conversations
     - vector_io
+
     providers:
       inference:
-      - provider_id: mock-llm
+      - provider_id: openai
         provider_type: remote::openai
         config:
-          url: http://localhost:11434/v1
-          api_key: fake-key
+          api_key: fake-key-for-testing
+          base_url: http://localhost:11434/v1
+      - config: {}
+        provider_id: sentence-transformers
+        provider_type: inline::sentence-transformers
       files:
-      - provider_id: localfs
+      - config:
+          metadata_store:
+            table_name: files_metadata
+            backend: sql_default
+          storage_dir: /tmp/llama-storage/files
+        provider_id: meta-reference-files
         provider_type: inline::localfs
+      file_processors:
+      - provider_id: pypdf
+        provider_type: inline::pypdf
         config:
-          storage_dir: /tmp/file_uploads
+          default_chunk_size_tokens: 800
+          default_chunk_overlap_tokens: 400
       tool_runtime:
-      - provider_id: file-search
-        provider_type: inline::rag-runtime
-        config: {}
+      - config: {}
+        provider_id: model-context-protocol
+        provider_type: remote::model-context-protocol
+      - config: {}
+        provider_id: file-search
+        provider_type: inline::file-search
+      vector_io:
+      - provider_id: faiss
+        provider_type: inline::faiss
+        config:
+          persistence:
+            namespace: vector_io::faiss
+            backend: kv_default
       responses:
-      - provider_id: builtin-responses
+      - config:
+          persistence:
+            responses:
+              table_name: agents_responses
+              backend: sql_default
+        provider_id: meta-reference
         provider_type: inline::builtin
-        config:
-          persistence_store:
-            type: sqlite
-            db_path: /tmp/responses_store.db
-      batches:
-      - provider_id: builtin-batches
-        provider_type: inline::reference
-        config:
-          sqlstore:
-            type: sqlite
-            db_path: /tmp/batches_store.db
+
     server:
       port: 8321
+
     storage:
       backends:
-        kv_sqlite:
-          type: sqlite
-          db_path: /tmp/kv_store.db
-        sql_sqlite:
-          type: sqlite
-          db_path: /tmp/sql_store.db
+        kv_default:
+          type: kv_sqlite
+          db_path: /tmp/llama-storage/kv_store.db
+        sql_default:
+          type: sql_sqlite
+          db_path: /tmp/llama-storage/sql_store.db
       stores:
         metadata:
-          backend_id: kv_sqlite
+          namespace: registry
+          backend: kv_default
         inference:
-          backend_id: kv_sqlite
+          table_name: inference_store
+          backend: sql_default
+          max_write_queue_size: 10000
+          num_writers: 4
         conversations:
-          backend_id: kv_sqlite
+          table_name: openai_conversations
+          backend: sql_default
         prompts:
-          backend_id: kv_sqlite
+          table_name: prompts
+          backend: sql_default
         connectors:
-          backend_id: kv_sqlite
+          table_name: connectors
+          backend: sql_default
+
     registered_resources:
       models:
-      - provider_id: mock-llm
-        model_id: mock-model
+      - model_id: granite-3.1-8b-instruct
         model_type: llm
-    telemetry:
-      enabled: false
+        provider_id: openai
+        provider_model_id: granite-3.1-8b-instruct
+      - model_id: llama-guard-3-8b
+        model_type: llm
+        provider_id: openai
+        provider_model_id: llama-guard-3-8b
+
+    vector_stores:
+      annotation_prompt_params:
+        enable_annotations: false
+      default_provider_id: faiss
+      default_embedding_model:
+        provider_id: sentence-transformers
+        model_id: nomic-ai/nomic-embed-text-v1.5
 LCS_STACK_CONFIG
 
 # 4b. Deploy LCS with mock LLM sidecar
@@ -333,9 +373,9 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
               value: \"${PYROSCOPE_URL}\""
 fi
 
-LCS_COMMAND_OVERRIDE='          command: ["python3", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml"]'
+LCS_COMMAND_OVERRIDE='          command: ["python3", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
 if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
-  LCS_COMMAND_OVERRIDE='          command: ["memray", "run", "--output", "/mnt/profiling/memray-output.bin", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml"]'
+  LCS_COMMAND_OVERRIDE='          command: ["memray", "run", "--output", "/mnt/profiling/memray-output.bin", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
 fi
 
 cat <<DEPLOYMENT | oc apply -f -
@@ -383,6 +423,8 @@ ${LCS_COMMAND_OVERRIDE}
               mountPath: /app-config
             - name: profiling-volume
               mountPath: /mnt/profiling
+            - name: generated-config
+              mountPath: /app-root/.generated
           resources:
             requests:
               cpu: "1"
@@ -412,6 +454,9 @@ ${LCS_COMMAND_OVERRIDE}
               drop: ["ALL"]
           ports:
             - containerPort: 11434
+          env:
+            - name: MOCK_MODELS
+              value: "granite-3.1-8b-instruct,llama-guard-3-8b"
           resources:
             requests:
               cpu: "250m"
@@ -421,6 +466,8 @@ ${LCS_COMMAND_OVERRIDE}
           configMap:
             name: lcs-config
         - name: profiling-volume
+          emptyDir: {}
+        - name: generated-config
           emptyDir: {}
 ---
 apiVersion: v1
