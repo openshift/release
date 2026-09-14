@@ -130,18 +130,18 @@ fi
 rm -f "${CI_REGISTRY_AUTH}"
 $WAS_TRACING && set -x
 
-# 3) Add imagePullSecret directly to the deployment pod template so the
-#    kubelet definitely has credentials regardless of SA linking propagation
-oc -n "${NAMESPACE}" patch "deployment/${QUAY_DEPLOY}" --type=strategic \
-  -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"ci-registry-pull-secret"}]}}}}'
-echo "Deployment imagePullSecrets patched"
-
-# Patch the container image
-oc -n "${NAMESPACE}" set image "deployment/${QUAY_DEPLOY}" "quay-app=${QUAY_CI_IMAGE}"
-
-# Switch entrypoint from registry-nomigrate to registry so the new image
-# runs alembic migrations before starting (the operator default skips them).
-oc -n "${NAMESPACE}" set env "deployment/${QUAY_DEPLOY}" QUAYENTRY=registry
+# Add imagePullSecret directly to the deployment pod template so the kubelet
+# definitely has credentials regardless of SA linking propagation, swap in the
+# CI-built image, and switch entrypoint from registry-nomigrate to registry so
+# the new image runs alembic migrations before starting (the operator default
+# skips them). One strategic patch: containers/env merge by name, so this
+# targets quay-app without needing its current env list.
+PATCH=$(cat <<EOF
+{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"ci-registry-pull-secret"}],"containers":[{"name":"quay-app","image":"${QUAY_CI_IMAGE}","env":[{"name":"QUAYENTRY","value":"registry"}]}]}}}}
+EOF
+)
+oc -n "${NAMESPACE}" patch "deployment/${QUAY_DEPLOY}" --type=strategic -p "${PATCH}"
+echo "Deployment patched: imagePullSecrets, image, QUAYENTRY=registry"
 
 # Wait for rollout
 echo "Waiting for rollout of deployment/${QUAY_DEPLOY}..."
