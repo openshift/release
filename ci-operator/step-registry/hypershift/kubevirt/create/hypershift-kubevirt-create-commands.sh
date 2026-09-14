@@ -459,6 +459,53 @@ SCRIPT_EOF
   done
 }
 
+# Return the first IPv4 on the VLAN worker prefix (e.g. 192.168.112.x).
+localnet_vlan_pick_vlan_worker_ipv4() {
+  local vlan_prefix="$1"
+  local ip
+  while read -r ip; do
+    [[ -z "${ip}" ]] && continue
+    [[ "${ip}" == *:* ]] && continue
+    [[ "${ip}" == "${vlan_prefix}."* ]] && echo "${ip}" && return 0
+  done
+  return 1
+}
+
+localnet_vlan_mgmt_hypervisor_ipv4() {
+  local hypervisor="$1"
+  local ip
+  while read -r ip; do
+    [[ -z "${ip}" ]] && continue
+    [[ "${ip}" == *:* ]] && continue
+    echo "${ip}"
+    return 0
+  done < <(oc get node "${hypervisor}" -o jsonpath='{range .status.addresses[*]}{.type}{" "}{.address}{"\n"}{end}' \
+    | awk '$1=="InternalIP" || $1=="ExternalIP" {print $2}')
+  return 1
+}
+
+# Map guest worker VLAN IPs (112.x) to the mgmt hypervisor nodeName hosting each VMI.
+localnet_vlan_map_worker_vlan_ips() {
+  local vmi_namespace="$1"
+  local vlan_subnet="$2"
+  local vlan_octets
+  local vmi hypervisor ip
+
+  vlan_octets="${vlan_subnet%/*}"
+  vlan_octets="${vlan_octets%.*}"
+
+  for vmi in $(oc get vmi -n "${vmi_namespace}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    [[ -z "${vmi}" ]] && continue
+    hypervisor=$(oc get vmi "${vmi}" -n "${vmi_namespace}" -o jsonpath='{.status.nodeName}')
+    [[ -z "${hypervisor}" ]] && continue
+    ip=$(localnet_vlan_pick_vlan_worker_ipv4 "${vlan_octets}" < <(oc get vmi "${vmi}" -n "${vmi_namespace}" \
+      -o jsonpath='{range .status.interfaces[*]}{.ipAddress}{"\n"}{end}') || true)
+    if [[ -n "${ip}" ]]; then
+      echo "${ip} ${hypervisor}"
+    fi
+  done
+}
+
 # Per-node br-ex.<vlan> segments are L2 islands; guest workers on different hypervisors need
 # host /32 routes via the primary uplink (br-ex) so OVN Geneve between worker VMIs can flow.
 localnet_vlan_configure_worker_host_routes() {
@@ -469,37 +516,44 @@ localnet_vlan_configure_worker_host_routes() {
   local -A hypervisor_ips=()
   local -A worker_routes=()
   local node
-  local vmi
   local hypervisor
   local gw
   local ip
   local route_script_b64
   local node_route_lines
+  local attempt
+  local strict="${LOCALNET_VLAN_WORKER_HOST_ROUTES_STRICT:-true}"
+  local max_attempts="${LOCALNET_VLAN_WORKER_ROUTE_DISCOVERY_ATTEMPTS:-12}"
 
   vlan_octets="${vlan_subnet%/*}"
   vlan_octets="${vlan_octets%.*}"
 
-  while read -r hypervisor gw; do
-    [[ -n "${hypervisor}" && -n "${gw}" ]] && hypervisor_ips["${hypervisor}"]="${gw}"
-  done < <(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}')
+  for attempt in $(seq 1 "${max_attempts}"); do
+    worker_routes=()
+    hypervisor_ips=()
+    for hypervisor in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+      [[ -z "${hypervisor}" ]] && continue
+      gw=$(localnet_vlan_mgmt_hypervisor_ipv4 "${hypervisor}" || true)
+      [[ -n "${gw}" ]] && hypervisor_ips["${hypervisor}"]="${gw}"
+    done
 
-  for vmi in $(oc get vmi -n "${vmi_namespace}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-    [[ -z "${vmi}" ]] && continue
-    hypervisor=$(oc get vmi "${vmi}" -n "${vmi_namespace}" -o jsonpath='{.status.nodeName}')
-    gw="${hypervisor_ips[${hypervisor}]:-}"
-    if [[ -z "${gw}" ]]; then
-      echo "WARNING: no mgmt InternalIP for hypervisor ${hypervisor} (VMI ${vmi})" >&2
-      continue
-    fi
-    while read -r ip; do
-      [[ -z "${ip}" ]] && continue
-      [[ "${ip}" == *:* ]] && continue
-      [[ "${ip}" == "${vlan_octets}."* ]] || continue
+    while read -r ip hypervisor; do
+      [[ -z "${ip}" || -z "${hypervisor}" ]] && continue
       worker_routes["${ip}"]="${hypervisor}"
-    done < <(oc get vmi "${vmi}" -n "${vmi_namespace}" -o jsonpath='{range .status.interfaces[*]}{.ipAddress}{"\n"}{end}')
+    done < <(localnet_vlan_map_worker_vlan_ips "${vmi_namespace}" "${vlan_subnet}")
+
+    if [[ ${#worker_routes[@]} -gt 0 ]]; then
+      break
+    fi
+    echo "localnet-vlan: no worker ${vlan_subnet} IPs in ${vmi_namespace} (attempt ${attempt}/${max_attempts}), retrying in 30s..." >&2
+    sleep 30
   done
 
   if [[ ${#worker_routes[@]} -eq 0 ]]; then
+    if [[ "${strict}" == "true" ]]; then
+      echo "ERROR: no worker ${vlan_subnet} addresses found in ${vmi_namespace}; host /32 routes required" >&2
+      return 1
+    fi
     echo "WARNING: no worker ${vlan_subnet} addresses found in ${vmi_namespace}; skipping host /32 routes" >&2
     return 0
   fi
@@ -536,6 +590,138 @@ SCRIPT_EOF
       return 1
     fi
   done
+}
+
+# Guest ingress defaults to NodePort on OVN; localnet-vlan dnsmasq points *.apps at the lab
+# ingress VIP (111.x). Publish the router on the worker host network and DNAT the VIP to it.
+localnet_vlan_configure_guest_ingress_hostnetwork() {
+  local nested_kc="${SHARED_DIR}/nested_kubeconfig"
+  local current_strategy
+
+  if [[ ! -f "${nested_kc}" ]]; then
+    echo "ERROR: nested kubeconfig missing at ${nested_kc}" >&2
+    return 1
+  fi
+
+  echo "Waiting for guest default ingress controller to deploy..."
+  for _ in $(seq 1 60); do
+    if KUBECONFIG="${nested_kc}" oc get deployment router-default -n openshift-ingress \
+      -o jsonpath='{.status.readyReplicas}' 2>/dev/null | grep -q '^1$'; then
+      break
+    fi
+    sleep 10
+  done
+
+  current_strategy=$(KUBECONFIG="${nested_kc}" oc get ingresscontroller default -n openshift-ingress-operator \
+    -o jsonpath='{.spec.endpointPublishingStrategy.type}' 2>/dev/null || true)
+  if [[ "${current_strategy}" == "HostNetwork" ]]; then
+    echo "Guest ingress controller already uses HostNetwork"
+    return 0
+  fi
+
+  echo "Patching guest ingress controller to HostNetwork (worker VLAN NIC)..."
+  KUBECONFIG="${nested_kc}" oc patch ingresscontroller default -n openshift-ingress-operator --type=merge -p \
+    '{"spec":{"endpointPublishingStrategy":{"type":"HostNetwork","hostNetwork":{"protocol":"TCP"}}}}'
+
+  KUBECONFIG="${nested_kc}" oc rollout status deployment/router-default -n openshift-ingress --timeout=10m
+}
+
+localnet_vlan_guest_ingress_worker_ip() {
+  local vmi_namespace="$1"
+  local vlan_subnet="$2"
+  local vlan_octets
+  local nested_kc="${SHARED_DIR}/nested_kubeconfig"
+  local router_node worker_ip
+
+  vlan_octets="${vlan_subnet%/*}"
+  vlan_octets="${vlan_octets%.*}"
+
+  router_node=$(KUBECONFIG="${nested_kc}" oc get pods -n openshift-ingress \
+    -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default \
+    -o jsonpath='{.items[0].spec.nodeName}' 2>/dev/null || true)
+  if [[ -n "${router_node}" ]]; then
+    worker_ip=$(localnet_vlan_pick_vlan_worker_ipv4 "${vlan_octets}" < <(KUBECONFIG="${nested_kc}" oc get node "${router_node}" \
+      -o jsonpath='{range .status.addresses[*]}{.address}{"\n"}{end}') || true)
+    if [[ -n "${worker_ip}" ]]; then
+      echo "${worker_ip}"
+      return 0
+    fi
+  fi
+
+  worker_ip=$(localnet_vlan_map_worker_vlan_ips "${vmi_namespace}" "${vlan_subnet}" | awk 'NR==1{print $1}')
+  if [[ -n "${worker_ip}" ]]; then
+    echo "${worker_ip}"
+    return 0
+  fi
+
+  echo "ERROR: could not determine guest ingress worker IP on ${vlan_subnet}" >&2
+  return 1
+}
+
+localnet_vlan_configure_ingress_vip_dnat() {
+  local ingress_vip="$1"
+  local worker_ip="$2"
+  local dnat_b64
+
+  if [[ -z "${ingress_vip}" || -z "${worker_ip}" ]]; then
+    echo "ERROR: ingress VIP DNAT requires ingress_vip and worker_ip" >&2
+    return 1
+  fi
+
+  dnat_b64=$(base64 -w0 <<'SCRIPT_EOF'
+#!/bin/bash
+set -euo pipefail
+ingress_vip="$1"
+worker_ip="$2"
+
+add_dnat() {
+  local dport="$1"
+  local toport="$2"
+  iptables -t nat -C PREROUTING -d "${ingress_vip}" -p tcp --dport "${dport}" -j DNAT \
+    --to-destination "${worker_ip}:${toport}" 2>/dev/null || \
+    iptables -t nat -A PREROUTING -d "${ingress_vip}" -p tcp --dport "${dport}" -j DNAT \
+      --to-destination "${worker_ip}:${toport}"
+  iptables -t nat -C OUTPUT -d "${ingress_vip}" -p tcp --dport "${dport}" -j DNAT \
+    --to-destination "${worker_ip}:${toport}" 2>/dev/null || \
+    iptables -t nat -A OUTPUT -d "${ingress_vip}" -p tcp --dport "${dport}" -j DNAT \
+      --to-destination "${worker_ip}:${toport}"
+}
+
+add_dnat 443 443
+add_dnat 80 80
+echo "localnet-vlan ingress VIP ${ingress_vip} DNAT -> ${worker_ip}:443/80"
+SCRIPT_EOF
+)
+
+  echo "Installing ingress VIP ${ingress_vip} -> ${worker_ip} DNAT on all mgmt nodes..."
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+      "echo '${dnat_b64}' | base64 -d | bash -s -- '${ingress_vip}' '${worker_ip}'"; then
+      echo "  ${node}: ingress VIP DNAT configured"
+    else
+      echo "ERROR: failed to configure ingress VIP DNAT on ${node}" >&2
+      return 1
+    fi
+  done
+}
+
+localnet_vlan_configure_guest_ingress_datapath() {
+  local vmi_namespace="$1"
+  local vlan_subnet="$2"
+  local ingress_vip="$3"
+  local worker_ip
+
+  if [[ "${LOCALNET_VLAN_INGRESS_HOSTNETWORK:-true}" == "true" ]]; then
+    localnet_vlan_configure_guest_ingress_hostnetwork
+  fi
+
+  if [[ "${LOCALNET_VLAN_INGRESS_VIP_DNAT:-true}" != "true" ]]; then
+    echo "Skipping ingress VIP DNAT (LOCALNET_VLAN_INGRESS_VIP_DNAT=false)"
+    return 0
+  fi
+
+  worker_ip=$(localnet_vlan_guest_ingress_worker_ip "${vmi_namespace}" "${vlan_subnet}")
+  localnet_vlan_configure_ingress_vip_dnat "${ingress_vip}" "${worker_ip}"
 }
 
 localnet_vlan_configure_br_localnet_dhcp() {
@@ -742,6 +928,67 @@ EOF
   return 0
 }
 
+# Namespace + SCC for mgmt-cluster ip-echo (Multus localnet, runAsUser 0). Waits for the
+# openshift.io/sa.scc.uid-range annotation so pod admission does not fail during API load.
+ensure_egressip_ipecho_namespace() {
+  local ns="$1"
+  local uid_range
+  local attempt
+
+  oc apply -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${ns}
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+  annotations:
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+EOF
+
+  oc wait --for=jsonpath='{.status.phase}'=Active "namespace/${ns}" --timeout=120s 2>/dev/null \
+    || echo "WARNING: namespace ${ns} not Active within 120s (continuing)" >&2
+
+  for attempt in $(seq 1 90); do
+    uid_range=$(oc get namespace "${ns}" -o jsonpath='{.metadata.annotations.openshift\.io/sa\.scc\.uid-range}' 2>/dev/null || true)
+    if [[ -n "${uid_range}" ]]; then
+      echo "ip-echo namespace ${ns} has SCC uid-range ${uid_range}"
+      break
+    fi
+    if [[ "${attempt}" -eq 90 ]]; then
+      echo "WARNING: ${ns} missing openshift.io/sa.scc.uid-range after 180s (privileged labels set)" >&2
+    fi
+    sleep 2
+  done
+
+  oc create serviceaccount egressip-ipecho -n "${ns}" --dry-run=client -o yaml | oc apply -f -
+  oc adm policy add-scc-to-user anyuid -z egressip-ipecho -n "${ns}" 2>/dev/null || true
+}
+
+prepare_ipecho_ovn_localnet_lsps() {
+  local ns="$1"
+  local max_attempts="${2:-24}"
+  local attempt
+
+  for attempt in $(seq 1 "${max_attempts}"); do
+    if prepare_ovn_localnet_lsp_host_dhcp "${ns}"; then
+      return 0
+    fi
+    echo "ip-echo: waiting for localnet LSP in ${ns} (${attempt}/${max_attempts})..."
+    sleep 10
+  done
+  echo "ERROR: no localnet LSP in ${ns} for ip-echo after ${max_attempts} attempts" >&2
+  return 1
+}
+
+ipecho_pod_events_suggest_scc_wait() {
+  local ns="$1"
+  oc get events -n "${ns}" --field-selector "involvedObject.name=egressip-ipecho" -o go-template='{{range .items}}{{.message}}{{"\n"}}{{end}}' 2>/dev/null \
+    | grep -q 'sa.scc.uid-range'
+}
+
 # Pick a Ready mgmt node without DiskPressure for the ip-echo pod. The blanket
 # operator:Exists toleration would allow scheduling onto disk-pressured nodes and
 # immediate eviction. Optional args: space-separated node names to skip on retry.
@@ -766,6 +1013,34 @@ sys.exit(1)
 "; then
     return 1
   fi
+}
+
+# Prefer nodes that already run localnet-vlan dnsmasq (per-node 112.x islands).
+select_ipecho_node_preferring_dhcp_nodes() {
+  local exclude_nodes="${1:-}"
+  local dhcp_nodes_file="${SHARED_DIR}/localnet-vlan-dhcp-nodes"
+  local node
+
+  if [[ -f "${dhcp_nodes_file}" ]]; then
+    while read -r node; do
+      [[ -z "${node}" ]] && continue
+      [[ " ${exclude_nodes} " == *" ${node} "* ]] && continue
+      if oc get node "${node}" -o json | python3 -c "
+import json, sys
+node = json.load(sys.stdin)
+conditions = {c['type']: c['status'] for c in node.get('status', {}).get('conditions', [])}
+if conditions.get('Ready') != 'True':
+    sys.exit(1)
+if conditions.get('DiskPressure') == 'True':
+    sys.exit(1)
+sys.exit(0)
+"; then
+        echo "${node}"
+        return 0
+      fi
+    done < "${dhcp_nodes_file}"
+  fi
+  select_ipecho_node "${exclude_nodes}"
 }
 
 wait_for_ipecho_pod() {
@@ -800,8 +1075,7 @@ deploy_localnet_vlan_ipecho() {
 
   ipecho_namespace="egressip-ipecho-${CLUSTER_NAME}"
   echo "Deploying ip-echo in dedicated namespace ${ipecho_namespace} on localnet-vlan (static ${static_ip})..."
-  oc create namespace "${ipecho_namespace}" --dry-run=client -o yaml | oc apply -f -
-  oc label ns "${ipecho_namespace}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+  ensure_egressip_ipecho_namespace "${ipecho_namespace}"
 
   oc apply -f - <<IPECHO_NAD_EOF
 apiVersion: "k8s.cni.cncf.io/v1"
@@ -820,8 +1094,8 @@ spec:
 IPECHO_NAD_EOF
 
   ipecho_tried_nodes=""
-  for attempt in 1 2 3; do
-    ipecho_node=$(select_ipecho_node "${ipecho_tried_nodes}") || return 1
+  for attempt in $(seq 1 "${LOCALNET_VLAN_IPECHO_SCHEDULE_ATTEMPTS:-5}"); do
+    ipecho_node=$(select_ipecho_node_preferring_dhcp_nodes "${ipecho_tried_nodes}") || return 1
     ipecho_tried_nodes="${ipecho_tried_nodes} ${ipecho_node}"
     echo "Scheduling ip-echo on node ${ipecho_node} (attempt ${attempt})"
     oc delete pod egressip-ipecho -n "${ipecho_namespace}" --ignore-not-found --force --grace-period=0 2>/dev/null || true
@@ -840,6 +1114,7 @@ metadata:
         "ips": ["${static_ip}"]
       }]
 spec:
+  serviceAccountName: egressip-ipecho
   nodeName: ${ipecho_node}
   containers:
   - name: ip-echo
@@ -859,14 +1134,28 @@ spec:
     effect: NoSchedule
 IPECHO_EOF
 
-    if wait_for_ipecho_pod "${ipecho_namespace}" 120; then
+    for _ in $(seq 1 60); do
+      oc get pod egressip-ipecho -n "${ipecho_namespace}" &>/dev/null && break
+      sleep 2
+    done
+
+    prepare_ipecho_ovn_localnet_lsps "${ipecho_namespace}" "${LOCALNET_VLAN_IPECHO_LSP_PREP_ATTEMPTS:-24}" \
+      || echo "WARNING: ip-echo OVN LSP prep failed on ${ipecho_node} (continuing wait)" >&2
+
+    if wait_for_ipecho_pod "${ipecho_namespace}" "${LOCALNET_VLAN_IPECHO_POD_READY_TIMEOUT:-300}"; then
       break
     fi
     reason=$(oc get pod egressip-ipecho -n "${ipecho_namespace}" -o jsonpath='{.status.reason}' 2>/dev/null || true)
-    if [[ "${reason}" != "Evicted" ]]; then
-      return 1
+    if [[ "${reason}" == "Evicted" ]]; then
+      echo "ip-echo evicted from ${ipecho_node}, will retry on another node" >&2
+      continue
     fi
-    echo "ip-echo evicted from ${ipecho_node}, will retry on another node" >&2
+    if ipecho_pod_events_suggest_scc_wait "${ipecho_namespace}"; then
+      echo "ip-echo: SCC uid-range admission failure, refreshing namespace and retrying..." >&2
+      ensure_egressip_ipecho_namespace "${ipecho_namespace}"
+      continue
+    fi
+    return 1
   done
 
   if ! oc get pod egressip-ipecho -n "${ipecho_namespace}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
@@ -1564,6 +1853,12 @@ if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
       || echo "WARNING: post-NodePool localnet-vlan routing refresh failed (continuing)" >&2
   fi
 
+  localnet_vlan_configure_guest_ingress_datapath "${LOCALNET_VLAN_NS}" \
+    "${LOCALNET_VLAN_SUBNET}" "${LOCALNET_VLAN_INGRESS_VIP}" || {
+    echo "ERROR: localnet-vlan guest ingress datapath configuration failed" >&2
+    exit 1
+  }
+
   if [[ "${LOCALNET_VLAN_DEPLOY_IPECHO:-true}" == "true" ]]; then
     deploy_localnet_vlan_ipecho "${LOCALNET_VLAN_PHYSNET}" "${LOCALNET_VLAN_IPECHO_STATIC_IP:-192.168.112.250/24}" || {
       echo "ERROR: localnet-vlan ip-echo deployment failed" >&2
@@ -1641,8 +1936,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
   # garbage-collecting it during namespace reconciliation.
   IPECHO_NAMESPACE="egressip-ipecho-${CLUSTER_NAME}"
   echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE}..."
-  oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
-  oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+  ensure_egressip_ipecho_namespace "${IPECHO_NAMESPACE}"
 
   # Create a localnet NAD in the ip-echo namespace (same config as the hosted cluster namespace)
   oc apply -f - <<IPECHO_NAD_EOF
@@ -1678,6 +1972,7 @@ metadata:
   annotations:
     k8s.v1.cni.cncf.io/networks: localnet-network
 spec:
+  serviceAccountName: egressip-ipecho
   nodeName: ${IPECHO_NODE}
   containers:
   - name: ip-echo
@@ -1696,6 +1991,9 @@ spec:
     operator: Exists
     effect: NoSchedule
 IPECHO_EOF
+
+    prepare_ipecho_ovn_localnet_lsps "${IPECHO_NAMESPACE}" 12 \
+      || echo "WARNING: ip-echo OVN LSP prep failed (continuing wait)" >&2
 
     if wait_for_ipecho_pod "${IPECHO_NAMESPACE}" 120; then
       break
@@ -1735,8 +2033,7 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   fi
   IPECHO_NAMESPACE="egressip-ipecho-${CLUSTER_NAME}"
   echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE} on ${IPECHO_NAD} (static ${IPECHO_STATIC_IP})..."
-  oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
-  oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+  ensure_egressip_ipecho_namespace "${IPECHO_NAMESPACE}"
 
   oc apply -f - <<IPECHO_NAD_EOF
 apiVersion: "k8s.cni.cncf.io/v1"
@@ -1775,6 +2072,7 @@ metadata:
         "ips": ["${IPECHO_STATIC_IP}"]
       }]
 spec:
+  serviceAccountName: egressip-ipecho
   nodeName: ${IPECHO_NODE}
   containers:
   - name: ip-echo
@@ -1794,14 +2092,22 @@ spec:
     effect: NoSchedule
 IPECHO_EOF
 
+    prepare_ipecho_ovn_localnet_lsps "${IPECHO_NAMESPACE}" 12 \
+      || echo "WARNING: ip-echo OVN LSP prep failed (continuing wait)" >&2
+
     if wait_for_ipecho_pod "${IPECHO_NAMESPACE}" 120; then
       break
     fi
     reason=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" -o jsonpath='{.status.reason}' 2>/dev/null || true)
-    if [[ "${reason}" != "Evicted" ]]; then
-      exit 1
+    if [[ "${reason}" == "Evicted" ]]; then
+      echo "ip-echo evicted from ${IPECHO_NODE}, will retry on another node" >&2
+      continue
     fi
-    echo "ip-echo evicted from ${IPECHO_NODE}, will retry on another node" >&2
+    if ipecho_pod_events_suggest_scc_wait "${IPECHO_NAMESPACE}"; then
+      ensure_egressip_ipecho_namespace "${IPECHO_NAMESPACE}"
+      continue
+    fi
+    exit 1
   done
   if ! oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
     echo "ERROR: ip-echo pod failed to become Ready after retries" >&2

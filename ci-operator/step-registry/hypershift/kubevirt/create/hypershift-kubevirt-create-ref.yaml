@@ -105,6 +105,29 @@ ref:
       documentation: |-
         Ingress VIP for static *.apps DNS records in VLAN dnsmasq (same role as ostestbm
         on baremetal dev-scripts for localnet-multi). Distinct from LOCALNET_VLAN_API_VIP.
+        After NodePool Ready the create step patches the guest ingress controller to HostNetwork
+        and installs per-mgmt-node iptables DNAT from this VIP:80/443 to the router worker's
+        VLAN IP so canary/console route checks reach the hosted cluster router (not mgmt ingress).
+    - name: LOCALNET_VLAN_INGRESS_HOSTNETWORK
+      default: "true"
+      documentation: |-
+        When true and ATTACH_DEFAULT_NETWORK=localnet-vlan, patch the guest default IngressController
+        to HostNetwork so the router listens on the worker VLAN NIC (192.168.112.x).
+    - name: LOCALNET_VLAN_INGRESS_VIP_DNAT
+      default: "true"
+      documentation: |-
+        When true, DNAT LOCALNET_VLAN_INGRESS_VIP:80/443 on every mgmt node to the guest router
+        worker VLAN IP (required for *.apps DNS pointing at the lab ingress VIP).
+    - name: LOCALNET_VLAN_WORKER_HOST_ROUTES_STRICT
+      default: "true"
+      documentation: |-
+        When true, fail create if worker VLAN IPs cannot be discovered for /32 host routes
+        (retries LOCALNET_VLAN_WORKER_ROUTE_DISCOVERY_ATTEMPTS before failing).
+    - name: LOCALNET_VLAN_WORKER_ROUTE_DISCOVERY_ATTEMPTS
+      default: "12"
+      documentation: |-
+        Retry count (30s apart) when discovering worker 192.168.112.x addresses from VMIs before
+        installing /32 host routes or ingress DNAT target selection.
     - name: LOCALNET_VLAN_DHCP_INTERFACE
       default: ""
       documentation: |-
@@ -159,13 +182,28 @@ ref:
       default: "true"
       documentation: |-
         When true and ATTACH_DEFAULT_NETWORK=localnet-vlan, deploy egressip-ipecho on the mgmt
-        cluster after NodePool Ready (secondary VLAN localnet NAD, static IP). URL written to
-        ${SHARED_DIR}/kubevirt_ipecho_url for downstream EgressIP or probe tests.
+        cluster after guest ingress datapath setup (secondary VLAN localnet NAD, static IP).
+        The step waits for namespace SCC uid-range, prepares OVN localnet LSPs in the ip-echo
+        namespace, and prefers nodes listed in ${SHARED_DIR}/localnet-vlan-dhcp-nodes. URL written
+        to ${SHARED_DIR}/kubevirt_ipecho_url for downstream EgressIP or probe tests.
     - name: LOCALNET_VLAN_IPECHO_STATIC_IP
       default: "192.168.112.250/24"
       documentation: |-
         Static IPv4 for the ip-echo pod on the localnet-vlan NAD (Multus). Must be on the VLAN
         worker subnet (default 192.168.112.0/24) and outside the dnsmasq DHCP pool (.100-.240).
+    - name: LOCALNET_VLAN_IPECHO_POD_READY_TIMEOUT
+      default: "300"
+      documentation: |-
+        Seconds to wait for the egressip-ipecho pod Ready condition on localnet-vlan (mgmt cluster).
+    - name: LOCALNET_VLAN_IPECHO_LSP_PREP_ATTEMPTS
+      default: "24"
+      documentation: |-
+        Retries (10s apart) to prepare OVN localnet LSPs in the ip-echo namespace after the pod is
+        created (clear OVN DHCP/port_security for static Multus IP on br-ex.<vlan-id>).
+    - name: LOCALNET_VLAN_IPECHO_SCHEDULE_ATTEMPTS
+      default: "5"
+      documentation: |-
+        Node scheduling retries for ip-echo (evictions, SCC uid-range flakes, alternate dhcp nodes).
     - name: LOCALNET_MULTI_NETWORK_COUNT
       default: "2"
       documentation: "Number of localnet networks for the multi-localnet architecture. Primary (localnet-1) uses libvirt DHCP passthrough."
