@@ -100,7 +100,7 @@ fi
 # All waits share a single 300s budget so the total time is bounded.
 if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" && -n "${OPERATOR_NAMESPACE}" ]]; then
     DEPLOY_NAME="${OPERATOR_NAME}"
-    WAIT_BUDGET=300
+    WAIT_BUDGET=600
     WAIT_START=$(date +%s)
 
     wait_remaining() {
@@ -171,6 +171,35 @@ if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" && -n "${OPERATOR_NAM
                 log "WARNING: Deployment ${deploy} did not appear within budget — cluster may self-heal"
             fi
         done
+    fi
+
+    # Phase 4: if PORT_FORWARD_SVC is set, poll for the service to exist
+    # so the cluster is not returned with a missing service endpoint.
+    if [[ -n "${PORT_FORWARD_SVC:-}" ]]; then
+        PF_NS="${PORT_FORWARD_SVC%%/*}"
+        PF_SVC_PORT="${PORT_FORWARD_SVC#*/}"
+        PF_SVC="${PF_SVC_PORT%%:*}"
+
+        REMAINING=$(wait_remaining)
+        if [[ "${REMAINING}" -gt 0 ]]; then
+            log "Waiting for service ${PF_SVC} to appear in ${PF_NS} (${REMAINING}s remaining)"
+            SVC_FOUND=false
+            while [[ "$(wait_remaining)" -gt 0 ]]; do
+                if oc get svc "${PF_SVC}" -n "${PF_NS}" &>/dev/null; then
+                    SVC_FOUND=true
+                    break
+                fi
+                sleep 5
+            done
+
+            if [[ "${SVC_FOUND}" == "true" ]]; then
+                log "Service ${PF_SVC} is present in ${PF_NS}"
+            else
+                log "WARNING: Service ${PF_SVC} did not appear in ${PF_NS} within budget — cluster may self-heal"
+            fi
+        else
+            log "WARNING: Budget exhausted, skipping wait for service ${PF_SVC} — cluster may self-heal"
+        fi
     fi
 fi
 

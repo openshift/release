@@ -79,6 +79,27 @@ if [[ -n "${PORT_FORWARD_SVC:-}" ]]; then
     PF_SVC_PORT="${PORT_FORWARD_SVC#*/}"
     PF_SVC="${PF_SVC_PORT%%:*}"
     PF_PORT="${PF_SVC_PORT#*:}"
+    # Wait for the service to exist before attempting port-forward.
+    # After cleanup, PKO may still be re-deploying the service.
+    log "Waiting up to 120s for service ${PF_SVC} to appear in ${PF_NS}"
+    SVC_DEADLINE=$(( $(date +%s) + 120 ))
+    SVC_FOUND=false
+    while [[ $(date +%s) -lt ${SVC_DEADLINE} ]]; do
+        if kubectl get svc "${PF_SVC}" -n "${PF_NS}" &>/dev/null; then
+            SVC_FOUND=true
+            break
+        fi
+        sleep 5
+    done
+    if [[ "${SVC_FOUND}" != "true" ]]; then
+        log "ERROR: Service ${PF_SVC} not found in ${PF_NS} after 120s"
+        log "Diagnostic: resources in ${PF_NS}:"
+        kubectl get all -n "${PF_NS}" 2>&1 || true
+        log "Diagnostic: OcmAgent resources:"
+        kubectl get ocmagents -A 2>&1 || true
+        exit 1
+    fi
+    log "Service ${PF_SVC} found in ${PF_NS}"
     log "Starting kubectl port-forward svc/${PF_SVC} ${PF_PORT}:${PF_PORT} -n ${PF_NS}"
     kubectl port-forward "svc/${PF_SVC}" "${PF_PORT}:${PF_PORT}" -n "${PF_NS}" &
     PF_PID=$!
