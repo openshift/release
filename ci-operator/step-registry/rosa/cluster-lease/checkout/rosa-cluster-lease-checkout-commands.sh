@@ -167,11 +167,10 @@ while true; do
         fi
         # Fast-fail: if all clusters are non-recoverable (maintenance/error), exit immediately
         if [[ "${LEASE_FAIL_FAST_ON_EXHAUSTED}" == "true" ]]; then
-            POOL_SUMMARY=$(get_pool_status_summary "${DIAG_JSON}")
             POOL_TOTAL=$(echo "${DIAG_JSON}" | jq '.items | length')
-            POOL_AVAIL=$(echo "${POOL_SUMMARY}" | grep -oP 'available=\K[0-9]+')
-            POOL_INUSE=$(echo "${POOL_SUMMARY}" | grep -oP 'in-use=\K[0-9]+')
-            if [[ "${POOL_TOTAL}" -gt 0 && "${POOL_AVAIL}" -eq 0 && "${POOL_INUSE}" -eq 0 ]]; then
+            POOL_NONRECOVERABLE=$(echo "${DIAG_JSON}" | jq '[.items[] | select(.metadata.labels["rosa-cluster-lease/status"] == "maintenance" or .metadata.labels["rosa-cluster-lease/status"] == "error")] | length')
+            if [[ "${POOL_TOTAL}" -gt 0 && "${POOL_NONRECOVERABLE}" -eq "${POOL_TOTAL}" ]]; then
+                POOL_SUMMARY=$(get_pool_status_summary "${DIAG_JSON}")
                 log "FATAL: Pool is fully exhausted — all ${POOL_TOTAL} cluster(s) are non-recoverable"
                 log "  Pool breakdown: ${POOL_SUMMARY}"
                 log "  No clusters will become available without manual intervention."
