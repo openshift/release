@@ -81,10 +81,19 @@ function set_virtualised_sno_hub_as_installed {
 
 function main {
 
+  local ansible_group_all="/var/run/telcov10n/ansible-group-all/all"
+
   #### SSH Private key
   export BASTION_VHUB_HOST_SSH_PRI_KEY_FILE="${PWD}/remote-hypervisor-ssh-privkey"
-  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key > ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
-  chmod 600 ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
+  # The private key spans several lines in ansible_group_all, take everything between the quotes.
+  # The file is created 0600 before anything is written to it, so the key is never world-readable.
+  install -m 600 /dev/null "${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}"
+  sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${ansible_group_all}" \
+    | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}"
+  if [ ! -s "${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}" ]; then
+    echo "Error: ansible_ssh_private_key not found in ${ansible_group_all}" >&2
+    exit 1
+  fi
   setup_aux_host_ssh_access ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
 
   set_virtualised_sno_hub_as_installed
