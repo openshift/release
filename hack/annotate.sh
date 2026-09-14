@@ -99,6 +99,11 @@ for release in ${releases[@]}; do
 	annotate "ocp-arm64" "${release}-art-latest-arm64" "ocp-${release}-arm64.json"
 	annotate "ocp-multi" "${release}-art-latest-multi" "ocp-${release}-multi.json"
 
+	annotate "ocp" "${release}-konflux-rhcos" "konflux-ocp-${release}-rhcos.json"
+	annotate "ocp-s390x" "${release}-konflux-rhcos-s390x" "konflux-ocp-${release}-rhcos-s390x.json"
+	annotate "ocp-ppc64le" "${release}-konflux-rhcos-ppc64le" "konflux-ocp-${release}-rhcos-ppc64le.json"
+	annotate "ocp-arm64" "${release}-konflux-rhcos-arm64" "konflux-ocp-${release}-rhcos-arm64.json"
+
 	annotate "ocp-priv" "${release}-art-latest-priv" "ocp-${release}.json" "private"
 	annotate "ocp-s390x-priv" "${release}-art-latest-s390x-priv" "ocp-${release}-s390x.json" "private"
 	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le-priv" "ocp-${release}-ppc64le.json" "private"
