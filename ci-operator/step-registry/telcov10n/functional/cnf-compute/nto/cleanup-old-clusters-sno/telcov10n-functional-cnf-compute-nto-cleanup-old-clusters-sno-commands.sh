@@ -7,18 +7,6 @@ COMMON_VARIABLES="/var/common_variables"
 HYPERVISOR_VARIABLES="/var/hypervisors"
 INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 
-function copy_to_shared_dir() {
-	if [ -z "$1" ]
-	then
-		echo "missing directory to copy"
-		exit 1
-	fi
-
-	echo "copying files to $1..."
-	for filename in $1/*; do cp $filename "${SHARED_DIR}/$(basename $1)_$(basename $filename)"; done
-
-}
-
 install_vars() {
     local src="$1"
     local allow_host_vars="$2"
@@ -44,6 +32,7 @@ install_vars() {
             ;;
     esac
     cp "$src" "${dest_dir}/${name}"
+    chmod 0400 "${dest_dir}/${name}"
 }
 
 process_mount() {
@@ -55,18 +44,23 @@ process_mount() {
         return 1
     fi
 
-    # -L so that files exposed as symlinks by the secrets mount are matched as regular files
+    # Reject symlinks to prevent symlink attacks - only process regular files
     while IFS= read -r filename; do
+        # Skip if the file is a symlink
+        if [ -L "$filename" ]; then
+            echo "  warning: skipped symlink $filename"
+            continue
+        fi
         install_vars "$filename" "${allow_host_vars}"
-    done < <(find -L "$directory" -maxdepth 1 -type f ! -name '..*' | sort)
+    done < <(find "$directory" -maxdepth 1 -type f ! -name '..*' | sort)
 }
 
 # Hypervisors are shared between clusters, so the whole hypervisors group is mounted and the
 # right one is picked here.
 hypervisor_for_cluster() {
     case "${CLUSTER_NAME}" in
-        hlxcl15) echo "ocp-edge91-lab-eng-tlv2-redhat-com" ;;
-        *)       echo "" ;;
+        hlxcl51-sno) echo "ocp-edge91-lab-eng-tlv2-redhat-com" ;;
+        *)           echo "" ;;
     esac
 }
 
@@ -76,10 +70,17 @@ main() {
     if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
         CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
     fi
+
+    # Validate CLUSTER_NAME to prevent directory traversal attacks
+    if [[ ! "${CLUSTER_NAME}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+        echo "Error: Invalid CLUSTER_NAME '${CLUSTER_NAME}' - must contain only alphanumeric, dot, underscore, and hyphen characters"
+        exit 1
+    fi
+
     export CLUSTER_NAME=${CLUSTER_NAME}
     echo CLUSTER_NAME="${CLUSTER_NAME}"
 
-    mkdir -pv "${INVENTORY_PATH}/group_vars" "${INVENTORY_PATH}/host_vars"
+    mkdir -p "${INVENTORY_PATH}/group_vars" "${INVENTORY_PATH}/host_vars"
 
     echo "Processing common group_vars"
     process_mount "${COMMON_VARIABLES}" false
@@ -99,13 +100,14 @@ main() {
         exit 1
     fi
     cp "${HYPERVISOR_FILE}" "${INVENTORY_PATH}/host_vars/hypervisor"
+    chmod 0400 "${INVENTORY_PATH}/host_vars/hypervisor"
 
-    echo "Store inventory in SHARED_DIR"
-    copy_to_shared_dir "${INVENTORY_PATH}/host_vars"
-    copy_to_shared_dir "${INVENTORY_PATH}/group_vars"
+    cd /eco-ci-cd
 
-    echo "Flag process-inventory as completed"
-    touch "${SHARED_DIR}/process-inventory-completed"
+    echo "Clean old clusters"
+    ansible-playbook ./playbooks/compute/delete_old_clusters.yml \
+        -e "cluster_name=${CLUSTER_NAME}" \
+        -i ./inventories/ocp-deployment/build-inventory.py
 }
 
 main
