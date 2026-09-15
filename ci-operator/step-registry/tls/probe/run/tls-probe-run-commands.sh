@@ -1,9 +1,10 @@
 #!/bin/bash
 # tls-probe-run-commands.sh
 #
-# Deploys the tls-probe eBPF DaemonSet, captures TLS handshakes for a bounded
-# window, collects per-node JSONL, and emits [OCPFeatureGate:TLSAdherence]-tagged
-# JUnit to ARTIFACT_DIR.
+# Deploys the tls-probe eBPF DaemonSet, fires a bounded burst of internal +
+# external TLS client traffic (so a claimed, otherwise-idle cluster still has
+# real handshakes to capture), collects per-node JSONL, and emits
+# [OCPFeatureGate:TLSAdherence]-tagged JUnit to ARTIFACT_DIR.
 #
 # Verdict is keyed by destination port on ServerHello events. For full workload
 # identity resolution and richer analysis (client negotiations, certs, PQC),
@@ -24,6 +25,8 @@ readonly SCRATCH_DIR
 readonly CAPTURES_DIR="${SCRATCH_DIR}/captures"
 readonly JUNIT_CLASSNAME="tls.probe.adherence.runtime"
 readonly SCC_NAME="tls-probe-capture-${NS}"  # cluster-scoped; suffix with NS so concurrent runs on a shared/long-lived cluster don't race on the same SCC
+readonly TRAFFIC_JOB_NAME="tls-probe-client-traffic"
+readonly TRAFFIC_JOB_TIMEOUT="60s"
 
 # Only "${NS}" and "${NS}-"-prefixed names are accepted: create_namespace and
 # cleanup pass this straight to `oc delete namespace`, so a typo or an
@@ -240,7 +243,60 @@ EOF
   log "DaemonSet ready on $(oc get pods -n "${NS}" -l app.kubernetes.io/name=tls-probe --no-headers | wc -l) node(s)"
 }
 
-# ── 3. capture window ─────────────────────────────────────────────────────────
+# ── 3. client traffic ────────────────────────────────────────────────────────
+generate_traffic() {
+  log "generating client TLS traffic"
+  oc delete job "${TRAFFIC_JOB_NAME}" -n "${NS}" --ignore-not-found
+
+  oc create -f - <<EOF
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${TRAFFIC_JOB_NAME}
+  namespace: ${NS}
+  labels:
+    app.kubernetes.io/name: tls-probe
+    app.kubernetes.io/component: traffic-gen
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tls-probe
+        app.kubernetes.io/component: traffic-gen
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: traffic-gen
+        image: ${PROBE_TRAFFIC_IMAGE:-registry.access.redhat.com/ubi9/ubi-minimal:latest}
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -uo pipefail
+          probe() { curl -sk --max-time 5 "\$1" -o /dev/null && echo "\$1 [ok]" || echo "\$1 [fail]"; }
+
+          probe https://kubernetes.default.svc:443/healthz
+          probe https://kubernetes.default.svc:443/version
+          probe https://openshift.default.svc:443/.well-known/oauth-authorization-server
+          probe https://image-registry.openshift-image-registry.svc:5000/healthz
+          probe https://prometheus-k8s.openshift-monitoring.svc:9091/-/healthy
+          probe https://alertmanager-main.openshift-monitoring.svc:9094/-/healthy
+          probe https://registry.redhat.io/v2/
+          probe https://quay.io/v2/
+          probe https://registry.access.redhat.com/v2/
+          probe https://cdn.redhat.com/
+
+          for _ in \$(seq 1 10); do
+            curl -sk --max-time 5 https://kubernetes.default.svc:443/healthz -o /dev/null &
+          done
+          wait
+EOF
+
+  oc wait --for=condition=complete "job/${TRAFFIC_JOB_NAME}" -n "${NS}" --timeout="${TRAFFIC_JOB_TIMEOUT}" \
+    || log "traffic Job did not complete within ${TRAFFIC_JOB_TIMEOUT} (continuing with capture anyway)"
+}
+
+# ── 4. capture window ─────────────────────────────────────────────────────────
 # The capture container's restartPolicy is the DaemonSet-mandated "Always", so
 # the container restarts (not "Succeeds") once `--duration` elapses and the
 # pod never reaches phase Succeeded. Poll each pod's last-terminated exit code
@@ -269,7 +325,7 @@ wait_for_capture() {
   die "capture window (${CAPTURE_SECS}s) elapsed without every pod completing a capture cycle"
 }
 
-# ── 4. collect JSONL ──────────────────────────────────────────────────────────
+# ── 5. collect JSONL ──────────────────────────────────────────────────────────
 # Reads the completed capture from each pod's previous (restarted) container.
 # Falls back to the live container if the pod never restarted in time.
 # Files are kept in SCRATCH_DIR (not ARTIFACT_DIR) and named by ordinal, not
@@ -294,7 +350,7 @@ collect_jsonl() {
   log "collected from ${pod_count} pod(s) — $(wc -l < "${SCRATCH_DIR}/all-events.jsonl") events"
 }
 
-# ── 5. read cluster TLS policy ────────────────────────────────────────────────
+# ── 6. read cluster TLS policy ────────────────────────────────────────────────
 # Prints the cluster's configured TLSAdherencePolicy, or empty if unset.
 read_adherence_policy() {
   oc get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null || echo ""
@@ -310,7 +366,7 @@ should_enforce() {
     && echo "true" || echo "false"
 }
 
-# ── 6. verdict ───────────────────────────────────────────────────────────────
+# ── 7. verdict ───────────────────────────────────────────────────────────────
 # Aggregates ServerHello events by server (source) port — the negotiated
 # version and the serving port are both on the ServerHello's .src side; .dst
 # is the client's ephemeral port. ClientHello data (offered versions, cipher
@@ -341,7 +397,7 @@ build_verdict() {
   ' "${all_events}" 2>/dev/null || echo "[]"
 }
 
-# ── 7. emit JUnit ─────────────────────────────────────────────────────────────
+# ── 8. emit JUnit ─────────────────────────────────────────────────────────────
 # Appends one <testcase> block (pass/fail/observe) to the caller's XML
 # accumulator, using bash namerefs rather than eval so shellcheck can see the
 # read/write and the caller's counter/buffer are updated in place.
@@ -459,6 +515,7 @@ main() {
 
   create_namespace
   deploy_daemonset
+  generate_traffic
   wait_for_capture
   collect_jsonl
 
