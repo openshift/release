@@ -1,0 +1,88 @@
+base_images:
+  rhel-coreos-base:
+    name: "4.20"
+    namespace: ocp
+    tag: rhel-coreos
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+  items:
+  - dockerfile_literal: |
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
+      RUN rpm-ostree install tree && rpm-ostree cleanup -m && ostree container commit
+    inputs:
+      rhel-coreos-base:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+    to: rhel-coreos
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+  standard:
+    integration:
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-aws-verify-no-tree
+  steps:
+    cluster_profile: aws-edge-infra
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:standard
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+    test:
+    - as: verify-no-tree
+      commands: |
+        set -euo pipefail
+        NODE=$(oc get nodes -o jsonpath='{.items[0].metadata.name}')
+        echo "Checking that tree is NOT installed on node $NODE (standard RHCOS)"
+        if oc debug "node/$NODE" -- chroot /host rpm -q tree 2>/dev/null; then
+          echo "FAIL: tree is installed on standard RHCOS, this is unexpected"
+          exit 1
+        fi
+        echo "PASS: tree is not installed on standard RHCOS, as expected"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-verify-tree-layered
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+    test:
+    - as: verify-tree
+      commands: |
+        set -euo pipefail
+        NODE=$(oc get nodes -o jsonpath='{.items[0].metadata.name}')
+        echo "Checking that tree IS installed on node $NODE (custom layered RHCOS)"
+        oc debug "node/$NODE" -- chroot /host rpm -q tree 2>/dev/null
+        echo "PASS: tree is installed on layered RHCOS, as expected"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 4.20-custom-rhcos
