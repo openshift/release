@@ -233,9 +233,15 @@ fi
 if oc get clusterpackage "${OPERATOR_NAME}" &>/dev/null; then
     (
         log "Backing up production ClusterPackage ${OPERATOR_NAME}"
-        oc get clusterpackage "${OPERATOR_NAME}" -o json \
+        backup_file="${SHARED_DIR}/production-clusterpackage.yaml"
+        temporary_backup="$(mktemp "${SHARED_DIR}/production-clusterpackage.XXXXXX")"
+        if ! oc get clusterpackage "${OPERATOR_NAME}" -o json \
           | jq 'del(.status, .metadata.resourceVersion, .metadata.uid, .metadata.generation, .metadata.creationTimestamp, .metadata.ownerReferences, .metadata.finalizers, .metadata.managedFields, .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"])' \
-          > "${SHARED_DIR}/production-clusterpackage.yaml"
+          > "${temporary_backup}"; then
+            rm -f "${temporary_backup}"
+            exit 1
+        fi
+        mv "${temporary_backup}" "${backup_file}"
         log "Production ClusterPackage backed up to SHARED_DIR"
     ) || log "WARNING: Failed to back up production ClusterPackage ${OPERATOR_NAME}, continuing without backup"
 fi
