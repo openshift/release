@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -8,34 +8,32 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   arm64-latest:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipsec-24nodes
-  cron: 0 0 5 * *
+- always_run: false
+  as: aws-ipsec-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -47,8 +45,9 @@ tests:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws-ovn-ipsec
-  timeout: 7h0m0s
-- as: gcp-etcd-fips-24nodes
+  timeout: 8h0m0s
+- always_run: false
+  as: gcp-etcd-fips-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-perfscale-qe
@@ -107,8 +106,9 @@ tests:
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: baremetal-lab-upi
-  timeout: 7h0m0s
-- as: vsphere-24nodes
+  timeout: 8h0m0s
+- always_run: false
+  as: vsphere-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: vsphere-connected-2
@@ -121,7 +121,7 @@ tests:
     - chain: workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-vsphere-ipi-ovn
-  timeout: 8h0m0s
+  timeout: 7h0m0s
 - always_run: false
   as: ibmcloud-24nodes
   steps:
@@ -134,8 +134,9 @@ tests:
     - ref: workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
-  timeout: 7h0m0s
-- as: nutanix-24nodes
+  timeout: 8h0m0s
+- always_run: false
+  as: nutanix-24nodes
   capabilities:
   - sshd-bastion
   steps:
@@ -172,7 +173,7 @@ tests:
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: baremetal-lab-upi
-  timeout: 7h0m0s
+  timeout: 8h0m0s
 - always_run: false
   as: aws-3nodes-1500ppn
   steps:
@@ -212,4 +213,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-qe-perfscale-ci
-  variant: 4.22-nightly-node-density-heavy
+  variant: 5.0-nightly-node-density-heavy
