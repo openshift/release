@@ -28,19 +28,7 @@ function add_pullsecret() {
   rm /tmp/.dockerconfigjson /tmp/.dockerconfigjson.new
 }
 
-
-# Get yq tool
-YQ="/tmp/yq"
-curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-chmod +x ${YQ}
-
-# Dynamically get CNV catalog image and channel that were provided to the job via gangway API
-CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
-  ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_PRERELEASE_CATALOG_IMAGE") | .value')
-CNV_SUBSCRIPTION_CHANNEL=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
-  ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value')
-
-if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]
+if [ "${CNV_SUBSCRIPTION_SOURCE:-}" == "redhat-operators" ]
 then
   CNV_RELEASE_CHANNEL=stable
 elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]
