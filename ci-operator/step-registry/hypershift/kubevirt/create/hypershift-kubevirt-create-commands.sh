@@ -658,13 +658,39 @@ localnet_vlan_guest_ingress_worker_ip() {
   return 1
 }
 
+localnet_vlan_ingress_dnat_backend_ports() {
+  local nested_kc="${SHARED_DIR}/nested_kubeconfig"
+  local strategy
+  local np_https np_http
+
+  strategy=$(KUBECONFIG="${nested_kc}" oc get ingresscontroller default -n openshift-ingress-operator \
+    -o jsonpath='{.spec.endpointPublishingStrategy.type}' 2>/dev/null || true)
+  if [[ "${strategy}" == "HostNetwork" ]]; then
+    echo "443 80"
+    return 0
+  fi
+
+  np_https=$(KUBECONFIG="${nested_kc}" oc get svc -n openshift-ingress router-nodeport-default \
+    -o jsonpath='{.spec.ports[?(@.port==443)].nodePort}' 2>/dev/null || true)
+  np_http=$(KUBECONFIG="${nested_kc}" oc get svc -n openshift-ingress router-nodeport-default \
+    -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}' 2>/dev/null || true)
+  if [[ -z "${np_https}" || -z "${np_http}" ]]; then
+    echo "ERROR: could not read openshift-ingress NodePort (strategy=${strategy})" >&2
+    return 1
+  fi
+  echo "Ingress NodePort backend ports ${np_https}/${np_http} (strategy=${strategy})" >&2
+  echo "${np_https} ${np_http}"
+}
+
 localnet_vlan_configure_ingress_vip_dnat() {
   local ingress_vip="$1"
   local worker_ip="$2"
+  local backend_https="$3"
+  local backend_http="$4"
   local dnat_b64
 
-  if [[ -z "${ingress_vip}" || -z "${worker_ip}" ]]; then
-    echo "ERROR: ingress VIP DNAT requires ingress_vip and worker_ip" >&2
+  if [[ -z "${ingress_vip}" || -z "${worker_ip}" || -z "${backend_https}" || -z "${backend_http}" ]]; then
+    echo "ERROR: ingress VIP DNAT requires ingress_vip, worker_ip, and backend http/https ports" >&2
     return 1
   fi
 
@@ -673,6 +699,8 @@ localnet_vlan_configure_ingress_vip_dnat() {
 set -euo pipefail
 ingress_vip="$1"
 worker_ip="$2"
+backend_https="$3"
+backend_http="$4"
 
 add_dnat() {
   local dport="$1"
@@ -687,16 +715,16 @@ add_dnat() {
       --to-destination "${worker_ip}:${toport}"
 }
 
-add_dnat 443 443
-add_dnat 80 80
-echo "localnet-vlan ingress VIP ${ingress_vip} DNAT -> ${worker_ip}:443/80"
+add_dnat 443 "${backend_https}"
+add_dnat 80 "${backend_http}"
+echo "localnet-vlan ingress VIP ${ingress_vip} DNAT -> ${worker_ip}:${backend_https}/${backend_http}"
 SCRIPT_EOF
 )
 
-  echo "Installing ingress VIP ${ingress_vip} -> ${worker_ip} DNAT on all mgmt nodes..."
+  echo "Installing ingress VIP ${ingress_vip} -> ${worker_ip} (${backend_https}/${backend_http}) DNAT on all mgmt nodes..."
   for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
     if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
-      "echo '${dnat_b64}' | base64 -d | bash -s -- '${ingress_vip}' '${worker_ip}'"; then
+      "echo '${dnat_b64}' | base64 -d | bash -s -- '${ingress_vip}' '${worker_ip}' '${backend_https}' '${backend_http}'"; then
       echo "  ${node}: ingress VIP DNAT configured"
     else
       echo "ERROR: failed to configure ingress VIP DNAT on ${node}" >&2
@@ -720,8 +748,10 @@ localnet_vlan_configure_guest_ingress_datapath() {
     return 0
   fi
 
+  local backend_https backend_http
   worker_ip=$(localnet_vlan_guest_ingress_worker_ip "${vmi_namespace}" "${vlan_subnet}")
-  localnet_vlan_configure_ingress_vip_dnat "${ingress_vip}" "${worker_ip}"
+  read -r backend_https backend_http < <(localnet_vlan_ingress_dnat_backend_ports)
+  localnet_vlan_configure_ingress_vip_dnat "${ingress_vip}" "${worker_ip}" "${backend_https}" "${backend_http}"
 }
 
 localnet_vlan_configure_br_localnet_dhcp() {
