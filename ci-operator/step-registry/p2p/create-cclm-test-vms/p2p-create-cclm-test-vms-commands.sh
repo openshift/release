@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Create multiple CNV test VMs on the ACM hub and on a spoke cluster for hubâ†”spoke MTV live
+# Create multiple CNV test VMs on the ACM hub and on a spoke cluster for hubspoke MTV live
 # migration testing.
 #
 # Creates P2P_HS_VM_COUNT VMs on the hub (prefix P2P_HS_HUB_VM_PREFIX, using KUBECONFIG)
 # and P2P_HS_VM_COUNT VMs on the spoke (prefix P2P_HS_SPOKE_VM_PREFIX, using SHARED_DIR
-# kubeconfig). Hub VMs will be migrated hubâ†’spoke; spoke VMs will be migrated spokeâ†’hub.
+# kubeconfig). Hub VMs will be migrated hub’spoke; spoke VMs will be migrated spoke’hub.
 #
 # Both sets use ODF RWX block storage. RHEL DataSource clones require cloneStrategy=copy
 # and cdi.kubevirt.io/storage.usePopulator=false to avoid prime-* ClaimMisbound failures.
@@ -35,12 +35,12 @@ fi
 # Backward-compatible env var resolution 
 # New P2P_HS_* vars take priority; fall back to old CNV_TEST_VM_* names
 # so spoke-to-spoke workflows work without CI config changes (Option A).
-P2P_HS_VM_COUNT="${P2P_HS_VM_COUNT:-${CNV_TEST_VM_COUNT:-1}}"
+P2P_HS_VM_COUNT="${P2P_HS_VM_COUNT:-1}}"
 P2P_HS_VM_CPUS="${P2P_HS_VM_CPUS:-${CNV_TEST_VM_CPUS:-2}}"
 P2P_HS_VM_MEMORY="${P2P_HS_VM_MEMORY:-${CNV_TEST_VM_MEMORY:-4Gi}}"
 P2P_HS_SPOKE_VM_PREFIX="${P2P_HS_SPOKE_VM_PREFIX:-${CNV_TEST_VM_PREFIX:-test-vm}}"
 P2P_HS_CREATE_HUB_VMS="${P2P_HS_CREATE_HUB_VMS:-false}"
-# ^ spoke-only workflows don't set this â†’ defaults to false â†’ no hub VMs created
+# ^ spoke-only workflows don't set this ’ defaults to false ’ no hub VMs created
 typeset -i vmCount="${P2P_HS_VM_COUNT}"
 typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE}"
 typeset spokeKubeconfig=""
@@ -61,6 +61,7 @@ ResolveSpokeKubeconfig() {
         return 1
     fi
     [[ -r "${spokeKubeconfig}" ]]
+    printf '%s' "${spokeKubeconfig}" > "${SHARED_DIR}/.spoke-kubeconfig-path"
 }
 
 # EnsureNamespace idempotently create the test VM namespace on a cluster.
@@ -124,7 +125,7 @@ CleanupVm() {
             -n "${ns}" --ignore-not-found --wait=false
     done < <(oc --kubeconfig="${kc}" get pvc -n "${ns}" -o json \
         | jq -r --arg dv "${dvName}" \
-            '.items[].metadata.name | select(test("^(" + $dv + "|prime-" + $dv + ")"))'  \
+            '.items[].metadata.name | select(. == $dv or . == ("prime-" + $dv))'
         || true)
 
     oc --kubeconfig="${kc}" wait --for=delete "datavolume/${dvName}" \
@@ -501,9 +502,9 @@ typeset -i cclmStepRc=0
 
     ResolveSpokeKubeconfig
 
-    # Create VMs on hub (hubâ†’spoke migration sources).
+    # Create VMs on hub (hub’spoke migration sources).
     # Skipped when P2P_HS_CREATE_HUB_VMS=false, e.g. for spoke-round-trip where
-    # hub VMs are populated by the spokeâ†’hub migration leg, not pre-created.
+    # hub VMs are populated by the spoke’hub migration leg, not pre-created.
     if [[ "${P2P_HS_CREATE_HUB_VMS}" != "false" ]]; then
         CreateClusterVms \
             "${KUBECONFIG}" \
@@ -515,7 +516,7 @@ typeset -i cclmStepRc=0
             "hub"
     fi
 
-    # Create VMs on spoke (spokeâ†’hub migration sources, or round-trip starting point).
+    # Create VMs on spoke (spoke’hub migration sources, or round-trip starting point).
     CreateClusterVms \
         "${spokeKubeconfig}" \
         "${P2P_HS_SPOKE_VM_PREFIX}" \
@@ -551,11 +552,16 @@ typeset -i cclmStepRc=0
     fi
     true
 ) || cclmStepRc=$?
+# Recover spokeKubeconfig from subshell — subshell variable assignments
+# don't propagate to the parent, but DumpDiagnostics needs the path.
+if [[ -z "${spokeKubeconfig}" && -r "${SHARED_DIR}/.spoke-kubeconfig-path" ]]; then
+    spokeKubeconfig="$(< "${SHARED_DIR}/.spoke-kubeconfig-path")"
+fi
 
 if (( cclmStepRc != 0 )); then
     DumpDiagnostics
     if [[ "${cclmDebugMode}" == "true" ]]; then
-        : "WARNING: p2p-create-hub-spoke-test-vms failed (rc=${cclmStepRc}); not failing job (debug mode)"
+        : "WARNING: p2p-create-cclm-test-vms failed (rc=${cclmStepRc}); not failing job (debug mode)"
     else
         exit "${cclmStepRc}"
     fi

@@ -110,6 +110,7 @@ ResolveDestKubeconfig() {
         return 1
     fi
     [[ -r "${destKubeconfig}" ]]
+    printf '%s' "${destKubeconfig}" > "${SHARED_DIR}/.dest-kubeconfig-path"
 }
 
 # KcForCluster ” return kubeconfig path for a cluster role label.
@@ -1193,6 +1194,18 @@ typeset _revVmNs="${MTV_REV_VM_NAMESPACE:-${MTV_HS_SPOKE_VM_NAMESPACE}}"
 
     true
 ) || cclmStepRc=$?
+
+# Recover spokeKubeconfig from subshell — subshell variable assignments
+# don't propagate to the parent, but DumpDiagnostics needs the path.
+if [[ -z "${spokeKubeconfig}" && -r "${SHARED_DIR}/.spoke-kubeconfig-path" ]]; then
+    spokeKubeconfig="$(< "${SHARED_DIR}/.spoke-kubeconfig-path")"
+fi
+
+# Recover destKubeconfig from subshell — subshell variable assignments
+# don't propagate to the parent, but DumpDiagnostics needs the path.
+if [[ -z "${destKubeconfig}" && -r "${SHARED_DIR}/.dest-kubeconfig-path" ]]; then
+    destKubeconfig="$(< "${SHARED_DIR}/.dest-kubeconfig-path")"
+fi
 
 WriteJunit
 
