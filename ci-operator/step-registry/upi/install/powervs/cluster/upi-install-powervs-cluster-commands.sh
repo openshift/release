@@ -240,6 +240,8 @@ function cleanup_prior() {
 # creates the var file
 # Note: kdump_enable is false so that is simplifies the setup of one MCP
 function configure_terraform() {
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IBMCLOUD_API_KEY
 
@@ -260,6 +262,7 @@ function configure_terraform() {
 
     PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
+    $WAS_TRACING && set -x
 
     echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
     VPC_NAME="${WORKSPACE_NAME}"
@@ -454,9 +457,12 @@ function build_upi_cluster() {
     POWERVS_USER_ID=$(ibmcloud account show --output json | jq -r '.account_id')
     echo "IBM Cloud User ID: ${POWERVS_USER_ID}"
 
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     cat > "${SHARED_DIR}/powervs-config.json" << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${RESOURCE_GROUP}"}
 EOF
+    $WAS_TRACING && set -x
     echo "powervs-config.json created successfully"
 }
 

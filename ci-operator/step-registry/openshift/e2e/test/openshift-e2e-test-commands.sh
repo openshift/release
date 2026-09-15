@@ -225,16 +225,22 @@ openstack*)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 ibmcloud*)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
+    $WAS_TRACING && set -x
     ;;
 powervs*)
     #export TEST_PROVIDER='{"type":"powervs"}' # TODO In the future, powervs will be a supprted test type
     export TEST_PROVIDER='{"type":"ibmcloud"}'
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     IC_API_KEY=$(sed -e 's,^.*"apikey":",,' -e 's,".*$,,' ${SHARED_DIR}/powervs-config.json)
     IBMCLOUD_API_KEY=${IC_API_KEY}
     export IC_API_KEY
     export IBMCLOUD_API_KEY
+    $WAS_TRACING && set -x
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
 external) export TEST_PROVIDER='{"type":"external"}' ;;
