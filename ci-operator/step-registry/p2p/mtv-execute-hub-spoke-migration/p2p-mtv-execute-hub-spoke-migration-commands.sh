@@ -40,7 +40,7 @@ fi
 typeset -i vmCount="${P2P_HS_VM_COUNT}"
 typeset -i migrationPollInterval="${MTV_HS_MIGRATION_POLL_INTERVAL_SECONDS}"
 typeset -i syncStuckMinutes="${MTV_HS_SYNC_STUCK_MINUTES}"
-typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE}"
+typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE:-false}"
 # spokeKubeconfig the source (spoke-1) cluster kubeconfig for hub->spoke topologies.
 # For spoke-spoke topologies this is the first spoke (source cluster).
 typeset spokeKubeconfig=""
@@ -106,7 +106,7 @@ ResolveDestKubeconfig() {
             return 1
         fi
     else
-        : "ERROR: spoke-spoke direction requires P2P_DEST_KUBECONFIG or P2P_DEST_SPOKE_INDEX" >&2
+        : "ERROR: spoke-spoke direction requires P2P_DEST_KUBECONFIG or P2P_DEST_SPOKE_INDEX"
         return 1
     fi
     [[ -r "${destKubeconfig}" ]]
@@ -868,6 +868,23 @@ DumpDirectionDiagnostics() {
 DumpDiagnostics() {
     typeset fwdTargetNs="${1:-${_fwdVmNs:-${MTV_HS_HUB_VM_NAMESPACE}}}"
     typeset revTargetNs="${2:-${_revVmNs:-${MTV_HS_SPOKE_VM_NAMESPACE}}}"
+    if [[ "${cclmDirection}" == 'spoke-to-spoke' || "${cclmDirection}" == 'spoke-round-trip-ss' ]]; then
+        [[ -n "${_fwdPlan}" ]] || {
+            : "ERROR: spoke-spoke requires MTV_FWD_PLAN (or MTV_HS_HUB_TO_SPOKE_PLAN fallback)"
+            return 0
+        }
+        [[ -n "${_fwdMig}" ]] || {
+            : "ERROR: spoke-spoke requires MTV_FWD_MIGRATION (or MTV_HS_HUB_TO_SPOKE_MIGRATION fallback)"
+            return 0
+        }
+    fi
+
+    if [[ "${cclmDirection}" == 'spoke-round-trip-ss' ]]; then
+        [[ -n "${_revPlan}" ]] || {
+            : "WARNING: _revPlan is empty – spoke-spoke reverse diagnostics will be incomplete"
+            return 0
+        }
+    fi
 
     case "${cclmDirection}" in
     (both|spoke-to-hub)
@@ -916,6 +933,7 @@ DumpDiagnostics() {
             "${_fwdVmPrefix}" || true
         ;;
     esac
+    true
 }
 
 OnError() {

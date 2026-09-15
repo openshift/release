@@ -35,14 +35,14 @@ fi
 # Backward-compatible env var resolution 
 # New P2P_HS_* vars take priority; fall back to old CNV_TEST_VM_* names
 # so spoke-to-spoke workflows work without CI config changes (Option A).
-P2P_HS_VM_COUNT="${P2P_HS_VM_COUNT:-1}}"
-P2P_HS_VM_CPUS="${P2P_HS_VM_CPUS:-${CNV_TEST_VM_CPUS:-2}}"
-P2P_HS_VM_MEMORY="${P2P_HS_VM_MEMORY:-${CNV_TEST_VM_MEMORY:-4Gi}}"
-P2P_HS_SPOKE_VM_PREFIX="${P2P_HS_SPOKE_VM_PREFIX:-${CNV_TEST_VM_PREFIX:-test-vm}}"
-P2P_HS_CREATE_HUB_VMS="${P2P_HS_CREATE_HUB_VMS:-false}"
+typeset P2P_HS_VM_COUNT="${P2P_HS_VM_COUNT:-1}"
+typeset P2P_HS_VM_CPUS="${P2P_HS_VM_CPUS:-2}"
+typeset P2P_HS_VM_MEMORY="${P2P_HS_VM_MEMORY:-4Gi}"
+typeset P2P_HS_HUB_VM_PREFIX="${P2P_HS_HUB_VM_PREFIX:-test-vm}"
+typeset P2P_HS_CREATE_HUB_VMS="${P2P_HS_CREATE_HUB_VMS:-false}"
 # ^ spoke-only workflows don't set this ’ defaults to false ’ no hub VMs created
 typeset -i vmCount="${P2P_HS_VM_COUNT}"
-typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE}"
+typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE:-false}"
 typeset spokeKubeconfig=""
 typeset diagDir=""
 
@@ -125,8 +125,7 @@ CleanupVm() {
             -n "${ns}" --ignore-not-found --wait=false
     done < <(oc --kubeconfig="${kc}" get pvc -n "${ns}" -o json \
         | jq -r --arg dv "${dvName}" \
-            '.items[].metadata.name | select(. == $dv or . == ("prime-" + $dv))'
-        || true)
+            '.items[].metadata.name | select(. == $dv or . == ("prime-" + $dv))' || true)
 
     oc --kubeconfig="${kc}" wait --for=delete "datavolume/${dvName}" \
         -n "${ns}" --timeout=5m 1>/dev/null || true
@@ -532,8 +531,7 @@ typeset -i cclmStepRc=0
             typeset -i i
             if [[ "${P2P_HS_CREATE_HUB_VMS}" != "false" ]]; then
                 for ((i = 1; i <= vmCount; i++)); do
-                    printf '=== Hub VM %d (%s-%d) ” migration source for hub spoke ===\n' \
-                        "${i}" "${P2P_HS_HUB_VM_PREFIX}" "${i}"
+                    : "Hub VM ${i} (${P2P_HS_HUB_VM_PREFIX}-${i}) → migration source for hub->spoke"
                     oc --kubeconfig="${KUBECONFIG}" get \
                         "virtualmachine/${P2P_HS_HUB_VM_PREFIX}-${i}" \
                         "virtualmachineinstance/${P2P_HS_HUB_VM_PREFIX}-${i}" \
@@ -541,8 +539,7 @@ typeset -i cclmStepRc=0
                 done
             fi
             for ((i = 1; i <= vmCount; i++)); do
-                printf '=== Spoke VM %d (%s-%d) migration source for spoke->hub ===\n' \
-                    "${i}" "${P2P_HS_SPOKE_VM_PREFIX}" "${i}"
+                : "Spoke VM ${i} (${P2P_HS_SPOKE_VM_PREFIX}-${i}) → migration source for spoke->hub"
                 oc --kubeconfig="${spokeKubeconfig}" get \
                     "virtualmachine/${P2P_HS_SPOKE_VM_PREFIX}-${i}" \
                     "virtualmachineinstance/${P2P_HS_SPOKE_VM_PREFIX}-${i}" \
