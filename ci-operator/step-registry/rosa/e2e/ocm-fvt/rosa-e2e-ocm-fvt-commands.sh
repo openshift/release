@@ -175,10 +175,6 @@ if [[ -n "${hive_kubeconfig}" ]]; then
   echo "http_proxy=${backplane_proxy_url}" >> "${podman_env_file}"
 fi
 
-if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
-  echo "ENABLE_JIRA_REPORTING=true" >> "${podman_env_file}"
-fi
-
 if [[ -n "${OCM_FVT_OCM_ENV:-}" ]]; then
   echo "OCM_ENV=${OCM_FVT_OCM_ENV}" >> "${podman_env_file}"
 fi
@@ -263,9 +259,6 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
 fi
 
 cred_sources='source /usr/local/cs-qe-credentials/ocm-tokens'
-if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
-  cred_sources="${cred_sources}; source /usr/local/cs-qe-credentials/jira-cred"
-fi
 
 env -i bash --norc --noprofile -c "
   ${cred_sources}
@@ -309,9 +302,6 @@ podman_args+=("-v" "${ocm_fvt_output}:/ocm-backend-tests/output:z")
 podman_args+=(--rm)
 
 ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
-if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
-  ocmtest_args+=(--reportJiraTicket)
-fi
 
 # osdfm post-alerts: port-forward AppSRE Prom; tests use a hard-coded in-cluster URL.
 # --add-host maps that hostname to host-gateway:9090 (backplane monitoring is not available).
