@@ -66,7 +66,7 @@ hypervisor_for_cluster() {
   esac
 }
 
-echo "CLUSTER_NAME=${CLUSTER_NAME}"
+echo "CLUSTER_NAME=${CLUSTER_NAME}" 
 
 mkdir -p "${INVENTORY_PATH}/group_vars" "${INVENTORY_PATH}/host_vars"
 
