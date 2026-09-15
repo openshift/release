@@ -40,23 +40,6 @@ if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
 fi
 gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet
 
-# A lifecycle step may be interrupted before its EXIT trap can remove the
-# temporary submitter key. Retry the deletion here as a second cleanup line of
-# defense; the key ID contains no credential material.
-E2E_HC_SUBMITTER_KEY_ID_FILE="${SHARED_DIR}/e2e-hc-submitter-key-id"
-E2E_HC_SUBMITTER_SA="e2e-hc-submitter@gcp-hcp-platform-ci.iam.gserviceaccount.com"
-if [[ -s "${E2E_HC_SUBMITTER_KEY_ID_FILE}" ]]; then
-  E2E_HC_SUBMITTER_KEY_ID="$(<"${E2E_HC_SUBMITTER_KEY_ID_FILE}")"
-  if gcloud iam service-accounts keys delete "${E2E_HC_SUBMITTER_KEY_ID}" \
-    --iam-account="${E2E_HC_SUBMITTER_SA}" \
-    --quiet; then
-    rm -f "${E2E_HC_SUBMITTER_KEY_ID_FILE}"
-    log "Removed leaked temporary e2e HC submitter key ${E2E_HC_SUBMITTER_KEY_ID}"
-  else
-    log "WARNING: Could not remove temporary e2e HC submitter key ${E2E_HC_SUBMITTER_KEY_ID}"
-  fi
-fi
-
 # Read infrastructure info from SHARED_DIR
 if [[ ! -f "${SHARED_DIR}/region-project-id" ]]; then
   log "No region-project-id in SHARED_DIR — provision didn't complete, nothing to clean up"
