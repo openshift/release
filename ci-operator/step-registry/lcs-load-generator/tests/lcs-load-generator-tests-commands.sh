@@ -26,6 +26,12 @@ TEST_DURATION="${TEST_DURATION:-5m}"
 LCS_APP_IMAGE="${LCS_APP_IMAGE:-quay.io/lightspeed-core/lightspeed-stack:dev-latest}"
 MOCK_LLM_IMAGE="${MOCK_LLM_IMAGE:-quay.io/rh-ee-bbodapat/lcs-testing:mock-llm-server}"
 ENABLE_PYROSCOPE="${ENABLE_PYROSCOPE:-true}"
+
+# Use the perf overlay image (with pyroscope-io pre-installed) when profiling is enabled
+if [[ "${ENABLE_PYROSCOPE}" == "true" && -n "${LCS_PERF_IMAGE:-}" ]]; then
+  LCS_APP_IMAGE="${LCS_PERF_IMAGE}"
+  echo "── Using perf overlay image for Pyroscope: ${LCS_APP_IMAGE} ──"
+fi
 ENABLE_MEMRAY="${ENABLE_MEMRAY:-false}"
 LCS_WORKERS="${LCS_WORKERS:-1}"
 ES_INDEX="${ES_BENCHMARK_INDEX:-lcs-perf-results}"
@@ -747,19 +753,19 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
   PYROSCOPE_LOCAL="http://localhost:4040"
 
   # pprof format (importable into Go pprof tools)
-  curl -sS "${PYROSCOPE_LOCAL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=pprof" \
+  curl -sS "${PYROSCOPE_LOCAL}/render?query=lightspeed-stack.cpu%7B%7D&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=pprof" \
     -o "${PROF_DIR}/cpu-profile.pprof" || echo "WARN: Pyroscope pprof export failed"
 
   # HTML flamegraph (viewable in browser from artifacts page)
-  curl -sS "${PYROSCOPE_LOCAL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=html" \
+  curl -sS "${PYROSCOPE_LOCAL}/render?query=lightspeed-stack.cpu%7B%7D&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=html" \
     -o "${PROF_DIR}/cpu-flamegraph.html" || echo "WARN: Pyroscope HTML export failed"
 
   # Collapsed stacks (for flamegraph.pl or speedscope)
-  curl -sS "${PYROSCOPE_LOCAL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=collapsed" \
+  curl -sS "${PYROSCOPE_LOCAL}/render?query=lightspeed-stack.cpu%7B%7D&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=collapsed" \
     -o "${PROF_DIR}/cpu-collapsed.txt" || echo "WARN: Pyroscope collapsed export failed"
 
   # JSON format (for programmatic analysis)
-  curl -sS "${PYROSCOPE_LOCAL}/render?query=process_cpu&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=json" \
+  curl -sS "${PYROSCOPE_LOCAL}/render?query=lightspeed-stack.cpu%7B%7D&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=json" \
     -o "${PROF_DIR}/cpu-profile.json" || echo "WARN: Pyroscope JSON export failed"
 
   # Clean up port-forward
