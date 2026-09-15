@@ -25,6 +25,22 @@ EOF
     exit 0
 fi
 
+# --- Gate --------------------------------------------------------------------
+# The gate step (test phase) creates ${SHARED_DIR}/testsuites_gate. Skip this
+# suite when the file is absent.
+if [[ ! -f "${SHARED_DIR}/testsuites_gate" ]]; then
+    echo "gate does not exist; skipping kata-upstream suite."
+    cat > "${ARTIFACT_DIR}/junit_kata_upstream_skip.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="kata-upstream" tests="1" failures="0" errors="0" skipped="1">
+  <testcase name="kata-upstream" classname="osc.testsuites.kata-upstream" time="0">
+    <skipped message="gate does not exist"/>
+  </testcase>
+</testsuite>
+EOF
+    exit 0
+fi
+
 # --- Configuration -----------------------------------------------------------
 # The upstream test runner lives in the operator repo. We always run the
 # runner from the development branch.
