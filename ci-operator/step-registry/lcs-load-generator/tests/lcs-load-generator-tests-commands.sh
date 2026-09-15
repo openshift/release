@@ -166,7 +166,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: pyroscope
-          image: grafana/pyroscope:latest
+          image: pyroscope/pyroscope:latest
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -752,64 +752,27 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
 
   PYROSCOPE_LOCAL="http://localhost:4040"
 
-  # Grafana Pyroscope query parameters:
-  #   Route:  /pyroscope/render  (NOT /render — the old route returns 404)
-  #   Query:  must use full profile-type ID with label selector; the old
-  #           "app.cpu{}" format fails because hyphens parse as minus.
-  #   Formats: only "json" (flamebearer) and "dot" (graphviz) are supported;
-  #           pprof/html/collapsed silently return JSON.
-  #   Native pprof: use Connect API SelectMergeProfile endpoint.
-  PYRO_QUERY='process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="lightspeed-stack"}'
-  # Convert epoch seconds to milliseconds for the Connect API
-  START_MS="${TEST_START_EPOCH}000"
-  END_MS="${TEST_END_EPOCH}000"
+  # pyroscope/pyroscope (original Pyroscope server) query parameters:
+  #   Route:  /render
+  #   Query:  lightspeed-stack.cpu{} (application_name based)
+  #   Formats: pprof, html (flamegraph), collapsed, json
+  PYRO_QUERY="lightspeed-stack.cpu%7B%7D"
 
-  # JSON flamebearer (for programmatic analysis and visualization)
-  RESP_CODE=$(curl -sS -o "${PROF_DIR}/cpu-profile.json" -w '%{http_code}' \
-    -G "${PYROSCOPE_LOCAL}/pyroscope/render" \
-    --data-urlencode "query=${PYRO_QUERY}" \
-    --data-urlencode "from=${TEST_START_EPOCH}" \
-    --data-urlencode "until=${TEST_END_EPOCH}" \
-    --data-urlencode "format=json") || true
-  if [[ "${RESP_CODE}" != "200" ]] || [[ ! -s "${PROF_DIR}/cpu-profile.json" ]]; then
-    echo "WARN: Pyroscope JSON export failed (HTTP ${RESP_CODE})"
-    rm -f "${PROF_DIR}/cpu-profile.json"
-  else
-    echo "  Saved cpu-profile.json ($(wc -c < "${PROF_DIR}/cpu-profile.json") bytes)"
-  fi
-
-  # Native pprof via Connect API (JSON transport — returns pprof protobuf in JSON encoding)
-  # This is the only way to get real pprof data from grafana/pyroscope;
-  # /pyroscope/render?format=pprof silently returns JSON flamebearer instead.
-  RESP_CODE=$(curl -sS -o "${PROF_DIR}/cpu-profile.pprof.json" -w '%{http_code}' \
-    -X POST "${PYROSCOPE_LOCAL}/querier.v1.QuerierService/SelectMergeProfile" \
-    -H "Content-Type: application/json" \
-    -d "{\"profile_typeID\":\"process_cpu:cpu:nanoseconds:cpu:nanoseconds\",\"label_selector\":\"{service_name=\\\"lightspeed-stack\\\"}\",\"start\":\"${START_MS}\",\"end\":\"${END_MS}\"}") || true
-  if [[ "${RESP_CODE}" != "200" ]] || [[ ! -s "${PROF_DIR}/cpu-profile.pprof.json" ]]; then
-    echo "WARN: Pyroscope pprof export via Connect API failed (HTTP ${RESP_CODE})"
-    rm -f "${PROF_DIR}/cpu-profile.pprof.json"
-  else
-    echo "  Saved cpu-profile.pprof.json ($(wc -c < "${PROF_DIR}/cpu-profile.pprof.json") bytes)"
-  fi
-
-  # Graphviz DOT call graph (the only non-JSON format /pyroscope/render supports)
-  RESP_CODE=$(curl -sS -o "${PROF_DIR}/cpu-callgraph.dot" -w '%{http_code}' \
-    -G "${PYROSCOPE_LOCAL}/pyroscope/render" \
-    --data-urlencode "query=${PYRO_QUERY}" \
-    --data-urlencode "from=${TEST_START_EPOCH}" \
-    --data-urlencode "until=${TEST_END_EPOCH}" \
-    --data-urlencode "format=dot") || true
-  if [[ "${RESP_CODE}" != "200" ]] || [[ ! -s "${PROF_DIR}/cpu-callgraph.dot" ]]; then
-    echo "WARN: Pyroscope DOT export failed (HTTP ${RESP_CODE})"
-    rm -f "${PROF_DIR}/cpu-callgraph.dot"
-  else
-    echo "  Saved cpu-callgraph.dot ($(wc -c < "${PROF_DIR}/cpu-callgraph.dot") bytes)"
-  fi
-
-  # Note: grafana/pyroscope /pyroscope/render does not support format=html
-  # or format=collapsed — those silently return JSON. Flamegraph HTML and
-  # collapsed-stack artifacts are not produced; use cpu-profile.json or
-  # cpu-profile.pprof with external tools (speedscope, pprof) instead.
+  # Fetch all four profile formats; each fetch is non-fatal so a profiling
+  # hiccup never crashes the pipeline.
+  for fmt_pair in "pprof:cpu-profile.pprof" "html:cpu-flamegraph.html" \
+                  "collapsed:cpu-collapsed.txt" "json:cpu-profile.json"; do
+    FMT="${fmt_pair%%:*}"
+    FNAME="${fmt_pair##*:}"
+    RESP_CODE=$(curl -sS -o "${PROF_DIR}/${FNAME}" -w '%{http_code}' \
+      "${PYROSCOPE_LOCAL}/render?query=${PYRO_QUERY}&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=${FMT}") || true
+    if [[ "${RESP_CODE}" != "200" ]] || [[ ! -s "${PROF_DIR}/${FNAME}" ]]; then
+      echo "WARN: Pyroscope ${FMT} export failed (HTTP ${RESP_CODE})"
+      rm -f "${PROF_DIR}/${FNAME}"
+    else
+      echo "  Saved ${FNAME} ($(wc -c < "${PROF_DIR}/${FNAME}") bytes)"
+    fi
+  done
 
   # Clean up port-forward
   kill "${PF_PID}" 2>/dev/null || true
