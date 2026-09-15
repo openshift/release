@@ -592,11 +592,34 @@ SCRIPT_EOF
   done
 }
 
+# Guest API is on lab L2 (111.x). CI sets HTTP_PROXY for outbound internet; nested_kubeconfig
+# must reach the guest API directly from the mgmt pod network (proxy step runs after create).
+localnet_vlan_guest_cluster_oc_env() {
+  local api_vip="${LOCALNET_VLAN_API_VIP:-192.168.111.32}"
+  local ingress_vip="${LOCALNET_VLAN_INGRESS_VIP:-192.168.111.4}"
+  local lab_no_proxy="192.168.111.0/24,192.168.112.0/24,${api_vip},${ingress_vip}"
+
+  if [[ -n "${NO_PROXY:-}" ]]; then
+    export NO_PROXY="${NO_PROXY},${lab_no_proxy}"
+  else
+    export NO_PROXY="${lab_no_proxy}"
+  fi
+  export no_proxy="${NO_PROXY}"
+  unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
+}
+
+localnet_vlan_guest_oc() {
+  local nested_kc="${SHARED_DIR}/nested_kubeconfig"
+  localnet_vlan_guest_cluster_oc_env
+  KUBECONFIG="${nested_kc}" oc "$@"
+}
+
 # Guest ingress defaults to NodePort on OVN; localnet-vlan dnsmasq points *.apps at the lab
 # ingress VIP (111.x). Publish the router on the worker host network and DNAT the VIP to it.
 localnet_vlan_configure_guest_ingress_hostnetwork() {
   local nested_kc="${SHARED_DIR}/nested_kubeconfig"
   local current_strategy
+  local router_ready=false
 
   if [[ ! -f "${nested_kc}" ]]; then
     echo "ERROR: nested kubeconfig missing at ${nested_kc}" >&2
@@ -605,14 +628,24 @@ localnet_vlan_configure_guest_ingress_hostnetwork() {
 
   echo "Waiting for guest default ingress controller to deploy..."
   for _ in $(seq 1 60); do
-    if KUBECONFIG="${nested_kc}" oc get deployment router-default -n openshift-ingress \
+    if localnet_vlan_guest_oc get deployment router-default -n openshift-ingress \
       -o jsonpath='{.status.readyReplicas}' 2>/dev/null | grep -q '^1$'; then
+      router_ready=true
       break
     fi
     sleep 10
   done
+  if [[ "${router_ready}" != "true" ]]; then
+    echo "WARNING: guest router-default not Ready after wait; continuing ingress HostNetwork patch" >&2
+  fi
 
-  current_strategy=$(KUBECONFIG="${nested_kc}" oc get ingresscontroller default -n openshift-ingress-operator \
+  if ! localnet_vlan_guest_oc auth can-i patch ingresscontroller/default --namespace=openshift-ingress-operator \
+    >/dev/null 2>&1; then
+    echo "ERROR: cannot access guest API with nested kubeconfig (check lab routing and HTTP_PROXY bypass)" >&2
+    return 1
+  fi
+
+  current_strategy=$(localnet_vlan_guest_oc get ingresscontroller default -n openshift-ingress-operator \
     -o jsonpath='{.spec.endpointPublishingStrategy.type}' 2>/dev/null || true)
   if [[ "${current_strategy}" == "HostNetwork" ]]; then
     echo "Guest ingress controller already uses HostNetwork"
@@ -620,27 +653,26 @@ localnet_vlan_configure_guest_ingress_hostnetwork() {
   fi
 
   echo "Patching guest ingress controller to HostNetwork (worker VLAN NIC)..."
-  KUBECONFIG="${nested_kc}" oc patch ingresscontroller default -n openshift-ingress-operator --type=merge -p \
+  localnet_vlan_guest_oc patch ingresscontroller default -n openshift-ingress-operator --type=merge -p \
     '{"spec":{"endpointPublishingStrategy":{"type":"HostNetwork","hostNetwork":{"protocol":"TCP"}}}}'
 
-  KUBECONFIG="${nested_kc}" oc rollout status deployment/router-default -n openshift-ingress --timeout=10m
+  localnet_vlan_guest_oc rollout status deployment/router-default -n openshift-ingress --timeout=10m
 }
 
 localnet_vlan_guest_ingress_worker_ip() {
   local vmi_namespace="$1"
   local vlan_subnet="$2"
   local vlan_octets
-  local nested_kc="${SHARED_DIR}/nested_kubeconfig"
   local router_node worker_ip
 
   vlan_octets="${vlan_subnet%/*}"
   vlan_octets="${vlan_octets%.*}"
 
-  router_node=$(KUBECONFIG="${nested_kc}" oc get pods -n openshift-ingress \
+  router_node=$(localnet_vlan_guest_oc get pods -n openshift-ingress \
     -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default \
     -o jsonpath='{.items[0].spec.nodeName}' 2>/dev/null || true)
   if [[ -n "${router_node}" ]]; then
-    worker_ip=$(localnet_vlan_pick_vlan_worker_ipv4 "${vlan_octets}" < <(KUBECONFIG="${nested_kc}" oc get node "${router_node}" \
+    worker_ip=$(localnet_vlan_pick_vlan_worker_ipv4 "${vlan_octets}" < <(localnet_vlan_guest_oc get node "${router_node}" \
       -o jsonpath='{range .status.addresses[*]}{.address}{"\n"}{end}') || true)
     if [[ -n "${worker_ip}" ]]; then
       echo "${worker_ip}"
@@ -659,22 +691,26 @@ localnet_vlan_guest_ingress_worker_ip() {
 }
 
 localnet_vlan_ingress_dnat_backend_ports() {
-  local nested_kc="${SHARED_DIR}/nested_kubeconfig"
   local strategy
   local np_https np_http
 
-  strategy=$(KUBECONFIG="${nested_kc}" oc get ingresscontroller default -n openshift-ingress-operator \
+  strategy=$(localnet_vlan_guest_oc get ingresscontroller default -n openshift-ingress-operator \
     -o jsonpath='{.spec.endpointPublishingStrategy.type}' 2>/dev/null || true)
   if [[ "${strategy}" == "HostNetwork" ]]; then
     echo "443 80"
     return 0
   fi
 
-  np_https=$(KUBECONFIG="${nested_kc}" oc get svc -n openshift-ingress router-nodeport-default \
+  np_https=$(localnet_vlan_guest_oc get svc -n openshift-ingress router-nodeport-default \
     -o jsonpath='{.spec.ports[?(@.port==443)].nodePort}' 2>/dev/null || true)
-  np_http=$(KUBECONFIG="${nested_kc}" oc get svc -n openshift-ingress router-nodeport-default \
+  np_http=$(localnet_vlan_guest_oc get svc -n openshift-ingress router-nodeport-default \
     -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}' 2>/dev/null || true)
   if [[ -z "${np_https}" || -z "${np_http}" ]]; then
+    if [[ "${LOCALNET_VLAN_INGRESS_HOSTNETWORK:-true}" == "true" ]]; then
+      echo "WARNING: could not read guest ingress NodePort (strategy=${strategy}); assuming HostNetwork 443/80 for DNAT" >&2
+      echo "443 80"
+      return 0
+    fi
     echo "ERROR: could not read openshift-ingress NodePort (strategy=${strategy})" >&2
     return 1
   fi
@@ -1260,7 +1296,7 @@ configure_localnet_multi_egress_prereqs() {
 
   echo "Waiting for guest OVN node pods..."
   for _ in $(seq 1 60); do
-    ovn_ready=$(KUBECONFIG="${nested_kc}" oc get pods -n openshift-ovn-kubernetes \
+    ovn_ready=$(localnet_vlan_guest_oc get pods -n openshift-ovn-kubernetes \
       -l app=ovnkube-node --no-headers 2>/dev/null | grep -c Running || true)
     if [[ "${ovn_ready}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
       echo "All ${ovn_ready} guest OVN node pods are running"
@@ -1271,10 +1307,10 @@ configure_localnet_multi_egress_prereqs() {
   done
 
   echo "Enabling IP forwarding on secondary guest NICs enp2s0..enp${network_count}s0..."
-  for ovn_node_pod in $(KUBECONFIG="${nested_kc}" oc get pods -n openshift-ovn-kubernetes \
+  for ovn_node_pod in $(localnet_vlan_guest_oc get pods -n openshift-ovn-kubernetes \
     -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
     for i in $(seq 2 "${network_count}"); do
-      KUBECONFIG="${nested_kc}" oc exec -n openshift-ovn-kubernetes "${ovn_node_pod}" \
+      localnet_vlan_guest_oc exec -n openshift-ovn-kubernetes "${ovn_node_pod}" \
         -c "${OVN_OVS_CONTAINER}" -- sysctl -w "net.ipv4.conf.enp${i}s0.forwarding=1" 2>/dev/null || true
     done
     echo "Enabled secondary NIC forwarding on guest ${ovn_node_pod}"
