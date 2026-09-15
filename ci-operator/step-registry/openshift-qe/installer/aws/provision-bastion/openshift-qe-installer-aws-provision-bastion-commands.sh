@@ -385,11 +385,22 @@ set -o errexit
 set -o pipefail
 
 echo "--- Installing system packages ---"
-# iproute provides ip and bridge (bridge vlan) used by setup/cleanup scripts
-# jq, wget, git are often preinstalled on AL2023 — install only if missing
-for pkg in iproute jq wget git; do
+# iproute: ip/bridge for FRR setup scripts
+# tar: extract kube-burner-ocp binary in e2e-benchmarking run.sh
+# util-linux: uuidgen used by run.sh when UUID is not preset
+# jq, wget, git: cluster/FRR tooling and repo clone on bastion
+# python3: e2e-benchmarking utils/index.sh (metadata indexing helpers)
+# curl: AL2023 ships curl-minimal (provides /usr/bin/curl); do not install full curl.
+for pkg in iproute jq wget git tar util-linux python3; do
   rpm -q "${pkg}" &>/dev/null || dnf install -y "${pkg}"
 done
+if ! command -v curl &>/dev/null; then
+  rpm -q curl-minimal &>/dev/null || dnf install -y curl-minimal
+fi
+if ! command -v curl &>/dev/null; then
+  echo "ERROR: curl not available after package install" >&2
+  exit 1
+fi
 
 # podman is not in the default AL2023 repos; enable SPAL first.
 # https://docs.aws.amazon.com/linux/al2023/ug/spal.html
@@ -412,6 +423,9 @@ echo "go: $(go version)"
 
 echo "--- Tool versions ---"
 command -v podman >/dev/null && podman --version
+command -v curl >/dev/null && curl --version | head -1
+command -v uuidgen >/dev/null && uuidgen >/dev/null && echo "uuidgen: ok"
+command -v python3 >/dev/null && python3 --version
 ip -V 2>/dev/null || true
 command -v bridge >/dev/null && bridge -V 2>/dev/null || true
 jq --version

@@ -1,0 +1,1 @@
+../openshift-qe-bgp-setup-commands.sh

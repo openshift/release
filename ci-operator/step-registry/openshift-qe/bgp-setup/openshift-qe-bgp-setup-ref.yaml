@@ -1,0 +1,47 @@
+ref:
+  as: openshift-qe-bgp-setup
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: NETWORK_WORKLOAD
+    default: ""
+    documentation: |-
+      Workload selector for BGP setup branching. Use openshift-qe-bgp-setup-evpn or
+      openshift-qe-bgp-setup-udn-bgp refs instead of this generic ref.
+  - name: FRR_IMAGE
+    default: "quay.io/frrouting/frr:10.4.1"
+    documentation: |-
+      FRR container image for upgrading frr-k8s daemonset (EVPN only)
+  - name: EXTERNAL_WEBSERVER_IP
+    default: "172.27.187.82"
+    documentation: |-
+      External webserver anycast IP used for EVPN bastion FRR VRF setup
+  - name: ITERATIONS
+    default: "72"
+    documentation: |-
+      Iteration/CUDN count used for EVPN external FRR VRF setup on bastion
+  - name: L3VNI_START
+    default: "100"
+    documentation: |-
+      Starting L3 VNI for EVPN external FRR VRF setup on bastion
+  - name: L2VNI_START
+    default: "20000"
+    documentation: |-
+      Starting L2 VNI for EVPN east-west CUDN macVRF and external bastion VXLAN/FRR setup
+  - name: VTEP_CIDR
+    default: "198.18.0.0/24"
+    documentation: |-
+      Fallback CIDR for the EVPN VTEP resource on baremetal. On AWS the VTEP is
+      created by openshift-qe-installer-aws-provision-bastion.
+  commands: openshift-qe-bgp-setup-commands.sh
+  timeout: 2h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  documentation: >-
+    Shared BGP/FRR bastion setup for perfscale network workloads. Branches on
+    NETWORK_WORKLOAD (evpn or udn-bgp). Prefer the workload-specific child refs.
