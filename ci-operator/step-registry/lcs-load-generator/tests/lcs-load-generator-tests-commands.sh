@@ -50,6 +50,11 @@ PYROSCOPE_URL="http://pyroscope.${PYROSCOPE_NAMESPACE}.svc.cluster.local:4040"
 
 ES_SERVER_HOST="search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
+# Single UUID shared between the load generator Job and the log_fingerprint
+# metadata document so Orion can join lcs-perf-results with perf_scale_ci.
+TEST_UUID="$(uuidgen)"
+export TEST_UUID
+
 RUNTIME_TMP_DIR=$(mktemp -d)
 chmod 700 "${RUNTIME_TMP_DIR}"
 trap 'rm -rf "${RUNTIME_TMP_DIR}"' EXIT
@@ -649,7 +654,7 @@ spec:
             - name: LOCUST_PROCESSES
               value: "${LOCUST_PROCESSES}"
             - name: TEST_UUID
-              value: ""
+              value: "${TEST_UUID}"
             - name: REQUEST_TIMEOUT
               value: "${REQUEST_TIMEOUT}"
             - name: RESULTS_DIR
@@ -755,7 +760,6 @@ if [[ -n "${LATEST_E2E_TAG}" ]] && \
      https://github.com/cloud-bulldozer/e2e-benchmarking.git \
      "${RUNTIME_TMP_DIR}/e2e-benchmarking" 2>&1; then
 
-  FINGERPRINT_UUID=$(uuidgen)
   JOB_START_TS=$(date -u -d "@${TEST_START_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ")
   JOB_END_TS=$(date -u -d "@${TEST_END_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -763,14 +767,14 @@ if [[ -n "${LATEST_E2E_TAG}" ]] && \
   env BENCHMARK="lcs-load-generator" \
       WORKLOAD="lcs-load-generator" \
       ES_SERVER="${ES_SERVER}" \
-      UUID="${FINGERPRINT_UUID}" \
+      UUID="${TEST_UUID}" \
       JOB_START="${JOB_START_TS}" \
       JOB_END="${JOB_END_TS}" \
       JOB_STATUS="success" \
       ./index.sh || echo "WARN: Fingerprint index.sh failed — continuing"
   popd >/dev/null
 
-  echo "  Fingerprint logged (UUID=${FINGERPRINT_UUID})"
+  echo "  Fingerprint logged (UUID=${TEST_UUID})"
 else
   echo "WARN: Failed to clone e2e-benchmarking — skipping fingerprint"
 fi
