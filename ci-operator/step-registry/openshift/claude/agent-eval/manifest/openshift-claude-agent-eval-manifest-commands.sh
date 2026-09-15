@@ -913,7 +913,7 @@ stop_runner() {
     wait "${runner_pid}" || true
     exit "$1"
 }
-python3 "${runner_dir}/manifest_runner.py" --input legacy &
+python3 "${runner_dir}/manifest_runner.py" --input manifest &
 runner_pid=$!
 trap 'stop_runner 143' TERM
 trap 'stop_runner 130' INT
