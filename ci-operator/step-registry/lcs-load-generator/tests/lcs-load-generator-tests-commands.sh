@@ -752,21 +752,64 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
 
   PYROSCOPE_LOCAL="http://localhost:4040"
 
-  # pprof format (importable into Go pprof tools)
-  curl -sS "${PYROSCOPE_LOCAL}/render?query=lightspeed-stack.cpu%7B%7D&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=pprof" \
-    -o "${PROF_DIR}/cpu-profile.pprof" || echo "WARN: Pyroscope pprof export failed"
+  # Grafana Pyroscope query parameters:
+  #   Route:  /pyroscope/render  (NOT /render — the old route returns 404)
+  #   Query:  must use full profile-type ID with label selector; the old
+  #           "app.cpu{}" format fails because hyphens parse as minus.
+  #   Formats: only "json" (flamebearer) and "dot" (graphviz) are supported;
+  #           pprof/html/collapsed silently return JSON.
+  #   Native pprof: use Connect API SelectMergeProfile endpoint.
+  PYRO_QUERY='process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="lightspeed-stack"}'
+  # Convert epoch seconds to milliseconds for the Connect API
+  START_MS="${TEST_START_EPOCH}000"
+  END_MS="${TEST_END_EPOCH}000"
 
-  # HTML flamegraph (viewable in browser from artifacts page)
-  curl -sS "${PYROSCOPE_LOCAL}/render?query=lightspeed-stack.cpu%7B%7D&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=html" \
-    -o "${PROF_DIR}/cpu-flamegraph.html" || echo "WARN: Pyroscope HTML export failed"
+  # JSON flamebearer (for programmatic analysis and visualization)
+  RESP_CODE=$(curl -sS -o "${PROF_DIR}/cpu-profile.json" -w '%{http_code}' \
+    -G "${PYROSCOPE_LOCAL}/pyroscope/render" \
+    --data-urlencode "query=${PYRO_QUERY}" \
+    --data-urlencode "from=${TEST_START_EPOCH}" \
+    --data-urlencode "until=${TEST_END_EPOCH}" \
+    --data-urlencode "format=json") || true
+  if [[ "${RESP_CODE}" != "200" ]] || [[ ! -s "${PROF_DIR}/cpu-profile.json" ]]; then
+    echo "WARN: Pyroscope JSON export failed (HTTP ${RESP_CODE})"
+    rm -f "${PROF_DIR}/cpu-profile.json"
+  else
+    echo "  Saved cpu-profile.json ($(wc -c < "${PROF_DIR}/cpu-profile.json") bytes)"
+  fi
 
-  # Collapsed stacks (for flamegraph.pl or speedscope)
-  curl -sS "${PYROSCOPE_LOCAL}/render?query=lightspeed-stack.cpu%7B%7D&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=collapsed" \
-    -o "${PROF_DIR}/cpu-collapsed.txt" || echo "WARN: Pyroscope collapsed export failed"
+  # Native pprof via Connect API (JSON transport — returns pprof protobuf in JSON encoding)
+  # This is the only way to get real pprof data from grafana/pyroscope;
+  # /pyroscope/render?format=pprof silently returns JSON flamebearer instead.
+  RESP_CODE=$(curl -sS -o "${PROF_DIR}/cpu-profile.pprof.json" -w '%{http_code}' \
+    -X POST "${PYROSCOPE_LOCAL}/querier.v1.QuerierService/SelectMergeProfile" \
+    -H "Content-Type: application/json" \
+    -d "{\"profile_typeID\":\"process_cpu:cpu:nanoseconds:cpu:nanoseconds\",\"label_selector\":\"{service_name=\\\"lightspeed-stack\\\"}\",\"start\":\"${START_MS}\",\"end\":\"${END_MS}\"}") || true
+  if [[ "${RESP_CODE}" != "200" ]] || [[ ! -s "${PROF_DIR}/cpu-profile.pprof.json" ]]; then
+    echo "WARN: Pyroscope pprof export via Connect API failed (HTTP ${RESP_CODE})"
+    rm -f "${PROF_DIR}/cpu-profile.pprof.json"
+  else
+    echo "  Saved cpu-profile.pprof.json ($(wc -c < "${PROF_DIR}/cpu-profile.pprof.json") bytes)"
+  fi
 
-  # JSON format (for programmatic analysis)
-  curl -sS "${PYROSCOPE_LOCAL}/render?query=lightspeed-stack.cpu%7B%7D&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=json" \
-    -o "${PROF_DIR}/cpu-profile.json" || echo "WARN: Pyroscope JSON export failed"
+  # Graphviz DOT call graph (the only non-JSON format /pyroscope/render supports)
+  RESP_CODE=$(curl -sS -o "${PROF_DIR}/cpu-callgraph.dot" -w '%{http_code}' \
+    -G "${PYROSCOPE_LOCAL}/pyroscope/render" \
+    --data-urlencode "query=${PYRO_QUERY}" \
+    --data-urlencode "from=${TEST_START_EPOCH}" \
+    --data-urlencode "until=${TEST_END_EPOCH}" \
+    --data-urlencode "format=dot") || true
+  if [[ "${RESP_CODE}" != "200" ]] || [[ ! -s "${PROF_DIR}/cpu-callgraph.dot" ]]; then
+    echo "WARN: Pyroscope DOT export failed (HTTP ${RESP_CODE})"
+    rm -f "${PROF_DIR}/cpu-callgraph.dot"
+  else
+    echo "  Saved cpu-callgraph.dot ($(wc -c < "${PROF_DIR}/cpu-callgraph.dot") bytes)"
+  fi
+
+  # Note: grafana/pyroscope /pyroscope/render does not support format=html
+  # or format=collapsed — those silently return JSON. Flamegraph HTML and
+  # collapsed-stack artifacts are not produced; use cpu-profile.json or
+  # cpu-profile.pprof with external tools (speedscope, pprof) instead.
 
   # Clean up port-forward
   kill "${PF_PID}" 2>/dev/null || true
