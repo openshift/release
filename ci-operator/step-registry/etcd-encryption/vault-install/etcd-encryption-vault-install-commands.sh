@@ -1,7 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+if [[ -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/kubeconfig" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
 
 resolve_image_repo() {
   local image="$1"
@@ -72,7 +74,7 @@ mirror_vault_images() {
   echo "Mirroring vault images to local registry (multi-arch manifest list)..."
   echo "  ${vault_enterprise_src} -> ${vault_enterprise_dst}"
   echo "  ${vault_kms_src} -> ${vault_kms_dst}"
-  echo "  verification: skopeo inspect / podman pull after skopeo copy --all"
+  echo "  verification: skopeo inspect / podman pull --platform (detected arch) after mirror"
 
   # shellcheck disable=SC2087
   ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
@@ -95,6 +97,17 @@ registry_auth_header() {
 vault_image_mirror_complete() {
   local image="\$1"
   local pull_args=(--authfile "\${REGISTRY_CONFIG}")
+  local arch platform
+
+  # Detect architecture: x86_64->amd64, aarch64->arm64, etc.
+  arch="\$(uname -m)"
+  case "\${arch}" in
+    x86_64) platform="linux/amd64" ;;
+    aarch64) platform="linux/arm64" ;;
+    ppc64le) platform="linux/ppc64le" ;;
+    s390x) platform="linux/s390x" ;;
+    *) platform="linux/amd64" ;;
+  esac
 
   if command -v skopeo >/dev/null 2>&1; then
     if skopeo inspect --authfile "\${REGISTRY_CONFIG}" --tls-verify=false "docker://\${image}" >/dev/null 2>&1; then
@@ -104,18 +117,15 @@ vault_image_mirror_complete() {
     return 1
   fi
 
+  # Pull for the detected platform to verify the multi-arch manifest list was mirrored correctly
   podman rmi "\${image}" >/dev/null 2>&1 || true
-  if podman pull "\${pull_args[@]}" "\${image}" >/dev/null 2>&1; then
+  if podman pull "\${pull_args[@]}" --platform="\${platform}" --tls-verify=false "\${image}" >/dev/null 2>&1; then
+    echo "Mirror verification succeeded: podman pull --platform=\${platform} \${image}"
     podman rmi "\${image}" >/dev/null 2>&1 || true
     return 0
   fi
 
-  if podman pull "\${pull_args[@]}" --tls-verify=false "\${image}" >/dev/null 2>&1; then
-    podman rmi "\${image}" >/dev/null 2>&1 || true
-    return 0
-  fi
-
-  echo "Mirror verification failed: podman pull \${image}"
+  echo "Mirror verification failed: podman pull --platform=\${platform} \${image}"
   return 1
 }
 
@@ -343,9 +353,18 @@ setup_packet_cluster() {
     # Always mirror on baremetal. Nodes often lack IPv6 egress to quay.io even when
     # DS_IP_STACK=v4 (connected), while pods still use IPv6 addresses. The dev-scripts
     # local registry is reachable from all metal nodes regardless of IP stack.
-    echo "mirroring Vault to local registry"
-    mirror_vault_images
-    apply_vault_icsp
+    if [[ "${SKIP_VAULT_MIRROR:-}" == "true" ]]; then
+      echo "SKIP_VAULT_MIRROR=true; skipping image mirror and ICSP (images must already be reachable)"
+      if [[ -n "${DS_REGISTRY:-}" ]]; then
+        VAULT_IMAGE_REPOSITORY="${DS_REGISTRY}/localimages/vault-enterprise"
+        export VAULT_IMAGE_REPOSITORY
+        echo "Using mirrored Vault image repository: ${VAULT_IMAGE_REPOSITORY}"
+      fi
+    else
+      echo "mirroring Vault to local registry"
+      mirror_vault_images
+      apply_vault_icsp
+    fi
   fi
 }
 
@@ -402,6 +421,56 @@ pick_vault_node() {
   echo "${node}"
 }
 
+vault_scc_name() {
+  # hostPath volumes on RHCOS bare metal need hostmount-anyuid so the Vault
+  # pod (uid 100, fsGroup 1000) can write through a hostPath mount.
+  if [[ "${CLUSTER_TYPE:-}" == "equinix-ocp-metal" ]]; then
+    echo "hostmount-anyuid"
+    return
+  fi
+  # HashiCorp Vault runs as uid 100 in its image. The upstream Helm docs for
+  # OpenShift grant anyuid to the Vault service account; restricted SCC rejects
+  # that uid/fsGroup pairing on cloud platforms.
+  echo "anyuid"
+}
+
+vault_server_platform_values_block() {
+  # vault-helm 0.28 skips pod securityContext when global.openshift is true.
+  # Vault Enterprise expects uid 100 / gid 1000 and the chart mounts the license
+  # secret with defaultMode 0440, which requires fsGroup 1000 to be readable.
+  cat <<EOF
+  updateStrategyType: RollingUpdate
+  statefulSet:
+    securityContext:
+      pod:
+        runAsUser: 100
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsNonRoot: true
+      container:
+        allowPrivilegeEscalation: false
+EOF
+}
+
+# Prepare the host directory before the PV is bound so Vault can persist its
+# keyring under /vault/data (file backend). DirectoryOrCreate alone leaves
+# root:root with the wrong SELinux context on bare metal nodes.
+prepare_vault_host_path() {
+  local node="$1"
+  local host_path="$2"
+
+  echo "Preparing hostPath ${host_path} on node ${node}..."
+  oc debug -n default "node/${node}" --quiet -- chroot /host bash -c "
+    set -euo pipefail
+    mkdir -p '${host_path}'
+    chown -R 100:1000 '${host_path}'
+    chmod -R g+rwX '${host_path}'
+    if command -v chcon >/dev/null 2>&1; then
+      chcon -Rt container_file_t '${host_path}' || echo 'warning: chcon failed for ${host_path}'
+    fi
+  "
+}
+
 ensure_vault_local_storage_class() {
   local storage_class="$1"
 
@@ -431,14 +500,16 @@ ensure_vault_local_pv() {
   local host_path="/var/lib/vault-kms/${namespace}/${release_name}"
   local node
 
-  if oc get pv "${pv_name}" >/dev/null 2>&1; then
-    return 0
-  fi
-
   wait_until "pvc ${pvc_name} in ${namespace}" 60 2 \
     oc get "pvc/${pvc_name}" -n "${namespace}"
 
   node="$(pick_vault_node)"
+  prepare_vault_host_path "${node}" "${host_path}"
+
+  if oc get pv "${pv_name}" >/dev/null 2>&1; then
+    return 0
+  fi
+
   echo "Creating local PersistentVolume ${pv_name} on node ${node} for ${namespace}/${pvc_name}..."
   oc apply -f - <<EOF
 apiVersion: v1
@@ -470,8 +541,6 @@ spec:
 EOF
 }
 
-VAULT_SECRET_UNSEAL_KEY_PATH="/vault/secrets/unseal/unseal-key"
-
 vault_exec() {
   local namespace="$1"
   local pod_name="$2"
@@ -490,12 +559,15 @@ setup_vault_namespace() {
   echo "Creating namespace ${namespace}..."
   oc create namespace "${namespace}" --dry-run=client -o yaml | oc apply -f -
 
-  echo "Adding restricted SCC for Vault service account..."
-  oc adm policy add-scc-to-user restricted -z "${release_name}" -n "${namespace}"
+  local vault_scc
+  vault_scc="$(vault_scc_name)"
+  echo "Adding ${vault_scc} SCC for Vault service account (CLUSTER_TYPE=${CLUSTER_TYPE:-unset})..."
+  oc adm policy add-scc-to-user "${vault_scc}" -z "${release_name}" -n "${namespace}"
 
   echo "Creating Vault license secret from mounted credential..."
+  VAULT_LICENSE_FILE="${VAULT_LICENSE_FILE:-/var/run/vault/tests-private-account/kms-vault-license}"
   oc create secret generic "${VAULT_LICENSE_SECRET_NAME}" \
-    --from-file=license=/var/run/vault/tests-private-account/kms-vault-license \
+    --from-file=license="${VAULT_LICENSE_FILE}" \
     -n "${namespace}" \
     --dry-run=client -o yaml | oc apply -f -
 }
@@ -525,21 +597,54 @@ store_vault_init_secrets() {
   fi
 }
 
+read_vault_unseal_key() {
+  local namespace="$1"
+
+  # Disable tracing due to password handling
+  local WAS_TRACING=false
+  [[ $- == *x* ]] && WAS_TRACING=true
+  set +x
+  local unseal_key
+  unseal_key="$(oc get secret vault-unseal-key -n "${namespace}" -o jsonpath='{.data.unseal-key}' | base64 -d)"
+  if [[ "${WAS_TRACING}" == true ]]; then
+    set -x
+  fi
+  if [[ -z "${unseal_key}" ]]; then
+    echo "Error: vault-unseal-key secret is empty in ${namespace}"
+    return 1
+  fi
+  printf '%s' "${unseal_key}"
+}
+
 unseal_vault() {
   local namespace="$1"
   local pod_name="$2"
+  local unseal_key
 
-  vault_exec "${namespace}" "${pod_name}" sh -c \
-    "test -s '${VAULT_SECRET_UNSEAL_KEY_PATH}' && vault operator unseal \"\$(cat '${VAULT_SECRET_UNSEAL_KEY_PATH}')\" >/dev/null"
+  # Secrets are optional at pod start and do not hot-reload into running pods.
+  # Read the key from the API and pass it to vault operator unseal directly.
+  unseal_key="$(read_vault_unseal_key "${namespace}")"
+  vault_exec "${namespace}" "${pod_name}" vault operator unseal "${unseal_key}" >/dev/null
+  unset unseal_key
 }
 
-wait_for_mounted_secret() {
+vault_is_unsealed() {
   local namespace="$1"
   local pod_name="$2"
-  local secret_path="$3"
+  local status_rc=0
 
-  wait_until "mounted secret at ${secret_path}" 60 2 \
-    vault_exec "${namespace}" "${pod_name}" test -s "${secret_path}"
+  set +e
+  vault_exec "${namespace}" "${pod_name}" vault status >/dev/null 2>&1
+  status_rc=$?
+  set -e
+  [[ "${status_rc}" -eq 0 ]]
+}
+
+wait_for_vault_unsealed() {
+  local namespace="$1"
+  local pod_name="$2"
+
+  wait_until "Vault unsealed on ${pod_name}" 60 5 vault_is_unsealed "${namespace}" "${pod_name}"
 }
 
 wait_for_vault_listener() {
@@ -595,8 +700,8 @@ initialize_or_unseal_vault() {
       exit 1
     fi
     echo "Unsealing Vault with stored key..."
-    wait_for_mounted_secret "${namespace}" "${pod_name}" "${VAULT_SECRET_UNSEAL_KEY_PATH}"
     unseal_vault "${namespace}" "${pod_name}"
+    wait_for_vault_unsealed "${namespace}" "${pod_name}"
     return 0
   fi
 
@@ -611,8 +716,154 @@ initialize_or_unseal_vault() {
   if [[ "${was_tracing}" == true ]]; then
     set -x
   fi
-  wait_for_mounted_secret "${namespace}" "${pod_name}" "${VAULT_SECRET_UNSEAL_KEY_PATH}"
   unseal_vault "${namespace}" "${pod_name}"
+  wait_for_vault_unsealed "${namespace}" "${pod_name}"
+
+  # Init secrets are created after the TLS restart pod is already running. Kubernetes
+  # does not hot-reload optional secret volumes, so recreate the pod once so the
+  # auto-unseal sidecar mounts vault-unseal-key. This is separate from the earlier
+  # StatefulSet restart that mounts the service-CA TLS certificate.
+  echo "Recreating ${pod_name} so init secrets mount for auto-unseal sidecar..."
+  oc delete pod "${pod_name}" -n "${namespace}" --wait=false
+  wait_for_vault_pod_created "${namespace}" "${pod_name}"
+  oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
+  wait_for_vault_listener "${namespace}" "${pod_name}"
+  wait_for_vault_unsealed "${namespace}" "${pod_name}"
+}
+
+restart_vault_statefulset() {
+  local namespace="$1"
+  local release_name="$2"
+
+  echo "Restarting StatefulSet ${release_name} to mount service-CA TLS..."
+  oc patch statefulset "${release_name}" -n "${namespace}" --type merge -p \
+    "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"vault.hashicorp.com/restartedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}}}}"
+}
+
+describe_vault_workload() {
+  local namespace="$1"
+  local pod_name="$2"
+  local release_name="${pod_name%-0}"
+
+  oc get statefulset,pod,pvc -n "${namespace}" || true
+  oc describe "statefulset/${release_name}" -n "${namespace}" || true
+  oc get events -n "${namespace}" --sort-by='.lastTimestamp' | tail -30 || true
+}
+
+wait_for_vault_pod_created() {
+  local namespace="$1"
+  local pod_name="$2"
+  local release_name="${pod_name%-0}"
+
+  vault_pod_exists() {
+    oc get "pod/${pod_name}" -n "${namespace}" >/dev/null 2>&1
+  }
+
+  statefulset_pod_create_failed() {
+    oc get events -n "${namespace}" \
+      --field-selector "involvedObject.name=${release_name},involvedObject.kind=StatefulSet" \
+      --sort-by='.lastTimestamp' 2>/dev/null \
+      | tail -3 \
+      | grep -Fq 'FailedCreate'
+  }
+
+  echo "Waiting for Vault pod ${pod_name} to be created..."
+  local i=0
+  while ! vault_pod_exists; do
+    if statefulset_pod_create_failed; then
+      echo "StatefulSet ${release_name} cannot create pod ${pod_name}"
+      describe_vault_workload "${namespace}" "${pod_name}"
+      return 1
+    fi
+    i=$((i + 1))
+    if [[ "${i}" -ge 120 ]]; then
+      echo "Timed out waiting for pod ${pod_name}"
+      describe_vault_workload "${namespace}" "${pod_name}"
+      return 1
+    fi
+    sleep 5
+  done
+
+  oc get "pod/${pod_name}" -n "${namespace}" -o wide || true
+  return 0
+}
+
+wait_for_vault_pod_running() {
+  local namespace="$1"
+  local pod_name="$2"
+
+  wait_for_vault_pod_created "${namespace}" "${pod_name}" || return 1
+
+  # WaitForFirstConsumer storage binds once the pod is scheduled to a node.
+  if ! oc wait --for=condition=PodScheduled "pod/${pod_name}" -n "${namespace}" --timeout=10m; then
+    echo "Vault pod ${pod_name} was not scheduled"
+    oc describe "pod/${pod_name}" -n "${namespace}" || true
+    oc get events -n "${namespace}" --field-selector "involvedObject.name=${pod_name}" --sort-by='.lastTimestamp' || true
+    return 1
+  fi
+
+  if oc wait --for=jsonpath='{.status.phase}'=Running "pod/${pod_name}" -n "${namespace}" --timeout=10m; then
+    return 0
+  fi
+
+  echo "Vault pod did not reach Running phase"
+  oc get "pod/${pod_name}" -n "${namespace}" -o wide || true
+  oc describe "pod/${pod_name}" -n "${namespace}" || true
+  oc get events -n "${namespace}" --field-selector "involvedObject.name=${pod_name}" --sort-by='.lastTimestamp' || true
+  for container in $(oc get "pod/${pod_name}" -n "${namespace}" -o jsonpath='{.spec.initContainers[*].name}{"\n"}{.spec.containers[*].name}' 2>/dev/null); do
+    echo "--- logs: ${container} ---"
+    oc logs "pod/${pod_name}" -n "${namespace}" -c "${container}" --tail=80 || true
+  done
+  return 1
+}
+
+describe_vault_data_pvc() {
+  local namespace="$1"
+  local pod_name="$2"
+
+  oc get storageclass || true
+  oc describe "pvc/data-${pod_name}" -n "${namespace}" || true
+}
+
+wait_for_vault_data_pvc_bound() {
+  local namespace="$1"
+  local pod_name="$2"
+
+  echo "Waiting for persistent volume claim data-${pod_name} to bind..."
+  wait_until "pvc data-${pod_name}" 60 5 oc get "pvc/data-${pod_name}" -n "${namespace}"
+  if ! oc wait --for=jsonpath='{.status.phase}'=Bound "pvc/data-${pod_name}" -n "${namespace}" --timeout=10m; then
+    echo "PVC data-${pod_name} did not bind"
+    describe_vault_data_pvc "${namespace}" "${pod_name}"
+    return 1
+  fi
+  return 0
+}
+
+# Metal uses a pre-created hostPath PV (Immediate binding). Cloud defaults such as
+# GKE standard-csi use WaitForFirstConsumer, so the PVC stays Pending until the
+# StatefulSet pod is scheduled as the first consumer.
+wait_for_vault_data_volume() {
+  local namespace="$1"
+  local pod_name="$2"
+  local vault_storage_class="$3"
+
+  wait_until "pvc data-${pod_name}" 60 5 oc get "pvc/data-${pod_name}" -n "${namespace}"
+
+  if [[ -n "${vault_storage_class}" ]]; then
+    wait_for_vault_data_pvc_bound "${namespace}" "${pod_name}" || return 1
+    echo "Waiting for Vault pod to be Running..."
+    wait_for_vault_pod_running "${namespace}" "${pod_name}"
+    return $?
+  fi
+
+  echo "Waiting for Vault pod to schedule (WaitForFirstConsumer PVC binding)..."
+  wait_for_vault_pod_running "${namespace}" "${pod_name}" || return 1
+
+  if ! oc wait --for=jsonpath='{.status.phase}'=Bound "pvc/data-${pod_name}" -n "${namespace}" --timeout=2m; then
+    echo "Warning: PVC data-${pod_name} is not Bound after pod reached Running"
+    describe_vault_data_pvc "${namespace}" "${pod_name}"
+  fi
+  return 0
 }
 
 # Install a Vault Enterprise instance in the given namespace.
@@ -636,12 +887,19 @@ install_vault() {
   local vault_service_fqdn="${release_name}.${namespace}.svc"
   local values_file="/tmp/vault-values-${namespace}.yaml"
   local vault_image="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
-  local vault_storage_class data_storage_block
+  local vault_storage_class data_storage_block server_platform_block
 
   vault_storage_class="$(resolve_vault_storage_class)"
+  server_platform_block="$(vault_server_platform_values_block)"
+  if [[ "${CLUSTER_TYPE:-}" == "equinix-ocp-metal" ]]; then
+    echo "Vault platform profile: bare metal (hostmount-anyuid, uid/fsGroup 100/1000)"
+  else
+    echo "Vault platform profile: cloud (anyuid SCC, uid/fsGroup 100/1000)"
+  fi
   if [[ -n "${vault_storage_class}" ]]; then
     echo "Using StorageClass ${vault_storage_class} for Vault file storage"
     ensure_vault_local_storage_class "${vault_storage_class}"
+    prepare_vault_host_path "$(pick_vault_node)" "/var/lib/vault-kms/${namespace}/${release_name}"
     data_storage_block="$(cat <<EOF
   dataStorage:
     enabled: true
@@ -670,6 +928,7 @@ server:
   image:
     repository: ${VAULT_IMAGE_REPOSITORY}
     tag: "${VAULT_VERSION}"
+${server_platform_block}
   standalone:
     enabled: true
     config: |
@@ -693,6 +952,7 @@ ${data_storage_block}
     - name: tls
       secret:
         secretName: ${serving_cert}
+        optional: true
     - name: unseal-key
       secret:
         secretName: vault-unseal-key
@@ -747,6 +1007,18 @@ EOF
     -f "${values_file}" \
     --timeout 10m
 
+  echo "Vault Helm platform settings:"
+  grep -E 'updateStrategyType|securityContext|runAsUser|fsGroup|runAsGroup' "${values_file}" || true
+  echo "Vault StatefulSet pod securityContext:"
+  oc get statefulset "${release_name}" -n "${namespace}" \
+    -o jsonpath='{.spec.template.spec.securityContext}{"\n"}' 2>/dev/null || true
+
+  # Request the serving cert after Helm creates the Service. The TLS volume is
+  # optional at install time so the StatefulSet pod can be created immediately.
+  echo "Requesting service-CA serving certificate for ${vault_service_fqdn}..."
+  oc annotate service "${release_name}" -n "${namespace}" \
+    "service.beta.openshift.io/serving-cert-secret-name=${serving_cert}" --overwrite
+
   if [[ -n "${vault_storage_class}" ]]; then
     ensure_vault_local_pv "${namespace}" "${release_name}" "${pod_name}" "${vault_storage_class}"
   fi
@@ -754,10 +1026,6 @@ EOF
   # Chart 0.28.1 copies server.service.annotations onto both the client Service
   # and vault-internal. Annotate only the client Service so the serving cert is
   # valid for vault.vault-kms.svc, which is what the KMS tests connect to.
-  echo "Requesting service-CA serving certificate for ${vault_service_fqdn}..."
-  oc annotate service "${release_name}" -n "${namespace}" \
-    "service.beta.openshift.io/serving-cert-secret-name=${serving_cert}" --overwrite
-
   echo "Waiting for serving certificate secret ${serving_cert}..."
   wait_until "serving certificate secret ${serving_cert}" 60 5 \
     oc get secret "${serving_cert}" -n "${namespace}"
@@ -775,20 +1043,11 @@ EOF
     exit 1
   fi
 
-  # Do not delete the pod to "pick up" the cert. The TLS secret is a required
-  # volume, so the pod stays pending until the cert exists and then starts once
-  # with the correct SAN already mounted.
-  echo "Waiting for persistent volume claim data-${pod_name}..."
-  wait_until "pvc data-${pod_name}" 60 5 oc get "pvc/data-${pod_name}" -n "${namespace}"
-  if ! oc wait --for=jsonpath='{.status.phase}'=Bound "pvc/data-${pod_name}" -n "${namespace}" --timeout=10m; then
-    echo "PVC data-${pod_name} did not bind"
-    oc get storageclass || true
-    oc describe "pvc/data-${pod_name}" -n "${namespace}" || true
-    exit 1
-  fi
-
-  echo "Waiting for Vault pod to be Running..."
-  oc wait --for=jsonpath='{.status.phase}'=Running "pod/${pod_name}" -n "${namespace}" --timeout=10m
+  # Helm references the serving cert before the service is annotated. Mark the volume
+  # optional so the StatefulSet pod is created and can act as the WaitForFirstConsumer
+  # for cloud PVCs, then restart once the service-CA certificate is present.
+  restart_vault_statefulset "${namespace}" "${release_name}"
+  wait_for_vault_data_volume "${namespace}" "${pod_name}" "${vault_storage_class}" || exit 1
 
   echo "Initializing and unsealing Vault..."
   initialize_or_unseal_vault "${namespace}" "${pod_name}"
@@ -867,6 +1126,15 @@ echo ""
 
 record_vault_images
 
+# Source CLUSTER_TYPE early so vault_scc_name() can detect baremetal and use hostmount-anyuid.
+# On non-baremetal clusters, CLUSTER_TYPE won't be set and vault_scc_name() will use anyuid.
+if [[ -n "${CLUSTER_TYPE:-}" && "${CLUSTER_TYPE}" == equinix-ocp-metal ]]; then
+  if [[ -f "${SHARED_DIR}/packet-conf.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/packet-conf.sh"
+  fi
+fi
+
 setup_vault_namespace "${VAULT_NAMESPACE}" "vault"
 setup_vault_namespace "${VAULT_SECONDARY_NAMESPACE}" "vault-secondary"
 
@@ -884,4 +1152,6 @@ echo ""
 setup_packet_cluster
 
 install_vault "${VAULT_NAMESPACE}" "vault-ca-bundle" "vault"
-install_vault "${VAULT_SECONDARY_NAMESPACE}" "vault-ca-bundle-secondary" "vault-secondary"
+if [[ "${VAULT_INSTALL_PRIMARY_ONLY:-}" != "true" ]]; then
+  install_vault "${VAULT_SECONDARY_NAMESPACE}" "vault-ca-bundle-secondary" "vault-secondary"
+fi
