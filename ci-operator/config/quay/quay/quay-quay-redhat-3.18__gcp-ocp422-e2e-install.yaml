@@ -24,8 +24,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: gcp-gcs-3-18-nightly-4-22
-  cron: '@weekly'
+- as: gcp-gcs-nightly
+  cron: '@daily'
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -41,6 +41,7 @@ tests:
         FEATURE_USER_METADATA: true
         FEATURE_IMMUTABLE_TAGS: true
         FEATURE_SPARSE_INDEX: true
+        FEATURE_QUOTA_NOTIFICATIONS: true
         FEATURE_EDIT_QUOTA: true
         FEATURE_CHANGE_TAG_EXPIRATION: true
         FEATURE_IMAGE_PULL_STATS: false
@@ -58,11 +59,17 @@ tests:
           - admin
         GLOBAL_READONLY_SUPER_USERS:
           - readonly
+        FEATURE_OTEL_TRACING: true
+        OTEL_CONFIG:
+          service_name: quay
+          sample_rate: 1.0
+          endpoint: http://jaeger.quay-enterprise.svc.cluster.local:4318/v1/traces
       QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22
       QUAY_OPERATOR_CHANNEL: stable-3.18
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_STORAGE_PROVIDER: gcp
     post:
+    - ref: quay-gather-jaeger-traces
     - ref: quay-deprovision
     - chain: ipi-gcp-post
     test:
@@ -70,6 +77,7 @@ tests:
     - ref: quay-provisioning-tls
     - ref: quay-provisioning-builder
     - ref: quay-deploy-mailpit
+    - ref: quay-deploy-jaeger
     - ref: quay-deploy-gcp-gcs
     - ref: quay-test-e2e
     workflow: ipi-gcp
