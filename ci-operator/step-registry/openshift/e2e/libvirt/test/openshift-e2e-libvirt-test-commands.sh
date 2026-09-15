@@ -52,7 +52,9 @@ function prometheus_var_init() {
 	[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 	set +x
 	TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s || true)
-	$WAS_TRACING && set -x
+	if [[ "${WAS_TRACING}" == true ]]; then
+		set -x
+	fi
 	export HOSTNAME
 	export TOKEN
 }
