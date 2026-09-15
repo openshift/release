@@ -56,7 +56,7 @@ spec:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
-        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release
@@ -64,8 +64,8 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
-        - name: jobs-sparse-checkout
-          mountPath: /etc/git-sync-jobs
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
           readOnly: true
       containers:
       - name: tide
@@ -90,7 +90,7 @@ spec:
         - name: GITHUB_APP_ID
           valueFrom:
             secretKeyRef:
-              name: openshift-prow-github-app
+              name: openshift-merge-bot
               key: appid
         ports:
         - name: main
@@ -106,18 +106,20 @@ spec:
         - name: config
           mountPath: /etc/config
           readOnly: true
+        - name: release
+          mountPath: /var/repo
+        - name: tmp
+          mountPath: /tmp
+        - name: service-account
+          mountPath: /etc/service-account
+          readOnly: true
         - name: combined-jobs
           mountPath: /etc/jobs
         - name: job-configs
           mountPath: /etc/jobs/efs
           readOnly: true
         - name: release
-          mountPath: /etc/jobs/git
-          readOnly: true
-        - name: tmp
-          mountPath: /tmp
-        - name: service-account
-          mountPath: /etc/service-account
+          mountPath: /etc/jobs/release
           readOnly: true
         resources:
           requests:
@@ -131,15 +133,15 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
-        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
-        - name: jobs-sparse-checkout
-          mountPath: /etc/git-sync-jobs
+        - name: sparse-checkout-config
+          mountPath: /etc/git-sync
           readOnly: true
         resources:
           requests:
@@ -153,22 +155,22 @@ spec:
               path: token
       - name: github-app-credentials
         secret:
-          secretName: openshift-prow-github-app
+          secretName: openshift-merge-bot
       - name: config
         configMap:
           name: config
       - name: release
         emptyDir: {}
-      - name: combined-jobs
-        emptyDir: {}
-      - name: job-configs
-        persistentVolumeClaim:
-          claimName: job-configs-nfs
-      - name: jobs-sparse-checkout
-        configMap:
-          name: prow-jobs-sparse-checkout
       - name: tmp
         emptyDir: {}
       - name: service-account
         secret:
           secretName: gce-sa-credentials-gcs-tide-publisher
+      - name: combined-jobs
+        emptyDir: {}
+      - name: sparse-checkout-config
+        configMap:
+          name: prow-jobs-sparse-checkout
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
