@@ -11,6 +11,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -112,6 +116,67 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: tls-scanner
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+      SCAN_NAMESPACE: zero-trust-workload-identity-manager
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: ztwim-deploy-spire-operands
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: tls-scanner-periodic
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+      SCAN_NAMESPACE: zero-trust-workload-identity-manager
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: ztwim-deploy-spire-operands
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: tls-pqc-readiness
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: zero-trust-workload-identity-manager
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+    test:
+    - ref: tls-13
+    - ref: ztwim-deploy-spire-operands
+    - ref: tls-scanner-run
     workflow: optional-operators-ci-operator-sdk-aws
 - always_run: false
   as: e2e-operator-rhcos10-fips
