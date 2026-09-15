@@ -11,6 +11,14 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+# Optional shared test-tool environment. Projects that install developer tools
+# in a preceding step can expose them to openshift-tests and its extensions by
+# writing this file into SHARED_DIR.
+if [[ -f "${SHARED_DIR}/cluster-debug-tools.env" ]]; then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/cluster-debug-tools.env"
+fi
+
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
 # In order for openshift-tests to pull external binary images from the
