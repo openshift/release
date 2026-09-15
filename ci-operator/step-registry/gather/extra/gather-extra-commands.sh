@@ -776,7 +776,11 @@ if openshift-tests e2e-analysis --help &>/dev/null; then
             echo "Found install-duration.log, it will be used for collecting install durations"
             cat "${SHARED_DIR}/install-duration.log"
         fi
-        openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+        E2E_ANALYSIS_ARGS=()
+        if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]]; then
+            E2E_ANALYSIS_ARGS+=(--skip-readiness-checks)
+        fi
+        openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" "${E2E_ANALYSIS_ARGS[@]}" || true
     else
         echo "Install failed, skipping post e2e-analysis check"
     fi
