@@ -31,7 +31,7 @@ function add_pullsecret() {
 if [ "${CNV_SUBSCRIPTION_SOURCE:-}" == "redhat-operators" ]
 then
   CNV_RELEASE_CHANNEL=stable
-elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]
+elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE:-}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL:-}" ]
 then
   CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
 else
@@ -57,9 +57,9 @@ then
 	oc label node ${NODENAME} node-role.kubernetes.io/control-plane=
 fi
 
-if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
+if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE:-}" ]
 then
-  if [[ "${CNV_PRERELEASE_CATALOG_IMAGE}" == *"brew"* ]]; then
+  if [[ "${CNV_PRERELEASE_CATALOG_IMAGE:-}" == *"brew"* ]]; then
     # Add brew registry pull secret
     add_pullsecret "brew.registry.redhat.io" "${BREW_IMAGE_REGISTRY_USERNAME}" "$(cat "${BREW_IMAGE_REGISTRY_TOKEN_PATH}")"
 
@@ -75,7 +75,7 @@ spec:
     - brew.registry.redhat.io
     source: registry.redhat.io
 EOF
-  elif [[ "${CNV_PRERELEASE_CATALOG_IMAGE}" == *"quay"* ]]; then
+  elif [[ "${CNV_PRERELEASE_CATALOG_IMAGE:-}" == *"quay"* ]]; then
     # Add quay registry pull secret for cnv nightly channel
     QUAY_USERNAME=openshift-cnv+openshift_ci
     QUAY_PASSWORD=$(cat /etc/cnv-nightly-pull-credentials/openshift_cnv_pullsecret)
@@ -95,7 +95,7 @@ metadata:
   namespace: openshift-marketplace
 spec:
   sourceType: grpc
-  image: ${CNV_PRERELEASE_CATALOG_IMAGE}
+  image: ${CNV_PRERELEASE_CATALOG_IMAGE:-}
   displayName: OpenShift Virtualization Pre-Release Catalog
   publisher: Red Hat
   updateStrategy:
