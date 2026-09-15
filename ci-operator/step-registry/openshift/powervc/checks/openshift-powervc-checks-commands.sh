@@ -6,7 +6,7 @@ set -o errexit
 set -o pipefail
 
 # PowerVC helper release to download for this step.
-readonly POWERVC_TOOL_VERSION="v2.4.8"
+readonly POWERVC_TOOL_VERSION="v2.4.9"
 
 #######################################
 # Log an informational message with a timestamp.
@@ -64,7 +64,7 @@ trap 'cleanup_on_exit $?' EXIT
 #
 # Currently required variables:
 #   CLOUD – name of the target OpenStack/PowerVC cloud passed to
-#           PowerVC-Tool and print-stream-json.sh.
+#           PowerVC-Tool and current-servers.sh.
 #
 # Globals:
 #   CLOUD – (in) must be non-empty; validated but not modified.
@@ -217,13 +217,14 @@ function download_tool_w_sha() {
 #   2. Creates /tmp/bin and prepends it to PATH.
 #   3. Detects the host architecture (x86_64 → amd64, ppc64le stays as-is)
 #      and downloads the matching ocp-ipi-powervc binary together with
-#      print-stream-json.sh from the GitHub release at POWERVC_TOOL_VERSION.
-#      Each download is retried up to 10 times with a progressive back-off
-#      (attempt × 5 seconds) before the function exits non-zero.
+#      current-servers.sh from the GitHub release at POWERVC_TOOL_VERSION.
+#      Each download is retried up to 3 times with a constant 5-second delay
+#      before the function exits non-zero.
 #   4. Copies clouds.yaml (to both $HOME and $HOME/.config/openstack/) and
 #      ocp-ci-ca.pem from SECRETS_DIR, then rewrites any hardcoded
 #      /tmp/ocp-ci-ca.pem path in both copies to the real $HOME path.
-#   5. Verifies that PowerVC-Tool and openstack are resolvable on PATH.
+#   5. Verifies that PowerVC-Tool, current-servers.sh, and openstack are
+#      resolvable on PATH.
 #
 # Globals:
 #   POWERVC_TOOL_VERSION – (in)  GitHub release tag used to build the download
@@ -286,9 +287,9 @@ function install_required_tools() {
 	fi
 	mv "${tmp_bin_dir}/${tool_bin}" "${tmp_bin_dir}/PowerVC-Tool"
 
-	local print_stream_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/print-stream-json.sh"
-	if ! download_tool_w_sha "${print_stream_url}" "${tmp_bin_dir}/print-stream-json.sh" "print-stream-json ${POWERVC_TOOL_VERSION}"; then
-		log_error "Could not download ${print_stream_url}"
+	local current_servers_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/current-servers.sh"
+	if ! download_tool_w_sha "${current_servers_url}" "${tmp_bin_dir}/current-servers.sh" "current-servers ${POWERVC_TOOL_VERSION}"; then
+		log_error "Could not download ${current_servers_url}"
 		exit 1
 	fi
 
@@ -330,7 +331,7 @@ function install_required_tools() {
 
 	# Verify all required tools are available
 	log_info "Verifying installed tools..."
-	local tools=("PowerVC-Tool" "print-stream-json.sh" "openstack")
+	local tools=("PowerVC-Tool" "current-servers.sh" "jq" "openstack")
 	for tool in "${tools[@]}"; do
 		if ! command -v "${tool}" &>/dev/null; then
 			log_error "Required tool '${tool}' is not available"
@@ -345,6 +346,30 @@ function install_required_tools() {
 #######################################
 # Query the OpenShift CI release-stream API and populate the global RELEASES
 # array with every supported major.minor version.
+#
+# NOTE: RELEASES is not consumed by any later step yet (current-servers.sh does
+# not take a releases argument). This function is intentionally kept for future
+# use. Bash cannot export arrays, so RELEASES is left as a plain global rather
+# than exported.
+#
+# When a consumer is added, pass RELEASES to it with one of these approaches
+# (do NOT rely on `export RELEASES` — exporting an array is a silent no-op):
+#
+#   1. Pass as arguments (preferred when you control the callee). Element
+#      boundaries are preserved exactly with no quoting/escaping issues:
+#        current-servers.sh -c "${CLOUD}" --releases "${RELEASES[@]}"
+#      The callee then reads them from "$@".
+#
+#   2. Export a delimited scalar and re-split in the child (when the interface
+#      must be an env var). Safe here because elements are simple major.minor
+#      strings that never contain the delimiter:
+#        # parent:
+#        IFS=',' RELEASES_CSV="${RELEASES[*]}"; export RELEASES_CSV
+#        # child:
+#        IFS=',' read -r -a RELEASES <<< "${RELEASES_CSV}"
+#
+#   (For passing the list to a separate CI step rather than a child process,
+#   write it to "${SHARED_DIR}" instead, per this repo's conventions.)
 #
 # The function:
 #   1. Fetches all release-stream tags from the ppc64le CI endpoint.
@@ -392,10 +417,9 @@ function find_openshift_releases() {
 	   | .[]
 	 '
 	) || true
-	export RELEASES
 
 	if (( ${#RELEASES[@]} == 0 )); then
-		log_error "Could not any releases?"
+		log_error "Could not find any releases?"
 		return 1
 	fi
 
@@ -404,32 +428,18 @@ function find_openshift_releases() {
 }
 
 #######################################
-# Verify that RHCOS stream data is available for every supported OpenShift
-# release and RHEL generation on the target PowerVC cloud.
+# Run the PowerVC server inventory check against the target cloud.
 #
-# For each combination of RHEL version (rhel9, rhel10) and every entry in the
-# global RELEASES array, the function invokes print-stream-json.sh to confirm
-# that a corresponding RHCOS image stream entry exists.
+# Invokes current-servers.sh for CLOUD, which lists the servers currently
+# running on the cloud so the CI logs capture the environment's state.
 #
 # Globals:
-#   CLOUD    – (in) name of the target OpenStack/PowerVC cloud.
-#   RELEASES – (in) indexed array of "major.minor" OpenShift version strings,
-#              populated by find_openshift_releases.
+#   CLOUD – (in) name of the target cloud passed to current-servers.sh.
 # Returns:
-#   0 if all checks pass; non-zero if any print-stream-json.sh invocation fails.
+#   0 on success; inherits current-servers.sh's non-zero exit on failure.
 #######################################
-function check_rhcos_images() {
-	local -a rhels
-
-	rhels=("rhel9" "rhel10")
-
-	log_info "Checking RHCOS images for cloud ${CLOUD}"
-	for rhel in "${rhels[@]}"; do
-		for release in "${RELEASES[@]}"; do
-			log_info "Checking ${release} ${rhel}"
-			print-stream-json.sh --cloud "${CLOUD}" --release "release-${release}" --rhel "${rhel}"
-		done
-	done
+function check_current_servers() {
+	current-servers.sh -c "${CLOUD}"
 }
 
 #######################################
@@ -441,8 +451,8 @@ function check_rhcos_images() {
 #   3. Calls install_required_tools to download helper binaries and configure
 #      OpenStack credentials.
 #   4. Calls find_openshift_releases to populate the RELEASES array.
-#   5. Calls check_rhcos_images to verify RHCOS stream data for every
-#      supported release/RHEL combination on the target cloud.
+#   5. Calls check_current_servers to list the servers currently running on the
+#      target cloud.
 #
 # Globals:
 #   SECRETS_DIR – (out) path to the mounted PowerVC credentials secret.
@@ -468,9 +478,9 @@ function main() {
 
 	# Determine the OpenShift PowerVC supported releases
 	find_openshift_releases
-	
-	# Execute the image checks.
-	check_rhcos_images
+
+	# Execute the server check
+	check_current_servers
 
 	log_info "=== PowerVC Checks Script Completed ==="
 }
