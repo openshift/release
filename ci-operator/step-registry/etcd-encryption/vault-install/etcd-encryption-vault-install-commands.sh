@@ -65,14 +65,14 @@ mirror_vault_images() {
   local vault_enterprise_dst
   local vault_kms_src="${VAULT_KMS_PLUGIN_IMAGE}"
   local vault_kms_dst
-  local mirror_arch="${ARCHITECTURE:-amd64}"
+  local registry_port="${DS_REGISTRY##*:}"
   vault_enterprise_dst="$(resolve_image_mirror_destination "${DS_REGISTRY}/localimages/vault-enterprise" "${VAULT_ENTERPRISE_IMAGE}")"
   vault_kms_dst="$(resolve_image_mirror_destination "${DS_REGISTRY}/localimages/vault-kube-kms" "${VAULT_KMS_PLUGIN_IMAGE}")"
 
   echo "Mirroring vault images to local registry (multi-arch manifest list)..."
   echo "  ${vault_enterprise_src} -> ${vault_enterprise_dst}"
   echo "  ${vault_kms_src} -> ${vault_kms_dst}"
-  echo "  extract verification architecture: linux/${mirror_arch}.*"
+  echo "  verification: skopeo inspect / podman pull after skopeo copy --all"
 
   # shellcheck disable=SC2087
   ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
@@ -81,24 +81,62 @@ set -euo pipefail
 MAX_RETRIES=5
 REGISTRY_CONFIG="${DS_WORKING_DIR}/pull_secret.json"
 REGISTRY_HOST="${DS_REGISTRY}"
-EXTRACT_OS_FILTER="linux/${mirror_arch}.*"
+
+registry_auth_header() {
+  local registry="\$1"
+  local auth
+
+  auth="\$(jq -r --arg reg "\${registry}" '.auths[\$reg].auth // empty' "\${REGISTRY_CONFIG}" 2>/dev/null || true)"
+  if [[ -n "\${auth}" ]]; then
+    printf 'Authorization: Basic %s' "\${auth}"
+  fi
+}
 
 vault_image_mirror_complete() {
   local image="\$1"
-  local verify_dir="/tmp/vault-mirror-verify-\$\$"
+  local pull_args=(--authfile "\${REGISTRY_CONFIG}")
 
-  if ! oc image info --insecure=true "\${image}" --registry-config "\${REGISTRY_CONFIG}" >/dev/null 2>&1; then
+  if command -v skopeo >/dev/null 2>&1; then
+    if skopeo inspect --authfile "\${REGISTRY_CONFIG}" --tls-verify=false "docker://\${image}" >/dev/null 2>&1; then
+      return 0
+    fi
+    echo "Mirror verification failed: skopeo inspect \${image}"
     return 1
   fi
 
-  rm -rf "\${verify_dir}"
-  if oc image extract --insecure=true --filter-by-os="\${EXTRACT_OS_FILTER}" \
-    "\${image}" "\${verify_dir}" --path=/ --registry-config "\${REGISTRY_CONFIG}" >/dev/null 2>&1; then
-    rm -rf "\${verify_dir}"
+  podman rmi "\${image}" >/dev/null 2>&1 || true
+  if podman pull "\${pull_args[@]}" "\${image}" >/dev/null 2>&1; then
+    podman rmi "\${image}" >/dev/null 2>&1 || true
     return 0
   fi
-  rm -rf "\${verify_dir}"
+
+  if podman pull "\${pull_args[@]}" --tls-verify=false "\${image}" >/dev/null 2>&1; then
+    podman rmi "\${image}" >/dev/null 2>&1 || true
+    return 0
+  fi
+
+  echo "Mirror verification failed: podman pull \${image}"
   return 1
+}
+
+copy_vault_image() {
+  local src="\$1"
+  local dst="\$2"
+
+  if command -v skopeo >/dev/null 2>&1; then
+    echo "Using skopeo copy --all for multi-arch mirror"
+    skopeo copy --all --retry-times=3 \
+      --authfile "\${REGISTRY_CONFIG}" \
+      --src-authfile "\${REGISTRY_CONFIG}" \
+      --dest-tls-verify=false \
+      "docker://\${src}" \
+      "docker://\${dst}"
+    return
+  fi
+
+  echo "skopeo not found; falling back to oc image mirror --keep-manifest-list"
+  oc image mirror --insecure=true --keep-manifest-list=true --registry-config "\${REGISTRY_CONFIG}" \
+    "\${src}" "\${dst}"
 }
 
 registry_image_repo() {
@@ -130,38 +168,87 @@ registry_image_reference() {
   fi
 }
 
+find_registry_repositories_root() {
+  local candidate
+
+  for candidate in \
+    "${DS_WORKING_DIR}/registry/data/docker/registry/v2/repositories" \
+    "${DS_WORKING_DIR}/registry/docker/registry/v2/repositories" \
+    "${DS_WORKING_DIR}/registry-${registry_port}/data/docker/registry/v2/repositories" \
+    "${DS_WORKING_DIR}/registry-${registry_port}/docker/registry/v2/repositories"; do
+    if [[ -d "\${candidate}" ]]; then
+      echo "\${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+find_registry_ca_cert() {
+  local candidate
+
+  for candidate in \
+    "${DS_WORKING_DIR}/registry/certs/domain.crt" \
+    "${DS_WORKING_DIR}/registry/certs/registry.2.crt" \
+    "${DS_WORKING_DIR}/registry-${registry_port}/certs/domain.crt"; do
+    if [[ -f "\${candidate}" ]]; then
+      echo "\${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 purge_local_registry_repository() {
   local image="\$1"
-  local registry repo reference manifest_digest scheme
-  local registry_port registry_root repo_path
+  local registry repo reference manifest_digest repos_root repo_path registry_ca_cert
 
   registry="\${image%%/*}"
   repo="\$(registry_image_repo "\${image}")"
   reference="\$(registry_image_reference "\${image}")"
-  registry_port="\${registry##*:}"
-  registry_root="${DS_WORKING_DIR}/registry-\${registry_port}"
+  repos_root="\$(find_registry_repositories_root || true)"
 
-  for repo_path in \
-    "\${registry_root}/docker/registry/v2/repositories/\${repo}" \
-    "\${registry_root}/data/docker/registry/v2/repositories/\${repo}"; do
+  if [[ -n "\${repos_root}" ]]; then
+    repo_path="\${repos_root}/\${repo}"
     if [[ -d "\${repo_path}" ]]; then
       echo "Removing incomplete mirror repository data at \${repo_path}"
       rm -rf "\${repo_path}"
+    else
+      echo "No local registry repository data at \${repo_path}"
     fi
-  done
+  else
+    echo "Warning: could not locate dev-scripts registry repositories root under ${DS_WORKING_DIR}"
+  fi
 
-  for scheme in http https; do
-    manifest_digest="\$(curl -s -I \
-      -H "Accept: application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json" \
-      "\${scheme}://\${registry}/v2/\${repo}/manifests/\${reference}" \
-      | awk -F ': ' '/Docker-Content-Digest/ {print \$2}' | tr -d '\r')"
+  registry_ca_cert="\$(find_registry_ca_cert || true)"
+  if [[ -z "\${registry_ca_cert}" ]]; then
+    echo "Warning: could not locate dev-scripts registry CA; skipping manifest API purge for \${image}"
+    return 0
+  fi
 
-    if [[ -n "\${manifest_digest}" ]]; then
-      echo "Removing incomplete mirror manifest \${image} (\${manifest_digest}) via \${scheme}"
-      curl -s -X DELETE "\${scheme}://\${registry}/v2/\${repo}/manifests/\${manifest_digest}" >/dev/null || true
-      break
-    fi
-  done
+  local curl_auth curl_header_args=()
+  curl_auth="\$(registry_auth_header "\${registry}")"
+  if [[ -n "\${curl_auth}" ]]; then
+    curl_header_args=(-H "\${curl_auth}")
+  fi
+
+  # dev-scripts local registry serves HTTPS with a generated TLS certificate.
+  manifest_digest="\$(curl -s -I \
+    --cacert "\${registry_ca_cert}" \
+    "\${curl_header_args[@]}" \
+    -H "Accept: application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json" \
+    "https://\${registry}/v2/\${repo}/manifests/\${reference}" \
+    | awk -F ': ' '/Docker-Content-Digest/ {print \$2}' | tr -d '\r')"
+
+  if [[ -n "\${manifest_digest}" ]]; then
+    echo "Removing incomplete mirror manifest \${image} (\${manifest_digest})"
+    curl -s -X DELETE \
+      --cacert "\${registry_ca_cert}" \
+      "\${curl_header_args[@]}" \
+      "https://\${registry}/v2/\${repo}/manifests/\${manifest_digest}" >/dev/null || true
+  fi
 }
 
 mirror_vault_image() {
@@ -171,7 +258,7 @@ mirror_vault_image() {
   local attempt=1
 
   if vault_image_mirror_complete "\${dst}"; then
-    echo "Skipping \${label}; destination image is already present and extractable: \${dst}"
+    echo "Skipping \${label}; destination image is already present and pullable: \${dst}"
     return 0
   fi
 
@@ -181,13 +268,12 @@ mirror_vault_image() {
     echo "Mirroring \${label} attempt \${attempt}/\${MAX_RETRIES}"
     echo "  \${src} -> \${dst}"
     purge_local_registry_repository "\${dst}"
-    if oc image mirror --insecure=true --keep-manifest-list=true --registry-config "\${REGISTRY_CONFIG}" \
-      "\${src}" "\${dst}"; then
+    if copy_vault_image "\${src}" "\${dst}"; then
       if vault_image_mirror_complete "\${dst}"; then
         echo "Mirrored \${label} successfully"
         return 0
       fi
-      echo "Mirror command succeeded but \${dst} is not extractable (likely manifest without blobs)"
+      echo "Mirror command succeeded but \${dst} is not pullable"
     else
       echo "Mirroring \${label} attempt \${attempt} failed"
     fi
