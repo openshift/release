@@ -66,7 +66,15 @@ if oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" &>/dev/null; then
         sleep 5
     done
 else
-    CP_DELETED=true
+    # oc get failed — distinguish "not found" from API/auth errors.
+    # Only treat confirmed absence as deletion; API errors leave
+    # CP_DELETED=false so we do not restore into an ambiguous state.
+    GET_ERR=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" 2>&1) || true
+    if echo "${GET_ERR}" | grep -qi "not found"; then
+        CP_DELETED="true"
+    else
+        log "WARNING: Could not confirm e2e ClusterPackage status (API error?) — skipping post-deletion cleanup"
+    fi
 fi
 
 # Clear CRD ownerReferences left by the e2e ClusterPackage so the
@@ -85,6 +93,23 @@ if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_CRDS:-}" && -n "${OPERATOR_NAM
             fi
         fi
     done
+fi
+
+# Restore the production ClusterPackage that install backed up.
+# Without this, the cluster returns to the pool missing its production
+# operator until Hive resyncs (~2h), contaminating the lease pool.
+if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" ]]; then
+    PROD_CP_BACKUP="${SHARED_DIR}/production-clusterpackage.yaml"
+    if [[ -f "${PROD_CP_BACKUP}" ]]; then
+        log "Restoring production ClusterPackage ${OPERATOR_NAME} from backup"
+        if oc apply -f "${PROD_CP_BACKUP}"; then
+            log "Production ClusterPackage ${OPERATOR_NAME} restored"
+        else
+            log "WARNING: Failed to restore production ClusterPackage ${OPERATOR_NAME} — cluster may need Hive resync"
+        fi
+    else
+        log "WARNING: No production ClusterPackage backup found in SHARED_DIR — cluster will rely on Hive resync to restore ${OPERATOR_NAME}"
+    fi
 fi
 
 # Wait for the production operator to reconcile after cleanup.
