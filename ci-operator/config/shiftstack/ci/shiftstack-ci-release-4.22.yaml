@@ -83,7 +83,7 @@ tests:
     - ref: openshift-e2e-test
     - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-proxy
-- as: e2e-openstack-externallb
+- as: e2e-openstack-externallb-techpreview
   minimum_interval: 168h
   reporter_config:
     channel: '#shiftstack-bot'
@@ -95,8 +95,10 @@ tests:
   steps:
     cluster_profile: openstack-vh-bm-rhos
     env:
-      TEST_ARGS: --disable-monitor=termination-message-policy
+      TEST_ARGS: --disable-monitor=termination-message-policy,faulty-load-balancer
+      TEST_SKIPS: \[OCPFeatureGate:IngressControllerDynamicConfigurationManager\]
     test:
+    - ref: openstack-conf-externallb-verify
     - ref: openshift-e2e-test
     - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-external-lb
