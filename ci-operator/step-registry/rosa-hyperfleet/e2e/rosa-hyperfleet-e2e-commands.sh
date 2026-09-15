@@ -60,7 +60,12 @@ elif [[ "${REPO_NAME:-}" == "rosa-hyperfleet-zoa" ]] && [[ -n "${PULL_NUMBER:-}"
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Run e2e tests
+# 3. Export test control variables and run e2e tests
 # ---------------------------------------------------------------------------
+# Pass label filter if specified
+if [[ -n "${ROSA_LABEL_FILTER:-}" ]]; then
+  export LABEL_FILTER="${ROSA_LABEL_FILTER}"
+fi
+
 echo "Running e2e tests..."
 ./ci/e2e-tests.sh
