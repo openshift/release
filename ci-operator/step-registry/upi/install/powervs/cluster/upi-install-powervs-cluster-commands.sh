@@ -262,7 +262,9 @@ function configure_terraform() {
 
     PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
-    $WAS_TRACING && set -x
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
 
     echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
     VPC_NAME="${WORKSPACE_NAME}"
@@ -462,7 +464,9 @@ function build_upi_cluster() {
     cat > "${SHARED_DIR}/powervs-config.json" << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${RESOURCE_GROUP}"}
 EOF
-    $WAS_TRACING && set -x
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     echo "powervs-config.json created successfully"
 }
 
