@@ -606,6 +606,16 @@ function main {
 				sleep 20
 			fi
 		done
+		# Retry with pull-secret auth if unauthenticated attempts failed
+		if [[ -z "${commit}" || "${commit}" == "null" ]] && [[ "$DISCONNECTED" != "true" ]]; then
+			echo "Retrying oc image info with pull-secret authentication..."
+			for attempt in $(seq 1 3); do
+				commit=$(oc image info -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+					| jq -r '.config.config.Labels["vcs-ref"]') && break
+				echo "  oc image info (authenticated) attempt ${attempt}/3 failed, retrying in 20s..." >&2
+				sleep 20
+			done
+		fi
 		if [[ -z "${commit}" || "${commit}" == "null" ]]; then
 			echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
 			return 1
