@@ -36,6 +36,7 @@ tests:
       FEATURES: core
       FEATURES_TO_TEST: sctp|sriov|dpdk|vrf|ovs_qos|metallb|fec|multinetworkpolicy
       LABELS: net
+      METRICS_LIST: general_ocp,sriov,ptp,fec
       OPERATORS: |
         [
           {"name":"sriov-network-operator","catalog":"redhat-operators-sriov-art","fbc_iib_repo":"ose-sriov-network-rhel9-operator","nsname":"openshift-sriov-network-operator","channel":"stable","deploy_default_config":false, "og_name":"sriov-network-operators","subscription_name":"sriov-network-operator-subscription"},
@@ -44,15 +45,28 @@ tests:
           {"name":"sriov-fec","catalog":"certified-operators","nsname":"vran-acceleration-operators","channel":"stable"},
           {"name":"metallb-operator","catalog":"redhat-operators-metallb-art","fbc_iib_repo":"metallb-rhel9-operator","nsname":"metallb-system","channel":"stable","og_spec":{},"deploy_default_config":false}
         ]
+      REPORTER_LAUNCH_NAME: telco-ft-net-core
       REPORTER_TEMPLATE_NAME: 'Telco Network 4_15 Regression - Telco Network 4.15
         Regression Testing - Version: <version>; Build: <build>'
+      REPORTPORTAL_FILES: .reportportal_url_Net_core
+      UPLOAD_TO_REPORT_PORTAL: "true"
       VERSION: "4.15"
+    pre:
+    - ref: telcov10n-functional-cnf-network-schedule-job
+    - ref: telcov10n-functional-cnf-network-setup-cluster-env
+    - ref: telcov10n-functional-cnf-network-switch-config
+    - ref: telcov10n-functional-cnf-network-ocp-deploy
+    - ref: telcov10n-functional-cnf-network-ocp-operators
+    - ref: telcov10n-functional-cnf-network-cnf-config
     test:
     - ref: telcov10n-functional-cnf-network-metrics-daemon-tests
     - ref: telcov10n-functional-cnf-network-cnf-tests
     - ref: telcov10n-functional-cnf-network-eco-gotests
     - ref: telcov10n-functional-cnf-network-cnf-gotests
-    workflow: telcov10n-functional-cnf-network-ocp-setup
+    - ref: telcov10n-functional-report
+    - ref: telcov10n-verify-junit-reports
+    - ref: telcov10n-functional-cnf-network-clone-z-stream-issue
+    - ref: telcov10n-functional-cnf-network-send-slack-notification
 zz_generated_metadata:
   branch: main
   org: openshift-kni
