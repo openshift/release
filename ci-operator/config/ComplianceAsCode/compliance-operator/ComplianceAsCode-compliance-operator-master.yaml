@@ -203,13 +203,12 @@ tests:
           - name: scanner
             image: ${SCANNER_IMAGE}
             env:
-            # tls-scanner writes scratch files via os.CreateTemp("", ...) and
-            # testssl.sh's own mktemp calls, both of which resolve to \$TMPDIR
-            # (default /tmp) independent of --artifact-dir/--*-file, which are
-            # absolute paths and unaffected. Point it at the writable /results
-            # mount so readOnlyRootFilesystem below doesn't break the scan.
+            # tls-scanner's Go code uses os.CreateTemp("", ...) which resolves
+            # to $TMPDIR; testssl.sh hardcodes /tmp internally and ignores
+            # $TMPDIR. Mount a writable emptyDir at /tmp so both work under
+            # readOnlyRootFilesystem: true.
             - name: TMPDIR
-              value: /results
+              value: /tmp
             command:
             - /bin/bash
             - -c
@@ -248,8 +247,12 @@ tests:
             volumeMounts:
             - name: results
               mountPath: /results
+            - name: tmp
+              mountPath: /tmp
           volumes:
           - name: results
+            emptyDir: {}
+          - name: tmp
             emptyDir: {}
         SCANNERPOD
 
