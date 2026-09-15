@@ -730,6 +730,53 @@ if [[ -n "${JOB_POD}" ]]; then
 fi
 
 
+# ─── 6b. LOG FINGERPRINT FOR ORION METADATA ────────────────────────────────
+#
+# Clone cloud-bulldozer/e2e-benchmarking and run utils/index.sh to write a
+# standard metadata document to the perf_scale_ci Elasticsearch index.
+# This mirrors the pattern used by the OLS load-generator step.
+# ────────────────────────────────────────────────────────────────────────────
+
+echo "── Logging Orion metadata fingerprint ──"
+
+# Build ES_SERVER URL (credentials are mounted by the CI secret).
+# Tracing is already off (no set -x), so the URL stays out of logs.
+ES_USERNAME_RAW=$(<"/secret/username")
+ES_PASSWORD_RAW=$(<"/secret/password")
+ES_SERVER="https://${ES_USERNAME_RAW}:${ES_PASSWORD_RAW}@${ES_SERVER_HOST}"
+unset ES_USERNAME_RAW ES_PASSWORD_RAW
+
+LATEST_E2E_TAG=$(curl -sS \
+  "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" \
+  | jq -r '.tag_name') || true
+
+if [[ -n "${LATEST_E2E_TAG}" ]] && \
+   git clone --branch "${LATEST_E2E_TAG}" --depth 1 \
+     https://github.com/cloud-bulldozer/e2e-benchmarking.git \
+     "${RUNTIME_TMP_DIR}/e2e-benchmarking" 2>&1; then
+
+  FINGERPRINT_UUID=$(uuidgen)
+  JOB_START_TS=$(date -u -d "@${TEST_START_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ")
+  JOB_END_TS=$(date -u -d "@${TEST_END_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ")
+
+  pushd "${RUNTIME_TMP_DIR}/e2e-benchmarking/utils" >/dev/null
+  env BENCHMARK="lcs-load-generator" \
+      WORKLOAD="lcs-load-generator" \
+      ES_SERVER="${ES_SERVER}" \
+      UUID="${FINGERPRINT_UUID}" \
+      JOB_START="${JOB_START_TS}" \
+      JOB_END="${JOB_END_TS}" \
+      JOB_STATUS="success" \
+      ./index.sh || echo "WARN: Fingerprint index.sh failed — continuing"
+  popd >/dev/null
+
+  echo "  Fingerprint logged (UUID=${FINGERPRINT_UUID})"
+else
+  echo "WARN: Failed to clone e2e-benchmarking — skipping fingerprint"
+fi
+unset ES_SERVER
+
+
 # ─── 7. COLLECT PROFILING DATA ──────────────────────────────────────────────
 
 echo "── Collecting profiling data ──"
