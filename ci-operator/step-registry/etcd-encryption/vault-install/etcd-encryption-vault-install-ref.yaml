@@ -51,12 +51,13 @@ ref:
     This step:
     - Installs Helm if not present
     - Adds HashiCorp Helm repository
-    - Creates vault namespace with appropriate SCC (restricted)
+    - Creates vault namespace with appropriate SCC (restricted, or hostmount-anyuid on bare metal hostPath storage)
     - Creates vault-license secret from mounted credential (if available)
-    - Mirrors Vault Enterprise and vault-kube-kms plugin images to the dev-scripts local registry on baremetalds jobs (skopeo copy --all with oc image mirror fallback, purge under the discovered dev-scripts registry repository root, per-image retry, and skopeo inspect verification)
+    - Mirrors Vault Enterprise and vault-kube-kms plugin images to the dev-scripts local registry on baremetalds jobs (skopeo copy --all with oc image mirror fallback, purge under the discovered dev-scripts registry repository root, per-image retry, and platform-specific pull verification for the host architecture)
     - Applies ImageContentSourcePolicy/vault-mirror so cluster nodes pull both images from the local mirror
     - Installs Vault Enterprise using Helm chart in standalone mode with file storage
-    - Provisions vault-local-storage (hostPath PV) on baremetal when no StorageClass exists
+    - Provisions vault-local-storage (hostPath PV with pre-created node directory, SELinux context, and ownership for Vault uid 100:gid 1000) on baremetal when no StorageClass exists
+    - Configures pod securityContext (runAsUser: 100, runAsGroup: 1000, fsGroup: 1000) to ensure writable access to persistent storage
     - Requests an OpenShift service-CA serving certificate for the client Service
     - Initializes and unseals Vault, storing the root token and unseal key in Secrets
     - Deploys an auto-unseal sidecar so Vault comes back unsealed after pod restarts

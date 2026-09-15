@@ -72,7 +72,7 @@ mirror_vault_images() {
   echo "Mirroring vault images to local registry (multi-arch manifest list)..."
   echo "  ${vault_enterprise_src} -> ${vault_enterprise_dst}"
   echo "  ${vault_kms_src} -> ${vault_kms_dst}"
-  echo "  verification: skopeo inspect / podman pull after skopeo copy --all"
+  echo "  verification: skopeo inspect / podman pull --platform (detected arch) after mirror"
 
   # shellcheck disable=SC2087
   ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
@@ -95,6 +95,17 @@ registry_auth_header() {
 vault_image_mirror_complete() {
   local image="\$1"
   local pull_args=(--authfile "\${REGISTRY_CONFIG}")
+  local arch platform
+
+  # Detect architecture: x86_64->amd64, aarch64->arm64, etc.
+  arch="\$(uname -m)"
+  case "\${arch}" in
+    x86_64) platform="linux/amd64" ;;
+    aarch64) platform="linux/arm64" ;;
+    ppc64le) platform="linux/ppc64le" ;;
+    s390x) platform="linux/s390x" ;;
+    *) platform="linux/amd64" ;;
+  esac
 
   if command -v skopeo >/dev/null 2>&1; then
     if skopeo inspect --authfile "\${REGISTRY_CONFIG}" --tls-verify=false "docker://\${image}" >/dev/null 2>&1; then
@@ -104,18 +115,15 @@ vault_image_mirror_complete() {
     return 1
   fi
 
+  # Pull for the detected platform to verify the multi-arch manifest list was mirrored correctly
   podman rmi "\${image}" >/dev/null 2>&1 || true
-  if podman pull "\${pull_args[@]}" "\${image}" >/dev/null 2>&1; then
+  if podman pull "\${pull_args[@]}" --platform="\${platform}" --tls-verify=false "\${image}" >/dev/null 2>&1; then
+    echo "Mirror verification succeeded: podman pull --platform=\${platform} \${image}"
     podman rmi "\${image}" >/dev/null 2>&1 || true
     return 0
   fi
 
-  if podman pull "\${pull_args[@]}" --tls-verify=false "\${image}" >/dev/null 2>&1; then
-    podman rmi "\${image}" >/dev/null 2>&1 || true
-    return 0
-  fi
-
-  echo "Mirror verification failed: podman pull \${image}"
+  echo "Mirror verification failed: podman pull --platform=\${platform} \${image}"
   return 1
 }
 
@@ -402,6 +410,33 @@ pick_vault_node() {
   echo "${node}"
 }
 
+vault_scc_name() {
+  # hostPath volumes on RHCOS bare metal need hostmount-anyuid so the Vault
+  # pod (uid 100, fsGroup 1000) can write through a hostPath mount.
+  if [[ "${CLUSTER_TYPE:-}" == "equinix-ocp-metal" ]]; then
+    echo "hostmount-anyuid"
+    return
+  fi
+  echo "restricted"
+}
+
+# Prepare the host directory before the PV is bound so Vault can persist its
+# keyring under /vault/data (file backend). DirectoryOrCreate alone leaves
+# root:root with the wrong SELinux context on bare metal nodes.
+prepare_vault_host_path() {
+  local node="$1"
+  local host_path="$2"
+
+  echo "Preparing hostPath ${host_path} on node ${node}..."
+  oc debug -n default "node/${node}" --quiet -- chroot /host bash -c "
+    set -euo pipefail
+    mkdir -p '${host_path}'
+    chown 100:1000 '${host_path}'
+    chmod 2770 '${host_path}'
+    chcon -Rt container_file_t '${host_path}' 2>/dev/null || true
+  "
+}
+
 ensure_vault_local_storage_class() {
   local storage_class="$1"
 
@@ -431,14 +466,16 @@ ensure_vault_local_pv() {
   local host_path="/var/lib/vault-kms/${namespace}/${release_name}"
   local node
 
-  if oc get pv "${pv_name}" >/dev/null 2>&1; then
-    return 0
-  fi
-
   wait_until "pvc ${pvc_name} in ${namespace}" 60 2 \
     oc get "pvc/${pvc_name}" -n "${namespace}"
 
   node="$(pick_vault_node)"
+  prepare_vault_host_path "${node}" "${host_path}"
+
+  if oc get pv "${pv_name}" >/dev/null 2>&1; then
+    return 0
+  fi
+
   echo "Creating local PersistentVolume ${pv_name} on node ${node} for ${namespace}/${pvc_name}..."
   oc apply -f - <<EOF
 apiVersion: v1
@@ -490,8 +527,10 @@ setup_vault_namespace() {
   echo "Creating namespace ${namespace}..."
   oc create namespace "${namespace}" --dry-run=client -o yaml | oc apply -f -
 
-  echo "Adding restricted SCC for Vault service account..."
-  oc adm policy add-scc-to-user restricted -z "${release_name}" -n "${namespace}"
+  local vault_scc
+  vault_scc="$(vault_scc_name)"
+  echo "Adding ${vault_scc} SCC for Vault service account..."
+  oc adm policy add-scc-to-user "${vault_scc}" -z "${release_name}" -n "${namespace}"
 
   echo "Creating Vault license secret from mounted credential..."
   oc create secret generic "${VAULT_LICENSE_SECRET_NAME}" \
@@ -642,6 +681,7 @@ install_vault() {
   if [[ -n "${vault_storage_class}" ]]; then
     echo "Using StorageClass ${vault_storage_class} for Vault file storage"
     ensure_vault_local_storage_class "${vault_storage_class}"
+    prepare_vault_host_path "$(pick_vault_node)" "/var/lib/vault-kms/${namespace}/${release_name}"
     data_storage_block="$(cat <<EOF
   dataStorage:
     enabled: true
@@ -670,6 +710,10 @@ server:
   image:
     repository: ${VAULT_IMAGE_REPOSITORY}
     tag: "${VAULT_VERSION}"
+  securityContext:
+    runAsUser: 100
+    runAsGroup: 1000
+    fsGroup: 1000
   standalone:
     enabled: true
     config: |
@@ -866,6 +910,15 @@ fi
 echo ""
 
 record_vault_images
+
+# Source CLUSTER_TYPE early so vault_scc_name() can detect baremetal and use hostmount-anyuid.
+# On non-baremetal clusters, CLUSTER_TYPE won't be set and vault_scc_name() will use restricted.
+if [[ -n "${CLUSTER_TYPE:-}" && "${CLUSTER_TYPE}" == equinix-ocp-metal ]]; then
+  if [[ -f "${SHARED_DIR}/packet-conf.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/packet-conf.sh"
+  fi
+fi
 
 setup_vault_namespace "${VAULT_NAMESPACE}" "vault"
 setup_vault_namespace "${VAULT_SECONDARY_NAMESPACE}" "vault-secondary"
