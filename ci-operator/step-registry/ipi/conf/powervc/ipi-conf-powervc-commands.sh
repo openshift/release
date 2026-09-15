@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# This script configures an OpenShift IPI installation on IBM PowerVC.
+# It validates the environment, installs required tools (PowerVC-Tool, yq),
+# provisions a bastion host with HAProxy, and generates the install-config.yaml
+# needed by the openshift-install binary.
+
 # Strict mode
 set -o nounset
 set -o errexit
