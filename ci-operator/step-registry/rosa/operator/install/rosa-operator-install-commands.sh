@@ -227,6 +227,17 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
     done
 fi
 
+# Back up the production ClusterPackage before deleting it.
+# cleanup will restore it so the cluster is not returned to the pool
+# missing its production operator (otherwise Hive resync takes ~2h).
+if oc get clusterpackage "${OPERATOR_NAME}" &>/dev/null; then
+    log "Backing up production ClusterPackage ${OPERATOR_NAME}"
+    oc get clusterpackage "${OPERATOR_NAME}" -o yaml \
+      | yq 'del(.status, .metadata.resourceVersion, .metadata.uid, .metadata.generation, .metadata.creationTimestamp, .metadata.ownerReferences, .metadata.finalizers)' \
+      > "${SHARED_DIR}/production-clusterpackage.yaml"
+    log "Production ClusterPackage backed up to SHARED_DIR"
+fi
+
 # Remove existing operator resources that conflict with PKO adoption.
 # On managed clusters, operators are pre-deployed via SSS/PKO. PKO refuses
 # to adopt CRDs owned by a different ClusterObjectSet. We remove:
