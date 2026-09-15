@@ -50,11 +50,18 @@ tests:
         set -euo pipefail
         NODE=$(oc get nodes -o jsonpath='{.items[0].metadata.name}')
         echo "Checking that tree is NOT installed on node $NODE (standard RHCOS)"
-        if oc debug "node/$NODE" -- chroot /host rpm -q tree 2>/dev/null; then
+        OUTPUT=$(oc debug "node/$NODE" -- chroot /host rpm -q tree 2>&1) && {
           echo "FAIL: tree is installed on standard RHCOS, this is unexpected"
+          echo "rpm -q output: $OUTPUT"
+          exit 1
+        }
+        if echo "$OUTPUT" | grep -q "package tree is not installed"; then
+          echo "PASS: tree is not installed on standard RHCOS, as expected"
+        else
+          echo "FAIL: unexpected error from oc debug or rpm -q"
+          echo "Output: $OUTPUT"
           exit 1
         fi
-        echo "PASS: tree is not installed on standard RHCOS, as expected"
       from: cli
       resources:
         requests:
