@@ -1,0 +1,14 @@
+workflow:
+  as: gitops-operator-ipi-aws
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: gitops-operator-aws-cleanup-leftover-dns
+    - chain: ipi-aws-pre
+    - ref: cucushift-installer-reportportal-marker
+    post:
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+  documentation: |-
+    ipi-aws with leftover Route53 cleaned first. gitops-aws jobs share
+    ocp-gitops-qe.com so a failed deprovision blocks the retry.
