@@ -31,7 +31,7 @@ spokeName="$(tr -d '[:space:]' < "${SHARED_DIR}/managed-cluster-name")"
 [[ -n "${spokeName}" ]]
 
 typeset currentHopVersion=''
-
+# Writes spoke upgrade failure diagnostics to the artifact directory.
 WriteSpokeUpgradeFailureDiagnostics() {
     typeset artifactFile="${ARTIFACT_DIR}/spoke-${spokeName}-upgrade-failure.txt"
     {
@@ -47,7 +47,9 @@ WriteSpokeUpgradeFailureDiagnostics() {
         oc --kubeconfig="${spokeKubeconfig}" get machineconfigpools -o wide 2>&1 || true
         printf '\n'
         printf '%s\n' "=== oc get nodes ==="
-        oc --kubeconfig="${spokeKubeconfig}" get nodes -o wide 2>&1 || true
+        oc --kubeconfig="${spokeKubeconfig}" get nodes \
+            -o custom-columns='STATUS:.status.conditions[?(@.type=="Ready")].status,VERSION:.status.nodeInfo.kubeletVersion,OS-IMAGE:.status.nodeInfo.osImage' \
+            2>&1 || true
         printf '\n'
         printf '%s\n' "=== oc get clusteroperators ==="
         oc --kubeconfig="${spokeKubeconfig}" get clusteroperators 2>&1 || true
@@ -83,6 +85,7 @@ ResolveReleaseImage() {
     true
 }
 
+# Patches admin-acks ConfigMap for the given spoke kubeconfig.
 PatchAdminAcksForUpgrade() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset upgradeableMsg='' ackKey=''
@@ -271,7 +274,7 @@ if [[ "${SPOKE_CLUSTER_UPGRADE_EUS}" == "true" ]]; then
     WaitMcpCondition "${spokeKubeconfig}" worker Updated "${ACM_SPOKE_UPGRADE_TIMEOUT}"
     DumpSpokeUpgradeStatus "unpaused"
 else
-    UpgradeSpokeToPullspec "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+   UpgradeSpokeToPullspec "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" currentHopVersion
 fi
 
 true
