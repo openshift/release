@@ -302,7 +302,9 @@ function init_ibmcloud() {
     ibmcloud login --apikey "${IBMCLOUD_API_KEY}" -r ${VPCREGION}
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
   fi
-  $WAS_TRACING && set -x
+  if [[ "${WAS_TRACING}" == true ]]; then
+    set -x
+  fi
 
   echo "BASE_DOMAIN = ${BASE_DOMAIN}"
   (
@@ -732,7 +734,9 @@ IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds
 IBMCLOUD_REGISTRY_INSTALLER_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_REGISTRY_INSTALLER_CREDS")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
-$WAS_TRACING && set -x
+if [[ "${WAS_TRACING}" == true ]]; then
+  set -x
+fi
 POWERVS_SERVICE_INSTANCE_ID=$(yq-v4 eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
 POWERVS_REGION=$(yq-v4 eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
 POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
@@ -781,7 +785,9 @@ set +x
 cat > "/tmp/powervs-config.json" << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
-$WAS_TRACING && set -x
+if [[ "${WAS_TRACING}" == true ]]; then
+  set -x
+fi
 cp "/tmp/powervs-config.json" "${SHARED_DIR}/"
 export POWERVS_AUTH_FILEPATH=${SHARED_DIR}/powervs-config.json
 

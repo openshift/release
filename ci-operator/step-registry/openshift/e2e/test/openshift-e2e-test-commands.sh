@@ -229,7 +229,9 @@ ibmcloud*)
     set +x
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
-    $WAS_TRACING && set -x
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     ;;
 powervs*)
     #export TEST_PROVIDER='{"type":"powervs"}' # TODO In the future, powervs will be a supprted test type
@@ -240,7 +242,9 @@ powervs*)
     IBMCLOUD_API_KEY=${IC_API_KEY}
     export IC_API_KEY
     export IBMCLOUD_API_KEY
-    $WAS_TRACING && set -x
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
 external) export TEST_PROVIDER='{"type":"external"}' ;;
