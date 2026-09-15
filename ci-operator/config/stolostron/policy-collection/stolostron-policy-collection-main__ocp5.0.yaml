@@ -28,7 +28,7 @@ images:
   items:
   - dockerfile_literal: |
       FROM this-is-ignored
-      RUN dnf install -y git python39
+      RUN dnf install -y git python39 jq
     from: cli
     optional: true
     to: cli-with-git
@@ -77,17 +77,18 @@ tests:
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_BREACH: "true"
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-opp.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.0-lp","opp-aws-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/secrets/private-deck/creds.json
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
-      SKIP_POLICIES: policy-acs,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
+      SKIP_POLICIES: policy-acs,policy-acs-central-ca-bundle,policy-acs-central-status,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -107,6 +108,7 @@ tests:
     - chain: ipi-install
     - ref: interop-opp-disk-diag
     - ref: interop-opp-kubelet-config
+    - ref: interop-opp-wait-for-api
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
@@ -137,7 +139,7 @@ tests:
       {{end}}'
   steps:
     allow_best_effort_post_steps: true
-    cluster_profile: vsphere-connected-2
+    cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "3"
       FAIL_ON_BREACH: "true"
@@ -147,6 +149,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/secrets/private-deck/creds.json
       OPENSHIFT_REQUIRED_CORES: "72"
       OPENSHIFT_REQUIRED_MEMORY: "288"
       OPERATORS: |
@@ -155,7 +158,7 @@ tests:
         ]
       RESOURCE_BIND_TIMEOUT: "180"
       SIZE_VARIANT: large
-      SKIP_POLICIES: policy-acs,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
+      SKIP_POLICIES: policy-acs,policy-acs-central-ca-bundle,policy-acs-central-status,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
     post:
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
@@ -163,8 +166,10 @@ tests:
     - chain: ipi-vsphere-post
     - ref: firewatch-report-issues
     pre:
+    - chain: ipi-vsphere-pre
     - ref: interop-opp-disk-diag
     - ref: interop-opp-kubelet-config
+    - ref: interop-opp-wait-for-api
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup

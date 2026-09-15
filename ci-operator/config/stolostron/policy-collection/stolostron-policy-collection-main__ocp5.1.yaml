@@ -32,7 +32,7 @@ images:
   items:
   - dockerfile_literal: |
       FROM this-is-ignored
-      RUN dnf install -y git python39
+      RUN dnf install -y git python39 jq
     from: cli
     optional: true
     to: cli-with-git
@@ -81,12 +81,13 @@ tests:
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_BREACH: "true"
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-opp.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.1-lp","opp-aws-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9181
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/secrets/private-deck/creds.json
       ODF_VERSION_MAJOR_MINOR: "5.1"
       OPERATORS: |
         [
@@ -111,6 +112,7 @@ tests:
     - chain: ipi-install
     - ref: interop-opp-disk-diag
     - ref: interop-opp-kubelet-config
+    - ref: interop-opp-wait-for-api
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
@@ -141,7 +143,7 @@ tests:
       {{end}}'
   steps:
     allow_best_effort_post_steps: true
-    cluster_profile: vsphere-connected-2
+    cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "6"
       DISABLE_ENVIRONMENT_CHECKER: "true"
@@ -152,6 +154,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9181
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/secrets/private-deck/creds.json
       ODF_VERSION_MAJOR_MINOR: "5.1"
       OPENSHIFT_REQUIRED_CORES: "72"
       OPENSHIFT_REQUIRED_MEMORY: "288"
@@ -160,9 +163,17 @@ tests:
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
       SIZE_VARIANT: large
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: mce-must-gather
+    - chain: ipi-vsphere-post
+    - ref: firewatch-report-issues
     pre:
+    - chain: ipi-vsphere-pre
     - ref: interop-opp-disk-diag
     - ref: interop-opp-kubelet-config
+    - ref: interop-opp-wait-for-api
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup

@@ -36,7 +36,7 @@ images:
   items:
   - dockerfile_literal: |
       FROM this-is-ignored
-      RUN dnf install -y git python39
+      RUN dnf install -y git python39 jq
     from: cli
     optional: true
     to: cli-with-git
@@ -96,12 +96,13 @@ tests:
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_BREACH: "true"
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-opp.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-aws-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/secrets/private-deck/creds.json
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
@@ -127,6 +128,7 @@ tests:
     - chain: ipi-install
     - ref: interop-opp-disk-diag
     - ref: interop-opp-kubelet-config
+    - ref: interop-opp-wait-for-api
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
@@ -159,7 +161,7 @@ tests:
       {{end}}'
   steps:
     allow_best_effort_post_steps: true
-    cluster_profile: vsphere-connected-2
+    cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "3"
       FAIL_ON_BREACH: "true"
@@ -169,6 +171,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/secrets/private-deck/creds.json
       OPENSHIFT_REQUIRED_CORES: "72"
       OPENSHIFT_REQUIRED_MEMORY: "288"
       OPERATORS: |
@@ -189,6 +192,7 @@ tests:
     - chain: ipi-vsphere-pre
     - ref: interop-opp-disk-diag
     - ref: interop-opp-kubelet-config
+    - ref: interop-opp-wait-for-api
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
