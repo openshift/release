@@ -27,6 +27,7 @@ readonly JUNIT_CLASSNAME="tls.probe.adherence.runtime"
 readonly SCC_NAME="tls-probe-capture-${NS}"  # cluster-scoped; suffix with NS so concurrent runs on a shared/long-lived cluster don't race on the same SCC
 readonly TRAFFIC_JOB_NAME="tls-probe-client-traffic"
 readonly TRAFFIC_JOB_TIMEOUT="60s"
+readonly CAPTURE_SELECTOR="app.kubernetes.io/name=tls-probe,app.kubernetes.io/component=capture"
 
 # Only "${NS}" and "${NS}-"-prefixed names are accepted: create_namespace and
 # cleanup pass this straight to `oc delete namespace`, so a typo or an
@@ -240,7 +241,7 @@ EOF
       | tail -20 || true
     die "DaemonSet failed to roll out — probe image may not be pullable"
   }
-  log "DaemonSet ready on $(oc get pods -n "${NS}" -l app.kubernetes.io/name=tls-probe --no-headers | wc -l) node(s)"
+  log "DaemonSet ready on $(oc get pods -n "${NS}" -l "${CAPTURE_SELECTOR}" --no-headers | wc -l) node(s)"
 }
 
 # ── 3. client traffic ────────────────────────────────────────────────────────
@@ -307,18 +308,33 @@ EOF
 wait_for_capture() {
   log "waiting for ${CAPTURE_SECS}s capture to complete (detected via container exit)"
   local deadline=$(( $(date +%s) + CAPTURE_SECS + 60 ))
+  local expected
+  expected=$(oc get daemonset/tls-probe -n "${NS}" -o jsonpath='{.status.desiredNumberScheduled}')
+  [[ "${expected}" =~ ^[1-9][0-9]*$ ]] \
+    || die "DaemonSet reported invalid desired pod count: ${expected:-empty}"
 
   while (( $(date +%s) < deadline )); do
-    local total exit_codes bad pending
-    total=$(oc get pods -n "${NS}" -l app.kubernetes.io/name=tls-probe --no-headers 2>/dev/null | wc -l | tr -d ' ')
-    exit_codes=$(oc get pods -n "${NS}" -l app.kubernetes.io/name=tls-probe \
-      -o jsonpath='{range .items[*]}{.status.containerStatuses[0].lastState.terminated.exitCode}{"\n"}{end}' 2>/dev/null)
+    local pods_json bad completed
+    pods_json=$(oc get pods -n "${NS}" -l "${CAPTURE_SELECTOR}" -o json)
 
-    bad=$(echo "${exit_codes}" | awk 'NF && $0 != "0"')
+    bad=$(jq -r '
+      [.items[].status.containerStatuses[]?
+       | select(.name == "capture")
+       | .lastState.terminated?
+       | select(.exitCode != 0)
+       | .exitCode]
+      | unique
+      | join(",")
+    ' <<< "${pods_json}")
     [[ -n "${bad}" ]] && die "capture container(s) exited non-zero: ${bad}"
 
-    pending=$(echo "${exit_codes}" | awk '$0 != "0"' | wc -l | tr -d ' ')
-    [[ "${total:-0}" -gt 0 ]] && [[ "${pending:-1}" -eq 0 ]] && return 0
+    completed=$(jq '
+      [.items[]
+       | select(any(.status.containerStatuses[]?;
+           .name == "capture" and .lastState.terminated.exitCode == 0))]
+      | length
+    ' <<< "${pods_json}")
+    [[ "${completed}" -eq "${expected}" ]] && return 0
     sleep 5
   done
 
@@ -342,7 +358,7 @@ collect_jsonl() {
         || oc logs "${pod}" -n "${NS}" 2>/dev/null; } \
       | grep -E '^\{' > "${out}" || true
     pod_count=$(( pod_count + 1 ))
-  done < <(oc get pods -n "${NS}" -l app.kubernetes.io/name=tls-probe \
+  done < <(oc get pods -n "${NS}" -l "${CAPTURE_SELECTOR}" \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)
 
   cat "${CAPTURES_DIR}"/*.jsonl > "${SCRATCH_DIR}/all-events.jsonl" 2>/dev/null \
