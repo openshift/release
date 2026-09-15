@@ -3,6 +3,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   loki:
     name: loki
     namespace: logging
@@ -35,6 +39,10 @@ images:
         as:
         - registry.redhat.io/ubi9/go-toolset:latest
     to: loki-operator-src
+  - context_dir: operator
+    dockerfile_path: passthrough-gateway.Dockerfile
+    from: base
+    to: passthrough-gateway
 operator:
   bundles:
   - as: loki-operator-bundle
@@ -49,6 +57,8 @@ operator:
     with: pipeline:lokistack-gateway
   - pullspec: quay.io/observatorium/opa-openshift:latest
     with: pipeline:opa-openshift
+  - pullspec: quay.io/openshift-logging/passthrough-gateway:.+
+    with: pipeline:passthrough-gateway
 promotion:
   to:
   - additional_images:
@@ -147,6 +157,47 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-generic-claim
+- as: e2e-prgate
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  optional: true
+  skip_if_only_changed: ^(?:.*/)?docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      OPERATORS: |
+        [
+            {"name": "cluster-logging", "source": "redhat-operators", "install_namespace": "openshift-logging", "target_namespaces": "", "operator_group": "openshift-logging"}
+        ]
+      TEST_SUITE: openshift-logging-e2e-tests/loki-operator
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        for ns in openshift-logging openshift-operators-redhat; do
+          oc create namespace "$ns"
+          oc annotate namespace "$ns" openshift.io/node-selector=""
+          oc label namespace "$ns" openshift.io/cluster-monitoring="true"
+        done
+        cd /tmp && operator-sdk run bundle --timeout=10m --install-mode AllNamespaces --security-context-config restricted -n openshift-operators-redhat "$OO_BUNDLE"
+        oc wait --for condition=Available --timeout=5m -n openshift-operators-redhat deployment loki-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: loki-operator-bundle
+      from: cli-operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: install-operators
+    - ref: openshift-observability-logging-e2e-tests
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
