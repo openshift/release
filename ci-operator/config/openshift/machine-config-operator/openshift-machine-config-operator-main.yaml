@@ -106,49 +106,65 @@ tests:
 - as: nested-podman-test
   capabilities:
   - nested-podman
-  commands: |
-    set -xeuo pipefail
-    # ci-operator overrides the image ENTRYPOINT, so the nested-podman
-    # entrypoint.sh does not run automatically. Invoke it explicitly to create
-    # the podman configuration (registries.conf/storage.conf) before use.
-
-    export REGISTRY_AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
-    /entrypoint.sh
-    # entrypoint.sh only writes config; it does not start the API service.
-    # Start the podman system service so testcontainers-go has a socket to talk to.
-    PODMAN_PID=""
-    cleanup() {
-      if [[ -n "${PODMAN_PID}" ]]; then
-        kill "${PODMAN_PID}" 2>/dev/null || true
-        wait "${PODMAN_PID}" 2>/dev/null || true
-      fi
-    }
-    trap cleanup EXIT
-    podman system service --time=0 &
-    PODMAN_PID=$!
-    # Wait for the podman socket to become available.
-    SOCKET_PATH="$(podman info --format '{{.Host.RemoteSocket.Path}}')"
-    for _ in $(seq 1 30); do
-      [[ -S "${SOCKET_PATH}" ]] && break
-      sleep 1
-    done
-    # Point testcontainers-go at the podman socket and disable the ryuk reaper,
-    # which does not work reliably in the rootless nested-podman environment.
-    export DOCKER_HOST="unix://${SOCKET_PATH}"
-    export TESTCONTAINERS_RYUK_DISABLED=true
-
-    podman pull quay.io/zzlotnik/testing:kwokdriver
-    podman create --name kwokdriver quay.io/zzlotnik/testing:kwokdriver
-    podman cp kwokdriver:/usr/local/bin/kwokdriver ./kwokdriver
-    podman rm kwokdriver
-    ./kwokdriver
-  container:
-    from: nested-podman
   nested_podman: true
-  secrets:
-  - bundle: registry-pull-credentials
-    mount_path: /var/secrets/registry-pull-secret
-    namespace: test-credentials
+  steps:
+    test:
+    - as: nested-podman-test
+      commands: |
+        set -xeuo pipefail
+        # ci-operator overrides the image ENTRYPOINT, so the nested-podman
+        # entrypoint.sh does not run automatically. Invoke it explicitly to create
+        # the podman configuration (registries.conf/storage.conf) before use.
+
+        export REGISTRY_AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
+        cfg_dir="$(mktemp -d)"
+        cp "$REGISTRY_AUTH_FILE" "$cfg_dir/config.json"
+        export DOCKER_CONFIG="$cfg_dir"
+
+        /entrypoint.sh
+        # entrypoint.sh only writes config; it does not start the API service.
+        # Start the podman system service so testcontainers-go has a socket to talk to.
+        PODMAN_PID=""
+        cleanup() {
+          if [[ -n "${PODMAN_PID}" ]]; then
+            kill "${PODMAN_PID}" 2>/dev/null || true
+            wait "${PODMAN_PID}" 2>/dev/null || true
+          fi
+
+          rm rf "$cfg_dir"
+        }
+        trap cleanup EXIT
+        podman system service --time=0 &
+        PODMAN_PID=$!
+        # Wait for the podman socket to become available.
+        SOCKET_PATH="$(podman info --format '{{.Host.RemoteSocket.Path}}')"
+        for _ in $(seq 1 30); do
+          [[ -S "${SOCKET_PATH}" ]] && break
+          sleep 1
+        done
+        # Point testcontainers-go at the podman socket and disable the ryuk reaper,
+        # which does not work reliably in the rootless nested-podman environment.
+        export DOCKER_HOST="unix://${SOCKET_PATH}"
+        export TESTCONTAINERS_RYUK_DISABLED=true
+
+        podman pull quay.io/zzlotnik/testing:kwokdriver
+        podman create --name kwokdriver quay.io/zzlotnik/testing:kwokdriver
+        podman cp kwokdriver:/usr/local/bin/kwokdriver ./kwokdriver
+        podman rm kwokdriver
+        ./kwokdriver
+      credentials:
+      - bundle: registry-pull-credentials
+        mount_path: /var/secrets/registry-pull-secret
+        namespace: test-credentials
+      dependencies:
+      - env: OPENSHIFT_RELEASE_IMAGE
+        name: release:latest
+      from: nested-podman
+      grace_period: 10s
+      nested_podman: true
+      resources:
+        requests:
+          cpu: 500m
 - as: unit
   commands: make test-unit
   container:
