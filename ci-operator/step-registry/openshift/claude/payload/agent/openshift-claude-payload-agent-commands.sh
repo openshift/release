@@ -763,9 +763,9 @@ fi
 
 # Send Slack summary including analysis and any revert actions
 if [ "${JOB_TYPE:-}" = "presubmit" ]; then
-    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
 else
-    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
+    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/${JOB_NAME}/${BUILD_ID}"
 fi
 
 echo "Asking ${AGENT_DISPLAY_NAME} to summarize findings for Slack..."
