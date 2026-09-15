@@ -5,6 +5,30 @@ ENV_FILE="${SHARED_DIR}/capz-test-env.sh"
 
 { set +o xtrace; } 2>/dev/null
 
+resolve_subscription_id() {
+  local cred_dir="$1"
+  local subscription_name="${2:-}"
+  local name_file
+
+  if [[ -s "${cred_dir}/subscription-id" ]]; then
+    cat "${cred_dir}/subscription-id"
+    return
+  fi
+
+  if [[ -z "${subscription_name}" ]]; then
+    return
+  fi
+
+  for name_file in "${cred_dir}"/customer-*-subscription-name; do
+    [[ -f "${name_file}" ]] || continue
+    if [[ "$(cat "${name_file}")" == "${subscription_name}" ]]; then
+      local id_file="${name_file%-subscription-name}-subscription-id"
+      [[ -s "${id_file}" ]] && cat "${id_file}"
+      return
+    fi
+  done
+}
+
 # Resolve Azure credentials from mounted secrets.
 AZURE_CLIENT_ID=""
 AZURE_CLIENT_SECRET=""
@@ -16,7 +40,7 @@ if [[ -n "${VAULT_SECRET_PROFILE:-}" && -d "/var/run/aro-hcp-${VAULT_SECRET_PROF
   AZURE_CLIENT_ID="$(cat "${CRED_DIR}/client-id")"
   AZURE_CLIENT_SECRET="$(cat "${CRED_DIR}/client-secret")"
   AZURE_TENANT_ID="$(cat "${CRED_DIR}/tenant")"
-  AZURE_SUBSCRIPTION_ID="$(cat "${CRED_DIR}/subscription-id")"
+  AZURE_SUBSCRIPTION_ID="$(resolve_subscription_id "${CRED_DIR}" "${CUSTOMER_SUBSCRIPTION:-}")"
   echo "[write-env] Credentials resolved from ${CRED_DIR}"
 elif [[ -n "${CLUSTER_PROFILE_DIR:-}" && -f "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" ]]; then
   AZURE_CLIENT_ID=$(jq -r .clientId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
@@ -69,17 +93,7 @@ if [[ -f "${SLOT_ENV_FILE}" ]]; then
   if [[ -n "${CUSTOMER_SUBSCRIPTION:-}" ]]; then
     # CUSTOMER_SUBSCRIPTION is a subscription name; resolve to UUID via vault profile files.
     CRED_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
-    RESOLVED_SUB_ID=""
-    for name_file in "${CRED_DIR}"/customer-*-subscription-name; do
-      [[ -f "${name_file}" ]] || continue
-      if [[ "$(cat "${name_file}")" == "${CUSTOMER_SUBSCRIPTION}" ]]; then
-        id_file="${name_file%-subscription-name}-subscription-id"
-        if [[ -f "${id_file}" ]]; then
-          RESOLVED_SUB_ID="$(cat "${id_file}")"
-        fi
-        break
-      fi
-    done
+    RESOLVED_SUB_ID="$(resolve_subscription_id "${CRED_DIR}" "${CUSTOMER_SUBSCRIPTION}")"
     if [[ -n "${RESOLVED_SUB_ID}" ]]; then
       AZURE_SUBSCRIPTION_ID="${RESOLVED_SUB_ID}"
       echo "[write-env] AZURE_SUBSCRIPTION_ID resolved from CUSTOMER_SUBSCRIPTION"
