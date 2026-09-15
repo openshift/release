@@ -10,26 +10,6 @@ ref:
     group: github-bot-token
     mount_path: /var/run/github-token
   env:
-  - name: EVAL_MANIFEST
-    default: "false"
-    documentation: |-
-      Set to "true" to run PR evals from evals.yaml at the EVAL_WORKDIR
-      repository root. Entries declare config, run, parallelism, max_turns,
-      optional setup_script and eval_cases_dir, and triggers (nonempty for run: pr). Triggers
-      are literal repository-relative path prefixes matched against the
-      PULL_BASE_SHA...HEAD diff. No matches means success without Claude calls.
-      eval_cases_dir filters case-only changes to exact case IDs via --cases.
-      Skill/shared-file changes or removed case directories run the full dataset.
-      It must match the eval YAML's dataset.path and adds no implicit triggers.
-      periodic/manual entries are skipped; those run modes are follow-on work.
-      Manifest mode requires a PR Git checkout including the base commit.
-      It is mutually exclusive with EVAL_DISCOVER and explicit EVAL_CONFIG.
-      EVAL_EXTRA_ARGS is rejected. Other global EVAL_* runner overrides are
-      ignored: per-eval settings come from the manifest and models.skill
-      comes from each unmodified eval YAML. CLAUDE_MODEL still chooses the
-      outer orchestrator model. max_turns caps that orchestrator session,
-      consistent with existing EVAL_MAX_TURNS; it is not a per-case limit.
-      Schema and tests: hack/claude-agent-eval/ in openshift/release.
   - name: EVAL_CONFIG
     default: "eval.yaml"
   - name: EVAL_MODEL
@@ -67,9 +47,6 @@ ref:
     default: ""
   - name: EVAL_DISCOVER
     default: ""
-    documentation: |-
-      Deprecated for new jobs; use EVAL_MANIFEST. Existing glob-discovery
-      jobs retain their behavior until they explicitly migrate.
   - name: EVAL_WORKDIR
     default: ""
     documentation: |-
@@ -97,9 +74,6 @@ ref:
   timeout: 4h0m0s
   grace_period: 1m0s
   documentation: |-
-    Runs skill evaluations using the agent-eval-harness. Installs the
-    eval harness plugin, runs /eval-run with the specified config and
-    model, and produces JUnit XML, AutoDL session metrics, and artifacts.
-    Eval traces and reports are archived for download.
-    EVAL_MANIFEST enables repo-local enrollment and PR trigger filtering
-    with namespaced per-eval artifacts and aggregate JUnit results.
+    Runs skill evaluations through the legacy EVAL_* input adapter and shared
+    Python engine. Produces JUnit, eval reports, run archives, and AutoDL metrics.
+    Adapter contract and migration: https://github.com/openshift/release/blob/main/hack/claude-agent-eval/README.md

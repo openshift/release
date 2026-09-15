@@ -1,0 +1,40 @@
+ref:
+  as: openshift-claude-agent-eval-manifest
+  from: claude-ai-helpers
+  commands: openshift-claude-agent-eval-manifest-commands.sh
+  credentials:
+  - collection: ci-claude-code
+    group: claude-openshift-ci
+    mount_path: /var/run/claude-code-service-account
+  - collection: technical-release-team
+    group: github-bot-token
+    mount_path: /var/run/github-token
+  env:
+  - name: EVAL_WORKDIR
+    default: ""
+    documentation: |-
+      Root of the PR Git checkout containing evals.yaml and PULL_BASE_SHA history.
+      Defaults to /opt/ai-helpers. See hack/claude-agent-eval/README.md in openshift/release.
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+    documentation: Model for the outer orchestrator; skill models come from each eval YAML.
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "openshift-ci-prow-agents"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/google-token"
+  - name: GITHUB_TOKEN_PATH
+    default: "/var/run/github-token/token"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+  timeout: 4h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Runs PR evals selected from repo-root evals.yaml using agent-eval-harness.
+    Produces aggregate JUnit, per-eval reports, archived runs, and AutoDL metrics.
+    Manifest contract and integration: https://github.com/openshift/release/blob/main/hack/claude-agent-eval/README.md
