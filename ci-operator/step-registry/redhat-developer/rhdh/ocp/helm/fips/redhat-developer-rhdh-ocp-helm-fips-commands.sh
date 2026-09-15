@@ -192,7 +192,8 @@ elif [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     IMAGE_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
-        TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+        #TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+        TAG_NAME="next"
     else
         TAG_NAME="next"
     fi
