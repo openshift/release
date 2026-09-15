@@ -1,0 +1,52 @@
+workflow:
+  as: sandboxed-containers-operator-e2e-azure-restricted-proxy-mirror
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      RESTRICTED_NETWORK: "yes"
+      BASTION_BOOT_IMAGE: "azureopenshift:aro4:aro_417:417.94.20240701"
+      BASTION_VM_SIZE: "Standard_D4s_v3"
+      COMPUTE_NODE_REPLICAS: "1"
+      OPERATORS_TO_MIRROR: "sandboxed-containers-operator"
+      SLEEP_DURATION: 3h
+      TEST_PARALLEL: 1
+      FORCE_SUCCESS_EXIT: "no"
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+      MUST_GATHER_TIMEOUT: "35m"
+      ENABLE_MUST_GATHER: "false"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
+      TEST_FILTERS: ~Disruptive&
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-vnet
+    - chain: azure-provision-bastionhost
+    - ref: openshift-cluster-bot-rbac
+    - ref: sandboxed-containers-operator-provision-acr-endpoint
+    - ref: ipi-install-rbac
+    - chain: ipi-conf-azure
+    - chain: sandboxed-containers-operator-proxy-setup
+    - ref: sandboxed-containers-operator-ipi-conf-acr-mirror
+    - ref: ipi-conf-azure-provisionednetwork
+    - chain: azure-provision-service-principal-minimal-permission
+    - ref: ipi-install-install
+    - chain: cucushift-installer-check
+    - ref: sandboxed-containers-operator-verify-restricted-network
+    - ref: sandboxed-containers-operator-mirror-operator
+    - chain: sandboxed-containers-operator-pre
+    test:
+    - ref: openshift-extended-test
+    post:
+    - ref: cucushift-installer-wait
+      timeout: 12h10m0s
+      best_effort: true
+      optional_on_success: true
+    - ref: sandboxed-containers-operator-gather-must-gather
+    - chain: cucushift-installer-rehearse-azure-ipi-disconnected-deprovision
+  documentation: |-
+    Run openshift-extended-test on a Restricted Network Azure IPI cluster
+    (proxy + ACR mirror) with sandboxed containers deployed. Matches Red
+    Hat's "Restricted Network" definition: traffic is limited by proxy
+    and image pulls come from a mirror, but the cluster API stays public.
+    For a true "Disconnected" workflow (egress fully blocked, no proxy),
+    see a future sandboxed-containers-operator-e2e-azure-disconnected
+    workflow.
