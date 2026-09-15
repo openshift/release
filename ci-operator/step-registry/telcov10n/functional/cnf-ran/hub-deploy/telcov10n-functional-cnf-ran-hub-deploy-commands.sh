@@ -116,10 +116,13 @@ HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfi
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
-# The private key spans several lines in group_vars/all, take everything between the quotes
+# Vault copies ansible_group_all as YAML; the key is a literal block (|), not a quoted string
 install -m 600 /dev/null "/tmp/temp_ssh_key"
-sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${INVENTORY_PATH}/group_vars/all" \
-  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "/tmp/temp_ssh_key"
+sed -n '/^ansible_ssh_private_key:/,$ {
+  /^ansible_ssh_private_key:/d
+  /^[^[:space:]]/q
+  s/^[[:space:]]*//p
+}' "${INVENTORY_PATH}/group_vars/all" > "/tmp/temp_ssh_key"
 
 CLUSTER_VERSION=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}" \
