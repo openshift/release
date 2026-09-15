@@ -23,8 +23,12 @@ SSH_KEY="$SHARED_DIR/$CLUSTER_NAME-key"
 chmod 600 $SSH_KEY
 HAPROXY_REMOTE_CFG="/etc/haproxy/haproxy.cfg"
 
+# Tracing is disabled while the private key is read, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
 export ssh_key_string
+set -x
 tmp_ssh_key="/tmp/ssh-private-key"
 envsubst <<"EOF" >${tmp_ssh_key}
 -----BEGIN OPENSSH PRIVATE KEY-----
@@ -130,12 +134,20 @@ for plugin in "${plugins_list[@]}"; do
     fi
 done
 
+# Tracing is disabled while the API key is handled, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
+set -x
 
 # Login to IBM cloud
 echo "Logging in to IBM Cloud..."
+# Tracing is disabled while the API key is handled, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 ibmcloud login --apikey "$IC_API_KEY" -r "$IC_REGION" -g "$RESOURCE_GROUP" || { echo "Login failed"; exit 1; }
+set -x
 echo "Login successful."
 
 # To get the bastion node IP

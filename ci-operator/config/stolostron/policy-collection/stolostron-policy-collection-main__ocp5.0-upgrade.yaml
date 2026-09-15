@@ -29,6 +29,7 @@ tests:
 - as: interop-opp-upgrade-aws
   capabilities:
   - intranet
+  cluster: build05
   cron: 0 23 31 2 *
   reporter_config:
     channel: '#opp-discussion'
@@ -47,10 +48,12 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
       ACM_SUBSCRIPTION_NAMESPACE: ocm
+      AWS_COMPUTE_VOLUME_SIZE: "500"
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FAIL_ON_BREACH: "true"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.0-lp","opp-aws-lp","opp-lp","opp-upgrade"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
@@ -74,16 +77,20 @@ tests:
     - ref: ipi-conf-telemetry
     - ref: ipi-conf-aws-custom-az
     - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-rootvolume
     - ref: ipi-install-monitoringpvc
     - chain: ipi-install
-    test:
+    - ref: interop-opp-disk-diag
+    - ref: interop-opp-kubelet-config
     - ref: install-operators
+    test:
     - ref: interop-opp-backup
     - ref: interop-opp-preflight
     - ref: interop-opp-upgrade
     - ref: cucushift-upgrade-healthcheck
     - ref: interop-opp-product-upgrade-acm
     - ref: interop-opp-smoke
+    - ref: interop-opp-skip-ratio-gate
 zz_generated_metadata:
   branch: main
   org: stolostron

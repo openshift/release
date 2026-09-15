@@ -1,6 +1,6 @@
 # GSM Configuration File for Secret Management
 # This file defines how secrets from Google Secret Manager are bundled and consumed in our CI.
-# See docs for further info: [TODO docs link]
+# See docs for further info: https://docs.ci.openshift.org/how-tos/adding-a-new-secret-to-ci-gsm/
 
 cluster_groups:
   build_farm:
@@ -188,6 +188,17 @@ bundles:
     targets:
       - cluster: core-ci
         namespace: ci
+
+  - name: test-harness-ui-session-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: test-harness
+        fields:
+          - name: oauth-proxy-session-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: test-harness
 
   - name: registry-pull-credentials
     dockerconfig:
@@ -1834,6 +1845,28 @@ bundles:
       - cluster_groups: [build_farm]
         namespace: ci
 
+  - name: cert-issuer
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: cert-manager
+        fields:
+          - name: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+      - collection: test-platform-infra
+        group: cert-issuer
+        fields:
+          - name: service-account
+            as: key.json
+      - collection: test-platform-infra
+        group: openshift-ci-build-farm-cert-issuer
+        fields:
+          - name: service-account
+            as: openshift-ci-build-farm-cert-issuer.json
+    sync_to_cluster: true
+    targets:
+      - cluster_groups: [managed_clusters]
+        namespace: cert-manager
+
   - name: hypershift-workload-credentials-hosted-mgmt2
     gsm_secrets:
       - collection: test-platform-infra
@@ -1846,6 +1879,32 @@ bundles:
     targets:
       - cluster_groups: [build_farm]
         namespace: test-credentials
+      - cluster_groups: [build_farm]
+        namespace: ci
+
+  - name: rosa-cluster-lease-manager
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: rosa-cluster-lease-credentials
+        fields:
+          - name: sa--dot--rosa-cluster-lease-manager--dot--hosted-mgmt--dot--config
+            as: kubeconfig
+          - name: sa--dot--rosa-cluster-lease-manager--dot--hosted-mgmt--dot--token--dot--txt
+            as: sa.rosa-cluster-lease-manager.hosted-mgmt.token.txt
+    sync_to_cluster: true
+    targets:
+      - cluster_groups: [build_farm]
+        namespace: test-credentials
+
+  - name: github-credentials-openshift-ci-robot-private-git-cloner
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-ci-robot
+        fields:
+          - name: private-git-cloner
+            as: oauth
+    sync_to_cluster: true
+    targets:
       - cluster_groups: [build_farm]
         namespace: ci
 
@@ -2664,6 +2723,47 @@ bundles:
     - collection: hcm-aro
       group: aro-classic-stg
     name: cluster-secrets-aro-classic-stg
+    sync_to_cluster: true
+    targets:
+    - cluster_groups:
+      - non_app_ci
+      namespace: ci
+
+  - dockerconfig:
+      as: pull-secret
+      registries:
+      - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        group: cloud--dot--openshift--dot--com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        group: quay--dot--io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        group: quay--dot--io/multi-arch
+        registry_url: quay.io/multi-arch
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--redhat--dot--io-pull-secret
+        registry_url: registry.redhat.io
+    gsm_secrets:
+    - collection: hcm-aro
+      group: aro-hcp-dev
+    name: cluster-secrets-aro-hcp-dev
     sync_to_cluster: true
     targets:
     - cluster_groups:
@@ -5867,9 +5967,6 @@ bundles:
         email_field: email
         group: registry--dot--redhat--dot--io-pull-secret
         registry_url: registry.redhat.io
-    gsm_secrets:
-    - collection: quay-tests
-      group: gcp-quay-qe
     name: cluster-secrets-gcp-quay-qe
     sync_to_cluster: true
     targets:
@@ -8762,9 +8859,6 @@ bundles:
       - auth_field: token_image-puller_build04_reg_auth_value--dot--txt
         group: build_farm
         registry_url: registry.build04.ci.openshift.org
-    gsm_secrets:
-    - collection: quay-tests
-      group: azure-quay-qe
     name: cluster-secrets-azure-quay-qe
     sync_to_cluster: true
     targets:
@@ -10780,3 +10874,316 @@ bundles:
     - cluster_groups:
       - user_secrets_target_clusters
       namespace: ci
+
+  # CRT Infrastructure Secrets...
+  - name: apps-engineering-secret
+    gsm_secrets:
+      - collection: crt
+        group: apps-engineering-secret
+        fields:
+          - id
+          - secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+
+  - name: ci-chat-bot-slack-app
+    gsm_secrets:
+      - collection: crt
+        group: ci-chat-bot
+        fields:
+          - slack-app-bot-token
+          - slack-app-bot-app-token
+          - slack-app-bot-signing-secret
+          - rosa-aws-access-key-id
+          - rosa-aws-secret-access-key
+          - gcs-service-account-key
+          - jira-password
+          - jira-bot-password
+          - jira-token
+          - rosa-subnet-ids
+          - rosa-billing-account-id
+          - rosa-oidc-config-id
+          - rosa-admin-ocm
+          - name: sa--dot--ci-chat-bot-mce--dot--dpcr--dot--config
+            as: sa.ci-chat-bot-mce.dpcr.config
+          - name: sa--dot--ci-chat-bot-mce--dot--dpcr--dot--token--dot--txt
+            as: sa.ci-chat-bot-mce.dpcr.token.txt
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
+  - name: dptools-aws-read-only-bot
+    gsm_secrets:
+      - collection: crt
+        group: dptools-aws-read-only-bot
+        fields:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_KEY
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: app.ci
+        namespace: continuous-release-jobs
+
+  - name: dptools-jenkins-service-account-kubeconfig
+    gsm_secrets:
+      - collection: crt
+        group: dptools-jenkins-service-account-kubeconfig
+        fields:
+          - kubeconfig
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: app.ci
+        namespace: continuous-release-jobs
+
+  - name: dptp-github-ldap-user-group-creator
+    gsm_secrets:
+      - collection: crt
+        group: dptp-github-ldap-user-group-creator
+        fields:
+          - kubeconfig
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
+  - name: team-crt-bigquery-verified-wri-credentials
+    gsm_secrets:
+      - collection: crt
+        group: jira-lifecycle-plugin-bigquery
+        fields:
+          - name: team-crt-bigquery-verified-wri--dot--json
+            as: team-crt-bigquery-verified-wri.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
+  - name: crt-job-aggregator-credentials
+    gsm_secrets:
+      - collection: crt
+        group: job-aggregator-credentials
+        fields:
+          - name: google-serviceaccount-credentials--dot--json
+            as: google-serviceaccount-credentials.json
+    sync_to_cluster: true
+    targets:
+      - cluster_groups: [ build_farm ]
+        namespace: test-credentials
+ 
+  - name: openshift-crt-sonar-tokens
+    gsm_secrets:
+      - collection: crt
+        group: openshift-crt-sonar
+        fields:
+          - ci-chat-bot
+          - release-controller
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
+  - name: jira-token-lifecycle-plugin
+    gsm_secrets:
+      - collection: crt
+        group: prow-jira-token
+        fields:
+          - bot-password
+          - password
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
+  - name: files-cache-session-secret
+    gsm_secrets:
+      - collection: crt
+        group: release-controller-amd64-private-session-secret
+        fields:
+          - session_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release-priv
+
+  - name: files-cache-session-secret
+    gsm_secrets:
+      - collection: crt
+        group: release-controller-arm64-private-session-secret
+        fields:
+          - session_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release-arm64-priv
+
+  - name: jira-credentials-openshift-jira-robot
+    gsm_secrets:
+      - collection: crt
+        group: release-controller-jira-token
+        fields:
+          - bot-password
+          - password
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
+  - name: files-cache-session-secret
+    gsm_secrets:
+      - collection: crt
+        group: release-controller-multi-private-session-secret
+        fields:
+          - session_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release-multi-priv
+
+  - name: release-controller-oc-git-credentials
+    gsm_secrets:
+      - collection: crt
+        group: release-controller-oc-git-credentials
+        fields:
+          - name: --dot--git-credentials
+            as: .git-credentials
+          - git_url_with_credentials
+          - github-oauth-token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
+  - name: files-cache-session-secret
+    gsm_secrets:
+      - collection: crt
+        group: release-controller-ppc64le-private-session-secret
+        fields:
+          - session_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release-ppc64le-priv
+
+  - name: release-controller-qci-mirror-secret
+    gsm_secrets:
+      - collection: crt
+        group: release-controller-qci-mirror-secret
+        fields:
+          - name: config--dot--json
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release
+      - cluster: app.ci
+        namespace: ci-release-priv
+      - cluster: app.ci
+        namespace: ci-release-arm64
+      - cluster: app.ci
+        namespace: ci-release-arm64-priv
+      - cluster: app.ci
+        namespace: ci-release-multi
+      - cluster: app.ci
+        namespace: ci-release-multi-priv
+      - cluster: app.ci
+        namespace: ci-release-multi-2
+      - cluster: app.ci
+        namespace: ci-release-multi-2-priv
+      - cluster: app.ci
+        namespace: ci-release-ppc64le
+      - cluster: app.ci
+        namespace: ci-release-ppc64le-priv
+      - cluster: app.ci
+        namespace: ci-release-s390x
+      - cluster: app.ci
+        namespace: ci-release-s390x-priv
+
+  - name: release-controller-quay-mirror-secret
+    gsm_secrets:
+      - collection: crt
+        group: release-controller-quay-mirror-secret
+        fields:
+          - name: config--dot--json
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release
+      - cluster: app.ci
+        namespace: ci-release-priv
+      - cluster: app.ci
+        namespace: ci-release-arm64
+      - cluster: app.ci
+        namespace: ci-release-arm64-priv
+      - cluster: app.ci
+        namespace: ci-release-multi
+      - cluster: app.ci
+        namespace: ci-release-multi-priv
+      - cluster: app.ci
+        namespace: ci-release-multi-2
+      - cluster: app.ci
+        namespace: ci-release-multi-2-priv
+      - cluster: app.ci
+        namespace: ci-release-ppc64le
+      - cluster: app.ci
+        namespace: ci-release-ppc64le-priv
+      - cluster: app.ci
+        namespace: ci-release-s390x
+      - cluster: app.ci
+        namespace: ci-release-s390x-priv
+
+  - name: files-cache-session-secret
+    gsm_secrets:
+      - collection: crt
+        group: release-controller-s390x-private-session-secret
+        fields:
+          - session_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release-s390x-priv
+
+  - name: release-payload-controller-google-credentials
+    gsm_secrets:
+      - collection: crt
+        group: release-payload-controller-google-credentials
+        fields:
+          - name: credentials--dot--json
+            as: credentials.json
+          - project_id
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
+  - name: release-payload-modifier-token
+    gsm_secrets:
+      - collection: crt
+        group: release-payload-modifier
+        fields:
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster_groups: [ build_farm ]
+        namespace: test-credentials
+ 
+  - name: release-watcher-bot-token
+    gsm_secrets:
+      - collection: crt
+        group: release-watcher
+        fields:
+          - TOKEN
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+

@@ -49,7 +49,10 @@ function urlencode() {
 function prometheus_var_init() {
 	HOSTNAME=$(oc get routes/prometheus-k8s -n openshift-monitoring -o json | jq -r '.spec.host')
 	# Do not exit with err if a token was not obtained. Collecting metrics is optional and should not fail the whole run
+	[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+	set +x
 	TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s || true)
+	$WAS_TRACING && set -x
 	export HOSTNAME
 	export TOKEN
 }

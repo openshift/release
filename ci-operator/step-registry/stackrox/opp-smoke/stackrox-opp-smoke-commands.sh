@@ -1,5 +1,12 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
+
+# shellcheck disable=SC2317
+_propagate_junit () {
+    mkdir -p "${SHARED_DIR}/junit"
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+}
+trap _propagate_junit EXIT
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -37,7 +44,7 @@ cd /tmp/stackrox/qa-tests-backend/src/main/proto
 typeset target=''
 for link in api internalapi storage test tools; do
     if [[ -L "${link}" ]]; then
-        target=$(readlink -f "${link}")
+        target="$(readlink -f "${link}")"
         rm "${link}"
         cp -r "${target}" "${link}"
     fi
@@ -70,6 +77,9 @@ if [[ -f /tmp/vault/stackrox-stackrox-e2e-tests/GOOGLE_ARTIFACT_REGISTRY_SERVICE
     GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2="$(cat /tmp/vault/stackrox-stackrox-e2e-tests/GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2)"
     export GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2
 fi
+
+# Re-enable trace logging now that all credentials are loaded
+set -x
 
 cd /tmp/stackrox/qa-tests-backend
 

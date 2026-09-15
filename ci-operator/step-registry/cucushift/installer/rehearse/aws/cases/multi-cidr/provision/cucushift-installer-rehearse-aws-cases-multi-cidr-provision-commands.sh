@@ -543,7 +543,7 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
 # so that the credentials of the build farm registry can be saved in docker client config file.
 # A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
+KUBECONFIG="" oc registry login
 ocp_version=$(oc adm release info ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
 
@@ -605,14 +605,14 @@ function save_artifacts()
 
 
 echo "Creating cluster 1"
-cat ${install_dir1}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/cluster-1-install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${install_dir1}/install-config.yaml" | tee "${ARTIFACT_DIR}/cluster-1-install-config.yaml"
 openshift-install --dir="${install_dir1}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 ret="$?"
 echo "Installer exit with code $ret"
 
 echo "Creating cluster 2"
-cat ${install_dir2}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/cluster-2-install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${install_dir2}/install-config.yaml" | tee "${ARTIFACT_DIR}/cluster-2-install-config.yaml"
 openshift-install --dir="${install_dir2}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 ret="$?"
