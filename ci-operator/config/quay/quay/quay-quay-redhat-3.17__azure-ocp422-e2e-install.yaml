@@ -1,0 +1,74 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_path: web/Containerfile.playwright
+    to: quay-playwright-runner
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: azure-blob-3-16-daily-4-22
+  cron: '@daily'
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      COMPUTE_NODE_TYPE: Standard_D8as_v5
+      ENABLE_BUILD_SUPPORT: "true"
+      PLAYWRIGHT_GIT_REPO: https://github.com/quay/quay.git
+      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP'
+      QUAY_EXTRA_CONFIG: |
+        FEATURE_USER_METADATA: true
+        FEATURE_EDIT_QUOTA: true
+        FEATURE_IMMUTABLE_TAGS: true
+        FEATURE_SPARSE_INDEX: true
+        FEATURE_CHANGE_TAG_EXPIRATION: true
+        FEATURE_IMAGE_PULL_STATS: false
+        LOG_ARCHIVE_LOCATION: default
+        ACTION_LOG_ARCHIVE_LOCATION: default
+        SESSION_TIMEOUT: 2h
+        FEATURE_MAILING: true
+        MAIL_SERVER: mailpit.quay-enterprise.svc.cluster.local
+        MAIL_PORT: 1025
+        MAIL_USE_TLS: false
+        MAIL_USE_AUTH: false
+        MAIL_DEFAULT_SENDER: quay@quayqe.local
+        DEFAULT_UI: react
+        SUPER_USERS:
+          - admin
+        GLOBAL_READONLY_SUPER_USERS:
+          - readonly
+      QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-22
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_STORAGE_PROVIDER: azure
+    post:
+    - ref: quay-deprovision
+    - chain: ipi-azure-post
+    test:
+    - ref: quay-enable-catalogsource
+    - ref: quay-provisioning-tls
+    - ref: quay-provisioning-builder
+    - ref: quay-deploy-mailpit
+    - ref: quay-deploy-azure-blob
+    - ref: quay-test-e2e
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: redhat-3.17
+  org: quay
+  repo: quay
+  variant: azure-ocp422-e2e-install
