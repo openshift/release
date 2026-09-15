@@ -1,0 +1,64 @@
+ref:
+  as: optional-operators-enable-index-catalog
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  cli: latest
+  grace_period: 10m
+  timeout: 45m
+  commands: optional-operators-enable-index-catalog-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  env:
+  - name: INDEX_IMAGE
+    default: ""
+    documentation: |-
+      Optional IIB / FBC catalog index image (for example
+      registry-proxy.engineering.redhat.com/rh-osbs/iib@sha256:...). When empty
+      (the default) this step is a no-op and the cluster keeps redhat-operators.
+      When set, the step applies brew/stage mirrors, disables redhat-operators,
+      and creates a CatalogSource from this image.
+  - name: MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE
+    default: ""
+    documentation: |-
+      Gangway / runtime override for INDEX_IMAGE. When set, it takes
+      precedence so a run can pin a specific IIB without editing the
+      ci-operator config.
+  - name: CATALOGSOURCE_NAME
+    default: cs-custom
+    documentation: Name of the CatalogSource created in openshift-marketplace.
+  - name: CATALOGSOURCE_DISPLAY_NAME
+    default: Custom Operators Catalog
+    documentation: displayName on the CatalogSource.
+  - name: PACKAGE_NAME
+    default: ""
+    documentation: |-
+      Optional package to wait for in PackageManifest after the catalog is
+      READY (for example cluster-kube-descheduler-operator). When empty, the
+      step only waits for the CatalogSource to become READY.
+  - name: DISABLE_REDHAT_OPERATORS
+    default: "true"
+    documentation: |-
+      When true (and INDEX_IMAGE is set), disable and delete the default
+      redhat-operators CatalogSource so PackageManifests come from the custom
+      catalog.
+  documentation: |-
+    Optionally replace redhat-operators with a custom IIB/FBC CatalogSource.
+
+    If INDEX_IMAGE (or MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE) is empty, the
+    step exits 0 and leaves the default catalogs in place.
+
+    If an index image is provided:
+    1. Merge brew/stage pull credentials into the cluster pull-secret
+    2. Apply ImageContentSourcePolicy mirrors for brew/stage/registry-proxy
+    3. Wait for the worker MCP to finish rolling
+    4. Disable and delete redhat-operators (unless DISABLE_REDHAT_OPERATORS=false)
+    5. Create the CatalogSource and wait until READY
+    6. Optionally wait until PACKAGE_NAME's PackageManifest lists this catalog
