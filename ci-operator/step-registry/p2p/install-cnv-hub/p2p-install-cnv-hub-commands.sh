@@ -172,8 +172,8 @@ WaitVirtStorageClassAndAnnotate() {
     done
 
     if ! oc get "storageclass/${CNV_HUB_VIRT_STORAGE_CLASS}" 1>/dev/null; then
-        : "WARNING: virt StorageClass ${CNV_HUB_VIRT_STORAGE_CLASS} not found after ${scWaitMax}s — skipping annotation"
-        return 0
+        : "ERROR: Required virt StorageClass ${CNV_HUB_VIRT_STORAGE_CLASS} was not found after ${scWaitMax}s"
+        return 1
     fi
 
     oc annotate "storageclass/${CNV_HUB_VIRT_STORAGE_CLASS}" \
