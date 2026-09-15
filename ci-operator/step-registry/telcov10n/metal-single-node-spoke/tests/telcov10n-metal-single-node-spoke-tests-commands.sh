@@ -9,6 +9,36 @@ echo "************ telcov10n Fix user IDs in a container ************"
 
 source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
+function setup_socks5_proxy_via_aux_host {
+
+  # The spoke's admin kubeconfig may already have a 'proxy-url: socks5://127.0.0.1:<port>'
+  # baked in by the cluster-install step (see add_proxy_to_kubeconfig_if_needed there). That
+  # tunnel only lived inside the cluster-install pod, so this pod must open its own tunnel on
+  # the same local port for the kubeconfig's proxy-url to find a live listener here too.
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    echo "************ telcov10n Using the SOCKS5 proxy given by the job config ************"
+    return
+  fi
+
+  echo "************ telcov10n Open a SOCKS5 tunnel through AUX_HOST ************"
+
+  ssh -f -N -D "127.0.0.1:${SOCKS5_LOCAL_PORT}" \
+    -o ExitOnForwardFailure=yes \
+    "${SSHOPTS[@]}" "root@${AUX_HOST}"
+
+  for ((attempts = 0 ; attempts < 10 ; attempts++)); do
+    if timeout 5 bash -c "> /dev/tcp/127.0.0.1/${SOCKS5_LOCAL_PORT}" 2>/dev/null; then
+      export SOCKS5_PROXY="socks5h://127.0.0.1:${SOCKS5_LOCAL_PORT}"
+      echo "SOCKS5 tunnel listening on 127.0.0.1:${SOCKS5_LOCAL_PORT}"
+      return
+    fi
+    sleep 3
+  done
+
+  echo "[FAIL] The SOCKS5 tunnel through ${AUX_HOST} did not come up..."
+  exit 1
+}
+
 function set_spoke_cluster_kubeconfig {
 
   echo "************ telcov10n Set Spoke kubeconfig ************"
@@ -60,7 +90,7 @@ import pytest
 
 def test_spoke_cluster_operators_are_ready(bash):
     count = 0
-    attempts = 30
+    attempts = 15
     while attempts > 0:
       oc_cmd = f"oc get co --no-headers | grep -v 'True .* False .* False' | wc -l"
       if bash.run_script_inline([oc_cmd]) == '0':
@@ -123,6 +153,8 @@ function test_spoke_deployment {
 }
 
 function main {
+  setup_aux_host_ssh_access
+  setup_socks5_proxy_via_aux_host
   set_spoke_cluster_kubeconfig
   test_spoke_deployment
 }
