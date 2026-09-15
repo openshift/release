@@ -171,7 +171,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: pyroscope
-          image: pyroscope/pyroscope:latest
+          image: grafana/pyroscope:latest
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -803,11 +803,11 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
 
   PYROSCOPE_LOCAL="http://localhost:4040"
 
-  # pyroscope/pyroscope (original Pyroscope server) query parameters:
-  #   Route:  /render
-  #   Query:  lightspeed-stack.cpu{} (application_name based)
+  # grafana/pyroscope query parameters:
+  #   Route:  /pyroscope/render
+  #   Query:  process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="lightspeed-stack"}
   #   Formats: pprof, html (flamegraph), collapsed, json
-  PYRO_QUERY="lightspeed-stack.cpu%7B%7D"
+  PYRO_QUERY="process_cpu%3Acpu%3Ananoseconds%3Acpu%3Ananoseconds%7Bservice_name%3D%22lightspeed-stack%22%7D"
 
   # Fetch all four profile formats; each fetch is non-fatal so a profiling
   # hiccup never crashes the pipeline.
@@ -816,7 +816,7 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
     FMT="${fmt_pair%%:*}"
     FNAME="${fmt_pair##*:}"
     RESP_CODE=$(curl -sS -o "${PROF_DIR}/${FNAME}" -w '%{http_code}' \
-      "${PYROSCOPE_LOCAL}/render?query=${PYRO_QUERY}&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=${FMT}") || true
+      "${PYROSCOPE_LOCAL}/pyroscope/render?query=${PYRO_QUERY}&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=${FMT}") || true
     if [[ "${RESP_CODE}" != "200" ]] || [[ ! -s "${PROF_DIR}/${FNAME}" ]]; then
       echo "WARN: Pyroscope ${FMT} export failed (HTTP ${RESP_CODE})"
       rm -f "${PROF_DIR}/${FNAME}"
