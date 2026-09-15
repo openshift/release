@@ -5,9 +5,10 @@ set -o pipefail
 echo "Gathering report..."
   
 GDRIVE_FOLDER_NAME="${JOB_NAME}"
-GDRIVE_PARENT_ID="$(cat /var/reporter/GDRIVE_FOLDER_ID)"
 LOCAL_DOWNLOAD_DIR="${ARTIFACT_DIR}"
-GOOGLE_SERVICE_ACCOUNT_KEY=$(cat /var/reporter/SERVICE_ACCOUNT_KEY | sed "s/^'//; s/'$//")
+
+GDRIVE_PARENT_ID="$(yq '.GDRIVE_FOLDER_ID' /var/reporter/secret)"
+GOOGLE_SERVICE_ACCOUNT_KEY="$(yq '.SERVICE_ACCOUNT_KEY' /var/reporter/secret)"
   
 export GDRIVE_FOLDER_NAME GDRIVE_PARENT_ID LOCAL_DOWNLOAD_DIR GOOGLE_SERVICE_ACCOUNT_KEY
   
