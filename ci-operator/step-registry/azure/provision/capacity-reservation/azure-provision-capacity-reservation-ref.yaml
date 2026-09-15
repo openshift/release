@@ -1,0 +1,41 @@
+ref:
+  as: azure-provision-capacity-reservation
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-provision-capacity-reservation-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: CONTROL_PLANE_CAPACITY_RESERVATION_SKU
+    default: "Standard_D8as_v5"
+    documentation: |-
+      The VM SKU to reserve for control-plane and bootstrap nodes. Must match
+      the control-plane instance type in the install-config.
+  - name: CONTROL_PLANE_CAPACITY_RESERVATION_COUNT
+    default: "4"
+    documentation: |-
+      The number of control-plane SKU instances to reserve. The default covers
+      three control-plane nodes and one bootstrap node.
+  - name: COMPUTE_CAPACITY_RESERVATION_SKU
+    default: "Standard_D4as_v5"
+    documentation: |-
+      The VM SKU to reserve for compute nodes. Must match the compute instance
+      type in the install-config.
+  - name: COMPUTE_CAPACITY_RESERVATION_COUNT
+    default: "3"
+    documentation: |-
+      The number of compute SKU instances to reserve.
+  - name: CAPACITY_RESERVATION_ZONE
+    default: "1"
+    documentation: |-
+      The availability zone in which to create the capacity reservation.
+      All cluster nodes will be pinned to this zone.
+  documentation: |-
+    Provisions an Azure Capacity Reservation Group with separate control-plane
+    and compute reservations in a dedicated resource group. Writes reservation
+    metadata to SHARED_DIR for configuration, validation, and cleanup steps.
