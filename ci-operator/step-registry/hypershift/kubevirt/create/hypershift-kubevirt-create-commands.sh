@@ -11,6 +11,7 @@ if [[ -n ${MCE} ]] ; then
 else
     CLUSTER_NAMESPACE_PREFIX=clusters
 fi
+CONTROL_PLANE_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     # shellcheck source=/dev/null
@@ -134,14 +135,14 @@ then
 fi
 
 oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
-oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+oc create ns "${CONTROL_PLANE_NAMESPACE}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
   oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: macvlan-bridge-whereabouts
-  namespace: ${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}
+  namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
   config: '{
       "cniVersion": "0.3.1",
@@ -238,3 +239,97 @@ echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+# Workaround for OCPBUGS-54574: Apply NetworkPolicies for virt-launcher
+if [[ "${CNI_PROVIDER}" == "cilium" ]]; then
+
+  if ! oc get crd ciliumnetworkpolicies.cilium.io &>/dev/null; then
+    echo "CiliumNetworkPolicy CRD not found, aborting"
+    exit 1
+  fi
+
+  oc apply -f - <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: virt-launcher-egress
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s:kubevirt.io: virt-launcher
+  egress:
+    # In pure Kubernetes semantics, 0.0.0.0/0 excluding the Pod and Service CIDRs
+    # would include 192.168.111.4. However, Cilium classifies this peer as the
+    # host identity. CIDR/ipBlock rules do not match Cilium-managed host identities.
+    - toEntities:
+        - world
+        - host
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-konnectivity-from-nodes
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: kube-apiserver
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8091
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-ignition-server-proxy
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: ignition-server-proxy
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allows-ingress-to-ignition-server
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: ignition-server
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 9090
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allows-ingress-to-oauth-openshift
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: oauth-openshift
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 6443
+  policyTypes:
+    - Ingress
+EOF
+
+  echo "NetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
+fi
