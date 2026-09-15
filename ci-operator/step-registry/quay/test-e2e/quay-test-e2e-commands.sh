@@ -291,7 +291,7 @@ function copyArtifacts {
   # link when index.html actually landed so it is never dead; default every CI var
   # with :- so a missing var in a local run cannot abort this EXIT trap.
   if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
-    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results"
+    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
     local gcs_path
     if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
       gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"

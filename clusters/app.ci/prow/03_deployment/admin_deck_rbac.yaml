@@ -3,7 +3,12 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   annotations:
-    serviceaccounts.openshift.io/oauth-redirecturi.prow: https://prow.ci.openshift.org/oauth/callback
+    # deck-internal's oauth-proxy authenticates as this service account
+    # (-client-id=system:serviceaccount:ci:deck), so its callbacks must be
+    # registered here. It is reachable on two routes: `deck-internal` and
+    # `prow-internal-xwndp` (deck-internal.ci.openshift.org).
+    serviceaccounts.openshift.io/oauth-redirectreference.deck-internal: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"deck-internal"}}'
+    serviceaccounts.openshift.io/oauth-redirecturi.prow-internal-ingress: https://deck-internal.ci.openshift.org
   name: deck
   namespace: ci
 ---
