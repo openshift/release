@@ -99,6 +99,7 @@ run_tls_scan() {
 
   echo "=== TLS Scanner ==="
   echo "Image: ${SCANNER_IMAGE}"
+  echo "Target namespace(s): ${SCAN_NAMESPACE:-all}"
 
   # For management cluster scans, deploy the scanner pod into the HCP namespace
   # so it satisfies the HCP NetworkPolicy intra-namespace allow rules.
@@ -269,6 +270,10 @@ EOF
       fi
       cp "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" "${junit_artifact}"
       echo "JUnit results copied to ${junit_artifact} for Spyglass"
+      local tests failures
+      tests=$(grep -oP 'tests="\K[0-9]+' "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" | head -1 || echo "0")
+      failures=$(grep -oP 'failures="\K[0-9]+' "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" | head -1 || echo "0")
+      echo "JUnit summary (namespace: ${SCAN_NAMESPACE:-all}): ${tests} test(s), ${failures} failure(s)"
   fi
 
   wait $LOGS_PID 2>/dev/null || true
@@ -283,7 +288,8 @@ EOF
   pod_exit_code="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "")"
 
   if [[ "${pod_phase}" == "Failed" ]]; then
-      echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code}"
+      echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code} (namespace: ${SCAN_NAMESPACE:-all})"
+      echo "Result: FAILED"
       if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
           echo "Artifacts were collected — scanner found TLS compliance issues."
       else
@@ -306,7 +312,8 @@ EOF
       done
       if [[ "${pod_phase}" == "Failed" ]]; then
           pod_exit_code="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "")"
-          echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code}"
+          echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code} (namespace: ${SCAN_NAMESPACE:-all})"
+          echo "Result: FAILED"
           if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
               echo "Artifacts were collected — scanner found TLS compliance issues."
           else
@@ -321,7 +328,8 @@ EOF
       fi
   fi
 
-  echo "=== TLS Scanner Complete ==="
+  echo "=== TLS Scanner Complete (namespace: ${SCAN_NAMESPACE:-all}) ==="
+  echo "Result: PASSED"
   echo "Artifacts saved to: ${SCANNER_ARTIFACT_DIR}"
   ls -la "${SCANNER_ARTIFACT_DIR}" || true
 
