@@ -9,6 +9,8 @@ echo "************ telcov10n Fix user IDs in a container ************"
 
 source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
+ANSIBLE_GROUP_ALL="/var/run/telcov10n/ansible-group-all/all"
+
 function extract_and_set_ocp_version {
 
   echo "************ telcov10n Extracting OCP version from JOB_NAME ************"
@@ -199,8 +201,8 @@ function update_host_and_master_yaml_files {
   baremetal_iface="$(cat ${baremetal_host_path}/baremetal_iface)"
   ipi_disabled_ifaces="$(cat ${baremetal_host_path}/ipi_disabled_ifaces)"
 
-  bmc_user="$(cat /var/run/telcov10n/ansible-group-all/bmc_user)"
-  bmc_pass="$(cat /var/run/telcov10n/ansible-group-all/bmc_password)"
+  bmc_user="$(grep -oP '(?<=bmc_user: ).*' "${ANSIBLE_GROUP_ALL}" | sed "s/'//g")"
+  bmc_pass="$(grep -oP '(?<=bmc_password: ).*' "${ANSIBLE_GROUP_ALL}" | sed "s/'//g")"
 
   curl_="curl -sLk \
       $([ -n "${SOCKS5_PROXY}" ] && echo "-x ${SOCKS5_PROXY}") \
