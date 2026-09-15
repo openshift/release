@@ -3,8 +3,11 @@ set -euo pipefail
 set -x
 
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   # shellcheck disable=SC1090
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 OCP_VERSION=$(oc get clusterversion --no-headers | grep -oE '[0-9]+\.[0-9]+' | head -1)

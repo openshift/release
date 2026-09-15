@@ -86,7 +86,10 @@ export ES_SERVER
 
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     echo "Loading proxy settings from ${SHARED_DIR}/proxy-conf.sh"
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
