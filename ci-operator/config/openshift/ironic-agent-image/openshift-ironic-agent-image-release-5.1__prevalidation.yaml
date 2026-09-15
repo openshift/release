@@ -18,14 +18,12 @@ images:
         as:
         - registry.ci.openshift.org/ocp/4.22:base-rhel9
         - registry.ci.openshift.org/ocp/5.0:base-rhel9
-    to: ironic
+    to: ironic-agent
 promotion:
   to:
   - disabled: true
     name: "5.1"
     namespace: ocp
-prowgen:
-  enable_secrets_store_csi_driver: true
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -60,6 +58,14 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv4
 - always_run: false
+  as: e2e-metal-ipi-serial-ipv4-prevalidation
+  capabilities:
+  - intranet
+  pipeline_run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ovn-ipv4
+- always_run: false
   as: e2e-metal-ipi-virtualmedia-prevalidation
   capabilities:
   - intranet
@@ -75,8 +81,17 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-prevalidation
+  capabilities:
+  - intranet
+  optional: true
+  pipeline_run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
 zz_generated_metadata:
-  branch: main
+  branch: release-5.1
   org: openshift
-  repo: ironic-image
+  repo: ironic-agent-image
   variant: prevalidation
