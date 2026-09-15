@@ -33,4 +33,15 @@ if unsafe_kubelet_config_output=$(grep -RInF --include='*-commands.sh' \
   exit 1
 fi
 
+# install-config may contain credentials in the httpProxy and httpsProxy values.
+# Every use of the established sensitive-field filter must omit those fields too.
+if unsafe_install_config_filters=$(grep -RInF --include='*-commands.sh' \
+  'password\|username\|pullSecret' "${registry_dir}" \
+  | grep -F 'install-config.yaml' \
+  | grep -vF 'httpProxy\|httpsProxy'); then
+  echo "ERROR: install-config diagnostics must omit proxy credential fields:"
+  echo "${unsafe_install_config_filters}"
+  exit 1
+fi
+
 find "${registry_dir}" -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning

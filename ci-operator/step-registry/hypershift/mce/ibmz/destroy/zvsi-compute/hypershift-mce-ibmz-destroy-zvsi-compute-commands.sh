@@ -16,8 +16,12 @@ infra_name="hcp-ci-$job_id"
 export infra_name
 hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
 export hcp_domain
+# Tracing is disabled while the API key is handled, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
+set -x
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 
@@ -46,7 +50,11 @@ fi
 # Login to the IBM Cloud
 echo "Logging into IBM Cloud in the $IC_REGION region and $infra_name-rg resource group."
 ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
+# Tracing is disabled while the API key is handled, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 ibmcloud login --apikey $IC_API_KEY -r $IC_REGION -g $infra_name-rg
+set -x
 echo "Installing the required ibmcloud plugins if not present."
 for plugin in "${plugins_list[@]}"; do  
   ibmcloud plugin list -q | grep $plugin
