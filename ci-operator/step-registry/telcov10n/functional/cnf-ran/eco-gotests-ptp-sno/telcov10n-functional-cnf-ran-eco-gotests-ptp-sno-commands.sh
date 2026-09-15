@@ -27,14 +27,17 @@ KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconf
 SPOKE_KUBECONFIG_PATH="/tmp/${SPOKE_CLUSTER_NAME}-kubeconfig"
 
 PROJECT_DIR="/tmp"
+ALL_VARS="${INVENTORY_PATH}/group_vars/all"
 
 echo "Set bastion SSH configuration"
-cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/temp_ssh_key"
-chmod 600 "${PROJECT_DIR}/temp_ssh_key"
+# The private key spans several lines in group_vars/all, take everything between the quotes
+install -m 600 /dev/null "${PROJECT_DIR}/temp_ssh_key"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${ALL_VARS}" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${PROJECT_DIR}/temp_ssh_key"
 trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"' EXIT
 
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=^ansible_user: ).*' "${ALL_VARS}" | sed "s/'//g")
 
 echo "Extracting spoke kubeconfig from hub ACM"
 ssh -o ServerAliveInterval=60 \

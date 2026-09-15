@@ -8,43 +8,9 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
-process_inventory() {
-    local directory="$1"
-    local dest_file="$2"
-
-    if [ -z "$directory" ]; then
-        echo "Usage: process_inventory <directory> <dest_file>"
-        return 1
-    fi
-
-    if [ ! -d "$directory" ]; then
-        echo "Error: '$directory' is not a valid directory"
-        return 1
-    fi
-
-    find "$directory" -type f | while IFS= read -r filename; do
-        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        fi
-        local content
-        content=$(cat "$filename")
-        local varname
-        varname=$(basename "${filename}")
-        # Check if content has newlines - if so, use literal block scalar (|)
-        if [[ "$content" == *$'\n'* ]]; then
-          echo "${varname}: |"
-          echo "$content" | sed 's/^/  /'
-        else
-          echo "${varname}: '${content//\'/\'\'}'"
-        fi
-    done > "${dest_file}"
-
-    echo "Processing complete. Check \"${dest_file}\""
-}
-
 OCP_DEPLOYMENT_INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 CNF_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
-MOUNTED_SPOKE_INVENTORY="/var/host_variables/${CLUSTER_NAME}/spoke-master0"
+MOUNTED_SPOKE_INVENTORY="/var/clusters/${CLUSTER_NAME}/spoke-master0"
 
 echo "=== IBU Seed eco-gotests Configuration ==="
 echo "SEED_SPOKE_CLUSTER=${SEED_SPOKE_CLUSTER}"
@@ -77,9 +43,9 @@ cp "${SHARED_DIR}/bastions" "${CNF_INVENTORY_PATH}/group_vars/bastions.yaml"
 cp "${SHARED_DIR}/all" "${CNF_INVENTORY_PATH}/group_vars/all.yaml"
 cp "${SHARED_DIR}/bastion" "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml"
 
-echo "Processing spoke SNO inventory for master-0 with proper multi-line SSH key handling"
-process_inventory "${MOUNTED_SPOKE_INVENTORY}" "${CNF_INVENTORY_PATH}/host_vars/master-0.yaml"
-process_inventory "${MOUNTED_SPOKE_INVENTORY}" "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/master-0"
+echo "Installing spoke SNO inventory for master-0"
+cp "${MOUNTED_SPOKE_INVENTORY}" "${CNF_INVENTORY_PATH}/host_vars/master-0.yaml"
+cp "${MOUNTED_SPOKE_INVENTORY}" "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/master-0"
 
 
 echo "Inventory copied from SHARED_DIR and spoke inventory processed"
@@ -126,11 +92,13 @@ ansible-playbook playbooks/ran/ibu-run-seedgeneration.yml \
 
 echo "Set bastion SSH configuration"
 PROJECT_DIR="/tmp"
-grep ansible_ssh_private_key -A 100 "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/temp_ssh_key"
-chmod 600 "${PROJECT_DIR}/temp_ssh_key"
+# The private key spans several lines in group_vars/all, take everything between the quotes
+install -m 600 /dev/null "${PROJECT_DIR}/temp_ssh_key"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${CNF_INVENTORY_PATH}/group_vars/all.yaml" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${PROJECT_DIR}/temp_ssh_key"
 
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml" | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=^ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g")
 
 echo "Gather artifacts from bastion"
 mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests"
@@ -161,14 +129,12 @@ done
 echo ""
 echo "=== Step 3: Power off seed spoke node ==="
 
-grep ansible_ssh_private_key -A 100 \
+# The private key spans several lines in the master-0 host vars, take everything between the quotes
+install -m 600 /dev/null /tmp/spoke-master-ssh-key
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" \
   "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/master-0" \
-  | sed 's/ansible_ssh_private_key: //g' \
-  | sed "s/'//g" \
-  | sed 's/^  //' \
-  | sed -n '/BEGIN/,/END/p' \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" \
   > /tmp/spoke-master-ssh-key
-chmod 600 /tmp/spoke-master-ssh-key
 ansible-playbook playbooks/ran/ibu-poweroff-seed-spoke.yml \
   -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
   --private-key=/tmp/spoke-master-ssh-key

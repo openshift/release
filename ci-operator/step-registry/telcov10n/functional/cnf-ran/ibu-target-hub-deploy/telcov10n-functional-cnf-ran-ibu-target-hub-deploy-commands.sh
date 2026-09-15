@@ -6,55 +6,66 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
-MOUNTED_HOST_INVENTORY="/var/host_variables"
+COMMON_VARIABLES="/var/common_variables"
+CLUSTER_VARIABLES="/var/clusters/${TARGET_CLUSTER_NAME}"
+HYPERVISOR_VARIABLES="/var/hypervisors"
+INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 
-process_inventory() {
+install_vars() {
+  local src="$1"
+  local allow_host_vars="$2"
+  local base dest_dir name
+
+  base="$(basename "$src")"
+
+  case "$base" in
+    ansible_group_*)
+      dest_dir="${INVENTORY_PATH}/group_vars"
+      name="${base#ansible_group_}"
+      ;;
+    *)
+      if [ "${allow_host_vars}" != "true" ]; then
+        echo "  skipped a file that is not a group var"
+        return 0
+      fi
+      dest_dir="${INVENTORY_PATH}/host_vars"
+      case "$base" in
+        bastion*) name="bastion" ;;
+        *)        name="${base}" ;;
+      esac
+      ;;
+  esac
+  cp "$src" "${dest_dir}/${name}"
+}
+
+process_mount() {
   local directory="$1"
-  local dest_file="$2"
-
-  if [ -z "$directory" ]; then
-    echo "Usage: process_inventory <directory> <dest_file>"
-    return 1
-  fi
+  local allow_host_vars="$2"
 
   if [ ! -d "$directory" ]; then
     echo "Error: '$directory' is not a valid directory"
     return 1
   fi
 
-  find "$directory" -type f | while IFS= read -r filename; do
-    if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-      continue
-    else
-      echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
-    fi
-  done > "${dest_file}"
+  # -L so that files exposed as symlinks by the secrets mount are matched as regular files
+  while IFS= read -r filename; do
+    install_vars "$filename" "${allow_host_vars}"
+  done < <(find -L "$directory" -maxdepth 1 -type f ! -name '..*' | sort)
 }
 
 echo "TARGET_CLUSTER_NAME=${TARGET_CLUSTER_NAME}"
 echo "TARGET_HUB_VERSION=${VERSION}"
 
+mkdir -p "${INVENTORY_PATH}/group_vars" "${INVENTORY_PATH}/host_vars"
+
 echo "Processing common group_vars"
-mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
+process_mount "${COMMON_VARIABLES}" false
 
-find /var/group_variables/common/ -mindepth 1 -maxdepth 1 -type d | while read -r dir; do
-  echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
-done
+echo "Processing target hub vars (${TARGET_CLUSTER_NAME})"
+process_mount "${CLUSTER_VARIABLES}" true
 
-echo "Processing target hub group_vars (${TARGET_CLUSTER_NAME})"
-find "/var/group_variables/${TARGET_CLUSTER_NAME}/" -mindepth 1 -maxdepth 1 -type d | while read -r dir; do
-  echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
-done
-
-echo "Processing target hub host_vars (${TARGET_CLUSTER_NAME})"
-mkdir /eco-ci-cd/inventories/ocp-deployment/host_vars
-
-find "${MOUNTED_HOST_INVENTORY}/${TARGET_CLUSTER_NAME}/" -mindepth 1 -maxdepth 1 -type d | while read -r dir; do
-  echo "  host_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
-done
+echo "Processing hypervisor vars"
+cp "${HYPERVISOR_VARIABLES}/hypervisor" "${INVENTORY_PATH}/host_vars/hypervisor"
 
 cd /eco-ci-cd
 
@@ -72,10 +83,10 @@ ansible-playbook ./playbooks/deploy-ocp-sno.yml \
 # host_vars are copied flat — no prefix, as these are the "primary" hub files.
 # group_vars/all is common across all clusters — same approach as seed hub.
 echo "Copying target hub inventory to SHARED_DIR"
-find /eco-ci-cd/inventories/ocp-deployment/host_vars -maxdepth 1 -type f | while read -r f; do
+find "${INVENTORY_PATH}/host_vars" -maxdepth 1 -type f | while read -r f; do
   cp "$f" "${SHARED_DIR}/$(basename "$f")"
 done
-find /eco-ci-cd/inventories/ocp-deployment/group_vars -maxdepth 1 -type f | while read -r f; do
+find "${INVENTORY_PATH}/group_vars" -maxdepth 1 -type f | while read -r f; do
   cp "$f" "${SHARED_DIR}/$(basename "$f")"
 done
 echo "${TARGET_CLUSTER_NAME}" > "${SHARED_DIR}/cluster_name"
@@ -88,11 +99,13 @@ done
 echo "Getting target hub cluster version"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
 
-BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' /eco-ci-cd/inventories/ocp-deployment/group_vars/all | sed "s/'//g")
+BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=^ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
-cat /var/group_variables/common/all/ansible_ssh_private_key > "/tmp/temp_ssh_key"
-chmod 600 "/tmp/temp_ssh_key"
+# The private key spans several lines in group_vars/all, take everything between the quotes
+install -m 600 /dev/null "/tmp/temp_ssh_key"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${INVENTORY_PATH}/group_vars/all" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "/tmp/temp_ssh_key"
 
 CLUSTER_VERSION=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}" \

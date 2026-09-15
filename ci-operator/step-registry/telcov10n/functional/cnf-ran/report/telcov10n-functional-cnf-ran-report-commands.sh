@@ -10,52 +10,58 @@ fi
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
-process_inventory() {
-  local directory="$1"
-  local dest_file="$2"
+COMMON_VARIABLES="/var/common_variables"
 
-  if [ -z "$directory" ]; then
-    echo "Usage: process_inventory <directory> <dest_file>"
-    return 1
-  fi
+install_vars() {
+  local src="$1"
+  local allow_host_vars="$2"
+  local base dest_dir name
+
+  base="$(basename "$src")"
+
+  case "$base" in
+    ansible_group_*)
+      dest_dir="${ECO_CI_CD_INVENTORY_PATH}/group_vars"
+      name="${base#ansible_group_}"
+      ;;
+    *)
+      if [ "${allow_host_vars}" != "true" ]; then
+        echo "  skipped a file that is not a group var"
+        return 0
+      fi
+      dest_dir="${ECO_CI_CD_INVENTORY_PATH}/host_vars"
+      case "$base" in
+        bastion*) name="bastion" ;;
+        *)        name="${base}" ;;
+      esac
+      ;;
+  esac
+  cp "$src" "${dest_dir}/${name}"
+}
+
+process_mount() {
+  local directory="$1"
+  local allow_host_vars="$2"
 
   if [ ! -d "$directory" ]; then
     echo "Error: '$directory' is not a valid directory"
     return 1
   fi
 
-  find "$directory" -type f | while IFS= read -r filename; do
-    if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-      continue
-    fi
-    local content
-    content=$(cat "$filename")
-    local varname
-    varname=$(basename "${filename}")
-    if [[ "$content" == *$'\n'* ]]; then
-      echo "${varname}: |"
-      echo "$content" | sed 's/^/  /'
-    else
-      echo "${varname}": \'"${content}"\'
-    fi
-  done > "${dest_file}"
+  # -L so that files exposed as symlinks by the secrets mount are matched as regular files
+  while IFS= read -r filename; do
+    install_vars "$filename" "${allow_host_vars}"
+  done < <(find -L "$directory" -maxdepth 1 -type f ! -name '..*' | sort)
 }
 
-echo "Processing common group_vars"
-mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
+echo "Create inventory directories"
+mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars" "${ECO_CI_CD_INVENTORY_PATH}/host_vars"
 
-find /var/group_variables/common/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
-  echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
-done
+echo "Processing common group_vars"
+process_mount "${COMMON_VARIABLES}" false
 
 echo "Processing hub host_vars (${CLUSTER_NAME})"
-mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/host_vars"
-
-find "/var/host_variables/${CLUSTER_NAME}/" -mindepth 1 -type d 2>/dev/null | while read -r dir; do
-  echo "  host_var: $(basename "${dir}")"
-  process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
-done
+process_mount "/var/clusters/${CLUSTER_NAME}" true
 
 rm -rf /tmp/reports /tmp/junit
 

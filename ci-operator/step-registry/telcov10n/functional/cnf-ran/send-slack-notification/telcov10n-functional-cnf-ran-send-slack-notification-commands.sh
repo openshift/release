@@ -36,11 +36,16 @@ else
 fi
 
 echo "Fetching bastion credentials for ${CLUSTER_NAME}"
-BASTION_IP=$(cat /var/host_variables/${CLUSTER_NAME}/bastion/ansible_host)
-BASTION_USER=$(cat /var/group_variables/common/all/ansible_user)
+ALL_VARS="/var/common_variables/all"
+BASTION_VARS="/var/clusters/${CLUSTER_NAME}/bastion"
 
-cat /var/group_variables/common/all/ansible_ssh_private_key > "/tmp/temp_ssh_key"
-chmod 600 "/tmp/temp_ssh_key"
+BASTION_IP=$(grep -oP '(?<=^ansible_host: ).*' "${BASTION_VARS}" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=^ansible_user: ).*' "${ALL_VARS}" | sed "s/'//g")
+
+# The private key spans several lines in the all vars, take everything between the quotes
+install -m 600 /dev/null "/tmp/temp_ssh_key"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${ALL_VARS}" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "/tmp/temp_ssh_key"
 
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key"
 
