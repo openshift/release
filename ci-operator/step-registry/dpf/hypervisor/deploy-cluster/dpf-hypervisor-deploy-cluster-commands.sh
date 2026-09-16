@@ -72,8 +72,9 @@ datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 CLEAN_ALL_LOG="${REMOTE_LOGS_DIR}/make_clean-all_${datetime_string}.log"
 echo "Remote make clean-all logs directory on hypervisor: ${CLEAN_ALL_LOG}"
 
-DEPLOYMENT_LOG="${REMOTE_LOGS_DIR}/make_all_${datetime_string}.log"
+DEPLOYMENT_LOG="${REMOTE_LOGS_DIR}/make_${DPF_DEPLOY_MAKE_TARGET}_${datetime_string}.log"
 echo "Remote deployment logs directory on hypervisor: ${DEPLOYMENT_LOG}"
+echo "Deploy make target: ${DPF_DEPLOY_MAKE_TARGET}"
 
 
 # Git clone the dpf-openshift repo on hypervisor
@@ -100,6 +101,20 @@ if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; the
     echo "Successfully checked out PR #${PULL_NUMBER}"
   else
     echo "ERROR: Failed to checkout PR #${PULL_NUMBER}"
+    exit 1
+  fi
+elif [[ "${REPO_NAME:-}" != "openshift-dpf" ]]; then
+  # Temporary: pin unmerged openshift-dpf#395 so nvidia-ci/rehearsal jobs can run
+  # make create-base-cluster. Remove after
+  # https://github.com/rh-ecosystem-edge/openshift-dpf/pull/395 merges.
+  echo "Temporary: fetching openshift-dpf PR #395 for cross-PR testing..."
+  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; \
+    git fetch origin pull/395/head:pr-395 && \
+    git checkout pr-395 && \
+    git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
+    echo "Successfully checked out openshift-dpf PR #395"
+  else
+    echo "ERROR: Failed to checkout openshift-dpf PR #395"
     exit 1
   fi
 fi
@@ -227,7 +242,7 @@ scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env ${ARTI
 
 
 # SSH session to hypervisor
-echo "Starting DPF deployment with 'make all'..."
+echo "Starting DPF deployment with 'make ${DPF_DEPLOY_MAKE_TARGET}'..."
 echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
 
 
@@ -245,17 +260,17 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   echo "Sleeping for 300 seconds ...."
   sleep 300
 
-  # Execute make all on hypervisor with comprehensive logging
-  echo "Execute make all on hypervisor with comprehensive logging"
+  # Execute the configured make target on hypervisor with comprehensive logging
+  echo "Execute make ${DPF_DEPLOY_MAKE_TARGET} on hypervisor with comprehensive logging"
 
   if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
     cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
     mkdir -p ${REMOTE_LOGS_DIR} ; \
-    make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
+    make ${DPF_DEPLOY_MAKE_TARGET} 2>&1 | tee ${DEPLOYMENT_LOG}"; then
 
     DEPLOYMENT_SUCCESS=true
 
-    # Note:  here we often get here but make all failed, so we need to ssh again
+    # Note:  here we often get here but make failed, so we need to ssh again
     # and run oc commands to confirm the deployment is success and we got the DPU workers ready
 
     echo "DPF deployment completed successfully, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
@@ -273,5 +288,5 @@ else
   exit 1
 fi
 
-# To Do: add basic oc commands to verify make all step passed
+# To Do: add basic oc commands to verify the deploy make target passed
 
