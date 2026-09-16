@@ -14,7 +14,7 @@ JOB_TYPE="${JOB_TYPE:-}"
 PULL_NUMBER="${PULL_NUMBER:-}"
 REPO_OWNER="${REPO_OWNER:-}"
 REPO_NAME="${REPO_NAME:-}"
-GCS_HTTPS="https://storage.googleapis.com/test-platform-results"
+GCS_HTTPS="https://storage.googleapis.com/test-platform-results-public"
 MAX_ARTIFACT_BYTES=8388608
 
 if [[ -z "${TEST_NAME:-}" ]]; then
@@ -34,7 +34,7 @@ else
   GCS_BUCKET_PATH="logs/${JOB_NAME}/${BUILD_ID}"
 fi
 
-GCSWEB_BASE="https://gcs.ci.openshift.org/gcs/test-platform-results"
+GCSWEB_BASE="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
 PROW_JOB_URL="${GCSWEB_BASE}/${GCS_BUCKET_PATH}"
 ARTIFACTS_BASE="${GCSWEB_BASE}/${GCS_BUCKET_PATH}/artifacts/${TEST_NAME}"
 
@@ -136,7 +136,7 @@ fetch_junit_prefix() {
   local encoded resp name dest
   encoded=$(jq -nr --arg p "${prefix}" '$p|@uri')
   resp=$(curl -sL --connect-timeout 10 --max-time 30 \
-    "https://storage.googleapis.com/storage/v1/b/test-platform-results/o?prefix=${encoded}&maxResults=50&fields=items(name,size)" \
+    "https://storage.googleapis.com/storage/v1/b/test-platform-results-public/o?prefix=${encoded}&maxResults=50&fields=items(name,size)" \
     || true)
   while IFS= read -r name; do
     [[ -z "${name}" ]] && continue
