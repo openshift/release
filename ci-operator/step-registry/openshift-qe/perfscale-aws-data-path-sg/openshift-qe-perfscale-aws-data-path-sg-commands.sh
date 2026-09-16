@@ -12,6 +12,7 @@ AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
   export AWS_DEFAULT_REGION="${CLOUD_PROVIDER_REGION}"
+  export AWS_REGION="${CLOUD_PROVIDER_REGION}"
 else
   echo "Did not find compatible cloud provider cluster_profile"
   exit 1
