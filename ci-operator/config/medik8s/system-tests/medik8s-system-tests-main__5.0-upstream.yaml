@@ -1,0 +1,67 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- always_run: false
+  as: e2e-sbr-aws-odf
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_VERBOSE: "true"
+      MEDIK8S_BUNDLE_IMAGES: storage-based-remediation=quay.io/medik8s/storage-based-remediation-operator-bundle:latest
+      ODF_OPERATOR_CHANNEL: stable-4.23
+      ODF_VERSION_MAJOR_MINOR: "4.23"
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      TEST_NAME: e2e-sbr-aws-odf
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-upstream-bundle-install
+    - ref: medik8s-deploy-odf-dev-catalog
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: system-tests
+  variant: 5.0-upstream
