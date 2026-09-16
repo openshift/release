@@ -40,9 +40,29 @@ if [ "$CNV_AVAILABLE" != "True" ]; then
         interval: 8h
 EOF
 
-  sleep 30
+  # Poll for the packagemanifest to be indexed instead of a fixed sleep.
+  # A fixed sleep races against OLM standing up and indexing the freshly
+  # created CatalogSource. If the packagemanifest is not yet populated,
+  # STARTING_CSV comes back empty and every downstream `oc get/wait csv`
+  # runs without a resource name and fails with
+  # "resource(s) were provided, but no name was specified".
+  STARTING_CSV=""
+  for _ in $(seq 1 60); do
+    STARTING_CSV=$(oc get packagemanifest -l catalog=cnv-nightly-catalog-source -n openshift-marketplace -o jsonpath="{$.items[?(@.metadata.name=='kubevirt-hyperconverged')].status.channels[?(@.name==\"nightly-${CNV_VERSION}\")].currentCSV}" 2>/dev/null || true)
+    if [ -n "$STARTING_CSV" ]; then
+      break
+    fi
+    echo "Waiting for cnv-nightly-catalog-source packagemanifest to be indexed..."
+    sleep 10
+  done
 
-  STARTING_CSV=$(oc get packagemanifest -l catalog=cnv-nightly-catalog-source -n openshift-marketplace -o jsonpath="{$.items[?(@.metadata.name=='kubevirt-hyperconverged')].status.channels[?(@.name==\"nightly-${CNV_VERSION}\")].currentCSV}")
+  if [ -z "$STARTING_CSV" ]; then
+    echo "ERROR: timed out waiting for kubevirt-hyperconverged packagemanifest from cnv-nightly-catalog-source" >&2
+    oc get catalogsource -n openshift-marketplace || true
+    oc get pods -n openshift-marketplace || true
+    exit 1
+  fi
+  echo "Resolved starting CSV: ${STARTING_CSV}"
 
   cat << EOF| oc apply -f -
   apiVersion: v1
@@ -76,8 +96,8 @@ EOF
       channel: "nightly-${CNV_VERSION}"
 EOF
 
-  until oc get csv -n openshift-cnv $STARTING_CSV ; do  sleep 5; done
-  oc wait --timeout=300s -n openshift-cnv csv $STARTING_CSV --for=jsonpath='{.status.phase}'=Succeeded
+  until oc get csv -n openshift-cnv "$STARTING_CSV" ; do sleep 5; done
+  oc wait --timeout=300s -n openshift-cnv csv "$STARTING_CSV" --for=jsonpath='{.status.phase}'=Succeeded
 
   cat << EOF| oc apply -f -
   apiVersion: hco.kubevirt.io/v1beta1
@@ -90,7 +110,7 @@ EOF
 
   sleep 20
 
-  oc wait --timeout=300s -n openshift-cnv csv $STARTING_CSV --for=jsonpath='{.status.phase}'=Succeeded
+  oc wait --timeout=300s -n openshift-cnv csv "$STARTING_CSV" --for=jsonpath='{.status.phase}'=Succeeded
   oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
 fi
 
