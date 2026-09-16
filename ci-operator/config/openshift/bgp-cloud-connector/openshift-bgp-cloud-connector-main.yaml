@@ -143,6 +143,198 @@ tests:
     test:
     - ref: fips-check-image-scan
 - always_run: false
+  as: aro-preflight
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    test:
+    - as: preflight
+      commands: |
+        # Whether this subscription can build an ARO cluster at all, asked in
+        # a minute and without building one. az aro create cannot tell a
+        # resource provider nobody registered from a region that does not
+        # offer ARO from a version string nobody publishes: it fails the same
+        # way, ten minutes in, for all three. These reads separate them.
+        #
+        # It also proves the image carries a working az aro. The build root
+        # takes azure-cli from Microsoft's repository, and a command group
+        # that moved out of the box would otherwise surface as a provisioning
+        # failure much later.
+        set -uo pipefail
+
+        # az keeps its token cache and profile under $HOME/.azure, and a prow
+        # test container runs as a random uid whose home it does not own:
+        # without this it fails with a permission error before doing anything.
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+
+        # Azure names subscriptions, tenants and principals in its output and
+        # in its error text, and both prow logs and published artifacts are
+        # public for openshift repositories. Everything az says goes through
+        # here first.
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+        section() { echo; echo "=== $* ==="; }
+
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        if [[ ! -f "${sp}" ]]; then
+          echo "the cluster profile has no osServicePrincipal.json" >&2
+          exit 1
+        fi
+
+        # Nothing here prints the secret, and --output none is for the same
+        # reason: a successful login otherwise prints the subscription, the
+        # tenant and the signed-in principal.
+        if ! az login --service-principal \
+              --username "$(jq -er .clientId "${sp}")" \
+              --password "$(jq -er .clientSecret "${sp}")" \
+              --tenant "$(jq -er .tenantId "${sp}")" \
+              --output none; then
+          echo "could not log in as the service principal in the cluster profile" >&2
+          exit 1
+        fi
+        az account set --subscription "$(jq -er .subscriptionId "${sp}")" || exit 1
+
+        region="${LEASED_RESOURCE}"
+        echo "region: ${region}"
+        echo "az:     $(az version --query '"azure-cli"' -o tsv)"
+
+        # Every check runs and the verdict comes at the end. One answer does
+        # not explain another: a region offering no versions and a provider
+        # nobody registered are different problems with different owners, and
+        # stopping at the first would hide the second.
+        rc=0
+
+        section "resource providers"
+        # aro-provision-cluster registers these four before it creates
+        # anything. Registration takes minutes the first time, so knowing
+        # which are already done says how long a cold provision will take.
+        for provider in Microsoft.RedHatOpenShift Microsoft.Network \
+                        Microsoft.Compute Microsoft.Storage Microsoft.Authorization; do
+          state="$(az provider show -n "${provider}" --query registrationState -o tsv 2>/dev/null)"
+          printf '  %-30s %s\n' "${provider}" "${state:-unreadable}"
+          if [[ "${provider}" == Microsoft.RedHatOpenShift && "${state}" != Registered ]]; then
+            echo "MISSING: the ARO provider is not registered in this subscription" >&2
+            rc=1
+          fi
+        done
+
+        # Answers are captured before they are examined, never piped into a
+        # grep that exits early. Under pipefail a grep -q closing the pipe
+        # leaves the sed upstream of it dead of SIGPIPE, the pipeline reports
+        # 141, and a region that does offer ARO reads as one that does not.
+        # The azure-cli-image test above documents the same failure.
+        offers() {
+          local what="$1" provider="$2" resource="$3" listing
+          # Selected in jq rather than in JMESPath because JMESPath compares
+          # strings case sensitively and Azure's own capitalisation is not
+          # something to depend on: this provider spells it OpenShiftClusters
+          # while Microsoft.Network spells virtualHubs, and a filter that
+          # guesses wrong returns an empty list rather than an error -- which
+          # reads exactly like a region that does not offer the service.
+          local raw
+          # A read that failed is not an answer of "no locations". Without this
+          # an expired login or an API error reads as a region that does not
+          # offer the service, which is the same conflation the case sensitive
+          # filter above already caused once.
+          if ! raw="$(az provider show -n "${provider}" -o json 2>/dev/null)"; then
+            echo "  could not read ${provider}: an access or API failure, not an answer"
+            return 1
+          fi
+          listing="$(printf '%s' "${raw}" \
+            | jq -r --arg want "$(printf '%s' "${resource}" | tr '[:upper:]' '[:lower:]')" \
+                '.resourceTypes[]? | select(((.resourceType // "") | ascii_downcase) == $want) | .locations[]?' \
+            | redact)"
+          if [[ -z "${listing}" ]]; then
+            echo "  nothing listed, which is itself worth knowing"
+            return 1
+          fi
+          printf '%s\n' "${listing}" | sed 's/^/  /'
+          # Azure writes these with spaces and in mixed case, so both sides are
+          # folded before they are compared. The comparison is a case statement
+          # rather than a grep so that nothing is left holding a pipe nobody is
+          # reading.
+          local folded
+          folded="$(printf '%s\n' "${listing}" | tr -d ' ' | tr '[:upper:]' '[:lower:]')"
+          case $'\n'"${folded}"$'\n' in
+            *$'\n'"$(printf '%s' "${region}" | tr -d ' ' | tr '[:upper:]' '[:lower:]')"$'\n'*)
+              echo "  ${region} offers ${what}" ;;
+            *)
+              echo "  ${region} does NOT appear to offer ${what}"
+              return 1 ;;
+          esac
+        }
+
+        section "does ${region} offer ARO"
+        offers ARO Microsoft.RedHatOpenShift openShiftClusters || rc=1
+
+        section "does ${region} offer Route Server"
+        # The operator reads and writes Microsoft.Network/virtualHubs and its
+        # bgpConnections. A region with ARO but no Route Server would host the
+        # cluster and none of the estate the operator needs.
+        offers "Route Server" Microsoft.Network virtualHubs || rc=1
+
+        section "installable ARO versions in ${region}"
+        # Asking az aro anything also proves the image carries it.
+        #
+        # The command's own status decides this, not whether it printed
+        # something. A failed get-versions writes an error to stderr and exits
+        # non-zero, so folding stderr into the value with 2>&1 would make the
+        # variable non-empty, print "ERROR: (NoRegisteredProviderFound) ..." as
+        # though it were a list of versions, and let the verdict below say this
+        # subscription can build a cluster. Measured against a bogus region.
+        versions_err="$(mktemp)"
+        if versions="$(az aro get-versions -l "${region}" -o tsv 2>"${versions_err}")" \
+             && [[ -n "${versions}" ]]; then
+          printf '%s\n' "${versions}" | redact | sed 's/^/  /'
+        else
+          echo "MISSING: az aro get-versions gave no usable answer for ${region}" >&2
+          redact <"${versions_err}" | sed 's/^/    /' >&2
+          rc=1
+        fi
+        rm -f "${versions_err}"
+
+        section "compute quota in ${region}"
+        # Three masters and three workers is the ARO minimum, so a job that
+        # cannot get those cores fails in provisioning rather than in test.
+        az vm list-usage -l "${region}" \
+          --query "[?contains(name.value, 'standardDSv3Family') || contains(name.value, 'standardDASv4Family') || name.value=='cores'].{name:localName, used:currentValue, limit:limit}" \
+          -o table 2>&1 | redact | sed 's/^/  /'
+
+        section "pull secret"
+        if [[ -f "${CLUSTER_PROFILE_DIR}/pull-secret" ]]; then
+          echo "  present"
+        else
+          echo "  absent: az aro create would install without Red Hat entitlements,"
+          echo "  so the cluster would carry no redhat-operators catalogue"
+        fi
+
+        # There is deliberately no resource group check here, though it would
+        # be the obvious next thing to ask. Creating one is the only write this
+        # step would make, and a delete that fails, or a cancellation between
+        # the two, leaves a resource group behind in a subscription shared with
+        # every other job -- for an optional step whose whole point is to cost
+        # nothing. It would also answer a question nothing really asks: a
+        # principal that cannot create a resource group breaks every Azure job
+        # on this profile, not just this one, and aro-probe's own
+        # azure-provision-resourcegroup step says so in the one place it
+        # matters. Leaving it out keeps this step purely read only, which means
+        # anyone can run it against any subscription at any time.
+
+        section "verdict"
+        if (( rc == 0 )); then
+          echo "  nothing here says this subscription cannot build an ARO cluster in ${region}"
+        else
+          echo "  see the MISSING lines above" >&2
+        fi
+        exit "${rc}"
+      from: azure-e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- always_run: false
   as: e2e-aws
   optional: true
   steps:
