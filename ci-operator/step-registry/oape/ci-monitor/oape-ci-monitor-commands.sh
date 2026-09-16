@@ -107,10 +107,10 @@ if ! gh pr view "${PULL_NUMBER}" --repo "${REPO_OWNER}/${REPO_NAME}" --json numb
   exit 1
 fi
 
-export GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS:-/var/run/gcloud-adc/application_default_credentials.json}"
+export GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS:-/var/run/claude-code-service-account/google-token}"
 export CLAUDE_CODE_USE_VERTEX="1"
 export CLOUD_ML_REGION="${CLOUD_ML_REGION:-global}"
-export ANTHROPIC_VERTEX_PROJECT_ID="${ANTHROPIC_VERTEX_PROJECT_ID:-itpc-gcp-hcm-pe-eng-claude}"
+export ANTHROPIC_VERTEX_PROJECT_ID="${ANTHROPIC_VERTEX_PROJECT_ID:-openshift-ci-prow-agents}"
 
 export DRY_RUN="${DRY_RUN:-true}"
 export REVIEW_HANDLER_ENABLED="${REVIEW_HANDLER_ENABLED:-false}"
