@@ -757,6 +757,8 @@ if [[ -n "${LATEST_E2E_TAG}" ]] && \
   JOB_START_TS=$(date -u -d "@${TEST_START_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ")
   JOB_END_TS=$(date -u -d "@${TEST_END_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ")
 
+  ADDITIONAL_PARAMS='{"lcsTestWorkers": '"${NUM_USERS}"', "lcsTestDuration": "'"${TEST_DURATION}"'"}'
+
   pushd "${RUNTIME_TMP_DIR}/e2e-benchmarking/utils" >/dev/null
   env BENCHMARK="lcs-load-generator" \
       WORKLOAD="lcs-load-generator" \
@@ -765,8 +767,7 @@ if [[ -n "${LATEST_E2E_TAG}" ]] && \
       JOB_START="${JOB_START_TS}" \
       JOB_END="${JOB_END_TS}" \
       JOB_STATUS="success" \
-      lcsTestWorkers="${NUM_USERS}" \
-      lcsTestDuration="${TEST_DURATION}" \
+      ADDITIONAL_PARAMS="${ADDITIONAL_PARAMS}" \
       ./index.sh || echo "WARN: Fingerprint index.sh failed — continuing"
   popd >/dev/null
 
