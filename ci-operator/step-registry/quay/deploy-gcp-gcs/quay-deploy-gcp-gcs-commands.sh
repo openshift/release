@@ -70,6 +70,7 @@ function on_exit() {
       ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-gcp__quay-tests-deploy-quay-gcp.xml || true
   fi
   write_quay_install_junit "${ec}"
+  [[ -n "${YQ_TMPDIR:-}" ]] && rm -rf "${YQ_TMPDIR}" || true
   exit "${ec}"
 }
 trap on_exit EXIT
@@ -374,10 +375,13 @@ FEATURE_MAILING: false
 FEATURE_OTEL_TRACING: false
 EOF
 
-# Fetch yq once: used below to merge config fragments and to strip
-# operator-managed keys, which now run unconditionally.
+# Fetch yq once into a private temp dir: used below to merge config
+# fragments and to strip operator-managed keys, which now run
+# unconditionally.
+YQ_TMPDIR="$(mktemp -d)"
+YQ="${YQ_TMPDIR}/yq"
 curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-	-o /tmp/yq && chmod +x /tmp/yq
+	-o "${YQ}" && chmod +x "${YQ}"
 
 # Merge a config fragment into config.yaml with list-append semantics ('*+',
 # not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
@@ -385,11 +389,11 @@ curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(u
 # instead of corrupting config.yaml.
 function merge_config_fragment() {
 	local fragment="$1"
-	if ! /tmp/yq e 'true' "${fragment}" >/dev/null 2>&1; then
+	if ! "${YQ}" e 'true' "${fragment}" >/dev/null 2>&1; then
 		echo "ERROR: ${fragment} is not valid YAML" >&2
 		exit 1
 	fi
-	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+	"${YQ}" eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
 # Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
@@ -415,7 +419,7 @@ fi
 # injects those values; leaving them in configBundleSecret blocks rollout.
 # Runs unconditionally now: a no-op on the defaults block when no overlay
 # above added any of these keys.
-/tmp/yq -i '
+"${YQ}" -i '
 	del(
 		.FEATURE_SECURITY_SCANNER,
 		.FEATURE_SECURITY_NOTIFICATIONS,
