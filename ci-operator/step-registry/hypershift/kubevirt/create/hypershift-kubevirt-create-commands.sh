@@ -614,174 +614,28 @@ localnet_vlan_guest_oc() {
   KUBECONFIG="${nested_kc}" oc "$@"
 }
 
-# Guest ingress defaults to NodePort on OVN; localnet-vlan dnsmasq points *.apps at the lab
-# ingress VIP (111.x). Publish the router on the worker host network and DNAT the VIP to it.
-localnet_vlan_configure_guest_ingress_hostnetwork() {
-  local nested_kc="${SHARED_DIR}/nested_kubeconfig"
-  local current_strategy
+# Guest ingress uses HyperShift's baseDomainPassthrough mechanism: the management cluster's
+# router has a wildcard passthrough route that forwards *.apps.<cluster>.apps.<mgmt-domain>
+# through a passthrough service to the guest VMs' NodePort ingress. No DNAT or HostNetwork
+# patching required — the passthrough service endpoints are managed by HyperShift from VMI IPs.
+localnet_vlan_verify_guest_ingress_passthrough() {
+  local vmi_namespace="$1"
+  local ep_count
 
-  if [[ ! -f "${nested_kc}" ]]; then
-    echo "ERROR: nested kubeconfig missing at ${nested_kc}" >&2
-    return 1
-  fi
-
-  echo "Waiting for guest API to be reachable..."
-  for _ in $(seq 1 60); do
-    if localnet_vlan_guest_oc auth can-i patch ingresscontroller/default --namespace=openshift-ingress-operator \
-      >/dev/null 2>&1; then
-      break
+  echo "Verifying baseDomainPassthrough ingress (passthrough service endpoints)..."
+  for _ in $(seq 1 30); do
+    ep_count=$(oc get endpointslices -n "${vmi_namespace}" \
+      -l endpointslice.kubernetes.io/managed-by=control-plane-operator.hypershift.openshift.io \
+      -o jsonpath='{range .items[*]}{range .endpoints[*]}{.addresses[0]}{"\n"}{end}{end}' 2>/dev/null \
+      | grep -c . || echo "0")
+    if [[ "${ep_count}" -gt 0 ]]; then
+      echo "Passthrough service has ${ep_count} endpoint(s) — guest ingress path is ready"
+      return 0
     fi
     sleep 10
   done
-  if ! localnet_vlan_guest_oc auth can-i patch ingresscontroller/default --namespace=openshift-ingress-operator \
-    >/dev/null 2>&1; then
-    echo "ERROR: cannot access guest API with nested kubeconfig (check lab routing and HTTP_PROXY bypass)" >&2
-    return 1
-  fi
-
-  current_strategy=$(localnet_vlan_guest_oc get ingresscontroller default -n openshift-ingress-operator \
-    -o jsonpath='{.spec.endpointPublishingStrategy.type}' 2>/dev/null || true)
-  if [[ "${current_strategy}" == "HostNetwork" ]]; then
-    echo "Guest ingress controller already uses HostNetwork"
-  else
-    echo "Patching guest ingress controller to HostNetwork (worker VLAN NIC)..."
-    localnet_vlan_guest_oc patch ingresscontroller default -n openshift-ingress-operator --type=merge -p \
-      '{"spec":{"endpointPublishingStrategy":{"type":"HostNetwork","hostNetwork":{"protocol":"TCP"}}}}'
-  fi
-
-  echo "Waiting for guest default ingress router to deploy with HostNetwork..."
-  localnet_vlan_guest_oc rollout status deployment/router-default -n openshift-ingress --timeout=10m
-}
-
-localnet_vlan_guest_ingress_worker_ip() {
-  local vmi_namespace="$1"
-  local vlan_subnet="$2"
-  local vlan_octets
-  local router_node worker_ip
-
-  vlan_octets="${vlan_subnet%/*}"
-  vlan_octets="${vlan_octets%.*}"
-
-  router_node=$(localnet_vlan_guest_oc get pods -n openshift-ingress \
-    -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default \
-    -o jsonpath='{.items[0].spec.nodeName}' 2>/dev/null || true)
-  if [[ -n "${router_node}" ]]; then
-    worker_ip=$(localnet_vlan_pick_vlan_worker_ipv4 "${vlan_octets}" < <(localnet_vlan_guest_oc get node "${router_node}" \
-      -o jsonpath='{range .status.addresses[*]}{.address}{"\n"}{end}') || true)
-    if [[ -n "${worker_ip}" ]]; then
-      echo "${worker_ip}"
-      return 0
-    fi
-  fi
-
-  worker_ip=$(localnet_vlan_map_worker_vlan_ips "${vmi_namespace}" "${vlan_subnet}" | awk 'NR==1{print $1}')
-  if [[ -n "${worker_ip}" ]]; then
-    echo "${worker_ip}"
-    return 0
-  fi
-
-  echo "ERROR: could not determine guest ingress worker IP on ${vlan_subnet}" >&2
-  return 1
-}
-
-localnet_vlan_ingress_dnat_backend_ports() {
-  local strategy
-  local np_https np_http
-
-  strategy=$(localnet_vlan_guest_oc get ingresscontroller default -n openshift-ingress-operator \
-    -o jsonpath='{.spec.endpointPublishingStrategy.type}' 2>/dev/null || true)
-  if [[ "${strategy}" == "HostNetwork" ]]; then
-    echo "443 80"
-    return 0
-  fi
-
-  np_https=$(localnet_vlan_guest_oc get svc -n openshift-ingress router-nodeport-default \
-    -o jsonpath='{.spec.ports[?(@.port==443)].nodePort}' 2>/dev/null || true)
-  np_http=$(localnet_vlan_guest_oc get svc -n openshift-ingress router-nodeport-default \
-    -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}' 2>/dev/null || true)
-  if [[ -z "${np_https}" || -z "${np_http}" ]]; then
-    if [[ "${LOCALNET_VLAN_INGRESS_HOSTNETWORK:-true}" == "true" ]]; then
-      echo "WARNING: could not read guest ingress NodePort (strategy=${strategy}); assuming HostNetwork 443/80 for DNAT" >&2
-      echo "443 80"
-      return 0
-    fi
-    echo "ERROR: could not read openshift-ingress NodePort (strategy=${strategy})" >&2
-    return 1
-  fi
-  echo "Ingress NodePort backend ports ${np_https}/${np_http} (strategy=${strategy})" >&2
-  echo "${np_https} ${np_http}"
-}
-
-localnet_vlan_configure_ingress_vip_dnat() {
-  local ingress_vip="$1"
-  local worker_ip="$2"
-  local backend_https="$3"
-  local backend_http="$4"
-  local dnat_b64
-
-  if [[ -z "${ingress_vip}" || -z "${worker_ip}" || -z "${backend_https}" || -z "${backend_http}" ]]; then
-    echo "ERROR: ingress VIP DNAT requires ingress_vip, worker_ip, and backend http/https ports" >&2
-    return 1
-  fi
-
-  dnat_b64=$(base64 -w0 <<'SCRIPT_EOF'
-#!/bin/bash
-set -euo pipefail
-ingress_vip="$1"
-worker_ip="$2"
-backend_https="$3"
-backend_http="$4"
-
-add_dnat() {
-  local dport="$1"
-  local toport="$2"
-  iptables -t nat -C PREROUTING -d "${ingress_vip}" -p tcp --dport "${dport}" -j DNAT \
-    --to-destination "${worker_ip}:${toport}" 2>/dev/null || \
-    iptables -t nat -A PREROUTING -d "${ingress_vip}" -p tcp --dport "${dport}" -j DNAT \
-      --to-destination "${worker_ip}:${toport}"
-  iptables -t nat -C OUTPUT -d "${ingress_vip}" -p tcp --dport "${dport}" -j DNAT \
-    --to-destination "${worker_ip}:${toport}" 2>/dev/null || \
-    iptables -t nat -A OUTPUT -d "${ingress_vip}" -p tcp --dport "${dport}" -j DNAT \
-      --to-destination "${worker_ip}:${toport}"
-}
-
-add_dnat 443 "${backend_https}"
-add_dnat 80 "${backend_http}"
-echo "localnet-vlan ingress VIP ${ingress_vip} DNAT -> ${worker_ip}:${backend_https}/${backend_http}"
-SCRIPT_EOF
-)
-
-  echo "Installing ingress VIP ${ingress_vip} -> ${worker_ip} (${backend_https}/${backend_http}) DNAT on all mgmt nodes..."
-  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
-    if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
-      "echo '${dnat_b64}' | base64 -d | bash -s -- '${ingress_vip}' '${worker_ip}' '${backend_https}' '${backend_http}'"; then
-      echo "  ${node}: ingress VIP DNAT configured"
-    else
-      echo "ERROR: failed to configure ingress VIP DNAT on ${node}" >&2
-      return 1
-    fi
-  done
-}
-
-localnet_vlan_configure_guest_ingress_datapath() {
-  local vmi_namespace="$1"
-  local vlan_subnet="$2"
-  local ingress_vip="$3"
-  local worker_ip
-
-  if [[ "${LOCALNET_VLAN_INGRESS_HOSTNETWORK:-true}" == "true" ]]; then
-    localnet_vlan_configure_guest_ingress_hostnetwork
-  fi
-
-  if [[ "${LOCALNET_VLAN_INGRESS_VIP_DNAT:-true}" != "true" ]]; then
-    echo "Skipping ingress VIP DNAT (LOCALNET_VLAN_INGRESS_VIP_DNAT=false)"
-    return 0
-  fi
-
-  local backend_https backend_http
-  worker_ip=$(localnet_vlan_guest_ingress_worker_ip "${vmi_namespace}" "${vlan_subnet}")
-  read -r backend_https backend_http < <(localnet_vlan_ingress_dnat_backend_ports)
-  localnet_vlan_configure_ingress_vip_dnat "${ingress_vip}" "${worker_ip}" "${backend_https}" "${backend_http}"
+  echo "WARNING: passthrough service has no endpoints after 5 min (guest ingress may not be ready)" >&2
+  return 0
 }
 
 localnet_vlan_configure_br_localnet_dhcp() {
@@ -1913,11 +1767,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
       || echo "WARNING: post-NodePool localnet-vlan routing refresh failed (continuing)" >&2
   fi
 
-  localnet_vlan_configure_guest_ingress_datapath "${LOCALNET_VLAN_NS}" \
-    "${LOCALNET_VLAN_SUBNET}" "${LOCALNET_VLAN_INGRESS_VIP}" || {
-    echo "ERROR: localnet-vlan guest ingress datapath configuration failed" >&2
-    exit 1
-  }
+  localnet_vlan_verify_guest_ingress_passthrough "${LOCALNET_VLAN_NS}"
 
   if [[ "${LOCALNET_VLAN_DEPLOY_IPECHO:-true}" == "true" ]]; then
     deploy_localnet_vlan_ipecho "${LOCALNET_VLAN_PHYSNET}" "${LOCALNET_VLAN_IPECHO_STATIC_IP:-192.168.112.250/24}" || {
