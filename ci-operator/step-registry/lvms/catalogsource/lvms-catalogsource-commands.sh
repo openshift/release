@@ -593,6 +593,10 @@ function main {
 	# Extract source commit from catalog image for z-stream integration test builds.
 	# Only needed when ZSTREAM_VERSION is set — non-z-stream tests use pre-built images.
 	if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
+		# TEMPORARY: sleep for debugging — remove before merging
+		echo "DEBUG: sleeping 2h for manual debugging. Connect and test vcs-ref extraction."
+		echo "DEBUG: LVM_INDEX_IMAGE=${LVM_INDEX_IMAGE}"
+		sleep 7200
 		local commit image_info_flags="" oc_stderr=""
 		if [[ "$DISCONNECTED" == "true" ]]; then
 			image_info_flags="--insecure -a /tmp/new-dockerconfigjson"
