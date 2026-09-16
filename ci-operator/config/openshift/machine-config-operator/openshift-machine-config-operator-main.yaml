@@ -110,13 +110,27 @@ tests:
   steps:
     test:
     - as: nested-podman-test
-      commands: |
+      commands: |-
+        #!/usr/bin/env bash
+
         set -xeuo pipefail
         # ci-operator overrides the image ENTRYPOINT, so the nested-podman
         # entrypoint.sh does not run automatically. Invoke it explicitly to create
         # the podman configuration (registries.conf/storage.conf) before use.
 
         export REGISTRY_AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
+
+        if [ -f "$REGISTRY_AUTH_FILE" ]; then
+          echo "$REGISTRY_AUTH_FILE exists"
+          if [ -s "$REGISTRY_AUTH_FILE" ]; then
+            echo "$REGISTRY_AUTH_FILE contains data"
+          else
+            echo "$REGISTRY_AUTH_FILE is empty"
+          fi
+        else
+          echo "$REGISTRY_AUTH_FILE does not exist"
+        fi
+
         cfg_dir="$(mktemp -d)"
         cp "$REGISTRY_AUTH_FILE" "$cfg_dir/config.json"
         export DOCKER_CONFIG="$cfg_dir"
@@ -131,7 +145,7 @@ tests:
             wait "${PODMAN_PID}" 2>/dev/null || true
           fi
 
-          rm rf "$cfg_dir"
+          rm -rf "$cfg_dir"
         }
         trap cleanup EXIT
         podman system service --time=0 &
@@ -148,6 +162,7 @@ tests:
         export TESTCONTAINERS_RYUK_DISABLED=true
 
         podman pull quay.io/zzlotnik/testing:kwokdriver
+        podman pull quay.io/fedora/fedora:latest
         podman create --name kwokdriver quay.io/zzlotnik/testing:kwokdriver
         podman cp kwokdriver:/usr/local/bin/kwokdriver ./kwokdriver
         podman rm kwokdriver
@@ -156,9 +171,6 @@ tests:
       - bundle: registry-pull-credentials
         mount_path: /var/secrets/registry-pull-secret
         namespace: test-credentials
-      dependencies:
-      - env: OPENSHIFT_RELEASE_IMAGE
-        name: release:latest
       from: nested-podman
       grace_period: 10s
       nested_podman: true
