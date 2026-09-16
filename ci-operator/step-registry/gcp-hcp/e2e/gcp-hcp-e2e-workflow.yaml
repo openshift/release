@@ -2,6 +2,7 @@ workflow:
   as: gcp-hcp-e2e
   steps:
     pre:
+    - ref: gcp-hcp-update-commit-status
     - ref: hypershift-gcp-wif-auth
     - ref: gcp-hcp-tf-provision
     - ref: gcp-hcp-generate-kubeconfigs
@@ -16,8 +17,8 @@ workflow:
     ephemeral workspaces, runs validation tests, and normally cleans up resources.
     
     Phase breakdown:
-    - Pre: Authenticate via WIF, provision infrastructure with terraform apply,
-      generate kubeconfigs
+    - Pre: Post a pending GitHub commit status, authenticate via WIF, provision
+      infrastructure with terraform apply, generate kubeconfigs
     - Test: Validate ArgoCD application sync, then run HC lifecycle test
       (create cluster, verify, deploy workload, tear down)
     - Post: Force-delete GCP projects and clear TFC workspace state
