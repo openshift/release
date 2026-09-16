@@ -516,6 +516,22 @@ tests:
 
         ns=openshift-bgp-cloud-connector
 
+        # A post step runs whatever the test did, which is the point of putting
+        # this one here: a failed enable-frr or a failed install should still
+        # leave the operator measured. It also runs when provisioning never
+        # happened at all, and then there is no cluster kubeconfig -- oc falls
+        # through to the build cluster as the job's own service account, and
+        # every read below is refused against entirely the wrong cluster.
+        #
+        # Measured in the first rehearsal, where aro-provision-cluster failed
+        # and this step reported Forbidden on networks.operator.openshift.io
+        # against the build farm. aro-provision-cluster writes this file last,
+        # so its absence means no cluster was ever handed over.
+        if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
+          echo "no cluster was provisioned, so there is nothing here to measure"
+          exit 0
+        fi
+
         section "did the FRR patch survive the install"
         # ARO reverts configuration it manages, and it has had the length of
         # the install step to do so. If this does not stick, the first step of
