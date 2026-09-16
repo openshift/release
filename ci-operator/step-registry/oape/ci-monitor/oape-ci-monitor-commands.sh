@@ -63,7 +63,8 @@ if [[ -f /var/run/github-app/app-id && -f /var/run/github-app/private-key.pem ]]
       echo "[auth] WARN: GitHub App token creation request failed, falling back to GITHUB_TOKEN"
     fi
     if [[ "$TOKEN_HTTP_CODE" -eq 201 ]]; then
-      export GH_TOKEN=$(echo "$TOKEN_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+      GH_TOKEN=$(echo "$TOKEN_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+      export GH_TOKEN
       USE_APP_TOKEN="true"
       echo "[auth] GitHub App token generated successfully"
     else
