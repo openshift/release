@@ -39,18 +39,21 @@ run_az_with_retry() {
     # substitution, while stderr is used only for quiet retry classification.
 
     if ((rc >= 128 && rc <= 192)); then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s ended with status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
     fi
 
     if ! grep -Eiq "${AZURE_CLI_TRANSIENT_ERROR_PATTERN}" "${capture_dir}/stderr"; then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s failed with non-retryable status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
     fi
 
     if ((attempt >= max_attempts)); then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s failed after %d attempts with transient status %d\n' "${operation}" "${max_attempts}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
@@ -61,6 +64,7 @@ run_az_with_retry() {
       :
     else
       rc=$?
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s retry wait ended with status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
@@ -73,6 +77,13 @@ run_az_with_retry() {
   done
 }
 # END AZURE CLI RETRY HELPER
+
+print_az_cli_failure() {
+  local capture_dir="$1"
+  [[ -s "${capture_dir}/stdout" ]] && cat "${capture_dir}/stdout" >&2
+  [[ -s "${capture_dir}/stderr" ]] && cat "${capture_dir}/stderr" >&2
+  return 0
+}
 
 # Reconcile desired state after an ambiguous mutation response before retrying.
 # BEGIN AZURE CLI MUTATION RETRY HELPER
@@ -137,6 +148,7 @@ run_az_mutation_with_reconcile() {
     # Keep failed output private while using stderr for quiet classification.
 
     if ((mutation_rc >= 128 && mutation_rc <= 192)); then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s ended with status %d\n' "${operation}" "${mutation_rc}" >&2
       rm -rf "${capture_dir}"
       return "${mutation_rc}"
@@ -156,21 +168,25 @@ run_az_mutation_with_reconcile() {
       :
     else
       state_rc=$?
+      print_az_cli_failure "${capture_dir}"
       rm -rf "${capture_dir}"
       return "${state_rc}"
     fi
     if [[ "${AZURE_CLI_DESIRED_STATE}" == true ]]; then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s returned status %d, but desired state was reached\n' "${operation}" "${mutation_rc}"
       rm -rf "${capture_dir}"
       return 0
     fi
 
     if [[ "${mutation_was_retryable}" != true ]]; then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s failed with non-retryable status %d\n' "${operation}" "${mutation_rc}" >&2
       rm -rf "${capture_dir}"
       return "${mutation_rc}"
     fi
     if ((attempt >= max_attempts)); then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s failed after %d reconciled attempts with status %d\n' "${operation}" "${max_attempts}" "${mutation_rc}" >&2
       rm -rf "${capture_dir}"
       return "${mutation_rc}"
@@ -181,6 +197,7 @@ run_az_mutation_with_reconcile() {
       :
     else
       mutation_rc=$?
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s retry wait ended with status %d\n' "${operation}" "${mutation_rc}" >&2
       rm -rf "${capture_dir}"
       return "${mutation_rc}"
