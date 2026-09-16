@@ -190,9 +190,9 @@ export CYPRESS_CACHE_FOLDER=/tmp/Cypress
 repo_url="https://github.com/openshift/distributed-tracing-console-plugin.git"
 target_dir="/tmp/distributed-tracing-console-plugin"
 
-# Clone the repository (uses main branch by default)
+# Clone the repository, explicitly selecting the main branch.
 echo "Cloning the repository."
-git clone "$repo_url" "$target_dir"
+git clone --branch main --single-branch "$repo_url" "$target_dir"
 if [ $? -eq 0 ]; then
   cd "$target_dir/tests" || exit 1
   echo "Successfully cloned the repository and changed directory to $target_dir/tests."
