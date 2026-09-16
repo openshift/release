@@ -7,7 +7,7 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # Configure aws
-CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
+CLOUD_PROVIDER_REGION=${REGION:-${LEASED_RESOURCE}}
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
