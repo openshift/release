@@ -54,7 +54,10 @@ hcp create cluster kubevirt \
   --cores 4 \
   --root-volume-size 60 \
   --vm-node-selector role=kubevirt \
-  --release-image ${OCP_IMAGE_MULTI} 
+  --release-image ${OCP_IMAGE_MULTI} \
+  --annotations "resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m" \
+  --annotations "resource-request-override.hypershift.openshift.io/kube-scheduler.kube-scheduler=memory=512Mi,cpu=500m" \
+  --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m"
 
 oc wait --timeout=45m --for=condition=Available --namespace=hcpvirt-oz-ci-ns hostedclusters.hypershift.openshift.io/hcpvirt-oz-ci
 echo "$(date) Kubevirt cluster is available"
@@ -121,18 +124,36 @@ oc describe np -A
 
 wait_for_nodes() {
   local retries=0
+
+  # --- Check kube-apiserver reachability via /readyz before polling nodes ---
+  API_SERVER=$(oc --kubeconfig "${VIRT_KC}" config view \
+    -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)
+  echo "$(date) Guest cluster API server URL from kubeconfig: ${API_SERVER}"
+  READYZ_RESPONSE=$(curl -sk "${API_SERVER}/readyz" 2>&1 || true)
+  echo "$(date) /readyz response: ${READYZ_RESPONSE}"
+  if [[ "${READYZ_RESPONSE}" == "ok" ]]; then
+    echo "$(date) kube-apiserver is reachable and ready"
+  else
+    echo "$(date) WARNING: kube-apiserver /readyz did not return 'ok' — API may not be reachable yet"
+  fi
+
   while [[ ${retries} -lt ${MAX_RETRIES} ]]; do
+    # --- Per-retry reachability check ---
+    READYZ=$(curl -sk "${API_SERVER}/readyz" 2>&1 || true)
+    echo "$(date) [retry ${retries}] /readyz: ${READYZ}"
+
     READY_NODES=$(oc get no --kubeconfig "${VIRT_KC}" --no-headers 2>/dev/null \
       | grep -c " Ready" || true)
     echo "$(date) Ready nodes: ${READY_NODES}/${REQUIRED_NODES}"
     if [[ ${READY_NODES} -ge ${REQUIRED_NODES} ]]; then
       echo "$(date) ${REQUIRED_NODES} nodes are Ready"
+      oc get no --kubeconfig "${VIRT_KC}" -o wide -v6
       return 0
     fi
 
     echo "$(date) Nodes not ready yet — printing debug status"
     echo "$(date) DEBUG: All nodes in guest cluster:"
-    oc get no --kubeconfig "${VIRT_KC}" -o wide 2>/dev/null || echo "  (kubeconfig not yet accessible)"
+    oc get no --kubeconfig "${VIRT_KC}" -o wide -v6
     echo "$(date) DEBUG: KubeVirt VMs on mgmt cluster:"
     oc get vmi -n ${HC_NS}-${HC_NAME} 2>/dev/null || true
 
