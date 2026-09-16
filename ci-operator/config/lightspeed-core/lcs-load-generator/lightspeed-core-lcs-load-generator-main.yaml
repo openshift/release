@@ -6,9 +6,14 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
+      FROM quay.io/lightspeed-core/lightspeed-stack:dev-latest AS builder
+      USER 0
+      RUN pip install --no-cache-dir --target /opt/profiling-deps pyroscope-io memray
+
       FROM quay.io/lightspeed-core/lightspeed-stack:dev-latest
       USER 0
-      RUN pip install --no-cache-dir pyroscope-io
+      COPY --from=builder /opt/profiling-deps/ /opt/profiling-deps/
+      RUN cp -a /opt/profiling-deps/* "$(python3 -c 'import sysconfig; print(sysconfig.get_path("platlib"))')/" && rm -rf /opt/profiling-deps
       USER 1001
     to: lcs-perf
 prowgen:

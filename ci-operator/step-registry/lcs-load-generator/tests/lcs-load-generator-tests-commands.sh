@@ -26,12 +26,6 @@ TEST_DURATION="${TEST_DURATION:-5m}"
 LCS_APP_IMAGE="${LCS_APP_IMAGE:-quay.io/lightspeed-core/lightspeed-stack:dev-latest}"
 MOCK_LLM_IMAGE="${MOCK_LLM_IMAGE:-quay.io/rh-ee-bbodapat/lcs-testing:mock-llm-server}"
 ENABLE_PYROSCOPE="${ENABLE_PYROSCOPE:-true}"
-
-# Use the perf overlay image (with pyroscope-io pre-installed) when profiling is enabled
-if [[ "${ENABLE_PYROSCOPE}" == "true" && -n "${LCS_PERF_IMAGE:-}" ]]; then
-  LCS_APP_IMAGE="${LCS_PERF_IMAGE}"
-  echo "── Using perf overlay image for Pyroscope: ${LCS_APP_IMAGE} ──"
-fi
 ENABLE_MEMRAY="${ENABLE_MEMRAY:-false}"
 LCS_WORKERS="${LCS_WORKERS:-1}"
 ES_INDEX="${ES_BENCHMARK_INDEX:-lcs-perf-results}"
