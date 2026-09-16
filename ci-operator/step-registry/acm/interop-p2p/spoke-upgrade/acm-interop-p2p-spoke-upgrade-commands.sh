@@ -73,7 +73,7 @@ ResolveReleaseImage() {
     typeset pullspec="${1:?}"; (($#)) && shift
     typeset -n _version="${1:?}"; (($#)) && shift
     typeset -n _image="${1:?}"; (($#)) && shift
-    typeset releaseInfoJson digest imgRepo
+    typeset releaseInfoJson='' digest='' imgRepo=''
     releaseInfoJson="$(oc adm release info "${pullspec}" -o json)"
     _version="$(jq -r '.metadata.version' <<<"${releaseInfoJson}")"
     digest="$(jq -r '.digest' <<<"${releaseInfoJson}")"
@@ -175,16 +175,33 @@ EOF
     true
 }
 
+WaitSpokeVersionAppears() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset version="${1:?}"; (($#)) && shift
+    # Only waits for the version entry to appear in history (state may be Partial).
+    # Use this during CPOU hops where the worker MCP is paused — ClusterVersion state
+    # stays Partial until workers are upgraded, so waiting for Completed here would
+    # time out.  Call WaitSpokeUpgradeCompleted after workers are unpaused.
+    : "Waiting for spoke ClusterVersion ${version} version entry (${ACM_SPOKE_UPGRADE_TIMEOUT})"
+    oc --kubeconfig="${kubeconfig}" wait clusterversion/version \
+        --for=jsonpath='{.status.history[0].version}'="${version}" \
+        --timeout="${ACM_SPOKE_UPGRADE_TIMEOUT}" 1>/dev/null
+    true
+}
+
 WaitSpokeUpgradeCompleted() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset version="${1:?}"; (($#)) && shift
-    : "Waiting for spoke ClusterVersion ${version} to reach Completed (${ACM_SPOKE_UPGRADE_TIMEOUT})"
+    : "Waiting for spoke ClusterVersion ${version} version entry (${ACM_SPOKE_UPGRADE_TIMEOUT})"
     oc --kubeconfig="${kubeconfig}" wait clusterversion/version \
         --for=jsonpath='{.status.history[0].version}'="${version}" \
-        --timeout="${ACM_SPOKE_UPGRADE_TIMEOUT}"
+        --timeout="${ACM_SPOKE_UPGRADE_TIMEOUT}" 1>/dev/null
+    # Once the target version entry appears, Completed follows after operators reconcile.
+    # Use a separate ceiling so we don't consume the full main timeout a second time.
+    : "Waiting for spoke ClusterVersion ${version} state=Completed (${ACM_SPOKE_UPGRADE_COMPLETION_TIMEOUT})"
     oc --kubeconfig="${kubeconfig}" wait clusterversion/version \
         --for=jsonpath='{.status.history[0].state}'="Completed" \
-        --timeout="${ACM_SPOKE_UPGRADE_TIMEOUT}"
+        --timeout="${ACM_SPOKE_UPGRADE_COMPLETION_TIMEOUT}" 1>/dev/null
     true
 }
 
@@ -196,7 +213,7 @@ WaitMcpCondition() {
     : "Waiting for spoke mcp/${mcp} condition ${condition} (${timeout})"
     oc --kubeconfig="${kubeconfig}" wait "mcp/${mcp}" \
         --for="condition=${condition}" \
-        --timeout="${timeout}"
+        --timeout="${timeout}" 1>/dev/null
     true
 }
 
@@ -224,6 +241,8 @@ DumpSpokeUpgradeStatus() {
 # Upgrade the spoke cluster to a specific release pullspec.
 # Sets caller-scoped variable (arg 2) to the resolved hop version
 # so the trap handler can report which hop was in progress on failure.
+# Only waits for the version entry (state may be Partial) — callers are responsible
+# for waiting for state=Completed after workers are unpaused (EUS) or immediately (n+1).
 UpgradeSpokeToPullspec() {
     typeset pullspec="${1:?}"; (($#)) && shift
     typeset -n _currentHopVersion="${1:?}"; (($#)) && shift    # ← nameref (MPEX-compliant)
@@ -234,7 +253,7 @@ UpgradeSpokeToPullspec() {
     PatchAdminAcksForUpgrade "${spokeKubeconfig}"
     ApplySpokeUpgradeManifestWork "${spokeName}" "${ACM_MANIFESTWORK_NAME}" \
         "${mwManifest}" "${hopImage}"
-    WaitSpokeUpgradeCompleted "${spokeKubeconfig}" "${hopVersion}"
+    WaitSpokeVersionAppears "${spokeKubeconfig}" "${hopVersion}"
     WaitMcpCondition "${spokeKubeconfig}" master Updated "${ACM_SPOKE_UPGRADE_TIMEOUT}"
     DumpSpokeUpgradeStatus "${hopVersion}"
     true
@@ -253,7 +272,7 @@ fi
 
 ApplySpokeClusterVersionRbac "${spokeKubeconfig}" "${rbacManifest}"
 
-if [[ "${SPOKE_CLUSTER_UPGRADE_EUS}" == "true" ]]; then
+if [[ "${SPOKE_CLUSTER_UPGRADE_EUS}" == 'true' ]]; then
     typeset hopPullspecs='' hopPullspec=''
     typeset -a hopImages=()
     [ -f "${SHARED_DIR}/upgrade-edge" ]
@@ -268,13 +287,24 @@ if [[ "${SPOKE_CLUSTER_UPGRADE_EUS}" == "true" ]]; then
         hopPullspec="${hopPullspec//[[:space:]]/}"
         [[ -n "${hopPullspec}" ]]
         UpgradeSpokeToPullspec "${hopPullspec}" currentHopVersion
+        # Re-apply the target channel after each hop so the CVO's Upgradeable condition
+        # and update graph reflect the final EUS target (idempotent if already set).
+        if [[ -n "${SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL}" ]]; then
+            : "Re-applying channel ${SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL} after hop to ${currentHopVersion}"
+            oc --kubeconfig="${spokeKubeconfig}" patch clusterversion version --type merge \
+                -p "$(jq -cn --arg ch "${SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL}" '{"spec":{"channel":$ch}}')"
+        fi
     done
-    WaitMcpCondition "${spokeKubeconfig}" worker 'Updated=False' 30m
+    WaitMcpCondition "${spokeKubeconfig}" worker 'Updated=False' "${ACM_SPOKE_UPGRADE_TIMEOUT}"
     SetWorkerMcpPaused "${spokeKubeconfig}" false
     WaitMcpCondition "${spokeKubeconfig}" worker Updated "${ACM_SPOKE_UPGRADE_TIMEOUT}"
+    # Workers are now upgraded — CVO can finally mark the last hop Completed.
+    WaitSpokeUpgradeCompleted "${spokeKubeconfig}" "${currentHopVersion}"
     DumpSpokeUpgradeStatus "unpaused"
 else
-   UpgradeSpokeToPullspec "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" currentHopVersion
+    UpgradeSpokeToPullspec "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" currentHopVersion
+    # n+1: workers were never paused, so Completed can be checked immediately.
+    WaitSpokeUpgradeCompleted "${spokeKubeconfig}" "${currentHopVersion}"
 fi
 
 true

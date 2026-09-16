@@ -32,8 +32,16 @@ ref:
   - name: ACM_SPOKE_UPGRADE_TIMEOUT
     default: "3h"
     documentation: |-
-      Max time to wait per hop for spoke ClusterVersion Completed and for
-      master/worker MCP Updated. Accepts any oc wait duration.
+      Max time to wait per hop for spoke ClusterVersion history[0].version to appear
+      and for master/worker MCP Updated. Accepts any oc wait duration.
+  - name: ACM_SPOKE_UPGRADE_COMPLETION_TIMEOUT
+    default: "1h"
+    documentation: |-
+      Max time to wait for spoke ClusterVersion state=Completed after the target version
+      has already appeared in history[0]. Kept separate from ACM_SPOKE_UPGRADE_TIMEOUT
+      so the full main timeout is not consumed twice per hop. Once the version entry is
+      present, operator reconciliation typically finishes within minutes; 1h provides
+      ample headroom for slow clusters. Accepts any oc wait duration.
   documentation: |-
     Upgrades the ACM managed spoke cluster (from acm-interop-p2p-cluster-install SHARED_DIR files)
     using ManifestWork on the hub and klusterlet-work RBAC on the spoke.

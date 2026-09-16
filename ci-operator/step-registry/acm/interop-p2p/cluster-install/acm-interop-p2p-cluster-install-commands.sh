@@ -815,6 +815,79 @@ DisableClusterImagePolicySignatureEnforcement() {
     true
 }
 
+# ApplyPermissiveClusterImagePolicy — narrow the default 'openshift' ClusterImagePolicy scopes
+# so that unsigned nightly images (ocp-v4.0-art-dev, registry.ci.openshift.org/ocp/release) can
+# be pulled on the spoke cluster (OCPBUGS-114622).
+# OCP 4.20+ enforces Red Hat's signing key for several image registries by default via the
+# 'openshift' ClusterImagePolicy. Patching its scopes to only
+# ["quay.io/openshift-release-dev/ocp-release"] (which IS signed) removes enforcement for
+# unsigned nightly component images without touching enforcement for release payloads.
+# Must be called after DisableClusterImagePolicySignatureEnforcement (which marks the CIP
+# unmanaged in the CVO) so the CVO does not revert the patch.
+ApplyPermissiveClusterImagePolicy() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+    typeset cipJson='' currentScopes=''
+    typeset isChanged='false'
+    typeset -a prevRenderedArr=()
+    typeset -a currRenderedArr=()
+    typeset -i wMax=300 wInt=10 j=0
+
+    # If the openshift CIP doesn't exist the cluster is already permissive — nothing to do.
+    cipJson="$(oc --kubeconfig="${kubeconfig}" get clusterimagepolicy openshift \
+        --ignore-not-found -o json 2>/dev/null)"
+    if [[ -z "${cipJson}" ]]; then
+        : "No 'openshift' ClusterImagePolicy on spoke ${clusterName} — already permissive, skipping"
+        true
+        return 0
+    fi
+
+    currentScopes="$(jq -r '.spec.scopes // [] | join(",")' <<<"${cipJson}")"
+    : "Current 'openshift' CIP scopes on spoke ${clusterName}: ${currentScopes}"
+
+    # Capture rendered-config markers before the patch; the patch triggers MCO to generate a new
+    # rendered config and we need the pre-patch names as a baseline for change detection.
+    mapfile -t prevRenderedArr < <(
+        oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+            -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
+    )
+
+    # Replace scopes with only ocp-release (signed in nightlies).
+    # This removes ocp-v4.0-art-dev and registry.ci.openshift.org/ocp/release from enforcement,
+    # allowing unsigned nightly component images to be pulled.
+    : "Patching 'openshift' CIP scopes on spoke ${clusterName} to allow unsigned nightlies"
+    oc --kubeconfig="${kubeconfig}" patch clusterimagepolicy openshift --type=json \
+        -p '[{"op":"replace","path":"/spec/scopes","value":["quay.io/openshift-release-dev/ocp-release"]}]' \
+        1>/dev/null
+
+    # Wait until at least one MCP's rendered-config name changes — proves MCO picked up the patch.
+    : "Waiting for MCO to generate new rendered config on spoke ${clusterName} (${wMax}s)"
+    SECONDS=0
+    while (( SECONDS < wMax )); do
+        mapfile -t currRenderedArr < <(
+            oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+                -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
+        )
+        isChanged='false'
+        for (( j = 0; j < ${#prevRenderedArr[@]}; j++ )); do
+            [[ "${prevRenderedArr[j]}" != "${currRenderedArr[j]:-}" ]] && { isChanged='true'; break; }
+        done
+        [[ "${isChanged}" == 'true' ]] && break
+        sleep "${wInt}"
+    done
+    if (( SECONDS >= wMax )); then
+        : "WARNING: MCO rendered config unchanged after ${wMax}s on spoke ${clusterName} — continuing"
+    fi
+
+    # Wait for full MCP rollout — all pools Updated=True with the new config.
+    : "Waiting for MachineConfigPools to finish rolling out on spoke ${clusterName} (20m)"
+    oc --kubeconfig="${kubeconfig}" wait machineconfigpool --all \
+        --for='condition=Updated=True' \
+        --timeout=20m 1>/dev/null
+    : "'openshift' CIP scopes narrowed and MCO rollout complete on spoke ${clusterName}"
+    true
+}
+
 #=====================
 # Main execution: Create all clusters
 #=====================
@@ -854,10 +927,6 @@ done
 for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     idx=$((i + 1))
     ExtractClusterCredentials "${clusterNamesArr[i]}" "${idx}"
-    if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY}" == "true" ]]; then
-        DisableClusterImagePolicySignatureEnforcement \
-            "${SHARED_DIR}/managed-cluster-kubeconfig-${idx}" "${clusterNamesArr[i]}"
-    fi
 done
 
 : "All credentials extracted. Waiting for ACM klusterlet agents to become Available..."
@@ -873,12 +942,21 @@ for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     WaitForManagedClusterAvailable "${clusterNamesArr[i]}" "${idx}"
 done
 
-# Phase 5: Disable ClusterImagePolicy signature enforcement on spokes
-# Only needed when installing with unsigned nightly images.
+# Phase 5: Disable ClusterImagePolicy signature enforcement then narrow the policy scopes.
+# DisableClusterImagePolicySignatureEnforcement patches clusterversion so the CVO stops
+# managing the openshift ClusterImagePolicy, preventing it from reverting our patch.
+# ApplyPermissiveClusterImagePolicy patches the 'openshift' CIP scopes to only
+# ["quay.io/openshift-release-dev/ocp-release"], removing enforcement for unsigned nightly
+# component images (ocp-v4.0-art-dev, CI registry) while keeping it for signed release payloads.
+# Waits for MCO to roll out the change to every node.
+# Only needed when installing from unsigned nightly images.
 if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}" == "true" ]]; then
     for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
         idx=$((i + 1))
         DisableClusterImagePolicySignatureEnforcement \
+            "${SHARED_DIR}/managed-cluster-kubeconfig-${idx}" \
+            "${clusterNamesArr[i]}"
+        ApplyPermissiveClusterImagePolicy \
             "${SHARED_DIR}/managed-cluster-kubeconfig-${idx}" \
             "${clusterNamesArr[i]}"
     done
