@@ -81,17 +81,14 @@ tests:
     test:
     - as: e2e
       from: insights-on-prem-tests
-      # REHEARSAL-ONLY (openshift/release#85084): the IOP_IMAGE_REF dependency on
-      # the `insights-on-prem` app image is temporarily removed so
-      # `--target=test-e2e` does NOT build that image. Its base
-      # (registry.redhat.io/.../ocp-rules-rhel9) is likely unpullable by the build
-      # farm and, being a hard dependency of this test node, would abort the run
-      # BEFORE the ocm-e2e-clusterpool checkout ever runs. Removing it isolates the
-      # pool-access check (lease from acm-observability-usa + checkin).
-      # RESTORE before merge:
-      #   dependencies:
-      #   - env: IOP_IMAGE_REF
-      #     name: insights-on-prem
+      # The PR-built IOP app image, exposed to the e2e suite as IOP_IMAGE_REF so
+      # it can deploy that image onto the hub (substituted into deploy/08-insights.yml).
+      # The build farm can pull the entitled base
+      # (registry.redhat.io/lightspeed-services-ocp/ocp-rules-rhel9), verified by
+      # the -images job on openshift/release#85084.
+      dependencies:
+      - env: IOP_IMAGE_REF
+        name: insights-on-prem
       commands: |
         set -eo pipefail
 
