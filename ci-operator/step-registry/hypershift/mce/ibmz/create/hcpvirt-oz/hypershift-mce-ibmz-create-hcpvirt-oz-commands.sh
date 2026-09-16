@@ -31,13 +31,26 @@ PULL_SECRET_FILE=/tmp/pull-secret
 set -x
 
 # Restrict virt VMs on compute nodes
-for node in compute-0 compute-1; do
-  oc label node "${node}" role=kubevirt --overwrite
-done
-oc get nodes -l role=kubevirt
-# Hosted cluster identity and namespace
-HC_NAME=hcpvirt-oz-ci
-HC_NS=hcpvirt-oz-ci-ns
+#for node in compute-0 compute-1; do
+#  oc label node "${node}" role=kubevirt --overwrite
+#done
+#oc get nodes -l role=kubevirt
+# Hosted cluster identity and namespace — derived from the MetalLB IPAddressPool range
+POOL_RANGE=$(oc get ipaddresspool -n metallb-system -o jsonpath='{.items[0].spec.addresses[0]}' 2>/dev/null || true)
+echo "$(date) MetalLB IPAddressPool range: ${POOL_RANGE}"
+
+if [[ "${POOL_RANGE}" == 192.168.2.* ]]; then
+  HC_NAME=hcpvirt-oz-ci
+  HC_NS=hcpvirt-oz-ci-ns
+elif [[ "${POOL_RANGE}" == 192.168.3.* ]]; then
+  HC_NAME=hcpvirtnew-oz-ci
+  HC_NS=hcpvirtnew-oz-ci-ns
+else
+  echo "$(date) ERROR: Unrecognised IPAddressPool range '${POOL_RANGE}', expected 192.168.2.x or 192.168.3.x"
+  exit 1
+fi
+
+echo "$(date) Using HC_NAME=${HC_NAME}, HC_NS=${HC_NS}"
 MGMT_HOST_IP=10.0.1.15
 echo "$(date) LPAR host IP: ${MGMT_HOST_IP}"
 
@@ -53,12 +66,11 @@ hcp create cluster kubevirt \
   --memory 16Gi \
   --cores 4 \
   --root-volume-size 60 \
-  --vm-node-selector role=kubevirt \
   --release-image ${OCP_IMAGE_MULTI} \
   --annotations "resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m" \
   --annotations "resource-request-override.hypershift.openshift.io/kube-scheduler.kube-scheduler=memory=512Mi,cpu=500m" \
   --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m"
-
+ #--vm-node-selector role=kubevirt \
 oc wait --timeout=45m --for=condition=Available --namespace=hcpvirt-oz-ci-ns hostedclusters.hypershift.openshift.io/hcpvirt-oz-ci
 echo "$(date) Kubevirt cluster is available"
 
