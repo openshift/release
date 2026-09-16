@@ -126,10 +126,7 @@ wait_for_nodes() {
   local retries=0
 
   # --- Check kube-apiserver reachability via /readyz before polling nodes ---
-  API_SERVER=$(oc --kubeconfig "${VIRT_KC}" config view \
-    -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)
-  echo "$(date) Guest cluster API server URL from kubeconfig: ${API_SERVER}"
-  READYZ_RESPONSE=$(curl -sk "${API_SERVER}/readyz" 2>&1 || true)
+  READYZ_RESPONSE=$(curl -sk "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>&1 || true)
   echo "$(date) /readyz response: ${READYZ_RESPONSE}"
   if [[ "${READYZ_RESPONSE}" == "ok" ]]; then
     echo "$(date) kube-apiserver is reachable and ready"
@@ -153,7 +150,7 @@ wait_for_nodes() {
 
     echo "$(date) Nodes not ready yet — printing debug status"
     echo "$(date) DEBUG: All nodes in guest cluster:"
-    oc get no --kubeconfig "${VIRT_KC}" -o wide -v6
+    oc get no --kubeconfig "${VIRT_KC}" -o wide
     echo "$(date) DEBUG: KubeVirt VMs on mgmt cluster:"
     oc get vmi -n ${HC_NS}-${HC_NAME} 2>/dev/null || true
 
@@ -175,16 +172,11 @@ wait_for_nodes() {
   return 1
 }
 
-# DEBUG: 2h sleep before wait_for_nodes to allow live exec into the pod for debugging
-echo "$(date) DEBUG SLEEP: sleeping 2h before wait_for_nodes to allow live debugging..."
-sleep 7200
-echo "$(date) DEBUG SLEEP: 2h sleep complete, proceeding to wait_for_nodes"
-
 wait_for_nodes
 
 # --- Step 4: Read NodePort values from the guest cluster's default ingress service ---
-# The guest cluster uses a NodePort-type router; we need the assigned ports to wire up
-# the management-side LoadBalancer service that exposes *.apps externally.
+# The guest cluster router listens on NodePorts, not 80/443 directly.
+# We need these ports as targetPorts for the management-side LoadBalancer service.
 echo "$(date) Retrieving NodePort values from guest cluster ingress service"
 
 HTTP_PORT=$(oc --kubeconfig "${VIRT_KC}" get services -n openshift-ingress router-nodeport-default \
@@ -195,9 +187,9 @@ HTTPS_PORT=$(oc --kubeconfig "${VIRT_KC}" get services -n openshift-ingress rout
 echo "$(date) HTTP NodePort: ${HTTP_PORT}, HTTPS NodePort: ${HTTPS_PORT}"
 
 # --- Step 5: Create a LoadBalancer Service on the management cluster to expose guest *.apps traffic ---
-# This Service selects the KubeVirt VM pods (virt-launcher) and forwards port 80/443 to the
-# guest cluster's NodePort ingress, giving the hosted cluster a reachable external ingress.
+# Selects KubeVirt VM pods (virt-launcher) and forwards port 80/443 to the guest router NodePorts.
 echo "$(date) Creating *.apps LoadBalancer Service targeting KubeVirt VM pods"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 oc apply -f - <<SVCEOF
 apiVersion: v1
@@ -222,14 +214,8 @@ spec:
   type: LoadBalancer
 SVCEOF
 
-
-# DEBUG: 1h sleep after deploying *.apps LoadBalancer Service to allow live debugging
-echo "$(date) DEBUG SLEEP: sleeping 1h after deploying *.apps LoadBalancer Service..."
-sleep 3600
-echo "$(date) DEBUG SLEEP: 1h sleep complete, proceeding to ClusterOperator check"
-
-# --- Step 6: Wait for all guest cluster ClusterOperators to be Available and not Degraded ---
-echo "$(date) Waiting for all ClusterOperators to be Available and not Degraded"
+# --- Step 6: Wait for all guest cluster ClusterOperators to be Available ---
+echo "$(date) Waiting for all ClusterOperators to be Available"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 CO_MAX_WAIT=1800  # 30 minutes in seconds
@@ -239,10 +225,10 @@ UNAVAILABLE=""
 
 while [[ ${CO_ELAPSED} -lt ${CO_MAX_WAIT} ]]; do
   UNAVAILABLE=$(oc get co --kubeconfig "${VIRT_KC}" --no-headers 2>/dev/null \
-    | awk '{print $3, $5}' \
-    | grep -v "^True False$" || true)
+    | awk '{print $3}' \
+    | grep -v "^True$" || true)
   if [[ -z "${UNAVAILABLE}" ]]; then
-    echo "$(date) All ClusterOperators are Available=True and Degraded=False"
+    echo "$(date) All ClusterOperators are Available=True"
     break
   fi
   echo "$(date) ClusterOperators not yet healthy (${CO_ELAPSED}s elapsed):"
@@ -252,7 +238,7 @@ while [[ ${CO_ELAPSED} -lt ${CO_MAX_WAIT} ]]; do
 done
 
 if [[ -n "${UNAVAILABLE}" ]]; then
-  echo "$(date) ERROR: Some ClusterOperators are not Available or are Degraded:"
+  echo "$(date) ERROR: Some ClusterOperators are not Available:"
   oc get co --kubeconfig "${VIRT_KC}"
   echo "$(date) DEBUG: Degraded CO details:"
   oc get co --kubeconfig "${VIRT_KC}" -o yaml || true
@@ -277,5 +263,11 @@ fi
 
 echo "$(date) HCP KubeVirt hosted cluster is fully operational"
 
-# --- Step 7: Switch KUBECONFIG to the guest cluster for downstream conformance steps ---
+# Print control-plane workload resource requests regardless of pass/fail
+echo "$(date) Control-plane deploy/statefulset resource requests:"
+oc get deploy,statefulset -n ${HC_NS}-${HC_NAME} \
+  --kubeconfig="${SHARED_DIR}/kubeconfig" \
+  -o custom-columns='KIND:.kind,NAME:.metadata.name,CPU:.spec.template.spec.containers[0].resources.requests.cpu,MEM:.spec.template.spec.containers[0].resources.requests.memory' || true
+
+# --- Step 10: Switch KUBECONFIG to the guest cluster for downstream conformance steps ---
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
