@@ -448,12 +448,21 @@ SCRIPT_EOF
 )
 
   echo "Configuring localnet-vlan routing on all nodes (${vlan_subnet} -> ${uplink_bond}, mgmt pod ${mgmt_pod_cidr})..."
+  local max_retries=3
   for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
-    if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
-      "echo '${routing_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${uplink_bond}' '${vlan_subnet}' '${mgmt_pod_cidr}' '${mgmt_svc_cidr}'"; then
-      echo "  ${node}: routing configured"
-    else
-      echo "WARNING: failed to configure routing on ${node}" >&2
+    local ok=false
+    for attempt in $(seq 1 "${max_retries}"); do
+      if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${routing_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${uplink_bond}' '${vlan_subnet}' '${mgmt_pod_cidr}' '${mgmt_svc_cidr}'"; then
+        echo "  ${node}: routing configured"
+        ok=true
+        break
+      fi
+      echo "  ${node}: oc debug failed (attempt ${attempt}/${max_retries}), retrying in 10s..." >&2
+      sleep 10
+    done
+    if [[ "${ok}" != "true" ]]; then
+      echo "ERROR: failed to configure routing on ${node} after ${max_retries} attempts" >&2
       return 1
     fi
   done
@@ -582,11 +591,19 @@ echo "localnet-vlan worker /32 routes installed via ${uplink_bond} (node ${node}
 SCRIPT_EOF
 )
 
-    if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
-      "echo '${route_script_b64}' | base64 -d | bash"; then
-      echo "  ${node}: worker host routes configured"
-    else
-      echo "ERROR: failed to configure worker host routes on ${node}" >&2
+    local route_ok=false
+    for route_attempt in $(seq 1 3); do
+      if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${route_script_b64}' | base64 -d | bash"; then
+        echo "  ${node}: worker host routes configured"
+        route_ok=true
+        break
+      fi
+      echo "  ${node}: oc debug failed (attempt ${route_attempt}/3), retrying in 10s..." >&2
+      sleep 10
+    done
+    if [[ "${route_ok}" != "true" ]]; then
+      echo "ERROR: failed to configure worker host routes on ${node} after 3 attempts" >&2
       return 1
     fi
   done
@@ -666,13 +683,21 @@ localnet_vlan_configure_br_localnet_dhcp() {
     echo "Setting up ${dhcp_iface} DHCP/DNS on node ${node} (per-node secondary VLAN segment)..."
     # oc debug defaults to OPENSHIFT_BUILD_NAMESPACE (ci-op-* on build cluster), which does
     # not exist on the baremetal test cluster. Always target default.
-    if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
-      "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
-    then
-      echo "${node}" >> "${SHARED_DIR}/localnet-vlan-dhcp-nodes"
-      echo "  ${node}: dnsmasq configured on ${dhcp_iface}"
-    else
-      echo "ERROR: failed to configure ${dhcp_iface} DHCP on node ${node}" >&2
+    local dhcp_ok=false
+    for dhcp_attempt in $(seq 1 3); do
+      if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
+      then
+        echo "${node}" >> "${SHARED_DIR}/localnet-vlan-dhcp-nodes"
+        echo "  ${node}: dnsmasq configured on ${dhcp_iface}"
+        dhcp_ok=true
+        break
+      fi
+      echo "  ${node}: oc debug failed (attempt ${dhcp_attempt}/3), retrying in 10s..." >&2
+      sleep 10
+    done
+    if [[ "${dhcp_ok}" != "true" ]]; then
+      echo "ERROR: failed to configure ${dhcp_iface} DHCP on node ${node} after 3 attempts" >&2
       failed=1
     fi
   done
