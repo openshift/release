@@ -1,0 +1,37 @@
+ref:
+  as: kuadrant-s390x-verify-gateway
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: kuadrant-s390x-verify-gateway-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 20m0s
+  env:
+  - name: GATEWAY_PROBE_NAMESPACE
+    default: "kuadrant-gw-probe"
+    documentation: |-
+      Namespace used for the fail-fast Istio Gateway Programmed preflight.
+  - name: GATEWAY_PROBE_NAME
+    default: "probe-gw"
+    documentation: |-
+      Name of the probe Gateway created before the Kuadrant testsuite runs.
+  - name: GATEWAY_PROBE_CLASS
+    default: "istio"
+    documentation: |-
+      GatewayClass for the probe. Must match what the Kuadrant testsuite selects
+      when openshift-default is absent (typically "istio").
+  - name: GATEWAY_PROBE_TIMEOUT_SECONDS
+    default: "600"
+    documentation: |-
+      How long to wait for the probe Gateway to reach Programmed=True.
+  documentation: |-
+    Fail-fast preflight after OSSM/Istio install: creates a minimal Gateway with
+    gatewayClassName istio and waits until status Programmed=True. On success the
+    probe is deleted and the chain continues. On failure, dumps GatewayClass,
+    Istio/IstioCNI, istiod logs, and probe-namespace Deployments/Services/Pods/
+    Events into ${ARTIFACT_DIR}/gateway-probe/ then exits non-zero so the suite
+    does not run; workflow post cleanup still executes.
