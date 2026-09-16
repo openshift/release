@@ -63,7 +63,7 @@ tests:
         set -euo pipefail
         NODE=$(oc get nodes -o jsonpath='{.items[0].metadata.name}')
         echo "Checking that tree is NOT installed on node $NODE (standard RHCOS)"
-        OUTPUT=$(oc debug "node/$NODE" -- chroot /host rpm -q tree 2>&1) && {
+        OUTPUT=$(oc debug -n default "node/$NODE" -- chroot /host rpm -q tree 2>&1) && {
           echo "FAIL: tree is installed on standard RHCOS, this is unexpected"
           echo "rpm -q output: $OUTPUT"
           exit 1
@@ -94,7 +94,7 @@ tests:
         set -euo pipefail
         NODE=$(oc get nodes -o jsonpath='{.items[0].metadata.name}')
         echo "Checking that tree IS installed on node $NODE (custom layered RHCOS)"
-        oc debug "node/$NODE" -- chroot /host rpm -q tree 2>/dev/null
+        oc debug -n default "node/$NODE" -- chroot /host rpm -q tree 2>/dev/null
         echo "PASS: tree is installed on layered RHCOS, as expected"
       from: cli
       resources:
