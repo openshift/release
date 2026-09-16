@@ -388,11 +388,18 @@ ocEOF
         cluster.open-cluster-management.io/credentials="" \
         -n "${clusterName}" --overwrite
 
-    # Create pull-secret for accessing container registries
-    : "Creating pull-secret"
+    # Create pull-secret for accessing container registries.
+    # ACM_SPOKE_PULL_SECRET_FILE selects which cluster-profile credential file to use:
+    #   config.json  – base OpenShift pull secret (default; works for GA/nightly images
+    #                  hosted on quay.io or registry.ci.openshift.org)
+    #   pull-secret  – CI-augmented pull secret; required when the spoke ClusterImageSet
+    #                  points to a CI build-namespace image
+    #                  (registry.build*.ci.openshift.org) so the bootstrap EC2 machines
+    #                  can authenticate to that registry.
+    : "Creating pull-secret from ${CLUSTER_PROFILE_DIR}/${ACM_SPOKE_PULL_SECRET_FILE}"
     oc -n "${clusterName}" create secret generic pull-secret \
         --type=kubernetes.io/dockerconfigjson \
-        --from-file=.dockerconfigjson="${CLUSTER_PROFILE_DIR}/config.json" \
+        --from-file=.dockerconfigjson="${CLUSTER_PROFILE_DIR}/${ACM_SPOKE_PULL_SECRET_FILE}" \
         --dry-run=client -o yaml --save-config | oc apply -f -
 
     # Create SSH key secrets for node access
@@ -593,6 +600,42 @@ ocEOF
 }
 
 #=====================
+# Function: WaitForManagedClusterAvailable
+#=====================
+# Waits for a ManagedCluster to reach ManagedClusterConditionAvailable=True.
+#
+# This is a separate gate from ClusterDeployment.Provisioned=True (Hive side).
+# After Hive marks a cluster Provisioned, the ACM klusterlet agent on the spoke
+# must boot, connect back to the hub, and update the ManagedCluster status.
+# On bare-metal worker nodes (e.g. c5n.metal) this can take significantly
+# longer than on virtual instances (e.g. m8i.8xlarge) due to slower boot times.
+# Without this wait, subsequent steps that query ACM for available clusters
+# (e.g. acm-fetch-managed-clusters) may find no clusters and fail.
+#
+# Arguments:
+#   $1 - clusterName: Name of the ManagedCluster to wait for
+#   $2 - clusterIdx:  Index number of the cluster (1-based)
+#
+WaitForManagedClusterAvailable() {
+    typeset clusterName="$1"
+    typeset clusterIdx="$2"
+
+    : "Waiting for ManagedCluster '${clusterName}' to reach Available=True in ACM (timeout=30m)"
+
+    if oc wait managedcluster "${clusterName}" \
+            --for='condition=ManagedClusterConditionAvailable' \
+            --timeout="${ACM_MANAGED_CLUSTER_AVAILABLE_TIMEOUT_MINUTES}m"; then
+        : "ManagedCluster ${clusterIdx} (${clusterName}) - Available=True"
+    else
+        : "Timed out waiting for ManagedCluster '${clusterName}' Available=True — current conditions:"
+        oc get managedcluster "${clusterName}" \
+            -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}' \
+            2>/dev/null || true
+        return 1
+    fi
+}
+
+#=====================
 # Function: WaitForClusterProvisioned
 #=====================
 # Waits for a ClusterDeployment to reach Provisioned=True status.
@@ -772,6 +815,30 @@ for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     idx=$((i + 1))
     ExtractClusterCredentials "${clusterNamesArr[i]}" "${idx}"
 done
+
+: "All credentials extracted. Waiting for ACM klusterlet agents to become Available..."
+
+# Phase 4: Wait for each ManagedCluster to show Available=True in ACM.
+# ClusterDeployment.Provisioned=True (Phase 2) only confirms the OCP bootstrap
+# completed. The ACM klusterlet agent on the spoke still needs to boot and
+# connect back to the hub. On bare-metal workers this can take significantly
+# longer than on virtual instances, so steps that query ACM availability
+# (e.g. acm-fetch-managed-clusters) must not run until this gate passes.
+for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
+    idx=$((i + 1))
+    WaitForManagedClusterAvailable "${clusterNamesArr[i]}" "${idx}"
+done
+
+# Phase 5: Disable ClusterImagePolicy signature enforcement on spokes
+# Only needed when installing with unsigned nightly images.
+if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}" == "true" ]]; then
+    for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
+        idx=$((i + 1))
+        DisableClusterImagePolicySignatureEnforcement \
+            "${SHARED_DIR}/managed-cluster-kubeconfig-${idx}" \
+            "${clusterNamesArr[i]}"
+    done
+fi
 
 # Create symlinks for backward compatibility with single-cluster workflows
 # This allows existing steps that expect 'managed-cluster-kubeconfig' to work

@@ -148,7 +148,7 @@ append_security() {
 
 # --- Assemble system prompt: CI extras + skill + repo-specific config ---
 # Same shape as jira-solver: a short additional/security block, then SKILL.md,
-# then .agentic/followup-config.md last so repo directions win.
+# then REVIEW.md last so repo directions win.
 SYSTEM_PROMPT="/tmp/agentic-review-system-prompt-$(basename "${WORKDIR}").md"
 cat > "${SYSTEM_PROMPT}" <<'SYSTEM_EOF'
 # Additional Instructions
@@ -198,10 +198,10 @@ if [[ "${EVAL_MODE:-}" == "true" ]]; then
     fi
 fi
 
-# Append repo-specific config last so it takes precedence over generic skill guidance
-if [[ -f "${WORKDIR}/.agentic/followup-config.md" ]]; then
+# Append repo-specific REVIEW.md last so it takes precedence over generic skill guidance
+if [[ -f "${WORKDIR}/REVIEW.md" ]]; then
     echo "" >> "${SYSTEM_PROMPT}"
-    cat "${WORKDIR}/.agentic/followup-config.md" >> "${SYSTEM_PROMPT}"
+    cat "${WORKDIR}/REVIEW.md" >> "${SYSTEM_PROMPT}"
 fi
 
 CI_SKILL="/opt/ai-helpers/plugins/openshift-developer/skills/address-ci-failures/SKILL.md"

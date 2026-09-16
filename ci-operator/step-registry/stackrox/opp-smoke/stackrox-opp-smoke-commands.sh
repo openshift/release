@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
 
 # shellcheck disable=SC2317
 _propagate_junit () {
@@ -77,6 +77,9 @@ if [[ -f /tmp/vault/stackrox-stackrox-e2e-tests/GOOGLE_ARTIFACT_REGISTRY_SERVICE
     GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2="$(cat /tmp/vault/stackrox-stackrox-e2e-tests/GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2)"
     export GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2
 fi
+
+# Re-enable trace logging now that all credentials are loaded
+set -x
 
 cd /tmp/stackrox/qa-tests-backend
 
