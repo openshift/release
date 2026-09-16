@@ -105,5 +105,5 @@ fi
 # evictions and consistent failures.
 # See: https://redhat-internal.slack.com/archives/C020CKMP6CT/p1788749810927519
 echo "Waiting for worker MachineConfigPool to finish updating..."
-oc wait mcp worker --for condition=Updated --timeout=30m
+oc wait mcp worker --for condition=Updated --timeout=45m
 echo "Worker MachineConfigPool is updated, all nodes are ready."
