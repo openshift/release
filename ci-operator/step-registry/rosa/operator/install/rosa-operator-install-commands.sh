@@ -262,14 +262,19 @@ fi
 # are preserved.
 if [[ -n "${OPERATOR_CRDS:-}" ]]; then
     log "Orphaning CRDs from ClusterObjectSets BEFORE ClusterPackage deletion (prevents cascade-deletion of CRs)"
+    orphan_failed=false
     IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
     for crd in "${CRD_LIST[@]}"; do
         crd=$(echo "${crd}" | xargs)
         if oc get crd "${crd}" &>/dev/null; then
             log "  Clearing ownerReferences on CRD ${crd}"
-            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${CLUSTER_PACKAGE_NAME}"'"}}}' || true
+            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${CLUSTER_PACKAGE_NAME}"'"}}}' || { log "ERROR: Failed to orphan CRD ${crd}"; orphan_failed=true; }
         fi
     done
+    if [[ "${orphan_failed}" == "true" ]]; then
+        log "ERROR: Refusing to delete ClusterPackage — CRD orphan patches failed, cascade protection is incomplete"
+        exit 1
+    fi
 fi
 
 # Remove existing operator resources that conflict with PKO adoption.
@@ -497,7 +502,7 @@ done
 # a cryptic "resource not found".
 # Format: comma-separated "plural.group/name[/namespace]"
 #   Namespaced: routemonitors.monitoring.openshift.io/console/openshift-route-monitor-operator
-#   Cluster-scoped: clusterurlmonitors.monitoring.openshift.io/api
+#   Namespaced: clusterurlmonitors.monitoring.openshift.io/api/openshift-route-monitor-operator
 if [[ -n "${OPERATOR_REQUIRED_CRS:-}" ]]; then
     log "Verifying required CRs exist (OPERATOR_REQUIRED_CRS)"
     IFS=',' read -ra REQUIRED_LIST <<< "${OPERATOR_REQUIRED_CRS}"

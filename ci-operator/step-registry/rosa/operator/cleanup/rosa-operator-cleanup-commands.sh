@@ -60,14 +60,19 @@ log "Cleaning up test operator resources"
 # CP → owns → COS → own → CRDs (via ownerRefs) → CRD deletion removes CRs.
 # Clear ownerReferences first so CRDs (and their CRs) survive CP deletion.
 if [[ -n "${OPERATOR_CRDS:-}" ]]; then
+    orphan_failed=false
     IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
     for crd in "${CRD_LIST[@]}"; do
         crd=$(echo "${crd}" | xargs)
         if oc get crd "${crd}" &>/dev/null; then
             log "Orphaning CRD ${crd} from e2e ClusterObjectSets before CP deletion"
-            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[]}}' 2>/dev/null || true
+            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[]}}' || { log "ERROR: Failed to orphan CRD ${crd}"; orphan_failed=true; }
         fi
     done
+    if [[ "${orphan_failed}" == "true" ]]; then
+        log "ERROR: Refusing to delete ClusterPackage — CRD orphan patches failed, cascade protection is incomplete"
+        exit 1
+    fi
 fi
 
 CP_DELETED=false
