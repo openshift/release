@@ -809,8 +809,13 @@ DisableClusterImagePolicySignatureEnforcement() {
         return 0
     fi
     newOverrides="$(jq -c \
-        '. + [{"group":"config.openshift.io","kind":"ClusterImagePolicy","name":"openshift","namespace":"","unmanaged":true}]' \
-        <<<"${currentOverrides}")"
+        '[.[] | select(
+            .group!="config.openshift.io" or
+            .kind!="ClusterImagePolicy" or
+            .name!="openshift" or
+            .namespace!=""
+        )] + [{"group":"config.openshift.io","kind":"ClusterImagePolicy","name":"openshift","namespace":"","unmanaged":true}]' \
+    <<<"${currentOverrides}")"
     patchPayload="$(jq -cn --argjson overrides "${newOverrides}" \
         '{"spec":{"overrides":$overrides}}')"
     oc --kubeconfig="${kubeconfig}" patch clusterversion version --type merge \
