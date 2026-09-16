@@ -370,40 +370,73 @@ PULL_METRICS_REDIS:
         host: quay-quay-redis
         port: 6379
         db: 1
+FEATURE_MAILING: false
+FEATURE_OTEL_TRACING: false
 EOF
 
-# Merge caller-provided extra config if set
+# Fetch yq once: used below to merge config fragments and to strip
+# operator-managed keys, which now run unconditionally.
+curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+	-o /tmp/yq && chmod +x /tmp/yq
+
+# Merge a config fragment into config.yaml with list-append semantics ('*+',
+# not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
+# Validate first so a present-but-malformed fragment fails the step clearly
+# instead of corrupting config.yaml.
+function merge_config_fragment() {
+	local fragment="$1"
+	if ! /tmp/yq e 'true' "${fragment}" >/dev/null 2>&1; then
+		echo "ERROR: ${fragment} is not valid YAML" >&2
+		exit 1
+	fi
+	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+}
+
+# Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
+# so an explicit override still wins over the service-owned fragments. A
+# missing fragment is a silent no-op, leaving the disabled default above.
+if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
+	echo "Merging Mailpit config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-mail-config.yaml"
+fi
+
+if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
+	echo "Merging Jaeger/OTel config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
+fi
+
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	echo "Merging extra Quay config into defaults..."
 	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
-	curl -sL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-		-o /tmp/yq && chmod +x /tmp/yq
-	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
-	# Strip field-group keys for components this CR keeps managed. The operator
-	# injects those values; leaving them in configBundleSecret blocks rollout.
-	/tmp/yq -i '
-		del(
-			.FEATURE_SECURITY_SCANNER,
-			.FEATURE_SECURITY_NOTIFICATIONS,
-			.SECURITY_SCANNER_ENDPOINT,
-			.SECURITY_SCANNER_INDEXING_INTERVAL,
-			.SECURITY_SCANNER_V4_ENDPOINT,
-			.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
-			.SECURITY_SCANNER_V4_PSK,
-			.FEATURE_REPO_MIRROR,
-			.REPO_MIRROR_INTERVAL,
-			.REPO_MIRROR_SERVER_HOSTNAME,
-			.REPO_MIRROR_TLS_VERIFY,
-			.BUILDLOGS_REDIS,
-			.USER_EVENTS_REDIS,
-			.DB_URI,
-			.DB_CONNECTION_ARGS,
-			.SERVER_HOSTNAME,
-			.PREFERRED_URL_SCHEME,
-			.EXTERNAL_TLS_TERMINATION
-		)
-	' config.yaml
+	merge_config_fragment extra_config.yaml
 fi
+
+# Strip field-group keys for components this CR keeps managed. The operator
+# injects those values; leaving them in configBundleSecret blocks rollout.
+# Runs unconditionally now: a no-op on the defaults block when no overlay
+# above added any of these keys.
+/tmp/yq -i '
+	del(
+		.FEATURE_SECURITY_SCANNER,
+		.FEATURE_SECURITY_NOTIFICATIONS,
+		.SECURITY_SCANNER_ENDPOINT,
+		.SECURITY_SCANNER_INDEXING_INTERVAL,
+		.SECURITY_SCANNER_V4_ENDPOINT,
+		.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
+		.SECURITY_SCANNER_V4_PSK,
+		.FEATURE_REPO_MIRROR,
+		.REPO_MIRROR_INTERVAL,
+		.REPO_MIRROR_SERVER_HOSTNAME,
+		.REPO_MIRROR_TLS_VERIFY,
+		.BUILDLOGS_REDIS,
+		.USER_EVENTS_REDIS,
+		.DB_URI,
+		.DB_CONNECTION_ARGS,
+		.SERVER_HOSTNAME,
+		.PREFERRED_URL_SCHEME,
+		.EXTERNAL_TLS_TERMINATION
+	)
+' config.yaml
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
 # quay-provisioning-{tls,builder} steps have already written the
