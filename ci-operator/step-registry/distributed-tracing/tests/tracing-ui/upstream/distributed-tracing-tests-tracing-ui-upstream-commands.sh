@@ -186,9 +186,12 @@ export NO_COLOR=1
 export CYPRESS_CACHE_FOLDER=/tmp/Cypress
 
 # Always run the tests from the main branch, regardless of the branch/PR under test.
-# Define the repository URL and target directory
+# Define the repository URL and target directory.
+# The obs-tests-runner image already has /tmp/distributed-tracing-console-plugin
+# populated from the branch/PR under test (see tests/Dockerfile), so clone into a
+# different path to avoid "destination path already exists" failures.
 repo_url="https://github.com/openshift/distributed-tracing-console-plugin.git"
-target_dir="/tmp/distributed-tracing-console-plugin"
+target_dir="/tmp/distributed-tracing-console-plugin-main"
 
 # Clone the repository, explicitly selecting the main branch.
 echo "Cloning the repository."
