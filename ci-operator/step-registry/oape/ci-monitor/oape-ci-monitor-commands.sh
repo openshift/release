@@ -12,6 +12,7 @@ if [[ "${REPO_NAME}" == "release" && "${REPO_OWNER}" == "openshift" ]]; then
   echo "[setup] Detected openshift/release context — switching to test target ${OAPE_TARGET_REPO}"
   export REPO_OWNER="${OAPE_TARGET_REPO%%/*}"
   export REPO_NAME="${OAPE_TARGET_REPO#*/}"
+  export REHEARSAL_MODE="true"
 fi
 
 # --- Pin to explicit test PR during staged rollout ---
@@ -87,15 +88,23 @@ if [[ "$USE_APP_TOKEN" != "true" ]]; then
 fi
 $WAS_TRACING && set -x
 
-# --- Invalid PR during rehearsal ---
-if ! gh pr view "${PULL_NUMBER}" --repo "${REPO_OWNER}/${REPO_NAME}" --json number >/dev/null 2>&1; then
-  if [[ -n "${OAPE_TEST_PR_NUMBER:-}" ]]; then
-    export PULL_NUMBER="$OAPE_TEST_PR_NUMBER"
-    echo "[setup] PR not found on target repo — using OAPE_TEST_PR_NUMBER=${PULL_NUMBER}"
-  else
-    echo "[setup] ERROR: PR #${PULL_NUMBER} not found on ${REPO_OWNER}/${REPO_NAME}" >&2
+gh auth setup-git
+
+# --- Rehearsal: auto-resolve latest open PR when not pinned ---
+if [[ "${REHEARSAL_MODE:-}" == "true" && -z "${OAPE_TEST_PR_NUMBER:-}" ]]; then
+  PULL_NUMBER=$(gh pr list --repo "${REPO_OWNER}/${REPO_NAME}" \
+    --state open --limit 1 --json number --jq '.[0].number')
+  if [[ -z "${PULL_NUMBER}" || "${PULL_NUMBER}" == "null" ]]; then
+    echo "[setup] ERROR: No open PRs on ${REPO_OWNER}/${REPO_NAME}" >&2
     exit 1
   fi
+  export PULL_NUMBER
+  echo "[setup] Rehearsal: using latest open PR #${PULL_NUMBER}"
+fi
+
+if ! gh pr view "${PULL_NUMBER}" --repo "${REPO_OWNER}/${REPO_NAME}" --json number >/dev/null 2>&1; then
+  echo "[setup] ERROR: PR #${PULL_NUMBER} not found on ${REPO_OWNER}/${REPO_NAME}" >&2
+  exit 1
 fi
 
 export GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS:-/var/run/gcloud-adc/application_default_credentials.json}"
@@ -112,6 +121,5 @@ export BUILD_ID="${BUILD_ID:-}"
 export OAPE_RUN_URL="${BUILD_LOG_URL:-}"
 export OAPE_ROOT="${OAPE_ROOT:-/app}"
 
-gh auth setup-git
 "${OAPE_ROOT}/scripts/ci-monitor/monitor.sh"
 "${OAPE_ROOT}/scripts/ci-monitor/dispatch.sh"

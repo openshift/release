@@ -18,10 +18,14 @@ ref:
     default: ""
     documentation: |-
       owner/repo for pj-rehearse redirect when the job runs in openshift/release context.
+      Required when rehearsing from openshift/release.
   - name: OAPE_TEST_PR_NUMBER
     default: ""
     documentation: |-
-      Optional pinned PR number for staged testing and rehearsal.
+      Optional pinned PR number for scenario testing (e.g. failure harness PRs).
+      When unset during openshift/release rehearsal, the step auto-resolves the
+      latest open PR on OAPE_TARGET_REPO. On real operator PRs, Prow PULL_NUMBER
+      is used instead.
   - name: SELF_JOB_NAME
     default: "oape-ci-monitor"
     documentation: |-
@@ -61,4 +65,5 @@ ref:
     Monitor operator PR CI status, classify failures, and optionally dispatch
     auto-fix actions. Uses the ci-monitor-agent image built from oape-ai-e2e CI
     config. Teams onboard by adding an optional presubmit that references this
-    ref and sets OAPE_TARGET_REPO for rehearsal when needed.
+    ref and sets OAPE_TARGET_REPO for pj-rehearse. During rehearsal, the latest
+    open PR on the target repo is used unless OAPE_TEST_PR_NUMBER is pinned.
