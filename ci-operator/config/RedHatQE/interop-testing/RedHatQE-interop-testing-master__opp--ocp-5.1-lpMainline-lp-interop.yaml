@@ -89,6 +89,7 @@ tests:
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      SKIP_POLICIES: policy-acs,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -112,9 +113,14 @@ tests:
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
     - chain: cucushift-installer-check-cluster-health
-    - ref: acm-tests-clc-create
+    - ref: interop-opp-wait-mcp
+    - ref: stackrox-opp-readiness
+    - ref: stackrox-opp-smoke
+    - ref: acm-tests-clc-smoke
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
+    - ref: interop-opp-odf-health
+    - ref: interop-opp-observability-odf
     - ref: interop-tests-ocs-tests
     - ref: interop-tests-opp-quay-smoke
     - ref: acm-tests-observability
@@ -153,7 +159,9 @@ tests:
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      RESOURCE_BIND_TIMEOUT: "180"
       SIZE_VARIANT: large
+      SKIP_POLICIES: policy-acs,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
     post:
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
@@ -172,6 +180,9 @@ tests:
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
     - chain: cucushift-installer-check-cluster-health
+    - ref: interop-opp-wait-mcp
+    - ref: interop-opp-odf-health
+    - ref: interop-opp-observability-odf
     - ref: interop-tests-ocs-tests
     - ref: acm-tests-observability
     - ref: acm-opp-app
