@@ -1,0 +1,30 @@
+ref:
+  as: aws-c2s-ipi-disconnected-e2e-images
+  from: tests
+  grace_period: 10m
+  commands: aws-c2s-ipi-disconnected-e2e-images-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Prepare origin conformance (openshift-e2e-test) to run against a disconnected
+    AWS C2S/SC2S cluster.
+
+    1. Extends NO_PROXY in ${SHARED_DIR}/proxy-conf.sh with the CI build-farm
+       registries (.ci.openshift.org). openshift-e2e-test sources proxy-conf.sh,
+       which routes all egress through the cluster's disconnected bastion proxy
+       (NO_PROXY=localhost,127.0.0.1). openshift-tests, however, extracts the
+       external test binaries from the release payload image hosted on the build
+       farm; forcing that pull through the disconnected proxy returns 503 and the
+       suite cannot be enumerated. The test pod runs on the build farm and is
+       allowed to reach CI infra directly, so only the cluster under test stays
+       disconnected.
+    2. Generates the version-specific list of e2e test images to mirror to the
+       bastion mirror registry (${SHARED_DIR}/mirror-images-list.yaml) and records
+       the mirror repository in ${SHARED_DIR}/mirror-tests-image, so that
+       openshift-e2e-test passes --from-repository and the disconnected cluster
+       pulls e2e workload images from the mirror.
+
+    The actual mirroring of the generated list is performed by the subsequent
+    mirror-images-qe-test-images step.
