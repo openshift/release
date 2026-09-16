@@ -266,9 +266,16 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
     IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
     for crd in "${CRD_LIST[@]}"; do
         crd=$(echo "${crd}" | xargs)
-        if oc get crd "${crd}" &>/dev/null; then
+        if CRD_LOOKUP=$(oc get crd "${crd}" --ignore-not-found -o name 2>&1); then
+            if [[ -z "${CRD_LOOKUP}" ]]; then
+                log "  CRD ${crd} is absent; no ownership to clear"
+                continue
+            fi
             log "  Clearing ownerReferences on CRD ${crd}"
             oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${CLUSTER_PACKAGE_NAME}"'"}}}' || { log "ERROR: Failed to orphan CRD ${crd}"; orphan_failed=true; }
+        else
+            log "ERROR: Failed to look up CRD ${crd}: ${CRD_LOOKUP}"
+            orphan_failed=true
         fi
     done
     if [[ "${orphan_failed}" == "true" ]]; then
