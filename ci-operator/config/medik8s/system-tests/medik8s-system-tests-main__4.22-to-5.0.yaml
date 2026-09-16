@@ -1,0 +1,83 @@
+base_images:
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.22"
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- always_run: false
+  as: e2e-nhc-upgrade-4-22-to-5-0-aws
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      CATALOG_IMAGE_REF: quay.io/jsussman/rhwa-nmo-catalog@sha256:4227d6d6c61c62bdb9ad4fa7c7e68fd3973a6c034a0264e6203106d238bff817
+      CATALOG_MODE: direct
+      CATALOG_SOURCE_NAME: medik8s-catalog
+      ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: tier:upgrade-cluster
+      MEDIK8S_OPERATOR_PACKAGE: node-healthcheck-operator
+      MEDIK8S_SKIP_UPGRADE_IDMS: "true"
+      NHC_UPGRADE_CANDIDATE_IMAGE: quay.io/jsussman/rhwa-nmo-catalog@sha256:84607c79946d2f6708bafeb2e5c52e29e16c5fbb8ad9f00823933c4bbb0aa6ff
+      NHC_UPGRADE_CANDIDATE_VERSION: 5.8.0
+      OCP_VERSION: "50"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    test:
+    - ref: medik8s-lib
+    - ref: medik8s-catalogsource
+    - ref: ssh-bastion
+    - as: run-nhc-cluster-upgrade
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+
+        : "${ARTIFACT_DIR:?ci-operator must collect step artifacts}"
+        mkdir -p "$ARTIFACT_DIR/provenance"
+        exec > >(tee "$ARTIFACT_DIR/cluster-upgrade-step.log") 2>&1
+        printf '%s\n' "${JOB_SPEC:-}" > "$ARTIFACT_DIR/provenance/job-spec.json"
+        git show --no-patch --format=fuller HEAD > "$ARTIFACT_DIR/provenance/system-tests-source.txt"
+        export WORKLOAD_IMAGE=unused-by-nhc-cluster-upgrade
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: MEDIK8S_OPERATOR_PACKAGE
+      - name: MEDIK8S_SKIP_UPGRADE_IDMS
+      - name: NHC_UPGRADE_CANDIDATE_IMAGE
+      - name: NHC_UPGRADE_CANDIDATE_VERSION
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 500Mi
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: system-tests
+  variant: 4.22-to-5.0
