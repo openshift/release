@@ -765,7 +765,7 @@ wait
 
 mkdir -p ${ARTIFACT_DIR}/junit/
 
-if openshift-tests e2e-analysis --help &>/dev/null; then
+if E2E_ANALYSIS_HELP=$(openshift-tests e2e-analysis --help 2>&1); then
     INSTALL_EXIT_CODE=0
     if [[ -f "${SHARED_DIR}/install-status.txt" ]]; then
         INSTALL_EXIT_CODE=$(tail -n1 "${SHARED_DIR}/install-status.txt" | awk '{print $1}')
@@ -777,7 +777,7 @@ if openshift-tests e2e-analysis --help &>/dev/null; then
             cat "${SHARED_DIR}/install-duration.log"
         fi
         E2E_ANALYSIS_ARGS=()
-        if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]] && openshift-tests e2e-analysis --help 2>&1 | grep -Fq -- "--skip-readiness-checks"; then
+        if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]] && [[ "${E2E_ANALYSIS_HELP}" == *"--skip-readiness-checks"* ]]; then
             E2E_ANALYSIS_ARGS+=(--skip-readiness-checks)
         elif [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]]; then
             echo "SKIP_READINESS_CHECKS=true, but this openshift-tests binary does not advertise e2e-analysis --skip-readiness-checks; running e2e-analysis without that flag."
