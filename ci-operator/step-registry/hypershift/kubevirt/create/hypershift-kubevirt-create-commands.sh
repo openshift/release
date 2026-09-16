@@ -619,26 +619,20 @@ localnet_vlan_guest_oc() {
 localnet_vlan_configure_guest_ingress_hostnetwork() {
   local nested_kc="${SHARED_DIR}/nested_kubeconfig"
   local current_strategy
-  local router_ready=false
 
   if [[ ! -f "${nested_kc}" ]]; then
     echo "ERROR: nested kubeconfig missing at ${nested_kc}" >&2
     return 1
   fi
 
-  echo "Waiting for guest default ingress controller to deploy..."
+  echo "Waiting for guest API to be reachable..."
   for _ in $(seq 1 60); do
-    if localnet_vlan_guest_oc get deployment router-default -n openshift-ingress \
-      -o jsonpath='{.status.readyReplicas}' 2>/dev/null | grep -q '^1$'; then
-      router_ready=true
+    if localnet_vlan_guest_oc auth can-i patch ingresscontroller/default --namespace=openshift-ingress-operator \
+      >/dev/null 2>&1; then
       break
     fi
     sleep 10
   done
-  if [[ "${router_ready}" != "true" ]]; then
-    echo "WARNING: guest router-default not Ready after wait; continuing ingress HostNetwork patch" >&2
-  fi
-
   if ! localnet_vlan_guest_oc auth can-i patch ingresscontroller/default --namespace=openshift-ingress-operator \
     >/dev/null 2>&1; then
     echo "ERROR: cannot access guest API with nested kubeconfig (check lab routing and HTTP_PROXY bypass)" >&2
@@ -649,13 +643,13 @@ localnet_vlan_configure_guest_ingress_hostnetwork() {
     -o jsonpath='{.spec.endpointPublishingStrategy.type}' 2>/dev/null || true)
   if [[ "${current_strategy}" == "HostNetwork" ]]; then
     echo "Guest ingress controller already uses HostNetwork"
-    return 0
+  else
+    echo "Patching guest ingress controller to HostNetwork (worker VLAN NIC)..."
+    localnet_vlan_guest_oc patch ingresscontroller default -n openshift-ingress-operator --type=merge -p \
+      '{"spec":{"endpointPublishingStrategy":{"type":"HostNetwork","hostNetwork":{"protocol":"TCP"}}}}'
   fi
 
-  echo "Patching guest ingress controller to HostNetwork (worker VLAN NIC)..."
-  localnet_vlan_guest_oc patch ingresscontroller default -n openshift-ingress-operator --type=merge -p \
-    '{"spec":{"endpointPublishingStrategy":{"type":"HostNetwork","hostNetwork":{"protocol":"TCP"}}}}'
-
+  echo "Waiting for guest default ingress router to deploy with HostNetwork..."
   localnet_vlan_guest_oc rollout status deployment/router-default -n openshift-ingress --timeout=10m
 }
 
