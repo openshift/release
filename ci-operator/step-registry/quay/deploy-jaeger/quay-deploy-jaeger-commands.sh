@@ -18,6 +18,10 @@ JAEGER_IMAGE="${JAEGER_IMAGE:-quay.io/jaegertracing/jaeger:2.20.0}"
 JAEGER_MAX_TRACES="${JAEGER_MAX_TRACES:-50000}"
 SHARED_DIR="${SHARED_DIR:-/tmp/shared}"
 
+# Remove any stale fragment from a prior attempt so a retry never hands the
+# deploy steps a config left over from a different run.
+rm -f "${SHARED_DIR}/quay-otel-config.yaml"
+
 # Any failure in setup/apply/rollout is best-effort: warn, print diagnostics,
 # leave ${SHARED_DIR}/jaeger_deployed unwritten, and exit 0.
 fail() {
@@ -161,5 +165,16 @@ fi
 date +%s > "${SHARED_DIR}/jaeger_deployed"
 cp "${SHARED_DIR}/jaeger_deployed" "${ARTIFACT_DIR}/jaeger_deployed" || true
 echo "Jaeger ready. In-cluster OTLP endpoint: http://jaeger.${QUAY_NS}.svc.cluster.local:4318/v1/traces"
+
+# Own the Quay OTel config: the deploy steps merge this fragment in so
+# FEATURE_OTEL_TRACING is only enabled when Jaeger actually deployed.
+cat <<EOF > "${SHARED_DIR}/quay-otel-config.yaml"
+FEATURE_OTEL_TRACING: true
+OTEL_CONFIG:
+  service_name: quay
+  sample_rate: 1.0
+  endpoint: http://jaeger.${QUAY_NS}.svc.cluster.local:4318/v1/traces
+EOF
+cp "${SHARED_DIR}/quay-otel-config.yaml" "${ARTIFACT_DIR}/quay-otel-config.yaml" || true
 
 exit 0

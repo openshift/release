@@ -223,8 +223,12 @@ fi
 # Fetch the zVSI mac address
 set -e
 echo "Fetching the mac address of zVSI $zvsi_fip"
+# Tracing is disabled while the private key is read, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
 export ssh_key_string
+set -x
 tmp_ssh_key="/tmp/httpd-vsi-key"
 envsubst <<"EOF" >${tmp_ssh_key}
 -----BEGIN OPENSSH PRIVATE KEY-----

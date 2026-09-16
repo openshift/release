@@ -765,7 +765,7 @@ wait
 
 mkdir -p ${ARTIFACT_DIR}/junit/
 
-if openshift-tests e2e-analysis --help &>/dev/null; then
+if E2E_ANALYSIS_HELP=$(openshift-tests e2e-analysis --help 2>&1); then
     INSTALL_EXIT_CODE=0
     if [[ -f "${SHARED_DIR}/install-status.txt" ]]; then
         INSTALL_EXIT_CODE=$(tail -n1 "${SHARED_DIR}/install-status.txt" | awk '{print $1}')
@@ -776,7 +776,13 @@ if openshift-tests e2e-analysis --help &>/dev/null; then
             echo "Found install-duration.log, it will be used for collecting install durations"
             cat "${SHARED_DIR}/install-duration.log"
         fi
-        openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+        E2E_ANALYSIS_ARGS=()
+        if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]] && [[ "${E2E_ANALYSIS_HELP}" == *"--skip-readiness-checks"* ]]; then
+            E2E_ANALYSIS_ARGS+=(--skip-readiness-checks)
+        elif [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]]; then
+            echo "SKIP_READINESS_CHECKS=true, but this openshift-tests binary does not advertise e2e-analysis --skip-readiness-checks; running e2e-analysis without that flag."
+        fi
+        openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" "${E2E_ANALYSIS_ARGS[@]}" || true
     else
         echo "Install failed, skipping post e2e-analysis check"
     fi

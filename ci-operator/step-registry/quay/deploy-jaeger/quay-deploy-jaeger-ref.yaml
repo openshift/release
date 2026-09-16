@@ -16,9 +16,13 @@ ref:
     traces that Quay emits when FEATURE_OTEL_TRACING is enabled. Creates a
     Deployment and a Service exposing the OTLP HTTP receiver (4318) and the query
     UI/API (16686), using in-memory storage. On success writes
-    ${SHARED_DIR}/jaeger_deployed so the post-run gather step knows to collect.
+    ${SHARED_DIR}/jaeger_deployed so the post-run gather step knows to collect,
+    and ${SHARED_DIR}/quay-otel-config.yaml (FEATURE_OTEL_TRACING and
+    OTEL_CONFIG pointed at the in-cluster OTLP HTTP endpoint) for the deploy
+    steps to merge into config.yaml.
     This is best-effort: if Jaeger fails to roll out the step logs diagnostics,
-    warns, and exits 0 so the e2e run continues without traces.
+    warns, and exits 0 so the e2e run continues without traces and no config
+    fragment is written.
   env:
   - name: QUAYNAMESPACE
     default: "quay-enterprise"

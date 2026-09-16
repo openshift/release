@@ -58,7 +58,7 @@ cp -rt "${installer_dir}" \
 # Copy install-config to artifacts directory for debugging
 echo "install-config.yaml"
 echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${SHARED_DIR}/install-config.yaml" | tee "${ARTIFACT_DIR}/install-config.yaml"
 
 INSTALLER_BINARY="openshift-install"
 
