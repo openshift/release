@@ -777,8 +777,10 @@ if openshift-tests e2e-analysis --help &>/dev/null; then
             cat "${SHARED_DIR}/install-duration.log"
         fi
         E2E_ANALYSIS_ARGS=()
-        if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]]; then
+        if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]] && openshift-tests e2e-analysis --help 2>&1 | grep -Fq -- "--skip-readiness-checks"; then
             E2E_ANALYSIS_ARGS+=(--skip-readiness-checks)
+        elif [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]]; then
+            echo "SKIP_READINESS_CHECKS=true, but this openshift-tests binary does not advertise e2e-analysis --skip-readiness-checks; running e2e-analysis without that flag."
         fi
         openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" "${E2E_ANALYSIS_ARGS[@]}" || true
     else
