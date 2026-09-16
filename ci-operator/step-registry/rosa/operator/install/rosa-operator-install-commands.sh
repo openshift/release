@@ -191,10 +191,14 @@ else
     log "WARNING: Could not get CI registry credentials, PKO may fail to pull images"
 fi
 
-# Save operator CR instances before removing the ClusterPackage.
-# On managed clusters, SSS deploys CRs (RouteMonitors, etc.) that we need
-# to preserve. Deleting the ClusterPackage may cascade-delete CRDs and CRs.
-# We back up all CR instances for each operator CRD, then restore after install.
+# Save Hive/MCC-managed CR instances before removing the ClusterPackage.
+# On managed clusters, Hive SyncSets deploy CRs (RouteMonitors, etc.) that
+# we must preserve. We select ONLY Hive-managed CRs via the
+# hive.openshift.io/managed=true label — this precisely captures "what to
+# preserve" rather than a fragile heuristic (e.g. skipping test-* names).
+# The backup is belt-and-suspenders: the primary protection is orphaning
+# CRDs before CP deletion (below), but if something goes wrong this backup
+# enables CR restoration.
 CR_BACKUP_DIR="/tmp/operator-cr-backup"
 mkdir -p "${CR_BACKUP_DIR}"
 if [[ -n "${OPERATOR_CRDS:-}" ]]; then
@@ -204,25 +208,26 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
         if oc get crd "${crd}" &>/dev/null; then
             RESOURCE=$(oc get crd "${crd}" -o jsonpath='{.spec.names.plural}')
             GROUP=$(oc get crd "${crd}" -o jsonpath='{.spec.group}')
-            log "Backing up ${RESOURCE}.${GROUP} instances"
-            # Back up only non-test CRs. Test CRs (names starting with "test-")
-            # are created by e2e tests and should not persist across CI runs.
-            ALL_ITEMS=$(oc get "${RESOURCE}.${GROUP}" -A --no-headers -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name 2>/dev/null || true)
-            : > "${CR_BACKUP_DIR}/${crd}.yaml"
-            while IFS= read -r line; do
-                [[ -z "${line}" ]] && continue
-                cr_ns=$(echo "${line}" | awk '{print $1}')
-                cr_name=$(echo "${line}" | awk '{print $2}')
-                if [[ "${cr_name}" == test-* ]]; then
-                    log "  Skipping test CR ${cr_name}"
-                    continue
-                fi
-                if oc get "${RESOURCE}.${GROUP}" "${cr_name}" -n "${cr_ns}" -o yaml >> "${CR_BACKUP_DIR}/${crd}.yaml" 2>/dev/null; then
-                    echo "---" >> "${CR_BACKUP_DIR}/${crd}.yaml"
-                else
-                    log "  WARNING: failed to back up ${cr_name} in ${cr_ns} (may have been deleted)"
-                fi
-            done <<< "${ALL_ITEMS}"
+            log "Backing up Hive-managed ${RESOURCE}.${GROUP} instances (label: hive.openshift.io/managed=true)"
+            # Select only Hive-managed CRs and strip server-side fields so
+            # the backup re-applies cleanly without conflicts.
+            if oc get "${RESOURCE}.${GROUP}" -A -l hive.openshift.io/managed=true -o json 2>/dev/null \
+                | jq '
+                    .items[] |
+                    del(
+                        .metadata.resourceVersion,
+                        .metadata.uid,
+                        .metadata.ownerReferences,
+                        .metadata.managedFields,
+                        .metadata.creationTimestamp
+                    )
+                ' > "${CR_BACKUP_DIR}/${crd}.json" 2>/dev/null; then
+                CR_COUNT=$(jq -s 'length' "${CR_BACKUP_DIR}/${crd}.json" 2>/dev/null || echo 0)
+                log "  Backed up ${CR_COUNT} Hive-managed CR(s) for ${crd}"
+            else
+                log "  No Hive-managed CRs found for ${crd}"
+                : > "${CR_BACKUP_DIR}/${crd}.json"
+            fi
         fi
     done
 fi
@@ -246,12 +251,33 @@ if oc get clusterpackage "${OPERATOR_NAME}" &>/dev/null; then
     ) || log "WARNING: Failed to back up production ClusterPackage ${OPERATOR_NAME}, continuing without backup"
 fi
 
+# ──────────────────────────────────────────────────────────────────────
+# CRITICAL: Orphan CRDs BEFORE deleting the ClusterPackage.
+# ──────────────────────────────────────────────────────────────────────
+# Cascade chain: CP → owns → ClusterObjectSets → own → CRDs (via ownerRefs)
+# If we delete CP first, PKO deletes the COS, and the COS deletion
+# cascade-deletes CRDs (via ownerReferences), which in turn removes ALL
+# CR instances — including Hive-managed CRs (RouteMonitors, etc.).
+# By clearing ownerReferences FIRST, CRDs survive COS deletion and CRs
+# are preserved.
+if [[ -n "${OPERATOR_CRDS:-}" ]]; then
+    log "Orphaning CRDs from ClusterObjectSets BEFORE ClusterPackage deletion (prevents cascade-deletion of CRs)"
+    IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
+    for crd in "${CRD_LIST[@]}"; do
+        crd=$(echo "${crd}" | xargs)
+        if oc get crd "${crd}" &>/dev/null; then
+            log "  Clearing ownerReferences on CRD ${crd}"
+            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${CLUSTER_PACKAGE_NAME}"'"}}}' || true
+        fi
+    done
+fi
+
 # Remove existing operator resources that conflict with PKO adoption.
 # On managed clusters, operators are pre-deployed via SSS/PKO. PKO refuses
 # to adopt CRDs owned by a different ClusterObjectSet. We remove:
 # 1. The existing ClusterPackage (releases the ClusterObjectSet)
 # 2. Orphaned ClusterObjectSets (releases CRD ownerReferences)
-# 3. CRD ownerReferences (so PKO can adopt them fresh)
+# CRD ownerReferences are already cleared above to prevent cascade deletion.
 # Safe on ephemeral clusters only.
 if oc get clusterpackage "${OPERATOR_NAME}" &>/dev/null; then
     log "Removing existing ClusterPackage ${OPERATOR_NAME}"
@@ -286,18 +312,6 @@ for cos in $(oc get clusterobjectset -o name 2>/dev/null | grep "${OPERATOR_NAME
     oc patch "${cos}" --type merge -p '{"metadata":{"finalizers":[]}}' || true
     oc delete "${cos}" --timeout=60s || true
 done
-
-# Clear ownerReferences on operator CRDs so PKO can adopt them
-if [[ -n "${OPERATOR_CRDS:-}" ]]; then
-    IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
-    for crd in "${CRD_LIST[@]}"; do
-        crd=$(echo "${crd}" | xargs)
-        if oc get crd "${crd}" &>/dev/null; then
-            log "Clearing ownership on CRD ${crd}"
-            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${CLUSTER_PACKAGE_NAME}"'"}}}' || true
-        fi
-    done
-fi
 
 # Also remove any leftover e2e ClusterPackage from a previous run
 if [[ "${CLUSTER_PACKAGE_NAME}" != "${OPERATOR_NAME}" ]]; then
@@ -461,15 +475,77 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
     done
 fi
 
-# Restore backed-up CR instances that were deployed by SSS/MCC
-for backup in "${CR_BACKUP_DIR}"/*.yaml; do
+# Restore backed-up Hive-managed CR instances (belt-and-suspenders).
+# These were exported as individual JSON objects; wrap in a list for oc apply.
+for backup in "${CR_BACKUP_DIR}"/*.json; do
     [[ -f "${backup}" ]] || continue
     if [[ -s "${backup}" ]]; then
-        crd_name=$(basename "${backup}" .yaml)
-        log "Restoring CR instances for ${crd_name}"
-        oc apply -f "${backup}" 2>/dev/null || true
+        crd_name=$(basename "${backup}" .json)
+        log "Restoring Hive-managed CR instances for ${crd_name}"
+        jq -s '{apiVersion: "v1", kind: "List", items: .}' "${backup}" \
+            | oc apply -f - 2>/dev/null || true
     fi
 done
+
+# ──────────────────────────────────────────────────────────────────────
+# Post-restore handoff gate: verify required CRs exist.
+# ──────────────────────────────────────────────────────────────────────
+# After CP swap and CRD re-establishment, confirm that Hive-managed CRs
+# are present. If a CR is missing (e.g. Hive SyncSet hasn't resynced yet),
+# poll for up to 120s. Hard-fail if still absent — better to fail here
+# with a clear error than hand off to e2e tests that will time out with
+# a cryptic "resource not found".
+# Format: comma-separated "plural.group/name[/namespace]"
+#   Namespaced: routemonitors.monitoring.openshift.io/console/openshift-route-monitor-operator
+#   Cluster-scoped: clusterurlmonitors.monitoring.openshift.io/api
+if [[ -n "${OPERATOR_REQUIRED_CRS:-}" ]]; then
+    log "Verifying required CRs exist (OPERATOR_REQUIRED_CRS)"
+    IFS=',' read -ra REQUIRED_LIST <<< "${OPERATOR_REQUIRED_CRS}"
+    for entry in "${REQUIRED_LIST[@]}"; do
+        entry=$(echo "${entry}" | xargs)
+        [[ -z "${entry}" ]] && continue
+
+        # Parse: plural.group/name[/namespace]
+        RESOURCE_TYPE="${entry%%/*}"
+        REMAINDER="${entry#*/}"
+        CR_NAME="${REMAINDER%%/*}"
+        CR_NAMESPACE=""
+        if [[ "${REMAINDER}" == */* ]]; then
+            CR_NAMESPACE="${REMAINDER#*/}"
+        fi
+
+        NS_FLAG=""
+        NS_DISPLAY=""
+        if [[ -n "${CR_NAMESPACE}" ]]; then
+            NS_FLAG="-n ${CR_NAMESPACE}"
+            NS_DISPLAY=" in namespace ${CR_NAMESPACE}"
+        fi
+
+        log "Checking for required CR: ${CR_NAME} (${RESOURCE_TYPE})${NS_DISPLAY}"
+
+        CR_FOUND=false
+        for i in $(seq 1 24); do
+            # shellcheck disable=SC2086
+            if oc get "${RESOURCE_TYPE}" "${CR_NAME}" ${NS_FLAG} &>/dev/null; then
+                CR_FOUND=true
+                log "  Required CR ${CR_NAME} exists"
+                break
+            fi
+            if [[ $i -eq 1 ]]; then
+                log "  CR ${CR_NAME} not found, polling up to 120s for Hive SyncSet resync..."
+            fi
+            sleep 5
+        done
+
+        if [[ "${CR_FOUND}" != "true" ]]; then
+            log "ERROR: Required CR ${CR_NAME} (${RESOURCE_TYPE})${NS_DISPLAY} not found after 120s"
+            log "ERROR: This CR is expected to be deployed by Hive SyncSet. The ClusterPackage swap may have cascade-deleted it."
+            log "ERROR: Check whether CRD ownerReferences were properly cleared before ClusterPackage deletion."
+            exit 1
+        fi
+    done
+    log "All required CRs verified"
+fi
 
 # Wait for additional operator-managed deployments to become ready.
 # Some operators create secondary deployments (e.g., ocm-agent-operator
