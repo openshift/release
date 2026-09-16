@@ -16,6 +16,9 @@ SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/
 CONTAINER_NAME="tft-iperf3-server"
 echo "Cleaning up any leftover iperf3 container on bastion..."
 ssh ${SSH_OPTS} root@${REMOTE_HOST} "podman rm -f ${CONTAINER_NAME}" || true
+echo "Opening firewall port 5201/tcp for iperf3 on bastion..."
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "firewall-cmd --add-port=5201/tcp" || true
+
 echo "Starting iperf3 server container '${CONTAINER_NAME}' on bastion ${REMOTE_HOST}..."
 ssh ${SSH_OPTS} root@${REMOTE_HOST} \
     "podman run -d --rm --name ${CONTAINER_NAME} --network host ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest iperf3 -s -p 5201"
@@ -23,6 +26,8 @@ ssh ${SSH_OPTS} root@${REMOTE_HOST} \
 cleanup() {
     echo "Stopping iperf3 server container on bastion..."
     ssh ${SSH_OPTS} root@${REMOTE_HOST} "podman stop ${CONTAINER_NAME}" || true
+    echo "Closing firewall port 5201/tcp on bastion..."
+    ssh ${SSH_OPTS} root@${REMOTE_HOST} "firewall-cmd --remove-port=5201/tcp" || true
 }
 trap cleanup EXIT
 
