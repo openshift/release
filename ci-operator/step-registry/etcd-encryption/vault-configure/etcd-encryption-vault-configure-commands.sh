@@ -7,13 +7,133 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 VAULT_SECRET_UNSEAL_KEY_PATH="/vault/secrets/unseal/unseal-key"
 VAULT_SECRET_ROOT_TOKEN_PATH="/vault/secrets/root/token"
+VAULT_KMS_CONFIG_OPENSHIFT_NS="openshift-config"
+VAULT_KMS_CONFIG_CRD_URL="https://raw.githubusercontent.com/kevinrizza/vault-kms-plugin-openshift-provider/main/bundle/manifests/kms.openshift.io_vaultkmsconfigs.yaml"
+
+resolve_vault_kms_plugin_image() {
+  if [[ -n "${VAULT_KMS_PLUGIN_IMAGE:-}" ]]; then
+    echo "${VAULT_KMS_PLUGIN_IMAGE}"
+    return
+  fi
+  if [[ -f "${SHARED_DIR}/vault-kms-plugin-image" ]]; then
+    tr -d '[:space:]' < "${SHARED_DIR}/vault-kms-plugin-image"
+    return
+  fi
+  echo "Error: set VAULT_KMS_PLUGIN_IMAGE or run etcd-encryption-vault-install first" >&2
+  exit 1
+}
+
+install_vault_kms_config_crd() {
+  echo "Installing VaultKMSConfig CRD (mock operator API)..."
+  curl -fsSL "${VAULT_KMS_CONFIG_CRD_URL}" | oc apply -f -
+}
+
+# Create or update a generic secret from env-file lines on stdin (avoids --from-literal argv leaks).
+apply_opaque_secret_from_stdin() {
+  local secret_name="$1"
+  local namespace="$2"
+  oc create secret generic "${secret_name}" \
+    --from-env-file=/dev/stdin \
+    -n "${namespace}" \
+    --dry-run=client -o yaml | oc apply -f -
+}
+
+# Copy AppRole credentials to openshift-config for VaultKMSConfig (library-go test helper).
+ensure_vault_approle_secret() {
+  local vault_namespace="$1"
+  local secret_name="$2"
+  local role_id=""
+  local secret_id=""
+
+  echo "Creating AppRole secret ${secret_name} in ${VAULT_KMS_CONFIG_OPENSHIFT_NS}..."
+  local was_tracing=false
+  [[ $- == *x* ]] && was_tracing=true
+  set +x
+  role_id="$(oc get secret vault-credentials -n "${vault_namespace}" -o jsonpath='{.data.role-id}' | base64 -d)"
+  secret_id="$(oc get secret vault-credentials -n "${vault_namespace}" -o jsonpath='{.data.secret-id}' | base64 -d)"
+  {
+    printf 'role-id=%s\n' "${role_id}"
+    printf 'secret-id=%s\n' "${secret_id}"
+  } | apply_opaque_secret_from_stdin "${secret_name}" "${VAULT_KMS_CONFIG_OPENSHIFT_NS}"
+  unset role_id secret_id
+  if [[ "${was_tracing}" == true ]]; then
+    set -x
+  fi
+}
+
+# kube-apiserver uses host-network DNS and cannot resolve cluster Service names; use ClusterIP
+# (same as library-go getVaultServiceAddress in test/library/encryption/kms/vault.go).
+resolve_vault_service_address() {
+  local vault_namespace="$1"
+  local service_name="$2"
+  local cluster_ip=""
+  local port=""
+
+  cluster_ip="$(oc get svc "${service_name}" -n "${vault_namespace}" -o jsonpath='{.spec.clusterIP}')"
+  if [[ -z "${cluster_ip}" || "${cluster_ip}" == "None" ]]; then
+    echo "Error: Service ${service_name} in ${vault_namespace} has no ClusterIP" >&2
+    exit 1
+  fi
+  port="$(oc get svc "${service_name}" -n "${vault_namespace}" -o jsonpath='{.spec.ports[?(@.name=="https")].port}')"
+  if [[ -z "${port}" ]]; then
+    echo "Error: Service ${service_name} in ${vault_namespace} has no port named https" >&2
+    exit 1
+  fi
+  echo "https://${cluster_ip}:${port}"
+}
+
+# Apply a cluster VaultKMSConfig matching library-go test/library/encryption/kms/vault.go defaults.
+apply_vault_kms_config() {
+  local cr_name="$1"
+  local service_name="$2"
+  local vault_namespace="$3"
+  local key_name="$4"
+  local ca_bundle_name="$5"
+  local approle_secret_name="$6"
+  local vault_address=""
+  local server_name="${service_name}.${vault_namespace}.svc"
+  local vault_key_path="transit/keys/${key_name}"
+  local plugin_image=""
+
+  vault_address="$(resolve_vault_service_address "${vault_namespace}" "${service_name}")"
+  echo "Resolved Vault address for ${cr_name}: ${vault_address} (serverName: ${server_name})"
+
+  echo "Applying VaultKMSConfig ${cr_name}..."
+  oc apply -f - <<EOF
+apiVersion: kms.openshift.io/v1alpha1
+kind: VaultKMSConfig
+metadata:
+  name: ${cr_name}
+spec:
+  vaultAddress: ${vault_address}
+  vaultNamespace: ${VAULT_ENTERPRISE_NS}
+  vaultKeyPath: ${vault_key_path}
+  authentication:
+    type: AppRole
+    appRole:
+      secret:
+        name: ${approle_secret_name}
+  tls:
+    caBundle:
+      name: ${ca_bundle_name}
+    serverName: ${server_name}
+EOF
+
+  plugin_image="$(resolve_vault_kms_plugin_image)"
+  echo "Setting VaultKMSConfig status.kmsPluginImage (normally set by the operator)..."
+  oc patch vaultkmsconfig "${cr_name}" --type=merge --subresource=status \
+    -p "$(jq -n --arg img "${plugin_image}" '{status:{kmsPluginImage:$img}}')"
+}
 
 # Configure a Vault instance for KMS encryption.
-# Args: $1 = namespace, $2 = KMS key name, $3 = pod name
+# Args: $1 = namespace, $2 = KMS key name, $3 = pod name, $4 = CA ConfigMap name in openshift-config,
+#       $5 = AppRole secret name in openshift-config
 configure_vault() {
   local namespace="$1"
   local key_name="$2"
   local pod_name="$3"
+  local ca_bundle_name="$4"
+  local approle_secret_name="$5"
   local service_name="${pod_name%-0}"
 
   # Disable tracing due to password handling
@@ -151,12 +271,11 @@ POLICY
   SECRET_ID=$(vault_cli write -namespace="${VAULT_ENTERPRISE_NS}" -field=secret_id -f auth/approle/role/kms-plugin/secret-id)
 
   echo "Creating vault-credentials secret..."
-  oc create secret generic vault-credentials \
-    --from-literal=role-id="${ROLE_ID}" \
-    --from-literal=secret-id="${SECRET_ID}" \
-    --from-literal=root-token="${ROOT_TOKEN}" \
-    -n "${namespace}" \
-    --dry-run=client -o yaml | oc apply -f -
+  {
+    printf 'role-id=%s\n' "${ROLE_ID}"
+    printf 'secret-id=%s\n' "${SECRET_ID}"
+    printf 'root-token=%s\n' "${ROOT_TOKEN}"
+  } | apply_opaque_secret_from_stdin vault-credentials "${namespace}"
   local role_id_summary="${ROLE_ID}"
   unset ROLE_ID SECRET_ID
   if [[ "${was_tracing}" == true ]]; then
@@ -177,7 +296,12 @@ POLICY
   echo "  - Transit Key: ${key_name}"
   echo "  - ROLE_ID: ${role_id_summary}"
   echo ""
+
+  ensure_vault_approle_secret "${namespace}" "${approle_secret_name}"
+  apply_vault_kms_config "${namespace}" "${service_name}" "${namespace}" "${key_name}" "${ca_bundle_name}" "${approle_secret_name}"
 }
 
-configure_vault "${VAULT_NAMESPACE}" "${VAULT_KMS_KEY_NAME}" "vault-0"
-configure_vault "${VAULT_SECONDARY_NAMESPACE}" "${VAULT_SECONDARY_KMS_KEY_NAME}" "vault-secondary-0"
+install_vault_kms_config_crd
+
+configure_vault "${VAULT_NAMESPACE}" "${VAULT_KMS_KEY_NAME}" "vault-0" "vault-ca-bundle" "vault-approle-secret"
+configure_vault "${VAULT_SECONDARY_NAMESPACE}" "${VAULT_SECONDARY_KMS_KEY_NAME}" "vault-secondary-0" "vault-ca-bundle-secondary" "vault-approle-secret-secondary"
