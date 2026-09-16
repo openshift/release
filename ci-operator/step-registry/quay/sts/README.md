@@ -5,7 +5,7 @@ account, then invoke the operator repository's Chainsaw STS test on the existing
 QA-created Quay QE OpenShift cluster. They support
 [quay-operator#1324](https://github.com/quay/quay-operator/pull/1324).
 
-**This draft does not register a runnable job.** Nayan/Brady's job and suite
+**The target is the existing shared Quay QE cluster, with a separate `e2e-sts` job that keeps existing E2E jobs unchanged. This draft does not yet register that runnable job.** Nayan/Brady's job and suite
 integration, credential registration, helper image, and a reviewed isolated OLM
 installation/teardown adapter are still needed. It does not assume that their new
 suite already calls Chainsaw. No live AWS or QE-cluster test has been run for this
