@@ -124,11 +124,18 @@ export OAPE_ROOT="${OAPE_ROOT:-/app}"
 # Bootstrap until ci-monitor-agent is promoted to quay (built by oape-ai-e2e CI).
 if [[ ! -f "${OAPE_ROOT}/scripts/ci-monitor/monitor.sh" ]]; then
   OAPE_AI_E2E_REPO="${OAPE_AI_E2E_REPO:-https://github.com/neha037/oape-ai-e2e.git}"
+  OAPE_AI_E2E_BRANCH="${OAPE_AI_E2E_BRANCH:-CI-Monitor}"
   OAPE_AI_E2E_COMMIT="${OAPE_AI_E2E_COMMIT:-b4de252c7688f27d243ae73b7fa987ebe2ae8c9c}"
   OAPE_CLONE_DIR=$(mktemp -d)
   echo "[setup] ci-monitor scripts not in image — cloning ${OAPE_AI_E2E_REPO}@${OAPE_AI_E2E_COMMIT:0:7}"
-  git clone --depth 1 "${OAPE_AI_E2E_REPO}" "${OAPE_CLONE_DIR}"
-  git -C "${OAPE_CLONE_DIR}" checkout "${OAPE_AI_E2E_COMMIT}"
+  # Shallow clone CI-Monitor branch (pinned commit is branch tip); full clone fallback.
+  if ! git clone --depth 1 -b "${OAPE_AI_E2E_BRANCH}" "${OAPE_AI_E2E_REPO}" "${OAPE_CLONE_DIR}"; then
+    git clone "${OAPE_AI_E2E_REPO}" "${OAPE_CLONE_DIR}"
+    git -C "${OAPE_CLONE_DIR}" checkout "${OAPE_AI_E2E_COMMIT}"
+  elif [[ "$(git -C "${OAPE_CLONE_DIR}" rev-parse HEAD)" != "${OAPE_AI_E2E_COMMIT}" ]]; then
+    git -C "${OAPE_CLONE_DIR}" fetch --depth 1 origin "${OAPE_AI_E2E_COMMIT}"
+    git -C "${OAPE_CLONE_DIR}" checkout "${OAPE_AI_E2E_COMMIT}"
+  fi
   export OAPE_ROOT="${OAPE_CLONE_DIR}"
 fi
 
