@@ -12,6 +12,13 @@ EXIT_CODE=101
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
 
 REGION="${LEASED_RESOURCE}"
+# C2S/SC2S secret regions are emulated on a standard AWS partition: the cluster's
+# load balancers and ENIs live in the backing account's source region, not the iso
+# LEASED_RESOURCE region. Remap REGION so the aws-cli calls below target it
+# (same pattern as aws-provision-bastionhost).
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+    REGION=$(jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+fi
 INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 

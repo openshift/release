@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64|aws-usgov|aws-eusc)
+aws|aws-arm64|aws-usgov|aws-eusc|aws-c2s|aws-sc2s)
     export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
     ;;
 gcp)
@@ -63,6 +63,13 @@ azure4|azuremag|azurestack)
 esac
 
 REGION="${LEASED_RESOURCE}"
+# C2S/SC2S secret regions are emulated on a standard AWS partition: the Route53
+# zones and records live in the backing account's source region, not the iso
+# LEASED_RESOURCE region. Remap REGION so the aws-cli calls below query it
+# (same pattern as aws-provision-bastionhost).
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
+    REGION=$(jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+fi
 INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 # CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
@@ -79,7 +86,7 @@ ret=0
 # ------------------------------------------------------------------------------
 echo "Checking if private zone were created."
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64|aws-usgov|aws-eusc)
+aws|aws-arm64|aws-usgov|aws-eusc|aws-c2s|aws-sc2s)
     # records in public zone
     if [[ ${PUBLISH_STRATEGY} != "Internal" ]]; then
         echo "Checking records in public zone."
