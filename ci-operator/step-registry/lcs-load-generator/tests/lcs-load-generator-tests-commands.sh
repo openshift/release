@@ -548,10 +548,6 @@ oc create secret generic lcs-load-generator-es-credentials \
 
 # ─── 6. RUN LOAD TESTS ──────────────────────────────────────────────────────
 
-echo "══════════════════════════════════════════════════════════"
-echo "  Starting load test: ${NUM_USERS} users × ${TEST_DURATION}"
-echo "══════════════════════════════════════════════════════════"
-
 # Record start time for profiling collection window
 TEST_START_EPOCH=$(date +%s)
 
@@ -559,11 +555,18 @@ TEST_START_EPOCH=$(date +%s)
 export LCS_NAMESPACE LCS_LOADGEN_IMAGE LCS_HOST LCS_TOKEN
 export LCS_PROVIDER LCS_MODEL ES_INDEX ES_SERVER_HOST
 export LOCUST_USERS="${NUM_USERS}"
-export LOCUST_RUN_TIME="${TEST_DURATION}"
 export LOCUST_PROCESSES REQUEST_TIMEOUT METRIC_STEP
 
-# Delete any previous Job (idempotent)
-oc delete job lcs-load-generator -n "${LCS_NAMESPACE}" --ignore-not-found=true
+IFS=',' read -ra DURATIONS <<< "${TEST_DURATION}"
+for duration in "${DURATIONS[@]}"; do
+export LOCUST_RUN_TIME="${duration}"
+
+echo "══════════════════════════════════════════════════════════"
+echo "  Starting load test: ${NUM_USERS} users × ${duration}"
+echo "══════════════════════════════════════════════════════════"
+
+# Delete previous Job if it exists (for subsequent iterations)
+oc delete job/lcs-load-generator -n "${LCS_NAMESPACE}" --ignore-not-found=true 2>/dev/null || true
 
 # Apply the dedicated ServiceAccount and Job manifests inline.
 echo "── Applying load generator ServiceAccount and Job ──"
@@ -705,7 +708,7 @@ while [[ -z "${JOB_FINISHED}" ]]; do
 done
 
 if [[ "${JOB_FINISHED}" != "complete" ]]; then
-  echo "ERROR: Load generator Job ${JOB_FINISHED}"
+  echo "ERROR: Load generator Job ${JOB_FINISHED} (duration=${duration})"
   echo "── Job status ──"
   oc describe job lcs-load-generator -n "${LCS_NAMESPACE}"
   echo "── Job pod logs ──"
@@ -716,17 +719,21 @@ if [[ "${JOB_FINISHED}" != "complete" ]]; then
   exit 1
 fi
 
-TEST_END_EPOCH=$(date +%s)
-TEST_DURATION_SECONDS=$((TEST_END_EPOCH - TEST_START_EPOCH))
-
-echo "── Load test completed in ${TEST_DURATION_SECONDS}s ──"
+echo "── Load test (${duration}) completed ──"
 
 # Collect Job logs to artifacts
 JOB_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
 if [[ -n "${JOB_POD}" ]]; then
   mkdir -p "${ARTIFACT_DIR}/logs"
-  oc logs -n "${LCS_NAMESPACE}" "${JOB_POD}" > "${ARTIFACT_DIR}/logs/lcs-load-generator.log" 2>&1 || true
+  oc logs -n "${LCS_NAMESPACE}" "${JOB_POD}" > "${ARTIFACT_DIR}/logs/lcs-load-generator-${duration}.log" 2>&1 || true
 fi
+
+done
+
+TEST_END_EPOCH=$(date +%s)
+TEST_DURATION_SECONDS=$((TEST_END_EPOCH - TEST_START_EPOCH))
+
+echo "── All load tests completed in ${TEST_DURATION_SECONDS}s ──"
 
 
 # ─── 6b. LOG FINGERPRINT FOR ORION METADATA ────────────────────────────────
