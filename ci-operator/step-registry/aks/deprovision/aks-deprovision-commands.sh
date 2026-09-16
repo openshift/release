@@ -286,7 +286,17 @@ vmss_rolling_upgrade_inactive() {
     rc=$?
     return "${rc}"
   fi
-  [[ "${status}" != "RollingForward" ]] && AZURE_CLI_DESIRED_STATE=true
+  case "${status}" in
+    Cancelled|Completed|Faulted)
+      AZURE_CLI_DESIRED_STATE=true
+      ;;
+    RollingForward)
+      ;;
+    *)
+      echo "Unexpected VMSS rolling upgrade status '${status}'; cancellation state is uncertain." >&2
+      return 1
+      ;;
+  esac
   return 0
 }
 
