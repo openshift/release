@@ -649,11 +649,23 @@ function create_peer_pods_secret() {
       local auth_json
       auth_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.auth\.json}' 2>/dev/null || echo "")
       if [[ -n "${auth_json}" ]]; then
-        echo "${auth_json}" | base64 -d > "${SCRATCH}/auth.json"
-        oc_with_retry oc create secret generic peer-pods-secret \
-          -n "${OSC_NAMESPACE}" \
-          --from-file="${SCRATCH}/auth.json"
-        rm -f "${SCRATCH}/auth.json"
+        local decoded access_key secret_key
+        decoded=$(echo "${auth_json}" | base64 -d)
+        access_key=$(echo "${decoded}" | jq -r '.aws.aws_access_key_id // ""')
+        secret_key=$(echo "${decoded}" | jq -r '.aws.aws_secret_access_key // ""')
+
+        # The OSC operator's image-generator requires flat AWS_ACCESS_KEY_ID /
+        # AWS_SECRET_ACCESS_KEY keys in peer-pods-secret (not a nested auth.json
+        # blob) - mirrors the azure) case above.
+        if [[ -n "${access_key}" && -n "${secret_key}" ]]; then
+          set +x
+          oc_with_retry oc create secret generic peer-pods-secret \
+            -n "${OSC_NAMESPACE}" \
+            --from-literal="AWS_ACCESS_KEY_ID=${access_key}" \
+            --from-literal="AWS_SECRET_ACCESS_KEY=${secret_key}"
+        else
+          echo ">>> WARNING: Could not extract AWS credentials from peerpods-param-secret"
+        fi
       else
         echo ">>> WARNING: Could not extract AWS credentials from peerpods-param-secret"
       fi
