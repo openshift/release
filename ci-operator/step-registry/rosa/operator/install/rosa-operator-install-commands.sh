@@ -225,8 +225,8 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
                 CR_COUNT=$(jq -s 'length' "${CR_BACKUP_DIR}/${crd}.json" 2>/dev/null || echo 0)
                 log "  Backed up ${CR_COUNT} Hive-managed CR(s) for ${crd}"
             else
-                log "  No Hive-managed CRs found for ${crd}"
-                : > "${CR_BACKUP_DIR}/${crd}.json"
+                log "ERROR: Failed to back up Hive-managed CRs for ${crd}"
+                exit 1
             fi
         fi
     done
