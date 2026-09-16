@@ -14,11 +14,20 @@ ref:
     group: quay
     mount_path: /var/run/quay-qe-quay-secret
   env:
-  - name: PLAYWRIGHT_GIT_REPO
+  - name: PLAYWRIGHT_USE_IMAGE_TESTS
+    default: "false"
     documentation: |-
-      Git repository the Playwright suite is cloned from. Required (no default):
-      the tests must be deliberately version-matched to the deployed Quay image,
-      so the caller must set this explicitly in the ci-operator config.
+      When "true", skip cloning PLAYWRIGHT_GIT_REPO and run the Playwright
+      suite baked into the quay-playwright-runner image at /app. When
+      "false" (default) the suite is cloned at runtime as before.
+  - name: PLAYWRIGHT_GIT_REPO
+    default: ""
+    documentation: |-
+      Git repository the Playwright suite is cloned from. Empty by default;
+      the caller must set this explicitly in the ci-operator config whenever
+      PLAYWRIGHT_USE_IMAGE_TESTS is "false", since the tests must be
+      deliberately version-matched to the deployed Quay image. Not needed
+      when PLAYWRIGHT_USE_IMAGE_TESTS is "true".
   - name: PLAYWRIGHT_GIT_BRANCH
     default: ""
     documentation: |-
@@ -45,5 +54,6 @@ ref:
       E2E_FAILURE_REPORT.md for the rationale behind each quarantined entry.
   documentation: |-
     Execute Quay Playwright e2e smoke tests against a deployed Quay instance.
-    By default tests and browsers come from the quay-playwright-runner image.
-    Set PLAYWRIGHT_GIT_BRANCH to clone a different quay.git ref at runtime.
+    By default the suite is cloned at runtime from PLAYWRIGHT_GIT_REPO; set
+    PLAYWRIGHT_USE_IMAGE_TESTS "true" to run the suite baked into the
+    quay-playwright-runner image at /app instead.

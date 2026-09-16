@@ -13,8 +13,11 @@ else
 fi
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 if [[ -n ${MCE} ]] ; then

@@ -299,7 +299,10 @@ function render_osc_operator_chart() {
     "--set" "namespaceOverride=${OSC_NAMESPACE}"
   )
 
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
+  if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
+    helm_args+=("--set" "dev.enabled=false")
+    echo ">>> Helm: dev.enabled=false (GA redhat-operators catalog)" >&2
+  elif [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
     helm_args+=("--set" "dev.enabled=true" "--set" "dev.image=${CATALOG_SOURCE_IMAGE}")
     echo ">>> Helm: dev.enabled=true, dev.image=${CATALOG_SOURCE_IMAGE}" >&2
   else
@@ -396,7 +399,8 @@ function render_osc_operands_chart() {
           [[ -n "${aws_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_REGION=${aws_region}")
           [[ -n "${aws_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SUBNET_ID=${aws_subnet_id}")
           [[ -n "${aws_vpc_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_VPC_ID=${aws_vpc_id}")
-          [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids}")
+          # Escape commas so helm --set-string treats multiple SG IDs as one value.
+          [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids//,/\\,}") || true
           [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}")
           # Escape commas so helm --set-string treats the list as one value.
           [[ -n "${podvm_instance_types}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPES=${podvm_instance_types//,/\\,}") || true
@@ -447,6 +451,15 @@ function install_osc_operator() {
   oc apply -f "${operator_yaml}" --dry-run=client -o name || true
 
   oc_with_retry oc apply -f "${operator_yaml}"
+
+  # The helm chart creates osc-operator-dev-catalog unconditionally regardless of dev.enabled
+  # (helm chart bug).  When using the GA redhat-operators catalog the dev catalog has no valid
+  # image and will never become READY, blocking Stage 0 of wait_for_operator().  Delete it so
+  # the wait only covers catalogs that are actually needed.
+  if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
+    echo ">>> redhat-operators catalog in use; deleting spurious ${OSC_DEV_CATALOG_NAME} CatalogSource (helm chart bug)"
+    oc delete catalogsource "${OSC_DEV_CATALOG_NAME}" -n openshift-marketplace --ignore-not-found=true || true
+  fi
 }
 
 function wait_for_operator() {

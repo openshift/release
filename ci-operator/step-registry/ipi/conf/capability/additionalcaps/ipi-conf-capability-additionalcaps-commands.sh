@@ -51,7 +51,7 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
 # so that the credentials of the build farm registry can be saved in docker client config file.
 # A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
+KUBECONFIG="" oc registry login
 ocp_version=$(oc adm release info ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
 ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )

@@ -20,15 +20,65 @@ if [[ ! "${PROVISIONER_LAUNCH_TIMEOUT}" =~ ^[0-9]+$ ]]; then
 fi
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
+capture_classic_resources() {
+    if [[ "${HOSTED_CP}" == "true" ]]; then
+        return
+    fi
+
+    local live_resources
+    local account_claim
+    live_resources=$(mktemp)
+
+    if ! timeout 30 ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/resources/live" \
+        > "${live_resources}" 2>/dev/null; then
+        log "Unable to retrieve live Classic cluster resources"
+        rm -f "${live_resources}"
+        return
+    fi
+
+    jq '.resources.cluster_deployment' "${live_resources}" \
+        > "${ARTIFACT_DIR}/cluster-deployment.json" 2>/dev/null || true
+
+    # The live-resource API returns each resource as a JSON-encoded string. Keep only
+    # the AccountClaim fields needed for diagnosing AAO reconciliation. In particular,
+    # do not publish role ARNs, external IDs, legal entity data, or secret references
+    # in CI artifacts.
+    account_claim=$(jq -r '.resources.aws_account_claim // empty' "${live_resources}" 2>/dev/null || true)
+    if [[ -n "${account_claim}" ]]; then
+        if jq '{
+            apiVersion: .apiVersion,
+            kind: .kind,
+            metadata: {
+                name: .metadata.name,
+                namespace: .metadata.namespace,
+                creationTimestamp: .metadata.creationTimestamp,
+                generation: .metadata.generation
+            },
+            spec: {
+                accountLink: .spec.accountLink,
+                byoc: .spec.byoc,
+                manualSTSMode: .spec.manualSTSMode,
+                aws: .spec.aws
+            },
+            status: .status
+        }' <<< "${account_claim}" > "${ARTIFACT_DIR}/aws-account-claim.json" 2>/dev/null; then
+            log "Saved sanitized AWS AccountClaim to ${ARTIFACT_DIR}/aws-account-claim.json"
+        else
+            log "Unable to parse the AWS AccountClaim returned by the live-resource API"
+            rm -f "${ARTIFACT_DIR}/aws-account-claim.json"
+        fi
+    else
+        log "AWS AccountClaim is not available in the live Classic cluster resources"
+    fi
+
+    rm -f "${live_resources}"
+}
+
 capture_diagnostics_on_crash() {
     log "UNEXPECTED EXIT: Capturing diagnostics before crash..."
     timeout 30 rosa describe cluster -c "${CLUSTER_ID}" -o json > "${ARTIFACT_DIR}/cluster-description.json" 2>&1 || true
     timeout 60 rosa logs install -c "${CLUSTER_ID}" > "${ARTIFACT_DIR}/.install.log" 2>&1 || true
-    if [[ "${HOSTED_CP}" != "true" ]]; then
-        timeout 30 ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/resources/live" \
-            | jq '.resources.cluster_deployment' \
-            > "${ARTIFACT_DIR}/cluster-deployment.json" 2>/dev/null || true
-    fi
+    capture_classic_resources || true
     log "Diagnostics captured to ${ARTIFACT_DIR}/"
 }
 trap 'capture_diagnostics_on_crash' ERR
@@ -232,6 +282,12 @@ while true; do
         log "Checking install logs for fatal errors..."
         install_log_output=$(retry_cmd 3 10 timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
         fatal_pattern=$(echo "${install_log_output}" | grep -E "ProvisionFailed|failed to create|InvalidSubnet|LimitExceeded|QuotaExceeded|InsufficientFreeAddresses|UnauthorizedAccess" || true)
+        # Filter out KMS provider x509 false positive (OCPBUGS-49661): the admin-kubeconfig CA
+        # does not trust the Let's Encrypt CA on ROSA HCP API servers, so "failed to create token
+        # for KMS provider service account" with an x509 error always fires early but is transient.
+        if [[ -n "${fatal_pattern}" ]]; then
+          fatal_pattern=$(echo "${fatal_pattern}" | grep -v -E 'kms-provider.*x509|x509.*kms-provider' || true)
+        fi
         if [[ -n "${fatal_pattern}" ]]; then
           log "ERROR: Fatal error detected in install logs:"
           log "${fatal_pattern}"
@@ -296,12 +352,10 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
   log "Cluster status description: ${status_desc}"
   # Save install logs
   timeout 60 rosa logs install -c ${CLUSTER_ID} > "${ARTIFACT_DIR}/.install.log" || true
-  # Save Hive ClusterDeployment conditions for Classic clusters (not applicable to HyperShift)
+  # Save Hive ClusterDeployment and AWS AccountClaim status for Classic clusters.
   if [[ "${HOSTED_CP}" != "true" ]]; then
-    log "Saving Hive ClusterDeployment..."
-    ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/resources/live" \
-      | jq '.resources.cluster_deployment' \
-      > "${ARTIFACT_DIR}/cluster-deployment.json" 2>/dev/null || true
+    log "Saving Classic cluster resources..."
+    capture_classic_resources || true
   fi
   # DNS diagnostics: when the failure involves DNS resolution errors ("no such host" or
   # "dial tcp: lookup"), capture Route 53 record state and resolver output as artifacts.
