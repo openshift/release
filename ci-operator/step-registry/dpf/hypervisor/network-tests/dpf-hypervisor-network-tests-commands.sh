@@ -16,8 +16,14 @@ SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/
 CONTAINER_NAME="tft-iperf3-server"
 echo "Cleaning up any leftover iperf3 container on bastion..."
 ssh ${SSH_OPTS} root@${REMOTE_HOST} "podman rm -f ${CONTAINER_NAME}" || true
-echo "Opening firewall port 5201/tcp for iperf3 on bastion..."
-ssh ${SSH_OPTS} root@${REMOTE_HOST} "firewall-cmd --add-port=5201/tcp" || true
+FIREWALL_PORT_ADDED=false
+if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "firewall-cmd --query-port=5201/tcp" 2>/dev/null; then
+    echo "Opening firewall port 5201/tcp for iperf3 on bastion..."
+    ssh ${SSH_OPTS} root@${REMOTE_HOST} "firewall-cmd --add-port=5201/tcp"
+    FIREWALL_PORT_ADDED=true
+else
+    echo "Firewall port 5201/tcp already open on bastion"
+fi
 
 echo "Starting iperf3 server container '${CONTAINER_NAME}' on bastion ${REMOTE_HOST}..."
 ssh ${SSH_OPTS} root@${REMOTE_HOST} \
@@ -26,8 +32,10 @@ ssh ${SSH_OPTS} root@${REMOTE_HOST} \
 cleanup() {
     echo "Stopping iperf3 server container on bastion..."
     ssh ${SSH_OPTS} root@${REMOTE_HOST} "podman stop ${CONTAINER_NAME}" || true
-    echo "Closing firewall port 5201/tcp on bastion..."
-    ssh ${SSH_OPTS} root@${REMOTE_HOST} "firewall-cmd --remove-port=5201/tcp" || true
+    if [[ "${FIREWALL_PORT_ADDED}" == "true" ]]; then
+        echo "Closing firewall port 5201/tcp on bastion..."
+        ssh ${SSH_OPTS} root@${REMOTE_HOST} "firewall-cmd --remove-port=5201/tcp" || echo "WARNING: Failed to close firewall port 5201/tcp"
+    fi
 }
 trap cleanup EXIT
 
