@@ -765,6 +765,8 @@ if [[ -n "${LATEST_E2E_TAG}" ]] && \
       JOB_START="${JOB_START_TS}" \
       JOB_END="${JOB_END_TS}" \
       JOB_STATUS="success" \
+      lcsTestWorkers="${NUM_USERS}" \
+      lcsTestDuration="${TEST_DURATION}" \
       ./index.sh || echo "WARN: Fingerprint index.sh failed — continuing"
   popd >/dev/null
 
