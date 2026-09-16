@@ -38,7 +38,7 @@ pushd /tmp
 # ${ODF_OPERATOR_CHANNEL} if the PackageManifest is unavailable.
 _odf_resolve_channel() {
   local desired="${ODF_OPERATOR_CHANNEL}" pm="" i default channels newest c av bv
-  echo "Querying odf-operator PackageManifest for available channels"
+  echo "Querying odf-operator PackageManifest for available channels" >&2
   for i in $(seq 1 12); do
     pm="$(oc get packagemanifest odf-operator -n openshift-marketplace \
           -o jsonpath='{.status.defaultChannel}|{range .status.channels[*]}{.name},{end}' 2>/dev/null || true)"
@@ -46,17 +46,17 @@ _odf_resolve_channel() {
     sleep 10
   done
   if [[ -z "$pm" || "$pm" == "|" ]]; then
-    echo "WARNING: odf-operator PackageManifest unavailable; using ${desired}"
+    echo "WARNING: odf-operator PackageManifest unavailable; using ${desired}" >&2
     echo "$desired"; return
   fi
   default="${pm%%|*}"; channels="${pm#*|}"
-  echo "Available channels: ${channels%,}"
+  echo "Available channels: ${channels%,}" >&2
   if [[ ",${channels}" == *",${desired},"* ]]; then
-    echo "Desired channel ${desired} is available"
+    echo "Desired channel ${desired} is available" >&2
     echo "$desired"; return
   fi
   if [[ -n "$default" && ",${channels}" == *",${default},"* ]]; then
-    echo "Desired channel ${desired} not found; using catalog default: ${default}"
+    echo "Desired channel ${desired} not found; using catalog default: ${default}" >&2
     echo "$default"; return
   fi
   # Find newest stable-X.Y channel
@@ -73,10 +73,10 @@ _odf_resolve_channel() {
     fi
   done
   if [[ -n "$newest" ]]; then
-    echo "Desired channel ${desired} not found; using newest stable: ${newest}"
+    echo "Desired channel ${desired} not found; using newest stable: ${newest}" >&2
     echo "$newest"
   else
-    echo "No stable-X.Y channels found; falling back to ${default:-$desired}"
+    echo "No stable-X.Y channels found; falling back to ${default:-$desired}" >&2
     echo "${default:-$desired}"
   fi
 }
