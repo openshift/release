@@ -30,7 +30,7 @@ if [[ -f "${SHARED_DIR}/vpc_info.json" ]]; then
   VPC=$(jq -r '.vpc_id // empty' "${SHARED_DIR}/vpc_info.json")
   echo "VPC ID (from vpc_info.json): $VPC"
 else
-  VPC=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name,PrivateIpAddress,PublicIpAddress, PrivateDnsName, VpcId]' --output text | column -t | grep "${CLUSTER_NAME}" | awk '{print $7}' | grep -v '^$' | sort -u)
+  VPC=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name,PrivateIpAddress,PublicIpAddress, PrivateDnsName, VpcId]' --output text | column -t | awk -v cluster_name="${CLUSTER_NAME}" 'index($0, cluster_name) && $7 != "" {print $7}' | sort -u)
   echo "VPC ID (from EC2 instance tags): $VPC"
 fi
 
