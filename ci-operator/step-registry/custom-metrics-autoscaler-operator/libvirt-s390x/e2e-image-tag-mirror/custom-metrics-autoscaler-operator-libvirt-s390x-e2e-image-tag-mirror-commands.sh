@@ -50,9 +50,12 @@ EOF
 
 for pool in master worker; do
   echo "Waiting for MachineConfigPool/${pool} to start updating..."
-  oc wait "machineconfigpool/${pool}" --for=condition=Updating=True --timeout=60m
+  oc wait "machineconfigpool/${pool}" --for=condition=Updating=True --timeout=30m
+done
+
+for pool in master worker; do
   echo "MachineConfigPool/${pool} is updating, waiting for completion..."
-  oc wait "machineconfigpool/${pool}" --for=condition=Updated=True --for=condition=Degraded=False --timeout=60m
+  oc wait "machineconfigpool/${pool}" --for=condition=Updated=True --for=condition=Degraded=False --timeout=30m
 done
 
 echo "ImageTagMirrorSet ${ITMS_NAME} rollout completed."
