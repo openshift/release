@@ -7,6 +7,10 @@ set -o pipefail
 echo "=== Edge Enablement CI Monitor ==="
 echo "Started at $(date -u '+%Y-%m-%d %H:%M UTC')"
 
+# Let the post step distinguish a monitor that never started from one that
+# started but could not produce a usable report.
+touch "${SHARED_DIR}/monitor-started"
+
 # ---------------------------------------------------------------------------
 # Load secrets (xtrace disabled to prevent leaking credentials in logs)
 # ---------------------------------------------------------------------------
@@ -109,13 +113,19 @@ echo "Claude permissions configured."
 # ---------------------------------------------------------------------------
 WORKDIR=$(mktemp -d /tmp/ci-monitor-XXXXXX)
 cd "${WORKDIR}"
+REPORT_START_MARKER="${WORKDIR}/report-started"
+touch "${REPORT_START_MARKER}"
 
 copy_artifacts() {
     echo "Copying artifacts to ${ARTIFACT_DIR}..."
+    rm -f "${SHARED_DIR}/monitor-report-ready"
+
     local report_dir="${EDGE_TOOLING_DIR}/payload-monitor/reports"
     if [[ -d "${report_dir}" ]]; then
         local latest_html
-        latest_html=$(ls -t "${report_dir}"/*.html 2>/dev/null | head -1)
+        latest_html=$(find "${report_dir}" -maxdepth 1 -type f -name '*.html' \
+            -newer "${REPORT_START_MARKER}" -printf '%T@ %p\n' \
+            | sort -nr | head -1 | cut -d' ' -f2-)
         if [[ -n "${latest_html}" ]]; then
             cp "${latest_html}" "${ARTIFACT_DIR}/edge-ci-monitor-summary.html"
         fi
@@ -133,6 +143,23 @@ copy_artifacts() {
             sed -n '/INFORMING_JOBS_START/,/INFORMING_JOBS_END/p' "${ARTIFACT_DIR}/claude-analysis.log" \
                 | grep -oE 'INFORMING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[a-zA-Z0-9._-]+'
         } | sort -u > "${SHARED_DIR}/failing-jobs.txt" || true
+    fi
+
+    # A report is ready only when this run generated a complete dashboard with
+    # complete data. The Slack post step must not infer success from an empty
+    # extracted jobs file alone.
+    local dashboard="${ARTIFACT_DIR}/edge-ci-monitor-summary.html"
+    if [[ -s "${dashboard}" ]] \
+        && grep -qF '<title>Edge OCP Payload Monitor</title>' "${dashboard}" \
+        && grep -qF '</html>' "${dashboard}" \
+        && ! grep -qF 'class="error-banner"' "${dashboard}" \
+        && ! grep -qF 'class="skip-banner"' "${dashboard}" \
+        && grep -qE 'Versions: \[[^]]*[0-9]' "${ARTIFACT_DIR}/claude-analysis.log" \
+        && ! grep -qF 'No payload data for versions:' "${ARTIFACT_DIR}/claude-analysis.log"; then
+        touch "${SHARED_DIR}/monitor-report-ready"
+        echo "Dashboard report is ready for Slack notification."
+    else
+        echo "WARNING: Dashboard report is unavailable or incomplete."
     fi
 
     # Archive Claude session for local continuation

@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Guards — skip sending in certain conditions
+# Guard — do nothing only when the monitor step never started
 # ---------------------------------------------------------------------------
-if [[ ! -f "${SHARED_DIR}/monitor-completed" ]]; then
-    echo "Monitor step did not complete — skipping Slack notification."
+if [[ ! -f "${SHARED_DIR}/monitor-started" ]]; then
+    echo "Monitor step did not start — skipping Slack notification."
     exit 0
 fi
 
@@ -30,22 +30,30 @@ DASHBOARD_URL="${GCS_BASE}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/ocp-ci-monitor
 #   INFORMING|<job_name>|<prow_url>|<topology>|<version>|<payload>
 # ---------------------------------------------------------------------------
 JOBS_FILE="${SHARED_DIR}/failing-jobs.txt"
+DATA_LINE_REGEX='^(BLOCKING|INFORMING)\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[a-zA-Z0-9._-]+$'
 
 BLOCKING_COUNT=0
 INFORMING_COUNT=0
 BLOCKING_LINES=""
 INFORMING_LINES=""
-DATA_AVAILABLE=false
+NOTIFICATION_READY=false
+UNAVAILABLE_REASON=""
 
-if [[ -f "${JOBS_FILE}" ]]; then
-    DATA_AVAILABLE=true
+if [[ ! -f "${SHARED_DIR}/monitor-completed" ]]; then
+    UNAVAILABLE_REASON="monitor did not complete"
+elif [[ ! -f "${SHARED_DIR}/monitor-report-ready" ]]; then
+    UNAVAILABLE_REASON="dashboard report is unavailable or incomplete"
+elif [[ ! -f "${JOBS_FILE}" ]]; then
+    UNAVAILABLE_REASON="extracted job data is unavailable"
+elif [[ -s "${JOBS_FILE}" ]] && grep -qvE "${DATA_LINE_REGEX}" "${JOBS_FILE}"; then
+    UNAVAILABLE_REASON="extracted job data is invalid"
+else
+    NOTIFICATION_READY=true
     BLOCKING_LINES=$(grep '^BLOCKING|' "${JOBS_FILE}" || true)
     INFORMING_LINES=$(grep '^INFORMING|' "${JOBS_FILE}" || true)
 
     [[ -n "${BLOCKING_LINES}" ]] && BLOCKING_COUNT=$(echo "${BLOCKING_LINES}" | wc -l)
     [[ -n "${INFORMING_LINES}" ]] && INFORMING_COUNT=$(echo "${INFORMING_LINES}" | wc -l)
-else
-    echo "Warning: ${JOBS_FILE} not found."
 fi
 
 # ---------------------------------------------------------------------------
@@ -78,9 +86,9 @@ version_summary() {
 # ---------------------------------------------------------------------------
 NL=$'\n'
 
-if [[ "${DATA_AVAILABLE}" != "true" ]]; then
+if [[ "${NOTIFICATION_READY}" != "true" ]]; then
     ICON=":warning:"
-    MESSAGE="${ICON} *Edge OCP CI Monitor* — Data unavailable. Please investigate the artifacts."
+    MESSAGE="${ICON} *Edge OCP CI Monitor* — Data unavailable: ${UNAVAILABLE_REASON}. Please investigate the Prow logs."
 elif [[ "${BLOCKING_COUNT}" -eq 0 ]] && [[ "${INFORMING_COUNT}" -eq 0 ]]; then
     ICON=":large_green_circle:"
     MESSAGE="${ICON} *Edge OCP CI Monitor* — No failing jobs found."
@@ -104,7 +112,11 @@ else
     fi
 fi
 
-MESSAGE+="${NL}<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @edge-enablement-payload-manager"
+if [[ "${NOTIFICATION_READY}" == "true" ]]; then
+    MESSAGE+="${NL}<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @edge-enablement-payload-manager"
+else
+    MESSAGE+="${NL}<${JOB_URL}|Prow Logs> | @edge-enablement-payload-manager"
+fi
 
 # ---------------------------------------------------------------------------
 # Send to Slack (or dry-run on PRs)
