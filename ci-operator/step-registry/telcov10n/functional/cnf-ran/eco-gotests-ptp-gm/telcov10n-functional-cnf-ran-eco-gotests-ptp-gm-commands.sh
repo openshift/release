@@ -10,45 +10,58 @@ fi
 
 ECO_CI_CD_DIR=/eco-ci-cd
 INVENTORY_PATH="${ECO_CI_CD_DIR}/inventories/ocp-deployment"
+COMMON_VARIABLES="/var/common_variables"
 
-process_inventory() {
+install_vars() {
+  local src="$1"
+  local allow_host_vars="$2"
+  local base dest_dir name
+
+  base="$(basename "$src")"
+
+  case "$base" in
+    ansible_group_*)
+      dest_dir="${INVENTORY_PATH}/group_vars"
+      name="${base#ansible_group_}"
+      ;;
+    *)
+      if [ "${allow_host_vars}" != "true" ]; then
+        echo "  skipped a file that is not a group var"
+        return 0
+      fi
+      dest_dir="${INVENTORY_PATH}/host_vars"
+      case "$base" in
+        bastion*) name="bastion" ;;
+        *)        name="${base}" ;;
+      esac
+      ;;
+  esac
+  cp "$src" "${dest_dir}/${name}"
+}
+
+process_mount() {
   local directory="$1"
-  local dest_file="$2"
+  local allow_host_vars="$2"
 
   if [ ! -d "$directory" ]; then
     echo "Error: '$directory' is not a valid directory"
     return 1
   fi
 
-  find "$directory" -type f | while IFS= read -r filename; do
-    if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-      continue
-    fi
-    local content
-    content=$(cat "$filename")
-    local varname
-    varname=$(basename "${filename}")
-    if [[ "$content" == *$'\n'* ]]; then
-      echo "${varname}: |"
-      echo "$content" | sed 's/^/  /'
-    else
-      echo "${varname}: '${content//\'/\'\'}'"
-    fi
-  done > "${dest_file}"
+  # -L so that files exposed as symlinks by the secrets mount are matched as regular files
+  while IFS= read -r filename; do
+    install_vars "$filename" "${allow_host_vars}"
+  done < <(find -L "$directory" -maxdepth 1 -type f ! -name '..*' | sort)
 }
 
-echo "Create group_vars directory"
-mkdir -p "${INVENTORY_PATH}/group_vars"
+echo "Create inventory directories"
+mkdir -p "${INVENTORY_PATH}/group_vars" "${INVENTORY_PATH}/host_vars"
 
-echo "Process group inventory files"
-process_inventory /var/group_variables/common/all      "${INVENTORY_PATH}/group_vars/all"
-process_inventory /var/group_variables/common/bastions "${INVENTORY_PATH}/group_vars/bastions"
+echo "Processing common group_vars"
+process_mount "${COMMON_VARIABLES}" false
 
-echo "Create host_vars directory"
-mkdir -p "${INVENTORY_PATH}/host_vars"
-
-echo "Process host inventory files"
-process_inventory "/var/host_variables/${CLUSTER_NAME}/bastion" "${INVENTORY_PATH}/host_vars/bastion"
+echo "Processing cluster vars for ${CLUSTER_NAME}"
+process_mount "/var/clusters/${CLUSTER_NAME}" true
 
 echo "Copy processed inventory files to SHARED_DIR for later steps"
 cp "${INVENTORY_PATH}/group_vars/all"     "${SHARED_DIR}/all"
@@ -59,20 +72,25 @@ HUB_CLUSTERCONFIGS_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}"
 KUBECONFIG_PATH="${HUB_CLUSTERCONFIGS_PATH}/auth/kubeconfig"
 
 PROJECT_DIR="/tmp"
+ALL_VARS="${INVENTORY_PATH}/group_vars/all"
 
 echo "Set bastion SSH configuration"
-cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/temp_ssh_key"
-chmod 600 "${PROJECT_DIR}/temp_ssh_key"
+# The private key spans several lines in group_vars/all, take everything between the quotes
+install -m 600 /dev/null "${PROJECT_DIR}/temp_ssh_key"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${ALL_VARS}" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${PROJECT_DIR}/temp_ssh_key"
 trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"' EXIT
 
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=^ansible_user: ).*' "${ALL_VARS}" | sed "s/'//g")
 
 cd "${ECO_CI_CD_DIR}"
 
 echo "Read BMC credentials from ansible group_all secret"
-[[ -f /var/group_variables/common/all/bmc_user ]] && BMC_USER=$(tr -d '[:space:]' < /var/group_variables/common/all/bmc_user)
-[[ -f /var/group_variables/common/all/bmc_password ]] && BMC_PASSWORD=$(tr -d '[:space:]' < /var/group_variables/common/all/bmc_password)
+bmc_user_from_secret=$(grep -oP "(?<=^bmc_user: ).*" "${ALL_VARS}" | sed "s/'//g") || true
+bmc_password_from_secret=$(grep -oP "(?<=^bmc_password: ).*" "${ALL_VARS}" | sed "s/'//g") || true
+[[ -n "${bmc_user_from_secret}" ]] && BMC_USER="${bmc_user_from_secret}"
+[[ -n "${bmc_password_from_secret}" ]] && BMC_PASSWORD="${bmc_password_from_secret}"
 
 MIRROR_REGISTRY_VAR=""
 if [[ -n "${MIRROR_REGISTRY}" ]]; then

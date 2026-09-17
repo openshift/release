@@ -10,38 +10,49 @@ fi
 
 ECO_CI_CD_DIR=/eco-ci-cd
 ECO_CI_CD_INVENTORY_PATH="${ECO_CI_CD_DIR}/inventories/cnf"
+COMMON_VARIABLES="/var/common_variables"
+HYPERVISOR_VARIABLES="/var/hypervisors"
 
-process_inventory() {
-    local directory="$1"
-    local dest_file="$2"
+install_vars() {
+  local src="$1"
+  local allow_host_vars="$2"
+  local base dest_dir name
 
-    if [ -z "$directory" ]; then
-        echo "Usage: process_inventory <directory> <dest_file>"
-        return 1
-    fi
+  base="$(basename "$src")"
 
-    if [ ! -d "$directory" ]; then
-        echo "Error: '$directory' is not a valid directory"
-        return 1
-    fi
+  case "$base" in
+    ansible_group_*)
+      dest_dir="${ECO_CI_CD_INVENTORY_PATH}/group_vars"
+      name="${base#ansible_group_}"
+      ;;
+    *)
+      if [ "${allow_host_vars}" != "true" ]; then
+        echo "  skipped a file that is not a group var"
+        return 0
+      fi
+      dest_dir="${ECO_CI_CD_INVENTORY_PATH}/host_vars"
+      case "$base" in
+        bastion*) name="bastion" ;;
+        *)        name="${base}" ;;
+      esac
+      ;;
+  esac
+  cp "$src" "${dest_dir}/${name}"
+}
 
-    find "$directory" -type f | while IFS= read -r filename; do
-        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        fi
-        local content
-        content=$(cat "$filename")
-        local varname
-        varname=$(basename "${filename}")
-        if [[ "$content" == *$'\n'* ]]; then
-          echo "${varname}: |"
-          echo "$content" | sed 's/^/  /'
-        else
-          echo "${varname}: '${content//\'/\'\'}'"
-        fi
-    done > "${dest_file}"
+process_mount() {
+  local directory="$1"
+  local allow_host_vars="$2"
 
-    echo "Processing complete. Check \"${dest_file}\""
+  if [ ! -d "$directory" ]; then
+    echo "Error: '$directory' is not a valid directory"
+    return 1
+  fi
+
+  # -L so that files exposed as symlinks by the secrets mount are matched as regular files
+  while IFS= read -r filename; do
+    install_vars "$filename" "${allow_host_vars}"
+  done < <(find -L "$directory" -maxdepth 1 -type f ! -name '..*' | sort)
 }
 
 SPOKE_CLUSTER=$(echo "${SPOKE_CLUSTER}" | tr -d "[]'\" ")
@@ -81,46 +92,32 @@ fi
 echo "CNF_GOTESTS_FEATURES=${CNF_GOTESTS_FEATURES}"
 echo "DOWNSTREAM_TEST_REPO=${DOWNSTREAM_TEST_REPO}"
 
-echo "Create group_vars directory"
-mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
+echo "Create inventory directories"
+mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars" "${ECO_CI_CD_INVENTORY_PATH}/host_vars"
 
-echo "Process all common group variables"
-while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
-done < <(find /var/group_variables/common/ -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null)
+echo "Processing common group_vars"
+process_mount "${COMMON_VARIABLES}" false
 
-echo "Process spoke cluster group variables"
-while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
-done < <(find "/var/group_variables/${SPOKE_CLUSTER}/" -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null)
+echo "Processing hub cluster vars (${HUB_CLUSTER})"
+process_mount "/var/clusters/${HUB_CLUSTER}" true
 
-echo "Create host_vars directory"
-mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/host_vars"
-
-echo "Process bastion host variables (from hub ${HUB_CLUSTER})"
-while read -r dir; do
-    echo "Process host inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
-done < <(find "/var/host_variables/${HUB_CLUSTER}/" -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null)
-
-echo "Process spoke cluster host variables"
-while read -r dir; do
-    echo "Process host inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
-done < <(find "/var/host_variables/${SPOKE_CLUSTER}/" -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null)
+echo "Processing hypervisor vars"
+cp "${HYPERVISOR_VARIABLES}/hypervisor" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/hypervisor"
 
 WORKDIR=$(mktemp -d)
 HUB_CLUSTERCONFIGS_PATH="/home/telcov10n/project/generated/${HUB_CLUSTER}"
 HUB_KUBECONFIG_PATH="${HUB_CLUSTERCONFIGS_PATH}/auth/kubeconfig"
 
+ALL_VARS="${ECO_CI_CD_INVENTORY_PATH}/group_vars/all"
+
 echo "Set bastion SSH configuration"
-cat /var/group_variables/common/all/ansible_ssh_private_key > "${WORKDIR}/temp_ssh_key"
-chmod 600 "${WORKDIR}/temp_ssh_key"
+# The private key spans several lines in group_vars/all, take everything between the quotes
+install -m 600 /dev/null "${WORKDIR}/temp_ssh_key"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${ALL_VARS}" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${WORKDIR}/temp_ssh_key"
 
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=^ansible_user: ).*' "${ALL_VARS}" | sed "s/'//g")
 
 SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
 SSH_OPTS_KEEPALIVE=(-o ServerAliveInterval=60 -o ServerAliveCountMax=3 "${SSH_OPTS[@]}")
@@ -155,8 +152,10 @@ BMC_HOSTS=$(ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${WORKDIR}/
 echo "BMC_HOSTS=${BMC_HOSTS}"
 
 echo "Read BMC credentials from ansible group_all secret"
-[[ -f /var/group_variables/common/all/bmc_user ]] && BMC_USER=$(tr -d '[:space:]' < /var/group_variables/common/all/bmc_user)
-[[ -f /var/group_variables/common/all/bmc_password ]] && BMC_PASSWORD=$(tr -d '[:space:]' < /var/group_variables/common/all/bmc_password)
+bmc_user_from_secret=$(grep -oP "(?<=^bmc_user: ).*" "${ALL_VARS}" | sed "s/'//g") || true
+bmc_password_from_secret=$(grep -oP "(?<=^bmc_password: ).*" "${ALL_VARS}" | sed "s/'//g") || true
+[[ -n "${bmc_user_from_secret}" ]] && BMC_USER="${bmc_user_from_secret}"
+[[ -n "${bmc_password_from_secret}" ]] && BMC_PASSWORD="${bmc_password_from_secret}"
 echo "BMC_USER=${BMC_USER}"
 
 echo "Resolve OCP tools image for CNF_TEST_IMAGE (available on disconnected registry)"

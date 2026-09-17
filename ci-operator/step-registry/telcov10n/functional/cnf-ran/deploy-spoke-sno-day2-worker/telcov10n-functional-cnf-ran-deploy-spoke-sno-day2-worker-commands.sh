@@ -9,31 +9,49 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
 fi
 
 INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
-MOUNTED_HOST_INVENTORY="/var/host_variables"
+COMMON_VARIABLES="/var/common_variables"
+HYPERVISOR_VARIABLES="/var/hypervisors"
 
-process_inventory() {
-    local directory="$1"
-    local dest_file="$2"
+install_vars() {
+  local src="$1"
+  local allow_host_vars="$2"
+  local base dest_dir name
 
-    if [ -z "$directory" ]; then
-        echo "Usage: process_inventory <directory> <dest_file>"
-        return 1
-    fi
+  base="$(basename "$src")"
 
-    if [ ! -d "$directory" ]; then
-        echo "Error: '$directory' is not a valid directory"
-        return 1
-    fi
+  case "$base" in
+    ansible_group_*)
+      dest_dir="${INVENTORY_PATH}/group_vars"
+      name="${base#ansible_group_}"
+      ;;
+    *)
+      if [ "${allow_host_vars}" != "true" ]; then
+        echo "  skipped a file that is not a group var"
+        return 0
+      fi
+      dest_dir="${INVENTORY_PATH}/host_vars"
+      case "$base" in
+        bastion*) name="bastion" ;;
+        *)        name="${base}" ;;
+      esac
+      ;;
+  esac
+  cp "$src" "${dest_dir}/${name}"
+}
 
-    find "$directory" -type f | while IFS= read -r filename; do
-        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        else
-          echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
-        fi
-    done > "${dest_file}"
+process_mount() {
+  local directory="$1"
+  local allow_host_vars="$2"
 
-    echo "Processing complete. Check \"${dest_file}\""
+  if [ ! -d "$directory" ]; then
+    echo "Error: '$directory' is not a valid directory"
+    return 1
+  fi
+
+  # -L so that files exposed as symlinks by the secrets mount are matched as regular files
+  while IFS= read -r filename; do
+    install_vars "$filename" "${allow_host_vars}"
+  done < <(find -L "$directory" -maxdepth 1 -type f ! -name '..*' | sort)
 }
 
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
@@ -44,38 +62,17 @@ if [ "${CLUSTER_NAME}" != "kni-qe-106" ]; then
     exit 1
 fi
 
-echo "Create group_vars directory"
-mkdir -p ${INVENTORY_PATH}/group_vars
+echo "Create inventory directories"
+mkdir -p "${INVENTORY_PATH}/group_vars" "${INVENTORY_PATH}/host_vars"
 
-echo "Process common group variables (all, bastions, hypervisors)"
-find /var/group_variables/common/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory "$dir" ${INVENTORY_PATH}/group_vars/"$(basename "${dir}")"
-done
+echo "Processing common group_vars"
+process_mount "${COMMON_VARIABLES}" false
 
-echo "Process cluster group variables for ${CLUSTER_NAME}"
-find "/var/group_variables/${CLUSTER_NAME}/" -mindepth 1 -type d 2>/dev/null | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory "$dir" ${INVENTORY_PATH}/group_vars/"$(basename "${dir}")"
-done
+echo "Processing cluster vars for ${CLUSTER_NAME}"
+process_mount "/var/clusters/${CLUSTER_NAME}" true
 
-echo "Create host_vars directory"
-mkdir -p ${INVENTORY_PATH}/host_vars
-
-echo "Process host variables for ${CLUSTER_NAME}"
-find ${MOUNTED_HOST_INVENTORY}/"${CLUSTER_NAME}"/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
-    echo "Process host inventory file: ${dir}"
-    process_inventory "$dir" ${INVENTORY_PATH}/host_vars/"$(basename "${dir}")"
-done
-
-# Workaround: fthub-01 and kni-qe-106 share the same hypervisor (hv16), but
-# ci-operator cannot mount the same secret twice. Process the fthub-01 mount
-# as the kni-qe-106 hypervisor inventory.
-if [ "${CLUSTER_NAME}" = "kni-qe-106" ]; then
-    echo "Process shared hypervisor inventory for kni-qe-106 from fthub-01 mount"
-    process_inventory "${MOUNTED_HOST_INVENTORY}/fthub-01/hypervisor" \
-        ${INVENTORY_PATH}/host_vars/hypervisor
-fi
+echo "Processing hypervisor vars"
+cp "${HYPERVISOR_VARIABLES}/hypervisor" "${INVENTORY_PATH}/host_vars/hypervisor"
 
 # Set kubeconfig path
 KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
