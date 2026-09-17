@@ -68,7 +68,12 @@ write_cypress_spyglass_report() {
   local step_name="netobserv-frontend-tests"
   local job_safe="${JOB_NAME_SAFE:-${JOB_NAME:-unknown}}"
   local gcs_job_path=""
-  local gcsweb_base="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+  # ci-operator uploads to the private test-platform-results bucket, but that bucket is
+  # not readable by unauthenticated browsers; the censored public mirror
+  # test-platform-results-public is what humans reach from Spyglass. Override via
+  # GCS_PUBLIC_BUCKET if the mirror name changes again.
+  local gcs_bucket="${GCS_PUBLIC_BUCKET:-test-platform-results-public}"
+  local gcsweb_base="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${gcs_bucket}"
   local artifacts_base=""
   local step_base=""
   local report=""
