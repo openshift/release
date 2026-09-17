@@ -163,8 +163,8 @@ for i in $(seq 0 $((TOTAL - 1))); do
             EXPECTED_CPS=$(lease_oc get configmap rosa-cluster-lease-config -n "${LEASE_NAMESPACE}" -o jsonpath='{.data.expected-clusterpackages}' 2>/dev/null || true)
         fi
         if [[ -z "${EXPECTED_CPS}" ]]; then
-            # Default: the 10 managed operator ClusterPackages
-            EXPECTED_CPS="addon-operator configure-alertmanager-operator managed-node-metadata-operator managed-upgrade-operator ocm-agent-operator osd-metrics-exporter package-operator rbac-permissions-operator route-monitor-operator splunk-forwarder-operator"
+            # Default: the 8 managed operator ClusterPackages
+            EXPECTED_CPS="configure-alertmanager-operator managed-node-metadata-operator managed-upgrade-operator ocm-agent-operator osd-metrics-exporter rbac-permissions-operator route-monitor-operator splunk-forwarder-operator"
         fi
 
         # Get actual ClusterPackages with the managed label from the cluster

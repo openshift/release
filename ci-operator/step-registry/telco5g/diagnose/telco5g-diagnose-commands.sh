@@ -389,6 +389,5 @@ if [[ -f "${ARTIFACT_DIR}/diagnose-output.txt" ]]; then
 else
     echo "No diagnose output received from the hypervisor."
 fi
-cp "${SHARED_DIR}/kubeconfig.original" "${ARTIFACT_DIR}/" || true
 cp "${LOG_FILE}" "${ARTIFACT_DIR}/" || true
 cp /tmp/diagnose-prompt.txt ${ARTIFACT_DIR}/ || true
