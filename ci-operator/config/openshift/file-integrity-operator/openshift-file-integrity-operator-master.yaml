@@ -11,6 +11,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: release
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   image_stream_tag:
     name: builder
@@ -69,6 +73,9 @@ tests:
   pipeline_skip_if_only_changed: ^(?:\.github|\.tekton)|\.md$|bundle-hack|^(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-file-integrity
     test:
     - as: test
       cli: latest
@@ -80,6 +87,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - ref: tls-scanner-run
     workflow: ipi-aws
 - always_run: false
   as: e2e-rosa
