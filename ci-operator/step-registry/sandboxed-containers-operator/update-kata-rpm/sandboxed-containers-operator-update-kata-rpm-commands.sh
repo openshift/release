@@ -107,7 +107,7 @@ for node in $nodes;do
     # Install the RPM
     install_output=""
     install_err=0
-    install_output=$(oc debug -n default "${node}" -- chroot /host bash -c \
+    install_output=$(oc debug -n default "${node}" -- nsenter -a -t 1 bash -c \
         "ostree admin unlock --hotfix && rpm -Uvh /var/local/kata-containers.rpm && rpm -q kata-containers && systemctl restart crio" 2>&1) || install_err=$?
 
     if [ $install_err -ne 0 ]; then
