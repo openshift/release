@@ -476,10 +476,15 @@ tests:
     workflow: hypershift-aws-conformance
 - as: unit
   commands: |
-    cd go-controller
+    status=0
     unset KUBERNETES_SERVICE_HOST # Unit tests expect non-K8s-pod environment; unset to match upstream CI behavior
     unset KUBERNETES_SERVICE_PORT
-    make test NOROOT=TRUE
+    cd go-controller
+    make test NOROOT=TRUE || status=$?
+    cd ../openshift
+    go mod vendor
+    make test || status=$?
+    exit $status
   container:
     from: src
 - as: lint
