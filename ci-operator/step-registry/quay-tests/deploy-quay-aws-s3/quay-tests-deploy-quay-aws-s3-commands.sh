@@ -270,14 +270,60 @@ spec:
     managed: true
 EOF
 
+echo "Sleeping 1h for debugging — connect now!"
+sleep 1h
+
+# After QuayRegistry CR is created, before the readiness wait
+if [[ "${PATCH_STARTUP_PROBE:-false}" == "true" ]]; then
+    echo "Wait for quay-database and clair-postgres pods to be up."
+    sleep 5m
+    for i in $(seq 1 60); do
+        if oc get deployment quay-quay-app -n ${QUAY_NAMESPACE:-quay-enterprise} &>/dev/null; then
+            echo "Scale down quay-quay-app deployment..."
+            oc scale deployment quay-quay-app -n ${QUAY_NAMESPACE:-quay-enterprise} --replicas=0
+            echo "Patching quay-quay-app with startupProbe for slow-starting architectures..."
+            oc patch deployment quay-quay-app -n ${QUAY_NAMESPACE:-quay-enterprise} --type=json -p='[
+              {"op": "add", "path": "/spec/template/spec/containers/0/startupProbe", "value": {
+                "httpGet": {"path": "/health/instance", "port": 8080, "scheme": "HTTP"},
+                "failureThreshold": 30,
+                "periodSeconds": 10,
+                "timeoutSeconds": 10
+              }}
+            ]'
+            echo "startupProbe patched successfully"
+            oc scale deployment quay-quay-app -n ${QUAY_NAMESPACE:-quay-enterprise} --replicas=1
+            echo "Delete older quay-quay-app replicasets."
+            oc get rs -n ${QUAY_NAMESPACE:-quay-enterprise} -l quay-component=quay-app --sort-by=.metadata.creationTimestamp -o name | head -n -1 | xargs -r oc delete -n ${QUAY_NAMESPACE:-quay-enterprise}
+            break
+        fi
+        echo "Waiting for deployment... ($i/60)"
+        sleep 60
+    done
+fi
+
 for _ in {1..60}; do
   if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Quay is in ready status" >&2
     oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
-    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    # Use oc exec for in-cluster API access (external route resolves to private
+    # PowerVS IPs unreachable from the CI build farm)
+    quay_pod=$(oc get pods -n quay-enterprise --field-selector=status.phase=Running -o name | grep quay-app | head -1)
+    if [[ -n "$quay_pod" ]]; then
+        echo "Initializing Quay user via in-cluster oc exec ($quay_pod)..."
+        oc exec -n quay-enterprise "$quay_pod" -- \
+          curl -sk -X POST https://$quay_route/api/v1/user/initialize \
+            --header 'Content-Type: application/json' \
+            --data '{ "username": "'"$QUAY_USERNAME"'", "password": "'"$QUAY_PASSWORD"'", \
+              "email": "'"$QUAY_EMAIL"'", "access_token": true }' \
+          | jq '.access_token' | tr -d '"' | tr -d '\n' \
+          > "$SHARED_DIR"/quay_oauth2_token || true
+    else
+        echo "ERROR: No running quay-app pod found for user initialization" >&2
+    fi
+
     archive_pod_info
     exit 0
   fi
