@@ -235,20 +235,30 @@ fi
 # Back up the production ClusterPackage before deleting it.
 # cleanup will restore it so the cluster is not returned to the pool
 # missing its production operator (otherwise Hive resync takes ~2h).
-if oc get clusterpackage "${OPERATOR_NAME}" &>/dev/null; then
-    (
-        log "Backing up production ClusterPackage ${OPERATOR_NAME}"
-        backup_file="${SHARED_DIR}/production-clusterpackage.yaml"
-        temporary_backup="$(mktemp "${SHARED_DIR}/production-clusterpackage.XXXXXX")"
-        if ! oc get clusterpackage "${OPERATOR_NAME}" -o json \
-          | jq 'del(.status, .metadata.resourceVersion, .metadata.uid, .metadata.generation, .metadata.creationTimestamp, .metadata.ownerReferences, .metadata.finalizers, .metadata.managedFields, .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"])' \
-          > "${temporary_backup}"; then
-            rm -f "${temporary_backup}"
-            exit 1
-        fi
-        mv "${temporary_backup}" "${backup_file}"
-        log "Production ClusterPackage backed up to SHARED_DIR"
-    ) || log "WARNING: Failed to back up production ClusterPackage ${OPERATOR_NAME}, continuing without backup"
+if ! PRODUCTION_CP_LOOKUP=$(oc get clusterpackage "${OPERATOR_NAME}" --ignore-not-found -o name 2>/dev/null); then
+    log "ERROR: Failed to look up production ClusterPackage ${OPERATOR_NAME}"
+    exit 1
+fi
+if [[ -n "${PRODUCTION_CP_LOOKUP}" ]]; then
+    log "Backing up production ClusterPackage ${OPERATOR_NAME}"
+    backup_file="${SHARED_DIR}/production-clusterpackage.yaml"
+    if ! temporary_backup="$(mktemp "${SHARED_DIR}/production-clusterpackage.XXXXXX" 2>/dev/null)"; then
+        log "ERROR: Failed to create production ClusterPackage backup"
+        exit 1
+    fi
+    if ! oc get clusterpackage "${OPERATOR_NAME}" -o json 2>/dev/null \
+      | jq 'del(.status, .metadata.resourceVersion, .metadata.uid, .metadata.generation, .metadata.creationTimestamp, .metadata.ownerReferences, .metadata.finalizers, .metadata.managedFields, .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"])' 2>/dev/null \
+      > "${temporary_backup}"; then
+        rm -f "${temporary_backup}"
+        log "ERROR: Failed to back up production ClusterPackage ${OPERATOR_NAME}"
+        exit 1
+    fi
+    if ! mv "${temporary_backup}" "${backup_file}" 2>/dev/null; then
+        rm -f "${temporary_backup}"
+        log "ERROR: Failed to save production ClusterPackage backup"
+        exit 1
+    fi
+    log "Production ClusterPackage backed up to SHARED_DIR"
 fi
 
 # ──────────────────────────────────────────────────────────────────────
@@ -494,8 +504,11 @@ for backup in "${CR_BACKUP_DIR}"/*.json; do
     if [[ -s "${backup}" ]]; then
         crd_name=$(basename "${backup}" .json)
         log "Restoring Hive-managed CR instances for ${crd_name}"
-        jq -s '{apiVersion: "v1", kind: "List", items: .}' "${backup}" \
-            | oc apply -f - 2>/dev/null || true
+        if ! jq -s '{apiVersion: "v1", kind: "List", items: .}' "${backup}" 2>/dev/null \
+            | oc apply -f - 2>/dev/null; then
+            log "ERROR: Failed to restore Hive-managed CR instances for ${crd_name} from ${backup}"
+            exit 1
+        fi
     fi
 done
 
