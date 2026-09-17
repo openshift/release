@@ -97,8 +97,12 @@ if [[ -f "${SHARED_DIR}/vsphere_context.sh" ]]; then
     declare vsphere_datacenter
     declare vsphere_datastore
     declare vsphere_cluster
+    # Tracing is disabled while govc.sh is sourced, otherwise xtrace expands
+    # GOVC_PASSWORD into the publicly readable build log.
+    set +x
     source "${SHARED_DIR}/vsphere_context.sh"
     source "${SHARED_DIR}/govc.sh"
+    set -x
 
     cat >> "${LOGS_CONFIG}" << __APPENDED_ENV_DATA__
 ENV_DATA:

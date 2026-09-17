@@ -10,7 +10,10 @@ set -exuo pipefail
 
 # setup proxy
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 if [ -f "${SHARED_DIR}/runtime_env" ]; then

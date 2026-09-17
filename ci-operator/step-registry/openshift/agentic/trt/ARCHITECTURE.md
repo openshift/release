@@ -151,7 +151,7 @@ The repo provides the runtime environment:
 | [`.devcontainer/post-create.sh`][dc-post] | Installs Go tools, `go mod download`, `make npm`, builds sippy, seeds DB |
 | [`hack/agentic_setup.sh`][setup] | CI wrapper: sets env vars, calls `init-services.sh` + `post-create.sh` |
 | [`.agentic/solve-config.md`][solve-cfg] | Repo-specific Claude instructions: run `make test`, `make lint`, use MCP tools |
-| [`.agentic/followup-config.md`][followup-cfg] | Repo-specific follow-up instructions (appended to review-responder prompt) |
+| [`REVIEW.md`][review-md] | Optional repo-specific review-response instructions (appended to review-responder prompt) |
 | [`CLAUDE.md`][claude-md] | Claude project context: DB migrations, coding conventions, test patterns |
 
 [dc-dockerfile]: https://github.com/openshift/sippy/blob/main/.devcontainer/Dockerfile
@@ -160,7 +160,7 @@ The repo provides the runtime environment:
 [dc-post]: https://github.com/openshift/sippy/blob/main/.devcontainer/post-create.sh
 [setup]: https://github.com/openshift/sippy/blob/main/hack/agentic_setup.sh
 [solve-cfg]: https://github.com/openshift/sippy/blob/main/.agentic/solve-config.md
-[followup-cfg]: https://github.com/openshift/sippy/blob/main/.agentic/followup-config.md
+[review-md]: https://github.com/openshift/sippy/blob/main/REVIEW.md
 [claude-md]: https://github.com/openshift/sippy/blob/main/CLAUDE.md
 
 ## State Machine
@@ -179,6 +179,6 @@ States are tracked in Firestore (`agentic_solves` collection), managed by `Solve
 
 ## Onboarding a New Repo
 
-1. **Target repo**: Create `.devcontainer/` (Dockerfile, init-services.sh, etc.), `hack/agentic_setup.sh`, `.agentic/solve-config.md`, and `CLAUDE.md`
+1. **Target repo**: Create `.devcontainer/` (Dockerfile, init-services.sh, etc.), `hack/agentic_setup.sh`, `.agentic/solve-config.md`, optional root `REVIEW.md`, and `CLAUDE.md`
 2. **Release repo**: Add CI operator config (`openshift-<repo>-main__agentic.yaml`) defining the `agentic-dev` image build and both periodic jobs
 3. **ship-help-bot**: Add entry to `repo_jobs` in `config/workspaces.yaml` mapping the repo to its solve/followup job names and fork

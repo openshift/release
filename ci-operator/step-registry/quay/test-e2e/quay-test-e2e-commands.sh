@@ -47,6 +47,20 @@ else
   echo "No mailpit_api in SHARED_DIR; email-dependent specs may skip or fail"
 fi
 
+PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_USE_IMAGE_TESTS:-false}"
+CLONE_DIR="/tmp/quay-playwright-src"
+if [[ "${PLAYWRIGHT_USE_IMAGE_TESTS}" == "true" ]]; then
+  # /app is root-owned in the runner image (USER 1001, arbitrary UID on OpenShift) and
+  # Playwright writes test-results/ and playwright-report/ into its cwd, so run a copy.
+  echo "PLAYWRIGHT_USE_IMAGE_TESTS=true: using the suite baked into the runner image at /app"
+  rm -rf "${CLONE_DIR}"; mkdir -p "${CLONE_DIR}/web"
+  cp -a /app/. "${CLONE_DIR}/web/"
+  PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
+  PLAYWRIGHT_GIT_REF="image"
+  pushd "${PLAYWRIGHT_WORKDIR}"
+else
+# Left at column 0 (not indented) so this branch stays a byte-for-byte diff of
+# the pre-image-tests script.
 # The Playwright suite is cloned from PLAYWRIGHT_GIT_REPO at a ref resolved in this
 # order (first match wins):
 #   1. PLAYWRIGHT_GIT_BRANCH        - explicit override from the ci-operator config.
@@ -121,7 +135,6 @@ clone_playwright_sources() {
   rm -f "${archive}"
 }
 
-CLONE_DIR="/tmp/quay-playwright-src"
 echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (ref ${PLAYWRIGHT_GIT_REF})"
 clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
 PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
@@ -133,6 +146,7 @@ fi
 echo "Installing npm dependencies for Playwright ref ${PLAYWRIGHT_GIT_REF}..."
 pushd "${PLAYWRIGHT_WORKDIR}"
 npm ci
+fi
 
 # Image browsers live in /opt/playwright as root. Test pods cannot write there.
 IMAGE_BROWSERS=/opt/playwright
@@ -277,7 +291,7 @@ function copyArtifacts {
   # link when index.html actually landed so it is never dead; default every CI var
   # with :- so a missing var in a local run cannot abort this EXIT trap.
   if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
-    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results"
+    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
     local gcs_path
     if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
       gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"

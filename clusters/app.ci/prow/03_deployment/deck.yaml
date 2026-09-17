@@ -21,7 +21,7 @@ objects:
       haproxy.router.openshift.io/timeout: "90s"
   spec:
     port:
-      targetPort: 8080
+      targetPort: main
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: edge
@@ -37,7 +37,7 @@ objects:
       haproxy.router.openshift.io/timeout: "90s"
   spec:
     port:
-      targetPort: 8080
+      targetPort: main
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: edge
@@ -121,7 +121,12 @@ objects:
             mountPath: /tmp/git-sync
         containers:
         - name: deck
-          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260908-104d452f4
+          # Forked Deck: adds --history-bucket*, which upstream Deck rejects on
+          # startup. periodic-prow-image-autobump-openshift-release is paused so
+          # it cannot revert this. Built from openshift/prow jmguzik/deck-history-bucket.
+          image: registry.ci.openshift.org/ci/deck:history-bucket
+          # Mutable tag, so a re-push plus `oc rollout restart` is enough to ship a fix.
+          imagePullPolicy: Always
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -137,6 +142,9 @@ objects:
           - --oauth-url=/github-login
           - --job-config-path=/var/repo/release/ci-operator/jobs
           - --spyglass=true
+          - --gcs-credentials-file=/etc/test-platform-results-viewer/credentials.json
+          - --history-bucket=test-platform-results
+          - --history-bucket-browser-prefix=https://gcsweb-test-platform-results-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
           - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
@@ -175,6 +183,9 @@ objects:
             readOnly: true
           - name: service-account-token
             mountPath: /var/sa-token
+          - name: test-platform-results-viewer
+            mountPath: /etc/test-platform-results-viewer
+            readOnly: true
           - name: config
             mountPath: /etc/config
             readOnly: true
@@ -235,6 +246,9 @@ objects:
         - name: cookie-secret
           secret:
             secretName: cookie
+        - name: test-platform-results-viewer
+          secret:
+            secretName: test-platform-results-viewer
         - name: release
           emptyDir: {}
         - name: build-farm-credentials

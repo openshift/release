@@ -266,13 +266,16 @@ else:
     typeset secretKey="${storageConfig#*|}"
 
     typeset secretJson=""
-    secretJson="$(oc get secret "${secretName}" -n "${obsNamespace}" -o json 2>/dev/null)" || true
-    if [[ -z "${secretJson}" ]]; then
-        AddResult "storage-endpoint" "fail" "Secret ${secretName} not found in ${obsNamespace}"
-        return
+    typeset secretPresent=false
+    typeset _wasTracing=false
+    if [[ $- == *x* ]]; then
+        _wasTracing=true
     fi
+    set +x
+    secretJson="$(oc get secret "${secretName}" -n "${obsNamespace}" -o json 2>/dev/null)" || true
     typeset endpointCheck=""
     if [[ -n "${secretJson}" ]]; then
+        secretPresent=true
         endpointCheck="$(printf '%s' "${secretJson}" | python3 -c "
 import sys,json,base64,re
 sys.tracebacklimit=0
@@ -302,6 +305,18 @@ if not endpoint:
 odf_pat=re.compile(r'(openshift-storage|noobaa|ceph|rgw|rook|ocs|mcg)',re.IGNORECASE)
 print('odf-backed' if odf_pat.search(endpoint) else 'external')
 " "${secretKey}")"
+    fi
+    unset secretJson
+    if [[ "${_wasTracing}" == "true" ]]; then
+        unset _wasTracing
+        set -x
+    else
+        unset _wasTracing
+    fi
+
+    if [[ "${secretPresent}" != "true" ]]; then
+        AddResult "storage-endpoint" "fail" "Secret ${secretName} not found in ${obsNamespace}"
+        return
     fi
 
     if [[ "${endpointCheck}" == "no-endpoint" || -z "${endpointCheck}" ]]; then
@@ -521,6 +536,7 @@ print('ok')
     else
         AddResult "thanos-query" "fail" "Thanos query via ${via} returned ${validation}"
     fi
+    unset body
     true
 }
 
@@ -560,6 +576,12 @@ print(items[0]['metadata']['name'] if items else '')
         fi
 
         typeset queryResult=""
+        typeset queryReachable=true
+        typeset _wasTracing=false
+        if [[ $- == *x* ]]; then
+            _wasTracing=true
+        fi
+        set +x
         if [[ -n "${queryFrontendPod}" ]]; then
             queryResult="$(oc exec --request-timeout=60s -n "${obsNamespace}" "${queryFrontendPod}" \
                 -- curl -sk --connect-timeout 10 --max-time 30 \
@@ -582,19 +604,34 @@ print(items[0]['metadata']['name'] if items else '')
         fi
 
         if [[ -z "${queryResult}" ]]; then
-            AddResult "thanos-query" "skip" "Cannot reach Thanos query endpoint (no route, exec failed)"
-            return
+            queryReachable=false
+        else
+            ValidateThanosResponse "${queryResult}" "exec"
+        fi
+        unset queryResult
+        if [[ "${_wasTracing}" == "true" ]]; then
+            unset _wasTracing
+            set -x
+        else
+            unset _wasTracing
         fi
 
-        ValidateThanosResponse "${queryResult}" "exec"
+        if [[ "${queryReachable}" != "true" ]]; then
+            AddResult "thanos-query" "skip" "Cannot reach Thanos query endpoint (no route, exec failed)"
+        fi
         return
     fi
 
     typeset token=""
-    token="$(oc whoami -t)" || true
-
     typeset responseBody=""
     typeset httpCode=""
+    typeset querySucceeded=false
+    typeset _wasTracing=false
+    if [[ $- == *x* ]]; then
+        _wasTracing=true
+    fi
+    set +x
+    token="$(oc whoami -t)" || true
     responseBody="$(curl -sk -w '\n%{http_code}' \
         -H "Authorization: Bearer ${token}" \
         "https://${queryRoute}/api/v1/query?query=up" \
@@ -603,16 +640,27 @@ print(items[0]['metadata']['name'] if items else '')
     httpCode="$(echo "${responseBody}" | tail -1)"
     responseBody="$(echo "${responseBody}" | sed '$d')"
 
-    if [[ "${httpCode}" != "200" ]]; then
-        if [[ "${httpCode}" =~ ^(401|403)$ ]]; then
-            AddResult "thanos-query" "fail" "Thanos query route auth failed (HTTP ${httpCode}); no data flow verified"
-        else
-            AddResult "thanos-query" "fail" "Thanos query route unreachable (HTTP ${httpCode:-timeout})"
-        fi
+    if [[ "${httpCode}" == "200" ]]; then
+        ValidateThanosResponse "${responseBody}" "route"
+        querySucceeded=true
+    fi
+    unset token responseBody
+    if [[ "${_wasTracing}" == "true" ]]; then
+        unset _wasTracing
+        set -x
+    else
+        unset _wasTracing
+    fi
+
+    if [[ "${querySucceeded}" == "true" ]]; then
         return
     fi
 
-    ValidateThanosResponse "${responseBody}" "route"
+    if [[ "${httpCode}" =~ ^(401|403)$ ]]; then
+        AddResult "thanos-query" "fail" "Thanos query route auth failed (HTTP ${httpCode}); no data flow verified"
+    else
+        AddResult "thanos-query" "fail" "Thanos query route unreachable (HTTP ${httpCode:-timeout})"
+    fi
     true
 }
 

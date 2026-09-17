@@ -159,7 +159,7 @@ if [[ -n "${TUNNEL_URL}" ]]; then
 HTMLEOF
 
     if gcloud auth activate-service-account --quiet --key-file "${GCS_SA}" 2>/dev/null && \
-       gsutil -q cp /tmp/custom-link-staging.html "gs://test-platform-results/${GCS_PATH}/custom-link-staging.html"; then
+       gsutil -q cp /tmp/custom-link-staging.html "gs://test-platform-results-public/${GCS_PATH}/custom-link-staging.html"; then
       echo "    Uploaded to Spyglass."
       URL_SURFACED=true
     else

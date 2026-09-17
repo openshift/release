@@ -8,6 +8,11 @@ set -o pipefail
 # Inspect the performance of the OPP environment
 #
 
+if ! oc get crd multiclusterhubs.operator.open-cluster-management.io &>/dev/null; then
+    echo "WARNING: MultiClusterHub CRD not found — ACM is not installed. Skipping ACM inspector."
+    exit 0
+fi
+
 # cd to writable directory
 cd /tmp/
 
