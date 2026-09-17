@@ -41,3 +41,15 @@ This step expects the following to be available (created by earlier steps in the
 - `osc-config` ConfigMap in default namespace (created by `env-cm` step)
 - `peerpods-param-cm` ConfigMap in default namespace (created by `peerpods-param-cm` step, when peer-pods enabled)
 - `peerpods-param-secret` Secret in default namespace (created by `peerpods-param-cm` step, when peer-pods enabled)
+
+## AWS Peer-Pods: VM Import/Export Prerequisites
+
+When `WORKLOAD_TO_TEST=peer-pods` (or `coco`) on AWS, the OSC operator builds a
+podvm AMI using AWS's "manual credentials" VM Import/Export flow, which requires
+an S3 bucket and a `vmimport` IAM role to already exist in the target AWS
+account. This step waits (up to 5 minutes) for the operator-managed
+`aws-podvm-image-cm` ConfigMap to appear, reads the expected bucket name from
+it, and idempotently creates the bucket and `vmimport` role (with a policy
+scoped to that bucket) using the same AWS credentials already available via
+`peerpods-param-secret`. If the ConfigMap doesn't appear in time, this is
+logged as a warning and the step continues (non-fatal).

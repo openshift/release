@@ -67,6 +67,15 @@ ref:
     creates peer-pods-secret in the operator namespace. For coco, enables confidential
     mode in osc-feature-gates.
 
+    For AWS peer-pods, also ensures the AWS VM Import/Export prerequisites (an S3
+    bucket and the "vmimport" IAM role) exist before the operator attempts to build
+    the podvm AMI via "manual credentials" mode. The bucket name is read from the
+    operator-managed "aws-podvm-image-cm" ConfigMap (created once the KataConfig
+    starts reconciling); this step waits up to 5 minutes for that ConfigMap to
+    appear, then idempotently creates the bucket/role using the same AWS
+    credentials already available via peerpods-param-secret. If the ConfigMap
+    doesn't appear in time, this is logged as a warning and does not fail the step.
+
     When complete, patches osc-config ConfigMap so tests can detect the pre-installed operator.
 
     The 2h timeout covers KataConfig readiness (typically ~1h for node reboots)

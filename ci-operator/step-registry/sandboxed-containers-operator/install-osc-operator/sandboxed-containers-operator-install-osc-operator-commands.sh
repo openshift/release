@@ -676,6 +676,147 @@ function create_peer_pods_secret() {
   esac
 }
 
+function ensure_aws_vmimport_prerequisites() {
+  local provider="$1"
+  if [[ "${provider}" != "aws" ]]; then
+    return 0
+  fi
+
+  echo ">>> Ensuring AWS VM Import/Export prerequisites (S3 bucket + vmimport IAM role)"
+
+  # The operator computes the podvm image bucket name (AMI_BASE_NAME-AMI_VERSION,
+  # tied to the operator/podvm-builder version) into aws-podvm-image-cm once the
+  # KataConfig with peer-pods enabled starts reconciling. Wait for it so we know
+  # the exact bucket name to provision.
+  local bucket_name=""
+  local waited=0
+  local max_wait=300
+  local interval=10
+  while (( waited < max_wait )); do
+    bucket_name=$(oc get configmap aws-podvm-image-cm -n "${OSC_NAMESPACE}" -o jsonpath='{.data.BUCKET_NAME}' 2>/dev/null || echo "")
+    [[ -n "${bucket_name}" ]] && break
+    sleep "${interval}"
+    (( waited += interval ))
+  done
+
+  if [[ -z "${bucket_name}" ]]; then
+    echo ">>> WARNING: aws-podvm-image-cm not found after ${max_wait}s; skipping vmimport prerequisite setup"
+    return 0
+  fi
+
+  echo ">>> Target podvm image bucket: ${bucket_name}"
+
+  local aws_region
+  aws_region=$(oc get configmap peerpods-param-cm -n default -o jsonpath='{.data.AWS_REGION}' 2>/dev/null || echo "")
+  if [[ -z "${aws_region}" ]]; then
+    echo ">>> WARNING: could not determine AWS region; skipping vmimport prerequisite setup"
+    return 0
+  fi
+
+  local auth_json
+  auth_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.auth\.json}' 2>/dev/null || echo "")
+  if [[ -z "${auth_json}" ]]; then
+    echo ">>> WARNING: peerpods-param-secret not found; skipping vmimport prerequisite setup"
+    return 0
+  fi
+
+  local decoded access_key secret_key
+  decoded=$(echo "${auth_json}" | base64 -d)
+  access_key=$(echo "${decoded}" | jq -r '.aws.aws_access_key_id // ""')
+  secret_key=$(echo "${decoded}" | jq -r '.aws.aws_secret_access_key // ""')
+
+  if [[ -z "${access_key}" || -z "${secret_key}" ]]; then
+    echo ">>> WARNING: could not extract AWS credentials; skipping vmimport prerequisite setup"
+    return 0
+  fi
+
+  # Disable tracing while AWS static credentials are exported into the environment.
+  set +x
+  export AWS_ACCESS_KEY_ID="${access_key}"
+  export AWS_SECRET_ACCESS_KEY="${secret_key}"
+  export AWS_DEFAULT_REGION="${aws_region}"
+
+  if aws s3api head-bucket --bucket "${bucket_name}" >/dev/null 2>&1; then
+    echo ">>> S3 bucket ${bucket_name} already exists"
+  else
+    echo ">>> Creating S3 bucket ${bucket_name} in ${aws_region}"
+    if [[ "${aws_region}" == "us-east-1" ]]; then
+      aws s3api create-bucket --bucket "${bucket_name}" --region "${aws_region}" \
+        || echo ">>> WARNING: failed to create S3 bucket ${bucket_name}"
+    else
+      aws s3api create-bucket --bucket "${bucket_name}" --region "${aws_region}" \
+        --create-bucket-configuration LocationConstraint="${aws_region}" \
+        || echo ">>> WARNING: failed to create S3 bucket ${bucket_name}"
+    fi
+  fi
+
+  if aws iam get-role --role-name vmimport >/dev/null 2>&1; then
+    echo ">>> IAM role vmimport already exists"
+  else
+    echo ">>> Creating IAM role vmimport"
+    local trust_policy_file="${SCRATCH}/vmimport-trust-policy.json"
+    cat > "${trust_policy_file}" <<'TRUSTEOF'
+{
+   "Version": "2012-10-17",
+   "Statement": [
+      {
+         "Effect": "Allow",
+         "Principal": { "Service": "vmie.amazonaws.com" },
+         "Action": "sts:AssumeRole",
+         "Condition": {
+            "StringEquals": {
+               "sts:Externalid": "vmimport"
+            }
+         }
+      }
+   ]
+}
+TRUSTEOF
+    aws iam create-role --role-name vmimport --assume-role-policy-document "file://${trust_policy_file}" \
+      || echo ">>> WARNING: failed to create IAM role vmimport"
+    rm -f "${trust_policy_file}"
+  fi
+
+  echo ">>> Ensuring vmimport role policy grants access to ${bucket_name}"
+  local role_policy_file="${SCRATCH}/vmimport-role-policy.json"
+  cat > "${role_policy_file}" <<EOF
+{
+   "Version":"2012-10-17",
+   "Statement":[
+      {
+         "Effect":"Allow",
+         "Action":[
+            "s3:GetBucketLocation",
+            "s3:GetObject",
+            "s3:ListBucket"
+         ],
+         "Resource":[
+            "arn:aws:s3:::${bucket_name}",
+            "arn:aws:s3:::${bucket_name}/*"
+         ]
+      },
+      {
+         "Effect":"Allow",
+         "Action":[
+            "ec2:ModifySnapshotAttribute",
+            "ec2:CopySnapshot",
+            "ec2:RegisterImage",
+            "ec2:Describe*"
+         ],
+         "Resource":"*"
+      }
+   ]
+}
+EOF
+  aws iam put-role-policy --role-name vmimport --policy-name vmimport-policy --policy-document "file://${role_policy_file}" \
+    || echo ">>> WARNING: failed to update vmimport role policy"
+  rm -f "${role_policy_file}"
+
+  unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
+
+  echo ">>> AWS VM Import/Export prerequisites ensured"
+}
+
 function wait_for_kataconfig() {
   echo ">>> Waiting for KataConfig to be ready (this may take up to 2 hours for node reboots)"
 
@@ -770,6 +911,11 @@ if [[ "${ENABLEPEERPODS}" == "true" ]]; then
 fi
 
 install_osc_operands "${CHARTS_DIR}"
+
+if [[ "${ENABLEPEERPODS}" == "true" ]]; then
+  ensure_aws_vmimport_prerequisites "$(get_cloud_provider)"
+fi
+
 wait_for_kataconfig
 
 # Phase 5: Update shared state
