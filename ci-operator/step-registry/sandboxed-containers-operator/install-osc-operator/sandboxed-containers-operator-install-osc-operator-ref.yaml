@@ -67,6 +67,16 @@ ref:
     creates peer-pods-secret in the operator namespace. For coco, enables confidential
     mode in osc-feature-gates.
 
+    For AWS, peer-pods-secret is intentionally NOT created by this step. The OSC
+    operator has its own built-in credential automation for AWS (STS, then CCO
+    as documented in docs/credentials-handling.md in the operator repo), which
+    only activates when no peer-pods-secret already exists. That automation also
+    handles provisioning the S3 bucket and "vmimport" IAM role required for podvm
+    AMI creation using narrowly-scoped, temporary CCO-minted credentials. Manually
+    pre-creating peer-pods-secret for AWS (as this step does for Azure) would force
+    the operator into "manual credentials" mode, which instead requires that
+    bucket/role to already exist in the AWS account and fails hard if not.
+
     When complete, patches osc-config ConfigMap so tests can detect the pre-installed operator.
 
     The 2h timeout covers KataConfig readiness (typically ~1h for node reboots)

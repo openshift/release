@@ -585,6 +585,34 @@ function create_peer_pods_secret() {
     return 0
   fi
 
+  local provider
+  provider=$(get_cloud_provider)
+
+  # AWS: always defer to the operator's own built-in credential automation
+  # (STS, then CCO) instead of manually creating a static-key secret here.
+  #
+  # confirmed against openshift/sandboxed-containers-operator source
+  # (aws-podvm-image-handler.sh prepare_for_prebuilt_artifact()): the
+  # image-build job only auto-provisions the required S3 bucket + vmimport
+  # IAM role when it detects AWS_ROLE_ARN/AWS_WEB_IDENTITY_TOKEN_FILE (STS)
+  # or a peer-pods-secret created via the CCO flow (labeled
+  # kataconfiguration.openshift.io/credentials-request-based=true). ANY
+  # other pre-existing peer-pods-secret - including one manually created
+  # here - forces "manual credentials" mode, which requires the bucket/role
+  # to already exist in the AWS account and hard-fails if not (see
+  # docs/credentials-handling.md and ami-helper.sh in the operator repo).
+  #
+  # credentials_controller.go's setupPeerPodsCredentials() only attempts
+  # STS/CCO when NO peer-pods-secret exists yet, so simply not creating one
+  # here lets the operator fall through to CCO automatically, which
+  # provisions the bucket/role itself using narrowly-scoped, temporary
+  # CCO-minted credentials (more secure than reusing the cluster's
+  # long-lived admin-level AWS credentials for this).
+  if [[ "${provider}" == "aws" ]]; then
+    echo ">>> AWS: skipping manual peer-pods-secret creation; deferring to the operator's built-in STS/CCO credential automation"
+    return 0
+  fi
+
   # Detect identity mode from osc-config or default to manual
   local identity_mode
   identity_mode=$(oc get configmap osc-config -n default -o jsonpath='{.data.identityMode}' 2>/dev/null || echo "manual")
@@ -608,9 +636,6 @@ function create_peer_pods_secret() {
     echo ">>> WARNING: peerpods-param-secret not found in default namespace"
     return 0
   fi
-
-  local provider
-  provider=$(get_cloud_provider)
 
   case "${provider}" in
     azure)
@@ -644,21 +669,9 @@ function create_peer_pods_secret() {
         echo ">>> WARNING: Could not extract Azure credentials from peerpods-param-secret"
       fi
       ;;
-    aws)
-      # Extract AWS credentials
-      local auth_json
-      auth_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.auth\.json}' 2>/dev/null || echo "")
-      if [[ -n "${auth_json}" ]]; then
-        echo "${auth_json}" | base64 -d > "${SCRATCH}/auth.json"
-        oc_with_retry oc create secret generic peer-pods-secret \
-          -n "${OSC_NAMESPACE}" \
-          --from-file="${SCRATCH}/auth.json"
-        rm -f "${SCRATCH}/auth.json"
-      else
-        echo ">>> WARNING: Could not extract AWS credentials from peerpods-param-secret"
-      fi
-      ;;
     *)
+      # aws is handled earlier in this function (always deferred to the
+      # operator's built-in STS/CCO automation) and never reaches here.
       echo ">>> WARNING: peer-pods-secret creation not implemented for provider: ${provider}"
       ;;
   esac
