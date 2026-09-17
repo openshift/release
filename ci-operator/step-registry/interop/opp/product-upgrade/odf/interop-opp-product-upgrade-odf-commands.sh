@@ -217,7 +217,7 @@ function ResolveSubOperatorCsv () {
         oc get csv -n "${ODF_SUBSCRIPTION_NAMESPACE}" \
             -l "operators.coreos.com/${subOp}.${ODF_SUBSCRIPTION_NAMESPACE}=" \
             -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{.spec.replaces}{"\n"}{end}' \
-            2>/dev/null | LC_ALL=C sort -u || true
+            2>/dev/null || true
     )
 
     typeset -A replacedCsvs=()
@@ -233,14 +233,22 @@ function ResolveSubOperatorCsv () {
         fi
     done
 
+    typeset resolvedCsv=""
     for candidate in "${candidateCsvs[@]}"; do
         if [[ -z "${replacedCsvs["${candidate}"]:-}" ]]; then
-            echo "${candidate}"
-            return 0
+            if [[ -n "${resolvedCsv}" ]]; then
+                return 1
+            fi
+            resolvedCsv="${candidate}"
         fi
     done
 
-    return 1
+    if [[ -z "${resolvedCsv}" ]]; then
+        return 1
+    fi
+
+    echo "${resolvedCsv}"
+    return 0
 }
 
 function ValidateSubOperatorUpgrades () {
