@@ -53,6 +53,35 @@ fi
 
 log "Cleaning up test operator resources"
 
+# ──────────────────────────────────────────────────────────────────────
+# CRITICAL: Orphan CRDs BEFORE deleting the e2e ClusterPackage.
+# ──────────────────────────────────────────────────────────────────────
+# Same cascade prevention as in the install step:
+# CP → owns → COS → own → CRDs (via ownerRefs) → CRD deletion removes CRs.
+# Clear ownerReferences first so CRDs (and their CRs) survive CP deletion.
+if [[ -n "${OPERATOR_CRDS:-}" ]]; then
+    orphan_failed=false
+    IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
+    for crd in "${CRD_LIST[@]}"; do
+        crd=$(echo "${crd}" | xargs)
+        if CRD_LOOKUP=$(oc get crd "${crd}" --ignore-not-found -o name 2>/dev/null); then
+            if [[ -z "${CRD_LOOKUP}" ]]; then
+                log "CRD ${crd} is absent; no ownership to clear"
+                continue
+            fi
+            log "Orphaning CRD ${crd} from e2e ClusterObjectSets before CP deletion"
+            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[]}}' 2>/dev/null || { log "ERROR: Failed to orphan CRD ${crd}"; orphan_failed=true; }
+        else
+            log "ERROR: Failed to look up CRD ${crd}"
+            orphan_failed=true
+        fi
+    done
+    if [[ "${orphan_failed}" == "true" ]]; then
+        log "ERROR: Refusing to delete ClusterPackage — CRD orphan patches failed, cascade protection is incomplete"
+        exit 1
+    fi
+fi
+
 CP_DELETED=false
 if oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" &>/dev/null; then
     log "Deleting ClusterPackage ${CLUSTER_PACKAGE_NAME}"
@@ -77,20 +106,17 @@ else
     fi
 fi
 
-# Clear CRD ownerReferences left by the e2e ClusterPackage so the
-# production ClusterPackage can re-adopt them. Without this, PKO
-# refuses adoption with "not owned by previous revision".
-# Only proceed if the ClusterPackage was confirmed deleted.
+# Re-label CRDs with the production CP instance name so the restored
+# production ClusterPackage can re-adopt them. ownerReferences were
+# already cleared before CP deletion above; this step sets the PKO
+# instance label to the production name.
 if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_CRDS:-}" && -n "${OPERATOR_NAME:-}" ]]; then
     IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
     for crd in "${CRD_LIST[@]}"; do
         crd=$(echo "${crd}" | xargs)
         if oc get crd "${crd}" &>/dev/null; then
-            INSTANCE=$(oc get crd "${crd}" -o jsonpath='{.metadata.labels.package-operator\.run/instance}' 2>/dev/null || true)
-            if [[ "${INSTANCE}" == "${CLUSTER_PACKAGE_NAME}" ]]; then
-                log "Clearing stale e2e ownership on CRD ${crd} (test ClusterPackage deleted)"
-                oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${OPERATOR_NAME}"'"}}}' 2>/dev/null || true
-            fi
+            log "Re-labeling CRD ${crd} for production ClusterPackage ${OPERATOR_NAME}"
+            oc patch crd "${crd}" --type merge -p '{"metadata":{"labels":{"package-operator.run/instance":"'"${OPERATOR_NAME}"'"}}}' 2>/dev/null || true
         fi
     done
 fi
