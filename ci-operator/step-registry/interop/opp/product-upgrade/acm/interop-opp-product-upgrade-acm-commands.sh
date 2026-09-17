@@ -33,6 +33,10 @@ ACM_TARGET_CHANNEL="${ACM_TARGET_CHANNEL:-}"
 ACM_UPGRADE_TIMEOUT="${ACM_UPGRADE_TIMEOUT:-30m}"
 ACM_SUBSCRIPTION_NAME="${ACM_SUBSCRIPTION_NAME:-advanced-cluster-management}"
 ACM_SUBSCRIPTION_NAMESPACE="${ACM_SUBSCRIPTION_NAMESPACE:-open-cluster-management}"
+# Use the fully-qualified OLM resource type to avoid ambiguity with ACM's own
+# subscriptions.apps.open-cluster-management.io CRD that is registered on the
+# hub once ACM is installed. Override via ACM_SUBSCRIPTION_RESOURCE if needed.
+ACM_SUBSCRIPTION_RESOURCE="${ACM_SUBSCRIPTION_RESOURCE:-subscriptions.operators.coreos.com}"
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -42,7 +46,7 @@ function CollectDiagnostics () {
     {
         printf '=== ACM Operator Upgrade Diagnostics ===\n\n'
         printf '=== Subscription ===\n'
-        oc get subscription "${ACM_SUBSCRIPTION_NAME}" -n "${ACM_SUBSCRIPTION_NAMESPACE}" -o yaml 2>&1 || true
+        oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" -n "${ACM_SUBSCRIPTION_NAMESPACE}" -o yaml 2>&1 || true
         printf '\n=== CSVs in %s ===\n' "${ACM_SUBSCRIPTION_NAMESPACE}"
         oc get csv -n "${ACM_SUBSCRIPTION_NAMESPACE}" 2>&1 || true
         printf '\n=== InstallPlan ===\n'
@@ -59,7 +63,7 @@ function CollectDiagnostics () {
 trap '_opp_cleanup; if (( _exit_code != 0 )); then CollectDiagnostics; fi' EXIT
 
 function GetCurrentCsv () {
-    oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.currentCSV}' || true
 }
@@ -83,7 +87,7 @@ function GetInstalledVersion () {
 }
 
 function GetCurrentChannel () {
-    oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.channel}' || true
 }
@@ -102,12 +106,12 @@ function ResolveTargetChannel () {
     fi
 
     typeset catalogNamespace
-    catalogNamespace="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    catalogNamespace="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.sourceNamespace}' || true)"
 
     typeset packageName
-    packageName="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    packageName="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.name}' || true)"
 
@@ -402,7 +406,7 @@ function Main () {
     echo "Target channel: ${targetChannel}"
 
     prePatchPlan=""
-    if ! prePatchPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    if ! prePatchPlan="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null)"; then
         echo "WARNING: Could not query current installPlanRef; treating as empty"
@@ -426,7 +430,7 @@ function Main () {
         installPlan="${prePatchPlan}"
     else
         echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
-        oc patch subscription "${ACM_SUBSCRIPTION_NAME}" \
+        oc patch "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
             -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
             --type merge \
             -p "{\"spec\":{\"channel\":\"${targetChannel}\"}}"
@@ -436,7 +440,7 @@ function Main () {
 
         installPlan=""
         for _ in {1..18}; do
-            installPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+            installPlan="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
                 -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
                 -o jsonpath='{.status.installPlanRef.name}' || true)"
             if [[ -n "${installPlan}" && "${installPlan}" != "${prePatchPlan}" ]]; then
