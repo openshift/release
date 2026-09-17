@@ -199,20 +199,57 @@ function ParseTimeout () {
     true
 }
 
+function ResolveSubOperatorCsv () {
+    typeset subOp="$1"
+    typeset installedCsv
+    installedCsv="$(oc get subscription "${subOp}" \
+        -n "${ODF_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+
+    if [[ -n "${installedCsv}" ]] && \
+       oc get csv "${installedCsv}" -n "${ODF_SUBSCRIPTION_NAMESPACE}" >/dev/null 2>&1; then
+        echo "${installedCsv}"
+        return 0
+    fi
+
+    typeset -a csvRelationships candidateCsvs=()
+    mapfile -t csvRelationships < <(
+        oc get csv -n "${ODF_SUBSCRIPTION_NAMESPACE}" \
+            -l "operators.coreos.com/${subOp}.${ODF_SUBSCRIPTION_NAMESPACE}=" \
+            -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{.spec.replaces}{"\n"}{end}' \
+            2>/dev/null | LC_ALL=C sort -u || true
+    )
+
+    typeset -A replacedCsvs=()
+    typeset relationship candidate replaces
+    for relationship in "${csvRelationships[@]}"; do
+        IFS='|' read -r candidate replaces <<< "${relationship}"
+        if [[ -z "${candidate}" ]]; then
+            continue
+        fi
+        candidateCsvs+=("${candidate}")
+        if [[ -n "${replaces}" ]]; then
+            replacedCsvs["${replaces}"]=1
+        fi
+    done
+
+    for candidate in "${candidateCsvs[@]}"; do
+        if [[ -z "${replacedCsvs["${candidate}"]:-}" ]]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 function ValidateSubOperatorUpgrades () {
     echo "Validating ODF sub-operator upgrades..."
     typeset -a subOperators=("ocs-operator" "mcg-operator" "noobaa-operator")
 
     for subOp in "${subOperators[@]}"; do
         typeset subCsv
-        subCsv="$(oc get csv -n "${ODF_SUBSCRIPTION_NAMESPACE}" \
-            -l "operators.coreos.com/${subOp}.${ODF_SUBSCRIPTION_NAMESPACE}=" \
-            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-
-        if [[ -z "${subCsv}" ]]; then
-            subCsv="$(oc get csv -n "${ODF_SUBSCRIPTION_NAMESPACE}" \
-                --no-headers 2>/dev/null | grep "^${subOp}" | awk '{print $1}' || true)"
-        fi
+        subCsv="$(ResolveSubOperatorCsv "${subOp}" || true)"
 
         if [[ -z "${subCsv}" ]]; then
             echo "  WARNING: ${subOp} CSV not found; skipping"
