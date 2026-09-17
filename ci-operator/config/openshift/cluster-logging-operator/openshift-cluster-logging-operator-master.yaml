@@ -23,8 +23,8 @@ base_images:
     name: 5.y
     namespace: logging
     tag: loki-operator-src
-  logging-e2e-tests-runtime:
-    name: openshift-logging-e2e-tests
+  obs-tests-runner:
+    name: obs-tests-runner
     namespace: logging
     tag: main
   operator-sdk:
@@ -57,18 +57,6 @@ images:
         as:
         - loki-operator-src
     to: cluster-logging-operator-e2e
-  - dockerfile_literal: |
-      FROM logging-e2e-tests-runtime
-      RUN install -d -m 0755 /etc/pki/rpm-gpg \
-          && curl -fsSL https://downloads.claude.ai/keys/claude-code.asc \
-               -o /etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code \
-          && rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code \
-          && echo -e "[claude-code]\nname=Claude Code\nbaseurl=https://downloads.claude.ai/claude-code/rpm/stable/\$basearch\nenabled=1\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code" \
-               > /etc/yum.repos.d/claude-code.repo \
-          && dnf install -y claude-code \
-          && dnf clean all
-    from: logging-e2e-tests-runtime
-    to: obs-tests-runner
 operator:
   bundles:
   - as: cluster-logging-operator-bundle
