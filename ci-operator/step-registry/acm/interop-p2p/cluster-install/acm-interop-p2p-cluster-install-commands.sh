@@ -848,12 +848,10 @@ ApplyPermissiveClusterImagePolicy() {
 
     if oc --kubeconfig="${kubeconfig}" get clusterimagepolicy "${cipName}" \
             --ignore-not-found -o name | grep -q .; then
-        : "Spoke ${clusterName}: ${cipName} ClusterImagePolicy already exists — skipping"
-        return 0
-    fi
-
-    : "Creating permissive ClusterImagePolicy '${cipName}' on spoke ${clusterName}"
-    oc --kubeconfig="${kubeconfig}" apply -f - <<'EOF'
+        : "Spoke ${clusterName}: ${cipName} ClusterImagePolicy already exists"
+    else
+        : "Creating permissive ClusterImagePolicy '${cipName}' on spoke ${clusterName}"
+        oc --kubeconfig="${kubeconfig}" apply -f - <<'EOF'
 apiVersion: config.openshift.io/v1
 kind: ClusterImagePolicy
 metadata:
@@ -868,10 +866,10 @@ spec:
       publicKey:
         keyData: ""
 EOF
+    fi
 
-    # Wait for MCO to pick up the new policy and roll it out to all nodes.
-    # The MCO updates /etc/containers/policy.json on every node when a
-    # ClusterImagePolicy is created or modified.
+    # Always wait — the resource can exist before the MCO finishes
+    # writing policy.json to every node.
     : "Waiting for MachineConfigPools to finish rolling out on spoke ${clusterName}"
     oc --kubeconfig="${kubeconfig}" wait machineconfigpool --all \
         --for=condition=Updated=True \
