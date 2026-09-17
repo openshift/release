@@ -148,7 +148,7 @@ wait_for_nodes() {
 
   while [[ ${retries} -lt ${MAX_RETRIES} ]]; do
     # --- Per-retry reachability check ---
-    READYZ=$(curl -sk "${API_SERVER}/readyz" 2>&1 || true)
+    READYZ=$(curl -sk "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>&1 || true)
     echo "$(date) [retry ${retries}] /readyz: ${READYZ}"
 
     READY_NODES=$(oc get no --kubeconfig "${VIRT_KC}" --no-headers 2>/dev/null \
