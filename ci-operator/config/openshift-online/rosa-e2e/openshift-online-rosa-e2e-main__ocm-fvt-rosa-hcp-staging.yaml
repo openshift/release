@@ -3,6 +3,10 @@ base_images:
     name: nested-podman
     namespace: ci
     tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: builder
@@ -24,6 +28,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: ocm-fvt-periodic-ocp5-resource-cleaner
+  cron: 0 2 * * *
+  steps:
+    test:
+    - ref: rosa-e2e-ocm-resource-cleaner
+  timeout: 30m0s
 - as: ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
   capabilities:
   - nested-podman
