@@ -10,19 +10,9 @@ images:
       RUN GONOSUMDB="*" GOFLAGS="" go install github.com/go-bindata/go-bindata/v3/go-bindata@latest && \
           make build && \
           install -m 0755 bin/openshift-logging-e2e-tests-tests-ext /usr/local/bin/openshift-logging-e2e-tests-tests-ext
-      RUN dnf install -y gnupg2 \
-          && install -d -m 0755 /etc/pki/rpm-gpg \
-          && curl -fsSL https://downloads.claude.ai/keys/claude-code.asc \
-               -o /tmp/RPM-GPG-KEY-claude-code \
-          && FPR=$(gpg --with-colons --import-options show-only --import /tmp/RPM-GPG-KEY-claude-code 2>/dev/null | awk -F: '/^fpr:/ {print $10; exit}') \
-          && test "$FPR" = "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE" \
-               || { echo "Claude Code signing key fingerprint mismatch: got '$FPR', expected 31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE" >&2; exit 1; } \
-          && mv /tmp/RPM-GPG-KEY-claude-code /etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code \
-          && rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code \
-          && echo -e "[claude-code]\nname=Claude Code\nbaseurl=https://downloads.claude.ai/claude-code/rpm/stable/\$basearch\nenabled=1\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code" \
-               > /etc/yum.repos.d/claude-code.repo \
-          && dnf install -y claude-code \
-          && dnf clean all
+      RUN curl -fsSL https://claude.ai/install.sh | bash \
+          && install -m 0755 "$HOME/.local/bin/claude" /usr/local/bin/claude \
+          && claude --version
     from: src
     to: obs-tests-runner
 promotion:
