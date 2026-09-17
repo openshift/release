@@ -185,6 +185,25 @@ export CYPRESS_LOGIN_USERS=kubeadmin:${kubeadmin_password}
 export NO_COLOR=1
 export CYPRESS_CACHE_FOLDER=/tmp/Cypress
 
+# Always run the tests from the main branch, regardless of the branch/PR under test.
+# Define the repository URL and target directory.
+# The obs-tests-runner image already has /tmp/distributed-tracing-console-plugin
+# populated from the branch/PR under test (see tests/Dockerfile), so clone into a
+# different path to avoid "destination path already exists" failures.
+repo_url="https://github.com/openshift/distributed-tracing-console-plugin.git"
+target_dir="/tmp/distributed-tracing-console-plugin-main"
+
+# Clone the repository, explicitly selecting the main branch.
+echo "Cloning the repository."
+git clone --branch main --single-branch "$repo_url" "$target_dir"
+if [ $? -eq 0 ]; then
+  cd "$target_dir/tests" || exit 1
+  echo "Successfully cloned the repository and changed directory to $target_dir/tests."
+else
+  echo "Error cloning the repository."
+  exit 1
+fi
+
 # Install npm modules
 npm install
 
