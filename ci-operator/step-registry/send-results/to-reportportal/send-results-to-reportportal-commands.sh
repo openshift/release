@@ -71,7 +71,7 @@ DECK_NAME="$(jq -r 'if .decoration_config and .decoration_config.gcs_configurati
                     then .decoration_config.gcs_configuration.bucket
                     else error
                     end' <<< ${JOB_SPEC})"
-if [[ "$DECK_NAME" = 'test-platform-results' ]]
+if [[ "$DECK_NAME" = 'test-platform-results-public' ]]
 then
   PROWCI='https://prow.ci.openshift.org'
   PROWWEB='https://gcs.ci.openshift.org'

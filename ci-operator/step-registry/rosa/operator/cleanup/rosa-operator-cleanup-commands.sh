@@ -53,6 +53,35 @@ fi
 
 log "Cleaning up test operator resources"
 
+# ──────────────────────────────────────────────────────────────────────
+# CRITICAL: Orphan CRDs BEFORE deleting the e2e ClusterPackage.
+# ──────────────────────────────────────────────────────────────────────
+# Same cascade prevention as in the install step:
+# CP → owns → COS → own → CRDs (via ownerRefs) → CRD deletion removes CRs.
+# Clear ownerReferences first so CRDs (and their CRs) survive CP deletion.
+if [[ -n "${OPERATOR_CRDS:-}" ]]; then
+    orphan_failed=false
+    IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
+    for crd in "${CRD_LIST[@]}"; do
+        crd=$(echo "${crd}" | xargs)
+        if CRD_LOOKUP=$(oc get crd "${crd}" --ignore-not-found -o name 2>/dev/null); then
+            if [[ -z "${CRD_LOOKUP}" ]]; then
+                log "CRD ${crd} is absent; no ownership to clear"
+                continue
+            fi
+            log "Orphaning CRD ${crd} from e2e ClusterObjectSets before CP deletion"
+            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[]}}' 2>/dev/null || { log "ERROR: Failed to orphan CRD ${crd}"; orphan_failed=true; }
+        else
+            log "ERROR: Failed to look up CRD ${crd}"
+            orphan_failed=true
+        fi
+    done
+    if [[ "${orphan_failed}" == "true" ]]; then
+        log "ERROR: Refusing to delete ClusterPackage — CRD orphan patches failed, cascade protection is incomplete"
+        exit 1
+    fi
+fi
+
 CP_DELETED=false
 if oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" &>/dev/null; then
     log "Deleting ClusterPackage ${CLUSTER_PACKAGE_NAME}"
@@ -66,30 +95,47 @@ if oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" &>/dev/null; then
         sleep 5
     done
 else
-    CP_DELETED=true
+    # oc get failed — distinguish "not found" from API/auth errors.
+    # Only treat confirmed absence as deletion; API errors leave
+    # CP_DELETED=false so we do not restore into an ambiguous state.
+    GET_ERR=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" 2>&1) || true
+    if echo "${GET_ERR}" | grep -qi "not found"; then
+        CP_DELETED="true"
+    else
+        log "WARNING: Could not confirm e2e ClusterPackage status (API error?) — skipping post-deletion cleanup"
+    fi
 fi
 
-# Clear CRD ownerReferences left by the e2e ClusterPackage so the
-# production ClusterPackage can re-adopt them. Without this, PKO
-# refuses adoption with "not owned by previous revision".
-# Only proceed if the ClusterPackage was confirmed deleted.
+# Re-label CRDs with the production CP instance name so the restored
+# production ClusterPackage can re-adopt them. ownerReferences were
+# already cleared before CP deletion above; this step sets the PKO
+# instance label to the production name.
 if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_CRDS:-}" && -n "${OPERATOR_NAME:-}" ]]; then
     IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
     for crd in "${CRD_LIST[@]}"; do
         crd=$(echo "${crd}" | xargs)
         if oc get crd "${crd}" &>/dev/null; then
-            INSTANCE=$(oc get crd "${crd}" -o jsonpath='{.metadata.labels.package-operator\.run/instance}' 2>/dev/null || true)
-            OWNER_COS=$(oc get crd "${crd}" -o jsonpath='{.metadata.ownerReferences[0].name}' 2>/dev/null || true)
-            if [[ "${INSTANCE}" == "${CLUSTER_PACKAGE_NAME}" && -n "${OWNER_COS}" ]]; then
-                # Confirm the owner COS is actually gone (not just an API error)
-                COS_CHECK=$(oc get "clusterobjectset/${OWNER_COS}" --ignore-not-found -o name 2>&1) || true
-                if [[ -z "${COS_CHECK}" ]]; then
-                    log "Clearing stale e2e ownership on CRD ${crd} (owner ${OWNER_COS} gone)"
-                    oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${OPERATOR_NAME}"'"}}}' 2>/dev/null || true
-                fi
-            fi
+            log "Re-labeling CRD ${crd} for production ClusterPackage ${OPERATOR_NAME}"
+            oc patch crd "${crd}" --type merge -p '{"metadata":{"labels":{"package-operator.run/instance":"'"${OPERATOR_NAME}"'"}}}' 2>/dev/null || true
         fi
     done
+fi
+
+# Restore the production ClusterPackage that install backed up.
+# Without this, the cluster returns to the pool missing its production
+# operator until Hive resyncs (~2h), contaminating the lease pool.
+if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" ]]; then
+    PROD_CP_BACKUP="${SHARED_DIR}/production-clusterpackage.yaml"
+    if [[ -f "${PROD_CP_BACKUP}" ]]; then
+        log "Restoring production ClusterPackage ${OPERATOR_NAME} from backup"
+        if oc apply -f "${PROD_CP_BACKUP}"; then
+            log "Production ClusterPackage ${OPERATOR_NAME} restored"
+        else
+            log "WARNING: Failed to restore production ClusterPackage ${OPERATOR_NAME} — cluster may need Hive resync"
+        fi
+    else
+        log "WARNING: No production ClusterPackage backup found in SHARED_DIR — cluster will rely on Hive resync to restore ${OPERATOR_NAME}"
+    fi
 fi
 
 # Wait for the production operator to reconcile after cleanup.
@@ -99,8 +145,8 @@ fi
 # the cluster is not returned to the pool in a degraded state.
 # All waits share a single 300s budget so the total time is bounded.
 if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" && -n "${OPERATOR_NAMESPACE}" ]]; then
-    DEPLOY_NAME="${OPERATOR_NAME}"
-    WAIT_BUDGET=300
+    DEPLOY_NAME="${OPERATOR_DEPLOYMENT_NAME:-${OPERATOR_NAME}}"
+    WAIT_BUDGET=600
     WAIT_START=$(date +%s)
 
     wait_remaining() {
@@ -171,6 +217,35 @@ if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" && -n "${OPERATOR_NAM
                 log "WARNING: Deployment ${deploy} did not appear within budget — cluster may self-heal"
             fi
         done
+    fi
+
+    # Phase 4: if PORT_FORWARD_SVC is set, poll for the service to exist
+    # so the cluster is not returned with a missing service endpoint.
+    if [[ -n "${PORT_FORWARD_SVC:-}" ]]; then
+        PF_NS="${PORT_FORWARD_SVC%%/*}"
+        PF_SVC_PORT="${PORT_FORWARD_SVC#*/}"
+        PF_SVC="${PF_SVC_PORT%%:*}"
+
+        REMAINING=$(wait_remaining)
+        if [[ "${REMAINING}" -gt 0 ]]; then
+            log "Waiting for service ${PF_SVC} to appear in ${PF_NS} (${REMAINING}s remaining)"
+            SVC_FOUND=false
+            while [[ "$(wait_remaining)" -gt 0 ]]; do
+                if oc get svc "${PF_SVC}" -n "${PF_NS}" &>/dev/null; then
+                    SVC_FOUND=true
+                    break
+                fi
+                sleep 5
+            done
+
+            if [[ "${SVC_FOUND}" == "true" ]]; then
+                log "Service ${PF_SVC} is present in ${PF_NS}"
+            else
+                log "WARNING: Service ${PF_SVC} did not appear in ${PF_NS} within budget — cluster may self-heal"
+            fi
+        else
+            log "WARNING: Budget exhausted, skipping wait for service ${PF_SVC} — cluster may self-heal"
+        fi
     fi
 fi
 

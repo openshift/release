@@ -8,7 +8,7 @@ if [ "${RUN_ORION}" == "false" ]; then
 fi
 
 # Fetch deferred JSON results from previous steps' GCS artifacts
-GCS_BUCKET="gs://test-platform-results"
+GCS_BUCKET="gs://test-platform-results-public"
 GCS_BASE=""
 
 case "${JOB_TYPE:-}" in

@@ -769,6 +769,24 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
                 }' || true
             fi
             echo "UPGRADE COMPLETE: ${CM_NAME} -> ${CURRENT_VERSION}" >> "${REPORT}"
+        elif [[ "${OCM_CHECK_STATUS}" == "ready" && -z "${UPGRADE_TARGET}" ]]; then
+            log "REFRESH RECOVERY: ${CM_NAME} is ready in OCM but stuck in maintenance (no upgrade target), restoring to available"
+            CURRENT_VERSION=$(echo "${OCM_CHECK_RESPONSE}" | jq -r '.openshift_version // ""' 2>/dev/null || true)
+            VERSION_LABEL=$(echo "${CURRENT_VERSION}" | cut -d. -f1,2)
+            if ! dry_run_guard "Would restore ${CM_NAME} to available"; then
+                if lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                    "metadata": {
+                        "labels": { "rosa-cluster-lease/status": "available", "rosa-cluster-lease/version": "'"${VERSION_LABEL}"'" }
+                    },
+                    "data": { "version": "'"${CURRENT_VERSION}"'" }
+                }'; then
+                    echo "REFRESH RECOVERY: ${CM_NAME} (restored to available)" >> "${REPORT}"
+                else
+                    log "ERROR: Failed to restore ${CM_NAME} to available after refresh recovery"
+                fi
+            else
+                echo "REFRESH RECOVERY: ${CM_NAME} (would restore to available, dry-run)" >> "${REPORT}"
+            fi
         fi
         HEALTHY=$((HEALTHY + 1))
         continue
@@ -853,6 +871,64 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         continue
     fi
 
+    # PKO health check: detect ClusterPackages stuck on "refusing adoption"
+    # and repair CRD ownership labels so PKO can re-adopt.
+    PKO_KUBECONFIG=$(mktemp)
+    trap 'rm -f "${PKO_KUBECONFIG}"' EXIT
+    PKO_CHECK_FAILED=false
+    if ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null \
+        | jq -r '.kubeconfig // empty' > "${PKO_KUBECONFIG}" 2>/dev/null \
+        && [[ -s "${PKO_KUBECONFIG}" ]]; then
+        STUCK_PKGS=$(oc get clusterpackage -l "hive.openshift.io/managed=true" \
+            -o json --kubeconfig="${PKO_KUBECONFIG}" 2>/dev/null \
+            | jq -r '.items[] | select(.status.conditions[]? | select(.type=="Progressing" and (.message // "" | contains("refusing adoption")))) | .metadata.name + "|" + (.status.conditions[] | select(.type=="Progressing") | .message)' 2>/dev/null) || true
+        if [[ -n "${STUCK_PKGS}" ]]; then
+            while IFS='|' read -r PKG_NAME PKG_MSG; do
+                [[ -z "${PKG_NAME}" ]] && continue
+                # Parse CRD name from message format: "object /<crd-name> kind:CustomResourceDefinition"
+                CRD_NAME=$(echo "${PKG_MSG}" | sed -n 's|.*object /\([^ ]*\) kind:CustomResourceDefinition.*|\1|p')
+                if [[ -z "${CRD_NAME}" ]]; then
+                    log "WARNING: ${CM_NAME} could not parse CRD name from PKO error: ${PKG_MSG}"
+                    continue
+                fi
+                # Check the CRD's instance label
+                CRD_INSTANCE=$(oc get crd "${CRD_NAME}" \
+                    -o jsonpath='{.metadata.labels.package-operator\.run/instance}' \
+                    --kubeconfig="${PKO_KUBECONFIG}" 2>/dev/null || true)
+                if [[ "${CRD_INSTANCE}" != "${PKG_NAME}" ]]; then
+                    log "Repairing CRD ${CRD_NAME} ownership: instance=${CRD_INSTANCE:-<empty>} -> ${PKG_NAME}"
+                    if dry_run_guard "Would repair CRD ${CRD_NAME} ownership for ${PKG_NAME}"; then continue; fi
+                    if ! oc patch crd "${CRD_NAME}" --type merge \
+                        -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${PKG_NAME}"'"}}}' \
+                        --kubeconfig="${PKO_KUBECONFIG}" 2>/dev/null; then
+                        log "UNHEALTHY: ${CM_NAME} PKO CRD repair failed for ${CRD_NAME}"
+                        PKO_CHECK_FAILED=true
+                    else
+                        log "Repaired CRD ${CRD_NAME} for ClusterPackage ${PKG_NAME}"
+                    fi
+                fi
+            done <<< "${STUCK_PKGS}"
+        fi
+    else
+        log "WARNING: ${CM_NAME} could not retrieve cluster kubeconfig for PKO check, skipping"
+    fi
+    rm -f "${PKO_KUBECONFIG}"
+    trap - EXIT
+
+    if [[ "${PKO_CHECK_FAILED}" == "true" ]]; then
+        if [[ "${STATUS}" != "error" ]] && ! dry_run_guard "Would mark ${CM_NAME} as error (PKO)"; then
+            lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                "metadata": {
+                    "labels": { "rosa-cluster-lease/status": "error" },
+                    "annotations": { "rosa-cluster-lease/error-reason": "PKO: CRD ownership repair failed", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
+                }
+            }'
+        fi
+        UNHEALTHY=$((UNHEALTHY + 1))
+        echo "UNHEALTHY: ${CM_NAME} (PKO: CRD ownership repair failed)" >> "${REPORT}"
+        continue
+    fi
+
     # Restore clusters that recovered from error
     if [[ "${STATUS}" == "error" ]]; then
         log "RESTORED: ${CM_NAME} is healthy again"
@@ -932,7 +1008,12 @@ else
                     "metadata": { "labels": { "rosa-cluster-lease/status": "maintenance" } }
                 }'
                 if ! delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}"; then
-                    log "WARNING: delete_cluster failed for ${CM_NAME}, preserving ConfigMap"
+                    log "WARNING: delete_cluster failed for ${CM_NAME}, restoring to available"
+                    if ! lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                        "metadata": { "labels": { "rosa-cluster-lease/status": "available" } }
+                    }'; then
+                        log "ERROR: Failed to restore ${CM_NAME} to available after delete failure"
+                    fi
                     continue
                 fi
                 lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}"

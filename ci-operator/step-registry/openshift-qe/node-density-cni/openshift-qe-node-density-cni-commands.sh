@@ -30,7 +30,10 @@ if [[ "${HYPERSHIFT_MGMT_CLUSTER}" != "true" ]]; then
         echo "Executing cluster-density-v2 in hypershift cluster"
         if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
             echo "Set http proxy for hypershift cluster"
+            # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+            set +x
             . $SHARED_DIR/proxy-conf.sh
+            set -x
         fi
         echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
         export KUBECONFIG=$SHARED_DIR/nested_kubeconfig

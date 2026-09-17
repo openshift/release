@@ -96,7 +96,7 @@ if [ -f "$PAT_FILE" ]; then
     if [ -n "$JOB_URL" ]; then
       COMMENT_BODY="Review agent triggered. [View job](${JOB_URL})"
     else
-      COMMENT_BODY="Review agent triggered (Gangway execution ID: \`${JOB_ID}\`). The Prow job has not started yet — check the [job history](https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/${PERIODIC_JOB_NAME}) for the run once it begins."
+      COMMENT_BODY="Review agent triggered (Gangway execution ID: \`${JOB_ID}\`). The Prow job has not started yet — check the [job history](https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/${PERIODIC_JOB_NAME}) for the run once it begins."
     fi
 
     curl --fail --silent --show-error -X POST \
