@@ -190,6 +190,11 @@ fi
 # the cluster is not returned to the pool in a degraded state.
 # All waits share a single 300s budget so the total time is bounded.
 if [[ "${PRODUCTION_CP_RESTORED}" == "true" && -n "${OPERATOR_NAMESPACE}" ]]; then
+    # Skip the deployment wait if no production ClusterPackage was backed up
+    # during install — there is nothing to wait for.
+    if [[ ! -s "${SHARED_DIR}/had-production-cp" ]]; then
+        log "No production ClusterPackage was present before the test — skipping deployment wait"
+    else
     DEPLOY_NAME="${OPERATOR_DEPLOYMENT_NAME:-${OPERATOR_NAME}}"
     WAIT_BUDGET=600
     WAIT_START=$(date +%s)
@@ -292,6 +297,7 @@ if [[ "${PRODUCTION_CP_RESTORED}" == "true" && -n "${OPERATOR_NAMESPACE}" ]]; th
             log "WARNING: Budget exhausted, skipping wait for service ${PF_SVC} — cluster may self-heal"
         fi
     fi
+    fi # end of had-production-cp else branch
 fi
 
 log "Cleanup complete"

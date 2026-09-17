@@ -266,6 +266,7 @@ if [[ -n "${PRODUCTION_CP_LOOKUP}" ]]; then
         exit 1
     fi
     log "Production ClusterPackage backed up to SHARED_DIR"
+    echo "true" > "${SHARED_DIR}/had-production-cp"
 fi
 
 # Record cleanup intent before pausing or deleting package resources so the post
