@@ -11,6 +11,10 @@ base_images:
     name: loki
     namespace: logging
     tag: v3.6.5
+  logging-e2e-tests-runtime:
+    name: openshift-logging-e2e-tests
+    namespace: logging
+    tag: main
   lokistack-gateway:
     name: lokistack-gateway
     namespace: logging
@@ -43,6 +47,18 @@ images:
     dockerfile_path: passthrough-gateway.Dockerfile
     from: base
     to: passthrough-gateway
+  - dockerfile_literal: |
+      FROM logging-e2e-tests-runtime
+      RUN install -d -m 0755 /etc/pki/rpm-gpg \
+          && curl -fsSL https://downloads.claude.ai/keys/claude-code.asc \
+               -o /etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code \
+          && rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code \
+          && echo -e "[claude-code]\nname=Claude Code\nbaseurl=https://downloads.claude.ai/claude-code/rpm/stable/\$basearch\nenabled=1\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code" \
+               > /etc/yum.repos.d/claude-code.repo \
+          && dnf install -y claude-code \
+          && dnf clean all
+    from: logging-e2e-tests-runtime
+    to: obs-tests-runner
 operator:
   bundles:
   - as: loki-operator-bundle
@@ -171,11 +187,15 @@ tests:
   skip_if_only_changed: ^(?:.*/)?docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
+      AGENT_SKILL: loki
+      JIRA_PROJECT: LOG
       OPERATORS: |
         [
             {"name": "cluster-logging", "source": "redhat-operators", "install_namespace": "openshift-logging", "target_namespaces": "", "operator_group": "openshift-logging"}
         ]
       TEST_SUITE: openshift-logging-e2e-tests/loki-operator
+    post:
+    - ref: openshift-observability-qe-agent
     test:
     - as: install
       cli: latest
