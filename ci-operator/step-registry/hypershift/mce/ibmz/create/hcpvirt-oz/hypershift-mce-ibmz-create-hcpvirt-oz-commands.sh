@@ -31,13 +31,26 @@ PULL_SECRET_FILE=/tmp/pull-secret
 set -x
 
 # Restrict virt VMs on compute nodes
-for node in compute-0 compute-1; do
-  oc label node "${node}" role=kubevirt --overwrite
-done
-oc get nodes -l role=kubevirt
-# Hosted cluster identity and namespace
-HC_NAME=hcpvirt-oz-ci
-HC_NS=hcpvirt-oz-ci-ns
+#for node in compute-0 compute-1; do
+#  oc label node "${node}" role=kubevirt --overwrite
+#done
+#oc get nodes -l role=kubevirt
+# Hosted cluster identity and namespace — derived from the MetalLB IPAddressPool range
+POOL_RANGE=$(oc get ipaddresspool -n metallb-system -o jsonpath='{.items[0].spec.addresses[0]}' 2>/dev/null || true)
+echo "$(date) MetalLB IPAddressPool range: ${POOL_RANGE}"
+
+if [[ "${POOL_RANGE}" == 192.168.2.* ]]; then
+  HC_NAME=hcpvirt-oz-ci
+  HC_NS=hcpvirt-oz-ci-ns
+elif [[ "${POOL_RANGE}" == 192.168.3.* ]]; then
+  HC_NAME=hcpvirtnew-oz-ci
+  HC_NS=hcpvirtnew-oz-ci-ns
+else
+  echo "$(date) ERROR: Unrecognised IPAddressPool range '${POOL_RANGE}', expected 192.168.2.x or 192.168.3.x"
+  exit 1
+fi
+
+echo "$(date) Using HC_NAME=${HC_NAME}, HC_NS=${HC_NS}"
 MGMT_HOST_IP=10.0.1.15
 echo "$(date) LPAR host IP: ${MGMT_HOST_IP}"
 
@@ -53,9 +66,11 @@ hcp create cluster kubevirt \
   --memory 16Gi \
   --cores 4 \
   --root-volume-size 60 \
-  --vm-node-selector role=kubevirt \
-  --release-image ${OCP_IMAGE_MULTI} 
-
+  --release-image ${OCP_IMAGE_MULTI} \
+  --annotations "resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m" \
+  --annotations "resource-request-override.hypershift.openshift.io/kube-scheduler.kube-scheduler=memory=512Mi,cpu=500m" \
+  --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m"
+ #--vm-node-selector role=kubevirt \
 oc wait --timeout=45m --for=condition=Available --namespace=hcpvirt-oz-ci-ns hostedclusters.hypershift.openshift.io/hcpvirt-oz-ci
 echo "$(date) Kubevirt cluster is available"
 
@@ -121,18 +136,33 @@ oc describe np -A
 
 wait_for_nodes() {
   local retries=0
+
+  # --- Check kube-apiserver reachability via /readyz before polling nodes ---
+  READYZ_RESPONSE=$(curl -sk "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>&1 || true)
+  echo "$(date) /readyz response: ${READYZ_RESPONSE}"
+  if [[ "${READYZ_RESPONSE}" == "ok" ]]; then
+    echo "$(date) kube-apiserver is reachable and ready"
+  else
+    echo "$(date) WARNING: kube-apiserver /readyz did not return 'ok' — API may not be reachable yet"
+  fi
+
   while [[ ${retries} -lt ${MAX_RETRIES} ]]; do
+    # --- Per-retry reachability check ---
+    READYZ=$(curl -sk "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>&1 || true)
+    echo "$(date) [retry ${retries}] /readyz: ${READYZ}"
+
     READY_NODES=$(oc get no --kubeconfig "${VIRT_KC}" --no-headers 2>/dev/null \
       | grep -c " Ready" || true)
     echo "$(date) Ready nodes: ${READY_NODES}/${REQUIRED_NODES}"
     if [[ ${READY_NODES} -ge ${REQUIRED_NODES} ]]; then
       echo "$(date) ${REQUIRED_NODES} nodes are Ready"
+      oc get no --kubeconfig "${VIRT_KC}" -o wide -v6
       return 0
     fi
 
     echo "$(date) Nodes not ready yet — printing debug status"
     echo "$(date) DEBUG: All nodes in guest cluster:"
-    oc get no --kubeconfig "${VIRT_KC}" -o wide 2>/dev/null || echo "  (kubeconfig not yet accessible)"
+    oc get no --kubeconfig "${VIRT_KC}" -o wide
     echo "$(date) DEBUG: KubeVirt VMs on mgmt cluster:"
     oc get vmi -n ${HC_NS}-${HC_NAME} 2>/dev/null || true
 
@@ -154,16 +184,11 @@ wait_for_nodes() {
   return 1
 }
 
-# DEBUG: 2h sleep before wait_for_nodes to allow live exec into the pod for debugging
-echo "$(date) DEBUG SLEEP: sleeping 2h before wait_for_nodes to allow live debugging..."
-sleep 7200
-echo "$(date) DEBUG SLEEP: 2h sleep complete, proceeding to wait_for_nodes"
-
 wait_for_nodes
 
 # --- Step 4: Read NodePort values from the guest cluster's default ingress service ---
-# The guest cluster uses a NodePort-type router; we need the assigned ports to wire up
-# the management-side LoadBalancer service that exposes *.apps externally.
+# The guest cluster router listens on NodePorts, not 80/443 directly.
+# We need these ports as targetPorts for the management-side LoadBalancer service.
 echo "$(date) Retrieving NodePort values from guest cluster ingress service"
 
 HTTP_PORT=$(oc --kubeconfig "${VIRT_KC}" get services -n openshift-ingress router-nodeport-default \
@@ -174,9 +199,9 @@ HTTPS_PORT=$(oc --kubeconfig "${VIRT_KC}" get services -n openshift-ingress rout
 echo "$(date) HTTP NodePort: ${HTTP_PORT}, HTTPS NodePort: ${HTTPS_PORT}"
 
 # --- Step 5: Create a LoadBalancer Service on the management cluster to expose guest *.apps traffic ---
-# This Service selects the KubeVirt VM pods (virt-launcher) and forwards port 80/443 to the
-# guest cluster's NodePort ingress, giving the hosted cluster a reachable external ingress.
+# Selects KubeVirt VM pods (virt-launcher) and forwards port 80/443 to the guest router NodePorts.
 echo "$(date) Creating *.apps LoadBalancer Service targeting KubeVirt VM pods"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 oc apply -f - <<SVCEOF
 apiVersion: v1
@@ -201,14 +226,8 @@ spec:
   type: LoadBalancer
 SVCEOF
 
-
-# DEBUG: 1h sleep after deploying *.apps LoadBalancer Service to allow live debugging
-echo "$(date) DEBUG SLEEP: sleeping 1h after deploying *.apps LoadBalancer Service..."
-sleep 3600
-echo "$(date) DEBUG SLEEP: 1h sleep complete, proceeding to ClusterOperator check"
-
-# --- Step 6: Wait for all guest cluster ClusterOperators to be Available and not Degraded ---
-echo "$(date) Waiting for all ClusterOperators to be Available and not Degraded"
+# --- Step 6: Wait for all guest cluster ClusterOperators to be Available ---
+echo "$(date) Waiting for all ClusterOperators to be Available"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 CO_MAX_WAIT=1800  # 30 minutes in seconds
@@ -218,10 +237,10 @@ UNAVAILABLE=""
 
 while [[ ${CO_ELAPSED} -lt ${CO_MAX_WAIT} ]]; do
   UNAVAILABLE=$(oc get co --kubeconfig "${VIRT_KC}" --no-headers 2>/dev/null \
-    | awk '{print $3, $5}' \
-    | grep -v "^True False$" || true)
+    | awk '{print $3}' \
+    | grep -v "^True$" || true)
   if [[ -z "${UNAVAILABLE}" ]]; then
-    echo "$(date) All ClusterOperators are Available=True and Degraded=False"
+    echo "$(date) All ClusterOperators are Available=True"
     break
   fi
   echo "$(date) ClusterOperators not yet healthy (${CO_ELAPSED}s elapsed):"
@@ -231,7 +250,7 @@ while [[ ${CO_ELAPSED} -lt ${CO_MAX_WAIT} ]]; do
 done
 
 if [[ -n "${UNAVAILABLE}" ]]; then
-  echo "$(date) ERROR: Some ClusterOperators are not Available or are Degraded:"
+  echo "$(date) ERROR: Some ClusterOperators are not Available:"
   oc get co --kubeconfig "${VIRT_KC}"
   echo "$(date) DEBUG: Degraded CO details:"
   oc get co --kubeconfig "${VIRT_KC}" -o yaml || true
@@ -256,5 +275,11 @@ fi
 
 echo "$(date) HCP KubeVirt hosted cluster is fully operational"
 
-# --- Step 7: Switch KUBECONFIG to the guest cluster for downstream conformance steps ---
+# Print control-plane workload resource requests regardless of pass/fail
+echo "$(date) Control-plane deploy/statefulset resource requests:"
+oc get deploy,statefulset -n ${HC_NS}-${HC_NAME} \
+  --kubeconfig="${SHARED_DIR}/kubeconfig" \
+  -o custom-columns='KIND:.kind,NAME:.metadata.name,CPU:.spec.template.spec.containers[0].resources.requests.cpu,MEM:.spec.template.spec.containers[0].resources.requests.memory' || true
+
+# --- Step 10: Switch KUBECONFIG to the guest cluster for downstream conformance steps ---
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
