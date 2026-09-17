@@ -1,10 +1,17 @@
 chain:
   as: aws-c2s-ipi-disconnected-deprovision
   steps:
-  - ref: ipi-deprovision-deprovision
+  - ref: aws-c2s-ipi-disconnected-deprovision
   - ref: aws-deprovision-stacks
   - ref: aws-deprovision-s3buckets
   documentation: |-
     Tear down a disconnected IPI cluster on AWS C2S/SC2S: destroy the cluster and delete the
     bastion and S3 infrastructure stacks. Artifact gathering is expected to run earlier in the
     post phase (while the cluster still exists). Reused by both C2S and SC2S.
+
+    The cluster is deprovisioned by the aws-c2s-ipi-disconnected-deprovision ref (OCP >= 4.12
+    in the emulated environment with a freshly minted SHIFT credential; OCP <= 4.11 via the
+    commercial source_region workaround) instead of the generic ipi-deprovision-deprovision.
+    The bastion
+    and S3 stacks remain real commercial resources, so aws-deprovision-stacks and
+    aws-deprovision-s3buckets keep their own us-east-1 handling.
