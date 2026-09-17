@@ -12,7 +12,9 @@ cat /etc/os-release
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   # shellcheck disable=SC1090
+  set +x
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 oc config view
@@ -23,21 +25,27 @@ UUID=$(uuidgen)
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
 ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
+# Keep xtrace off while the ES credentials are in flight, otherwise they land
+# in the Prow logs.
+set +x
 ES_PASSWORD=$(cat "${ES_SECRETS_PATH}/password")
 ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
+set -x
 if [ -e "${ES_SECRETS_PATH}/host" ]; then
     ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
 
 # Clone e2e-benchmarking
-REPO_URL="https://github.com/vishnuchalla/e2e-benchmarking"
+REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking"
 LATEST_TAG=$(git ls-remote --tags "${REPO_URL}.git" | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)"
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/maas-gateway-perf
 
 # Set environment variables
+set +x
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+set -x
 export UUID
 export OPERATOR_TYPE="${OPERATOR_TYPE}"
 export PROVIDERS="${PROVIDERS}"
@@ -45,6 +53,10 @@ export PAYLOAD_SIZES="${PAYLOAD_SIZES}"
 export CONCURRENCY_LEVELS="${CONCURRENCY_LEVELS}"
 export BENCHMARK_DURATION="${BENCHMARK_DURATION}"
 export WARMUP="${WARMUP}"
+export SAMPLES="${SAMPLES}"
+export PARALLELISM="${PARALLELISM}"
+export PAUSE="${PAUSE}"
+export GUIDELLM_IMAGE="${GUIDELLM_IMAGE}"
 export KUBE_BURNER_VERSION="${KUBE_BURNER_VERSION}"
 export MAAS_REF="${MAAS_REF}"
 export DEPLOY_EXTRA_ARGS="${DEPLOY_EXTRA_ARGS}"

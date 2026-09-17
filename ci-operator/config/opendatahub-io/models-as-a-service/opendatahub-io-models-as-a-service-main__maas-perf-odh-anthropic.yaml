@@ -9,22 +9,26 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: maas-perf-odh
-  cron: 0 6 * * 1-5
+- as: maas-perf-odh-anthropic
+  cron: 0 2 * * 1
   steps:
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
+      BENCHMARK_DURATION: "180"
       COMPUTE_NODE_REPLICAS: "3"
-      COMPUTE_NODE_TYPE: m6i.2xlarge
-      CONCURRENCY_LEVELS: "8"
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      CONCURRENCY_LEVELS: 2,4,8,16,32,64,128,256,512,1024
       EXTRA_FLAGS: --metrics-profile=maas-gateway-perf-metrics.yml,metrics.yml --local-indexing=true
-        --profile-type=regular --timeout=10h
+        --profile-type=regular --timeout=7h
       OPERATOR_TYPE: odh
-      PAYLOAD_SIZES: small
-      PROVIDERS: gpt-4o-openai
+      PARALLELISM: "1"
+      PAUSE: 0s
+      PAYLOAD_SIZES: small,medium,large,very-large
+      PROVIDERS: claude-sonnet-anthropic
       RUN_ORION: "true"
       SAMPLES: "1"
+      WARMUP: "60"
       ZONES_COUNT: "3"
     test:
     - ref: openshift-qe-maas-gateway-perf
@@ -35,4 +39,4 @@ zz_generated_metadata:
   branch: main
   org: opendatahub-io
   repo: models-as-a-service
-  variant: maas-perf-odh
+  variant: maas-perf-odh-anthropic
