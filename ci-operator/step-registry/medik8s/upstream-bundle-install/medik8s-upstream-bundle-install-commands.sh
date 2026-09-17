@@ -78,6 +78,7 @@ wait_for_csv() {
             log "Found CSV: $csv"
             break
         fi
+        log "  attempt ${i}/60 — installedCSV not set yet, waiting 10s..."
         sleep 10
     done
 
