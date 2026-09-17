@@ -219,6 +219,19 @@ else
   exit 1
 fi
 
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; \
+  if grep -q '^VERIFY_MAX_RETRIES=' .env; then \
+    sed -i 's|^VERIFY_MAX_RETRIES=.*|VERIFY_MAX_RETRIES=${VERIFY_MAX_RETRIES}|' .env; \
+  else \
+    echo 'VERIFY_MAX_RETRIES=${VERIFY_MAX_RETRIES}' >> .env; \
+  fi; \
+  grep '^VERIFY_MAX_RETRIES=' .env"; then
+  echo "VERIFY_MAX_RETRIES set to ${VERIFY_MAX_RETRIES} in .env file"
+else
+  echo "ERROR: Failed to update VERIFY_MAX_RETRIES in .env file"
+  exit 1
+fi
+
 # Override dpf-hcp-provisioner-operator image if a CI-built override was provided
 if [[ -f "${SHARED_DIR}/dpf-hcp-provisioner-operator-override" ]]; then
   OVERRIDE_IMAGE=$(cat "${SHARED_DIR}/dpf-hcp-provisioner-operator-override")
