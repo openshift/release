@@ -97,13 +97,7 @@ function CollectExitArtifacts () {
     true
 }
 
-# shellcheck disable=SC2317
-_propagate_junit () {
-    mkdir -p "${SHARED_DIR}/junit"
-    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
-}
-
-trap '{( CollectExitArtifacts; _propagate_junit; true )}' EXIT
+trap '{( CollectExitArtifacts; true )}' EXIT
 
 # ---------------------------------------------------------------------------
 # Check 1: ODF Ceph RGW infrastructure ready
@@ -350,7 +344,7 @@ function CheckThanosHealth () {
     typeset -a missingComponents=()
 
     typeset -a componentNames=("thanos-receive"     "thanos-compact"     "thanos-store"       "thanos-query"       "alertmanager"       "rbac-query-proxy")
-    typeset -a componentLabels=("app=thanos-receive" "app=thanos-compact" "app=thanos-store"   "app=thanos-query"   "alertmanager=observability" "app=rbac-query-proxy")
+    typeset -a componentLabels=("app.kubernetes.io/name=thanos-receive" "app.kubernetes.io/name=thanos-compact" "app.kubernetes.io/name=thanos-store"   "app.kubernetes.io/name=thanos-query"   "alertmanager=observability" "app.kubernetes.io/name=rbac-query-proxy")
 
     typeset -i idx=0
     for idx in "${!componentNames[@]}"; do
@@ -363,6 +357,8 @@ function CheckThanosHealth () {
             (( ++discoveryErrors ))
             podList=""
         fi
+        # Filter out "No resources found" messages that confuse downstream parsing
+        podList="$(printf '%s' "${podList}" | grep -v 'No resources found' || true)"
 
         if [[ -z "${podList}" ]]; then
             typeset allPods=""
@@ -371,7 +367,8 @@ function CheckThanosHealth () {
                 (( ++discoveryErrors ))
                 allPods=""
             fi
-            podList="$(printf '%s' "${allPods}" | awk -v pat="^${component}" '$0 ~ pat')"
+            allPods="$(printf '%s' "${allPods}" | grep -v 'No resources found' || true)"
+            podList="$(printf '%s' "${allPods}" | awk -v pat="${component}" '$0 ~ pat')"
         fi
 
         typeset podCount=""

@@ -16,8 +16,6 @@ report_command="firewatch report"
 
 if [ "${FIREWATCH_PRIVATE_DECK,,}" = "true" ]; then
     report_command+=" --gcs-bucket qe-private-deck --gcs-creds-file /tmp/secrets/private-deck/creds.json"
-else
-    report_command+=" --gcs-bucket test-platform-results-public"
 fi
 
 if [ "${FIREWATCH_FAIL_WITH_TEST_FAILURES,,}" = "true" ]; then
