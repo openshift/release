@@ -25,135 +25,14 @@ for f in api-endpoint oidc-endpoint customer-project-id; do
   fi
 done
 
-# Authenticate with WIF credential
-# - gcloud auth login: for gcloud CLI commands (access tokens)
-# - GOOGLE_APPLICATION_CREDENTIALS: for GCP Go SDK clients used by
-#   gcphcpctl --setup-infra (IAM, networking)
-# - A temporary e2e-hc-submitter key: WIF credentials can't generate identity
-#   tokens directly, so gcloud uses the submitter account for Platform API auth.
-if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
-  echo "Authenticating with WIF credential..."
-  gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet
-  export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
-
-  E2E_HC_SUBMITTER_SA="e2e-hc-submitter@gcp-hcp-platform-ci.iam.gserviceaccount.com"
-  E2E_HC_SUBMITTER_KEY_DIR="$(mktemp -d)"
-  E2E_HC_SUBMITTER_KEY_FILE="${E2E_HC_SUBMITTER_KEY_DIR}/key.json"
-  E2E_HC_SUBMITTER_KEY_ID_FILE="${SHARED_DIR}/e2e-hc-submitter-key-id"
-  E2E_HC_SUBMITTER_KEY_ID=""
-
-  extract_e2e_hc_submitter_key_id() {
-    sed -n 's/^[[:space:]]*"private_key_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*$/\1/p' "$1"
-  }
-
-  cleanup_e2e_hc_submitter_key() {
-    local key_id="${E2E_HC_SUBMITTER_KEY_ID}"
-    if [[ -z "${key_id}" && -s "${E2E_HC_SUBMITTER_KEY_FILE}" ]]; then
-      key_id="$(extract_e2e_hc_submitter_key_id "${E2E_HC_SUBMITTER_KEY_FILE}")"
-    fi
-
-    if [[ -n "${key_id}" ]]; then
-      echo "Deleting temporary e2e HC submitter key..."
-      local max_delete_attempts=5
-      local delete_attempt=1
-      local key_deleted=false
-
-      while (( delete_attempt <= max_delete_attempts )); do
-        if gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet && \
-          gcloud iam service-accounts keys delete "${key_id}" \
-            --iam-account="${E2E_HC_SUBMITTER_SA}" \
-            --quiet; then
-          key_deleted=true
-          break
-        fi
-
-        if (( delete_attempt < max_delete_attempts )); then
-          local wait_seconds=$((5 << (delete_attempt - 1)))
-          echo "Key deletion failed; retrying in ${wait_seconds}s (attempt ${delete_attempt}/${max_delete_attempts})..."
-          sleep "${wait_seconds}"
-        fi
-        ((delete_attempt++))
-      done
-
-      if [[ "${key_deleted}" != true ]]; then
-        echo "WARNING: Failed to restore WIF authentication or delete temporary key ${key_id} after ${max_delete_attempts} attempts"
-      else
-        rm -f "${E2E_HC_SUBMITTER_KEY_ID_FILE}"
-      fi
-    fi
-
-    rm -f "${E2E_HC_SUBMITTER_KEY_FILE}"
-    rmdir "${E2E_HC_SUBMITTER_KEY_DIR}" 2>/dev/null || true
-  }
-  trap cleanup_e2e_hc_submitter_key EXIT
-
-  echo "Creating temporary key for ${E2E_HC_SUBMITTER_SA}..."
-  (
-    umask 077
-    gcloud iam service-accounts keys create "${E2E_HC_SUBMITTER_KEY_FILE}" \
-      --iam-account="${E2E_HC_SUBMITTER_SA}" \
-      --quiet
-  )
-  chmod 600 "${E2E_HC_SUBMITTER_KEY_FILE}"
-  E2E_HC_SUBMITTER_KEY_ID="$(extract_e2e_hc_submitter_key_id "${E2E_HC_SUBMITTER_KEY_FILE}")"
-  if [[ -z "${E2E_HC_SUBMITTER_KEY_ID}" ]]; then
-    echo "ERROR: Could not determine the temporary key ID"
-    exit 1
-  fi
-  # Leave the key ID in SHARED_DIR so the cleanup step can remove the key if
-  # this step is interrupted before its EXIT trap runs successfully.
-  (umask 077 && printf '%s\n' "${E2E_HC_SUBMITTER_KEY_ID}" > "${E2E_HC_SUBMITTER_KEY_ID_FILE}")
-
-  echo "Activating ${E2E_HC_SUBMITTER_SA} for identity token authentication..."
-  MAX_KEY_ACTIVATION_ATTEMPTS=6
-  key_activated=false
-  for ((attempt = 1; attempt <= MAX_KEY_ACTIVATION_ATTEMPTS; attempt++)); do
-    if gcloud auth activate-service-account "${E2E_HC_SUBMITTER_SA}" \
-      --key-file="${E2E_HC_SUBMITTER_KEY_FILE}" \
-      --quiet; then
-      key_activated=true
-      break
-    fi
-
-    if (( attempt < MAX_KEY_ACTIVATION_ATTEMPTS )); then
-      wait_seconds=$((5 << (attempt - 1)))
-      echo "Key activation failed; retrying in ${wait_seconds}s (attempt ${attempt}/${MAX_KEY_ACTIVATION_ATTEMPTS})..."
-      sleep "${wait_seconds}"
-    fi
-  done
-
-  if [[ "${key_activated}" != true ]]; then
-    echo "ERROR: Failed to activate ${E2E_HC_SUBMITTER_SA} after ${MAX_KEY_ACTIVATION_ATTEMPTS} attempts"
-    exit 1
-  fi
-
-  # A newly-created service-account key can take a short time to propagate to
-  # the IAM Credentials identity-token endpoint even after activation succeeds.
-  # Retry with exponential backoff so transient propagation failures do not
-  # fail the entire lifecycle step.
-  MAX_ID_TOKEN_ATTEMPTS=6
-  id_token_verified=false
-  for ((attempt = 1; attempt <= MAX_ID_TOKEN_ATTEMPTS; attempt++)); do
-    if gcloud auth print-identity-token >/dev/null; then
-      id_token_verified=true
-      break
-    fi
-
-    if (( attempt < MAX_ID_TOKEN_ATTEMPTS )); then
-      wait_seconds=$((5 << (attempt - 1)))
-      echo "Identity token generation failed; retrying in ${wait_seconds}s (attempt ${attempt}/${MAX_ID_TOKEN_ATTEMPTS})..."
-      sleep "${wait_seconds}"
-    fi
-  done
-
-  if [[ "${id_token_verified}" != true ]]; then
-    echo "ERROR: Failed to generate an identity token for ${E2E_HC_SUBMITTER_SA}"
-    exit 1
-  fi
-  echo "Identity token authentication verified successfully"
-else
-  echo "WARNING: WIF credential not found, relying on existing gcloud auth"
+# Configure Application Default Credentials for gcphcpctl. The CLI uses the
+# WIF credential for both Platform API identity tokens and GCP SDK operations.
+if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
+  echo "ERROR: WIF credential not found"
+  exit 1
 fi
+echo "Configuring gcphcpctl with the WIF credential..."
+export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 
 # The Ginkgo binary reads these values from SHARED_DIR, but the standalone
 # gcphcpctl readiness probe uses the CLI's environment-based configuration.

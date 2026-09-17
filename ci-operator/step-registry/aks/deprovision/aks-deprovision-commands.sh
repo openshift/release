@@ -275,6 +275,96 @@ aks_cluster_absent() {
   return 0
 }
 
+vmss_rolling_upgrade_inactive() {
+  local vmss_id="${1}"
+  local status
+  local rc
+
+  if status="$(run_az_with_retry "VMSS rolling upgrade lookup" az vmss rolling-upgrade get-latest --ids "${vmss_id}" --query runningStatus.code -o tsv)"; then
+    :
+  else
+    rc=$?
+    return "${rc}"
+  fi
+  case "${status}" in
+    Cancelled|Completed|Faulted)
+      AZURE_CLI_DESIRED_STATE=true
+      ;;
+    RollingForward)
+      ;;
+    *)
+      echo "Unexpected VMSS rolling upgrade status '${status}'; cancellation state is uncertain." >&2
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+cancel_active_vmss_rolling_upgrades() {
+  local cluster="${1}"
+  local resource_group="${2}"
+  local node_resource_group
+  local vmss_ids_text
+  local vmss_id
+  local vmss_name
+  local rolling_upgrade_status
+  local cancelled=false
+  local vmss_ids=()
+
+  if node_resource_group="$(run_az_with_retry "AKS node resource group lookup" az aks show --name "${cluster}" --resource-group "${resource_group}" --query nodeResourceGroup -o tsv)"; then
+    :
+  else
+    echo "Unable to discover the AKS node resource group; continuing with cluster deletion." >&2
+    return 1
+  fi
+  if [[ -z "${node_resource_group}" ]]; then
+    echo "AKS node resource group is unavailable; continuing with cluster deletion." >&2
+    return 1
+  fi
+
+  if vmss_ids_text="$(run_az_with_retry "AKS VMSS lookup" az vmss list --resource-group "${node_resource_group}" --query '[].id' -o tsv)"; then
+    :
+  else
+    echo "Unable to list AKS VM scale sets; continuing with cluster deletion." >&2
+    return 1
+  fi
+  [[ -z "${vmss_ids_text}" ]] && return 1
+  mapfile -t vmss_ids <<<"${vmss_ids_text}"
+
+  for vmss_id in "${vmss_ids[@]}"; do
+    vmss_name="${vmss_id##*/}"
+    if rolling_upgrade_status="$(run_az_with_retry "VMSS rolling upgrade lookup" az vmss rolling-upgrade get-latest --ids "${vmss_id}" --query runningStatus.code -o tsv)"; then
+      :
+    else
+      echo "Unable to inspect rolling upgrade status for ${vmss_name}; continuing." >&2
+      continue
+    fi
+    [[ "${rolling_upgrade_status}" == "RollingForward" ]] || continue
+
+    echo "Cancelling active rolling upgrade for AKS VM scale set ${vmss_name}."
+    if run_az_mutation_with_reconcile \
+      "VMSS rolling upgrade cancellation" \
+      vmss_rolling_upgrade_inactive "${vmss_id}" -- \
+      az vmss rolling-upgrade cancel --ids "${vmss_id}" --output none; then
+      cancelled=true
+    else
+      echo "Unable to cancel rolling upgrade for ${vmss_name}; attempting cluster deletion." >&2
+    fi
+  done
+
+  [[ "${cancelled}" == true ]]
+}
+
+delete_aks_cluster() {
+  local cluster="${1}"
+  local resource_group="${2}"
+
+  run_az_mutation_with_reconcile \
+    "AKS cluster deletion" \
+    aks_cluster_absent "${cluster}" "${resource_group}" -- \
+    az aks delete --name "${cluster}" --resource-group "${resource_group}" --yes
+}
+
 verify_shared_value() {
   local path="${1}"
   local expected="${2}"
@@ -345,12 +435,24 @@ if [[ -n "${AKS_KV_SECRETS_PROVIDER_OBJECT_ID}" ]]; then
   fi
 fi
 
+# Platform-initiated VM Agent rolling upgrades prevent Azure from deleting the
+# underlying scale sets. Cancelling them is safe because this disposable
+# management cluster is already being destroyed.
+cancel_active_vmss_rolling_upgrades "${CLUSTER}" "${RESOURCEGROUP}" || true
+
 # If an AKS delete response is lost, reconcile absence. A cluster already in
 # Deleting state is waited on instead of issuing a competing delete request.
 echo "Deleting AKS management cluster ${CLUSTER} from resource group ${RESOURCEGROUP}"
-run_az_mutation_with_reconcile \
-  "AKS cluster deletion" \
-  aks_cluster_absent "$CLUSTER" "$RESOURCEGROUP" -- \
-  az aks delete --name "$CLUSTER" --resource-group "$RESOURCEGROUP" --yes
+if delete_aks_cluster "${CLUSTER}" "${RESOURCEGROUP}"; then
+  :
+else
+  DELETION_RC=$?
+  if cancel_active_vmss_rolling_upgrades "${CLUSTER}" "${RESOURCEGROUP}"; then
+    echo "Retrying AKS management cluster deletion after cancelling a rolling upgrade."
+    delete_aks_cluster "${CLUSTER}" "${RESOURCEGROUP}"
+  else
+    exit "${DELETION_RC}"
+  fi
+fi
 echo "Verifying AKS management cluster ${CLUSTER} is deleted from resource group ${RESOURCEGROUP}"
 run_az_with_retry "AKS deletion verification" az aks wait --deleted --name "$CLUSTER" --resource-group "$RESOURCEGROUP" --interval 30 --timeout 1200
