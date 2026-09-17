@@ -11,6 +11,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+  upi-installer:
+    name: "4.23"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -18,28 +22,68 @@ images:
   - dockerfile_path: Dockerfile
     to: bgp-cloud-connector
   - dockerfile_literal: |
+      FROM upi-installer AS tools
       FROM src
-      # The build root carries no az and there is no standalone binary to
-      # fetch, so it is installed from Microsoft's own repository, as
-      # kata-containers and stolostron/capi-tests both do.
+      # Every e2e job talks to a cloud, and the suite is go test, so the
+      # image has to be src with the cloud tools added rather than a tools
+      # image with the source added: upi-installer carries no go, no make
+      # and no repository.
       #
+      # oc is deliberately absent. Every step gets one from cli: latest,
+      # built from the release under test, and entrypoint-wrapper appends
+      # that directory to PATH rather than prepending it -- so an oc in
+      # the image would shadow it and each step would quietly run a
+      # different oc from the cluster it is talking to.
+      #
+      # aws comes out of upi-installer, which is where the rest of CI gets
+      # its cloud tooling. az and gcloud do not: upi-installer's az is a
+      # venv with a baked interpreter path, and its gcloud is pinned to
+      # 563 where the repository gives 585, so both are installed from the
+      # vendors' own repositories instead.
+
+      # aws v2 bundles its own python, so the tree is self-contained and a
+      # symlink is all that is needed to put it on PATH. upi-installer
+      # installs it with --bin-dir /bin and leaves the tree at the
+      # installer's default --install-dir, which is why only the tree is
+      # worth copying and the symlink is made again here.
+      COPY --from=tools /usr/local/aws-cli /usr/local/aws-cli
+      RUN ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/bin/aws
+
       # The two awkward bits are measured rather than copied. The build
       # root wraps dnf with ART's wrapper, which ignores
-      # /etc/yum.repos.d, so the repository has to be put where the
-      # wrapper looks as well. And packages-microsoft-prod.rpm is what
-      # configures the RHEL 9 repository: pointing at the older
-      # yumrepos/azure-cli path instead yields azure-cli 2.38 from 2022,
-      # where this yields 2.90.
+      # /etc/yum.repos.d, so a repository has to be put where the wrapper
+      # looks as well. And packages-microsoft-prod.rpm is what configures
+      # the RHEL 9 repository: pointing at the older yumrepos/azure-cli
+      # path instead yields azure-cli 2.38 from 2022, where this yields
+      # 2.90.
+      #
+      # The gcloud repository is el9-x86_64, as it is in upi-installer and
+      # in openshift-tests-private. These jobs are amd64.
       ENV ART_DNF_WRAPPER_POLICY=append
       RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
+          rpm --import https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg && \
           dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm && \
+          printf '%s\n' \
+            '[google-cloud-cli]' \
+            'name=Google Cloud CLI' \
+            'baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64' \
+            'enabled=1' \
+            'gpgcheck=1' \
+            'repo_gpgcheck=0' \
+            'gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg' \
+            > /etc/yum.repos.d/google-cloud-cli.repo && \
           if [ -d /etc/yum.repos.art/ci ]; then \
-            cp /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/ || true; \
+            cp /etc/yum.repos.d/microsoft-prod.repo \
+               /etc/yum.repos.d/google-cloud-cli.repo /etc/yum.repos.art/ci/ || true; \
           fi && \
-          dnf install -y azure-cli && \
+          dnf install -y azure-cli google-cloud-cli jq && \
           dnf clean all
     from: src
-    to: azure-e2e-runner
+    inputs:
+      upi-installer:
+        as:
+        - upi-installer
+    to: e2e-runner
 operator:
   bundles:
   - as: bgp-cloud-connector-bundle
@@ -83,23 +127,67 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: azure-cli-image
+- as: e2e-runner-image
   commands: |
-    # Proves the image the e2e job runs in actually carries a usable az,
-    # in seconds and without a cluster. The alternative is finding out
-    # forty minutes into e2e-azure-operator, after an install has been
-    # paid for.
+    # Proves the image the e2e jobs run in actually carries the tools
+    # they call, in seconds and without a cluster. The alternative is
+    # finding out forty minutes in, after an install has been paid for.
     set -euo pipefail
 
-    # az keeps its config under $HOME/.azure, and a prow test container
-    # runs as a random uid whose home it does not own: without this it
-    # fails with "PermissionError: [Errno 13] Permission denied:
-    # '/.azure'" before doing anything at all. hack/azure/ci.sh points it
-    # at the run's scratch directory for the same reason.
+    # az keeps its config under $HOME/.azure and gcloud keeps its under
+    # $HOME/.config/gcloud, and a prow test container runs as a random uid
+    # whose home it does not own: without these both fail with a
+    # permission error before doing anything at all. hack/azure/ci.sh and
+    # hack/gcp/ci.sh point them at the run's scratch directory for the
+    # same reason.
     AZURE_CONFIG_DIR="$(mktemp -d)"
-    export AZURE_CONFIG_DIR
+    CLOUDSDK_CONFIG="$(mktemp -d)"
+    export AZURE_CONFIG_DIR CLOUDSDK_CONFIG
 
+    # The roll call first, so a rehearsal log names every tool and the
+    # path it resolved to before anything tries to run one. command -v
+    # rather than which: which is a package, and depending on a tool
+    # being installed to find out whether tools are installed is the
+    # wrong way round. The whole list is walked before exiting, so one
+    # missing tool does not hide the next.
+    #
+    # No oc. The image deliberately carries none, because cli: latest
+    # gives each step one from the release under test and an oc here
+    # would shadow it; a container test gets no injected oc either, so
+    # there is nothing here to check.
+    missing=()
+    for tool in aws gcloud az jq; do
+      if path="$(command -v "${tool}")"; then
+        printf 'ok: %-6s %s\n' "${tool}" "${path}"
+      else
+        printf 'MISSING: %s\n' "${tool}" >&2
+        missing+=("${tool}")
+      fi
+    done
+    if (( ${#missing[@]} )); then
+      echo "the e2e-runner image is missing: ${missing[*]}" >&2
+      exit 1
+    fi
+
+    # Present is not the same as working: gcloud is an RPM that wants a
+    # python beside it and az is a venv, and either can resolve on PATH
+    # and then fail on its first invocation.
+    aws --version
+    gcloud version
     az version
+    jq --version
+
+    # hack/aws/ensure-cli.sh downloads an aws CLI when the one on PATH is
+    # older than this, and that download is what carrying aws in the image
+    # exists to prevent. aws comes from upi-installer, which is rebuilt on
+    # its own schedule, so the floor is asserted rather than assumed.
+    min_aws=2.34.7
+    have_aws="$(aws --version 2>&1 | sed -n 's|^aws-cli/\([0-9.]*\).*|\1|p')"
+    if [[ "$(printf '%s\n%s\n' "${min_aws}" "${have_aws}" | sort -V | head -1)" != "${min_aws}" ]]; then
+      echo "MISSING: aws ${min_aws} or newer; the image carries ${have_aws:-nothing parseable}" >&2
+      exit 1
+    fi
+    echo "ok: aws ${have_aws}"
 
     # The flags the scripts actually pass, rather than just the command
     # groups. A release of az that renames one is the failure worth
@@ -133,7 +221,7 @@ tests:
     check --peer-ip            network routeserver peering create
     check --peer-asn           network routeserver peering create
   container:
-    from: azure-e2e-runner
+    from: e2e-runner
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: fips-image-scan
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -151,7 +239,7 @@ tests:
     - as: test
       cli: latest
       commands: hack/ci-e2e-aws.sh
-      from: src
+      from: e2e-runner
       grace_period: 30m0s
       resources:
         requests:
@@ -208,7 +296,7 @@ tests:
         done
 
         oc -n openshift-frr-k8s get daemonset frr-k8s
-      from: src
+      from: e2e-runner
       resources:
         requests:
           cpu: 100m
@@ -240,7 +328,7 @@ tests:
     - as: test
       cli: latest
       commands: hack/ci-e2e-aws.sh
-      from: src
+      from: e2e-runner
       grace_period: 30m0s
       resources:
         requests:
@@ -256,7 +344,7 @@ tests:
     - as: enable-frr
       cli: latest
       commands: hack/enable-frr.sh
-      from: src
+      from: e2e-runner
       resources:
         requests:
           cpu: 100m
@@ -288,7 +376,7 @@ tests:
     - as: test
       cli: latest
       commands: hack/ci-e2e-azure.sh
-      from: azure-e2e-runner
+      from: e2e-runner
       grace_period: 1h0m0s
       resources:
         requests:
@@ -306,7 +394,7 @@ tests:
     - as: enable-frr
       cli: latest
       commands: hack/enable-frr.sh
-      from: src
+      from: e2e-runner
       resources:
         requests:
           cpu: 100m
@@ -338,7 +426,7 @@ tests:
     - as: test
       cli: latest
       commands: hack/ci-e2e-gcp.sh
-      from: src
+      from: e2e-runner
       grace_period: 30m0s
       resources:
         requests:
@@ -362,7 +450,7 @@ tests:
     - as: enable-frr
       cli: latest
       commands: hack/enable-frr.sh
-      from: src
+      from: e2e-runner
       resources:
         requests:
           cpu: 100m
@@ -409,8 +497,6 @@ tests:
         # After the install, not before, because the ServiceAccount the
         # trust policy names does not exist until the CSV is applied.
         export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-        PATH="$(hack/aws/ensure-cli.sh)":"${PATH}"
-        export PATH
 
         region="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.aws.region}')"
         export AWS_REGION="${region}" AWS_DEFAULT_REGION="${region}"
@@ -583,7 +669,7 @@ tests:
         # The suite applies its own, from a profile naming a route server
         # that exists.
         oc delete bgpcloudconfiguration cluster --wait=false
-      from: src
+      from: e2e-runner
       resources:
         requests:
           cpu: 100m
@@ -591,7 +677,7 @@ tests:
     - as: test
       cli: latest
       commands: hack/ci-e2e-aws.sh
-      from: src
+      from: e2e-runner
       grace_period: 30m0s
       resources:
         requests:
