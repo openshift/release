@@ -30,7 +30,6 @@ DASHBOARD_URL="${GCS_BASE}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/ocp-ci-monitor
 #   INFORMING|<job_name>|<prow_url>|<topology>|<version>|<payload>
 # ---------------------------------------------------------------------------
 JOBS_FILE="${SHARED_DIR}/failing-jobs.txt"
-DATA_LINE_REGEX='^(BLOCKING|INFORMING)\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[a-zA-Z0-9._-]+$'
 
 BLOCKING_COUNT=0
 INFORMING_COUNT=0
@@ -43,9 +42,11 @@ if [[ ! -f "${SHARED_DIR}/monitor-completed" ]]; then
     UNAVAILABLE_REASON="monitor did not complete"
 elif [[ ! -f "${SHARED_DIR}/monitor-report-ready" ]]; then
     UNAVAILABLE_REASON="dashboard report is unavailable or incomplete"
+elif [[ ! -f "${SHARED_DIR}/monitor-data-ready" ]]; then
+    UNAVAILABLE_REASON="extracted job data is unavailable or incomplete"
 elif [[ ! -f "${JOBS_FILE}" ]]; then
     UNAVAILABLE_REASON="extracted job data is unavailable"
-elif [[ -s "${JOBS_FILE}" ]] && grep -qvE "${DATA_LINE_REGEX}" "${JOBS_FILE}"; then
+elif [[ -s "${JOBS_FILE}" ]] && grep -qvE '^(BLOCKING|INFORMING)[|][^|]+[|]https://[^|]+[|][^|]+[|][0-9]+[.][0-9]+[|][a-zA-Z0-9._-]+$' "${JOBS_FILE}"; then
     UNAVAILABLE_REASON="extracted job data is invalid"
 else
     NOTIFICATION_READY=true

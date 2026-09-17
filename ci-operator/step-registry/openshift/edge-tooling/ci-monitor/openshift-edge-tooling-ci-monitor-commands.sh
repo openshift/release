@@ -11,6 +11,15 @@ echo "Started at $(date -u '+%Y-%m-%d %H:%M UTC')"
 # started but could not produce a usable report.
 touch "${SHARED_DIR}/monitor-started"
 
+# Do not let data from an earlier attempt be evaluated as this monitor's
+# result. The post step only accepts data published after validation below.
+rm -f "${SHARED_DIR}/monitor-completed" \
+    "${SHARED_DIR}/monitor-report-ready" \
+    "${SHARED_DIR}/monitor-data-ready" \
+    "${SHARED_DIR}/failing-jobs.txt" \
+    "${SHARED_DIR}"/.failing-jobs.* \
+    "${SHARED_DIR}"/.monitor-data-ready.*
+
 # ---------------------------------------------------------------------------
 # Load secrets (xtrace disabled to prevent leaking credentials in logs)
 # ---------------------------------------------------------------------------
@@ -116,9 +125,95 @@ cd "${WORKDIR}"
 REPORT_START_MARKER="${WORKDIR}/report-started"
 touch "${REPORT_START_MARKER}"
 
+DATA_LINE_REGEX='^(BLOCKING|INFORMING)[|][^|]+[|]https://[^|]+[|][^|]+[|][0-9]+[.][0-9]+[|][a-zA-Z0-9._-]+$'
+
+clear_monitor_data() {
+    rm -f "${SHARED_DIR}/monitor-data-ready" \
+        "${SHARED_DIR}/failing-jobs.txt" \
+        "${SHARED_DIR}"/.failing-jobs.* \
+        "${SHARED_DIR}"/.monitor-data-ready.*
+}
+
+# Extract one complete, explicitly delimited section. Empty sections are valid;
+# malformed data, repeated/out-of-order delimiters, and truncated sections are
+# not. Stream-json records can have surrounding text, so emit only the matched
+# pipe-delimited record.
+extract_job_section() {
+    local section="$1"
+    local log_file="$2"
+
+    awk -v section="${section}" '
+        BEGIN {
+            start = section "_JOBS_START"
+            end = section "_JOBS_END"
+            record = section "[|][^|]+[|]https://[^|]+[|][^|]+[|][0-9]+[.][0-9]+[|][a-zA-Z0-9._-]+"
+        }
+        index($0, start) {
+            if (started || in_section || ended) exit 1
+            started = 1
+            in_section = 1
+            next
+        }
+        index($0, end) {
+            if (!in_section || ended) exit 1
+            in_section = 0
+            ended = 1
+            next
+        }
+        in_section && index($0, section "|") {
+            if (!match($0, record)) exit 1
+            entry = substr($0, RSTART, RLENGTH)
+            remainder = substr($0, RSTART + RLENGTH)
+            if (entry !~ ("^" record "$") || remainder ~ /^[|]/) exit 1
+            print entry
+        }
+        END {
+            if (!started || !ended || in_section) exit 1
+        }
+    ' "${log_file}"
+}
+
+publish_extracted_jobs() {
+    local log_file="$1"
+    local jobs_tmp
+    local ready_tmp
+
+    [[ -r "${log_file}" ]] || return 1
+    jobs_tmp=$(mktemp "${SHARED_DIR}/.failing-jobs.XXXXXX") || return 1
+
+    if ! extract_job_section BLOCKING "${log_file}" > "${jobs_tmp}" \
+        || ! extract_job_section INFORMING "${log_file}" >> "${jobs_tmp}" \
+        || ! sort -u "${jobs_tmp}" -o "${jobs_tmp}"; then
+        rm -f "${jobs_tmp}"
+        return 1
+    fi
+
+    # A zero-byte result is valid only after both sections above validated and
+    # the separate data-ready marker is atomically published below.
+    if [[ -s "${jobs_tmp}" ]] && grep -qvE "${DATA_LINE_REGEX}" "${jobs_tmp}"; then
+        rm -f "${jobs_tmp}"
+        return 1
+    fi
+
+    if ! mv -f "${jobs_tmp}" "${SHARED_DIR}/failing-jobs.txt"; then
+        rm -f "${jobs_tmp}"
+        return 1
+    fi
+
+    ready_tmp=$(mktemp "${SHARED_DIR}/.monitor-data-ready.XXXXXX") || {
+        rm -f "${SHARED_DIR}/failing-jobs.txt"
+        return 1
+    }
+    if ! mv -f "${ready_tmp}" "${SHARED_DIR}/monitor-data-ready"; then
+        rm -f "${ready_tmp}" "${SHARED_DIR}/failing-jobs.txt"
+        return 1
+    fi
+}
+
 copy_artifacts() {
     echo "Copying artifacts to ${ARTIFACT_DIR}..."
     rm -f "${SHARED_DIR}/monitor-report-ready"
+    clear_monitor_data
 
     local report_dir="${EDGE_TOOLING_DIR}/payload-monitor/reports"
     if [[ -d "${report_dir}" ]]; then
@@ -136,13 +231,11 @@ copy_artifacts() {
     # downstream steps.  Each line is prefixed BLOCKING| or INFORMING|.
     # SHARED_DIR is backed by a K8s Secret (1 MB limit) so only the
     # extracted data is shared — not the full multi-MB stream-JSON log.
-    if [[ -r "${ARTIFACT_DIR}/claude-analysis.log" ]]; then
-        {
-            sed -n '/BLOCKING_JOBS_START/,/BLOCKING_JOBS_END/p' "${ARTIFACT_DIR}/claude-analysis.log" \
-                | grep -oE 'BLOCKING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[a-zA-Z0-9._-]+'
-            sed -n '/INFORMING_JOBS_START/,/INFORMING_JOBS_END/p' "${ARTIFACT_DIR}/claude-analysis.log" \
-                | grep -oE 'INFORMING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[a-zA-Z0-9._-]+'
-        } | sort -u > "${SHARED_DIR}/failing-jobs.txt" || true
+    if publish_extracted_jobs "${ARTIFACT_DIR}/claude-analysis.log"; then
+        echo "Validated job data is ready for Slack notification."
+    else
+        clear_monitor_data
+        echo "WARNING: Extracted job data is unavailable or incomplete."
     fi
 
     # A report is ready only when this run generated a complete dashboard with
