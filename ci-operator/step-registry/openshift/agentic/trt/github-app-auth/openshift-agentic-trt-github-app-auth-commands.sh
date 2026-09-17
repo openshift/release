@@ -55,17 +55,21 @@ generate_token() {
     echo "${token}"
 }
 
-# Mint a fresh installation token for every mapping in github-app-token-outputs,
-# write them to SHARED_DIR, and export GH_FORK_TOKEN / GITHUB_TOKEN.
+# Mint a fresh installation token for every mapping in github-app-token-outputs.
+# Tokens are staged in a temp dir and only replace SHARED_DIR files after every
+# mapping succeeds, so a mid-loop failure leaves existing files and exports as-is.
 refresh_github_tokens() {
     local outputs_file="${SHARED_DIR}/github-app-token-outputs"
-    local pairs pair id_file output_name id_path installation_id token
+    local pairs pair id_file output_name id_path installation_id token tmpdir
     local was_tracing=false
+    local -a staged=()
 
     [[ -f "${outputs_file}" ]] || {
         echo "ERROR: ${outputs_file} not found — github-app-auth step must run first" >&2
         return 1
     }
+
+    tmpdir=$(mktemp -d) || return 1
 
     echo "Refreshing GitHub App installation tokens..."
     IFS=',' read -ra pairs <<< "$(cat "${outputs_file}")"
@@ -73,14 +77,30 @@ refresh_github_tokens() {
         id_file="${pair%%:*}"
         output_name="${pair##*:}"
 
-        [[ "${id_file}" =~ ^[a-zA-Z0-9._-]+$ ]] || { echo "ERROR: Invalid id_file name '${id_file}'." >&2; return 1; }
-        [[ "${output_name}" =~ ^[a-zA-Z0-9._-]+$ ]] || { echo "ERROR: Invalid output_name '${output_name}'." >&2; return 1; }
+        if [[ ! "${id_file}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            echo "ERROR: Invalid id_file name '${id_file}'." >&2
+            rm -rf "${tmpdir}"
+            return 1
+        fi
+        if [[ ! "${output_name}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            echo "ERROR: Invalid output_name '${output_name}'." >&2
+            rm -rf "${tmpdir}"
+            return 1
+        fi
 
         id_path="${GITHUB_APP_CRED_DIR}/${id_file}"
-        [[ -f "${id_path}" ]] || { echo "ERROR: Installation ID file ${id_path} not found." >&2; return 1; }
+        if [[ ! -f "${id_path}" ]]; then
+            echo "ERROR: Installation ID file ${id_path} not found." >&2
+            rm -rf "${tmpdir}"
+            return 1
+        fi
 
         installation_id=$(cat "${id_path}")
-        [[ "${installation_id}" =~ ^[0-9]+$ ]] || { echo "ERROR: Installation ID from ${id_file} is not numeric." >&2; return 1; }
+        if [[ ! "${installation_id}" =~ ^[0-9]+$ ]]; then
+            echo "ERROR: Installation ID from ${id_file} is not numeric." >&2
+            rm -rf "${tmpdir}"
+            return 1
+        fi
         echo "  Generating token for ${id_file}..."
 
         [[ $- == *x* ]] && was_tracing=true || was_tracing=false
@@ -89,24 +109,35 @@ refresh_github_tokens() {
         if [[ -z "${token}" ]]; then
             ${was_tracing} && set -x
             echo "ERROR: Failed to generate token for ${id_file}." >&2
+            rm -rf "${tmpdir}"
             return 1
         fi
-        echo "${token}" > "${SHARED_DIR}/${output_name}"
+        if ! echo "${token}" > "${tmpdir}/${output_name}"; then
+            ${was_tracing} && set -x
+            echo "ERROR: Failed to stage token for ${id_file}." >&2
+            rm -rf "${tmpdir}"
+            return 1
+        fi
+        staged+=("${output_name}")
         ${was_tracing} && set -x
+    done
 
+    for output_name in "${staged[@]}"; do
+        if ! mv -f "${tmpdir}/${output_name}" "${SHARED_DIR}/${output_name}"; then
+            echo "ERROR: Failed to install ${output_name}." >&2
+            rm -rf "${tmpdir}"
+            return 1
+        fi
         echo "  Written to \${SHARED_DIR}/${output_name}"
     done
+    rm -rf "${tmpdir}"
 
     [[ $- == *x* ]] && was_tracing=true || was_tracing=false
     set +x
-    if [[ -f "${SHARED_DIR}/gh-fork-token" ]]; then
-        GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
-        export GH_FORK_TOKEN
-    fi
-    if [[ -f "${SHARED_DIR}/gh-upstream-token" ]]; then
-        GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
-        export GITHUB_TOKEN
-    fi
+    GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
+    export GH_FORK_TOKEN
+    GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
+    export GITHUB_TOKEN
     ${was_tracing} && set -x
 
     echo "GitHub App tokens refreshed"
