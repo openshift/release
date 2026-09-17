@@ -42,14 +42,26 @@ This step expects the following to be available (created by earlier steps in the
 - `peerpods-param-cm` ConfigMap in default namespace (created by `peerpods-param-cm` step, when peer-pods enabled)
 - `peerpods-param-secret` Secret in default namespace (created by `peerpods-param-cm` step, when peer-pods enabled)
 
-## AWS Peer-Pods: VM Import/Export Prerequisites
+## AWS Peer-Pods: Credentials Are Intentionally Not Created Here
 
-When `WORKLOAD_TO_TEST=peer-pods` (or `coco`) on AWS, the OSC operator builds a
-podvm AMI using AWS's "manual credentials" VM Import/Export flow, which requires
-an S3 bucket and a `vmimport` IAM role to already exist in the target AWS
-account. This step waits (up to 5 minutes) for the operator-managed
-`aws-podvm-image-cm` ConfigMap to appear, reads the expected bucket name from
-it, and idempotently creates the bucket and `vmimport` role (with a policy
-scoped to that bucket) using the same AWS credentials already available via
-`peerpods-param-secret`. If the ConfigMap doesn't appear in time, this is
-logged as a warning and the step continues (non-fatal).
+Unlike Azure, this step does **not** create `peer-pods-secret` for AWS. The
+OSC operator has its own built-in credential automation for AWS (see
+`docs/credentials-handling.md` in the [openshift/sandboxed-containers-operator](https://github.com/openshift/sandboxed-containers-operator)
+repo), with this priority order: user-created secret → STS (IRSA) → CCO
+(Cloud Credential Operator). That automation only runs when no
+`peer-pods-secret` already exists in the operator namespace
+(`credentials_controller.go`'s `setupPeerPodsCredentials()`), and it's also
+what makes podvm AMI creation work: the operator's image-build script
+(`aws-podvm-image-handler.sh`) only auto-provisions the required S3 bucket and
+`vmimport` IAM role when it detects STS env vars or a `peer-pods-secret`
+created via the CCO flow (labeled
+`kataconfiguration.openshift.io/credentials-request-based=true`).
+
+If this step (or anything else) pre-creates `peer-pods-secret` for AWS with
+static keys, the operator falls into "manual credentials" mode instead, which
+requires that S3 bucket/IAM role to already exist in the target AWS account
+and hard-fails otherwise — this is what caused the original AWS peer-pods
+failures this step was built to fix. Simply not creating the secret lets the
+operator's own CCO automation provision everything it needs automatically,
+using narrowly-scoped, temporary credentials rather than the cluster's
+long-lived admin AWS credentials.
