@@ -303,6 +303,14 @@ Resources:
         FromPort: 9095
         ToPort: 9095
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 12000
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: udp
+        FromPort: 12000
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
       VpcId: !Ref VpcId
   BastionSecurityGroupIpv6:
     Condition: AssignIpv6
@@ -341,6 +349,14 @@ Resources:
       - IpProtocol: tcp
         FromPort: 9095
         ToPort: 9095
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 12000
+        ToPort: 65535
+        CidrIpv6: ::/0
+      - IpProtocol: udp
+        FromPort: 12000
+        ToPort: 65535
         CidrIpv6: ::/0
       VpcId: !Ref VpcId
   BastionInstance:

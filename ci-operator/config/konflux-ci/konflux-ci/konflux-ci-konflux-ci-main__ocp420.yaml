@@ -8,6 +8,8 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.26-openshift-5.0
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -34,6 +36,13 @@ tests:
       logs>'
   steps:
     cluster_profile: aws-konflux-qe
+    env:
+      PROPAGATE_USER_TAGS: "yes"
+      USER_TAGS: |
+        iac ipi
+        k8s-type ocp
+        component konflux-ci
+        repo konflux-ci/konflux-ci
     test:
     - ref: konflux-ci-install-operator
     - ref: konflux-ci-e2e-tests

@@ -1,6 +1,8 @@
 binary_build_commands: make build
 build_root:
   from_repository: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -28,8 +30,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: osd-network-verifier-codecov-token
     mount_path: /tmp/secret
-    name: osd-network-verifier-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -38,8 +41,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: osd-network-verifier-codecov-token
     mount_path: /tmp/secret
-    name: osd-network-verifier-codecov-token
 - as: lint
   commands: make lint
   container:

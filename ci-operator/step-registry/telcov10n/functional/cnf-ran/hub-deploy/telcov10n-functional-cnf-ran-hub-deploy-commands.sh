@@ -7,74 +7,92 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
-MOUNTED_HOST_INVENTORY="/var/host_variables"
+COMMON_VARIABLES="/var/common_variables"
+CLUSTER_VARIABLES="/var/clusters/${CLUSTER_NAME}"
+HYPERVISOR_VARIABLES="/var/hypervisors"
+INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 
-process_inventory() {
+install_vars() {
+  local src="$1"
+  local allow_host_vars="$2"
+  local base dest_dir name
+
+  base="$(basename "$src")"
+
+  case "$base" in
+    ansible_group_*)
+      dest_dir="${INVENTORY_PATH}/group_vars"
+      name="${base#ansible_group_}"
+      ;;
+    *)
+      if [ "${allow_host_vars}" != "true" ]; then
+        echo "  skipped a file that is not a group var"
+        return 0
+      fi
+      dest_dir="${INVENTORY_PATH}/host_vars"
+      case "$base" in
+        bastion*) name="bastion" ;;
+        *)        name="${base}" ;;
+      esac
+      ;;
+  esac
+  cp "$src" "${dest_dir}/${name}"
+}
+
+process_mount() {
   local directory="$1"
-  local dest_file="$2"
-
-  if [ -z "$directory" ]; then
-    echo "Usage: process_inventory <directory> <dest_file>"
-    return 1
-  fi
+  local allow_host_vars="$2"
 
   if [ ! -d "$directory" ]; then
     echo "Error: '$directory' is not a valid directory"
     return 1
   fi
 
-  find "$directory" -type f | while IFS= read -r filename; do
-    if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-      continue
-    else
-      echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
-    fi
-  done > "${dest_file}"
+  # -L so that files exposed as symlinks by the secrets mount are matched as regular files
+  while IFS= read -r filename; do
+    install_vars "$filename" "${allow_host_vars}"
+  done < <(find -L "$directory" -maxdepth 1 -type f ! -name '..*' | sort)
+}
+
+# Hypervisors are shared between clusters, so the whole hypervisors group is mounted and the
+# right one is picked here.
+hypervisor_for_cluster() {
+  case "${CLUSTER_NAME}" in
+    kni-qe-99)                        echo "helix41-lab-eng-tlv2-redhat-com" ;;
+    fthub-01|kni-qe-106|kni-qe-110)   echo "helix107-hv-telcoqe-eng-rdu2-dc-redhat-com" ;;
+    kni-qe-108|kni-qe-111)            echo "helix89-telcoqe-eng-rdu2-dc-redhat-com" ;;
+    kni-qe-127|kni-qe-128)                       echo "helix118-hv-telcoqe-eng-rdu2-dc-redhat-com" ;;
+    *)                                echo "" ;;
+  esac
 }
 
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
+mkdir -p "${INVENTORY_PATH}/group_vars" "${INVENTORY_PATH}/host_vars"
+
 echo "Processing common group_vars"
-mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
+process_mount "${COMMON_VARIABLES}" false
 
-find /var/group_variables/common/ -mindepth 1 -type d | while read -r dir; do
-  echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
-done
+echo "Processing cluster vars (${CLUSTER_NAME})"
+process_mount "${CLUSTER_VARIABLES}" true
 
-echo "Processing cluster group_vars (${CLUSTER_NAME})"
-find "/var/group_variables/${CLUSTER_NAME}/" -mindepth 1 -type d | while read -r dir; do
-  echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
-done
-
-echo "Processing cluster host_vars (${CLUSTER_NAME})"
-mkdir /eco-ci-cd/inventories/ocp-deployment/host_vars
-
-find "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/" -mindepth 1 -type d | while read -r dir; do
-  echo "  host_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
-done
-
-# fthub-01, kni-qe-106 and kni-qe-110 share the same hypervisor (helix107), but ci-operator
-# cannot mount the same secret twice.
-if [ "${CLUSTER_NAME}" = "kni-qe-106" ] || [ "${CLUSTER_NAME}" = "kni-qe-110" ]; then
-  echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} from fthub-01 mount"
-  process_inventory "${MOUNTED_HOST_INVENTORY}/fthub-01/hypervisor" \
-    /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
-fi
-
-# kni-qe-111 uses helix89 (same as kni-qe-108), ci-operator cannot mount the same secret twice.
-if [ "${CLUSTER_NAME}" = "kni-qe-111" ]; then
-  echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} from kni-qe-108 mount"
-  process_inventory "${MOUNTED_HOST_INVENTORY}/kni-qe-108/hypervisor" \
-    /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
+echo "Processing hypervisor vars"
+HYPERVISOR="$(hypervisor_for_cluster)"
+if [ -z "${HYPERVISOR}" ]; then
+  echo "No hypervisor mapped for ${CLUSTER_NAME} — skipping host_vars/hypervisor"
+else
+  HYPERVISOR_FILE="${HYPERVISOR_VARIABLES}/${HYPERVISOR}"
+  if [ ! -f "${HYPERVISOR_FILE}" ]; then
+    echo "Error: hypervisor of ${CLUSTER_NAME} not found in ${HYPERVISOR_VARIABLES}"
+    exit 1
+  fi
+  cp "${HYPERVISOR_FILE}" "${INVENTORY_PATH}/host_vars/hypervisor"
 fi
 
 cd /eco-ci-cd
 
 echo "Running deploy-ocp-sno for ${CLUSTER_NAME} (version=${VERSION})"
-EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true release_age_max_days=14"
+EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true release_age_max_days=${MULTISTAGE_PARAM_OVERRIDE_RELEASE_AGE_MAX_DAYS}"
 if [ "${DISABLE_INSIGHTS}" = "true" ]; then
   EXTRA_VARS="${EXTRA_VARS} disable_insights=true"
 fi
@@ -84,8 +102,8 @@ ansible-playbook ./playbooks/deploy-ocp-sno.yml \
   --extra-vars "${EXTRA_VARS}"
 
 echo "Copying inventory to SHARED_DIR"
-cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
-cp -r /eco-ci-cd/inventories/ocp-deployment/group_vars/* "${SHARED_DIR}"/
+cp -r "${INVENTORY_PATH}"/host_vars/* "${SHARED_DIR}"/
+cp -r "${INVENTORY_PATH}"/group_vars/* "${SHARED_DIR}"/
 
 echo "Preserving seed hub inventory with seed- prefix for later restore"
 for key in bastion hypervisor master0 all bastions hypervisors nodes masters; do
@@ -95,11 +113,13 @@ done
 echo "Getting hub cluster version"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
-BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' /eco-ci-cd/inventories/ocp-deployment/group_vars/all | sed "s/'//g")
+BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
-cat /var/group_variables/common/all/ansible_ssh_private_key > "/tmp/temp_ssh_key"
-chmod 600 "/tmp/temp_ssh_key"
+# The private key spans several lines in group_vars/all, take everything between the quotes
+install -m 600 /dev/null "/tmp/temp_ssh_key"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${INVENTORY_PATH}/group_vars/all" \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "/tmp/temp_ssh_key"
 
 CLUSTER_VERSION=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}" \

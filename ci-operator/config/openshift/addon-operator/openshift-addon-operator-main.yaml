@@ -36,6 +36,8 @@ operator:
     with: addon-operator-manager
   - pullspec: quay.io/openshift/addon-operator-webhook:latest
     with: addon-operator-webhook
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     integration:
@@ -57,8 +59,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: addon-operator-codecov-token
     mount_path: /tmp/secret
-    name: addon-operator-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -67,8 +70,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: addon-operator-codecov-token
     mount_path: /tmp/secret
-    name: addon-operator-codecov-token
 - as: lint
   commands: make lint
   container:

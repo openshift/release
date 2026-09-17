@@ -1,0 +1,40 @@
+workflow:
+  as: aws-neuron-operator-dra-e2e-rosa
+  steps:
+    env:
+      HOSTED_CP: "true"
+      ENABLE_BYOVPC: "true"
+      ZONES_COUNT: "1"
+      COMPUTE_MACHINE_TYPE: "inf2.8xlarge"
+      REPLICAS: "2"
+      OCM_LOGIN_ENV: "production"
+      REGION: "us-west-2"
+    pre:
+    - ref: aws-neuron-operator-cleanup-vpc
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    - chain: rosa-sts-oidc-config-create
+    - ref: aws-neuron-operator-rosa-cluster-provision
+    - ref: rosa-cluster-wait-ready-cluster
+    - ref: rosa-cluster-notify-error
+    - ref: rosa-conf-idp-htpasswd
+    - ref: rosa-cluster-wait-ready-nodes
+    - ref: rosa-cluster-wait-ready-operators
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: aws-neuron-operator-install-operators
+    test:
+    - ref: aws-neuron-operator-dra-test
+    post:
+    - ref: aws-neuron-operator-gather
+    - ref: aws-neuron-operator-rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+      timeout: 30m
+  documentation: |-
+    Provisions a ROSA HCP cluster with two AWS Inferentia nodes, installs the
+    pinned DRA-capable KMM and AWS Neuron operators, and runs the complete
+    Neuron DRA eco-gotests suite.

@@ -1,0 +1,26 @@
+ref:
+  as: qe-rhel-jetson-get-latest-bootc-tag
+  from: qe-rhel-jetson
+  commands: qe-rhel-jetson-get-latest-bootc-tag-commands.sh
+  env:
+    - name: BOOTC_IMAGE_BASE
+      default: "quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-98-bootc"
+      documentation: Base image URL (without tag) to query for latest tag
+  grace_period: 2m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 5m0s
+  documentation: |-
+    Fetch the actual latest tag for a bootc image from Quay.io API.
+
+    This is necessary because the :latest tag isn't always updated automatically
+    on Quay.io. This step queries the repository API and retrieves the most recent
+    tag by last_modified timestamp.
+
+    Outputs (saved to SHARED_DIR):
+      - bootc_image_url: Full image reference with the latest tag
+      - bootc_image_tag: Just the tag portion
+
+    These can be consumed by subsequent steps like qe-rhel-jetson-bootc-switch.

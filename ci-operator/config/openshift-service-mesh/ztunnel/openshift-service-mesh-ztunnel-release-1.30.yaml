@@ -9,6 +9,8 @@ build_root:
     namespace: ci
     tag: "3.4"
   use_build_cache: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -44,9 +46,9 @@ tests:
       commands: |
         GOOGLE_APPLICATION_CREDENTIALS='/maistra-secrets/service-account.json' ./ossm/ci/post-submit.sh
       credentials:
-      - mount_path: /maistra-secrets
-        name: gcs-credentials
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: gcs
+        mount_path: /maistra-secrets
       from: src
       resources:
         requests:
@@ -58,7 +60,7 @@ tests:
   commands: |
     # load test-infra automator.sh script
     export ISTIO_ZTUNNEL_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/ztunnel"
-    git clone https://github.com/maistra/test-infra.git
+    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
     cd test-infra
     ./tools/automator.sh \
       -o openshift-service-mesh \
@@ -79,9 +81,31 @@ tests:
     report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs>'
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
   timeout: 8h0m0s
+- as: sync-upstream-ztunnel-1.30
+  commands: |
+    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
+    cd test-infra
+    export GITHUB_TOKEN_PATH=/creds-github/token
+    export MERGE_BRANCH=release-1.30
+    ./tools/automator-main.sh \
+    --org=openshift-service-mesh \
+    --repo=ztunnel \
+    --branch=release-1.30 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    --modifier=merge_upstream_ztunnel_1.30 \
+    --cmd=./ossm/merge_upstream.sh
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 zz_generated_metadata:
   branch: release-1.30
   org: openshift-service-mesh

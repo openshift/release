@@ -19,6 +19,8 @@ promotion:
   to:
   - name: "5.0"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -50,7 +52,9 @@ tests:
 - as: security
   steps:
     workflow: openshift-ci-security
-- as: e2e-hypershift
+- always_run: false
+  as: e2e-hypershift
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -62,7 +66,9 @@ tests:
     test:
     - chain: hypershift-openstack-e2e
     workflow: hypershift-aws-e2e-nested
-- as: e2e-openstack-capi-techpreview
+- always_run: false
+  as: e2e-openstack-capi-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -71,7 +77,7 @@ tests:
     - as: test
       commands: |
         dir=$GOPATH/src/github.com/openshift/cluster-api-provider-openstack
-        git clone https://github.com/openshift/cluster-api-provider-openstack --branch main --depth=1 $dir
+        git clone https://github.com/openshift/cluster-api-provider-openstack --branch ${PULL_BASE_REF} --depth=1 $dir
         cd $dir
         test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
         openshift/e2e-tests.sh

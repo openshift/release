@@ -4,8 +4,12 @@ set -ex
 
 # Session variables
 zvsi_fip=$(cat "${SHARED_DIR}/zvsi_fip")
+# Tracing is disabled while the private key is read, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
 export ssh_key_string
+set -x
 tmp_ssh_key="/tmp/httpd-vsi-key"
 envsubst <<"EOF" >${tmp_ssh_key}
 -----BEGIN OPENSSH PRIVATE KEY-----
@@ -85,6 +89,10 @@ echo "Image is $DESTINATION_IMAGE_REF"
 echo "JOB SPECS are $JOB_SPEC"
 echo "FIP of VM is $zvsi_fip"
 
+# Tracing is disabled while the registry credentials are read and folded into
+# ALL_VARS_STR, otherwise xtrace expands the password into the publicly
+# readable build log.
+set +x
 # Get credentials for quay repo
 DOCKER_USER=$(cat "${SECRETS_PATH}/$REGISTRY_SECRET/${REGISTRY_SECRET_FILE}" | jq -r ".auths[\"${REGISTRY_HOST}\"].auth" | base64 -d | cut -d':' -f1)
 export DOCKER_USER
@@ -96,8 +104,13 @@ export DOCKER_PASS
 ALL_VARS=("DESTINATION_IMAGE_REF='$DESTINATION_IMAGE_REF' SECRETS_PATH='$SECRETS_PATH' REGISTRY_SECRET_FILE='$REGISTRY_SECRET_FILE' REGISTRY_HOST='$REGISTRY_HOST' DOCKER_USER='$DOCKER_USER' DOCKER_PASS='$DOCKER_PASS' PLATFORMS='$PLATFORMS'")
 ALL_VARS_STR=$(IFS=" "; echo "${ALL_VARS[*]}")
 export ALL_VARS_STR
+set -x
 
 # create ssh session to zvsi and pass the script
+# Tracing is disabled for this one command, otherwise xtrace expands
+# ALL_VARS_STR -- which carries the registry password -- into the publicly
+# readable build log. The heredoc body below is never traced by bash.
+set +x
 ssh "${ssh_options[@]}" root@"$zvsi_fip" "$ALL_VARS_STR bash -s" << 'EOF'
 #Installing docker in zvsi
 echo "Installing docker engine in zvsi"
@@ -146,3 +159,4 @@ else
     echo "Build and publish failed for multiarch image $DESTINATION_IMAGE_REF "
 fi
 EOF
+set -x

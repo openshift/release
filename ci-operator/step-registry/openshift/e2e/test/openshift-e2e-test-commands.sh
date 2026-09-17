@@ -51,8 +51,14 @@ fi
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
 fi
 
 # OpenShift clusters intalled with platform type External is handled as 'None'
@@ -81,6 +87,34 @@ function cleanup() {
 trap cleanup EXIT
 
 mkdir -p "${HOME}"
+
+# OpenSSH in this pod needs a passwd row for the random CI UID and a default
+# identity so tests can SSH to the bastion host in SHARED_DIR.
+if [[ -n "${TEST_USE_PROVISIONED_BASTION-}" ]]; then
+    if [[ ! -s "${SHARED_DIR}/bastion_public_address" ]]; then
+        echo >&2 "TEST_USE_PROVISIONED_BASTION is set but ${SHARED_DIR}/bastion_public_address is missing"
+        exit 1
+    fi
+    if [[ ! -s "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ]]; then
+        echo >&2 "TEST_USE_PROVISIONED_BASTION is set but ${CLUSTER_PROFILE_DIR}/ssh-privatekey is missing"
+        exit 1
+    fi
+    if ! whoami &>/dev/null; then
+        if [[ ! -w /etc/passwd ]]; then
+            echo >&2 "Cannot register UID $(id -u): /etc/passwd is not writable"
+            exit 1
+        fi
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+        if ! whoami &>/dev/null; then
+            echo >&2 "Failed to register UID $(id -u) in /etc/passwd"
+            exit 1
+        fi
+    fi
+    mkdir -p "${HOME}/.ssh"
+    chmod 0700 "${HOME}/.ssh"
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" "${HOME}/.ssh/id_rsa"
+    chmod 0600 "${HOME}/.ssh/id_rsa"
+fi
 
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
@@ -168,13 +202,18 @@ azurestack)
     export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
     ;;
 vsphere)
+    # The test suite requires a vSphere config file with explicit user and password fields.
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/govc.sh"
     export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
     oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
-    # The test suite requires a vSphere config file with explicit user and password fields.
     sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
     sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     export TEST_PROVIDER=vsphere;;
 alibabacloud)
     mkdir -p ~/.ssh
@@ -186,8 +225,13 @@ alibabacloud)
     export KUBE_SSH_USER=core
 ;;
 openstack*)
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     if test -n "${HTTP_PROXY:-}" -o -n "${HTTPS_PROXY:-}"; then
         export TEST_PROVIDER='{"type":"openstack","disconnected":true}'
     else
@@ -197,16 +241,26 @@ openstack*)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 ibmcloud*)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     ;;
 powervs*)
     #export TEST_PROVIDER='{"type":"powervs"}' # TODO In the future, powervs will be a supprted test type
     export TEST_PROVIDER='{"type":"ibmcloud"}'
-    IC_API_KEY=$(sed -e 's,^.*"apikey":",,' -e 's,".*$,,' ${SHARED_DIR}/powervs-config.json)
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
+    IC_API_KEY=$(sed -e 's,^.*"apikey":",,' -e 's,".*$,,' "${SHARED_DIR}/powervs-config.json")
     IBMCLOUD_API_KEY=${IC_API_KEY}
     export IC_API_KEY
     export IBMCLOUD_API_KEY
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
 external) export TEST_PROVIDER='{"type":"external"}' ;;
@@ -223,6 +277,8 @@ if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64" ]]; then
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     UNIVERSE_DOMAIN=$(jq -r ".universe_domain // empty" "${GCP_SHARED_CREDENTIALS_FILE}" 2>/dev/null)
     if [[ -n "${UNIVERSE_DOMAIN}" ]]; then
       export GOOGLE_CLOUD_UNIVERSE_DOMAIN="${UNIVERSE_DOMAIN}"
@@ -230,6 +286,9 @@ if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64" ]]; then
     fi
     gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
     gcloud config set project "${PROJECT}"
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     popd
 fi
 

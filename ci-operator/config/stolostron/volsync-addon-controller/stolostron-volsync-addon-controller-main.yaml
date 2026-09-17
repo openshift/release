@@ -9,10 +9,12 @@ images:
     to: volsync-addon-controller
 promotion:
   to:
-  - name: "5.0"
-    namespace: stolostron
   - name: "5.1"
     namespace: stolostron
+  - name: "5.2"
+    namespace: stolostron
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -30,23 +32,27 @@ tests:
   commands: |
     export SELF="make -f Makefile.prow"
     export HOME="/tmp"
+    go clean -cache -modcache
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
     export HOME="/tmp"
+    go clean -cache -modcache
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 zz_generated_metadata:
   branch: main
   org: stolostron

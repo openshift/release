@@ -6,6 +6,9 @@ set -o pipefail
 
 start_time=$SECONDS
 
+# shellcheck disable=SC1090
+source <(curl -fsSL "https://raw.githubusercontent.com/openshift-cnv/cnv-ci/refs/heads/master/hack/shared-functions.sh")
+
 # This trap will be executed when the script exits for any reason (successful, error, or signal).
 trap 'debug_on_exit' EXIT
 
@@ -95,27 +98,6 @@ function runMustGather() {
     # tar -czf must-gather-cnv.tar.gz must-gather-cnv || true
 }
 
-function retry() {
-    local max_retries=$1; shift
-    local delay=$1; shift
-    local count=0
-
-    until "$@"; do
-        exit_code=$?
-        count=$((count + 1))
-        # shellcheck disable=SC2086
-        if [ $count -lt $max_retries ]; then
-            echo "Command failed. Attempt $count/$max_retries. Retrying in $delay seconds..."
-            # shellcheck disable=SC2086
-            sleep $delay
-        else
-            echo "Command failed after $max_retries attempts."
-            return $exit_code
-        fi
-    done
-    return 0
-}
-
 #
 # Enable or disable Common Boot Image Import
 #
@@ -197,80 +179,6 @@ function cnv::reimport_datavolumes() {
   oc get pvc -n "${dvnamespace}"
 }
 
-function install_yq_if_not_exists() {
-    # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
-        echo "yq version: $cmd_yq"
-    else
-        echo "Installing yq"
-        mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    fi
-}
-
-function mapTestsForComponentReadiness() {
-
-    [[ ${MAP_TESTS:-false} != "true" ]] && return
-
-    results_file="${1}"
-    echo "Patching Tests Result File: ${results_file}"
-    if [ -f "${results_file}" ]; then
-        install_yq_if_not_exists
-        echo "Mapping Test Suite Name To: CNV-lp-interop"
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' "${results_file}"
-    fi
-}
-
-# Run a command until it succeeds or the maximum number of retries is reached.
-#
-# Arguments:
-# - $1: a banner describing what we are waiting for
-# - $2: the maximum number of retries before giving up
-# - $3: the delay to wait before each retry
-# - $@: the command to run
-function wait_for() {
-  local what="$1"; shift
-  local retries="$1"; shift
-  local delay="$1"; shift
-
-  echo "[INFO] Waiting for ${what}." >&2
-
-  time (
-    { set +x; } 2>/dev/null
-    while true; do
-      if "$@"; then
-        break
-      fi
-
-      # Give up after too many tries
-      if [[ "${retries}" -le 0 ]]; then
-        echo "[ERROR] Timeout waiting for ${what}." >&2
-        exit 1
-      fi
-
-      retries=$((retries - 1))
-      sleep "${delay}"
-    done
-  )
-}
-
-function download_virtctl() {
-    echo "[INFO] Downloading virtctl to ${BIN_FOLDER} .." >&2
-    curl -k -fsS "${virtctl_url}" | tar -C "${BIN_FOLDER}" \
-      --transform='flags=r;s/virtctl-linux-.*/virtctl/' -xzf -
-
-    chmod +x "${BIN_FOLDER}/virtctl"
-    echo "[INFO] virtctl installed: $("${BIN_FOLDER}/virtctl" version --client 2>/dev/null | head -1 || echo unknown)" >&2
-}
-
-# shellcheck disable=SC2329
-function virtctl_download_ready() {
-  curl -k -fsS -o /dev/null --connect-timeout 15 --max-time 120 "$1" 2>/dev/null
-}
 
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"

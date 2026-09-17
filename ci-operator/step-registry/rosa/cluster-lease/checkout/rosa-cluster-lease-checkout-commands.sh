@@ -16,9 +16,10 @@ LEASE_ENV="${LEASE_ENV:-}"
 LEASE_REGION="${LEASE_REGION:-}"
 LEASE_VERSION="${LEASE_VERSION:-}"
 LEASE_CHECKOUT_TIMEOUT="${LEASE_CHECKOUT_TIMEOUT_MINUTES:-30}"
-LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
+LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/sa.rosa-cluster-lease-manager.hosted-mgmt.config"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
 OPERATOR_NAME="${OPERATOR_NAME:-}"
+LEASE_FAIL_FAST_ON_EXHAUSTED="${LEASE_FAIL_FAST_ON_EXHAUSTED:-true}"
 
 if [[ ! -f "${LEASE_HOST_KUBECONFIG}" ]]; then
     log "ERROR: Lease host kubeconfig not found at ${LEASE_HOST_KUBECONFIG}"
@@ -30,22 +31,54 @@ lease_oc() {
 }
 
 # Build label selector
+# DIAG_SELECTOR matches all managed clusters in the pool (no status filter) for diagnostic logging.
+# SELECTOR further restricts to available clusters in exclusive mode.
+DIAG_SELECTOR="rosa-cluster-lease/managed=true,rosa-cluster-lease/type=${LEASE_TYPE}"
+if [[ -n "${LEASE_ENV}" ]]; then
+    DIAG_SELECTOR="${DIAG_SELECTOR},rosa-cluster-lease/env=${LEASE_ENV}"
+fi
+if [[ -n "${LEASE_REGION}" ]]; then
+    DIAG_SELECTOR="${DIAG_SELECTOR},rosa-cluster-lease/region=${LEASE_REGION}"
+fi
+if [[ -n "${LEASE_VERSION}" ]]; then
+    DIAG_SELECTOR="${DIAG_SELECTOR},rosa-cluster-lease/version=${LEASE_VERSION}"
+fi
+
 # When OPERATOR_NAME is set, query all managed clusters (not just available)
 # and filter by operator in-script to support concurrent use
 if [[ -n "${OPERATOR_NAME}" ]]; then
-    SELECTOR="rosa-cluster-lease/managed=true,rosa-cluster-lease/type=${LEASE_TYPE}"
+    SELECTOR="${DIAG_SELECTOR}"
 else
-    SELECTOR="rosa-cluster-lease/managed=true,rosa-cluster-lease/status=available,rosa-cluster-lease/type=${LEASE_TYPE}"
+    SELECTOR="${DIAG_SELECTOR},rosa-cluster-lease/status=available"
 fi
-if [[ -n "${LEASE_ENV}" ]]; then
-    SELECTOR="${SELECTOR},rosa-cluster-lease/env=${LEASE_ENV}"
-fi
-if [[ -n "${LEASE_REGION}" ]]; then
-    SELECTOR="${SELECTOR},rosa-cluster-lease/region=${LEASE_REGION}"
-fi
-if [[ -n "${LEASE_VERSION}" ]]; then
-    SELECTOR="${SELECTOR},rosa-cluster-lease/version=${LEASE_VERSION}"
-fi
+
+log_cluster_inventory() {
+    local clusters_json="$1"
+    local total i cm name status ops holder build_id acquired_at
+    total=$(echo "${clusters_json}" | jq '.items | length')
+    log "Cluster inventory (${total} total):"
+    for i in $(seq 0 $((total - 1))); do
+        cm=$(echo "${clusters_json}" | jq ".items[${i}]")
+        name=$(echo "${cm}" | jq -r '.metadata.name')
+        status=$(echo "${cm}" | jq -r '.metadata.labels["rosa-cluster-lease/status"] // "unknown"')
+        ops=$(echo "${cm}" | jq -r '.metadata.annotations["rosa-cluster-lease/operators"] // ""')
+        holder=$(echo "${cm}" | jq -r '.metadata.annotations["rosa-cluster-lease/holder"] // ""')
+        build_id=$(echo "${cm}" | jq -r '.metadata.annotations["rosa-cluster-lease/build-id"] // ""')
+        acquired_at=$(echo "${cm}" | jq -r '.metadata.annotations["rosa-cluster-lease/acquired-at"] // ""')
+        log "  ${name}: status=${status} ops=[${ops}] holder=${holder:-none} build=${build_id:-none} acquired=${acquired_at:-never}"
+    done
+}
+
+get_pool_status_summary() {
+    local clusters_json="$1"
+    local available in_use maintenance error_count other
+    available=$(echo "${clusters_json}" | jq '[.items[] | select(.metadata.labels["rosa-cluster-lease/status"] == "available")] | length')
+    in_use=$(echo "${clusters_json}" | jq '[.items[] | select(.metadata.labels["rosa-cluster-lease/status"] == "in-use")] | length')
+    maintenance=$(echo "${clusters_json}" | jq '[.items[] | select(.metadata.labels["rosa-cluster-lease/status"] == "maintenance")] | length')
+    error_count=$(echo "${clusters_json}" | jq '[.items[] | select(.metadata.labels["rosa-cluster-lease/status"] == "error")] | length')
+    other=$(echo "${clusters_json}" | jq '[.items[] | select(.metadata.labels["rosa-cluster-lease/status"] | . != "available" and . != "in-use" and . != "maintenance" and . != "error")] | length')
+    echo "available=${available} in-use=${in_use} maintenance=${maintenance} error=${error_count} other=${other}"
+}
 
 # Check if a cluster is eligible for this operator
 cluster_eligible() {
@@ -91,7 +124,13 @@ while true; do
     NOW=$(date +%s)
     if [[ ${NOW} -ge ${DEADLINE} ]]; then
         log "ERROR: Lease checkout timed out after ${LEASE_CHECKOUT_TIMEOUT} minutes"
-        log "No available clusters matching selector: ${SELECTOR}"
+        TIMEOUT_DIAG=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "${DIAG_SELECTOR}" -o json 2>/dev/null || echo '{"items":[]}')
+        TIMEOUT_SUMMARY=$(get_pool_status_summary "${TIMEOUT_DIAG}")
+        log "Pool status at timeout: ${TIMEOUT_SUMMARY}"
+        log "Selector: ${SELECTOR}"
+        if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+            echo "${TIMEOUT_DIAG}" > "${ARTIFACT_DIR}/lease-pool-state.json"
+        fi
         exit 1
     fi
 
@@ -117,6 +156,27 @@ while true; do
             log "No eligible clusters (${TOTAL} total, all either have ${OPERATOR_NAME} running or are unhealthy). Waiting 30s..."
         else
             log "No available clusters in lease inventory. Waiting 30s..."
+        fi
+        DIAG_JSON=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "${DIAG_SELECTOR}" -o json 2>/dev/null || echo '{"items":[]}')
+        if [[ "${ATTEMPT}" -eq 1 || $(( ATTEMPT % 10 )) -eq 0 ]]; then
+            log_cluster_inventory "${DIAG_JSON}"
+        fi
+        # Write diagnostic state for machine-parseable diagnostics
+        if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+            echo "${DIAG_JSON}" > "${ARTIFACT_DIR}/lease-pool-state.json"
+        fi
+        # Fast-fail: if all clusters are non-recoverable (maintenance/error), exit immediately
+        if [[ "${LEASE_FAIL_FAST_ON_EXHAUSTED}" == "true" ]]; then
+            POOL_TOTAL=$(echo "${DIAG_JSON}" | jq '.items | length')
+            POOL_NONRECOVERABLE=$(echo "${DIAG_JSON}" | jq '[.items[] | select(.metadata.labels["rosa-cluster-lease/status"] == "maintenance" or .metadata.labels["rosa-cluster-lease/status"] == "error")] | length')
+            if [[ "${POOL_TOTAL}" -gt 0 && "${POOL_NONRECOVERABLE}" -eq "${POOL_TOTAL}" ]]; then
+                POOL_SUMMARY=$(get_pool_status_summary "${DIAG_JSON}")
+                log "FATAL: Pool is fully exhausted — all ${POOL_TOTAL} cluster(s) are non-recoverable"
+                log "  Pool breakdown: ${POOL_SUMMARY}"
+                log "  No clusters will become available without manual intervention."
+                log "  Selector: ${DIAG_SELECTOR}"
+                exit 1
+            fi
         fi
         sleep 30
         continue

@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   openshift-velero-plugin-oadp-1.4:
     name: openshift-velero-plugin
     namespace: konveyor
@@ -54,6 +58,7 @@ operator:
   - pullspec: quay.io/konveyor/velero:oadp-1.4
     with: velero-oadp-1.4
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   latest:
@@ -80,18 +85,22 @@ tests:
     env:
       FEATURE_GATES: '[''OpenShiftPodSecurityAdmission=false'']'
       FEATURE_SET: CustomNoUpgrade
+      OADP_BRANCH: oadp-1.4
       OO_CHANNEL: stable-1.4
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
+      TEST_NAME: e2e-test-cli-aws
+    post:
+    - ref: oadp-analyze-e2e-failure
     test:
     - as: e2e
       cli: latest
       commands: make TEST_CLI=true test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator-1.4
       resources:
         requests:
@@ -108,18 +117,22 @@ tests:
     env:
       FEATURE_GATES: '[''OpenShiftPodSecurityAdmission=false'']'
       FEATURE_SET: CustomNoUpgrade
+      OADP_BRANCH: oadp-1.4
       OO_CHANNEL: stable-1.4
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
+      TEST_NAME: e2e-test-aws
+    post:
+    - ref: oadp-analyze-e2e-failure
     test:
     - as: e2e
       cli: latest
       commands: make test-e2e
       credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
       from: test-oadp-operator-1.4
       resources:
         requests:

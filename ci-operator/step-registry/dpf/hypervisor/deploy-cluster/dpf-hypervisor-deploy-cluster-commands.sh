@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+export PATH="/cli:${PATH}"
+
 echo "Checking access to SHARED_DIR ..."
 echo "Testing SHARED_DIR" > ${SHARED_DIR}/testing.txt
 ls -ltra ${SHARED_DIR}
@@ -92,8 +94,8 @@ fi
 if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; then
   echo "PR job detected: checking out PR #${PULL_NUMBER} on the remote host"
   if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; \
-    git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}; \
-    git checkout pr-${PULL_NUMBER}; \
+    git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER} && \
+    git checkout pr-${PULL_NUMBER} && \
     git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
     echo "Successfully checked out PR #${PULL_NUMBER}"
   else
@@ -149,6 +151,24 @@ echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR
 # Pass the CI release payload (resolved by ci-operator from the releases.latest config)
 PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
 echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
+
+# Merge CI registry credentials into the pull secret so the cluster can
+# access the Prow-internal registry (registry.buildXX.ci.openshift.org).
+if [[ -n "${PAYLOAD_URL}" ]]; then
+  echo "Merging CI registry credentials into pull secret on hypervisor..."
+  PULL_SECRET_SRC="${CLUSTER_PROFILE_DIR}/openshift-pull-secret"
+  if [[ ! -f "${PULL_SECRET_SRC}" ]]; then
+    echo "ERROR: ${PULL_SECRET_SRC} not found"
+    exit 1
+  fi
+  cp "${PULL_SECRET_SRC}" /tmp/pull-secret.json
+  oc registry login --to=/tmp/pull-secret.json
+  REMOTE_PULL_SECRET=$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -ea; source ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}; set +a; PS=\${OPENSHIFT_PULL_SECRET:-openshift_pull.json}; [[ \"\$PS\" = /* ]] && echo \"\$PS\" || echo \"${REMOTE_WORK_DIR}/openshift-dpf/\$PS\"")
+  scp -q ${SSH_OPTS} /tmp/pull-secret.json root@${REMOTE_HOST}:"${REMOTE_PULL_SECRET}"
+  echo "Pull secret with CI registry credentials copied to ${REMOTE_PULL_SECRET}"
+  rm -f /tmp/pull-secret.json
+fi
+
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
   cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
@@ -183,6 +203,27 @@ else
   echo "ERROR: Failed to update KUBECONFIG variable in .env file"
   exit 1
 fi
+
+# Override dpf-hcp-provisioner-operator image if a CI-built override was provided
+if [[ -f "${SHARED_DIR}/dpf-hcp-provisioner-operator-override" ]]; then
+  OVERRIDE_IMAGE=$(cat "${SHARED_DIR}/dpf-hcp-provisioner-operator-override")
+  if [[ -n "${OVERRIDE_IMAGE}" ]]; then
+    OVERRIDE_REPO="${OVERRIDE_IMAGE%:*}"
+    OVERRIDE_TAG="${OVERRIDE_IMAGE##*:}"
+    echo "Overriding dpf-hcp-provisioner-operator image: repo=${OVERRIDE_REPO} tag=${OVERRIDE_TAG}"
+    if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; \
+      sed -i 's|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_REPO=.*|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_REPO=${OVERRIDE_REPO}|' .env; \
+      sed -i 's|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_TAG=.*|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_TAG=${OVERRIDE_TAG}|' .env"; then
+      echo "dpf-hcp-provisioner-operator image override applied successfully"
+    else
+      echo "ERROR: Failed to apply dpf-hcp-provisioner-operator image override"
+      exit 1
+    fi
+  fi
+fi
+
+echo "Copying .env from hypervisor to artifacts..."
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env ${ARTIFACT_DIR}/.env || echo "WARNING: Failed to copy .env to artifacts"
 
 
 # SSH session to hypervisor

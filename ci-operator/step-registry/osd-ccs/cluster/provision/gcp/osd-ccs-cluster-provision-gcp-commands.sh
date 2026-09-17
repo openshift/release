@@ -38,7 +38,7 @@ function gcloud_auth() {
     GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
     logger "INFO" "gcloud not installed, installing from $GCLOUD_URL"
     pushd ${HOME}
-    curl -O "$GCLOUD_URL"
+    curl --retry 3 --retry-delay 10 -O "$GCLOUD_URL"
     tar -xzf "$GCLOUD_TAR"
     export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
     popd
@@ -90,7 +90,7 @@ function wait_for_bootstrap() {
     GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
     logger "INFO" "gcloud not installed, installing from $GCLOUD_URL"
     pushd ${HOME}
-    curl -O "$GCLOUD_URL"
+    curl --retry 3 --retry-delay 10 -O "$GCLOUD_URL"
     tar -xzf "$GCLOUD_TAR"
     export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
     popd

@@ -11,7 +11,10 @@ set -x
 VIRTHOST_IP="192.168.111.1"
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-oadp-plugin:latest}"
@@ -80,23 +83,6 @@ spec:
     s3ForcePathStyle: "true"
     s3Url: "http://${VIRTHOST_IP}:9000"
     insecureSkipTLSVerify: "true"
-    profile: default
-EOF
-
-echo "Creating VolumeSnapshotLocation..."
-cat <<EOF | oc apply -f -
-apiVersion: velero.io/v1
-kind: VolumeSnapshotLocation
-metadata:
-  name: ${CLUSTER_NAME}
-  namespace: openshift-adp
-spec:
-  provider: aws
-  credential:
-    name: cloud-credentials
-    key: cloud
-  config:
-    region: minio
     profile: default
 EOF
 

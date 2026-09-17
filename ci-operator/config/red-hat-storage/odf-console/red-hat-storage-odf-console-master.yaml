@@ -4,15 +4,17 @@ images:
   items:
   - dockerfile_path: Dockerfile.ci
     to: odf-console
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
-      name: "4.23"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.23"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -34,8 +36,8 @@ tests:
       ODF_CONSOLE_FULL_IMG_NAME: odf-console
     env:
       BASE_DOMAIN: ocs.syseng.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "4"
-      COMPUTE_NODE_TYPE: m4.2xlarge
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.4xlarge
       USER_TAGS: |
         createdBy gh-openshift-ci
       ZONES_COUNT: "3"
@@ -47,12 +49,12 @@ tests:
         node --version
         ./test-prow-e2e.sh ${ODF_CONSOLE_FULL_IMG_NAME}
       credentials:
-      - mount_path: /var/run/operator-secret
-        name: operator-secret
-        namespace: test-credentials
-      - mount_path: /etc/odf-console-e2e/odf-e2e-credentials
-        name: odf-e2e-credentials
-        namespace: test-credentials
+      - collection: console-storage-plugin
+        group: operator-secret
+        mount_path: /var/run/operator-secret
+      - collection: odf-console-e2e
+        group: odf-e2e-credentials
+        mount_path: /etc/odf-console-e2e/odf-e2e-credentials
       dependencies:
       - env: ODF_CONSOLE_FULL_IMG_NAME
         name: odf-console-img

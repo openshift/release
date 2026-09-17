@@ -16,6 +16,15 @@ SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/
 CONTAINER_NAME="tft-iperf3-server"
 echo "Cleaning up any leftover iperf3 container on bastion..."
 ssh ${SSH_OPTS} root@${REMOTE_HOST} "podman rm -f ${CONTAINER_NAME}" || true
+FIREWALL_PORT_ADDED=false
+if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "firewall-cmd --query-port=5201/tcp" 2>/dev/null; then
+    echo "Opening firewall port 5201/tcp for iperf3 on bastion..."
+    ssh ${SSH_OPTS} root@${REMOTE_HOST} "firewall-cmd --add-port=5201/tcp"
+    FIREWALL_PORT_ADDED=true
+else
+    echo "Firewall port 5201/tcp already open on bastion"
+fi
+
 echo "Starting iperf3 server container '${CONTAINER_NAME}' on bastion ${REMOTE_HOST}..."
 ssh ${SSH_OPTS} root@${REMOTE_HOST} \
     "podman run -d --rm --name ${CONTAINER_NAME} --network host ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest iperf3 -s -p 5201"
@@ -23,6 +32,10 @@ ssh ${SSH_OPTS} root@${REMOTE_HOST} \
 cleanup() {
     echo "Stopping iperf3 server container on bastion..."
     ssh ${SSH_OPTS} root@${REMOTE_HOST} "podman stop ${CONTAINER_NAME}" || true
+    if [[ "${FIREWALL_PORT_ADDED}" == "true" ]]; then
+        echo "Closing firewall port 5201/tcp on bastion..."
+        ssh ${SSH_OPTS} root@${REMOTE_HOST} "firewall-cmd --remove-port=5201/tcp" || echo "WARNING: Failed to close firewall port 5201/tcp"
+    fi
 }
 trap cleanup EXIT
 
@@ -35,24 +48,15 @@ cp "${SHARED_DIR}/.env" .env
 echo "Verifying cluster access..."
 oc get nodes
 
-# Select two worker-dpu nodes
-TFT_SERVER_NODE=$(oc get nodes --no-headers | grep worker-dpu | awk 'NR==1 {print $1}')
-TFT_CLIENT_NODE=$(oc get nodes --no-headers | grep worker-dpu | awk 'NR==2 {print $1}')
-
-if [[ -z "${TFT_SERVER_NODE}" ]] || [[ -z "${TFT_CLIENT_NODE}" ]]; then
-    echo "ERROR: Need at least 2 worker-dpu nodes, found:"
-    oc get nodes --no-headers | grep worker-dpu || true
-    exit 1
-fi
-
-echo "TFT_SERVER_NODE=${TFT_SERVER_NODE}"
-echo "TFT_CLIENT_NODE=${TFT_CLIENT_NODE}"
-
-export TFT_SERVER_NODE
-export TFT_CLIENT_NODE
 export TFT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export TFT_EXTERNAL_SERVER="${REMOTE_HOST}:5201"
 
 echo "=== Running DPF Kubernetes Traffic Flow Tests ==="
 echo "TFT_EXTERNAL_SERVER=${TFT_EXTERNAL_SERVER}"
-make run-traffic-flow-tests
+rc=0
+make run-traffic-flow-tests || rc=$?
+
+echo "Copying TFT config to artifacts..."
+cp repos/kubernetes-traffic-flow-tests/tft-config.yaml "${ARTIFACT_DIR}/tft-config.yaml" 2>/dev/null || echo "WARNING: TFT config file not found"
+
+exit $rc

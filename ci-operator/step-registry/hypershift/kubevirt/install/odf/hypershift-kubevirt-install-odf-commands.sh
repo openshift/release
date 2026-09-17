@@ -19,7 +19,7 @@ then
 fi
 
 ODF_CATALOG_SOURCE="${ODF_SUBSCRIPTION_SOURCE}"
-if oc get packagemanifest -l "catalog=${ODF_SUBSCRIPTION_SOURCE}" -n openshift-marketplace -o name 2>/dev/null | grep -q 'odf-operator'; then
+if oc get packagemanifest -l "catalog=${ODF_SUBSCRIPTION_SOURCE}" -n openshift-marketplace -o name 2>/dev/null | grep 'packagemanifest.packages.operators.coreos.com/odf-operator$' >/dev/null; then
   echo "odf-operator package found in ${ODF_SUBSCRIPTION_SOURCE} catalog"
   ODF_OPERATOR_CHANNEL=$(oc get packagemanifest -l "catalog=${ODF_SUBSCRIPTION_SOURCE}" -n openshift-marketplace \
     -o jsonpath='{.items[?(@.metadata.name=="odf-operator")].status.channels[*].name}' | tr ' ' '\n' | sort -V | tail -1)
@@ -306,7 +306,7 @@ EOCATALOG
 
   echo "Waiting for odf-operator packagemanifest to appear in ODF catalog"
   for ((i=1; i <= 60; i++)); do
-    if oc get packagemanifest -l "catalog=${ODF_CATALOG_SOURCE}" -n openshift-marketplace -o name 2>/dev/null | grep -q 'odf-operator'; then
+    if oc get packagemanifest -l "catalog=${ODF_CATALOG_SOURCE}" -n openshift-marketplace -o name 2>/dev/null | grep 'packagemanifest.packages.operators.coreos.com/odf-operator$' >/dev/null; then
       echo "odf-operator package found in ODF catalog"
       break
     fi

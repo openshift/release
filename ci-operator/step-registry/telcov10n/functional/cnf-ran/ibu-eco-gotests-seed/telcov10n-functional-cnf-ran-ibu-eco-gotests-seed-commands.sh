@@ -86,14 +86,12 @@ echo "Inventory copied from SHARED_DIR and spoke inventory processed"
 
 echo ""
 echo "=== Step 1: Prepare IBU seed SNO and retrieve kubeconfig ==="
-SEED_VM_NAME="master-0.${CLUSTER_NAME}"
 
 cd /eco-ci-cd
 ansible-playbook playbooks/ran/ibu-prepare-spoke-sno.yml \
   -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
   --extra-vars "hub_cluster=${CLUSTER_NAME}" \
-  --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}" \
-  --extra-vars "seed_vm_name=${SEED_VM_NAME}"
+  --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}"
 
 echo ""
 echo "=== Step 2: Generate eco-gotests IBU seedgeneration script ==="
@@ -142,9 +140,22 @@ scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   "${ARTIFACT_DIR}/junit_eco_gotests/" || true
 rm -f "${PROJECT_DIR}/temp_ssh_key"
 
-# Save junit XMLs to SHARED_DIR with junit_ prefix for ibu-report step
+# ibu-report sends polarion_* files to Report Portal (POLARION_REPORT_PATH)
+# and junit_* files to the Polarion converter (JUNIT_REPORT_PATH).
+echo "Store Polarion and junit reports for reporter step"
+for f in "${ARTIFACT_DIR}/junit_eco_gotests/"report_*.xml; do
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f")
+    echo "Copying polarion report: ${filename} -> polarion_ibu_seed_${filename}"
+    cp "$f" "${SHARED_DIR}/polarion_ibu_seed_${filename}"
+  fi
+done
 for f in "${ARTIFACT_DIR}/junit_eco_gotests/"*.xml; do
-  [[ -f "$f" ]] && cp "$f" "${SHARED_DIR}/junit_ibu_seed_$(basename "$f")"
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f")
+    echo "Copying junit report: ${filename} -> junit_ibu_seed_${filename}"
+    cp "$f" "${SHARED_DIR}/junit_ibu_seed_${filename}"
+  fi
 done
 
 echo ""
@@ -166,5 +177,5 @@ rm -f /tmp/spoke-master-ssh-key
 echo ""
 echo "=== IBU Seed Eco-Gotests Complete ==="
 echo "Seed image: ${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
-echo "Seed spoke VM has been powered off and is ready for IBU upgrade"
+echo "Seed spoke has been powered off and is ready for IBU upgrade"
 

@@ -40,6 +40,8 @@ images:
         - destination_dir: .
           source_path: /go/src/github.com/openshift/backplane-cli
     to: backplane-ci-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -74,8 +76,9 @@ tests:
   container:
     from: backplane-ci-runner
   secret:
+    collection: sd-sre-secrets
+    group: backplane-cli-codecov-token
     mount_path: /tmp/secret
-    name: backplane-cli-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -84,8 +87,9 @@ tests:
     from: backplane-ci-runner
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: backplane-cli-codecov-token
     mount_path: /tmp/secret
-    name: backplane-cli-codecov-token
 - as: combined-release
   commands: |
     bash ci-release.sh
@@ -96,8 +100,9 @@ tests:
   postsubmit: true
   run_if_changed: ^VERSION.md$
   secret:
+    collection: sd-sre-secrets
+    group: backplane-cli-release-token
     mount_path: /tmp/secret
-    name: backplane-cli-release-token
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -85,14 +85,6 @@ wait_for_ipsec_tunnels() {
   expected_tunnels=$(( $(oc get nodes --no-headers | wc -l) - 1 ))
   echo "Expecting each ovn-ipsec-host pod to report $expected_tunnels tunnels Up"
 
-  declare -A pod_node_map
-  while IFS= read -r line; do
-    local pod node
-    pod=$(echo "$line" | awk '{print $1}')
-    node=$(echo "$line" | awk '{print $7}')
-    pod_node_map["$pod"]="$node"
-  done < <(oc get pods -n openshift-ovn-kubernetes -l app=ovn-ipsec -o wide --no-headers)
-
   declare -A wait_counts
   local status_file="${ARTIFACT_DIR}/ipsec-tunnel-status.txt"
   local deadline all_up
@@ -103,6 +95,14 @@ wait_for_ipsec_tunnels() {
 
   deadline=$(( $(date +%s) + ${IPSEC_WAIT_TIMEOUT:-600} ))
   while [[ $(date +%s) -lt $deadline ]]; do
+    # Fetch all pods on each loop, as they can respawn during initialize
+    declare -A pod_node_map
+    while IFS= read -r line; do
+      local pod node
+      pod=$(echo "$line" | awk '{print $1}')
+      node=$(echo "$line" | awk '{print $2}')
+      pod_node_map["$pod"]="$node"
+    done < <(oc get pods -n openshift-ovn-kubernetes -l app=ovn-ipsec -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName --no-headers)
     all_up=true
     : > "$status_file"
     echo "=== IPsec Tunnel Status ($(date -u)) ===" >> "$status_file"

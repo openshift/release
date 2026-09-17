@@ -141,9 +141,6 @@ validate_and_set_defaults() {
         exit 1
     fi
 
-    # Allow override of test scenarios
-    TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
-
     # exclude C00133 from test by default
     TEST_FILTERS="${TEST_FILTERS:-~DisconnectedOnly&;~Disruptive&;~C00133&}"
     local -a _test_filter_segments
@@ -238,7 +235,7 @@ show_usage() {
     echo "  INSTALL_KATA_RPM               - Install Kata RPM: true or false (default: true)"
     echo "  KATA_RPM_VERSION               - Kata RPM version (default: 3.17.0-3.rhaos4.19.el9)"
     echo "  SLEEP_DURATION                 - Sleep duration after tests (default: 0h)"
-    echo "  TEST_SCENARIOS                 - Test scenarios filter (default: sig-kata.*Kata Author)"
+    echo "  TEST_SCENARIOS                 - Test scenarios filter (default: \"sig-kata.*Kata Author\" or \"sig-kata.*run and verify cosigned pod\")"
     echo "  TEST_FILTERS                   - openshift-extended-test filters (default: ~DisconnectedOnly&;~Disruptive&)"
     echo "                                   Append ;~Cnnnnn& to skip a Polarion-style id appearing in case lines"
     echo "  TEST_TIMEOUT                   - Test timeout in minutes (default: 90)"
@@ -320,6 +317,17 @@ generate_workflow() {
     env_vars+=("AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}")
   fi
 
+  local test_scenarios
+  if [[ -n "${TEST_SCENARIOS:-}" ]]; then
+    test_scenarios="$TEST_SCENARIOS"
+  else
+    if [[ "$workload" = "coco" ]]; then
+      test_scenarios="sig-kata.*run and verify cosigned pod"
+    else
+      test_scenarios="sig-kata.*Kata Author"
+    fi
+  fi
+
   # Common
   env_vars+=(
     "CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE:-\"\"}"
@@ -333,7 +341,7 @@ generate_workflow() {
     "SLEEP_DURATION: ${SLEEP_DURATION}"
     "TEST_FILTERS: ${TEST_FILTERS}"
     "TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}"
-    "TEST_SCENARIOS: ${TEST_SCENARIOS}"
+    "TEST_SCENARIOS: ${test_scenarios}"
     "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     "TRUSTEE_URL: ${TRUSTEE_URL:-\"\"}"
   )

@@ -18,9 +18,9 @@ LOG_PREFIX="${JOB_SUFFIX}-$(date +%Y-%m-%d-%H-%M)"
 echo "Log prefix: ${LOG_PREFIX}"
 JOB_URL=""
 if [[ "$JOB_NAME_FULL" == *"rehearse"* ]]; then
-    JOB_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/${PULL_NUMBER:-}/${JOB_NAME_FULL}/${BUILD_ID:-}/"
+    JOB_URL="https://gcs.ci.openshift.org/gcs/test-platform-results-public/pr-logs/pull/openshift_release/${PULL_NUMBER:-}/${JOB_NAME_FULL}/${BUILD_ID:-}/"
 else
-    JOB_URL=" https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/${JOB_NAME_FULL}/${BUILD_ID:-}/"
+    JOB_URL=" https://gcs.ci.openshift.org/gcs/test-platform-results-public/logs/${JOB_NAME_FULL}/${BUILD_ID:-}/"
 fi
 
 
@@ -389,6 +389,5 @@ if [[ -f "${ARTIFACT_DIR}/diagnose-output.txt" ]]; then
 else
     echo "No diagnose output received from the hypervisor."
 fi
-cp "${SHARED_DIR}/kubeconfig.original" "${ARTIFACT_DIR}/" || true
 cp "${LOG_FILE}" "${ARTIFACT_DIR}/" || true
 cp /tmp/diagnose-prompt.txt ${ARTIFACT_DIR}/ || true

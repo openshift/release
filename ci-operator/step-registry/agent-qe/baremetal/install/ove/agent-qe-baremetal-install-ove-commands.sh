@@ -73,14 +73,16 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
      boot_selection="vcd"
    fi
    echo "Power on #${host} (${name})..."
-   HOST_ADDRESS=$(<"${SHARED_DIR}"/cluster_name).$(<"${CLUSTER_PROFILE_DIR}"/base_domain)
-   if ! timeout -s 9 15m ssh "${SSHOPTS[@]}" -p $((14000+"${HOST_ID}")) root@access."${HOST_ADDRESS}" prepare_host_for_boot \
-          --host "$bmc_address" \
-          --user "$bmc_user" \
-          --password "$bmc_pass" \
-          --vendor "$vendor" \
-          --bootmode "$boot_selection" \
-          --iso "$iso_path"; then
+   CONTAINER_NAME="haproxy-$(<"${SHARED_DIR}"/cluster_name)"
+   if ! timeout -s 9 15m ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" \
+        "nsenter -n -t \"\$(podman inspect -f '{{ .State.Pid }}' \"${CONTAINER_NAME}\")\" \
+          ssh -o StrictHostKeyChecking=no root@\"${OVE_ISO_STORAGE_HOST}\" prepare_host_for_boot \
+          --host \"${bmc_address}\" \
+          --user \"${bmc_user}\" \
+          --password \"${bmc_pass}\" \
+          --vendor \"${vendor}\" \
+          --bootmode \"${boot_selection}\" \
+          --iso \"${iso_path}\""; then
      echo "Failed to power on ${host} (${name})"
    fi
   ) &

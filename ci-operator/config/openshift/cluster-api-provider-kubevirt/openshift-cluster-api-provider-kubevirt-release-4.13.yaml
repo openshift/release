@@ -106,6 +106,8 @@ promotion:
     - hypershift-cli-e2e
     name: "4.13"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -141,9 +143,9 @@ tests:
       cli: latest
       commands: CNV_PRERELEASE_VERSION=4.13 ./hack/ci/install-cnv.sh
       credentials:
-      - mount_path: /etc/cnv-nightly-pull-credentials
-        name: openshift-cnv-quay-credentials
-        namespace: test-credentials
+      - collection: cnv-nightly-channel
+        group: pullsecret
+        mount_path: /etc/cnv-nightly-pull-credentials
       from: hypershift-cli-e2e
       resources:
         requests:
@@ -184,8 +186,8 @@ tests:
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
                   --e2e.platform=KubeVirt
       credentials:
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
+      - bundle: ci-pull-credentials
+        mount_path: /etc/ci-pull-credentials
         namespace: test-credentials
       dependencies:
       - env: OCP_IMAGE_LATEST

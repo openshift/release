@@ -118,6 +118,8 @@ handle_azure() {
     local PP_SUBNET_ID
     local PP_RESOURCE_GROUP
     local PP_NSG_ID
+    local PP_INSTANCE_SIZE
+    local PP_INSTANCE_SIZES
 
     IS_ARO=$(oc get crd clusters.aro.openshift.io &>/dev/null && echo true || echo false)
     # Note: Keep the following commands in sync with https://raw.githubusercontent.com/kata-containers/kata-containers/refs/heads/main/ci/openshift-ci/peer-pods-azure.sh
@@ -207,6 +209,46 @@ handle_azure() {
 
     create_ssh_key
 
+    # Select instance type based on workload: CoCo requires confidential VM sizes
+    if [[ "${WORKLOAD_TO_TEST}" == "coco" ]]; then
+        PP_INSTANCE_SIZE="${AZURE_CVM_INSTANCE_SIZE:-Standard_DC2as_v5}"
+        PP_INSTANCE_SIZES="${AZURE_CVM_INSTANCE_SIZES:-Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5}"
+
+        local sku_json
+        sku_json=$(az vm list-skus --location "${PP_REGION}" --size "${PP_INSTANCE_SIZE}" \
+            --query "[?name=='${PP_INSTANCE_SIZE}']" \
+            --output json 2>/dev/null || echo "[]")
+        local sku_count
+        sku_count=$(echo "${sku_json}" | jq 'length')
+        if [[ "${sku_count}" == "0" ]]; then
+            echo "ERROR: Confidential VM size ${PP_INSTANCE_SIZE} is not available in region ${PP_REGION}"
+            echo "CoCo workloads require a confidential VM size (DCas_v5 family). Either:"
+            echo "  - Deploy the cluster in a region that supports ${PP_INSTANCE_SIZE}"
+            echo "  - Set AZURE_CVM_INSTANCE_SIZE to a CVM type available in ${PP_REGION}"
+            echo "Available confidential VM sizes in ${PP_REGION}:"
+            local available_cvms
+            available_cvms=$(az vm list-skus --location "${PP_REGION}" \
+                --query "[?starts_with(name, 'Standard_DC') && contains(name, 'as_v5')].name" \
+                --output tsv 2>/dev/null)
+            if [[ -n "${available_cvms}" ]]; then
+                echo "${available_cvms}"
+            else
+                echo "  (none found — this region does not support confidential VMs)"
+            fi
+            exit 1
+        fi
+        local restricted_count
+        restricted_count=$(echo "${sku_json}" | jq '[.[] | select(.restrictions[]?.reasonCode == "NotAvailableForSubscription")] | length')
+        if [[ "${restricted_count}" != "0" ]]; then
+            echo "WARNING: ${PP_INSTANCE_SIZE} exists in ${PP_REGION} but may have subscription restrictions"
+        fi
+        echo "CoCo workload: using confidential VM size ${PP_INSTANCE_SIZE} in region ${PP_REGION}"
+    else
+        PP_INSTANCE_SIZE="${AZURE_PEERPODS_INSTANCE_SIZE:-Standard_B2als_v2}"
+        PP_INSTANCE_SIZES="${AZURE_PEERPODS_INSTANCE_SIZES:-Standard_B2als_v2,Standard_B2as_v2,Standard_D2as_v5,Standard_B4als_v2,Standard_D4as_v5,Standard_D8as_v5,Standard_NC64as_T4_v3,Standard_NC8as_T4_v3}"
+        echo "Peer-pods workload: using VM size ${PP_INSTANCE_SIZE} in region ${PP_REGION}"
+    fi
+
     # Creating peerpods-param-cm config map with all the cloud params needed for test case execution
     cat <<- EOF > "${PP_CONFIGM_PATH}"
     apiVersion: v1
@@ -217,8 +259,8 @@ handle_azure() {
     data:
       CLOUD_PROVIDER: "azure"
       VXLAN_PORT: "9000"
-      AZURE_INSTANCE_SIZE: "Standard_B2als_v2"
-      AZURE_INSTANCE_SIZES: Standard_B2als_v2,Standard_B2as_v2,Standard_D2as_v5,Standard_B4als_v2,Standard_D4as_v5,Standard_D8as_v5,Standard_NC64as_T4_v3,Standard_NC8as_T4_v3
+      AZURE_INSTANCE_SIZE: "${PP_INSTANCE_SIZE}"
+      AZURE_INSTANCE_SIZES: ${PP_INSTANCE_SIZES}
       AZURE_SSH_KEY_PUB: "${PP_SSH_KEY_PUB}"
       AZURE_SUBNET_ID: "${PP_SUBNET_ID}"
       AZURE_NSG_ID: "${PP_NSG_ID}"

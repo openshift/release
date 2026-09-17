@@ -13,6 +13,7 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.23-openshift-4.20
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 releases:
@@ -67,10 +68,10 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
+    report_template: '{{if eq .Status.State "success"}} :slack-green: *Quay stage
+      FULL performance* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{else}} :failed: *Quay stage FULL performance* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: aws-quay-qe
     env:
@@ -83,12 +84,36 @@ tests:
       LOOKBACK: "180"
       LOOKBACK_SIZE: "15"
       ORION_CONFIG: examples/quay-load-test-stable-stage.yaml
-      ORION_ENVS: ocp_version=4.20,quay_version=stable-stage,quay_load_test_index=quay-vegeta-results*,quay_image_push_pull_index=quay-push-pull*
+      ORION_ENVS: ocp_version=4.20,quay_version=quayio-stage,quay_load_test_index=quay-vegeta-results*,quay_image_push_pull_index=quay-push-pull*
       OUTPUT_FORMAT: JUNIT
       RUN_ORION: "true"
     test:
     - ref: quay-tests-test-stage-performance
     - ref: openshift-qe-orion
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quayio-stage-load-smoke
+  cron: 5 0,8 * * 1-5
+  reporter_config:
+    channel: '#oncall-quay'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: *Quay stage
+      SETUP + PUSH/PULL smoke* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> {{else}} :failed: *Quay stage SETUP + PUSH/PULL smoke* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "5"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      CONCURRENCY: "1"
+      HITSIZE: "10"
+      PUSH_PULL_NUMBERS: "1"
+      TEST_PHASES: load
+    test:
+    - ref: quay-tests-test-stage-performance
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master

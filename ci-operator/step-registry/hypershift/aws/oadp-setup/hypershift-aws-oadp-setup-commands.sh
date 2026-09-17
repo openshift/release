@@ -97,22 +97,4 @@ spec:
     profile: default
 EOF
 
-# Create VolumeSnapshotLocation
-echo "Creating VolumeSnapshotLocation..."
-cat <<EOF | oc apply -f -
-apiVersion: velero.io/v1
-kind: VolumeSnapshotLocation
-metadata:
-  name: ${CLUSTER_NAME}
-  namespace: openshift-adp
-spec:
-  provider: aws
-  credential:
-    name: ${CLUSTER_NAME}
-    key: credentials
-  config:
-    region: ${REGION}
-    profile: default
-EOF
-
 echo "OADP setup complete"

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build09
     context: ci/prow/code-quality-checks
     decorate: true
     decoration_config:
@@ -70,7 +70,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build09
     context: ci/prow/hypershift-pr-check
     decorate: true
     decoration_config:
@@ -84,12 +84,13 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/osde2e-common
-        - --secret-dir=/secrets/osde2e-credentials
-        - --secret-dir=/secrets/osde2e-hypershift-credentials
         - --target=hypershift-pr-check
         command:
         - ci-operator
@@ -111,17 +112,14 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /secrets/osde2e-common
-          name: osde2e-common
-          readOnly: true
-        - mountPath: /secrets/osde2e-credentials
-          name: osde2e-credentials
-          readOnly: true
-        - mountPath: /secrets/osde2e-hypershift-credentials
-          name: osde2e-hypershift-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -131,18 +129,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
-      - name: osde2e-common
-        secret:
-          secretName: osde2e-common
-      - name: osde2e-credentials
-        secret:
-          secretName: osde2e-credentials
-      - name: osde2e-hypershift-credentials
-        secret:
-          secretName: osde2e-hypershift-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

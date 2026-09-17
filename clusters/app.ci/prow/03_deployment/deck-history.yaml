@@ -1,0 +1,302 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: deck-history
+  namespace: openshift
+parameters:
+  - description: The session secret for the component.
+    name: SESSION_SECRET
+    generate: expression
+    from: "[a-zA-Z0-9]{43}"
+  - description: "The namespace. Must come from a var or it will get stripped off"
+    name: NAMESPACE
+    value: ci
+objects:
+  # A second Deck serving the archived results bucket, test-platform-results,
+  # behind Red Hat SSO. The public Deck deliberately refuses to serve archived
+  # artifacts (it runs with --history-bucket, which blocks their bytes and links
+  # out instead); this instance is where a logged-in user can open them with the
+  # full set of Spyglass lenses.
+  #
+  # It never serves the bucket that jobs currently write to. Everything here is
+  # additive: no existing deployment, service or route is touched.
+  - apiVersion: v1
+    kind: Route
+    metadata:
+      namespace: ${NAMESPACE}
+      name: deck-history
+      annotations:
+        haproxy.router.openshift.io/timeout: "90s"
+    spec:
+      port:
+        targetPort: 8443
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: reencrypt
+      to:
+        kind: Service
+        name: deck-history
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      namespace: ${NAMESPACE}
+      name: deck-history
+      labels:
+        app: prow
+        component: deck-history
+      annotations:
+        service.alpha.openshift.io/serving-cert-secret-name: deck-history-tls
+    spec:
+      selector:
+        app: prow
+        component: deck-history
+      ports:
+        - name: main
+          port: 443
+          targetPort: 8443
+        - name: metrics
+          port: 9090
+          protocol: TCP
+          targetPort: 9090
+      type: ClusterIP
+  - kind: Deployment
+    apiVersion: apps/v1
+    metadata:
+      name: deck-history
+      namespace: ${NAMESPACE}
+      labels:
+        app: prow
+        component: deck-history
+    spec:
+      replicas: 2
+      revisionHistoryLimit: 2
+      selector:
+        matchLabels:
+          app: prow
+          component: deck-history
+      template:
+        metadata:
+          labels:
+            app: prow
+            component: deck-history
+        spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      component: deck-history
+                  topologyKey: topology.kubernetes.io/zone
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchLabels:
+                    component: deck-history
+                topologyKey: kubernetes.io/hostname
+          serviceAccountName: deck-history
+          initContainers:
+          - name: git-sync-init
+            resources:
+              requests:
+                memory: "256Mi"
+            command:
+            - /git-sync
+            args:
+            - --repo=https://github.com/openshift/release.git
+            - --ref=main
+            - --root=/tmp/git-sync
+            - --one-time=true
+            - --depth=1
+            - --link=release
+            image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+            volumeMounts:
+            - name: release
+              mountPath: /tmp/git-sync
+          containers:
+            - name: deck
+              # Upstream Deck: this instance serves the archive directly, so it
+              # must not be the forked image the public Deck runs, whose
+              # --history-bucket guard exists precisely to withhold these bytes.
+              image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260908-104d452f4
+              args:
+                - --config-path=/etc/config/config.yaml
+                - --supplemental-prow-config-dir=/etc/config
+                - --job-config-path=/var/repo/release/ci-operator/jobs
+                - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+                - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
+                - --github-oauth-config-file=/etc/oauth/config.json
+                - --github-app-id=$(GITHUB_APP_ID)
+                - --github-app-private-key-path=/etc/github/cert
+                - --github-endpoint=http://ghproxy
+                - --github-endpoint=https://api.github.com
+                - --github-graphql-endpoint=http://ghproxy/graphql
+                - --oauth-url=/github-login
+                - --tide-url=http://tide/
+                - --hook-url=http://hook-apps:8888/plugin-help
+                - --spyglass=true
+                - --cookie-secret=/etc/proxy/secrets/session_secret
+                - --gcs-credentials-file=/etc/test-platform-results-viewer/credentials.json
+                - --projected-token-file=/var/sa-token/token
+                # Archive browser: reruns belong on the public Deck, and the
+                # service account here has no permission to create ProwJobs.
+                - --rerun-creates-job=false
+                - --kubeconfig-dir=/etc/build-farm-credentials
+                - --kubeconfig-suffix=config
+                - --tenant-id=GlobalDefaultID
+                - --tenant-id=gangway-api
+              env:
+              - name: GITHUB_APP_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: openshift-prow-github-app
+                    key: appid
+              ports:
+                - name: main
+                  containerPort: 8080
+                - name: metrics
+                  containerPort: 9090
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: 8081
+                initialDelaySeconds: 120
+                periodSeconds: 10
+              readinessProbe:
+                httpGet:
+                  path: /healthz/ready
+                  port: 8081
+                initialDelaySeconds: 120
+                periodSeconds: 10
+                timeoutSeconds: 600
+              volumeMounts:
+                - name: github-app-credentials
+                  mountPath: /etc/github
+                  readOnly: true
+                - name: service-account-token
+                  mountPath: /var/sa-token
+                - name: test-platform-results-viewer
+                  mountPath: /etc/test-platform-results-viewer
+                  readOnly: true
+                - mountPath: /etc/proxy/secrets
+                  name: session-secret
+                - name: config
+                  mountPath: /etc/config
+                  readOnly: true
+                - name: extensions
+                  mountPath: /var/run/ko/static/extensions
+                  readOnly: true
+                - name: oauth-config
+                  mountPath: /etc/oauth
+                  readOnly: true
+                - name: release
+                  mountPath: /var/repo
+                - mountPath: /etc/build-farm-credentials
+                  name: build-farm-credentials
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "20Gi"
+                  cpu: "1"
+            - name: git-sync
+              command:
+              - /git-sync
+              args:
+              - --repo=https://github.com/openshift/release.git
+              - --ref=main
+              - --period=30s
+              - --root=/tmp/git-sync
+              - --max-failures=3
+              - --link=release
+              image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+              volumeMounts:
+              - name: release
+                mountPath: /tmp/git-sync
+              resources:
+                requests:
+                  memory: "512Mi"
+                  cpu: "100m"
+            - name: oauth-proxy
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "50m"
+              image: quay.io/openshift/origin-oauth-proxy:4.16
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 8443
+                  name: web
+              args:
+                - -provider=openshift
+                - -https-address=:8443
+                - -http-address=
+                - -email-domain=*
+                - -upstream=http://localhost:8080
+                - -client-id=system:serviceaccount:ci:deck-history
+                - -openshift-ca=/etc/pki/tls/cert.pem
+                - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                # No -openshift-sar: any account that can log in to app.ci may
+                # read the archive, which is the same audience the SSO-gated
+                # GCSWeb already serves. Narrowing both together is tracked
+                # separately; doing it here alone would only move users back to
+                # GCSWeb.
+                - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+                - -cookie-secret-file=/etc/proxy/secrets/session_secret
+                - -cookie-samesite=none
+                - -tls-cert=/etc/tls/private/tls.crt
+                - -tls-key=/etc/tls/private/tls.key
+              volumeMounts:
+                - mountPath: /etc/tls/private
+                  name: deck-history-tls
+                - mountPath: /etc/proxy/secrets
+                  name: session-secret
+          volumes:
+            - name: github-app-credentials
+              secret:
+                secretName: openshift-prow-github-app
+            - name: service-account-token
+              projected:
+                sources:
+                  - serviceAccountToken:
+                      path: token
+            - name: config
+              configMap:
+                name: config
+            - name: extensions
+              configMap:
+                name: deck-extensions
+            - name: oauth-config
+              secret:
+                secretName: github-app-credentials
+            - name: test-platform-results-viewer
+              secret:
+                secretName: test-platform-results-viewer
+            - name: session-secret
+              secret:
+                secretName: deck-history-session-secret
+            - name: deck-history-tls
+              secret:
+                secretName: deck-history-tls
+            - name: release
+              emptyDir: {}
+            - name: build-farm-credentials
+              secret:
+                secretName: deck
+  - apiVersion: policy/v1
+    kind: PodDisruptionBudget
+    metadata:
+      namespace: ${NAMESPACE}
+      name: deck-history
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          app: prow
+          component: deck-history
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      namespace: ${NAMESPACE}
+      name: deck-history-session-secret
+    stringData:
+      session_secret: "${SESSION_SECRET}="

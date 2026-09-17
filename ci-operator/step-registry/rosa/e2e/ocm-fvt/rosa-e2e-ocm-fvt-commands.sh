@@ -8,7 +8,7 @@ if [[ -z "${OCM_FVT_JOB_NAME:-}" ]]; then
   exit 1
 fi
 
-JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results-public/"
 if [[ -n "${PULL_NUMBER:-}" ]]; then
   JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
 else
@@ -132,9 +132,23 @@ old_umask=$(umask)
 umask 077
 podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
 prom_pf_pid=""
+pf_watchdog_pid=""
+pf_pid_file=""
 appsre_kubeconfig=""
 cleanup_ocm_fvt() {
-  if [[ -n "${prom_pf_pid}" ]]; then
+  if [[ -n "${pf_watchdog_pid}" ]]; then
+    kill "${pf_watchdog_pid}" 2>/dev/null || true
+    wait "${pf_watchdog_pid}" 2>/dev/null || true
+  fi
+  if [[ -n "${pf_pid_file}" && -f "${pf_pid_file}" ]]; then
+    local cur_pid
+    cur_pid="$(cat "${pf_pid_file}" 2>/dev/null || true)"
+    if [[ -n "${cur_pid}" ]]; then
+      kill "${cur_pid}" 2>/dev/null || true
+      wait "${cur_pid}" 2>/dev/null || true
+    fi
+    rm -f "${pf_pid_file}"
+  elif [[ -n "${prom_pf_pid}" ]]; then
     kill "${prom_pf_pid}" 2>/dev/null || true
     wait "${prom_pf_pid}" 2>/dev/null || true
   fi
@@ -161,10 +175,6 @@ if [[ -n "${hive_kubeconfig}" ]]; then
   echo "http_proxy=${backplane_proxy_url}" >> "${podman_env_file}"
 fi
 
-if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
-  echo "ENABLE_JIRA_REPORTING=true" >> "${podman_env_file}"
-fi
-
 if [[ -n "${OCM_FVT_OCM_ENV:-}" ]]; then
   echo "OCM_ENV=${OCM_FVT_OCM_ENV}" >> "${podman_env_file}"
 fi
@@ -174,6 +184,17 @@ if [[ -n "${OCM_FVT_EXTRA_ENVS:-}" ]]; then
     [[ -z "${line}" ]] && continue
     echo "${line}" >> "${podman_env_file}"
   done <<< "${OCM_FVT_EXTRA_ENVS}"
+fi
+
+# Simple backplane credential export from cs-qe-credentials.
+if [[ "${OCM_FVT_BACKPLANE_CREDS:-false}" == "true" ]]; then
+  if [[ -f /usr/local/cs-qe-credentials/backplane_client_id ]]; then
+    echo "BACKPLANE_CLIENT_ID=$(cat /usr/local/cs-qe-credentials/backplane_client_id)" >> "${podman_env_file}"
+  fi
+  if [[ -f /usr/local/cs-qe-credentials/backplane_client_secret ]]; then
+    echo "BACKPLANE_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/backplane_client_secret)" >> "${podman_env_file}"
+  fi
+  echo "HTTPS_PROXY=$(cat /usr/local/cs-qe-credentials/backplane_proxy_url)" >> "${podman_env_file}"
 fi
 
 osdfm_qe_creds_dir=/usr/local/osdfm-qe-credentials
@@ -238,14 +259,21 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
 fi
 
 cred_sources='source /usr/local/cs-qe-credentials/ocm-tokens'
-if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
-  cred_sources="${cred_sources}; source /usr/local/cs-qe-credentials/jira-cred"
-fi
 
 env -i bash --norc --noprofile -c "
   ${cred_sources}
   env | grep -v '^_='
 " >> "${podman_env_file}"
+
+# SREP service account: use backplane client credentials so tests don't depend
+# on expiring offline tokens for the SREP role.
+if [[ -f /usr/local/cs-qe-credentials/backplane_client_id && -f /usr/local/cs-qe-credentials/backplane_client_secret ]]; then
+  [[ $- == *x* ]] && WAS_TRACING_SREP=true || WAS_TRACING_SREP=false
+  set +x
+  echo "SREP_CLIENT_ID=$(cat /usr/local/cs-qe-credentials/backplane_client_id)" >> "${podman_env_file}"
+  echo "SREP_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/backplane_client_secret)" >> "${podman_env_file}"
+  $WAS_TRACING_SREP && set -x
+fi
 
 podman_args=(
   --authfile /usr/local/cs-qe-credentials/.dockerconfigjson
@@ -274,9 +302,6 @@ podman_args+=("-v" "${ocm_fvt_output}:/ocm-backend-tests/output:z")
 podman_args+=(--rm)
 
 ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
-if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
-  ocmtest_args+=(--reportJiraTicket)
-fi
 
 # osdfm post-alerts: port-forward AppSRE Prom; tests use a hard-coded in-cluster URL.
 # --add-host maps that hostname to host-gateway:9090 (backplane monitoring is not available).
@@ -368,6 +393,56 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && "${OCM_FVT_USE_BACKPLANE:-false}" == 
       echo "NO_PROXY=${prom_host_fqdn},localhost,127.0.0.1" >> "${podman_env_file}"
       echo "no_proxy=${prom_host_fqdn},localhost,127.0.0.1" >> "${podman_env_file}"
       echo "Prometheus PF ready (pid ${prom_pf_pid}); podman --add-host ${prom_host_fqdn}:host-gateway"
+
+      # Start background watchdog to monitor and auto-restart PF if it drops.
+      pf_pid_file="$(mktemp /tmp/prom-pf-pid.XXXXXX)"
+      echo "${prom_pf_pid}" > "${pf_pid_file}"
+      (
+        wd_kubeconfig="${appsre_kubeconfig}"
+        wd_ns="${prom_ns}"
+        wd_svc="${prom_svc}"
+        wd_log="${pf_log}"
+        wd_pid_file="${pf_pid_file}"
+        while true; do
+          sleep 10
+          if ! curl -sS -o /dev/null --max-time 2 \
+            "http://127.0.0.1:9090/api/v1/query?query=up" 2>/dev/null; then
+            echo "[PF-WATCHDOG] $(date '+%Y-%m-%d %H:%M:%S') Port-forward health check failed, restarting..."
+            old_pid="$(cat "${wd_pid_file}" 2>/dev/null || true)"
+            if [[ -n "${old_pid}" ]]; then
+              kill "${old_pid}" 2>/dev/null || true
+              for (( wd_wait=0; wd_wait<10; wd_wait++ )); do
+                if ! kill -0 "${old_pid}" 2>/dev/null; then
+                  break
+                fi
+                sleep 1
+              done
+            fi
+            KUBECONFIG="${wd_kubeconfig}" oc -n "${wd_ns}" port-forward \
+              --address 0.0.0.0 "svc/${wd_svc}" 9090:9090 \
+              >>"${wd_log}" 2>&1 &
+            new_pid=$!
+            echo "${new_pid}" > "${wd_pid_file}"
+            echo "[PF-WATCHDOG] New port-forward started (pid ${new_pid})"
+            wd_ready=false
+            for (( wd_i=0; wd_i<30; wd_i++ )); do
+              if curl -sS -o /dev/null --max-time 1 \
+                "http://127.0.0.1:9090/api/v1/query?query=up" 2>/dev/null; then
+                wd_ready=true
+                break
+              fi
+              sleep 1
+            done
+            if [[ "${wd_ready}" == "true" ]]; then
+              echo "[PF-WATCHDOG] Port-forward restored (pid ${new_pid})"
+            else
+              echo "[PF-WATCHDOG] WARNING: Port-forward restart failed" >&2
+            fi
+          fi
+        done
+      ) &
+      pf_watchdog_pid=$!
+      echo "[PF-WATCHDOG] Started background port-forward watchdog (pid ${pf_watchdog_pid})"
     fi
 
     # Restore Hive kubeconfig; port-forward stays up until EXIT cleanup.

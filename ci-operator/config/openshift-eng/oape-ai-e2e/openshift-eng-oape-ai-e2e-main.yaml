@@ -23,6 +23,8 @@ promotion:
     name: ai-e2e-agent
     namespace: oape
     tag_by_commit: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -53,9 +55,9 @@ tests:
         set +x
         python /app/ghpat_server.py > "${SHARED_DIR}/gh-token"
       credentials:
-      - mount_path: /var/run/github-app
-        name: openshift-app-platform-shift-github-bot
-        namespace: test-credentials
+      - collection: oape-ai-e2e
+        group: openshift-app-platform-shift-github-bot
+        mount_path: /var/run/github-app
       from: gh-token-minter
       resources:
         requests:
@@ -81,9 +83,9 @@ tests:
 
         gh auth setup-git && python3.11 main.py
       credentials:
-      - mount_path: /var/run/gcloud-adc
-        name: oap-lts-claude-gcp-vertex-sa
-        namespace: test-credentials
+      - collection: oape-ai-e2e
+        group: oap-lts-claude-gcp-vertex-sa
+        mount_path: /var/run/gcloud-adc
       from: agent-worker
       resources:
         requests:

@@ -4,8 +4,6 @@ metadata:
   name: cli-yq
   namespace: ci
 spec:
-  external_registries:
-  - quay.io/openshift/ci
   build_spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -13,18 +11,18 @@ spec:
       pushSecret:
         name: registry-push-credentials-ci-images-mirror
       to:
-        kind: ImageStreamTag
-        namespace: ocp
-        name: cli-yq:latest
+        kind: DockerImage
+        name: quay.io/openshift/ci:ocp_cli-yq_latest
     source:
       dockerfile: |
-        FROM quay.io/openshift/ci:ocp_4.18_cli
+        FROM registry.access.redhat.com/ubi9/ubi
         RUN ARCH=$(uname -m) && \
             case "$ARCH" in \
                 x86_64) ARCH='amd64' ;; \
                 aarch64) ARCH='arm64' ;; \
                 *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
             esac && \
+            curl -L https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/stable/openshift-client-linux.tar.gz | tar -xzf - -C /usr/bin/ oc && \
             curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${ARCH} -o /tmp/yq && chmod +x /tmp/yq
         RUN yum install -y jq
       type: Dockerfile
@@ -32,6 +30,7 @@ spec:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: quay.io/openshift/ci:ocp_4.18_cli
+          name: registry.access.redhat.com/ubi9/ubi
         imageOptimizationPolicy: SkipLayers
       type: Docker
+    successfulBuildsHistoryLimit: 1

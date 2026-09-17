@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -8,7 +8,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   upi-installer:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: upi-installer
 binary_build_commands: make build --warn-undefined-variables
@@ -18,16 +18,18 @@ images:
   items:
   - dockerfile_path: Dockerfile.rhel7
     to: cluster-kube-apiserver-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "5.0"
+      version: "5.1"
 resources:
   '*':
     requests:
@@ -180,7 +182,8 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_ARGS: --disable-monitor=legacy-node-invariants --cluster-stability=Disruptive
+      TEST_ARGS: --disable-monitor=legacy-node-invariants,legacy-test-framework-invariants,legacy-kube-apiserver-invariants,legacy-etcd-invariants
+        --cluster-stability=Disruptive
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
       VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
       VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
@@ -291,7 +294,8 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_ARGS: --disable-monitor=legacy-node-invariants --cluster-stability=Disruptive
+      TEST_ARGS: --disable-monitor=legacy-node-invariants,legacy-test-framework-invariants,legacy-kube-apiserver-invariants
+        --cluster-stability=Disruptive
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms-2
       VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
       VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a

@@ -1,7 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+STAGING_LIVE=false
+
+shutdown() {
+    echo "==> Shutting down staging environment..."
+    trap '' TERM INT
+    pkill -TERM '^(sippy|httpd|cloudflared)$' 2>/dev/null || true
+    sleep 2
+    pkill -KILL '^(sippy|httpd|cloudflared)$' 2>/dev/null || true
+    podman stop --all --time 5 >/dev/null 2>&1 || true
+}
+
+# After the environment is live, TERM (timeout/abort) is a successful end.
+trap 'shutdown; if [[ "${STAGING_LIVE}" == "true" ]]; then exit 0; else exit 1; fi' TERM INT
 
 cd /workspace
 
@@ -147,7 +159,7 @@ if [[ -n "${TUNNEL_URL}" ]]; then
 HTMLEOF
 
     if gcloud auth activate-service-account --quiet --key-file "${GCS_SA}" 2>/dev/null && \
-       gsutil -q cp /tmp/custom-link-staging.html "gs://test-platform-results/${GCS_PATH}/custom-link-staging.html"; then
+       gsutil -q cp /tmp/custom-link-staging.html "gs://test-platform-results-public/${GCS_PATH}/custom-link-staging.html"; then
       echo "    Uploaded to Spyglass."
       URL_SURFACED=true
     else
@@ -192,6 +204,9 @@ if [[ "${URL_SURFACED}" != "true" ]]; then
 fi
 
 echo "==> Staging environment is live. Sleeping for ${STAGING_TIMEOUT} seconds..."
+STAGING_LIVE=true
 sleep "${STAGING_TIMEOUT}"
 
 echo "==> Staging timeout reached. Shutting down."
+shutdown
+exit 0

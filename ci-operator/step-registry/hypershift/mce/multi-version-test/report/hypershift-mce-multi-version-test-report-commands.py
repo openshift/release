@@ -18,7 +18,7 @@ SAMPLE_SPREADSHEET_ID = "1g4EFkOrcr6D4WJKo4O8bmOK7txA4ZRTfqFazHtCoM3E"
 # The tab id is available in the URL of the template tab after "gid="
 TEMPLATE_TAB_ID = "1597804194"
 TOKEN_PATH = "/secret/ga-gsheet/googlesheet-api-token"
-GCSWEB_BASE = "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+GCSWEB_BASE = "https://gcs.ci.openshift.org/gcs/test-platform-results-public"
 TEST_STEPS = [
     "conformance-tests", "csi-conformance-tests",
     "hypershift-aws-run-e2e-external", "hypershift-aws-run-e2e-nested",
@@ -109,7 +109,7 @@ def determine_status(job_status, job_url, job_name):
         return "\U0001F534" # 🔴 install failed, trigger failed, etc.
 
     # Extract job name and build ID from Prow deck URL
-    # e.g. https://prow.ci.openshift.org/view/gs/test-platform-results/logs/<job-name>/<build-id>
+    # e.g. https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/<job-name>/<build-id>
     url_match = re.search(r'/logs/([^/]+)/(\d+)', job_url)
     if not url_match:
         return "\U0001F534"

@@ -5,6 +5,11 @@ build_root:
     tag: rhel-9-release-golang-1.20-openshift-4.17
 prowgen:
   enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -13,14 +18,165 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: censor-check-container
+  commands: |
+    # Mimics openshift-qe-orion-cudn-density: xtrace echoes the assignment, the
+    # value is interpolated into a derived string, and the step exits non-zero so
+    # ci-operator copies the pod log into its own (publicly readable) build-log.txt.
+    set -x
+    VALUE=$(<"/var/censor-check/first-secret")
+    SENTINEL="https://user:${VALUE}@example.com"
+    echo "sentinel-begin ${SENTINEL} sentinel-end"
+    exit 1
+  container:
+    from: src
+  secrets:
+  - collection: psalajova-first-secret
+    field: first-secret
+    group: test
+    mount_path: /var/censor-check
+- as: censor-check-multistage
+  steps:
+    test:
+    - as: print-gsm-secret
+      commands: |
+        # Mimics openshift-qe-orion-cudn-density: xtrace echoes the assignment, the
+        # value is interpolated into a derived string, and the step exits non-zero so
+        # ci-operator copies the pod log into its own (publicly readable) build-log.txt.
+        set -x
+        VALUE=$(<"/var/censor-check/first-secret")
+        SENTINEL="https://user:${VALUE}@example.com"
+        echo "sentinel-begin ${SENTINEL} sentinel-end"
+        exit 1
+      credentials:
+      - collection: psalajova-first-secret
+        field: first-secret
+        group: test
+        mount_path: /var/censor-check
+      from: src
+      resources:
+        requests:
+          cpu: 10m
+- as: censor-check-multiline
+  steps:
+    test:
+    - as: probe-multiline
+      commands: |
+        # Probes whether the censor masks a SUBSTRING of a registered secret.
+        # AddSecrets -> ReloadingCensorer.Refresh registers each value whole, plus
+        # its TrimSpace'd and base64 forms, and never splits on newlines. So a
+        # single line lifted out of a multi-line credential file should match no
+        # replacement and leak, even though the whole file is censored.
+        #
+        # Payload is AWS's published dummy key pair, so a leak here costs nothing.
+        set -x
+        CRED_FILE=/var/censor-check/multiline-cred
+
+        # Expected: censored, the whole value is what got registered.
+        WHOLE=$(<"${CRED_FILE}")
+        echo "whole-begin ${WHOLE} whole-end"
+
+        # Expected: LEAKS. One line of a multi-line registered value.
+        LINE=$(grep aws_secret_access_key "${CRED_FILE}")
+        echo "line-begin ${LINE} line-end"
+
+        # Expected: LEAKS. Just the key, the shape a step would actually export.
+        BARE=$(awk -F' = ' '/aws_secret_access_key/ {print $2}' "${CRED_FILE}")
+        echo "bare-begin ${BARE} bare-end"
+
+        exit 1
+      credentials:
+      - collection: psalajova-first-secret
+        field: multiline-cred
+        group: test
+        mount_path: /var/censor-check
+      from: src
+      resources:
+        requests:
+          cpu: 10m
+- as: censor-check-cluster-profile
+  steps:
+    cluster_profile: aws-perfscale-qe
+    test:
+    - as: print-gsm-and-profile
+      commands: |
+        # Reproduces the leak shape of
+        # periodic-ci-openshift-eng-ocp-perfscale-main-aws-5.0-nightly-x86-cudn-density-single-ns-1000-24nodes:
+        # `set -x` traces each assignment, values are interpolated into derived
+        # strings, and the step exits non-zero so ci-operator copies the pod log
+        # into its own publicly readable build-log.txt.
+        #
+        # The two halves exercise different censoring paths:
+        #   CSI credential  -> only censored via RegisterGSMCredentialsForCensoring
+        #   cluster profile -> mounted as a k8s Secret, so already recorded by
+        #                      secretrecordingclient when getProfileData reads it
+        set -x
+
+        ES_PASSWORD=$(<"/var/censor-check/first-secret")
+        ES_USERNAME=ocp-qe
+        ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@search.example.com"
+        echo "csi-begin ${ES_SERVER} csi-end"
+
+        AWS_CRED=$(<"${CLUSTER_PROFILE_DIR}/.awscred")
+        echo "profile-awscred-begin ${AWS_CRED} profile-awscred-end"
+
+        # Cover whatever else the profile carries; field names vary per profile.
+        for f in "${CLUSTER_PROFILE_DIR}"/*; do
+          [[ -f "${f}" ]] || continue
+          CP_VALUE=$(<"${f}")
+          echo "profile-begin $(basename "${f}")=${CP_VALUE} profile-end"
+        done
+
+        exit 1
+      credentials:
+      - collection: psalajova-first-secret
+        field: first-secret
+        group: test
+        mount_path: /var/censor-check
+      from: src
+      resources:
+        requests:
+          cpu: 10m
 - as: test-credentials
   steps:
     workflow: psalajova-test
 - as: test-gsm-secrets
   commands: |
-    echo "=== auto-discovery (collection+group, all fields) ==="
-    ls -la /var/my-secrets
-    cat /var/my-secrets/*
+    set -euo pipefail
+    # Assert that each expected mount directory exists and contains only
+    # non-empty secret files. No secret values are printed, only byte counts.
+    # Only the mount paths declared in this test's `secrets` stanza are checked,
+    # so pre-existing directories in the image (e.g. /var/adm) never affect the
+    # result.
+    assert_nonempty() {
+      local dir="$1"
+      echo "=== checking ${dir} ==="
+      if [[ ! -d "${dir}" ]]; then
+        echo "FAIL: expected mount directory ${dir} does not exist"
+        exit 1
+      fi
+      ls -la "${dir}"
+      local had_file=false f
+      # dotglob so keys like .dockerconfigjson are seen; the -f test skips the
+      # Kubernetes-internal ..data symlink and ..<timestamp> directory.
+      shopt -s nullglob dotglob
+      for f in "${dir}"/*; do
+        [[ -f "${f}" ]] || continue
+        if [[ ! -s "${f}" ]]; then
+          echo "FAIL: empty secret file ${f}"
+          exit 1
+        fi
+        echo "OK: ${f} ($(wc -c < "${f}") bytes)"
+        had_file=true
+      done
+      shopt -u nullglob dotglob
+      if ! "${had_file}"; then
+        echo "FAIL: no secret files mounted in ${dir}"
+        exit 1
+      fi
+    }
+    assert_nonempty /var/my-secrets
+    echo "all expected secret mounts validated"
   container:
     from: src
   cron: 0 0 1 1 *
@@ -30,16 +186,54 @@ tests:
     mount_path: /var/my-secrets
 - as: test-gsm-secrets-mixed
   commands: |
-    echo "=== 1. auto-discovery (collection+group) ==="
-    ls -la /var/auto-discovery
-    echo "=== 2. explicit field (collection+group+field) ==="
-    ls -la /var/explicit-field-without-as
-    echo "=== 3. explicit field with as rename ==="
-    ls -la /var/explicit-as
-    echo "=== 4. bundle sync_to_cluster:false (CSI path, multi-collection) ==="
-    ls -la /var/bundle-csi
-    echo "=== 5. bundle sync_to_cluster:true (K8s Secret path) ==="
-    ls -la /var/bundle-k8s
+    set -euo pipefail
+    # Assert that each expected mount directory exists and contains only
+    # non-empty secret files. No secret values are printed, only byte counts.
+    # Only the mount paths declared in this test's `secrets` stanza are checked,
+    # so pre-existing directories in the image (e.g. /var/adm) never affect the
+    # result.
+    assert_nonempty() {
+      local dir="$1"
+      echo "=== checking ${dir} ==="
+      if [[ ! -d "${dir}" ]]; then
+        echo "FAIL: expected mount directory ${dir} does not exist"
+        exit 1
+      fi
+      ls -la "${dir}"
+      local had_file=false f
+      # dotglob so keys like .dockerconfigjson are seen; the -f test skips the
+      # Kubernetes-internal ..data symlink and ..<timestamp> directory.
+      shopt -s nullglob dotglob
+      for f in "${dir}"/*; do
+        [[ -f "${f}" ]] || continue
+        if [[ ! -s "${f}" ]]; then
+          echo "FAIL: empty secret file ${f}"
+          exit 1
+        fi
+        echo "OK: ${f} ($(wc -c < "${f}") bytes)"
+        had_file=true
+      done
+      shopt -u nullglob dotglob
+      if ! "${had_file}"; then
+        echo "FAIL: no secret files mounted in ${dir}"
+        exit 1
+      fi
+    }
+    for mount_dir in \
+      /var/auto-discovery \
+      /var/explicit-field-without-as \
+      /var/explicit-as \
+      /var/bundle-csi \
+      /var/bundle-k8s; do
+      assert_nonempty "${mount_dir}"
+    done
+    # Validate the `as:` rename: the login field must be mounted as renamed-login.
+    if [[ ! -f /var/explicit-as/renamed-login ]]; then
+      echo "FAIL: expected renamed file /var/explicit-as/renamed-login not found"
+      exit 1
+    fi
+    echo "OK: 'as:' rename validated - /var/explicit-as/renamed-login exists"
+    echo "all expected secret mounts validated"
   container:
     from: src
   cron: 0 0 1 1 *
@@ -60,6 +254,7 @@ tests:
     mount_path: /var/bundle-csi
   - bundle: gce-sa-credentials-gcs-publisher
     mount_path: /var/bundle-k8s
+    namespace: ci
 zz_generated_metadata:
   branch: master
   org: psalajova

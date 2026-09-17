@@ -409,7 +409,7 @@ EOF
 
 		run "oc get mcp,node"
 		run "oc get mcp worker -o yaml"
-		run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+		run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\") | {path, mode, overwrite}'"
 
 		return 1
 	}
@@ -593,13 +593,29 @@ function main {
 	# Extract source commit from catalog image for z-stream integration test builds.
 	# Only needed when ZSTREAM_VERSION is set — non-z-stream tests use pre-built images.
 	if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
-		local commit
 		local commit image_info_flags=""
 		if [[ "$DISCONNECTED" == "true" ]]; then
 			image_info_flags="--insecure -a /tmp/new-dockerconfigjson"
 		fi
-		commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
-			| jq -r '.config.config.Labels["vcs-ref"]')
+		local attempt
+		for attempt in 1 2 3; do
+			commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+				| jq -r '.config.config.Labels["vcs-ref"]') && break
+			if [[ ${attempt} -lt 3 ]]; then
+				echo "  oc image info attempt ${attempt}/3 failed, retrying in 20s..." >&2
+				sleep 20
+			fi
+		done
+		# Retry with pull-secret auth if unauthenticated attempts failed
+		if [[ -z "${commit}" || "${commit}" == "null" ]] && [[ "$DISCONNECTED" != "true" ]]; then
+			echo "Retrying oc image info with pull-secret authentication..."
+			for attempt in $(seq 1 3); do
+				commit=$(oc image info -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+					| jq -r '.config.config.Labels["vcs-ref"]') && break
+				echo "  oc image info (authenticated) attempt ${attempt}/3 failed, retrying in 20s..." >&2
+				sleep 20
+			done
+		fi
 		if [[ -z "${commit}" || "${commit}" == "null" ]]; then
 			echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
 			return 1

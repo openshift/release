@@ -43,6 +43,8 @@ promotion:
     - '*'
     namespace: hypershift
     tag: "4.22"
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -174,7 +176,7 @@ tests:
 - always_run: false
   as: e2e-aws
   capabilities:
-  - build-tmpfs
+  - arm64
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-aws
@@ -298,7 +300,7 @@ tests:
 - always_run: false
   as: e2e-aws-upgrade-hypershift-operator
   capabilities:
-  - build-tmpfs
+  - arm64
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
   steps:
     cluster_profile: hypershift-aws
@@ -312,7 +314,7 @@ tests:
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-override
   capabilities:
-  - build-tmpfs
+  - arm64
   run_if_changed: (/overrides\.yaml$)
   steps:
     cluster_profile: hypershift-aws
@@ -324,7 +326,7 @@ tests:
 - always_run: false
   as: e2e-aws-4-21
   capabilities:
-  - build-tmpfs
+  - arm64
   pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift-aws
@@ -350,8 +352,6 @@ tests:
       E2E_TEST_REGEX: ^TestCreateCluster$
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
-      ETCD_STORAGE_CLASS: gp3-csi
-      KUBEVIRT_CSI_INFRA: gp3-csi
       RUN_EXTERNAL_INFRA_TEST: "false"
     workflow: hypershift-kubevirt-e2e-aws
 - always_run: false
@@ -364,8 +364,6 @@ tests:
       COMPUTE_NODE_TYPE: c5n.metal
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
-      ETCD_STORAGE_CLASS: gp3-csi
-      KUBEVIRT_CSI_INFRA: gp3-csi
     workflow: hypershift-kubevirt-e2e-aws
 - always_run: false
   as: e2e-kubevirt-azure-ovn
@@ -466,7 +464,7 @@ tests:
 - always_run: false
   as: reqserving-e2e-aws
   capabilities:
-  - build-tmpfs
+  - arm64
   optional: true
   steps:
     cluster_profile: openshift-org-aws
@@ -477,12 +475,6 @@ tests:
   cron: 0 12 * * 5
   steps:
     workflow: hypershift-dependabot-triage
-- always_run: false
-  as: address-review-comments
-  optional: true
-  skip_if_only_changed: .*
-  steps:
-    workflow: hypershift-review-agent-trigger
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

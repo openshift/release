@@ -32,6 +32,7 @@ promotion:
   - name: "4.22"
     namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -65,8 +66,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: must-gather-operator-codecov-token
     mount_path: /tmp/secret
-    name: must-gather-operator-codecov-token
   skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: lint
   commands: make lint
@@ -110,9 +112,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
@@ -147,9 +149,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
@@ -182,9 +184,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:

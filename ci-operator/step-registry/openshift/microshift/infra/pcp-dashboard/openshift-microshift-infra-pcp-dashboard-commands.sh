@@ -18,7 +18,7 @@ if [ "${JOB_TYPE}" == "presubmit" ]; then
 else
     GCS_JOB_PATH="logs/${JOB_NAME}/${BUILD_ID}"
 fi
-GCS_BASE="gs://test-platform-results/${GCS_JOB_PATH}"
+GCS_BASE="gs://test-platform-results-public/${GCS_JOB_PATH}"
 
 # Find scenario-info path (wildcard handles different workflow names)
 SCENARIO_GCS=$(gsutil ls -d "${GCS_BASE}/artifacts/*/openshift-microshift-e2e-metal-tests/artifacts/scenario-info/" 2>/dev/null | head -1 || true)
@@ -53,7 +53,7 @@ bash "${PCP_SCRIPTS}/generate-dashboard.sh" \
 # Spyglass does not execute JavaScript in custom-link HTML, so the toggle
 # provides a link to the full interactive dashboard instead.
 STEP_NAME="openshift-microshift-infra-pcp-dashboard"
-GCSWEB_BASE="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+GCSWEB_BASE="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
 
 WORKFLOW_NAME=""
 if [ -n "${SCENARIO_GCS}" ]; then

@@ -12,6 +12,8 @@ images:
   items:
   - dockerfile_path: bundle.Dockerfile
     to: functions-operator-bundle
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     integration:
@@ -29,7 +31,7 @@ tests:
   commands: operator-sdk bundle validate ./bundle --select-optional suite=operatorframework
   container:
     from: operator-sdk
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  run_if_changed: ^bundle/|^bundle\.Dockerfile$
 - as: e2e-install-aws
   cluster_claim:
     architecture: amd64
@@ -38,10 +40,22 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.22"
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  run_if_changed: ^bundle/|^bundle\.Dockerfile$
   steps:
     allow_best_effort_post_steps: true
     test:
+    - as: apply-mirror-set
+      cli: latest
+      commands: |
+        oc apply -f .tekton/images-mirror-set.yaml
+        # Phase 1: Wait for MCP to START updating (proves MCO picked up the change)
+        oc wait mcp master worker --for='condition=Updating=True' --timeout=5m
+        # Phase 2: Wait for MCP to FINISH updating
+        oc wait mcp master worker --for='condition=Updated=True' --timeout=15m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: install
       cli: latest
       commands: |

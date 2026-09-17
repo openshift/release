@@ -187,6 +187,20 @@ for ISSUE_KEY in "${ISSUE_KEYS[@]}"; do
     fi
 done
 
+# Emit the claude_session_metrics BigQuery autodl so this step's Vertex spend
+# is reported on the CI cost dashboards. OTEL from every agentic_ci call above
+# has been accumulated in ${OTEL_LOG}; a single row aggregates all issues.
+# extract_metrics.py ships in the claude-ai-helpers image. Best-effort: never
+# fail the step on a metrics-extraction problem.
+EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+if [[ -s "${OTEL_LOG}" && -f "${EXTRACT_METRICS}" ]]; then
+    python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" \
+        "${ARTIFACT_DIR}/claude-session-metrics-autodl.json" \
+        || echo "Warning: session metrics extraction failed"
+else
+    echo "No OTEL data collected or extract_metrics.py not found; skipping session metrics"
+fi
+
 echo ""
 echo "=== Summary ==="
 echo "Processed: ${PROCESSED}, Succeeded: ${PASSED}, Failed: ${FAILED}"

@@ -23,6 +23,8 @@ images:
         - src
         - builder
     to: operator-e2e
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -49,8 +51,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: certman-operator-codecov-token
     mount_path: /tmp/secret
-    name: certman-operator-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -59,8 +62,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: certman-operator-codecov-token
     mount_path: /tmp/secret
-    name: certman-operator-codecov-token
 - as: lint
   commands: make lint
   container:
@@ -84,6 +88,7 @@ tests:
       BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-61837
       GINKGO_FOCUS: Certman Operator Hive
       OPERATOR_NAME: certman-operator
+      OPERATOR_NAMESPACE: certman-operator
     workflow: rosa-hive-e2e
 - as: hive-e2e-promotion-int
   capabilities:
@@ -95,8 +100,10 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
   restrict_network_access: false
   steps:
     cluster_profile: rosa-e2e-01
@@ -105,6 +112,7 @@ tests:
       BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-61837
       GINKGO_FOCUS: Certman Operator Hive
       OPERATOR_NAME: certman-operator
+      OPERATOR_NAMESPACE: certman-operator
     workflow: rosa-hive-e2e
 - as: hive-e2e-promotion-stage
   capabilities:
@@ -116,8 +124,10 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
   restrict_network_access: false
   steps:
     cluster_profile: rosa-e2e-01
@@ -126,6 +136,7 @@ tests:
       BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-61837
       GINKGO_FOCUS: Certman Operator Hive
       OPERATOR_NAME: certman-operator
+      OPERATOR_NAMESPACE: certman-operator
     workflow: rosa-hive-e2e
 zz_generated_metadata:
   branch: master

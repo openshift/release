@@ -29,6 +29,10 @@ promotion:
     namespace: stolostron
   - name: "5.1"
     namespace: stolostron
+  - name: "5.2"
+    namespace: stolostron
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -121,8 +125,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
   skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: sonarcloud-post-submit
   commands: |
@@ -140,8 +145,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
   skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: latest-operator-image-mirror
   postsubmit: true
@@ -184,6 +190,12 @@ tests:
   steps:
     env:
       DESTINATION_BRANCH: release-5.1
+    workflow: ocm-ci-fastforward
+- as: fast-forward-5-2
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: release-5.2
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

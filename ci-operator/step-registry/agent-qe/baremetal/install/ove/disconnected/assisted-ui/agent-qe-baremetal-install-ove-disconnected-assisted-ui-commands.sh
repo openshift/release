@@ -25,7 +25,14 @@ export BASE_DOMAIN
 export PULL_SECRET
 export RENDEZVOUS_IP
 export PROXY_URL
-export USER_MANAGED_NETWORKING=true
+
+if [ "${LOAD_BALANCER_TYPE:-cluster-managed}" = "cluster-managed" ]; then
+  API_IP=$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
+  INGRESS_IP=$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
+  export API_IP INGRESS_IP
+else
+  export USER_MANAGED_NETWORKING=true
+fi
 
 if ! python3.11 assisted-ui/run_agent_tui.py; then
  echo "Assisted UI workflow failed."
@@ -47,3 +54,8 @@ sleep "$wait_time"
 
 echo "Checking cluster installation progress by verifying all cluster operators are available and stable."
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=105m
+
+# Replicate https://github.com/openshift/release/blob/main/ci-operator/step-registry/baremetalds/devscripts/setup/baremetalds-devscripts-setup-commands.sh#L32
+# Add proxy config in this step and leave conformance test step untouched
+echo "Adding proxy-url in kubeconfig for e2e conformance tests"
+sed -i "/- cluster/ a\    proxy-url: ${proxy}" "${SHARED_DIR}"/kubeconfig

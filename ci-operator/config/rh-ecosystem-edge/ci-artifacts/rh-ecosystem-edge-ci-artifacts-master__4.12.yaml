@@ -13,6 +13,8 @@ images:
   - dockerfile_path: build/Dockerfile
     from: os
     to: ci-artifacts
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -34,10 +36,6 @@ tests:
     - as: presubmit-operatorhub
       commands: |
         run prow gpu-operator test_operatorhub
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-artifacts
       resources:
         requests:
@@ -46,10 +44,6 @@ tests:
     - as: presubmit-operatorhub-cleanup
       commands: |
         run prow gpu-operator cleanup_cluster
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-artifacts
       resources:
         requests:
@@ -58,10 +52,6 @@ tests:
     - as: presubmit-master
       commands: |
         run prow gpu-operator test_master_branch
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-artifacts
       resources:
         requests:
@@ -75,10 +65,6 @@ tests:
     - as: test-commit
       commands: |
         run test-commit
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-artifacts
       resources:
         requests:

@@ -9,6 +9,8 @@ build_root:
     namespace: ci
     tag: "2.6"
   use_build_cache: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -98,9 +100,9 @@ tests:
         TARGET=$(readlink -f /maistra-secrets/service-account.json)
         oc cp "${TARGET}" "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
       credentials:
-      - mount_path: /maistra-secrets
-        name: gcs-credentials
-        namespace: test-credentials
+      - collection: maistra-dev-prow
+        group: gcs
+        mount_path: /maistra-secrets
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -155,8 +157,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 zz_generated_metadata:
   branch: maistra-2.6
   org: maistra

@@ -316,6 +316,11 @@ cd dev-scripts
 
 cp /root/pull-secret /root/dev-scripts/pull_secret.json
 
+# Copy pull-secret to /root/.docker/config.json so that images can be pulled from the local registry
+mkdir -p /root/.docker
+cp /root/pull-secret /root/.docker/config.json
+chmod 600 /root/.docker/config.json
+
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh

@@ -20,6 +20,13 @@ echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 REGION="${LEASED_RESOURCE}"
+# TODO: temporary workaround for GCP us-central1 capacity exhaustion
+if [[ "${REGION}" == "us-central1" ]]; then
+	ALTERNATE_REGIONS=("us-east1" "us-east4" "us-west1")
+	REGION="${ALTERNATE_REGIONS[RANDOM % ${#ALTERNATE_REGIONS[@]}]}"
+	echo "Overriding us-central1 with ${REGION} due to capacity issues"
+fi
+echo "${REGION}" >"${SHARED_DIR}/actual_region"
 SUBNET_CIDR='10.0.0.0/19'
 
 cat <<EOF >01_vpc.py
