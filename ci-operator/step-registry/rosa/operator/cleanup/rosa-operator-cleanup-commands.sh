@@ -53,6 +53,21 @@ fi
 
 log "Cleaning up test operator resources"
 
+PREEXISTING_CRDS_FILE="${SHARED_DIR}/operator-preexisting-crds"
+PROD_CP_BACKUP="${SHARED_DIR}/production-clusterpackage.yaml"
+crd_was_preexisting() {
+    grep -Fqx -- "$1" "${PREEXISTING_CRDS_FILE}" 2>/dev/null
+}
+
+# Stop the active ObjectSet from restoring CRD metadata while it is detached.
+if oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" &>/dev/null; then
+    log "Pausing ClusterPackage ${CLUSTER_PACKAGE_NAME} before orphaning CRDs"
+    oc patch clusterpackage "${CLUSTER_PACKAGE_NAME}" --type merge \
+        -p '{"spec":{"paused":true}}' >/dev/null
+    oc wait clusterpackage "${CLUSTER_PACKAGE_NAME}" \
+        --for='jsonpath={.status.conditions[?(@.type=="Paused")].status}=True' --timeout=120s
+fi
+
 # ──────────────────────────────────────────────────────────────────────
 # CRITICAL: Orphan CRDs BEFORE deleting the e2e ClusterPackage.
 # ──────────────────────────────────────────────────────────────────────
@@ -64,13 +79,19 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
     IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
     for crd in "${CRD_LIST[@]}"; do
         crd=$(echo "${crd}" | xargs)
+        if ! crd_was_preexisting "${crd}"; then
+            log "CRD ${crd} was created by the test; leaving it owned for garbage collection"
+            continue
+        fi
         if CRD_LOOKUP=$(oc get crd "${crd}" --ignore-not-found -o name 2>/dev/null); then
             if [[ -z "${CRD_LOOKUP}" ]]; then
                 log "CRD ${crd} is absent; no ownership to clear"
                 continue
             fi
             log "Orphaning CRD ${crd} from e2e ClusterObjectSets before CP deletion"
-            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[]}}' 2>/dev/null || { log "ERROR: Failed to orphan CRD ${crd}"; orphan_failed=true; }
+            oc patch crd "${crd}" --type merge \
+                -p '{"metadata":{"ownerReferences":[],"annotations":{"package-operator.run/revision":null}}}' \
+                2>/dev/null || { log "ERROR: Failed to orphan CRD ${crd}"; orphan_failed=true; }
         else
             log "ERROR: Failed to look up CRD ${crd}"
             orphan_failed=true
@@ -106,17 +127,43 @@ else
     fi
 fi
 
-# Re-label CRDs with the production CP instance name so the restored
-# production ClusterPackage can re-adopt them. ownerReferences were
-# already cleared before CP deletion above; this step sets the PKO
-# instance label to the production name.
+if [[ "${CP_DELETED}" != "true" ]]; then
+    log "ERROR: ClusterPackage ${CLUSTER_PACKAGE_NAME} was not deleted"
+    exit 1
+fi
+
+# Do not race the restored production package against a terminating e2e
+# ClusterObjectSet that can still reconcile or delete shared resources.
+for _i in $(seq 1 24); do
+    ALL_OBJECTSETS=$(oc get clusterobjectset --no-headers \
+        -o custom-columns=':metadata.name')
+    E2E_OBJECTSETS=$(echo "${ALL_OBJECTSETS}" | grep "^${CLUSTER_PACKAGE_NAME}-" || true)
+    [[ -z "${E2E_OBJECTSETS}" ]] && break
+    sleep 5
+done
+if [[ -n "${E2E_OBJECTSETS}" ]]; then
+    log "ERROR: e2e ClusterObjectSets still exist: ${E2E_OBJECTSETS}"
+    exit 1
+fi
+
+# Re-label only CRDs that predated the test. Clear the revision annotation so
+# a newly restored revision-1 production package can adopt them.
 if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_CRDS:-}" && -n "${OPERATOR_NAME:-}" ]]; then
     IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
     for crd in "${CRD_LIST[@]}"; do
         crd=$(echo "${crd}" | xargs)
+        if ! crd_was_preexisting "${crd}"; then
+            oc delete crd "${crd}" --ignore-not-found --timeout=60s
+            continue
+        fi
         if oc get crd "${crd}" &>/dev/null; then
-            log "Re-labeling CRD ${crd} for production ClusterPackage ${OPERATOR_NAME}"
-            oc patch crd "${crd}" --type merge -p '{"metadata":{"labels":{"package-operator.run/instance":"'"${OPERATOR_NAME}"'"}}}' 2>/dev/null || true
+            if [[ -f "${PROD_CP_BACKUP}" ]]; then
+                log "Re-labeling CRD ${crd} for production ClusterPackage ${OPERATOR_NAME}"
+                oc patch crd "${crd}" --type merge \
+                    -p '{"metadata":{"annotations":{"package-operator.run/revision":null},"labels":{"package-operator.run/instance":"'"${OPERATOR_NAME}"'"}}}' >/dev/null
+            else
+                oc label crd "${crd}" package-operator.run/instance- >/dev/null 2>&1 || true
+            fi
         fi
     done
 fi
@@ -124,17 +171,15 @@ fi
 # Restore the production ClusterPackage that install backed up.
 # Without this, the cluster returns to the pool missing its production
 # operator until Hive resyncs (~2h), contaminating the lease pool.
+PRODUCTION_CP_RESTORED=false
 if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" ]]; then
-    PROD_CP_BACKUP="${SHARED_DIR}/production-clusterpackage.yaml"
     if [[ -f "${PROD_CP_BACKUP}" ]]; then
         log "Restoring production ClusterPackage ${OPERATOR_NAME} from backup"
-        if oc apply -f "${PROD_CP_BACKUP}"; then
-            log "Production ClusterPackage ${OPERATOR_NAME} restored"
-        else
-            log "WARNING: Failed to restore production ClusterPackage ${OPERATOR_NAME} — cluster may need Hive resync"
-        fi
+        oc apply -f "${PROD_CP_BACKUP}"
+        PRODUCTION_CP_RESTORED=true
+        log "Production ClusterPackage ${OPERATOR_NAME} restored"
     else
-        log "WARNING: No production ClusterPackage backup found in SHARED_DIR — cluster will rely on Hive resync to restore ${OPERATOR_NAME}"
+        log "No production ClusterPackage existed before the test; skipping production restore"
     fi
 fi
 
@@ -144,7 +189,7 @@ fi
 # ClusterPackage then needs to re-deploy everything. We wait here so
 # the cluster is not returned to the pool in a degraded state.
 # All waits share a single 300s budget so the total time is bounded.
-if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" && -n "${OPERATOR_NAMESPACE}" ]]; then
+if [[ "${PRODUCTION_CP_RESTORED}" == "true" && -n "${OPERATOR_NAMESPACE}" ]]; then
     DEPLOY_NAME="${OPERATOR_DEPLOYMENT_NAME:-${OPERATOR_NAME}}"
     WAIT_BUDGET=600
     WAIT_START=$(date +%s)

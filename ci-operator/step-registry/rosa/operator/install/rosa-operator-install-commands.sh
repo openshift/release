@@ -201,11 +201,14 @@ fi
 # enables CR restoration.
 CR_BACKUP_DIR="/tmp/operator-cr-backup"
 mkdir -p "${CR_BACKUP_DIR}"
+PREEXISTING_CRDS_FILE="${SHARED_DIR}/operator-preexisting-crds"
+: > "${PREEXISTING_CRDS_FILE}"
 if [[ -n "${OPERATOR_CRDS:-}" ]]; then
     IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
     for crd in "${CRD_LIST[@]}"; do
         crd=$(echo "${crd}" | xargs)
         if oc get crd "${crd}" &>/dev/null; then
+            printf '%s\n' "${crd}" >> "${PREEXISTING_CRDS_FILE}"
             RESOURCE=$(oc get crd "${crd}" -o jsonpath='{.spec.names.plural}')
             GROUP=$(oc get crd "${crd}" -o jsonpath='{.spec.group}')
             log "Backing up Hive-managed ${RESOURCE}.${GROUP} instances (label: hive.openshift.io/managed=true)"
@@ -240,6 +243,10 @@ if ! PRODUCTION_CP_LOOKUP=$(oc get clusterpackage "${OPERATOR_NAME}" --ignore-no
     exit 1
 fi
 if [[ -n "${PRODUCTION_CP_LOOKUP}" ]]; then
+    if [[ "$(oc get clusterpackage "${OPERATOR_NAME}" -o jsonpath='{.spec.paused}' 2>/dev/null || true)" == "true" ]]; then
+        log "ERROR: Production ClusterPackage ${OPERATOR_NAME} was already paused"
+        exit 1
+    fi
     log "Backing up production ClusterPackage ${OPERATOR_NAME}"
     backup_file="${SHARED_DIR}/production-clusterpackage.yaml"
     if ! temporary_backup="$(mktemp "${SHARED_DIR}/production-clusterpackage.XXXXXX" 2>/dev/null)"; then
@@ -260,6 +267,31 @@ if [[ -n "${PRODUCTION_CP_LOOKUP}" ]]; then
     fi
     log "Production ClusterPackage backed up to SHARED_DIR"
 fi
+
+# Record cleanup intent before pausing or deleting package resources so the post
+# step can recover if install is interrupted during the package swap.
+echo "${CLUSTER_PACKAGE_NAME}" > "${SHARED_DIR}/operator-e2e-clusterpackage"
+echo "${OPERATOR_NAMESPACE}" > "${SHARED_DIR}/operator-e2e-namespace"
+
+# Stop Package Operator reconciliation before changing CRD ownership. Without
+# this gate an active ClusterObjectSet can immediately restore the ownerReference
+# or revision annotation while we are preparing to delete its ClusterPackage.
+PACKAGES_TO_PAUSE=("${OPERATOR_NAME}")
+if [[ "${CLUSTER_PACKAGE_NAME}" != "${OPERATOR_NAME}" ]]; then
+    PACKAGES_TO_PAUSE+=("${CLUSTER_PACKAGE_NAME}")
+fi
+for package_name in "${PACKAGES_TO_PAUSE[@]}"; do
+    if oc get clusterpackage "${package_name}" &>/dev/null; then
+        log "Pausing ClusterPackage ${package_name} before orphaning CRDs"
+        if ! oc patch clusterpackage "${package_name}" --type merge \
+            -p '{"spec":{"paused":true}}' >/dev/null \
+            || ! oc wait clusterpackage "${package_name}" \
+                --for='jsonpath={.status.conditions[?(@.type=="Paused")].status}=True' --timeout=120s; then
+            log "ERROR: ClusterPackage ${package_name} did not report Paused=True"
+            exit 1
+        fi
+    fi
+done
 
 # ──────────────────────────────────────────────────────────────────────
 # CRITICAL: Orphan CRDs BEFORE deleting the ClusterPackage.
@@ -282,7 +314,13 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
                 continue
             fi
             log "  Clearing ownerReferences on CRD ${crd}"
-            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"labels":{"package-operator.run/instance":"'"${CLUSTER_PACKAGE_NAME}"'"}}}' 2>/dev/null || { log "ERROR: Failed to orphan CRD ${crd}"; orphan_failed=true; }
+            oc patch crd "${crd}" --type merge -p '{"metadata":{"ownerReferences":[],"annotations":{"package-operator.run/revision":null},"labels":{"package-operator.run/instance":"'"${CLUSTER_PACKAGE_NAME}"'"}}}' 2>/dev/null || { log "ERROR: Failed to orphan CRD ${crd}"; orphan_failed=true; }
+            if ! oc get crd "${crd}" -o json 2>/dev/null | jq -e '
+                ((.metadata.ownerReferences // []) | length == 0) and
+                ((.metadata.annotations // {})["package-operator.run/revision"] == null)' >/dev/null; then
+                log "ERROR: CRD ${crd} still has Package Operator ownership metadata"
+                orphan_failed=true
+            fi
         else
             log "ERROR: Failed to look up CRD ${crd}"
             orphan_failed=true
@@ -375,6 +413,7 @@ metadata:
     package-operator.run/collision-protection: None
 spec:
   image: ${OPERATOR_PKO_IMAGE}
+  paused: false
   config:
 ${PKO_CONFIG}
 EOF
