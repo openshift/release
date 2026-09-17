@@ -80,8 +80,8 @@ run_az_with_retry() {
 
 print_az_cli_failure() {
   local capture_dir="$1"
-  [[ -s "${capture_dir}/stdout" ]] && cat "${capture_dir}/stdout" >&2
-  [[ -s "${capture_dir}/stderr" ]] && cat "${capture_dir}/stderr" >&2
+  [[ -s "${capture_dir}/stdout" ]] && sed "s|${AZURE_AUTH_CLIENT_SECRET}|***REDACTED***|g" "${capture_dir}/stdout" >&2
+  [[ -s "${capture_dir}/stderr" ]] && sed "s|${AZURE_AUTH_CLIENT_SECRET}|***REDACTED***|g" "${capture_dir}/stderr" >&2
   return 0
 }
 
