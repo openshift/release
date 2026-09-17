@@ -66,14 +66,34 @@ install_bundle() {
     wait_for_csv "${pkg}"
 }
 
+subscription_csv_for_package() {
+    local pkg="$1"
+    local sub csv
+    while IFS= read -r sub; do
+        [[ -z "$sub" ]] && continue
+        if [[ "$(oc get subscription "$sub" -n "$OO_INSTALL_NAMESPACE" \
+            -o jsonpath='{.spec.name}' 2>/dev/null)" == "$pkg" ]]; then
+            csv=$(oc get subscription "$sub" -n "$OO_INSTALL_NAMESPACE" \
+                -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
+            if [[ -n "$csv" ]]; then
+                echo "$csv"
+                return 0
+            fi
+        fi
+    done < <(oc get subscription -n "$OO_INSTALL_NAMESPACE" \
+        -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+    return 1
+}
+
 wait_for_csv() {
     local pkg="$1"
-    log "Waiting for CSV from subscription ${pkg}..."
+    # operator-sdk run bundle names subscriptions e.g. storage-based-remediation-v0-0-1-sub,
+    # not the OLM package name (medik8s-operator-subscribe uses metadata.name == pkg).
+    log "Waiting for CSV for OLM package ${pkg}..."
 
     local csv=""
     for i in $(seq 1 60); do
-        csv=$(oc get subscription "$pkg" -n "$OO_INSTALL_NAMESPACE" \
-            -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
+        csv=$(subscription_csv_for_package "$pkg" || true)
         if [[ -n "$csv" ]]; then
             log "Found CSV: $csv"
             break
@@ -83,8 +103,8 @@ wait_for_csv() {
     done
 
     if [[ -z "$csv" ]]; then
-        log "ERROR: No CSV installed for subscription ${pkg} after 10m"
-        oc get subscription "$pkg" -n "$OO_INSTALL_NAMESPACE" -o yaml || true
+        log "ERROR: No CSV installed for package ${pkg} after 10m"
+        oc get subscription -n "$OO_INSTALL_NAMESPACE" -o yaml || true
         return 1
     fi
 
