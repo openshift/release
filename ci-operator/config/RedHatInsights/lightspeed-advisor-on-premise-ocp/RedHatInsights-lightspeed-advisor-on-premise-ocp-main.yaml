@@ -1,0 +1,146 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      # ubi-python-311 defaults to a non-root user; clonerefs (which seeds
+      # pipeline:src) must run as root to create /go. Same as sibling
+      # lightspeed-core/lightspeed-stack.
+      USER 0
+images:
+  items:
+  # The IOP application image, deployed to the ACM hub during e2e.
+  # NOTE: Dockerfile hardcodes
+  #   FROM registry.redhat.io/lightspeed-services-ocp/ocp-rules-rhel9:<tag>
+  # which must be pullable by the OpenShift CI build cluster. See the "Risks"
+  # note in the accompanying PR/notes if the build fails to pull this base.
+  - dockerfile_path: Dockerfile
+    to: insights-on-prem
+  # The test runtime image (pytest + curl + tar + jq). oc is downloaded at
+  # runtime from the target cluster's downloads route.
+  - dockerfile_path: tests-image/Dockerfile
+    to: insights-on-prem-tests
+prowgen:
+  # Required by the ocm-e2e-clusterpool steps: their clusterpool credentials use
+  # the secret-collection form (collection:/group:), delivered via the
+  # secrets-store CSI driver. Without this flag ci-operator cannot resolve those
+  # source secrets and the test aborts at 0s with "could not read source
+  # credential: resource name may not be empty". All 111 clusterpool consumers
+  # set this.
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-e2e
+  # Optional presubmit: runs on demand via `/test test-e2e` to conserve
+  # ClusterPool capacity. Promote to always-run once it is stable.
+  optional: true
+  skip_if_only_changed: ^docs/|^\.tekton/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    # COMPONENT_IMAGE_REF is required by the cluster-deploy step's dependency
+    # even when SKIP_COMPONENT_INSTALL is true. IOP is not an ACM component,
+    # so we point it at `src` to satisfy the dependency without building a
+    # separate component image (same pattern as backube/volsync).
+    dependencies:
+      COMPONENT_IMAGE_REF: src
+    env:
+      # Deploy stock ACM on the hub; do not swap a PR component into the
+      # ACM release snapshot (IOP is a standalone addon, not an ACM operand).
+      SKIP_COMPONENT_INSTALL: "true"
+      # Pin the ACM release stream the cluster-deploy step installs. Without
+      # this, a main-branch PR auto-derives the stream from stolostron/release
+      # CURRENT_RELEASE (currently 5.2), whose pipeline branch `5.2-dev` has no
+      # published snapshot manifests yet -> "no manifest file found in
+      # pipeline/snapshots". `release-2.17` matches what the observability team
+      # (owner of the acm-observability-usa pool) deploys in their own MCO
+      # test-e2e job against this same pool -- the ACM version its OCP-4.22
+      # clusters are validated against.
+      ACM_RELEASE_VERSION: release-2.17
+      PIPELINE_STAGE: dev
+      # ClusterPool: acm-observability-usa (approved by the observability
+      # team, 2026-09-10). Mirrors their test-e2e job: SNO 4xlarge hub +
+      # 1 SNO managed cluster, OCP 4.22.
+      CLUSTERPOOL_GROUP_NAME: Core-Services
+      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
+      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-422
+      CLUSTERPOOL_MANAGED_FILTER: sno-422
+      CLUSTERPOOL_MANAGED_COUNT: "1"
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: "422"
+      CLUSTERPOOL_LIFETIME: 2h
+    # NOTE: do not add a `post:` here without re-listing the workflow's
+    # checkin step. A test-level `post:` REPLACES the workflow's post
+    # (ocm-e2e-clusterpool-checkin), which returns the cluster to the pool.
+    # To add diagnostics later, use:
+    #   post:
+    #   - as: acm-must-gather
+    #     ...
+    #   - ref: ocm-e2e-clusterpool-checkin
+    test:
+    - as: e2e
+      from: insights-on-prem-tests
+      # The PR-built IOP app image, exposed to the e2e suite as IOP_IMAGE_REF so
+      # it can deploy that image onto the hub (substituted into deploy/08-insights.yml).
+      # The build farm can pull the entitled base
+      # (registry.redhat.io/lightspeed-services-ocp/ocp-rules-rhel9), verified by
+      # the -images job on openshift/release#85084.
+      dependencies:
+      - env: IOP_IMAGE_REF
+        name: insights-on-prem
+      commands: |
+        set -eo pipefail
+
+        # ACM is already deployed on the hub by the ocm-e2e-clusterpool
+        # cluster-deploy step. hub-1.kc and managed-1.kc are the checked-out
+        # cluster kubeconfigs.
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+
+        # oc is not baked into the test image; pull a version-matched client
+        # from the hub cluster's downloads route (see tests/README.md).
+        CONSOLE_HOST=$(oc --kubeconfig "${SHARED_DIR}/hub-1.kc" whoami --show-console 2>/dev/null | sed 's#https://console-openshift-console#downloads#') || true
+        curl -kL "https://downloads-openshift-console.apps.$(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}' | sed -E 's#https://api\.([^:]+):6443#\1#')/amd64/linux/oc.tar.gz" \
+          | tar xz -C /tmp && export PATH="/tmp:${PATH}" || echo "WARN: falling back to preinstalled oc"
+
+        echo "IOP_IMAGE_REF=${IOP_IMAGE_REF}"
+
+        # 1. Import the managed (spoke) cluster into ACM.
+        oc create namespace managed --dry-run=client -o yaml | oc apply -f -
+        cat <<EOF | oc apply -f -
+        apiVersion: cluster.open-cluster-management.io/v1
+        kind: ManagedCluster
+        metadata:
+          name: managed
+          labels:
+            cloud: auto-detect
+            vendor: auto-detect
+        spec:
+          hubAcceptsClient: true
+        EOF
+        oc create secret generic auto-import-secret \
+          -n managed \
+          --from-file=kubeconfig="${SHARED_DIR}/managed-1.kc" \
+          --dry-run=client -o yaml | oc apply -f -
+        oc wait managedcluster managed \
+          --for=condition=ManagedClusterConditionAvailable=True \
+          --timeout=600s
+
+        # 2. Deploy IOP to the hub, addon + policies to the spoke.
+        #    TODO: wire the numbered deploy manifests in deploy/ here (01-namespace
+        #    .. 14-hub-config), substituting the PR-built image (IOP_IMAGE_REF)
+        #    into 08-insights.yml. e.g. a `make deploy` target or `oc apply -f`.
+        #
+        # 3. Run the e2e suite.
+        #    TODO: tests/e2e/ does not exist yet. Once written:
+        #      python -m pytest tests/e2e -v 2>&1 | tee "${ARTIFACT_DIR}/e2e.log"
+        echo "TODO: deploy IOP + addon and run tests/e2e once implemented"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 500Mi
+    workflow: ocm-e2e-clusterpool
+zz_generated_metadata:
+  branch: main
+  org: RedHatInsights
+  repo: lightspeed-advisor-on-premise-ocp
