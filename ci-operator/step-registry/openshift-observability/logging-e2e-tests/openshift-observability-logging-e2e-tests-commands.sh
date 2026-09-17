@@ -16,6 +16,11 @@ fi
 export HOME=/tmp/home
 mkdir -p "${HOME}"
 
+# ci-operator sets NAMESPACE to the build farm namespace for this job, not the
+# claimed test cluster. Unset it so nothing in the test binary's process tree
+# can pick it up as a default namespace for the target cluster.
+unset NAMESPACE
+
 TESTS_EXT=openshift-logging-e2e-tests-tests-ext
 
 # Dump the operator state next to the test results to ease debugging of failures.
