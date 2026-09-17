@@ -45,16 +45,25 @@ VPN_URL="$(cat /var/run/bastion1/vpn-url)"
 VPN_USERNAME="$(cat /var/run/bastion1/vpn-username)"
 VPN_PASSWORD=$(cat /var/run/bastion1/vpn-password)
 
-## SSH 
-SSH_KEY_PATH=/var/run/telcov10n/ansible_ssh_private_key
+## SSH
 SSH_KEY=~/key
 IFNAME=tun10
 
 ## LAB SERVER SELECTION
 LAB_SERVER=$S614
 
-cp $SSH_KEY_PATH $SSH_KEY
-chmod 600 $SSH_KEY
+# Extract the SSH private key with tracing off so it never hits the build log.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+# The private key spans several lines in group_vars/all, take everything between the quotes
+install -m 600 /dev/null "${SSH_KEY}"
+sed -n "/^ansible_ssh_private_key: /,/'\$/p" /var/common_variables/ansible_group_all \
+  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${SSH_KEY}"
+if [ ! -s "${SSH_KEY}" ]; then
+  echo "Error: ansible_ssh_private_key not found in /var/common_variables/ansible_group_all" >&2
+  exit 1
+fi
+$WAS_TRACING && set -x
 
 SSHOPTS=(
   -o 'ConnectTimeout=5'
@@ -67,7 +76,11 @@ SSHOPTS=(
 
 ## JUMP SERVER
 JUMP_SERVER_ADDRESS="$(cat /var/run/bastion1/jump-server)"
-JUMP_SERVER_USER="$(cat /var/run/telcov10n/ansible_user)"
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+JUMP_SERVER_USER="$(grep -oP '(?<=ansible_user: ).*' /var/common_variables/ansible_group_all | sed "s/'//g")" \
+  || { echo "Error: ansible_user not found in /var/common_variables/ansible_group_all" >&2; exit 1; }
+$WAS_TRACING && set -x
 
 ## COPY JUNIT FILES FUNCTION
 copy_junit_files() {
