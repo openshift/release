@@ -84,17 +84,14 @@ hcp create kubeconfig kubevirt --name "${HC_NAME}" --namespace "${HC_NS}" > "${S
 # Persist management cluster kubeconfig separately so conformance steps can reference it
 cp "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/mgmt_kubeconfig"
 
-# Allow time for the KubeVirt VMs to be scheduled and begin booting before polling nodes
-echo "$(date) Sleeping 20 minutes to allow KubeVirt VMs to boot before checking node readiness..."
-sleep 1200
-echo "$(date) Sleep complete, proceeding to node readiness check"
-
-# --- Step 3: Wait for KubeVirt worker VMs to boot and join the guest cluster as Ready nodes ---
-echo "$(date) Waiting for 2 worker nodes to join the guest cluster"
+# --- Step 3: Wait for guest API via LPAR IP + NodePort, then for worker nodes ---
+echo "$(date) Waiting for guest cluster API and worker node readiness"
 
 VIRT_KC="${SHARED_DIR}/nested_kubeconfig"
 REQUIRED_NODES=2
-MAX_RETRIES=20
+MAX_RETRIES=30
+API_MAX_WAIT=7200  # guest API via NodePort can take well over 20 minutes to stabilise
+API_INTERVAL=30
 
 # --- Wait for kube-apiserver NodePort ---
 # HyperShift assigns the NodePort asynchronously after the HostedCluster becomes
@@ -134,59 +131,64 @@ oc rollout restart daemonset speaker -n metallb-system || true
 oc rollout status daemonset speaker -n metallb-system --timeout=120s || true
 
 echo "$(date) Nodepool status........"
-oc get np -A
-oc describe np -A
+oc get np -A || true
+oc describe np -A || true
+
+wait_for_api() {
+  local elapsed=0
+  local readyz=""
+
+  while [[ ${elapsed} -lt ${API_MAX_WAIT} ]]; do
+    readyz=$(curl -sk --connect-timeout 10 --max-time 30 \
+      "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>/dev/null || true)
+    echo "$(date) API wait (${elapsed}s): /readyz=${readyz:-<empty>}"
+    if [[ "${readyz}" == "ok" ]]; then
+      echo "$(date) Guest kube-apiserver is reachable via https://${MGMT_HOST_IP}:${NODEPORT}"
+      return 0
+    fi
+    sleep ${API_INTERVAL}
+    elapsed=$((elapsed + API_INTERVAL))
+  done
+
+  echo "$(date) ERROR: Guest kube-apiserver /readyz did not return ok within ${API_MAX_WAIT}s"
+  return 1
+}
 
 wait_for_nodes() {
   local retries=0
 
-  # --- Check kube-apiserver reachability via /readyz before polling nodes ---
-  READYZ_RESPONSE=$(curl -sk "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>&1 || true)
-  echo "$(date) /readyz response: ${READYZ_RESPONSE}"
-  if [[ "${READYZ_RESPONSE}" == "ok" ]]; then
-    echo "$(date) kube-apiserver is reachable and ready"
-  else
-    echo "$(date) WARNING: kube-apiserver /readyz did not return 'ok' — API may not be reachable yet"
-  fi
-
   while [[ ${retries} -lt ${MAX_RETRIES} ]]; do
-    # --- Per-retry reachability check ---
-    READYZ=$(curl -sk "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>&1 || true)
-    echo "$(date) [retry ${retries}] /readyz: ${READYZ}"
-
-    READY_NODES=$(oc get no --kubeconfig "${VIRT_KC}" --no-headers 2>/dev/null \
+    READY_NODES=$(oc get no --kubeconfig "${VIRT_KC}" --request-timeout=30s --no-headers 2>/dev/null \
       | grep -c " Ready" || true)
-    echo "$(date) Ready nodes: ${READY_NODES}/${REQUIRED_NODES}"
+    echo "$(date) Ready nodes: ${READY_NODES}/${REQUIRED_NODES} (attempt $((retries + 1))/${MAX_RETRIES})"
     if [[ ${READY_NODES} -ge ${REQUIRED_NODES} ]]; then
       echo "$(date) ${REQUIRED_NODES} nodes are Ready"
-      oc get no --kubeconfig "${VIRT_KC}" -o wide -v6
+      oc get no --kubeconfig "${VIRT_KC}" -o wide || true
       return 0
     fi
 
     echo "$(date) Nodes not ready yet — printing debug status"
-    echo "$(date) DEBUG: All nodes in guest cluster:"
-    oc get no --kubeconfig "${VIRT_KC}" -o wide
-    echo "$(date) DEBUG: KubeVirt VMs on mgmt cluster:"
-    oc get vmi -n ${HC_NS}-${HC_NAME} 2>/dev/null || true
+    oc get no --kubeconfig "${VIRT_KC}" -o wide --request-timeout=30s 2>/dev/null || true
+    oc get vmi -n "${HC_NS}-${HC_NAME}" 2>/dev/null || true
 
-    echo "$(date) Waiting 60s before retrying node check (attempt $((retries + 1))/${MAX_RETRIES})"
     sleep 60
     retries=$((retries + 1))
   done
+
   echo "$(date) ERROR: Timed out waiting for ${REQUIRED_NODES} nodes to be Ready after ${MAX_RETRIES} retries"
-  echo "$(date) DEBUG: Final management cluster state:"
   export KUBECONFIG="${SHARED_DIR}/kubeconfig"
   oc get no || true
   oc get hc -A || true
-  oc describe hc -n ${HC_NS} ${HC_NAME} || true
+  oc describe hc -n "${HC_NS}" "${HC_NAME}" || true
   oc get np -A || true
-  oc describe np -n ${HC_NS} || true
-  oc get po -n ${HC_NS}-${HC_NAME} || true
+  oc describe np -n "${HC_NS}" || true
+  oc get po -n "${HC_NS}-${HC_NAME}" || true
   oc get vmi -A || true
   oc describe vmi -A || true
   return 1
 }
 
+wait_for_api
 wait_for_nodes
 
 # --- Step 4: Wait for HyperShift baseDomainPassthrough ingress wiring on mgmt cluster ---
