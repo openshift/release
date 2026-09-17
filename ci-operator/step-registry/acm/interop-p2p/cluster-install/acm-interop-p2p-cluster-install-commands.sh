@@ -845,17 +845,24 @@ ApplyPermissiveClusterImagePolicy() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
     typeset cipName='allow-nightly-unsigned'
-    typeset prevRendered=''
 
-    # Capture rendered-config markers BEFORE applying, so we can detect
-    # when the MCO has actually started reconciling the new policy.
-    prevRendered="$(oc --kubeconfig="${kubeconfig}" get machineconfigpool \
-        -o jsonpath='{range .items[*]}{.metadata.name}={.status.configuration.name}{"\n"}{end}')"
+    typeset -a prevRenderedArr=()
+    typeset isNew=true
 
     if oc --kubeconfig="${kubeconfig}" get clusterimagepolicy "${cipName}" \
             --ignore-not-found -o name | grep -q .; then
         : "Spoke ${clusterName}: ${cipName} ClusterImagePolicy already exists"
-    else
+        isNew=false
+    fi
+
+    # Capture current rendered-config markers BEFORE applying the policy.
+    # MCO will generate new rendered configs when it picks up the CIP change.
+    mapfile -t prevRenderedArr < <(
+        oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+            -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
+    )
+
+    if "${isNew}"; then
         : "Creating permissive ClusterImagePolicy '${cipName}' on spoke ${clusterName}"
         oc --kubeconfig="${kubeconfig}" apply -f - <<'EOF'
 apiVersion: config.openshift.io/v1
@@ -874,23 +881,29 @@ spec:
 EOF
     fi
 
-    # Wait until at least one pool's rendered config changes, proving the
-    # MCO has picked up the new policy.  This closes the race where
-    # Updated=True still reflects the *previous* rendered configuration.
-    : "Waiting for MCO to begin reconciling on spoke ${clusterName}"
-    typeset timeout=300 elapsed=0
-    while (( elapsed < timeout )); do
-        typeset currentRendered
-        currentRendered="$(oc --kubeconfig="${kubeconfig}" get machineconfigpool \
-            -o jsonpath='{range .items[*]}{.metadata.name}={.status.configuration.name}{"\n"}{end}')"
-        if [[ "${currentRendered}" != "${prevRendered}" ]]; then
-            break
-        fi
-        sleep 10
-        (( elapsed += 10 ))
+    # Wait until at least one MCP's rendered-config changes, proving MCO picked up the policy.
+    : "Waiting for MCO to generate new rendered config on spoke ${clusterName}"
+    typeset -i wMax=300 wInt=10
+    SECONDS=0
+    while ((SECONDS < wMax)); do
+        typeset -a currRenderedArr=()
+        mapfile -t currRenderedArr < <(
+            oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+                -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
+        )
+        typeset changed=false
+        typeset -i j=0
+        for ((j = 0; j < ${#prevRenderedArr[@]}; j++)); do
+            [[ "${prevRenderedArr[j]}" != "${currRenderedArr[j]:-}" ]] && { changed=true; break; }
+        done
+        "${changed}" && break
+        sleep "${wInt}"
     done
+    ((SECONDS >= wMax)) && {
+        : "WARNING: MCO did not generate new rendered config within ${wMax}s on spoke ${clusterName}"
+    }
 
-    # Now wait for the rollout to complete across all nodes.
+    # Now wait for full rollout — all MCPs Updated=True with the NEW config.
     : "Waiting for MachineConfigPools to finish rolling out on spoke ${clusterName}"
     oc --kubeconfig="${kubeconfig}" wait machineconfigpool --all \
         --for=condition=Updated=True \
