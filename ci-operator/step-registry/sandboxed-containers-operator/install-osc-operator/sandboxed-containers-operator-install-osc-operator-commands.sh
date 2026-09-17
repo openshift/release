@@ -613,6 +613,15 @@ function create_peer_pods_secret() {
     return 0
   fi
 
+  # TEMPORARY (testing): skip manual peer-pods-secret creation for Azure too,
+  # to validate whether the operator's built-in CCO automation also works
+  # here. Simple skip only - to be reworked (or reverted) after rehearsal
+  # results are in. See AWS comment above for the underlying reasoning.
+  if [[ "${provider}" == "azure" ]]; then
+    echo ">>> AZURE (testing): skipping manual peer-pods-secret creation; deferring to the operator's built-in STS/CCO credential automation"
+    return 0
+  fi
+
   # Detect identity mode from osc-config or default to manual
   local identity_mode
   identity_mode=$(oc get configmap osc-config -n default -o jsonpath='{.data.identityMode}' 2>/dev/null || echo "manual")
