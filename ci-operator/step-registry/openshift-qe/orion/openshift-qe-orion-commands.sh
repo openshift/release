@@ -227,7 +227,7 @@ process_change_point() {
 
     [[ -z "${CHANGE_POINT_REPOS}" ]] && return
 
-    GCS_BUCKET="gs://test-platform-results"
+    GCS_BUCKET="gs://test-platform-results-public"
     GCS_PATH=""
 
     # Determine the path to prowjob.json based on prow ENV variables

@@ -119,7 +119,7 @@ fi
 # the cluster is not returned to the pool in a degraded state.
 # All waits share a single 300s budget so the total time is bounded.
 if [[ "${CP_DELETED}" == "true" && -n "${OPERATOR_NAME:-}" && -n "${OPERATOR_NAMESPACE}" ]]; then
-    DEPLOY_NAME="${OPERATOR_NAME}"
+    DEPLOY_NAME="${OPERATOR_DEPLOYMENT_NAME:-${OPERATOR_NAME}}"
     WAIT_BUDGET=600
     WAIT_START=$(date +%s)
 

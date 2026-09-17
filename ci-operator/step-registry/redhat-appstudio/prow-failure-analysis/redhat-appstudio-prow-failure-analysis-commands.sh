@@ -31,7 +31,7 @@ if [[ -z "${ORG_REPO:-}" ]] && [[ -n "${REPO_OWNER:-}" ]] && [[ -n "${REPO_NAME:
 fi
 
 # Export GCS configuration
-export GCS_BUCKET="${GCS_BUCKET:-test-platform-results}"
+export GCS_BUCKET="${GCS_BUCKET:-test-platform-results-public}"
 
 if [[ -n "${GCS_CREDS_PATH:-}" ]]; then
     export GCS_CREDS_PATH
