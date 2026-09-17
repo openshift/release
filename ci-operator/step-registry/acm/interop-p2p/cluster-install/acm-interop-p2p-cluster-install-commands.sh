@@ -845,6 +845,12 @@ ApplyPermissiveClusterImagePolicy() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
     typeset cipName='allow-nightly-unsigned'
+    typeset prevRendered=''
+
+    # Capture rendered-config markers BEFORE applying, so we can detect
+    # when the MCO has actually started reconciling the new policy.
+    prevRendered="$(oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+        -o jsonpath='{range .items[*]}{.metadata.name}={.status.configuration.name}{"\n"}{end}')"
 
     if oc --kubeconfig="${kubeconfig}" get clusterimagepolicy "${cipName}" \
             --ignore-not-found -o name | grep -q .; then
@@ -868,8 +874,23 @@ spec:
 EOF
     fi
 
-    # Always wait — the resource can exist before the MCO finishes
-    # writing policy.json to every node.
+    # Wait until at least one pool's rendered config changes, proving the
+    # MCO has picked up the new policy.  This closes the race where
+    # Updated=True still reflects the *previous* rendered configuration.
+    : "Waiting for MCO to begin reconciling on spoke ${clusterName}"
+    typeset timeout=300 elapsed=0
+    while (( elapsed < timeout )); do
+        typeset currentRendered
+        currentRendered="$(oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+            -o jsonpath='{range .items[*]}{.metadata.name}={.status.configuration.name}{"\n"}{end}')"
+        if [[ "${currentRendered}" != "${prevRendered}" ]]; then
+            break
+        fi
+        sleep 10
+        (( elapsed += 10 ))
+    done
+
+    # Now wait for the rollout to complete across all nodes.
     : "Waiting for MachineConfigPools to finish rolling out on spoke ${clusterName}"
     oc --kubeconfig="${kubeconfig}" wait machineconfigpool --all \
         --for=condition=Updated=True \
@@ -878,7 +899,6 @@ EOF
     : "Permissive ClusterImagePolicy '${cipName}' applied and rolled out on spoke ${clusterName}"
     true
 }
-
 #=====================
 # Main execution: Create all clusters
 #=====================
