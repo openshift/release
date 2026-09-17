@@ -192,7 +192,14 @@ aws|aws-arm64|aws-eusc|aws-c2s|aws-sc2s)
     # TODO: make openshift-tests auto-discover this from cluster config
     REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
     ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
-    export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
+    # Flag the provider disconnected so openshift-tests skips [Skipped:Disconnected]
+    # tests. mirror-tests-image is only written when e2e images were mirrored for a
+    # disconnected cluster (e.g. AWS C2S/SC2S), so connected AWS jobs are unaffected.
+    DISCONNECTED=""
+    if [[ -f "${SHARED_DIR}/mirror-tests-image" ]]; then
+        DISCONNECTED=',"disconnected":true'
+    fi
+    export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true${DISCONNECTED}}"
     export KUBE_SSH_USER=core
     ;;
 azure4|azure-arm64) export TEST_PROVIDER=azure;;
