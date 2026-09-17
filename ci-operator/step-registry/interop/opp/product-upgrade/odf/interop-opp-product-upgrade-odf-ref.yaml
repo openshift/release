@@ -1,0 +1,52 @@
+ref:
+  as: interop-opp-product-upgrade-odf
+  commands: interop-opp-product-upgrade-odf-commands.sh
+  documentation: |-
+    Upgrades the ODF (OpenShift Data Foundation) operator via OLM subscription
+    channel change and validates the upgrade completes successfully.
+
+    The step performs:
+    1. Identifies the currently installed ODF version via CSV
+    2. Patches the Subscription to the target channel (or next available)
+    3. Waits for the new CSV to reach Succeeded phase
+    4. Validates sub-operator CSVs (ocs-operator, mcg-operator, noobaa-operator)
+    5. Checks StorageCluster and CephCluster health post-upgrade
+
+    ODF upgrades may take longer than other operators due to Ceph data
+    rebalancing. The default timeout is 45 minutes.
+
+    This step is part of the OPP coordinated product upgrade workflow.
+
+    Exit codes:
+      0 - upgrade successful, all health checks passed
+      1 - upgrade failed (CSV did not reach Succeeded)
+      2 - timeout waiting for upgrade
+      3 - precondition failure (no subscription found, no upgrade path)
+  env:
+    - default: "odf-operator"
+      documentation: |-
+        Name of the ODF Subscription resource in the target namespace.
+      name: ODF_SUBSCRIPTION_NAME
+    - default: "openshift-storage"
+      documentation: |-
+        Namespace containing the ODF Subscription and CSV resources.
+      name: ODF_SUBSCRIPTION_NAMESPACE
+    - default: ""
+      documentation: |-
+        Target subscription channel for ODF operator upgrade (e.g. stable-4.17).
+        When empty, the step determines the next available channel automatically
+        by querying the catalog for channels newer than the currently installed version.
+      name: ODF_TARGET_CHANNEL
+    - default: "45m"
+      documentation: |-
+        Maximum time to wait for the ODF operator upgrade to complete.
+        Covers CSV transition from Replacing to Succeeded phase.
+        Default is 45 minutes to accommodate Ceph rebalancing.
+      name: ODF_UPGRADE_TIMEOUT
+  from: cli
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 60m
