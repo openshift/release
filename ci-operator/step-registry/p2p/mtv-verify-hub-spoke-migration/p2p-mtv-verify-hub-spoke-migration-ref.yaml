@@ -1,0 +1,96 @@
+ref:
+  as: p2p-mtv-verify-hub-spoke-migration
+  from: cli
+  commands: p2p-mtv-verify-hub-spoke-migration-commands.sh
+  timeout: 30m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Verify post-migration VM state after the hub↔spoke round-trip CCLM produced by
+    p2p-mtv-execute-hub-spoke-migration (P2P_MIGRATION_DIRECTION=both).
+
+    Verifies the final state: VMs returned to the spoke (hub→spoke return leg complete).
+    Source cluster is the hub (KUBECONFIG, MTV_SOURCE_SPOKE_INDEX=0 sentinel).
+    Destination cluster is the spoke (SHARED_DIR/managed-cluster-kubeconfig-1).
+
+    Checks performed (each recorded as a JUnit test case; all are hard failures):
+    1. Destination (spoke) VMIs Running
+    2. Destination VM runStrategy==Always (OCPBUGS-101771)
+    3. Source (hub) VMIM not Failed (OCPBUGS-99403)
+    4. SSH port 22 reachable from a peer virt-launcher (requires MTV_TEST_VM_COUNT>1)
+    5. Cloud-init marker file intact via QEMU Guest Agent
+    6. Guest disk I/O (write + fsync + checksum + unlink)
+    7. Guest network reachability (ping a peer VM IP from inside the guest)
+
+    Writes ${ARTIFACT_DIR}/junit_cclm_migration_verify_hub_spoke.xml;
+    diagnostics under mtv-migration-verify-hub-spoke-diagnostics/.
+
+    Set MTV_TEST_VM_COUNT to match P2P_HS_VM_COUNT used in p2p-create-cclm-test-vms.
+  env:
+  - name: MTV_TEST_VM_COUNT
+    default: "2"
+    documentation: |-
+      Number of VMs to verify. Must match P2P_HS_VM_COUNT used in p2p-create-cclm-test-vms.
+  - name: MTV_TEST_VM_NAME
+    default: "test-vm-1"
+    documentation: VM name to verify (single-VM path; ignored when MTV_TEST_VM_COUNT>1).
+  - name: MTV_TEST_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Source namespace of the migrated VM on the hub (used to check source VMIM).
+  - name: MTV_TEST_VM_TARGET_NAMESPACE
+    default: ""
+    documentation: Destination namespace on the spoke. Empty uses MTV_TEST_VM_NAMESPACE.
+  - name: MTV_SOURCE_SPOKE_INDEX
+    default: "0"
+    documentation: |-
+      Hub sentinel (0) — use KUBECONFIG directly as source kubeconfig (hub cluster is
+      the source of the hub→spoke return leg). Set to a positive integer to override with
+      a SHARED_DIR spoke kubeconfig.
+  - name: MTV_DEST_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the destination spoke.
+  - name: MTV_SOURCE_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional explicit source kubeconfig path. Overrides MTV_SOURCE_SPOKE_INDEX.
+  - name: MTV_DEST_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional explicit destination kubeconfig path. Overrides MTV_DEST_SPOKE_INDEX.
+  - name: MTV_CNV_NAMESPACE
+    default: "openshift-cnv"
+    documentation: OpenShift Virtualization namespace on hub and spoke (used for diagnostics).
+  - name: MTV_PLAN_TYPE
+    default: "live"
+    documentation: Plan type — live or cold. SSH probe only runs for live migrations.
+  - name: MTV_VM_SSH_VERIFY
+    default: "true"
+    documentation: |-
+      When true, probe SSH port 22 on each migrated VM from a peer
+      virt-launcher. Failure fails the step. Requires MTV_TEST_VM_COUNT>1.
+  - name: MTV_VM_DATA_INTEGRITY
+    default: "true"
+    documentation: |-
+      When true, verify cloud-init marker files survive migration via QEMU Guest Agent.
+      Failure or "skipped on all VMs" fails the step. Set false for cirros guests.
+  - name: MTV_VM_GUEST_EXEC
+    default: "true"
+    documentation: |-
+      When true, run QEMU Guest Agent checks: guest disk I/O (VerifyGuestDiskIo) and
+      guest network reachability (VerifyGuestNetwork). Set false for cirros or other
+      guest images that do not ship a QEMU Guest Agent.
+  - name: MTV_MIGRATION_SUFFIX
+    default: "-hub-spoke"
+    documentation: |-
+      Suffix applied to artifact names (JUnit XML, diagnostics dir).
+      Default "-hub-spoke" → junit_cclm_migration_verify_hub_spoke.xml.
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV Plan and Migration CRs live on the hub (used for diagnostics).
+  - name: MTV_PLAN_NAME
+    default: "cclm-hub-to-spoke-plan"
+    documentation: Hub→spoke Plan metadata.name on the hub (used for diagnostics).
+  - name: MTV_MIGRATION_NAME
+    default: "cclm-hub-to-spoke-run-1"
+    documentation: Hub→spoke Migration metadata.name on the hub (used for diagnostics).
