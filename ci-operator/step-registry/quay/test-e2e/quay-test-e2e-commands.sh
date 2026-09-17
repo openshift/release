@@ -291,7 +291,7 @@ function copyArtifacts {
   # link when index.html actually landed so it is never dead; default every CI var
   # with :- so a missing var in a local run cannot abort this EXIT trap.
   if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
-    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results"
+    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
     local gcs_path
     if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
       gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"
@@ -360,7 +360,8 @@ QUAY_HOST="${QUAY_ROUTE#*://}"; QUAY_HOST="${QUAY_HOST%%/*}"
 echo "Waiting for Quay route DNS + HTTPS readiness..."
 ready=0
 for attempt in $(seq 1 60); do
-  http_code="$(curl -sk -o /dev/null -m 10 -w '%{http_code}' "${QUAY_ROUTE}/api/v1/discovery" 2>/dev/null || echo 000)"
+  # curl prints its own 000 on failure, so keep the fallback out of the substitution.
+  http_code="$(curl -sk -o /dev/null -m 10 -w '%{http_code}' "${QUAY_ROUTE}/api/v1/discovery" 2>/dev/null)" || http_code=000
   if getent ahosts "${QUAY_HOST}" >/dev/null 2>&1 && [[ "${http_code}" != "000" ]]; then
     ready=$((ready + 1))
     echo "  readiness ${ready}/5 (attempt ${attempt}, http=${http_code})"

@@ -299,7 +299,10 @@ function render_osc_operator_chart() {
     "--set" "namespaceOverride=${OSC_NAMESPACE}"
   )
 
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
+  if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
+    helm_args+=("--set" "dev.enabled=false")
+    echo ">>> Helm: dev.enabled=false (GA redhat-operators catalog)" >&2
+  elif [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
     helm_args+=("--set" "dev.enabled=true" "--set" "dev.image=${CATALOG_SOURCE_IMAGE}")
     echo ">>> Helm: dev.enabled=true, dev.image=${CATALOG_SOURCE_IMAGE}" >&2
   else
@@ -448,6 +451,15 @@ function install_osc_operator() {
   oc apply -f "${operator_yaml}" --dry-run=client -o name || true
 
   oc_with_retry oc apply -f "${operator_yaml}"
+
+  # The helm chart creates osc-operator-dev-catalog unconditionally regardless of dev.enabled
+  # (helm chart bug).  When using the GA redhat-operators catalog the dev catalog has no valid
+  # image and will never become READY, blocking Stage 0 of wait_for_operator().  Delete it so
+  # the wait only covers catalogs that are actually needed.
+  if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
+    echo ">>> redhat-operators catalog in use; deleting spurious ${OSC_DEV_CATALOG_NAME} CatalogSource (helm chart bug)"
+    oc delete catalogsource "${OSC_DEV_CATALOG_NAME}" -n openshift-marketplace --ignore-not-found=true || true
+  fi
 }
 
 function wait_for_operator() {

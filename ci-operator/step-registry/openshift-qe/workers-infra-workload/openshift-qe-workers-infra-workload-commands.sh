@@ -557,8 +557,11 @@ fi
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
+	# Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+	set +x
 	# shellcheck disable=SC1090
 	source "${SHARED_DIR}/proxy-conf.sh"
+	set -x
 fi
 
 IF_INSTALL_INFRA_WORKLOAD=${IF_INSTALL_INFRA_WORKLOAD:=true}
