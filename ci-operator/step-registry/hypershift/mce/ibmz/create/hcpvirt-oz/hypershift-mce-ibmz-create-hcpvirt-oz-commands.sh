@@ -18,7 +18,9 @@ hcp version
 echo "$(date) Targeting management cluster kubeconfig"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-# Enable wildcard DNS routes so guest *.apps routes resolve through the management ingress
+# Required for KubeVirt baseDomainPassthrough: guest *.apps becomes a subdomain of the
+# management cluster's *.apps domain and HyperShift wires ingress automatically.
+# See https://hypershift.pages.dev/how-to/kubevirt/ingress-and-dns/
 oc patch ingresscontroller -n openshift-ingress-operator default \
   --type=json \
     -p '[{ "op": "add", "path": "/spec/routeAdmission", "value": {"wildcardPolicy": "WildcardsAllowed"}}]'
@@ -55,12 +57,13 @@ MGMT_HOST_IP=10.0.1.15
 echo "$(date) LPAR host IP: ${MGMT_HOST_IP}"
 
 
+# Omit --base-domain so HyperShift enables baseDomainPassthrough and creates the
+# management-cluster wildcard Route/Service/EndpointSlice for guest *.apps ingress.
 hcp create cluster kubevirt \
   --name ${HC_NAME} \
   --node-pool-replicas 2 \
   --pull-secret "${PULL_SECRET_FILE}" \
   --namespace ${HC_NS} \
-  --base-domain phc-cicd.cis.ibm.net \
   --control-plane-availability-policy SingleReplica \
   --arch s390x \
   --memory 16Gi \
@@ -71,7 +74,7 @@ hcp create cluster kubevirt \
   --annotations "resource-request-override.hypershift.openshift.io/kube-scheduler.kube-scheduler=memory=512Mi,cpu=500m" \
   --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m"
  #--vm-node-selector role=kubevirt \
-oc wait --timeout=45m --for=condition=Available --namespace=hcpvirt-oz-ci-ns hostedclusters.hypershift.openshift.io/hcpvirt-oz-ci
+oc wait --timeout=45m --for=condition=Available --namespace="${HC_NS}" "hostedclusters.hypershift.openshift.io/${HC_NAME}"
 echo "$(date) Kubevirt cluster is available"
 
 # --- Step 2: Retrieve the guest cluster kubeconfig ---
@@ -186,47 +189,45 @@ wait_for_nodes() {
 
 wait_for_nodes
 
-# --- Step 4: Read NodePort values from the guest cluster's default ingress service ---
-# The guest cluster router listens on NodePorts, not 80/443 directly.
-# We need these ports as targetPorts for the management-side LoadBalancer service.
-echo "$(date) Retrieving NodePort values from guest cluster ingress service"
-
-HTTP_PORT=$(oc --kubeconfig "${VIRT_KC}" get services -n openshift-ingress router-nodeport-default \
-  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')
-HTTPS_PORT=$(oc --kubeconfig "${VIRT_KC}" get services -n openshift-ingress router-nodeport-default \
-  -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}')
-
-echo "$(date) HTTP NodePort: ${HTTP_PORT}, HTTPS NodePort: ${HTTPS_PORT}"
-
-# --- Step 5: Create a LoadBalancer Service on the management cluster to expose guest *.apps traffic ---
-# Selects KubeVirt VM pods (virt-launcher) and forwards port 80/443 to the guest router NodePorts.
-echo "$(date) Creating *.apps LoadBalancer Service targeting KubeVirt VM pods"
+# --- Step 4: Wait for HyperShift baseDomainPassthrough ingress wiring on mgmt cluster ---
+# With baseDomainPassthrough, HyperShift creates a wildcard passthrough Route, a
+# selector-less Service, and EndpointSlices targeting guest VM machineNetwork IPs.
+HCP_NS="${HC_NS}-${HC_NAME}"
+echo "$(date) Waiting for baseDomainPassthrough ingress resources in ${HCP_NS}"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-oc apply -f - <<SVCEOF
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: test-apps
-  name: test-apps
-  namespace: ${HC_NS}-${HC_NAME}
-spec:
-  ports:
-  - name: https-443
-    port: 443
-    protocol: TCP
-    targetPort: ${HTTPS_PORT}
-  - name: http-80
-    port: 80
-    protocol: TCP
-    targetPort: ${HTTP_PORT}
-  selector:
-    kubevirt.io: virt-launcher
-  type: LoadBalancer
-SVCEOF
+PASSTHROUGH_WAIT=900  # 15 minutes
+PASSTHROUGH_INTERVAL=15
+PASSTHROUGH_ELAPSED=0
+PASSTHROUGH_READY=false
 
-# --- Step 6: Wait for all guest cluster ClusterOperators to be Available ---
+while [[ ${PASSTHROUGH_ELAPSED} -lt ${PASSTHROUGH_WAIT} ]]; do
+  PASSTHROUGH_ROUTE=$(oc get route -n "${HCP_NS}" -o name 2>/dev/null | grep default-ingress-passthrough-route || true)
+  PASSTHROUGH_SVC=$(oc get svc -n "${HCP_NS}" -o name 2>/dev/null | grep default-ingress-passthrough-service || true)
+  PASSTHROUGH_EPS=$(oc get endpointslice -n "${HCP_NS}" -o name 2>/dev/null | grep default-ingress-passthrough-service || true)
+
+  if [[ -n "${PASSTHROUGH_ROUTE}" && -n "${PASSTHROUGH_SVC}" && -n "${PASSTHROUGH_EPS}" ]]; then
+    echo "$(date) baseDomainPassthrough ingress resources are present:"
+    echo "  ${PASSTHROUGH_ROUTE}"
+    echo "  ${PASSTHROUGH_SVC}"
+    echo "  ${PASSTHROUGH_EPS}"
+    PASSTHROUGH_READY=true
+    break
+  fi
+
+  echo "$(date) baseDomainPassthrough ingress not ready yet (${PASSTHROUGH_ELAPSED}s elapsed)"
+  oc get route,svc,endpointslice -n "${HCP_NS}" 2>/dev/null || true
+  sleep ${PASSTHROUGH_INTERVAL}
+  PASSTHROUGH_ELAPSED=$((PASSTHROUGH_ELAPSED + PASSTHROUGH_INTERVAL))
+done
+
+if [[ "${PASSTHROUGH_READY}" != "true" ]]; then
+  echo "$(date) ERROR: baseDomainPassthrough ingress resources did not appear in ${HCP_NS}"
+  oc get route,svc,endpointslice -n "${HCP_NS}" -o wide || true
+  exit 1
+fi
+
+# --- Step 5: Wait for all guest cluster ClusterOperators to be Available ---
 echo "$(date) Waiting for all ClusterOperators to be Available"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
