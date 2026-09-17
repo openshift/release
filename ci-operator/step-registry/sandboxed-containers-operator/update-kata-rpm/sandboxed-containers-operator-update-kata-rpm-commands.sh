@@ -116,7 +116,16 @@ for node in $nodes;do
         continue
     fi
 
-    echo "${node}: installed successfully"
+    # Verify the correct version is installed
+    verified=""
+    verified=$(oc debug -n default "${node}" -- chroot /host rpm -q kata-containers 2>/dev/null) || true
+    if [ "${verified}" != "${target_version}" ]; then
+        echo "ERROR: ${node}: expected ${target_version} but found ${verified}"
+        failed_nodes="${node} ${failed_nodes}"
+        continue
+    fi
+
+    echo "${node}: installed successfully (${verified})"
     updated=$((updated + 1))
 done
 
