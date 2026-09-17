@@ -2,9 +2,8 @@
 set -e
 set -o pipefail
 
-COMMON_VARIABLES="/var/common_variables"
-SWITCH_VARIABLES="/var/switches"
-INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
+ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
+MOUNTED_HOST_INVENTORY="/var/host_variables/"
 
 echo "Checking if the job should be skipped..."
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
@@ -12,56 +11,40 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
-install_vars() {
-  local src="$1"
-  local allow_host_vars="$2"
-  local base dest_dir name
+process_inventory() {
+    local directory="$1"
+    local dest_file="$2"
 
-  base="$(basename "$src")"
+    if [ -z "$directory" ]; then
+        echo "Usage: process_inventory <directory> <dest_file>"
+        return 1
+    fi
 
-  case "$base" in
-    ansible_group_*)
-      dest_dir="${INVENTORY_PATH}/group_vars"
-      name="${base#ansible_group_}"
-      ;;
-    *)
-      if [ "${allow_host_vars}" != "true" ]; then
-        echo "  skipped a file that is not a group var"
-        return 0
-      fi
-      dest_dir="${INVENTORY_PATH}/host_vars"
-      case "$base" in
-        bastion*) name="bastion" ;;
-        *)        name="${base}" ;;
-      esac
-      ;;
-  esac
-  cp "$src" "${dest_dir}/${name}"
+    if [ ! -d "$directory" ]; then
+        echo "Error: '$directory' is not a valid directory"
+        return 1
+    fi
+
+    find "$directory" -type f | while IFS= read -r filename; do
+        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
+          continue
+        elif [[ $filename == *"ansible_ssh_private_key"* ]]; then
+          echo -e "$(basename "${filename}")": \|"\n$(sed 's/^/  /' "${filename}")"
+        else
+          echo "$(basename "${filename}")": \'"$(cat "${filename}")"\'
+        fi
+    done > "${dest_file}"
+
+    echo "Processing complete. Check ${dest_file}"
 }
 
-process_mount() {
-  local directory="$1"
-  local allow_host_vars="$2"
+echo "Create group_vars directory"
+mkdir ${ECO_CI_CD_INVENTORY_PATH}/group_vars
 
-  if [ ! -d "$directory" ]; then
-    echo "Error: '$directory' is not a valid directory"
-    return 1
-  fi
-
-  # -L so that files exposed as symlinks by the secrets mount are matched as regular files
-  while IFS= read -r filename; do
-    install_vars "$filename" "${allow_host_vars}"
-  done < <(find -L "$directory" -maxdepth 1 -type f ! -name '..*' | sort)
-}
-
-# hlxcl2, hlxcl3 and hlxcl7 all sit behind the same TLV2 switch.
-switch_for_cluster() {
-  case "${CLUSTER_NAME}" in
-    kni-qe-92) echo "rdu3_switch" ;;
-    hlxcl*)    echo "tlv2_switch" ;;
-    *)         echo "" ;;
-  esac
-}
+find /var/group_variables/common/ -mindepth 1 -type d | while read -r dir; do
+    echo "Process group inventory file: ${dir}"
+    process_inventory "${dir}" "${ECO_CI_CD_INVENTORY_PATH}"/group_vars/"$(basename "${dir}")"
+done
 
 echo "Set CLUSTER_NAME env var"
 if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
@@ -70,26 +53,21 @@ fi
 export CLUSTER_NAME=${CLUSTER_NAME}
 echo CLUSTER_NAME="${CLUSTER_NAME}"
 
-mkdir -p "${INVENTORY_PATH}/group_vars" "${INVENTORY_PATH}/host_vars"
+echo "Create host_vars directory"
+mkdir ${ECO_CI_CD_INVENTORY_PATH}/host_vars
 
-echo "Processing common group_vars"
-process_mount "${COMMON_VARIABLES}" false
-
-echo "Processing cluster vars (${CLUSTER_NAME})"
-process_mount "/var/clusters/${CLUSTER_NAME}" true
-
-echo "Processing switch vars"
-SWITCH="$(switch_for_cluster)"
-if [ -z "${SWITCH}" ]; then
-  echo "Error: no switch mapped for ${CLUSTER_NAME}"
-  exit 1
+if [[ "$CLUSTER_NAME" == *hlxcl* ]]; then
+  mkdir /tmp/"${CLUSTER_NAME}"
+  cp -r ${MOUNTED_HOST_INVENTORY}/hlxcl2/switch /tmp/"${CLUSTER_NAME}"/switch
+  cp -r ${MOUNTED_HOST_INVENTORY}/"${CLUSTER_NAME}"/* /tmp/"${CLUSTER_NAME}"/
+  ls -l /tmp/"${CLUSTER_NAME}"/
+  MOUNTED_HOST_INVENTORY="/tmp"
 fi
-SWITCH_FILE="${SWITCH_VARIABLES}/${SWITCH}"
-if [ ! -f "${SWITCH_FILE}" ]; then
-  echo "Error: switch of ${CLUSTER_NAME} not found in ${SWITCH_VARIABLES}"
-  exit 1
-fi
-cp "${SWITCH_FILE}" "${INVENTORY_PATH}/host_vars/switch"
+
+find ${MOUNTED_HOST_INVENTORY}/"${CLUSTER_NAME}"/ -mindepth 1 -type d | while read -r dir; do
+    echo "Process group inventory file: ${dir}"
+    process_inventory "${dir}" ${ECO_CI_CD_INVENTORY_PATH}/host_vars/"$(basename "${dir}")"
+done
 
 echo "Set OCP_NIC env var"
 if [[ -f "${SHARED_DIR}/ocp_nic" ]]; then
@@ -111,4 +89,4 @@ export ANSIBLE_REMOTE_TEMP="/tmp"
 ansible-playbook ./playbooks/cnf/switch-config.yaml -i ./inventories/cnf/switch-config.yaml \
     --extra-vars "cluster_name=$CLUSTER_NAME artifact_dest_dir=$SHARED_DIR ocp_nic=$OCP_NIC version=$VERSION secondary_nic=$SECONDARY_NIC"
 
-cp "${INVENTORY_PATH}/host_vars/switch" "${SHARED_DIR}"/
+cp ${ECO_CI_CD_INVENTORY_PATH}/host_vars/switch "${SHARED_DIR}"/

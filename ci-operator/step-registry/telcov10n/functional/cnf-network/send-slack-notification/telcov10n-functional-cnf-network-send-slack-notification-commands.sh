@@ -29,10 +29,9 @@ BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${SHARED_DIR}/bastion" | sed "s/'
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${SHARED_DIR}/all" | sed "s/'//g")
 
 echo "Set bastion ssh configuration"
-# The private key spans several lines in "all", take everything between the quotes
-install -m 600 /dev/null "/tmp/temp_ssh_key"
-sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${SHARED_DIR}/all" \
-  | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "/tmp/temp_ssh_key"
+grep ansible_ssh_private_key -A 100 "${SHARED_DIR}/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "/tmp/temp_ssh_key"
+
+chmod 600 "/tmp/temp_ssh_key"
 
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
