@@ -1,0 +1,43 @@
+ref:
+  as: acm-obs-e2e-run
+  from: observability-e2e-test
+  best_effort: true
+  commands: acm-obs-e2e-run-commands.sh
+  timeout: 2h0m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: '2'
+      memory: 4Gi
+  env:
+  - name: DR__RP__CR_COMP_NAME
+    default: "lp-interop--ACM-Virt"
+    documentation: Component Readiness component name for junit remapping
+  - name: MAP_TESTS
+    default: "false"
+    documentation: When true, remap junit test suite names for Component Readiness routing
+  - name: GINKGO_FOCUS
+    default: "@ocpInterop"
+    documentation: Ginkgo --focus regex to select test specs (e.g. @ocpInterop)
+  - name: GINKGO_SKIP
+    default: "Integration"
+    documentation: Ginkgo --skip regex to exclude test specs
+  documentation: |-
+    Runs the maintained ACM observability Ginkgo test suite from the
+    stolostron/multicluster-observability-operator test image.
+
+    Requires acm-obs-odf-setup (or equivalent) to have already deployed
+    MCO with ODF storage and created the mco-e2e-testing-sa RBAC resources.
+
+    Runs with SKIP_INSTALL_STEP=true and SKIP_UNINSTALL_STEP=true so the
+    suite uses the pre-existing MCO installation and does not tear it down.
+
+    Produces JUnit XML for Prow / Sippy / TestGrid / Component Readiness.
+
+    The consuming CI config must define the 'observability-e2e-test' image
+    alias in base_images, e.g.:
+      base_images:
+        observability-e2e-test:
+          name: "2.17"
+          namespace: stolostron
+          tag: observability-e2e-test
