@@ -41,10 +41,26 @@ tests:
         # 1. Full environment dump (values included — private bucket only)
         set > "$CAPTURE_DIR/env-full.txt" 2>&1
         # 4. Vault secrets health check
+        warn_count=0
+        ok_count=0
         {
           echo "=== Vault Secrets Health Check ==="
-          echo "Checks: trailing newline, trailing whitespace, embedded newlines, empty/placeholder values"
+          echo "Checks: trailing newline/whitespace, embedded newlines, empty/placeholder,"
+          echo "        suspiciously short, base64-decoded multiline/trailing whitespace"
           echo ""
+          # Show collection version/timestamp metadata
+          echo "=== Collection Versions ==="
+          for col_dir in /tmp/vault/*/; do
+            col_name="$(basename "$col_dir")"
+            version_dir=$(ls -1d "${col_dir}"..* 2>/dev/null | head -1)
+            if [[ -n "$version_dir" ]]; then
+              echo "  ${col_name}: version=$(basename "$version_dir")"
+            else
+              echo "  ${col_name}: version=unknown"
+            fi
+          done
+          echo ""
+          echo "=== Per-Secret Results ==="
           while IFS= read -r -d '' cred; do
             varname="$(basename "$cred")"
             dir="$(dirname "$cred")"
@@ -80,11 +96,22 @@ tests:
             fi
             if [[ -n "$issues" ]]; then
               echo "WARN ${collection}/${varname}: size=${size} lines=${lines}${issues}"
+              warn_count=$((warn_count + 1))
             else
               echo "OK   ${collection}/${varname}: size=${size} lines=${lines}"
+              ok_count=$((ok_count + 1))
             fi
           done < <(find /tmp/vault/ -type f -name '[A-Z]*' -print0 2>/dev/null)
+          echo ""
+          echo "=== Summary ==="
+          echo "OK: ${ok_count}  WARN: ${warn_count}"
         } > "$CAPTURE_DIR/vault-health-check.txt"
+        # Print public-safe summary to stdout (no secret names or values)
+        echo "Vault health check: ${ok_count} OK, ${warn_count} warnings (details in GCS)"
+        if [[ "$warn_count" -gt 0 ]]; then
+          echo "WARNING: ${warn_count} vault secrets have potential formatting issues."
+          echo "Check vault-health-check.txt in $DEST_PREFIX/ for details."
+        fi
         # 2. System metadata
         {
           echo "=== id ==="
