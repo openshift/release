@@ -6,7 +6,34 @@ ref:
     requests:
       cpu: 10m
       memory: 100Mi
+  env:
+  - name: QUAYNAMESPACE
+    default: ""
+    documentation: |-
+      Namespace Quay is deployed into, as passed to the deploy steps. Normally
+      left empty: the step discovers the namespace from the QuayRegistry CRs and
+      the quay-operator Subscription. Set it to keep the gather working when the
+      cluster API is unreachable, which is the one case discovery cannot cover.
   documentation: |-
-    Gathers diagnostic information from Quay operator installations including
-    custom resources, OLM subscription/CSV status, events, and pod logs from
-    the quay and openshift-operators namespaces.
+    Gathers diagnostic information from Quay installations: the QuayRegistry CRs
+    and their conditions, OLM subscription and CSV status, and per-namespace pods,
+    events and container logs (including init containers, where Quay renders its
+    config and runs database migrations, and previous-container logs for anything
+    that restarted).
+
+    Namespaces are discovered from the cluster - the QuayRegistry CRs and the
+    quay-operator Subscription - unioned with QUAYNAMESPACE and with the names this
+    registry's deploy paths use, so the step works for the quay-enterprise deploy
+    path and the quay/openshift-operators install path alike. Names that do not
+    exist on the cluster are dropped.
+
+    gather-summary.txt records the namespaces gathered and the pod and container-log
+    counts per namespace. If nothing was collected the step writes EMPTY-GATHER.txt
+    and repeats it in the step log: every job running this step has Quay deployed,
+    so an empty collection is a broken collector, not a quiet cluster.
+
+    Per-namespace artifacts are written under <namespace>/, with container logs in
+    <namespace>/logs/<pod>-<container>.log.
+
+    Jaeger traces are gathered separately by quay-gather-jaeger-traces, which needs
+    a port-forward and a deployed-Jaeger marker.
