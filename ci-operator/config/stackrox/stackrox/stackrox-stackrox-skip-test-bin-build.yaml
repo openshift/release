@@ -1,0 +1,59 @@
+binary_build_commands: "true"
+build_root:
+  use_build_cache: true
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-ui-test-stable
+promotion:
+  to:
+  - namespace: stackrox
+    name: stackrox-cache
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+tests:
+- always_run: true
+  as: gke-qa-e2e-tests
+  steps:
+    pre:
+    - as: stackrox-stackrox-begin
+      commands: |
+        echo "no-op begin step for startup timing test"
+        date -u
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 5m0s
+    test:
+    - as: stackrox-stackrox-e2e-test
+      commands: |
+        echo "no-op e2e step for startup timing test"
+        date -u
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 5m0s
+    post:
+    - as: stackrox-stackrox-end
+      commands: |
+        echo "no-op end step for startup timing test"
+        date -u
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 5m0s
+zz_generated_metadata:
+  branch: skip-test-bin-build
+  org: stackrox
+  repo: stackrox
