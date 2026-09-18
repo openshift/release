@@ -107,6 +107,7 @@ fi
 
 mkdir -p /results
 
+typeset -i ginkgoRc=0
 "${ginkgoBin}" \
     --v \
     --focus="${GINKGO_FOCUS}" \
@@ -114,14 +115,27 @@ mkdir -p /results
     --timeout=7200s \
     --no-color \
     -nodes=1 \
-    --junit-report=results.xml \
+    --junit-report=/results/results.xml \
     "${testBin}" \
-    -- -v=3 || true
+    -- -v=3 || ginkgoRc=$?
 
-# Move junit report to /results if ginkgo wrote it in CWD
-[[ -f results.xml ]] && mv results.xml /results/results.xml 2>/dev/null || true
+# Fallback if ginkgo wrote the report in CWD instead of the absolute path.
+if [[ ! -f /results/results.xml && -f results.xml ]]; then
+    mv results.xml /results/results.xml
+fi
 
-# Rename for standard CI consumption
-[[ -f /results/results.xml ]] && cp /results/results.xml "${ARTIFACT_DIR}/junit_acm-observability.xml"
+[[ -f /results/results.xml ]] || {
+    : "ERROR: missing JUnit report /results/results.xml (ginkgo exit=${ginkgoRc})"
+    exit 1
+}
 
-true
+typeset -i testCnt=0
+testCnt="$(grep -c '<testcase' /results/results.xml || true)"
+((testCnt > 0)) || {
+    : "ERROR: Ginkgo focus/skip matched no specs (focus=${GINKGO_FOCUS} skip=${GINKGO_SKIP})"
+    exit 1
+}
+
+cp /results/results.xml "${ARTIFACT_DIR}/junit_acm-observability.xml"
+
+exit "${ginkgoRc}"
