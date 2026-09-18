@@ -152,7 +152,9 @@ load_github_tokens() {
     export GH_FORK_TOKEN
     GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
     export GITHUB_TOKEN
-    ${was_tracing} && set -x
+    if [[ "${was_tracing}" == "true" ]]; then
+        set -x
+    fi
 }
 
 # Point git at the token file so pushes pick up refreshes without re-exporting.
