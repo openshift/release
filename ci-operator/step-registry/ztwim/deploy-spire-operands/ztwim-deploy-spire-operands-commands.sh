@@ -12,6 +12,8 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
 fi
 
 NS=zero-trust-workload-identity-manager
+CLUSTER_NAME="${ZTWIM_CLUSTER_NAME:-cluster1}"
+BUNDLE_CONFIGMAP="spire-bundle"
 
 echo "Waiting for operator Deployment..."
 oc wait --for=condition=Available -n "${NS}" deployment/zero-trust-workload-identity-manager-controller-manager --timeout=10m
@@ -32,10 +34,14 @@ done
 # Disable tracing while handling cluster-derived hostnames/issuer URLs.
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
-APP_DOMAIN="apps.$(oc get dns cluster -o jsonpath='{.spec.baseDomain}')"
+BASE_DOMAIN="$(oc get dnses.config.openshift.io cluster -o jsonpath='{.spec.baseDomain}')"
+APP_DOMAIN="apps.${BASE_DOMAIN}"
 JWT_ISSUER="https://oidc-discovery.${APP_DOMAIN}"
-CLUSTER_NAME="cluster1"
-BUNDLE_CONFIGMAP="spire-bundle"
+
+OIDC_MANAGED_ROUTE_LINE=""
+if [[ "${ZTWIM_OIDC_MANAGED_ROUTE:-true}" == "true" ]]; then
+  OIDC_MANAGED_ROUTE_LINE='  managedRoute: "true"'
+fi
 
 echo "Applying ZTWIM and SPIRE operand CRs..."
 cat <<EOF | oc apply -f - >/dev/null
@@ -96,7 +102,7 @@ metadata:
   name: cluster
 spec:
   jwtIssuer: ${JWT_ISSUER}
-  managedRoute: "true"
+${OIDC_MANAGED_ROUTE_LINE}
 EOF
 $WAS_TRACING && set -x
 
@@ -126,5 +132,10 @@ for cr in \
   oc wait --for=condition=Ready "${cr}" --timeout=10m
 done
 
-echo "Operand pod status in ${NS} before TLS scan:"
+if [[ "${ZTWIM_WAIT_OPERANDS_AVAILABLE:-false}" == "true" ]]; then
+  echo "Waiting for ZTWIM OperandsAvailable..."
+  oc wait --for=condition=OperandsAvailable zerotrustworkloadidentitymanagers.operator.openshift.io/cluster --timeout=10m
+fi
+
+echo "Operand pod status in ${NS}:"
 oc get pods -n "${NS}" -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,READY:.status.containerStatuses[*].ready --no-headers || true
