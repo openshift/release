@@ -62,6 +62,22 @@ tests:
             [[ "$lines" -gt 1 ]] && issues="${issues} MULTILINE(${lines}lines)"
             [[ "$size" -le 1 ]] && issues="${issues} EMPTY_OR_PLACEHOLDER"
             [[ "$size" -le 5 ]] && [[ "$size" -gt 1 ]] && issues="${issues} SUSPICIOUSLY_SHORT(${size}b)"
+            # Check if value is base64 — if so, decode and check the decoded content
+            raw=$(cat "$cred")
+            if decoded=$(echo -n "$raw" | base64 -d 2>/dev/null); then
+              dec_size=${#decoded}
+              dec_lines=$(echo -n "$decoded" | grep -c '' || true)
+              dec_last=$(echo -n "$decoded" | xxd -s -1 -l 1 -p 2>/dev/null)
+              if [[ "$dec_lines" -gt 1 ]]; then
+                issues="${issues} B64_DECODED_MULTILINE(${dec_lines}lines)"
+              fi
+              if [[ "$dec_last" == "0a" ]] || [[ "$dec_last" == "20" ]]; then
+                issues="${issues} B64_DECODED_TRAILING_WS(0x${dec_last})"
+              fi
+              if [[ "$dec_size" -le 1 ]] && [[ "$dec_size" -gt 0 ]]; then
+                issues="${issues} B64_DECODED_SUSPICIOUSLY_SHORT(${dec_size}b)"
+              fi
+            fi
             if [[ -n "$issues" ]]; then
               echo "WARN ${collection}/${varname}: size=${size} lines=${lines}${issues}"
             else
