@@ -444,8 +444,8 @@ fi
 
 if [[ "${IS_EXPENSIVE_MACHINE}" == "true" ]]; then
     # Scenario 1: Use specified control-plane but default worker for initial config
-    DEFAULT_COMPUTE_INSTANCE_TYPE="n2-standard-2"
-    DEFAULT_COMPUTE_FAMILY="N2"
+    DEFAULT_COMPUTE_INSTANCE_TYPE="n4-standard-4"
+    DEFAULT_COMPUTE_FAMILY="N4"
     if [[ "${COMPUTE_ARCH}" == "arm64" ]]; then
         DEFAULT_COMPUTE_INSTANCE_TYPE="t2a-standard-2"
         DEFAULT_COMPUTE_FAMILY="T2A"
