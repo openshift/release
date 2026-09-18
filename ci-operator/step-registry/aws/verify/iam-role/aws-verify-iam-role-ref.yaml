@@ -1,0 +1,19 @@
+ref:
+  as: aws-verify-iam-role
+  from: upi-installer
+  grace_period: 10m
+  commands: aws-verify-iam-role-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Verify the IAM role of each machine pool (control plane, compute, and edge
+    compute). When a bring-your-own (BYO) IAM role is configured for a pool in
+    install-config.yaml (controlPlane, compute[0], compute[name=edge], or
+    defaultMachinePlatform), the pool is verified to use that role (matching name
+    and the BYO "shared" tag). When no BYO IAM role is configured for a pool, it
+    is instead verified to use the installer-generated default role (infra-ID
+    naming and the installer "owned" tag), so a mix of BYO and default pools can
+    be exercised. Edge nodes are discovered via the node-role.kubernetes.io/edge
+    label; the edge check is skipped only when the cluster has no edge pool.
