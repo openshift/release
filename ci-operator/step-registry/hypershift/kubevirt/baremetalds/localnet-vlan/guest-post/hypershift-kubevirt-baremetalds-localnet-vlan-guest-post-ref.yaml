@@ -1,0 +1,25 @@
+ref:
+  as: hypershift-kubevirt-baremetalds-localnet-vlan-guest-post
+  from: cli
+  grace_period: 5m
+  commands: hypershift-kubevirt-baremetalds-localnet-vlan-guest-post-commands.sh
+  timeout: 45m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    After nested_kubeconfig proxy-url is configured, patch guest CNO (ipForwarding=Global,
+    local gateway mode) and label nodes egress-assignable for localnet-vlan dual-NAD topology.
+    Guest egress NIC IPs come from mgmt-side dnsmasq DHCP on br-ex.<egress-vlan-id> — no
+    guest-side NMState NNCPs needed. Mgmt NNCPs persist until the destroy step.
+  env:
+    - name: ATTACH_DEFAULT_NETWORK
+      default: ""
+      documentation: Must be localnet-vlan for this step to run guest post-config.
+    - name: LOCALNET_VLAN_EGRESS_ENABLE
+      default: "true"
+      documentation: When true, label guest nodes with egress-assignable for EgressIP.
+    - name: LOCALNET_VLAN_GUEST_API_WAIT_TIMEOUT
+      default: "600"
+      documentation: Seconds to wait for guest API via nested kubeconfig before failing.
