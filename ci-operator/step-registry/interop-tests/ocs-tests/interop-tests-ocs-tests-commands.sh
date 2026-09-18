@@ -23,13 +23,14 @@ fi
 CLUSTER_NAME=$([[ -f "${SHARED_DIR}/CLUSTER_NAME" ]] && cat "${SHARED_DIR}/CLUSTER_NAME" || echo "cluster-name")
 CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
 LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
-LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
+LOGS_CONFIG="$(mktemp /tmp/ocs-tests-config.XXXXXX.yaml)"
 CLUSTER_PATH="${ARTIFACT_DIR}/ocs-tests"
 
 export BIN_FOLDER="${LOGS_FOLDER}/bin"
 
 # Function to clean up folders
 cleanup() {
+    rm -f "${LOGS_CONFIG}"
     # Tear down local auth copy created for run-ci.
     [[ -d "${CLUSTER_PATH}/auth" ]] && rm -rf "${CLUSTER_PATH}/auth"
 }
