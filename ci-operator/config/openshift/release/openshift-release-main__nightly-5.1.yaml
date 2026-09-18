@@ -121,12 +121,54 @@ releases:
       product: ocp
       stream: nightly
       version: "5.1"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.1"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: aws-c2s-ipi-disc-priv-arm-fips-f7
+  cron: 7 7 6,13,20,27 * *
+  steps:
+    cluster_profile: aws-c2s-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      OCP_ARCH: arm64
+      TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
+      TEST_SKIPS: should cleanup security groups when service is deleted\|should create
+        NLB service with security group attached\|should update security group rules
+        when service is updated\|should have correct security group rules for service
+        ports\|should transition from Managed SG to BYO Security Group\|should transition
+        from BYO SG to Managed Security Group\|created with BYO Security Group should
+        have BYO Security Group associated\|\[OCPFeatureGate:GatewayAPIController\]\[Feature:Router\]
+    workflow: aws-c2s-ipi-disconnected
+- as: aws-sc2s-ipi-disc-priv-arm-fips-f7
+  cron: 37 21 7,14,21,28 * *
+  steps:
+    cluster_profile: aws-sc2s-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      OCP_ARCH: arm64
+      TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
+      TEST_SKIPS: should cleanup security groups when service is deleted\|should create
+        NLB service with security group attached\|should update security group rules
+        when service is updated\|should have correct security group rules for service
+        ports\|should transition from Managed SG to BYO Security Group\|should transition
+        from BYO SG to Managed Security Group\|created with BYO Security Group should
+        have BYO Security Group associated\|\[OCPFeatureGate:GatewayAPIController\]\[Feature:Router\]
+    workflow: aws-sc2s-ipi-disconnected
 - as: e2e-aws-ovn-single-node-csi
   interval: 168h
   steps:
