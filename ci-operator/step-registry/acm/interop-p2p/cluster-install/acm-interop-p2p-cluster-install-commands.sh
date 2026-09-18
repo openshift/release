@@ -875,9 +875,7 @@ spec:
   - "registry.ci.openshift.org/ocp/release"
   policy:
     rootOfTrust:
-      policyType: PublicKey
-      publicKey:
-        keyData: ""
+      policyType: InsecureAcceptAnything
 EOF
     fi
 
