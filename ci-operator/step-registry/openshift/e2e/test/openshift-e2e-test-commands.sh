@@ -210,7 +210,12 @@ vsphere)
     export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
     oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
     sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
+    # Disable tracing due to vCenter credential in the sed argument
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    # Restore previous tracing state
+    $WAS_TRACING && set -x
     if [[ "${WAS_TRACING}" == true ]]; then
         set -x
     fi
