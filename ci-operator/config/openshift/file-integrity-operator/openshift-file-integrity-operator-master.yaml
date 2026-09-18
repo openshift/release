@@ -73,10 +73,6 @@ tests:
   pipeline_skip_if_only_changed: ^(?:\.github|\.tekton)|\.md$|bundle-hack|^(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
-    env:
-      PQC_CHECK: "true"
-      SCAN_NAMESPACE: openshift-file-integrity
-      SCANNER_NAMESPACE: openshift-file-integrity
     test:
     - as: test
       cli: latest
@@ -88,7 +84,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-    - ref: tls-scanner-run
     workflow: ipi-aws
 - always_run: false
   as: e2e-rosa
@@ -188,6 +183,30 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-tls-scanner
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-file-integrity
+      SCANNER_NAMESPACE: openshift-file-integrity
+    test:
+    - as: deploy
+      cli: latest
+      commands: |
+        make e2e-set-image deploy
+        oc wait --timeout=5m --for=condition=Available -n openshift-file-integrity deployment/file-integrity-operator
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-scanner-run
     workflow: ipi-aws
 zz_generated_metadata:
   branch: master
