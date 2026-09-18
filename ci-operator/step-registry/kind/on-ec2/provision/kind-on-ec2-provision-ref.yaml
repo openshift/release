@@ -1,0 +1,37 @@
+ref:
+  as: kind-on-ec2-provision
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  grace_period: 10m
+  commands: kind-on-ec2-provision-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: EC2_INSTANCE_TYPE
+    default: t3.large
+    documentation: EC2 instance type for the kind host.
+  - name: REGION
+    default: us-west-2
+    documentation: AWS region where the EC2 instance will be created.
+  - name: EC2_AMI
+    default: "ami-09c3a3c2cf6003f6c"
+    documentation: |-
+      AMI ID to use. Defaults to Ubuntu 22.04 LTS in us-west-2.
+  documentation: |-
+    Provision a standalone EC2 instance via CloudFormation for running kind.
+    The instance gets Docker and kind pre-installed via UserData.
+
+    Requires cluster_profile providing:
+      ${CLUSTER_PROFILE_DIR}/.awscred
+      ${CLUSTER_PROFILE_DIR}/ssh-publickey
+
+    Outputs stored in SHARED_DIR:
+      ${SHARED_DIR}/public_address
+      ${SHARED_DIR}/ssh_user
+      ${SHARED_DIR}/to_be_removed_cf_stack_list
+
+    Use `aws-deprovision-stacks` to clean up.
