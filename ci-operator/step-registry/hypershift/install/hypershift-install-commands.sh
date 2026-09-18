@@ -61,6 +61,75 @@ elif [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
   extract_hcp_cli "${OPERATOR_IMAGE}"
 fi
 
+# --- Helper functions for operator-image verification ---
+# Defined before the install command so the operator-image artifact can be
+# written early enough to survive an install failure under set -e.
+
+# Extract a sha256 digest from an image reference or runtime imageID.
+# Handles pullspec digests ("…@sha256:abc"), CRI-O runtime imageIDs
+# ("docker://sha256:abc"), and returns "tag-only" or "unavailable" otherwise.
+# Never emits a raw pullspec.
+_safe_digest() {
+  local ref="$1"
+  if [[ "${ref}" == *@sha256:* ]]; then
+    echo "${ref##*@}"
+  elif [[ "${ref}" == docker://sha256:* ]]; then
+    echo "${ref#docker://}"
+  elif [[ "${ref}" == "unavailable" ]]; then
+    echo "unavailable"
+  else
+    echo "tag-only"
+  fi
+}
+
+# Extract a sha256 digest from a raw image reference for comparison.
+_extract_digest() {
+  local ref="$1"
+  if [[ "${ref}" == *@sha256:* ]]; then
+    echo "${ref##*@}"
+  elif [[ "${ref}" == docker://sha256:* ]]; then
+    echo "${ref#docker://}"
+  else
+    echo "${ref}"
+  fi
+}
+
+# --- Record operator-image artifacts before the install command ---
+# Writing here ensures the artifacts survive a set -e exit during install.
+# SHARED_DIR is for downstream steps; ARTIFACT_DIR is the public Prow artifact.
+echo "${OPERATOR_IMAGE}" > "${SHARED_DIR}/hypershift-operator-image"
+# Suppress xtrace around _safe_digest so raw pullspec arguments are not logged.
+{ set +x; } 2>/dev/null
+_safe_digest "${OPERATOR_IMAGE}" > "${ARTIFACT_DIR}/hypershift-operator-image.txt"
+
+# --- Verification artifact state (defaults for the EXIT trap) ---
+_VERIFY_INTENDED=$(_safe_digest "${OPERATOR_IMAGE}")
+_VERIFY_DEPLOYED="unavailable"
+_VERIFY_POD="unavailable"
+_VERIFY_OVERRIDE="false"
+[[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]] && _VERIFY_OVERRIDE="true"
+set -x
+
+# EXIT trap: always emit the structured verification JSON, even on failure.
+_write_verification_artifact() {
+  { set +ex; } 2>/dev/null   # run to completion, suppress trace
+  if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+    cat > "${ARTIFACT_DIR}/hypershift-operator-image-verification.json" <<TRAP_EOF
+{
+  "intended_digest": "${_VERIFY_INTENDED}",
+  "deployed_digest": "${_VERIFY_DEPLOYED}",
+  "pod_digest": "${_VERIFY_POD}",
+  "override_supplied": ${_VERIFY_OVERRIDE}
+}
+TRAP_EOF
+    echo "INFO: HyperShift Operator image verification artifact written"
+    echo "  Intended: ${_VERIFY_INTENDED}"
+    echo "  Deployed: ${_VERIFY_DEPLOYED}"
+    echo "  Pod: ${_VERIFY_POD}"
+  fi
+}
+trap _write_verification_artifact EXIT
+
 INSTALL_HELP=$("${HCP_CLI}" install --help 2>&1 || true)
 
 if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
@@ -236,3 +305,86 @@ case "${CLOUD_PROVIDER}" in
     ${EXTRA_ARGS}
     ;;
 esac
+
+# --- Post-install operator image verification ---
+# Update the verification state with data from the live deployment. The EXIT
+# trap (registered before the install) writes the JSON artifact on any exit,
+# so these values are captured even if a later command fails.
+# Disable xtrace so raw pullspecs and imageIDs are never logged.
+[[ $- == *x* ]] && _XTRACE_WAS_ON=true || _XTRACE_WAS_ON=false
+set +x
+
+# Query the actual deployed operator from the management cluster.
+# Prefer the explicit management_cluster_kubeconfig written by the nested-management-cluster
+# setup chain; fall back to the default KUBECONFIG (covers 2-tier root-management-cluster
+# workflows where management_cluster_kubeconfig does not exist).
+VERIFY_KUBECONFIG="${KUBECONFIG:-}"
+if [[ -f "${SHARED_DIR}/management_cluster_kubeconfig" ]]; then
+  VERIFY_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+fi
+
+DEPLOYED_IMAGE="unavailable"
+POD_IMAGE_ID="unavailable"
+
+if [[ -n "${VERIFY_KUBECONFIG}" ]] && [[ -f "${VERIFY_KUBECONFIG}" ]]; then
+  # Select the "operator" container by name (not positional index) to avoid reading
+  # a sidecar when container ordering varies.
+  DEPLOYED_IMAGE=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get deployment -n hypershift operator \
+    -o jsonpath='{.spec.template.spec.containers[?(@.name=="operator")].image}' 2>/dev/null) || DEPLOYED_IMAGE="unavailable"
+  # Select the newest Running operator pod by creation time and read the "operator"
+  # container's imageID by name. During a deployment rollout the newest Running pod
+  # belongs to the current ReplicaSet revision; sorting by creationTimestamp avoids
+  # reading a stale imageID from an old-revision pod that has not yet terminated.
+  # Pending, completed, or terminating pods are excluded by the phase filter.
+  POD_IMAGE_ID=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get pods -n hypershift -l app=operator \
+    --field-selector=status.phase=Running --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{range .items[*]}{.status.containerStatuses[?(@.name=="operator")].imageID}{"\n"}{end}' 2>/dev/null \
+    | tail -1) || POD_IMAGE_ID="unavailable"
+  # Normalize empty oc output (exit 0 with no matching jsonpath result) to "unavailable".
+  [[ -z "${DEPLOYED_IMAGE}" ]] && DEPLOYED_IMAGE="unavailable"
+  [[ -z "${POD_IMAGE_ID}" ]] && POD_IMAGE_ID="unavailable"
+fi
+
+# Update the verification state for the EXIT trap.
+_VERIFY_DEPLOYED=$(_safe_digest "${DEPLOYED_IMAGE}")
+_VERIFY_POD=$(_safe_digest "${POD_IMAGE_ID}")
+
+# When an explicit override was supplied, verify the deployment converged to the
+# intended image. Digest-pinned overrides (image@sha256:…) require a matching
+# deployed digest — exit non-zero when the deployed digest cannot be resolved or
+# does not match. Tag-only overrides have no immutable digest to compare, so
+# verification is explicitly skipped with an informational message. Ordinary e2e
+# jobs that use the default pipeline image are unaffected.
+if [[ "${_VERIFY_OVERRIDE}" == "true" ]]; then
+  # Extract sha256 digest from the intended override image if it contains one.
+  INTENDED_DIGEST=$(_extract_digest "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}")
+
+  if [[ "${INTENDED_DIGEST}" == sha256:* ]]; then
+    # Override is digest-pinned — deployed digest must be resolvable and matching.
+    DEPLOYED_DIGEST=$(_extract_digest "${POD_IMAGE_ID}")
+    if [[ "${DEPLOYED_DIGEST}" != sha256:* ]]; then
+      echo "ERROR: HyperShift Operator image digest could not be verified"
+      echo "  Intended digest: ${INTENDED_DIGEST}"
+      echo "  Pod digest: $(_safe_digest "${POD_IMAGE_ID}")"
+      # Restore xtrace before exiting so post-step cleanup is visible.
+      ${_XTRACE_WAS_ON} && set -x || true
+      exit 1
+    elif [[ "${INTENDED_DIGEST}" != "${DEPLOYED_DIGEST}" ]]; then
+      echo "ERROR: HyperShift Operator image digest mismatch"
+      echo "  Intended digest: ${INTENDED_DIGEST}"
+      echo "  Deployed digest: ${DEPLOYED_DIGEST}"
+      # Restore xtrace before exiting so post-step cleanup is visible.
+      ${_XTRACE_WAS_ON} && set -x || true
+      exit 1
+    else
+      echo "INFO: HyperShift Operator image digest verified"
+      echo "  Digest: ${DEPLOYED_DIGEST}"
+    fi
+  else
+    # Override is tag-only — no immutable digest to compare.
+    echo "INFO: digest verification skipped (tag-only override, no immutable digest to compare)"
+  fi
+fi
+
+# Restore xtrace to its previous state.
+${_XTRACE_WAS_ON} && set -x || true
