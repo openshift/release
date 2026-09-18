@@ -68,13 +68,11 @@ tests:
             collection="$(basename "$dir")"
             size=$(wc -c < "$cred")
             lines=$(wc -l < "$cred")
-            last_byte=$(xxd -s -1 -l 1 -p "$cred" 2>/dev/null)
-            trail_ws="no"
-            if [[ "$(tail -c 1 "$cred" | xxd -p)" == "0a" ]] || [[ "$(tail -c 1 "$cred" | xxd -p)" == "20" ]]; then
-              trail_ws="yes"
-            fi
+            # Get last byte using od (POSIX, always available; xxd is not)
+            last_byte=$(tail -c 1 "$cred" | od -An -tx1 | tr -d ' \n')
             issues=""
-            [[ "$trail_ws" == "yes" ]] && issues="${issues} TRAILING_WHITESPACE(0x${last_byte})"
+            [[ "$last_byte" == "0a" || "$last_byte" == "20" || "$last_byte" == "09" ]] && \
+              issues="${issues} TRAILING_WHITESPACE(0x${last_byte})"
             [[ "$lines" -gt 1 ]] && issues="${issues} MULTILINE(${lines}lines)"
             [[ "$size" -le 1 ]] && issues="${issues} EMPTY_OR_PLACEHOLDER"
             [[ "$size" -le 5 ]] && [[ "$size" -gt 1 ]] && issues="${issues} SUSPICIOUSLY_SHORT(${size}b)"
@@ -83,11 +81,11 @@ tests:
             if decoded=$(echo -n "$raw" | base64 -d 2>/dev/null); then
               dec_size=${#decoded}
               dec_lines=$(echo -n "$decoded" | grep -c '' || true)
-              dec_last=$(echo -n "$decoded" | xxd -s -1 -l 1 -p 2>/dev/null)
+              dec_last=$(printf '%s' "$decoded" | tail -c 1 | od -An -tx1 | tr -d ' \n')
               if [[ "$dec_lines" -gt 1 ]]; then
                 issues="${issues} B64_DECODED_MULTILINE(${dec_lines}lines)"
               fi
-              if [[ "$dec_last" == "0a" ]] || [[ "$dec_last" == "20" ]]; then
+              if [[ "$dec_last" == "0a" || "$dec_last" == "20" || "$dec_last" == "09" ]]; then
                 issues="${issues} B64_DECODED_TRAILING_WS(0x${dec_last})"
               fi
               if [[ "$dec_size" -le 1 ]] && [[ "$dec_size" -gt 0 ]]; then
