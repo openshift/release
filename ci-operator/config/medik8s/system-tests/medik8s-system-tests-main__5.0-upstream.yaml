@@ -57,7 +57,12 @@ tests:
     - as: e2e-test
       cli: latest
       commands: |
-        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
