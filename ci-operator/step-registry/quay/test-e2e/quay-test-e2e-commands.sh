@@ -188,6 +188,64 @@ function gatherBuilderDiagnostics {
     > "${out}/quay-app-buildman.log" 2>&1 || true
 }
 
+# Expose the in-cluster Jaeger query API to the Playwright suite. On a failed
+# test the suite attaches server-spans.json -- the Jaeger spans for that test's
+# own requests -- by GETting ${JAEGER_QUERY_URL}/api/traces/<traceId>. With the
+# variable unset that collection silently no-ops, so it has to be set here.
+#
+# Port-forward, not the in-cluster Service DNS: this step's pod runs in the CI
+# build farm, not in the target cluster, so jaeger.${ns}.svc is unreachable from
+# it. The step has `cli: latest` and the target-cluster KUBECONFIG, which is the
+# same mechanism the quay-gather-jaeger-traces post step already uses against
+# this Service. 127.0.0.1 rather than localhost so Node's fetch cannot pick ::1,
+# which the forward does not bind.
+#
+# Best-effort: if Jaeger was not deployed or the forward never answers, leave
+# JAEGER_QUERY_URL UNSET. The suite treats that as "not collected" and records a
+# reason, which is better than handing it a URL that quietly returns nothing.
+function startJaegerPortForward {
+  local ns="${QUAYNAMESPACE:-quay-enterprise}"
+  if [[ ! -f "${SHARED_DIR}/jaeger_deployed" ]]; then
+    echo "Jaeger was not deployed; leaving JAEGER_QUERY_URL unset"
+    return 0
+  fi
+
+  # The suite can run for hours and a single port-forward does not survive a
+  # Jaeger pod restart or an idle drop, so supervise it: the keeper restarts oc
+  # until it is asked to stop, and on TERM kills the forward it is currently
+  # supervising.
+  (
+    pf=""
+    trap '[[ -n "${pf}" ]] && kill "${pf}" 2>/dev/null; exit 0' TERM
+    while true; do
+      oc port-forward -n "${ns}" svc/jaeger 16686:16686 >> "${ARTIFACT_DIR}/jaeger-port-forward.log" 2>&1 &
+      pf=$!
+      wait "${pf}" || true
+      sleep 5
+    done
+  ) &
+  JAEGER_PF_PID=$!
+
+  for _ in $(seq 1 12); do
+    if curl -sf --connect-timeout 5 --max-time 10 "http://127.0.0.1:16686/api/services" -o /dev/null; then
+      export JAEGER_QUERY_URL="http://127.0.0.1:16686"
+      echo "JAEGER_QUERY_URL=${JAEGER_QUERY_URL}"
+      return 0
+    fi
+    sleep 5
+  done
+
+  echo "WARNING: Jaeger query API never became reachable; leaving JAEGER_QUERY_URL unset" >&2
+  stopJaegerPortForward
+}
+
+function stopJaegerPortForward {
+  [[ -n "${JAEGER_PF_PID:-}" ]] || return 0
+  kill "${JAEGER_PF_PID}" 2>/dev/null || true
+  wait "${JAEGER_PF_PID}" 2>/dev/null || true
+  JAEGER_PF_PID=""
+}
+
 function copyArtifacts {
   echo "Copying test artifacts..."
   local src="${PLAYWRIGHT_WORKDIR:-.}"
@@ -317,7 +375,7 @@ EOF
   fi
   gatherBuilderDiagnostics || true
 }
-trap copyArtifacts EXIT
+trap 'copyArtifacts; stopJaegerPortForward' EXIT
 
 # Test users (admin/testuser/readonly) are created by Playwright's global-setup.ts,
 # exactly as in upstream Quay CI (.github/workflows/ci-web.yaml). With FEATURE_MAILING
@@ -402,6 +460,8 @@ fi
 # same operations pass on retry). Cap concurrency to relieve that contention. The CLI
 # --workers flag overrides the config value; override via PLAYWRIGHT_WORKERS if needed.
 PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-2}"
+
+startJaegerPortForward
 
 echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
