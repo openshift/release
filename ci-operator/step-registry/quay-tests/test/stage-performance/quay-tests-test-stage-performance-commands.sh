@@ -59,6 +59,10 @@ cleanup_repositories() {
       -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
       "https://$QUAY_ROUTE/api/v1/repository/${quay_perf_organization}/${repo}" -o /dev/null || true
   done
+  echo "Deleting organization: ${quay_perf_organization}"
+  curl -s -X DELETE \
+    -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
+    "https://$QUAY_ROUTE/api/v1/organization/${quay_perf_organization}" -o /dev/null || true
   echo "Repository cleanup complete."
 }
 
