@@ -93,10 +93,11 @@ wait_for_ipsec_tunnels() {
   echo "Waiting 120s for ipsec daemonset pods to initialize..."
   sleep 120
 
+  declare -A pod_node_map
   deadline=$(( $(date +%s) + ${IPSEC_WAIT_TIMEOUT:-600} ))
   while [[ $(date +%s) -lt $deadline ]]; do
     # Fetch all pods on each loop, as they can respawn during initialize
-    declare -A pod_node_map
+    pod_node_map=()
     while IFS= read -r line; do
       local pod node
       pod=$(echo "$line" | awk '{print $1}')
