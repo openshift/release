@@ -3,10 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
-  operator-sdk:
-    name: "4.22"
-    namespace: origin
-    tag: operator-sdk
+  system-tests-builder:
+    name: builder
+    namespace: medik8s
+    tag: go1.27
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -15,6 +15,16 @@ images:
   - dockerfile_path: Dockerfile
     from: base
     to: node-healthcheck-operator
+  - dockerfile_literal: |
+      # system-tests needs Go 1.27, skopeo, and the exact Operator SDK version;
+      # no existing CI base image provides all three.
+      FROM quay.io/operator-framework/operator-sdk@sha256:1b37b208f424e5abec0dc2045b54d3942e2eb03e085f48baf19aff7e5a333d84 AS operator-sdk
+      FROM system-tests-builder
+      USER 0
+      RUN dnf install -y skopeo && dnf clean all
+      COPY --from=operator-sdk /usr/local/bin/operator-sdk /usr/local/bin/operator-sdk
+    from: system-tests-builder
+    to: nhc-upgrade-test-runner
 operator:
   bundles:
   - as: my-bundle
@@ -59,8 +69,21 @@ tests:
         : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
         exec > >(tee "$ARTIFACT_DIR/nhc-upgrade-tests.log") 2>&1
 
+        # Reuse the cluster pull secret so skopeo can discover the released
+        # Red Hat bundle versions without exposing registry credentials.
+        export XDG_RUNTIME_DIR=/tmp/nhc-xdg-runtime
+        mkdir -p "$XDG_RUNTIME_DIR/containers"
+        oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' |
+          base64 --decode > "$XDG_RUNTIME_DIR/containers/auth.json"
+        chmod 0600 "$XDG_RUNTIME_DIR/containers/auth.json"
+        export REGISTRY_AUTH_FILE="$XDG_RUNTIME_DIR/containers/auth.json"
+
+        go version
+        skopeo --version
+        operator-sdk version
         operator-sdk bundle validate "$OO_BUNDLE"
         git clone --depth=1 https://github.com/medik8s/system-tests.git /tmp/system-tests
+        git -C /tmp/system-tests show --no-patch --format=fuller HEAD
 
         candidate_version="$(sed -n 's/^  version: *//p' bundle/manifests/node-healthcheck-operator.clusterserviceversion.yaml | tr -d '"')"
         : "${candidate_version:?NHC bundle CSV must specify spec.version}"
@@ -91,7 +114,7 @@ tests:
         name: my-bundle
       - env: NHC_CANDIDATE_OPERATOR
         name: node-healthcheck-operator
-      from: operator-sdk
+      from: nhc-upgrade-test-runner
       resources:
         requests:
           cpu: 100m
