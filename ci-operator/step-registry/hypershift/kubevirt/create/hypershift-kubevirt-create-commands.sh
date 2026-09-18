@@ -602,25 +602,58 @@ echo "localnet-vlan routing configured (${vlan_subnet} via ${uplink_bond}, east-
 SCRIPT_EOF
 )
 
+  local routing_succeeded=0
+  local routing_failed_nodes=""
+
   echo "Configuring localnet-vlan routing on all nodes (${vlan_subnet} -> ${uplink_bond}, mgmt pod ${mgmt_pod_cidr})..."
-  local max_retries=3
   for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    localnet_vlan_wait_node_ready "${node}" 120 || true
     local ok=false
-    for attempt in $(seq 1 "${max_retries}"); do
+    for attempt in $(seq 1 5); do
       if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
         "echo '${routing_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${uplink_bond}' '${vlan_subnet}' '${mgmt_pod_cidr}' '${mgmt_svc_cidr}'"; then
         echo "  ${node}: routing configured"
         ok=true
         break
       fi
-      echo "  ${node}: oc debug failed (attempt ${attempt}/${max_retries}), retrying in 10s..." >&2
-      sleep 10
+      echo "  ${node}: oc debug failed (attempt ${attempt}/5), retrying in 15s..." >&2
+      sleep 15
     done
-    if [[ "${ok}" != "true" ]]; then
-      echo "ERROR: failed to configure routing on ${node} after ${max_retries} attempts" >&2
-      return 1
+    if [[ "${ok}" == "true" ]]; then
+      routing_succeeded=$((routing_succeeded + 1))
+    else
+      echo "WARNING: failed to configure routing on ${node} after 5 attempts" >&2
+      routing_failed_nodes="${routing_failed_nodes} ${node}"
     fi
   done
+
+  if [[ -n "${routing_failed_nodes}" ]]; then
+    echo "Deferred retry for failed routing nodes:${routing_failed_nodes}"
+    for node in ${routing_failed_nodes}; do
+      echo "  Retrying ${node} (deferred)..."
+      localnet_vlan_wait_node_ready "${node}" 60 || true
+      if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${routing_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${uplink_bond}' '${vlan_subnet}' '${mgmt_pod_cidr}' '${mgmt_svc_cidr}'"; then
+        echo "  ${node}: routing configured on deferred retry"
+        routing_succeeded=$((routing_succeeded + 1))
+      else
+        echo "WARNING: ${node} failed deferred retry — no routing on this node" >&2
+      fi
+    done
+  fi
+
+  if [[ "${routing_succeeded}" -eq 0 ]]; then
+    echo "ERROR: routing configured on zero nodes — cannot proceed" >&2
+    return 1
+  fi
+
+  local routing_total
+  routing_total=$(oc get nodes --no-headers 2>/dev/null | wc -l)
+  if [[ "${routing_succeeded}" -lt "${routing_total}" ]]; then
+    echo "WARNING: routing configured on ${routing_succeeded}/${routing_total} nodes"
+  else
+    echo "routing configured on all ${routing_succeeded} nodes"
+  fi
 }
 
 # Return the first IPv4 on the VLAN worker prefix (e.g. 192.168.112.x).
@@ -722,6 +755,9 @@ localnet_vlan_configure_worker_host_routes() {
     return 0
   fi
 
+  local route_succeeded=0
+  local route_failed_nodes=""
+
   echo "Installing localnet-vlan worker /32 host routes on all nodes (${vmi_namespace})..."
   for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
     node_route_lines=""
@@ -729,8 +765,6 @@ localnet_vlan_configure_worker_host_routes() {
       hypervisor="${worker_routes[${ip}]}"
       gw="${hypervisor_ips[${hypervisor}]:-}"
       [[ -z "${gw}" ]] && continue
-      # VMIs on this hypervisor are on the local br-ex.<vlan> segment; a /32 via our own
-      # br-ex address steals traffic from br-ex.100 and breaks kubelet/API on that node.
       if [[ "${hypervisor}" == "${node}" ]]; then
         node_route_lines+="ip route del ${ip}/32 via ${gw} 2>/dev/null || true"$'\n'
         continue
@@ -746,22 +780,71 @@ echo "localnet-vlan worker /32 routes installed via ${uplink_bond} (node ${node}
 SCRIPT_EOF
 )
 
+    localnet_vlan_wait_node_ready "${node}" 120 || true
     local route_ok=false
-    for route_attempt in $(seq 1 3); do
+    for route_attempt in $(seq 1 5); do
       if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
         "echo '${route_script_b64}' | base64 -d | bash"; then
         echo "  ${node}: worker host routes configured"
         route_ok=true
         break
       fi
-      echo "  ${node}: oc debug failed (attempt ${route_attempt}/3), retrying in 10s..." >&2
-      sleep 10
+      echo "  ${node}: oc debug failed (attempt ${route_attempt}/5), retrying in 15s..." >&2
+      sleep 15
     done
-    if [[ "${route_ok}" != "true" ]]; then
-      echo "ERROR: failed to configure worker host routes on ${node} after 3 attempts" >&2
-      return 1
+    if [[ "${route_ok}" == "true" ]]; then
+      route_succeeded=$((route_succeeded + 1))
+    else
+      echo "WARNING: failed to configure worker host routes on ${node} after 5 attempts" >&2
+      route_failed_nodes="${route_failed_nodes} ${node}"
     fi
   done
+
+  if [[ -n "${route_failed_nodes}" ]]; then
+    echo "Deferred retry for failed worker host route nodes:${route_failed_nodes}"
+    for node in ${route_failed_nodes}; do
+      echo "  Retrying ${node} (deferred)..."
+      node_route_lines=""
+      for ip in "${!worker_routes[@]}"; do
+        hypervisor="${worker_routes[${ip}]}"
+        gw="${hypervisor_ips[${hypervisor}]:-}"
+        [[ -z "${gw}" ]] && continue
+        if [[ "${hypervisor}" == "${node}" ]]; then
+          node_route_lines+="ip route del ${ip}/32 via ${gw} 2>/dev/null || true"$'\n'
+          continue
+        fi
+        node_route_lines+="ip route replace ${ip}/32 via ${gw}"$'\n'
+      done
+      route_script_b64=$(base64 -w0 <<SCRIPT_EOF
+#!/bin/bash
+set -euo pipefail
+${node_route_lines}
+echo "localnet-vlan worker /32 routes installed via ${uplink_bond} (node ${node})"
+SCRIPT_EOF
+)
+      localnet_vlan_wait_node_ready "${node}" 60 || true
+      if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${route_script_b64}' | base64 -d | bash"; then
+        echo "  ${node}: worker host routes configured on deferred retry"
+        route_succeeded=$((route_succeeded + 1))
+      else
+        echo "WARNING: ${node} failed deferred retry — no worker host routes on this node" >&2
+      fi
+    done
+  fi
+
+  if [[ "${route_succeeded}" -eq 0 ]]; then
+    echo "ERROR: worker host routes configured on zero nodes — cannot proceed" >&2
+    return 1
+  fi
+
+  local route_total
+  route_total=$(oc get nodes --no-headers 2>/dev/null | wc -l)
+  if [[ "${route_succeeded}" -lt "${route_total}" ]]; then
+    echo "WARNING: worker host routes configured on ${route_succeeded}/${route_total} nodes"
+  else
+    echo "worker host routes configured on all ${route_succeeded} nodes"
+  fi
 }
 
 # Guest API is on lab L2 (111.x). CI sets HTTP_PROXY for outbound internet; nested_kubeconfig
@@ -957,11 +1040,41 @@ localnet_vlan_refresh_dnsmasq_api_dns() {
   base_domain=$(oc get dns/cluster -o jsonpath='{.spec.baseDomain}')
   echo "Refreshing localnet-vlan dnsmasq API DNS on all nodes (api/api-int -> ${api_vip})..."
   setup_b64=$(localnet_vlan_dnsmasq_setup_script_b64)
+  local refresh_failed_nodes=""
   for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
-    oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
-      "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'" \
-      || echo "WARNING: dnsmasq API refresh failed on ${node}" >&2
+    localnet_vlan_wait_node_ready "${node}" 120 || true
+    local refresh_ok=false
+    for refresh_attempt in $(seq 1 5); do
+      if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
+      then
+        echo "  ${node}: dnsmasq API DNS refreshed"
+        refresh_ok=true
+        break
+      fi
+      echo "  ${node}: oc debug failed (attempt ${refresh_attempt}/5), retrying in 15s..." >&2
+      sleep 15
+    done
+    if [[ "${refresh_ok}" != "true" ]]; then
+      echo "WARNING: dnsmasq API refresh failed on ${node} after 5 attempts" >&2
+      refresh_failed_nodes="${refresh_failed_nodes} ${node}"
+    fi
   done
+
+  if [[ -n "${refresh_failed_nodes}" ]]; then
+    echo "Deferred retry for failed dnsmasq API refresh nodes:${refresh_failed_nodes}"
+    for node in ${refresh_failed_nodes}; do
+      echo "  Retrying ${node} (deferred)..."
+      localnet_vlan_wait_node_ready "${node}" 60 || true
+      if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
+      then
+        echo "  ${node}: dnsmasq API DNS refreshed on deferred retry"
+      else
+        echo "WARNING: ${node} failed deferred retry — dnsmasq API DNS not refreshed on this node" >&2
+      fi
+    done
+  fi
 }
 
 localnet_multi_label_namespace_privileged() {
