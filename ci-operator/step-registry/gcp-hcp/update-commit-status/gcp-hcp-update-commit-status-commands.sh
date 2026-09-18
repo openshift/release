@@ -45,12 +45,12 @@ if [[ -z "${tested_sha}" ]]; then
     exit 1
   fi
 
-  remote_url="$(git config --get remote.origin.url)"
-  if [[ ! "${remote_url}" =~ (^|[:/])${target_org}/${target_repo}(\.git)?$ ]]; then
-    echo "ERROR: active checkout is not ${target_org}/${target_repo}" >&2
+  # Prow marks this exact extra ref as the active workdir, but its checkout can
+  # omit remote.origin.url. Resolve HEAD without depending on remote metadata.
+  if ! tested_sha="$(git rev-parse HEAD 2>/dev/null)"; then
+    echo "ERROR: unable to resolve HEAD from the active target checkout" >&2
     exit 1
   fi
-  tested_sha="$(git rev-parse HEAD)"
 fi
 
 if [[ ! "${tested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
