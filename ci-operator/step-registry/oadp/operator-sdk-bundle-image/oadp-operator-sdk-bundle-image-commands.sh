@@ -404,7 +404,7 @@ while true; do
         break
     fi
     echo "[$(date --utc +%FT%T.%3NZ)] operator-sdk run bundle failed (exit ${RUN_BUNDLE_STATUS}, attempt ${BUNDLE_ATTEMPT}/${OO_RUN_BUNDLE_ATTEMPTS}) -- retrying after backoff in case this was a transient infra pull failure"
-    sleep $(( BUNDLE_ATTEMPT * 30 ))
+    sleep $(( BUNDLE_ATTEMPT * 60 ))
     BUNDLE_ATTEMPT=$(( BUNDLE_ATTEMPT + 1 ))
 done
 
