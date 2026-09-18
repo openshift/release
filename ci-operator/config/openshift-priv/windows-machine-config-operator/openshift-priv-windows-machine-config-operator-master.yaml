@@ -413,6 +413,40 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-nutanix-ovn-hybrid
 - always_run: false
+  as: nutanix-e2e-ote
+  cluster: build01
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: nutanix
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-nutanix-ovn-hybrid
+- always_run: false
   as: tls-scanner
   optional: true
   steps:
