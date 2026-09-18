@@ -27,6 +27,12 @@ collect_operator_logs() {
         fi
         oc get clusterpackage "${CLUSTER_PACKAGE_NAME:-}" -o yaml \
             > "${ARTIFACT_DIR}/clusterpackage-dump.yaml" 2>/dev/null || true
+        # Also dump the production ClusterPackage if its name differs from
+        # the e2e test package, so pause-timeout failures are diagnosable.
+        if [[ -n "${OPERATOR_NAME:-}" && "${OPERATOR_NAME}" != "${CLUSTER_PACKAGE_NAME:-}" ]]; then
+            oc get clusterpackage "${OPERATOR_NAME}" -o yaml \
+                > "${ARTIFACT_DIR}/clusterpackage-${OPERATOR_NAME}-dump.yaml" 2>/dev/null || true
+        fi
         oc get clusterobjectset -o wide \
             > "${ARTIFACT_DIR}/clusterobjectset-list.txt" 2>/dev/null || true
     fi
@@ -290,6 +296,17 @@ for package_name in "${PACKAGES_TO_PAUSE[@]}"; do
             || ! oc wait clusterobjectset "${objectset_name}" \
                 --for=condition=Paused --timeout=120s; then
             log "ERROR: ClusterObjectSet ${objectset_name} did not report Paused=True"
+            # Collect diagnostics before exiting so the build-log and
+            # artifacts explain WHY the pause timed out.
+            log "Collecting pause-timeout diagnostics for ${package_name}..."
+            oc get clusterpackage "${package_name}" -o yaml \
+                > "${ARTIFACT_DIR}/clusterpackage-${package_name}-dump.yaml" 2>/dev/null || true
+            log "ClusterPackage ${package_name} status conditions:"
+            oc get clusterpackage "${package_name}" \
+                -o jsonpath='{.status.conditions}' 2>/dev/null || true
+            echo ""  # newline after jsonpath output
+            oc get pods -n openshift-package-operator -o wide \
+                > "${ARTIFACT_DIR}/pko-pods-on-pause-timeout.txt" 2>/dev/null || true
             exit 1
         fi
     fi
