@@ -73,6 +73,83 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- always_run: false
+  as: e2e-snr-aws
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_VERBOSE: "true"
+      MEDIK8S_BUNDLE_IMAGES: self-node-remediation=quay.io/medik8s/self-node-remediation-operator-bundle:latest,node-healthcheck-operator=quay.io/medik8s/node-healthcheck-operator-bundle:latest
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      TEST_NAME: e2e-snr-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-upstream-bundle-install
+    - as: e2e-test
+      cli: latest
+      commands: |
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-nhc-aws
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_VERBOSE: "true"
+      MEDIK8S_BUNDLE_IMAGES: node-healthcheck-operator=quay.io/medik8s/node-healthcheck-operator-bundle:latest,self-node-remediation=quay.io/medik8s/self-node-remediation-operator-bundle:latest
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      TEST_NAME: e2e-nhc-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-upstream-bundle-install
+    - ref: ssh-bastion
+    - as: e2e-test
+      cli: latest
+      commands: |
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: medik8s
