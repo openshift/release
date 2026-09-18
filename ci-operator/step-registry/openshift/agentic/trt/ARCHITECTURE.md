@@ -20,8 +20,8 @@ flowchart TD
         M3["job_running:<br/>Poll Gangway, probe GitHub for PR"]
         M4["PR found → notify Slack,<br/>JIRA → 'Review'"]
         M5["Job complete →<br/>state: pr_tracking"]
-        M6["pr_tracking:<br/>Check for new actionable<br/>review comments"]
-        M7["Actionable comments found →<br/>trigger follow-up Prow job"]
+        M6["pr_tracking:<br/>Check for actionable review comments<br/>or newly-failing required CI"]
+        M7["Actionable comments or new required<br/>CI failures → trigger follow-up Prow job"]
         M8["followup_running:<br/>Poll Gangway for completion"]
         M9["Follow-up done →<br/>state: pr_tracking"]
         M10["PR merged/closed →<br/>state: completed, cleanup"]
@@ -61,8 +61,8 @@ flowchart TD
     M2 --> M8
     M3 --> M4 --> M5
     M5 --> M6
-    M6 -->|"no comments"| M1
-    M6 -->|"comments found"| M7
+    M6 -->|"no new signal"| M1
+    M6 -->|"comments or required CI"| M7
     M6 -->|"PR merged/closed"| M10
     M7 -->|"Gangway"| followup_job
     M7 --> M8
@@ -81,9 +81,9 @@ flowchart TD
 | Component | Path | Role |
 |-----------|------|------|
 | Tool functions | [`ship_help_bot/tools/agentic_solver/tools.py`][tools] | Entry points: `solve_jira_issue`, `notify_review_ready`, `list_active_solves`, `cancel_solve` |
-| Monitor handler | [`ship_help_bot/tools/agentic_solver/handler.py`][handler] | Scheduled every 5 min. State machine: `job_running` → `pr_tracking` ⇄ `followup_running` → `completed` |
+| Monitor handler | [`ship_help_bot/tools/agentic_solver/handler.py`][handler] | Scheduled every 5 min. State machine: `job_running` → `pr_tracking` ⇄ `followup_running` → `completed`. Follow-up triggers on actionable review comments or newly-failing required CI |
 | State tracker | [`ship_help_bot/tools/agentic_solver/tracker.py`][tracker] | `SolveRequest` CRUD in Firestore (collection: `agentic_solves`, 30-day TTL) |
-| GitHub client | [`ship_help_bot/tools/agentic_solver/github_client.py`][ghclient] | PR lookup, review comment fetching, actionability classification |
+| GitHub client | [`ship_help_bot/tools/agentic_solver/github_client.py`][ghclient] | PR lookup, review comments, and failing required CI (optional Prow jobs ignored via `prow.k8s.io/is-optional`) |
 | JIRA helpers | [`ship_help_bot/tools/agentic_solver/jira_helpers.py`][jira] | Safe wrappers for JIRA transitions and assignment |
 | Config | [`config/workspaces.yaml`][workspaces] | `repo_jobs` mapping (repo → solve job + followup job + fork), `ignored_bots` list |
 
@@ -170,7 +170,7 @@ stateDiagram-v2
     [*] --> job_running: solve_jira_issue()
     job_running --> pr_tracking: Job succeeds, PR found
     job_running --> [*]: Job fails (notify Slack)
-    pr_tracking --> followup_running: Actionable review comments
+    pr_tracking --> followup_running: Actionable comments or newly-failing required CI
     pr_tracking --> [*]: PR merged or closed
     followup_running --> pr_tracking: Follow-up job completes
 ```
