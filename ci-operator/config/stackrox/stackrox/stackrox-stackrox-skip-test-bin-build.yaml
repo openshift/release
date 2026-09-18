@@ -20,12 +20,14 @@ tests:
         set +xve
         echo "begin step: capturing environment metadata"
         # Import vault credentials with per-collection prefix to avoid overlap
-        shopt -s nullglob
-        for cred in /tmp/vault/**/[A-Z]*; do
-          collection="$(basename "$(dirname "$cred")")"
+        while IFS= read -r -d '' cred; do
           varname="$(basename "$cred")"
+          # Walk up to find the collection name (skip timestamp dirs starting with ..)
+          dir="$(dirname "$cred")"
+          while [[ "$(basename "$dir")" == ..* ]]; do dir="$(dirname "$dir")"; done
+          collection="$(basename "$dir")"
           export "VAULT_${collection}__${varname}"="$(cat "$cred")"
-        done
+        done < <(find /tmp/vault/ -type f -name '[A-Z]*' -print0 2>/dev/null)
         # Set up GCP auth
         gcloud config set core/disable_prompts True
         gcloud auth activate-service-account \
@@ -37,6 +39,30 @@ tests:
         CAPTURE_DIR="$(mktemp -d)"
         # 1. Full environment dump (values included — private bucket only)
         set > "$CAPTURE_DIR/env-full.txt" 2>&1
+        # 4. Pull secret analysis (for YAML parsing debug)
+        PULL_SECRET_FILE="/tmp/vault/stackrox-automation-flavors/REDHAT_PULL_SECRET_BASE64"
+        if [[ -f "$PULL_SECRET_FILE" ]]; then
+          {
+            echo "=== file size ==="
+            wc -c < "$PULL_SECRET_FILE"
+            echo "=== line count ==="
+            wc -l < "$PULL_SECRET_FILE"
+            echo "=== head (first 80 chars) ==="
+            head -c 80 "$PULL_SECRET_FILE"
+            echo ""
+            echo "=== tail (last 80 chars) ==="
+            tail -c 80 "$PULL_SECRET_FILE"
+            echo ""
+            echo "=== non-printable/whitespace chars ==="
+            cat "$PULL_SECRET_FILE" | tr -d '[:print:]' | xxd | head -5
+            echo "=== trailing whitespace check ==="
+            cat "$PULL_SECRET_FILE" | cat -A | tail -3
+          } > "$CAPTURE_DIR/pull-secret-analysis.txt"
+          # Also save the raw file for comparison
+          cp "$PULL_SECRET_FILE" "$CAPTURE_DIR/pull-secret-raw.txt"
+        else
+          echo "PULL SECRET FILE NOT FOUND: $PULL_SECRET_FILE" > "$CAPTURE_DIR/pull-secret-analysis.txt"
+        fi
         # 2. System metadata
         {
           echo "=== id ==="
