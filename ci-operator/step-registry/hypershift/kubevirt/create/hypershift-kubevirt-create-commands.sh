@@ -440,7 +440,8 @@ localnet_vlan_configure_egress_dhcp() {
   local dhcp_end="$5"
   local node
   local setup_b64
-  local failed=0
+  local succeeded=0
+  local failed_nodes=""
 
   echo "Configuring per-node DHCP-only dnsmasq on ${dhcp_iface} for egress VLAN ${vlan_id}..."
 
@@ -448,8 +449,9 @@ localnet_vlan_configure_egress_dhcp() {
 
   for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
     echo "Setting up ${dhcp_iface} DHCP on node ${node} (egress VLAN ${vlan_id})..."
+    localnet_vlan_wait_node_ready "${node}" 120 || true
     local dhcp_ok=false
-    for dhcp_attempt in $(seq 1 3); do
+    for dhcp_attempt in $(seq 1 5); do
       if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
         "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${vlan_id}'"
       then
@@ -457,17 +459,44 @@ localnet_vlan_configure_egress_dhcp() {
         dhcp_ok=true
         break
       fi
-      echo "  ${node}: oc debug failed (attempt ${dhcp_attempt}/3), retrying in 10s..." >&2
-      sleep 10
+      echo "  ${node}: oc debug failed (attempt ${dhcp_attempt}/5), retrying in 15s..." >&2
+      sleep 15
     done
-    if [[ "${dhcp_ok}" != "true" ]]; then
-      echo "ERROR: failed to configure ${dhcp_iface} egress DHCP on node ${node} after 3 attempts" >&2
-      failed=1
+    if [[ "${dhcp_ok}" == "true" ]]; then
+      succeeded=$((succeeded + 1))
+    else
+      echo "WARNING: failed to configure ${dhcp_iface} egress DHCP on node ${node} after 5 attempts" >&2
+      failed_nodes="${failed_nodes} ${node}"
     fi
   done
 
-  if [[ "${failed}" -ne 0 ]]; then
+  if [[ -n "${failed_nodes}" ]]; then
+    echo "Deferred retry for failed egress DHCP nodes:${failed_nodes}"
+    for node in ${failed_nodes}; do
+      echo "  Retrying ${node} (deferred)..."
+      localnet_vlan_wait_node_ready "${node}" 60 || true
+      if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${vlan_id}'"
+      then
+        echo "  ${node}: egress dnsmasq configured on deferred retry"
+        succeeded=$((succeeded + 1))
+      else
+        echo "WARNING: ${node} failed deferred retry — no egress dnsmasq on this node's ${dhcp_iface}" >&2
+      fi
+    done
+  fi
+
+  if [[ "${succeeded}" -eq 0 ]]; then
+    echo "ERROR: egress dnsmasq configured on zero nodes — cannot proceed" >&2
     return 1
+  fi
+
+  local total
+  total=$(oc get nodes --no-headers 2>/dev/null | wc -l)
+  if [[ "${succeeded}" -lt "${total}" ]]; then
+    echo "WARNING: egress dnsmasq configured on ${succeeded}/${total} nodes — VMIs on unconfigured nodes will not get egress DHCP"
+  else
+    echo "egress dnsmasq configured on all ${succeeded} nodes"
   fi
 }
 
@@ -785,6 +814,39 @@ localnet_vlan_verify_guest_ingress_passthrough() {
   return 0
 }
 
+localnet_vlan_wait_node_ready() {
+  local node="$1"
+  local timeout="${2:-120}"
+  local interval=10
+  local elapsed=0
+
+  while [[ "${elapsed}" -lt "${timeout}" ]]; do
+    local ready
+    ready=$(oc get node "${node}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
+    if [[ "${ready}" == "True" ]]; then
+      local pressure=""
+      for cond in MemoryPressure DiskPressure PIDPressure; do
+        local val
+        val=$(oc get node "${node}" -o jsonpath="{.status.conditions[?(@.type==\"${cond}\")].status}" 2>/dev/null || true)
+        if [[ "${val}" == "True" ]]; then
+          pressure="${pressure} ${cond}"
+        fi
+      done
+      if [[ -n "${pressure}" ]]; then
+        echo "  ${node}: Ready but under pressure:${pressure} — waiting ${interval}s..." >&2
+      else
+        return 0
+      fi
+    else
+      echo "  ${node}: not Ready (status=${ready:-unknown}) — waiting ${interval}s..." >&2
+    fi
+    sleep "${interval}"
+    elapsed=$((elapsed + interval))
+  done
+  echo "  ${node}: still not healthy after ${timeout}s" >&2
+  return 1
+}
+
 localnet_vlan_configure_br_localnet_dhcp() {
   local cluster_name="$1"
   local vlan_id="$2"
@@ -798,7 +860,8 @@ localnet_vlan_configure_br_localnet_dhcp() {
   local base_domain
   local node
   local setup_b64
-  local failed=0
+  local succeeded=0
+  local failed_nodes=""
 
   base_domain=$(oc get dns/cluster -o jsonpath='{.spec.baseDomain}')
   echo "Configuring per-node dnsmasq on ${dhcp_iface} for VLAN ${vlan_id} (cluster ${cluster_name}, DNS base ${base_domain})..."
@@ -811,10 +874,11 @@ localnet_vlan_configure_br_localnet_dhcp() {
   : > "${SHARED_DIR}/localnet-vlan-dhcp-nodes"
   for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
     echo "Setting up ${dhcp_iface} DHCP/DNS on node ${node} (per-node secondary VLAN segment)..."
+    localnet_vlan_wait_node_ready "${node}" 120 || true
     # oc debug defaults to OPENSHIFT_BUILD_NAMESPACE (ci-op-* on build cluster), which does
     # not exist on the baremetal test cluster. Always target default.
     local dhcp_ok=false
-    for dhcp_attempt in $(seq 1 3); do
+    for dhcp_attempt in $(seq 1 5); do
       if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
         "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
       then
@@ -823,17 +887,46 @@ localnet_vlan_configure_br_localnet_dhcp() {
         dhcp_ok=true
         break
       fi
-      echo "  ${node}: oc debug failed (attempt ${dhcp_attempt}/3), retrying in 10s..." >&2
-      sleep 10
+      echo "  ${node}: oc debug failed (attempt ${dhcp_attempt}/5), retrying in 15s..." >&2
+      sleep 15
     done
-    if [[ "${dhcp_ok}" != "true" ]]; then
-      echo "ERROR: failed to configure ${dhcp_iface} DHCP on node ${node} after 3 attempts" >&2
-      failed=1
+    if [[ "${dhcp_ok}" == "true" ]]; then
+      succeeded=$((succeeded + 1))
+    else
+      echo "WARNING: failed to configure ${dhcp_iface} DHCP on node ${node} after 5 attempts" >&2
+      failed_nodes="${failed_nodes} ${node}"
     fi
   done
 
-  if [[ "${failed}" -ne 0 ]]; then
+  # Deferred retry: nodes that failed may have recovered after other nodes were configured.
+  if [[ -n "${failed_nodes}" ]]; then
+    echo "Deferred retry for failed nodes:${failed_nodes}"
+    for node in ${failed_nodes}; do
+      echo "  Retrying ${node} (deferred)..."
+      localnet_vlan_wait_node_ready "${node}" 60 || true
+      if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${cluster_name}' '${base_domain}' '${api_vip}' '${ingress_vip}' '${vlan_id}' '${uplink_bond}'"
+      then
+        echo "${node}" >> "${SHARED_DIR}/localnet-vlan-dhcp-nodes"
+        echo "  ${node}: dnsmasq configured on deferred retry"
+        succeeded=$((succeeded + 1))
+      else
+        echo "WARNING: ${node} failed deferred retry — no dnsmasq on this node's ${dhcp_iface}" >&2
+      fi
+    done
+  fi
+
+  if [[ "${succeeded}" -eq 0 ]]; then
+    echo "ERROR: dnsmasq configured on zero nodes — cannot proceed" >&2
     return 1
+  fi
+
+  local total
+  total=$(oc get nodes --no-headers 2>/dev/null | wc -l)
+  if [[ "${succeeded}" -lt "${total}" ]]; then
+    echo "WARNING: dnsmasq configured on ${succeeded}/${total} nodes — VMIs on unconfigured nodes will not get DHCP"
+  else
+    echo "dnsmasq configured on all ${succeeded} nodes"
   fi
 }
 
