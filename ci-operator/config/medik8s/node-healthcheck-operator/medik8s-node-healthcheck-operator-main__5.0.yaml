@@ -1,0 +1,102 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+  operator-sdk:
+    name: "4.22"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make manager
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: node-healthcheck-operator
+operator:
+  bundles:
+  - as: my-bundle
+    dockerfile_path: bundle.ci.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/medik8s/node-healthcheck-operator:.*
+    with: pipeline:node-healthcheck-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 500Mi
+tests:
+- always_run: false
+  as: e2e-system-tests-nhc-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - as: run-nhc-upgrade-tests
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+
+        : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
+        exec > >(tee "$ARTIFACT_DIR/nhc-upgrade-tests.log") 2>&1
+
+        operator-sdk bundle validate "$OO_BUNDLE"
+        git clone --depth=1 https://github.com/medik8s/system-tests.git /tmp/system-tests
+
+        candidate_version="$(sed -n 's/^  version: *//p' bundle/manifests/node-healthcheck-operator.clusterserviceversion.yaml | tr -d '"')"
+        : "${candidate_version:?NHC bundle CSV must specify spec.version}"
+
+        export NHC_UPGRADE_CANDIDATE_NHC_BUNDLE="$OO_BUNDLE"
+        export NHC_UPGRADE_CANDIDATE_NHC_IMAGE="$NHC_CANDIDATE_OPERATOR"
+        export NHC_UPGRADE_CANDIDATE_NHC_VERSION="$candidate_version"
+        export NHC_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
+        export ECO_TEST_FEATURES=nhc-operator
+        export WORKLOAD_IMAGE=unused-by-nhc-upgrade-tests
+
+        failed_tiers=()
+        for tier in upgrade-operator fresh-install; do
+          export ECO_TEST_LABELS="tier:${tier}"
+          export ECO_REPORTS_DUMP_DIR="$ARTIFACT_DIR/$tier"
+          mkdir -p "$ECO_REPORTS_DUMP_DIR"
+          if ! make -C /tmp/system-tests run-tests 2>&1 | tee "$ECO_REPORTS_DUMP_DIR/run.log"; then
+            failed_tiers+=("$tier")
+          fi
+        done
+
+        if (( ${#failed_tiers[@]} > 0 )); then
+          printf 'Failed tiers: %s\n' "${failed_tiers[*]}"
+          exit 1
+        fi
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      - env: NHC_CANDIDATE_OPERATOR
+        name: node-healthcheck-operator
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 500Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: node-healthcheck-operator
+  variant: "5.0"
