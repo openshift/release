@@ -1,0 +1,52 @@
+chain:
+  as: ipi-gcp-pre-disconnected
+  steps:
+  - ref: gcp-provision-minimal-permission
+  - ref: openshift-cluster-bot-rbac
+  - ref: gcp-provision-vpc
+  - ref: ignition-bastionhost
+  - ref: gcp-provision-bastionhost
+  - chain: mirror-images-by-oc-adm
+  # Mirror any caller-provided custom images (MIRROR_CUSTOM_IMAGES) into the bastion
+  # registry and emit the matching redirect. No-op unless MIRROR_CUSTOM_IMAGES is set.
+  - ref: mirror-images-custom
+  - chain: ipi-conf-gcp
+  - ref: ipi-conf-mirror
+  - ref: ipi-install-install
+  - ref: ipi-install-times-collection
+  # Disable the unreachable default OperatorHub sources. Runs post-install (patches a live
+  # cluster); inlined per chain to match ipi-aws-pre-disconnected (not extracted to a ref).
+  - as: disable-default-sources
+    from: cli
+    commands: |-
+      set -euo pipefail
+      if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        source "${SHARED_DIR}/proxy-conf.sh"
+      fi
+      oc patch OperatorHub cluster --type json \
+        -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 5m0s
+    grace_period: 5m0s
+  env:
+  - name: RESTRICTED_NETWORK
+    default: "yes"
+    documentation: "Create an isolated (disconnected) network."
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+    documentation: "Register the bastion mirror registry DNS and write ${SHARED_DIR}/mirror_registry_url."
+  - name: MIRROR_IN_BASTION
+    default: "yes"
+    documentation: "Mirror images from the bastion host rather than the build farm."
+  documentation: |-
+    The ipi-gcp-pre-disconnected chain provisions a fully disconnected OpenShift cluster
+    on GCP: a VPC with a restricted (no direct internet) network, a bastion host providing
+    a mirror registry, egress proxy and SSH jump host, then mirrors the release payload
+    (and any MIRROR_CUSTOM_IMAGES) and installs the cluster. Modeled on the QE cucushift
+    disconnected recipe, without the QE-only steps, so it is reusable by any team. GCP is
+    IPv4-only (the platform has no dual-stack support), so there is no IPv6 variant. Set
+    ENABLE_IDMS=yes to use the IDMS/ITMS redirect family (required for tag-referenced
+    custom images).
