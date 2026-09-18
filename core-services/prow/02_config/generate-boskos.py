@@ -5,6 +5,9 @@ import json
 import yaml
 
 CONFIG = {
+    'ibmcloud-perfscale-jp-quota-slice': {
+        'jp-osa': 10,
+    },
     'ibmcloud-perfscale-quota-slice': {
         'us-south': 15,
     },
