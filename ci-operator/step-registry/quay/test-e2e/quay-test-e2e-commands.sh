@@ -205,6 +205,9 @@ function gatherBuilderDiagnostics {
 # reason, which is better than handing it a URL that quietly returns nothing.
 function startJaegerPortForward {
   local ns="${QUAYNAMESPACE:-quay-enterprise}"
+  # Drop any inherited value so the "unset" paths below cannot leave an
+  # unverified URL in the suite's environment.
+  unset JAEGER_QUERY_URL
   if [[ ! -f "${SHARED_DIR}/jaeger_deployed" ]]; then
     echo "Jaeger was not deployed; leaving JAEGER_QUERY_URL unset"
     return 0
