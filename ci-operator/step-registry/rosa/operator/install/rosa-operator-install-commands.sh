@@ -283,12 +283,13 @@ if [[ "${CLUSTER_PACKAGE_NAME}" != "${OPERATOR_NAME}" ]]; then
 fi
 for package_name in "${PACKAGES_TO_PAUSE[@]}"; do
     if oc get clusterpackage "${package_name}" &>/dev/null; then
+        objectset_name="${package_name}-$(oc get clusterobjectdeployment "${package_name}" -o jsonpath='{.status.templateHash}')"
         log "Pausing ClusterPackage ${package_name} before orphaning CRDs"
         if ! oc patch clusterpackage "${package_name}" --type merge \
             -p '{"spec":{"paused":true}}' >/dev/null \
-            || ! oc wait clusterpackage "${package_name}" \
-                --for='jsonpath={.status.conditions[?(@.type=="Paused")].status}=True' --timeout=120s; then
-            log "ERROR: ClusterPackage ${package_name} did not report Paused=True"
+            || ! oc wait clusterobjectset "${objectset_name}" \
+                --for=condition=Paused --timeout=120s; then
+            log "ERROR: ClusterObjectSet ${objectset_name} did not report Paused=True"
             exit 1
         fi
     fi

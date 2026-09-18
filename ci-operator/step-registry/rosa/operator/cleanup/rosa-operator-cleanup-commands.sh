@@ -61,11 +61,12 @@ crd_was_preexisting() {
 
 # Stop the active ObjectSet from restoring CRD metadata while it is detached.
 if oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" &>/dev/null; then
+    objectset_name="${CLUSTER_PACKAGE_NAME}-$(oc get clusterobjectdeployment "${CLUSTER_PACKAGE_NAME}" -o jsonpath='{.status.templateHash}')"
     log "Pausing ClusterPackage ${CLUSTER_PACKAGE_NAME} before orphaning CRDs"
     oc patch clusterpackage "${CLUSTER_PACKAGE_NAME}" --type merge \
         -p '{"spec":{"paused":true}}' >/dev/null
-    oc wait clusterpackage "${CLUSTER_PACKAGE_NAME}" \
-        --for='jsonpath={.status.conditions[?(@.type=="Paused")].status}=True' --timeout=120s
+    oc wait clusterobjectset "${objectset_name}" \
+        --for=condition=Paused --timeout=120s
 fi
 
 # ──────────────────────────────────────────────────────────────────────
