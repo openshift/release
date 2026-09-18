@@ -51,6 +51,7 @@ dashboard.new(
         legend_max=true,
         legend_min=true,
         legend_sortDesc=true,
+        sort='decreasing',
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(label_replace(boskos_resources{state="leased"}, "type", "$1", "type", "(.*)-quota-slice")) by(type)',
