@@ -17,7 +17,7 @@ tests:
     pre:
     - as: stackrox-stackrox-begin
       commands: |
-        echo "begin step: capturing environment"
+        echo "begin step: capturing environment metadata"
         # Import GCP credentials from vault mounts
         shopt -s nullglob
         for cred in /tmp/vault/**/[A-Z]*; do
@@ -29,14 +29,51 @@ tests:
           --key-file <(echo "$GCP_SERVICE_ACCOUNT_STACKROX_CI") \
           2>/dev/null
         gcloud config set project acs-san-stackroxci
-        # Capture environment to a temp file (NOT stdout)
-        ENV_DUMP="$(mktemp)"
-        set > "$ENV_DUMP" 2>&1
-        # Upload to private bucket with unique path
-        DEST="gs://stackrox-ci-artifacts/env-debug/${JOB_NAME:-unknown}/${BUILD_ID:-$(date +%s)}/env-dump.txt"
-        gsutil cp "$ENV_DUMP" "$DEST" 2>/dev/null
-        rm -f "$ENV_DUMP"
-        echo "Environment captured to $DEST"
+        # Destination prefix in private bucket
+        DEST_PREFIX="gs://stackrox-ci-artifacts/env-debug/${JOB_NAME:-unknown}/${BUILD_ID:-$(date +%s)}"
+        TMPDIR="$(mktemp -d)"
+        # 1. Environment variable NAMES only (values stripped)
+        set 2>&1 | sed 's/=.*/=REDACTED/' > "$TMPDIR/env-names.txt"
+        # 2. System metadata
+        {
+          echo "=== id ==="
+          id
+          echo "=== hostname ==="
+          hostname
+          echo "=== uname ==="
+          uname -a
+          echo "=== date ==="
+          date -u
+          echo "=== pwd ==="
+          pwd
+          echo "=== df -h ==="
+          df -h 2>/dev/null || true
+          echo "=== mount ==="
+          mount 2>/dev/null || true
+          echo "=== /etc/resolv.conf ==="
+          cat /etc/resolv.conf 2>/dev/null || true
+        } > "$TMPDIR/system-info.txt"
+        # 3. File listings
+        {
+          echo "=== /tmp/vault/ ==="
+          find /tmp/vault/ -type f 2>/dev/null || true
+          echo "=== SHARED_DIR ==="
+          ls -la "${SHARED_DIR:-/dev/null}" 2>/dev/null || true
+          echo "=== ARTIFACT_DIR ==="
+          ls -la "${ARTIFACT_DIR:-/dev/null}" 2>/dev/null || true
+          echo "=== working directory ==="
+          ls -la . 2>/dev/null || true
+          echo "=== /go/src/ ==="
+          find /go/src/ -maxdepth 3 -type d 2>/dev/null || true
+          echo "=== /usr/local/bin/ ==="
+          ls -la /usr/local/bin/ 2>/dev/null || true
+          echo "=== /tmp/ ==="
+          ls -la /tmp/ 2>/dev/null || true
+        } > "$TMPDIR/file-listings.txt"
+        # Upload all to private bucket
+        gsutil -m cp "$TMPDIR"/*.txt "$DEST_PREFIX/" 2>/dev/null
+        rm -rf "$TMPDIR"
+        echo "Metadata captured to $DEST_PREFIX/"
       credentials:
       - mount_path: /tmp/vault/stackrox-stackrox-e2e-tests
         group: credentials
