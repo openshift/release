@@ -4,7 +4,7 @@ ref:
     name: rhdh-e2e-runner
     namespace: ci
     tag: main
-  timeout: 2h0m0s
+  timeout: 4h0m0s
   grace_period: 10m
   commands: sandboxed-containers-operator-install-osc-operator-commands.sh
   resources:
@@ -54,6 +54,13 @@ ref:
     default: "openshift-sandboxed-containers-operator"
     documentation: |-
       The namespace where the OSC operator will be installed.
+  - name: KATACONFIG_WAIT_TIMEOUT
+    default: "7200"
+    documentation: |-
+      Seconds to wait for the KataConfig to become ready (InProgress=False).
+      This is the longest wait in the step because it covers node reboots.
+      Lower it (e.g. "300") when debugging a known failure so the step fails
+      fast instead of consuming the full default (7200s / 2h).
   documentation: |-
     If OSC_INSTALL=true, installs the OSC operator and configures the cluster for
     the target workload (kata, peer-pods, or coco) using Helm charts from OSC_CHARTS_REPO.
@@ -69,7 +76,10 @@ ref:
 
     When complete, patches osc-config ConfigMap so tests can detect the pre-installed operator.
 
-    The 2h timeout covers KataConfig readiness (typically ~1h for node reboots)
-    plus operator install waits. Observed test phase times: kata ~34min avg,
-    peerpods ~97min avg (includes podvm image creation), coco ~44min avg.
-    Worst-case peerpods runs reach ~2h.
+    The 4h timeout covers the sum of all internal waits: operator install
+    (~65min worst case), MachineConfigPool updates (~30min when a dev catalog
+    is mirrored) and KataConfig readiness (KATACONFIG_WAIT_TIMEOUT, default 2h,
+    typically ~1h for node reboots). Observed KataConfig phase times: kata
+    ~34min avg, peerpods ~97min avg (includes podvm image creation), coco
+    ~44min avg. KATACONFIG_WAIT_TIMEOUT can be lowered to fail fast when
+    debugging a known KataConfig failure.
