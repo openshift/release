@@ -831,85 +831,16 @@ DisableClusterImagePolicySignatureEnforcement() {
         : "Failed to verify CVO override for ClusterImagePolicy on spoke ${clusterName}"
         return 1
     fi
+
+    # CVO no longer manages the CIP — delete it so MCO removes the signature
+    # requirement from each node's /etc/containers/policy.json.
+    # Without this CIP, CRI-O permits unsigned nightly image pulls by default.
+    oc --kubeconfig="${kubeconfig}" delete clusterimagepolicy openshift \
+        --ignore-not-found 1>/dev/null
     : "ClusterImagePolicy signature enforcement disabled on spoke ${clusterName}"
     true
 }
 
-
-# ApplyPermissiveClusterImagePolicy — create a ClusterImagePolicy that allows
-# unsigned nightly images from quay.io/openshift-release-dev and
-# registry.ci.openshift.org/ocp/release. The MCO watches this resource and
-# writes a permissive /etc/containers/policy.json to every node, which is
-# what rpm-ostree reads during rebase (OCPBUGS-114622).
-ApplyPermissiveClusterImagePolicy() {
-    typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset clusterName="${1:?}"; (($#)) && shift
-    typeset cipName='allow-nightly-unsigned'
-
-    typeset -a prevRenderedArr=()
-    typeset isNew=true
-
-    if oc --kubeconfig="${kubeconfig}" get clusterimagepolicy "${cipName}" \
-            --ignore-not-found -o name | grep -q .; then
-        : "Spoke ${clusterName}: ${cipName} ClusterImagePolicy already exists"
-        isNew=false
-    fi
-
-    # Capture current rendered-config markers BEFORE applying the policy.
-    # MCO will generate new rendered configs when it picks up the CIP change.
-    mapfile -t prevRenderedArr < <(
-        oc --kubeconfig="${kubeconfig}" get machineconfigpool \
-            -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
-    )
-
-    if "${isNew}"; then
-        : "Creating permissive ClusterImagePolicy '${cipName}' on spoke ${clusterName}"
-        oc --kubeconfig="${kubeconfig}" apply -f - <<'EOF'
-apiVersion: config.openshift.io/v1
-kind: ClusterImagePolicy
-metadata:
-  name: allow-nightly-unsigned
-spec:
-  scopes:
-  - "quay.io/openshift-release-dev"
-  - "registry.ci.openshift.org/ocp/release"
-  policy:
-    rootOfTrust:
-      policyType: InsecureAcceptAnything
-EOF
-    fi
-
-    # Wait until at least one MCP's rendered-config changes, proving MCO picked up the policy.
-    : "Waiting for MCO to generate new rendered config on spoke ${clusterName}"
-    typeset -i wMax=300 wInt=10
-    SECONDS=0
-    while ((SECONDS < wMax)); do
-        typeset -a currRenderedArr=()
-        mapfile -t currRenderedArr < <(
-            oc --kubeconfig="${kubeconfig}" get machineconfigpool \
-                -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
-        )
-        typeset changed=false
-        typeset -i j=0
-        for ((j = 0; j < ${#prevRenderedArr[@]}; j++)); do
-            [[ "${prevRenderedArr[j]}" != "${currRenderedArr[j]:-}" ]] && { changed=true; break; }
-        done
-        "${changed}" && break
-        sleep "${wInt}"
-    done
-    ((SECONDS >= wMax)) && {
-        : "WARNING: MCO did not generate new rendered config within ${wMax}s on spoke ${clusterName}"
-    }
-
-    # Now wait for full rollout — all MCPs Updated=True with the NEW config.
-    : "Waiting for MachineConfigPools to finish rolling out on spoke ${clusterName}"
-    oc --kubeconfig="${kubeconfig}" wait machineconfigpool --all \
-        --for=condition=Updated=True \
-        --timeout=20m
-
-    : "Permissive ClusterImagePolicy '${cipName}' applied and rolled out on spoke ${clusterName}"
-    true
-}
 #=====================
 # Main execution: Create all clusters
 #=====================
@@ -970,9 +901,6 @@ if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}" == "true" ]]; t
     for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
         idx=$((i + 1))
         DisableClusterImagePolicySignatureEnforcement \
-            "${SHARED_DIR}/managed-cluster-kubeconfig-${idx}" \
-            "${clusterNamesArr[i]}"
-        ApplyPermissiveClusterImagePolicy \
             "${SHARED_DIR}/managed-cluster-kubeconfig-${idx}" \
             "${clusterNamesArr[i]}"
     done
