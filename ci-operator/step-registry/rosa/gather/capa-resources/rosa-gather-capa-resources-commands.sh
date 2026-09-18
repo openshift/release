@@ -2,8 +2,8 @@
 #
 # Collects ROSA-specific custom resources and events from the management
 # cluster for post-failure debugging.  Captures ROSARoleConfig,
-# ROSAControlPlane, and ROSAMachinePool instances with their full status
-# and conditions, plus events from the ROSA and CAPI namespaces.
+# ROSAControlPlane, ROSAMachinePool, and ROSANetwork instances with their
+# full status and conditions, plus events from the ROSA and CAPI namespaces.
 #
 # Every command uses "|| true" so individual failures never abort
 # collection of the remaining resources.
@@ -30,6 +30,9 @@ oc get rosacontrolplanes.controlplane.cluster.x-k8s.io -A -o yaml > "${ROSA_DIR}
 
 echo "Collecting ROSAMachinePools..."
 oc get rosamachinepools.infrastructure.cluster.x-k8s.io -A -o yaml > "${ROSA_DIR}/rosamachinepools.yaml" || true
+
+echo "Collecting ROSANetwork..."
+oc get rosanetworks.infrastructure.cluster.x-k8s.io -A -o yaml > "${ROSA_DIR}/rosanetworks.yaml" || true
 
 # ---- Events from ROSA and CAPI namespaces -----------------------------------
 echo "Collecting events from ns-rosa-hcp..."
