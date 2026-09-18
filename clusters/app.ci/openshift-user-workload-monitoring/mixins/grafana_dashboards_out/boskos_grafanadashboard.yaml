@@ -29,7 +29,7 @@ spec:
              "dashLength": 10,
              "dashes": false,
              "datasource": "prometheus",
-             "description": "sum(label_replace(boskos_resources{state=\"leased\"}, \"type\", \"$1\", \"type\", \"(.*)-quota-slice\")) by(type)",
+             "description": "sum(label_replace(boskos_resources{state=\"leased\", type=~\"(${account})-quota-slice\"}, \"type\", \"$1\", \"type\", \"(.*)-quota-slice\")) by(type)",
              "fill": 1,
              "fillGradient": 0,
              "gridPos": {
@@ -67,7 +67,7 @@ spec:
              "steppedLine": false,
              "targets": [
                 {
-                   "expr": "sum(label_replace(boskos_resources{state=\"leased\"}, \"type\", \"$1\", \"type\", \"(.*)-quota-slice\")) by(type)",
+                   "expr": "sum(label_replace(boskos_resources{state=\"leased\", type=~\"(${account})-quota-slice\"}, \"type\", \"$1\", \"type\", \"(.*)-quota-slice\")) by(type)",
                    "format": "time_series",
                    "intervalFactor": 2,
                    "legendFormat": "{{type}}",
@@ -80,7 +80,7 @@ spec:
              "title": "Running Clusters by Platform",
              "tooltip": {
                 "shared": true,
-                "sort": 0,
+                "sort": 2,
                 "value_type": "individual"
              },
              "type": "graph",
@@ -1335,7 +1335,31 @@ spec:
        "style": "dark",
        "tags": [ ],
        "templating": {
-          "list": [ ]
+          "list": [
+             {
+                "allValue": ".*",
+                "current": {
+                   "text": "all",
+                   "value": "$__all"
+                },
+                "datasource": "prometheus",
+                "hide": 0,
+                "includeAll": true,
+                "label": "Account",
+                "multi": true,
+                "name": "account",
+                "options": [ ],
+                "query": "label_values(boskos_resources{state=\"leased\"}, type)",
+                "refresh": 2,
+                "regex": "/(.*)-quota-slice/",
+                "sort": 1,
+                "tagValuesQuery": "",
+                "tags": [ ],
+                "tagsQuery": "",
+                "type": "query",
+                "useTags": false
+             }
+          ]
        },
        "time": {
           "from": "now-1d",

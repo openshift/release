@@ -34,15 +34,33 @@ local statePanel(iaas, displayName) = (graphPanel.new(
     legendFormat='{{state}}',
   ));
 
+// Multi-select account (boskos type with -quota-slice stripped). Defaults to All.
+local runningClustersQuery = 'sum(label_replace(boskos_resources{state="leased", type=~"(${account})-quota-slice"}, "type", "$1", "type", "(.*)-quota-slice")) by(type)';
+
 dashboard.new(
         'Boskos Dashboard',
         time_from='now-1d',
         schemaVersion=18,
       )
+.addTemplate(
+  template.new(
+    'account',
+    'prometheus',
+    'label_values(boskos_resources{state="leased"}, type)',
+    label='Account',
+    allValues='.*',
+    current='all',
+    includeAll=true,
+    multi=true,
+    regex='/(.*)-quota-slice/',
+    refresh='time',
+    sort=1,
+  )
+)
 .addPanel(
     (graphPanel.new(
         'Running Clusters by Platform',
-        description='sum(label_replace(boskos_resources{state="leased"}, "type", "$1", "type", "(.*)-quota-slice")) by(type)',
+        description=runningClustersQuery,
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -54,7 +72,7 @@ dashboard.new(
         sort='decreasing',
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(label_replace(boskos_resources{state="leased"}, "type", "$1", "type", "(.*)-quota-slice")) by(type)',
+        runningClustersQuery,
         legendFormat='{{type}}',
     )), gridPos={
     h: 9,
