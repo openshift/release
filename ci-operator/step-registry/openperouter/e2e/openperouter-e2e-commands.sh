@@ -9,6 +9,10 @@ echo "************ openperouter deploy-verify test ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+echo "### Copying OpenPERouter E2E source to remote host"
+tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" \
+  "mkdir -p /root/openperouter && tar -C /root/openperouter -xzf -"
+
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
 ssh "${SSHOPTS[@]}" "root@${IP}" bash /dev/stdin << 'RUNTESTS'
 set -xeo pipefail
