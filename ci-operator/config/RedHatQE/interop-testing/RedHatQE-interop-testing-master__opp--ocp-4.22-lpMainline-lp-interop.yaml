@@ -57,6 +57,8 @@ images:
           && rm -f openshift-client-linux.tar.gz
       USER 1001
     to: acs-smoke-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -72,6 +74,7 @@ tests:
 - as: cr--full-stack--aws
   capabilities:
   - intranet
+  cluster: build05
   cron: 0 3,15 * * *
   reporter_config:
     channel: '#opp-discussion'
@@ -87,8 +90,9 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
     env:
+      AWS_COMPUTE_VOLUME_SIZE: "500"
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       DR__RP__CR_COMP_NAME: lp-interop--OPP
@@ -120,13 +124,18 @@ tests:
     - ref: ipi-conf-telemetry
     - ref: ipi-conf-aws-custom-az
     - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-rootvolume
     - ref: ipi-install-monitoringpvc
     - chain: ipi-install
-    test:
+    - ref: interop-opp-disk-diag
+    - ref: interop-opp-kubelet-config
+    - ref: interop-opp-wait-for-api
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
+    test:
     - ref: acm-policies-openshift-plus
+    - ref: interop-opp-wait-mcp
     - chain: cucushift-installer-check-cluster-health
     - ref: stackrox-opp-readiness
     - ref: stackrox-opp-smoke
@@ -136,10 +145,11 @@ tests:
     - ref: interop-opp-odf-health
     - ref: interop-opp-observability-odf
     - ref: interop-tests-opp-quay-smoke
-    - ref: acm-tests-observability
+    - ref: interop-opp-skip-ratio-gate
 - as: cr--full-stack--vsphere
   capabilities:
   - intranet
+  cluster: vsphere02
   cron: 0 3,15 * * *
   reporter_config:
     channel: '#opp-discussion'
@@ -153,9 +163,9 @@ tests:
       {{end}}'
   steps:
     allow_best_effort_post_steps: true
-    cluster_profile: vsphere-connected-2
+    cluster_profile: vsphere-elastic
     env:
-      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_REPLICAS: "3"
       DR__RP__CR_COMP_NAME: lp-interop--OPP
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-vsphere-lp","opp-lp"]'
@@ -181,17 +191,21 @@ tests:
     - chain: ipi-vsphere-post
     - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues
-    test:
+    pre:
+    - chain: ipi-vsphere-pre
+    - ref: interop-opp-disk-diag
+    - ref: interop-opp-kubelet-config
+    - ref: interop-opp-wait-for-api
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
+    test:
     - ref: acm-policies-openshift-plus
-    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-opp-wait-mcp
     - ref: interop-opp-odf-health
     - ref: interop-opp-observability-odf
     - ref: acm-tests-observability
     - ref: acm-opp-app
-    workflow: acm-ipi-vsphere
 zz_generated_metadata:
   branch: master
   org: RedHatQE
