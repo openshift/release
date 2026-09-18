@@ -197,6 +197,11 @@ tests:
     - as: deploy
       cli: latest
       commands: |
+        # The Makefile's install/deploy targets shell out to "kubectl" directly
+        # (kubebuilder-scaffolded boilerplate); the CI cli image only has "oc".
+        mkdir -p /tmp/bin
+        ln -sf "$(command -v oc)" /tmp/bin/kubectl
+        export PATH="/tmp/bin:$PATH"
         make e2e-set-image deploy
         oc wait --timeout=5m --for=condition=Available -n openshift-file-integrity deployment/file-integrity-operator
       dependencies:
