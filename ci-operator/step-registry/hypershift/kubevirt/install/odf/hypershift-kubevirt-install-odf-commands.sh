@@ -344,31 +344,6 @@ metadata:
   name: "${ODF_INSTALL_NAMESPACE}"
 EOF
 
-OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1,2)
-if [[ "${OCP_VERSION}" == "4.23" ]]; then
-  # Workaround for https://redhat.atlassian.net/browse/OCPBUGS-125800
-  echo "Creating the OpenShift 4.23 CSI image set workaround"
-  oc apply -f - <<EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: csi-images-v4.23
-  namespace: ${ODF_INSTALL_NAMESPACE}
-  labels:
-    ocs.openshift.io/csi-images-version: v4.23
-data:
-  addons: registry.redhat.io/odf4/odf-csi-addons-sidecar-rhel9@sha256:e0a27fbcea919087c25508490c3c896cd9259b412c88715d6a1faff9525e8afe
-  attacher: quay.io/rhceph-dev/openshift-ose-csi-external-attacher-rhel9@sha256:7aaf622865d099cc736e6bf53f3ee9e648ff4da8ede67c25a2bdf55bea2b39e2
-  ex-snapshotter: registry.redhat.io/odf4/odf-external-snapshotter-sidecar-rhel9@sha256:b4e81127a256b6a7030c24f58b71e8d38ef15f0d1ae23219fd6ba59354777222
-  plugin: registry.redhat.io/odf4/cephcsi-rhel9@sha256:42995a744021d216f3d9db1bfd924985f0df8ef5461f211205338480e0c9c1fe
-  provisioner: quay.io/rhceph-dev/openshift-ose-csi-external-provisioner-rhel9@sha256:81698667b2610c39a864e62fd2894467f6d0158277050d049904485522a7fe88
-  registrar: quay.io/rhceph-dev/openshift-ose-csi-node-driver-registrar-rhel9@sha256:dbc11cafb4230ab8cd0e3788ae9294d3b057562e1c4498350b383c3c08d64439
-  resizer: quay.io/rhceph-dev/openshift-ose-csi-external-resizer-rhel9@sha256:b21e481eee1818bcc66d8a38406270133d8e577f150ad97e29d2c0c2885eb784
-  snapshot-metadata: registry.redhat.io/odf4/odf-external-snapshot-metadata-sidecar-rhel9@sha256:3925b2889620bf717f461309ccda00660a4f34789c53ed7744c664946089e57c
-  snapshotter: quay.io/rhceph-dev/openshift-ose-csi-external-snapshotter-rhel9@sha256:a2f5c6a5258a456e045f51c426492ff735bbe121643841935e05ab890f7eee65
-EOF
-fi
-
 # deploy new operator group
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
