@@ -1,0 +1,66 @@
+chain:
+  as: kueue-operator-libvirt-s390x-test-e2e-upstream
+  steps:
+  - ref: kueue-operator-image-env-setup
+  - ref: cert-manager-install-operator
+  - as: run-sdk
+    commands: |
+      source "${SHARED_DIR}/env"
+      echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE" --security-context-config=restricted
+    from: operator-sdk
+    resources:
+      requests:
+        cpu: 200m
+        memory: 300Mi
+  - ref: kueue-operator-image-patch
+  - chain: jobset-install
+  - chain: leader-worker-set-install
+  - as: e2e-kueue-upstream
+    cli: latest
+    env:
+    - name: E2E_TARGET_FOLDERS
+      default: "singlecluster certmanager"
+      documentation: |-
+        Space-separated list of upstream e2e test folders to run.
+        Available folders: singlecluster, certmanager, dra.
+    - name: OPERATOR_COMPONENT
+      default: kueue-operator-1-4
+      documentation: |-
+        Operator component name from the job env. Used to select the
+        job_test.go patch path (kueue-operator-1-3 vs kueue-operator-1-4/main).
+    commands: |
+      source "${SHARED_DIR}/env"
+
+      # TEMPORARY: libvirt-s390x only. Fix highWlLookupKey copy-paste (lowJob ->
+      # highJob). Path differs by kueue-operator release.
+      if [[ "${OPERATOR_COMPONENT}" == *-1-3 ]]; then
+        JOB_TEST="upstream/kueue/src/test/e2e/singlecluster/job_test.go"
+      elif [[ "${OPERATOR_COMPONENT}" == *-1-4 || "${OPERATOR_COMPONENT}" == *-main ]]; then
+        JOB_TEST="upstream/kueue/src/test/e2e/singlecluster/baseline/job_test.go"
+      else
+        echo "WARNING: unrecognized OPERATOR_COMPONENT=${OPERATOR_COMPONENT:-<empty>}; skipping job_test.go patch"
+        JOB_TEST=""
+      fi
+
+      if [[ -n "${JOB_TEST}" ]]; then
+        if [[ -f "${JOB_TEST}" ]]; then
+          sed -i \
+            's/highWlLookupKey := types.NamespacedName{Name: workloadjob.GetWorkloadNameForJob(lowJob.Name, lowJob.UID)/highWlLookupKey := types.NamespacedName{Name: workloadjob.GetWorkloadNameForJob(highJob.Name, highJob.UID)/' \
+            "${JOB_TEST}"
+          echo "=== Patched ${JOB_TEST} (OPERATOR_COMPONENT=${OPERATOR_COMPONENT}) ==="
+        else
+          echo "WARNING: ${JOB_TEST} not found for OPERATOR_COMPONENT=${OPERATOR_COMPONENT}; skipping patch"
+        fi
+      fi
+
+      make e2e-upstream-test
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: "4"
+        memory: "4Gi"
+  documentation: |-
+    Libvirt s390x variant of kueue-operator-test-e2e-upstream. Applies a
+    temporary checkout patch for the highWlLookupKey copy-paste (1.3, 1.4, and
+    main job_test.go paths) before running make e2e-upstream-test.
