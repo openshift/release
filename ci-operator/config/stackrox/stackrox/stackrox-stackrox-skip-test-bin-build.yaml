@@ -40,30 +40,35 @@ tests:
         CAPTURE_DIR="$(mktemp -d)"
         # 1. Full environment dump (values included — private bucket only)
         set > "$CAPTURE_DIR/env-full.txt" 2>&1
-        # 4. Pull secret analysis (for YAML parsing debug)
-        PULL_SECRET_FILE="/tmp/vault/stackrox-automation-flavors/REDHAT_PULL_SECRET_BASE64"
-        if [[ -f "$PULL_SECRET_FILE" ]]; then
-          {
-            echo "=== file size ==="
-            wc -c < "$PULL_SECRET_FILE"
-            echo "=== line count ==="
-            wc -l < "$PULL_SECRET_FILE"
-            echo "=== head (first 80 chars) ==="
-            head -c 80 "$PULL_SECRET_FILE"
-            echo ""
-            echo "=== tail (last 80 chars) ==="
-            tail -c 80 "$PULL_SECRET_FILE"
-            echo ""
-            echo "=== non-printable/whitespace chars ==="
-            cat "$PULL_SECRET_FILE" | tr -d '[:print:]' | xxd | head -5
-            echo "=== trailing whitespace check ==="
-            cat "$PULL_SECRET_FILE" | cat -A | tail -3
-          } > "$CAPTURE_DIR/pull-secret-analysis.txt"
-          # Also save the raw file for comparison
-          cp "$PULL_SECRET_FILE" "$CAPTURE_DIR/pull-secret-raw.txt"
-        else
-          echo "PULL SECRET FILE NOT FOUND: $PULL_SECRET_FILE" > "$CAPTURE_DIR/pull-secret-analysis.txt"
-        fi
+        # 4. Vault secrets health check
+        {
+          echo "=== Vault Secrets Health Check ==="
+          echo "Checks: trailing newline, trailing whitespace, embedded newlines, empty/placeholder values"
+          echo ""
+          while IFS= read -r -d '' cred; do
+            varname="$(basename "$cred")"
+            dir="$(dirname "$cred")"
+            while [[ "$(basename "$dir")" == ..* ]]; do dir="$(dirname "$dir")"; done
+            collection="$(basename "$dir")"
+            size=$(wc -c < "$cred")
+            lines=$(wc -l < "$cred")
+            last_byte=$(xxd -s -1 -l 1 -p "$cred" 2>/dev/null)
+            trail_ws="no"
+            if [[ "$(tail -c 1 "$cred" | xxd -p)" == "0a" ]] || [[ "$(tail -c 1 "$cred" | xxd -p)" == "20" ]]; then
+              trail_ws="yes"
+            fi
+            issues=""
+            [[ "$trail_ws" == "yes" ]] && issues="${issues} TRAILING_WHITESPACE(0x${last_byte})"
+            [[ "$lines" -gt 1 ]] && issues="${issues} MULTILINE(${lines}lines)"
+            [[ "$size" -le 1 ]] && issues="${issues} EMPTY_OR_PLACEHOLDER"
+            [[ "$size" -le 5 ]] && [[ "$size" -gt 1 ]] && issues="${issues} SUSPICIOUSLY_SHORT(${size}b)"
+            if [[ -n "$issues" ]]; then
+              echo "WARN ${collection}/${varname}: size=${size} lines=${lines}${issues}"
+            else
+              echo "OK   ${collection}/${varname}: size=${size} lines=${lines}"
+            fi
+          done < <(find /tmp/vault/ -type f -name '[A-Z]*' -print0 2>/dev/null)
+        } > "$CAPTURE_DIR/vault-health-check.txt"
         # 2. System metadata
         {
           echo "=== id ==="
