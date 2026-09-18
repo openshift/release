@@ -19,7 +19,14 @@ tests:
       commands: |
         set +xve
         echo "begin step: capturing environment metadata"
-        # Set up GCP auth using only the specific credential we need
+        # Import vault credentials with per-collection prefix to avoid overlap
+        shopt -s nullglob
+        for cred in /tmp/vault/**/[A-Z]*; do
+          collection="$(basename "$(dirname "$cred")")"
+          varname="$(basename "$cred")"
+          export "VAULT_${collection}__${varname}"="$(cat "$cred")"
+        done
+        # Set up GCP auth
         gcloud config set core/disable_prompts True
         gcloud auth activate-service-account \
           --key-file /tmp/vault/stackrox-stackrox-e2e-tests/GCP_SERVICE_ACCOUNT_STACKROX_CI \
