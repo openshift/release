@@ -1,12 +1,21 @@
 #!/bin/bash
-set -o errexit
+set -exo pipefail shopt -s inherit_errexit
+
+if [ "${MAP_TESTS}" == "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--redhat-chaos--kubevirt-outage.xml
+    ' EXIT
+fi
 
 console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
 export HEALTH_CHECK_URL=https://$console_url
 oc get vmis -A
-set -o nounset
-set -o pipefail
-set -x
 
 
 typeset secretDir=/secret/es
