@@ -57,4 +57,13 @@ sudo podman run -d --rm \
 EOF
 
 echo "Adding proxy-url in nested_kubeconfig (http://${IP}:${PROXYPORT}/)"
-yq -i '.clusters[0].cluster."proxy-url" = "http://'"${IP}"':'"${PROXYPORT}"'/"' "${SHARED_DIR}/nested_kubeconfig"
+python3 -c "
+import yaml, sys
+kc_path = sys.argv[1]
+proxy_url = sys.argv[2]
+with open(kc_path) as f:
+    kc = yaml.safe_load(f)
+kc['clusters'][0]['cluster']['proxy-url'] = proxy_url
+with open(kc_path, 'w') as f:
+    yaml.dump(kc, f, default_flow_style=False)
+" "${SHARED_DIR}/nested_kubeconfig" "http://${IP}:${PROXYPORT}/"

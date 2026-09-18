@@ -204,6 +204,46 @@ ref:
       default: "5"
       documentation: |-
         Node scheduling retries for ip-echo (evictions, SCC uid-range flakes, alternate dhcp nodes).
+    - name: LOCALNET_VLAN_EGRESS_ENABLE
+      default: "true"
+      documentation: |-
+        When true, set up egress VLAN (NAD 2) for EgressIP: NNCP, OVS bridge, DHCP-only dnsmasq,
+        and localnet NAD on the mgmt cluster. Guest nodes get egress NIC IPs via DHCP.
+    - name: LOCALNET_VLAN_EGRESS_VLAN_ID
+      default: "200"
+      documentation: |-
+        VLAN ID for the egress localnet segment. NNCP creates br-egress OVS bridge with
+        untagged port to <bond>.<egress-vlan-id> (e.g. br-ex.200).
+    - name: LOCALNET_VLAN_EGRESS_BRIDGE
+      default: "br-egress"
+      documentation: |-
+        OVS bridge name for the egress localnet segment.
+    - name: LOCALNET_VLAN_EGRESS_PHYSNET
+      default: "egress-physnet"
+      documentation: |-
+        OVN physnet name for the egress bridge-mapping.
+    - name: LOCALNET_VLAN_EGRESS_SUBNET
+      default: "192.168.200.0/24"
+      documentation: |-
+        L3 subnet on the egress VLAN segment.
+    - name: LOCALNET_VLAN_EGRESS_GATEWAY
+      default: "192.168.200.1"
+      documentation: |-
+        Gateway IP on br-ex.<egress-vlan-id> for the DHCP-only dnsmasq server. Not advertised
+        as a default route to guests (egress NIC is L2-only).
+    - name: LOCALNET_VLAN_EGRESS_DHCP_RANGE_START
+      default: "192.168.200.100"
+      documentation: |-
+        Start of the DHCP pool for guest egress NICs on the egress VLAN segment.
+    - name: LOCALNET_VLAN_EGRESS_DHCP_RANGE_END
+      default: "192.168.200.240"
+      documentation: |-
+        End of the DHCP pool for guest egress NICs on the egress VLAN segment.
+    - name: LOCALNET_VLAN_EGRESS_DHCP_INTERFACE
+      default: ""
+      documentation: |-
+        Kernel netdev for egress DHCP (defaults to <LOCALNET_VLAN_BOND>.<LOCALNET_VLAN_EGRESS_VLAN_ID>,
+        e.g. br-ex.200).
     - name: LOCALNET_MULTI_NETWORK_COUNT
       default: "2"
       documentation: "Number of localnet networks for the multi-localnet architecture. Primary (localnet-1) uses libvirt DHCP passthrough."

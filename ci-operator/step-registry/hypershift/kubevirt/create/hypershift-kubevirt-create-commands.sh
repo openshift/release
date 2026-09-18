@@ -345,6 +345,132 @@ echo "dnsmasq configured on ${dhcp_iface} (${gateway}, api=${api_vip}, apps=${in
 SCRIPT_EOF
 }
 
+# DHCP-only dnsmasq for the egress VLAN segment (NAD 2 / EgressIP).
+# Unlike the primary VLAN dnsmasq, the egress instance:
+#   - port=0: disables DNS entirely (guest DNS is on VLAN 100)
+#   - no dhcp-option=3: no default gateway (egress NIC is L2-only, default route on VLAN 100)
+#   - no dhcp-option=6: no DNS server option
+#   - no FORWARD/MASQUERADE: egress VLAN is a flat L2 segment, not a routed gateway
+localnet_vlan_egress_dnsmasq_setup_script_b64() {
+  base64 -w0 <<'SCRIPT_EOF'
+#!/bin/bash
+set -euo pipefail
+dhcp_iface="$1"
+gateway="$2"
+dhcp_start="$3"
+dhcp_end="$4"
+vlan_id="$5"
+netmask="255.255.255.0"
+conf="/etc/dnsmasq.d/localnet-vlan-${vlan_id}.conf"
+pidfile="/run/localnet-vlan-${vlan_id}.pid"
+unit="/etc/systemd/system/localnet-vlan-${vlan_id}.service"
+
+if ! ip link show "${dhcp_iface}" &>/dev/null; then
+  echo "VLAN interface ${dhcp_iface} not present on this node; skipping"
+  exit 0
+fi
+
+ip link set "${dhcp_iface}" up
+if ! ip addr show dev "${dhcp_iface}" | grep -q "inet ${gateway}/"; then
+  ip addr add "${gateway}/24" dev "${dhcp_iface}"
+fi
+
+mkdir -p /etc/dnsmasq.d
+cat > "${conf}" <<CONF
+interface=${dhcp_iface}
+bind-interfaces
+except-interface=lo
+port=0
+dhcp-range=${dhcp_start},${dhcp_end},${netmask},12h
+dhcp-option=3
+dhcp-option=6
+log-dhcp
+CONF
+
+cat > "${unit}" <<UNIT
+[Unit]
+Description=Hypershift localnet-vlan ${vlan_id} DHCP on ${dhcp_iface}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+PIDFile=${pidfile}
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_NET_ADMIN
+ExecStart=/usr/sbin/dnsmasq --conf-file=${conf} --pid-file=${pidfile}
+ExecStop=/bin/kill -s TERM \$MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+/usr/sbin/dnsmasq --test --conf-file="${conf}"
+
+systemctl stop "localnet-vlan-${vlan_id}.service" 2>/dev/null || true
+pkill -f "localnet-vlan-${vlan_id}.conf" 2>/dev/null || true
+rm -f "${pidfile}"
+systemctl reset-failed "localnet-vlan-${vlan_id}.service" 2>/dev/null || true
+
+systemctl daemon-reload
+systemctl enable --now "localnet-vlan-${vlan_id}.service"
+
+if ! systemctl is-active --quiet "localnet-vlan-${vlan_id}.service"; then
+  echo "localnet-vlan-${vlan_id}.service failed to start"
+  systemctl status "localnet-vlan-${vlan_id}.service" --no-pager || true
+  journalctl -u "localnet-vlan-${vlan_id}.service" -n 20 --no-pager || true
+  exit 1
+fi
+
+if ! ss -ulnp | grep -q "${dhcp_iface}:67"; then
+  echo "dnsmasq is not listening for DHCP on ${dhcp_iface}"
+  journalctl -u "localnet-vlan-${vlan_id}.service" -n 20 --no-pager || true
+  exit 1
+fi
+
+echo "dnsmasq DHCP-only configured on ${dhcp_iface} (${gateway}, DHCP ${dhcp_start}-${dhcp_end})"
+SCRIPT_EOF
+}
+
+localnet_vlan_configure_egress_dhcp() {
+  local vlan_id="$1"
+  local dhcp_iface="$2"
+  local gateway="$3"
+  local dhcp_start="$4"
+  local dhcp_end="$5"
+  local node
+  local setup_b64
+  local failed=0
+
+  echo "Configuring per-node DHCP-only dnsmasq on ${dhcp_iface} for egress VLAN ${vlan_id}..."
+
+  setup_b64=$(localnet_vlan_egress_dnsmasq_setup_script_b64)
+
+  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+    echo "Setting up ${dhcp_iface} DHCP on node ${node} (egress VLAN ${vlan_id})..."
+    local dhcp_ok=false
+    for dhcp_attempt in $(seq 1 3); do
+      if oc debug "node/${node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${setup_b64}' | base64 -d | bash -s -- '${dhcp_iface}' '${gateway}' '${dhcp_start}' '${dhcp_end}' '${vlan_id}'"
+      then
+        echo "  ${node}: egress dnsmasq configured on ${dhcp_iface}"
+        dhcp_ok=true
+        break
+      fi
+      echo "  ${node}: oc debug failed (attempt ${dhcp_attempt}/3), retrying in 10s..." >&2
+      sleep 10
+    done
+    if [[ "${dhcp_ok}" != "true" ]]; then
+      echo "ERROR: failed to configure ${dhcp_iface} egress DHCP on node ${node} after 3 attempts" >&2
+      failed=1
+    fi
+  done
+
+  if [[ "${failed}" -ne 0 ]]; then
+    return 1
+  fi
+}
+
 # Mgmt cluster SDN CIDR (hosted control plane pods) for routing to guest worker VLAN IPs.
 localnet_vlan_mgmt_cluster_pod_cidr() {
   if [[ -n "${LOCALNET_VLAN_MGMT_POD_CIDR:-}" ]]; then
@@ -1499,6 +1625,8 @@ EOF
     LOCALNET_VLAN_EGRESS_SUBNET="${LOCALNET_VLAN_EGRESS_SUBNET:-192.168.200.0/24}"
     LOCALNET_VLAN_EGRESS_GATEWAY="${LOCALNET_VLAN_EGRESS_GATEWAY:-192.168.200.1}"
     LOCALNET_VLAN_EGRESS_DHCP_INTERFACE="${LOCALNET_VLAN_EGRESS_DHCP_INTERFACE:-${LOCALNET_VLAN_BOND}.${LOCALNET_VLAN_EGRESS_VLAN_ID}}"
+    LOCALNET_VLAN_EGRESS_DHCP_RANGE_START="${LOCALNET_VLAN_EGRESS_DHCP_RANGE_START:-192.168.200.100}"
+    LOCALNET_VLAN_EGRESS_DHCP_RANGE_END="${LOCALNET_VLAN_EGRESS_DHCP_RANGE_END:-192.168.200.240}"
     LOCALNET_VLAN_EGRESS_ENABLE="${LOCALNET_VLAN_EGRESS_ENABLE:-true}"
 
     echo "Setting up localnet-vlan: VLAN ${LOCALNET_VLAN_ID}, bridge ${LOCALNET_VLAN_BRIDGE}, physnet ${LOCALNET_VLAN_PHYSNET}..."
@@ -1696,6 +1824,13 @@ spec:
   }'
 EGRESS_NAD_EOF
       echo "Created NAD localnet-egress (${LOCALNET_VLAN_EGRESS_PHYSNET}:${LOCALNET_VLAN_EGRESS_BRIDGE}, VLAN ${LOCALNET_VLAN_EGRESS_VLAN_ID})"
+
+      localnet_vlan_configure_egress_dhcp "${LOCALNET_VLAN_EGRESS_VLAN_ID}" \
+        "${LOCALNET_VLAN_EGRESS_DHCP_INTERFACE}" "${LOCALNET_VLAN_EGRESS_GATEWAY}" \
+        "${LOCALNET_VLAN_EGRESS_DHCP_RANGE_START}" "${LOCALNET_VLAN_EGRESS_DHCP_RANGE_END}" || {
+        echo "ERROR: egress VLAN ${LOCALNET_VLAN_EGRESS_VLAN_ID} dnsmasq configuration failed" >&2
+        exit 1
+      }
 
       EXTRA_ARGS="${EXTRA_ARGS} --additional-network name:${ns}/localnet-egress"
     fi

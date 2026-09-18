@@ -9,21 +9,17 @@ ref:
       cpu: 100m
       memory: 200Mi
   documentation: |-
-    After nested_kubeconfig proxy-url is configured, patch guest CNO (routingViaHost /
-    ipForwarding) and apply per-node egress NNCPs for localnet-vlan dual-NAD topology.
+    After nested_kubeconfig proxy-url is configured, patch guest CNO (ipForwarding=Global,
+    local gateway mode) and label nodes egress-assignable for localnet-vlan dual-NAD topology.
+    Guest egress NIC IPs come from mgmt-side dnsmasq DHCP on br-ex.<egress-vlan-id> — no
+    guest-side NMState NNCPs needed. Mgmt NNCPs persist until the destroy step.
   env:
     - name: ATTACH_DEFAULT_NETWORK
       default: ""
       documentation: Must be localnet-vlan for this step to run guest post-config.
     - name: LOCALNET_VLAN_EGRESS_ENABLE
       default: "true"
-      documentation: When true, apply guest egress NNCPs and egress-assignable labels.
-    - name: LOCALNET_VLAN_EGRESS_SUBNET
-      default: "192.168.200.0/24"
-      documentation: Guest secondary (egress) NAD L3 subnet.
-    - name: LOCALNET_VLAN_EGRESS_GATEWAY
-      default: "192.168.200.1"
-      documentation: Gateway on guest egress localnet segment.
+      documentation: When true, label guest nodes with egress-assignable for EgressIP.
     - name: LOCALNET_VLAN_GUEST_API_WAIT_TIMEOUT
       default: "600"
       documentation: Seconds to wait for guest API via nested kubeconfig before failing.

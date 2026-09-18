@@ -4,11 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Guest cluster API is reached via nested_kubeconfig proxy-url (set by hypershift-kubevirt-baremetalds-proxy).
-# Do not unset HTTP_PROXY here — oc uses clusters[0].cluster.proxy-url for API CONNECT.
-
-LOCALNET_VLAN_EGRESS_SUBNET="${LOCALNET_VLAN_EGRESS_SUBNET:-192.168.200.0/24}"
-LOCALNET_VLAN_EGRESS_GATEWAY="${LOCALNET_VLAN_EGRESS_GATEWAY:-192.168.200.1}"
 LOCALNET_VLAN_EGRESS_ENABLE="${LOCALNET_VLAN_EGRESS_ENABLE:-true}"
 
 if [[ "${ATTACH_DEFAULT_NETWORK:-}" != "localnet-vlan" ]]; then
@@ -48,7 +43,7 @@ localnet_vlan_wait_nested_api_ready() {
 }
 
 localnet_vlan_configure_guest_cno() {
-  echo "Configuring guest CNO: ipForwarding=Global, routingViaHost=true..."
+  echo "Configuring guest CNO: ipForwarding=Global, routingViaHost=false (local gateway mode)..."
 
   local current_forwarding current_rvh
   current_forwarding=$(localnet_vlan_nested_oc get network.operator cluster \
@@ -56,13 +51,13 @@ localnet_vlan_configure_guest_cno() {
   current_rvh=$(localnet_vlan_nested_oc get network.operator cluster \
     -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}' 2>/dev/null || true)
 
-  if [[ "${current_forwarding}" == "Global" && "${current_rvh}" == "true" ]]; then
-    echo "Guest CNO already configured (ipForwarding=Global, routingViaHost=true)"
+  if [[ "${current_forwarding}" == "Global" && "${current_rvh}" == "false" ]]; then
+    echo "Guest CNO already configured (ipForwarding=Global, routingViaHost=false)"
     return 0
   fi
 
   if ! localnet_vlan_nested_oc patch network.operator cluster --type=merge -p \
-    '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global","routingViaHost":true}}}}}'; then
+    '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global","routingViaHost":false}}}}}'; then
     echo "ERROR: failed to patch guest network.operator" >&2
     return 1
   fi
@@ -92,77 +87,20 @@ localnet_vlan_configure_guest_cno() {
   return 1
 }
 
-localnet_vlan_configure_guest_egress_nncp() {
-  local egress_subnet="$1"
-  local egress_gateway="$2"
-  local egress_prefix="${egress_subnet#*/}"
-  local egress_base="${egress_subnet%.*}"
-  local node_names i ip_offset node_ip
-
-  echo "Configuring per-node NNCP on guest cluster for egress interface IPs..."
-
+localnet_vlan_label_egress_nodes() {
+  local node_names
   node_names=$(localnet_vlan_nested_oc get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
   if [[ -z "${node_names}" ]]; then
-    echo "ERROR: no guest nodes found for egress NNCP" >&2
+    echo "ERROR: no guest nodes found for egress-assignable labeling" >&2
     return 1
   fi
-
-  if ! localnet_vlan_nested_oc get crd nodenetworkconfigurationpolicies.nmstate.io &>/dev/null; then
-    echo "ERROR: NMState CRD not found on guest cluster (install kubernetes-nmstate-operator)" >&2
-    return 1
-  fi
-
-  i=0
-  for node in ${node_names}; do
-    ip_offset=$((10 + i))
-    node_ip="${egress_base}.${ip_offset}"
-    echo "  ${node}: assigning egress IP ${node_ip}/${egress_prefix} on net2..."
-
-    localnet_vlan_nested_oc apply -f - <<GUEST_NNCP_EOF
-apiVersion: nmstate.io/v1
-kind: NodeNetworkConfigurationPolicy
-metadata:
-  name: egress-${node}
-spec:
-  nodeSelector:
-    kubernetes.io/hostname: ${node}
-  desiredState:
-    interfaces:
-      - name: net2
-        type: ethernet
-        state: up
-        ipv4:
-          enabled: true
-          address:
-            - ip: ${node_ip}
-              prefix-length: ${egress_prefix}
-          dhcp: false
-        ipv6:
-          enabled: false
-    routes:
-      config:
-        - destination: ${egress_subnet}
-          next-hop-interface: net2
-GUEST_NNCP_EOF
-    i=$((i + 1))
-  done
-
-  echo "Waiting for guest egress NNCPs to be Available..."
-  for node in ${node_names}; do
-    if ! localnet_vlan_nested_oc wait nncp "egress-${node}" \
-      --for=condition=Available --timeout=120s; then
-      echo "ERROR: guest NNCP egress-${node} not Available after 120s" >&2
-      localnet_vlan_nested_oc get nncp "egress-${node}" -o yaml 2>/dev/null || true
-      return 1
-    fi
-  done
 
   echo "Labeling guest nodes with k8s.ovn.org/egress-assignable..."
   for node in ${node_names}; do
     localnet_vlan_nested_oc label node "${node}" \
       k8s.ovn.org/egress-assignable="" --overwrite
   done
-  echo "Guest egress NNCP configuration complete"
+  echo "Guest egress-assignable labeling complete"
 }
 
 localnet_vlan_wait_nested_api_ready
@@ -170,8 +108,7 @@ localnet_vlan_wait_nested_api_ready
 localnet_vlan_configure_guest_cno
 
 if [[ "${LOCALNET_VLAN_EGRESS_ENABLE}" == "true" ]]; then
-  localnet_vlan_configure_guest_egress_nncp \
-    "${LOCALNET_VLAN_EGRESS_SUBNET}" "${LOCALNET_VLAN_EGRESS_GATEWAY}"
+  localnet_vlan_label_egress_nodes
 fi
 
 echo "Localnet-vlan guest post-configuration complete"
