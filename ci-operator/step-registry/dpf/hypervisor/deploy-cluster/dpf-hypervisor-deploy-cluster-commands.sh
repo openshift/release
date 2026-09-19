@@ -161,7 +161,9 @@ if [[ -n "${PAYLOAD_URL}" ]]; then
     echo "ERROR: ${PULL_SECRET_SRC} not found"
     exit 1
   fi
-  cp "${PULL_SECRET_SRC}" /tmp/pull-secret.json
+  # Cluster profile secrets are mounted as base64-encoded values. Decode the
+  # pull secret before passing it to oc, which expects Docker config JSON.
+  base64 -d "${PULL_SECRET_SRC}" > /tmp/pull-secret.json
   oc registry login --to=/tmp/pull-secret.json
   REMOTE_PULL_SECRET=$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -ea; source ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}; set +a; PS=\${OPENSHIFT_PULL_SECRET:-openshift_pull.json}; [[ \"\$PS\" = /* ]] && echo \"\$PS\" || echo \"${REMOTE_WORK_DIR}/openshift-dpf/\$PS\"")
   scp -q ${SSH_OPTS} /tmp/pull-secret.json root@${REMOTE_HOST}:"${REMOTE_PULL_SECRET}"
@@ -274,4 +276,3 @@ else
 fi
 
 # To Do: add basic oc commands to verify make all step passed
-
