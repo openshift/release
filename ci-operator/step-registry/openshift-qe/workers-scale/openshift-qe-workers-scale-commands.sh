@@ -41,6 +41,8 @@ if [[ -f "${SHARED_DIR}/cluster-type" ]]; then
 fi
 
 if [[ "$CLUSTER_TYPE" == "rosa" ]]; then
+  # Disable xtrace: reading ROSA credentials (SSO client secret and OCM token)
+  set +x
   ROSA_SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
   ROSA_SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
   ROSA_TOKEN=$(read_profile_file "ocm-token")
@@ -55,6 +57,7 @@ if [[ "$CLUSTER_TYPE" == "rosa" ]]; then
     echo "ROSA cluster detected but no credentials found for rosa login"
     exit 1
   fi
+  set -x
 else
   echo "Non-ROSA cluster detected (cluster-type: ${CLUSTER_TYPE:-not set}), skipping rosa login"
 fi
