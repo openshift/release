@@ -1,0 +1,50 @@
+ref:
+  as: quay-deploy-azure-blob
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-deploy-azure-blob-commands.sh
+  timeout: 8h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: azure
+    mount_path: /var/run/quay-qe-azure-secret
+  - collection: quay-tests
+    group: quay
+    mount_path: /var/run/quay-qe-quay-secret
+  documentation: |-
+    Provision an Azure Blob storage account and container, then deploy Quay
+    Operator and Quay configured to use AzureStorage distributed storage. The
+    storage ID and Terraform state are passed through SHARED_DIR so
+    quay-deprovision (QUAY_STORAGE_PROVIDER=azure) can remove the resources.
+  env:
+  - name: DR__RP__CR_COMP_NAME
+    default: "lp-ocp-compat--Quay"
+    documentation: ReportPortal Component Readiness component name for junit remapping
+  - name: MAP_TESTS
+    default: "false"
+    documentation: Specify whether to update the test suite name for reporting tools
+  - name: QUAY_OPERATOR_CHANNEL
+    documentation: The quay operator channel
+    default: "stable-3.16"
+  - name: QUAY_OPERATOR_SOURCE
+    documentation: The quay operator source
+    default: "redhat-operators"
+  - name: QUAY_EXTRA_CONFIG
+    documentation: |-
+      Additional Quay configuration YAML merged on top of the default config.
+      Values provided here override defaults.
+    default: ""
+  - name: ENABLE_BUILD_SUPPORT
+    documentation: |-
+      When "true", deploy Quay with virtual-builder support and unmanaged TLS.
+      Requires quay-provisioning-tls and quay-provisioning-builder to have
+      populated SHARED_DIR first.
+    default: "false"
