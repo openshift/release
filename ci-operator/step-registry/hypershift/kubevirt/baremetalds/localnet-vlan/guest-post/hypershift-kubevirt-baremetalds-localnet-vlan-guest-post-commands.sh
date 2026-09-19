@@ -43,7 +43,7 @@ localnet_vlan_wait_nested_api_ready() {
 }
 
 localnet_vlan_configure_guest_cno() {
-  echo "Configuring guest CNO: ipForwarding=Global, routingViaHost=false (local gateway mode)..."
+  echo "Configuring guest CNO: ipForwarding=Global, routingViaHost=true (local gateway mode)..."
 
   local current_forwarding current_rvh
   current_forwarding=$(localnet_vlan_nested_oc get network.operator cluster \
@@ -51,13 +51,13 @@ localnet_vlan_configure_guest_cno() {
   current_rvh=$(localnet_vlan_nested_oc get network.operator cluster \
     -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}' 2>/dev/null || true)
 
-  if [[ "${current_forwarding}" == "Global" && "${current_rvh}" == "false" ]]; then
-    echo "Guest CNO already configured (ipForwarding=Global, routingViaHost=false)"
+  if [[ "${current_forwarding}" == "Global" && "${current_rvh}" == "true" ]]; then
+    echo "Guest CNO already configured (ipForwarding=Global, routingViaHost=true)"
     return 0
   fi
 
   if ! localnet_vlan_nested_oc patch network.operator cluster --type=merge -p \
-    '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global","routingViaHost":false}}}}}'; then
+    '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global","routingViaHost":true}}}}}'; then
     echo "ERROR: failed to patch guest network.operator" >&2
     return 1
   fi

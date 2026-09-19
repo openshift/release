@@ -847,6 +847,87 @@ SCRIPT_EOF
   fi
 }
 
+# Per-node L2 islands mean guest VMs on different hypervisors cannot ARP for each other even
+# though they share 192.168.112.0/24.  Install /32 routes inside each guest VM pointing remote
+# worker IPs via the dnsmasq gateway (192.168.112.1) so OVN Geneve tunnels and cross-node
+# NodePort forwarding work.  Runs AFTER mgmt-side /32 host routes are in place (SSH needs them).
+localnet_vlan_configure_guest_worker_routes() {
+  local vmi_namespace="$1"
+  local vlan_subnet="$2"
+  local gateway="${3:-192.168.112.1}"
+  local ssh_key_secret="${CLUSTER_NAME}-ssh-key"
+  local -A worker_routes=()
+  local ip hypervisor
+
+  while read -r ip hypervisor; do
+    [[ -z "${ip}" || -z "${hypervisor}" ]] && continue
+    worker_routes["${ip}"]="${hypervisor}"
+  done < <(localnet_vlan_map_worker_vlan_ips "${vmi_namespace}" "${vlan_subnet}")
+
+  if [[ ${#worker_routes[@]} -lt 2 ]]; then
+    echo "localnet-vlan: fewer than 2 worker IPs — guest /32 routes not needed"
+    return 0
+  fi
+
+  local ssh_key
+  ssh_key=$(oc get secret -n "${CLUSTER_NAMESPACE_PREFIX}" "${ssh_key_secret}" \
+    -o jsonpath='{.data.id_rsa}' 2>/dev/null | base64 -d) || true
+  if [[ -z "${ssh_key}" ]]; then
+    echo "WARNING: SSH key secret ${ssh_key_secret} not found — skipping guest /32 routes" >&2
+    return 0
+  fi
+
+  local all_ips=("${!worker_routes[@]}")
+  local ssh_node="${worker_routes[${all_ips[0]}]}"
+  local guest_succeeded=0
+
+  echo "Installing guest-side /32 routes for cross-VM connectivity (${#all_ips[@]} workers)..."
+  for target_ip in "${all_ips[@]}"; do
+    local remote_routes=""
+    for other_ip in "${all_ips[@]}"; do
+      [[ "${other_ip}" == "${target_ip}" ]] && continue
+      remote_routes+="ip route replace ${other_ip}/32 via ${gateway}; "
+    done
+    [[ -z "${remote_routes}" ]] && continue
+
+    local ssh_script_b64
+    ssh_script_b64=$(base64 -w0 <<GEOF
+#!/bin/bash
+set -euo pipefail
+mkdir -p /tmp/.gk && cat > /tmp/.gk/k <<'KEOF'
+${ssh_key}
+KEOF
+chmod 600 /tmp/.gk/k
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 \
+  -i /tmp/.gk/k core@${target_ip} "sudo ${remote_routes} echo ok" 2>/dev/null
+rm -rf /tmp/.gk
+GEOF
+)
+
+    local guest_ok=false
+    for attempt in $(seq 1 3); do
+      if oc debug "node/${ssh_node}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${ssh_script_b64}' | base64 -d | bash"; then
+        echo "  ${target_ip}: guest /32 routes installed"
+        guest_ok=true
+        break
+      fi
+      sleep 10
+    done
+    if [[ "${guest_ok}" == "true" ]]; then
+      guest_succeeded=$((guest_succeeded + 1))
+    else
+      echo "WARNING: failed to install guest /32 routes on ${target_ip}" >&2
+    fi
+  done
+
+  if [[ "${guest_succeeded}" -eq 0 ]]; then
+    echo "WARNING: guest /32 routes installed on zero VMs — cross-node Geneve may fail" >&2
+  else
+    echo "Guest /32 routes installed on ${guest_succeeded}/${#all_ips[@]} VMs"
+  fi
+}
+
 # Guest API is on lab L2 (111.x). CI sets HTTP_PROXY for outbound internet; nested_kubeconfig
 # must reach the guest API directly from the mgmt pod network (proxy step runs after create).
 localnet_vlan_guest_cluster_oc_env() {
@@ -2212,6 +2293,9 @@ if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
     localnet_vlan_configure_nodes_routing "${LOCALNET_VLAN_DHCP_INTERFACE}" \
       "${LOCALNET_VLAN_BOND}" "${LOCALNET_VLAN_SUBNET}" \
       || echo "WARNING: post-NodePool localnet-vlan routing refresh failed (continuing)" >&2
+    localnet_vlan_configure_guest_worker_routes "${LOCALNET_VLAN_NS}" \
+      "${LOCALNET_VLAN_SUBNET}" "${LOCALNET_VLAN_GATEWAY}" \
+      || echo "WARNING: guest-side /32 routes failed — cross-node Geneve may not work" >&2
   fi
 
   localnet_vlan_verify_guest_ingress_passthrough "${LOCALNET_VLAN_NS}"
