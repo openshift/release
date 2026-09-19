@@ -3,6 +3,10 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: cli
+  libvirt-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: libvirt-installer
   operand:
     name: "4.18"
     namespace: ocp
@@ -19,6 +23,10 @@ base_images:
     name: "4.18"
     namespace: origin
     tag: operator-sdk
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kedacore/keda-olm-operator
@@ -61,6 +69,12 @@ releases:
       include_built_images: true
       name: "4.18"
       namespace: ocp
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -163,6 +177,84 @@ tests:
       resources:
         requests:
           cpu: 100m
+- always_run: false
+  as: cma-e2e-s390x-libvirt
+  capabilities:
+  - intranet
+  cluster: build12
+  optional: true
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.18"
+      ETCD_DISK_SPEED: slow
+      USE_EXTERNAL_DNS: "true"
+    test:
+    - ref: custom-metrics-autoscaler-operator-libvirt-s390x-e2e-image-tag-mirror
+    - as: test-install
+      cli: latest
+      commands: |
+        oc create ns keda
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n keda "$OO_BUNDLE"
+        oc wait --for condition=Available -n keda deployment custom-metrics-autoscaler-operator --timeout 10m
+      dependencies:
+      - env: OO_BUNDLE
+        name: custom-metrics-autoscaler-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-apply-kedacontroller
+      cli: latest
+      commands: |
+        oc apply -n keda -f config/samples/keda_v1alpha1_kedacontroller.yaml
+        # there is no 'wait --for=exists' yet, and we return if it's not there yet, so wait a bit
+        sleep 30
+        oc get deployment -n keda
+        oc wait --for condition=Available -n keda deployment keda-admission --timeout 10m
+        oc wait --for condition=Available -n keda deployment keda-metrics-apiserver --timeout 10m
+        oc wait --for condition=Available -n keda deployment keda-operator --timeout 10m
+        oc get deployment -n keda
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-setup
+      cli: latest
+      commands: E2E_INSTALL_KEDA=false make e2e-test-openshift-setup
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-run
+      cli: latest
+      commands: make e2e-test-openshift
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-clean
+      cli: latest
+      commands: E2E_INSTALL_KEDA=false make e2e-test-openshift-clean
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-teardown
+      cli: latest
+      commands: |
+        oc get deployment -n keda
+        operator-sdk cleanup -n keda keda
+        oc wait --for=delete -n keda deployment custom-metrics-autoscaler-operator --timeout 10m
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    workflow: custom-metrics-autoscaler-operator-libvirt-s390x
 zz_generated_metadata:
   branch: release-4.18
   org: openshift
