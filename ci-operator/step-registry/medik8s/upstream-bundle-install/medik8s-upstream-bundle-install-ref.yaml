@@ -1,0 +1,39 @@
+ref:
+  as: medik8s-upstream-bundle-install
+  from: operator-sdk
+  cli: latest
+  grace_period: 10m
+  commands: medik8s-upstream-bundle-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: MEDIK8S_BUNDLE_IMAGES
+    documentation: |-
+      Comma-separated list of package=bundle-image pairs for quay.io/medik8s (or other) bundles.
+      Example: storage-based-remediation=quay.io/medik8s/storage-based-remediation-operator-bundle:latest
+    default: ""
+  - name: OO_PACKAGE
+    documentation: |-
+      OLM package name when installing a single bundle via OO_BUNDLE (e.g. storage-based-remediation).
+      Ignored when MEDIK8S_BUNDLE_IMAGES is set.
+    default: ""
+  - name: OO_BUNDLE
+    documentation: |-
+      Single bundle image URL. Requires OO_PACKAGE. Use MEDIK8S_BUNDLE_IMAGES for multiple operators.
+    default: ""
+  - name: OO_INSTALL_NAMESPACE
+    documentation: Namespace for OLM install via operator-sdk run bundle.
+    default: "openshift-workload-availability"
+  - name: OO_INSTALL_MODE
+    documentation: operator-sdk run bundle --install-mode value (e.g. AllNamespaces).
+    default: "AllNamespaces"
+  - name: OO_INSTALL_TIMEOUT_MINUTES
+    documentation: Timeout for operator-sdk run bundle.
+    default: "15"
+  - name: OO_SECURITY_CONTEXT
+    documentation: Security context config for the catalog pod created by operator-sdk.
+    default: "restricted"
+  documentation: |-
+    Installs medik8s operators from pre-built OLM medik8s bundle images.
