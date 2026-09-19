@@ -24,8 +24,9 @@ eval "$(
 
 # Resolve the FIRST (lowest) kubevirt-hyperconverged x.y.z for major.minor from the spoke catalog.
 # Used for one-hop upgrade tests where the target is the initial z-stream entry point for the minor
-# (e.g. 4.21.0). OLM's upgrade graph provides a direct 'replaces' edge from the latest 4.20.z to
-# the first 4.21.z, making this a single-hop upgrade.
+# (e.g. 4.21.0). OLM's upgrade graph often has a direct 'replaces' edge from the latest 4.20.z to
+# the first 4.21.z. Catalogs may skip that first z-stream (e.g. 4.21.17 → 4.22.6, not 4.22.0);
+# PrepareCnvOlmForUpgradeTest retargets to the CSV OLM actually offers.
 ResolveCnvFirstVersion() {
     typeset majorMinor="${1:?}" channel="${2:?}"
     oc get packagemanifest kubevirt-hyperconverged -n openshift-marketplace -o json \
@@ -36,6 +37,85 @@ ResolveCnvFirstVersion() {
             | select(.version | startswith($prefix))
             | .version' \
         | sort -V | head -n1
+}
+
+CnvCsvNameToVersion() {
+    typeset csvName="${1:?}"; (($#)) && shift
+    typeset ver="${csvName#kubevirt-hyperconverged-operator.v}"
+    [[ "${ver}" != "${csvName}" ]]
+    [[ "${ver}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]
+    printf '%s\n' "${ver}"
+    true
+}
+
+CnvSameMajorMinor() {
+    typeset left="${1:?}"; (($#)) && shift
+    typeset right="${1:?}"; (($#)) && shift
+    [[ "${left%.*}" == "${right%.*}" ]]
+}
+
+CnvVersionGte() {
+    typeset left="${1:?}"; (($#)) && shift
+    typeset right="${1:?}"; (($#)) && shift
+    if [[ "$(printf '%s\n%s\n' "${left}" "${right}" | sort -V | tail -n1)" == "${left}" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+WriteCnvTargetVersion() {
+    typeset ver="${1:?}"; (($#)) && shift
+    export CNV_TARGET_VERSION="${ver}"
+    printf '%s\n' "${CNV_TARGET_VERSION}" > "${SHARED_DIR}/cnv-target-version"
+    : "CNV_TARGET_VERSION=${CNV_TARGET_VERSION} written to ${SHARED_DIR}/cnv-target-version"
+    true
+}
+
+# True when planCsv is the same x.y as CNV_TARGET_VERSION and z >= the resolved first
+# z-stream (catalog skipped older patches). Retargets CNV_TARGET_VERSION to planCsv.
+IsCnvOfferedTargetPlan() {
+    typeset planCsv="${1:?}"; (($#)) && shift
+    typeset planVer='' firstVer="${CNV_TARGET_VERSION:?}"
+    [[ "${planCsv}" == kubevirt-hyperconverged-operator.v* ]] || return 1
+    planVer="$(CnvCsvNameToVersion "${planCsv}")"
+    CnvSameMajorMinor "${planVer}" "${firstVer}" || return 1
+    CnvVersionGte "${planVer}" "${firstVer}" || return 1
+    if [[ "${planVer}" != "${firstVer}" ]]; then
+        : "Catalog skipped ${firstVer}; OLM offered ${planVer} — retargeting"
+        WriteCnvTargetVersion "${planVer}"
+    fi
+    return 0
+}
+
+WaitForNewInstallPlan() {
+    typeset subApi="${1:?}"; (($#)) && shift
+    typeset ns="${1:?}"; (($#)) && shift
+    typeset seenPlan="${1:?}"; (($#)) && shift
+    typeset seenCsv="${1:?}"; (($#)) && shift
+    typeset -i waitMax="${1:?}"; (($#)) && shift
+    typeset -i waitInt="${1:?}"; (($#)) && shift
+    (
+        SECONDS=0
+        typeset newPlan='' newCsv=''
+        until [[ -n "${newPlan}" && ( "${newPlan}" != "${seenPlan}" || "${newCsv}" != "${seenCsv}" ) ]]; do
+            (( SECONDS >= waitMax )) && {
+                : "Timed out waiting for a new install plan after ${seenPlan}/${seenCsv}"
+                exit 1
+            }
+            newPlan="$(oc get "${subApi}" -n "${ns}" \
+                -o jsonpath='{.status.installplan.name}' || true)"
+            newCsv=''
+            if [[ -n "${newPlan}" ]]; then
+                newCsv="$(oc get "installplan/${newPlan}" -n "${ns}" \
+                    -o jsonpath='{.spec.clusterServiceVersionNames[0]}' || true)"
+            fi
+            [[ -n "${newPlan}" && ( "${newPlan}" != "${seenPlan}" || "${newCsv}" != "${seenCsv}" ) ]] && break
+            : "Waiting for a new install plan after ${seenPlan}/${seenCsv} (${SECONDS}/${waitMax}s, current=${newPlan}/${newCsv})"
+            sleep "${waitInt}"
+        done
+        true
+    )
+    true
 }
 
 Retry() {
@@ -430,8 +510,10 @@ InstallAndVerifyVirtctl() {
 # already created that plan with Manual approval, and this function returns immediately.
 # The loop is retained as a safety net for graphs that require an intermediate step;
 # any such intermediate plan is approved and waited on before checking for the target.
+# If the catalog skips the packagemanifest first z-stream (4.22.0 listed, OLM offers
+# 4.22.6), retarget CNV_TARGET_VERSION to the offered CSV and leave that plan pending.
 PrepareCnvOlmForUpgradeTest() {
-    typeset -r targetCsv="kubevirt-hyperconverged-operator.v${CNV_TARGET_VERSION:?}"
+    typeset targetCsv="kubevirt-hyperconverged-operator.v${CNV_TARGET_VERSION:?}"
     typeset -r ns="openshift-cnv"
     typeset -r subApi="subscription.operators.coreos.com/hco-operatorhub"
     typeset -i maxHops=10
@@ -446,6 +528,7 @@ PrepareCnvOlmForUpgradeTest() {
 
         while (( hop < maxHops )); do
             (( ++hop ))
+            targetCsv="kubevirt-hyperconverged-operator.v${CNV_TARGET_VERSION}"
 
             subIp=''
             SECONDS=0
@@ -465,13 +548,24 @@ PrepareCnvOlmForUpgradeTest() {
             ipCsv="$(oc get "installplan/${subIp}" -n "${ns}" \
                 -o jsonpath='{.spec.clusterServiceVersionNames[0]}' || true)"
 
-            if [[ "${ipCsv}" == "${targetCsv}" ]]; then
+            if [[ -n "${ipCsv}" ]] && IsCnvOfferedTargetPlan "${ipCsv}"; then
+                targetCsv="kubevirt-hyperconverged-operator.v${CNV_TARGET_VERSION}"
                 : "Hop ${hop}: install plan ${subIp} already targets ${targetCsv}"
                 break
             fi
 
             ipPhase="$(oc get "installplan/${subIp}" -n "${ns}" \
                 -o jsonpath='{.status.phase}' || true)"
+            installedCsv="$(oc get "${subApi}" -n "${ns}" \
+                -o jsonpath='{.status.installedCSV}' || true)"
+
+            if [[ "${ipPhase}" == "Complete" && -n "${ipCsv}" && "${installedCsv}" == "${ipCsv}" ]]; then
+                : "Hop ${hop}: plan ${subIp} already Complete (${ipCsv}); waiting for next OLM plan"
+                WaitForNewInstallPlan "${subApi}" "${ns}" "${subIp}" "${ipCsv}" \
+                    "${planPollMax}" "${planPollInt}"
+                continue
+            fi
+
             : "Hop ${hop}: approving intermediate plan ${subIp} (${ipCsv}) phase=${ipPhase}"
 
             if [[ "${ipPhase}" == "RequiresApproval" ]]; then
@@ -495,15 +589,16 @@ PrepareCnvOlmForUpgradeTest() {
                 sleep "${csvInstallInt}"
             done
             : "Hop ${hop}: ${ipCsv} installed; waiting for OLM to resolve next plan"
-            sleep 15
-            subIp=''
+            WaitForNewInstallPlan "${subApi}" "${ns}" "${subIp}" "${ipCsv}" \
+                "${planPollMax}" "${planPollInt}"
         done
 
         typeset -i targetWaitMax=600
         SECONDS=0
         subIp=''
         ipCsv=''
-        until [[ "${ipCsv}" == "${targetCsv}" ]]; do
+        targetCsv="kubevirt-hyperconverged-operator.v${CNV_TARGET_VERSION}"
+        until [[ -n "${ipCsv}" ]] && IsCnvOfferedTargetPlan "${ipCsv}"; do
             subIp="$(oc get "${subApi}" -n "${ns}" \
                 -o jsonpath='{.status.installplan.name}' || true)"
             ipCsv=''
@@ -511,7 +606,10 @@ PrepareCnvOlmForUpgradeTest() {
                 ipCsv="$(oc get "installplan/${subIp}" -n "${ns}" \
                     -o jsonpath='{.spec.clusterServiceVersionNames[0]}' || true)"
             fi
-            [[ "${ipCsv}" == "${targetCsv}" ]] && break
+            if [[ -n "${ipCsv}" ]] && IsCnvOfferedTargetPlan "${ipCsv}"; then
+                targetCsv="kubevirt-hyperconverged-operator.v${CNV_TARGET_VERSION}"
+                break
+            fi
             (( SECONDS >= targetWaitMax )) && {
                 oc get subscription.operators.coreos.com,installplan,csv -n "${ns}" -o yaml \
                     > "${ARTIFACT_DIR}/cnv-upgrade-installplan-wait-failure.yaml" || true
@@ -527,6 +625,8 @@ PrepareCnvOlmForUpgradeTest() {
         : "CNV OLM ready: hco-operatorhub points to ${targetCsv} plan ${subIp}"
         true
     )
+    CNV_TARGET_VERSION="$(< "${SHARED_DIR}/cnv-target-version")"
+    export CNV_TARGET_VERSION
     true
 }
 
@@ -577,12 +677,13 @@ if [[ -n "${CNV_TARGET_MAJOR_MINOR}" ]]; then
     typeset resolvedCnvVersion
     resolvedCnvVersion="$(ResolveCnvFirstVersion "${CNV_TARGET_MAJOR_MINOR}" "${CNV_CHANNEL}")"
     [[ -n "${resolvedCnvVersion}" ]]
-    export CNV_TARGET_VERSION="${resolvedCnvVersion}"
+    WriteCnvTargetVersion "${resolvedCnvVersion}"
     : "Resolved CNV ${CNV_TARGET_MAJOR_MINOR}.x -> ${CNV_TARGET_VERSION} (first z-stream) from packagemanifest/${CNV_CHANNEL}"
 fi
 
-printf '%s\n' "${CNV_TARGET_VERSION}" > "${SHARED_DIR}/cnv-target-version"
-: "CNV_TARGET_VERSION=${CNV_TARGET_VERSION} written to ${SHARED_DIR}/cnv-target-version"
+if [[ ! -f "${SHARED_DIR}/cnv-target-version" ]]; then
+    WriteCnvTargetVersion "${CNV_TARGET_VERSION}"
+fi
 
 oc whoami --show-console
 oc get "subscription.operators.coreos.com/hco-operatorhub" -n openshift-cnv
