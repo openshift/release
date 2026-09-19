@@ -113,6 +113,36 @@ tests:
                   repository: IMAGE_REPO
                   tag: IMAGE_TAG
     workflow: rosa-hyperfleet-ephemeral-e2e
+- always_run: false
+  as: on-demand-e2e-rosa
+  steps:
+    dependencies:
+      CI_API_IMAGE: platform-api
+      CI_OPERATOR_IMAGE: hyperfleet-operator
+    env:
+      E2E_SKIP_HCP: "true"
+      E2E_SKIP_ROSA_CLI: "false"
+      ROSA_LABEL_FILTER: hyperfleet-sanity
+      ROSA_REGIONAL_EXTRA_COMPONENTS: |
+        - image: CI_API_IMAGE
+          repo: quay.io/rrp-dev-ci/platform-api
+          target: argocd/config/regional-cluster/platform-api/values.yaml
+          override:
+            platformApi:
+              app:
+                image:
+                  repository: IMAGE_REPO
+                  tag: IMAGE_TAG
+        - image: CI_OPERATOR_IMAGE
+          repo: quay.io/rrp-dev-ci/hyperfleet-operator
+          target: argocd/config/regional-cluster/hyperfleet/values.yaml
+          override:
+            hyperfleet:
+              helmValues:
+                image:
+                  repository: IMAGE_REPO
+                  tag: IMAGE_TAG
+    workflow: rosa-hyperfleet-ephemeral-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-online

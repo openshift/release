@@ -60,7 +60,18 @@ elif [[ "${REPO_NAME:-}" == "rosa-hyperfleet-zoa" ]] && [[ -n "${PULL_NUMBER:-}"
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Run e2e tests
+# 3. Export test control variables and run e2e tests
 # ---------------------------------------------------------------------------
+# Pass through test skip flags
+export E2E_SKIP_PLATFORM_API="${E2E_SKIP_PLATFORM_API:-false}"
+export E2E_SKIP_HCP="${E2E_SKIP_HCP:-false}"
+export E2E_SKIP_MONITORING="${E2E_SKIP_MONITORING:-false}"
+export E2E_SKIP_ROSA_CLI="${E2E_SKIP_ROSA_CLI:-true}"
+
+# Pass label filter if specified
+if [[ -n "${ROSA_LABEL_FILTER:-}" ]]; then
+  export ROSA_LABEL_FILTER="${ROSA_LABEL_FILTER}"
+fi
+
 echo "Running e2e tests..."
 ./ci/e2e-tests.sh

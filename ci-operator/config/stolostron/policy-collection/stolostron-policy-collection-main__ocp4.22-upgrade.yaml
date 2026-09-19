@@ -48,7 +48,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
       ACM_SUBSCRIPTION_NAMESPACE: ocm
-      AWS_COMPUTE_VOLUME_SIZE: "500"
+      ACS_SUBSCRIPTION_NAMESPACE: openshift-operators
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.2xlarge
@@ -60,6 +60,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8942
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_SUBSCRIPTION_NAMESPACE: openshift-storage
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
@@ -67,6 +68,7 @@ tests:
           {"name": "odf-operator", "source": "redhat-operators", "channel": "stable-4.22", "install_namespace": "openshift-storage", "target_namespaces": "openshift-storage", "operator_group": "openshift-storage-operator-group"},
           {"name": "quay-operator", "source": "redhat-operators", "channel": "stable-3.17", "install_namespace": "openshift-operators"}
         ]
+      QUAY_SUBSCRIPTION_NAMESPACE: openshift-operators
       ZONES_COUNT: "3"
     post:
     - ref: gather-aws-console
@@ -77,7 +79,6 @@ tests:
     - ref: ipi-conf-telemetry
     - ref: ipi-conf-aws-custom-az
     - ref: ipi-conf-aws
-    - ref: ipi-conf-aws-rootvolume
     - ref: ipi-install-monitoringpvc
     - chain: ipi-install-stableinitial
     - ref: interop-opp-disk-diag
@@ -90,6 +91,9 @@ tests:
     - ref: interop-opp-upgrade
     - ref: cucushift-upgrade-healthcheck
     - ref: interop-opp-product-upgrade-acm
+    - ref: interop-opp-product-upgrade-acs
+    - ref: interop-opp-product-upgrade-odf
+    - ref: interop-opp-product-upgrade-quay
     - ref: interop-opp-smoke
     - ref: interop-opp-skip-ratio-gate
 zz_generated_metadata:

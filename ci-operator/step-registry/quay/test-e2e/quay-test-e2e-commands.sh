@@ -188,6 +188,67 @@ function gatherBuilderDiagnostics {
     > "${out}/quay-app-buildman.log" 2>&1 || true
 }
 
+# Expose the in-cluster Jaeger query API to the Playwright suite. On a failed
+# test the suite attaches server-spans.json -- the Jaeger spans for that test's
+# own requests -- by GETting ${JAEGER_QUERY_URL}/api/traces/<traceId>. With the
+# variable unset that collection silently no-ops, so it has to be set here.
+#
+# Port-forward, not the in-cluster Service DNS: this step's pod runs in the CI
+# build farm, not in the target cluster, so jaeger.${ns}.svc is unreachable from
+# it. The step has `cli: latest` and the target-cluster KUBECONFIG, which is the
+# same mechanism the quay-gather-jaeger-traces post step already uses against
+# this Service. 127.0.0.1 rather than localhost so Node's fetch cannot pick ::1,
+# which the forward does not bind.
+#
+# Best-effort: if Jaeger was not deployed or the forward never answers, leave
+# JAEGER_QUERY_URL UNSET. The suite treats that as "not collected" and records a
+# reason, which is better than handing it a URL that quietly returns nothing.
+function startJaegerPortForward {
+  local ns="${QUAYNAMESPACE:-quay-enterprise}"
+  # Drop any inherited value so the "unset" paths below cannot leave an
+  # unverified URL in the suite's environment.
+  unset JAEGER_QUERY_URL
+  if [[ ! -f "${SHARED_DIR}/jaeger_deployed" ]]; then
+    echo "Jaeger was not deployed; leaving JAEGER_QUERY_URL unset"
+    return 0
+  fi
+
+  # The suite can run for hours and a single port-forward does not survive a
+  # Jaeger pod restart or an idle drop, so supervise it: the keeper restarts oc
+  # until it is asked to stop, and on TERM kills the forward it is currently
+  # supervising.
+  (
+    pf=""
+    trap '[[ -n "${pf}" ]] && kill "${pf}" 2>/dev/null; exit 0' TERM
+    while true; do
+      oc port-forward -n "${ns}" svc/jaeger 16686:16686 >> "${ARTIFACT_DIR}/jaeger-port-forward.log" 2>&1 &
+      pf=$!
+      wait "${pf}" || true
+      sleep 5
+    done
+  ) &
+  JAEGER_PF_PID=$!
+
+  for _ in $(seq 1 12); do
+    if curl -sf --connect-timeout 5 --max-time 10 "http://127.0.0.1:16686/api/services" -o /dev/null; then
+      export JAEGER_QUERY_URL="http://127.0.0.1:16686"
+      echo "JAEGER_QUERY_URL=${JAEGER_QUERY_URL}"
+      return 0
+    fi
+    sleep 5
+  done
+
+  echo "WARNING: Jaeger query API never became reachable; leaving JAEGER_QUERY_URL unset" >&2
+  stopJaegerPortForward
+}
+
+function stopJaegerPortForward {
+  [[ -n "${JAEGER_PF_PID:-}" ]] || return 0
+  kill "${JAEGER_PF_PID}" 2>/dev/null || true
+  wait "${JAEGER_PF_PID}" 2>/dev/null || true
+  JAEGER_PF_PID=""
+}
+
 function copyArtifacts {
   echo "Copying test artifacts..."
   local src="${PLAYWRIGHT_WORKDIR:-.}"
@@ -317,7 +378,7 @@ EOF
   fi
   gatherBuilderDiagnostics || true
 }
-trap copyArtifacts EXIT
+trap 'copyArtifacts; stopJaegerPortForward' EXIT
 
 # Test users (admin/testuser/readonly) are created by Playwright's global-setup.ts,
 # exactly as in upstream Quay CI (.github/workflows/ci-web.yaml). With FEATURE_MAILING
@@ -349,32 +410,150 @@ if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
   echo "SSL_CERT_FILE=${SSL_CERT_FILE}"
 fi
 
-# Route DNS/connectivity readiness gate. The suite fires hundreds of rapid
-# apiRequestContext calls with tight 5-10s timeouts; on a freshly provisioned
-# cluster the test pod's resolver intermittently returns ENOTFOUND for the *.apps
-# wildcard (and TCP/TLS is slow) until the record and resolver cache warm. Starting
-# the run into a cold resolver is the top source of flakes/failures. Block until the
-# route both resolves AND answers over HTTPS several times in a row before launching
-# Playwright. Best-effort: warn and proceed on timeout so we never hard-fail here.
-QUAY_HOST="${QUAY_ROUTE#*://}"; QUAY_HOST="${QUAY_HOST%%/*}"
-echo "Waiting for Quay route DNS + HTTPS readiness..."
-ready=0
-for attempt in $(seq 1 60); do
-  http_code="$(curl -sk -o /dev/null -m 10 -w '%{http_code}' "${QUAY_ROUTE}/api/v1/discovery" 2>/dev/null || echo 000)"
-  if getent ahosts "${QUAY_HOST}" >/dev/null 2>&1 && [[ "${http_code}" != "000" ]]; then
-    ready=$((ready + 1))
-    echo "  readiness ${ready}/5 (attempt ${attempt}, http=${http_code})"
-    [[ "${ready}" -ge 5 ]] && break
+# Route preflight gate. The suite fires hundreds of rapid apiRequestContext calls
+# with tight 5-10s timeouts; on a freshly provisioned cluster the test pod's resolver
+# intermittently returns ENOTFOUND for the *.apps wildcard (and TCP/TLS is slow) until
+# the record and resolver cache warm, and the route happily answers 404/503 from the
+# router while quay-app is still starting. Starting the run into either is the top
+# source of mass failures, so require a genuinely healthy endpoint -- DNS answer,
+# successful curl, HTTP 200, and a discovery-shaped JSON body -- for several samples
+# in a row, and fail the step on the deadline instead of running the suite. One
+# preflight JUnit case then reports the not-ready environment as a single clear
+# failure rather than hundreds of test failures.
+# A real quayroute is scheme+host with no port, but strip one anyway so getent always
+# gets a bare name -- that also lets a local dry run point the gate at a host:port stub.
+QUAY_HOST="${QUAY_ROUTE#*://}"; QUAY_HOST="${QUAY_HOST%%/*}"; QUAY_HOST="${QUAY_HOST%%:*}"
+DISCOVERY_URL="${QUAY_ROUTE}/api/v1/discovery"
+PREFLIGHT_DEADLINE_SECONDS=300
+PREFLIGHT_REQUIRED_SAMPLES=5
+PREFLIGHT_BODY=/tmp/quay-discovery-body.json
+READINESS_LOG="${ARTIFACT_DIR}/readiness.jsonl"
+
+function xml_escape() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e "s/'/\&apos;/g" -e 's/"/\&quot;/g'
+}
+
+# One preflight sample against the discovery endpoint. Appends a JSON line to
+# READINESS_LOG (timestamp, DNS answers, curl exit, HTTP status, curl's
+# dns/connect/tls/ttfb timings) and sets PROBE_CLASS to one of
+# ok | dns | transport | http | app-contract, with a human-readable PROBE_DETAIL.
+function probe_route() {
+  local attempt="$1"
+  local ts dns curl_exit metrics http_code t_dns t_conn t_tls t_ttfb
+
+  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # getent exits 2 when the name does not resolve; under set -e/pipefail that would
+  # abort the step, and an empty answer is exactly the dns failure we want to record.
+  dns="$(getent ahosts "${QUAY_HOST}" 2>/dev/null | awk '{print $1}' | sort -u | paste -sd, -)" || dns=""
+
+  # LC_ALL=C keeps curl's -w timings dot-decimal so the JSONL stays valid JSON.
+  curl_exit=0
+  metrics="$(LC_ALL=C curl -sk -m 10 -o "${PREFLIGHT_BODY}" \
+    -w '%{http_code} %{time_namelookup} %{time_connect} %{time_appconnect} %{time_starttransfer}' \
+    "${DISCOVERY_URL}" 2>/dev/null)" || curl_exit=$?
+  read -r http_code t_dns t_conn t_tls t_ttfb <<<"${metrics:-000 0 0 0 0}"
+
+  if [[ -z "${dns}" || "${curl_exit}" -eq 6 ]]; then
+    PROBE_CLASS=dns
+    PROBE_DETAIL="${QUAY_HOST} did not resolve (curl exit ${curl_exit})"
+  elif [[ "${curl_exit}" -ne 0 ]]; then
+    PROBE_CLASS=transport
+    PROBE_DETAIL="curl exit ${curl_exit} talking to ${DISCOVERY_URL}"
+  elif [[ "${http_code}" != "200" ]]; then
+    PROBE_CLASS=http
+    PROBE_DETAIL="${DISCOVERY_URL} answered HTTP ${http_code}, want 200"
+  # The runner is a nodejs image (it runs the Playwright suite), so node is the
+  # available JSON parser here; python3 and jq are not in ubi9 nodejs-minimal.
+  # Quay's swagger_route_data() always emits a non-empty top-level "paths" object,
+  # so its absence means something other than Quay answered 200.
+  elif ! node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const p=d&&d.paths;if(!p||typeof p!=="object"||Array.isArray(p)||Object.keys(p).length===0)process.exit(1)' \
+      "${PREFLIGHT_BODY}" >/dev/null 2>&1; then
+    PROBE_CLASS=app-contract
+    PROBE_DETAIL="HTTP 200 from ${DISCOVERY_URL} but the body is not a discovery document (no non-empty JSON \"paths\")"
   else
-    [[ "${ready}" -ne 0 ]] && echo "  readiness reset (attempt ${attempt}, http=${http_code})"
-    ready=0
+    PROBE_CLASS=ok
+    PROBE_DETAIL="HTTP 200 discovery document"
+  fi
+
+  printf '{"timestamp":"%s","attempt":%d,"dns":"%s","curl_exit":%d,"http_status":"%s","time_namelookup":%s,"time_connect":%s,"time_appconnect":%s,"time_starttransfer":%s,"class":"%s"}\n' \
+    "${ts}" "${attempt}" "${dns}" "${curl_exit}" "${http_code}" \
+    "${t_dns}" "${t_conn}" "${t_tls}" "${t_ttfb}" "${PROBE_CLASS}" >> "${READINESS_LOG}"
+}
+
+# Same lifecycle-JUnit shape the quay deploy steps write, so Sippy sees preflight as
+# one more case in the quay-lifecycle suite.
+function write_preflight_junit() {
+  local failures="$1" duration="$2" message="$3"
+  local tmp
+  tmp="$(mktemp "${ARTIFACT_DIR}/junit_quay_preflight.xml.XXXXXX")"
+  {
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+    printf '<testsuite name="quay-lifecycle" tests="1" failures="%d" skipped="0" time="%d">\n' \
+      "${failures}" "${duration}"
+    printf '  <testcase name="[sig-quay] route preflight should report a healthy discovery endpoint" time="%d"' \
+      "${duration}"
+    if [[ "${failures}" -eq 1 ]]; then
+      printf '>\n    <failure message="%s">%s</failure>\n  </testcase>\n' \
+        "$(xml_escape "${message}")" "$(xml_escape "${message}")"
+    else
+      # Explicit close tag, not a self-closing testcase: the flaky-tagging awk in
+      # copyArtifacts buffers from <testcase until it sees </testcase> and would
+      # otherwise buffer this file to EOF and emit nothing after <testsuite>.
+      printf '></testcase>\n'
+    fi
+    echo '</testsuite>'
+  } > "${tmp}"
+  mv "${tmp}" "${ARTIFACT_DIR}/junit_quay_preflight.xml"
+}
+
+echo "Preflight: waiting up to ${PREFLIGHT_DEADLINE_SECONDS}s for ${PREFLIGHT_REQUIRED_SAMPLES} consecutive healthy samples from ${DISCOVERY_URL}"
+: > "${READINESS_LOG}"
+preflight_start="$(date +%s)"
+preflight_deadline=$((preflight_start + PREFLIGHT_DEADLINE_SECONDS))
+consecutive=0
+attempt=0
+PROBE_CLASS=""
+PROBE_DETAIL=""
+last_bad_class=""
+last_bad_detail=""
+while :; do
+  attempt=$((attempt + 1))
+  probe_route "${attempt}"
+  if [[ "${PROBE_CLASS}" == "ok" ]]; then
+    consecutive=$((consecutive + 1))
+    echo "  preflight ${consecutive}/${PREFLIGHT_REQUIRED_SAMPLES} (attempt ${attempt}, ${PROBE_DETAIL})"
+    if [[ "${consecutive}" -ge "${PREFLIGHT_REQUIRED_SAMPLES}" ]]; then
+      break
+    fi
+  else
+    echo "  preflight not ready (attempt ${attempt}, ${PROBE_CLASS}: ${PROBE_DETAIL})"
+    last_bad_class="${PROBE_CLASS}"
+    last_bad_detail="${PROBE_DETAIL}"
+    consecutive=0
+  fi
+  if [[ "$(date +%s)" -ge "${preflight_deadline}" ]]; then
+    break
   fi
   sleep 5
 done
-if [[ "${ready}" -ge 5 ]]; then
-  echo "Quay route is resolvable and responding; starting tests."
+preflight_seconds=$(( $(date +%s) - preflight_start ))
+if [[ "${consecutive}" -ge "${PREFLIGHT_REQUIRED_SAMPLES}" ]]; then
+  write_preflight_junit 0 "${preflight_seconds}" ""
+  echo "Preflight passed in ${preflight_seconds}s over ${attempt} attempts; starting tests."
 else
-  echo "WARNING: Quay route did not reach stable DNS+HTTPS readiness in time; proceeding anyway" >&2
+  # The last sample can be healthy when the deadline expires mid-streak (a flapping
+  # route), so report the flap rather than mislabelling the failure "ok".
+  if [[ "${PROBE_CLASS}" == "ok" ]]; then
+    fail_class="flapping"
+    fail_detail="reached only ${consecutive}/${PREFLIGHT_REQUIRED_SAMPLES} consecutive healthy samples; last unhealthy sample was ${last_bad_class}: ${last_bad_detail}"
+  else
+    fail_class="${PROBE_CLASS}"
+    fail_detail="${PROBE_DETAIL}"
+  fi
+  PREFLIGHT_MESSAGE="Quay route preflight failed after ${preflight_seconds}s and ${attempt} attempts; failure class ${fail_class}: ${fail_detail}. Per-attempt evidence in readiness.jsonl."
+  write_preflight_junit 1 "${preflight_seconds}" "${PREFLIGHT_MESSAGE}"
+  echo "ERROR: ${PREFLIGHT_MESSAGE}" >&2
+  exit 1
 fi
 
 # Tests excluded from the run come entirely from PLAYWRIGHT_GREP_INVERT, set in the
@@ -401,6 +580,8 @@ fi
 # same operations pass on retry). Cap concurrency to relieve that contention. The CLI
 # --workers flag overrides the config value; override via PLAYWRIGHT_WORKERS if needed.
 PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-2}"
+
+startJaegerPortForward
 
 echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
