@@ -65,7 +65,7 @@ echo "Tests selected by suite ${TEST_SUITE}:"
 "${TESTS_EXT}" list tests --suite "${TEST_SUITE}" -o names
 
 echo "Running suite ${TEST_SUITE}"
-"${TESTS_EXT}" run-suite "${TEST_SUITE}" --junit-path "${ARTIFACT_DIR}/${report_name}" || true
+"${TESTS_EXT}" run-suite "${TEST_SUITE}" --max-concurrency "${TEST_MAX_CONCURRENCY:-1}" --junit-path "${ARTIFACT_DIR}/${report_name}" || true
 
 # run-suite exits 0 even when individual tests fail, because every spec in this
 # extension is tagged with an "informing" lifecycle (see the openshift-logging-e2e-tests
