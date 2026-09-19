@@ -52,12 +52,7 @@ tests:
         echo "" >> "$HEALTH_REPORT"
         echo "=== Per-Secret Results ===" >> "$HEALTH_REPORT"
         (
-          # exec 1>/dev/null 2>/dev/null  # disabled for debugging hang
-          FPSALT=""
-          SALT_FILE="/tmp/vault/stackrox-stackrox-e2e-tests/HEALTH_CHECK_FINGERPRINT_SALT"
-          if [[ -f "$SALT_FILE" ]]; then
-            FPSALT=$(cat "$SALT_FILE")
-          fi
+          # Fingerprinting disabled to isolate hang cause
           while IFS= read -r -d '' cred; do
             varname="$(basename "$cred")"
             dir="$(dirname "$cred")"
@@ -97,20 +92,16 @@ tests:
                 issues="${issues} B64_DECODED_SUSPICIOUSLY_SHORT(${dec_size}b)"
               fi
             fi
-            fp=""
-            if [[ -n "$FPSALT" ]]; then
-              fp=$(printf '%s' "${FPSALT}:${collection}:${varname}:${raw}" | sha256sum | cut -c1-8)
-            fi
             if [[ -n "$issues" ]]; then
-              echo "WARN ${collection}/${varname}: size=${size} fp=${fp:-none}${issues}" >> "$HEALTH_REPORT"
+              echo "WARN ${collection}/${varname}: size=${size}${issues}" >> "$HEALTH_REPORT"
             else
-              echo "OK   ${collection}/${varname}: size=${size} fp=${fp:-none}" >> "$HEALTH_REPORT"
+              echo "OK   ${collection}/${varname}: size=${size}" >> "$HEALTH_REPORT"
             fi
           done < <(find /tmp/vault/ -type f -name '[A-Z]*' -not -name 'HEALTH_CHECK_FINGERPRINT_SALT' -print0 2>/dev/null)
         )
         warn_count=$(grep -c "^WARN" "$HEALTH_REPORT" || true)
         ok_count=$(grep -c "^OK" "$HEALTH_REPORT" || true)
-        overall_fp=$(grep -o 'fp=[a-f0-9]*' "$HEALTH_REPORT" | sort | sha256sum | cut -c1-12)
+        overall_fp="disabled"
         echo "" >> "$HEALTH_REPORT"
         echo "=== Summary ===" >> "$HEALTH_REPORT"
         echo "OK: ${ok_count}  WARN: ${warn_count}  collection-fp: ${overall_fp}" >> "$HEALTH_REPORT"
