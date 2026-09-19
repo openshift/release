@@ -10,6 +10,29 @@ echo "************ Fix container user ************"
 
 source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
+ansible_group_all="/var/run/telcov10n/ansible-group-all/all"
+
+# Read a single-line scalar out of the mounted ansible_group_all secret. Values are
+# single-quoted YAML scalars, and only the outer quotes are stripped: a blanket
+# s/'//g would also eat apostrophes belonging to the value (e.g. in a password).
+function read_ansible_group_all_var {
+
+  local key
+  key=${1} ; shift
+
+  # sed quits at the first match rather than piping through head, which under
+  # `set -o pipefail` would kill the script with SIGPIPE on a longer secret.
+  local value
+  value="$(sed -n "/^${key}: /{s/^${key}: //p;q;}" "${ansible_group_all}" | sed -e "s/^'//" -e "s/'\$//")"
+
+  if [ -z "${value}" ]; then
+    echo "Error: ${key} not found in ${ansible_group_all}" >&2
+    return 1
+  fi
+
+  printf '%s' "${value}"
+}
+
 function get_hub_id_and_updated_pool {
 
   local ts
@@ -174,13 +197,20 @@ function load_env {
 
   #### SSH Private key
   export BASTION_VHUB_HOST_SSH_PRI_KEY_FILE="${PWD}/remote-hypervisor-ssh-privkey"
-  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key > ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
-  chmod 600 ${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}
+  # The private key spans several lines in ansible_group_all, take everything between the quotes.
+  # The file is created 0600 before anything is written to it, so the key is never world-readable.
+  install -m 600 /dev/null "${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}"
+  sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${ansible_group_all}" \
+    | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" > "${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}"
+  if [ ! -s "${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}" ]; then
+    echo "Error: ansible_ssh_private_key not found in ${ansible_group_all}" >&2
+    exit 1
+  fi
 
   select_virtualised_sno_hub "${BASTION_VHUB_HOST_SSH_PRI_KEY_FILE}"
 
   #### SSH Public key
-  CLUSTER_SSH_PUB_KEY="$(cat /var/run/telcov10n/ansible-group-all/ssh_public_key)"
+  CLUSTER_SSH_PUB_KEY="$(read_ansible_group_all_var ssh_public_key)"
   export CLUSTER_SSH_PUB_KEY
 
   #### Pull secret encoded in base64
@@ -189,7 +219,7 @@ function load_env {
   export CLUSTER_B64_PULL_SECRET
 
   #### Bastion user
-  BASTION_VHUB_HOST_USER="$(cat /var/run/telcov10n/ansible-group-all/ansible_user)"
+  BASTION_VHUB_HOST_USER="$(read_ansible_group_all_var ansible_user)"
   export BASTION_VHUB_HOST_USER
 
   #### Network setup
@@ -281,7 +311,7 @@ function load_env {
   export VM_DISKS
 
   #### Console password
-  VM_PASSWD="$(cat /var/run/telcov10n/ansible-group-all/ansible_password)"
+  VM_PASSWD="$(read_ansible_group_all_var ansible_password)"
   export VM_PASSWD
 
   # shellcheck disable=SC2089

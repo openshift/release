@@ -213,15 +213,31 @@ function use_shared_ssh_keys_from_vault {
 
   echo "************ telcov10n use shared ssh keys from vault ************"
 
+  local ansible_group_all="/var/run/telcov10n/ansible-group-all/all"
+
   ssh_pri_key_file=${SHARED_DIR}/ssh-key-${gitea_project}
   ssh_pub_key_file="${ssh_pri_key_file}.pub"
 
   #### SSH Private key
-  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key >| ${ssh_pri_key_file}
-  chmod 0600 ${ssh_pri_key_file}
+  # The private key spans several lines in ansible_group_all, take everything between the quotes.
+  # The file is created 0600 before anything is written to it, so the key is never world-readable.
+  install -m 600 /dev/null ${ssh_pri_key_file}
+  sed -n "/^ansible_ssh_private_key: /,/'\$/p" "${ansible_group_all}" \
+    | sed -e "s/^ansible_ssh_private_key: '//" -e "s/'\$//" >| ${ssh_pri_key_file}
+  if [ ! -s ${ssh_pri_key_file} ]; then
+    echo "Error: ansible_ssh_private_key not found in ${ansible_group_all}" >&2
+    exit 1
+  fi
 
   #### SSH Public key
-  cat /var/run/telcov10n/ansible-group-all/ssh_public_key >| ${ssh_pub_key_file}
+  # Only the outer quotes are stripped: a blanket s/'//g would also eat apostrophes
+  # belonging to the value itself.
+  sed -n "/^ssh_public_key: /{s/^ssh_public_key: //p;q;}" "${ansible_group_all}" \
+    | sed -e "s/^'//" -e "s/'\$//" >| ${ssh_pub_key_file}
+  if [ ! -s ${ssh_pub_key_file} ]; then
+    echo "Error: ssh_public_key not found in ${ansible_group_all}" >&2
+    exit 1
+  fi
   chmod 0644 ${ssh_pub_key_file}
 
   ls -lhtr ${ssh_pri_key_file}*
