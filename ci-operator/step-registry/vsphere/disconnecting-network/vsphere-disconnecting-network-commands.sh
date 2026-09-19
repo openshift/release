@@ -77,6 +77,10 @@ function wait_machineconfig_applied() {
 }
 
 mirror_registry_url=$(< "${SHARED_DIR}"/mirror_registry_url)
+# Disable tracing due to registry credential handling
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+
 registry_creds=$(< /var/run/vault/mirror-registry/registry_creds)
 
 #node_name=$(oc get nodes --no-headers | awk '{print $1}' | tail -1)
@@ -85,6 +89,9 @@ echo "Updating the global cluster pull secret"
 oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > /tmp/.dockerconfigjson
 oc registry login --registry="${mirror_registry_url}" --auth-basic="${registry_creds}" --insecure --to=/tmp/.dockerconfigjson
 oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/.dockerconfigjson
+
+# Restore previous tracing state
+$WAS_TRACING && set -x
 #echo "Checking that pull-secret is updated with mirror registry's pull secret"
 #ret=0
 #oc debug node/${node_name} -- -- chroot /host cat /var/lib/kubelet/config.json | grep ${mirror_registry_url} || ret=$?

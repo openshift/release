@@ -423,11 +423,16 @@ fi
 # update haproxy image of haproxy.service on lb server if deploying cluster in a disconnected network
 if [ -f ${SHARED_DIR}/haproxy-router-image ]; then
   echo "$(date -u --rfc-3339=seconds) - replace haproxy image with one in private registry on lb server"
+  # Disable tracing due to registry credential handling
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
   tgt_haproxy_image=$(head -1 "${SHARED_DIR}/haproxy-router-image")
   registry_auths=$(tail -1 "${SHARED_DIR}/haproxy-router-image")
   src_haproxy_image=$(grep "podman pull" ./lb/haproxy.service | awk -F' ' '{print $3}')
   sed -i "s#${src_haproxy_image}#${tgt_haproxy_image}#" ./lb/haproxy.service
   sed -i "s#/bin/podman pull #/bin/podman pull --creds=${registry_auths} --tls-verify=false #" ./lb/haproxy.service
+  # Restore previous tracing state
+  $WAS_TRACING && set -x
 fi
 
 if [ ${SECURE_BOOT_ENABLED} = "true" ]; then
