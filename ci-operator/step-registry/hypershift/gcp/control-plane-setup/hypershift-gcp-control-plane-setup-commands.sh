@@ -21,7 +21,7 @@ SA_EMAIL="${SA_NAME}@${CP_PROJECT_ID}.iam.gserviceaccount.com"
 
 # Custom role name and permissions (from workload-identity.yaml)
 ROLE_NAME="hypershiftPSCOperator"
-ROLE_PERMISSIONS="compute.forwardingRules.list,compute.forwardingRules.use,compute.serviceAttachments.create,compute.serviceAttachments.delete,compute.serviceAttachments.get,compute.serviceAttachments.list,compute.subnetworks.list,compute.subnetworks.use,compute.regionOperations.get"
+ROLE_PERMISSIONS="compute.forwardingRules.list,compute.forwardingRules.setLabels,compute.forwardingRules.use,compute.serviceAttachments.create,compute.serviceAttachments.delete,compute.serviceAttachments.get,compute.serviceAttachments.list,compute.subnetworks.list,compute.subnetworks.use,compute.regionOperations.get"
 
 # Enable tracing for non-sensitive operations
 set -x
