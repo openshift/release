@@ -2,6 +2,12 @@
 
 set -ex
 
+# Allow callers (e.g. the infra chain) to redirect oc commands to a different
+# cluster by setting INSTALL_KUBECONFIG. Empty = use ci-operator default.
+if [[ -n "${INSTALL_KUBECONFIG:-}" ]]; then
+  export KUBECONFIG="${INSTALL_KUBECONFIG}"
+fi
+
 function ocp_version() {
     oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
 }
@@ -29,26 +35,45 @@ function add_pullsecret() {
 }
 
 
-# Get yq tool
-YQ="/tmp/yq"
-curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-chmod +x ${YQ}
-
-# Dynamically get CNV catalog image and channel that were provided to the job via gangway API
-CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
-  ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_PRERELEASE_CATALOG_IMAGE") | .value')
-CNV_SUBSCRIPTION_CHANNEL=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
-  ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value')
-
-if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]
-then
+if [[ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]]; then
   CNV_RELEASE_CHANNEL=stable
-elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]
-then
-  CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
+
+  # Prevent the later prerelease CatalogSource block from running.
+  CNV_PRERELEASE_CATALOG_IMAGE=""
+  CNV_SUBSCRIPTION_CHANNEL=""
 else
-  CNV_RELEASE_CHANNEL=nightly-$(ocp_version)
-  CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:$(ocp_version)
+  YQ="/tmp/yq"
+  curl -fSL --retry 3 -o "${YQ}" \
+    https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+  chmod +x "${YQ}"
+
+  # Fetch once; a request or parsing failure remains an explicit error.
+  PROWJOB_FILE=$(mktemp)
+  curl -fsSL --retry 3 \
+    "https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}" \
+    -o "${PROWJOB_FILE}"
+
+  CNV_PRERELEASE_CATALOG_IMAGE=$(
+    "${YQ}" e \
+      '.spec.pod_spec.containers[0].env[] |
+       select(.name == "CNV_PRERELEASE_CATALOG_IMAGE") | .value' \
+      "${PROWJOB_FILE}"
+  )
+  CNV_SUBSCRIPTION_CHANNEL=$(
+    "${YQ}" e \
+      '.spec.pod_spec.containers[0].env[] |
+       select(.name == "CNV_CHANNEL") | .value' \
+      "${PROWJOB_FILE}"
+  )
+  rm -f "${PROWJOB_FILE}"
+
+  if [[ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" &&
+        -n "${CNV_SUBSCRIPTION_CHANNEL}" ]]; then
+    CNV_RELEASE_CHANNEL="${CNV_SUBSCRIPTION_CHANNEL}"
+  else
+    CNV_RELEASE_CHANNEL="nightly-$(ocp_version)"
+    CNV_PRERELEASE_CATALOG_IMAGE="quay.io/openshift-cnv/nightly-catalog:$(ocp_version)"
+  fi
 fi
 
 # The kubevirt tests require wildcard routes to be allowed
@@ -200,7 +225,7 @@ spec:
       virtOperator: 8
 EOF
 
-oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=30m
 
 # CDI auto-detects only volumeMode=Block for gp3-csi in its StorageProfile.
 # KubeVirt DataVolumes created by HyperShift request volumeMode=Filesystem,

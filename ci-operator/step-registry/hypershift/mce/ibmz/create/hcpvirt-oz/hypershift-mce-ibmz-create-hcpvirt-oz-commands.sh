@@ -1,0 +1,288 @@
+#!/bin/bash
+
+set -x
+set -e
+
+# --- Step 0: Download and install the hcp CLI ---
+echo "$(date) Installing hcp CLI"
+mkdir -p /tmp/hcp_cli
+downloadURL=$(oc get ConsoleCLIDownload hcp-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
+curl -k --output /tmp/hcp.tar.gz ${downloadURL}
+tar -xvf /tmp/hcp.tar.gz -C /tmp/hcp_cli
+chmod +x /tmp/hcp_cli/hcp
+export PATH=$PATH:/tmp/hcp_cli
+hcp version
+
+# --- Step 1: Prepare management cluster and create the HCP KubeVirt hosted cluster ---
+# The management cluster hosts both the HCP control plane pods and the KubeVirt VMs (worker nodes).
+echo "$(date) Targeting management cluster kubeconfig"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+# Required for KubeVirt baseDomainPassthrough: guest *.apps becomes a subdomain of the
+# management cluster's *.apps domain and HyperShift wires ingress automatically.
+# See https://hypershift.pages.dev/how-to/kubevirt/ingress-and-dns/
+oc patch ingresscontroller -n openshift-ingress-operator default \
+  --type=json \
+    -p '[{ "op": "add", "path": "/spec/routeAdmission", "value": {"wildcardPolicy": "WildcardsAllowed"}}]'
+
+set +x
+# Extract the management cluster pull secret for use when provisioning the hosted cluster
+oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+cp /tmp/.dockerconfigjson /tmp/pull-secret
+PULL_SECRET_FILE=/tmp/pull-secret
+set -x
+
+# Restrict virt VMs on compute nodes
+#for node in compute-0 compute-1; do
+#  oc label node "${node}" role=kubevirt --overwrite
+#done
+#oc get nodes -l role=kubevirt
+# Hosted cluster identity and namespace — derived from the MetalLB IPAddressPool range
+POOL_RANGE=$(oc get ipaddresspool -n metallb-system -o jsonpath='{.items[0].spec.addresses[0]}' 2>/dev/null || true)
+echo "$(date) MetalLB IPAddressPool range: ${POOL_RANGE}"
+
+if [[ "${POOL_RANGE}" == 192.168.2.* ]]; then
+  HC_NAME=hcpvirt-oz-ci
+  HC_NS=hcpvirt-oz-ci-ns
+elif [[ "${POOL_RANGE}" == 192.168.3.* ]]; then
+  HC_NAME=hcpvirtnew-oz-ci
+  HC_NS=hcpvirtnew-oz-ci-ns
+else
+  echo "$(date) ERROR: Unrecognised IPAddressPool range '${POOL_RANGE}', expected 192.168.2.x or 192.168.3.x"
+  exit 1
+fi
+
+echo "$(date) Using HC_NAME=${HC_NAME}, HC_NS=${HC_NS}"
+MGMT_HOST_IP=10.0.1.15
+echo "$(date) LPAR host IP: ${MGMT_HOST_IP}"
+
+
+# Omit --base-domain so HyperShift enables baseDomainPassthrough and creates the
+# management-cluster wildcard Route/Service/EndpointSlice for guest *.apps ingress.
+hcp create cluster kubevirt \
+  --name ${HC_NAME} \
+  --node-pool-replicas 2 \
+  --pull-secret "${PULL_SECRET_FILE}" \
+  --namespace ${HC_NS} \
+  --control-plane-availability-policy SingleReplica \
+  --arch s390x \
+  --memory 16Gi \
+  --cores 4 \
+  --root-volume-size 60 \
+  --release-image ${OCP_IMAGE_MULTI} \
+  --annotations "resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m" \
+  --annotations "resource-request-override.hypershift.openshift.io/kube-scheduler.kube-scheduler=memory=512Mi,cpu=500m" \
+  --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m"
+ #--vm-node-selector role=kubevirt \
+oc wait --timeout=45m --for=condition=Available --namespace="${HC_NS}" "hostedclusters.hypershift.openshift.io/${HC_NAME}"
+echo "$(date) Kubevirt cluster is available"
+
+# --- Step 2: Retrieve the guest cluster kubeconfig ---
+echo "$(date) Retrieving guest cluster kubeconfig"
+hcp create kubeconfig kubevirt --name "${HC_NAME}" --namespace "${HC_NS}" > "${SHARED_DIR}/nested_kubeconfig"
+
+# Persist management cluster kubeconfig separately so conformance steps can reference it
+cp "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/mgmt_kubeconfig"
+
+# --- Step 3: Wait for guest API via LPAR IP + NodePort, then for worker nodes ---
+echo "$(date) Waiting for guest cluster API and worker node readiness"
+
+VIRT_KC="${SHARED_DIR}/nested_kubeconfig"
+REQUIRED_NODES=2
+MAX_RETRIES=30
+API_MAX_WAIT=7200  # guest API via NodePort can take well over 20 minutes to stabilise
+API_INTERVAL=30
+
+# --- Wait for kube-apiserver NodePort ---
+# HyperShift assigns the NodePort asynchronously after the HostedCluster becomes
+# Available — retry until it appears rather than sampling once.
+NODEPORT=""
+for i in {1..30}; do
+  NODEPORT=$(oc get svc kube-apiserver -n "${HC_NS}-${HC_NAME}" \
+    -o jsonpath="{.spec.ports[?(@.port==6443)].nodePort}" 2>/dev/null || true)
+  [[ -n "${NODEPORT}" ]] && break
+  echo "$(date) kube-apiserver NodePort not ready yet, retrying... ($i/30)"
+  sleep 10
+done
+if [[ -z "${NODEPORT}" ]]; then
+  echo "$(date) ERROR: kube-apiserver NodePort never appeared — aborting"
+  oc get svc -n "${HC_NS}-${HC_NAME}" || true
+  exit 1
+fi
+echo "$(date) kube-apiserver NodePort: ${NODEPORT}"
+
+# --- Patch nested kubeconfig to use the reachable LPAR IP + NodePort ---
+# The kubeconfig written by 'hcp create kubeconfig' contains an internal cluster
+# address; replace it with the LPAR host IP that the CI runner pod can reach.
+# --insecure-skip-tls-verify is required because the kube-apiserver TLS cert is
+# issued for the cluster's internal DNS name, not for MGMT_HOST_IP.
+CLSTR_NAME=$(oc --kubeconfig "${VIRT_KC}" config view -o jsonpath='{.clusters[0].name}')
+oc --kubeconfig "${VIRT_KC}" config set-cluster "${CLSTR_NAME}" \
+  --server="https://${MGMT_HOST_IP}:${NODEPORT}" \
+  --insecure-skip-tls-verify=true
+echo "$(date) Patched nested_kubeconfig server → https://${MGMT_HOST_IP}:${NODEPORT}"
+
+# Restart MetalLB speaker daemonset once before the wait loop to trigger fresh ARP announcements
+# (needed on SNO management clusters where the speaker may not have announced the LB IP yet)
+echo "$(date) Restarting MetalLB speaker daemonset on management cluster once..."
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+oc get pods -n metallb-system 2>/dev/null || true
+oc rollout restart daemonset speaker -n metallb-system || true
+oc rollout status daemonset speaker -n metallb-system --timeout=120s || true
+
+echo "$(date) Nodepool status........"
+oc get np -A || true
+oc describe np -A || true
+
+wait_for_api() {
+  local elapsed=0
+  local readyz=""
+
+  while [[ ${elapsed} -lt ${API_MAX_WAIT} ]]; do
+    readyz=$(curl -sk --connect-timeout 10 --max-time 30 \
+      "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>/dev/null || true)
+    echo "$(date) API wait (${elapsed}s): /readyz=${readyz:-<empty>}"
+    if [[ "${readyz}" == "ok" ]]; then
+      echo "$(date) Guest kube-apiserver is reachable via https://${MGMT_HOST_IP}:${NODEPORT}"
+      return 0
+    fi
+    sleep ${API_INTERVAL}
+    elapsed=$((elapsed + API_INTERVAL))
+  done
+
+  echo "$(date) ERROR: Guest kube-apiserver /readyz did not return ok within ${API_MAX_WAIT}s"
+  return 1
+}
+
+wait_for_nodes() {
+  local retries=0
+
+  while [[ ${retries} -lt ${MAX_RETRIES} ]]; do
+    READY_NODES=$(oc get no --kubeconfig "${VIRT_KC}" --request-timeout=30s --no-headers 2>/dev/null \
+      | grep -c " Ready" || true)
+    echo "$(date) Ready nodes: ${READY_NODES}/${REQUIRED_NODES} (attempt $((retries + 1))/${MAX_RETRIES})"
+    if [[ ${READY_NODES} -ge ${REQUIRED_NODES} ]]; then
+      echo "$(date) ${REQUIRED_NODES} nodes are Ready"
+      oc get no --kubeconfig "${VIRT_KC}" -o wide || true
+      return 0
+    fi
+
+    echo "$(date) Nodes not ready yet — printing debug status"
+    oc get no --kubeconfig "${VIRT_KC}" -o wide --request-timeout=30s 2>/dev/null || true
+    oc get vmi -n "${HC_NS}-${HC_NAME}" 2>/dev/null || true
+
+    sleep 60
+    retries=$((retries + 1))
+  done
+
+  echo "$(date) ERROR: Timed out waiting for ${REQUIRED_NODES} nodes to be Ready after ${MAX_RETRIES} retries"
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  oc get no || true
+  oc get hc -A || true
+  oc describe hc -n "${HC_NS}" "${HC_NAME}" || true
+  oc get np -A || true
+  oc describe np -n "${HC_NS}" || true
+  oc get po -n "${HC_NS}-${HC_NAME}" || true
+  oc get vmi -A || true
+  oc describe vmi -A || true
+  return 1
+}
+
+wait_for_api
+wait_for_nodes
+
+# --- Step 4: Wait for HyperShift baseDomainPassthrough ingress wiring on mgmt cluster ---
+# With baseDomainPassthrough, HyperShift creates a wildcard passthrough Route, a
+# selector-less Service, and EndpointSlices targeting guest VM machineNetwork IPs.
+HCP_NS="${HC_NS}-${HC_NAME}"
+echo "$(date) Waiting for baseDomainPassthrough ingress resources in ${HCP_NS}"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+PASSTHROUGH_WAIT=900  # 15 minutes
+PASSTHROUGH_INTERVAL=15
+PASSTHROUGH_ELAPSED=0
+PASSTHROUGH_READY=false
+
+while [[ ${PASSTHROUGH_ELAPSED} -lt ${PASSTHROUGH_WAIT} ]]; do
+  PASSTHROUGH_ROUTE=$(oc get route -n "${HCP_NS}" -o name 2>/dev/null | grep default-ingress-passthrough-route || true)
+  PASSTHROUGH_SVC=$(oc get svc -n "${HCP_NS}" -o name 2>/dev/null | grep default-ingress-passthrough-service || true)
+  PASSTHROUGH_EPS=$(oc get endpointslice -n "${HCP_NS}" -o name 2>/dev/null | grep default-ingress-passthrough-service || true)
+
+  if [[ -n "${PASSTHROUGH_ROUTE}" && -n "${PASSTHROUGH_SVC}" && -n "${PASSTHROUGH_EPS}" ]]; then
+    echo "$(date) baseDomainPassthrough ingress resources are present:"
+    echo "  ${PASSTHROUGH_ROUTE}"
+    echo "  ${PASSTHROUGH_SVC}"
+    echo "  ${PASSTHROUGH_EPS}"
+    PASSTHROUGH_READY=true
+    break
+  fi
+
+  echo "$(date) baseDomainPassthrough ingress not ready yet (${PASSTHROUGH_ELAPSED}s elapsed)"
+  oc get route,svc,endpointslice -n "${HCP_NS}" 2>/dev/null || true
+  sleep ${PASSTHROUGH_INTERVAL}
+  PASSTHROUGH_ELAPSED=$((PASSTHROUGH_ELAPSED + PASSTHROUGH_INTERVAL))
+done
+
+if [[ "${PASSTHROUGH_READY}" != "true" ]]; then
+  echo "$(date) ERROR: baseDomainPassthrough ingress resources did not appear in ${HCP_NS}"
+  oc get route,svc,endpointslice -n "${HCP_NS}" -o wide || true
+  exit 1
+fi
+
+# --- Step 5: Wait for all guest cluster ClusterOperators to be Available ---
+echo "$(date) Waiting for all ClusterOperators to be Available"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+CO_MAX_WAIT=1800  # 30 minutes in seconds
+CO_INTERVAL=30
+CO_ELAPSED=0
+UNAVAILABLE=""
+
+while [[ ${CO_ELAPSED} -lt ${CO_MAX_WAIT} ]]; do
+  UNAVAILABLE=$(oc get co --kubeconfig "${VIRT_KC}" --no-headers 2>/dev/null \
+    | awk '{print $3}' \
+    | grep -v "^True$" || true)
+  if [[ -z "${UNAVAILABLE}" ]]; then
+    echo "$(date) All ClusterOperators are Available=True"
+    break
+  fi
+  echo "$(date) ClusterOperators not yet healthy (${CO_ELAPSED}s elapsed):"
+  echo "${UNAVAILABLE}"
+  sleep ${CO_INTERVAL}
+  CO_ELAPSED=$((CO_ELAPSED + CO_INTERVAL))
+done
+
+if [[ -n "${UNAVAILABLE}" ]]; then
+  echo "$(date) ERROR: Some ClusterOperators are not Available:"
+  oc get co --kubeconfig "${VIRT_KC}"
+  echo "$(date) DEBUG: Degraded CO details:"
+  oc get co --kubeconfig "${VIRT_KC}" -o yaml || true
+  echo "$(date) DEBUG: Guest cluster nodes:"
+  oc get no --kubeconfig "${VIRT_KC}" -o wide || true
+  echo "$(date) DEBUG: Guest cluster pods with issues:"
+  oc get pods -A --kubeconfig "${VIRT_KC}" --field-selector=status.phase!=Running,status.phase!=Succeeded 2>/dev/null || true
+
+  echo "$(date) DEBUG: Management cluster state at CO failure"
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  oc get no || true
+  oc get hc -A || true
+  oc describe hc -n ${HC_NS} ${HC_NAME} || true
+  oc get np -A || true
+  oc describe np -n ${HC_NS} || true
+  oc get po -n ${HC_NS}-${HC_NAME} || true
+  oc get vmi -A || true
+  oc describe vmi -A || true
+  
+  exit 1
+fi
+
+echo "$(date) HCP KubeVirt hosted cluster is fully operational"
+
+# Print control-plane workload resource requests regardless of pass/fail
+echo "$(date) Control-plane deploy/statefulset resource requests:"
+oc get deploy,statefulset -n ${HC_NS}-${HC_NAME} \
+  --kubeconfig="${SHARED_DIR}/kubeconfig" \
+  -o custom-columns='KIND:.kind,NAME:.metadata.name,CPU:.spec.template.spec.containers[0].resources.requests.cpu,MEM:.spec.template.spec.containers[0].resources.requests.memory' || true
+
+# --- Step 10: Switch KUBECONFIG to the guest cluster for downstream conformance steps ---
+export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
