@@ -1,8 +1,4 @@
 base_images:
-  cli-operator-sdk:
-    name: cli-operator-sdk
-    namespace: ocp
-    tag: v1.39.2
   go_builder:
     name: builder
     namespace: ocp
@@ -173,48 +169,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
-- as: e2e-prgate
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obs-logging
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.20"
-  optional: true
-  skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
-  steps:
-    env:
-      OPERATORS: |
-        [
-            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat", "target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"}
-        ]
-      TEST_SUITE: openshift-logging-e2e-tests/cluster-logging-operator
-    test:
-    - as: install
-      cli: latest
-      commands: |
-        for ns in openshift-logging openshift-operators-redhat; do
-          oc create namespace "$ns"
-          oc annotate namespace "$ns" openshift.io/node-selector=""
-          oc label namespace "$ns" openshift.io/cluster-monitoring="true"
-        done
-        cd /tmp && operator-sdk run bundle --timeout=10m --install-mode AllNamespaces --security-context-config restricted -n openshift-logging "$OO_BUNDLE"
-        oc wait --for condition=Available --timeout=5m -n openshift-logging deployment cluster-logging-operator
-      dependencies:
-      - env: OO_BUNDLE
-        name: cluster-logging-operator-bundle
-      from: cli-operator-sdk
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 400Mi
-    - ref: install-operators
-    - ref: openshift-observability-logging-e2e-tests
     workflow: generic-claim
 zz_generated_metadata:
   branch: release-6.2
