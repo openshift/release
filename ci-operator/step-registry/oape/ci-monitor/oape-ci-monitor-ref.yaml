@@ -1,0 +1,70 @@
+ref:
+  as: oape-ci-monitor
+  from_image:
+    namespace: oape
+    name: ai-e2e-agent
+    tag: review-handler-agent
+  commands: oape-ci-monitor-commands.sh
+  env:
+  - name: DRY_RUN
+    default: "true"
+    documentation: |-
+      If "true", monitor and dispatch run in report-only mode without posting fixes.
+  - name: REVIEW_HANDLER_ENABLED
+    default: "false"
+    documentation: |-
+      If "true", dispatch runs review-handler when CI is green.
+  - name: OAPE_TARGET_REPO
+    default: ""
+    documentation: |-
+      owner/repo for pj-rehearse redirect when the job runs in openshift/release context.
+      Required when rehearsing from openshift/release.
+  - name: OAPE_TEST_PR_NUMBER
+    default: ""
+    documentation: |-
+      Optional pinned PR number for scenario testing (e.g. failure harness PRs).
+      When unset during openshift/release rehearsal, the step auto-resolves the
+      latest open PR on OAPE_TARGET_REPO. On real operator PRs, Prow PULL_NUMBER
+      is used instead.
+  - name: SELF_JOB_NAME
+    default: "oape-ci-monitor"
+    documentation: |-
+      This job's Prow context name; excluded from CI monitoring.
+  - name: CLOUD_ML_REGION
+    default: "global"
+    documentation: |-
+      Google Cloud region for Vertex AI.
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "openshift-ci-prow-agents"
+    documentation: |-
+      Google Cloud project ID for Vertex AI authentication.
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/google-token"
+    documentation: |-
+      Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  - name: OAPE_ROOT
+    default: "/app"
+    documentation: |-
+      Root directory containing scripts/ci-monitor and scripts/pr-agent in the image.
+  credentials:
+  - mount_path: /var/run/claude-code-service-account
+    group: claude-openshift-ci
+    collection: ci-claude-code
+  - mount_path: /var/run/github-app
+    group: openshift-app-platform-shift-github-bot
+    collection: oape-ai-e2e
+  timeout: 3h0m0s
+  resources:
+    requests:
+      cpu: "1"
+      memory: 500Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  documentation: |-
+    Monitor operator PR CI status, classify failures, and optionally dispatch
+    auto-fix actions. Uses the review-handler-agent image (bootstrap until
+    ci-monitor-agent is promoted by oape-ai-e2e CI). Teams onboard by adding
+    an optional presubmit that references this
+    ref and sets OAPE_TARGET_REPO for pj-rehearse. During rehearsal, the latest
+    open PR on the target repo is used unless OAPE_TEST_PR_NUMBER is pinned.
