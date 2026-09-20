@@ -36,7 +36,7 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
 fi
 
 # Clone e2e-benchmarking
-REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking"
+REPO_URL="https://github.com/vishnuchalla/e2e-benchmarking"
 LATEST_TAG=$(git ls-remote --tags "${REPO_URL}.git" | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)"
 git clone $REPO_URL $TAG_OPTION --depth 1
