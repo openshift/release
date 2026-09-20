@@ -1,0 +1,16 @@
+chain:
+  as: p2p-cclm-hub-spoke-migration-test
+  steps:
+    - ref: p2p-create-cclm-test-vms
+    - ref: p2p-mtv-create-hub-spoke-maps
+    - ref: p2p-mtv-execute-hub-spoke-migration
+  documentation: |-
+    Spoke-VM round-trip CCLM test (P2P_MIGRATION_DIRECTION=both):
+      1. Create P2P_HS_VM_COUNT VMs on the spoke cluster only (P2P_HS_CREATE_HUB_VMS=false by
+         default; hub VMs are not pre-created — the hub is populated by the spoke→hub migration leg).
+      2. Create MTV NetworkMaps and StorageMaps for both directions on the hub.
+      3. Leg 1 — spoke→hub: migrate all spoke VMs (prefix P2P_HS_SPOKE_VM_PREFIX) to the hub.
+      4. Clean up spoke source VM resources.
+      5. Leg 2 — hub→spoke return: migrate the same VMs from hub back to spoke.
+         Only runs if Leg 1 succeeded (error propagation prevents orphaned return migration).
+    Set P2P_HS_CREATE_HUB_VMS=true to also pre-create hub VMs for a true bi-directional test.

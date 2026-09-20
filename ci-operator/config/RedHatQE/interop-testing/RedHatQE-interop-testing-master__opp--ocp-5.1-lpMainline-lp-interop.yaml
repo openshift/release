@@ -32,7 +32,7 @@ images:
   items:
   - dockerfile_literal: |
       FROM this-is-ignored
-      RUN dnf install -y git python39
+      RUN dnf install -y git python39 jq
     from: cli
     optional: true
     to: cli-with-git
@@ -42,6 +42,8 @@ images:
     from: cli
     optional: true
     to: cli-with-skopeo
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -57,7 +59,8 @@ tests:
 - as: cr--full-stack--aws
   capabilities:
   - intranet
-  cron: 0 23 31 2 *
+  cluster: build05
+  cron: 0 3,15 * * *
   reporter_config:
     channel: '#opp-discussion'
     job_states_to_report:
@@ -111,7 +114,7 @@ tests:
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
-    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-opp-wait-mcp
     - ref: acm-tests-clc-create
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
@@ -121,7 +124,8 @@ tests:
 - as: cr--full-stack--vsphere
   capabilities:
   - intranet
-  cron: 0 23 31 2 *
+  cluster: vsphere02
+  cron: 0 3,15 * * *
   reporter_config:
     channel: '#opp-discussion'
     job_states_to_report:
@@ -134,7 +138,7 @@ tests:
       {{end}}'
   steps:
     allow_best_effort_post_steps: true
-    cluster_profile: vsphere-connected-2
+    cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "6"
       DISABLE_ENVIRONMENT_CHECKER: "true"
@@ -161,12 +165,17 @@ tests:
     - chain: ipi-vsphere-post
     - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues
+    pre:
+    - chain: ipi-vsphere-pre
+    - ref: interop-opp-disk-diag
+    - ref: interop-opp-kubelet-config
+    - ref: interop-opp-wait-for-api
     test:
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
-    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-opp-wait-mcp
     - ref: interop-tests-ocs-tests
     - ref: acm-tests-observability
     - ref: acm-opp-app
