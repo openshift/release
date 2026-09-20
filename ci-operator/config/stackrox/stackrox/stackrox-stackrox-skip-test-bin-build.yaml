@@ -83,7 +83,7 @@ tests:
             if not os.path.isdir(col_path):
                 continue
             count = sum(1 for r, d, fs in os.walk(col_path) for f in fs if f[0:1].isupper() and f != "HEALTH_CHECK_FINGERPRINT_SALT")
-            report.write(f"  {col}: {count} secrets\n")
+            report.write(f"  {col}: {count} secrets{chr(92)}n")
         report.write("\n=== Per-Secret Results ===\n")
         warn_count = 0
         ok_count = 0
@@ -107,7 +107,7 @@ tests:
                     if size > 0 and raw[-1:] in (b'\n', b' ', b'\t'):
                         issues.append(f"TRAILING_WHITESPACE(0x{raw[-1]:02x})")
                     if raw.count(b'\n') > 1:
-                        issues.append(f"MULTILINE({raw.count(b'\n')}lines)")
+                        issues.append("MULTILINE:{}".format(raw.count(b'\n')))
                     if size <= 1:
                         issues.append("EMPTY_OR_PLACEHOLDER")
                     elif size <= 5:
@@ -118,8 +118,9 @@ tests:
                         issues.append("STARTS_WITH_DOUBLE_QUOTE")
                     try:
                         decoded = base64.b64decode(raw.strip())
-                        if decoded.count(b'\n') > 1:
-                            issues.append(f"B64_DECODED_MULTILINE({decoded.count(b'\n')}lines)")
+                        decoded_count = decoded.count(b'\n')
+                        if decoded_count > 1:
+                            issues.append(f"B64_DECODED_MULTILINE({decoded_count}lines)")
                         if len(decoded) > 0 and decoded[-1:] in (b'\n', b' ', b'\t'):
                             issues.append(f"B64_DECODED_TRAILING_WS(0x{decoded[-1]:02x})")
                     except Exception:
@@ -130,7 +131,7 @@ tests:
                     fps.append(fp)
                     status = "WARN" if issues else "OK  "
                     issue_str = " " + " ".join(issues) if issues else ""
-                    report.write(f"{status} {col}/{fname}: size={size} fp={fp}{issue_str}\n")
+                    report.write(f"{status} {col}/{fname}: size={size} fp={fp}{issue_str}{chr(92)}n")
                     if issues:
                         warn_count += 1
                     else:
@@ -139,7 +140,7 @@ tests:
                     if checked % 20 == 0:
                         print(f"{ts()} py: checked {checked} secrets", flush=True)
         overall_fp = hashlib.sha256("\n".join(sorted(fps)).encode()).hexdigest()[:12]
-        report.write(f"\n=== Summary ===\nOK: {ok_count}  WARN: {warn_count}  collection-fp: {overall_fp}\n")
+        report.write(f"{chr(92)}=== Summary ===\nOK: {ok_count}  WARN: {warn_count}  collection-fp: {overall_fp}{chr(92)}")
         if warn_count > 0:
             report.write("\n=== Warnings ===\n")
             report.seek(0)
