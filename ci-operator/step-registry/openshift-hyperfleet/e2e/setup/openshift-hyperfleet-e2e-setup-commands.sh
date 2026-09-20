@@ -81,7 +81,8 @@ NAMESPACE=${NAMESPACE_NAME} HELMFILE_ENV="${HELMFILE_ENV}" make install-hyperfle
 
 # Save installed charts for cleanup
 HELMFILE_JSON="${SHARED_DIR}/helm-release-${NAMESPACE_NAME}.json"
-NAMESPACE="${NAMESPACE_NAME}" helmfile -f helmfile/helmfile.yaml.gotmpl list -e "${HELMFILE_ENV}" --output json > "${HELMFILE_JSON}"
+NAMESPACE="${NAMESPACE_NAME}" OIDC_ISSUER_MODE="mock" \
+  helmfile -f helmfile/helmfile.yaml.gotmpl list -e "${HELMFILE_ENV}" --output json > "${HELMFILE_JSON}"
 
 # Verify deployed components
 log "=== Checking all deployed resources ==="
