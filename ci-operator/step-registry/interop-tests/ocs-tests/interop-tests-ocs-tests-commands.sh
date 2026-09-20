@@ -52,6 +52,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
     )"
     trap '
         cleanup
+        _propagate_junit
         mkdir -p /tmp/bin
         printf "%s\n" "#!/bin/sh" "exit 1" > /tmp/bin/yq && chmod +x /tmp/bin/yq
         PATH="/tmp/bin:${PATH}"
