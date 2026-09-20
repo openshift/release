@@ -75,19 +75,34 @@ trap 'exit 143' TERM INT
 
 # run <outfile> <oc args...> — capture stdout+stderr, record failure in-band so a
 # reader can tell "command failed" from "no such object". Returns the oc status so
-# callers can count what was actually collected.
+# callers can count what was actually collected, and sets RUN_PARTIAL=true when the
+# call failed *after* writing output, which the status alone cannot express.
+RUN_PARTIAL=false
+# Scratch sink for one call's stderr, kept out of ARTIFACT_DIR so a step killed
+# mid-call leaves no stray file among the artifacts.
+RUN_ERR="$(mktemp)"
 run() {
   local out="$1"
   shift
+  RUN_PARTIAL=false
   if past_deadline; then
     echo "[quay-gather] SKIPPED (deadline reached): oc $*" >>"${ABSENT}"
     return 1
   fi
   local rc=0
-  timeout "${CALL_TIMEOUT}" oc "$@" >"${out}" 2>&1 || {
+  # stderr goes to its own file until the test below, then back in-band. Merged
+  # into ${out} from the start it would be indistinguishable from log content,
+  # and the most common failure here writes only to stderr: a container that
+  # never started ("is waiting to start: PodInitializing") would then be counted
+  # as a collected log, silencing the marker on exactly the deploys it flags.
+  timeout "${CALL_TIMEOUT}" oc "$@" >"${out}" 2>"${RUN_ERR}" || {
     rc=$?
-    echo "[quay-gather] FAILED (exit ${rc}): oc $*" >>"${out}"
+    # Test before anything else is appended: afterwards the file is non-empty
+    # either way and the two cases can no longer be told apart.
+    [[ -s "${out}" ]] && RUN_PARTIAL=true
   }
+  cat "${RUN_ERR}" >>"${out}"
+  [[ "${rc}" -eq 0 ]] || echo "[quay-gather] FAILED (exit ${rc}): oc $*" >>"${out}"
   return "${rc}"
 }
 
@@ -202,9 +217,11 @@ while IFS= read -r ns; do
       fi
       # Count only logs that were actually retrieved: run() always leaves a file,
       # with a FAILED marker inside when the call failed, so counting files would
-      # report collection that never happened.
+      # report collection that never happened. A call that streamed log content
+      # and then failed (RUN_PARTIAL) did collect evidence, and counts.
       if run "${logdir}/${pod}-${container}.log" \
-        logs -n "${ns}" "${pod}" -c "${container}" --tail="${LOG_TAIL}"; then
+        logs -n "${ns}" "${pod}" -c "${container}" --tail="${LOG_TAIL}" \
+        || [[ "${RUN_PARTIAL}" == true ]]; then
         ns_logs=$(( ns_logs + 1 )); TOTAL_LOGS=$(( TOTAL_LOGS + 1 ))
       fi
       # A crashlooping pod's current log is often empty or a partial restart; the
