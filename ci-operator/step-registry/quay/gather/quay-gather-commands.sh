@@ -1,11 +1,19 @@
 #!/bin/bash
 
 # Runs in post, against a deployment that is usually already broken, so it is
-# best-effort end to end: no errexit, every oc call time-boxed, and a failure
-# anywhere never stops later collection. Always exits 0.
+# best-effort end to end: errexit explicitly off (see below), every oc call
+# time-boxed, and a failure anywhere never stops later collection. Exits 0 on
+# the normal path; any other exit is a bug in this collector.
 
 set -o nounset
 set -o pipefail
+# ci-operator prepends "#!/bin/bash\nset -eu\n" to every step's commands
+# (ci-tools multi_stage.CommandPrefix), so errexit is already on before this
+# script's first line and the shebang above is only a comment. Turn it back off
+# explicitly: the first oc call that fails - `oc logs --previous` for a
+# container that never restarted always does - would otherwise kill the gather
+# where it stands, silently, because that call sends stderr to /dev/null.
+set +o errexit
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -24,6 +32,46 @@ TOTAL_PODS=0
 TOTAL_LOGS=0
 
 past_deadline() { [[ "$(date +%s)" -ge "${DEADLINE_AT}" ]]; }
+
+# --- result, said out loud --------------------------------------------------
+# An empty artifact directory reads as a quiet system, not a failed collector.
+# Say what was collected, every time - from an EXIT trap installed before any
+# collection, so the report lands even when the script dies part-way through.
+COMPLETE=false
+# shellcheck disable=SC2329  # invoked by the EXIT trap installed below
+report() {
+  local rc=$?
+  {
+    [[ "${COMPLETE}" == true ]] || printf \
+      'INCOMPLETE: quay-gather exited early (status %s); counts below are partial.\n' "${rc}"
+    printf 'namespaces gathered: %s\n' "$(echo "${NAMESPACES:-}" | tr '\n' ' ')"
+    printf 'totals: pods=%s container-logs=%s\n' "${TOTAL_PODS}" "${TOTAL_LOGS}"
+  } >>"${SUMMARY}"
+
+  if [[ "${TOTAL_PODS}" -eq 0 || "${TOTAL_LOGS}" -eq 0 ]]; then
+    {
+      echo "quay-gather collected ${TOTAL_PODS} pods and ${TOTAL_LOGS} container logs."
+      echo
+      echo "Every job running this step has Quay deployed, so this is a broken"
+      echo "collector, not a quiet cluster. Likely causes, in order:"
+      echo "  - the step exited before it finished (an INCOMPLETE line in"
+      echo "    gather-summary.txt next to this one records that, with the status);"
+      echo "  - the deploy path uses a namespace this step did not discover"
+      echo "    (see gathered-namespaces.txt and quayregistries.json);"
+      echo "  - the deploy failed before any pod was created (see the per-namespace"
+      echo "    events.txt and olm-csvs.yaml);"
+      echo "  - the API server was unreachable, or the step ran out of time (an"
+      echo "    absent-resources.txt file next to this one records either)."
+    } >"${ARTIFACT_DIR}/EMPTY-GATHER.txt"
+    cat "${ARTIFACT_DIR}/EMPTY-GATHER.txt" >&2
+  fi
+  cat "${SUMMARY}" >&2
+}
+trap report EXIT
+# An aborted job or a hit job deadline reaches the step as SIGTERM, which would
+# otherwise kill the shell without running the EXIT trap. Turn it into a normal
+# exit so the report still lands; grace_period in the ref is what buys the time.
+trap 'exit 143' TERM INT
 
 # run <outfile> <oc args...> — capture stdout+stderr, record failure in-band so a
 # reader can tell "command failed" from "no such object". Returns the oc status so
@@ -141,7 +189,7 @@ while IFS= read -r ns; do
       echo "[quay-gather] SKIPPED (deadline reached): logs for ${ns}/${pod}" >>"${ABSENT}"
       break
     fi
-    ns_pods=$(( ns_pods + 1 ))
+    ns_pods=$(( ns_pods + 1 )); TOTAL_PODS=$(( TOTAL_PODS + 1 ))
     containers="$(timeout "${CALL_TIMEOUT}" oc get pod "${pod}" -n "${ns}" \
       -o jsonpath='{range .spec.initContainers[*]}{.name}{"\n"}{end}{range .spec.containers[*]}{.name}{"\n"}{end}' 2>/dev/null)"
     while IFS= read -r container; do
@@ -157,7 +205,7 @@ while IFS= read -r ns; do
       # report collection that never happened.
       if run "${logdir}/${pod}-${container}.log" \
         logs -n "${ns}" "${pod}" -c "${container}" --tail="${LOG_TAIL}"; then
-        ns_logs=$(( ns_logs + 1 ))
+        ns_logs=$(( ns_logs + 1 )); TOTAL_LOGS=$(( TOTAL_LOGS + 1 ))
       fi
       # A crashlooping pod's current log is often empty or a partial restart; the
       # failure is in the prior container. Keep the file only if it has content,
@@ -174,7 +222,7 @@ while IFS= read -r ns; do
         # A kept previous log is collected evidence. Count it, or a crashlooping
         # pod caught between restarts reports zero logs - and the loud banner
         # below calls the collector broken - while its root cause sits on disk.
-        ns_logs=$(( ns_logs + 1 ))
+        ns_logs=$(( ns_logs + 1 )); TOTAL_LOGS=$(( TOTAL_LOGS + 1 ))
       else
         rm -f "${prev}"
       fi
@@ -183,32 +231,8 @@ while IFS= read -r ns; do
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)
 
   printf '%s pods=%s container-logs=%s\n' "${ns}" "${ns_pods}" "${ns_logs}" >>"${SUMMARY}"
-  TOTAL_PODS=$(( TOTAL_PODS + ns_pods ))
-  TOTAL_LOGS=$(( TOTAL_LOGS + ns_logs ))
 done <<<"${NAMESPACES}"
 
-# --- result, said out loud --------------------------------------------------
-# An empty artifact directory reads as a quiet system, not a failed collector.
-# Say what was collected, every time.
-printf 'namespaces gathered: %s\n' "$(echo "${NAMESPACES}" | tr '\n' ' ')" >>"${SUMMARY}"
-printf 'totals: pods=%s container-logs=%s\n' "${TOTAL_PODS}" "${TOTAL_LOGS}" >>"${SUMMARY}"
-
-if [[ "${TOTAL_PODS}" -eq 0 || "${TOTAL_LOGS}" -eq 0 ]]; then
-  {
-    echo "quay-gather collected ${TOTAL_PODS} pods and ${TOTAL_LOGS} container logs."
-    echo
-    echo "Every job running this step has Quay deployed, so this is a broken"
-    echo "collector, not a quiet cluster. Likely causes, in order:"
-    echo "  - the deploy path uses a namespace this step did not discover"
-    echo "    (see gathered-namespaces.txt and quayregistries.json);"
-    echo "  - the deploy failed before any pod was created (see the per-namespace"
-    echo "    events.txt and olm-csvs.yaml);"
-    echo "  - the API server was unreachable, or the step ran out of time (an"
-    echo "    absent-resources.txt file next to this one records either)."
-  } >"${ARTIFACT_DIR}/EMPTY-GATHER.txt"
-  cat "${ARTIFACT_DIR}/EMPTY-GATHER.txt" >&2
-fi
-
+COMPLETE=true
 echo "Quay diagnostics gathering complete."
-cat "${SUMMARY}" >&2
 exit 0

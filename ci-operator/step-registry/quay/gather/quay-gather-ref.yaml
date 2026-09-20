@@ -2,6 +2,14 @@ ref:
   as: quay-gather
   from: cli
   commands: quay-gather-commands.sh
+  # The step traps SIGTERM so an aborted job still gets the gather summary and,
+  # when nothing was collected, the EMPTY-GATHER marker. prow's entrypoint
+  # signals the step process, not the process group, so bash cannot run the
+  # trap until the in-flight `timeout 60 oc ...` child returns - the budget has
+  # to clear CALL_TIMEOUT with room to spare, not just the trap's own runtime.
+  # 10m is what 9 of the 11 gather/* refs use, and it is a ceiling, not a
+  # delay: entrypoint stops waiting the moment the process exits.
+  grace_period: 10m
   resources:
     requests:
       cpu: 10m
@@ -30,7 +38,10 @@ ref:
     gather-summary.txt records the namespaces gathered and the pod and container-log
     counts per namespace. If nothing was collected the step writes EMPTY-GATHER.txt
     and repeats it in the step log: every job running this step has Quay deployed,
-    so an empty collection is a broken collector, not a quiet cluster.
+    so an empty collection is a broken collector, not a quiet cluster. That report
+    is written from an EXIT trap, so a step that dies part-way through still says
+    so - as an INCOMPLETE line in gather-summary.txt - rather than leaving a
+    half-filled artifact directory that reads as a complete collection.
 
     Per-namespace artifacts are written under <namespace>/, with container logs in
     <namespace>/logs/<pod>-<container>.log.
