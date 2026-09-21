@@ -149,7 +149,7 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]] && [[ -z "$
     SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
     echo "TAG_NAME: $TAG_NAME"
-    IMAGE_NAME="${IMAGE_REPO:-rhdh-community/rhdh}:${TAG_NAME}"
+    IMAGE_NAME="${IMAGE_REPO:-rhdh-community/rhdh-pr}:${TAG_NAME}"
     echo "IMAGE_NAME: $IMAGE_NAME"
 fi
 
@@ -195,7 +195,7 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
     echo "INFO: Container image will be tagged as: ${IMAGE_REPO}:${TAG_NAME}"
 else
-    IMAGE_REPO="rhdh-community/rhdh"
+    IMAGE_REPO="rhdh-community/rhdh-pr"
     IMAGE_NAME="${IMAGE_REPO}:${TAG_NAME}"
     if [[ "${IMAGE_REGISTRY}" == "quay.io" ]]; then
         echo "Waiting for Docker image availability..."
