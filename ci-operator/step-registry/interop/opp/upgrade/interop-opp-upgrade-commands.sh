@@ -1,6 +1,27 @@
 #!/bin/bash
-set -eux -o pipefail
+set -euo pipefail
 shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
 
 # NOTE: UPGRADE_TIMEOUT, POLL_INTERVAL, STALL_WINDOW, OPP_OPERATORS are set via step config YAML
 # (naming deviates from OPP__ convention)
@@ -67,7 +88,7 @@ function DebugOnExit () {
     true
 }
 
-trap '{ exitCode=$?; DebugOnExit; true; }' EXIT
+trap '_opp_cleanup; exitCode=${_exit_code}; DebugOnExit' EXIT
 trap '{ exitCode=143; DebugOnExit; trap - EXIT; exit 143; }' TERM
 
 set +x
@@ -217,6 +238,7 @@ function UpdateCcoAnnotation () {
 
 function InitiateUpgrade () {
     typeset isForce="${1:-}"; (($#)) && shift
+    echo ">>> PHASE: Initiating upgrade"
     : "Initiating upgrade to ${upgradeTarget}"
     : "Force flag: ${isForce}"
     oc adm upgrade --to-image="${upgradeTarget}" --allow-explicit-upgrade --force="${isForce}"
@@ -234,6 +256,7 @@ function InitiateUpgrade () {
 }
 
 function MonitorUpgrade () {
+    echo ">>> PHASE: Monitoring upgrade"
     typeset -i pollCount=0
     typeset -i lastProgressChange=0
     lastProgressChange=$(date +%s)
@@ -299,6 +322,7 @@ function MonitorUpgrade () {
 }
 
 function StabilizeCluster () {
+    echo ">>> PHASE: Stabilizing cluster"
     : "Waiting for cluster stability (minimum-stable-period=5m, timeout=30m)"
     if ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
         : "Cluster stabilization failed; gathering diagnostics"
@@ -312,6 +336,7 @@ function StabilizeCluster () {
 }
 
 function ValidatePlatformHealth () {
+    echo ">>> PHASE: Validating platform health"
     : "Validating platform health"
 
     typeset avail="" progressing="" degraded=""
@@ -351,6 +376,7 @@ function ValidatePlatformHealth () {
 }
 
 function ValidateOppOperators () {
+    echo ">>> PHASE: Validating OPP operators"
     : "Validating OPP operator health"
     typeset -a operatorsArr=()
     IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
@@ -429,6 +455,8 @@ function Main () {
     sourceVersion="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')"
     sourceMinorVersion="$(echo "${sourceVersion}" | cut -f2 -d.)"
     : "Source release: ${sourceVersion} (minor: ${sourceMinorVersion})"
+
+    echo ">>> PHASE: OCP upgrade starting"
 
     isForceUpdate="false"
     if ! CheckSigned "${upgradeTarget}"; then

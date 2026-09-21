@@ -15,6 +15,10 @@ base_images:
     name: "2.17"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
+  ocs-ci-tests:
+    name: ocs-ci-container
+    namespace: ci
+    tag: stable
   tests-private:
     name: tests-private
     namespace: ci
@@ -87,6 +91,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       MAP_TESTS: "true"
+      ODF_VERSION_MAJOR_MINOR: "4.22"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
@@ -115,14 +120,17 @@ tests:
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
     - ref: interop-opp-wait-mcp
+    - ref: stackrox-opp-readiness
+    - ref: stackrox-opp-smoke
     - ref: acm-tests-clc-smoke
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
     - ref: interop-opp-odf-health
     - ref: interop-opp-observability-odf
+    - ref: interop-tests-ocs-tests
     - ref: interop-tests-opp-quay-smoke
-    - ref: acm-tests-observability
-- as: cr--full-stack--vsphere
+    - ref: interop-opp-skip-ratio-gate
+- as: interop-opp-vsphere
   capabilities:
   - intranet
   cluster: vsphere02
@@ -150,6 +158,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       MAP_TESTS: "true"
+      ODF_VERSION_MAJOR_MINOR: "4.22"
       OPENSHIFT_REQUIRED_CORES: "72"
       OPENSHIFT_REQUIRED_MEMORY: "288"
       OPERATORS: |
@@ -179,8 +188,9 @@ tests:
     - ref: interop-opp-wait-mcp
     - ref: interop-opp-odf-health
     - ref: interop-opp-observability-odf
-    - ref: acm-tests-observability
+    - ref: interop-tests-ocs-tests
     - ref: acm-opp-app
+    - ref: interop-opp-skip-ratio-gate
     workflow: acm-ipi-vsphere
 zz_generated_metadata:
   branch: master

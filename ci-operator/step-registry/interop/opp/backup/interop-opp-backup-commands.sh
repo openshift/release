@@ -1,6 +1,27 @@
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
 
 # NOTE: BACKUP_TIMEOUT and OPP_OPERATORS are set via step config YAML (naming deviates from OPP__ convention)
 BACKUP_TIMEOUT="${BACKUP_TIMEOUT:-300}"
@@ -43,15 +64,15 @@ TimeoutMonitor() {
 # Start timeout monitor in background
 TimeoutMonitor &
 typeset timeoutPid=$!
-trap 'kill ${timeoutPid} || true' EXIT
+trap '_opp_cleanup; kill ${timeoutPid} || true' EXIT
 trap 'kill ${timeoutPid} || true; exit 124' TERM
 
-: "=== Pre-Upgrade Cluster Backup ==="
+echo ">>> PHASE: Pre-Upgrade Cluster Backup"
 : "Start time: $(date '+%F %T')"
 : "Backup timeout: ${BACKUP_TIMEOUT}s"
 
 # --- Etcd snapshot ---
-: "--- Etcd Snapshot ---"
+echo ">>> PHASE: Etcd Snapshot"
 typeset controlPlaneNode=""
 controlPlaneNode=$(oc get nodes -l node-role.kubernetes.io/master="" -o jsonpath='{.items[0].metadata.name}') || true
 if [[ -n "${controlPlaneNode}" ]]; then
@@ -104,7 +125,7 @@ else
 fi
 
 # --- Control plane resource state ---
-: "--- Control Plane State ---"
+echo ">>> PHASE: Control Plane State"
 Capture "ClusterVersion" "${backupDir}/clusterversion.yaml" \
     oc get clusterversion version -o yaml
 
@@ -118,7 +139,7 @@ Capture "MachineConfigPools" "${backupDir}/machineconfigpools.yaml" \
     oc get machineconfigpools -o yaml
 
 # --- OPP operator state ---
-: "--- OPP Operator State ---"
+echo ">>> PHASE: OPP Operator State"
 Capture "CSVs" "${backupDir}/csvs.yaml" \
     oc get csv -A -o yaml
 
@@ -129,7 +150,7 @@ Capture "InstallPlans" "${backupDir}/installplans.yaml" \
     oc get installplans -A -o yaml
 
 # --- Backup manifest ---
-: "--- Generating Backup Manifest ---"
+echo ">>> PHASE: Generating Backup Manifest"
 typeset clusterVersion=""
 clusterVersion=$(oc get clusterversion version -o jsonpath='{.status.desired.version}') || true
 
@@ -160,7 +181,7 @@ EOF
 : "OK: backup-manifest.json"
 
 # --- Summary ---
-: "=== Backup Summary ==="
+echo ">>> PHASE: Backup Summary"
 : "End time: $(date '+%F %T')"
 : "Cluster version: ${clusterVersion:-unknown}"
 : "Node count: ${nodeCount}"
