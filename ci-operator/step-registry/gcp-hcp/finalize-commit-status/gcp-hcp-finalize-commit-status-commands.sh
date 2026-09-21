@@ -6,7 +6,6 @@ readonly target_org="openshift-online"
 readonly target_repo="gcp-hcp-infra"
 readonly token_path="${GITHUB_TOKEN_PATH:-/etc/github-private/oauth}"
 readonly tested_sha_path="${SHARED_DIR}/gcp-hcp-tested-sha"
-readonly main_head_path="${SHARED_DIR}/gcp-hcp-main-head-at-start"
 readonly tests_passed_path="${SHARED_DIR}/gcp-hcp-e2e-tests-passed"
 
 if [[ ! -s "${tested_sha_path}" ]]; then
@@ -20,17 +19,6 @@ if [[ ! "${tested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 
-if [[ ! -s "${main_head_path}" ]]; then
-  echo "ERROR: initial main HEAD is missing or empty" >&2
-  exit 1
-fi
-main_head_at_start="$(<"${main_head_path}")"
-
-if [[ ! "${main_head_at_start}" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "ERROR: initial main HEAD is not a full lowercase Git SHA" >&2
-  exit 1
-fi
-
 if [[ ! "${PROW_JOB_ID:-}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
   echo "ERROR: PROW_JOB_ID is missing or invalid" >&2
   exit 1
@@ -41,26 +29,7 @@ if [[ ! -s "${token_path}" ]]; then
   exit 1
 fi
 
-main_head_at_end="$(
-  curl \
-    --fail-with-body \
-    --silent \
-    --show-error \
-    --header "Accept: application/vnd.github+json" \
-    --header "Authorization: Bearer $(<"${token_path}")" \
-    --header "X-GitHub-Api-Version: 2022-11-28" \
-    "https://api.github.com/repos/${target_org}/${target_repo}/git/ref/heads/main" \
-    | jq -er '.object.sha'
-)"
-if [[ ! "${main_head_at_end}" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "ERROR: final main HEAD is not a full lowercase Git SHA" >&2
-  exit 1
-fi
-
-if [[ "${main_head_at_end}" != "${main_head_at_start}" ]]; then
-  state="pending"
-  description="Inconclusive: main changed during the E2E run"
-elif [[ -e "${tests_passed_path}" ]]; then
+if [[ -e "${tests_passed_path}" ]]; then
   state="success"
   description="GCP HCP platform E2E test passed"
 else

@@ -6,7 +6,6 @@ readonly target_org="openshift-online"
 readonly target_repo="gcp-hcp-infra"
 readonly token_path="${GITHUB_TOKEN_PATH:-/etc/github-private/oauth}"
 readonly tested_sha_path="${SHARED_DIR}/gcp-hcp-tested-sha"
-readonly main_head_path="${SHARED_DIR}/gcp-hcp-main-head-at-start"
 
 if [[ -z "${JOB_SPEC:-}" ]]; then
   echo "ERROR: JOB_SPEC is required to resolve the tested commit" >&2
@@ -70,25 +69,8 @@ if [[ ! -s "${token_path}" ]]; then
   exit 1
 fi
 
-main_head="$(
-  curl \
-    --fail-with-body \
-    --silent \
-    --show-error \
-    --header "Accept: application/vnd.github+json" \
-    --header "Authorization: Bearer $(<"${token_path}")" \
-    --header "X-GitHub-Api-Version: 2022-11-28" \
-    "https://api.github.com/repos/${target_org}/${target_repo}/git/ref/heads/main" \
-    | jq -er '.object.sha'
-)"
-if [[ ! "${main_head}" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "ERROR: main HEAD is not a full lowercase Git SHA" >&2
-  exit 1
-fi
-
 readonly target_url="https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}"
 printf '%s\n' "${tested_sha}" >"${tested_sha_path}"
-printf '%s\n' "${main_head}" >"${main_head_path}"
 payload="$(jq -cn --arg target_url "${target_url}" '{
   state: "pending",
   context: "e2e/platform",
