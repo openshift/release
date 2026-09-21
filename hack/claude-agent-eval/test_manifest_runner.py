@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -13,6 +14,7 @@ import tempfile
 import time
 import unittest
 from unittest import mock
+from urllib.parse import unquote
 import xml.etree.ElementTree as ET
 
 import yaml
@@ -181,6 +183,14 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
     def claude_calls(self):
         return [json.loads(line) for line in self.calls() if line.startswith("{")]
 
+    def eval_artifacts(self, config=None):
+        config = config or self.entry["config"]
+        name = runner.EvalPlan(config, {}, "model", 1, 1).artifact_name
+        return self.artifacts / "evals" / name
+
+    def index(self):
+        return (self.artifacts / "evals-summary.html").read_text()
+
     def junit(self):
         return ET.parse(self.artifacts / "junit_claude-eval.xml").getroot()
 
@@ -198,6 +208,7 @@ class SelectionTests(Fixture):
         self.assertFalse((self.repo / "should-not-exist").exists())
         self.assertEqual(self.junit().attrib["tests"], "0")
         self.assertIn("SKIP evals/eval-foo.yaml", result.stdout)
+        self.assertIn("No evaluations selected", self.index())
 
     def test_skill_only_change_runs_all_cases_with_owned_settings(self):
         original = (self.repo / self.entry["config"]).read_bytes()
@@ -232,6 +243,7 @@ class SelectionTests(Fixture):
                 result = self.run_step(PULL_BASE_SHA="")
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn("run must be pr", result.stdout)
+                self.assertIn("run must be pr", self.index())
                 self.assertEqual(self.calls(), [])
                 self.assertEqual(self.junit().attrib["failures"], "1")
 
@@ -465,6 +477,85 @@ class ValidationTests(Fixture):
 
 
 class ExecutionTests(Fixture):
+    def test_setup_extra_artifacts_are_scoped_to_each_eval(self):
+        self.put("setup.sh", 'echo prepared > "$ARTIFACT_DIR/extra.txt"\nprintf /tmp/snapshot\n')
+        self.entry["setup_script"] = "setup.sh"
+        other = self.make_entry("evals/other.yaml")
+        self.write_manifest([self.entry, other])
+        self.change_skill()
+        result = self.run_step()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.eval_artifacts() / "extra.txt").read_text(), "prepared\n")
+        self.assertFalse((self.eval_artifacts(other["config"]) / "extra.txt").exists())
+        self.assertFalse((self.artifacts / "extra.txt").exists())
+
+    def test_partial_run_is_archived_without_historical_results(self):
+        self.put("eval/runs/old/old-run/old.txt", "historical")
+        self.change_skill()
+        result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "missing_result"}))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("<td>failed</td>", self.index())
+        with tarfile.open(self.eval_artifacts() / "eval-run.tar.gz") as archive:
+            self.assertIn("run/report.html", archive.getnames())
+            self.assertNotIn("run/run_result.json", archive.getnames())
+            self.assertFalse(any("old" in name for name in archive.getnames()))
+        self.assertFalse((self.eval_artifacts() / "run_result.json").exists())
+
+    def test_collection_and_archive_failures_preserve_logs_and_next_eval(self):
+        other = self.make_entry("evals/other.yaml")
+        self.write_manifest([self.entry, other])
+        self.change_skill()
+        self.artifacts.mkdir()
+        plans = runner.manifest_plans(self.repo, self.env)
+        original_collect, original_archive = runner.collect_result, runner.archive
+
+        def fail_collect(directory, artifacts):
+            if artifacts == self.eval_artifacts():
+                raise OSError("copy unavailable")
+            return original_collect(directory, artifacts)
+
+        def fail_archive(directory, artifacts):
+            if artifacts == self.eval_artifacts():
+                raise OSError("archive unavailable")
+            return original_archive(directory, artifacts)
+
+        with mock.patch.object(runner, "collect_result", side_effect=fail_collect), \
+                mock.patch.object(runner, "archive", side_effect=fail_archive):
+            env = {**self.env, "BEHAVIORS": json.dumps({self.entry["config"]: "missing_result"})}
+            self.assertEqual(runner.run_evals(self.repo, plans, self.artifacts, env), 1)
+        self.assertEqual(len(self.claude_calls()), 2)
+        self.assertTrue((self.eval_artifacts() / "claude-eval.log").is_file())
+        self.assertTrue((self.eval_artifacts(other["config"]) / "report-summary.html").is_file())
+        self.assertIn("copy unavailable", self.index())
+        self.assertIn("archive unavailable", self.index())
+        self.assertIn("missing or invalid harness results", self.index())
+        self.assertEqual(self.junit().attrib["failures"], "1")
+
+    def test_index_escapes_text_and_only_links_existing_artifacts(self):
+        self.artifacts.mkdir()
+        entry = {"config": '<script>alert("x")</script>', "name": 'a & "b"',
+                 "run_id": "run", "status": "failed", "failure": "bad <value>"}
+        directory = self.artifacts / "evals" / entry["name"]
+        directory.mkdir(parents=True)
+        (directory / "claude-eval.log").write_text("log")
+        runner.write_index(self.artifacts, [entry], ["runner <error>"])
+        html = self.index()
+        self.assertNotIn("<script>", html)
+        self.assertIn("&lt;script&gt;", html)
+        self.assertIn("bad &lt;value&gt;", html)
+        self.assertIn("runner &lt;error&gt;", html)
+        self.assertNotIn("report-summary.html", html)
+        for href in re.findall(r'href="([^"]+)"', html):
+            self.assertTrue((self.artifacts / unquote(href)).exists(), href)
+
+    def test_index_failure_still_writes_failed_junit(self):
+        self.artifacts.mkdir()
+        results, errors = [], []
+        with mock.patch.object(runner, "write_index", side_effect=OSError("disk error")):
+            runner.write_reports(self.artifacts, results, [], errors)
+        self.assertEqual(self.junit().attrib["failures"], "1")
+        self.assertIn("disk error", errors[0])
+
     def test_run_artifacts_are_kept_without_global_session_archive(self):
         sessions = Path(self.env["CLAUDE_CONFIG_DIR"]) / "projects"
         sessions.mkdir(parents=True)
@@ -472,9 +563,9 @@ class ExecutionTests(Fixture):
         self.change_skill()
         result = self.run_step()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue((self.artifacts / "eval-runs.tar.gz").is_file())
-        self.assertTrue(list(self.artifacts.glob("*-report-summary.html")))
-        self.assertTrue(list(self.artifacts.glob("claude-eval-*.log")))
+        self.assertTrue((self.eval_artifacts() / "eval-run.tar.gz").is_file())
+        self.assertTrue((self.eval_artifacts() / "report-summary.html").is_file())
+        self.assertTrue((self.eval_artifacts() / "claude-eval.log").is_file())
         self.assertFalse((self.artifacts / "claude-sessions.tar.gz").exists())
         self.assertEqual((sessions / "unrelated-session.jsonl").read_text(), "existing session")
 
@@ -513,6 +604,8 @@ class ExecutionTests(Fixture):
         self.assertEqual(process.returncode, 143, stdout + stderr)
         self.assertIn("interrupted by signal", stdout)
         self.assertGreater(int(self.junit().attrib["failures"]), 0)
+        self.assertIn("<td>failed</td>", self.index())
+        self.assertIn("interrupted by signal", self.index())
         self.assertEqual(list(bundle_tmp.iterdir()), [])
         with self.assertRaises(ProcessLookupError):
             os.kill(int(ready.read_text()), 0)
@@ -529,13 +622,21 @@ class ExecutionTests(Fixture):
         self.assertEqual([c["config"] for c in calls], [first["config"], second["config"]])
         self.assertEqual([c["parallelism"] for c in calls], ["5", "2"])
         self.assertEqual([c["snapshot"] for c in calls], ["/tmp/fixture-foo", None])
-        reports = list(self.artifacts.glob("eval-same-*-report-summary.html"))
+        reports = list(self.artifacts.glob("evals/eval-same-*/report-summary.html"))
         self.assertEqual(len(reports), 2)
         self.assertEqual({r.read_text() for r in reports}, {first["config"], second["config"]})
-        self.assertEqual(len(list(self.artifacts.glob("*-summary.yaml"))), 2)
+        self.assertEqual(len(list(self.artifacts.glob("evals/*/summary.yaml"))), 2)
         self.assertEqual(self.junit().attrib["tests"], "2")
-        with tarfile.open(self.artifacts / "eval-runs.tar.gz") as archive:
-            self.assertEqual(sum(n.endswith("report.html") for n in archive.getnames()), 2)
+        for entry in (first, second):
+            with tarfile.open(self.eval_artifacts(entry["config"]) / "eval-run.tar.gz") as archive:
+                self.assertEqual(archive.extractfile("run/report.html").read().decode(), entry["config"])
+                self.assertEqual(sum(n.endswith("report.html") for n in archive.getnames()), 1)
+        self.assertFalse((self.artifacts / "eval-runs.tar.gz").exists())
+        self.assertEqual({p.name for p in self.artifacts.iterdir() if p.is_file()},
+                         {"junit_claude-eval.xml", "evals-summary.html"})
+        for href in re.findall(r'href="([^"]+)"', self.index()):
+            self.assertTrue((self.artifacts / unquote(href)).exists(), href)
+        self.assertEqual(self.index().count("<td>passed</td>"), 2)
 
     def test_same_setup_script_runs_for_each_eval_with_its_own_snapshot(self):
         self.put("setup.sh", 'echo setup >> setup-count\n'
@@ -588,6 +689,8 @@ class ExecutionTests(Fixture):
         self.assertNotEqual(self.run_step(CLONE_EXIT="1").returncode, 0)
         self.assertEqual(self.claude_calls(), [])
         self.assertEqual(self.junit().attrib["failures"], "1")
+        self.assertIn("<td>not run</td>", self.index())
+        self.assertIn("runner/harness-install.log", self.index())
 
     def test_junit_escapes_config_paths(self):
         entry = self.make_entry('evals/eval-foo & "bar".yaml')
@@ -611,13 +714,15 @@ class ExecutionTests(Fixture):
 
     def test_metrics_run_in_python_without_exported_shell_functions(self):
         with mock.patch.object(runner, "command", return_value=0) as command:
-            runner.emit_metrics(self.env, self.repo, self.artifacts,
+            runner.emit_metrics(self.env, self.repo, self.artifacts, self.eval_artifacts(),
                                 stream_log=self.root / "stream.log", result=None,
                                 run_id="example", prompt="/eval-run")
         args = command.call_args.args[0]
         self.assertEqual(args[0], sys.executable)
         self.assertEqual(Path(args[1]).name, "eval_metrics.py")
         self.assertEqual(args[-2:], ["example", "/eval-run"])
+        self.assertEqual(args[5], str(self.artifacts / "claude-session-metrics-autodl.json"))
+        self.assertEqual(command.call_args.args[3], self.eval_artifacts() / "metrics.log")
 
 
 class PackagingTests(unittest.TestCase):

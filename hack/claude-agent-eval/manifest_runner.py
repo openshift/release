@@ -6,6 +6,7 @@ the commands file, not sibling Python files. Only PyYAML and the stdlib are need
 """
 
 import json
+from html import escape
 import os
 from pathlib import Path, PurePosixPath
 import shlex
@@ -18,6 +19,7 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from urllib.parse import quote
 
 import yaml
 
@@ -221,15 +223,19 @@ def run_directory(runs, run_id):
     return matches[0]
 
 
-def collect_result(runs, run_id, name, artifacts):
-    directory = run_directory(runs, run_id)
+def collect_result(directory, artifacts):
+    errors = []
     for filename, suffix in (("summary.yaml", "summary.yaml"),
                              ("report.html", "report-summary.html"),
                              ("run_result.json", "run_result.json")):
         source = directory / filename
-        if source.is_file():
-            (artifacts / f"{name}-{suffix}").write_bytes(source.read_bytes())
-    return directory
+        try:
+            if source.is_file():
+                (artifacts / suffix).write_bytes(source.read_bytes())
+        except OSError as error:
+            errors.append(f"cannot collect {filename}: {error}")
+    if errors:
+        raise EvalError("; ".join(errors))
 
 
 def verify_result(directory, config):
@@ -252,13 +258,66 @@ def verify_result(directory, config):
             raise EvalError(f"missing thresholded judge in summary: {judge}")
 
 
-def archive(runs, artifacts):
-    if runs.is_dir():
-        with tarfile.open(artifacts / "eval-runs.tar.gz", "w:gz") as output:
-            output.add(runs, arcname="eval/runs")
+def archive(directory, artifacts):
+    destination = artifacts / "eval-run.tar.gz"
+    temporary = destination.with_suffix(".tmp")
+    try:
+        with tarfile.open(temporary, "w:gz") as output:
+            output.add(directory, arcname="run")
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
-def emit_metrics(env, repo, artifacts, *, stream_log, result, run_id, prompt):  # pylint: disable=too-many-arguments
+def write_index(artifacts, entries, errors):
+    """Write a small index linking only artifacts that actually exist."""
+    rows = []
+    filenames = ("report-summary.html", "summary.yaml", "run_result.json", "claude-eval.log",
+                 "setup.log", "regression.log", "metrics.log", "eval-run.tar.gz")
+    for entry in entries:
+        relative = Path("evals") / entry["name"]
+        links = []
+        if (artifacts / relative).is_dir():
+            links.append(f'<a href="{quote(relative.as_posix())}/">All artifacts</a>')
+        for filename in filenames:
+            path = relative / filename
+            if (artifacts / path).is_file():
+                links.append(f'<a href="{quote(path.as_posix())}">{filename}</a>')
+        cells = [escape(str(entry[key])) for key in ("config", "run_id", "status", "failure")]
+        rows.append("<tr>" + "".join(f"<td>{cell}</td>" for cell in cells)
+                    + f'<td>{" | ".join(links)}</td></tr>')
+    errors_html = "".join(f"<li>{escape(error)}</li>" for error in errors)
+    install_log = artifacts / "runner/harness-install.log"
+    install_link = ('<p><a href="runner/harness-install.log">Harness installation log</a></p>'
+                    if install_log.is_file() else "")
+    table = ("<table><thead><tr><th>Eval config</th><th>Run ID</th><th>Status</th>"
+             "<th>Failure</th><th>Artifacts</th></tr></thead><tbody>"
+             + "".join(rows) + "</tbody></table>" if rows else "<p>No evaluations selected.</p>")
+    document = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+                '<title>Eval results</title></head><body><h1>Eval results</h1>'
+                + (f"<ul>{errors_html}</ul>" if errors else "")
+                + install_link + table + "</body></html>\n")
+    destination = artifacts / "evals-summary.html"
+    temporary = destination.with_suffix(".tmp")
+    temporary.write_text(document, encoding="utf-8")
+    temporary.replace(destination)
+
+
+def write_reports(artifacts, results, entries, errors):
+    """Try both reports even when one output cannot be written."""
+    for label, writer, args in (("index", write_index, (artifacts, entries, errors)),
+                                ("JUnit", write_junit, (artifacts, results))):
+        try:
+            writer(*args)
+        except OSError as error:
+            message = f"cannot write {label}: {error}"
+            if message not in errors:
+                errors.append(message)
+                results.append(("artifact reporting", 0, message))
+            print(f"ERROR: {message}", flush=True)
+
+
+def emit_metrics(env, repo, artifacts, eval_artifacts, *, stream_log, result, run_id, prompt):  # pylint: disable=too-many-arguments
     # Keep accounting bounded and non-fatal, including for incomplete eval runs.
     try:
         status = command([sys.executable, str(Path(__file__).with_name("eval_metrics.py")),
@@ -266,7 +325,7 @@ def emit_metrics(env, repo, artifacts, *, stream_log, result, run_id, prompt):  
                           str(stream_log), str(result) if result else "",
                           str(artifacts / "claude-session-metrics-autodl.json"),
                           env.get("BUILD_ID", "unknown"), run_id, prompt],
-                         repo, env, artifacts / f"{run_id}-metrics.log", 60)
+                         repo, env, eval_artifacts / "metrics.log", 60)
         if status:
             print(f"WARNING: metrics extraction failed for {run_id}", flush=True)
     except (OSError, subprocess.TimeoutExpired) as error:
@@ -274,7 +333,9 @@ def emit_metrics(env, repo, artifacts, *, stream_log, result, run_id, prompt):  
 
 
 def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statements
-    results = []
+    results, errors = [], []
+    index = [{"config": entry.config, "name": entry.artifact_name,
+              "run_id": "", "status": "not run", "failure": ""} for entry in entries]
     started = time.monotonic()
     runs = Path(env.get("AGENT_EVAL_RUNS_DIR") or "eval/runs")
     if not runs.is_absolute():
@@ -289,6 +350,9 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
         return STEP_TIMEOUT - (time.monotonic() - started)
 
     try:
+        write_reports(artifacts, results, index, errors)
+        runner_artifacts = artifacts / "runner"
+        runner_artifacts.mkdir(exist_ok=True)
         token_path = Path(env.get("GITHUB_TOKEN_PATH") or "/nonexistent")
         if token_path.is_file():
             child_env["GITHUB_TOKEN"] = token_path.read_text(encoding="utf-8").strip()
@@ -296,21 +360,24 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
             harness = Path(temporary) / "plugin"
             status = command(["git", "clone", "--depth", "1",
                               "https://github.com/opendatahub-io/agent-eval-harness.git", str(harness)],
-                             repo, child_env, artifacts / "harness-install.log", min(300, remaining()))
+                             repo, child_env, runner_artifacts / "harness-install.log", min(300, remaining()))
             if status:
-                raise EvalError("cannot clone agent-eval-harness; see harness-install.log")
+                raise EvalError("cannot clone agent-eval-harness; see runner/harness-install.log")
             child_env["PYTHONPATH"] = os.pathsep.join(
                 [str(harness), str(repo), child_env.get("PYTHONPATH", "")])
-            for entry in entries:
+            for entry, record in zip(entries, index):
                 config, model, cases = entry.settings, entry.model, entry.cases
                 name = entry.artifact_name
                 run_id = f"ci-{name}-{uuid.uuid4().hex[:12]}"
+                record["run_id"] = run_id
+                eval_artifacts = artifacts / "evals" / name
                 run_env = child_env.copy()
+                run_env["ARTIFACT_DIR"] = str(eval_artifacts)
                 begin = time.monotonic()
-                failure = ""
+                failures = []
                 invoked = False
                 directory = None
-                stream_log = artifacts / f"claude-eval-{name}.log"
+                stream_log = eval_artifacts / "claude-eval.log"
                 args = ["--config", entry.config, "--model", model,
                         "--run-id", run_id, "--parallelism", str(entry.parallelism)]
                 if cases:
@@ -319,10 +386,11 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                 print(f"RUN {entry.config}: model={model}, parallelism={entry.parallelism}, "
                       f"orchestrator max_turns={entry.max_turns}", flush=True)
                 try:
+                    eval_artifacts.mkdir(parents=True, exist_ok=True)
                     if remaining() <= 0:
                         raise EvalError("step time limit reached before this eval could start")
                     if entry.setup_script:
-                        setup_log = artifacts / f"{name}-setup.log"
+                        setup_log = eval_artifacts / "setup.log"
                         with tempfile.TemporaryFile() as output:
                             status = command(["bash", entry.setup_script], repo, run_env, setup_log,
                                              remaining(), stdout=output)
@@ -342,41 +410,47 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                                      min(EVAL_TIMEOUT, remaining()))
                     if status:
                         raise EvalError(f"Claude orchestrator failed (exit {status}); see {stream_log.name}")
-                    directory = collect_result(runs, run_id, name, artifacts)
+                    directory = run_directory(runs, run_id)
                     verify_result(directory, config)
                     # Deterministic threshold check using the harness itself: do
                     # not trust an outer Claude exit code as the eval verdict.
                     status = command([sys.executable, str(harness / "skills/eval-run/scripts/score.py"),
                                       "regression", "--config", entry.config, "--run-id", run_id],
-                                     repo, run_env, artifacts / f"{name}-regression.log", min(60, remaining()))
+                                     repo, run_env, eval_artifacts / "regression.log", min(60, remaining()))
                     if status:
                         raise EvalError("harness regression check failed; see regression log")
                 except (EvalError, OSError, ValueError, subprocess.TimeoutExpired) as error:
-                    failure = str(error)
+                    failures.append(str(error))
                 except Interrupted as error:
-                    failure = str(error)
+                    failures.append(str(error))
                     raise
                 finally:
                     if invoked:
+                        directory = None
                         try:
-                            directory = collect_result(runs, run_id, name, artifacts)
+                            directory = run_directory(runs, run_id)
                         except (EvalError, OSError) as error:
-                            failure = failure or str(error)
-                        emit_metrics(env, repo, artifacts, stream_log=stream_log,
+                            failures.append(str(error))
+                        if directory is not None:
+                            for label, action in (("collect results", collect_result), ("archive run", archive)):
+                                try:
+                                    action(directory, eval_artifacts)
+                                except (EvalError, OSError, tarfile.TarError) as error:
+                                    failures.append(f"{label}: {error}")
+                        emit_metrics(env, repo, artifacts, eval_artifacts, stream_log=stream_log,
                                      result=directory / "run_result.json" if directory else None,
                                      run_id=run_id, prompt=prompt)
+                    failure = "; ".join(dict.fromkeys(failures))
+                    record.update(status="failed" if failure else "passed", failure=failure)
                     results.append((entry.config, time.monotonic() - begin, failure))
-                    write_junit(artifacts, results)
+                    write_reports(artifacts, results, index, errors)
                 print(f"{'FAIL' if failure else 'PASS'} {entry.config}: {failure or 'complete'}", flush=True)
     except (EvalError, Interrupted, OSError, ValueError, subprocess.TimeoutExpired) as error:
+        errors.append(str(error))
         results.append(("eval runner", time.monotonic() - started, str(error)))
         print(f"ERROR: {error}", flush=True)
     finally:
-        try:
-            archive(runs, artifacts)
-        except (OSError, tarfile.TarError) as error:
-            results.append(("artifact archive", 0, str(error)))
-        write_junit(artifacts, results)
+        write_reports(artifacts, results, index, errors)
     return int(any(result[2] for result in results))
 
 
@@ -414,11 +488,12 @@ def main():
         selected = manifest_plans(repo, env)
         if not selected:
             print("No evals matched; exiting without setup, harness installation, or Claude calls.", flush=True)
-            write_junit(artifacts, [])
-            return 0
+            results = []
+            write_reports(artifacts, results, [], [])
+            return int(bool(results))
     except (EvalError, Interrupted, OSError, ValueError) as error:
         print(f"ERROR: {error}", flush=True)
-        write_junit(artifacts, [("eval selection", 0, str(error))])
+        write_reports(artifacts, [("eval selection", 0, str(error))], [], [str(error)])
         return 1
     return run_evals(repo, selected, artifacts, env)
 

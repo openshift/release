@@ -111,9 +111,36 @@ and `/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py` for AutoDL.
 ## Results
 
 Evals run sequentially; parallelism applies to cases within each eval.
-Each gets a unique run ID. Artifact names combine the config basename and
-a path hash to avoid collisions. HTML reports end in `-summary.html` for
-Prow display. The complete runs directory is archived as `eval-runs.tar.gz`.
+Each gets a unique run ID. Artifact directory names combine the config basename
+and a path hash, so configs with the same basename remain separate:
+
+```text
+ARTIFACT_DIR/
+  junit_claude-eval.xml
+  claude-session-metrics-autodl.json  # when metrics are available
+  evals-summary.html
+  runner/harness-install.log
+  evals/<artifact_name>/
+    report-summary.html
+    summary.yaml
+    run_result.json
+    claude-eval.log
+    setup.log                       # if setup ran
+    regression.log                  # if scoring ran
+    metrics.log                     # if metrics extraction was attempted
+    eval-run.tar.gz
+```
+
+The static index links available artifacts and reports selected evals as passed,
+failed, or not run. No matching evals and configuration errors also produce an
+index. HTML reports retain the `-summary.html` suffix for Prow display.
+The eval's child processes receive its own directory as `ARTIFACT_DIR`; setup
+scripts can write additional diagnostic files there. JUnit and AutoDL metrics
+remain aggregated at the job root.
+
+Each archive contains only the current eval's harness run under `run/`, including
+partial results on failure. Other evals and historical runs are not archived.
+Files for stages that never ran are absent; the index only links existing files.
 JUnit contains one testcase per attempted eval, not per dataset case.
 
 This workflow does not provide session continuation or archive the global
@@ -123,7 +150,9 @@ artifacts remain available for diagnosis.
 Setup/process failures, incomplete results, and failed deterministic harness
 regression checks fail the eval; subsequent evals still run. Any failure
 fails the step. Deadline-expired evals are recorded as failures. SIGTERM/SIGINT
-stop scheduling and terminate child processes while preserving artifacts.
+stop scheduling and terminate child processes while preserving available artifacts
+when possible. Collection or archive failures fail that eval, retain existing
+logs, and allow subsequent evals to run.
 Python emits AutoDL metrics for orchestrator and harness model usage;
 metrics failures remain warnings and do not replace the eval verdict.
 
