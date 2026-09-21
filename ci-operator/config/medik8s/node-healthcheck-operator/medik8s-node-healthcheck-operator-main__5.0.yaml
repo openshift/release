@@ -78,6 +78,13 @@ tests:
         chmod 0600 "$XDG_RUNTIME_DIR/containers/auth.json"
         export REGISTRY_AUTH_FILE="$XDG_RUNTIME_DIR/containers/auth.json"
 
+        # OpenShift runs test containers as an arbitrary non-root UID. Keep Go
+        # downloads and build caches out of the image's read-only GOPATH.
+        export GOPATH=/tmp/nhc-go
+        export GOMODCACHE="$GOPATH/pkg/mod"
+        export GOCACHE=/tmp/nhc-go-build-cache
+        mkdir -p "$GOMODCACHE" "$GOCACHE"
+
         go version
         skopeo --version
         operator-sdk version
