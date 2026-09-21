@@ -1261,14 +1261,57 @@ is_version_gte() {
   return 1
 }
 
+# Returns 0 (skip) if REPO_MAP_PATH marks the component at $repo_url as
+# deprecated. Per the REPO_MAP_PATH schema, a deprecated component should be
+# skipped regardless of whether removed_in_version is set — deprecated means
+# it's not expected to be carried forward, so it's left for manual handling
+# rather than being auto-fast-forwarded or having new Tekton files generated.
+# Matches on the product bundle and documented .repository field (full URL),
+# not .name, since a component's .name does not always match the last path
+# segment of its .repository URL (e.g. "multicluster-operators-application"
+# vs. repository ".../multicloud-operators-application").
+is_repo_deprecated() {
+  local repo_url=$1
+  local product=$2
+
+  local deprecated
+  deprecated=$(yq '.components[] |
+    select(.repository == "'"${repo_url}"'") |
+    select(.bundle == "'"${product}-operator-bundle"'" or .name == "'"${product}-operator-bundle"'") |
+    .deprecated' "${REPO_MAP_PATH}" 2>/dev/null | head -1)
+
+  [[ "${deprecated}" == "true" ]]
+}
+
+# Prints a human-readable reason for skipping a deprecated component: the
+# specific removed_in_version if the manifest records one, otherwise a
+# generic message pointing at the manifest so it can be filled in.
+deprecated_repo_skip_reason() {
+  local repo_url=$1
+  local product=$2
+
+  local removed_in
+  removed_in=$(yq '.components[] |
+    select(.repository == "'"${repo_url}"'") |
+    select(.bundle == "'"${product}-operator-bundle"'" or .name == "'"${product}-operator-bundle"'") |
+    .removed_in_version' "${REPO_MAP_PATH}" 2>/dev/null | head -1)
+
+  if [[ -n "${removed_in}" && "${removed_in}" != "null" ]]; then
+    echo "removed in version ${removed_in}"
+  else
+    echo "deprecated component — specify removed_in_version in manifest or update manually"
+  fi
+}
+
 # Returns 0 (skip) if REPO_MAP_PATH marks the component at $repo_url deprecated
-# with a removed_in_version <= $version, meaning the repo no longer exists on
-# that release line and should not be fast-forwarded to it. Matches on the
-# product bundle and documented .repository field (full URL), not .name, since a
-# component's .name does not always match the last path segment of its
-# .repository URL (e.g. "multicluster-operators-application" vs. repository
-# ".../multicloud-operators-application").
-is_repo_deprecated_for_version() {
+# with a removed_in_version <= $version, meaning the repo no longer exists as
+# of that release line and must not have Tekton files generated for it. E.g.
+# maestro's default branch is backplane-5.1 but it is removed_in_version:
+# "5.1" — the component no longer exists as of that version, so that branch
+# should never have Tekton files generated on it (doing so falls back to
+# stale LAST_RELEASE_VERSION templates and then fails cleanup since those
+# fallback files can't be removed).
+is_repo_removed_as_of_version() {
   local repo_url=$1
   local product=$2
   local version=$3
@@ -1284,10 +1327,7 @@ is_repo_deprecated_for_version() {
     return 1
   fi
 
-  if is_version_gte "${version}" "${removed_in}"; then
-    return 0
-  fi
-  return 1
+  is_version_gte "${version}" "${removed_in}"
 }
 
 # Repos with a non-main default branch (e.g., release-5.0) are not "excluded"
@@ -1390,20 +1430,21 @@ for product in mce acm globalhub; do
       # NORMAL REPO HANDLING: default branch is main/master
       echo "INFO: Using normal fast-forward (${default_branch} → release branches)"
 
-      # Build filtered version list for this repo (excluding per-repo version skips
-      # and versions where the repo is marked deprecated/removed in REPO_MAP_PATH)
+      # Build filtered version list for this repo (excluding per-repo version
+      # skips, and all destination versions if the repo is deprecated — a
+      # deprecated component is not fast-forwarded to future release lines)
       REPO_DEST_VERSIONS=""
-      for version in ${DESTINATION_VERSIONS}; do
-        if is_repo_deprecated_for_version "https://github.com/${owner_repo}" "${product}" "${version}"; then
-          echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (deprecated component)"
-          continue
-        fi
-        if is_repo_version_skipped "${repo}" "${version}"; then
-          echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (per-repo version exclusion)"
-          continue
-        fi
-        REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS} ${version}"
-      done
+      if is_repo_deprecated "https://github.com/${owner_repo}" "${product}"; then
+        echo "INFO: Skipping fast-forward for ${owner_repo} (deprecated — not fast-forwarded)"
+      else
+        for version in ${DESTINATION_VERSIONS}; do
+          if is_repo_version_skipped "${repo}" "${version}"; then
+            echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (per-repo version exclusion)"
+            continue
+          fi
+          REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS} ${version}"
+        done
+      fi
       REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS# }"
 
       for version in ${REPO_DEST_VERSIONS}; do
@@ -1490,15 +1531,11 @@ for product in mce acm globalhub; do
 
       echo "INFO: Default branch version: ${default_version}"
 
-      # Skip entirely if this component is deprecated/removed as of its own
-      # default branch version. E.g. maestro's default branch is
-      # backplane-5.1 but it is removed_in_version: "5.1" — the component no
-      # longer exists as of that version, so that branch should never have
-      # been created and must not have Tekton files generated on it (doing so
-      # falls back to stale LAST_RELEASE_VERSION templates and then fails
-      # cleanup since those fallback files can't be removed).
-      if is_repo_deprecated_for_version "https://github.com/${owner_repo}" "${product}" "${default_version}"; then
-        echo "INFO: Skipping ${owner_repo} (removed in version ${default_version})"
+      # Skip entirely if this component is already removed as of its own
+      # default branch version — the branch should never have been created
+      # and must not have Tekton files generated on it.
+      if is_repo_removed_as_of_version "https://github.com/${owner_repo}" "${product}" "${default_version}"; then
+        echo "INFO: Skipping ${owner_repo} ($(deprecated_repo_skip_reason "https://github.com/${owner_repo}" "${product}"))"
         continue
       fi
 
@@ -1566,14 +1603,15 @@ for product in mce acm globalhub; do
         fi
       fi
 
-      # Fast-forward to destination branches and transform Tekton files
-      for version in ${DESTINATION_VERSIONS}; do
-        # Check if repo is deprecated/removed as of this version
-        if is_repo_deprecated_for_version "https://github.com/${owner_repo}" "${product}" "${version}"; then
-          echo "INFO: Skipping ${owner_repo} → ${repo_branch_prefix}-${version} (deprecated component)"
-          continue
-        fi
+      # Fast-forward to destination branches and transform Tekton files.
+      # Deprecated components still get Tekton files on their own default
+      # branch (above), but are not fast-forwarded to future release lines.
+      if is_repo_deprecated "https://github.com/${owner_repo}" "${product}"; then
+        echo "INFO: Skipping fast-forward for ${owner_repo} (deprecated — not fast-forwarded)"
+        continue
+      fi
 
+      for version in ${DESTINATION_VERSIONS}; do
         # Check per-repo version exclusion
         if is_repo_version_skipped "${repo}" "${version}"; then
           echo "INFO: Skipping ${owner_repo} → ${repo_branch_prefix}-${version} (per-repo version exclusion)"
