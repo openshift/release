@@ -1,0 +1,85 @@
+base_images:
+  cli:
+    name: "5.0"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: Dockerfile
+    to: openshift-pipelines-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: openshift-pipelines-e2e-ginkgo
+  cron: 0 0 * * *
+  reporter_config:
+    channel: '#tektoncd-pipeline-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: aws-osp-qe
+    env:
+      BASE_DOMAIN: psi.ospqa.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "openshift-cluster-bot-rbac", "failure_type": "all", "classification": "Other", "jira_additional_labels": ["!default"]},
+              {"step": "openshift-pipelines-install", "failure_type": "all", "classification": "Operator Installation Failure", "jira_additional_labels": ["!default","osp-tests"]},
+              {"step": "openshift-pipelines-ginkgo-tests", "failure_type": "all", "classification": "Test Failure", "jira_project": "SRVKP", "jira_assignee": "!default", "jira_component": ["QA"], "jira_additional_labels": ["!default","osp-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.0-osp","self-managed-osp","pipelines-osp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: sselvan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: SRVKP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      USER_TAGS: |
+        scenario pipelines
+    test:
+    - ref: openshift-pipelines-install
+    - ref: openshift-pipelines-ginkgo-tests
+    workflow: firewatch-ipi-aws
+  timeout: 3h0m0s
+- always_run: false
+  as: e2e-ginkgo
+  optional: true
+  steps:
+    cluster_profile: aws-osp-qe
+    env:
+      BASE_DOMAIN: psi.ospqa.com
+    test:
+    - ref: openshift-pipelines-install
+    - ref: openshift-pipelines-ginkgo-tests
+    workflow: ipi-aws
+  timeout: 3h0m0s
+zz_generated_metadata:
+  branch: release-v1.24
+  org: openshift-pipelines
+  repo: release-tests-ginkgo
+  variant: openshift-pipelines-ocp5.0-e2e-osp
