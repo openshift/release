@@ -5,6 +5,11 @@
 # The step creates manifests (openshift-install create manifests) and generate the ignition
 # config files (create ignition-configs), saving in a the shared storage.
 #
+# Always run openshift-install from OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE so bootstrap
+# assets (bootkube/cvo-render flags) match the install payload. Using the step container's
+# installer imagestream alone breaks upgrades when latest installer > initial CVO
+# (e.g. --cluster-version-manifest-path). Same pattern as ipi-install-install extract.
+#
 
 set -o nounset
 set -o errexit
@@ -14,7 +19,13 @@ if [[ -n "${PLATFORM_EXTERNAL_OVERRIDE_RELEASE-}" ]]; then
   export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${PLATFORM_EXTERNAL_OVERRIDE_RELEASE}"
 fi
 echo "Using release image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-# Persist for preflight (must match payload baked into ignition / bootstrap)
+
+if [[ -z "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  echo "ERROR: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is empty"
+  exit 1
+fi
+
+# Persist for preflight (exact payload baked into ignition / bootstrap)
 echo -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" > "${SHARED_DIR}/platform-external-install-release-image"
 
 STEP_WORKDIR=${STEP_WORKDIR:-/tmp}
@@ -23,11 +34,21 @@ mkdir -vp "${INSTALL_DIR}"
 
 source "${SHARED_DIR}/init-fn.sh" || true
 
+# Prefer installer binary from the install payload over the step's imagestream tag.
+INSTALLER_BINARY="${STEP_WORKDIR}/openshift-install"
+log "Extracting openshift-install from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" \
+  "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install \
+  --to="${STEP_WORKDIR}"
+chmod +x "${INSTALLER_BINARY}"
+"${INSTALLER_BINARY}" version
+
 log "Copying to install dir"
 cp -vp "${SHARED_DIR}"/install-config.yaml "${INSTALL_DIR}"/install-config.yaml
 
 log "Creating manifests"
-openshift-install create manifests --dir "${INSTALL_DIR}"
+"${INSTALLER_BINARY}" create manifests --dir "${INSTALL_DIR}"
 
 log "# << Manifest customization >> #"
 
@@ -145,7 +166,7 @@ rm -vf "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_worker-machineset-*.y
 
 log "# << Ignition config/generation >> #"
 
-openshift-install --dir="${INSTALL_DIR}" create ignition-configs &
+"${INSTALLER_BINARY}" --dir="${INSTALL_DIR}" create ignition-configs &
 wait "$!"
 
 log "# << Saving to shared dir >> #"
