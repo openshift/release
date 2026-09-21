@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build13
+  cluster: build11
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -11,6 +11,7 @@ periodics:
     workdir: true
   interval: 4h
   labels:
+    capability/aws: aws
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ipi-deprovision-aws
@@ -29,10 +30,22 @@ periodics:
       env:
       - name: HOME
         value: /tmp
-      - name: AWS_SHARED_CREDENTIALS_FILE
-        value: /aws/.awscred
       - name: CLUSTER_TTL
         value: 30 minutes ago
+      - name: AWS_STS_MODE
+        value: "yes"
+      - name: AWS_WEB_IDENTITY_TOKEN_FILE
+        value: /var/run/secrets/aws/token
+      - name: HOME_ROLE_ARN
+        valueFrom:
+          secretKeyRef:
+            key: home_role_arn
+            name: aws-sts-cluster-config
+      - name: TARGET_ROLE_ARN
+        valueFrom:
+          secretKeyRef:
+            key: target_role_arn
+            name: cluster-secrets-aws
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ipi-deprovision_latest
       imagePullPolicy: Always
       name: ipi-deprovision
@@ -41,20 +54,22 @@ periodics:
           cpu: "1"
           memory: 600Mi
       volumeMounts:
-      - mountPath: /aws
-        name: cluster-secrets-aws
+      - mountPath: /var/run/secrets/aws
+        name: aws-token
+        readOnly: true
     nodeSelector:
       beta.kubernetes.io/arch: amd64
     serviceAccountName: ipi-deprovisioner
     volumes:
-    - name: cluster-secrets-aws
-      secret:
-        items:
-        - key: .awscred
-          path: .awscred
-        secretName: cluster-secrets-aws
+    - name: aws-token
+      projected:
+        sources:
+        - serviceAccountToken:
+            audience: sts.amazonaws.com
+            expirationSeconds: 3600
+            path: token
 - agent: kubernetes
-  cluster: build13
+  cluster: build11
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -65,6 +80,7 @@ periodics:
     workdir: true
   interval: 4h
   labels:
+    capability/aws: aws
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ipi-deprovision-aws-2
@@ -83,10 +99,22 @@ periodics:
       env:
       - name: HOME
         value: /tmp
-      - name: AWS_SHARED_CREDENTIALS_FILE
-        value: /aws/.awscred
       - name: CLUSTER_TTL
         value: 30 minutes ago
+      - name: AWS_STS_MODE
+        value: "yes"
+      - name: AWS_WEB_IDENTITY_TOKEN_FILE
+        value: /var/run/secrets/aws/token
+      - name: HOME_ROLE_ARN
+        valueFrom:
+          secretKeyRef:
+            key: home_role_arn
+            name: aws-sts-cluster-config
+      - name: TARGET_ROLE_ARN
+        valueFrom:
+          secretKeyRef:
+            key: target_role_arn
+            name: cluster-secrets-aws-2
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ipi-deprovision_latest
       imagePullPolicy: Always
       name: ipi-deprovision
@@ -95,20 +123,22 @@ periodics:
           cpu: "1"
           memory: 600Mi
       volumeMounts:
-      - mountPath: /aws
-        name: cluster-secrets-aws
+      - mountPath: /var/run/secrets/aws
+        name: aws-token
+        readOnly: true
     nodeSelector:
       beta.kubernetes.io/arch: amd64
     serviceAccountName: ipi-deprovisioner
     volumes:
-    - name: cluster-secrets-aws
-      secret:
-        items:
-        - key: .awscred
-          path: .awscred
-        secretName: cluster-secrets-aws-2
+    - name: aws-token
+      projected:
+        sources:
+        - serviceAccountToken:
+            audience: sts.amazonaws.com
+            expirationSeconds: 3600
+            path: token
 - agent: kubernetes
-  cluster: build13
+  cluster: build11
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -119,6 +149,7 @@ periodics:
     workdir: true
   interval: 4h
   labels:
+    capability/aws: aws
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ipi-deprovision-aws-3
@@ -137,10 +168,22 @@ periodics:
       env:
       - name: HOME
         value: /tmp
-      - name: AWS_SHARED_CREDENTIALS_FILE
-        value: /aws/.awscred
       - name: CLUSTER_TTL
         value: 30 minutes ago
+      - name: AWS_STS_MODE
+        value: "yes"
+      - name: AWS_WEB_IDENTITY_TOKEN_FILE
+        value: /var/run/secrets/aws/token
+      - name: HOME_ROLE_ARN
+        valueFrom:
+          secretKeyRef:
+            key: home_role_arn
+            name: aws-sts-cluster-config
+      - name: TARGET_ROLE_ARN
+        valueFrom:
+          secretKeyRef:
+            key: target_role_arn
+            name: cluster-secrets-aws-3
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ipi-deprovision_latest
       imagePullPolicy: Always
       name: ipi-deprovision
@@ -149,20 +192,22 @@ periodics:
           cpu: "1"
           memory: 600Mi
       volumeMounts:
-      - mountPath: /aws
-        name: cluster-secrets-aws
+      - mountPath: /var/run/secrets/aws
+        name: aws-token
+        readOnly: true
     nodeSelector:
       beta.kubernetes.io/arch: amd64
     serviceAccountName: ipi-deprovisioner
     volumes:
-    - name: cluster-secrets-aws
-      secret:
-        items:
-        - key: .awscred
-          path: .awscred
-        secretName: cluster-secrets-aws-3
+    - name: aws-token
+      projected:
+        sources:
+        - serviceAccountToken:
+            audience: sts.amazonaws.com
+            expirationSeconds: 3600
+            path: token
 - agent: kubernetes
-  cluster: build13
+  cluster: build11
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -173,6 +218,7 @@ periodics:
     workdir: true
   interval: 4h
   labels:
+    capability/aws: aws
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ipi-deprovision-aws-4
@@ -191,10 +237,22 @@ periodics:
       env:
       - name: HOME
         value: /tmp
-      - name: AWS_SHARED_CREDENTIALS_FILE
-        value: /aws/.awscred
       - name: CLUSTER_TTL
         value: 30 minutes ago
+      - name: AWS_STS_MODE
+        value: "yes"
+      - name: AWS_WEB_IDENTITY_TOKEN_FILE
+        value: /var/run/secrets/aws/token
+      - name: HOME_ROLE_ARN
+        valueFrom:
+          secretKeyRef:
+            key: home_role_arn
+            name: aws-sts-cluster-config
+      - name: TARGET_ROLE_ARN
+        valueFrom:
+          secretKeyRef:
+            key: target_role_arn
+            name: cluster-secrets-aws-4
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ipi-deprovision_latest
       imagePullPolicy: Always
       name: ipi-deprovision
@@ -203,20 +261,22 @@ periodics:
           cpu: "1"
           memory: 600Mi
       volumeMounts:
-      - mountPath: /aws
-        name: cluster-secrets-aws
+      - mountPath: /var/run/secrets/aws
+        name: aws-token
+        readOnly: true
     nodeSelector:
       beta.kubernetes.io/arch: amd64
     serviceAccountName: ipi-deprovisioner
     volumes:
-    - name: cluster-secrets-aws
-      secret:
-        items:
-        - key: .awscred
-          path: .awscred
-        secretName: cluster-secrets-aws-4
+    - name: aws-token
+      projected:
+        sources:
+        - serviceAccountToken:
+            audience: sts.amazonaws.com
+            expirationSeconds: 3600
+            path: token
 - agent: kubernetes
-  cluster: build13
+  cluster: build11
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -227,6 +287,7 @@ periodics:
     workdir: true
   interval: 4h
   labels:
+    capability/aws: aws
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ipi-deprovision-aws-5
@@ -245,10 +306,22 @@ periodics:
       env:
       - name: HOME
         value: /tmp
-      - name: AWS_SHARED_CREDENTIALS_FILE
-        value: /aws/.awscred
       - name: CLUSTER_TTL
         value: 30 minutes ago
+      - name: AWS_STS_MODE
+        value: "yes"
+      - name: AWS_WEB_IDENTITY_TOKEN_FILE
+        value: /var/run/secrets/aws/token
+      - name: HOME_ROLE_ARN
+        valueFrom:
+          secretKeyRef:
+            key: home_role_arn
+            name: aws-sts-cluster-config
+      - name: TARGET_ROLE_ARN
+        valueFrom:
+          secretKeyRef:
+            key: target_role_arn
+            name: cluster-secrets-aws-5
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ipi-deprovision_latest
       imagePullPolicy: Always
       name: ipi-deprovision
@@ -257,18 +330,20 @@ periodics:
           cpu: "1"
           memory: 600Mi
       volumeMounts:
-      - mountPath: /aws
-        name: cluster-secrets-aws
+      - mountPath: /var/run/secrets/aws
+        name: aws-token
+        readOnly: true
     nodeSelector:
       beta.kubernetes.io/arch: amd64
     serviceAccountName: ipi-deprovisioner
     volumes:
-    - name: cluster-secrets-aws
-      secret:
-        items:
-        - key: .awscred
-          path: .awscred
-        secretName: cluster-secrets-aws-5
+    - name: aws-token
+      projected:
+        sources:
+        - serviceAccountToken:
+            audience: sts.amazonaws.com
+            expirationSeconds: 3600
+            path: token
 - agent: kubernetes
   cluster: build13
   decorate: true

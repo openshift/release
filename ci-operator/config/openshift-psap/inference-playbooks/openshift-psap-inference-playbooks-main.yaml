@@ -15,7 +15,7 @@ resources:
       memory: 2Gi
 tests:
 - always_run: false
-  as: deploy-inference-playbooks-wip
+  as: forge
   capabilities:
   - intranet
   restrict_network_access: false
@@ -26,23 +26,26 @@ tests:
       commands: |
         exec &> >(tee -a "$ARTIFACT_DIR/run.log")
 
-        export PSAP_FORGE_FOURNOS_DEPLOY_SECRET_PATH=/var/run/psap-forge-fournos-deploy
+        export PSAP_FORGE_FOURNOS_CI_SECRET_PATH=/var/run/psap-forge-ci
         export PSAP_FORGE_NOTIFICATIONS_SECRET_PATH=/var/run/psap-forge-notifications
+        export PSAP_FOURNOS_INTLAB_CI_SECRET_PATH=/var/run/psap-fournos-intlab-ci
 
         export PSAP_FORGE_FOREIGN_TESTING=openshift-psap/inference-playbooks
 
-        MAIN_BRANCH=main
-        git -C $HOME fetch --quiet origin $MAIN_BRANCH
+        FORGE_BRANCH=main
+        git -C $HOME fetch --quiet origin $FORGE_BRANCH
         git -C $HOME reset --hard FETCH_HEAD
 
         exec ./bin/run_ci foreign_testing ci submit
       credentials:
-      - collection: psap
-        group: psap-forge-fournos-deploy
-        mount_path: /var/run/psap-forge-fournos-deploy
+      - bundle: psap-forge-ci
+        mount_path: /var/run/psap-forge-ci
       - collection: psap
         group: psap-forge-notifications
         mount_path: /var/run/psap-forge-notifications
+      - collection: psap
+        group: psap-fournos-intlab-ci
+        mount_path: /var/run/psap-fournos-intlab-ci
       from_image:
         name: forge-light
         namespace: ci
@@ -53,7 +56,7 @@ tests:
           memory: 500Mi
       timeout: 23h0m0s
 - always_run: false
-  as: deploy-inference-playbooks-wip-from-forge-wip
+  as: forge-wip
   capabilities:
   - intranet
   restrict_network_access: false
@@ -64,23 +67,26 @@ tests:
       commands: |
         exec &> >(tee -a "$ARTIFACT_DIR/run.log")
 
-        export PSAP_FORGE_FOURNOS_DEPLOY_SECRET_PATH=/var/run/psap-forge-fournos-deploy
+        export PSAP_FORGE_FOURNOS_CI_SECRET_PATH=/var/run/psap-forge-ci
         export PSAP_FORGE_NOTIFICATIONS_SECRET_PATH=/var/run/psap-forge-notifications
+        export PSAP_FOURNOS_INTLAB_CI_SECRET_PATH=/var/run/psap-fournos-intlab-ci
 
         export PSAP_FORGE_FOREIGN_TESTING=openshift-psap/inference-playbooks
 
-        TMP_MAIN_BRANCH=fournos-testing
-        git -C $HOME fetch --quiet origin $TMP_MAIN_BRANCH
+        WIP_BRANCH=fournos-testing
+        git -C $HOME fetch --quiet origin $WIP_BRANCH
         git -C $HOME reset --hard FETCH_HEAD
 
         exec ./bin/run_ci foreign_testing ci submit
       credentials:
-      - collection: psap
-        group: psap-forge-fournos-deploy
-        mount_path: /var/run/psap-forge-fournos-deploy
+      - bundle: psap-forge-ci
+        mount_path: /var/run/psap-forge-ci
       - collection: psap
         group: psap-forge-notifications
         mount_path: /var/run/psap-forge-notifications
+      - collection: psap
+        group: psap-fournos-intlab-ci
+        mount_path: /var/run/psap-fournos-intlab-ci
       from_image:
         name: forge-light
         namespace: ci
