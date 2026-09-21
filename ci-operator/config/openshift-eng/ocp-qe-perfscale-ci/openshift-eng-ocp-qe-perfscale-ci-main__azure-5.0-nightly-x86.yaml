@@ -49,6 +49,7 @@ tests:
       ADDITIONAL_WORKER_ARCHITECTURE: aarch64
       ADDITIONAL_WORKER_VM_TYPE: Standard_D8ps_v5
       ADDITIONAL_WORKERS: "3"
+      AZURE_IDENTITY_TYPE_DEFAULT_MACHINE: None
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D8s_v5
@@ -59,6 +60,14 @@ tests:
       SET_ENV_BY_PLATFORM: custom
       TOLERANCE: "99"
       WORKER_REPLICA_COUNT: "9"
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-custom-region
+    - ref: ipi-conf-azure-identity
+    - ref: ovn-conf
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    - chain: create-infra-move-ingress-monitoring-registry
     test:
     - ref: ipi-install-heterogeneous
     - chain: workers-scale
