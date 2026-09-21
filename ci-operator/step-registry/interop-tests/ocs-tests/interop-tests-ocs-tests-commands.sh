@@ -2,7 +2,26 @@
 
 set -euo pipefail
 shopt -s inherit_errexit
-[[ "${DEBUG:-false}" == "true" ]] && set -x
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+_original_exit_trap="$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")"
+# shellcheck disable=SC2154
+trap '
+  _exit_code=$?
+  set +x 2>/dev/null
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+  eval "${_original_exit_trap}"
+' EXIT
+
+echo ">>> PHASE: initialization"
 
 CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.version}')
 OCP_MAJOR_MINOR=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1,2)
@@ -114,7 +133,7 @@ if [[ -f "${SHARED_DIR}/vsphere_context.sh" ]]; then
     set +x
     source "${SHARED_DIR}/vsphere_context.sh"
     source "${SHARED_DIR}/govc.sh"
-    [[ "${DEBUG:-false}" == "true" ]] && set -x
+    set -x
 
     cat >> "${LOGS_CONFIG}" << __APPENDED_ENV_DATA__
 ENV_DATA:

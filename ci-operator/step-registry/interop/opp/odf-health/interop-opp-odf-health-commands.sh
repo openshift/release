@@ -1,6 +1,25 @@
 #!/bin/bash
 set -euo pipefail; shopt -s inherit_errexit
-[[ "${DEBUG:-false}" == "true" ]] && set -x
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+_original_exit_trap="$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")"
+# shellcheck disable=SC2154
+trap '
+  _exit_code=$?
+  set +x 2>/dev/null
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+  eval "${_original_exit_trap}"
+' EXIT
+
+echo ">>> PHASE: initialization"
 
 # ---------------------------------------------------------------------------
 # ODF Health Check (7-point gate)
@@ -667,12 +686,12 @@ function Main () {
     typeset scJson="" scCount=""
     set +x  # suppress xtrace for API response
     if ! scJson="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json 2>/dev/null)"; then
-        [[ "${DEBUG:-false}" == "true" ]] && set -x  # restore xtrace
+        set -x
         : "Failed to query StorageClusters in ${ODF_NAMESPACE}"
         exit 1
     fi
     if [[ -z "${scJson}" ]]; then
-        [[ "${DEBUG:-false}" == "true" ]] && set -x  # restore xtrace
+        set -x
         : "StorageCluster query returned empty output in ${ODF_NAMESPACE}"
         exit 1
     fi
@@ -682,11 +701,11 @@ items=d.get('items')
 if not isinstance(items,list): raise ValueError('StorageCluster items is not a list')
 print(len(items))
 ")"; then
-        [[ "${DEBUG:-false}" == "true" ]] && set -x  # restore xtrace
+        set -x
         : "Failed to parse StorageCluster JSON from ${ODF_NAMESPACE}"
         exit 1
     fi
-    [[ "${DEBUG:-false}" == "true" ]] && set -x  # restore xtrace
+    set -x
     if (( scCount == 0 )); then
         AddResult "odf-csv-phase" "pass"
         SkipAllChecks "ODF operator installed but no StorageCluster configured in ${ODF_NAMESPACE}" \

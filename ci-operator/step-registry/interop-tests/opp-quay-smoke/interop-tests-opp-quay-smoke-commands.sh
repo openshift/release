@@ -1,6 +1,25 @@
 #!/bin/bash
 set -euo pipefail; shopt -s inherit_errexit
-[[ "${DEBUG:-false}" == "true" ]] && set -x
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+_original_exit_trap="$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")"
+# shellcheck disable=SC2154
+trap '
+  _exit_code=$?
+  set +x 2>/dev/null
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+  eval "${_original_exit_trap}"
+' EXIT
+
+echo ">>> PHASE: initialization"
 
 ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -515,16 +534,21 @@ function RunAcsScan () {
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
 
+    # Mask credentials: function call args expand in xtrace
+    set +x 2>/dev/null
     if ! RegisterQuayInAcs "${acsHost}" "${acsPassword}"; then
+        "${xtraceOn}" && set -x
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Failed to register Quay in ACS" "${elapsed}"
         return 1
     fi
     if ! RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"; then
+        "${xtraceOn}" && set -x
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "ACS scan request failed" "${elapsed}"
         return 1
     fi
+    "${xtraceOn}" && set -x
 
     typeset -i attempts=0 maxAttempts=40
 
@@ -547,7 +571,9 @@ sys.exit(0 if len(images) > 0 else 1)
         fi
 
         if (( attempts % 4 == 3 )); then
+            set +x 2>/dev/null
             RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}" || true
+            "${xtraceOn}" && set -x
         fi
 
         attempts=$((attempts + 1))

@@ -1,7 +1,26 @@
 #!/bin/bash
-set -eu -o pipefail
-[[ "${DEBUG:-false}" == "true" ]] && set -x
+set -euo pipefail
 shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+_original_exit_trap="$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")"
+# shellcheck disable=SC2154
+trap '
+  _exit_code=$?
+  set +x 2>/dev/null
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+  eval "${_original_exit_trap}"
+' EXIT
+
+echo ">>> PHASE: initialization"
 
 # NOTE: UPGRADE_TIMEOUT, POLL_INTERVAL, STALL_WINDOW, OPP_OPERATORS are set via step config YAML
 # (naming deviates from OPP__ convention)
@@ -18,7 +37,7 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     set +x
     source "${SHARED_DIR}/proxy-conf.sh"
-    [[ "${DEBUG:-false}" == "true" ]] && set -x
+    set -x
 fi
 
 typeset -i exitCode=0
@@ -73,7 +92,7 @@ trap '{ exitCode=143; DebugOnExit; trap - EXIT; exit 143; }' TERM
 
 set +x
 KUBECONFIG="" oc registry login
-[[ "${DEBUG:-false}" == "true" ]] && set -x
+set -x
 
 function ResolveTargetImage () {
     typeset image="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"

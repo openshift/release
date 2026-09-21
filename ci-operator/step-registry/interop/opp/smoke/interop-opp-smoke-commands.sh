@@ -1,6 +1,25 @@
 #!/bin/bash
 set -euo pipefail; shopt -s inherit_errexit
-[[ "${DEBUG:-false}" == "true" ]] && set -x
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+_original_exit_trap="$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")"
+# shellcheck disable=SC2154
+trap '
+  _exit_code=$?
+  set +x 2>/dev/null
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+  eval "${_original_exit_trap}"
+' EXIT
+
+echo ">>> PHASE: initialization"
 
 # ---------------------------------------------------------------------------
 # OPP post-upgrade smoke tests
@@ -185,6 +204,12 @@ TestClusterHealth() {
 
 TestOppOperators() {
     echo ">>> PHASE: Test — opp-operators"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: opp-operators check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "opp-operators" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "opp-operators" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     typeset -a operatorsArr=()
@@ -279,6 +304,12 @@ TestOppOperators() {
 
 TestAcmConnectivity() {
     echo ">>> PHASE: Test — acm-connectivity"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: acm-connectivity check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "acm-connectivity" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "acm-connectivity" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     # Check if ManagedCluster resources exist
@@ -326,6 +357,12 @@ TestAcmConnectivity() {
 
 TestAcsSensors() {
     echo ">>> PHASE: Test — acs-sensors"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: acs-sensors check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "acs-sensors" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "acs-sensors" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     # Check SecuredCluster CR status first
@@ -396,6 +433,12 @@ TestAcsSensors() {
 
 TestQuayPull() {
     echo ">>> PHASE: Test — quay-pull"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: quay-pull check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "quay-pull" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "quay-pull" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     # Find the Quay registry route

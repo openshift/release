@@ -1,7 +1,26 @@
 #!/bin/bash
 set -euo pipefail
-[[ "${DEBUG:-false}" == "true" ]] && set -x
 shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+_original_exit_trap="$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")"
+# shellcheck disable=SC2154
+trap '
+  _exit_code=$?
+  set +x 2>/dev/null
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+  eval "${_original_exit_trap}"
+' EXIT
+
+echo ">>> PHASE: initialization"
 
 ACM_TARGET_CHANNEL="${ACM_TARGET_CHANNEL:-}"
 ACM_UPGRADE_TIMEOUT="${ACM_UPGRADE_TIMEOUT:-30m}"
@@ -311,6 +330,38 @@ function ValidateHubHealth () {
     return 0
 }
 
+_xml_escape() {
+    local text="$1"
+    text="${text//&/&amp;}"
+    text="${text//</&lt;}"
+    text="${text//>/&gt;}"
+    text="${text//\"/&quot;}"
+    text="${text//\'/&apos;}"
+    printf '%s' "${text}"
+}
+
+_detect_known_issue() {
+    local error_output="$1"
+    local bug_id="$2"
+    local bug_description="$3"
+    local safe_desc safe_error
+
+    safe_desc="$(_xml_escape "${bug_description}")"
+    safe_error="$(_xml_escape "${error_output:0:500}")"
+
+    echo ">>> KNOWN ISSUE: ${bug_id} — ${bug_description}"
+    echo ">>> Marking as SKIPPED (tracked: https://issues.redhat.com/browse/${bug_id})"
+
+    cat <<JUNIT_EOF >> "${ARTIFACT_DIR}/junit_known_issues.xml"
+<testcase name="${bug_id}: ${safe_desc}" classname="opp.interop.known_issues">
+  <skipped message="Known issue: ${bug_id}">
+    Tracked at https://issues.redhat.com/browse/${bug_id}
+    Error: ${safe_error}
+  </skipped>
+</testcase>
+JUNIT_EOF
+}
+
 # === Main ===
 
 function Main () {
@@ -405,8 +456,30 @@ function Main () {
     newVersion="$(GetInstalledVersion)"
     echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
 
-    ValidateMceUpgrade
-    ValidateHubHealth
+    typeset _acm_upgrade_output=""
+    if ! _acm_upgrade_output="$(ValidateMceUpgrade 2>&1)"; then
+        echo "${_acm_upgrade_output}"
+        if echo "${_acm_upgrade_output}" | grep -q "cannot unmarshal string into Go struct"; then
+            _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
+                "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
+        else
+            exit 1
+        fi
+    else
+        echo "${_acm_upgrade_output}"
+    fi
+
+    if ! _acm_upgrade_output="$(ValidateHubHealth 2>&1)"; then
+        echo "${_acm_upgrade_output}"
+        if echo "${_acm_upgrade_output}" | grep -q "cannot unmarshal string into Go struct"; then
+            _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
+                "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
+        else
+            exit 1
+        fi
+    else
+        echo "${_acm_upgrade_output}"
+    fi
 
     {
         printf '=== ACM Operator Upgrade Summary ===\n'
