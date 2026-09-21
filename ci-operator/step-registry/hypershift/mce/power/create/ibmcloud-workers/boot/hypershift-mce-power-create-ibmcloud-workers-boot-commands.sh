@@ -114,6 +114,7 @@ export HTTP_PROXY=http://${BASTION}:2005/
 export HTTPS_PROXY=http://${BASTION}:2005/
 export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
+	printf 'http://%s:2005/\n' "${BASTION}" >"${SHARED_DIR}/proxy_public_url"
 }
 
 boot_power_workers() {
