@@ -1,0 +1,25 @@
+workflow:
+  as: opct-conformance-external-aws-upgrade
+  steps:
+    pre:
+      - chain: opct-pre-init
+      - chain: platform-external-cluster-aws-pre-stableinitial
+      - chain: opct-pre
+    test:
+      - chain: opct-conformance-test
+    post:
+      - chain: gather
+      - chain: opct-post
+      - chain: platform-external-cluster-aws-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      PROVIDER_NAME: aws
+      PLATFORM_EXTERNAL_CCM_ENABLED: no
+      OPCT_CLI_IMAGE: "quay.io/opct/opct:v0.6.7"
+      OPCT_RUN_MODE: upgrade
+  documentation: |-
+    OPCT Conformance External E2E upgrade workflow. Installs the initial release with the
+    stable-initial installer (correct bootstrap/CVO flag pairing), runs preflight before
+    AWS provisioning, then upgrades and executes OPCT conformance.

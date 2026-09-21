@@ -1,6 +1,10 @@
 #!/bin/bash
 
 #
+# NOTE: Keep in sync with ../platform-external-pre-conf-manifests-commands.sh
+# This variant only differs by ref.from (stable-initial:installer) and release deps.
+#
+#
 # Step to customize installer manifests required by Platform External for each platform.
 # The step creates manifests (openshift-install create manifests) and generate the ignition
 # config files (create ignition-configs), saving in a the shared storage.

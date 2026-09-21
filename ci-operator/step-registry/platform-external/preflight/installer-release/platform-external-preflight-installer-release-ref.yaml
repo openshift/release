@@ -1,0 +1,26 @@
+ref:
+  as: platform-external-preflight-installer-release
+  from: cli
+  commands: platform-external-preflight-installer-release-commands.sh
+  grace_period: 10m
+  timeout: 15m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Preflight guard run after ignition generation and before AWS provisioning.
+    Fails fast when bootstrap assets embed cvo-render flags (for example
+    --cluster-version-manifest-path) that the install release's CVO does not accept,
+    which otherwise wastes CloudFormation resources and hangs wait-for-api-bootstrap.
+  dependencies:
+    # Used by upgrade/stableinitial workflows (INSTALL=initial). Override if reused elsewhere.
+    - name: "release:initial"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    - name: "release:latest"
+      env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: PLATFORM_EXTERNAL_OVERRIDE_RELEASE
+    default: ""
+    documentation: |-
+      Override release image used for install (same semantics as manifests step).
