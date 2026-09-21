@@ -170,8 +170,8 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
         self.put("skills/foo/SKILL.md", "new skill")
         self.commit()
 
-    def run_step(self, **overrides):
-        result = subprocess.run(["bash", str(self.commands)], cwd=self.root,
+    def run_step(self, *, cwd=None, **overrides):
+        result = subprocess.run(["bash", str(self.commands)], cwd=cwd or self.root,
                                 env={**self.env, **overrides}, capture_output=True,
                                 text=True, timeout=20, check=False)
         self.last_result = result
@@ -193,6 +193,37 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
 
     def junit(self):
         return ET.parse(self.artifacts / "junit_claude-eval.xml").getroot()
+
+
+class WorkdirTests(Fixture):
+    def test_unset_workdir_uses_current_checkout(self):
+        self.change_skill()
+        del self.env["EVAL_WORKDIR"]
+        result = self.run_step(cwd=self.repo)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(len(self.claude_calls()), 1)
+
+    def test_empty_workdir_uses_current_checkout(self):
+        self.change_skill()
+        result = self.run_step(cwd=self.repo, EVAL_WORKDIR="")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(len(self.claude_calls()), 1)
+
+    def test_explicit_workdir_overrides_current_directory(self):
+        self.change_skill()
+        for workdir in (str(self.repo), "repo"):
+            with self.subTest(workdir=workdir):
+                result = self.run_step(EVAL_WORKDIR=workdir)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(len(self.claude_calls()), 2)
+
+    def test_invalid_current_directory_does_not_search_for_checkout(self):
+        self.change_skill()
+        result = self.run_step(EVAL_WORKDIR="")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("manifest must reference an existing file", result.stdout)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.junit().attrib["failures"], "1")
 
 
 class SelectionTests(Fixture):

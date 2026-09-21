@@ -93,9 +93,12 @@ Existing jobs continue to use the unchanged `openshift-claude-agent-eval` workfl
 ## CI integration
 
 Select `workflow: openshift-claude-agent-eval-manifest`, supply its
-`claude-ai-helpers` image, and set `EVAL_WORKDIR` to the PR checkout root,
-including `.git` and the base commit's history. The default `/opt/ai-helpers`
-only works if it contains that checkout. No `EVAL_MANIFEST` flag is needed.
+`claude-ai-helpers` image, and start the step in the PR checkout root, including
+`.git` and the base commit's history. An unset or empty `EVAL_WORKDIR` defaults
+to the current working directory; set it explicitly when the checkout is
+elsewhere. Relative overrides resolve from the starting directory. The runner
+does not search for another checkout or fall back to `/opt/ai-helpers`.
+No `EVAL_MANIFEST` flag is needed.
 
 This workflow supports presubmit jobs only. Prow job configuration controls
 whether PR creation, new commits on an open PR, or a manual test request
@@ -107,6 +110,7 @@ The job uses `skip_if_only_changed` for broad filtering and the manifest for
 precise selection. Skills are Markdown, so do not exclude all `*.md` files.
 The step reuses the existing Vertex/GitHub credential mounts, Python/PyYAML,
 and `/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py` for AutoDL.
+This extractor remains an image dependency, independent of the checkout path.
 
 ## Results
 

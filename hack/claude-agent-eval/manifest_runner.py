@@ -478,7 +478,7 @@ def manifest_plans(repo, env):
 
 def main():
     env = dict(os.environ)
-    repo = Path(env.get("EVAL_WORKDIR") or "/opt/ai-helpers").resolve()
+    repo = Path(env.get("EVAL_WORKDIR") or os.getcwd()).resolve()
     artifacts = Path(env["ARTIFACT_DIR"]).resolve()
     artifacts.mkdir(parents=True, exist_ok=True)
     env["ARTIFACT_DIR"] = str(artifacts)
