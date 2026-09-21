@@ -216,19 +216,30 @@ function CheckMcoReady () {
         elapsed=$(( $(date +%s) - startTime ))
         echo ">>> MCO poll ${attempt}/${maxAttempts} (${elapsed}s elapsed)…"
 
-        typeset mcoStatus=""
-        if ! mcoStatus="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
-            observability -o jsonpath='{.status.conditions}' 2>/dev/null | python3 -c "
+        typeset mcoStatus="" mcoConditions="" mcoError="" queryFailed="false"
+        if ! mcoConditions="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
+            observability -o jsonpath='{.status.conditions}' 2>&1)"; then
+            mcoError="${mcoConditions}"
+            if [[ "${mcoError}" == *"(NotFound)"* && "${mcoError}" == *'"observability" not found'* ]]; then
+                AddResult "mco-ready" "skip" "MultiClusterObservability CR not found; observability not deployed"
+                return 0
+            fi
+            queryFailed="true"
+        elif ! mcoStatus="$(printf '%s' "${mcoConditions}" | python3 -c "
 import sys,json
 raw=sys.stdin.read().strip()
 if not raw:
-    print('NotFound')
+    print('NoCondition')
     sys.exit(0)
 conds=json.loads(raw)
 ready=[c for c in conds if c.get('type')=='Ready']
 print(ready[0].get('status','Unknown') if ready else 'NoCondition')
 ")"; then
-            # Query failed — might be transient; retry unless last attempt
+            queryFailed="true"
+        fi
+
+        if [[ "${queryFailed}" == "true" ]]; then
+            # Query or parsing failed — might be transient; retry unless last attempt
             if (( attempt >= maxAttempts )); then
                 elapsed=$(( $(date +%s) - startTime ))
                 AddResult "mco-ready" "fail" "Failed to query MultiClusterObservability CR after ${elapsed}s"
@@ -242,11 +253,6 @@ print(ready[0].get('status','Unknown') if ready else 'NoCondition')
             elapsed=$(( $(date +%s) - startTime ))
             : "PASS: MultiClusterObservability Ready=True after ${elapsed}s"
             AddResult "mco-ready" "pass" "MultiClusterObservability is Ready after ${elapsed}s"
-            return 0
-        fi
-
-        if [[ "${mcoStatus}" == "NotFound" ]]; then
-            AddResult "mco-ready" "skip" "MultiClusterObservability CR not found; observability not deployed"
             return 0
         fi
 
