@@ -1316,10 +1316,20 @@ for product in mce acm globalhub; do
       select((.bundle == "'"${product}-operator-bundle"'" or
       .name == "'"${product}-operator-bundle"'") and
       (.repository | test("^https://github\\.com/stolostron/"))).repository' "${REPO_MAP_PATH}" | sort -u)
+  first_repo_in_product=true
   for repo in ${component_repos}; do
     owner_repo=${repo#https://github.com/}
     owner=${owner_repo%/*}
     repo=${owner_repo#*/}
+
+    # Blank line between each component's analysis so per-repo output blocks
+    # are visually separated in the build log (skip before the first repo of
+    # each product section, since the section header already added one).
+    if [[ "${first_repo_in_product}" == "true" ]]; then
+      first_repo_in_product=false
+    else
+      echo ""
+    fi
 
     # Check if repo should be completely skipped
     skip=false
@@ -1489,6 +1499,18 @@ for product in mce acm globalhub; do
       fi
 
       echo "INFO: Default branch version: ${default_version}"
+
+      # Skip entirely if this component is deprecated/removed as of its own
+      # default branch version. E.g. maestro's default branch is
+      # backplane-5.1 but it is removed_in_version: "5.1" — the component no
+      # longer exists as of that version, so that branch should never have
+      # been created and must not have Tekton files generated on it (doing so
+      # falls back to stale LAST_RELEASE_VERSION templates and then fails
+      # cleanup since those fallback files can't be removed).
+      if is_repo_deprecated_for_version "https://github.com/${owner_repo}" "${product}" "${default_version}"; then
+        echo "INFO: Skipping ${owner_repo} (removed in version ${default_version})"
+        continue
+      fi
 
       # Create Tekton files ONLY on default branch for default version ONLY
       echo "INFO: Creating Tekton files for ${owner_repo} on ${default_branch} (version ${default_version})"
