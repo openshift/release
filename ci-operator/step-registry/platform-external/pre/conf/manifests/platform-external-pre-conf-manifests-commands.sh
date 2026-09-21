@@ -36,12 +36,16 @@ source "${SHARED_DIR}/init-fn.sh" || true
 
 # Prefer installer binary from the install payload over the step's imagestream tag.
 INSTALLER_BINARY="${STEP_WORKDIR}/openshift-install"
+
 log "Extracting openshift-install from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" \
   "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
   --command=openshift-install \
   --to="${STEP_WORKDIR}"
+
+
 chmod +x "${INSTALLER_BINARY}"
+log openshift-install version:"
 "${INSTALLER_BINARY}" version
 
 log "Copying to install dir"
