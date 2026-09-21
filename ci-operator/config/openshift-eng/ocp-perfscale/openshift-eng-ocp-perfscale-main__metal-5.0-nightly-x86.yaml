@@ -50,6 +50,7 @@ tests:
       CONFIG: config/standard-scalelab.yml
       ENABLE_LOCAL_INDEX: "true"
       INFRA: "true"
+      LVM_VG_NAME: nvme
       OUTPUT_FORMAT: JUNIT
       PUBLIC_VLAN: "false"
       RUN_ORION: deferred
@@ -60,6 +61,7 @@ tests:
     - ref: openshift-qe-installer-bm-must-gather
     test:
     - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-lvms
     - ref: openshift-qe-installer-bm-day2-cnv
     - chain: openshift-qe-data-path-tests
     - ref: openshift-qe-orion-data-path
@@ -69,6 +71,8 @@ tests:
     - ref: openshift-qe-orion-virt-udn-density
     - ref: openshift-qe-virt-density-nomount
     - ref: openshift-qe-orion-virt-density-nomount
+    - ref: openshift-qe-windows-bootstorm
+    - ref: openshift-qe-orion-windows-bootstorm
     - ref: openshift-qe-orion-report
     workflow: openshift-qe-installer-bm-deploy
 - as: network-workloads
@@ -109,7 +113,7 @@ tests:
     - ref: openshift-qe-installer-bm-day2-network-workloads-post
     - ref: openshift-qe-egressip
     - ref: openshift-qe-evpn
-- as: daily-telco-core-6nodes
+- as: payload-daily-telco-core-6nodes
   capabilities:
   - intranet
   cron: 0 17 * * *
@@ -131,11 +135,12 @@ tests:
       CHURN_CYCLES: "2"
       CHURN_PERCENT: "50"
       EXTRA_FLAGS: --perf-profile=cpt-pao --gc-metrics=false --gc=true --phased=true
-        --idle-duration=15m
+        --idle-duration=15m --local-indexing=true
       ITERATIONS: "15"
       LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
       ND_CNI_EXTRA_FLAGS: --churn-cycles 2 --selector=node-role.kubernetes.io/node-density-cni-workload=
         --churn-delay 2m --churn-percent 50 --num-sriovs=1 --sriov-networkname sriov-net-node-density
+        --local-indexing=true
       NODE_DENSITY_CNI_WORKLOAD: "true"
       OCP_BUILD: dev
       OPERATOR_SOURCE_INDEX: prega-operator-index
@@ -155,7 +160,7 @@ tests:
     - ref: openshift-qe-rds-core
     - ref: openshift-qe-orion-rds-core
     workflow: openshift-qe-installer-bm-deploy
-- as: daily-node-density-cni-sriov-mlx
+- as: payload-daily-node-density-cni-sriov-mlx
   capabilities:
   - intranet
   cron: 0 17 * * *
@@ -178,6 +183,7 @@ tests:
       MAX_PODS: "350"
       ND_CNI_EXTRA_FLAGS: --churn-cycles 3 --selector=node-role.kubernetes.io/worker=
         --churn-delay 2m --churn-percent 50 --num-sriovs=1 --sriov-networkname sriov-net-node-density
+        --local-indexing=true
       NODE_DENSITY_CNI_WORKLOAD: "true"
       OCP_BUILD: dev
       OCP_INVENTORY_OVERRIDE: "true"

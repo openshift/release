@@ -14,6 +14,10 @@ mkdir -p "${ARTIFACT_DIR}"
 
 QUAY_NS="${QUAYNAMESPACE}"
 
+# Remove any stale fragment from a prior attempt so a retry never hands the
+# deploy steps a config left over from a different run.
+rm -f "${SHARED_DIR}/quay-mail-config.yaml"
+
 # Ensure the namespace exists (deploy-aws-s3 also creates it; be order-independent).
 oc get namespace "${QUAY_NS}" >/dev/null 2>&1 || oc create namespace "${QUAY_NS}"
 
@@ -132,3 +136,15 @@ echo "Mailpit API reachable (HTTP 200) at ${MAILPIT_API_URL}/messages"
 echo "${MAILPIT_API_URL}" > "${SHARED_DIR}/mailpit_api"
 cp "${SHARED_DIR}/mailpit_api" "${ARTIFACT_DIR}/mailpit_api" || true
 echo "Mailpit API: ${MAILPIT_API_URL}"
+
+# Own the Quay mail config: the deploy steps merge this fragment in so
+# FEATURE_MAILING is only enabled when Mailpit actually deployed.
+cat <<EOF > "${SHARED_DIR}/quay-mail-config.yaml"
+FEATURE_MAILING: true
+MAIL_SERVER: mailpit.${QUAY_NS}.svc.cluster.local
+MAIL_PORT: 1025
+MAIL_USE_TLS: false
+MAIL_USE_AUTH: false
+MAIL_DEFAULT_SENDER: quay@quayqe.local
+EOF
+cp "${SHARED_DIR}/quay-mail-config.yaml" "${ARTIFACT_DIR}/quay-mail-config.yaml" || true

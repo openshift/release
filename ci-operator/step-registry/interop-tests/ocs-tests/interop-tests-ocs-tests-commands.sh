@@ -34,6 +34,16 @@ cleanup() {
     [[ -d "${CLUSTER_PATH}/auth" ]] && rm -rf "${CLUSTER_PATH}/auth"
 }
 
+_propagate_junit() {
+    local shared_junit="${SHARED_DIR}/junit"
+    mkdir -p "${shared_junit}"
+    # ocs-tests writes JUnit into ${ARTIFACT_DIR}/ocs-tests/
+    local ocs_dir="${ARTIFACT_DIR}/ocs-tests"
+    if compgen -G "${ocs_dir}"/junit*.xml > /dev/null 2>&1; then
+        cp -v "${ocs_dir}"/junit*.xml "${shared_junit}/"
+    fi
+}
+
 if [ "${MAP_TESTS}" = "true" ]; then
     # Avoid conflicts with the older versioned yq from the image:
     # Write /tmp/bin/yq as a tiny script (#!/bin/sh; exit 1), so yq --version fails and ExitTrap EnsureReqs downloads latest yq (replacing the stub).
@@ -42,6 +52,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
     )"
     trap '
         cleanup
+        _propagate_junit
         mkdir -p /tmp/bin
         printf "%s\n" "#!/bin/sh" "exit 1" > /tmp/bin/yq && chmod +x /tmp/bin/yq
         PATH="/tmp/bin:${PATH}"
@@ -49,7 +60,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
             ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
     ' EXIT
 else
-    trap 'cleanup' EXIT
+    trap 'cleanup; _propagate_junit' EXIT
 fi
 
 #
@@ -97,8 +108,12 @@ if [[ -f "${SHARED_DIR}/vsphere_context.sh" ]]; then
     declare vsphere_datacenter
     declare vsphere_datastore
     declare vsphere_cluster
+    # Tracing is disabled while govc.sh is sourced, otherwise xtrace expands
+    # GOVC_PASSWORD into the publicly readable build log.
+    set +x
     source "${SHARED_DIR}/vsphere_context.sh"
     source "${SHARED_DIR}/govc.sh"
+    set -x
 
     cat >> "${LOGS_CONFIG}" << __APPENDED_ENV_DATA__
 ENV_DATA:

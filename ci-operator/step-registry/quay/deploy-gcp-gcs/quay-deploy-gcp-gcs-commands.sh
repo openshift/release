@@ -10,11 +10,70 @@ if [ "${MAP_TESTS}" = "true" ]; then
         type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
         "${_fURL[@]}" \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-    )"; trap '
-        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-            ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-gcp__quay-tests-deploy-quay-gcp.xml
-    ' EXIT
+    )"
 fi
+
+# Tracks the Quay install for Sippy's quay-lifecycle suite. Empty
+# QL_INSTALL_STATUS means the install was never attempted.
+QL_INSTALL_START=""
+QL_INSTALL_STATUS=""
+QL_INSTALL_FAILURE=""
+
+# shellcheck disable=SC2329 # invoked only from write_quay_install_junit, below
+function ql_xml_escape() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e "s/'/\&apos;/g" -e 's/"/\&quot;/g'
+}
+
+# shellcheck disable=SC2329 # invoked only from on_exit, below
+function write_quay_install_junit() {
+  local exit_code="$1"
+
+  # No Subscription was ever created: an infra failure, not a Quay install attempt.
+  if [[ -z "${QL_INSTALL_START}" ]]; then
+    return 0
+  fi
+
+  # The install started but the script exited (e.g. a hard timeout kill) before
+  # it recorded a result; that is still a failure, not a skip.
+  if [[ -z "${QL_INSTALL_STATUS}" && "${exit_code}" -ne 0 ]]; then
+    QL_INSTALL_STATUS="failed"
+    QL_INSTALL_FAILURE="step exited with status ${exit_code}"
+  fi
+
+  local install_time=$(( $(date +%s) - QL_INSTALL_START ))
+  local failures=0
+  [[ "${QL_INSTALL_STATUS}" == "failed" ]] && failures=1
+
+  local tmp
+  tmp="$(mktemp "${ARTIFACT_DIR}/junit_quay_install.xml.XXXXXX")"
+  {
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+    printf '<testsuite name="quay-lifecycle" tests="1" failures="%d" skipped="0" time="%d">\n' \
+      "${failures}" "${install_time}"
+    printf '  <testcase name="[sig-quay] install should succeed" time="%d"' "${install_time}"
+    if [[ "${failures}" -eq 1 ]]; then
+      printf '>\n    <failure message="%s">%s</failure>\n  </testcase>\n' \
+        "$(ql_xml_escape "${QL_INSTALL_FAILURE}")" "$(ql_xml_escape "${QL_INSTALL_FAILURE}")"
+    else
+      printf '/>\n'
+    fi
+    echo '</testsuite>'
+  } > "${tmp}"
+  mv "${tmp}" "${ARTIFACT_DIR}/junit_quay_install.xml"
+}
+
+# shellcheck disable=SC2329 # invoked only via the EXIT trap installed below
+function on_exit() {
+  local ec=$?
+  if [ "${MAP_TESTS}" = "true" ]; then
+    LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+      ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-gcp__quay-tests-deploy-quay-gcp.xml || true
+  fi
+  write_quay_install_junit "${ec}"
+  [[ -n "${YQ_TMPDIR:-}" ]] && rm -rf "${YQ_TMPDIR}" || true
+  exit "${ec}"
+}
+trap on_exit EXIT
 
 QUAY_NS="quay-enterprise"
 
@@ -191,6 +250,7 @@ spec:
   - quay-enterprise
 EOF
 
+QL_INSTALL_START="$(date +%s)"
 SUB=$(
   cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
 apiVersion: operators.coreos.com/v1alpha1
@@ -222,6 +282,8 @@ for _ in {1..60}; do
   sleep 10
 done
 if [[ "$CSV_READY" != "true" ]]; then
+  QL_INSTALL_STATUS="failed"
+  QL_INSTALL_FAILURE="Timed out waiting for Quay Operator CSV to reach Succeeded phase"
   echo "Timed out waiting for Quay Operator CSV to reach Succeeded phase" >&2
   echo "=== CSV Status ===" >&2
   oc -n quay-enterprise get csv -o wide 2>&1 || true
@@ -244,6 +306,8 @@ for _ in {1..30}; do
   sleep 5
 done
 if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+  QL_INSTALL_STATUS="failed"
+  QL_INSTALL_FAILURE="Timed out waiting for QuayRegistry CRD"
   echo "Timed out waiting for QuayRegistry CRD" >&2
   echo "=== Operator Pod Logs ===" >&2
   oc logs -n quay-enterprise -l name=quay-operator --tail=100 2>&1 || true
@@ -307,40 +371,76 @@ PULL_METRICS_REDIS:
         host: quay-quay-redis
         port: 6379
         db: 1
+FEATURE_MAILING: false
+FEATURE_OTEL_TRACING: false
 EOF
 
-# Merge caller-provided extra config if set
+# Fetch yq once into a private temp dir: used below to merge config
+# fragments and to strip operator-managed keys, which now run
+# unconditionally.
+YQ_TMPDIR="$(mktemp -d)"
+YQ="${YQ_TMPDIR}/yq"
+curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+	-o "${YQ}" && chmod +x "${YQ}"
+
+# Merge a config fragment into config.yaml with list-append semantics ('*+',
+# not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
+# Validate first so a present-but-malformed fragment fails the step clearly
+# instead of corrupting config.yaml.
+function merge_config_fragment() {
+	local fragment="$1"
+	if ! "${YQ}" e 'true' "${fragment}" >/dev/null 2>&1; then
+		echo "ERROR: ${fragment} is not valid YAML" >&2
+		exit 1
+	fi
+	"${YQ}" eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+}
+
+# Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
+# so an explicit override still wins over the service-owned fragments. A
+# missing fragment is a silent no-op, leaving the disabled default above.
+if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
+	echo "Merging Mailpit config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-mail-config.yaml"
+fi
+
+if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
+	echo "Merging Jaeger/OTel config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
+fi
+
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	echo "Merging extra Quay config into defaults..."
 	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
-	curl -sL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-		-o /tmp/yq && chmod +x /tmp/yq
-	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
-	# Strip field-group keys for components this CR keeps managed. The operator
-	# injects those values; leaving them in configBundleSecret blocks rollout.
-	/tmp/yq -i '
-		del(
-			.FEATURE_SECURITY_SCANNER,
-			.FEATURE_SECURITY_NOTIFICATIONS,
-			.SECURITY_SCANNER_ENDPOINT,
-			.SECURITY_SCANNER_INDEXING_INTERVAL,
-			.SECURITY_SCANNER_V4_ENDPOINT,
-			.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
-			.SECURITY_SCANNER_V4_PSK,
-			.FEATURE_REPO_MIRROR,
-			.REPO_MIRROR_INTERVAL,
-			.REPO_MIRROR_SERVER_HOSTNAME,
-			.REPO_MIRROR_TLS_VERIFY,
-			.BUILDLOGS_REDIS,
-			.USER_EVENTS_REDIS,
-			.DB_URI,
-			.DB_CONNECTION_ARGS,
-			.SERVER_HOSTNAME,
-			.PREFERRED_URL_SCHEME,
-			.EXTERNAL_TLS_TERMINATION
-		)
-	' config.yaml
+	merge_config_fragment extra_config.yaml
 fi
+
+# Strip field-group keys for components this CR keeps managed. The operator
+# injects those values; leaving them in configBundleSecret blocks rollout.
+# Runs unconditionally now: a no-op on the defaults block when no overlay
+# above added any of these keys.
+"${YQ}" -i '
+	del(
+		.FEATURE_SECURITY_SCANNER,
+		.FEATURE_SECURITY_NOTIFICATIONS,
+		.SECURITY_SCANNER_ENDPOINT,
+		.SECURITY_SCANNER_INDEXING_INTERVAL,
+		.SECURITY_SCANNER_V4_ENDPOINT,
+		.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
+		.SECURITY_SCANNER_V4_PSK,
+		.FEATURE_REPO_MIRROR,
+		.REPO_MIRROR_INTERVAL,
+		.REPO_MIRROR_SERVER_HOSTNAME,
+		.REPO_MIRROR_TLS_VERIFY,
+		.BUILDLOGS_REDIS,
+		.USER_EVENTS_REDIS,
+		.DB_URI,
+		.DB_CONNECTION_ARGS,
+		.SERVER_HOSTNAME,
+		.PREFERRED_URL_SCHEME,
+		.EXTERNAL_TLS_TERMINATION
+	)
+' config.yaml
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
 # quay-provisioning-{tls,builder} steps have already written the
@@ -404,6 +504,7 @@ for i in $(seq 1 90); do
   status="$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
   if [[ "$status" == "True" ]]; then
     echo "Quay is ready (after $((i * 10))s)" >&2
+    QL_INSTALL_STATUS="passed"
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
     quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
@@ -421,6 +522,9 @@ for i in $(seq 1 90); do
 done
 
 echo "Timed out waiting for Quay to become ready" >&2
+ql_conditions="$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions}' 2>/dev/null || true)"
+QL_INSTALL_STATUS="failed"
+QL_INSTALL_FAILURE="Timed out waiting for Quay to become ready: ${ql_conditions}"
 echo "Final QuayRegistry conditions:" >&2
 print_quayregistry_conditions
 echo "Pods in ${QUAY_NS} namespace:" >&2

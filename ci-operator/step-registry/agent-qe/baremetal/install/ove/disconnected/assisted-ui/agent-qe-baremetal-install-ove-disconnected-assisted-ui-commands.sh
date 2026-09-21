@@ -36,7 +36,6 @@ fi
 
 if ! python3.11 assisted-ui/run_agent_tui.py; then
  echo "Assisted UI workflow failed."
- cp /tmp/assisted_ui.log "$ARTIFACT_DIR"
  cp -r /tmp/screenshots/* "$ARTIFACT_DIR"
  exit 1
 fi

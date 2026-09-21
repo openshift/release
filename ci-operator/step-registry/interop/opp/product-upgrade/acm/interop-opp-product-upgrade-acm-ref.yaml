@@ -1,33 +1,6 @@
 ref:
   as: interop-opp-product-upgrade-acm
-  from: cli
-  grace_period: 5m
   commands: interop-opp-product-upgrade-acm-commands.sh
-  timeout: 45m
-  resources:
-    requests:
-      cpu: 100m
-      memory: 100Mi
-  env:
-    - name: ACM_TARGET_CHANNEL
-      default: ""
-      documentation: |-
-        Target subscription channel for ACM operator upgrade (e.g. release-2.13).
-        When empty, the step determines the next available channel automatically
-        by querying the catalog for channels newer than the currently installed version.
-    - name: ACM_UPGRADE_TIMEOUT
-      default: "30m"
-      documentation: |-
-        Maximum time to wait for the ACM operator upgrade to complete.
-        Covers CSV transition from Replacing to Succeeded phase.
-    - name: ACM_SUBSCRIPTION_NAME
-      default: "advanced-cluster-management"
-      documentation: |-
-        Name of the ACM Subscription resource in the target namespace.
-    - name: ACM_SUBSCRIPTION_NAMESPACE
-      default: "open-cluster-management"
-      documentation: |-
-        Namespace containing the ACM Subscription and CSV resources.
   documentation: |-
     Upgrades the ACM (Advanced Cluster Management) operator via OLM subscription
     channel change and validates the upgrade completes successfully.
@@ -47,3 +20,30 @@ ref:
       1 - upgrade failed (CSV did not reach Succeeded)
       2 - timeout waiting for upgrade
       3 - precondition failure (no subscription found, no upgrade path)
+  env:
+    - default: "advanced-cluster-management"
+      documentation: |-
+        Name of the ACM Subscription resource in the target namespace.
+      name: ACM_SUBSCRIPTION_NAME
+    - default: "open-cluster-management"
+      documentation: |-
+        Namespace containing the ACM Subscription and CSV resources.
+      name: ACM_SUBSCRIPTION_NAMESPACE
+    - default: ""
+      documentation: |-
+        Target subscription channel for ACM operator upgrade (e.g. release-2.13).
+        When empty, the step determines the next available channel automatically
+        by querying the catalog for channels newer than the currently installed version.
+      name: ACM_TARGET_CHANNEL
+    - default: "30m"
+      documentation: |-
+        Maximum time to wait for the ACM operator upgrade to complete.
+        Covers CSV transition from Replacing to Succeeded phase.
+      name: ACM_UPGRADE_TIMEOUT
+  from: cli
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 45m

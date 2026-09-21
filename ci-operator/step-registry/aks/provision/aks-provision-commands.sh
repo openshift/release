@@ -39,18 +39,21 @@ run_az_with_retry() {
     # substitution, while stderr is used only for quiet retry classification.
 
     if ((rc >= 128 && rc <= 192)); then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s ended with status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
     fi
 
     if ! grep -Eiq "${AZURE_CLI_TRANSIENT_ERROR_PATTERN}" "${capture_dir}/stderr"; then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s failed with non-retryable status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
     fi
 
     if ((attempt >= max_attempts)); then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s failed after %d attempts with transient status %d\n' "${operation}" "${max_attempts}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
@@ -61,6 +64,7 @@ run_az_with_retry() {
       :
     else
       rc=$?
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s retry wait ended with status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
@@ -73,6 +77,13 @@ run_az_with_retry() {
   done
 }
 # END AZURE CLI RETRY HELPER
+
+print_az_cli_failure() {
+  local capture_dir="$1"
+  [[ -s "${capture_dir}/stdout" ]] && sed "s|${AZURE_AUTH_CLIENT_SECRET}|***REDACTED***|g" "${capture_dir}/stdout" >&2
+  [[ -s "${capture_dir}/stderr" ]] && sed "s|${AZURE_AUTH_CLIENT_SECRET}|***REDACTED***|g" "${capture_dir}/stderr" >&2
+  return 0
+}
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
@@ -126,6 +137,9 @@ echo "$RESOURCEGROUP" > "${SHARED_DIR}/resourcegroup_aks"
 
 echo "Building up the aks create command"
 CLUSTER="${RESOURCE_NAME_PREFIX}-aks-cluster"
+# Save the management cluster name before creation so post steps can clean up
+# a cluster when a later provisioning operation fails.
+echo "$CLUSTER" > "${SHARED_DIR}/aks-cluster-name"
 AKS_CREATE_COMMAND=(
     az aks create
     --name "$CLUSTER"
@@ -214,6 +228,8 @@ elif [[ -n "$AKS_ZONES" ]]; then
 fi
 
 echo "Saving cluster info"
+# Keep this generic name for existing consumers. HyperShift workflows may later
+# overwrite it with the hosted cluster name.
 echo "$CLUSTER" > "${SHARED_DIR}/cluster-name"
 if [[ $AKS_ADDONS == *azure-keyvault-secrets-provider* ]]; then
     run_az_with_retry "AKS cluster lookup" az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.clientId -r > "${SHARED_DIR}/aks_keyvault_secrets_provider_client_id"

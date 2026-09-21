@@ -1,6 +1,5 @@
 #!/bin/bash
-set -euxo pipefail
-shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
 # OPP post-upgrade smoke tests
@@ -88,7 +87,13 @@ CollectExitArtifacts() {
     oc get nodes -o yaml > "${ARTIFACT_DIR}/nodes.yaml" || true
 }
 
-trap CollectExitArtifacts EXIT
+# shellcheck disable=SC2317
+_propagate_junit () {
+    mkdir -p "${SHARED_DIR}/junit"
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+}
+
+trap '{( CollectExitArtifacts; _propagate_junit; true )}' EXIT
 
 # ---------------------------------------------------------------------------
 # Test 1: cluster-health

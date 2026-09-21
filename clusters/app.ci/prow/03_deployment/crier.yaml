@@ -53,6 +53,7 @@ spec:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release
@@ -60,6 +61,9 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: jobs-sparse-checkout
+          mountPath: /etc/git-sync-jobs
+          readOnly: true
       containers:
       - name: crier
         image: us-docker.pkg.dev/k8s-infra-prow/images/crier:v20260908-104d452f4
@@ -67,7 +71,7 @@ spec:
         - --github-workers=30
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -99,8 +103,14 @@ spec:
         - name: config
           mountPath: /etc/config
           readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
         - name: release
-          mountPath: /var/repo
+          mountPath: /etc/jobs/git
+          readOnly: true
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
           readOnly: true
@@ -119,12 +129,16 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: jobs-sparse-checkout
+          mountPath: /etc/git-sync-jobs
+          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -146,6 +160,14 @@ spec:
           name: config
       - name: release
         emptyDir: {}
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+      - name: jobs-sparse-checkout
+        configMap:
+          name: prow-jobs-sparse-checkout
       - name: build-farm-credentials
         secret:
           secretName: crier

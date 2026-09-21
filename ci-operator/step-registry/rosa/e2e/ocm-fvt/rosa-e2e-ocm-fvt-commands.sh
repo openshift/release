@@ -8,7 +8,7 @@ if [[ -z "${OCM_FVT_JOB_NAME:-}" ]]; then
   exit 1
 fi
 
-JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results-public/"
 if [[ -n "${PULL_NUMBER:-}" ]]; then
   JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
 else
@@ -175,10 +175,6 @@ if [[ -n "${hive_kubeconfig}" ]]; then
   echo "http_proxy=${backplane_proxy_url}" >> "${podman_env_file}"
 fi
 
-if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
-  echo "ENABLE_JIRA_REPORTING=true" >> "${podman_env_file}"
-fi
-
 if [[ -n "${OCM_FVT_OCM_ENV:-}" ]]; then
   echo "OCM_ENV=${OCM_FVT_OCM_ENV}" >> "${podman_env_file}"
 fi
@@ -263,14 +259,21 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
 fi
 
 cred_sources='source /usr/local/cs-qe-credentials/ocm-tokens'
-if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
-  cred_sources="${cred_sources}; source /usr/local/cs-qe-credentials/jira-cred"
-fi
 
 env -i bash --norc --noprofile -c "
   ${cred_sources}
   env | grep -v '^_='
 " >> "${podman_env_file}"
+
+# SREP service account: use backplane client credentials so tests don't depend
+# on expiring offline tokens for the SREP role.
+if [[ -f /usr/local/cs-qe-credentials/backplane_client_id && -f /usr/local/cs-qe-credentials/backplane_client_secret ]]; then
+  [[ $- == *x* ]] && WAS_TRACING_SREP=true || WAS_TRACING_SREP=false
+  set +x
+  echo "SREP_CLIENT_ID=$(cat /usr/local/cs-qe-credentials/backplane_client_id)" >> "${podman_env_file}"
+  echo "SREP_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/backplane_client_secret)" >> "${podman_env_file}"
+  $WAS_TRACING_SREP && set -x
+fi
 
 podman_args=(
   --authfile /usr/local/cs-qe-credentials/.dockerconfigjson
@@ -299,9 +302,6 @@ podman_args+=("-v" "${ocm_fvt_output}:/ocm-backend-tests/output:z")
 podman_args+=(--rm)
 
 ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
-if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
-  ocmtest_args+=(--reportJiraTicket)
-fi
 
 # osdfm post-alerts: port-forward AppSRE Prom; tests use a hard-coded in-cluster URL.
 # --add-host maps that hostname to host-gateway:9090 (backplane monitoring is not available).

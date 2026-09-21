@@ -14,6 +14,7 @@
 #   OSC_CHARTS_REF                - Charts git ref (default: main)
 #   ENABLEPEERPODS                - "true" to enable peer-pods (default: false)
 #   WORKLOAD_TO_TEST              - "kata", "peer-pods", or "coco" (default: kata)
+#   RUST_RUNTIME                  - "true" to use the Rust runtime (default: false)
 #
 # Outputs:
 #   Patches osc-config ConfigMap in default namespace to indicate installation complete.
@@ -62,6 +63,11 @@ if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
   echo ">>> Catalog source: ${OSC_DEV_CATALOG_NAME} (image: ${CATALOG_SOURCE_IMAGE})"
 else
   echo ">>> Catalog source: redhat-operators (using existing catalog)"
+fi
+if [[ "${RUST_RUNTIME}" = "true" ]]; then
+  echo ">>> Runtime: Rust"
+else
+  echo ">>> Runtime: Go"
 fi
 
 SCRATCH=$(mktemp -d)
@@ -299,7 +305,10 @@ function render_osc_operator_chart() {
     "--set" "namespaceOverride=${OSC_NAMESPACE}"
   )
 
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
+  if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
+    helm_args+=("--set" "dev.enabled=false")
+    echo ">>> Helm: dev.enabled=false (GA redhat-operators catalog)" >&2
+  elif [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
     helm_args+=("--set" "dev.enabled=true" "--set" "dev.image=${CATALOG_SOURCE_IMAGE}")
     echo ">>> Helm: dev.enabled=true, dev.image=${CATALOG_SOURCE_IMAGE}" >&2
   else
@@ -370,30 +379,37 @@ function render_osc_operands_chart() {
 
       case "${provider}" in
         azure)
-          local azure_subnet_id azure_nsg_id azure_resource_group azure_region azure_instance_size
+          local azure_subnet_id azure_nsg_id azure_resource_group azure_region azure_instance_size azure_instance_sizes
           azure_subnet_id=$(echo "${cm_data}" | jq -r '.data.AZURE_SUBNET_ID // ""')
           azure_nsg_id=$(echo "${cm_data}" | jq -r '.data.AZURE_NSG_ID // ""')
           azure_resource_group=$(echo "${cm_data}" | jq -r '.data.AZURE_RESOURCE_GROUP // ""')
           azure_region=$(echo "${cm_data}" | jq -r '.data.AZURE_REGION // ""')
           azure_instance_size=$(echo "${cm_data}" | jq -r '.data.AZURE_INSTANCE_SIZE // ""')
+          azure_instance_sizes=$(echo "${cm_data}" | jq -r '.data.AZURE_INSTANCE_SIZES // ""')
           [[ -n "${azure_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_SUBNET_ID=${azure_subnet_id}")
           [[ -n "${azure_nsg_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_NSG_ID=${azure_nsg_id}")
           [[ -n "${azure_resource_group}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_RESOURCE_GROUP=${azure_resource_group}")
           [[ -n "${azure_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_REGION=${azure_region}")
-          [[ -n "${azure_instance_size}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZE=${azure_instance_size}") || true
+          [[ -n "${azure_instance_size}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZE=${azure_instance_size}")
+          # Escape commas so helm --set-string treats the list as one value.
+          [[ -n "${azure_instance_sizes}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZES=${azure_instance_sizes//,/\\,}") || true
           ;;
         aws)
-          local aws_region aws_subnet_id aws_vpc_id aws_sg_ids podvm_instance_type
+          local aws_region aws_subnet_id aws_vpc_id aws_sg_ids podvm_instance_type podvm_instance_types
           aws_region=$(echo "${cm_data}" | jq -r '.data.AWS_REGION // ""')
           aws_subnet_id=$(echo "${cm_data}" | jq -r '.data.AWS_SUBNET_ID // ""')
           aws_vpc_id=$(echo "${cm_data}" | jq -r '.data.AWS_VPC_ID // ""')
           aws_sg_ids=$(echo "${cm_data}" | jq -r '.data.AWS_SG_IDS // ""')
           podvm_instance_type=$(echo "${cm_data}" | jq -r '.data.PODVM_INSTANCE_TYPE // ""')
+          podvm_instance_types=$(echo "${cm_data}" | jq -r '.data.PODVM_INSTANCE_TYPES // ""')
           [[ -n "${aws_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_REGION=${aws_region}")
           [[ -n "${aws_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SUBNET_ID=${aws_subnet_id}")
           [[ -n "${aws_vpc_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_VPC_ID=${aws_vpc_id}")
-          [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids}")
-          [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}") || true
+          # Escape commas so helm --set-string treats multiple SG IDs as one value.
+          [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids//,/\\,}") || true
+          [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}")
+          # Escape commas so helm --set-string treats the list as one value.
+          [[ -n "${podvm_instance_types}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPES=${podvm_instance_types//,/\\,}") || true
           ;;
         gcp)
           local gcp_project_id gcp_zone gcp_network gcp_machine_type
@@ -441,6 +457,15 @@ function install_osc_operator() {
   oc apply -f "${operator_yaml}" --dry-run=client -o name || true
 
   oc_with_retry oc apply -f "${operator_yaml}"
+
+  # The helm chart creates osc-operator-dev-catalog unconditionally regardless of dev.enabled
+  # (helm chart bug).  When using the GA redhat-operators catalog the dev catalog has no valid
+  # image and will never become READY, blocking Stage 0 of wait_for_operator().  Delete it so
+  # the wait only covers catalogs that are actually needed.
+  if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
+    echo ">>> redhat-operators catalog in use; deleting spurious ${OSC_DEV_CATALOG_NAME} CatalogSource (helm chart bug)"
+    oc delete catalogsource "${OSC_DEV_CATALOG_NAME}" -n openshift-marketplace --ignore-not-found=true || true
+  fi
 }
 
 function wait_for_operator() {
@@ -712,6 +737,35 @@ function update_osc_config() {
   echo ">>> osc-config patched with oscInstalled=true"
 }
 
+function switch_to_rust_runtime() {
+  echo ">>> Telling OSC to use the Rust runtime"
+
+  # Tell OSC to switch to rust. This will restart the controller.
+  oc set env -n "${OSC_NAMESPACE}" deployment/controller-manager RUST_RUNTIME="true"
+
+  if ! wait_until "controller-manager rollout after Rust runtime switch" 900 5 \
+    "oc rollout status deployment/controller-manager -n '${OSC_NAMESPACE}' --timeout=0 2>/dev/null | grep -q 'successfully rolled out'"; then
+    oc get pods -n "${OSC_NAMESPACE}" || true
+    oc describe deployment -n "${OSC_NAMESPACE}" controller-manager | tail -30 || true
+    return 1
+  fi
+
+  echo ">>> OSC now configured to use the Rust runtime"
+}
+
+function check_rust_runtime() {
+  echo ">>> Checking if Rust runtime is active"
+
+  if ! wait_until "kata RuntimeClass with rs-kata handler" 300 5 \
+    "oc get runtimeclass kata -o jsonpath='{.handler}' 2>/dev/null | grep -q '^rs-kata$'"; then
+    echo ">>> ERROR: kata RuntimeClass with rs-kata handler not found"
+    oc get runtimeclass -o custom-columns=NAME:.metadata.name,HANDLER:.handler || true
+    return 1
+  fi
+
+  echo ">>> Rust runtime is active (kata RuntimeClass handler=rs-kata)"
+}
+
 #========================================
 # Main Execution
 #========================================
@@ -738,8 +792,16 @@ if [[ "${ENABLEPEERPODS}" == "true" ]]; then
   create_peer_pods_secret
 fi
 
+if [[ "${RUST_RUNTIME}" == "true" ]]; then
+  switch_to_rust_runtime
+fi
+
 install_osc_operands "${CHARTS_DIR}"
 wait_for_kataconfig
+
+if [[ "${RUST_RUNTIME}" == "true" ]]; then
+  check_rust_runtime
+fi
 
 # Phase 5: Update shared state
 update_osc_config
