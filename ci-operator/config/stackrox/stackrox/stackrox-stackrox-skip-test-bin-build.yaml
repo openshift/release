@@ -1,8 +1,8 @@
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9/python-311
-      USER root
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-ui-test-stable
 prowgen:
   enable_secrets_store_csi_driver: true
 resources:
@@ -171,8 +171,9 @@ tests:
           ls -la /tmp/ 2>/dev/null
         } > "$CAPTURE_DIR/file-listings.txt"
 
-        echo "$(date -u +%H:%M:%S) Phase 4: gcloud upload"
-        gcloud storage cp "$CAPTURE_DIR"/*.txt "$DEST_PREFIX/"
+        echo "$(date -u +%H:%M:%S) Phase 4: gcs upload"
+        gcloud storage cp "$CAPTURE_DIR"/*.txt "$DEST_PREFIX/" \ 
+          || gsutil -m cp "$CAPTURE_DIR"/*.txt "$DEST_PREFIX/"
         rm -rf "$CAPTURE_DIR"
 
         echo "$(date -u +%H:%M:%S) Phase 5: done"
