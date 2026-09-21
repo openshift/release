@@ -1,0 +1,108 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- always_run: false
+  as: eval-manifest-smoke
+  optional: true
+  steps:
+    test:
+    - as: manifest-smoke
+      commands: |
+        set -euo pipefail
+
+        # Temporary rehearsal wiring: source refs belong to release, while the fixture
+        # belongs to ai-helpers. Keep both versions explicit; do not change the runner.
+        test "${REPO_OWNER}/${REPO_NAME}" = openshift/release
+        workdir="$(mktemp -d)"
+        trap 'rm -rf "${workdir}"' EXIT
+        release_sha="${PULL_PULL_SHA}"
+        fixture_base=b3ec8bbc4d7b947fd6f18dd13339d9acbb8c37ce
+        fixture_head=33bd5a54d78f598271dec7e780ceb3dcf5ee1976
+
+        git init "${workdir}/release"
+        git -C "${workdir}/release" remote add origin https://github.com/openshift/release.git
+        git -C "${workdir}/release" fetch --filter=blob:none --depth=1 origin "${release_sha}"
+        git -C "${workdir}/release" sparse-checkout init --cone
+        git -C "${workdir}/release" sparse-checkout set ci-operator/step-registry/openshift/claude/agent-eval/manifest
+        git -C "${workdir}/release" checkout --detach FETCH_HEAD
+        test "$(git -C "${workdir}/release" rev-parse HEAD)" = "${release_sha}"
+        runner="${workdir}/release/ci-operator/step-registry/openshift/claude/agent-eval/manifest/openshift-claude-agent-eval-manifest-commands.sh"
+
+        git init "${workdir}/ai-helpers"
+        git -C "${workdir}/ai-helpers" remote add origin https://github.com/openshift-eng/ai-helpers.git
+        git -C "${workdir}/ai-helpers" fetch --depth=2 origin refs/pull/765/head
+        git -C "${workdir}/ai-helpers" checkout --detach FETCH_HEAD
+        test "$(git -C "${workdir}/ai-helpers" rev-parse HEAD)" = "${fixture_head}"
+        git -C "${workdir}/ai-helpers" cat-file -e "${fixture_base}^{commit}"
+        cd "${workdir}/ai-helpers"
+        export PULL_BASE_SHA="${fixture_base}"
+        unset EVAL_WORKDIR
+        mkdir -p "${ARTIFACT_DIR}/runner"
+        {
+          echo "release_sha=${release_sha}"
+          echo "fixture_pr=https://github.com/openshift-eng/ai-helpers/pull/765"
+          echo "fixture_base=${fixture_base}"
+          echo "fixture_head=${fixture_head}"
+          sha256sum "${runner}"
+          git diff --name-only --no-renames "${PULL_BASE_SHA}...HEAD" --
+          claude --version
+        } | tee "${ARTIFACT_DIR}/runner/smoke-inputs.log"
+
+        # Invoke the exact generated entry point from the release PR under rehearsal.
+        # This validates runtime behavior; direct workflow enrollment remains separate.
+        bash "${runner}"
+      credentials:
+      - collection: ci-claude-code
+        group: claude-openshift-ci
+        mount_path: /var/run/claude-code-service-account
+      - collection: technical-release-team
+        group: github-bot-token
+        mount_path: /var/run/github-token
+      env:
+      - default: ""
+        documentation: |-
+          Root of the PR Git checkout containing evals.yaml and PULL_BASE_SHA history.
+          Defaults to the current working directory. Set this when the checkout is
+          elsewhere. See hack/claude-agent-eval/README.md in openshift/release.
+        name: EVAL_WORKDIR
+      - default: claude-opus-4-6
+        documentation: Model for the outer orchestrator; skill models come from each
+          eval YAML.
+        name: CLAUDE_MODEL
+      - default: "1"
+        name: CLAUDE_CODE_USE_VERTEX
+      - default: global
+        name: CLOUD_ML_REGION
+      - default: openshift-ci-prow-agents
+        name: ANTHROPIC_VERTEX_PROJECT_ID
+      - default: /var/run/claude-code-service-account/google-token
+        name: GOOGLE_APPLICATION_CREDENTIALS
+      - default: /var/run/github-token/token
+        name: GITHUB_TOKEN_PATH
+      from: claude-ai-helpers
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+      timeout: 30m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ai-helpers
+  variant: manifest-smoke
