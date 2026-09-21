@@ -53,6 +53,11 @@ curl \
   --fail-with-body \
   --silent \
   --show-error \
+  --connect-timeout 10 \
+  --max-time 30 \
+  --retry 3 \
+  --retry-all-errors \
+  --retry-delay 2 \
   --request POST \
   --header "Accept: application/vnd.github+json" \
   --header "Authorization: Bearer $(<"${token_path}")" \

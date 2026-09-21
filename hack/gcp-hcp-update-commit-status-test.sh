@@ -18,6 +18,19 @@ cat >"${test_root}/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
+args=" $* "
+for expected in \
+  " --connect-timeout 10 " \
+  " --max-time 30 " \
+  " --retry 3 " \
+  " --retry-all-errors " \
+  " --retry-delay 2 "; do
+  if [[ "${args}" != *"${expected}"* ]]; then
+    echo "ERROR: curl invocation is missing:${expected}" >&2
+    exit 1
+  fi
+done
+
 while (( $# > 0 )); do
   if [[ "$1" == "--data" ]]; then
     printf '%s' "$2" >"${CAPTURE_PATH}"
