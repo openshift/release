@@ -192,6 +192,8 @@ tests:
     env:
       PQC_CHECK: "true"
       SCAN_NAMESPACE: openshift-file-integrity
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_REQUEST: 1Gi
       SCANNER_NAMESPACE: openshift-file-integrity
     test:
     - as: deploy
@@ -202,7 +204,11 @@ tests:
         mkdir -p /tmp/bin
         ln -sf "$(command -v oc)" /tmp/bin/kubectl
         export PATH="/tmp/bin:$PATH"
-        make e2e-set-image deploy
+        # NOTE: do not chain "e2e-set-image deploy" -- deploy's own recipe
+        # unconditionally re-runs "kustomize edit set image ...=${IMG}",
+        # clobbering whatever e2e-set-image just set back to IMG's default
+        # (the public quay.io release image). Pass IMG directly instead.
+        make deploy IMG="${IMAGE_FROM_CI}"
         oc wait --timeout=5m --for=condition=Available -n openshift-file-integrity deployment/file-integrity-operator
       dependencies:
       - env: IMAGE_FROM_CI
