@@ -132,7 +132,7 @@ ARTIFACT_DIR/
     setup.log                       # if setup ran
     regression.log                  # if scoring ran
     metrics.log                     # if metrics extraction was attempted
-    eval-run.tar.gz
+    eval-run.tar
 ```
 
 The static index links available artifacts and reports selected evals as passed,
@@ -143,7 +143,9 @@ scripts can write additional diagnostic files there. JUnit and AutoDL metrics
 remain aggregated at the job root.
 
 Each archive contains only the current eval's harness run under `run/`, including
-partial results on failure. Other evals and historical runs are not archived.
+partial results on failure. It uses an uncompressed `.tar` so CI artifact
+processing preserves the filename used by the index. Other evals and historical
+runs are not archived.
 Files for stages that never ran are absent; the index only links existing files.
 JUnit contains one testcase per attempted eval, not per dataset case.
 

@@ -264,10 +264,12 @@ def verify_result(directory, config):
 
 
 def archive(directory, artifacts):
-    destination = artifacts / "eval-run.tar.gz"
+    destination = artifacts / "eval-run.tar"
     temporary = destination.with_suffix(".tmp")
     try:
-        with tarfile.open(temporary, "w:gz") as output:
+        # CI artifact processing removes the .gz suffix from compressed files.
+        # Use a plain tar so the uploaded name still matches the static index.
+        with tarfile.open(temporary, "w") as output:
             output.add(directory, arcname="run")
         temporary.replace(destination)
     finally:
@@ -278,7 +280,7 @@ def write_index(artifacts, entries, errors):
     """Write a small index linking only artifacts that actually exist."""
     rows = []
     filenames = ("report-summary.html", "summary.yaml", "run_result.json", "claude-eval.log",
-                 "setup.log", "regression.log", "metrics.log", "eval-run.tar.gz")
+                 "setup.log", "regression.log", "metrics.log", "eval-run.tar")
     for entry in entries:
         relative = Path("evals") / entry["name"]
         links = []

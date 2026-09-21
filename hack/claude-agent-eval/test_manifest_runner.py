@@ -518,7 +518,7 @@ class RunDirectoryTests(Fixture):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.junit().attrib["failures"], "0")
         self.assertTrue((self.eval_artifacts() / "report-summary.html").is_file())
-        with tarfile.open(self.eval_artifacts() / "eval-run.tar.gz") as archive:
+        with tarfile.open(self.eval_artifacts() / "eval-run.tar") as archive:
             self.assertTrue(archive.getmember("run").isdir())
             self.assertTrue(archive.getmember("run/run_result.json").isfile())
 
@@ -563,7 +563,7 @@ class ExecutionTests(Fixture):
         result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "missing_result"}))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("<td>failed</td>", self.index())
-        with tarfile.open(self.eval_artifacts() / "eval-run.tar.gz") as archive:
+        with tarfile.open(self.eval_artifacts() / "eval-run.tar") as archive:
             self.assertIn("run/report.html", archive.getnames())
             self.assertNotIn("run/run_result.json", archive.getnames())
             self.assertFalse(any("old" in name for name in archive.getnames()))
@@ -631,7 +631,11 @@ class ExecutionTests(Fixture):
         self.change_skill()
         result = self.run_step()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue((self.eval_artifacts() / "eval-run.tar.gz").is_file())
+        archive_path = self.eval_artifacts() / "eval-run.tar"
+        with tarfile.open(archive_path, "r:") as archive:
+            self.assertTrue(archive.getmember("run/run_result.json").isfile())
+        self.assertIn("/eval-run.tar\"", self.index())
+        self.assertNotIn("eval-run.tar.gz", self.index())
         self.assertTrue((self.eval_artifacts() / "report-summary.html").is_file())
         self.assertTrue((self.eval_artifacts() / "claude-eval.log").is_file())
         self.assertFalse((self.artifacts / "claude-sessions.tar.gz").exists())
@@ -696,7 +700,7 @@ class ExecutionTests(Fixture):
         self.assertEqual(len(list(self.artifacts.glob("evals/*/summary.yaml"))), 2)
         self.assertEqual(self.junit().attrib["tests"], "2")
         for entry in (first, second):
-            with tarfile.open(self.eval_artifacts(entry["config"]) / "eval-run.tar.gz") as archive:
+            with tarfile.open(self.eval_artifacts(entry["config"]) / "eval-run.tar") as archive:
                 self.assertEqual(archive.extractfile("run/report.html").read().decode(), entry["config"])
                 self.assertEqual(sum(n.endswith("report.html") for n in archive.getnames()), 1)
         self.assertFalse((self.artifacts / "eval-runs.tar.gz").exists())
