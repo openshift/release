@@ -98,10 +98,13 @@ tests:
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
 
         # oc is not baked into the test image; pull a version-matched client
-        # from the hub cluster's downloads route (see tests/README.md).
-        CONSOLE_HOST=$(oc --kubeconfig "${SHARED_DIR}/hub-1.kc" whoami --show-console 2>/dev/null | sed 's#https://console-openshift-console#downloads#') || true
-        curl -kL "https://downloads-openshift-console.apps.$(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}' | sed -E 's#https://api\.([^:]+):6443#\1#')/amd64/linux/oc.tar.gz" \
-          | tar xz -C /tmp && export PATH="/tmp:${PATH}" || echo "WARN: falling back to preinstalled oc"
+        # from the hub cluster's downloads route (see tests/README.md). Derive
+        # the cluster domain straight from hub-1.kc so we don't need oc before
+        # it is installed. Failure here is fatal (set -eo pipefail).
+        API_HOST=$(sed -nE 's#^[[:space:]]*server:[[:space:]]*https://api\.([^:]+):6443.*#\1#p' "${SHARED_DIR}/hub-1.kc" | head -1)
+        curl -kL "https://downloads-openshift-console.apps.${API_HOST}/amd64/linux/oc.tar.gz" \
+          | tar xz -C /tmp
+        export PATH="/tmp:${PATH}"
 
         echo "IOP_IMAGE_REF=${IOP_IMAGE_REF}"
 
