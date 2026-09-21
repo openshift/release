@@ -1,5 +1,6 @@
 #!/bin/bash
-set -eux -o pipefail
+set -eu -o pipefail
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 shopt -s inherit_errexit
 
 # NOTE: UPGRADE_TIMEOUT, POLL_INTERVAL, STALL_WINDOW, OPP_OPERATORS are set via step config YAML
@@ -17,7 +18,7 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     set +x
     source "${SHARED_DIR}/proxy-conf.sh"
-    set -x
+    [[ "${DEBUG:-false}" == "true" ]] && set -x
 fi
 
 typeset -i exitCode=0
@@ -72,7 +73,7 @@ trap '{ exitCode=143; DebugOnExit; trap - EXIT; exit 143; }' TERM
 
 set +x
 KUBECONFIG="" oc registry login
-set -x
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 
 function ResolveTargetImage () {
     typeset image="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
@@ -217,6 +218,7 @@ function UpdateCcoAnnotation () {
 
 function InitiateUpgrade () {
     typeset isForce="${1:-}"; (($#)) && shift
+    echo ">>> PHASE: Initiating upgrade"
     : "Initiating upgrade to ${upgradeTarget}"
     : "Force flag: ${isForce}"
     oc adm upgrade --to-image="${upgradeTarget}" --allow-explicit-upgrade --force="${isForce}"
@@ -234,6 +236,7 @@ function InitiateUpgrade () {
 }
 
 function MonitorUpgrade () {
+    echo ">>> PHASE: Monitoring upgrade"
     typeset -i pollCount=0
     typeset -i lastProgressChange=0
     lastProgressChange=$(date +%s)
@@ -299,6 +302,7 @@ function MonitorUpgrade () {
 }
 
 function StabilizeCluster () {
+    echo ">>> PHASE: Stabilizing cluster"
     : "Waiting for cluster stability (minimum-stable-period=5m, timeout=30m)"
     if ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
         : "Cluster stabilization failed; gathering diagnostics"
@@ -312,6 +316,7 @@ function StabilizeCluster () {
 }
 
 function ValidatePlatformHealth () {
+    echo ">>> PHASE: Validating platform health"
     : "Validating platform health"
 
     typeset avail="" progressing="" degraded=""
@@ -351,6 +356,7 @@ function ValidatePlatformHealth () {
 }
 
 function ValidateOppOperators () {
+    echo ">>> PHASE: Validating OPP operators"
     : "Validating OPP operator health"
     typeset -a operatorsArr=()
     IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
@@ -429,6 +435,8 @@ function Main () {
     sourceVersion="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')"
     sourceMinorVersion="$(echo "${sourceVersion}" | cut -f2 -d.)"
     : "Source release: ${sourceVersion} (minor: ${sourceMinorVersion})"
+
+    echo ">>> PHASE: OCP upgrade starting"
 
     isForceUpdate="false"
     if ! CheckSigned "${upgradeTarget}"; then

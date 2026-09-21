@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 
 ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"

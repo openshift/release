@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 
 ODF_INSTALL_NAMESPACE=openshift-storage
 DEFAULT_ODF_OPERATOR_CHANNEL="stable-${ODF_VERSION_MAJOR_MINOR}"

@@ -1,7 +1,8 @@
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 shopt -s inherit_errexit
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 
 CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.version}')
 OCP_MAJOR_MINOR=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1,2)
@@ -113,7 +114,7 @@ if [[ -f "${SHARED_DIR}/vsphere_context.sh" ]]; then
     set +x
     source "${SHARED_DIR}/vsphere_context.sh"
     source "${SHARED_DIR}/govc.sh"
-    set -x
+    [[ "${DEBUG:-false}" == "true" ]] && set -x
 
     cat >> "${LOGS_CONFIG}" << __APPENDED_ENV_DATA__
 ENV_DATA:

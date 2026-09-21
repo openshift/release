@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 shopt -s inherit_errexit
 
 # NOTE: BACKUP_TIMEOUT and OPP_OPERATORS are set via step config YAML (naming deviates from OPP__ convention)
@@ -46,12 +47,12 @@ typeset timeoutPid=$!
 trap 'kill ${timeoutPid} || true' EXIT
 trap 'kill ${timeoutPid} || true; exit 124' TERM
 
-: "=== Pre-Upgrade Cluster Backup ==="
+echo ">>> PHASE: Pre-Upgrade Cluster Backup"
 : "Start time: $(date '+%F %T')"
 : "Backup timeout: ${BACKUP_TIMEOUT}s"
 
 # --- Etcd snapshot ---
-: "--- Etcd Snapshot ---"
+echo ">>> PHASE: Etcd Snapshot"
 typeset controlPlaneNode=""
 controlPlaneNode=$(oc get nodes -l node-role.kubernetes.io/master="" -o jsonpath='{.items[0].metadata.name}') || true
 if [[ -n "${controlPlaneNode}" ]]; then
@@ -104,7 +105,7 @@ else
 fi
 
 # --- Control plane resource state ---
-: "--- Control Plane State ---"
+echo ">>> PHASE: Control Plane State"
 Capture "ClusterVersion" "${backupDir}/clusterversion.yaml" \
     oc get clusterversion version -o yaml
 
@@ -118,7 +119,7 @@ Capture "MachineConfigPools" "${backupDir}/machineconfigpools.yaml" \
     oc get machineconfigpools -o yaml
 
 # --- OPP operator state ---
-: "--- OPP Operator State ---"
+echo ">>> PHASE: OPP Operator State"
 Capture "CSVs" "${backupDir}/csvs.yaml" \
     oc get csv -A -o yaml
 
@@ -129,7 +130,7 @@ Capture "InstallPlans" "${backupDir}/installplans.yaml" \
     oc get installplans -A -o yaml
 
 # --- Backup manifest ---
-: "--- Generating Backup Manifest ---"
+echo ">>> PHASE: Generating Backup Manifest"
 typeset clusterVersion=""
 clusterVersion=$(oc get clusterversion version -o jsonpath='{.status.desired.version}') || true
 
@@ -160,7 +161,7 @@ EOF
 : "OK: backup-manifest.json"
 
 # --- Summary ---
-: "=== Backup Summary ==="
+echo ">>> PHASE: Backup Summary"
 : "End time: $(date '+%F %T')"
 : "Cluster version: ${clusterVersion:-unknown}"
 : "Node count: ${nodeCount}"

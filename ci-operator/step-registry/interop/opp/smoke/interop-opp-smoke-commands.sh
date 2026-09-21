@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 
 # ---------------------------------------------------------------------------
 # OPP post-upgrade smoke tests
@@ -100,7 +101,7 @@ trap '{( CollectExitArtifacts; _propagate_junit; true )}' EXIT
 # ---------------------------------------------------------------------------
 
 TestClusterHealth() {
-    : "=== Test: cluster-health ==="
+    echo ">>> PHASE: Test — cluster-health"
     typeset failMsg=""
 
     # ClusterOperators: Available=True, Degraded!=True
@@ -183,7 +184,7 @@ TestClusterHealth() {
 # ---------------------------------------------------------------------------
 
 TestOppOperators() {
-    : "=== Test: opp-operators ==="
+    echo ">>> PHASE: Test — opp-operators"
     typeset failMsg=""
 
     typeset -a operatorsArr=()
@@ -277,7 +278,7 @@ TestOppOperators() {
 # ---------------------------------------------------------------------------
 
 TestAcmConnectivity() {
-    : "=== Test: acm-connectivity ==="
+    echo ">>> PHASE: Test — acm-connectivity"
     typeset failMsg=""
 
     # Check if ManagedCluster resources exist
@@ -324,7 +325,7 @@ TestAcmConnectivity() {
 # ---------------------------------------------------------------------------
 
 TestAcsSensors() {
-    : "=== Test: acs-sensors ==="
+    echo ">>> PHASE: Test — acs-sensors"
     typeset failMsg=""
 
     # Check SecuredCluster CR status first
@@ -394,7 +395,7 @@ TestAcsSensors() {
 # ---------------------------------------------------------------------------
 
 TestQuayPull() {
-    : "=== Test: quay-pull ==="
+    echo ">>> PHASE: Test — quay-pull"
     typeset failMsg=""
 
     # Find the Quay registry route
@@ -471,7 +472,7 @@ Main() {
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
 
-    : "OPP Smoke Tests starting"
+    echo ">>> PHASE: OPP Smoke Tests starting"
     : "Operators: ${OPP_OPERATORS}"
     : "Settle window: ${SMOKE_SETTLE_SECONDS}s"
     : "Artifacts dir: ${ARTIFACT_DIR}"

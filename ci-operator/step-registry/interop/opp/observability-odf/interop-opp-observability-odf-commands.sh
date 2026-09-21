@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 
 # ---------------------------------------------------------------------------
 # ACM Observability + ODF Interop Validation (6-point gate)
@@ -110,7 +111,7 @@ trap '{( CollectExitArtifacts; _propagate_junit; true )}' EXIT
 # ---------------------------------------------------------------------------
 
 function CheckRgwReady () {
-    : "=== Check 1: ODF Ceph RGW infrastructure ==="
+    echo ">>> PHASE: Check 1 — ODF Ceph RGW infrastructure"
 
     typeset rgwPhase=""
     typeset rgwJson="" rgwErr=""
@@ -201,34 +202,64 @@ print(items[0].get('status',{}).get('phase','') if items else '')
 # ---------------------------------------------------------------------------
 
 function CheckMcoReady () {
-    : "=== Check 2: MultiClusterObservability CR ==="
+    echo ">>> PHASE: Check 2 — MultiClusterObservability CR readiness poll"
 
-    typeset mcoStatus=""
-    if ! mcoStatus="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
-        --all-namespaces -o json | python3 -c "
+    typeset -i maxAttempts=24
+    typeset -i sleepSeconds=30
+    typeset -i attempt=0
+    typeset -i startTime=0
+    startTime=$(date +%s)
+
+    while (( attempt < maxAttempts )); do
+        (( attempt += 1 ))
+        typeset -i elapsed=0
+        elapsed=$(( $(date +%s) - startTime ))
+        echo ">>> MCO poll ${attempt}/${maxAttempts} (${elapsed}s elapsed)…"
+
+        typeset mcoStatus=""
+        if ! mcoStatus="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
+            observability -o jsonpath='{.status.conditions}' 2>/dev/null | python3 -c "
 import sys,json
-d=json.load(sys.stdin)
-items=d.get('items',[])
-if not items:
+raw=sys.stdin.read().strip()
+if not raw:
     print('NotFound')
-else:
-    conds=items[0].get('status',{}).get('conditions',[])
-    ready=[c for c in conds if c.get('type')=='Ready']
-    print(ready[0].get('status','Unknown') if ready else 'NoCondition')
+    sys.exit(0)
+conds=json.loads(raw)
+ready=[c for c in conds if c.get('type')=='Ready']
+print(ready[0].get('status','Unknown') if ready else 'NoCondition')
 ")"; then
-        AddResult "mco-ready" "fail" "Failed to query MultiClusterObservability CR"
-        return
-    fi
+            # Query failed — might be transient; retry unless last attempt
+            if (( attempt >= maxAttempts )); then
+                elapsed=$(( $(date +%s) - startTime ))
+                AddResult "mco-ready" "fail" "Failed to query MultiClusterObservability CR after ${elapsed}s"
+                return 1
+            fi
+            sleep "${sleepSeconds}"
+            continue
+        fi
 
-    if [[ "${mcoStatus}" == "True" ]]; then
-        : "PASS: MultiClusterObservability Ready=True"
-        AddResult "mco-ready" "pass"
-    elif [[ "${mcoStatus}" == "NotFound" ]]; then
-        AddResult "mco-ready" "skip" "MultiClusterObservability CR not found; observability not deployed"
-    else
-        AddResult "mco-ready" "fail" "MultiClusterObservability Ready=${mcoStatus} (expected True)"
-    fi
-    true
+        if [[ "${mcoStatus}" == "True" ]]; then
+            elapsed=$(( $(date +%s) - startTime ))
+            : "PASS: MultiClusterObservability Ready=True after ${elapsed}s"
+            AddResult "mco-ready" "pass" "MultiClusterObservability is Ready after ${elapsed}s"
+            return 0
+        fi
+
+        if [[ "${mcoStatus}" == "NotFound" ]]; then
+            AddResult "mco-ready" "skip" "MultiClusterObservability CR not found; observability not deployed"
+            return 0
+        fi
+
+        # Not ready yet — sleep and retry
+        if (( attempt < maxAttempts )); then
+            sleep "${sleepSeconds}"
+        fi
+    done
+
+    typeset -i elapsed=0
+    elapsed=$(( $(date +%s) - startTime ))
+    AddResult "mco-ready" "fail" "MultiClusterObservability not Ready after ${elapsed}s (last status=${mcoStatus:-unknown})"
+    return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -236,7 +267,7 @@ else:
 # ---------------------------------------------------------------------------
 
 function CheckStorageEndpoint () {
-    : "=== Check 3: Object storage endpoint ==="
+    echo ">>> PHASE: Check 3 — Object storage endpoint"
 
     typeset storageConfig=""
     if ! storageConfig="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
@@ -337,7 +368,7 @@ print('odf-backed' if odf_pat.search(endpoint) else 'external')
 # ---------------------------------------------------------------------------
 
 function CheckThanosHealth () {
-    : "=== Check 4: Thanos components healthy ==="
+    echo ">>> PHASE: Check 4 — Thanos components healthy"
 
     if ! oc get namespace "${obsNamespace}" -o name; then
         AddResult "thanos-health" "skip" "Observability namespace ${obsNamespace} does not exist"
@@ -419,7 +450,7 @@ function CheckThanosHealth () {
 # ---------------------------------------------------------------------------
 
 function CheckObcBound () {
-    : "=== Check 5: Observability ObjectBucketClaim ==="
+    echo ">>> PHASE: Check 5 — Observability ObjectBucketClaim"
 
     typeset obcList=""
     obcList="$(oc get obc -n "${obsNamespace}" -o json 2>/dev/null)" || true
@@ -541,7 +572,7 @@ print('ok')
 }
 
 function CheckThanosQuery () {
-    : "=== Check 6: Thanos query functional ==="
+    echo ">>> PHASE: Check 6 — Thanos query functional"
 
     typeset routeJson=""
     routeJson="$(oc get routes -n "${obsNamespace}" -o json)" || true
@@ -673,7 +704,7 @@ function Main () {
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
 
-    : "ACM Observability + ODF Interop Validation starting"
+    echo ">>> PHASE: ACM Observability + ODF Interop Validation starting"
     : "ACM namespace: ${acmNamespace}"
     : "Observability namespace: ${obsNamespace}"
     : "ODF namespace: ${odfNamespace}"

@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 shopt -s inherit_errexit
 
 typeset -ri mcpWaitTimeout="${MCP_WAIT_TIMEOUT:-3600}"

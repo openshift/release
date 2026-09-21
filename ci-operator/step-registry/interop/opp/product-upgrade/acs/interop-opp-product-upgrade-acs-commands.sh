@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 shopt -s inherit_errexit
 
 ACS_TARGET_CHANNEL="${ACS_TARGET_CHANNEL:-}"

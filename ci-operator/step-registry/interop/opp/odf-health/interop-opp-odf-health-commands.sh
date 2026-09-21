@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 
 # ---------------------------------------------------------------------------
 # ODF Health Check (7-point gate)
@@ -159,7 +160,7 @@ trap '{( CollectExitArtifacts; _propagate_junit; true )}' EXIT
 # ---------------------------------------------------------------------------
 
 function CheckOdfCsv () {
-    : "=== Check 1: ODF Operator CSV ==="
+    echo ">>> PHASE: Check 1 — ODF Operator CSV"
 
     typeset csvPhase=""
     if ! csvPhase="$(oc get csv -n "${ODF_NAMESPACE}" -o json | python3 -c "
@@ -187,7 +188,7 @@ print((m[0].get('status',{}).get('phase','NotFound')) if m else 'NotFound')
 # ---------------------------------------------------------------------------
 
 function CheckStorageCluster () {
-    : "=== Check 2: StorageCluster Ready ==="
+    echo ">>> PHASE: Check 2 — StorageCluster Ready"
 
     typeset scPhase=""
     if ! scPhase="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json | python3 -c "
@@ -214,7 +215,7 @@ print(d['items'][0]['status'].get('phase','NotFound') if d.get('items') else 'No
 # ---------------------------------------------------------------------------
 
 function CheckCephCluster () {
-    : "=== Check 3: CephCluster health ==="
+    echo ">>> PHASE: Check 3 — CephCluster health"
 
     typeset cephHealth=""
     if ! cephHealth="$(oc get cephcluster -n "${ODF_NAMESPACE}" -o json | python3 -c "
@@ -241,7 +242,7 @@ print(d['items'][0].get('status',{}).get('ceph',{}).get('health','NotFound') if 
 # ---------------------------------------------------------------------------
 
 function CheckStorageClasses () {
-    : "=== Check 4: StorageClasses ==="
+    echo ">>> PHASE: Check 4 — StorageClasses"
     typeset failMsg=""
     typeset scName=""
 
@@ -270,7 +271,7 @@ function CheckStorageClasses () {
 # ---------------------------------------------------------------------------
 
 function CheckPvcProvision () {
-    : "=== Check 5: PVC provisioning (RBD + CephFS) ==="
+    echo ">>> PHASE: Check 5 — PVC provisioning"
 
     typeset -a scTests=("ocs-storagecluster-ceph-rbd" "ocs-storagecluster-cephfs")
     typeset -a scModes=("ReadWriteOnce" "ReadWriteMany")
@@ -333,7 +334,7 @@ EOF
 # ---------------------------------------------------------------------------
 
 function CheckNoobaa () {
-    : "=== Check 6: NooBaa S3 functional ==="
+    echo ">>> PHASE: Check 6 — NooBaa S3 functional"
 
     typeset nbPhase=""
     if ! nbPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | python3 -c "
@@ -521,7 +522,7 @@ EOF
 # ---------------------------------------------------------------------------
 
 function CheckCephHealth () {
-    : "=== Check 7: Ceph health detail ==="
+    echo ">>> PHASE: Check 7 — Ceph health detail"
 
     typeset cephDetail=""
     if ! cephDetail="$(oc get cephcluster -n "${ODF_NAMESPACE}" -o json | python3 -c "
@@ -563,7 +564,7 @@ function WaitForOdfReady () {
     typeset -i deadline=$(( SECONDS + timeout ))
     typeset -i pollInterval=15
 
-    : "Waiting up to ${timeout}s for StorageCluster and NooBaa to reach Ready..."
+    echo ">>> PHASE: Waiting for ODF subsystems to reach Ready"
 
     typeset scPhase="" nbPhase=""
     while (( SECONDS < deadline )); do
@@ -643,7 +644,7 @@ function Main () {
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
 
-    : "ODF Health Check (7-point gate) starting"
+    echo ">>> PHASE: ODF Health Check (7-point gate) starting"
     : "Namespace: ${ODF_NAMESPACE}"
     : "Artifacts dir: ${ARTIFACT_DIR}"
 
@@ -666,12 +667,12 @@ function Main () {
     typeset scJson="" scCount=""
     set +x  # suppress xtrace for API response
     if ! scJson="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json 2>/dev/null)"; then
-        set -x  # restore xtrace
+        [[ "${DEBUG:-false}" == "true" ]] && set -x  # restore xtrace
         : "Failed to query StorageClusters in ${ODF_NAMESPACE}"
         exit 1
     fi
     if [[ -z "${scJson}" ]]; then
-        set -x  # restore xtrace
+        [[ "${DEBUG:-false}" == "true" ]] && set -x  # restore xtrace
         : "StorageCluster query returned empty output in ${ODF_NAMESPACE}"
         exit 1
     fi
@@ -681,11 +682,11 @@ items=d.get('items')
 if not isinstance(items,list): raise ValueError('StorageCluster items is not a list')
 print(len(items))
 ")"; then
-        set -x  # restore xtrace
+        [[ "${DEBUG:-false}" == "true" ]] && set -x  # restore xtrace
         : "Failed to parse StorageCluster JSON from ${ODF_NAMESPACE}"
         exit 1
     fi
-    set -x  # restore xtrace
+    [[ "${DEBUG:-false}" == "true" ]] && set -x  # restore xtrace
     if (( scCount == 0 )); then
         AddResult "odf-csv-phase" "pass"
         SkipAllChecks "ODF operator installed but no StorageCluster configured in ${ODF_NAMESPACE}" \

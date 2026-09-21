@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -eux -o pipefail
+set -eu -o pipefail
+[[ "${DEBUG:-false}" == "true" ]] && set -x
 shopt -s inherit_errexit
 
 OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-operator,quay-operator}"
@@ -13,7 +14,7 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     set +x
     source "${SHARED_DIR}/proxy-conf.sh"
-    set -x
+    [[ "${DEBUG:-false}" == "true" ]] && set -x
 fi
 
 REPORT_DIR="${ARTIFACT_DIR}/preflight"
@@ -101,7 +102,7 @@ with open(sys.argv[1], 'w') as f:
 }
 
 function CheckApiDeprecations () {
-    : "=== Check 1: API deprecation scan ==="
+    echo ">>> PHASE: Check 1 — API deprecation scan"
 
     typeset targetMinor="${1}"
     typeset ocpDisplay="${2:-4.${targetMinor}}"
@@ -147,7 +148,7 @@ function CheckApiDeprecations () {
 }
 
 function CheckOppCompatibility () {
-    : "=== Check 2: OPP operator compatibility matrix ==="
+    echo ">>> PHASE: Check 2 — OPP operator compatibility matrix"
 
     typeset ocpKey="${1}"
     typeset compatSpec="${OPP_COMPAT[${ocpKey}]:-}"
@@ -219,7 +220,7 @@ function CheckOppCompatibility () {
 }
 
 function CheckClusterHealth () {
-    : "=== Check 3: Cluster health baseline ==="
+    echo ">>> PHASE: Check 3 — Cluster health baseline"
 
     typeset failed=0 details=""
 
@@ -314,7 +315,7 @@ print('\n'.join(names))
 }
 
 function CheckMcpReadiness () {
-    : "=== Check 4: MachineConfigPool readiness ==="
+    echo ">>> PHASE: Check 4 — MachineConfigPool readiness"
 
     typeset failed=0 details=""
 
@@ -391,7 +392,7 @@ function Main () {
 
     set +x
     KUBECONFIG="" oc registry login
-    set -x
+    [[ "${DEBUG:-false}" == "true" ]] && set -x
 
     typeset targetVersion targetMajor targetMinor ocpXy
     targetVersion="$(oc adm release info "${target}" -o jsonpath='{.metadata.version}')"
@@ -404,7 +405,7 @@ function Main () {
     sourceVersion="$(oc get clusterversion --no-headers | awk '{print $2}')"
     : "Source OCP version: ${sourceVersion}"
 
-    : "=== Starting OPP pre-flight validation ==="
+    echo ">>> PHASE: Starting OPP pre-flight validation"
 
     InitReport
 
