@@ -1,0 +1,44 @@
+base_images:
+  claude-runtime:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+prowgen:
+  enable_secrets_store_csi_driver: true
+raw_steps:
+- project_directory_image_build_step:
+    dockerfile_literal: |
+      FROM claude-runtime
+      USER root
+      COPY --chown=1000:0 . /workspace
+      RUN chmod -R g+rwX /workspace && git config --system --add safe.directory /workspace
+      WORKDIR /workspace
+      USER 1000
+      RUN test -d .git && test -f evals.yaml && git rev-parse HEAD
+    from: claude-runtime
+    optional: true
+    to: claude-ai-helpers
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- always_run: false
+  as: eval-manifest-smoke
+  optional: true
+  steps:
+    env:
+      EVAL_WORKDIR: /workspace
+    workflow: openshift-claude-agent-eval-manifest
+  timeout: 30m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: manifest-smoke-workflow

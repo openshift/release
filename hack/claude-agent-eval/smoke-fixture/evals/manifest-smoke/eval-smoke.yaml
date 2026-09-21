@@ -1,0 +1,78 @@
+name: manifest-smoke
+description: Single-case CI smoke test for the manifest eval workflow.
+
+execution:
+  mode: case
+  skill: code-review:classify-review-comment
+  arguments: "{comment}"
+  timeout: 120
+  max_budget_usd: 1.0
+
+runner:
+  type: claude-code
+  plugin_dirs:
+  - hack/claude-agent-eval/smoke-fixture/plugins/code-review
+  system_prompt: |
+    Classify the supplied review comment using the skill's label taxonomy.
+    Write the classification object to classification.json in the current
+    working directory, with severity, topic, confidence, and rationale fields.
+    The file must contain only JSON, without markdown fences.
+
+models:
+  skill: claude-sonnet-4-6
+
+permissions:
+  allow:
+  - Read
+  - Write
+  - Skill
+  deny:
+  - Bash
+  - Agent
+  - mcp__*
+
+dataset:
+  path: cases
+  schema: |
+    input.yaml contains a comment string. annotations.yaml contains
+    expected_severity and expected_topic for deterministic scoring.
+
+outputs:
+- path: classification.json
+  schema: |
+    JSON object with severity and topic strings, a numeric confidence from
+    zero to one, and a nonempty rationale string.
+
+judges:
+- name: classification_correct
+  description: Require a valid classification matching the expected labels.
+  check: |
+    import json
+    files = {**outputs.get("files", {}), **outputs.get("modified_files", {})}
+    matches = [value for path, value in files.items()
+               if path == "classification.json" or path.endswith("/classification.json")]
+    if len(matches) != 1:
+        return (False, "Expected exactly one classification.json")
+    try:
+        result = json.loads(matches[0])
+    except (TypeError, ValueError):
+        return (False, "Output is not valid JSON")
+    if not isinstance(result, dict):
+        return (False, "Output must be an object")
+    expected = outputs.get("annotations", {})
+    for field in ("severity", "topic"):
+        if result.get(field) != expected.get("expected_" + field):
+            return (False, "Unexpected " + field)
+    confidence = result.get("confidence")
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        return (False, "Confidence must be numeric")
+    if not 0 <= confidence <= 1:
+        return (False, "Confidence must be between zero and one")
+    rationale = result.get("rationale")
+    if not isinstance(rationale, str) or not rationale.strip():
+        return (False, "Rationale must be nonempty")
+    return (True, "Expected classification produced")
+
+thresholds:
+  classification_correct:
+    min_pass_rate: 1.0
