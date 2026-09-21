@@ -13,8 +13,7 @@ images:
   # build cluster pulls via ci-pull-credentials (confirmed by the -images job).
   - dockerfile_path: Dockerfile
     to: insights-on-prem
-  # The test runtime image (pytest + curl + tar + jq). oc is downloaded at
-  # runtime from the target cluster's downloads route.
+  # The test runtime image (pytest + jq + a baked-in oc client).
   - dockerfile_path: tests-image/Dockerfile
     to: insights-on-prem-tests
 prowgen:
@@ -83,15 +82,7 @@ tests:
         # cluster kubeconfigs.
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
 
-        # oc is not baked into the test image; pull a version-matched client
-        # from the hub cluster's downloads route. Derive
-        # the cluster domain straight from hub-1.kc so we don't need oc before
-        # it is installed. Failure here is fatal (set -eo pipefail).
-        API_HOST=$(sed -nE 's#^[[:space:]]*server:[[:space:]]*https://api\.([^:]+):6443.*#\1#p' "${SHARED_DIR}/hub-1.kc" | head -1)
-        curl -kL "https://downloads-openshift-console.apps.${API_HOST}/amd64/linux/oc.tar.gz" \
-          | tar xz -C /tmp
-        export PATH="/tmp:${PATH}"
-
+        # oc is baked into the insights-on-prem-tests image (see tests-image/Dockerfile).
         echo "IOP_IMAGE_REF=${IOP_IMAGE_REF}"
 
         # 1. Import the managed (spoke) cluster into ACM.
