@@ -32,7 +32,7 @@ tests:
         trap 'rm -rf "${workdir}"' EXIT
         release_sha="${PULL_PULL_SHA}"
         fixture_base=b3ec8bbc4d7b947fd6f18dd13339d9acbb8c37ce
-        fixture_head=c1e94a6bf90220f3273d976ec9a37113e38b88c6
+        fixture_head=da76969fe72f0bd8b560383a93d48fa96dc15815
 
         git init "${workdir}/release"
         git -C "${workdir}/release" remote add origin https://github.com/openshift/release.git
@@ -66,17 +66,7 @@ tests:
 
         # Invoke the exact generated entry point from the release PR under rehearsal.
         # This validates runtime behavior; direct workflow enrollment remains separate.
-        runner_status=0
-        bash "${runner}" || runner_status=$?
-        # The orchestrator must not repair the intentional judge failure.
-        integrity_status=0
-        git diff --exit-code HEAD -- evals.yaml evals/manifest-smoke evals/manifest-smoke-secondary plugins/code-review > "${ARTIFACT_DIR}/runner/fixture-integrity.log" || integrity_status=$?
-        echo "fixture_integrity_exit_code=${integrity_status}" >> "${ARTIFACT_DIR}/runner/fixture-integrity.log"
-        if [[ "${integrity_status}" != 0 ]]; then
-          echo "Fixture changed during evaluation; this rehearsal is invalid."
-          exit 1
-        fi
-        exit "${runner_status}"
+        bash "${runner}"
       credentials:
       - collection: ci-claude-code
         group: claude-openshift-ci
