@@ -210,6 +210,25 @@ tests:
         # (the public quay.io release image). Pass IMG directly instead.
         make deploy IMG="${IMAGE_FROM_CI}"
         oc wait --timeout=5m --for=condition=Available -n openshift-file-integrity deployment/file-integrity-operator
+        # deployment.yaml has no readiness/liveness probe, so "Available" above
+        # only means the container process started -- it says nothing about the
+        # metrics HTTPS listener on :8585, which pkg/controller/metrics/metrics.go
+        # deliberately brings up later, after blocking (up to 5m) for the
+        # service-ca-issued serving cert to be mounted. Wait for that same file
+        # to actually appear in the running container before scanning, otherwise
+        # tls-scanner's /proc/net/tcp-based port discovery (this Deployment
+        # declares no containerPorts) races it and only ever sees the two plain
+        # HTTP ports (8081 health, 8383 controller-runtime metrics) that are up
+        # immediately -- silently skipping the one HTTPS endpoint under test.
+        for i in $(seq 1 36); do
+          if oc exec -n openshift-file-integrity deploy/file-integrity-operator -- test -f /var/run/secrets/serving-cert/tls.crt 2>/dev/null; then
+            echo "metrics serving cert is mounted, endpoint should be listening"
+            sleep 5
+            break
+          fi
+          echo "waiting for metrics serving cert to be mounted (attempt $i/36)..."
+          sleep 5
+        done
       dependencies:
       - env: IMAGE_FROM_CI
         name: file-integrity-operator
