@@ -26,10 +26,12 @@ else
   RELEASE_IMAGE="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}"
 fi
 BOOTSTRAP_IGN="${SHARED_DIR}/bootstrap.ign"
-PULL_SECRET="${CLUSTER_PROFILE_DIR}/pull-secret"
+# Same auth pattern as platform-external-pre-conf / manifests extract.
+PULL_SECRET="${REGISTRY_AUTH_FILE:-/tmp/secret/pull-secret-with-ci}"
 ARTIFACT_LOG="${ARTIFACT_DIR}/preflight-installer-release.log"
 
 mkdir -p "${ARTIFACT_DIR}"
+mkdir -p "$(dirname "${PULL_SECRET}")"
 exec > >(tee -a "${ARTIFACT_LOG}") 2>&1
 
 echo "=== platform-external preflight: installer/bootstrap vs install release ==="
@@ -46,9 +48,15 @@ if [[ ! -f "${BOOTSTRAP_IGN}" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${PULL_SECRET}" ]]; then
-  echo "ERROR: pull secret not found at ${PULL_SECRET}"
+if [[ ! -f "${CLUSTER_PROFILE_DIR}/pull-secret" ]]; then
+  echo "ERROR: pull secret not found at ${CLUSTER_PROFILE_DIR}/pull-secret"
   exit 1
+fi
+
+cp -f "${CLUSTER_PROFILE_DIR}/pull-secret" "${PULL_SECRET}"
+if [[ "$(dirname "$(dirname "${RELEASE_IMAGE}")")" != "quay.io" ]]; then
+  echo "Logging into CI registry for release/CVO image pulls"
+  KUBECONFIG="" oc registry login --to "${PULL_SECRET}"
 fi
 
 FLAG_CHECK_SCRIPT="$(mktemp)"
@@ -157,9 +165,9 @@ cat <<EOF
 ERROR: bootstrap/installer embeds --cluster-version-manifest-path but install release
 CVO (${RELEASE_VERSION}) does not accept that flag.
 
-This is an installer/bootstrap vs initial-release pairing bug. Upgrade installs must use
-the stable-initial installer (see platform-external-pre-conf-manifests-stableinitial /
-ipi-install-install-stableinitial), not the latest installer imagestream.
+This is an installer/bootstrap vs initial-release pairing bug. Ensure
+platform-external-pre-conf-manifests extracts openshift-install from the install
+payload (OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE), not a newer installer imagestream.
 
 Refusing to provision AWS resources.
 EOF
