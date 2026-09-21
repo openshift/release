@@ -121,8 +121,8 @@ if [[ "${DEPLOY_ENV}" == "ci00" || "${DEPLOY_ENV}" == "ci01" ]]; then
     echo "ERROR: ARO_HCP_E2E_SLOT_NAME must be a lowercase DNS label, got '${ARO_HCP_E2E_SLOT_NAME}'"
     exit 1
   fi
-  if (( ${#ARO_HCP_E2E_SLOT_NAME} > 48 )); then
-    echo "ERROR: ARO_HCP_E2E_SLOT_NAME is too long for the maestro certificate DNS label"
+  if (( ${#ARO_HCP_E2E_SLOT_NAME} > 43 )); then
+    echo "ERROR: ARO_HCP_E2E_SLOT_NAME is too long for the certificate DNS labels"
     exit 1
   fi
 
@@ -137,7 +137,10 @@ if [[ "${DEPLOY_ENV}" == "ci00" || "${DEPLOY_ENV}" == "ci01" ]]; then
     .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.cert.san = \"sessiongate.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\" |
     .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.server.mqttClientName = \"maestro-server-\" + strenv(CERTIFICATE_SLOT_NAME) |
     .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.server.certSAN = \"maestro-server-\" + strenv(CERTIFICATE_SLOT_NAME) + \".maestro.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\" |
-    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.server.certCN = \"server.maestro.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\"
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.server.certCN = \"server.maestro.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.agent.consumerName = \"hcp-underlay-\" + strenv(CERTIFICATE_SLOT_NAME) + \"-mgmt-1\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.agent.certSAN = \"hcp-underlay-\" + strenv(CERTIFICATE_SLOT_NAME) + \"-mgmt-1.maestro.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.agent.certCN = \"mgmt-1.maestro.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\"
   " "${OVERRIDE_CONFIG_FILE}"
   unset CERTIFICATE_SLOT_NAME
 fi
