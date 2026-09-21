@@ -686,7 +686,6 @@ echo "── All load tests completed in ${TEST_DURATION_SECONDS}s ──"
 #
 # Clone cloud-bulldozer/e2e-benchmarking and run utils/index.sh to write a
 # standard metadata document to the perf_scale_ci Elasticsearch index.
-# This mirrors the pattern used by the OLS load-generator step.
 # ────────────────────────────────────────────────────────────────────────────
 
 echo "── Logging Orion metadata fingerprint ──"
