@@ -32,7 +32,7 @@ tests:
         trap 'rm -rf "${workdir}"' EXIT
         release_sha="${PULL_PULL_SHA}"
         fixture_base=b3ec8bbc4d7b947fd6f18dd13339d9acbb8c37ce
-        fixture_head=33bd5a54d78f598271dec7e780ceb3dcf5ee1976
+        fixture_head=fa0e455581ebfd85af4a1c3f54ab469d798122ba
 
         git init "${workdir}/release"
         git -C "${workdir}/release" remote add origin https://github.com/openshift/release.git
@@ -45,10 +45,11 @@ tests:
 
         git init "${workdir}/ai-helpers"
         git -C "${workdir}/ai-helpers" remote add origin https://github.com/openshift-eng/ai-helpers.git
-        git -C "${workdir}/ai-helpers" fetch --depth=2 origin refs/pull/765/head
+        git -C "${workdir}/ai-helpers" fetch --depth=50 origin refs/pull/765/head
         git -C "${workdir}/ai-helpers" checkout --detach FETCH_HEAD
         test "$(git -C "${workdir}/ai-helpers" rev-parse HEAD)" = "${fixture_head}"
         git -C "${workdir}/ai-helpers" cat-file -e "${fixture_base}^{commit}"
+        git -C "${workdir}/ai-helpers" merge-base --is-ancestor "${fixture_base}" HEAD
         cd "${workdir}/ai-helpers"
         export PULL_BASE_SHA="${fixture_base}"
         unset EVAL_WORKDIR
