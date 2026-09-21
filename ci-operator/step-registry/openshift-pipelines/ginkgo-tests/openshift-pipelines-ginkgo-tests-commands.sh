@@ -3,7 +3,7 @@ set -euo pipefail
 
 SECRETS_DIR="/usr/local/ci-secrets/osp-ci-secrets"
 
-if [ -s "${KUBECONFIG}" ]; then
+if [ -s "${KUBECONFIG:-}" ]; then
     oc whoami
 else
     login_file="${SHARED_DIR}/api.login"
