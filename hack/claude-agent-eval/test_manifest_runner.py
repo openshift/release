@@ -72,6 +72,10 @@ root = pathlib.Path(os.environ.get("AGENT_EVAL_RUNS_DIR", "eval/runs"))
 run = root / "skill-name-not-config-name" / run_id
 run.mkdir(parents=True)
 behavior = json.loads(os.environ.get("BEHAVIORS", "{}" )).get(config, "pass")
+if behavior == "run_alias":
+    alias = root / "config-name" / run_id
+    alias.parent.mkdir(parents=True)
+    alias.symlink_to(run, target_is_directory=True)
 if behavior != "missing_result":
     result = {"exit_code": 1 if behavior == "case_failure" else 0}
     (run / "run_result.json").write_text(json.dumps(result))
@@ -505,6 +509,39 @@ class ValidationTests(Fixture):
             with self.subTest(overrides=overrides):
                 self.assertNotEqual(self.run_step(**overrides).returncode, 0)
                 self.assertEqual(self.calls(), [])
+
+
+class RunDirectoryTests(Fixture):
+    def test_run_alias_preserves_reports_and_archive_contents(self):
+        self.change_skill()
+        result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "run_alias"}))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.junit().attrib["failures"], "0")
+        self.assertTrue((self.eval_artifacts() / "report-summary.html").is_file())
+        with tarfile.open(self.eval_artifacts() / "eval-run.tar.gz") as archive:
+            self.assertTrue(archive.getmember("run").isdir())
+            self.assertTrue(archive.getmember("run/run_result.json").isfile())
+
+    def test_flat_run_alias_resolves_to_the_same_directory(self):
+        runs = self.repo / "eval/runs"
+        directory = runs / "skill-name" / "current-run"
+        directory.mkdir(parents=True)
+        (runs / "current-run").symlink_to(directory, target_is_directory=True)
+        self.assertEqual(runner.run_directory(runs, "current-run"), directory)
+
+    def test_distinct_run_directories_remain_ambiguous(self):
+        runs = self.repo / "eval/runs"
+        for name in ("first", "second"):
+            (runs / name / "current-run").mkdir(parents=True)
+        with self.assertRaisesRegex(runner.EvalError, "found 2"):
+            runner.run_directory(runs, "current-run")
+
+    def test_run_alias_cannot_escape_runs_directory(self):
+        runs = self.repo / "eval/runs"
+        runs.mkdir(parents=True)
+        (runs / "current-run").symlink_to(self.root, target_is_directory=True)
+        with self.assertRaisesRegex(runner.EvalError, "escapes the runs directory"):
+            runner.run_directory(runs, "current-run")
 
 
 class ExecutionTests(Fixture):

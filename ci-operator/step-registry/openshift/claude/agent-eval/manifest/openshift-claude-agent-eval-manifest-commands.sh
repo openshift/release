@@ -317,9 +317,14 @@ def run_directory(runs, run_id):
     matches = [p for p in runs.glob(f"*/{run_id}") if p.is_dir()]
     if (runs / run_id).is_dir():  # Also support the older flat harness layout.
         matches.append(runs / run_id)
-    if len(matches) != 1:
-        raise EvalError(f"expected exactly one harness run directory for {run_id}, found {len(matches)}")
-    return matches[0]
+    # A harness invocation can expose the same run through an eval/skill alias.
+    # Count physical directories, and archive their contents rather than a link.
+    directories = {path.resolve() for path in matches}
+    if any(not path.is_relative_to(runs.resolve()) for path in directories):
+        raise EvalError(f"harness run directory for {run_id} escapes the runs directory")
+    if len(directories) != 1:
+        raise EvalError(f"expected exactly one harness run directory for {run_id}, found {len(directories)}")
+    return directories.pop()
 
 
 def collect_result(directory, artifacts):
