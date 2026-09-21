@@ -116,6 +116,10 @@ a path hash to avoid collisions. HTML reports end in `-summary.html` for
 Prow display. The complete runs directory is archived as `eval-runs.tar.gz`.
 JUnit contains one testcase per attempted eval, not per dataset case.
 
+This workflow does not provide session continuation or archive the global
+Claude session directory. Eval reports, execution logs, and harness run
+artifacts remain available for diagnosis.
+
 Setup/process failures, incomplete results, and failed deterministic harness
 regression checks fail the eval; subsequent evals still run. Any failure
 fails the step. Deadline-expired evals are recorded as failures. SIGTERM/SIGINT

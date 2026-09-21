@@ -252,14 +252,10 @@ def verify_result(directory, config):
             raise EvalError(f"missing thresholded judge in summary: {judge}")
 
 
-def archive(runs, artifacts, env):
-    sources = [(runs, "eval-runs.tar.gz", "eval/runs")]
-    sessions = Path(env.get("CLAUDE_CONFIG_DIR", "/home/claude/.claude")) / "projects"
-    sources.append((sessions, "claude-sessions.tar.gz", "projects"))
-    for source, filename, arcname in sources:
-        if source.is_dir():
-            with tarfile.open(artifacts / filename, "w:gz") as output:
-                output.add(source, arcname=arcname)
+def archive(runs, artifacts):
+    if runs.is_dir():
+        with tarfile.open(artifacts / "eval-runs.tar.gz", "w:gz") as output:
+            output.add(runs, arcname="eval/runs")
 
 
 def emit_metrics(env, repo, artifacts, *, stream_log, result, run_id, prompt):  # pylint: disable=too-many-arguments
@@ -377,7 +373,7 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
         print(f"ERROR: {error}", flush=True)
     finally:
         try:
-            archive(runs, artifacts, env)
+            archive(runs, artifacts)
         except (OSError, tarfile.TarError) as error:
             results.append(("artifact archive", 0, str(error)))
         write_junit(artifacts, results)

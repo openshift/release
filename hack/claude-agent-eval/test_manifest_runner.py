@@ -465,6 +465,19 @@ class ValidationTests(Fixture):
 
 
 class ExecutionTests(Fixture):
+    def test_run_artifacts_are_kept_without_global_session_archive(self):
+        sessions = Path(self.env["CLAUDE_CONFIG_DIR"]) / "projects"
+        sessions.mkdir(parents=True)
+        (sessions / "unrelated-session.jsonl").write_text("existing session")
+        self.change_skill()
+        result = self.run_step()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue((self.artifacts / "eval-runs.tar.gz").is_file())
+        self.assertTrue(list(self.artifacts.glob("*-report-summary.html")))
+        self.assertTrue(list(self.artifacts.glob("claude-eval-*.log")))
+        self.assertFalse((self.artifacts / "claude-sessions.tar.gz").exists())
+        self.assertEqual((sessions / "unrelated-session.jsonl").read_text(), "existing session")
+
     def test_distributed_commands_run_without_sibling_sources_and_clean_up(self):
         standalone = self.root / "commands.sh"
         standalone.write_bytes(sync_commands.COMMANDS.read_bytes())
@@ -616,6 +629,7 @@ class PackagingTests(unittest.TestCase):
         workflow = yaml.safe_load((directory / "openshift-claude-agent-eval-manifest-workflow.yaml").read_text())
         self.assertEqual(workflow["workflow"]["steps"]["test"],
                          [{"ref": "openshift-claude-agent-eval-manifest"}])
+        self.assertNotIn("post", workflow["workflow"]["steps"])
         legacy = yaml.safe_load((directory.parent / "openshift-claude-agent-eval-workflow.yaml").read_text())
         self.assertEqual(legacy["workflow"]["steps"]["test"], [{"ref": "openshift-claude-agent-eval"}])
 
