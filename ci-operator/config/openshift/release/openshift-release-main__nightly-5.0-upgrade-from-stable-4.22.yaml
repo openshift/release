@@ -248,6 +248,25 @@ tests:
     - ref: openshift-upgrade-aws-patch-master-iam
     - ref: ingress-conf-haproxy-version
     workflow: openshift-upgrade-aws
+- as: opct-platform-external-aws-upgrade
+  cron: '@weekly'
+  reporter_config:
+    channel: '#forum-opct-updates'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      OPCT_RUN_MODE: upgrade
+      UPGRADE_TO_CHANNEL_TYPE: candidate
+    workflow: opct-conformance-external-aws
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift
