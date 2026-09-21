@@ -248,6 +248,7 @@ data:
       host: 0.0.0.0
       port: 8080
       workers: ${LCS_WORKERS}
+      access_log: false
 
     ogx:
       use_as_library_client: true
@@ -435,7 +436,7 @@ ${LCS_COMMAND_OVERRIDE}
               cpu: "1"
               memory: "2Gi"
             limits:
-              cpu: "2"
+              cpu: "4"
               memory: "4Gi"
           readinessProbe:
             httpGet:
@@ -466,6 +467,9 @@ ${LCS_COMMAND_OVERRIDE}
             requests:
               cpu: "250m"
               memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
       volumes:
         - name: config-volume
           configMap:
@@ -764,7 +768,7 @@ if [[ -n "${LATEST_E2E_TAG}" ]] && \
   JOB_START_TS=$(date -u -d "@${TEST_START_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ")
   JOB_END_TS=$(date -u -d "@${TEST_END_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ")
 
-  ADDITIONAL_PARAMS='{"lcsTestWorkers": '"${NUM_USERS}"', "lcsTestDuration": "'"${TEST_DURATION}"'"}'
+  ADDITIONAL_PARAMS='{"lcsTestWorkers": "'"${NUM_USERS}"'", "lcsTestDuration": "'"${TEST_DURATION}"'"}'
 
   pushd "${RUNTIME_TMP_DIR}/e2e-benchmarking/utils" >/dev/null
   env BENCHMARK="lcs-load-generator" \
@@ -773,7 +777,7 @@ if [[ -n "${LATEST_E2E_TAG}" ]] && \
       UUID="${TEST_UUID}" \
       JOB_START="${JOB_START_TS}" \
       JOB_END="${JOB_END_TS}" \
-      JOB_STATUS="success" \
+      JOB_STATUS="$( [[ "${JOB_FINISHED}" == "complete" ]] && echo "success" || echo "failure" )" \
       ADDITIONAL_PARAMS="${ADDITIONAL_PARAMS}" \
       ./index.sh || echo "WARN: Fingerprint index.sh failed — continuing"
   popd >/dev/null
@@ -810,13 +814,12 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
   # grafana/pyroscope query parameters:
   #   Route:  /pyroscope/render
   #   Query:  process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="lightspeed-stack"}
-  #   Formats: pprof, html (flamegraph), collapsed, json
+  #   Formats: pprof, json
   PYRO_QUERY="process_cpu%3Acpu%3Ananoseconds%3Acpu%3Ananoseconds%7Bservice_name%3D%22lightspeed-stack%22%7D"
 
-  # Fetch all four profile formats; each fetch is non-fatal so a profiling
+  # Fetch profile formats; each fetch is non-fatal so a profiling
   # hiccup never crashes the pipeline.
-  for fmt_pair in "pprof:cpu-profile.pprof" "html:cpu-flamegraph.html" \
-                  "collapsed:cpu-collapsed.txt" "json:cpu-profile.json"; do
+  for fmt_pair in "pprof:cpu-profile.pprof" "json:cpu-profile.json"; do
     FMT="${fmt_pair%%:*}"
     FNAME="${fmt_pair##*:}"
     RESP_CODE=$(curl -sS -o "${PROF_DIR}/${FNAME}" -w '%{http_code}' \
