@@ -7,17 +7,18 @@ exec {_xtrace_fd}>"${_xtrace_log}"
 BASH_XTRACEFD=${_xtrace_fd}
 set -x
 
-_original_exit_trap="$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")"
 # shellcheck disable=SC2154
-trap '
+_opp_cleanup() {
   _exit_code=$?
   set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
   if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
     cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
-  eval "${_original_exit_trap}"
-' EXIT
+}
+trap '_opp_cleanup' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -84,6 +85,9 @@ function AddResult () {
     true
 }
 
+# XmlEscape: Required for bash 5.x where patsub_replacement is enabled
+# by default, changing how ${var//pattern/replacement} handles & and \ in
+# the replacement string. Without escaping, JUnit XML output is malformed.
 function XmlEscape () {
     typeset text="${1:-}"; (($#)) && shift
     text="${text//&/&amp;}"
@@ -172,7 +176,7 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '{( CollectExitArtifacts; _propagate_junit; true )}' EXIT
+trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
 
 # ---------------------------------------------------------------------------
 # Check 1: ODF Operator CSV in Succeeded phase

@@ -9,17 +9,18 @@ exec {_xtrace_fd}>"${_xtrace_log}"
 BASH_XTRACEFD=${_xtrace_fd}
 set -x
 
-_original_exit_trap="$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")"
 # shellcheck disable=SC2154
-trap '
+_opp_cleanup() {
   _exit_code=$?
   set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
   if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
     cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
-  eval "${_original_exit_trap}"
-' EXIT
+}
+trap '_opp_cleanup' EXIT
 
 echo ">>> PHASE: initialization"
 

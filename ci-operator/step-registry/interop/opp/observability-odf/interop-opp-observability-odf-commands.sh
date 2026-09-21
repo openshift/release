@@ -1,23 +1,30 @@
 #!/bin/bash
 set -euo pipefail; shopt -s inherit_errexit
 
+# === Known-Issue Skip Framework ===
+# This script uses _detect_known_issue() to emit JUnit SKIPPED results
+# for tracked bugs instead of failing the job. Unknown failures still FAIL.
+# Tracked issues: INTEROP-9455
+# See PR review Fix 3 for rationale.
+
 # --- Trace-to-file: always capture, dump on failure only ---
 _xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
 exec {_xtrace_fd}>"${_xtrace_log}"
 BASH_XTRACEFD=${_xtrace_fd}
 set -x
 
-_original_exit_trap="$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")"
 # shellcheck disable=SC2154
-trap '
+_opp_cleanup() {
   _exit_code=$?
   set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
   if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
     cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
-  eval "${_original_exit_trap}"
-' EXIT
+}
+trap '_opp_cleanup' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -55,13 +62,16 @@ function AddResult () {
     true
 }
 
+# XmlEscape: Required for bash 5.x where patsub_replacement is enabled
+# by default, changing how ${var//pattern/replacement} handles & and \ in
+# the replacement string. Without escaping, JUnit XML output is malformed.
 function XmlEscape () {
     typeset text="${1:-}"; (($#)) && shift
-    text="${text//&/&amp;}"
-    text="${text//</&lt;}"
-    text="${text//>/&gt;}"
-    text="${text//\"/&quot;}"
-    text="${text//\'/&apos;}"
+    text="${text//&/\&amp;}"
+    text="${text//</\&lt;}"
+    text="${text//>/\&gt;}"
+    text="${text//\"/\&quot;}"
+    text="${text//\'/\&apos;}"
     printf '%s' "${text}"
     true
 }
@@ -123,7 +133,7 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '{( CollectExitArtifacts; _propagate_junit; true )}' EXIT
+trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
 
 # ---------------------------------------------------------------------------
 # Check 1: ODF Ceph RGW infrastructure ready
@@ -225,9 +235,11 @@ function CheckMcoReady () {
 
     typeset -i maxAttempts=24
     typeset -i sleepSeconds=30
+    # Timeout budget: 24 x 30s poll = 720s max + ~180s margin within 900s step timeout
     typeset -i attempt=0
     typeset -i startTime=0
     startTime=$(date +%s)
+    typeset _last_mco_error=""
 
     # Fast-path: if the CR doesn't exist at all, skip immediately.
     # Capture exit status separately so RBAC/connectivity errors are not
@@ -260,6 +272,7 @@ function CheckMcoReady () {
                 return 0
             fi
             queryFailed="true"
+            _last_mco_error="${mcoError}"
         elif ! mcoStatus="$(printf '%s' "${mcoConditions}" | python3 -c "
 import sys,json
 raw=sys.stdin.read().strip()
@@ -299,7 +312,11 @@ print(ready[0].get('status','Unknown') if ready else 'NoCondition')
 
     typeset -i elapsed=0
     elapsed=$(( $(date +%s) - startTime ))
-    AddResult "mco-ready" "fail" "MultiClusterObservability not Ready after ${elapsed}s (last status=${mcoStatus:-unknown})"
+    typeset _mco_detail="MultiClusterObservability not Ready after ${elapsed}s (last status=${mcoStatus:-unknown})"
+    if [[ -n "${_last_mco_error}" ]]; then
+        _mco_detail="${_mco_detail}; last error: ${_last_mco_error:0:200}"
+    fi
+    AddResult "mco-ready" "fail" "${_mco_detail}"
     return 1
 }
 
@@ -740,32 +757,26 @@ print(items[0]['metadata']['name'] if items else '')
 # Main
 # ---------------------------------------------------------------------------
 
-_xml_escape() {
-    local text="$1"
-    text="${text//&/&amp;}"
-    text="${text//</&lt;}"
-    text="${text//>/&gt;}"
-    text="${text//\"/&quot;}"
-    text="${text//\'/&apos;}"
-    printf '%s' "${text}"
-}
-
+# JUnit fragment contract: ci-operator's junit_report.go accepts both
+# standalone <testcase> fragments and full <testsuite>-wrapped documents.
+# Fragments are appended to junit_known_issues.xml and consumed correctly.
 _detect_known_issue() {
     local error_output="$1"
     local bug_id="$2"
     local bug_description="$3"
-    local safe_desc safe_error
+    local safe_bug_id safe_desc safe_error
 
-    safe_desc="$(_xml_escape "${bug_description}")"
-    safe_error="$(_xml_escape "${error_output:0:500}")"
+    safe_bug_id="$(XmlEscape "${bug_id}")"
+    safe_desc="$(XmlEscape "${bug_description}")"
+    safe_error="$(XmlEscape "${error_output:0:500}")"
 
     echo ">>> KNOWN ISSUE: ${bug_id} — ${bug_description}"
     echo ">>> Marking as SKIPPED (tracked: https://issues.redhat.com/browse/${bug_id})"
 
     cat <<JUNIT_EOF >> "${ARTIFACT_DIR}/junit_known_issues.xml"
-<testcase name="${bug_id}: ${safe_desc}" classname="opp.interop.known_issues">
-  <skipped message="Known issue: ${bug_id}">
-    Tracked at https://issues.redhat.com/browse/${bug_id}
+<testcase name="${safe_bug_id}: ${safe_desc}" classname="opp.interop.known_issues">
+  <skipped message="Known issue: ${safe_bug_id}">
+    Tracked at https://issues.redhat.com/browse/${safe_bug_id}
     Error: ${safe_error}
   </skipped>
 </testcase>
@@ -790,43 +801,30 @@ function Main () {
     CheckObcBound          || true
     CheckThanosQuery       || true
 
-    # --- Reclassify known issues BEFORE writing JUnit ---
-    # Check for INTEROP-9455 (Thanos empty result) and reclassify as skip
-    # so the JUnit XML reflects the skip rather than a failure.
-    typeset -i _has_known_issue=0
-    typeset _fail_details=""
     typeset -i _idx=0
     for _idx in "${!tcResultsArr[@]}"; do
-        if [[ "${tcResultsArr[$_idx]}" == "fail" ]]; then
-            _fail_details="${_fail_details} ${tcNamesArr[$_idx]}: ${tcMessagesArr[$_idx]};"
-            if [[ "${tcMessagesArr[$_idx]}" == *"empty result vector"* ]]; then
-                # Reclassify this specific failure as skip in the results array
-                tcResultsArr[$_idx]="skip"
-                tcMessagesArr[$_idx]="Known issue INTEROP-9455: ${tcMessagesArr[$_idx]}"
-                _has_known_issue=1
-            fi
+        if [[ "${tcNamesArr[$_idx]}" == "thanos-query" \
+            && "${tcResultsArr[$_idx]}" == "fail" \
+            && "${tcMessagesArr[$_idx]}" == *"returned empty result vector"* ]]; then
+            # Known-issue skip: INTEROP-9455
+            # Added: 2026-09-21
+            # Review-by: 2026-12-21 (or when INTEROP-9455 is resolved)
+            # Owner: OPP-interop team
+            _detect_known_issue "${tcMessagesArr[$_idx]}" "INTEROP-9455" \
+                "Thanos query returns empty result during observability convergence"
+            tcResultsArr[$_idx]="skip"
         fi
     done
-    if (( _has_known_issue )); then
-        _detect_known_issue "${_fail_details}" "INTEROP-9455" \
-            "Thanos query returns empty result during observability convergence"
-    fi
 
     WriteJunit
 
-    typeset -i hasAnyFail=0
     typeset r=""
     for r in "${tcResultsArr[@]}"; do
         if [[ "${r}" == "fail" ]]; then
-            hasAnyFail=1
-            break
+            : "ACM Observability + ODF Interop: SOME CHECKS FAILED"
+            exit 1
         fi
     done
-
-    if (( hasAnyFail )); then
-        : "ACM Observability + ODF Interop: SOME CHECKS FAILED"
-        exit 1
-    fi
 
     : "ACM Observability + ODF Interop: ALL PASSED"
     exit 0
