@@ -14,6 +14,7 @@
 #   OSC_CHARTS_REF                - Charts git ref (default: main)
 #   ENABLEPEERPODS                - "true" to enable peer-pods (default: false)
 #   WORKLOAD_TO_TEST              - "kata", "peer-pods", or "coco" (default: kata)
+#   RUST_RUNTIME                  - "true" to use the Rust runtime (default: false)
 #
 # Outputs:
 #   Patches osc-config ConfigMap in default namespace to indicate installation complete.
@@ -62,6 +63,11 @@ if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
   echo ">>> Catalog source: ${OSC_DEV_CATALOG_NAME} (image: ${CATALOG_SOURCE_IMAGE})"
 else
   echo ">>> Catalog source: redhat-operators (using existing catalog)"
+fi
+if [[ "${RUST_RUNTIME}" = "true" ]]; then
+  echo ">>> Runtime: Rust"
+else
+  echo ">>> Runtime: Go"
 fi
 
 SCRATCH=$(mktemp -d)
@@ -731,6 +737,35 @@ function update_osc_config() {
   echo ">>> osc-config patched with oscInstalled=true"
 }
 
+function switch_to_rust_runtime() {
+  echo ">>> Telling OSC to use the Rust runtime"
+
+  # Tell OSC to switch to rust. This will restart the controller.
+  oc set env -n "${OSC_NAMESPACE}" deployment/controller-manager RUST_RUNTIME="true"
+
+  if ! wait_until "controller-manager rollout after Rust runtime switch" 900 5 \
+    "oc rollout status deployment/controller-manager -n '${OSC_NAMESPACE}' --timeout=0 2>/dev/null | grep -q 'successfully rolled out'"; then
+    oc get pods -n "${OSC_NAMESPACE}" || true
+    oc describe deployment -n "${OSC_NAMESPACE}" controller-manager | tail -30 || true
+    return 1
+  fi
+
+  echo ">>> OSC now configured to use the Rust runtime"
+}
+
+function check_rust_runtime() {
+  echo ">>> Checking if Rust runtime is active"
+
+  if ! wait_until "kata RuntimeClass with rs-kata handler" 300 5 \
+    "oc get runtimeclass kata -o jsonpath='{.handler}' 2>/dev/null | grep -q '^rs-kata$'"; then
+    echo ">>> ERROR: kata RuntimeClass with rs-kata handler not found"
+    oc get runtimeclass -o custom-columns=NAME:.metadata.name,HANDLER:.handler || true
+    return 1
+  fi
+
+  echo ">>> Rust runtime is active (kata RuntimeClass handler=rs-kata)"
+}
+
 #========================================
 # Main Execution
 #========================================
@@ -757,8 +792,16 @@ if [[ "${ENABLEPEERPODS}" == "true" ]]; then
   create_peer_pods_secret
 fi
 
+if [[ "${RUST_RUNTIME}" == "true" ]]; then
+  switch_to_rust_runtime
+fi
+
 install_osc_operands "${CHARTS_DIR}"
 wait_for_kataconfig
+
+if [[ "${RUST_RUNTIME}" == "true" ]]; then
+  check_rust_runtime
+fi
 
 # Phase 5: Update shared state
 update_osc_config

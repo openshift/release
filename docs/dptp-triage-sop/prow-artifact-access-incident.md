@@ -103,20 +103,12 @@ $ gcloud storage buckets add-iam-policy-binding gs://<bucket> \
     --role=roles/storage.objectViewer
 ```
 
-Create the Kubernetes secret without printing the key and remove the local key
-file immediately afterward:
+Store the service-account key in GSM (collection `test-platform-infra`, group
+`prow-tpr-viewer`, field `credentials.json`). After `ci-secret-bootstrap` syncs
+the bundle, `app.ci` has `secret/test-platform-results-viewer` with key
+`credentials.json`. GSM secret id:
 
-```console
-$ INCIDENT_KEY_DIR="$(mktemp -d)"
-$ gcloud iam service-accounts keys create "${INCIDENT_KEY_DIR}/credentials.json" \
-    --iam-account="${INCIDENT_READER}" \
-    --project="${INCIDENT_PROJECT_ID}"
-$ oc --context app.ci -n ci create secret generic test-platform-results-viewer \
-    --from-file=credentials.json="${INCIDENT_KEY_DIR}/credentials.json" \
-    --dry-run=client -o yaml | oc --context app.ci -n ci apply -f -
-$ shred -u "${INCIDENT_KEY_DIR}/credentials.json"
-$ rmdir "${INCIDENT_KEY_DIR}"
-```
+`test-platform-infra__prow-tpr-viewer__credentials--dot--json`
 
 ### Gate Deck
 

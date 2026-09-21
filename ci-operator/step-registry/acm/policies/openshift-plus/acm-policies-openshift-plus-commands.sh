@@ -109,7 +109,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
       : "Non-skipped policies failed to become compliant:"
       oc get policies -n policies --ignore-not-found | grep -Ev "/(${skipRegex})$"
       oc get policies -n policies --ignore-not-found -o yaml
-      oc describe policies --all -n policies
+      oc describe policies -n policies
       exit 1
     fi
   else
@@ -125,7 +125,7 @@ else
     : "Policies failed to become compliant:"
     oc get policies -n policies --ignore-not-found
     oc get policies -n policies --ignore-not-found -o yaml
-    oc describe policies --all -n policies
+    oc describe policies -n policies
     exit 1
   fi
 fi

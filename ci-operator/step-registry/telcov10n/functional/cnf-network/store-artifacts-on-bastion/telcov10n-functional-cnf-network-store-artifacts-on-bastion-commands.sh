@@ -25,6 +25,7 @@ echo "Run cnf-tests via ssh tunnel"
 ssh -o ServerAliveInterval=60 \
     -o ServerAliveCountMax=3 \
     -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile=/dev/null \
     "${BASTION_USER}@${BASTION_IP}" \
     -i /tmp/temp_ssh_key "rm -rf ~/build-artifiacts; mkdir ~/build-artifiacts; cp /tmp/downstream_report/*.xml ~/build-artifiacts/"
 

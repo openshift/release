@@ -274,6 +274,21 @@ typeset -i submarinerStepRc=0
             "${spokeNamesArr[i]}"
     done
 
+    # ── Hub-spoke: prepare the hub cluster for Submariner ──────────────────
+    # In spoke-to-spoke topology, the hub only hosts the broker.
+    # In hub-spoke topology, the hub must also be a Submariner participant
+    # with its own security group and gateway node.
+    if [[ "${SUBMARINER_VERIFY_HUB_SPOKE:-false}" == "true" ]]; then
+        PrepareAwsCluster \
+            "${KUBECONFIG}" \
+            "${SHARED_DIR}/metadata.json" \
+            "hub"
+
+        WaitForGatewayNode \
+            "${KUBECONFIG}" \
+            "hub"
+    fi
+
     for ((i = 0; i < spokeCount; i++)); do
         WaitForGatewayNode \
             "${spokeKubeconfigsArr[i]}" \

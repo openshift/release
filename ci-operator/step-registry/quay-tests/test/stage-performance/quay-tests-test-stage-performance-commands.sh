@@ -48,18 +48,38 @@ oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_names
 QUAY_ROUTE=${QUAY_ROUTE#https://} #remove "https://"
 
 cleanup_repositories() {
+  local cleanup_failed=0
   echo "Cleaning up repositories in organization ${quay_perf_organization}..."
-  repos=$(curl -s -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
+  if ! repos=$(curl --fail --silent --show-error \
+    -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
     "https://$QUAY_ROUTE/api/v1/repository?namespace=${quay_perf_organization}" \
-    | jq -r '.repositories[]?.name' || true)
+    | jq -r '.repositories[]?.name'); then
+    echo "Failed to list repositories in organization ${quay_perf_organization}." >&2
+    cleanup_failed=1
+    repos=""
+  fi
 
   for repo in $repos; do
     echo "Deleting repository: ${quay_perf_organization}/${repo}"
-    curl -s -X DELETE \
+    if ! curl --fail --silent --show-error -X DELETE \
       -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
-      "https://$QUAY_ROUTE/api/v1/repository/${quay_perf_organization}/${repo}" -o /dev/null || true
+      "https://$QUAY_ROUTE/api/v1/repository/${quay_perf_organization}/${repo}" -o /dev/null; then
+      echo "Failed to delete repository: ${quay_perf_organization}/${repo}." >&2
+      cleanup_failed=1
+    fi
   done
-  echo "Repository cleanup complete."
+  echo "Deleting organization: ${quay_perf_organization}"
+  if ! curl --fail --silent --show-error -X DELETE \
+    -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
+    "https://$QUAY_ROUTE/api/v1/organization/${quay_perf_organization}" -o /dev/null; then
+    echo "Failed to delete organization: ${quay_perf_organization}." >&2
+    cleanup_failed=1
+  fi
+  if (( cleanup_failed != 0 )); then
+    echo "Repository cleanup failed." >&2
+    return 1
+  fi
+  echo "Repository and organization cleanup complete."
 }
 
 trap cleanup_repositories EXIT

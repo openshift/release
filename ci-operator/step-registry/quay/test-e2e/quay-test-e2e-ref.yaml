@@ -57,3 +57,10 @@ ref:
     By default the suite is cloned at runtime from PLAYWRIGHT_GIT_REPO; set
     PLAYWRIGHT_USE_IMAGE_TESTS "true" to run the suite baked into the
     quay-playwright-runner image at /app instead.
+    When quay-deploy-jaeger ran successfully (${SHARED_DIR}/jaeger_deployed
+    exists), this step port-forwards the in-cluster Jaeger query API and exports
+    JAEGER_QUERY_URL=http://127.0.0.1:16686 so the suite can attach the server
+    spans for a failed test's own requests. The forward is supervised for the
+    length of the run and torn down on exit. If Jaeger was not deployed or the
+    query API never answers, JAEGER_QUERY_URL is left unset and the suite
+    records the spans as not collected rather than failing.
