@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import shlex
 import signal
 import subprocess
 import sys
@@ -30,7 +29,6 @@ def load_sibling(name):
 
 
 load_sibling("eval_plan")
-load_sibling("legacy_adapter")
 runner = load_sibling("manifest_runner")
 sync_commands = load_sibling("sync_commands")
 
@@ -132,8 +130,6 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
             "EVAL_CONFIG": "eval.yaml", "EVAL_DISCOVER": "",
             "EVAL_MODEL": "global-model-must-not-win", "EVAL_PARALLELISM": "99",
             "EVAL_MAX_TURNS": "99", "CLAUDE_MODEL": "outer-model",
-            "EVAL_SETUP_SCRIPT": "", "EVAL_CHANGED_ONLY": "", "EVAL_CASES_DIR": "",
-            "EVAL_CASES": "", "EVAL_BASELINE": "", "EVAL_EXTRA_ARGS": "",
             "CLAUDE_CONFIG_DIR": str(self.root / "claude"),
         }
 
@@ -228,15 +224,16 @@ class SelectionTests(Fixture):
         self.assertEqual(runner.select_evals([literal], ["skills/a1/file"]), [])
         self.assertEqual(runner.select_evals([literal], ["skills/a[1]/file"]), [literal])
 
-    def test_periodic_and_manual_skip_without_base_sha(self):
-        entries = [self.make_entry(f"evals/{mode}.yaml", run=mode, triggers=[])
-                   for mode in ("periodic", "manual")]
-        self.write_manifest(entries)
-        result = self.run_step(PULL_BASE_SHA="")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("run: periodic", result.stdout)
-        self.assertIn("run: manual", result.stdout)
-        self.assertEqual(self.calls(), [])
+    def test_periodic_and_manual_are_rejected_before_execution(self):
+        for mode in ("periodic", "manual"):
+            with self.subTest(mode=mode):
+                entry = self.make_entry(f"evals/{mode}.yaml", run=mode)
+                self.write_manifest([entry])
+                result = self.run_step(PULL_BASE_SHA="")
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("run must be pr", result.stdout)
+                self.assertEqual(self.calls(), [])
+                self.assertEqual(self.junit().attrib["failures"], "1")
 
     def test_empty_manifest(self):
         self.write_manifest([])
@@ -460,7 +457,8 @@ class ValidationTests(Fixture):
 
     def test_modes_and_extra_args_conflict(self):
         for overrides in ({"EVAL_CONFIG": "custom.yaml"}, {"EVAL_DISCOVER": "true"},
-                          {"EVAL_EXTRA_ARGS": "--model override"}, {"JOB_TYPE": "periodic"}):
+                          {"EVAL_EXTRA_ARGS": "--model override"}, {"JOB_TYPE": "periodic"},
+                          {"JOB_TYPE": "postsubmit"}):
             with self.subTest(overrides=overrides):
                 self.assertNotEqual(self.run_step(**overrides).returncode, 0)
                 self.assertEqual(self.calls(), [])
@@ -525,6 +523,19 @@ class ExecutionTests(Fixture):
         self.assertEqual(self.junit().attrib["tests"], "2")
         with tarfile.open(self.artifacts / "eval-runs.tar.gz") as archive:
             self.assertEqual(sum(n.endswith("report.html") for n in archive.getnames()), 2)
+
+    def test_same_setup_script_runs_for_each_eval_with_its_own_snapshot(self):
+        self.put("setup.sh", 'echo setup >> setup-count\n'
+                 'printf "/tmp/snapshot-%s" "$(wc -l < setup-count | tr -d \' \')"\n')
+        first = self.make_entry("evals/first.yaml", setup_script="setup.sh")
+        second = self.make_entry("evals/second.yaml", setup_script="setup.sh")
+        self.write_manifest([first, second])
+        self.change_skill()
+        result = self.run_step()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.repo / "setup-count").read_text().splitlines(), ["setup", "setup"])
+        self.assertEqual([call["snapshot"] for call in self.claude_calls()],
+                         ["/tmp/snapshot-1", "/tmp/snapshot-2"])
 
     def test_setup_failure_is_reported_and_next_eval_runs(self):
         self.put("setup.sh", "echo failed >&2\nexit 12\n")
@@ -596,165 +607,9 @@ class ExecutionTests(Fixture):
         self.assertEqual(args[-2:], ["example", "/eval-run"])
 
 
-class LegacyCompatibilityTests(Fixture):
-    commands = sync_commands.LEGACY_COMMANDS
-
-    def run_legacy(self, **overrides):
-        return self.run_step(**{**{"EVAL_CONFIG": self.entry["config"]}, **overrides})
-
-    @staticmethod
-    def prompt_args(call):
-        return shlex.split(call["args"][call["args"].index("-p") + 1])
-
-    def test_single_config_and_overrides_need_no_manifest_or_git_checkout(self):
-        (self.repo / "evals.yaml").unlink()
-        shutil.rmtree(self.repo / ".git")
-        self.put(self.entry["config"], "thresholds: {}\n")
-        original = (self.repo / self.entry["config"]).read_bytes()
-        result = self.run_legacy(PULL_BASE_SHA="", JOB_TYPE="periodic",
-                                 MULTISTAGE_PARAM_OVERRIDE_EVAL_MODEL="gangway-model",
-                                 MULTISTAGE_PARAM_OVERRIDE_EVAL_EFFORT="high",
-                                 EVAL_EFFORT="low", EVAL_CASES="case-001,case-002",
-                                 EVAL_BASELINE="previous-run",
-                                 EVAL_EXTRA_ARGS='--description "two words"')
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        call, = self.claude_calls()
-        args = self.prompt_args(call)
-        self.assertEqual(call["model"], "gangway-model")
-        self.assertEqual(call["parallelism"], "99")
-        self.assertEqual(call["args"][call["args"].index("--max-turns") + 1], "99")
-        self.assertEqual(call["args"][call["args"].index("--model") + 1], "outer-model")
-        self.assertEqual(args[args.index("--effort") + 1], "high")
-        self.assertEqual(args[args.index("--baseline") + 1], "previous-run")
-        self.assertEqual(args[args.index("--description") + 1], "two words")
-        self.assertEqual(args[args.index("--cases") + 1:args.index("--cases") + 3], ["case-001", "case-002"])
-        self.assertEqual((self.repo / self.entry["config"]).read_bytes(), original)
-        self.assertIn("regression", self.calls())
-
-    def test_legacy_ref_defaults_reach_the_common_engine(self):
-        ref = yaml.safe_load((self.commands.parent / "openshift-claude-agent-eval-ref.yaml").read_text())
-        defaults = {entry["name"]: entry.get("default", "") for entry in ref["ref"]["env"]}
-        defaults.update(EVAL_CONFIG=self.entry["config"], EVAL_WORKDIR=str(self.repo))
-        result = self.run_step(**defaults)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        call, = self.claude_calls()
-        self.assertEqual(call["model"], "claude-opus-4-6")
-        self.assertEqual(call["parallelism"], "1")
-        self.assertEqual(call["args"][call["args"].index("--max-turns") + 1], "100")
-
-    def test_discovery_uses_one_shared_setup_and_excludes_case_yamls(self):
-        self.make_entry("evals/eval-other.yaml")
-        self.put("evals/cases/ignored.yaml", "invalid eval")
-        self.put("setup.sh", 'echo setup >> "$CALLS"\nprintf /tmp/shared-snapshot\n')
-        result = self.run_step(EVAL_DISCOVER="evals/*.yaml", EVAL_CONFIG="eval.yaml", EVAL_SETUP_SCRIPT="setup.sh")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(len(self.claude_calls()), 2)
-        self.assertEqual(self.calls().count("setup"), 1)
-        self.assertEqual({call["snapshot"] for call in self.claude_calls()}, {"/tmp/shared-snapshot"})
-        self.assertEqual(self.junit().attrib["tests"], "2")
-
-    def test_default_discovery_pattern_and_no_matches(self):
-        self.make_entry("plugins/example/evals/eval-one.yaml")
-        result = self.run_step(EVAL_DISCOVER="true")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        call, = self.claude_calls()
-        self.assertEqual(call["config"], "plugins/example/evals/eval-one.yaml")
-        self.calls_path.unlink()
-        result = self.run_step(EVAL_DISCOVER="missing/*.yaml")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.calls(), [])
-        self.assertEqual(self.junit().attrib["tests"], "0")
-
-    def test_changed_cases_override_explicit_cases(self):
-        self.put("evals/cases/foo/case-002/data.txt", "changed")
-        self.put("evals/cases/foo/case-001/data.txt", "changed")
-        self.commit()
-        result = self.run_legacy(EVAL_CHANGED_ONLY="true", EVAL_CASES_DIR="evals/cases/foo", EVAL_CASES="case-explicit")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        call, = self.claude_calls()
-        self.assertEqual(call["cases"], ["case-001", "case-002"])
-
-    def test_changed_only_skips_without_cases_and_falls_back_to_explicit(self):
-        self.change_skill()
-        result = self.run_legacy(EVAL_CHANGED_ONLY="true", EVAL_CASES_DIR="evals/cases/foo")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.calls(), [])
-        result = self.run_legacy(EVAL_CHANGED_ONLY="true", EVAL_CASES="case-explicit")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.claude_calls()[0]["cases"], ["case-explicit"])
-
-    def test_changed_discovery_keeps_legacy_case_directory_convention(self):
-        self.make_entry("evals/eval-other.yaml")
-        self.put("evals/eval-foo/cases/case-001/input.txt", "changed")
-        self.commit()
-        result = self.run_step(EVAL_DISCOVER="evals/*.yaml", EVAL_CHANGED_ONLY="true")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        call, = self.claude_calls()
-        self.assertEqual(call["config"], self.entry["config"])
-        self.assertEqual(call["cases"], ["case-001"])
-
-    def test_changed_discovery_matches_nested_skills_with_explicit_cases(self):
-        config = "plugins/example/evals/foo.yaml"
-        skill = "plugins/example/skills/foo/SKILL.md"
-        self.make_entry(config)
-        self.make_entry("plugins/example/evals/foobar.yaml")
-        self.put(skill, "old skill")
-        self.commit()
-        self.env["PULL_BASE_SHA"] = self.git("rev-parse", "HEAD").strip()
-        self.put(skill, "updated skill")
-        self.commit()
-
-        result = self.run_step(EVAL_DISCOVER="true", EVAL_CHANGED_ONLY="true",
-                               EVAL_CASES="case-001")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        call, = self.claude_calls()
-        self.assertEqual(call["config"], config)
-        self.assertEqual(call["cases"], ["case-001"])
-        self.assertEqual(self.junit().attrib["tests"], "1")
-
-    def test_shared_setup_failure_is_not_retried(self):
-        self.make_entry("evals/eval-other.yaml")
-        self.put("setup.sh", 'echo setup >> "$CALLS"\nexit 2\n')
-        result = self.run_step(EVAL_DISCOVER="evals/*.yaml", EVAL_SETUP_SCRIPT="setup.sh")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.calls().count("setup"), 1)
-        self.assertEqual(self.claude_calls(), [])
-
-    def test_invalid_legacy_inputs_fail_before_model_calls(self):
-        for override in ({"EVAL_DISCOVER": "true"}, {"EVAL_PARALLELISM": "0"},
-                         {"EVAL_MAX_TURNS": "bad"}, {"EVAL_EXTRA_ARGS": '"unclosed'},
-                         {"EVAL_CONFIG": "missing.yaml"}, {"EVAL_SETUP_SCRIPT": "missing.sh"},
-                         {"EVAL_CHANGED_ONLY": "true", "PULL_BASE_SHA": "bad"}):
-            with self.subTest(override=override):
-                result = self.run_legacy(**override)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertEqual(self.calls(), [])
-                self.assertEqual(self.junit().attrib["failures"], "1")
-
-    def test_legacy_uses_shared_failure_verdict_and_continues_after_eval_failure(self):
-        second = self.make_entry("evals/eval-other.yaml")
-        result = self.run_step(EVAL_DISCOVER="evals/*.yaml",
-                               BEHAVIORS=json.dumps({self.entry["config"]: "missing_result"}))
-        self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(len(self.claude_calls()), 2)
-        self.assertEqual(self.junit().attrib["failures"], "1")
-        self.assertIn(second["config"], self.claude_calls()[1]["config"])
-
-    def test_distributed_legacy_bundle_runs_without_sibling_sources(self):
-        standalone = self.root / "legacy-commands.sh"
-        standalone.write_bytes(self.commands.read_bytes())
-        self.commands = standalone
-        result = self.run_legacy()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(len(self.claude_calls()), 1)
-
-
 class PackagingTests(unittest.TestCase):
     def test_bundled_source_is_current(self):
         self.assertEqual(sync_commands.COMMANDS.read_text(), sync_commands.generated_script())
-        self.assertEqual(sync_commands.LEGACY_COMMANDS.read_text(), sync_commands.generated_script("legacy"))
-        self.assertEqual(sync_commands.LEGACY_COMMANDS.read_text().replace("--input legacy", "--input manifest"),
-                         sync_commands.COMMANDS.read_text())
 
     def test_manifest_workflow_has_its_own_execution_step(self):
         directory = sync_commands.COMMANDS.parent

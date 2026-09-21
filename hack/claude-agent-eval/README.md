@@ -5,12 +5,11 @@ at the root of the repository under test. After one ci-operator job enrolls
 that repository, contributors add evals through its manifest, eval YAMLs,
 and cases, without another openshift/release test entry for each eval.
 
-This implements PIXAA-23. Both workflows use one Python execution engine.
-The existing `openshift-claude-agent-eval` workflow keeps its name and env
-interface through a temporary `legacy_adapter.py`; the dedicated manifest
-workflow reads repo-owned inputs directly. PIXAA job/image wiring, seed
-evals/docs, and migration of consumers to manifests are separate tasks.
-Manifest periodic/manual execution is reserved for PIXAA-26.
+This implements the independent manifest PR workflow for PIXAA-23. The new
+workflow uses a Python runner; the existing `openshift-claude-agent-eval`
+workflow retains its original commands and environment interface unchanged.
+PIXAA job/image wiring and seed evals/docs are separate tasks. Existing
+workflow migration and periodic/manual eval execution are out of scope.
 
 ## Manifest contract
 
@@ -31,8 +30,8 @@ evals:
 
 `config`, `run`, `parallelism`, and `max_turns` are required; the latter two
 are positive integers. `setup_script` and `eval_cases_dir` are optional.
-`triggers` is a list of literal path prefixes, nonempty for `run: pr`.
-`periodic` and `manual` entries are logged and skipped. `evals: []` is valid.
+`run` must be `pr`; `periodic` and `manual` entries are rejected before execution.
+`triggers` is a nonempty list of literal path prefixes. `evals: []` is valid.
 Unknown fields, duplicate YAML keys/configs, invalid types, missing paths,
 and paths escaping the repository fail before any model calls.
 
@@ -76,7 +75,7 @@ from the repository root; stdout becomes that eval's `EVAL_SNAPSHOT_DIR`.
 Write setup diagnostics to stderr. Each eval receives a fresh environment.
 
 **Turn-limit clarification:** `max_turns` currently limits the outer Claude
-session running `/eval-run`, matching legacy `EVAL_MAX_TURNS`. The ticket
+session running `/eval-run`. The ticket
 says "per case", but the current harness exposes no per-case max-turns
 argument. Strict per-case enforcement requires a coordinated harness change.
 
@@ -89,41 +88,7 @@ each case invocation, not total CI spend or judge/orchestrator calls.
 The new step exposes no legacy scheduling/runner overrides. `EVAL_DISCOVER`,
 an explicit non-default `EVAL_CONFIG`, and `EVAL_EXTRA_ARGS` are rejected.
 Other legacy runner overrides do not override manifest/eval settings.
-Use the existing workflow for legacy inputs until consumers migrate to manifests.
-
-## Legacy input adapter
-
-`openshift-claude-agent-eval` selects `--input legacy`; the new workflow
-selects `--input manifest`. Both adapters produce `EvalPlan` objects for the
-same setup, Claude, timeout, result validation, scoring, metrics, and artifact
-code. Neither shell entry point contains an execution loop. Delete the legacy
-adapter and its entry point once consumers have migrated to manifests.
-
-The legacy adapter preserves:
-
-- `EVAL_CONFIG`, `EVAL_DISCOVER` (including `true` and its default glob), and
-  their mutual exclusion. A manifest and PR Git checkout are not required
-  for single-config/manual or periodic legacy runs.
-- `EVAL_MODEL`, `EVAL_EFFORT`, their nonempty Gangway overrides,
-  `EVAL_PARALLELISM`, and `EVAL_MAX_TURNS`. Ref defaults remain unchanged;
-  legacy eval YAMLs need not declare `models.skill`.
-- `EVAL_CHANGED_ONLY`, `EVAL_CASES_DIR`, and comma-separated `EVAL_CASES`.
-  Detected changed cases take precedence over explicit cases. Discovery uses
-  `<config directory>/<config stem>/cases`; changed-only entries without
-  detected or explicit cases are skipped. Unlike manifest mode, a skill-only
-  change does not automatically run the full legacy dataset.
-- `EVAL_BASELINE` and shell-style quoted `EVAL_EXTRA_ARGS`, parsed as argument
-  values without executing shell code.
-- `EVAL_SETUP_SCRIPT` once per selected job, sharing its snapshot directory
-  across that job's evals. A failed shared setup is not retried. Manifest
-  setup remains once per selected eval, with an independent environment.
-
-The shared engine deliberately gives legacy runs the same failure reporting:
-invalid diffs fail instead of silently skipping, no matches produce zero-test
-JUnit, incomplete harness results and failed regression checks fail the job,
-and deadlines do not silently drop remaining evals. Reports use per-eval names
-instead of overwriting each other; the complete run archive remains available.
-Existing jobs need no configuration changes to use the adapter.
+Existing jobs continue to use the unchanged `openshift-claude-agent-eval` workflow.
 
 ## CI integration
 
@@ -131,6 +96,12 @@ Select `workflow: openshift-claude-agent-eval-manifest`, supply its
 `claude-ai-helpers` image, and set `EVAL_WORKDIR` to the PR checkout root,
 including `.git` and the base commit's history. The default `/opt/ai-helpers`
 only works if it contains that checkout. No `EVAL_MANIFEST` flag is needed.
+
+This workflow supports presubmit jobs only. Prow job configuration controls
+whether PR creation, new commits on an open PR, or a manual test request
+starts a job. Manually triggering a presubmit still uses `run: pr`; it does
+not require a manifest `run: manual` mode. Postsubmit and periodic jobs are
+not supported by this runner.
 
 The job uses `skip_if_only_changed` for broad filtering and the manifest for
 precise selection. Skills are Markdown, so do not exclude all `*.md` files.
@@ -154,10 +125,10 @@ metrics failures remain warnings and do not replace the eval verdict.
 
 ## Development and validation
 
-Edit `manifest_runner.py`, `eval_plan.py`, `legacy_adapter.py`, or
-`eval_metrics.py`, then run `sync_commands.py`. It packages the same Python
-sources into both steps' commands scripts, differing only in the selected
-input adapter. ci-operator ships a commands script's contents, not sibling
+Edit `manifest_runner.py`, `eval_plan.py`, or `eval_metrics.py`, then run
+`sync_commands.py`. It packages these sources into the manifest step's
+commands script only; it does not read or write the existing workflow's
+commands script. ci-operator ships a commands script's contents, not sibling
 Python files from release/hack.
 The shell unpacks the files and forwards signals; Python owns orchestration.
 This avoids a runtime source download or a shared-image change. Packaging
@@ -177,8 +148,9 @@ set `EVAL_TEST_IMAGE` to an immutable digest to reproduce a particular run.
 Set `CONTAINER_ENGINE=docker` to use Docker instead of Podman. The tests run
 with network disabled, fake Claude/harness executables, no mounted credentials,
 and real Git/Python; they make no model calls and need no fake GNU `timeout`.
-They cover both distributed entry points, legacy overrides/case selection,
-shared setup, and the manifest-specific contract.
+They cover the distributed manifest entry point, eval/case selection,
+per-eval setup, and failure reporting. These offline tests do not establish
+that the workflow works end to end in Prow with the real harness and models.
 
 For a fast local run (Python 3.9+ and PyYAML):
 `python3 -m unittest discover -s hack/claude-agent-eval -p 'test_*.py' -v`.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared eval orchestration with manifest and legacy input adapters.
+"""Run PR evaluations selected by the repository's manifest.
 
 The step bundles this file with sync_commands.py because ci-operator distributes
 the commands file, not sibling Python files. Only PyYAML and the stdlib are needed.
@@ -23,10 +23,8 @@ import yaml
 
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
     from .eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
-    from .legacy_adapter import load_legacy
 except ImportError:
     from eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
-    from legacy_adapter import load_legacy
 
 
 MANIFEST = "evals.yaml"
@@ -89,8 +87,8 @@ def load_manifest(repo):
         if PurePosixPath(config).suffix not in (".yaml", ".yml") or config in seen:
             raise EvalError(f"{label}.config must be a unique YAML config path")
         seen.add(config)
-        if entry["run"] not in ("pr", "periodic", "manual"):
-            raise EvalError(f"{label}.run must be pr, periodic, or manual")
+        if entry["run"] != "pr":
+            raise EvalError(f"{label}.run must be pr; periodic/manual evals are not supported")
         for field in ("parallelism", "max_turns"):
             if (not isinstance(entry[field], int) or isinstance(entry[field], bool)
                     or entry[field] <= 0):
@@ -102,8 +100,8 @@ def load_manifest(repo):
         if "eval_cases_dir" in entry:
             repo_directory(repo, cases_dir, f"{label}.eval_cases_dir")
         triggers = entry.get("triggers", [])
-        if not isinstance(triggers, list) or (entry["run"] == "pr" and not triggers):
-            raise EvalError(f"{label}.triggers must be a list, nonempty for run: pr")
+        if not isinstance(triggers, list) or not triggers:
+            raise EvalError(f"{label}.triggers must be a nonempty list")
         for trigger in triggers:
             relative_path(trigger, f"{label}.triggers")
         entries.append(Eval(config, entry["run"], entry["parallelism"],
@@ -114,9 +112,6 @@ def load_manifest(repo):
 def select_evals(entries, files):
     selected = []
     for entry in entries:
-        if entry.run != "pr":
-            print(f"SKIP {entry.config}: run: {entry.run} is not enabled in PR mode", flush=True)
-            continue
         match = next((path for path in files if path.startswith(entry.triggers)), None)
         if match is None:
             print(f"SKIP {entry.config}: no changed file matches triggers {entry.triggers}", flush=True)
@@ -284,7 +279,6 @@ def emit_metrics(env, repo, artifacts, *, stream_log, result, run_id, prompt):  
 
 def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statements
     results = []
-    setup_results = {}
     started = time.monotonic()
     runs = Path(env.get("AGENT_EVAL_RUNS_DIR") or "eval/runs")
     if not runs.is_absolute():
@@ -325,7 +319,6 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                         "--run-id", run_id, "--parallelism", str(entry.parallelism)]
                 if cases:
                     args.extend(["--cases", *cases])
-                args.extend(entry.extra_args)
                 prompt = "/eval-run " + shlex.join(args)
                 print(f"RUN {entry.config}: model={model}, parallelism={entry.parallelism}, "
                       f"orchestrator max_turns={entry.max_turns}", flush=True)
@@ -333,21 +326,14 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                     if remaining() <= 0:
                         raise EvalError("step time limit reached before this eval could start")
                     if entry.setup_script:
-                        # Legacy setup is job-wide; manifest setup is per eval.
-                        # Cache failures too so a failed shared setup is never retried.
-                        cached = setup_results.get(entry.setup_script) if entry.setup_once else None
-                        if cached is None:
-                            setup_log = artifacts / f"{name}-setup.log"
-                            with tempfile.TemporaryFile() as output:
-                                status = command(["bash", entry.setup_script], repo, run_env, setup_log,
-                                                 remaining(), stdout=output)
-                                output.seek(0)
-                                cached = (status, output.read().decode().rstrip("\n"), setup_log.name)
-                            if entry.setup_once:
-                                setup_results[entry.setup_script] = cached
-                        status, snapshot, log_name = cached
+                        setup_log = artifacts / f"{name}-setup.log"
+                        with tempfile.TemporaryFile() as output:
+                            status = command(["bash", entry.setup_script], repo, run_env, setup_log,
+                                             remaining(), stdout=output)
+                            output.seek(0)
+                            snapshot = output.read().decode().rstrip("\n")
                         if status:
-                            raise EvalError(f"setup_script failed (exit {status}); see {log_name}")
+                            raise EvalError(f"setup_script failed (exit {status}); see {setup_log.name}")
                         run_env["EVAL_SNAPSHOT_DIR"] = snapshot
                     if remaining() <= 0:
                         raise EvalError("step time limit reached during setup")
@@ -403,7 +389,7 @@ def interrupted(signum, _frame):
 
 
 def manifest_plans(repo, env):
-    """Validate and select manifest inputs before the common engine runs."""
+    """Validate and select manifest inputs before execution."""
     if env.get("EVAL_DISCOVER") or env.get("EVAL_CONFIG", "eval.yaml") not in ("", "eval.yaml"):
         raise EvalError("the manifest workflow does not accept EVAL_DISCOVER or explicit EVAL_CONFIG")
     if env.get("EVAL_EXTRA_ARGS"):
@@ -411,7 +397,7 @@ def manifest_plans(repo, env):
     if env.get("JOB_TYPE", "presubmit") != "presubmit":
         raise EvalError("manifest mode currently supports PR runs only (periodic/manual are follow-on work)")
     entries = load_manifest(repo)
-    files = changed_files(repo, env.get("PULL_BASE_SHA", "")) if any(e.run == "pr" for e in entries) else []
+    files = changed_files(repo, env.get("PULL_BASE_SHA", "")) if entries else []
     plans = []
     for entry in select_evals(entries, files):
         config, model = read_eval(repo, entry)
@@ -420,7 +406,7 @@ def manifest_plans(repo, env):
     return plans
 
 
-def main(mode="manifest"):
+def main():
     env = dict(os.environ)
     repo = Path(env.get("EVAL_WORKDIR") or "/opt/ai-helpers").resolve()
     artifacts = Path(env["ARTIFACT_DIR"]).resolve()
@@ -429,7 +415,7 @@ def main(mode="manifest"):
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGINT, interrupted)
     try:
-        selected = load_legacy(repo, env) if mode == "legacy" else manifest_plans(repo, env)
+        selected = manifest_plans(repo, env)
         if not selected:
             print("No evals matched; exiting without setup, harness installation, or Claude calls.", flush=True)
             write_junit(artifacts, [])
@@ -442,8 +428,4 @@ def main(mode="manifest"):
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", choices=("manifest", "legacy"), default="manifest")
-    sys.exit(main(parser.parse_args().input))
+    sys.exit(main())

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bundle the Python runner into the two ci-operator commands scripts."""
+"""Bundle the manifest runner into its ci-operator commands script."""
 
 import argparse
 from pathlib import Path
@@ -9,11 +9,10 @@ HERE = Path(__file__).resolve().parent
 COMMANDS = HERE.parents[1] / (
     "ci-operator/step-registry/openshift/claude/agent-eval/manifest/"
     "openshift-claude-agent-eval-manifest-commands.sh")
-LEGACY_COMMANDS = COMMANDS.parent.parent / "openshift-claude-agent-eval-commands.sh"
-SOURCES = ("eval_plan.py", "legacy_adapter.py", "manifest_runner.py", "eval_metrics.py")
+SOURCES = ("eval_plan.py", "manifest_runner.py", "eval_metrics.py")
 
 
-def generated_script(mode="manifest"):
+def generated_script():
     # ci-operator ships this commands file, not the source files in release/hack.
     # The shell only unpacks the bundle and forwards signals; Python owns execution.
     script = '''#!/bin/bash
@@ -37,27 +36,26 @@ stop_runner() {
     wait "${runner_pid}" || true
     exit "$1"
 }
-python3 "${runner_dir}/manifest_runner.py" --input INPUT_MODE &
+python3 "${runner_dir}/manifest_runner.py" &
 runner_pid=$!
 trap 'stop_runner 143' TERM
 trap 'stop_runner 130' INT
 status=0
 wait "${runner_pid}" || status=$?
 exit "${status}"
-'''.replace("INPUT_MODE", mode)
+'''
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    for destination, mode in ((COMMANDS, "manifest"), (LEGACY_COMMANDS, "legacy")):
-        updated = generated_script(mode)
-        if args.check:
-            if not destination.is_file() or destination.read_text(encoding="utf-8") != updated:
-                parser.exit(1, f"Bundled Python is stale in {destination}; run python3 hack/claude-agent-eval/sync_commands.py\n")
-        else:
-            destination.write_text(updated, encoding="utf-8")
+    updated = generated_script()
+    if args.check:
+        if not COMMANDS.is_file() or COMMANDS.read_text(encoding="utf-8") != updated:
+            parser.exit(1, f"Bundled Python is stale in {COMMANDS}; run python3 hack/claude-agent-eval/sync_commands.py\n")
+    else:
+        COMMANDS.write_text(updated, encoding="utf-8")
 
 
 if __name__ == "__main__":

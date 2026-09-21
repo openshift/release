@@ -1,4 +1,4 @@
-"""Normalized eval inputs shared by the manifest and temporary legacy adapters."""
+"""Selected manifest evals and repository input validation."""
 
 from dataclasses import dataclass
 import hashlib
@@ -15,8 +15,8 @@ class EvalError(Exception):
 
 
 @dataclass(frozen=True)
-class EvalPlan:  # pylint: disable=too-many-instance-attributes
-    """One fully selected eval; execution does not interpret legacy EVAL_* flags."""
+class EvalPlan:
+    """One manifest eval with its resolved settings and selected cases."""
 
     config: str
     settings: dict
@@ -25,8 +25,6 @@ class EvalPlan:  # pylint: disable=too-many-instance-attributes
     max_turns: int
     setup_script: str = ""
     cases: tuple = ()
-    extra_args: tuple = ()
-    setup_once: bool = False
 
     @property
     def artifact_name(self):
