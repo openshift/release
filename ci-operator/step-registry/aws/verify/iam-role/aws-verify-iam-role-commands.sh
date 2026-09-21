@@ -84,17 +84,17 @@ function verify_installer_default_role() {
   # Confirm the role exists via the API using the command's exit status rather
   # than matching an error message string. On failure, the stable NoSuchEntity
   # error code distinguishes genuine absence from other query errors.
-  if aws --region $REGION iam get-role --role-name ${default_role} > ${probe_output} 2>&1; then
+  if aws --region "$REGION" iam get-role --role-name "${default_role}" > "${probe_output}" 2>&1; then
     echo "PASS: ${label}: installer default role ${default_role} exists."
-  elif grep -q "NoSuchEntity" ${probe_output}; then
+  elif grep -q "NoSuchEntity" "${probe_output}"; then
     echo "FAIL: ${label}: installer default role ${default_role} does not exist."
     ret=$((ret+1))
   else
     echo "FAIL: ${label}: error querying installer default role ${default_role}:"
-    cat ${probe_output}
+    cat "${probe_output}"
     ret=$((ret+1))
   fi
-  rm -f ${probe_output}
+  rm -f "${probe_output}"
 
   if [[ "${actual_role}" != "${default_role}" ]]; then
     echo "FAIL: ${label}: IAM role mismatch: current: ${actual_role}, expected installer default: ${default_role}"
@@ -150,17 +150,17 @@ echo "-------------------------------------------------------------"
 echo "Roles used by cluster"
 echo "-------------------------------------------------------------"
 
-control_plane_profile=$(aws --region $REGION ec2 describe-instances --filters "Name=tag:Name,Values=${INFRA_ID}-master*" | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
-compute_profile=$(aws --region $REGION ec2 describe-instances --filters "Name=tag:Name,Values=${INFRA_ID}-worker*" | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
+control_plane_profile=$(aws --region "$REGION" ec2 describe-instances --filters "Name=tag:Name,Values=${INFRA_ID}-master*" | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
+compute_profile=$(aws --region "$REGION" ec2 describe-instances --filters "Name=tag:Name,Values=${INFRA_ID}-worker*" | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
 
-control_plane_role=$(aws --region $REGION iam get-instance-profile --instance-profile-name ${control_plane_profile} | jq -r '.InstanceProfile.Roles[0].Arn' | awk -F '/' '{print $NF}')
-compute_role=$(aws --region $REGION iam get-instance-profile --instance-profile-name ${compute_profile} | jq -r '.InstanceProfile.Roles[0].Arn' | awk -F '/' '{print $NF}')
+control_plane_role=$(aws --region "$REGION" iam get-instance-profile --instance-profile-name "${control_plane_profile}" | jq -r '.InstanceProfile.Roles[0].Arn' | awk -F '/' '{print $NF}')
+compute_role=$(aws --region "$REGION" iam get-instance-profile --instance-profile-name "${compute_profile}" | jq -r '.InstanceProfile.Roles[0].Arn' | awk -F '/' '{print $NF}')
 
 control_plane_role_output=$(mktemp)
 compute_role_output=$(mktemp)
 
-aws --region $REGION iam get-role --role-name ${control_plane_role} --output text >$control_plane_role_output
-aws --region $REGION iam get-role --role-name ${compute_role} --output text >$compute_role_output
+aws --region "$REGION" iam get-role --role-name "${control_plane_role}" --output text >"$control_plane_role_output"
+aws --region "$REGION" iam get-role --role-name "${compute_role}" --output text >"$compute_role_output"
 
 echo "Control plane: profile: ${control_plane_profile}, role: ${control_plane_role}"
 echo "Compute:       profile: ${compute_profile}, role: ${compute_role}"
@@ -173,9 +173,10 @@ edge_profile=""
 edge_role=""
 edge_role_output=$(mktemp)
 if [[ -n "${edge_instance_ids}" ]]; then
-  edge_profile=$(aws --region $REGION ec2 describe-instances --instance-ids ${edge_instance_ids} | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
-  edge_role=$(aws --region $REGION iam get-instance-profile --instance-profile-name ${edge_profile} | jq -r '.InstanceProfile.Roles[0].Arn' | awk -F '/' '{print $NF}')
-  aws --region $REGION iam get-role --role-name ${edge_role} --output text >$edge_role_output
+  # shellcheck disable=SC2086 # intentional word splitting: pass each instance ID as a separate argument
+  edge_profile=$(aws --region "$REGION" ec2 describe-instances --instance-ids ${edge_instance_ids} | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
+  edge_role=$(aws --region "$REGION" iam get-instance-profile --instance-profile-name "${edge_profile}" | jq -r '.InstanceProfile.Roles[0].Arn' | awk -F '/' '{print $NF}')
+  aws --region "$REGION" iam get-role --role-name "${edge_role}" --output text >"$edge_role_output"
   echo "Edge:          profile: ${edge_profile}, role: ${edge_role}"
 fi
 
@@ -242,14 +243,14 @@ if [[ ${expected_control_plane_role} != "" ]]; then
   # Inspect the lookup exit status: success means the default role exists
   # (unexpected), NoSuchEntity means it is absent (expected), and any other
   # failure is a query error that cannot be classified.
-  if aws --region $REGION iam get-role --role-name ${role_name} > ${output} 2>&1; then
+  if aws --region "$REGION" iam get-role --role-name "${role_name}" > "${output}" 2>&1; then
     echo "FAIL: ${role_name} was found; expected only the BYO role."
     ret=$((ret+1))
-  elif grep -q "NoSuchEntity" ${output}; then
+  elif grep -q "NoSuchEntity" "${output}"; then
     echo "PASS: ${role_name} does not exist."
   else
     echo "FAIL: error querying ${role_name}:"
-    cat ${output}
+    cat "${output}"
     ret=$((ret+1))
   fi
 
@@ -274,14 +275,14 @@ echo "-------------------------------------------------------------"
 if [[ ${expected_compute_role} != "" ]]; then
 
   role_name=${INFRA_ID}-worker-role
-  if aws --region $REGION iam get-role --role-name ${role_name} > ${output} 2>&1; then
+  if aws --region "$REGION" iam get-role --role-name "${role_name}" > "${output}" 2>&1; then
     echo "FAIL: ${role_name} was found; expected only the BYO role."
     ret=$((ret+1))
-  elif grep -q "NoSuchEntity" ${output}; then
+  elif grep -q "NoSuchEntity" "${output}"; then
     echo "PASS: ${role_name} does not exist."
   else
     echo "FAIL: error querying ${role_name}:"
-    cat ${output}
+    cat "${output}"
     ret=$((ret+1))
   fi
 

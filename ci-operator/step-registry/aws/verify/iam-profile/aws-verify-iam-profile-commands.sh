@@ -70,17 +70,17 @@ function verify_installer_default_profile() {
   # Confirm the instance profile exists via the API using the command's exit
   # status rather than matching an error message string. On failure, the stable
   # NoSuchEntity error code distinguishes genuine absence from other query errors.
-  if aws --region $REGION iam get-instance-profile --instance-profile-name ${default_profile} > ${probe_output} 2>&1; then
+  if aws --region "$REGION" iam get-instance-profile --instance-profile-name "${default_profile}" > "${probe_output}" 2>&1; then
     echo "PASS: ${label}: installer default instance profile ${default_profile} exists."
-  elif grep -q "NoSuchEntity" ${probe_output}; then
+  elif grep -q "NoSuchEntity" "${probe_output}"; then
     echo "FAIL: ${label}: installer default instance profile ${default_profile} does not exist."
     ret=$((ret+1))
   else
     echo "FAIL: ${label}: error querying installer default instance profile ${default_profile}:"
-    cat ${probe_output}
+    cat "${probe_output}"
     ret=$((ret+1))
   fi
-  rm -f ${probe_output}
+  rm -f "${probe_output}"
 
   if [[ "${actual_profile}" != "${default_profile}" ]]; then
     echo "FAIL: ${label}: IAM profile mismatch: current: ${actual_profile}, expected installer default: ${default_profile}"
@@ -112,14 +112,14 @@ echo "-------------------------------------------------------------"
 echo "Profiles used by cluster"
 echo "-------------------------------------------------------------"
 
-control_plane_profile=$(aws --region $REGION ec2 describe-instances --filters "Name=tag:Name,Values=${INFRA_ID}-master*" | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
-compute_profile=$(aws --region $REGION ec2 describe-instances --filters "Name=tag:Name,Values=${INFRA_ID}-worker*" | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
+control_plane_profile=$(aws --region "$REGION" ec2 describe-instances --filters "Name=tag:Name,Values=${INFRA_ID}-master*" | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
+compute_profile=$(aws --region "$REGION" ec2 describe-instances --filters "Name=tag:Name,Values=${INFRA_ID}-worker*" | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
 
 control_plane_profile_output=$(mktemp)
 compute_profile_output=$(mktemp)
 
-aws --region $REGION iam get-instance-profile --instance-profile-name ${control_plane_profile} --output text >$control_plane_profile_output
-aws --region $REGION iam get-instance-profile --instance-profile-name ${compute_profile} --output text >$compute_profile_output
+aws --region "$REGION" iam get-instance-profile --instance-profile-name "${control_plane_profile}" --output text >"$control_plane_profile_output"
+aws --region "$REGION" iam get-instance-profile --instance-profile-name "${compute_profile}" --output text >"$compute_profile_output"
 
 echo "Control plane: profile: ${control_plane_profile}"
 echo "Compute:       profile: ${compute_profile}"
@@ -131,8 +131,9 @@ edge_instance_ids=$(oc get nodes -l node-role.kubernetes.io/edge -o jsonpath='{r
 edge_profile=""
 edge_profile_output=$(mktemp)
 if [[ -n "${edge_instance_ids}" ]]; then
-  edge_profile=$(aws --region $REGION ec2 describe-instances --instance-ids ${edge_instance_ids} | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
-  aws --region $REGION iam get-instance-profile --instance-profile-name ${edge_profile} --output text >$edge_profile_output
+  # shellcheck disable=SC2086 # intentional word splitting: pass each instance ID as a separate argument
+  edge_profile=$(aws --region "$REGION" ec2 describe-instances --instance-ids ${edge_instance_ids} | jq -r '.Reservations[].Instances[].IamInstanceProfile.Arn' | sort | uniq | awk -F '/' '{print $NF}')
+  aws --region "$REGION" iam get-instance-profile --instance-profile-name "${edge_profile}" --output text >"$edge_profile_output"
   echo "Edge:          profile: ${edge_profile}"
 fi
 
@@ -200,14 +201,14 @@ if [[ ${expected_control_plane_profile} != "" ]]; then
   # profile exists (unexpected), NoSuchEntity means it is absent (expected), and
   # any other failure is a query error that cannot be classified.
   profile_name=${INFRA_ID}-master-profile
-  if aws --region $REGION iam get-instance-profile --instance-profile-name ${profile_name} > ${output} 2>&1; then
+  if aws --region "$REGION" iam get-instance-profile --instance-profile-name "${profile_name}" > "${output}" 2>&1; then
     echo "FAIL: ${profile_name} was found; expected only the BYO instance profile."
     ret=$((ret+1))
-  elif grep -q "NoSuchEntity" ${output}; then
+  elif grep -q "NoSuchEntity" "${output}"; then
     echo "PASS: ${profile_name} does not exist."
   else
     echo "FAIL: error querying ${profile_name}:"
-    cat ${output}
+    cat "${output}"
     ret=$((ret+1))
   fi
 
@@ -218,7 +219,7 @@ if [[ ${expected_control_plane_profile} != "" ]]; then
     echo "PASS: Control plane IAM profile"
   fi
 
-  if ! has_shared_tags ${control_plane_profile_output}; then
+  if ! has_shared_tags "${control_plane_profile_output}"; then
     echo "FAIL: tag check: No kubernetes.io/cluster/${INFRA_ID}:shared was found ${control_plane_profile}"
     ret=$((ret + 1))
   else
@@ -237,14 +238,14 @@ echo "-------------------------------------------------------------"
 if [[ ${expected_compute_profile} != "" ]]; then
 
   profile_name=${INFRA_ID}-worker-profile
-  if aws --region $REGION iam get-instance-profile --instance-profile-name ${profile_name} > ${output} 2>&1; then
+  if aws --region "$REGION" iam get-instance-profile --instance-profile-name "${profile_name}" > "${output}" 2>&1; then
     echo "FAIL: ${profile_name} was found; expected only the BYO instance profile."
     ret=$((ret+1))
-  elif grep -q "NoSuchEntity" ${output}; then
+  elif grep -q "NoSuchEntity" "${output}"; then
     echo "PASS: ${profile_name} does not exist."
   else
     echo "FAIL: error querying ${profile_name}:"
-    cat ${output}
+    cat "${output}"
     ret=$((ret+1))
   fi
 
@@ -255,7 +256,7 @@ if [[ ${expected_compute_profile} != "" ]]; then
     echo "PASS: Compute IAM profile"
   fi
 
-  if ! has_shared_tags ${compute_profile_output}; then
+  if ! has_shared_tags "${compute_profile_output}"; then
     echo "FAIL: tag check: No kubernetes.io/cluster/${INFRA_ID}:shared was found ${compute_profile}"
     ret=$((ret + 1))
   else
@@ -283,7 +284,7 @@ if [[ ${expected_edge_profile} != "" ]]; then
       echo "PASS: Edge IAM profile"
     fi
 
-    if ! has_shared_tags ${edge_profile_output}; then
+    if ! has_shared_tags "${edge_profile_output}"; then
       echo "FAIL: tag check: No kubernetes.io/cluster/${INFRA_ID}:shared was found ${edge_profile}"
       ret=$((ret + 1))
     else
