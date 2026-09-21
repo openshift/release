@@ -1,0 +1,54 @@
+ref:
+  as: p2p-upgrade-odf-hub
+  from: cli
+  commands: p2p-upgrade-odf-hub-commands.sh
+  timeout: 8h0m0s
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Upgrade ODF on the ACM hub cluster through one or more channels after an EUS OCP upgrade.
+
+    Iterates ODF_UPGRADE_CHANNEL_HOPS (comma-separated, e.g. "stable-4.21,stable-4.22"),
+    patching the odf-operator Subscription channel at each hop, waiting for OLM to detect
+    the channel change and install the new CSV (Succeeded), then waiting for StorageCluster
+    and NooBaa to return to Ready phase before moving to the next hop.
+
+    ODF's OLM upgrade graph requires sequential hops. Jumping directly from stable-4.20 to
+    stable-4.22 leaves OLM without an install-plan edge and the installedCSV never changes.
+    For a 4.20→4.22 EUS upgrade set ODF_UPGRADE_CHANNEL_HOPS=stable-4.21,stable-4.22.
+
+    Intended for EUS scenarios. Run after all OCP upgrade steps (hub + spoke) have completed.
+    Does not re-label nodes or re-create the StorageCluster — those are preserved from the
+    p2p-install-odf-hub step.
+
+    Writes diagnostics to ${ARTIFACT_DIR}/odf-hub-upgrade/ on completion (success and failure).
+    On failure, runs ocs-must-gather against the failing hop's ODF version.
+  env:
+  - name: ODF_UPGRADE_CHANNEL_HOPS
+    default: ""
+    documentation: |-
+      Comma-separated ordered list of ODF Subscription channels to upgrade through
+      (e.g. "stable-4.21,stable-4.22"). Each hop patches the Subscription, waits for the
+      new CSV to reach Succeeded, and waits for StorageCluster + NooBaa to return to Ready
+      before proceeding to the next hop. Required — step fails if empty.
+  - name: ODF_INSTALL_NAMESPACE
+    default: "openshift-storage"
+    documentation: Namespace of the ODF operator and StorageCluster on the hub.
+  - name: ODF_STORAGE_CLUSTER_NAME
+    default: "ocs-storagecluster"
+    documentation: StorageCluster metadata.name on the hub.
+  - name: ODF_SUBSCRIPTION_NAME
+    default: "odf-operator"
+    documentation: ODF Subscription metadata.name.
+  - name: ODF_CSV_POLL_INTERVAL_SECONDS
+    default: "10"
+    documentation: Sleep between installedCSV change polls (seconds).
+  - name: ODF_CSV_POLL_TIMEOUT_SECONDS
+    default: "900"
+    documentation: Max seconds to wait for the new CSV to appear and reach Succeeded per hop (15 min).
+  - name: ODF_STORAGECLUSTER_POLL_TIMEOUT_SECONDS
+    default: "5400"
+    documentation: Max seconds to wait for StorageCluster and NooBaa Ready per hop (90 min).
