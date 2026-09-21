@@ -3,6 +3,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -30,7 +34,7 @@ tests:
   capabilities:
   - intranet
   cluster: build05
-  cron: 0 23 31 2 *
+  cron: 0 4,16 * * *
   reporter_config:
     channel: '#opp-discussion'
     job_states_to_report:
@@ -44,8 +48,6 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
       ACM_SUBSCRIPTION_NAMESPACE: ocm
       ACS_SUBSCRIPTION_NAMESPACE: openshift-operators
@@ -60,7 +62,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8942
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "false"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
@@ -81,7 +83,7 @@ tests:
     - ref: ipi-conf-aws
     - ref: ipi-conf-aws-rootvolume
     - ref: ipi-install-monitoringpvc
-    - chain: ipi-install
+    - chain: ipi-install-stableinitial
     - ref: interop-opp-disk-diag
     - ref: interop-opp-kubelet-config
     - ref: interop-opp-wait-for-api

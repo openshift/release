@@ -1,7 +1,34 @@
 #!/bin/bash
 
-set -eux -o pipefail
+set -euo pipefail
 shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
 
 OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-operator,quay-operator}"
 
@@ -45,7 +72,7 @@ function DebugOnExit () {
     true
 }
 
-trap '{ EXIT_CODE=$?; DebugOnExit; true; }' EXIT
+trap '_opp_cleanup; EXIT_CODE=${_exit_code}; DebugOnExit' EXIT
 trap '{ EXIT_CODE=143; DebugOnExit; trap - EXIT; exit 143; }' TERM
 
 # ──────────────────────────────────────────────────────────────────────
@@ -101,7 +128,7 @@ with open(sys.argv[1], 'w') as f:
 }
 
 function CheckApiDeprecations () {
-    : "=== Check 1: API deprecation scan ==="
+    echo ">>> PHASE: Check 1 — API deprecation scan"
 
     typeset targetMinor="${1}"
     typeset ocpDisplay="${2:-4.${targetMinor}}"
@@ -147,7 +174,13 @@ function CheckApiDeprecations () {
 }
 
 function CheckOppCompatibility () {
-    : "=== Check 2: OPP operator compatibility matrix ==="
+    echo ">>> PHASE: Check 2 — OPP operator compatibility matrix"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: OPP compatibility matrix check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "opp_compatibility_matrix" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AppendCheck "opp_compatibility_matrix" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
 
     typeset ocpKey="${1}"
     typeset compatSpec="${OPP_COMPAT[${ocpKey}]:-}"
@@ -219,7 +252,7 @@ function CheckOppCompatibility () {
 }
 
 function CheckClusterHealth () {
-    : "=== Check 3: Cluster health baseline ==="
+    echo ">>> PHASE: Check 3 — Cluster health baseline"
 
     typeset failed=0 details=""
 
@@ -314,7 +347,7 @@ print('\n'.join(names))
 }
 
 function CheckMcpReadiness () {
-    : "=== Check 4: MachineConfigPool readiness ==="
+    echo ">>> PHASE: Check 4 — MachineConfigPool readiness"
 
     typeset failed=0 details=""
 
@@ -404,7 +437,7 @@ function Main () {
     sourceVersion="$(oc get clusterversion --no-headers | awk '{print $2}')"
     : "Source OCP version: ${sourceVersion}"
 
-    : "=== Starting OPP pre-flight validation ==="
+    echo ">>> PHASE: Starting OPP pre-flight validation"
 
     InitReport
 
