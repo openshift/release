@@ -42,10 +42,12 @@ image are introduced.
 rosa-marketplace-release-detect
         |
         |  GET /api/v1/releasestream/<stream>/config
-        |  GET /api/v1/releasestream/<stream>/tags
+        |  GET /api/v1/releasestreams/ready
         v
 OpenShift release controller
         |
+        |  earliest ready tag name
+        |  GET /api/v1/releasestream/<stream>/tags
         |  selected payload pullspec
         v
 oc adm release extract --command=openshift-install
@@ -91,10 +93,11 @@ The detector performs five operations:
    `TARGET_OCP_Y_STREAM`.
 2. Confirm that the release-controller stream exists and that its response
    identifies the expected stream.
-3. Read the stream tags and choose the lexically earliest payload in `Ready`,
-   `Accepted`, or `Rejected` phase. Those phases establish that a payload image
-   was built; they do not make a Marketplace release decision.
-4. Extract `openshift-install` from the selected payload and execute
+3. Read `/api/v1/releasestreams/ready` and choose the lexically earliest ready
+   tag for the target stream. Read the stream tags only to resolve that exact
+   tag's pullspec. If its phase changes to `Accepted` or `Rejected` between the
+   two requests, the already-observed ready signal remains valid.
+4. Extract `openshift-install` from the resolved payload and execute
    `coreos print-stream-json`.
 5. Validate and record the x86_64 RHCOS release and the AMI for the configured
    AWS region.
@@ -115,7 +118,7 @@ protected generator image and mount the required staging credentials.
 
 ### Tests and fixtures
 
-`hack/rosa-marketplace-release-monitor-tests.sh` provides grouped fixture and
+`hack/rosa-marketplace-release-monitor-tests.sh` provides fixture and
 configuration-contract tests. `hack/rosa-marketplace-release-monitor/` contains
 minimal JSON inputs and fake external commands.
 
@@ -159,9 +162,9 @@ All outputs are written to `SHARED_DIR` as single-line files.
 | `rosa-marketplace-rhcos-version` | `ready` | Installer-provided RHCOS release |
 | `rosa-marketplace-rhcos-ami` | `ready` | Installer-provided regional AMI |
 
-`ARTIFACT_DIR` also receives the downloaded config and tags documents, the
-selected payload object, and the installer-generated CoreOS stream document for
-debugging.
+`ARTIFACT_DIR` also receives the downloaded config, ready-streams, and tags
+documents, the selected ready tag and payload object, and the installer-generated
+CoreOS stream document for debugging.
 
 ## State and failure model
 
@@ -171,7 +174,7 @@ Normal lifecycle conditions are successful no-ops:
 |---|---|
 | `wait:stream-config-unavailable` | The requested nightly stream does not exist yet |
 | `wait:stream-tags-unavailable` | The stream exists but its tags endpoint is unavailable |
-| `wait:built-nightly-unavailable` | No `Ready`, `Accepted`, or `Rejected` payload exists |
+| `wait:built-nightly-unavailable` | The target stream has no tag in the `/ready` response |
 | `ready` | Payload and required RHCOS metadata were validated |
 
 Unexpected HTTP status codes, invalid JSON, mismatched stream names, missing

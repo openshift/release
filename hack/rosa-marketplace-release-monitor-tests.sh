@@ -39,8 +39,10 @@ run_detector() {
   SLEEP_BIN="${TEST_SLEEP_BIN:-sleep}" \
   ROSA_MARKETPLACE_INSTALLER_BIN="${TEST_ROOT}/mock-openshift-install.sh" \
   TEST_CONFIG_FIXTURE="${TEST_CONFIG_FIXTURE:-${FIXTURES}/config.json}" \
+  TEST_READY_FIXTURE="${TEST_READY_FIXTURE:-${FIXTURES}/ready-built.json}" \
   TEST_TAGS_FIXTURE="${TEST_TAGS_FIXTURE}" \
   TEST_CONFIG_HTTP_CODE="${TEST_CONFIG_HTTP_CODE:-200}" \
+  TEST_READY_HTTP_CODE="${TEST_READY_HTTP_CODE:-200}" \
   TEST_TAGS_HTTP_CODE="${TEST_TAGS_HTTP_CODE:-200}" \
   TEST_CONFIG_TRANSIENT_FAILURES="${TEST_CONFIG_TRANSIENT_FAILURES:-0}" \
   TEST_CONFIG_ATTEMPT_FILE="${TEST_CONFIG_ATTEMPT_FILE:-}" \
@@ -58,17 +60,21 @@ test_unknown_stream_waits() {
   assert_file_value "wait:stream-config-unavailable" "${output_dir}/shared/rosa-marketplace-release-state"
 }
 
-test_empty_tags_waits() {
+test_empty_ready_stream_waits() {
   local output_dir
   output_dir=$(mktemp -d)
-  TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" run_detector "${output_dir}"
+  TEST_READY_FIXTURE="${FIXTURES}/ready-empty.json" \
+    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
+      run_detector "${output_dir}"
   assert_file_value "wait:built-nightly-unavailable" "${output_dir}/shared/rosa-marketplace-release-state"
 }
 
-test_pending_tag_waits() {
+test_stream_absent_from_ready_response_waits() {
   local output_dir
   output_dir=$(mktemp -d)
-  TEST_TAGS_FIXTURE="${FIXTURES}/tags-pending.json" run_detector "${output_dir}"
+  TEST_READY_FIXTURE="${FIXTURES}/ready-wrong-stream.json" \
+    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
+      run_detector "${output_dir}"
   assert_file_value "wait:built-nightly-unavailable" "${output_dir}/shared/rosa-marketplace-release-state"
 }
 
@@ -85,25 +91,58 @@ test_first_built_payload_is_ready() {
   assert_file_value "ami-0123456789abcdef0" "${output_dir}/shared/rosa-marketplace-rhcos-ami"
 }
 
-test_accepted_payload_is_eligible() {
+test_ready_payload_transitioned_to_accepted_is_eligible() {
   local output_dir
   output_dir=$(mktemp -d)
   TEST_TAGS_FIXTURE="${FIXTURES}/tags-accepted.json" run_detector "${output_dir}"
   assert_file_value "ready" "${output_dir}/shared/rosa-marketplace-release-state"
 }
 
-test_rejected_payload_is_eligible() {
+test_ready_payload_transitioned_to_rejected_is_eligible() {
   local output_dir
   output_dir=$(mktemp -d)
   TEST_TAGS_FIXTURE="${FIXTURES}/tags-rejected.json" run_detector "${output_dir}"
   assert_file_value "ready" "${output_dir}/shared/rosa-marketplace-release-state"
 }
 
-test_failed_payload_waits() {
+test_failed_payload_without_ready_signal_waits() {
   local output_dir
   output_dir=$(mktemp -d)
-  TEST_TAGS_FIXTURE="${FIXTURES}/tags-failed.json" run_detector "${output_dir}"
+  TEST_READY_FIXTURE="${FIXTURES}/ready-empty.json" \
+    TEST_TAGS_FIXTURE="${FIXTURES}/tags-failed.json" \
+      run_detector "${output_dir}"
   assert_file_value "wait:built-nightly-unavailable" "${output_dir}/shared/rosa-marketplace-release-state"
+}
+
+test_malformed_ready_response_fails() {
+  local output_dir
+  output_dir=$(mktemp -d)
+
+  if TEST_READY_FIXTURE="${FIXTURES}/ready-malformed.json" \
+    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
+      run_detector "${output_dir}"; then
+    fail "malformed ready streams response unexpectedly succeeded"
+  fi
+}
+
+test_ready_endpoint_error_fails() {
+  local output_dir
+  output_dir=$(mktemp -d)
+
+  if TEST_READY_HTTP_CODE=404 \
+    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
+      run_detector "${output_dir}"; then
+    fail "ready endpoint error unexpectedly succeeded"
+  fi
+}
+
+test_ready_tag_missing_from_tags_fails() {
+  local output_dir
+  output_dir=$(mktemp -d)
+
+  if TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" run_detector "${output_dir}"; then
+    fail "ready payload missing from tags response unexpectedly succeeded"
+  fi
 }
 
 test_invalid_target_fails() {
@@ -245,6 +284,7 @@ test_transient_api_failures_retry_then_succeed() {
   TEST_RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS=8 \
   TEST_SLEEP_BIN="${TEST_ROOT}/mock-sleep.sh" \
   TEST_SLEEP_ARGS_FILE="${output_dir}/sleep-args" \
+  TEST_READY_FIXTURE="${FIXTURES}/ready-empty.json" \
   TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" \
     run_detector "${output_dir}"
 
@@ -373,12 +413,15 @@ test_generator_failure_propagates() {
 }
 
 test_unknown_stream_waits
-test_empty_tags_waits
-test_pending_tag_waits
+test_empty_ready_stream_waits
+test_stream_absent_from_ready_response_waits
 test_first_built_payload_is_ready
-test_accepted_payload_is_eligible
-test_rejected_payload_is_eligible
-test_failed_payload_waits
+test_ready_payload_transitioned_to_accepted_is_eligible
+test_ready_payload_transitioned_to_rejected_is_eligible
+test_failed_payload_without_ready_signal_waits
+test_malformed_ready_response_fails
+test_ready_endpoint_error_fails
+test_ready_tag_missing_from_tags_fails
 test_invalid_target_fails
 test_insecure_release_controller_api_fails
 test_release_controller_credentials_are_not_logged

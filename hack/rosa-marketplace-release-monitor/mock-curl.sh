@@ -60,6 +60,13 @@ elif [[ "${url}" == */tags ]]; then
   else
     printf 'tags unavailable\n' > "${destination}"
   fi
+elif [[ "${url}" == */releasestreams/ready ]]; then
+  printf '%s' "${TEST_READY_HTTP_CODE:-200}"
+  if [[ "${TEST_READY_HTTP_CODE:-200}" == "200" ]]; then
+    cp "${TEST_READY_FIXTURE}" "${destination}"
+  else
+    printf 'ready streams unavailable\n' > "${destination}"
+  fi
 else
   printf 'unexpected URL: %s\n' "${url}" >&2
   exit 2

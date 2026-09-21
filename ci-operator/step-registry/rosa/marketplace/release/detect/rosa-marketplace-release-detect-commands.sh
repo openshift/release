@@ -104,9 +104,36 @@ if action == "validate-config":
     expected_stream = sys.argv[3]
     if not isinstance(data, dict) or data.get("name") != expected_stream:
         sys.exit(2)
-elif action == "select-payload":
+elif action == "select-ready-payload":
     expected_stream = sys.argv[3]
     output_path = sys.argv[4]
+    if not isinstance(data, dict):
+        sys.exit(2)
+    ready_tags = data.get(expected_stream, [])
+    if ready_tags is None:
+        ready_tags = []
+    if not isinstance(ready_tags, list):
+        sys.exit(2)
+    for tag_name in ready_tags:
+        if (
+            not isinstance(tag_name, str)
+            or not tag_name
+            or not tag_name.startswith(expected_stream + "-")
+        ):
+            sys.exit(2)
+    if not ready_tags:
+        sys.exit(3)
+    selected = sorted(ready_tags)[0]
+    try:
+        with open(output_path, "w", encoding="utf-8") as destination:
+            destination.write(selected + "\n")
+    except OSError as error:
+        print("cannot write {}: {}".format(output_path, error), file=sys.stderr)
+        sys.exit(2)
+elif action == "resolve-payload":
+    expected_stream = sys.argv[3]
+    expected_tag = sys.argv[4]
+    output_path = sys.argv[5]
     if not isinstance(data, dict) or data.get("name") != expected_stream:
         sys.exit(2)
     tags = data.get("tags", [])
@@ -114,17 +141,19 @@ elif action == "select-payload":
         tags = []
     if not isinstance(tags, list):
         sys.exit(2)
-    eligible = []
+    matches = []
     for tag in tags:
         if not isinstance(tag, dict):
             sys.exit(2)
-        if tag.get("phase") in ("Ready", "Accepted", "Rejected"):
-            if not isinstance(tag.get("name"), str) or not tag["name"]:
-                sys.exit(2)
-            eligible.append(tag)
-    if not eligible:
-        sys.exit(3)
-    selected = sorted(eligible, key=lambda tag: tag["name"])[0]
+        if tag.get("name") == expected_tag:
+            matches.append(tag)
+    if len(matches) != 1:
+        sys.exit(2)
+    selected = matches[0]
+    if selected.get("phase") not in ("Ready", "Accepted", "Rejected"):
+        sys.exit(2)
+    if not isinstance(selected.get("pullSpec"), str) or not selected["pullSpec"]:
+        sys.exit(2)
     try:
         with open(output_path, "w", encoding="utf-8") as destination:
             json.dump(selected, destination, sort_keys=True)
@@ -224,13 +253,13 @@ validate_stream_config() {
     || fail "release-controller returned an invalid or mismatched stream config"
 }
 
-select_payload() {
+select_ready_payload() {
   local stream="$1"
-  local tags_file="$2"
-  local selected_file="$3"
+  local ready_file="$2"
+  local selected_tag_file="$3"
   local json_rc=0
 
-  if json_tool select-payload "${tags_file}" "${stream}" "${selected_file}"; then
+  if json_tool select-ready-payload "${ready_file}" "${stream}" "${selected_tag_file}"; then
     return 0
   else
     json_rc=$?
@@ -239,7 +268,17 @@ select_payload() {
   if (( json_rc == 3 )); then
     return 1
   fi
-  fail "release-controller returned an invalid or mismatched tags response"
+  fail "release-controller returned an invalid ready streams response"
+}
+
+resolve_payload() {
+  local stream="$1"
+  local payload_tag="$2"
+  local tags_file="$3"
+  local selected_file="$4"
+
+  json_tool resolve-payload "${tags_file}" "${stream}" "${payload_tag}" "${selected_file}" \
+    || fail "release-controller tags response did not resolve the selected ready payload"
 }
 
 extract_rhcos_metadata() {
@@ -270,6 +309,8 @@ extract_rhcos_metadata() {
 main() {
   local stream
   local config_file="${ARTIFACT_DIR}/rosa-marketplace-release-config.json"
+  local ready_file="${ARTIFACT_DIR}/rosa-marketplace-ready-streams.json"
+  local selected_tag_file="${ARTIFACT_DIR}/rosa-marketplace-selected-ready-tag"
   local tags_file="${ARTIFACT_DIR}/rosa-marketplace-release-tags.json"
   local selected_file="${ARTIFACT_DIR}/rosa-marketplace-selected-payload.json"
   local coreos_stream_file="${ARTIFACT_DIR}/rosa-marketplace-coreos-stream.json"
@@ -298,6 +339,22 @@ main() {
       ;;
   esac
 
+  http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestreams/ready" "${ready_file}" "ready-streams"
+  case "${HTTP_CODE}" in
+    200)
+      ;;
+    *)
+      fail "ready streams returned unexpected HTTP ${HTTP_CODE}"
+      ;;
+  esac
+
+  if ! select_ready_payload "${stream}" "${ready_file}" "${selected_tag_file}"; then
+    set_wait_state "built-nightly-unavailable"
+    return 0
+  fi
+
+  payload_tag=$(<"${selected_tag_file}")
+
   http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestream/${stream}/tags" "${tags_file}" "stream-tags"
   case "${HTTP_CODE}" in
     200)
@@ -311,10 +368,7 @@ main() {
       ;;
   esac
 
-  if ! select_payload "${stream}" "${tags_file}" "${selected_file}"; then
-    set_wait_state "built-nightly-unavailable"
-    return 0
-  fi
+  resolve_payload "${stream}" "${payload_tag}" "${tags_file}" "${selected_file}"
 
   payload_tag=$(json_tool payload-field "${selected_file}" name) \
     || fail "selected payload has no name"

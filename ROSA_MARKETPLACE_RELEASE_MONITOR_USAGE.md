@@ -77,13 +77,23 @@ curl --fail --silent --show-error \
   jq '{name, hide, endOfLife, to}'
 ```
 
-Inspect the stream tags used by the current detector:
+Inspect the ready-stream signal used by the detector:
+
+```bash
+curl --fail --silent --show-error \
+  --proto '=https' --proto-redir '=https' \
+  "${BASE_URL}/releasestreams/ready" |
+  jq --arg stream "${STREAM}" '{($stream): .[$stream]}'
+```
+
+Resolve a selected ready tag to its pullspec:
 
 ```bash
 curl --fail --silent --show-error \
   --proto '=https' --proto-redir '=https' \
   "${BASE_URL}/releasestream/${STREAM}/tags" |
-  jq '{name, tags: [.tags[] | {name, phase, pullSpec}]}'
+  jq --arg tag "<selected-ready-tag>" \
+    '{name, tags: [.tags[] | select(.name == $tag) | {name, phase, pullSpec}]}'
 ```
 
 These commands are diagnostic only. The values change as upstream payloads are
@@ -91,28 +101,18 @@ created and processed.
 
 ## Running local validation
 
-Run the complete deterministic suite:
+Run the deterministic suite:
 
 ```bash
-bash hack/rosa-marketplace-release-monitor-tests.sh all
+bash hack/rosa-marketplace-release-monitor-tests.sh
 ```
 
-Run one functional group while developing:
+The suite covers:
 
-```bash
-bash hack/rosa-marketplace-release-monitor-tests.sh release-controller-api
-bash hack/rosa-marketplace-release-monitor-tests.sh payload-selection
-bash hack/rosa-marketplace-release-monitor-tests.sh rhcos-extraction
-bash hack/rosa-marketplace-release-monitor-tests.sh prow-contract
-bash hack/rosa-marketplace-release-monitor-tests.sh publisher
-```
-
-The groups cover:
-
-| Group | Coverage |
+| Area | Coverage |
 |---|---|
 | `release-controller-api` | Settings, HTTPS, response validation, HTTP behavior, retries and size limits |
-| `payload-selection` | Empty, pending, failed, ready, accepted and rejected payloads |
+| `payload-selection` | Empty and malformed ready responses, deterministic ready-tag selection, exact tag resolution, and phase-transition races |
 | `rhcos-extraction` | Installer extraction, RHCOS release and regional AMI handling |
 | `prow-contract` | Step references, source CI configuration and generated Prow wiring |
 | `publisher` | State handoff, safety gates, generator arguments and exit propagation |
@@ -176,7 +176,7 @@ Interpret it as follows:
 | `ready` | A built payload and required RHCOS metadata were found | Inspect output values and publisher result |
 | `wait:stream-config-unavailable` | The configured future stream does not exist | No action unless the stream should already exist |
 | `wait:stream-tags-unavailable` | The stream exists but tags are not available | Wait; investigate if persistent |
-| `wait:built-nightly-unavailable` | No eligible built payload exists | Normal lifecycle wait |
+| `wait:built-nightly-unavailable` | The ready response contains no tag for the target stream | Normal lifecycle wait |
 
 For `ready`, inspect:
 
@@ -188,8 +188,8 @@ rosa-marketplace-rhcos-version
 rosa-marketplace-rhcos-ami
 ```
 
-Downloaded API responses and the CoreOS stream document are retained in
-`ARTIFACT_DIR` for troubleshooting.
+Downloaded config, ready-streams, and tags responses and the CoreOS stream
+document are retained in `ARTIFACT_DIR` for troubleshooting.
 
 ## Typical cases
 
@@ -212,8 +212,8 @@ The job succeeds and the publisher skips. This is an expected lifecycle state.
 
 ### Case 2: Stream exists but no payload has been built
 
-The config and tags requests succeed, but tags are empty or contain only
-`Pending` or `Failed` payloads.
+The config request succeeds, but the target stream is absent from the ready
+response or its ready-tag list is empty.
 
 Expected result:
 
@@ -225,17 +225,20 @@ The next four-hour run checks again.
 
 ### Case 3: More than one built payload is present
 
-If tags contain multiple `Ready`, `Accepted`, or `Rejected` payloads, the
-detector sorts their names and selects the earliest one. This provides a stable
-choice independent of response order.
+If the target stream has multiple tags in the ready response, the detector
+sorts their names and selects the earliest one. It then resolves only that tag
+in the stream tags response. This provides a stable choice independent of
+response order.
 
 Expected outputs include `ready`, the selected tag and pullspec, and the RHCOS
 version and regional AMI extracted from that payload.
 
-### Case 4: A payload is rejected by release verification
+### Case 4: A ready payload changes phase during resolution
 
-`Rejected` is eligible for detection because the payload image was built. The
-monitor records its embedded RHCOS data; it does not claim the payload is an
+The ready endpoint and tags endpoint are separate requests. A selected payload
+may move from `Ready` to `Accepted` or `Rejected` between them. The detector
+accepts either transition because the ready response already established that
+the payload image was built. It does not claim that a rejected payload is an
 accepted OpenShift release or independently authorize Marketplace publication.
 
 ### Case 5: Upstream returns malformed or mismatched data
@@ -328,7 +331,7 @@ periodic is responsible for detecting live upstream integration drift.
 |---|---|
 | `stream-config-unavailable` persists | Confirm the exact `<major>.<minor>.0-0.nightly` stream exists |
 | `stream-tags-unavailable` persists | Query the stream's `/tags` endpoint and inspect HTTP status |
-| `built-nightly-unavailable` persists | Inspect phases in the tags response |
+| `built-nightly-unavailable` persists | Inspect the target stream's array in `/api/v1/releasestreams/ready` |
 | Payload extraction fails | Verify pull-secret mount, pullspec access, and `oc` availability |
 | RHCOS version or AMI missing | Run the selected payload's installer with `coreos print-stream-json` |
 | Publisher reports missing output | Confirm the detector reached `ready` and both steps share `SHARED_DIR` |
