@@ -1,19 +1,3 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: boskos-forward-config
-  namespace: ci
-data:
-  "default.conf": |
-    server {
-      listen 8080;
-      location / {
-        proxy_pass https://boskos.ci.openshift.org;
-        proxy_set_header Host boskos.ci.openshift.org;
-        proxy_ssl_server_name on;
-      }
-    }
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -55,20 +39,37 @@ spec:
       serviceAccountName: boskos
       terminationGracePeriodSeconds: 30
       containers:
-      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_nginx-unprivileged_stable
-        name: boskos
-        ports:
-        - containerPort: 8080
+      - name: boskos
         resources:
           requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 1000m
-            memory: 512Mi
+            memory: "1Gi"
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_boskos_latest
+        imagePullPolicy: Always
+        args:
+        - --config=/etc/config/boskos.yaml
+        - --namespace=ci
+        - --projected-token-file=/var/sa-token/token
+        - --log-level=debug
+        - --pod-name=$(POD_NAME)
+        - --boskos-label-selector=app=prow,component=boskos
+        - --enable-leader-election=true
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+          - name: metrics
+            containerPort: 9090
+            protocol: TCP
         volumeMounts:
-        - name: config
-          mountPath: /etc/nginx/conf.d
+        - name: boskos-config
+          mountPath: /etc/config
+          readOnly: true
+        - name: service-account-token
+          mountPath: /var/sa-token
       - args:
         - -provider=openshift
         - -https-address=:8082
@@ -76,7 +77,6 @@ spec:
         - -email-domain=*
         - -upstream=http://localhost:8080
         - -htpasswd-file=/etc/proxy/htpasswd/ci.htpasswd
-        - -pass-basic-auth=false
         - -tls-cert=/etc/tls/private/tls.crt
         - -tls-key=/etc/tls/private/tls.key
         - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
@@ -103,6 +103,9 @@ spec:
         - mountPath: /etc/proxy/secrets
           name: secret-boskos-proxy
       volumes:
+        - name: boskos-config
+          configMap:
+            name: resources
         - name: secret-boskos-htpasswd
           secret:
             secretName: boskos-credentials
@@ -115,9 +118,11 @@ spec:
         - name: secret-boskos-tls
           secret:
             secretName: boskos-tls
-        - name: config
-          configMap:
-            name: boskos-forward-config
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
 ---
 apiVersion: v1
 kind: Service
@@ -133,6 +138,7 @@ spec:
   selector:
     app: prow
     component: boskos
+    boskos-leader: "true"
   ports:
   - name: https
     port: 8082
@@ -147,23 +153,29 @@ spec:
     protocol: TCP
     targetPort: 9090
 ---
-apiVersion: route.openshift.io/v1
-kind: Route
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
   annotations:
-    #https://docs.openshift.com/container-platform/3.11/architecture/networking/routes.html#env-variables
-    #default is 30s
-    #before figuring out why it takes so long, we set this up to work it around
-    haproxy.router.openshift.io/timeout: 1000s
+    cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: "90s"
+    # haproxy.router.openshift.io/timeout: 1h
+    route.openshift.io/termination: reencrypt
   name: boskos
   namespace: ci
 spec:
-  port:
-    targetPort: 8082
-  to:
-    kind: Service
-    name: boskos
-  wildcardPolicy: None
+  ingressClassName: openshift-default
   tls:
-    insecureEdgeTerminationPolicy: Redirect
-    termination: reencrypt
+    - secretName: boskos-web-tls
+      hosts:
+        - boskos.ci.openshift.org
+  rules:
+  - host: boskos.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: boskos
+            port:
+              number: 8082
+        pathType: ImplementationSpecific
