@@ -73,11 +73,16 @@ function AddResult () {
 # the replacement string. Without escaping, JUnit XML output is malformed.
 function XmlEscape () {
     typeset text="${1:-}"; (($#)) && shift
-    text="${text//&/\&amp;}"
-    text="${text//</\&lt;}"
-    text="${text//>/\&gt;}"
-    text="${text//\"/\&quot;}"
-    text="${text//\'/\&apos;}"
+    if shopt -q patsub_replacement 2>/dev/null; then
+        shopt -u patsub_replacement
+        local _restore_patsub=true
+    fi
+    text="${text//&/&amp;}"
+    text="${text//</&lt;}"
+    text="${text//>/&gt;}"
+    text="${text//\"/&quot;}"
+    text="${text//\'/&apos;}"
+    [[ "${_restore_patsub:-}" == true ]] && shopt -s patsub_replacement
     printf '%s' "${text}"
     true
 }
@@ -254,7 +259,7 @@ function CheckMcoReady () {
     _mco_probe="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
         observability --ignore-not-found -o name 2>&1)" || _mco_probe_rc=$?
     if (( _mco_probe_rc != 0 )); then
-        echo "WARNING: oc get MCO CR failed (exit ${_mco_probe_rc}): ${_mco_probe}"
+        echo "WARNING: MCO CR query failed (exit ${_mco_probe_rc})"
         echo "Proceeding to poll loop (may be transient)"
     elif [[ -z "${_mco_probe}" ]]; then
         echo "MultiClusterObservability CR 'observability' not found"

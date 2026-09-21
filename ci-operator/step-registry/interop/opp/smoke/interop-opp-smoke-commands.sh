@@ -66,11 +66,16 @@ AddResult() {
 # the replacement string. Without escaping, JUnit XML output is malformed.
 XmlEscape() {
     typeset text="${1:-}"; (($#)) && shift
+    if shopt -q patsub_replacement 2>/dev/null; then
+        shopt -u patsub_replacement
+        local _restore_patsub=true
+    fi
     text="${text//&/&amp;}"
     text="${text//</&lt;}"
     text="${text//>/&gt;}"
     text="${text//\"/&quot;}"
     text="${text//\'/&apos;}"
+    [[ "${_restore_patsub:-}" == true ]] && shopt -s patsub_replacement
     printf '%s' "${text}"
 }
 
