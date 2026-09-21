@@ -87,7 +87,11 @@ tests:
         git clone --depth=1 https://github.com/medik8s/system-tests.git /tmp/system-tests
         git -C /tmp/system-tests show --no-patch --format=fuller HEAD
 
-        candidate_version="$(sed -n 's/^  version: *//p' bundle/manifests/node-healthcheck-operator.clusterserviceversion.yaml | tr -d '"')"
+        candidate_bundle_dir="$(mktemp -d)"
+        oc image extract "$OO_BUNDLE" --path="/manifests/:$candidate_bundle_dir" --confirm
+        candidate_csv="$(find "$candidate_bundle_dir" -name '*clusterserviceversion.yaml' -print -quit)"
+        : "${candidate_csv:?candidate bundle must contain a ClusterServiceVersion}"
+        candidate_version="$(sed -n 's/^  version: *//p' "$candidate_csv" | tr -d '"')"
         : "${candidate_version:?NHC bundle CSV must specify spec.version}"
 
         export NHC_UPGRADE_CANDIDATE_NHC_BUNDLE="$OO_BUNDLE"
