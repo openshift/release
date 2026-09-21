@@ -81,7 +81,9 @@ tests:
         go version
         skopeo --version
         operator-sdk version
-        operator-sdk bundle validate "$OO_BUNDLE"
+        # The SDK defaults to Docker for remote bundle unpacking. CI does not
+        # run a container daemon, so use its daemonless registry client.
+        operator-sdk bundle validate --image-builder=none "$OO_BUNDLE"
         git clone --depth=1 https://github.com/medik8s/system-tests.git /tmp/system-tests
         git -C /tmp/system-tests show --no-patch --format=fuller HEAD
 
