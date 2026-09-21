@@ -19,6 +19,9 @@ tests:
       commands: |
         set +xve
 
+        DEST_PREFIX="gs://stackrox-ci-artifacts/env-debug/${JOB_NAME:-unknown}/${BUILD_ID:-$(date +%s)}"
+        CAPTURE_DIR="$(mktemp -d)"
+
         echo "$(date -u +%H:%M:%S) Phase 0: survey environment"
         # Import vault credentials with per-collection prefix to avoid overlap
         while IFS= read -r -d '' cred; do
@@ -40,8 +43,6 @@ tests:
           --key-file /tmp/vault/stackrox-stackrox-e2e-tests/GCP_SERVICE_ACCOUNT_STACKROX_CI \
           2>/dev/null
         gcloud config set project acs-san-stackroxci 2>/dev/null
-        DEST_PREFIX="gs://stackrox-ci-artifacts/env-debug/${JOB_NAME:-unknown}/${BUILD_ID:-$(date +%s)}"
-        CAPTURE_DIR="$(mktemp -d)"
 
         echo "$(date -u +%H:%M:%S) Phase 2: secrets healthcheck"
         # 4. Vault secrets health check (subshell with stdout+stderr blackholed)
