@@ -14,7 +14,13 @@ _opp_cleanup() {
   _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
-  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
   if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
     cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
@@ -73,6 +79,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
         curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
     trap '
+        _opp_cleanup
         cleanup
         _propagate_junit
         mkdir -p /tmp/bin

@@ -12,7 +12,13 @@ _opp_cleanup() {
   _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
-  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
   if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
     cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
@@ -90,11 +96,18 @@ function AddResult () {
 # the replacement string. Without escaping, JUnit XML output is malformed.
 function XmlEscape () {
     typeset text="${1:-}"; (($#)) && shift
+    # Disable patsub_replacement if available (bash 5.2+)
+    # so literal '&' in replacement is not special
+    if shopt -q patsub_replacement 2>/dev/null; then
+        shopt -u patsub_replacement
+        local _restore_patsub=true
+    fi
     text="${text//&/&amp;}"
     text="${text//</&lt;}"
     text="${text//>/&gt;}"
     text="${text//\"/&quot;}"
     text="${text//\'/&apos;}"
+    [[ "${_restore_patsub:-}" == true ]] && shopt -s patsub_replacement
     printf '%s' "${text}"
     true
 }
