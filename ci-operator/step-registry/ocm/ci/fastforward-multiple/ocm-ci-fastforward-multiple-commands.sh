@@ -1290,15 +1290,11 @@ is_repo_deprecated_for_version() {
   return 1
 }
 
-# Repos with release-* default branch - exclude from main fast-forward
-# These are processed separately to handle non-main default branches
-# EXCLUDED_REPOS list is no longer needed - auto-detect based on default branch
-# Repos with non-main default branch (e.g., release-5.0) are handled automatically
-# Previously hardcoded list included:
-#   cloudevents-conductor, cluster-permission, grafana, kube-rbac-proxy,
-#   kube-state-metrics, maestro, memcached_exporter, obo-prometheus-operator,
-#   node-exporter, prometheus, prometheus-alertmanager, prometheus-operator,
-#   thanos, thanos-receive-controller
+# Repos with a non-main default branch (e.g., release-5.0) are not "excluded"
+# from processing — they simply don't fast-forward from main like normal repos
+# do. They are auto-detected based on their default branch and processed
+# separately below to fast-forward from their own default branch to the other
+# release branches instead.
 
 for product in mce acm globalhub; do
   # Print section header
@@ -1316,20 +1312,14 @@ for product in mce acm globalhub; do
       select((.bundle == "'"${product}-operator-bundle"'" or
       .name == "'"${product}-operator-bundle"'") and
       (.repository | test("^https://github\\.com/stolostron/"))).repository' "${REPO_MAP_PATH}" | sort -u)
-  first_repo_in_product=true
   for repo in ${component_repos}; do
     owner_repo=${repo#https://github.com/}
     owner=${owner_repo%/*}
     repo=${owner_repo#*/}
 
-    # Blank line between each component's analysis so per-repo output blocks
-    # are visually separated in the build log (skip before the first repo of
-    # each product section, since the section header already added one).
-    if [[ "${first_repo_in_product}" == "true" ]]; then
-      first_repo_in_product=false
-    else
-      echo ""
-    fi
+    # Blank line before each component's analysis so per-repo output blocks
+    # are visually separated in the build log.
+    echo ""
 
     # Check if repo should be completely skipped
     skip=false
@@ -1395,7 +1385,7 @@ for product in mce acm globalhub; do
 
     # Route based on default branch
     # Normal repos: default = main/master → fast-forward main to release-X.Y
-    # Excluded repos: default = release-X.Y → fast-forward default to other release-X.Y
+    # Non-main default branch repos: default = release-X.Y → fast-forward default to other release-X.Y
     if [[ "${default_branch}" == "main" ]] || [[ "${default_branch}" == "master" ]]; then
       # NORMAL REPO HANDLING: default branch is main/master
       echo "INFO: Using normal fast-forward (${default_branch} → release branches)"
@@ -1480,8 +1470,8 @@ for product in mce acm globalhub; do
       fi
 
     else
-      # EXCLUDED REPO HANDLING: default branch is NOT main/master (e.g., release-5.0)
-      echo "INFO: Using excluded repo logic (${default_branch} → other release branches)"
+      # NON-MAIN DEFAULT BRANCH HANDLING: default branch is NOT main/master (e.g., release-5.0)
+      echo "INFO: Using non-main default branch logic (${default_branch} → other release branches)"
 
       # Use natural branch prefix for product (release for ACM, backplane for MCE)
       # Exception: cluster-permission in ACM uses backplane (deprecated, moved to MCE)
