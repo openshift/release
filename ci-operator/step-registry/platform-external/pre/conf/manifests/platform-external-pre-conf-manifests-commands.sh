@@ -183,6 +183,86 @@ log "# << Ignition config/generation >> #"
 "${INSTALLER_BINARY}" --dir="${INSTALL_DIR}" create ignition-configs &
 wait "$!"
 
+log "# << Injecting bootstrap serial-console diagnostics >> #"
+
+# The bootstrap node has repeatedly hung with node-image-pull.service started and
+# never finishing, and SSH resets during handshake make `openshift-install gather
+# bootstrap` useless. The serial console is the only channel that still works, but
+# nothing writes to it after the login prompt. Inject a unit that periodically
+# dumps unit state and journal excerpts to /dev/ttyS0, so the failure is visible in
+# `aws ec2 get-console-output --latest`, which the error handler already collects.
+install_jq
+
+DEBUG_SCRIPT_B64="$(base64 -w0 << 'DEBUG_SCRIPT_EOF'
+#!/usr/bin/env bash
+# OPCT bootstrap diagnostics. Everything this prints lands on the serial console.
+exec > /dev/ttyS0 2>&1
+
+UNITS="node-image-pull.service release-image.service bootkube.service kubelet.service crio.service sshd.service"
+
+while true; do
+  echo "===== OPCT-DEBUG $(date -u --rfc-3339=seconds) ====="
+
+  for u in ${UNITS}; do
+    echo "unit ${u}: active=$(systemctl is-active "${u}" 2>/dev/null) sub=$(systemctl show -p SubState --value "${u}" 2>/dev/null)"
+  done
+
+  echo "--- systemd jobs still running:"
+  systemctl list-jobs --no-legend 2>/dev/null | head -10
+
+  echo "--- registry reachability:"
+  for host in quay.io registry.ci.openshift.org; do
+    echo "  ${host}: $(curl -sS -m 10 -o /dev/null -w '%{http_code}' "https://${host}/v2/" 2>&1)"
+  done
+
+  echo "--- journal (node-image-pull, release-image, bootkube):"
+  journalctl -n 25 --no-pager --no-hostname -o short-precise \
+    -u node-image-pull.service -u release-image.service -u bootkube.service 2>/dev/null
+
+  echo "--- journal (sshd):"
+  journalctl -n 10 --no-pager --no-hostname -o short-precise -u sshd.service 2>/dev/null
+
+  sleep 30
+done
+DEBUG_SCRIPT_EOF
+)"
+
+DEBUG_UNIT="$(cat << 'DEBUG_UNIT_EOF'
+[Unit]
+Description=OPCT bootstrap serial console diagnostics
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+ExecStart=/usr/local/bin/opct-debug-console.sh
+
+[Install]
+WantedBy=multi-user.target
+DEBUG_UNIT_EOF
+)"
+
+jq \
+  --arg b64 "${DEBUG_SCRIPT_B64}" \
+  --arg unit "${DEBUG_UNIT}" \
+  '.storage.files += [{
+     "path": "/usr/local/bin/opct-debug-console.sh",
+     "mode": 493,
+     "overwrite": true,
+     "contents": {"source": ("data:text/plain;base64," + $b64)}
+   }]
+   | .systemd.units += [{
+     "name": "opct-debug-console.service",
+     "enabled": true,
+     "contents": $unit
+   }]' \
+  "${INSTALL_DIR}/bootstrap.ign" > "${INSTALL_DIR}/bootstrap.ign.new"
+
+mv -vf "${INSTALL_DIR}/bootstrap.ign.new" "${INSTALL_DIR}/bootstrap.ign"
+log "Injected opct-debug-console.service into bootstrap.ign"
+
 log "# << Saving to shared dir >> #"
 
 cp -vt "${SHARED_DIR}" \
