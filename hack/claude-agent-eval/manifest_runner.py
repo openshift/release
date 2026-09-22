@@ -33,6 +33,38 @@ MANIFEST = "evals.yaml"
 STEP_TIMEOUT = 13800  # Leave ten minutes inside the Prow step's four-hour limit.
 EVAL_TIMEOUT = 12600
 
+# Spyglass embeds HTML in srcdoc, which otherwise resolves relative links against
+# /spyglass/static/html/. Its lens request and document index identify the actual
+# artifact, including the bucket and step directory. Outside that lens, retain
+# relative links so downloaded artifact bundles still work.
+PROW_ARTIFACT_LINKS = r'''<script>
+(() => {
+  try {
+    if (!window.frameElement) return;
+    const lens = new URL(window.parent.location.href);
+    if (lens.pathname !== "/spyglass/lens/html/iframe") return;
+    const request = JSON.parse(lens.searchParams.get("req"));
+    const index = window.frameElement.id.match(/-(\d+)$/);
+    if (!index || !request || !Array.isArray(request.artifacts)) return;
+    const artifact = request.artifacts[Number(index[1])];
+    if (typeof artifact !== "string" || !artifact.endsWith("/evals-summary.html")
+        || typeof request.src !== "string" || !request.src.startsWith("gs/")) return;
+    const path = request.src.slice(3) + "/" + artifact;
+    const report = new URL("https://gcs.ci.openshift.org/gcs/"
+      + path.split("/").map(encodeURIComponent).join("/"));
+    for (const link of document.querySelectorAll("a[href]")) {
+      link.href = new URL(link.getAttribute("href"), report).href;
+      // Open outside the sandboxed report iframe; the artifact browser handles
+      // both individual files and directory listings.
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    }
+  } catch (error) {
+    console.warn("Cannot resolve Prow artifact links", error);
+  }
+})();
+</script>'''
+
 
 class Interrupted(BaseException):
     """Stop scheduling evals when Prow terminates the step."""
@@ -303,7 +335,7 @@ def write_index(artifacts, entries, errors):
     document = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
                 '<title>Eval results</title></head><body><h1>Eval results</h1>'
                 + (f"<ul>{errors_html}</ul>" if errors else "")
-                + install_link + table + "</body></html>\n")
+                + install_link + table + PROW_ARTIFACT_LINKS + "</body></html>\n")
     destination = artifacts / "evals-summary.html"
     temporary = destination.with_suffix(".tmp")
     temporary.write_text(document, encoding="utf-8")
