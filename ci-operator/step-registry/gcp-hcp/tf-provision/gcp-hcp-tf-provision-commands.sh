@@ -162,6 +162,18 @@ TFRC
 export TF_INPUT=false
 export TF_IN_AUTOMATION=true
 
+# HCP Terraform runs plan and apply remotely with workspace credentials, but
+# terraform import always executes locally in this Prow step. Use the WIF
+# credential prepared by hypershift-gcp-wif-auth so the Google provider can
+# read orphaned Firestore databases during recovery.
+WIF_CREDENTIAL_FILE="${SHARED_DIR}/wif-cred.json"
+if [[ ! -r "${WIF_CREDENTIAL_FILE}" ]]; then
+  log "ERROR: ${WIF_CREDENTIAL_FILE} not found or not readable"
+  log "The hypershift-gcp-wif-auth step must run before gcp-hcp-tf-provision"
+  exit 1
+fi
+export GOOGLE_APPLICATION_CREDENTIALS="${WIF_CREDENTIAL_FILE}"
+
 # --- Terraform Init ---
 
 log "Initializing terraform (auto-creates TFC workspace)..."
