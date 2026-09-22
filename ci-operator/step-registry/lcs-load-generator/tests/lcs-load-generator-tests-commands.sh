@@ -272,12 +272,15 @@ data:
   run.yaml: |
     version: 2
     distro_name: starter
-    external_providers_dir: ${env.EXTERNAL_PROVIDERS_DIR:=~/.llama/providers.d}
 
     apis:
-    - inference
     - responses
     - conversations
+    - files
+    - file_processors
+    - inference
+    - tool_runtime
+    - vector_io
 
     providers:
       inference:
@@ -286,14 +289,48 @@ data:
         config:
           api_key: fake-key-for-testing
           base_url: http://localhost:11434/v1
-      responses:
-      - provider_id: meta-reference
-        provider_type: inline::builtin
+      - config: {}
+        provider_id: sentence-transformers
+        provider_type: inline::sentence-transformers
+      files:
+      - config:
+          metadata_store:
+            table_name: files_metadata
+            backend: sql_default
+          storage_dir: /tmp/llama-storage/files
+        provider_id: meta-reference-files
+        provider_type: inline::localfs
+      file_processors:
+      - provider_id: pypdf
+        provider_type: inline::pypdf
         config:
+          default_chunk_size_tokens: 800
+          default_chunk_overlap_tokens: 400
+      tool_runtime:
+      - config: {}
+        provider_id: model-context-protocol
+        provider_type: remote::model-context-protocol
+      - config: {}
+        provider_id: file-search
+        provider_type: inline::file-search
+      vector_io:
+      - provider_id: faiss
+        provider_type: inline::faiss
+        config:
+          persistence:
+            namespace: vector_io::faiss
+            backend: kv_default
+      responses:
+      - config:
           persistence:
             responses:
               table_name: agents_responses
               backend: sql_default
+        provider_id: meta-reference
+        provider_type: inline::builtin
+
+    server:
+      port: 8321
 
     storage:
       backends:
@@ -332,7 +369,14 @@ data:
         model_type: llm
         provider_id: openai
         provider_model_id: llama-guard-3-8b
-      vector_stores: []
+
+    vector_stores:
+      annotation_prompt_params:
+        enable_annotations: false
+      default_provider_id: faiss
+      default_embedding_model:
+        provider_id: sentence-transformers
+        model_id: nomic-ai/nomic-embed-text-v1.5
 LCS_STACK_CONFIG
 
   # Deploy LCS with mock LLM sidecar
