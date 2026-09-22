@@ -105,7 +105,6 @@ the commands file, not sibling Python files. Only PyYAML and the stdlib are need
 """
 
 import json
-from html import escape
 import os
 from pathlib import Path, PurePosixPath
 import shlex
@@ -118,13 +117,14 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from urllib.parse import quote
 
 import yaml
 
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
+    from .eval_report import render_report
     from .eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
 except ImportError:
+    from eval_report import render_report
     from eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
 
 
@@ -132,37 +132,6 @@ MANIFEST = "evals.yaml"
 STEP_TIMEOUT = 13800  # Leave ten minutes inside the Prow step's four-hour limit.
 EVAL_TIMEOUT = 12600
 
-# Spyglass embeds HTML in srcdoc, which otherwise resolves relative links against
-# /spyglass/static/html/. Its lens request and document index identify the actual
-# artifact, including the bucket and step directory. Outside that lens, retain
-# relative links so downloaded artifact bundles still work.
-PROW_ARTIFACT_LINKS = r'''<script>
-(() => {
-  try {
-    if (!window.frameElement) return;
-    const lens = new URL(window.parent.location.href);
-    if (lens.pathname !== "/spyglass/lens/html/iframe") return;
-    const request = JSON.parse(lens.searchParams.get("req"));
-    const index = window.frameElement.id.match(/-(\d+)$/);
-    if (!index || !request || !Array.isArray(request.artifacts)) return;
-    const artifact = request.artifacts[Number(index[1])];
-    if (typeof artifact !== "string" || !artifact.endsWith("/evals-summary.html")
-        || typeof request.src !== "string" || !request.src.startsWith("gs/")) return;
-    const path = request.src.slice(3) + "/" + artifact;
-    const report = new URL("https://gcs.ci.openshift.org/gcs/"
-      + path.split("/").map(encodeURIComponent).join("/"));
-    for (const link of document.querySelectorAll("a[href]")) {
-      link.href = new URL(link.getAttribute("href"), report).href;
-      // Open outside the sandboxed report iframe; the artifact browser handles
-      // both individual files and directory listings.
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-    }
-  } catch (error) {
-    console.warn("Cannot resolve Prow artifact links", error);
-  }
-})();
-</script>'''
 
 
 class Interrupted(BaseException):
@@ -446,33 +415,14 @@ def write_summary(artifacts, entries, errors):
 
 
 def write_index(artifacts, entries, errors):
-    """Write a small index linking only artifacts that actually exist."""
-    rows = []
-    filenames = ("report-summary.html", "summary.yaml", "run_result.json", "claude-eval.log",
-                 "setup.log", "regression.log", "metrics.log", "eval-run.tar")
-    for entry in entries:
-        relative = Path("evals") / entry["name"]
-        links = []
-        if (artifacts / relative).is_dir():
-            links.append(f'<a href="{quote(relative.as_posix())}/">All artifacts</a>')
-        for filename in filenames:
-            path = relative / filename
-            if (artifacts / path).is_file():
-                links.append(f'<a href="{quote(path.as_posix())}">{filename}</a>')
-        cells = [escape(str(entry[key])) for key in ("config", "run_id", "status", "failure")]
-        rows.append("<tr>" + "".join(f"<td>{cell}</td>" for cell in cells)
-                    + f'<td>{" | ".join(links)}</td></tr>')
-    errors_html = "".join(f"<li>{escape(error)}</li>" for error in errors)
-    install_log = artifacts / "runner/harness-install.log"
-    install_link = ('<p><a href="runner/harness-install.log">Harness installation log</a></p>'
-                    if install_log.is_file() else "")
-    table = ("<table><thead><tr><th>Eval config</th><th>Run ID</th><th>Status</th>"
-             "<th>Failure</th><th>Artifacts</th></tr></thead><tbody>"
-             + "".join(rows) + "</tbody></table>" if rows else "<p>No evaluations selected.</p>")
-    document = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
-                '<title>Eval results</title></head><body><h1>Eval results</h1>'
-                + (f"<ul>{errors_html}</ul>" if errors else "")
-                + install_link + table + PROW_ARTIFACT_LINKS + "</body></html>\n")
+    """Render the published JSON; retain HTML diagnostics if JSON writing failed."""
+    try:
+        summary = json.loads((artifacts / "evals-summary.json").read_text(encoding="utf-8"))
+        if summary["errors"] != errors:
+            summary = summary_data(artifacts, entries, errors)
+    except (OSError, ValueError):
+        summary = summary_data(artifacts, entries, errors)
+    document = render_report(summary, link_json=(artifacts / "evals-summary.json").is_file())
     destination = artifacts / "evals-summary.html"
     temporary = destination.with_suffix(".tmp")
     temporary.write_text(document, encoding="utf-8")
@@ -950,6 +900,310 @@ def main(args):  # pylint: disable=too-many-statements
 if __name__ == "__main__":
     main(sys.argv[1:])
 PYTHON_SOURCE_2
+cat > "${runner_dir}/eval_report.py" <<'PYTHON_SOURCE_3'
+#!/usr/bin/env python3
+"""Render evals-summary.json as self-contained HTML without model calls.
+
+Usage: python3 eval_report.py evals-summary.json evals-summary.html
+"""
+
+import argparse
+from html import escape
+import json
+from pathlib import Path, PurePosixPath
+from string import Template
+from urllib.parse import quote
+
+
+HERE = Path(__file__).resolve().parent
+# Spyglass embeds HTML in srcdoc, which otherwise resolves relative links against
+# /spyglass/static/html/. Its lens request and document index identify the actual
+# artifact, including the bucket and step directory. Outside that lens, retain
+# relative links so downloaded artifact bundles still work.
+PROW_ARTIFACT_LINKS = r'''<script>
+(() => {
+  try {
+    if (!window.frameElement) return;
+    const lens = new URL(window.parent.location.href);
+    if (lens.pathname !== "/spyglass/lens/html/iframe") return;
+    const request = JSON.parse(lens.searchParams.get("req"));
+    const index = window.frameElement.id.match(/-(\d+)$/);
+    if (!index || !request || !Array.isArray(request.artifacts)) return;
+    const artifact = request.artifacts[Number(index[1])];
+    if (typeof artifact !== "string" || !artifact.endsWith("/evals-summary.html")
+        || typeof request.src !== "string" || !request.src.startsWith("gs/")) return;
+    const path = request.src.slice(3) + "/" + artifact;
+    const report = new URL("https://gcs.ci.openshift.org/gcs/"
+      + path.split("/").map(encodeURIComponent).join("/"));
+    for (const link of document.querySelectorAll("a[href]")) {
+      link.href = new URL(link.getAttribute("href"), report).href;
+      // Open outside the sandboxed report iframe; the artifact browser handles
+      // both individual files and directory listings.
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    }
+  } catch (error) {
+    console.warn("Cannot resolve Prow artifact links", error);
+  }
+})();
+</script>'''
+
+
+LABELS = {"passed": ("pass", "Passed"), "failed": ("fail", "Failed"),
+          "not_run": ("skip", "Not run"), "no_evals": ("skip", "No evals selected")}
+
+
+def badge(status):
+    """Use a fixed status vocabulary for both labels and CSS classes."""
+    style, label = LABELS[status]
+    return f'<span class="{style}">{label}</span>'
+
+
+def artifact_link(path, label):
+    """Escape display text and encode relative artifact paths as URLs."""
+    if not path or path.startswith("/") or "\\" in path or ".." in PurePosixPath(path).parts:
+        raise ValueError("artifact links must be relative paths inside the artifact directory")
+    return f'<a href="{quote(path)}">{escape(label)}</a>'
+
+
+def eval_card(entry):
+    """Present a verdict and available files without interpreting harness results."""
+    links = [artifact_link(path, name) for name, path in entry["artifacts"].items()]
+    if entry["artifact_dir"]:
+        links.append(artifact_link(entry["artifact_dir"], "All artifacts"))
+    failure = (f'<p class="failure">{escape(entry["failure"])}</p>' if entry["failure"] else "")
+    run = escape(entry["run_id"] or "Not started")
+    return ('<section class="section"><div class="eval-heading">'
+            f'<h2>{escape(entry["config"])}</h2>{badge(entry["status"])}</div>'
+            f'<p class="run-id">RUN <code>{run}</code></p>{failure}'
+            + ('<nav class="artifact-links" aria-label="Eval artifacts">' + "".join(links) + '</nav>'
+               if links else '<p class="report-note">No artifacts available.</p>') + '</section>')
+
+
+def render_report(summary, *, link_json=True):
+    """Only format schema v1 data; no filesystem scanning or model evaluation."""
+    if summary.get("schema_version") != 1:
+        raise ValueError("unsupported eval summary schema_version")
+    counts = summary["counts"]
+    chips = ''.join('<span class="meta-chip"><span class="meta-label">'
+                    f'{label}</span>{escape(str(counts[key]))}</span>'
+                    for key, label in (("selected", "Evaluations"), ("passed", "Passed"),
+                                       ("failed", "Failed"), ("not_run", "Not run")))
+    links = [artifact_link("evals-summary.json", "JSON summary")] if link_json else []
+    if log := summary["artifacts"].get("harness_install_log"):
+        links.append(artifact_link(log, "Harness installation log"))
+    body = ('<header class="report-header"><h1>Eval results</h1>'
+            f'<div class="header-meta">{badge(summary["status"])}{chips}</div>'
+            '<nav class="summary-links" aria-label="Summary artifacts">' + ' '.join(links)
+            + '</nav></header>')
+    if summary["errors"]:
+        body += ('<section class="section runner-errors"><h2>Runner errors</h2><ul>'
+                 + ''.join(f'<li>{escape(error)}</li>' for error in summary["errors"])
+                 + '</ul></section>')
+    body += ''.join(eval_card(entry) for entry in summary["evals"])
+    if not summary["evals"]:
+        body += '<section class="section"><p>No evaluations selected.</p></section>'
+    body += '<p class="report-note">Summary of selected evals. Open each report for case-level results.</p>'
+    return Template((HERE / "eval-report.html").read_text(encoding="utf-8")).substitute(
+        styles=(HERE / "eval-report.css").read_text(encoding="utf-8"), body=body,
+        artifact_links=PROW_ARTIFACT_LINKS)
+
+
+def main():
+    """Re-render a saved summary without running evaluations."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("summary", type=Path)
+    parser.add_argument("output", type=Path)
+    args = parser.parse_args()
+    summary = json.loads(args.summary.read_text(encoding="utf-8"))
+    args.output.write_text(render_report(summary), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()
+PYTHON_SOURCE_3
+cat > "${runner_dir}/eval-report.html" <<'PYTHON_SOURCE_4'
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eval results</title>
+<!-- Theme scripts adapted from agent-eval-harness report.py, Apache-2.0,
+     revision 3c4165bbfdd4a20f4472eec9c1c85e62f5167fba. -->
+<script>
+(function () {
+  try {
+    var stored = localStorage.getItem('eval-report-theme');
+    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = stored || (prefersDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+})();
+</script>
+<style>$styles</style>
+</head>
+<body>
+<button id="theme-toggle" type="button" aria-label="Toggle theme">☾</button>
+$body
+<script>
+(function () {
+  var btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function paint() {
+    var t = document.documentElement.getAttribute('data-theme') || 'light';
+    btn.textContent = t === 'dark' ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', t === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function () {
+    var current = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('eval-report-theme', next); } catch (e) {}
+    paint();
+  });
+  paint();
+})();
+</script>
+$artifact_links
+</body>
+</html>
+PYTHON_SOURCE_4
+cat > "${runner_dir}/eval-report.css" <<'PYTHON_SOURCE_5'
+/* Colors, typography, chips, cards, and theme control adapted from
+ * opendatahub-io/agent-eval-harness, Apache-2.0 (see repository LICENSE).
+ * skills/eval-run/scripts/report.py at 3c4165bbfdd4a20f4472eec9c1c85e62f5167fba.
+ * Layout additions support the multi-eval summary.
+ */
+
+:root {
+  --bg: #cbd1da;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-soft: #475569;
+  --accent: #2563eb;
+  --accent-strong: #1e3a8a;
+  --accent-soft: #dbeafe;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --success-border: #86efac;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --danger-border: #fca5a5;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --warning-border: #fcd34d;
+  --neutral-soft: #f1f5f9;
+  --neutral-border: #cbd5e1;
+  --code-bg: #eef2f7;
+  --shadow: 0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+  --shadow-strong: 0 4px 12px rgba(15,23,42,.08), 0 1px 3px rgba(15,23,42,.05);
+  --diff-add-bg: #e6ffec;
+  --diff-add-strong: #acf2bd;
+  --diff-del-bg: #ffeef0;
+  --diff-del-strong: #fdb8c0;
+  --diff-hdr-bg: #f0f0f0;
+  --case-pass-accent: #16a34a;
+  --case-fail-accent: #dc2626;
+  --case-pw-a-accent: #16a34a;
+  --case-pw-b-accent: #dc2626;
+  --case-pw-tie-accent: #d97706;
+  --case-pw-error-accent: #94a3b8;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0b1220;
+  --surface: #0f1729;
+  --surface-2: #162033;
+  --surface-3: #1e293b;
+  --border: #1e2c44;
+  --border-strong: #334155;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-soft: #cbd5e1;
+  --accent: #60a5fa;
+  --accent-strong: #93c5fd;
+  --accent-soft: #1e3a8a;
+  --success: #4ade80;
+  --success-soft: #14532d;
+  --success-border: #166534;
+  --danger: #f87171;
+  --danger-soft: #7f1d1d;
+  --danger-border: #991b1b;
+  --warning: #fbbf24;
+  --warning-soft: #78350f;
+  --warning-border: #92400e;
+  --neutral-soft: #1e293b;
+  --neutral-border: #334155;
+  --code-bg: #1e293b;
+  --shadow: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  --shadow-strong: 0 4px 14px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.35);
+  --diff-add-bg: rgba(74,222,128,.08);
+  --diff-add-strong: rgba(74,222,128,.28);
+  --diff-del-bg: rgba(248,113,113,.08);
+  --diff-del-strong: rgba(248,113,113,.28);
+  --diff-hdr-bg: #1e293b;
+  --case-pass-accent: #4ade80;
+  --case-fail-accent: #f87171;
+  --case-pw-a-accent: #4ade80;
+  --case-pw-b-accent: #f87171;
+  --case-pw-tie-accent: #fbbf24;
+  --case-pw-error-accent: #64748b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 15px; line-height: 1.55; max-width: 1200px; margin: 0 auto; padding: 1.5em 1.5em 4em; color: var(--text); background: var(--bg); transition: background-color .15s ease, color .15s ease; }
+h1 { padding-bottom: 0; margin: 0 0 0.55em; font-size: 1.9em; letter-spacing: -0.015em; font-weight: 700; color: var(--accent-strong); }
+.report-header { margin: 0 0 1.6em; padding-bottom: 1.1em; border-bottom: 2px solid var(--border-strong); }
+.header-meta { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.meta-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 999px; padding: 5px 13px 5px 12px; font-size: 0.95em; color: var(--text); box-shadow: var(--shadow); line-height: 1.4; }
+.meta-chip .meta-label { font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); font-weight: 700; }
+.meta-chip code { background: var(--code-bg); padding: 1px 7px; border-radius: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.92em; color: var(--text); }
+h2 { margin-top: 1.5em; letter-spacing: -0.005em; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; margin: 1em 0; font-variant-numeric: tabular-nums; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+th, td { border-bottom: 1px solid var(--border); padding: 9px 12px; text-align: left; }
+tr:last-child td { border-bottom: none; }
+th { background: var(--surface-2); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 600; }
+tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--surface-2) 50%, transparent); }
+tbody tr:hover td { background: var(--accent-soft); }
+.pass, .fail, .warn, .skip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.85em; font-weight: 600; line-height: 1.4; border: 1px solid transparent; }
+.pass { color: var(--success); background: var(--success-soft); border-color: var(--success-border); }
+.fail { color: var(--danger); background: var(--danger-soft); border-color: var(--danger-border); }
+.warn { color: var(--warning); background: var(--warning-soft); border-color: var(--warning-border); }
+.skip { color: var(--text-muted); background: var(--neutral-soft); border-color: var(--neutral-border); font-weight: 500; }
+
+.section, .analysis { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 1.3em 1.6em 1.4em; margin: 1.5em 0; box-shadow: var(--shadow); }
+.section > h2:first-child, h2.section-heading { margin: 0 0 0.7em; padding: 0; border: none; font-size: 1.3em; color: var(--accent-strong); letter-spacing: -0.005em; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+#theme-toggle { position: fixed; top: 16px; right: 16px; z-index: 1000; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 999px; width: 38px; height: 38px; padding: 0; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); transition: background-color .15s ease, transform .15s ease, border-color .15s ease; }
+#theme-toggle:hover { background: var(--surface-2); border-color: var(--accent); transform: scale(1.05); }
+#theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eval-heading { display: flex; gap: 1em; align-items: start; justify-content: space-between; }
+.eval-heading h2 { margin: 0; font-size: 1.12em; color: var(--accent-strong); overflow-wrap: anywhere; }
+.eval-heading .pass, .eval-heading .fail, .eval-heading .skip { flex-shrink: 0; }
+.run-id { color: var(--text-muted); font-size: .85em; overflow-wrap: anywhere; }
+.run-id code { color: var(--text-soft); }
+.artifact-links { display: flex; flex-wrap: wrap; gap: .5em 1em; margin-top: 1em; }
+.artifact-links a { border: 1px solid var(--border-strong); border-radius: 6px; padding: .4em .7em; font-size: .87em; }
+.artifact-links a:hover { background: var(--accent-soft); }
+.failure { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--danger); }
+.runner-errors { border-left-color: var(--danger); }
+.runner-errors li { overflow-wrap: anywhere; }
+.summary-links { display: flex; gap: 1.3em; flex-wrap: wrap; margin-top: 1em; }
+.report-note { color: var(--text-muted); font-size: .9em; }
+@media (max-width: 600px) { body { padding: 1em; } .section { padding: 1em; } .eval-heading { flex-direction: column; gap: .5em; } }
+@media print { #theme-toggle { display: none; } .section { break-inside: avoid; } }
+PYTHON_SOURCE_5
 
 # Forward termination so Python can stop its children and preserve artifacts
 # before the temporary source files are removed.

@@ -149,6 +149,18 @@ any eval or runner/reporting error fails, `not_run` while selected evals remain
 unattempted, `passed` when all selected evals pass, or `no_evals` when none were
 selected without errors. It is written for no-match and configuration failures
 too. Generating this summary makes no model calls.
+The HTML index renders that JSON with a deterministic template. It reuses the
+colors, typography, status chips, cards, and theme controls from the
+[agent-eval-harness report template](https://github.com/opendatahub-io/agent-eval-harness/blob/3c4165bbfdd4a20f4472eec9c1c85e62f5167fba/skills/eval-run/scripts/report.py)
+(Apache-2.0; see the repository LICENSE), with layout changes for multiple evals.
+The template, CSS, and scripts are bundled into the commands file and rendered
+inline; the report needs no CDN, network fetch, or model call. Detailed harness
+reports remain unchanged. To re-render a saved summary beside its artifacts:
+
+```sh
+python3 hack/claude-agent-eval/eval_report.py /path/to/evals-summary.json /path/to/evals-summary.html
+```
+
 When embedded in Prow's HTML lens, the index uses the lens's artifact path to
 open files and directories in the OpenShift artifact browser in a new tab.
 When opened directly or downloaded with its artifacts, links remain relative.
