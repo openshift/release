@@ -98,7 +98,7 @@ Export the `env` vars, then run the script's setup section (up to the first `npx
 | `kubectl create -f <url>` (CRDs) | `kubectl apply -f <url>` — `create` fails if it exists |
 | `oc patch csv ...` | Skip — already patched; verify with `oc get csv -n openshift-cluster-observability-operator` |
 | `CYPRESS_SKIP_TESTS` block | Keep it; reruns use it (Step 3) |
-| htpasswd / oauth setup | Create the secret only if `oc get secret htpass-secret -n openshift-config` fails; patch oauth only if the IDP is missing |
+| htpasswd / oauth setup | Create `uiauto-htpass-secret` only if `oc get secret uiauto-htpass-secret -n openshift-config` fails; patch oauth only if `uiauto-htpasswd-idp` is missing |
 | Operator installs / OperatorGroups | Verify readiness, not just presence — require CSV phase `Succeeded`; (re)install if missing or not Succeeded (`after()` can delete or fail COO/OTel/Tempo/Lightspeed). Check `oc get operatorgroup -n <ns>` first; a second one fails the CSV |
 | Cypress binary | `npx cypress version` can pass while the binary is only under `/root/.cache/Cypress/`, not `$CYPRESS_CACHE_FOLDER`. If empty: `cp -r /root/.cache/Cypress/*/ /tmp/Cypress/` |
 
@@ -134,7 +134,11 @@ Before rerunning, inspect the RBAC test's `chainsaw-*` namespaces and `verify-tr
 ```bash
 cd "<repo root>/tests"
 export NO_COLOR=1 CYPRESS_CACHE_FOLDER=/tmp/Cypress CYPRESS_SKIP_COO_INSTALL=true
-# Fresh shell: also re-export the CYPRESS_* vars from Step 0b setup
+# Fresh shell — these don't persist, set them in every rerun command:
+export CYPRESS_KUBECONFIG_PATH="${KUBECONFIG}"
+export CYPRESS_BASE_URL="https://$(oc get route console -n openshift-console -o jsonpath='{.spec.host}')"
+export CYPRESS_LOGIN_IDP="kube:admin"
+export CYPRESS_LOGIN_USERS="kubeadmin:$(cat /tmp/secret/kubeadmin-password)"
 CYPRESS_SKIP_TESTS=$(jq -r '.env.CYPRESS_SKIP_TESTS // ""' "${SHARED_DIR}/qe-agent-context.json" 2>/dev/null)
 GREP="<unique part of the failing test title>"
 [[ -n "${CYPRESS_SKIP_TESTS}" ]] && GREP="${GREP}; ${CYPRESS_SKIP_TESTS}"
@@ -364,19 +368,19 @@ The description must NOT contain raw credentials, tokens, passwords, or SHA-256 
 
 ## Step 5c — If FLAKY: Fix and Export
 
-Fix the race itself, not with blanket retries. Typical fixes: `cy.intercept()` plus `cy.wait('@alias')` before asserting UI state after an API call, `.should('be.visible')` with a timeout instead of an immediate assertion, and condition-based waits instead of `cy.wait(<ms>)`. Export the changed files and `CHANGES.md` as in Step 5a, with the 4-run pass/fail pattern as evidence.
+Fix the race itself, not with blanket retries: `cy.intercept()` + `cy.wait('@alias')` before asserting post-API UI state, `.should('be.visible')` with a timeout, condition-based waits instead of `cy.wait(<ms>)`. Export as in Step 5a, with the 4-run pattern as evidence.
 
 ---
 
 ## Step 5d — If CLUSTER_INSTABILITY: Write Incident Note
 
-Write `${ARTIFACT_DIR}/cluster-instability-report.md` with: a one-sentence summary; a table of affected tests (suite / test case / original duration / rerun duration); root cause (MCP updates, node evictions, COO pod restarts — include the MCP status snapshot from Step 0a); evidence (MCP output, relevant pod events); and a recommendation to rerun the CI job. Begin it with the same AI-Generated Content banner as the other reports.
+Write `${ARTIFACT_DIR}/cluster-instability-report.md`: a one-sentence summary; affected-tests table (suite / test case / original vs rerun duration); root cause (MCP updates, node evictions, COO restarts — include the Step 0a MCP snapshot); evidence (MCP output, pod events); and a recommendation to rerun the job. Same AI-Generated Content banner as the other reports.
 
 ---
 
 ## Step 5e — If JOB_CONFIG: Recommend a Job Configuration Change
 
-The test and product are fine, but the job needs something this cluster cannot provide (typically an operator not yet published for this OCP version). Do not modify the tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the missing package, OCP version and catalog evidence, and recommend the config change. For Lightspeed, add `CYPRESS_SKIP_TESTS: -Lightspeed` to the e2e `env` in `ci-operator/config/openshift/distributed-tracing-console-plugin/<variant>.yaml`; the spec then skips the Lightspeed install, setup and test. If COO, OpenTelemetry or Tempo is missing, recommend disabling or re-pointing the job instead.
+The test and product are fine, but the job needs something the cluster can't provide (typically an operator unpublished for this OCP version). Don't modify tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the missing package, OCP version and catalog evidence, and recommend the config change. For Lightspeed, add `CYPRESS_SKIP_TESTS: -Lightspeed` to the e2e `env` in `ci-operator/config/openshift/distributed-tracing-console-plugin/<variant>.yaml`. If COO, OpenTelemetry or Tempo is missing, recommend disabling or re-pointing the job.
 
 ---
 
@@ -438,7 +442,7 @@ Write `${ARTIFACT_DIR}/qe-agent-analysis.md` after each diagnosis and overwrite 
 - The cluster is already provisioned with COO and the Tracing UI console plugin installed — do not reinstall them
 - The qe-agent runs in a fresh pod, so `/tmp/` is empty at start; Step 0b clones the test repo there
 - `$KUBECONFIG` points to the test cluster; `oc`, `kubectl`, `jq` and `npm`/`npx` are in PATH
-- Do **not** copy Cypress screenshots or videos to `$SHARED_DIR` (1 MiB Secret limit); only JUnit XML is safe there. Write all output to `$ARTIFACT_DIR` (uploaded to GCS) or `$SHARED_DIR` (shared with other steps)
+- Do **not** copy screenshots/videos to `$SHARED_DIR` (1 MiB Secret limit); only JUnit XML is safe there. Write output to `$ARTIFACT_DIR` (GCS) or `$SHARED_DIR` (shared with other steps)
 - **Namespace restriction**: You MUST NOT access, read, list, or modify any resource in the `kube-system` namespace (cloud provider credentials, platform-critical components) — no `oc` or `kubectl` command may target it. Filter `kube-system` out of all-namespace output (e.g. `oc get pods -A`) before analysis
-- Do not call external APIs (Jira, GitHub API, Slack, etc.); the wrapper script handles integrations after the agent exits
+- Do not call external APIs (Jira, GitHub, Slack); the wrapper script handles integrations after exit
 - This step runs `best_effort: true` — always exit 0 even if analysis is incomplete
