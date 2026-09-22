@@ -48,9 +48,12 @@ images:
       RUN microdnf install -y git gzip && microdnf clean all
       RUN cd /tmp \
           && curl -sLO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-5.1/openshift-client-linux.tar.gz \
-          && curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-5.1/sha256sum.txt | grep openshift-client-linux.tar.gz | sha256sum -c - \
+          && curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-5.1/sha256sum.txt \
+             | grep openshift-client-linux.tar.gz > /tmp/checksum.txt \
+          && test -s /tmp/checksum.txt \
+          && sha256sum -c /tmp/checksum.txt \
           && tar xzf openshift-client-linux.tar.gz -C /usr/local/bin oc kubectl \
-          && rm -f openshift-client-linux.tar.gz
+          && rm -f openshift-client-linux.tar.gz /tmp/checksum.txt
       USER 1001
     to: acs-smoke-runner
 prowgen:
