@@ -727,9 +727,14 @@ tests:
         # and in its errors, and prow logs and artifacts are both public,
         # so everything az says is redacted before it is printed or saved
         # and no credential value is ever held in a shell variable.
-        creds="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
-        if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-false}" == "true" ]]; then
-          creds="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        # Chosen by what is mounted rather than by USE_HYPERSHIFT_AZURE_CREDS:
+        # an inline step only receives a variable it declares, so the
+        # workflow's value never reaches here and the default would win. The
+        # HCP job mounts the HyperShift credentials and the classic job does
+        # not, so presence is the honest signal.
+        creds="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        if [[ ! -f "${creds}" ]]; then
+          creds="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
         fi
         err="$(mktemp)"
         if ! az login --service-principal \
@@ -839,6 +844,12 @@ tests:
         fi
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 
+        # Prow logs and artifacts are public for openshift repositories, and
+        # a providerID carries the subscription, so everything printed here
+        # goes through this first.
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
         section() { echo; echo "=== $* ==="; }
 
         section "version"
@@ -855,7 +866,7 @@ tests:
         # whether the operator can write a node interface at all.
         for node in $(oc get nodes -o name 2>/dev/null); do
           echo "  ${node#node/}"
-          oc get "${node}" -o jsonpath='    providerID: {.spec.providerID}{"\n"}' 2>/dev/null
+          oc get "${node}" -o jsonpath='    providerID: {.spec.providerID}{"\n"}' 2>/dev/null | redact
           oc get "${node}" -o jsonpath='    zone:       {.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}' 2>/dev/null
         done
 
@@ -938,9 +949,14 @@ tests:
         }
         section() { echo; echo "=== $* ==="; }
 
-        creds="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
-        if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-false}" == "true" ]]; then
-          creds="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        # Chosen by what is mounted rather than by USE_HYPERSHIFT_AZURE_CREDS:
+        # an inline step only receives a variable it declares, so the
+        # workflow's value never reaches here and the default would win. The
+        # HCP job mounts the HyperShift credentials and the classic job does
+        # not, so presence is the honest signal.
+        creds="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        if [[ ! -f "${creds}" ]]; then
+          creds="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
         fi
         err="$(mktemp)"
         # --password=VALUE, not --password VALUE. A secret beginning with a
@@ -1012,6 +1028,7 @@ tests:
   as: aro-classic-probe
   optional: true
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: azure-qe
     env:
       ARO_CLUSTER_VERSION: "4.21"
@@ -1137,8 +1154,17 @@ tests:
         section "did it ask for credentials, and did it get any"
         oc -n openshift-cloud-credential-operator get credentialsrequest 2>&1 \
           | grep -i bgp | sed 's/^/  /' || echo "  it created no CredentialsRequest"
-        keys="$(secret_keys "${ns}" bgp-cloud-connector-azure-credentials)"
-        echo "  secret keys in ${ns}: ${keys:-<none: CCO wrote nothing for the operator>}"
+        # Retried, because the operator asks CCO only when it first
+        # reconciles and then requeues while the secret is written.
+        # Measured: this read ran two minutes before CCO wrote it and
+        # reported a credential gap that did not exist.
+        keys=""
+        for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+          keys="$(secret_keys "${ns}" bgp-cloud-connector-azure-credentials)"
+          [[ -n "${keys}" ]] && break
+          sleep 15
+        done
+        echo "  secret keys in ${ns}: ${keys:-<none after three minutes>}"
         dump operator-credentialsrequests.yaml oc -n openshift-cloud-credential-operator get credentialsrequest -o yaml
 
         section "a router node"
@@ -1239,6 +1265,16 @@ tests:
         section "everything else worth keeping"
         dump events.txt oc get events -A --sort-by=.lastTimestamp
         dump clusteroperators-final.txt oc get clusteroperators
+
+        section "quiescing the operator"
+        # The operator reconciles its peerings on a short loop, so left
+        # running it keeps an operation in flight on the Route Server and
+        # the teardown cannot get a clean delete. Measured: that took a
+        # run red with AnotherOperationInProgress after every fact had
+        # already been gathered.
+        oc delete bgpcloudconfiguration cluster --ignore-not-found --timeout=2m 2>&1 | sed 's/^/  /'
+        oc -n "${ns}" scale deployment/openshift-bgp-cloud-connector-controller-manager \
+          --replicas=0 --timeout=2m 2>&1 | sed 's/^/  /'
 
         section "done"
         exit 0
@@ -2375,6 +2411,23 @@ tests:
             az network routeserver peering create -g "${NET_RG}" \
             --routeserver "${ROUTE_SERVER}" -n bgp-probe-peering \
             --peer-ip "${peer_ip}" --peer-asn 65001 --output none
+        fi
+
+        section "removing the peering this step made"
+        # Azure refuses a second BGP connection to a peer address that
+        # already has one, and the operator peers the same router node.
+        # Measured: the operator's own peering failed with
+        # HubBgpConnectionPeerIpConflict against exactly this one, so
+        # proving the write and then leaving it behind denies the thing
+        # the run exists to observe.
+        if az network routeserver peering delete -g "${NET_RG}" \
+             --routeserver "${ROUTE_SERVER}" -n bgp-probe-peering \
+             --yes --output none 2>"${err}"; then
+          echo "  removed, so the operator may peer ${peer_ip} itself"
+        else
+          echo "  could NOT remove it, and the operator's own peering will"
+          echo "  conflict with it:"
+          redact <"${err}" | head -3 | sed 's/^/    /'
         fi
 
         section "verdict"
