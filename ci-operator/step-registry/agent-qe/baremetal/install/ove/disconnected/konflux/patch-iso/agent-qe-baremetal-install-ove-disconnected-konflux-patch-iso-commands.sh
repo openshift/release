@@ -77,7 +77,7 @@ compute:
   AGENT_ISO="${CLUSTER_NAME}.agent-ove.x86_64.iso"
   timeout -s 9 10m ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" \
     "nsenter -n -t \"\$(podman inspect -f '{{ .State.Pid }}' \"${CONTAINER_NAME}\")\" \
-     ssh -o StrictHostKeyChecking=no root@\"${OVE_ISO_STORAGE_HOST}\" sh /tmp/patch_static \
+     ssh -o StrictHostKeyChecking=no root@\"${OVE_ISO_STORAGE_HOST}\" patch_ove_static_network_ignition_file.sh \
       \"${AGENT_ISO}\" \"${INSTALL_CONFIG}\" \"${AGENT_CONFIG}\""
 fi
 
