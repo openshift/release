@@ -1730,8 +1730,14 @@ echo ""
 echo "=== Cleaning up stale ff-* branches ==="
 echo ""
 
-declare -a CLEANED_BRANCHES
 TOTAL_CLEANED=0
+
+# File used to record successfully deleted branches for the summary report.
+# A side-channel file (rather than appending to CLEANED_BRANCHES directly) is
+# required because each repo's cleanup below runs in an isolated subshell;
+# variables set inside a subshell are never visible to the parent shell.
+CLEANUP_RESULTS_FILE="${ARTIFACT_DIR}/.cleanup-results"
+: >"${CLEANUP_RESULTS_FILE}"
 
 # Get unique repos we processed
 declare -A PROCESSED_REPO_MAP
@@ -1778,57 +1784,101 @@ if [[ -f "${GITHUB_TOKEN_FILE}" ]]; then
   export GH_TOKEN="${token}"
 fi
 
-# For each processed repo, clean up stale ff-* branches
-for owner_repo in "${!PROCESSED_REPO_MAP[@]}"; do
-  owner=${owner_repo%/*}
-  repo=${owner_repo#*/}
+# Clean up stale ff-* branches for a single repo. Called inside a subshell by
+# the loop below so that any hard failure here (a transient gh crash, an
+# unexpected signal, etc.) is contained to that subshell and can never abort
+# the remaining repos or fail the overall job. This phase only removes
+# leftover branches from the old PR-based fast-forward flow; it is purely
+# janitorial and must never gate job success.
+cleanup_stale_branches_for_repo() {
+  local owner=$1
+  local repo=$2
+  local owner_repo="${owner}/${repo}"
 
   echo "INFO: Checking ${owner_repo} for stale ff-* branches"
 
-  # Get all ff-* branches for this repo
   if ! command -v gh >/dev/null 2>&1; then
-    echo "WARNING: gh CLI not available, skipping cleanup"
-    break
+    echo "WARNING: gh CLI not available, skipping cleanup for ${owner_repo}"
+    return 0
   fi
 
-  # List all branches matching ff-release-* or ff-backplane-*
-  stale_branches=$(gh api "repos/${owner}/${repo}/branches" --paginate --jq '.[].name | select(test("^ff-(release|backplane)-"))' 2>&1)
-  api_status=$?
+  # List only refs whose name starts with "ff-" via the matching-refs
+  # endpoint, instead of paginating every branch in the repo via
+  # `branches --paginate` (which buffers the full branch list for every repo
+  # in memory - unnecessary here, since we only ever care about a handful of
+  # leftover ff-* branches, and this was previously the first
+  # `gh api --paginate` call in the whole workflow to fetch an unbounded,
+  # unfiltered list). Bound the call with a timeout so a hung or misbehaving
+  # gh invocation can't stall this phase indefinitely.
+  local gh_timeout_cmd=()
+  if command -v timeout >/dev/null 2>&1; then
+    gh_timeout_cmd=(timeout 60s)
+  fi
 
-  if [[ $api_status -ne 0 ]]; then
-    echo "WARNING: Failed to list branches for ${owner_repo}: ${stale_branches}"
-    continue
+  local stale_branches gh_status
+  stale_branches=$("${gh_timeout_cmd[@]}" gh api "repos/${owner_repo}/git/matching-refs/heads/ff-" --paginate \
+    --jq '.[].ref | sub("^refs/heads/"; "") | select(test("^ff-(release|backplane)-"))' 2>&1)
+  gh_status=$?
+
+  if [[ ${gh_status} -ne 0 ]]; then
+    echo "WARNING: Failed to list ff-* branches for ${owner_repo}: ${stale_branches}"
+    return 0
   fi
 
   if [[ -z "${stale_branches}" ]]; then
-    continue
+    return 0
   fi
 
-  # Check each branch
+  local branch pr_number
   while IFS= read -r branch; do
     [[ -z "${branch}" ]] && continue
 
     # Check if branch has open PR
-    pr_number=$(gh pr list --repo "${owner}/${repo}" --head "${branch}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    pr_number=$(gh pr list --repo "${owner_repo}" --head "${branch}" --json number --jq '.[0].number' 2>/dev/null || echo "")
 
     if [[ -n "${pr_number}" ]]; then
       # Close the PR first
       echo "INFO: Closing obsolete PR #${pr_number} for ${branch} in ${owner_repo}"
-      gh pr close "${pr_number}" --repo "${owner}/${repo}" \
+      gh pr close "${pr_number}" --repo "${owner_repo}" \
         --comment "Closing obsolete PR. Fast-forward workflow now pushes directly to release branches instead of creating PRs. This branch and PR are no longer needed." \
         2>/dev/null || echo "WARNING: Failed to close PR #${pr_number}"
     fi
 
     # Delete the branch
     echo "INFO: Deleting stale branch ${branch} from ${owner_repo}"
-    if gh api -X DELETE "repos/${owner}/${repo}/git/refs/heads/${branch}" 2>/dev/null; then
-      CLEANED_BRANCHES+=("${owner_repo}:${branch}")
-      TOTAL_CLEANED=$((TOTAL_CLEANED + 1))
+    if gh api -X DELETE "repos/${owner_repo}/git/refs/heads/${branch}" 2>/dev/null; then
+      echo "${owner_repo}:${branch}" >>"${CLEANUP_RESULTS_FILE}"
     else
       echo "WARNING: Failed to delete ${branch} from ${owner_repo}"
     fi
   done <<< "${stale_branches}"
+
+  return 0
+}
+
+# For each processed repo, clean up stale ff-* branches. Each repo's cleanup
+# runs in its own subshell: if it dies unexpectedly (signal, gh crash, etc.)
+# only that subshell is affected, `$?` reports what happened, and the loop
+# moves on to the next repo instead of aborting the whole phase (and, in
+# turn, the job).
+for owner_repo in "${!PROCESSED_REPO_MAP[@]}"; do
+  owner=${owner_repo%/*}
+  repo=${owner_repo#*/}
+
+  if ! (cleanup_stale_branches_for_repo "${owner}" "${repo}"); then
+    cleanup_status=$?
+    echo "WARNING: Cleanup for ${owner_repo} exited unexpectedly (status ${cleanup_status}), continuing with remaining repos"
+  fi
 done
+
+if [[ -s "${CLEANUP_RESULTS_FILE}" ]]; then
+  while IFS= read -r cleaned; do
+    [[ -z "${cleaned}" ]] && continue
+    CLEANED_BRANCHES+=("${cleaned}")
+    TOTAL_CLEANED=$((TOTAL_CLEANED + 1))
+  done <"${CLEANUP_RESULTS_FILE}"
+fi
+rm -f "${CLEANUP_RESULTS_FILE}"
 
 if [[ ${TOTAL_CLEANED} -gt 0 ]]; then
   echo "INFO: Cleaned ${TOTAL_CLEANED} stale branches"
