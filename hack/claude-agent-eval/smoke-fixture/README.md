@@ -27,7 +27,13 @@ image, then copies that checkout, including `.git`, into a job-local image based
 on the existing Claude runtime. The checkout is writable by the OpenShift root
 group; Git trusts only that checkout path. The workflow runs at `/workspace`
 using Prow's release PR base SHA, without a cross-repository base override.
-The image is not promoted. The Prow job timeout is 30 minutes; the unchanged ref
+The image is declared under `images.items` so ci-operator recognizes
+`from: claude-ai-helpers` as a build dependency in the `pipeline` image stream.
+Declaring this build only in `raw_steps` does not establish that dependency:
+the unqualified image name would instead resolve to the `stable` image stream.
+The generated standalone images job is optional and skips automatic runs;
+the smoke test still builds the image as its own dependency. The image is not
+promoted. The Prow job timeout is 30 minutes; the unchanged ref
 has its own 4-hour timeout, so the overall job limit bounds the run first.
 
 After this commit is pushed, request the rehearsal on the release PR:
