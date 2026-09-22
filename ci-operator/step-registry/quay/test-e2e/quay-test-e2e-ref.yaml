@@ -32,16 +32,19 @@ ref:
     default: ""
     documentation: |-
       Optional explicit git ref (branch, tag, or commit SHA) for the Playwright
-      tests. When set it overrides everything else. When empty (the default), the
-      step uses the commit auto-derived from the deployed Quay app image
+      tests. When set it overrides everything else, and the step fails if it
+      cannot be cloned. When empty (the default), the step uses the commit
+      auto-derived from the deployed Quay app image
       (${SHARED_DIR}/playwright_git_ref, written by the deploy step); if that is
-      also absent it falls back to PLAYWRIGHT_GIT_FALLBACK_BRANCH.
+      absent, or is present but not fetchable from PLAYWRIGHT_GIT_REPO, it falls
+      back to PLAYWRIGHT_GIT_FALLBACK_BRANCH with a warning.
   - name: PLAYWRIGHT_GIT_FALLBACK_BRANCH
     default: "redhat-3.18"
     documentation: |-
-      Last-resort branch cloned when neither PLAYWRIGHT_GIT_BRANCH nor an
-      auto-derived ref in SHARED_DIR is available, so the run still executes
-      (with a warning) rather than hard-failing.
+      Last-resort branch cloned when neither PLAYWRIGHT_GIT_BRANCH nor a usable
+      auto-derived ref is available, so the run still executes (with a warning)
+      rather than hard-failing. Also used when an auto-derived ref exists but
+      cannot be fetched from PLAYWRIGHT_GIT_REPO.
   - name: QUAY_OPERATOR_CHANNEL
     default: "stable-3.16"
     documentation: Installed Quay operator channel (informational in this step).
