@@ -703,7 +703,9 @@ if [[ -n "${CUSTOMER_PROJECT}" ]]; then
   delete_project "${CUSTOMER_PROJECT}" "Customer" || CLEANUP_FAILED=1
 fi
 
-delete_folder "${REGION_FOLDER_ID}" "E2E Region" || CLEANUP_FAILED=1
+if [[ -n "${REGION_FOLDER_ID}" ]]; then
+  delete_folder "${REGION_FOLDER_ID}" "E2E Region" || CLEANUP_FAILED=1
+fi
 
 # Phase 6: Clear TFC workspace state
 log ""
