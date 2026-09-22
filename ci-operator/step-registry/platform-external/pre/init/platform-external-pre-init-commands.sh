@@ -145,6 +145,30 @@ function collect_bootstrap_handler() {
     fi
   } || true
 
+  # Fallback: collect EC2 console output if SSH/openshift-install gather failed
+  log "[\${handler_name}]: Attempting to collect EC2 console output as fallback..."
+  {
+    if command -v aws &> /dev/null && [ -n "\${CLUSTER_NAME:-}" ]; then
+      STACK_NAME="\${CLUSTER_NAME}-bootstrap"
+      INSTANCE_ID=\$(aws ec2 describe-instances \\
+        --filters "Name=tag:aws:cloudformation:stack-name,Values=\${STACK_NAME}" \\
+        --query 'Reservations[0].Instances[0].InstanceId' \\
+        --output text 2>/dev/null || echo "")
+
+      if [[ -n "\${INSTANCE_ID}" && "\${INSTANCE_ID}" != "None" && "\${INSTANCE_ID}" != "null" ]]; then
+        log "[\${handler_name}]: Collecting console output for instance \${INSTANCE_ID}..."
+        aws ec2 get-console-output \\
+          --instance-id "\${INSTANCE_ID}" \\
+          --output text > "\${ARTIFACT_DIR}/bootstrap-console-output.txt" 2>&1 || true
+        log "[\${handler_name}]: Console output saved to \${ARTIFACT_DIR}/bootstrap-console-output.txt"
+      else
+        log "[\${handler_name}]: Could not find bootstrap instance ID"
+      fi
+    else
+      log "[\${handler_name}]: Skipping console output (aws CLI not available or CLUSTER_NAME not set)"
+    fi
+  } || true
+
   log "[\${handler_name}]: Completed"
 }
 export -f collect_bootstrap_handler
