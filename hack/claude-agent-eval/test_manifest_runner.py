@@ -623,6 +623,9 @@ class ExecutionTests(Fixture):
             runner.write_reports(self.artifacts, results, [], errors)
         self.assertEqual(self.junit().attrib["failures"], "1")
         self.assertIn("disk error", errors[0])
+        summary = json.loads((self.artifacts / "evals-summary.json").read_text())
+        self.assertEqual(summary["status"], "failed")
+        self.assertIn("disk error", summary["errors"][0])
 
     def test_run_artifacts_are_kept_without_global_session_archive(self):
         sessions = Path(self.env["CLAUDE_CONFIG_DIR"]) / "projects"
@@ -705,7 +708,7 @@ class ExecutionTests(Fixture):
                 self.assertEqual(sum(n.endswith("report.html") for n in archive.getnames()), 1)
         self.assertFalse((self.artifacts / "eval-runs.tar.gz").exists())
         self.assertEqual({p.name for p in self.artifacts.iterdir() if p.is_file()},
-                         {"junit_claude-eval.xml", "evals-summary.html"})
+                         {"junit_claude-eval.xml", "evals-summary.html", "evals-summary.json"})
         for href in re.findall(r'href="([^"]+)"', self.index()):
             self.assertTrue((self.artifacts / unquote(href)).exists(), href)
         self.assertEqual(self.index().count("<td>passed</td>"), 2)
@@ -795,6 +798,43 @@ class ExecutionTests(Fixture):
         self.assertEqual(args[-2:], ["example", "/eval-run"])
         self.assertEqual(args[5], str(self.artifacts / "claude-session-metrics-autodl.json"))
         self.assertEqual(command.call_args.args[3], self.eval_artifacts() / "metrics.log")
+
+
+class SummaryTests(Fixture):
+    """Machine-readable result contract and reporting failures."""
+
+    def test_json_summary_status_and_partial_artifacts(self):
+        self.artifacts.mkdir()
+        entries = [{"config": "evals/a.yaml", "name": "a", "run_id": "run-a",
+                    "status": "failed", "failure": "bad <result>"},
+                   {"config": "evals/b.yaml", "name": "b", "run_id": "",
+                    "status": "not run", "failure": ""}]
+        directory = self.artifacts / "evals/a"
+        directory.mkdir(parents=True)
+        (directory / "claude-eval.log").write_text("partial")
+        runner.write_summary(self.artifacts, entries, [])
+        summary = json.loads((self.artifacts / "evals-summary.json").read_text())
+        self.assertEqual(summary["schema_version"], 1)
+        self.assertEqual(summary["status"], "failed")
+        self.assertEqual(summary["counts"], {"selected": 2, "passed": 0, "failed": 1, "not_run": 1})
+        self.assertEqual(summary["evals"][0]["failure"], "bad <result>")
+        self.assertEqual(summary["evals"][0]["artifacts"],
+                         {"claude-eval.log": "evals/a/claude-eval.log"})
+        self.assertIsNone(summary["evals"][1]["run_id"])
+        self.assertIsNone(summary["evals"][1]["artifact_dir"])
+        self.assertEqual(runner.summary_data(self.artifacts, [], [])["status"], "no_evals")
+        self.assertEqual(runner.summary_data(self.artifacts, [], ["bad config"])["status"], "failed")
+        self.assertEqual(runner.summary_data(self.artifacts, entries[1:], [])["status"], "not_run")
+        entries[0].update(status="passed", failure="")
+        self.assertEqual(runner.summary_data(self.artifacts, entries[:1], [])["status"], "passed")
+
+    def test_json_failure_does_not_prevent_other_reports(self):
+        self.artifacts.mkdir()
+        results, errors = [], []
+        with mock.patch.object(runner, "write_summary", side_effect=OSError("JSON unavailable")):
+            runner.write_reports(self.artifacts, results, [], errors)
+        self.assertIn("JSON unavailable", self.index())
+        self.assertEqual(self.junit().attrib["failures"], "1")
 
 
 class PackagingTests(unittest.TestCase):

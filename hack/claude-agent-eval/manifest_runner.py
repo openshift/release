@@ -308,6 +308,44 @@ def archive(directory, artifacts):
         temporary.unlink(missing_ok=True)
 
 
+def summary_data(artifacts, entries, errors):
+    """Build the versioned, model-independent summary shared by agents and HTML."""
+    counts = {status: sum(entry["status"] == status for entry in entries)
+              for status in ("passed", "failed", "not run")}
+    status = ("failed" if errors or counts["failed"] else
+              "not_run" if counts["not run"] else "passed" if entries else "no_evals")
+    evaluations = []
+    filenames = ("report-summary.html", "summary.yaml", "run_result.json", "claude-eval.log",
+                 "setup.log", "regression.log", "metrics.log", "eval-run.tar")
+    for entry in entries:
+        directory = Path("evals") / entry["name"]
+        files = {name: (directory / name).as_posix() for name in filenames
+                 if (artifacts / directory / name).is_file()}
+        evaluations.append({"config": entry["config"], "artifact_name": entry["name"],
+                            "run_id": entry["run_id"] or None,
+                            "status": entry["status"].replace(" ", "_"),
+                            "failure": entry["failure"] or None,
+                            "artifact_dir": directory.as_posix() + "/"
+                            if (artifacts / directory).is_dir() else None,
+                            "artifacts": files})
+    install_log = "runner/harness-install.log"
+    return {"schema_version": 1, "status": status,
+            "counts": {"selected": len(entries), "passed": counts["passed"],
+                       "failed": counts["failed"], "not_run": counts["not run"]},
+            "errors": list(errors), "evals": evaluations,
+            "artifacts": {"harness_install_log": install_log}
+            if (artifacts / install_log).is_file() else {}}
+
+
+def write_summary(artifacts, entries, errors):
+    """Publish JSON atomically, including incomplete and failed evaluations."""
+    destination = artifacts / "evals-summary.json"
+    temporary = destination.with_suffix(".tmp")
+    temporary.write_text(json.dumps(summary_data(artifacts, entries, errors),
+                                    ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(destination)
+
+
 def write_index(artifacts, entries, errors):
     """Write a small index linking only artifacts that actually exist."""
     rows = []
@@ -343,8 +381,10 @@ def write_index(artifacts, entries, errors):
 
 
 def write_reports(artifacts, results, entries, errors):
-    """Try both reports even when one output cannot be written."""
-    for label, writer, args in (("index", write_index, (artifacts, entries, errors)),
+    """Try every report even when one output cannot be written."""
+    previous_errors = len(errors)
+    for label, writer, args in (("JSON summary", write_summary, (artifacts, entries, errors)),
+                                ("index", write_index, (artifacts, entries, errors)),
                                 ("JUnit", write_junit, (artifacts, results))):
         try:
             writer(*args)
@@ -354,6 +394,12 @@ def write_reports(artifacts, results, entries, errors):
                 errors.append(message)
                 results.append(("artifact reporting", 0, message))
             print(f"ERROR: {message}", flush=True)
+    if len(errors) != previous_errors:
+        # Keep machine-readable status accurate if HTML or JUnit failed to write.
+        try:
+            write_summary(artifacts, entries, errors)
+        except OSError:
+            pass  # The original reporting error is already recorded above.
 
 
 def emit_metrics(env, repo, artifacts, eval_artifacts, *, stream_log, result, run_id, prompt):  # pylint: disable=too-many-arguments
