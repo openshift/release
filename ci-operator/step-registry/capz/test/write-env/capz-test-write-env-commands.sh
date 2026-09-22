@@ -5,24 +5,40 @@ ENV_FILE="${SHARED_DIR}/capz-test-env.sh"
 
 { set +o xtrace; } 2>/dev/null
 
+# Source the ARO-HCP slot-manager contract before selecting credentials. This
+# matches the ARO-HCP test steps, which use the leased subscription name and the
+# profile directory that owns it.
+SLOT_ENV_FILE="${SHARED_DIR}/aro-hcp-slot.env"
+if [[ -f "${SLOT_ENV_FILE}" ]]; then
+  # shellcheck disable=SC1090
+  source "${SLOT_ENV_FILE}"
+  echo "[write-env] Sourced slot-manager env from ${SLOT_ENV_FILE}"
+fi
+
 # Resolve Azure credentials from mounted secrets.
 AZURE_CLIENT_ID=""
 AZURE_CLIENT_SECRET=""
 AZURE_TENANT_ID=""
 AZURE_SUBSCRIPTION_ID=""
+CUSTOMER_SUBSCRIPTION="${CUSTOMER_SUBSCRIPTION:-}"
 
 if [[ -n "${VAULT_SECRET_PROFILE:-}" && -d "/var/run/aro-hcp-${VAULT_SECRET_PROFILE}" ]]; then
   CRED_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
+  if [[ -n "${SELECTED_CLUSTER_PROFILE_DIR:-}" ]]; then
+    CRED_DIR="${SELECTED_CLUSTER_PROFILE_DIR}"
+  fi
   AZURE_CLIENT_ID="$(cat "${CRED_DIR}/client-id")"
   AZURE_CLIENT_SECRET="$(cat "${CRED_DIR}/client-secret")"
   AZURE_TENANT_ID="$(cat "${CRED_DIR}/tenant")"
-  AZURE_SUBSCRIPTION_ID="$(cat "${CRED_DIR}/subscription-id")"
+  if [[ -s "${CRED_DIR}/subscription-id" ]]; then
+    CUSTOMER_SUBSCRIPTION="$(cat "${CRED_DIR}/subscription-id")"
+  fi
   echo "[write-env] Credentials resolved from ${CRED_DIR}"
 elif [[ -n "${CLUSTER_PROFILE_DIR:-}" && -f "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" ]]; then
   AZURE_CLIENT_ID=$(jq -r .clientId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
   AZURE_CLIENT_SECRET=$(jq -r .clientSecret "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
   AZURE_TENANT_ID=$(jq -r .tenantId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
-  AZURE_SUBSCRIPTION_ID=$(jq -r .subscriptionId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
+  CUSTOMER_SUBSCRIPTION=$(jq -r .subscriptionId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
   echo "[write-env] Credentials resolved from ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 fi
 
@@ -31,17 +47,25 @@ if [[ -d "${CAPZ_CREDS_DIR}" && -f "${CAPZ_CREDS_DIR}/AZURE_CLIENT_ID" ]]; then
   AZURE_CLIENT_ID=$(cat "${CAPZ_CREDS_DIR}/AZURE_CLIENT_ID")
   AZURE_CLIENT_SECRET=$(cat "${CAPZ_CREDS_DIR}/AZURE_CLIENT_SECRET")
   AZURE_TENANT_ID=$(cat "${CAPZ_CREDS_DIR}/AZURE_TENANT_ID")
-  AZURE_SUBSCRIPTION_ID=$(cat "${CAPZ_CREDS_DIR}/AZURE_SUBSCRIPTION_ID")
+  CUSTOMER_SUBSCRIPTION=$(cat "${CAPZ_CREDS_DIR}/AZURE_SUBSCRIPTION_ID")
   echo "[write-env] Credentials overridden from ${CAPZ_CREDS_DIR}"
 fi
 
-for var in AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+for var in AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID CUSTOMER_SUBSCRIPTION; do
   val="${!var}"
   if [[ -z "${val}" || "${val}" == "null" ]]; then
     echo "[write-env] ERROR: ${var} is missing or null" >&2
     exit 1
   fi
 done
+
+az login --service-principal \
+  --username "${AZURE_CLIENT_ID}" \
+  --password "${AZURE_CLIENT_SECRET}" \
+  --tenant "${AZURE_TENANT_ID}" \
+  --output none
+az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+AZURE_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
 
 # Generate stable identifiers for this job run.
 NAME_PREFIX_FILE="${SHARED_DIR}/name-prefix"
@@ -58,36 +82,6 @@ if [[ -f "$RESOURCEGROUPNAME_FILE" ]]; then
 else
   RESOURCEGROUPNAME="capz-tests-$(openssl rand -hex 3)-resgroup"
   echo "$RESOURCEGROUPNAME" > "$RESOURCEGROUPNAME_FILE"
-fi
-
-# Source slot-manager runtime contract if available (DEV path).
-SLOT_ENV_FILE="${SHARED_DIR}/aro-hcp-slot.env"
-if [[ -f "${SLOT_ENV_FILE}" ]]; then
-  # shellcheck disable=SC1090
-  source "${SLOT_ENV_FILE}"
-  echo "[write-env] Sourced slot-manager env from ${SLOT_ENV_FILE}"
-  if [[ -n "${CUSTOMER_SUBSCRIPTION:-}" ]]; then
-    # CUSTOMER_SUBSCRIPTION is a subscription name; resolve to UUID via vault profile files.
-    CRED_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
-    RESOLVED_SUB_ID=""
-    for name_file in "${CRED_DIR}"/customer-*-subscription-name; do
-      [[ -f "${name_file}" ]] || continue
-      if [[ "$(cat "${name_file}")" == "${CUSTOMER_SUBSCRIPTION}" ]]; then
-        id_file="${name_file%-subscription-name}-subscription-id"
-        if [[ -f "${id_file}" ]]; then
-          RESOLVED_SUB_ID="$(cat "${id_file}")"
-        fi
-        break
-      fi
-    done
-    if [[ -n "${RESOLVED_SUB_ID}" ]]; then
-      AZURE_SUBSCRIPTION_ID="${RESOLVED_SUB_ID}"
-      echo "[write-env] AZURE_SUBSCRIPTION_ID resolved from CUSTOMER_SUBSCRIPTION"
-    else
-      echo "[write-env] ERROR: Could not resolve subscription ID for CUSTOMER_SUBSCRIPTION" >&2
-      exit 1
-    fi
-  fi
 fi
 
 # Resolve MSI resource group from LEASED_MSI_CONTAINERS (slot-manager or ci-operator lease).
