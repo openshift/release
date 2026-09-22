@@ -1,0 +1,38 @@
+ref:
+  as: redhat-performance-benchmark-runner-04-grafana
+  from_image:
+    namespace: ci
+    name: benchmark-runner
+    tag: latest
+  commands: redhat-performance-benchmark-runner-04-grafana-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: benchmark-runner-perfci-config
+      mount_path: /secret
+  env:
+    - name: GRAFANA_JSON_PATH
+      default: "benchmark_runner/grafana/perf/dashboard.json"
+      documentation: Path to Grafana dashboard JSON within the benchmark-runner repo
+    - name: GRAFANA_FOLDER_NAME
+      default: "PerfCI-Benchmark-runner"
+      documentation: Grafana folder name for dashboard upload
+    - name: MAIN_LIBSONNET_PATH
+      default: "benchmark_runner/grafana/perf/jsonnet/main.libsonnet"
+      documentation: Path to main.libsonnet within the benchmark-runner repo
+    - name: GIT_BRANCH
+      default: "main"
+      documentation: Branch to clone and push to
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Update Grafana dashboards for PerfCI benchmark results.
+    SSHes to the provisioner and runs the Grafana update pipeline:
+    1. Clone benchmark-runner repo
+    2. Query Elasticsearch for latest product versions
+    3. Generate dashboard.json via grafonnet container
+    4. Upload dashboard to Grafana via REST API
+    5. Git commit and push changes if any
+  timeout: 1800s
+  grace_period: 30s
