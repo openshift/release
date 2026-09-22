@@ -157,7 +157,7 @@ Read the rerun JUnit XML:
 
 ### Flakiness confirmation loop
 
-Run the rerun block 3 more times with `RUN=2`, `3` and `4` (one JUnit file each) and record the pass/fail pattern (e.g. `PFPP`). Look for missing `cy.intercept()` or condition-based waits before asserting UI state, `cy.get()` without a visibility wait, or a changed URL path. A failure in even 1 of 4 runs is `FLAKY` → Step 5c.
+Run the rerun block 3 more times with `RUN=2`, `3` and `4` (one JUnit file each) and record the pass/fail pattern (e.g. `PFPP`). Look for missing `cy.intercept()` or condition-based waits before asserting UI state, `cy.get()` without a visibility wait, or a changed URL path. A failure in even 1 of 4 runs is `FLAKY` → Step 5c. An incomplete loop is tentative, never `FLAKY`.
 
 ---
 
@@ -168,7 +168,7 @@ Run the diagnostics below before classifying — logs and resource status, read 
 ### Cluster Observability Operator Diagnostics
 
 ```bash
-# Auto-detect COO namespace (depends on install mode)
+# Auto-detect COO namespace
 COO_NS="$(oc get pods --all-namespaces -l app.kubernetes.io/name=observability-operator -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)"
 COO_NS="${COO_NS:-openshift-cluster-observability-operator}"
 
@@ -177,7 +177,7 @@ oc get pods -n "${COO_NS}"
 oc logs -n "${COO_NS}" deploy/observability-operator --tail=150 2>/dev/null || true
 oc logs -n "${COO_NS}" deploy/observability-operator --previous --tail=50 2>/dev/null || true
 
-# UIPlugins (cluster-scoped; control console plugin registration) and MonitoringStacks
+# UIPlugins and MonitoringStacks
 oc get uiplugins -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}: {.status.conditions[*].type}={.status.conditions[*].status} {.status.conditions[*].message}{"\n"}{end}' 2>/dev/null || true
 oc get monitoringstacks --all-namespaces -o wide 2>/dev/null || true
 
@@ -185,7 +185,7 @@ oc get monitoringstacks --all-namespaces -o wide 2>/dev/null || true
 oc get consoleplugin distributed-tracing-console-plugin -o jsonpath='{.status}{"\n"}' 2>/dev/null || true
 oc get consoles.operator.openshift.io cluster -o jsonpath='{.spec.plugins}{"\n"}' 2>/dev/null || true
 
-# Events and CSV status in the COO namespace
+# Events and CSV status
 oc get events -n "${COO_NS}" --sort-by='.lastTimestamp' | tail -20
 oc get csv -n "${COO_NS}" -o jsonpath='{range .items[*]}{.metadata.name}: {.status.phase} — {.status.message}{"\n"}{end}'
 ```
@@ -200,7 +200,7 @@ oc api-resources | grep observability
 
 ### Operator catalog availability check
 
-The `before` hook installs COO, OpenTelemetry, Tempo and Lightspeed from `redhat-operators`. Pre-GA OCP versions may not ship all of them yet; OperatorHub then never renders the install form (`[data-test="install-operator"]` times out). Check before blaming the test or product:
+The `before` hook installs COO, OpenTelemetry, Tempo and Lightspeed from `redhat-operators`. Pre-GA OCP versions may lack one, so OperatorHub never renders the install form (`[data-test="install-operator"]` times out). Check before blaming the test or product:
 
 ```bash
 oc get clusterversion version -o jsonpath='{.status.desired.version}{"\n"}'
@@ -210,6 +210,10 @@ done
 ```
 
 A package missing from the catalog on a pre-GA OCP version is `JOB_CONFIG` (Step 5e): do not add catalog auto-detection or skip logic to the test (it would silently skip the capability where the operator must exist), and do not file a product bug.
+
+### Suppressed exception check
+
+`e2e.js`'s `uncaught:exception` handler swallows crashes like `'Cannot read prop'` — they surface as a timeout, invisible to `qe-agent-commands.log`/JUnit; a clean rerun doesn't rule it out. Before `FLAKY`/`TEST_ISSUE`, re-run with the filter commented out, or diff the API response against what the frontend expects.
 
 ### Product Bug indicators
 Classify as `PRODUCT_BUG` when the operator, plugin, or console itself misbehaved:
@@ -226,7 +230,7 @@ Classify as `TEST_ISSUE` when the test itself is wrong or stale:
 
 ### Cluster Instability indicators
 
-Before classifying as `CLUSTER_INSTABILITY`, rule out a tight COO reconciliation loop with debug logging:
+Before `CLUSTER_INSTABILITY`, rule out a tight COO reconciliation loop with debug logging:
 
 ```bash
 COO_NS="$(oc get pods --all-namespaces -l app.kubernetes.io/name=observability-operator \
