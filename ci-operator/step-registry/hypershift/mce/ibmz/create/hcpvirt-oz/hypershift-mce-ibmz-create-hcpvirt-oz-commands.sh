@@ -97,13 +97,15 @@ echo "$(date) Original nested_kubeconfig server: ${ORIG_SERVER}"
 oc --kubeconfig "${VIRT_KC}" config set-cluster "${CLSTR_NAME}" --insecure-skip-tls-verify=true
 
 # --- Discover reachable guest API endpoints ---
-# Do NOT hardcode LPAR IP:NodePort (e.g. 10.0.1.15:30417). That path is not
-# DNAT'd from CI and fails with empty /readyz + TLS handshake timeout even when
-# the HostedCluster/NodePool are healthy. Prefer:
+# Rehearsals on PR #84152 show LPAR IP:NodePort (10.0.1.15:<np>) is flaky:
+# sometimes /readyz=ok, sometimes empty + TLS handshake timeout. Prefer stable
+# paths first; keep LPAR only as a last-resort candidate.
 #   1) original hcp Route/URL (CI already reaches *.apps on the mgmt cluster)
 #   2) MetalLB LoadBalancer VIP on the kube-apiserver Service (:6443)
-#   3) a management-node InternalIP + NodePort as last resort
-echo "$(date) Discovering kube-apiserver Service endpoints..."
+#   3) a management-node InternalIP + NodePort
+#   4) LPAR host IP + NodePort (flaky; used only if nothing else answers)
+LPAR_HOST_IP="${LPAR_HOST_IP:-10.0.1.15}"
+echo "$(date) Discovering kube-apiserver Service endpoints (LPAR fallback ${LPAR_HOST_IP})..."
 # Restart MetalLB speakers once so any VIP is announced before we probe.
 echo "$(date) Restarting MetalLB speaker daemonset on management cluster once..."
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -117,6 +119,7 @@ probe_readyz() {
 }
 
 # Build / refresh candidate list each poll so a late MetalLB VIP can still be used.
+# Order matters: first /readyz=ok wins, so put the most stable endpoints first.
 build_api_candidates() {
   local nodeport=""
   local lb_ip=""
@@ -138,8 +141,11 @@ build_api_candidates() {
   if [[ -n "${node_ip}" && -n "${nodeport}" ]]; then
     API_CANDIDATES+=("https://${node_ip}:${nodeport}")
   fi
+  if [[ -n "${LPAR_HOST_IP}" && -n "${nodeport}" ]]; then
+    API_CANDIDATES+=("https://${LPAR_HOST_IP}:${nodeport}")
+  fi
 
-  echo "$(date) Candidates (nodePort=${nodeport:-none} lb=${lb_ip:-none} nodeIP=${node_ip:-none}): ${API_CANDIDATES[*]:-none}"
+  echo "$(date) Candidates (nodePort=${nodeport:-none} lb=${lb_ip:-none} nodeIP=${node_ip:-none} lpar=${LPAR_HOST_IP}): ${API_CANDIDATES[*]:-none}"
 }
 
 select_reachable_api() {

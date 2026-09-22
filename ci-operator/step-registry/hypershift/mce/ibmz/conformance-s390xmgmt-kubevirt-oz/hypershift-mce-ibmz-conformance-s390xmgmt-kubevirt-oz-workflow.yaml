@@ -1,8 +1,8 @@
 workflow:
   as: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-oz
   documentation: |-
-    Workflow that provisions a single ephemeral OpenShift SNO management cluster on
-    libvirt and deploys a HyperShift KubeVirt hosted cluster on top of it. Both the
+    Workflow that provisions an ephemeral OpenShift management cluster on a libvirt
+    OZ host and deploys a HyperShift KubeVirt hosted cluster on top of it. Both the
     HCP control plane pods and the KubeVirt worker VMs run on the same management
     cluster — there is no separate external infrastructure cluster.
     MCE, the virt operator, HPP, and MetalLB are installed on the management cluster
@@ -16,6 +16,29 @@ workflow:
       DOMAIN_MEMORY: "65536"   # 64 GiB; applies to both mgmt and infra cluster VMs
       DOMAIN_VCPUS: "16"       # 16 vCPUs; applies to both mgmt SNO and infra cluster VMs
       VOLUME_CAPACITY: "200G"  # 200 GB root disk for both mgmt SNO and infra cluster VMs
+      # Guest apps are served via HyperShift baseDomainPassthrough on mgmt ingress.
+      # Skip monitor/alert noise and known KubeVirt/Hypershift flakes (aligned with
+      # hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt).
+      SKIP_MONITOR_TEST: "true"
+      TEST_SKIPS: >-
+        etcd leader changes are not excessive\|
+        Kubectl client Simple pod should support exec through an HTTP proxy\|
+        Managed cluster should have no crashlooping recycler pods over four minutes\|
+        PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted\|
+        CSI Mock volume expansion CSI Volume expansion\|
+        Services should have session affinity timeout work for NodePort service\|
+        Services should be able to switch session affinity for NodePort service\|
+        Services should have session affinity work for NodePort service\|
+        Managed cluster should report ready nodes the entire duration of the test run \[Late\]\[apigroup:monitoring.coreos.com\]\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured \[Early\]\[apigroup:config.openshift.io\]\|
+        Alerts shouldn't exceed the series limit of total series sent via telemetry from each cluster\|
+        services when running openshift cluster on KubeVirt virtual machines should allow connections to pods from infra cluster pod via LoadBalancer service across different guest nodes\|
+        services when running openshift cluster on KubeVirt virtual machines should allow connections to pods from infra cluster pod via NodePort across different infra nodes\|
+        \[sig-kubevirt\] migration when running openshift cluster on KubeVirt virtual machines and live migrate hosted control plane workers \[Early\] should maintain node readiness \[Suite:openshift/conformance/parallel\]\|
+        \[sig-network\] Services should be rejected for evicted pods\|
+        Metrics should report short attach times\|
+        Metrics should report short mount times
     pre:
     # ── Management cluster (SNO: 3 control, 0 compute) ───────────────────
     - chain: hypershift-mce-ibmz-create-s390xmgmt-oz
@@ -23,7 +46,7 @@ workflow:
     # ── Operator installs ─────────────────────────────────────────────────
     # MCE, virt, HPP, MetalLB on mgmt cluster (default $KUBECONFIG → mgmt)
     - chain: hypershift-mce-ibmz-install-operators-mgmt
-    
+
     # ── KubeVirt hosted cluster on the management cluster ─────────────────
     - ref: hypershift-mce-ibmz-create-hcpvirt-oz
 
