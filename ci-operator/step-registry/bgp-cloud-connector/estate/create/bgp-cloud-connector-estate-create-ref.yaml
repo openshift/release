@@ -1,0 +1,45 @@
+ref:
+  as: bgp-cloud-connector-estate-create
+  from_image:
+    namespace: ocp
+    name: "4.14"
+    tag: upi-installer
+  commands: bgp-cloud-connector-estate-create-commands.sh
+  grace_period: 30m0s
+  timeout: 45m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: ROUTE_SERVER_NAME
+    default: "bgp-cloud-connector-rs"
+    documentation: The name of the Route Server to build.
+  - name: ROUTE_SERVER_SUBNET_PREFIX
+    default: "10.0.4.0/27"
+    documentation: |-
+      The address prefix for RouteServerSubnet. It has to be inside the
+      virtual network's existing address space and overlap no subnet
+      already there, because Azure refuses an added prefix that does.
+  - name: USE_HYPERSHIFT_AZURE_CREDS
+    default: "false"
+    documentation: |-
+      If true, use the HyperShift CI credentials rather than the cluster
+      profile's, matching azure-provision-resourcegroup and
+      azure-provision-vnet-hypershift. It has to be whatever the step
+      that created the resource group used, or this step cannot write
+      to it.
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-azurecreds
+    group: ops/hypershift-ci-jobs-azurecreds
+    collection: hypershift-team
+  documentation: |-
+    Build the Route Server that an ARO cluster's BGP cloud connector
+    would discover, in the resource group and virtual network an
+    earlier step created.
+
+    It reports rather than fails, so that a subscription which will not
+    build a Route Server still leaves everything measured after it. It
+    records what it built before building it, so
+    bgp-cloud-connector-estate-destroy can remove a Route Server this
+    step was killed in the middle of creating.
