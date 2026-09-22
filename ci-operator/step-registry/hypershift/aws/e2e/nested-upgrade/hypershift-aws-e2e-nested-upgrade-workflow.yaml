@@ -1,0 +1,19 @@
+workflow:
+  as: hypershift-aws-e2e-nested-upgrade
+  documentation: |-
+    Same as hypershift-aws-e2e-nested but the test step runs in
+    hypershift-tests-pr (built from the PR branch) instead of
+    hypershift-tests (from main). This ensures the install CLI and
+    embedded CRDs match the operator version being tested.
+    See OCPBUGS-127110.
+  steps:
+    post:
+    - chain: hypershift-destroy-nested-management-cluster
+    test:
+    - ref: hypershift-aws-run-e2e-nested
+      from: hypershift-tests-pr
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-resolve-nodepool-releases
