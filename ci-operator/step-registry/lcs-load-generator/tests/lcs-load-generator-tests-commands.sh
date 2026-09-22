@@ -1,15 +1,5 @@
 #!/bin/bash
-# ═══════════════════════════════════════════════════════════════════════════════
 # LCS Load Generator — CI Orchestration Script
-#
-# This script is the CI step command for lcs-load-generator performance tests.
-# It deploys lightspeed-core (library mode) with a mock LLM sidecar,
-# runs the lcs-load-generator K8s Job, collects profiling data, and
-# copies artifacts to ${ARTIFACT_DIR}.
-#
-# The load generator itself runs as a K8s Job (not from this pod).
-# This script orchestrates the environment, then applies the Job manifest.
-# ═══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
 # Keep time for diagnostics and artifact collection inside the ref's 24h timeout.
@@ -17,7 +7,7 @@ STEP_START_EPOCH=$(date +%s)
 STEP_TIMEOUT_SECONDS=$((24 * 60 * 60))
 DIAGNOSTIC_GRACE_SECONDS=$((15 * 60))
 
-# ─── 1. CONFIGURATION ────────────────────────────────────────────────────────
+# Configuration
 
 LCS_NAMESPACE="${LCS_NAMESPACE:-openshift-lightspeed}"
 NUM_USERS="${NUM_USERS:-5}"
@@ -63,24 +53,9 @@ job_terminal_state() {
   fi
 }
 
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║  LCS Performance Test Configuration                     ║"
-echo "╠══════════════════════════════════════════════════════════╣"
-echo "║  Namespace:       ${LCS_NAMESPACE}"
-echo "║  Users:           ${NUM_USERS}"
-echo "║  Duration:        ${TEST_DURATION}"
-echo "║  LCS Image:       ${LCS_APP_IMAGE}"
-echo "║  LoadGen Image:   ${LCS_LOADGEN_IMAGE}"
-echo "║  Workers:         ${LCS_WORKERS}"
-echo "║  Pyroscope:       ${ENABLE_PYROSCOPE}"
-echo "║  Memray:          ${ENABLE_MEMRAY}"
-echo "║  ES Index:        ${ES_INDEX}"
-echo "╚══════════════════════════════════════════════════════════╝"
 
+# Create namespace and monitoring prerequisites
 
-# ─── 2. CREATE NAMESPACE & MONITORING PREREQUISITES ──────────────────────────
-
-echo "── Creating namespace ${LCS_NAMESPACE} ──"
 oc create namespace "${LCS_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
 # Required for platform Prometheus to scrape ServiceMonitor in openshift-* ns
@@ -131,13 +106,10 @@ spec:
       interval: 30s
 SVCMON
 
-echo "── Namespace and monitoring ready ──"
 
-
-# ─── 3. DEPLOY PYROSCOPE (if enabled) ───────────────────────────────────────
+# Deploy Pyroscope (if enabled)
 
 if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
-  echo "── Deploying Pyroscope ──"
   oc create namespace "${PYROSCOPE_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
   cat <<'PYROSCOPE' | envsubst | oc apply -n "${PYROSCOPE_NAMESPACE}" -f -
@@ -203,38 +175,13 @@ PYROSCOPE
     -n "${PYROSCOPE_NAMESPACE}" --timeout=120s; then
     echo "WARN: Pyroscope failed to become ready — disabling profiling and continuing"
     ENABLE_PYROSCOPE="false"
-  else
-    echo "── Pyroscope ready ──"
   fi
 fi
 
 
-# ─── 3b. CREATE QUAY PULL SECRET ─────────────────────────────────────────────
+# Deploy LCS (library mode + mock LLM sidecar)
 
-QUAY_NAME_DIR="/var/run/quay-aipcc-name"
-QUAY_PASS_DIR="/var/run/quay-aipcc-password"
-if [[ -d "${QUAY_NAME_DIR}" && -d "${QUAY_PASS_DIR}" ]]; then
-  QUAY_ROBOT_NAME=$(<"${QUAY_NAME_DIR}/lcore-quay-name-lcore-test")
-  QUAY_ROBOT_PASSWORD=$(<"${QUAY_PASS_DIR}/lcore-quay-password-lcore-test")
-  echo "Creating Quay pull secret in ${LCS_NAMESPACE}..."
-  oc create secret docker-registry quay-lightspeed-pull-secret \
-    --docker-server=quay.io \
-    --docker-username="${QUAY_ROBOT_NAME}" \
-    --docker-password="${QUAY_ROBOT_PASSWORD}" \
-    -n "${LCS_NAMESPACE}" \
-    --dry-run=client -o yaml | oc apply -f -
-  oc secrets link default quay-lightspeed-pull-secret --for=pull -n "${LCS_NAMESPACE}"
-  echo "Quay pull secret created and linked to default SA"
-else
-  echo "WARNING: Quay credentials not found — private images may fail to pull"
-fi
-
-
-# ─── 4. DEPLOY LCS (library mode + mock LLM sidecar) ────────────────────────
-
-echo "── Deploying lightspeed-core ──"
-
-# 4a. Create ConfigMaps from heredocs
+# Create ConfigMaps from heredocs
 cat <<'LCS_STACK_CONFIG' | envsubst | oc apply -f -
 apiVersion: v1
 kind: ConfigMap
@@ -313,7 +260,7 @@ data:
         provider_model_id: llama-guard-3-8b
 LCS_STACK_CONFIG
 
-# 4b. Deploy LCS with mock LLM sidecar
+# Deploy LCS with mock LLM sidecar
 PYROSCOPE_ENV=""
 if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
   PYROSCOPE_ENV="
@@ -436,28 +383,14 @@ spec:
       targetPort: 8080
 DEPLOYMENT
 
-echo "── Waiting for LCS readiness ──"
 if ! oc rollout status deployment/lcs -n "${LCS_NAMESPACE}" --timeout=300s; then
   echo "ERROR: LCS deployment failed to become ready"
   mkdir -p "${ARTIFACT_DIR}/logs"
   {
-    echo "══════════════════════════════════════════════════════════"
-    echo "  LCS Deployment Failure Diagnostics"
-    echo "══════════════════════════════════════════════════════════"
-    echo ""
-    echo "── Pod status ──"
     oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o wide || true
-    echo ""
-    echo "── LCS container logs ──"
     oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c lcs --tail=100 || true
-    echo ""
-    echo "── Mock-LLM container logs ──"
     oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c mock-llm --tail=50 || true
-    echo ""
-    echo "── Pod description ──"
     oc describe pod -n "${LCS_NAMESPACE}" -l app=lcs || true
-    echo ""
-    echo "── Namespace events ──"
     oc get events -n "${LCS_NAMESPACE}" --sort-by='.lastTimestamp' | tail -30 || true
   } 2>&1 | tee "${ARTIFACT_DIR}/logs/lcs-diagnostic.log"
   exit 1
@@ -472,18 +405,15 @@ oc exec -n "${LCS_NAMESPACE}" "${LCS_POD}" -c lcs -- \
     oc logs -n "${LCS_NAMESPACE}" "${LCS_POD}" -c lcs --tail=50
     exit 1
   }
-echo "── LCS is ready ──"
 
 
-# ─── 5. CREATE KUBECONFIG SECRET FOR LOAD GENERATOR JOB ─────────────────────
+# Create kubeconfig secret for load generator Job
 
-echo "── Creating kubeconfig secret ──"
 oc create secret generic kubeconfig-secret \
   -n "${LCS_NAMESPACE}" \
   --from-file=kubeconfig="${KUBECONFIG}" \
   --dry-run=client -o yaml | oc apply -f -
 
-echo "── Creating Elasticsearch connection secret ──"
 oc delete secret lcs-load-generator-es-credentials \
   -n "${LCS_NAMESPACE}" --ignore-not-found=true
 oc create secret generic lcs-load-generator-es-credentials \
@@ -492,7 +422,7 @@ oc create secret generic lcs-load-generator-es-credentials \
   --from-file=password=/secret/password
 
 
-# ─── 6. RUN LOAD TESTS ──────────────────────────────────────────────────────
+# Run load tests
 
 # Record start time for profiling collection window
 TEST_START_EPOCH=$(date +%s)
@@ -507,15 +437,7 @@ IFS=',' read -ra DURATIONS <<< "${TEST_DURATION}"
 for duration in "${DURATIONS[@]}"; do
 export LOCUST_RUN_TIME="${duration}"
 
-echo "══════════════════════════════════════════════════════════"
-echo "  Starting load test: ${NUM_USERS} users × ${duration}"
-echo "══════════════════════════════════════════════════════════"
-
-# Delete previous Job if it exists (for subsequent iterations)
-oc delete job/lcs-load-generator -n "${LCS_NAMESPACE}" --ignore-not-found=true 2>/dev/null || true
-
 # Apply the dedicated ServiceAccount and Job manifests inline.
-echo "── Applying load generator ServiceAccount and Job ──"
 cat <<JOBMANIFEST | oc apply -f -
 ---
 apiVersion: v1
@@ -637,7 +559,6 @@ spec:
 JOBMANIFEST
 
 # Wait for Job to complete or fail, reserving time for diagnostics.
-echo "── Waiting for Job completion ──"
 JOB_WAIT_DEADLINE=$((STEP_START_EPOCH + STEP_TIMEOUT_SECONDS - DIAGNOSTIC_GRACE_SECONDS))
 JOB_FINISHED=""
 while [[ -z "${JOB_FINISHED}" ]]; do
@@ -655,17 +576,13 @@ done
 
 if [[ "${JOB_FINISHED}" != "complete" ]]; then
   echo "ERROR: Load generator Job ${JOB_FINISHED} (duration=${duration})"
-  echo "── Job status ──"
   oc describe job lcs-load-generator -n "${LCS_NAMESPACE}"
-  echo "── Job pod logs ──"
   JOB_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
   if [[ -n "${JOB_POD}" ]]; then
     oc logs -n "${LCS_NAMESPACE}" "${JOB_POD}" --tail=200
   fi
   exit 1
 fi
-
-echo "── Load test (${duration}) completed ──"
 
 # Collect Job logs to artifacts
 JOB_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
@@ -679,16 +596,8 @@ done
 TEST_END_EPOCH=$(date +%s)
 TEST_DURATION_SECONDS=$((TEST_END_EPOCH - TEST_START_EPOCH))
 
-echo "── All load tests completed in ${TEST_DURATION_SECONDS}s ──"
 
-
-# ─── 6b. LOG FINGERPRINT FOR ORION METADATA ────────────────────────────────
-#
-# Clone cloud-bulldozer/e2e-benchmarking and run utils/index.sh to write a
-# standard metadata document to the perf_scale_ci Elasticsearch index.
-# ────────────────────────────────────────────────────────────────────────────
-
-echo "── Logging Orion metadata fingerprint ──"
+# Log fingerprint for Orion metadata
 
 # Build ES_SERVER URL (credentials are mounted by the CI secret).
 # Tracing is already off (no set -x), so the URL stays out of logs.
@@ -730,12 +639,11 @@ fi
 unset ES_SERVER
 
 
-# ─── 7. COLLECT PROFILING DATA ──────────────────────────────────────────────
+# Collect profiling data
 
-echo "── Collecting profiling data ──"
 mkdir -p "${ARTIFACT_DIR}/profiling-data"
 
-# 7a. Pyroscope CPU profiles
+# Pyroscope CPU profiles
 if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
   PROF_DIR="${ARTIFACT_DIR}/profiling-data/pyroscope"
   mkdir -p "${PROF_DIR}"
@@ -780,7 +688,7 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
   echo "  Pyroscope profiles saved to ${PROF_DIR}"
 fi
 
-# 7b. Memray memory profiles (if enabled)
+# Memray memory profiles (if enabled)
 if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
   MEM_DIR="${ARTIFACT_DIR}/profiling-data/memray"
   mkdir -p "${MEM_DIR}"
@@ -813,7 +721,7 @@ if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
   fi
 fi
 
-# 7c. Collect LCS pod logs
+# Collect LCS pod logs
 echo "  Collecting LCS pod logs"
 LCS_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
 if [[ -n "${LCS_POD}" ]]; then
@@ -822,21 +730,7 @@ if [[ -n "${LCS_POD}" ]]; then
 fi
 
 
-# ─── 8. SUMMARY ─────────────────────────────────────────────────────────────
-
-echo ""
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║  LCS Performance Test — Complete                        ║"
-echo "╠══════════════════════════════════════════════════════════╣"
-echo "║  Duration:     ${TEST_DURATION_SECONDS}s"
-echo "║  Users:        ${NUM_USERS}"
-echo "║  ES Index:     ${ES_INDEX}"
-echo "║  Artifacts:    ${ARTIFACT_DIR}"
-echo "║  Pyroscope:    ${ENABLE_PYROSCOPE}"
-echo "║  Memray:       ${ENABLE_MEMRAY}"
-echo "╚══════════════════════════════════════════════════════════╝"
+# Summary
 
 ls -la "${ARTIFACT_DIR}/profiling-data/" 2>/dev/null || true
 ls -la "${ARTIFACT_DIR}/logs/" 2>/dev/null || true
-
-echo "── Done ──"
