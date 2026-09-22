@@ -166,7 +166,7 @@ wait_for_nodes() {
 
     echo "$(date) Nodes not ready yet — printing debug status"
     echo "$(date) DEBUG: All nodes in guest cluster:"
-    oc get no --kubeconfig "${VIRT_KC}" -o wide
+    oc get no --kubeconfig "${VIRT_KC}" -o wide || true
     echo "$(date) DEBUG: KubeVirt VMs on mgmt cluster:"
     oc get vmi -n ${HC_NS}-${HC_NAME} 2>/dev/null || true
 
