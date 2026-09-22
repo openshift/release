@@ -34,14 +34,70 @@ PYROSCOPE_URL="http://pyroscope.${PYROSCOPE_NAMESPACE}.svc.cluster.local:4040"
 
 ES_SERVER_HOST="search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-# Single UUID shared between the load generator Job and the log_fingerprint
-# metadata document so Orion can join lcs-perf-results with perf_scale_ci.
-TEST_UUID="$(uuidgen)"
-export TEST_UUID
+# ES credentials for Orion fingerprint logging.
+# Tracing is off (no set -x) so the URL stays out of CI logs.
+ES_USERNAME_RAW=$(<"/secret/username")
+ES_PASSWORD_RAW=$(<"/secret/password")
+ES_SERVER="https://${ES_USERNAME_RAW}:${ES_PASSWORD_RAW}@${ES_SERVER_HOST}"
+unset ES_USERNAME_RAW ES_PASSWORD_RAW
+
+# Orion tracking variables — reset per iteration inside the duration loop.
+job_start=""
+job_end=""
+job_status=""
+uuid=""
+workload="lcs-load-generator"
+additional_attributes='{}'
 
 RUNTIME_TMP_DIR=$(mktemp -d)
 chmod 700 "${RUNTIME_TMP_DIR}"
 trap 'rm -rf "${RUNTIME_TMP_DIR}"' EXIT
+
+# Clone e2e-benchmarking for fingerprint publishing utility.
+LATEST_E2E_TAG=$(curl -sS \
+  "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" \
+  | jq -r '.tag_name') || true
+
+E2E_BENCH_AVAILABLE="false"
+if [[ -n "${LATEST_E2E_TAG}" ]] && \
+   git clone --branch "${LATEST_E2E_TAG}" --depth 1 \
+     https://github.com/cloud-bulldozer/e2e-benchmarking.git \
+     "${RUNTIME_TMP_DIR}/e2e-benchmarking" 2>&1; then
+  E2E_BENCH_AVAILABLE="true"
+else
+  echo "WARN: Failed to clone e2e-benchmarking — fingerprints will be skipped"
+fi
+
+# Function to log job fingerprint to Orion via e2e-benchmarking index.sh
+log_fingerprint() {
+  if [[ "${E2E_BENCH_AVAILABLE}" != "true" ]]; then
+    echo "WARN: e2e-benchmarking not available — skipping fingerprint"
+    return 0
+  fi
+  pushd "${RUNTIME_TMP_DIR}/e2e-benchmarking/utils" >/dev/null
+  env BENCHMARK="lcs-load-generator" \
+      WORKLOAD="${workload}" \
+      ES_SERVER="${ES_SERVER}" \
+      UUID="${uuid}" \
+      JOB_START="${job_start}" \
+      JOB_END="${job_end}" \
+      JOB_STATUS="${job_status}" \
+      ADDITIONAL_PARAMS="${additional_attributes}" \
+      ./index.sh || echo "WARN: Fingerprint index.sh failed — continuing"
+  popd >/dev/null
+  echo "  Fingerprint logged (UUID=${uuid})"
+}
+
+# Function to run a command and handle failures
+run_or_fail() {
+  if ! "$@"; then
+    echo "Error: Command '$*' failed."
+    job_status="failure"
+    job_end=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    log_fingerprint
+    exit 1
+  fi
+}
 
 job_terminal_state() {
   local conditions=$1
@@ -433,8 +489,21 @@ export LCS_PROVIDER LCS_MODEL ES_INDEX ES_SERVER_HOST
 export LOCUST_USERS="${NUM_USERS}"
 export LOCUST_PROCESSES REQUEST_TIMEOUT METRIC_STEP
 
+# Start the test loop
 IFS=',' read -ra DURATIONS <<< "${TEST_DURATION}"
 for duration in "${DURATIONS[@]}"; do
+
+# Reset per-iteration metadata for Orion fingerprinting
+uuid=$(uuidgen)
+job_status="success"
+job_start=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+job_end=""
+additional_attributes='{"lcsTestWorkers": "'"${NUM_USERS}"'", "lcsTestDuration": "'"${duration}"'"}'
+export TEST_UUID="${uuid}"
+
+# Delete previous Job if it exists (for iterations after the first)
+oc delete job lcs-load-generator -n "${LCS_NAMESPACE}" --ignore-not-found=true
+
 export LOCUST_RUN_TIME="${duration}"
 
 # Apply the dedicated ServiceAccount and Job manifests inline.
@@ -576,11 +645,14 @@ done
 
 if [[ "${JOB_FINISHED}" != "complete" ]]; then
   echo "ERROR: Load generator Job ${JOB_FINISHED} (duration=${duration})"
-  oc describe job lcs-load-generator -n "${LCS_NAMESPACE}"
+  oc describe job lcs-load-generator -n "${LCS_NAMESPACE}" || true
   JOB_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
   if [[ -n "${JOB_POD}" ]]; then
-    oc logs -n "${LCS_NAMESPACE}" "${JOB_POD}" --tail=200
+    oc logs -n "${LCS_NAMESPACE}" "${JOB_POD}" --tail=200 || true
   fi
+  job_status="failure"
+  job_end=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  log_fingerprint
   exit 1
 fi
 
@@ -591,52 +663,16 @@ if [[ -n "${JOB_POD}" ]]; then
   oc logs -n "${LCS_NAMESPACE}" "${JOB_POD}" > "${ARTIFACT_DIR}/logs/lcs-load-generator-${duration}.log" 2>&1 || true
 fi
 
+# Log Orion fingerprint for this iteration
+job_end=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+log_fingerprint
+
+sleep 60  # stabilize between iterations
+
 done
 
 TEST_END_EPOCH=$(date +%s)
 TEST_DURATION_SECONDS=$((TEST_END_EPOCH - TEST_START_EPOCH))
-
-
-# Log fingerprint for Orion metadata
-
-# Build ES_SERVER URL (credentials are mounted by the CI secret).
-# Tracing is already off (no set -x), so the URL stays out of logs.
-ES_USERNAME_RAW=$(<"/secret/username")
-ES_PASSWORD_RAW=$(<"/secret/password")
-ES_SERVER="https://${ES_USERNAME_RAW}:${ES_PASSWORD_RAW}@${ES_SERVER_HOST}"
-unset ES_USERNAME_RAW ES_PASSWORD_RAW
-
-LATEST_E2E_TAG=$(curl -sS \
-  "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" \
-  | jq -r '.tag_name') || true
-
-if [[ -n "${LATEST_E2E_TAG}" ]] && \
-   git clone --branch "${LATEST_E2E_TAG}" --depth 1 \
-     https://github.com/cloud-bulldozer/e2e-benchmarking.git \
-     "${RUNTIME_TMP_DIR}/e2e-benchmarking" 2>&1; then
-
-  JOB_START_TS=$(date -u -d "@${TEST_START_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ")
-  JOB_END_TS=$(date -u -d "@${TEST_END_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ")
-
-  ADDITIONAL_PARAMS='{"lcsTestWorkers": "'"${NUM_USERS}"'", "lcsTestDuration": "'"${TEST_DURATION}"'"}'
-
-  pushd "${RUNTIME_TMP_DIR}/e2e-benchmarking/utils" >/dev/null
-  env BENCHMARK="lcs-load-generator" \
-      WORKLOAD="lcs-load-generator" \
-      ES_SERVER="${ES_SERVER}" \
-      UUID="${TEST_UUID}" \
-      JOB_START="${JOB_START_TS}" \
-      JOB_END="${JOB_END_TS}" \
-      JOB_STATUS="$( [[ "${JOB_FINISHED}" == "complete" ]] && echo "success" || echo "failure" )" \
-      ADDITIONAL_PARAMS="${ADDITIONAL_PARAMS}" \
-      ./index.sh || echo "WARN: Fingerprint index.sh failed — continuing"
-  popd >/dev/null
-
-  echo "  Fingerprint logged (UUID=${TEST_UUID})"
-else
-  echo "WARN: Failed to clone e2e-benchmarking — skipping fingerprint"
-fi
-unset ES_SERVER
 
 
 # Collect profiling data
@@ -648,7 +684,7 @@ if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
   PROF_DIR="${ARTIFACT_DIR}/profiling-data/pyroscope"
   mkdir -p "${PROF_DIR}"
 
-  echo "  Collecting Pyroscope profiles (${TEST_START_EPOCH} → ${TEST_END_EPOCH})"
+  echo "  Collecting Pyroscope profiles (${TEST_START_EPOCH} -> ${TEST_END_EPOCH})"
 
   # The test step pod runs on the build cluster, not the provisioned cluster,
   # so cluster-internal DNS (pyroscope.pyroscope.svc) is unreachable.
