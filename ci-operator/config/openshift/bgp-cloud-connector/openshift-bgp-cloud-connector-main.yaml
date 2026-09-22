@@ -683,6 +683,327 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: rosa-aws-sts-hcp
+- always_run: false
+  as: aro-hcp-probe
+  optional: true
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      HYPERSHIFT_AZURE_LOCATION: centralus
+    post:
+    - ref: bgp-cloud-connector-estate-destroy
+    - chain: hypershift-dump
+    - chain: hypershift-azure-destroy
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
+    test:
+    - as: probe-cloud
+      cli: latest
+      commands: |
+        # What the cloud looks like around an ARO HCP shaped cluster.
+        # Everything here is a read.
+        #
+        # errexit off explicitly, rather than merely left alone. These
+        # commands are wrapped before they run, set -uo pipefail does not
+        # clear -e if that wrapper set it, and a bare command that fails
+        # would abandon the step where it stands. A step that stops at its
+        # first unanswerable question gathers one fact where it could have
+        # gathered twenty.
+        set +e
+        set -uo pipefail
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+        section() { echo; echo "=== $* ==="; }
+
+        # Azure names subscriptions, tenants and principals in its output
+        # and in its errors, and prow logs and artifacts are both public,
+        # so everything az says is redacted before it is printed or saved
+        # and no credential value is ever held in a shell variable.
+        creds="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-false}" == "true" ]]; then
+          creds="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        fi
+        err="$(mktemp)"
+        if ! az login --service-principal \
+             --username "$(jq -er .clientId "${creds}")" \
+             --password="$(jq -er .clientSecret "${creds}")" \
+             --tenant "$(jq -er .tenantId "${creds}")" --output none 2>"${err}"; then
+          echo "could not log in:"; redact <"${err}" | sed 's/^/  /'; exit 0
+        fi
+        az account set --subscription "$(jq -er .subscriptionId "${creds}")" 2>/dev/null
+
+        section "the groups this job was given"
+        # Classic ARO hands over one group it manages and one we own. The
+        # HCP shape is recorded in files instead, and whether the split is
+        # the same is the question.
+        for f in resourcegroup resourcegroup_vnet resourcegroup_nsg; do
+          if [[ -s "${SHARED_DIR}/${f}" ]]; then
+            echo "  ${f}: $(<"${SHARED_DIR}/${f}")"
+          else
+            echo "  ${f}: <not recorded>"
+          fi
+        done
+
+        for f in resourcegroup resourcegroup_vnet; do
+          [[ -s "${SHARED_DIR}/${f}" ]] || continue
+          rg="$(<"${SHARED_DIR}/${f}")"
+          section "what is in ${rg}"
+          az resource list -g "${rg}" --query "[].{name:name,type:type}" -o table 2>&1 \
+            | redact | sed 's/^/  /'
+
+          section "deny assignments over ${rg}"
+          # Read back from ARM rather than trusted from the RP source. On
+          # classic ARO the managed group carries one; whether anything
+          # here does is what decides if a job can write to its own
+          # resources.
+          sub="$(az account show --query id -o tsv 2>/dev/null)"
+          az rest --method get --url \
+            "https://management.azure.com/subscriptions/${sub}/resourceGroups/${rg}/providers/Microsoft.Authorization/denyAssignments?api-version=2022-04-01" \
+            --query "value[].{name:denyAssignmentName, actions:permissions[].actions, notActions:permissions[].notActions}" \
+            -o json 2>&1 | redact | sed 's/^/  /'
+
+          section "can we write in ${rg}"
+          # A public address created and removed, which is the cheapest
+          # write Azure offers and says plainly whether this group is ours.
+          probe_pip="bgp-probe-write-check"
+          if az network public-ip create -g "${rg}" -n "${probe_pip}" \
+               --sku Standard --allocation-method Static --output none 2>"${err}"; then
+            echo "  write allowed"
+            az network public-ip delete -g "${rg}" -n "${probe_pip}" --output none 2>/dev/null
+          else
+            echo "  write refused:"; redact <"${err}" | head -3 | sed 's/^/    /'
+          fi
+        done
+
+        section "the virtual network"
+        if [[ -s "${SHARED_DIR}/azure_vnet_id" ]]; then
+          vnet_id="$(<"${SHARED_DIR}/azure_vnet_id")"
+          echo "  $(redact <<<"${vnet_id}")"
+          az network vnet show --ids "${vnet_id}" --query "{
+            addressSpace: addressSpace.addressPrefixes,
+            subnets: subnets[].{name:name, prefix:addressPrefix},
+            tags: tags
+          }" -o json 2>&1 | redact | sed 's/^/  /'
+        else
+          echo "  none recorded"
+        fi
+
+        section "the managed identities"
+        # ARO HCP is managed identity shaped where classic is service
+        # principal shaped. Which identities exist, and what they may
+        # reach, is what decides whether the operator can be given a
+        # credential at all.
+        for f in resourcegroup resourcegroup_vnet; do
+          [[ -s "${SHARED_DIR}/${f}" ]] || continue
+          rg="$(<"${SHARED_DIR}/${f}")"
+          echo "  --- ${rg} ---"
+          az identity list -g "${rg}" --query "[].{name:name, clientId:clientId}" -o json 2>&1 \
+            | redact | sed 's/^/    /'
+        done
+
+        rm -f "${err}"
+        section "done"
+        exit 0
+      credentials:
+      - collection: hypershift-team
+        group: ops/hypershift-ci-jobs-azurecreds
+        mount_path: /etc/hypershift-ci-jobs-azurecreds
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: probe-cluster
+      cli: latest
+      commands: |
+        # What the hosted cluster looks like from inside. Everything the
+        # operator would read on startup, read here first.
+        set +e
+        set -uo pipefail
+
+        # The management cluster is what KUBECONFIG points at in a
+        # HyperShift job. The guest is the cluster the operator would run
+        # on, and hypershift-azure-create writes its kubeconfig here.
+        if [[ ! -s "${SHARED_DIR}/nested_kubeconfig" ]]; then
+          echo "no guest kubeconfig, so no cluster was handed over; nothing to measure"
+          exit 0
+        fi
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+
+        section() { echo; echo "=== $* ==="; }
+
+        section "version"
+        oc get clusterversion version -o jsonpath='{.status.desired.version}{"\n"}' 2>&1 | sed 's/^/  /'
+
+        section "cluster operators"
+        oc get clusteroperators 2>&1 | sed 's/^/  /'
+        oc get clusteroperators -o yaml >"${ARTIFACT_DIR}/clusteroperators.yaml" 2>/dev/null
+
+        section "nodes"
+        # providerID is printed in full because
+        # internal/platform/azure/providerid.go parses the virtual machine
+        # and its resource group out of it, and which group that is decides
+        # whether the operator can write a node interface at all.
+        for node in $(oc get nodes -o name 2>/dev/null); do
+          echo "  ${node#node/}"
+          oc get "${node}" -o jsonpath='    providerID: {.spec.providerID}{"\n"}' 2>/dev/null
+          oc get "${node}" -o jsonpath='    zone:       {.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}' 2>/dev/null
+        done
+
+        section "machine API"
+        # A hosted cluster's node pools are managed from the control plane,
+        # which lives elsewhere. Whether the guest has a machine API at all
+        # is a fact the operator's node discovery depends on.
+        oc get machines.machine.openshift.io -A 2>&1 | sed 's/^/  /'
+
+        section "network"
+        oc get network.config cluster -o jsonpath='  networkType: {.spec.networkType}{"\n"}' 2>&1
+        echo "  routing capabilities and advertisements, before anything touches them:"
+        oc get network.operator cluster \
+          -o jsonpath='    additionalRoutingCapabilities: {.spec.additionalRoutingCapabilities}{"\n"}' 2>&1 \
+          | sed 's/: $/: <unset>/'
+        oc get network.operator cluster \
+          -o jsonpath='    routeAdvertisements: {.spec.defaultNetwork.ovnKubernetesConfig.routeAdvertisements}{"\n"}' 2>&1 \
+          | sed 's/: $/: <unset>/'
+        # Whether the guest even has a network operator config to patch is
+        # the question enable-frr would meet first: on a hosted cluster the
+        # cluster network operator runs in the control plane namespace.
+        oc get network.operator cluster -o yaml >"${ARTIFACT_DIR}/network-operator.yaml" 2>/dev/null
+
+        section "feature gates"
+        oc get featuregate cluster -o jsonpath='  featureSet: {.spec.featureSet}{"\n"}' 2>&1 \
+          | sed 's/: $/: <empty, which means Default>/'
+        oc get featuregate cluster -o json 2>/dev/null \
+          | jq -r '[.status.featureGates[]?.enabled[]?.name] | map(select(test("Route"))) | "  enabled and relevant: \(.)"' 2>/dev/null
+
+        section "cloud credentials"
+        # On classic ARO the cloud credential operator settles in
+        # passthrough and hands the cluster's own principal to whoever
+        # asks. A hosted cluster may have no CCO in the guest at all, in
+        # which case a CredentialsRequest is not the way the operator gets
+        # a credential here and something else has to be.
+        if oc get cloudcredential cluster -o jsonpath='  effective mode: {.status.mode}{"\n"}' 2>/dev/null; then
+          :
+        else
+          echo "  no cloudcredential resource in the guest"
+        fi
+        oc get crd credentialsrequests.cloudcredential.openshift.io --output name 2>&1 | sed 's/^/  /'
+        echo "  serviceAccountIssuer: $(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}' 2>/dev/null || echo '<none>')"
+
+        section "done"
+        exit 0
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: bgp-cloud-connector-estate-create
+    - as: probe-estate-access
+      cli: latest
+      commands: |
+        # Whether anything the cluster can obtain reaches the Route Server
+        # that was just built. On classic ARO the principal passthrough
+        # hands the operator holds Network Contributor on the virtual
+        # network resource and Contributor on the group ARO manages, and
+        # the Route Server is neither.
+        set +e
+        set -uo pipefail
+
+        if [[ ! -s "${SHARED_DIR}/bgp-cloud-connector-estate" ]]; then
+          echo "no estate was recorded, so there is nothing to reach"
+          exit 0
+        fi
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/bgp-cloud-connector-estate"
+        : "${NET_RG:=}" "${ROUTE_SERVER:=}" "${ROUTE_SERVER_BUILT:=no}"
+        if [[ "${ROUTE_SERVER_BUILT}" != "yes" ]]; then
+          echo "no Route Server was built, so there is nothing to reach"
+          exit 0
+        fi
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+        section() { echo; echo "=== $* ==="; }
+
+        creds="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-false}" == "true" ]]; then
+          creds="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        fi
+        err="$(mktemp)"
+        # --password=VALUE, not --password VALUE. A secret beginning with a
+        # hyphen is read by az as another flag.
+        if ! az login --service-principal \
+             --username "$(jq -er .clientId "${creds}")" \
+             --password="$(jq -er .clientSecret "${creds}")" \
+             --tenant "$(jq -er .tenantId "${creds}")" --output none 2>"${err}"; then
+          echo "could not log in:"; redact <"${err}" | sed 's/^/  /'; exit 0
+        fi
+        az account set --subscription "$(jq -er .subscriptionId "${creds}")" 2>/dev/null
+
+        section "the job's own principal reads it"
+        # The baseline. If this fails the Route Server is not where the
+        # record says it is, and nothing below means anything.
+        az network routeserver show -g "${NET_RG}" -n "${ROUTE_SERVER}" \
+          --query "{asn:virtualRouterAsn, ips:virtualRouterIps}" -o json 2>&1 \
+          | redact | sed 's/^/  /'
+
+        section "what the guest could present"
+        # A hosted cluster federates rather than holding a secret. Whether
+        # it has an issuer, and whether a federated credential naming our
+        # ServiceAccount could be added to an identity that can reach this
+        # group, is what decides if the operator can be given this at all.
+        if [[ -s "${SHARED_DIR}/nested_kubeconfig" ]]; then
+          issuer="$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" \
+            oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}' 2>/dev/null)"
+          echo "  serviceAccountIssuer: ${issuer:-<none, so it cannot federate>}"
+        else
+          echo "  no guest kubeconfig"
+        fi
+
+        section "an identity of our own in ${NET_RG}"
+        ident="bgp-probe-identity"
+        if az identity create -g "${NET_RG}" -n "${ident}" --output none 2>"${err}"; then
+          echo "  created"
+          obj="$(az identity show -g "${NET_RG}" -n "${ident}" --query principalId -o tsv 2>/dev/null)"
+          sub="$(az account show --query id -o tsv 2>/dev/null)"
+          if az role assignment create --assignee-object-id "${obj}" \
+               --assignee-principal-type ServicePrincipal --role "Network Contributor" \
+               --scope "/subscriptions/${sub}/resourceGroups/${NET_RG}" --output none 2>"${err}"; then
+            echo "  and may be given Network Contributor over ${NET_RG}"
+          else
+            echo "  but may NOT be given a role over ${NET_RG}:"
+            redact <"${err}" | head -3 | sed 's/^/    /'
+          fi
+          az identity delete -g "${NET_RG}" -n "${ident}" --output none 2>/dev/null
+          echo "  removed"
+        else
+          echo "  could NOT create an identity here:"
+          redact <"${err}" | head -3 | sed 's/^/    /'
+        fi
+
+        rm -f "${err}"
+        section "done"
+        exit 0
+      credentials:
+      - collection: hypershift-team
+        group: ops/hypershift-ci-jobs-azurecreds
+        mount_path: /etc/hypershift-ci-jobs-azurecreds
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-azure-aks-conformance
 zz_generated_metadata:
   branch: main
   org: openshift
