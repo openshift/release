@@ -55,7 +55,9 @@ function mirror_ccs() {
     if [[ ! -f /home/oc-mirror ]]; then
         MIRROR2URL="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4"
         CLIENTURL="${MIRROR2URL}"/x86_64/clients/ocp/stable
-        curl -s -k -L "${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
+        # Intentional: pull oc-mirror from stable clients (not CGW). Prefer TLS verify (-fsSL);
+        # the mirror host must present a valid cert. Fail fast on HTTP errors (-f).
+        curl -fsSL "${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
         if ls /home/oc-mirror > /dev/null ; then
             chmod +x /home/oc-mirror
         else

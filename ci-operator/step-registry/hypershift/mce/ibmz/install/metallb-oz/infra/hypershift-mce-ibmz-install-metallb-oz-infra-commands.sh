@@ -227,27 +227,53 @@ spec:
    - metallb
 EOF
 
-# ── Wait up to 2 minutes for all pods in metallb-system to be Running/Ready ──
-echo "$(date) Waiting up to 2 minutes for all pods in metallb-system to be Running..."
-METALLB_WAIT=120
+# ── Wait for MetalLB controller + speaker pods to be Ready ───────────────────
+# Empty pod list must not count as success. Require Ready=True and fail on timeout.
+echo "$(date) Waiting for MetalLB pods in metallb-system to be Ready..."
+oc get metallb,ipaddresspool,l2advertisement -n metallb-system -o wide || true
+METALLB_WAIT=180
 METALLB_INTERVAL=10
 METALLB_ELAPSED=0
-NOT_READY=""
+METALLB_OK=false
 
 while [[ ${METALLB_ELAPSED} -lt ${METALLB_WAIT} ]]; do
-  NOT_READY=$(oc get pods -n metallb-system --no-headers 2>/dev/null \
-    | grep -v "Running\|Completed" || true)
-  if [[ -z "${NOT_READY}" ]]; then
-    echo "$(date) All pods in metallb-system are Running"
-    break
+  POD_COUNT=$(oc get pods -n metallb-system --no-headers 2>/dev/null | grep -cvE 'Completed|Error' || true)
+  POD_COUNT=${POD_COUNT:-0}
+  if [[ ${POD_COUNT} -eq 0 ]]; then
+    echo "$(date) No metallb-system pods yet (${METALLB_ELAPSED}s/${METALLB_WAIT}s)"
+  else
+    NOT_READY=""
+    while IFS= read -r line; do
+      [[ -z "${line}" ]] && continue
+      pod=$(awk '{print $1}' <<< "${line}")
+      ready_col=$(awk '{print $2}' <<< "${line}")
+      status_col=$(awk '{print $3}' <<< "${line}")
+      ready_cond=$(oc get po -n metallb-system "${pod}" \
+        -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
+      echo "$(date)   pod=${pod} ready=${ready_col} phase=${status_col} Ready=${ready_cond:-?}"
+      if [[ "${ready_cond}" != "True" ]]; then
+        NOT_READY="${NOT_READY} ${pod}"
+      fi
+    done < <(oc get pods -n metallb-system --no-headers 2>/dev/null | grep -vE 'Completed' || true)
+
+    if [[ -z "${NOT_READY}" ]]; then
+      echo "$(date) All ${POD_COUNT} metallb-system pods are Ready"
+      oc get pods -n metallb-system -o wide || true
+      METALLB_OK=true
+      break
+    fi
+    echo "$(date) MetalLB pods not Ready yet:${NOT_READY}"
   fi
-  echo "$(date) Pods not yet ready (${METALLB_ELAPSED}s elapsed):"
-  echo "${NOT_READY}"
   sleep ${METALLB_INTERVAL}
   METALLB_ELAPSED=$((METALLB_ELAPSED + METALLB_INTERVAL))
 done
 
-if [[ -n "${NOT_READY}" ]]; then
-  echo "$(date) WARNING: Some pods in metallb-system are still not Running after ${METALLB_WAIT}s:"
-  oc get pods -n metallb-system -o wide
+if [[ "${METALLB_OK}" != "true" ]]; then
+  echo "$(date) ERROR: MetalLB pods did not become Ready within ${METALLB_WAIT}s"
+  oc get pods -n metallb-system -o wide || true
+  oc get metallb,ipaddresspool,l2advertisement -n metallb-system -o yaml || true
+  oc describe pods -n metallb-system || true
+  exit 1
 fi
+
+echo "$(date) MetalLB infra install and IP pool configuration completed"

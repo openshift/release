@@ -17,8 +17,10 @@ export KUBECONFIG="${EFFECTIVE_KUBECONFIG}"
 echo "Waiting for OpenShift Virtualization operator to be ready..."
 oc wait deployment -n openshift-cnv virt-operator --for=condition=Available --timeout=10m
 
-# Create HostPathProvisioner CR if it doesn't exist
-echo "Creating HostPathProvisioner CR..."
+# Create HostPathProvisioner CR if it doesn't exist.
+# STORAGE_POOL_NAME must match the StorageClass parameters.storagePool value.
+POOL_NAME="${STORAGE_POOL_NAME:-local}"
+echo "$(date) Creating HostPathProvisioner CR with storage pool name=${POOL_NAME}"
 oc apply -f - <<EOF
 apiVersion: hostpathprovisioner.kubevirt.io/v1beta1
 kind: HostPathProvisioner
@@ -33,27 +35,25 @@ spec:
         resources:
           requests:
             storage: 100Gi
-      name: local
+      name: ${POOL_NAME}
       path: "/var/hpvolumes"
   imagePullPolicy: IfNotPresent
 EOF
 
-# Wait for HostPathProvisioner to be ready
-echo "Waiting for HostPathProvisioner to be ready..."
+echo "$(date) HostPathProvisioner CR:"
+oc get hostpathprovisioner hostpath-provisioner -n openshift-cnv -o yaml || true
+
+echo "$(date) Waiting for HostPathProvisioner controller pods to be Ready..."
 oc wait pod -l app=hostpath-provisioner -n openshift-cnv --for=condition=Ready --timeout=5m || true
 
-# Get the storage pool name from HostPathProvisioner CR (.spec.storagePools[].name)
-# The StorageClass storagePool parameter must be the pool NAME, not the path.
-ACTUAL_POOL_NAME="${STORAGE_POOL_NAME}"
-if oc get hostpathprovisioner hostpath-provisioner &>/dev/null; then
-  ACTUAL_POOL_NAME=$(oc get hostpathprovisioner hostpath-provisioner \
-    -o jsonpath='{.spec.storagePools[0].name}' 2>/dev/null || echo "${STORAGE_POOL_NAME}")
+ACTUAL_POOL_NAME="${POOL_NAME}"
+if oc get hostpathprovisioner hostpath-provisioner -n openshift-cnv &>/dev/null; then
+  ACTUAL_POOL_NAME=$(oc get hostpathprovisioner hostpath-provisioner -n openshift-cnv \
+    -o jsonpath='{.spec.storagePools[0].name}' 2>/dev/null || echo "${POOL_NAME}")
 fi
+echo "$(date) Using storage pool name for StorageClass: ${ACTUAL_POOL_NAME}"
 
-echo "Using storage pool name: ${ACTUAL_POOL_NAME}"
-
-# Create StorageClass with HPP provisioner
-echo "Creating StorageClass ${STORAGE_CLASS_NAME}..."
+echo "$(date) Creating StorageClass ${STORAGE_CLASS_NAME}..."
 oc apply -f - <<EOF
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -66,45 +66,56 @@ parameters:
   storagePool: ${ACTUAL_POOL_NAME}
 EOF
 
-# Mark the StorageClass as default
-echo "Marking ${STORAGE_CLASS_NAME} as default storage class..."
+echo "$(date) Marking ${STORAGE_CLASS_NAME} as default storage class..."
 oc patch storageclass ${STORAGE_CLASS_NAME} -p \
   '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 
-# Verify the StorageClass is default
-echo "Verifying StorageClass configuration..."
-oc get storageclass ${STORAGE_CLASS_NAME} -o yaml | grep -A 2 "annotations:"
+echo "$(date) Verifying StorageClass configuration..."
+oc get storageclass ${STORAGE_CLASS_NAME} -o yaml | grep -A 2 "annotations:" || true
 
-# Wait for HPP pool daemonset/deployments/pods to be ready
-echo "Waiting for HPP pool pods (hpp-pool-*) in openshift-cnv to be Running and Ready..."
+# Wait until every hpp-pool-* pod is Ready (not just Running).
+echo "$(date) Waiting for HPP pool pods (hpp-pool-*) in openshift-cnv to be Ready..."
 HPP_TIMEOUT=600
 HPP_INTERVAL=10
 HPP_ELAPSED=0
+HPP_READY=false
 while [[ ${HPP_ELAPSED} -lt ${HPP_TIMEOUT} ]]; do
   HPP_PODS=$(oc get po -n openshift-cnv --no-headers -o custom-columns=":metadata.name" 2>/dev/null | grep '^hpp-pool-' || true)
-  if [[ -n "${HPP_PODS}" ]]; then
-    NOT_RUNNING=$(oc get po -n openshift-cnv --no-headers 2>/dev/null | grep '^hpp-pool-' | grep -v ' Running ' || true)
-    if [[ -z "${NOT_RUNNING}" ]]; then
-      echo "All HPP pool pods are running:"
-      oc get po -n openshift-cnv -l k8s-app=hostpath-provisioner -o wide || oc get po -n openshift-cnv | grep '^hpp-pool-' || true
+  if [[ -z "${HPP_PODS}" ]]; then
+    echo "$(date) No hpp-pool-* pods yet (${HPP_ELAPSED}s/${HPP_TIMEOUT}s)"
+  else
+    NOT_READY=""
+    while IFS= read -r pod; do
+      [[ -z "${pod}" ]] && continue
+      ready=$(oc get po -n openshift-cnv "${pod}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
+      phase=$(oc get po -n openshift-cnv "${pod}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+      echo "$(date)   pod=${pod} phase=${phase:-?} Ready=${ready:-?}"
+      if [[ "${ready}" != "True" ]]; then
+        NOT_READY="${NOT_READY} ${pod}"
+      fi
+    done <<< "${HPP_PODS}"
+    if [[ -z "${NOT_READY}" ]]; then
+      echo "$(date) All HPP pool pods are Ready:"
+      oc get po -n openshift-cnv | grep '^hpp-pool-' || true
+      HPP_READY=true
       break
     fi
+    echo "$(date) HPP pods not Ready yet:${NOT_READY}"
   fi
-  echo "HPP pool pods not ready yet (${HPP_ELAPSED}s elapsed), waiting..."
   sleep ${HPP_INTERVAL}
   HPP_ELAPSED=$((HPP_ELAPSED + HPP_INTERVAL))
 done
 
-if [[ ${HPP_ELAPSED} -ge ${HPP_TIMEOUT} ]]; then
-  echo "WARNING/ERROR: HPP pool pods did not become ready within ${HPP_TIMEOUT}s"
+if [[ "${HPP_READY}" != "true" ]]; then
+  echo "$(date) ERROR: HPP pool pods did not become Ready within ${HPP_TIMEOUT}s"
   oc get po -n openshift-cnv | grep '^hpp-pool-' || true
   oc get pvc -n openshift-cnv | grep '^hpp-pool-' || true
-  oc get po -n openshift-cnv --no-headers -o custom-columns=":metadata.name" 2>/dev/null | grep '^hpp-pool-' | xargs -r oc describe po -n openshift-cnv || true
+  oc get hostpathprovisioner -n openshift-cnv -o yaml || true
+  oc get po -n openshift-cnv --no-headers -o custom-columns=":metadata.name" 2>/dev/null | grep '^hpp-pool-' | xargs -r -n1 oc describe po -n openshift-cnv || true
   exit 1
 fi
 
-# List all storage classes to confirm default
-echo "All storage classes:"
+echo "$(date) All storage classes:"
 oc get storageclass
 
-echo "HostPathProvisioner and StorageClass configuration completed successfully!"
+echo "$(date) HostPathProvisioner and StorageClass configuration completed successfully!"

@@ -86,7 +86,6 @@ objects:
           - --repo=https://github.com/openshift/release.git
           - --ref=main
           - --root=/tmp/git-sync
-          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           - --one-time=true
           - --depth=1
           - --link=release
@@ -94,9 +93,6 @@ objects:
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
-          - name: sparse-checkout-config
-            mountPath: /etc/git-sync
-            readOnly: true
         containers:
         - name: gangway
           image: us-docker.pkg.dev/k8s-infra-prow/images/gangway:v20260908-104d452f4
@@ -108,7 +104,7 @@ objects:
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
-          - --job-config-path=/etc/jobs
+          - --job-config-path=/var/repo/release/ci-operator/jobs
           - --grace-period=110s
           - --dry-run=false
           env:
@@ -152,14 +148,6 @@ objects:
             readOnly: true
           - name: release
             mountPath: /var/repo
-          - name: combined-jobs
-            mountPath: /etc/jobs
-          - name: job-configs
-            mountPath: /etc/jobs/efs
-            readOnly: true
-          - name: release
-            mountPath: /etc/jobs/release
-            readOnly: true
           resources:
             requests:
               memory: "17Gi"
@@ -172,16 +160,12 @@ objects:
           - --ref=main
           - --period=30s
           - --root=/tmp/git-sync
-          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           - --max-failures=3
           - --link=release
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
-          - name: sparse-checkout-config
-            mountPath: /etc/git-sync
-            readOnly: true
           resources:
             requests:
               memory: "512Mi"
@@ -254,14 +238,6 @@ objects:
             secretName: gangway-tls
         - name: release
           emptyDir: {}
-        - name: combined-jobs
-          emptyDir: {}
-        - name: sparse-checkout-config
-          configMap:
-            name: prow-jobs-sparse-checkout
-        - name: job-configs
-          persistentVolumeClaim:
-            claimName: job-configs-nfs
         - name: nginx-cache
           emptyDir: {}
         - name: nginx-tmp
