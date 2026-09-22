@@ -1533,6 +1533,23 @@ IPECHO_EOF
   fi
   echo "ip-echo localnet-vlan IP: ${ipecho_localnet_ip}:80"
   echo "${ipecho_localnet_ip}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
+
+  local vmi_namespace="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  local vmi vmi_node guest_workers
+  guest_workers=""
+  for vmi in $(oc get vmi -n "${vmi_namespace}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    [[ -z "${vmi}" ]] && continue
+    vmi_node=$(oc get vmi "${vmi}" -n "${vmi_namespace}" -o jsonpath='{.status.nodeName}' 2>/dev/null || true)
+    if [[ "${vmi_node}" == "${ipecho_node}" ]]; then
+      guest_workers="${guest_workers}${vmi}"$'\n'
+    fi
+  done
+  if [[ -n "${guest_workers}" ]]; then
+    printf '%s' "${guest_workers}" > "${SHARED_DIR}/kubevirt_ipecho_guest_workers"
+    echo "Wrote co-located guest workers to kubevirt_ipecho_guest_workers: $(echo "${guest_workers}" | tr '\n' ' ')"
+  else
+    echo "WARNING: no guest VMIs found on ip-echo node ${ipecho_node}; kubevirt_ipecho_guest_workers not written" >&2
+  fi
 }
 
 # After workers join: clear OVN port security on all passthrough localnet LSPs (EgressIP
@@ -2301,7 +2318,14 @@ if [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-vlan" ]]; then
   localnet_vlan_verify_guest_ingress_passthrough "${LOCALNET_VLAN_NS}"
 
   if [[ "${LOCALNET_VLAN_DEPLOY_IPECHO:-true}" == "true" ]]; then
-    deploy_localnet_vlan_ipecho "${LOCALNET_VLAN_PHYSNET}" "${LOCALNET_VLAN_IPECHO_STATIC_IP:-192.168.112.250/24}" || {
+    local ipecho_physnet="${LOCALNET_VLAN_PHYSNET}"
+    local ipecho_static_ip="${LOCALNET_VLAN_IPECHO_STATIC_IP:-192.168.112.250/24}"
+    if [[ "${LOCALNET_VLAN_EGRESS_ENABLE}" == "true" ]]; then
+      ipecho_physnet="${LOCALNET_VLAN_EGRESS_PHYSNET}"
+      ipecho_static_ip="${LOCALNET_VLAN_EGRESS_IPECHO_STATIC_IP:-192.168.200.250/24}"
+      echo "EgressIP enabled: deploying ip-echo on egress physnet ${ipecho_physnet} (${ipecho_static_ip})"
+    fi
+    deploy_localnet_vlan_ipecho "${ipecho_physnet}" "${ipecho_static_ip}" || {
       echo "ERROR: localnet-vlan ip-echo deployment failed" >&2
       exit 1
     }

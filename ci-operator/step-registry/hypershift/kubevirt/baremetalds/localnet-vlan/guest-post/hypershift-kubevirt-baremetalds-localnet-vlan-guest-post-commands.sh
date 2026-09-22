@@ -63,10 +63,10 @@ localnet_vlan_configure_guest_cno() {
   fi
   echo "Guest CNO patched; waiting for guest OVN rollout..."
 
+  local num_ready desired updated
   for _ in $(seq 1 60); do
-    local ready desired
-    if ! ready=$(localnet_vlan_nested_oc get daemonset ovnkube-node -n openshift-ovn-kubernetes \
-      -o jsonpath='{.status.updatedNumberScheduled}' 2>/dev/null); then
+    if ! num_ready=$(localnet_vlan_nested_oc get daemonset ovnkube-node -n openshift-ovn-kubernetes \
+      -o jsonpath='{.status.numberReady}' 2>/dev/null); then
       echo "WARNING: guest API error while checking ovnkube-node rollout; retrying..." >&2
       sleep 10
       continue
@@ -77,14 +77,39 @@ localnet_vlan_configure_guest_cno() {
       sleep 10
       continue
     fi
-    if [[ "${ready}" -gt 0 && "${ready}" == "${desired}" ]]; then
-      echo "Guest OVN rollout complete (${ready}/${desired} updated)"
-      return 0
+    updated=$(localnet_vlan_nested_oc get daemonset ovnkube-node -n openshift-ovn-kubernetes \
+      -o jsonpath='{.status.updatedNumberScheduled}' 2>/dev/null || echo "0")
+    if [[ "${num_ready}" -gt 0 && "${num_ready}" == "${desired}" && "${updated}" == "${desired}" ]]; then
+      echo "Guest OVN rollout complete (${num_ready}/${desired} ready, ${updated} updated)"
+      break
     fi
+    echo "  ovnkube-node: ${num_ready}/${desired} ready, ${updated} updated..."
     sleep 10
   done
-  echo "ERROR: guest OVN rollout not complete after 10 minutes" >&2
-  return 1
+
+  if [[ "${num_ready:-0}" -lt 1 || "${num_ready:-0}" != "${desired:-1}" ]]; then
+    echo "ERROR: guest OVN rollout not complete after 10 minutes" >&2
+    return 1
+  fi
+
+  echo "Waiting for guest network ClusterOperator to stabilize..."
+  local co_available co_progressing co_degraded
+  for _ in $(seq 1 30); do
+    co_available=$(localnet_vlan_nested_oc get co network \
+      -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)
+    co_progressing=$(localnet_vlan_nested_oc get co network \
+      -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}' 2>/dev/null || true)
+    co_degraded=$(localnet_vlan_nested_oc get co network \
+      -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}' 2>/dev/null || true)
+    if [[ "${co_available}" == "True" && "${co_progressing}" == "False" && "${co_degraded}" != "True" ]]; then
+      echo "Guest network CO stable: Available=True, Progressing=False, Degraded=${co_degraded:-False}"
+      return 0
+    fi
+    echo "  network CO: Available=${co_available:-?}, Progressing=${co_progressing:-?}, Degraded=${co_degraded:-?}"
+    sleep 10
+  done
+  echo "WARNING: guest network CO not fully stable after 5 minutes (continuing)" >&2
+  return 0
 }
 
 localnet_vlan_label_egress_nodes() {
