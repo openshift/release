@@ -77,7 +77,8 @@ tests:
         printf 'CI source image: %s\n' "$NHC_SRC_IMAGE"
         mkdir -p /tmp/nhc-ci-src
         oc image extract "$NHC_SRC_IMAGE" \
-          --path="/go/src/github.com/medik8s/node-healthcheck-operator/:/tmp/nhc-ci-src" --confirm
+          --path="/go/src/github.com/medik8s/node-healthcheck-operator/:/tmp/nhc-ci-src" \
+          --registry-config=/etc/ci-pull-credentials/.dockerconfigjson --confirm
 
         echo '==> Clone NHC independently'
         git clone --depth=1 https://github.com/medik8s/node-healthcheck-operator.git /tmp/nhc-source
@@ -152,6 +153,10 @@ tests:
           CATALOG_IMG="${prefix}-catalog:1h"
         podman push --digestfile "$digest_dir/catalog.digest" "${prefix}-catalog:1h"
         echo "==> Catalog pushed: ${prefix}-catalog@$(cat "$digest_dir/catalog.digest")"
+      credentials:
+      - bundle: ci-pull-credentials
+        mount_path: /etc/ci-pull-credentials
+        namespace: test-credentials
       dependencies:
       - env: NHC_SRC_IMAGE
         name: src
