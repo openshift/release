@@ -161,7 +161,16 @@ else
   fi
 fi
 echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH}"
-npx playwright install chromium
+# The browser download fails on transient DNS errors from the CDN hosts; retry it.
+for attempt in 1 2 3; do
+  npx playwright install chromium && break
+  if [[ ${attempt} -eq 3 ]]; then
+    echo "ERROR: playwright browser install failed after 3 attempts" >&2
+    exit 1
+  fi
+  echo "playwright install attempt ${attempt} failed; retrying in $((attempt * 30))s"
+  sleep $((attempt * 30))
+done
 popd
 
 # Capture virtual-builder diagnostics from the TARGET cluster. Playwright build
