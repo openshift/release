@@ -138,6 +138,9 @@ ARTIFACT_DIR/
 The static index links available artifacts and reports selected evals as passed,
 failed, or not run. No matching evals and configuration errors also produce an
 index. HTML reports retain the `-summary.html` suffix for Prow display.
+When embedded in Prow's HTML lens, the index uses the lens's artifact path to
+open files and directories in the OpenShift artifact browser in a new tab.
+When opened directly or downloaded with its artifacts, links remain relative.
 The eval's child processes receive its own directory as `ARTIFACT_DIR`; setup
 scripts can write additional diagnostic files there. JUnit and AutoDL metrics
 remain aggregated at the job root.

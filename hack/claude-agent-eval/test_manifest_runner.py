@@ -608,7 +608,7 @@ class ExecutionTests(Fixture):
         (directory / "claude-eval.log").write_text("log")
         runner.write_index(self.artifacts, [entry], ["runner <error>"])
         html = self.index()
-        self.assertNotIn("<script>", html)
+        self.assertNotIn(entry["config"], html)
         self.assertIn("&lt;script&gt;", html)
         self.assertIn("bad &lt;value&gt;", html)
         self.assertIn("runner &lt;error&gt;", html)
