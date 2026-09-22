@@ -123,6 +123,7 @@ ARTIFACT_DIR/
   junit_claude-eval.xml
   claude-session-metrics-autodl.json  # when metrics are available
   evals-summary.html
+  evals-summary.json
   runner/harness-install.log
   evals/<artifact_name>/
     report-summary.html
@@ -138,6 +139,16 @@ ARTIFACT_DIR/
 The static index links available artifacts and reports selected evals as passed,
 failed, or not run. No matching evals and configuration errors also produce an
 index. HTML reports retain the `-summary.html` suffix for Prow display.
+`evals-summary.json` is the agent-readable summary (`schema_version: 1`). It
+contains the overall `status`, counts (`selected`, `passed`, `failed`, `not_run`),
+runner/reporting `errors`, and an `evals` array with each config, artifact name,
+run ID, status, failure, directory, and available artifact paths. Paths are raw
+paths relative to the summary directory, not URLs. Missing run IDs, failures,
+and directories are `null`; missing files are omitted. Status is `failed` when
+any eval or runner/reporting error fails, `not_run` while selected evals remain
+unattempted, `passed` when all selected evals pass, or `no_evals` when none were
+selected without errors. It is written for no-match and configuration failures
+too. Generating this summary makes no model calls.
 When embedded in Prow's HTML lens, the index uses the lens's artifact path to
 open files and directories in the OpenShift artifact browser in a new tab.
 When opened directly or downloaded with its artifacts, links remain relative.
