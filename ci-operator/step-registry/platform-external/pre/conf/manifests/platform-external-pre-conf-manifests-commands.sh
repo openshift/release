@@ -5,6 +5,11 @@
 # The step creates manifests (openshift-install create manifests) and generate the ignition
 # config files (create ignition-configs), saving in a the shared storage.
 #
+# Always run openshift-install from OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE so bootstrap
+# assets (bootkube/cvo-render flags) match the install payload. Using the step container's
+# installer imagestream alone breaks upgrades when latest installer > initial CVO
+# (e.g. --cluster-version-manifest-path). Same pattern as ipi-install-install extract.
+#
 
 set -o nounset
 set -o errexit
@@ -15,17 +20,49 @@ if [[ -n "${PLATFORM_EXTERNAL_OVERRIDE_RELEASE-}" ]]; then
 fi
 echo "Using release image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
+if [[ -z "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  echo "ERROR: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is empty"
+  exit 1
+fi
+
+# Persist for preflight (exact payload baked into ignition / bootstrap)
+echo -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" > "${SHARED_DIR}/platform-external-install-release-image"
+
 STEP_WORKDIR=${STEP_WORKDIR:-/tmp}
 INSTALL_DIR=${STEP_WORKDIR}/install-dir
 mkdir -vp "${INSTALL_DIR}"
 
 source "${SHARED_DIR}/init-fn.sh" || true
 
+# Prefer installer binary from the install payload over the step's imagestream tag.
+INSTALLER_BINARY="${STEP_WORKDIR}/openshift-install"
+
+# Build-farm release images (registry.build*.ci.openshift.org/ci-op-*) need CI
+# registry credentials. Cluster-profile pull-secret alone is not enough.
+PULL_SECRET="${REGISTRY_AUTH_FILE:-${STEP_WORKDIR}/pull-secret-with-ci}"
+mkdir -p "$(dirname "${PULL_SECRET}")"
+cp -f "${CLUSTER_PROFILE_DIR}/pull-secret" "${PULL_SECRET}"
+if [[ "$(dirname "$(dirname "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}")")" != "quay.io" ]]; then
+  log "Logging into CI registry to extract installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  # Prefer build-cluster SA token over any SHARED_DIR kubeconfig.
+  KUBECONFIG="" oc registry login --to "${PULL_SECRET}"
+fi
+
+log "Extracting openshift-install from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+oc adm release extract -a "${PULL_SECRET}" \
+  "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install \
+  --to="${STEP_WORKDIR}"
+
+chmod +x "${INSTALLER_BINARY}"
+log "openshift-install version:"
+"${INSTALLER_BINARY}" version
+
 log "Copying to install dir"
 cp -vp "${SHARED_DIR}"/install-config.yaml "${INSTALL_DIR}"/install-config.yaml
 
 log "Creating manifests"
-openshift-install create manifests --dir "${INSTALL_DIR}"
+"${INSTALLER_BINARY}" create manifests --dir "${INSTALL_DIR}"
 
 log "# << Manifest customization >> #"
 
@@ -143,7 +180,7 @@ rm -vf "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_worker-machineset-*.y
 
 log "# << Ignition config/generation >> #"
 
-openshift-install --dir="${INSTALL_DIR}" create ignition-configs &
+"${INSTALLER_BINARY}" --dir="${INSTALL_DIR}" create ignition-configs &
 wait "$!"
 
 log "# << Saving to shared dir >> #"
