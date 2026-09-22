@@ -174,9 +174,19 @@ patch_guest_server() {
 }
 
 # --- Discover reachable guest API endpoints ---
+#
+# Topology note (OZ libvirt + CI pod on build farm):
+# - hcp create kubeconfig often returns the MetalLB VIP (e.g. 192.168.3.53:6443).
+# - That VIP and node InternalIPs are L2 on the libvirt bridge — usually NOT
+#   routed to the Prow CI pod. Probing them from CI burns connect-timeouts.
+# - The path CI historically reaches is LPAR_HOST_IP:NodePort (VPN/port-forward),
+#   which is flaky but is the endpoint nested_kubeconfig must use for later steps.
+# - Prefer LPAR:NodePort first for CI reachability; still try VIP/nodeIP in case
+#   the job network can reach them; dedupe identical URLs.
+#
 LPAR_HOST_IP="${LPAR_HOST_IP:-10.0.1.15}"
-echo "$(date) Discovering kube-apiserver endpoints (LPAR fallback=${LPAR_HOST_IP})"
-echo "$(date) Preference order: hcp original URL → MetalLB VIP:6443 → nodeIP:NodePort → LPAR:NodePort"
+echo "$(date) Discovering kube-apiserver endpoints (LPAR=${LPAR_HOST_IP})"
+echo "$(date) Preference order (CI-reachable first): LPAR:NodePort → nodeIP:NodePort → MetalLB VIP → hcp original"
 
 echo "$(date) Restarting MetalLB speaker daemonset once to refresh VIP ARP announcements"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -184,14 +194,53 @@ oc get pods -n metallb-system -o wide 2>/dev/null || true
 oc rollout restart daemonset speaker -n metallb-system || true
 oc rollout status daemonset speaker -n metallb-system --timeout=120s || true
 
-probe_readyz() {
-  local url="$1"
-  # -k: probe must work even before kubeconfig TLS knobs are settled
-  curl -sk --connect-timeout 10 --max-time 30 "${url%/}/readyz" 2>/dev/null || true
+# Confirm guest API health via mgmt kube-apiserver tunnel (works from CI even when
+# the MetalLB VIP is not routed to the build farm). Uses no extra images (s390x-safe).
+probe_readyz_via_portforward() {
+  local ns="$1"
+  local local_port="${2:-16443}"
+  echo "$(date) Port-forward probe: svc/kube-apiserver in ${ns} → 127.0.0.1:${local_port}"
+  oc port-forward -n "${ns}" svc/kube-apiserver "${local_port}:6443" >/tmp/hcpvirt-oz-pf.log 2>&1 &
+  local pf_pid=$!
+  local out=""
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    sleep 1
+    if ! kill -0 "${pf_pid}" 2>/dev/null; then
+      echo "$(date) port-forward exited early; log:"
+      cat /tmp/hcpvirt-oz-pf.log || true
+      break
+    fi
+    out=$(curl -sk --connect-timeout 2 --max-time 5 "https://127.0.0.1:${local_port}/readyz" 2>/dev/null || true)
+    if [[ -n "${out}" ]]; then
+      break
+    fi
+  done
+  kill "${pf_pid}" 2>/dev/null || true
+  wait "${pf_pid}" 2>/dev/null || true
+  echo "$(date) Port-forward /readyz=${out:-<empty>}"
+  [[ "${out}" == "ok" ]]
 }
 
-# Build / refresh candidate list each poll so a late MetalLB VIP can still be used.
-# Order matters: first /readyz=ok wins, so put the most stable endpoints first.
+probe_readyz() {
+  local url="$1"
+  # Short timeouts: unreachable private VIPs must fail fast so LPAR is tried soon.
+  curl -sk --connect-timeout 5 --max-time 10 "${url%/}/readyz" 2>/dev/null || true
+}
+
+# Append URL if non-empty and not already present.
+add_candidate() {
+  local url="$1"
+  [[ -z "${url}" ]] && return 0
+  local existing
+  for existing in "${API_CANDIDATES[@]:-}"; do
+    [[ "${existing}" == "${url}" ]] && return 0
+  done
+  API_CANDIDATES+=("${url}")
+}
+
+# Build / refresh candidate list each poll.
+# Order: CI-reachable paths first (LPAR NodePort), then on-bridge addresses.
 build_api_candidates() {
   local nodeport=""
   local lb_ip=""
@@ -206,18 +255,20 @@ build_api_candidates() {
   node_ip=$(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
 
   API_CANDIDATES=()
-  if [[ -n "${ORIG_SERVER}" ]]; then
-    API_CANDIDATES+=("${ORIG_SERVER}")
-  fi
-  if [[ -n "${lb_ip}" ]]; then
-    API_CANDIDATES+=("https://${lb_ip}:6443")
-  fi
-  if [[ -n "${node_ip}" && -n "${nodeport}" ]]; then
-    API_CANDIDATES+=("https://${node_ip}:${nodeport}")
-  fi
+  # 1) LPAR:NodePort — path the CI pod can use via VPN (Shweta rehearsals)
   if [[ -n "${LPAR_HOST_IP}" && -n "${nodeport}" ]]; then
-    API_CANDIDATES+=("https://${LPAR_HOST_IP}:${nodeport}")
+    add_candidate "https://${LPAR_HOST_IP}:${nodeport}"
   fi
+  # 2) mgmt node InternalIP:NodePort — sometimes reachable on same VPN segment
+  if [[ -n "${node_ip}" && -n "${nodeport}" ]]; then
+    add_candidate "https://${node_ip}:${nodeport}"
+  fi
+  # 3) MetalLB VIP — works on-bridge; often NOT routed to CI (still try)
+  if [[ -n "${lb_ip}" ]]; then
+    add_candidate "https://${lb_ip}:6443"
+  fi
+  # 4) Original hcp kubeconfig server (often equals VIP — deduped)
+  add_candidate "${ORIG_SERVER}"
 
   echo "$(date) Candidates type=${svc_type:-?} nodePort=${nodeport:-none} lb=${lb_ip:-none} nodeIP=${node_ip:-none} lpar=${LPAR_HOST_IP}"
   local i=0
@@ -225,6 +276,12 @@ build_api_candidates() {
     echo "$(date)   [$i] ${c}"
     i=$((i + 1))
   done
+
+  # Once per ~2 minutes, probe guest API via port-forward for RCA
+  # (distinguishes "VIP not routed to CI" from "guest apiserver down").
+  if [[ -n "${nodeport}" && $((${API_ELAPSED:-0} % 120)) -eq 0 ]]; then
+    probe_readyz_via_portforward "${HCP_NS}" || true
+  fi
 }
 
 select_reachable_api() {
@@ -234,6 +291,7 @@ select_reachable_api() {
   local selected=""
 
   while [[ ${elapsed} -lt ${API_MAX_WAIT} ]]; do
+    API_ELAPSED=${elapsed}
     build_api_candidates
     if [[ ${#API_CANDIDATES[@]} -eq 0 ]]; then
       echo "$(date) No guest API candidates yet; waiting (${elapsed}s/${API_MAX_WAIT}s)..."
@@ -269,6 +327,8 @@ select_reachable_api() {
   echo "$(date) ERROR: No guest API endpoint returned /readyz=ok within ${API_MAX_WAIT}s"
   echo "$(date) DEBUG: kube-apiserver Service YAML:"
   oc get svc kube-apiserver -n "${HCP_NS}" -o yaml || true
+  echo "$(date) DEBUG: final port-forward probe (mgmt tunnel):"
+  probe_readyz_via_portforward "${HCP_NS}" || true
   dump_mgmt_debug
   dump_guest_debug
   return 1
