@@ -74,12 +74,10 @@ tests:
     NHC_VERSION="$(sed -n 's/^[[:space:]]*Version = "\([^"]*\)".*/\1/p' version/version.go)"
     makefile_version="$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)"
     test -n "$NHC_VERSION" && test "$NHC_VERSION" = "$makefile_version"
-    NHC_PREVIOUS_VERSION="$(skopeo list-tags docker://registry.redhat.io/workload-availability/node-healthcheck-operator-bundle |
-      jq -r '.Tags[] | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))' | sort -V | tail -n 1)"
-    test -n "$NHC_PREVIOUS_VERSION"
-    NHC_PREVIOUS_VERSION="${NHC_PREVIOUS_VERSION#v}"
+    # The smoke job has no cluster pull secret to discover the GA release.
+    NHC_PREVIOUS_VERSION=0.12.1
     test "$NHC_VERSION" != "$NHC_PREVIOUS_VERSION"
-    printf 'Candidate: %s; latest GA: %s\n' "$NHC_VERSION" "$NHC_PREVIOUS_VERSION"
+    printf 'Candidate: %s; smoke baseline: %s\n' "$NHC_VERSION" "$NHC_PREVIOUS_VERSION"
 
     probe_image="ttl.sh/nhc-prow-smoke-$(date +%Y%m%d-%H%M%S)-${BUILD_ID:-local}:1h"
     NHC_SKIP_TEST=true make docker-build VERSION="$NHC_VERSION" IMG="$probe_image"
