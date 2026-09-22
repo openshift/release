@@ -145,11 +145,19 @@ function collect_bootstrap_handler() {
     fi
   } || true
 
-  # Fallback: collect EC2 console output if SSH/openshift-install gather failed
+  # Fallback: collect EC2 serial console output. Works when SSH is down, and
+  # when the installer's own console gather is skipped (no metadata.json on
+  # platform external installs).
   log "[\${handler_name}]: Attempting to collect EC2 console output as fallback..."
   {
-    if command -v aws &> /dev/null && [ -n "\${CLUSTER_NAME:-}" ]; then
-      STACK_NAME="\${CLUSTER_NAME}-bootstrap"
+    export AWS_SHARED_CREDENTIALS_FILE="\${CLUSTER_PROFILE_DIR}/.awscred"
+    export AWS_DEFAULT_REGION="\${LEASED_RESOURCE}"
+    install_awscli
+
+    if ! [ -f "\${SHARED_DIR}/CLUSTER_NAME" ]; then
+      log "[\${handler_name}]: CLUSTER_NAME not found in \${SHARED_DIR}, skipping console output"
+    else
+      STACK_NAME="\$(<\${SHARED_DIR}/CLUSTER_NAME)-bootstrap"
       INSTANCE_ID=\$(aws ec2 describe-instances \\
         --filters "Name=tag:aws:cloudformation:stack-name,Values=\${STACK_NAME}" \\
         --query 'Reservations[0].Instances[0].InstanceId' \\
@@ -165,10 +173,8 @@ function collect_bootstrap_handler() {
           log "[\${handler_name}]: Could not collect EC2 console output"
         fi
       else
-        log "[\${handler_name}]: Could not find bootstrap instance ID"
+        log "[\${handler_name}]: Could not find bootstrap instance ID for stack \${STACK_NAME}"
       fi
-    else
-      log "[\${handler_name}]: Skipping console output (aws CLI not available or CLUSTER_NAME not set)"
     fi
   } || true
 
