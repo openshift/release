@@ -15,18 +15,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ -n "${PLATFORM_EXTERNAL_OVERRIDE_RELEASE-}" ]]; then
-  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${PLATFORM_EXTERNAL_OVERRIDE_RELEASE}"
-fi
 echo "Using release image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 if [[ -z "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   echo "ERROR: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is empty"
   exit 1
 fi
-
-# Persist for preflight (exact payload baked into ignition / bootstrap)
-echo -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" > "${SHARED_DIR}/platform-external-install-release-image"
 
 STEP_WORKDIR=${STEP_WORKDIR:-/tmp}
 INSTALL_DIR=${STEP_WORKDIR}/install-dir
@@ -37,19 +31,18 @@ source "${SHARED_DIR}/init-fn.sh" || true
 # Prefer installer binary from the install payload over the step's imagestream tag.
 INSTALLER_BINARY="${STEP_WORKDIR}/openshift-install"
 
-# Build-farm release images (registry.build*.ci.openshift.org/ci-op-*) need CI
-# registry credentials. Cluster-profile pull-secret alone is not enough.
-PULL_SECRET="${REGISTRY_AUTH_FILE:-${STEP_WORKDIR}/pull-secret-with-ci}"
-mkdir -p "$(dirname "${PULL_SECRET}")"
-cp -f "${CLUSTER_PROFILE_DIR}/pull-secret" "${PULL_SECRET}"
-if [[ "$(dirname "$(dirname "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}")")" != "quay.io" ]]; then
-  log "Logging into CI registry to extract installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-  # Prefer build-cluster SA token over any SHARED_DIR kubeconfig.
-  KUBECONFIG="" oc registry login --to "${PULL_SECRET}"
+# Reuse pull-secret written by platform-external-pre-conf under SHARED_DIR
+# (includes CI registry auth when needed). Do not re-login here — /tmp is
+# per-step and the shared file is the source of truth.
+REGISTRY_AUTH_FILE="${REGISTRY_AUTH_FILE:-${SHARED_DIR}/pull-secret-with-ci}"
+if [[ ! -f "${REGISTRY_AUTH_FILE}" ]]; then
+  echo "ERROR: registry auth file not found at ${REGISTRY_AUTH_FILE}"
+  echo "platform-external-pre-conf must run first and write ${SHARED_DIR}/pull-secret-with-ci"
+  exit 1
 fi
 
 log "Extracting openshift-install from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-oc adm release extract -a "${PULL_SECRET}" \
+oc adm release extract -a "${REGISTRY_AUTH_FILE}" \
   "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
   --command=openshift-install \
   --to="${STEP_WORKDIR}"
