@@ -272,6 +272,7 @@ data:
   run.yaml: |
     version: 2
     distro_name: starter
+    external_providers_dir: ${env.EXTERNAL_PROVIDERS_DIR:=~/.llama/providers.d}
 
     apis:
     - inference
@@ -296,10 +297,16 @@ data:
 
     storage:
       backends:
+        kv_default:
+          type: kv_sqlite
+          db_path: /tmp/llama-storage/kv_store.db
         sql_default:
           type: sql_sqlite
           db_path: /tmp/llama-storage/sql_store.db
       stores:
+        metadata:
+          namespace: registry
+          backend: kv_default
         inference:
           table_name: inference_store
           backend: sql_default
@@ -307,6 +314,12 @@ data:
           num_writers: 4
         conversations:
           table_name: openai_conversations
+          backend: sql_default
+        prompts:
+          table_name: prompts
+          backend: sql_default
+        connectors:
+          table_name: connectors
           backend: sql_default
 
     registered_resources:
@@ -319,6 +332,7 @@ data:
         model_type: llm
         provider_id: openai
         provider_model_id: llama-guard-3-8b
+      vector_stores: []
 LCS_STACK_CONFIG
 
   # Deploy LCS with mock LLM sidecar
@@ -449,9 +463,17 @@ DEPLOYMENT
     mkdir -p "${ARTIFACT_DIR}/logs"
     {
       oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o wide || true
+      echo "--- current lcs container logs ---"
       oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c lcs --tail=100 || true
+      echo "--- previous lcs container logs (crash-loop) ---"
+      oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c lcs --previous --tail=200 2>/dev/null || true
+      echo "--- current mock-llm container logs ---"
       oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c mock-llm --tail=50 || true
+      echo "--- previous mock-llm container logs (crash-loop) ---"
+      oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c mock-llm --previous --tail=50 2>/dev/null || true
+      echo "--- pod describe ---"
       oc describe pod -n "${LCS_NAMESPACE}" -l app=lcs || true
+      echo "--- namespace events ---"
       oc get events -n "${LCS_NAMESPACE}" --sort-by='.lastTimestamp' | tail -30 || true
     } 2>&1 | tee "${ARTIFACT_DIR}/logs/lcs-diagnostic.log"
     return 1
