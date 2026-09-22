@@ -66,9 +66,29 @@ tests:
   - nested-podman
   commands: |
     set -o errexit -o nounset -o pipefail
+    echo '==> Check nested Podman and its UID mapping'
     id
     podman info
 
+    # Preserve nested-podman's overlay settings while allowing the opm image's
+    # UID 65532 to be unpacked with this test container's smaller UID map.
+    storage_config="$(podman info --format '{{.Store.ConfigFile}}')"
+    test -r "$storage_config"
+    export CONTAINERS_STORAGE_CONF=/tmp/nhc-storage.conf
+    awk '
+      /^\[storage.options.overlay\]$/ {
+        in_overlay=1; found=1; print; print "ignore_chown_errors = \"true\""; next
+      }
+      /^\[/ { in_overlay=0 }
+      in_overlay && /^[[:space:]]*ignore_chown_errors[[:space:]]*=/ { next }
+      { print }
+      END { if (!found) { print "[storage.options.overlay]"; print "ignore_chown_errors = \"true\"" } }
+    ' "$storage_config" > "$CONTAINERS_STORAGE_CONF"
+    test "$(podman info --format '{{.Store.ConfigFile}}')" = "$CONTAINERS_STORAGE_CONF"
+    echo '==> Pull catalog base image with the corrected storage setting'
+    podman pull quay.io/operator-framework/opm:latest
+
+    echo '==> Clone NHC and read its candidate version'
     git clone --depth=1 https://github.com/medik8s/node-healthcheck-operator.git /tmp/nhc-source
     cd /tmp/nhc-source
     NHC_VERSION="$(sed -n 's/^[[:space:]]*Version = "\([^"]*\)".*/\1/p' version/version.go)"
@@ -79,9 +99,32 @@ tests:
     test "$NHC_VERSION" != "$NHC_PREVIOUS_VERSION"
     printf 'Candidate: %s; smoke baseline: %s\n' "$NHC_VERSION" "$NHC_PREVIOUS_VERSION"
 
-    probe_image="ttl.sh/nhc-prow-smoke-$(date +%Y%m%d-%H%M%S)-${BUILD_ID:-local}:1h"
-    NHC_SKIP_TEST=true make docker-build VERSION="$NHC_VERSION" IMG="$probe_image"
-    podman push "$probe_image"
+    prefix="ttl.sh/nhc-prow-smoke-$(date +%Y%m%d-%H%M%S)-${BUILD_ID:-local}"
+    digest_dir="$(mktemp -d)"
+    export CONSOLE_PLUGIN_IMAGE=quay.io/medik8s/node-remediation-console@sha256:384d35e7aed7be24f8837e33cfd1e94a683a1cdcafb7da58f813ae233e957ff7
+    export MUST_GATHER_IMAGE=quay.io/medik8s/must-gather@sha256:a3ba0753e60517c2a7cff68eca778c23198787af36e8214e8838d2c7fc676b97
+
+    echo '==> Build and push operator'
+    NHC_SKIP_TEST=true make docker-build VERSION="$NHC_VERSION" IMG="${prefix}-operator:1h"
+    podman push --digestfile "$digest_dir/operator.digest" "${prefix}-operator:1h"
+    operator_image="${prefix}-operator@$(cat "$digest_dir/operator.digest")"
+
+    echo '==> Build and push bundle'
+    make bundle-build-ocp \
+      VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
+      SKIP_RANGE_LOWER=0.1.0 DOCS_RHWA_VERSION=5.0 \
+      IMG="$operator_image" BUNDLE_IMG="${prefix}-bundle:1h" \
+      CONSOLE_PLUGIN_IMAGE="$CONSOLE_PLUGIN_IMAGE" MUST_GATHER_IMAGE="$MUST_GATHER_IMAGE"
+    podman push --digestfile "$digest_dir/bundle.digest" "${prefix}-bundle:1h"
+    bundle_image="${prefix}-bundle@$(cat "$digest_dir/bundle.digest")"
+
+    echo '==> Build and push catalog (the step that failed in the full job)'
+    make catalog-build \
+      VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
+      SKIP_RANGE_LOWER=0.1.0 BUNDLE_IMG="$bundle_image" \
+      CATALOG_IMG="${prefix}-catalog:1h"
+    podman push --digestfile "$digest_dir/catalog.digest" "${prefix}-catalog:1h"
+    echo "==> Catalog pushed: ${prefix}-catalog@$(cat "$digest_dir/catalog.digest")"
   container:
     from: nhc-upgrade-test-runner
   nested_podman: true
@@ -112,6 +155,7 @@ tests:
 
         prepare_runtime() {
           # Give skopeo the cluster's Red Hat registry credentials.
+          echo '==> Read cluster pull secret for Red Hat registry access'
           local auth_dir=/tmp/nhc-registry-auth
           mkdir -p "$auth_dir"
           oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' |
@@ -130,10 +174,29 @@ tests:
           operator-sdk version
           podman version
           podman info
+
+          echo '==> Configure rootless Podman for the catalog base image UID'
+          local storage_config
+          storage_config="$(podman info --format '{{.Store.ConfigFile}}')"
+          test -r "$storage_config"
+          export CONTAINERS_STORAGE_CONF=/tmp/nhc-storage.conf
+          awk '
+            /^\[storage.options.overlay\]$/ {
+              in_overlay=1; found=1; print; print "ignore_chown_errors = \"true\""; next
+            }
+            /^\[/ { in_overlay=0 }
+            in_overlay && /^[[:space:]]*ignore_chown_errors[[:space:]]*=/ { next }
+            { print }
+            END { if (!found) { print "[storage.options.overlay]"; print "ignore_chown_errors = \"true\"" } }
+          ' "$storage_config" > "$CONTAINERS_STORAGE_CONF"
+          test "$(podman info --format '{{.Store.ConfigFile}}')" = "$CONTAINERS_STORAGE_CONF"
+          echo '==> Pull catalog base image before building the candidate'
+          podman pull quay.io/operator-framework/opm:latest
         }
 
         build_candidate() {
           # Match build-and-push.sh: build operator, bundle, then catalog.
+          echo '==> Clone NHC main'
           git clone --depth=1 https://github.com/medik8s/node-healthcheck-operator.git /tmp/nhc-source
           local revision prefix operator_tag bundle_tag catalog_tag
           revision="$(git -C /tmp/nhc-source rev-parse HEAD)"
@@ -159,10 +222,13 @@ tests:
           bundle_tag="${prefix}-bundle:24h"
           catalog_tag="${prefix}-catalog:24h"
 
+          echo "==> Build and push operator: $operator_tag"
           make docker-build VERSION="$NHC_VERSION" IMG="$operator_tag"
           podman push --digestfile "$ARTIFACT_DIR/operator.digest" "$operator_tag"
           export NHC_UPGRADE_CANDIDATE_NHC_IMAGE="${prefix}-operator@$(cat "$ARTIFACT_DIR/operator.digest")"
+          echo "==> Operator pushed: $NHC_UPGRADE_CANDIDATE_NHC_IMAGE"
 
+          echo "==> Build and push bundle: $bundle_tag"
           make bundle-build-ocp \
             VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
             SKIP_RANGE_LOWER=0.1.0 DOCS_RHWA_VERSION=5.0 \
@@ -170,13 +236,16 @@ tests:
             CONSOLE_PLUGIN_IMAGE="$CONSOLE_PLUGIN_IMAGE" MUST_GATHER_IMAGE="$MUST_GATHER_IMAGE"
           podman push --digestfile "$ARTIFACT_DIR/bundle.digest" "$bundle_tag"
           export NHC_UPGRADE_CANDIDATE_NHC_BUNDLE="${prefix}-bundle@$(cat "$ARTIFACT_DIR/bundle.digest")"
+          echo "==> Bundle pushed: $NHC_UPGRADE_CANDIDATE_NHC_BUNDLE"
 
+          echo "==> Build and push catalog: $catalog_tag"
           make catalog-build \
             VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
             SKIP_RANGE_LOWER=0.1.0 BUNDLE_IMG="$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE" \
             CATALOG_IMG="$catalog_tag"
           podman push --digestfile "$ARTIFACT_DIR/catalog.digest" "$catalog_tag"
           export NHC_UPGRADE_CANDIDATE_NHC_CATALOG="${prefix}-catalog@$(cat "$ARTIFACT_DIR/catalog.digest")"
+          echo "==> Catalog pushed: $NHC_UPGRADE_CANDIDATE_NHC_CATALOG"
 
           printf 'NHC_UPGRADE_CANDIDATE_NHC_IMAGE=%s\nNHC_UPGRADE_CANDIDATE_NHC_BUNDLE=%s\nNHC_UPGRADE_CANDIDATE_NHC_CATALOG=%s\n' \
             "$NHC_UPGRADE_CANDIDATE_NHC_IMAGE" "$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE" \
@@ -184,6 +253,7 @@ tests:
         }
 
         verify_candidate() {
+          echo '==> Validate candidate bundle and its console plugin reference'
           operator-sdk bundle validate --image-builder=none "$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE"
           local bundle_dir candidate_csv candidate_version
           bundle_dir="$(mktemp -d)"
@@ -195,10 +265,12 @@ tests:
           test "$candidate_version" = "$NHC_VERSION"
           grep -Fq "$CONSOLE_PLUGIN_IMAGE" "$candidate_csv"
           export NHC_UPGRADE_CANDIDATE_NHC_VERSION="$candidate_version"
+          echo "==> Candidate bundle verified: version $candidate_version"
         }
 
         run_tests() {
           # Before merging, switch back to medik8s/system-tests main after #120 merges.
+          echo '==> Clone system-tests'
           git clone --depth=1 --branch fix/nhc-prow-rehearsal \
             https://github.com/JonahSussman/medik8s-system-tests.git /tmp/system-tests
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
@@ -210,11 +282,15 @@ tests:
           local tier
           local -a failed_tiers=()
           for tier in upgrade-operator fresh-install; do
+            echo "==> Start system-tests tier: $tier"
             export ECO_TEST_LABELS="tier:${tier}"
             export ECO_REPORTS_DUMP_DIR="$ARTIFACT_DIR/$tier"
             mkdir -p "$ECO_REPORTS_DUMP_DIR"
             if ! make -C /tmp/system-tests run-tests 2>&1 | tee "$ECO_REPORTS_DUMP_DIR/run.log"; then
               failed_tiers+=("$tier")
+              echo "==> System-tests tier failed: $tier"
+            else
+              echo "==> System-tests tier passed: $tier"
             fi
           done
 
