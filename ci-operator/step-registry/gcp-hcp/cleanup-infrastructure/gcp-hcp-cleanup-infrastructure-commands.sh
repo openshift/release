@@ -48,6 +48,7 @@ fi
 
 REGION_PROJECT=$(<"${SHARED_DIR}/region-project-id")
 REGION_CLUSTER=$(<"${SHARED_DIR}/region-cluster-name")
+REGION_FOLDER_ID=$(cat "${SHARED_DIR}/region-folder-id" 2>/dev/null || echo "")
 MC_PROJECT=$(<"${SHARED_DIR}/mc-project-id")
 MC_CLUSTER=$(<"${SHARED_DIR}/mc-cluster-name")
 SERVICE_PROJECT=$(cat "${SHARED_DIR}/service-project-id" 2>/dev/null || echo "")
@@ -60,6 +61,9 @@ MC_PROJECT_NUMBER=$(gcloud projects describe "${MC_PROJECT}" --format='value(pro
 
 log "Infrastructure to clean up:"
 log "  Region:   ${REGION_PROJECT} (#${REGION_PROJECT_NUMBER}) / ${REGION_CLUSTER}"
+if [[ -n "${REGION_FOLDER_ID}" ]]; then
+  log "  Folder:   ${REGION_FOLDER_ID}"
+fi
 log "  MC:       ${MC_PROJECT} (#${MC_PROJECT_NUMBER}) / ${MC_CLUSTER}"
 if [[ -n "${SERVICE_PROJECT}" ]]; then
   log "  Service:  ${SERVICE_PROJECT}"
@@ -291,6 +295,39 @@ delete_project() {
     log "  ERROR: Failed to delete project ${project} (exit code: ${exit_code})"
     return 1
   fi
+}
+
+# ========================================================================
+# Phase 5b: Delete the per-run E2E folder
+# ========================================================================
+delete_folder() {
+  local folder_id=$1
+  local label=$2
+  local attempt
+  local output
+
+  if [[ -z "${folder_id}" ]]; then
+    log "  ERROR: No folder ID available for ${label} cleanup"
+    return 1
+  fi
+
+  log "--- [${label}] Deleting folder: ${folder_id} ---"
+  for attempt in 1 2 3; do
+    if output=$(gcloud resource-manager folders delete "${folder_id}" --quiet 2>&1); then
+      echo "${output}" | tee -a "${LOG}"
+      log "  Folder ${folder_id} deletion initiated"
+      return 0
+    fi
+
+    echo "${output}" | tee -a "${LOG}"
+    if [[ ${attempt} -lt 3 ]]; then
+      log "  Folder deletion failed; waiting for project deletion to propagate (attempt ${attempt}/3)"
+      sleep 5
+    fi
+  done
+
+  log "  ERROR: Failed to delete folder ${folder_id} after 3 attempts"
+  return 1
 }
 
 # ========================================================================
@@ -666,6 +703,8 @@ if [[ -n "${CUSTOMER_PROJECT}" ]]; then
   delete_project "${CUSTOMER_PROJECT}" "Customer" || CLEANUP_FAILED=1
 fi
 
+delete_folder "${REGION_FOLDER_ID}" "E2E Region" || CLEANUP_FAILED=1
+
 # Phase 6: Clear TFC workspace state
 log ""
 clear_tfc_workspace || CLEANUP_FAILED=1
@@ -678,5 +717,5 @@ if [[ "${CLEANUP_FAILED}" -ne 0 ]]; then
 fi
 
 log "=== Cleanup complete ==="
-log "Projects are now in PENDING_DELETE state (30-day soft delete)"
+log "Projects and the per-run folder are now in PENDING_DELETE state (30-day soft delete)"
 log "TFC workspace state has been cleared"
