@@ -157,10 +157,13 @@ function collect_bootstrap_handler() {
 
       if [[ -n "\${INSTANCE_ID}" && "\${INSTANCE_ID}" != "None" && "\${INSTANCE_ID}" != "null" ]]; then
         log "[\${handler_name}]: Collecting console output for instance \${INSTANCE_ID}..."
-        aws ec2 get-console-output \\
+        if aws ec2 get-console-output \\
           --instance-id "\${INSTANCE_ID}" \\
-          --output text > "\${ARTIFACT_DIR}/bootstrap-console-output.txt" 2>&1 || true
-        log "[\${handler_name}]: Console output saved to \${ARTIFACT_DIR}/bootstrap-console-output.txt"
+          --output text > "\${ARTIFACT_DIR}/bootstrap-console-output.txt" 2>&1; then
+          log "[\${handler_name}]: Console output saved to \${ARTIFACT_DIR}/bootstrap-console-output.txt"
+        else
+          log "[\${handler_name}]: Could not collect EC2 console output"
+        fi
       else
         log "[\${handler_name}]: Could not find bootstrap instance ID"
       fi
