@@ -2,6 +2,12 @@
 set -euxo pipefail
 shopt -s inherit_errexit
 
+# shellcheck disable=SC2317
+_propagate_junit () {
+    mkdir -p "${SHARED_DIR}/junit"
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+}
+
 ################################################################################
 # Test Overview
 ################################################################################
@@ -283,7 +289,7 @@ function RunTestCase2 () {
 # Test Execution Setup
 ################################################################################
 # Set trap to generate JUnit XML on exit (regardless of success or failure)
-trap '{( GenerateJunitXml; true )}' EXIT
+trap '{( GenerateJunitXml; _propagate_junit; true )}' EXIT
 
 if [ "${MAP_TESTS:-}" = "true" ]; then
     eval "$(
@@ -295,6 +301,7 @@ if [ "${MAP_TESTS:-}" = "true" ]; then
     if type -t ExitTrap--PostProcessPrep; then
         trap '{(
             GenerateJunitXml
+            _propagate_junit
             LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
                 ExitTrap--PostProcessPrep junit--acm-opp-app.xml
             true

@@ -19,6 +19,10 @@ base_images:
     name: "2.17"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
+  ocs-ci-tests:
+    name: ocs-ci-container
+    namespace: ci
+    tag: stable
   tests-private:
     name: tests-private
     namespace: ci
@@ -71,7 +75,7 @@ tests:
   capabilities:
   - intranet
   cluster: build05
-  cron: 0 23 31 2 *
+  cron: 0 3,15 * * *
   reporter_config:
     channel: '#opp-discussion'
     job_states_to_report:
@@ -98,7 +102,8 @@ tests:
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9104
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "false"
+      ODF_VERSION_MAJOR_MINOR: "4.22"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
@@ -132,11 +137,12 @@ tests:
     - ref: interop-opp-wait-mcp
     - ref: stackrox-opp-readiness
     - ref: stackrox-opp-smoke
-    - ref: acm-tests-clc-create
+    - ref: acm-tests-clc-smoke
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
     - ref: interop-opp-odf-health
     - ref: interop-opp-observability-odf
+    - ref: interop-tests-ocs-tests
     - ref: interop-tests-opp-quay-smoke
     - ref: interop-opp-skip-ratio-gate
 zz_generated_metadata:

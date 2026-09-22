@@ -10,6 +10,82 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
 }
 
+capture_nonempty() {
+    local file="$1"
+    shift
+    "$@" > "${file}" 2>&1 || true
+    [[ -s "${file}" ]] || rm -f "${file}"
+}
+
+collect_diagnostics() {
+    local original_status=$?
+    trap - EXIT
+    set +x
+    set +e
+
+    if (( original_status == 0 )) || [[ -z "${NAMESPACE_NAME:-}" ]]; then
+        exit "${original_status}"
+    fi
+
+    local diagnostics_dir="${ARTIFACT_DIR:-/tmp/artifacts}/hyperfleet-e2e-failure-diagnostics"
+    local logs_dir="${diagnostics_dir}/container-logs"
+    local kubectl_options=(--request-timeout=10s)
+    if ! mkdir -p "${logs_dir}"; then
+        exit "${original_status}"
+    fi
+
+    capture_nonempty "${diagnostics_dir}/pods-wide.txt" \
+        kubectl "${kubectl_options[@]}" get pods -n "${NAMESPACE_NAME}" -o wide
+    capture_nonempty "${diagnostics_dir}/pod-descriptions.txt" \
+        kubectl "${kubectl_options[@]}" describe pods -n "${NAMESPACE_NAME}"
+    capture_nonempty "${diagnostics_dir}/events.txt" \
+        kubectl "${kubectl_options[@]}" get events -n "${NAMESPACE_NAME}" --sort-by=.lastTimestamp
+
+    local pods pod pod_json container_rows kind container log_file
+    local pod_list_errors="${diagnostics_dir}/pod-list-errors.txt"
+    local discovery_errors="${diagnostics_dir}/container-discovery-errors.txt"
+    local container_list="${diagnostics_dir}/pod-container-list.txt"
+    pods="$(kubectl "${kubectl_options[@]}" get pods -n "${NAMESPACE_NAME}" \
+        -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2> "${pod_list_errors}")" || true
+    [[ -s "${pod_list_errors}" ]] || rm -f "${pod_list_errors}"
+    while IFS= read -r pod; do
+        [[ -n "${pod}" ]] || continue
+        local pod_json_errors="${diagnostics_dir}/pod-${pod}-json-errors.txt"
+        pod_json="$(kubectl "${kubectl_options[@]}" get pod "${pod}" -n "${NAMESPACE_NAME}" \
+            -o json 2> "${pod_json_errors}")" || true
+        [[ -s "${pod_json_errors}" ]] || rm -f "${pod_json_errors}"
+        container_rows="$(jq -r '((.spec.initContainers[]? | ["init", .name]),
+            (.spec.containers[]? | ["app", .name])) | @tsv' \
+            <<< "${pod_json}" 2>> "${discovery_errors}")" || true
+        while IFS=$'\t' read -r kind container; do
+            [[ -n "${container}" ]] || continue
+            printf '%s %s %s\n' "${pod}" "${kind}" "${container}" >> "${container_list}" || true
+            if [[ "${kind}" == init ]]; then
+                log_file="${logs_dir}/${pod}-init-${container}.log"
+            else
+                log_file="${logs_dir}/${pod}-${container}.log"
+            fi
+            capture_nonempty "${log_file}" \
+                kubectl "${kubectl_options[@]}" logs "${pod}" -n "${NAMESPACE_NAME}" -c "${container}"
+        done <<< "${container_rows}"
+    done <<< "${pods}"
+    [[ -s "${discovery_errors}" ]] || rm -f "${discovery_errors}"
+
+    local node_file="${diagnostics_dir}/node-allocated-resources.txt"
+    local node_errors="${diagnostics_dir}/node-extraction-errors.txt"
+    local node_descriptions
+    node_descriptions="$(kubectl "${kubectl_options[@]}" describe nodes 2> "${node_errors}")" || true
+    awk '
+            /^Name:/ { node = $0; allocated = 0 }
+            /^Allocated resources:/ { print node; print; allocated = 1; next }
+            allocated { print; if (/^$/) allocated = 0 }
+        ' <<< "${node_descriptions}" > "${node_file}" 2>> "${node_errors}" || true
+    [[ -s "${node_file}" ]] || rm -f "${node_file}"
+    [[ -s "${node_errors}" ]] || rm -f "${node_errors}"
+
+    exit "${original_status}"
+}
+
 HYPERFLEET_E2E_CREDENTIALS_PATH="/var/run/hyperfleet-e2e/"
 export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_CREDENTIALS_PATH}/hcm-hyperfleet-e2e.json"
 PROJECT_ID="$(jq -r -c .project_id "${GOOGLE_APPLICATION_CREDENTIALS}")"
@@ -77,6 +153,7 @@ git clone --depth 1 "https://github.com/openshift-hyperfleet/hyperfleet-infra.gi
 cd /tmp/hyperfleet-infra
 
 HELMFILE_ENV="e2e-gcp"
+trap collect_diagnostics EXIT
 NAMESPACE=${NAMESPACE_NAME} HELMFILE_ENV="${HELMFILE_ENV}" make install-hyperfleet
 
 # Save installed charts for cleanup
