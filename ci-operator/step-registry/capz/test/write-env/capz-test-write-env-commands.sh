@@ -141,6 +141,8 @@ export ARO_REPO_URL="${ARO_REPO_URL:-https://github.com/stolostron/cluster-api-i
 export ARO_REPO_BRANCH="${ARO_REPO_BRANCH:-main}"
 export ARO_REPO_DIR="${ARO_REPO_DIR:-/tmp/cluster-api-installer-pro}"
 export USE_KUBECONFIG="${USE_KUBECONFIG}"
+# Persist the immutable test identity across the separate Prow step pods.
+export CAPI_TEST_CONTEXT_FILE="${SHARED_DIR}/run-context.json"
 export USE_K8S="${USE_K8S:-false}"
 export DEPLOYMENT_TIMEOUT="${DEPLOYMENT_TIMEOUT:-90m}"
 export NAME_PREFIX="${NAME_PREFIX}"
