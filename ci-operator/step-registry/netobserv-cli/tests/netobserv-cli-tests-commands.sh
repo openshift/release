@@ -10,8 +10,6 @@ export GINKGO_VERSION
 go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@$GINKGO_VERSION
 ginkgo version
 test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
-GINKGO_EXIT=0
-ginkgo --junit-report="${ARTIFACT_DIR}/junit/report.xml" e2e/integration-tests || GINKGO_EXIT=$?
 
 # ---------------------------------------------------------------------------
 # Spyglass HTML report: custom-link-cli.html is picked up by Deck's html lens
@@ -19,6 +17,10 @@ ginkgo --junit-report="${ARTIFACT_DIR}/junit/report.xml" e2e/integration-tests |
 # .*/custom-link-.*\.html). This step is shared by the netobserv-cli and
 # netobserv-ebpf-agent cli-tests jobs, so each gets its own report generated
 # from that job's ARTIFACT_DIR.
+#
+# The function is defined here (before the tests run) and registered on the
+# EXIT trap below so the report is always emitted -- regardless of which exit
+# path the script takes.
 # ---------------------------------------------------------------------------
 write_cli_spyglass_report() {
   local exit_code="${1:-0}"
@@ -228,6 +230,13 @@ EOF
   return "${write_rc}"
 }
 
-write_cli_spyglass_report "${GINKGO_EXIT}" || echo "====> Warning: failed to write CLI Spyglass report"
+# Emit the report on any exit path (failure or success).
+# Capture the incoming shell status first: adopt it only when no ginkgo failure
+# was already recorded, so recorded ginkgo failures win over an earlier/later
+# shell failure while the latter is still reflected on a clean ginkgo run.
+GINKGO_EXIT=0
+trap 'RC=$?; if [[ "${GINKGO_EXIT}" -eq 0 ]]; then GINKGO_EXIT=${RC}; fi; write_cli_spyglass_report "${GINKGO_EXIT}" || echo "====> Warning: failed to write CLI Spyglass report"' EXIT
+
+ginkgo --junit-report="${ARTIFACT_DIR}/junit/report.xml" e2e/integration-tests || GINKGO_EXIT=$?
 
 exit "${GINKGO_EXIT}"
