@@ -8,7 +8,7 @@ if [[ -z "${OCM_FVT_JOB_NAME:-}" ]]; then
   exit 1
 fi
 
-JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results-public/"
 if [[ -n "${PULL_NUMBER:-}" ]]; then
   JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
 else

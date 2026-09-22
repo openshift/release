@@ -59,7 +59,7 @@ objects:
     ports:
     - name: main
       port: 80
-      targetPort: 4180
+      targetPort: 8080
     - name: metrics
       port: 9090
       protocol: TCP
@@ -120,38 +120,13 @@ objects:
           - name: release
             mountPath: /tmp/git-sync
         containers:
-        - name: oauth-proxy
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "50m"
-          image: quay.io/openshift/origin-oauth-proxy:4.16
-          imagePullPolicy: IfNotPresent
-          ports:
-          - containerPort: 4180
-            name: web
-          args:
-          - -provider=openshift
-          - -https-address=
-          - -http-address=:4180
-          - -email-domain=*
-          - -upstream=http://localhost:8080
-          - -redirect-url=https://prow.ci.openshift.org/oauth/callback
-          - -client-id=system:serviceaccount:ci:deck
-          - -openshift-ca=/etc/pki/tls/cert.pem
-          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
-          - -cookie-secret-file=/etc/proxy/secrets/session_secret
-          - -cookie-samesite=none
-          - -cookie-secure=true
-          readinessProbe:
-            tcpSocket:
-              port: 4180
-          volumeMounts:
-          - mountPath: /etc/proxy/secrets
-            name: session-secret
         - name: deck
-          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260908-104d452f4
+          # Forked Deck: adds --history-bucket*, which upstream Deck rejects on
+          # startup. periodic-prow-image-autobump-openshift-release is paused so
+          # it cannot revert this. Built from openshift/prow jmguzik/deck-history-bucket.
+          image: registry.ci.openshift.org/ci/deck:history-bucket
+          # Mutable tag, so a re-push plus `oc rollout restart` is enough to ship a fix.
+          imagePullPolicy: Always
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -168,6 +143,12 @@ objects:
           - --job-config-path=/var/repo/release/ci-operator/jobs
           - --spyglass=true
           - --gcs-credentials-file=/etc/test-platform-results-viewer/credentials.json
+          - --history-bucket=test-platform-results
+          # Points at deck-history, which serves this same path behind SSO with
+          # the full set of lenses. The prefix is joined to the run path, so the
+          # Artifacts link resolves to the identical URL on the other host.
+          - --history-bucket-browser-prefix=https://deck-history-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/
+          - --history-bucket-banner=The artifacts for this job were archived to a private bucket and are not served here. Use the Artifacts link to proceed to the SSO-protected version of this page.
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
           - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
@@ -272,9 +253,6 @@ objects:
         - name: test-platform-results-viewer
           secret:
             secretName: test-platform-results-viewer
-        - name: session-secret
-          secret:
-            secretName: deck-internal-session-secret
         - name: release
           emptyDir: {}
         - name: build-farm-credentials

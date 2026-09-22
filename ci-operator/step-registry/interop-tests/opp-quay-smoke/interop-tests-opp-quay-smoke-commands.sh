@@ -1,5 +1,32 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
 
 ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -83,7 +110,7 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '{( GenerateJunit; _propagate_junit; true )}' EXIT
+trap '_opp_cleanup; GenerateJunit; _propagate_junit' EXIT
 
 function DiscoverQuay () {
     typeset registryJson="" discoverErr=""
@@ -514,16 +541,21 @@ function RunAcsScan () {
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
 
+    # Mask credentials: function call args expand in xtrace
+    set +x 2>/dev/null
     if ! RegisterQuayInAcs "${acsHost}" "${acsPassword}"; then
+        "${xtraceOn}" && set -x
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Failed to register Quay in ACS" "${elapsed}"
         return 1
     fi
     if ! RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"; then
+        "${xtraceOn}" && set -x
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "ACS scan request failed" "${elapsed}"
         return 1
     fi
+    "${xtraceOn}" && set -x
 
     typeset -i attempts=0 maxAttempts=40
 
@@ -546,7 +578,9 @@ sys.exit(0 if len(images) > 0 else 1)
         fi
 
         if (( attempts % 4 == 3 )); then
+            set +x 2>/dev/null
             RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}" || true
+            "${xtraceOn}" && set -x
         fi
 
         attempts=$((attempts + 1))

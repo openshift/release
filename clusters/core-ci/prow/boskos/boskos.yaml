@@ -1,0 +1,181 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: boskos
+  namespace: ci
+  labels:
+    app: prow
+    component: boskos
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: prow
+      component: boskos
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: boskos
+      namespace: ci
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - boskos
+              topologyKey: "kubernetes.io/hostname"
+      serviceAccountName: boskos
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: boskos
+        resources:
+          requests:
+            memory: "1Gi"
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_boskos_latest
+        imagePullPolicy: Always
+        args:
+        - --config=/etc/config/boskos.yaml
+        - --namespace=ci
+        - --projected-token-file=/var/sa-token/token
+        - --log-level=debug
+        - --pod-name=$(POD_NAME)
+        - --boskos-label-selector=app=prow,component=boskos
+        - --enable-leader-election=true
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+          - name: metrics
+            containerPort: 9090
+            protocol: TCP
+        volumeMounts:
+        - name: boskos-config
+          mountPath: /etc/config
+          readOnly: true
+        - name: service-account-token
+          mountPath: /var/sa-token
+      - args:
+        - -provider=openshift
+        - -https-address=:8082
+        - -http-address=
+        - -email-domain=*
+        - -upstream=http://localhost:8080
+        - -htpasswd-file=/etc/proxy/htpasswd/ci.htpasswd
+        - -tls-cert=/etc/tls/private/tls.crt
+        - -tls-key=/etc/tls/private/tls.key
+        - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+        - -cookie-secret-file=/etc/proxy/secrets/session_secret
+        - '-openshift-sar={"resource": "namespaces", "verb": "get"}'
+        - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
+        - -openshift-service-account=boskos
+        - -openshift-ca=/etc/pki/tls/cert.pem
+        - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        image: quay.io/openshift/origin-oauth-proxy:4.16
+        name: boskos-proxy
+        ports:
+        - containerPort: 8082
+          name: https
+        readinessProbe:
+          tcpSocket:
+            port: https
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/proxy/htpasswd
+          name: secret-boskos-htpasswd
+        - mountPath: /etc/tls/private
+          name: secret-boskos-tls
+        - mountPath: /etc/proxy/secrets
+          name: secret-boskos-proxy
+      volumes:
+        - name: boskos-config
+          configMap:
+            name: resources
+        - name: secret-boskos-htpasswd
+          secret:
+            secretName: boskos-credentials
+            items:
+            - key: ci.htpasswd
+              path: ci.htpasswd
+        - name: secret-boskos-proxy
+          secret:
+            secretName: boskos-proxy
+        - name: secret-boskos-tls
+          secret:
+            secretName: boskos-tls
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name: boskos-tls
+  labels:
+    app: prow
+    component: boskos
+  name: boskos
+  namespace: ci
+spec:
+  selector:
+    app: prow
+    component: boskos
+    boskos-leader: "true"
+  ports:
+  - name: https
+    port: 8082
+    protocol: TCP
+    targetPort: 8082
+  - name: default
+    protocol: TCP
+    port: 80
+    targetPort: 8080
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: "90s"
+    # haproxy.router.openshift.io/timeout: 1h
+    route.openshift.io/termination: reencrypt
+  name: boskos
+  namespace: ci
+spec:
+  ingressClassName: openshift-default
+  tls:
+    - secretName: boskos-web-tls
+      hosts:
+        - boskos.ci.openshift.org
+  rules:
+  - host: boskos.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: boskos
+            port:
+              number: 8082
+        pathType: ImplementationSpecific

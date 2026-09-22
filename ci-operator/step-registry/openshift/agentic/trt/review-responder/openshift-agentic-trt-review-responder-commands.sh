@@ -6,25 +6,22 @@ set -o pipefail
 
 echo "=== TRT Review Responder ==="
 
-# --- Read tokens from SHARED_DIR ---
-set +x
-GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
-export GH_FORK_TOKEN
-GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
-export GITHUB_TOKEN
-JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
-
-if [[ "${EVAL_MODE:-}" != "true" ]]; then
-    git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
-fi
-
-# --- Metrics instrumentation ---
+# Token helpers live on SHARED_DIR (step-registry refs cannot share extra files).
+[[ -f "${SHARED_DIR}/github-app-auth.sh" ]] || {
+    echo "ERROR: ${SHARED_DIR}/github-app-auth.sh not found — github-app-auth step must run first"
+    exit 1
+}
 [[ -f "${SHARED_DIR}/trt-telemetry.sh" ]] || {
     echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — workflow init step must run first"
     exit 1
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-telemetry.sh"
+# Prior steps (jira-solver) can already have burned the 1h token TTL.
+refresh_github_tokens || { echo "ERROR: Failed to refresh GitHub App tokens"; exit 1; }
+configure_github_git_credentials
+
+JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
 
 # --- Find PR number ---
 if [[ -f "${SHARED_DIR}/pr-number" ]]; then
@@ -96,18 +93,22 @@ DISALLOWED_TOOLS=(
     "Bash(cat*claude-code-service-account*)"
     "Bash(cat*gh-fork-token*)"
     "Bash(cat*gh-upstream-token*)"
+    "Bash(cat*github-app-auth.sh*)"
     "Bash(cat*google-token*)"
     "Bash(head*claude-code-service-account*)"
     "Bash(head*gh-fork-token*)"
     "Bash(head*gh-upstream-token*)"
+    "Bash(head*github-app-auth.sh*)"
     "Bash(head*google-token*)"
     "Bash(sed*claude-code-service-account*)"
     "Bash(sed*gh-fork-token*)"
     "Bash(sed*gh-upstream-token*)"
+    "Bash(sed*github-app-auth.sh*)"
     "Bash(sed*google-token*)"
     "Bash(od*claude-code-service-account*)"
     "Bash(od*gh-fork-token*)"
     "Bash(od*gh-upstream-token*)"
+    "Bash(od*github-app-auth.sh*)"
     "Bash(od*google-token*)"
     "Bash(git push*)"
     "Bash(head*/var/run/github-token*)"
@@ -290,6 +291,7 @@ print(json.dumps(obj, separators=(",", ":")))
 
 push_current_branch() {
     local branch_name
+    refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
     branch_name=$(git branch --show-current 2>/dev/null || echo "")
     if [[ -z "${branch_name}" ]]; then
         return 0

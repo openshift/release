@@ -38,7 +38,7 @@ set -euxo pipefail; shopt -s inherit_errexit
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq yq
 
 #=====================
@@ -772,6 +772,72 @@ ExtractClusterCredentials() {
             exit 1
         fi
     fi
+    true
+}
+
+# Marks the 'openshift' ClusterImagePolicy unmanaged on the spoke ClusterVersion
+# so CVO does not revert it during upgrade (unsigned nightlies, OCPBUGS-114622).
+# No-op when the policy is absent or does not enforce ocp-v4.0-art-dev.
+DisableClusterImagePolicySignatureEnforcement() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+    typeset cipJson='' currentOverrides='' newOverrides='' patchPayload=''
+
+    cipJson="$(oc --kubeconfig="${kubeconfig}" get clusterimagepolicy openshift \
+        --ignore-not-found -o json)"
+    if [[ -z "${cipJson}" ]]; then
+        : "Spoke ${clusterName}: no openshift ClusterImagePolicy found — skipping"
+        return 0
+    fi
+    if ! jq -e '.spec.scopes[]? | select(contains("ocp-v4.0-art-dev"))' \
+            <<<"${cipJson}" >/dev/null; then
+        : "Spoke ${clusterName}: ClusterImagePolicy does not enforce ocp-v4.0-art-dev — skipping"
+        return 0
+    fi
+
+    : "Disabling ClusterImagePolicy signature enforcement on spoke ${clusterName}"
+    currentOverrides="$(oc --kubeconfig="${kubeconfig}" get clusterversion version -o json |
+        jq -c '.spec.overrides // []')"
+    if jq -e '.[] | select(
+            .group=="config.openshift.io" and
+            .kind=="ClusterImagePolicy" and
+            .name=="openshift" and
+            .namespace=="" and
+            .unmanaged==true)' \
+            <<<"${currentOverrides}" >/dev/null; then
+        : "ClusterImagePolicy already unmanaged on ${clusterName}"
+        return 0
+    fi
+    newOverrides="$(jq -c \
+        '[.[] | select(
+            .group!="config.openshift.io" or
+            .kind!="ClusterImagePolicy" or
+            .name!="openshift" or
+            .namespace!=""
+        )] + [{"group":"config.openshift.io","kind":"ClusterImagePolicy","name":"openshift","namespace":"","unmanaged":true}]' \
+    <<<"${currentOverrides}")"
+    patchPayload="$(jq -cn --argjson overrides "${newOverrides}" \
+        '{"spec":{"overrides":$overrides}}')"
+    oc --kubeconfig="${kubeconfig}" patch clusterversion version --type merge \
+        -p "${patchPayload}" 1>/dev/null
+    if ! jq -e '.spec.overrides[] | select(
+            .group=="config.openshift.io" and
+            .kind=="ClusterImagePolicy" and
+            .name=="openshift" and
+            .namespace=="" and
+            .unmanaged==true)' \
+            <<<"$(oc --kubeconfig="${kubeconfig}" get clusterversion version -o json)" \
+            >/dev/null; then
+        : "Failed to verify CVO override for ClusterImagePolicy on spoke ${clusterName}"
+        return 1
+    fi
+
+    # CVO no longer manages the CIP — delete it so MCO removes the signature
+    # requirement from each node's /etc/containers/policy.json.
+    # Without this CIP, CRI-O permits unsigned nightly image pulls by default.
+    oc --kubeconfig="${kubeconfig}" delete clusterimagepolicy openshift \
+        --ignore-not-found 1>/dev/null
+    : "ClusterImagePolicy signature enforcement disabled on spoke ${clusterName}"
     true
 }
 

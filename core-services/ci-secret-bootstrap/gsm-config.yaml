@@ -88,6 +88,28 @@ cluster_groups:
     - hosted-mgmt2
     - vsphere02
 
+  bastion:
+    - build01
+    - build02
+  openshift_config_pull_secret:
+    - app.ci
+    - build01
+    - build02
+    - build03
+    - build04
+    - build05
+    - build06
+    - build07
+    - build08
+    - build09
+    - build10
+    - build11
+    - build12
+    - build13
+    - core-ci
+    - hosted-mgmt
+    - hosted-mgmt2
+    - vsphere02
 dptp_collection: test-platform-infra
 
 bundles:
@@ -107,6 +129,18 @@ bundles:
       - cluster: hosted-mgmt
         namespace: ci
       - cluster: hosted-mgmt2
+        namespace: ci
+
+  - name: test-platform-results-viewer
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: prow-tpr-viewer
+        fields:
+          - name: credentials--dot--json
+            as: credentials.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
         namespace: ci
 
   - name: hive-hive-credentials
@@ -164,6 +198,506 @@ bundles:
       - cluster_groups:
           - build_farm
         namespace: ci
+
+  - name: app.ci-ci-operator-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - name: sa--dot--ci-operator--dot--app--dot--ci--dot--config
+            as: kubeconfig
+          - sa--dot--ci-operator--dot--app--dot--ci--dot--config
+          - sa--dot--ci-operator--dot--app--dot--ci--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster_groups:
+          - non_app_ci
+
+  - name: ci-images-mirror
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--ci-images-mirror--dot--app--dot--ci--dot--config
+          - sa--dot--ci-images-mirror--dot--app--dot--ci--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
+
+  - name: cluster-display
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--cluster-display--dot--app--dot--ci--dot--config
+          - sa--dot--cluster-display--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build01--dot--config
+          - sa--dot--cluster-display--dot--build01--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build02--dot--config
+          - sa--dot--cluster-display--dot--build02--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build03--dot--config
+          - sa--dot--cluster-display--dot--build03--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build04--dot--config
+          - sa--dot--cluster-display--dot--build04--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build05--dot--config
+          - sa--dot--cluster-display--dot--build05--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build06--dot--config
+          - sa--dot--cluster-display--dot--build06--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build07--dot--config
+          - sa--dot--cluster-display--dot--build07--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build08--dot--config
+          - sa--dot--cluster-display--dot--build08--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build09--dot--config
+          - sa--dot--cluster-display--dot--build09--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build10--dot--config
+          - sa--dot--cluster-display--dot--build10--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build11--dot--config
+          - sa--dot--cluster-display--dot--build11--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build12--dot--config
+          - sa--dot--cluster-display--dot--build12--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--build13--dot--config
+          - sa--dot--cluster-display--dot--build13--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--core-ci--dot--config
+          - sa--dot--cluster-display--dot--core-ci--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--hosted-mgmt--dot--config
+          - sa--dot--cluster-display--dot--hosted-mgmt--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--hosted-mgmt2--dot--config
+          - sa--dot--cluster-display--dot--hosted-mgmt2--dot--token--dot--txt
+          - sa--dot--cluster-display--dot--vsphere02--dot--config
+          - sa--dot--cluster-display--dot--vsphere02--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
+
+  - name: clusterpool-manager-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - name: sa--dot--clusterpool-manager--dot--hosted-mgmt--dot--config
+            as: kubeconfig
+          - sa--dot--clusterpool-manager--dot--hosted-mgmt--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster_groups:
+          - non_app_ci
+
+  - name: crier
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--crier--dot--app--dot--ci--dot--config
+          - sa--dot--crier--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--crier--dot--build01--dot--config
+          - sa--dot--crier--dot--build01--dot--token--dot--txt
+          - sa--dot--crier--dot--build02--dot--config
+          - sa--dot--crier--dot--build02--dot--token--dot--txt
+          - sa--dot--crier--dot--build03--dot--config
+          - sa--dot--crier--dot--build03--dot--token--dot--txt
+          - sa--dot--crier--dot--build04--dot--config
+          - sa--dot--crier--dot--build04--dot--token--dot--txt
+          - sa--dot--crier--dot--build05--dot--config
+          - sa--dot--crier--dot--build05--dot--token--dot--txt
+          - sa--dot--crier--dot--build06--dot--config
+          - sa--dot--crier--dot--build06--dot--token--dot--txt
+          - sa--dot--crier--dot--build07--dot--config
+          - sa--dot--crier--dot--build07--dot--token--dot--txt
+          - sa--dot--crier--dot--build08--dot--config
+          - sa--dot--crier--dot--build08--dot--token--dot--txt
+          - sa--dot--crier--dot--build09--dot--config
+          - sa--dot--crier--dot--build09--dot--token--dot--txt
+          - sa--dot--crier--dot--build10--dot--config
+          - sa--dot--crier--dot--build10--dot--token--dot--txt
+          - sa--dot--crier--dot--build11--dot--config
+          - sa--dot--crier--dot--build11--dot--token--dot--txt
+          - sa--dot--crier--dot--build12--dot--config
+          - sa--dot--crier--dot--build12--dot--token--dot--txt
+          - sa--dot--crier--dot--build13--dot--config
+          - sa--dot--crier--dot--build13--dot--token--dot--txt
+          - sa--dot--crier--dot--core-ci--dot--config
+          - sa--dot--crier--dot--core-ci--dot--token--dot--txt
+          - sa--dot--crier--dot--vsphere02--dot--config
+          - sa--dot--crier--dot--vsphere02--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
+
+  - name: deck
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--deck--dot--app--dot--ci--dot--config
+          - sa--dot--deck--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--deck--dot--build01--dot--config
+          - sa--dot--deck--dot--build01--dot--token--dot--txt
+          - sa--dot--deck--dot--build02--dot--config
+          - sa--dot--deck--dot--build02--dot--token--dot--txt
+          - sa--dot--deck--dot--build03--dot--config
+          - sa--dot--deck--dot--build03--dot--token--dot--txt
+          - sa--dot--deck--dot--build04--dot--config
+          - sa--dot--deck--dot--build04--dot--token--dot--txt
+          - sa--dot--deck--dot--build05--dot--config
+          - sa--dot--deck--dot--build05--dot--token--dot--txt
+          - sa--dot--deck--dot--build06--dot--config
+          - sa--dot--deck--dot--build06--dot--token--dot--txt
+          - sa--dot--deck--dot--build07--dot--config
+          - sa--dot--deck--dot--build07--dot--token--dot--txt
+          - sa--dot--deck--dot--build08--dot--config
+          - sa--dot--deck--dot--build08--dot--token--dot--txt
+          - sa--dot--deck--dot--build09--dot--config
+          - sa--dot--deck--dot--build09--dot--token--dot--txt
+          - sa--dot--deck--dot--build10--dot--config
+          - sa--dot--deck--dot--build10--dot--token--dot--txt
+          - sa--dot--deck--dot--build11--dot--config
+          - sa--dot--deck--dot--build11--dot--token--dot--txt
+          - sa--dot--deck--dot--build12--dot--config
+          - sa--dot--deck--dot--build12--dot--token--dot--txt
+          - sa--dot--deck--dot--build13--dot--config
+          - sa--dot--deck--dot--build13--dot--token--dot--txt
+          - sa--dot--deck--dot--core-ci--dot--config
+          - sa--dot--deck--dot--core-ci--dot--token--dot--txt
+          - sa--dot--deck--dot--vsphere02--dot--config
+          - sa--dot--deck--dot--vsphere02--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
+
+  - name: dptp-controller-manager
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--dptp-controller-manager--dot--build01--dot--config
+          - sa--dot--dptp-controller-manager--dot--build01--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build02--dot--config
+          - sa--dot--dptp-controller-manager--dot--build02--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build03--dot--config
+          - sa--dot--dptp-controller-manager--dot--build03--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build04--dot--config
+          - sa--dot--dptp-controller-manager--dot--build04--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build05--dot--config
+          - sa--dot--dptp-controller-manager--dot--build05--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build06--dot--config
+          - sa--dot--dptp-controller-manager--dot--build06--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build07--dot--config
+          - sa--dot--dptp-controller-manager--dot--build07--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build08--dot--config
+          - sa--dot--dptp-controller-manager--dot--build08--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build09--dot--config
+          - sa--dot--dptp-controller-manager--dot--build09--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build10--dot--config
+          - sa--dot--dptp-controller-manager--dot--build10--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build11--dot--config
+          - sa--dot--dptp-controller-manager--dot--build11--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build12--dot--config
+          - sa--dot--dptp-controller-manager--dot--build12--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--build13--dot--config
+          - sa--dot--dptp-controller-manager--dot--build13--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--core-ci--dot--config
+          - sa--dot--dptp-controller-manager--dot--core-ci--dot--token--dot--txt
+          - sa--dot--dptp-controller-manager--dot--vsphere02--dot--config
+          - sa--dot--dptp-controller-manager--dot--vsphere02--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
+
+  - name: github-ldap-user-group-creator
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--github-ldap-user-group-creator--dot--build01--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build01--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build02--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build02--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build03--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build03--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build04--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build04--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build05--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build05--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build06--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build06--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build07--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build07--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build08--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build08--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build09--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build09--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build10--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build10--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build11--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build11--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build12--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build12--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--build13--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--build13--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--core-ci--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--core-ci--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--hosted-mgmt--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--hosted-mgmt--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--hosted-mgmt2--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--hosted-mgmt2--dot--token--dot--txt
+          - sa--dot--github-ldap-user-group-creator--dot--vsphere02--dot--config
+          - sa--dot--github-ldap-user-group-creator--dot--vsphere02--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
+
+  - name: hook
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--hook--dot--app--dot--ci--dot--config
+          - sa--dot--hook--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--hook--dot--build01--dot--config
+          - sa--dot--hook--dot--build01--dot--token--dot--txt
+          - sa--dot--hook--dot--build02--dot--config
+          - sa--dot--hook--dot--build02--dot--token--dot--txt
+          - sa--dot--hook--dot--build03--dot--config
+          - sa--dot--hook--dot--build03--dot--token--dot--txt
+          - sa--dot--hook--dot--build04--dot--config
+          - sa--dot--hook--dot--build04--dot--token--dot--txt
+          - sa--dot--hook--dot--build05--dot--config
+          - sa--dot--hook--dot--build05--dot--token--dot--txt
+          - sa--dot--hook--dot--build06--dot--config
+          - sa--dot--hook--dot--build06--dot--token--dot--txt
+          - sa--dot--hook--dot--build07--dot--config
+          - sa--dot--hook--dot--build07--dot--token--dot--txt
+          - sa--dot--hook--dot--build08--dot--config
+          - sa--dot--hook--dot--build08--dot--token--dot--txt
+          - sa--dot--hook--dot--build09--dot--config
+          - sa--dot--hook--dot--build09--dot--token--dot--txt
+          - sa--dot--hook--dot--build10--dot--config
+          - sa--dot--hook--dot--build10--dot--token--dot--txt
+          - sa--dot--hook--dot--build11--dot--config
+          - sa--dot--hook--dot--build11--dot--token--dot--txt
+          - sa--dot--hook--dot--build12--dot--config
+          - sa--dot--hook--dot--build12--dot--token--dot--txt
+          - sa--dot--hook--dot--build13--dot--config
+          - sa--dot--hook--dot--build13--dot--token--dot--txt
+          - sa--dot--hook--dot--core-ci--dot--config
+          - sa--dot--hook--dot--core-ci--dot--token--dot--txt
+          - sa--dot--hook--dot--vsphere02--dot--config
+          - sa--dot--hook--dot--vsphere02--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
+
+  - name: pj-rehearse
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--pj-rehearse--dot--app--dot--ci--dot--config
+          - sa--dot--pj-rehearse--dot--app--dot--ci--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+
+  - name: pj-rehearse
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--pj-rehearse--dot--core-ci--dot--config
+          - sa--dot--pj-rehearse--dot--core-ci--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: core-ci
+
+  - name: promoted-image-governor
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--promoted-image-governor--dot--build01--dot--config
+          - sa--dot--promoted-image-governor--dot--build01--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build02--dot--config
+          - sa--dot--promoted-image-governor--dot--build02--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build03--dot--config
+          - sa--dot--promoted-image-governor--dot--build03--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build04--dot--config
+          - sa--dot--promoted-image-governor--dot--build04--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build05--dot--config
+          - sa--dot--promoted-image-governor--dot--build05--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build06--dot--config
+          - sa--dot--promoted-image-governor--dot--build06--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build07--dot--config
+          - sa--dot--promoted-image-governor--dot--build07--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build08--dot--config
+          - sa--dot--promoted-image-governor--dot--build08--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build09--dot--config
+          - sa--dot--promoted-image-governor--dot--build09--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build10--dot--config
+          - sa--dot--promoted-image-governor--dot--build10--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build11--dot--config
+          - sa--dot--promoted-image-governor--dot--build11--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build12--dot--config
+          - sa--dot--promoted-image-governor--dot--build12--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--build13--dot--config
+          - sa--dot--promoted-image-governor--dot--build13--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--core-ci--dot--config
+          - sa--dot--promoted-image-governor--dot--core-ci--dot--token--dot--txt
+          - sa--dot--promoted-image-governor--dot--vsphere02--dot--config
+          - sa--dot--promoted-image-governor--dot--vsphere02--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
+
+  - name: promotion-quay-tagger-kubeconfig
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - name: sa--dot--promotion-quay-tagger--dot--app--dot--ci--dot--config
+            as: kubeconfig
+          - sa--dot--promotion-quay-tagger--dot--app--dot--ci--dot--config
+          - sa--dot--promotion-quay-tagger--dot--app--dot--ci--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster_groups:
+          - non_app_ci
+
+  - name: prow-controller-manager
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--prow-controller-manager--dot--app--dot--ci--dot--config
+          - sa--dot--prow-controller-manager--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build01--dot--config
+          - sa--dot--prow-controller-manager--dot--build01--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build02--dot--config
+          - sa--dot--prow-controller-manager--dot--build02--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build03--dot--config
+          - sa--dot--prow-controller-manager--dot--build03--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build04--dot--config
+          - sa--dot--prow-controller-manager--dot--build04--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build05--dot--config
+          - sa--dot--prow-controller-manager--dot--build05--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build06--dot--config
+          - sa--dot--prow-controller-manager--dot--build06--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build07--dot--config
+          - sa--dot--prow-controller-manager--dot--build07--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build08--dot--config
+          - sa--dot--prow-controller-manager--dot--build08--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build09--dot--config
+          - sa--dot--prow-controller-manager--dot--build09--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build10--dot--config
+          - sa--dot--prow-controller-manager--dot--build10--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build11--dot--config
+          - sa--dot--prow-controller-manager--dot--build11--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build12--dot--config
+          - sa--dot--prow-controller-manager--dot--build12--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--build13--dot--config
+          - sa--dot--prow-controller-manager--dot--build13--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--core-ci--dot--config
+          - sa--dot--prow-controller-manager--dot--core-ci--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--hosted-mgmt--dot--config
+          - sa--dot--prow-controller-manager--dot--hosted-mgmt--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--hosted-mgmt2--dot--config
+          - sa--dot--prow-controller-manager--dot--hosted-mgmt2--dot--token--dot--txt
+          - sa--dot--prow-controller-manager--dot--vsphere02--dot--config
+          - sa--dot--prow-controller-manager--dot--vsphere02--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
+
+  - name: sinker
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--sinker--dot--app--dot--ci--dot--config
+          - sa--dot--sinker--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--sinker--dot--build01--dot--config
+          - sa--dot--sinker--dot--build01--dot--token--dot--txt
+          - sa--dot--sinker--dot--build02--dot--config
+          - sa--dot--sinker--dot--build02--dot--token--dot--txt
+          - sa--dot--sinker--dot--build03--dot--config
+          - sa--dot--sinker--dot--build03--dot--token--dot--txt
+          - sa--dot--sinker--dot--build04--dot--config
+          - sa--dot--sinker--dot--build04--dot--token--dot--txt
+          - sa--dot--sinker--dot--build05--dot--config
+          - sa--dot--sinker--dot--build05--dot--token--dot--txt
+          - sa--dot--sinker--dot--build06--dot--config
+          - sa--dot--sinker--dot--build06--dot--token--dot--txt
+          - sa--dot--sinker--dot--build07--dot--config
+          - sa--dot--sinker--dot--build07--dot--token--dot--txt
+          - sa--dot--sinker--dot--build08--dot--config
+          - sa--dot--sinker--dot--build08--dot--token--dot--txt
+          - sa--dot--sinker--dot--build09--dot--config
+          - sa--dot--sinker--dot--build09--dot--token--dot--txt
+          - sa--dot--sinker--dot--build10--dot--config
+          - sa--dot--sinker--dot--build10--dot--token--dot--txt
+          - sa--dot--sinker--dot--build11--dot--config
+          - sa--dot--sinker--dot--build11--dot--token--dot--txt
+          - sa--dot--sinker--dot--build12--dot--config
+          - sa--dot--sinker--dot--build12--dot--token--dot--txt
+          - sa--dot--sinker--dot--build13--dot--config
+          - sa--dot--sinker--dot--build13--dot--token--dot--txt
+          - sa--dot--sinker--dot--core-ci--dot--config
+          - sa--dot--sinker--dot--core-ci--dot--token--dot--txt
+          - sa--dot--sinker--dot--vsphere02--dot--config
+          - sa--dot--sinker--dot--vsphere02--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
+
+  - name: sprint-automation
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--sprint-automation--dot--build01--dot--config
+          - sa--dot--sprint-automation--dot--build01--dot--token--dot--txt
+          - sa--dot--sprint-automation--dot--build02--dot--config
+          - sa--dot--sprint-automation--dot--build02--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: app.ci
+      - namespace: ci
+        cluster: core-ci
 
   - name: ci-operator
     gsm_secrets:
@@ -928,6 +1462,38 @@ bundles:
         type: kubernetes.io/dockerconfigjson
       - cluster: app.ci
         namespace: keel
+        type: kubernetes.io/dockerconfigjson
+      # Release-controller ImageStream imports (ART quay.io/openshift-release-dev/*)
+      # run in these namespaces; without this secret imports fail Unauthorized.
+      - cluster: app.ci
+        namespace: ocp
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: ocp-priv
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: ocp-arm64
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: ocp-arm64-priv
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: ocp-s390x
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: ocp-s390x-priv
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: ocp-ppc64le
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: ocp-ppc64le-priv
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: ocp-multi
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: ocp-multi-priv
         type: kubernetes.io/dockerconfigjson
       - cluster: hosted-mgmt
         namespace: keel
@@ -11187,3 +11753,3403 @@ bundles:
       - cluster: app.ci
         namespace: ci
 
+  - name: serverless-aws-credentials
+    gsm_secrets:
+      - collection: openshift-knative
+        group: cluster-pool
+        fields:
+          - aws_access_key_id
+          - aws_secret_access_key
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: serverless-cluster-pool
+
+  - name: konflux-aws-credentials
+    gsm_secrets:
+      - collection: redhat-appstudio-qe
+        group: konflux-cluster-pool-aws
+        fields:
+          - aws_access_key_id
+          - aws_secret_access_key
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: konflux-cluster-pool
+
+  - name: cvp-aws-credentials
+    gsm_secrets:
+      - collection: cvp
+        group: cluster-pool-aws-credentials
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: cvp-cluster-pool
+
+  - name: gitops-aws-credentials
+    gsm_secrets:
+      - collection: gitops-aws-credentials
+        group: gitops-aws-credentials
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: gitops-cluster-pool
+
+  - name: github-ossm-cluster-pool-aws-credentials
+    gsm_secrets:
+      - collection: openshift-service-mesh
+        group: github-ossm-cluster-pool-aws-credentials
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: ossm-cluster-pools
+
+  - name: msp-aws-ocp-creds
+    gsm_secrets:
+      - collection: msp-secrets
+        group: msp-aws-ocp-creds
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: msp-cluster-pools
+
+  - name: opendatahub-aws-credentials
+    gsm_secrets:
+      - collection: opendatahub-cluster-pool
+        group: aws-credentials
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: opendatahub-cluster-pool
+
+  - name: openstack-operators-vexxhost-hive-creds
+    gsm_secrets:
+      - collection: openstack-k8s-operators-hive-secrets
+        group: openstack-k8s-operators-secrets
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: openstack-k8s-operators-cluster-pool
+
+  - name: aws-credentials # perf-scale-openshift-psap cluster pool secret
+    gsm_secrets:
+      - collection: psap
+        group: aws-credentials
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: psap-rhoai-cluster-pool
+
+  - name: aws-credentials # rh-ecosystem-edge cluster pool secret
+    gsm_secrets:
+      - collection: kernel-module-management
+        group: pool-credentials
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: rh-ecosystem-edge-cluster-pool
+
+  - name: pipelines-openstack-credentials
+    gsm_secrets:
+      - collection: openshift-pipelines-team
+        group: openstack-creds
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: pipelines-cluster-pool
+
+  - name: rh-openshift-ecosystem-aws-credentials
+    gsm_secrets:
+      - collection: certification-pipeline
+        group: rh-openshift-ecosystem-pool-credentials
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: rhoe-cluster-pool
+
+  - name: rhdh-aws-credentials
+    gsm_secrets:
+      - collection: rhdh-aws-credentials
+        group: rhdh-cluster-pool
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: rhdh-cluster-pool
+
+  - name: rhecoedge-nvidia-ci-aws-credentials
+    gsm_secrets:
+      - collection: rhecoedge-nvidia-ci
+        group: rhecoedge-nvidia-ci-aws
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: rhecoedge-nvidia-ci-cluster-pools
+
+  - name: rhoam-aws-credentials
+    gsm_secrets:
+      - collection: integr8ly
+        group: rhoam-cluster-pool
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: rhoam-cluster-pool
+
+  - name: rhtap-aws-credentials
+    gsm_secrets:
+      - collection: redhat-appstudio-qe
+        group: rhtap-cluster-pool-aws
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: rhtap-cluster-pool
+
+  - name: stackrox-ocp-4-13-cluster-pool-credentials
+    gsm_secrets:
+      - collection: stackrox-cluster-pool
+        group: credentials
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: stackrox-cluster-pools
+
+  - name: aws-installer-credentials
+    gsm_secrets:
+      - collection: obs-openshift-installer
+        group: aws-installer-credentials
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: openshift-observability-cluster-pool
+
+  - name: aws-gpu-observability
+    gsm_secrets:
+      - collection: openshift-observability
+        group: cluster-secrets-aws-gpu-observability
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: openshift-observability-cluster-pool
+
+  - name: pod-scaler
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: pod-scaler
+        fields:
+          - name: sa--dot--pod-scaler--dot--app--dot--ci--dot--config
+            as: app.ci.config
+          - name: sa--dot--pod-scaler--dot--build01--dot--config
+            as: build01.config
+          - name: sa--dot--pod-scaler--dot--build02--dot--config
+            as: build02.config
+          - name: sa--dot--pod-scaler--dot--build03--dot--config
+            as: build03.config
+          - name: sa--dot--pod-scaler--dot--build04--dot--config
+            as: build04.config
+          - name: sa--dot--pod-scaler--dot--build05--dot--config
+            as: build05.config
+          - name: sa--dot--pod-scaler--dot--build06--dot--config
+            as: build06.config
+          - name: sa--dot--pod-scaler--dot--build07--dot--config
+            as: build07.config
+          - name: sa--dot--pod-scaler--dot--build08--dot--config
+            as: build08.config
+          - name: sa--dot--pod-scaler--dot--build09--dot--config
+            as: build09.config
+          - name: sa--dot--pod-scaler--dot--build10--dot--config
+            as: build10.config
+          - name: sa--dot--pod-scaler--dot--build11--dot--config
+            as: build11.config
+          - name: sa--dot--pod-scaler--dot--build12--dot--config
+            as: build12.config
+          - name: sa--dot--pod-scaler--dot--build13--dot--config
+            as: build13.config
+          - name: sa--dot--pod-scaler--dot--core-ci--dot--config
+            as: core-ci.config
+          - sa--dot--pod-scaler--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build01--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build02--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build03--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build04--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build05--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build06--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build07--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build08--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build09--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build10--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build11--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build12--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--build13--dot--token--dot--txt
+          - sa--dot--pod-scaler--dot--core-ci--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: component-monitor-kubeconfigs
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ship-status-dash-component-monitor
+        fields:
+          - name: sa--dot--component-monitor--dot--app--dot--ci--dot--config
+            as: app.ci.config
+          - name: sa--dot--component-monitor--dot--build01--dot--config
+            as: build01.config
+          - name: sa--dot--component-monitor--dot--build02--dot--config
+            as: build02.config
+          - name: sa--dot--component-monitor--dot--build03--dot--config
+            as: build03.config
+          - name: sa--dot--component-monitor--dot--build04--dot--config
+            as: build04.config
+          - name: sa--dot--component-monitor--dot--build05--dot--config
+            as: build05.config
+          - name: sa--dot--component-monitor--dot--build06--dot--config
+            as: build06.config
+          - name: sa--dot--component-monitor--dot--build07--dot--config
+            as: build07.config
+          - name: sa--dot--component-monitor--dot--build08--dot--config
+            as: build08.config
+          - name: sa--dot--component-monitor--dot--build09--dot--config
+            as: build09.config
+          - name: sa--dot--component-monitor--dot--build10--dot--config
+            as: build10.config
+          - name: sa--dot--component-monitor--dot--build11--dot--config
+            as: build11.config
+          - name: sa--dot--component-monitor--dot--build12--dot--config
+            as: build12.config
+          - name: sa--dot--component-monitor--dot--build13--dot--config
+            as: build13.config
+          - name: sa--dot--component-monitor--dot--core-ci--dot--config
+            as: core-ci.config
+          - name: sa--dot--component-monitor--dot--hosted-mgmt--dot--config
+            as: hosted-mgmt.config
+          - sa--dot--component-monitor--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build01--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build02--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build03--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build04--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build05--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build06--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build07--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build08--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build09--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build10--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build11--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build12--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--build13--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--core-ci--dot--token--dot--txt
+          - sa--dot--component-monitor--dot--hosted-mgmt--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ship-status
+      - cluster: core-ci
+        namespace: ship-status
+
+  - name: mcp-server-token
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ship-status-dash-mcp-server
+        fields:
+          - name: sa--dot--mcp-server--dot--app--dot--ci--dot--token--dot--txt
+            as: token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ship-status
+      - cluster: core-ci
+        namespace: ship-status
+
+  - name: release-controller-kubeconfigs
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: release-controller
+        fields:
+          - sa--dot--release-controller-ocp-arm64-priv--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller-ocp-arm64-priv--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--release-controller-ocp-arm64--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller-ocp-arm64--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--release-controller-ocp-multi-priv--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller-ocp-multi-priv--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--release-controller-ocp-multi--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller-ocp-multi--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--release-controller-ocp-ppc64le-priv--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller-ocp-ppc64le-priv--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--release-controller-ocp-ppc64le--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller-ocp-ppc64le--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--release-controller-ocp-priv--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller-ocp-priv--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--release-controller-ocp-s390x-priv--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller-ocp-s390x-priv--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--release-controller-ocp-s390x--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller-ocp-s390x--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--release-controller-ocp--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller-ocp--dot--app--dot--ci--dot--token--dot--txt
+          - sa--dot--release-controller--dot--app--dot--ci--dot--config
+          - sa--dot--release-controller--dot--app--dot--ci--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: app-ci-openshift-user-workload-monitoring-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-monitoring-credentials
+        fields:
+          - sa--dot--ci-monitoring--dot--app--dot--ci--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: external-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-monitoring-credentials
+        fields:
+          - name: sa--dot--ci-monitoring--dot--app--dot--ci--dot--token--dot--txt
+            as: OPENSHIFT_MONITORING_CI_TOKEN
+          - name: sa--dot--ci-monitoring--dot--hosted-mgmt--dot--token--dot--txt
+            as: OPENSHIFT_MONITORING_CI_TOKEN_ON_HOSTED_MGMT
+          - name: sa--dot--ci-monitoring--dot--hosted-mgmt2--dot--token--dot--txt
+            as: OPENSHIFT_MONITORING_CI_TOKEN_ON_HOSTED_MGMT2
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-grafana
+      - cluster: core-ci
+        namespace: ci-grafana
+
+  - name: quay-io-pull-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay-io-pull-credentials
+        fields:
+          - quay_io_password
+          - quay_io_username
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-ci-images-mirror
+    dockerconfig:
+      registries:
+        - auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay-proxy.ci.openshift.org
+        - auth_field: auth
+          group: quay-io-push-credentials
+          registry_url: quay.io/openshift/ci
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: ocp
+        type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: gcr-io
+        type: kubernetes.io/dockerconfigjson
+      - cluster: core-ci
+        namespace: gcr-io
+        type: kubernetes.io/dockerconfigjson
+      - cluster: core-ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: core-ci
+        namespace: ocp
+        type: kubernetes.io/dockerconfigjson
+
+  - name: registry-push-credentials-quay-qci-art-builder
+    dockerconfig:
+      registries:
+        - auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay-proxy.ci.openshift.org
+        - auth_field: auth
+          group: quay-io-push-credentials
+          registry_url: quay.io/openshift/ci
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: core-ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+
+  - name: pull-secret
+    dockerconfig:
+      registries:
+        - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: auth
+          email_field: email
+          group: cloud--dot--openshift--dot--com-pull-secret
+          registry_url: cloud.openshift.com
+        - auth_field: auth
+          email_field: email
+          group: quay--dot--io-pull-secret
+          registry_url: quay.io
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay-proxy.ci.openshift.org
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay.io/openshift/ci
+        - auth_field: auth
+          email_field: email
+          group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+          registry_url: registry.connect.redhat.com
+        - auth_field: auth
+          email_field: email
+          group: registry--dot--redhat--dot--io-pull-secret
+          registry_url: registry.redhat.io
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: ci-cluster-pool
+        type: kubernetes.io/dockerconfigjson
+
+  - name: cluster-secrets-hypershift
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-ci-aws-credentials
+        fields:
+          - --dot--awscred
+          - ssh-privatekey
+          - ssh-publickey
+    dockerconfig:
+      as: pull-secret
+      registries:
+        - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: auth
+          email_field: email
+          group: cloud--dot--openshift--dot--com-pull-secret
+          registry_url: cloud.openshift.com
+        - auth_field: auth
+          email_field: email
+          group: quay--dot--io-pull-secret
+          registry_url: quay.io
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay-proxy.ci.openshift.org
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay.io/openshift/ci
+        - auth_field: auth
+          email_field: email
+          group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+          registry_url: registry.connect.redhat.com
+        - auth_field: auth
+          email_field: email
+          group: registry--dot--redhat--dot--io-pull-secret
+          registry_url: registry.redhat.io
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - non_app_ci
+        namespace: ci
+
+  - name: multi-arch-mirroring-secrets
+    dockerconfig:
+      registries:
+        - auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+        - auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+        - auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: auth
+          group: brew--dot--registry--dot--redhat--dot--io-pull-secret
+          registry_url: brew.registry.redhat.io
+        - auth_field: auth
+          group: registry--dot--redhat--dot--io-pull-secret
+          registry_url: registry.redhat.io
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: core-ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+
+  - name: mirror.openshift.com
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: mirror--dot--openshift--dot--com
+        fields:
+          - name: cert-key--dot--pem
+            as: ops-mirror.pem
+      - collection: test-platform-infra
+        group: rh-cdn
+        fields:
+          - rh-cdn--dot--pem
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - build_farm
+        namespace: ocp
+
+  - name: sshd-slack-bot-alpha-authorized-keys
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: sshd-bastion-slack-bot-alpha
+        fields:
+          - authorized_keys
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: sshd-slack-bot-alpha-host-keys
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: sshd-bastion-slack-bot-alpha
+        fields:
+          - ssh_host_dsa_key
+          - ssh_host_ecdsa_key
+          - ssh_host_ed25519_key
+          - ssh_host_rsa_key
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: sshd-authorized-keys
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: sshd-bastion-z
+        fields:
+          - authorized_keys
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - bastion
+        namespace: bastion-z
+
+  - name: sshd-host-keys
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: sshd-bastion-z
+        fields:
+          - ssh_host_dsa_key
+          - ssh_host_ecdsa_key
+          - ssh_host_ed25519_key
+          - ssh_host_rsa_key
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - bastion
+        namespace: bastion-z
+
+  - name: sshd-authorized-keys
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: sshd-bastion-ppc64le
+        fields:
+          - authorized_keys
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - bastion
+        namespace: bastion-ppc64le
+
+  - name: sshd-host-keys
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: sshd-bastion-ppc64le
+        fields:
+          - ssh_host_dsa_key
+          - ssh_host_ecdsa_key
+          - ssh_host_ed25519_key
+          - ssh_host_rsa_key
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - bastion
+        namespace: bastion-ppc64le
+
+  - name: sshd-authorized-keys
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: sshd-bastion-ppc64le-libvirt
+        fields:
+          - authorized_keys
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - bastion
+        namespace: bastion-ppc64le-libvirt
+
+  - name: sshd-host-keys
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: sshd-bastion-ppc64le-libvirt
+        fields:
+          - ssh_host_dsa_key
+          - ssh_host_ecdsa_key
+          - ssh_host_ed25519_key
+          - ssh_host_rsa_key
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - bastion
+        namespace: bastion-ppc64le-libvirt
+
+  - name: sshd-authorized-keys
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: sshd-bastion-telco
+        fields:
+          - authorized_keys
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - bastion
+        namespace: bastion-telco
+
+  - name: sshd-host-keys
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: sshd-bastion-telco
+        fields:
+          - ssh_host_dsa_key
+          - ssh_host_ecdsa_key
+          - ssh_host_ed25519_key
+          - ssh_host_rsa_key
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - bastion
+        namespace: bastion-telco
+
+  - name: bugzilla-credentials-openshift-bugzilla-robot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-bugzilla-robot
+        fields:
+          - name: api-key
+            as: api
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - build_farm
+        namespace: ci
+
+  - name: github-credentials-openshift-bot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-bot
+        fields:
+          - name: github-oauth-token
+            as: oauth
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: github-credentials-openshift-cherrypick-robot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-cherrypick-robot
+        fields:
+          - name: github-oauth-token
+            as: oauth
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: github-credentials-openshift-ci-robot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-ci-robot
+        fields:
+          - name: github-oauth-token
+            as: oauth
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: github-credentials-openshift-merge-robot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-merge-robot
+        fields:
+          - name: github-oauth-token
+            as: oauth
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: aws-bedrock-token
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-bedrock-long-term-api-key
+        fields:
+          - name: token
+            as: oauth
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: github-credentials-openshift-merge-robot-peribolos-token
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-merge-robot
+        fields:
+          - name: github-oauth-token-peribolos
+            as: oauth
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: slack-credentials-prow
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: slack-credentials-prow
+        fields:
+          - name: oauth-token
+            as: oauth
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: ci-slack-api-url
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-slack-api-url
+        fields:
+          - url
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: pagerduty
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: pagerduty
+        fields:
+          - integration_key
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: chai-bot-alertmanager-webhook
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: chai-bot-alertmanager-webhook
+        fields:
+          - url
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: github-app-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: prow--dot--ci--dot--openshift--dot--org
+        fields:
+          - name: client-configuration
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: github-app-credentials-private
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: deck-internal-ci--dot--apps--dot--ci--dot--l2s4--dot--p1--dot--openshiftapps--dot--com
+        fields:
+          - name: client-configuration
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: github-app-qe-private-deck
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: qe-private-deck-ci--dot--apps--dot--ci--dot--l2s4--dot--p1--dot--openshiftapps--dot--com
+        fields:
+          - name: client-configuration
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: cookie
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: prow--dot--ci--dot--openshift--dot--org
+        fields:
+          - name: cookie32
+            as: cookie
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: github-webhook-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: hmac
+        fields:
+          - name: hmac-token
+            as: hmac
+          - name: ci-bot-github-app-combined--dot--yaml
+            as: hmac.yaml
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: unsplash-api-key
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: unsplash--dot--com
+        fields:
+          - api-key
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: gce-sa-credentials-gcs-tide-publisher
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: gcs-tide-publisher
+        fields:
+          - name: credentials--dot--json
+            as: service-account.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: gce-sa-credentials-resource-usage-data-publisher
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: resource-usage-data-publisher
+        fields:
+          - name: credentials--dot--json
+            as: service-account.json
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - build_farm
+        namespace: ci
+
+  - name: gce-sa-credentials-gcs-private
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: gcs-private
+        fields:
+          - name: credentials--dot--json
+            as: service-account.json
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - build_farm
+        namespace: ci
+      - cluster_groups:
+          - build_farm
+        namespace: ci-staging
+
+  - name: gce-sa-credentials-gcs-qe-private-deck
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: gcs-qe-private-deck
+        fields:
+          - name: credentials--dot--json
+            as: service-account.json
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - build_farm
+        namespace: ci
+
+  - name: gce-sa-credentials-gcs-crier-publisher
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: gcs-crier-publisher
+        fields:
+          - name: credentials--dot--json
+            as: service-account.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-quay.io-openshift-knative
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io/openshift-knative
+        fields:
+          - name: push-credentials
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-quay.io-openshift-kni
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io/openshift-kni
+        fields:
+          - name: push-credentials
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-quay.io-openshiftio
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io/openshiftio
+        fields:
+          - name: push-credentials
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-quay.io-openshift-pipeline
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io/openshift-pipeline
+        fields:
+          - name: push-credentials
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-quay.io-codeready-toolchain
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io/codeready-toolchain
+        fields:
+          - name: push-credentials
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-quay.io-integr8ly
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io/integr8ly
+        fields:
+          - name: push-credentials
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-quay.io-openshift-psap
+    dockerconfig:
+      registries:
+        - auth_field: push-token
+          group: quay--dot--io/openshift-psap
+          registry_url: quay.io
+        - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: core-ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+
+  - name: registry-push-credentials-quay.io-ovirt
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io/ovirt
+        fields:
+          - config--dot--json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-quay.io-redhat-developer
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io/redhat-developer
+        fields:
+          - name: push-credentials
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-quay.io-open-cluster-management
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io/open-cluster-management
+        fields:
+          - name: docker--dot--cfg
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-quay.io-ocs-dev
+    dockerconfig:
+      registries:
+        - auth_field: push-token
+          group: quay--dot--io/openshift-ocs-dev
+          registry_url: quay.io
+        - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: core-ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+
+  - name: registry-push-credentials-quay.io-openshift-azure
+    dockerconfig:
+      registries:
+        - auth_field: push-token
+          group: quay--dot--io/openshift-azure
+          registry_url: quay.io
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: core-ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+
+  - name: files-pull-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io
+        fields:
+          - name: pull-credentials
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release
+      - cluster: core-ci
+        namespace: ci-release
+      - cluster: app.ci
+        namespace: ci-release-priv
+      - cluster: core-ci
+        namespace: ci-release-priv
+      - cluster: app.ci
+        namespace: ci-release-ppc64le
+      - cluster: core-ci
+        namespace: ci-release-ppc64le
+      - cluster: app.ci
+        namespace: ci-release-ppc64le-priv
+      - cluster: core-ci
+        namespace: ci-release-ppc64le-priv
+      - cluster: app.ci
+        namespace: ci-release-s390x
+      - cluster: core-ci
+        namespace: ci-release-s390x
+      - cluster: app.ci
+        namespace: ci-release-s390x-priv
+      - cluster: core-ci
+        namespace: ci-release-s390x-priv
+      - cluster: app.ci
+        namespace: ci-release-arm64
+      - cluster: core-ci
+        namespace: ci-release-arm64
+      - cluster: app.ci
+        namespace: ci-release-arm64-priv
+      - cluster: core-ci
+        namespace: ci-release-arm64-priv
+      - cluster: app.ci
+        namespace: ci-release-multi
+      - cluster: core-ci
+        namespace: ci-release-multi
+      - cluster: app.ci
+        namespace: ci-release-multi-priv
+      - cluster: core-ci
+        namespace: ci-release-multi-priv
+
+  - name: git-pull-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io
+        fields:
+          - name: pull-credentials
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release
+      - cluster: core-ci
+        namespace: ci-release
+      - cluster: app.ci
+        namespace: ci-release-priv
+      - cluster: core-ci
+        namespace: ci-release-priv
+      - cluster: app.ci
+        namespace: ci-release-ppc64le
+      - cluster: core-ci
+        namespace: ci-release-ppc64le
+      - cluster: app.ci
+        namespace: ci-release-ppc64le-priv
+      - cluster: core-ci
+        namespace: ci-release-ppc64le-priv
+      - cluster: app.ci
+        namespace: ci-release-s390x
+      - cluster: core-ci
+        namespace: ci-release-s390x
+      - cluster: app.ci
+        namespace: ci-release-s390x-priv
+      - cluster: core-ci
+        namespace: ci-release-s390x-priv
+      - cluster: app.ci
+        namespace: ci-release-arm64
+      - cluster: core-ci
+        namespace: ci-release-arm64
+      - cluster: app.ci
+        namespace: ci-release-arm64-priv
+      - cluster: core-ci
+        namespace: ci-release-arm64-priv
+      - cluster: app.ci
+        namespace: ci-release-multi
+      - cluster: core-ci
+        namespace: ci-release-multi
+      - cluster: app.ci
+        namespace: ci-release-multi-priv
+      - cluster: core-ci
+        namespace: ci-release-multi-priv
+
+  - name: source
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quay--dot--io
+        fields:
+          - name: pull-credentials
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release
+      - cluster: core-ci
+        namespace: ci-release
+      - cluster: app.ci
+        namespace: ci-release-priv
+      - cluster: core-ci
+        namespace: ci-release-priv
+      - cluster: app.ci
+        namespace: ci-release-ppc64le
+      - cluster: core-ci
+        namespace: ci-release-ppc64le
+      - cluster: app.ci
+        namespace: ci-release-ppc64le-priv
+      - cluster: core-ci
+        namespace: ci-release-ppc64le-priv
+      - cluster: app.ci
+        namespace: ci-release-s390x
+      - cluster: core-ci
+        namespace: ci-release-s390x
+      - cluster: app.ci
+        namespace: ci-release-s390x-priv
+      - cluster: core-ci
+        namespace: ci-release-s390x-priv
+      - cluster: app.ci
+        namespace: ci-release-arm64
+      - cluster: core-ci
+        namespace: ci-release-arm64
+      - cluster: app.ci
+        namespace: ci-release-arm64-priv
+      - cluster: core-ci
+        namespace: ci-release-arm64-priv
+      - cluster: app.ci
+        namespace: ci-release-multi
+      - cluster: core-ci
+        namespace: ci-release-multi
+      - cluster: app.ci
+        namespace: ci-release-multi-priv
+      - cluster: core-ci
+        namespace: ci-release-multi-priv
+
+  - name: pull-secret
+    dockerconfig:
+      registries:
+        - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: cloud--dot--openshift--dot--com-auth
+          group: build-farm-global-pull-secret
+          registry_url: cloud.openshift.com
+          email_field: cloud--dot--openshift--dot--com-email
+        - auth_field: quay--dot--io-auth
+          group: build-farm-global-pull-secret
+          registry_url: quay.io
+          email_field: quay--dot--io-email
+        - auth_field: registry--dot--connect--dot--redhat--dot--com-auth
+          group: build-farm-global-pull-secret
+          registry_url: registry.connect.redhat.com
+          email_field: registry--dot--connect--dot--redhat--dot--com-email
+        - auth_field: registry--dot--redhat--dot--io-auth
+          group: build-farm-global-pull-secret
+          registry_url: registry.redhat.io
+          email_field: registry--dot--redhat--dot--io-email
+        - auth_field: registry--dot--redhat--dot--io-auth
+          group: build-farm-global-pull-secret
+          registry_url: brew.registry.redhat.io
+          email_field: registry--dot--redhat--dot--io-email
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay-proxy.ci.openshift.org
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay.io/openshift/ci
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay.io/openshift/network-edge-testing
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: qci-pull-through-cache-us-east-1-ci.apps.ci.l2s4.p1.openshiftapps.com
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - openshift_config_pull_secret
+        namespace: openshift-config
+        type: kubernetes.io/dockerconfigjson
+
+  - name: cluster-secrets-hyperfleet-e2e
+    dockerconfig:
+      as: pull-secret
+      registries:
+        - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: auth
+          group: cloud--dot--openshift--dot--com-pull-secret
+          registry_url: cloud.openshift.com
+          email_field: email
+        - auth_field: auth
+          group: quay--dot--io-pull-secret
+          registry_url: quay.io
+          email_field: email
+        - auth_field: auth
+          group: quay--dot--io/multi-arch
+          registry_url: quay.io/multi-arch
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay-proxy.ci.openshift.org
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay.io/openshift/ci
+        - auth_field: auth
+          group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+          registry_url: registry.connect.redhat.com
+          email_field: email
+        - auth_field: auth
+          group: registry--dot--redhat--dot--io-pull-secret
+          registry_url: registry.redhat.io
+          email_field: email
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - non_app_ci
+        namespace: test-credentials
+
+  - name: cluster-secrets-metal
+    dockerconfig:
+      as: pull-secret
+      registries:
+        - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: auth
+          group: cloud--dot--openshift--dot--com-pull-secret
+          registry_url: cloud.openshift.com
+          email_field: email
+        - auth_field: auth
+          group: quay--dot--io-pull-secret
+          registry_url: quay.io
+          email_field: email
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay-proxy.ci.openshift.org
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay.io/openshift/ci
+        - auth_field: auth
+          group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+          registry_url: registry.connect.redhat.com
+          email_field: email
+        - auth_field: auth
+          group: registry--dot--redhat--dot--io-pull-secret
+          registry_url: registry.redhat.io
+          email_field: email
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-ci-aws-credentials
+        fields:
+          - --dot--awscred
+          - ssh-privatekey
+          - ssh-publickey
+      - collection: test-platform-infra
+        group: packet--dot--net
+        fields:
+          - --dot--packetcred
+          - --dot--slackhook
+      - collection: test-platform-infra
+        group: insights-ci-account
+        fields:
+          - insights-live--dot--yaml
+      - collection: installer-ci-metal
+        group: matchbox
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - non_app_ci
+        namespace: ci
+
+  - name: redhat-developer-service-binding-operator-codecov-token
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: codecov-tokens
+        fields:
+          - name: redhat-developer-service-binding-operator
+            as: token
+    sync_to_cluster: true
+    targets:
+      - cluster: build01
+        namespace: ci
+      - cluster: build04
+        namespace: ci
+
+  - name: boskos-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: boskos-oauth-proxy
+        fields:
+          - ci--dot--htpasswd
+          - name: boskos-credentials
+            as: credentials
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - build_farm
+        namespace: ci
+      - cluster_groups:
+          - build_farm
+        namespace: ci-staging
+
+  - name: aws-ci-infra-ci-app-ci-audit-logs-uploader-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws_ci_infra_ci-app-ci-audit-logs-uploader
+        fields:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: api-audit-log
+      - cluster: core-ci
+        namespace: api-audit-log
+
+  - name: aws-ci-infra-ci-build01-audit-logs-uploader-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws_ci_infra_ci-build01-audit-logs-uploader
+        fields:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+    sync_to_cluster: true
+    targets:
+      - cluster: build01
+        namespace: api-audit-log
+
+  - name: aws-ci-infra-ci-build04-audit-logs-uploader-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws_ci_infra_ci-build04-audit-logs-uploader
+        fields:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+    sync_to_cluster: true
+    targets:
+      - cluster: build04
+        namespace: api-audit-log
+
+  - name: bitwarden-credentials-openshift-ci-bitwarden-bot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: OpenShift-CI-Bitwarden-Bot
+        fields:
+          - name: password
+            as: bw_password
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: config-updater
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: config-updater
+        fields:
+          - sa--dot--config-updater--dot--app--dot--ci--dot--config
+          - sa--dot--config-updater--dot--build01--dot--config
+          - sa--dot--config-updater--dot--build02--dot--config
+          - sa--dot--config-updater--dot--build03--dot--config
+          - sa--dot--config-updater--dot--build04--dot--config
+          - sa--dot--config-updater--dot--build05--dot--config
+          - sa--dot--config-updater--dot--build06--dot--config
+          - sa--dot--config-updater--dot--build07--dot--config
+          - sa--dot--config-updater--dot--build08--dot--config
+          - sa--dot--config-updater--dot--build09--dot--config
+          - sa--dot--config-updater--dot--build10--dot--config
+          - sa--dot--config-updater--dot--build11--dot--config
+          - sa--dot--config-updater--dot--build12--dot--config
+          - sa--dot--config-updater--dot--build13--dot--config
+          - sa--dot--config-updater--dot--core-ci--dot--config
+          - sa--dot--config-updater--dot--hosted-mgmt--dot--config
+          - sa--dot--config-updater--dot--hosted-mgmt2--dot--config
+          - sa--dot--config-updater--dot--vsphere02--dot--config
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: app.ci
+        namespace: vault
+      - cluster: core-ci
+        namespace: vault
+      - cluster: core-ci
+        namespace: ci
+
+  - name: result-aggregator
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: result-aggregator
+        fields:
+          - credentials
+          - passwd
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - build_farm
+        namespace: ci
+      - cluster_groups:
+          - build_farm
+        namespace: ci-staging
+
+  - name: ci-chat-bot-kubeconfigs
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-chat-bot
+        fields:
+          - sa--dot--ci-chat-bot--dot--build01--dot--config
+          - sa--dot--ci-chat-bot--dot--build01--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build02--dot--config
+          - sa--dot--ci-chat-bot--dot--build02--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build03--dot--config
+          - sa--dot--ci-chat-bot--dot--build03--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build04--dot--config
+          - sa--dot--ci-chat-bot--dot--build04--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build05--dot--config
+          - sa--dot--ci-chat-bot--dot--build05--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build06--dot--config
+          - sa--dot--ci-chat-bot--dot--build06--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build07--dot--config
+          - sa--dot--ci-chat-bot--dot--build07--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build08--dot--config
+          - sa--dot--ci-chat-bot--dot--build08--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build09--dot--config
+          - sa--dot--ci-chat-bot--dot--build09--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build10--dot--config
+          - sa--dot--ci-chat-bot--dot--build10--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build11--dot--config
+          - sa--dot--ci-chat-bot--dot--build11--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build12--dot--config
+          - sa--dot--ci-chat-bot--dot--build12--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--build13--dot--config
+          - sa--dot--ci-chat-bot--dot--build13--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--core-ci--dot--config
+          - sa--dot--ci-chat-bot--dot--core-ci--dot--token--dot--txt
+          - sa--dot--ci-chat-bot--dot--vsphere02--dot--config
+          - sa--dot--ci-chat-bot--dot--vsphere02--dot--token--dot--txt
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--hypershift-workload--dot--hosted-mgmt--dot--config
+          - sa--dot--hypershift-workload--dot--hosted-mgmt--dot--token--dot--txt
+          - sa--dot--hypershift-workload--dot--hosted-mgmt2--dot--config
+          - sa--dot--hypershift-workload--dot--hosted-mgmt2--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: openshift-gce-devel-ci-infra-users-to-bigquery-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-gce-devel-ci-infra-users-to-bigquery
+        fields:
+          - openshift-gce-devel-ci-infra-users-to-bigquery--dot--json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: cluster-bot-cloud-sso-for-ocm-ephemeral-osd
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: cluster-bot-cloud-sso-for-ocm-ephemeral-osd
+        fields:
+          - name: ocm-developer-productivity-staging
+            as: token
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - non_app_ci
+        namespace: ci
+
+  - name: cluster-bot-aws-account-for-ephemeral-osd
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: cluster-bot-aws-account-for-ephemeral-osd
+        fields:
+          - AWS_ACCESS_KEY_ID
+          - AWS_ACCOUNT_ID
+          - AWS_SECRET_ACCESS_KEY
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - non_app_ci
+        namespace: ci
+
+  - name: release-controller-signature-publisher
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-ci-release-signature-publisher
+        fields:
+          - service-account--dot--json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: openshift-private-viewer
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-private-viewer
+        fields:
+          - credentials--dot--json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: qe-private-deck-viewer
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: qe-private-deck-viewer
+        fields:
+          - credentials--dot--json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: prowjob-dispatcher-control
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: prowjob-dispatcher-control
+        fields:
+          - channel_id
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
+  - name: slack-credentials-dptp-bot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: slack-credentials-dptp-bot
+        fields:
+          - app_id
+          - client_id
+          - client_secret
+          - oauth_token
+          - signing_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: app.ci
+        namespace: ship-status
+      - cluster: core-ci
+        namespace: ship-status
+      - cluster: core-ci
+        namespace: ci
+
+  - name: slack-credentials-dptp-bot-alpha
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: slack-credentials-dptp-bot-alpha
+        fields:
+          - app_id
+          - client_id
+          - client_secret
+          - oauth_token
+          - signing_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: jira-token-dptp-bot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: jira-token-dptp-bot
+        fields:
+          - password
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: registry-push-credentials-openshift
+    dockerconfig:
+      registries:
+        - auth_field: push-token
+          group: quay--dot--io
+          registry_url: quay.io
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay-proxy.ci.openshift.org
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay.io/openshift/ci
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: core-ci
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+
+  - name: openshift-prow-github-app
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-prow-app
+        fields:
+          - appid
+          - name: openshift-prow--dot--2020-12-03--dot--private-key--dot--pem
+            as: cert
+          - hmac
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: openshift-merge-bot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-merge-bot
+        fields:
+          - appid
+          - name: openshift-merge-bot--dot--2023-10-24--dot--private-key--dot--pem
+            as: cert
+          - hmac
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: openshift-prow-github-app
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-ci-staging-prow-app
+        fields:
+          - appid
+          - cert
+          - hmac
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-staging
+      - cluster: core-ci
+        namespace: ci-staging
+
+  - name: rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: rh-internal-sso-client-id
+            as: client-id
+          - name: rh-internal-sso-client-secret
+            as: client-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: app.ci-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - app--dot--ci-id
+          - app--dot--ci-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build01-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build01-id
+          - build01-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build01-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build01-id
+          - build01-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build01-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build01
+        namespace: openshift-config
+
+  - name: build02-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build02-id
+          - build02-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build02-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build02-id
+          - build02-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: build04-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build04-id
+          - build04-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build04-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build04-id
+          - build04-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dpcr-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - dpcr-id
+          - dpcr-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: hosted-mgmt-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - hosted-mgmt-id
+          - hosted-mgmt-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: hosted-mgmt-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - hosted-mgmt-id
+          - hosted-mgmt-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: hosted-mgmt2-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - hosted-mgmt2-id
+          - hosted-mgmt2-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: hosted-mgmt2-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - hosted-mgmt2-id
+          - hosted-mgmt2-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: art-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - art-id
+          - art-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: retester-aws-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-prow-retester-robot-user-credentials
+        fields:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build02-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build02
+        namespace: openshift-config
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build04-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build04
+        namespace: openshift-config
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: hosted-mgmt-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: openshift-config
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: hosted-mgmt2-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt2
+        namespace: openshift-config
+
+  - name: hive-aws-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-ci-pools-hive
+        fields:
+          - aws_access_key_id
+          - aws_secret_access_key
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: ci-cluster-pool
+      - cluster: hosted-mgmt
+        namespace: fake-cluster-pool
+
+  - name: vault-secret-manager
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: vault-secret-manager-client-id
+            as: vault-secret-manager-id
+          - name: vault-secret-manager-client-secret
+            as: vault-secret-manager-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: vault-secret-collection-manager-oauth
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: vault-secret-manager-client-id
+            as: vault-secret-manager-id
+          - name: vault-secret-manager-client-secret
+            as: vault-secret-manager-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: vault-secret-collection-manager-cookie-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: vault-secret-collection-manager-cookie-secret
+        fields:
+          - secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: promtail-prod-creds
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: loki-collector
+        fields:
+          - client-id
+          - client-secret
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - build_farm
+        namespace: loki
+
+  - name: github-deploymentconfig-trigger
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: github-deploymentconfig-webhook-token
+        fields:
+          - name: Token
+            as: WebHookSecretKey
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: repo-init-client
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: repo-init-github-client
+        fields:
+          - github-client-id
+          - github-client-secret
+          - github-redirect-uri
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: splunk-receiver-token
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: log-forwarder
+        fields:
+          - hecToken
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - build_farm
+        namespace: log-forwarding
+      - cluster: hosted-mgmt
+        namespace: log-forwarding
+      - cluster: hosted-mgmt2
+        namespace: log-forwarding
+
+  - name: snyk-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: snyk-credentials
+        fields:
+          - api-token
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - build_farm
+        namespace: test-credentials
+
+  - name: cloudfront-app-ci-internal-registry-private-key
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: cloudfront-app-ci-internal-registry-private-key
+        fields:
+          - content
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: openshift-image-registry
+      - cluster: core-ci
+        namespace: openshift-image-registry
+
+  - name: cloudfront-buildfarm-internal-registry-private-key
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: cloudfront-buildfarm-internal-registry-private-key
+        fields:
+          - content
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - non_app_ci
+        namespace: openshift-image-registry
+
+  - name: quayio-pull-through-cache-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quayio-pull-through-cache-user
+        fields:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: quayio-pull-through-cache-r2-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quayio-pull-through-cache-r2-user
+        fields:
+          - R2_ACCESS_KEY_ID
+          - R2_SECRET_ACCESS_KEY
+          - R2_SECRET_REGIONENDPOINT
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: gcs-sa-quayio-pull-through-cache
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: gcs-quayio-pull-through-cache-service-account
+        fields:
+          - credentials--dot--json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: qci-robot-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: quayio-ci-read-only-robot
+        fields:
+          - password
+          - username
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: qci-appci-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: qci-appci-credentials
+        fields:
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: qci-pull-through-cache-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: cloudflare-r2-bucket-pull-through-cache-us-east-1
+        fields:
+          - AWS_ACCESS_KEY_ID
+          - AWS_ENDPOINT_URL
+          - AWS_SECRET_ACCESS_KEY
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: qci-pruner-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: qci-pruner-credentials
+        fields:
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: hypershift-operator-oidc-provider-s3-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: hypershift-oidc
+        fields:
+          - bucket
+          - credentials
+          - region
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: hypershift
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: hypershift-operator-oidc-provider-s3-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: hypershift-oidc-2
+        fields:
+          - bucket
+          - credentials
+          - region
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt2
+        namespace: hypershift
+
+  - name: hypershift-operator-oidc-provider-s3-credentials-2
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: hypershift-oidc-2
+        fields:
+          - bucket
+          - credentials
+          - region
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
+  - name: global-pull-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: hive-global-pull-secret
+        fields:
+          - --dot--dockerconfigjson
+    sync_to_cluster: true
+    targets:
+      - cluster: hosted-mgmt
+        namespace: hive
+
+  - name: cloudwatch-receiver-token
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: openshift-ci-audit-credentials
+        fields:
+          - aws_access_key_id
+          - aws_secret_access_key
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - managed_clusters
+        namespace: log-forwarding
+
+  - name: loki-s3
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: net-observ-loki-build01-credentials
+        fields:
+          - access_key_id
+          - access_key_secret
+          - bucketnames
+          - endpoint
+          - region
+    sync_to_cluster: true
+    targets:
+      - cluster: build01
+        namespace: netobserv
+
+  - name: cloudability-api-key
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: cloudability
+        fields:
+          - api-key
+    sync_to_cluster: true
+    targets:
+      - cluster_groups:
+          - managed_clusters
+        namespace: cloudability
+
+  - name: build06-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build06-id
+          - build06-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build06-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build06-id
+          - build06-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build06-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build06
+        namespace: openshift-config
+
+  - name: build11-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build11-id
+          - build11-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build11-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build11-id
+          - build11-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build11-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build11
+        namespace: openshift-config
+
+  - name: build07-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build07-id
+          - build07-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build07-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build07-id
+          - build07-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build07-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build07
+        namespace: openshift-config
+
+  - name: multi-arch-builder-controller-registry-credentials
+    dockerconfig:
+      registries:
+        - auth_field: token_image-pusher_build10_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+        - auth_field: token_multi-arch-builder-controller_build10_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.multi-build01.arm-build.devcluster.openshift.com
+        - auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: token_image-pusher_quay--dot--io_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: quay.io
+    sync_to_cluster: true
+    targets:
+      - cluster: build10
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+
+  - name: build10-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build10-id
+          - build10-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build10-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build10-id
+          - build10-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build10-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build10
+        namespace: openshift-config
+
+  - name: core-ci-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - core-ci-id
+          - core-ci-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: core-ci-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - core-ci-id
+          - core-ci-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: core-ci-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: openshift-config
+
+  - name: build03-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build03-id
+          - build03-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build03-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build03-id
+          - build03-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build03-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build03
+        namespace: openshift-config
+
+  - name: build09-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build09-id
+          - build09-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build09-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build09-id
+          - build09-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build09-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build09
+        namespace: openshift-config
+
+  - name: build08-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build08-id
+          - build08-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build08-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build08-id
+          - build08-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build08-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build08
+        namespace: openshift-config
+
+  - name: build05-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build05-id
+          - build05-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build05-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build05-id
+          - build05-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build05-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build05
+        namespace: openshift-config
+
+  - name: oauth-proxy-cookie-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ship-status-dash
+        fields:
+          - name: oauth-proxy-session-secret
+            as: session_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ship-status-dash
+      - cluster: core-ci
+        namespace: ship-status-dash
+
+  - name: postgres
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ship-status-dash
+        fields:
+          - name: postgres
+            as: dsn
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ship-status-dash
+      - cluster: core-ci
+        namespace: ship-status-dash
+
+  - name: dashboard-hmac
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ship-status-dash
+        fields:
+          - name: dashboard-hmac
+            as: hmac
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ship-status-dash
+      - cluster: core-ci
+        namespace: ship-status-dash
+
+  - name: grafana-ci-monitoring-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - grafana-ci-monitoring-id
+          - grafana-ci-monitoring-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: grafana-dex-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: grafana-ci-monitoring-id
+            as: client-id
+          - name: grafana-ci-monitoring-secret
+            as: client-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: ci-monitoring
+
+  - name: investigator-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - investigator-id
+          - investigator-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: investigator-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: investigator-id
+            as: client-id
+          - name: investigator-secret
+            as: client-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: investigator
+
+  - name: thanos-receive-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - server--dot--crt
+          - server--dot--key
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: ci-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build01--dot--crt
+            as: client.crt
+          - name: client--dot--build01--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build01
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build02--dot--crt
+            as: client.crt
+          - name: client--dot--build02--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build02
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build03--dot--crt
+            as: client.crt
+          - name: client--dot--build03--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build03
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build04--dot--crt
+            as: client.crt
+          - name: client--dot--build04--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build04
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build05--dot--crt
+            as: client.crt
+          - name: client--dot--build05--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build05
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build06--dot--crt
+            as: client.crt
+          - name: client--dot--build06--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build06
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build07--dot--crt
+            as: client.crt
+          - name: client--dot--build07--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build07
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build08--dot--crt
+            as: client.crt
+          - name: client--dot--build08--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build08
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build09--dot--crt
+            as: client.crt
+          - name: client--dot--build09--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build09
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build10--dot--crt
+            as: client.crt
+          - name: client--dot--build10--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build10
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build11--dot--crt
+            as: client.crt
+          - name: client--dot--build11--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build11
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build12--dot--crt
+            as: client.crt
+          - name: client--dot--build12--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build12
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--build13--dot--crt
+            as: client.crt
+          - name: client--dot--build13--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: build13
+        namespace: openshift-monitoring
+
+  - name: thanos-remote-write-tls
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-tls
+        fields:
+          - ca--dot--crt
+          - name: client--dot--core-ci--dot--crt
+            as: client.crt
+          - name: client--dot--core-ci--dot--key
+            as: client.key
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: openshift-monitoring
+
+  - name: thanos-object-storage
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-object-storage
+        fields:
+          - thanos--dot--yaml
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: ci-monitoring
+
+  - name: thanos-aws-credentials
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ci-monitoring-thanos-aws-credentials
+        fields:
+          - role-arn
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: ci-monitoring
+
+  - name: build12-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build12-id
+          - build12-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build12-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build12-id
+          - build12-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build12-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build12
+        namespace: openshift-config
+
+  - name: build13-secret
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build13-id
+          - build13-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: dex
+      - cluster: core-ci
+        namespace: dex
+
+  - name: build13-dex-oidc
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - build13-id
+          - build13-secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dex-rh-sso
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dex
+        fields:
+          - name: build13-secret
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: build13
+        namespace: openshift-config
+
+  - name: cluster-manifest-verifier-argocd
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: cluster-manifest-verifier-argocd
+        fields:
+          - name: token
+            as: clientSecret
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: ci
+
+  - name: aws-sts-cluster-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-sts-cluster-config
+        fields:
+          - name: build01
+            as: home_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build01
+        namespace: ci
+
+  - name: aws-sts-cluster-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-sts-cluster-config
+        fields:
+          - name: build03
+            as: home_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build03
+        namespace: ci
+
+  - name: aws-sts-cluster-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-sts-cluster-config
+        fields:
+          - name: build05
+            as: home_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build05
+        namespace: ci
+
+  - name: aws-sts-cluster-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-sts-cluster-config
+        fields:
+          - name: build06
+            as: home_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build06
+        namespace: ci
+
+  - name: aws-sts-cluster-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-sts-cluster-config
+        fields:
+          - name: build07
+            as: home_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build07
+        namespace: ci
+
+  - name: aws-sts-cluster-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-sts-cluster-config
+        fields:
+          - name: build09
+            as: home_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build09
+        namespace: ci
+
+  - name: aws-sts-cluster-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-sts-cluster-config
+        fields:
+          - name: build10
+            as: home_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build10
+        namespace: ci
+
+  - name: aws-sts-cluster-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-sts-cluster-config
+        fields:
+          - name: build11
+            as: home_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build11
+        namespace: ci
+
+  - name: aws-sts-cluster-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: aws-sts-cluster-config
+        fields:
+          - name: build12
+            as: home_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build12
+        namespace: ci

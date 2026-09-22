@@ -39,18 +39,21 @@ run_az_with_retry() {
     # substitution, while stderr is used only for quiet retry classification.
 
     if ((rc >= 128 && rc <= 192)); then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s ended with status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
     fi
 
     if ! grep -Eiq "${AZURE_CLI_TRANSIENT_ERROR_PATTERN}" "${capture_dir}/stderr"; then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s failed with non-retryable status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
     fi
 
     if ((attempt >= max_attempts)); then
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s failed after %d attempts with transient status %d\n' "${operation}" "${max_attempts}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
@@ -61,6 +64,7 @@ run_az_with_retry() {
       :
     else
       rc=$?
+      print_az_cli_failure "${capture_dir}"
       printf 'Azure CLI %s retry wait ended with status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
@@ -73,6 +77,13 @@ run_az_with_retry() {
   done
 }
 # END AZURE CLI RETRY HELPER
+
+print_az_cli_failure() {
+  local capture_dir="$1"
+  [[ -s "${capture_dir}/stdout" ]] && sed "s|${AZURE_AUTH_CLIENT_SECRET}|***REDACTED***|g" "${capture_dir}/stdout" >&2
+  [[ -s "${capture_dir}/stderr" ]] && sed "s|${AZURE_AUTH_CLIENT_SECRET}|***REDACTED***|g" "${capture_dir}/stderr" >&2
+  return 0
+}
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then

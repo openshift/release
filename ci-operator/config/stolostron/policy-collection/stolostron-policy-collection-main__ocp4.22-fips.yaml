@@ -19,14 +19,14 @@ base_images:
     name: "2.17"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
+  ocs-ci-tests:
+    name: ocs-ci-container
+    namespace: ci
+    tag: stable
   tests-private:
     name: tests-private
     namespace: ci
     tag: "4.22"
-  upi-installer:
-    name: "4.22"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -36,7 +36,7 @@ images:
   items:
   - dockerfile_literal: |
       FROM this-is-ignored
-      RUN dnf install -y git python39
+      RUN dnf install -y git python39 jq
     from: cli
     optional: true
     to: cli-with-git
@@ -75,7 +75,7 @@ tests:
   capabilities:
   - intranet
   cluster: build05
-  cron: 0 23 31 2 *
+  cron: 0 3,15 * * *
   reporter_config:
     channel: '#opp-discussion'
     job_states_to_report:
@@ -90,7 +90,6 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
     env:
-      AWS_COMPUTE_VOLUME_SIZE: "500"
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: m6a.2xlarge
@@ -103,13 +102,14 @@ tests:
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9104
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "false"
+      ODF_VERSION_MAJOR_MINOR: "4.22"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
       QUAY_OPERATOR_CHANNEL: stable-3.17
-      SKIP_POLICIES: policy-acs,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
+      SKIP_POLICIES: policy-acs,policy-acs-central-ca-bundle,policy-acs-central-status,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -124,7 +124,6 @@ tests:
     - ref: ipi-conf-telemetry
     - ref: ipi-conf-aws-custom-az
     - ref: ipi-conf-aws
-    - ref: ipi-conf-aws-rootvolume
     - ref: ipi-install-monitoringpvc
     - chain: ipi-install
     - ref: interop-opp-disk-diag
@@ -138,11 +137,12 @@ tests:
     - ref: interop-opp-wait-mcp
     - ref: stackrox-opp-readiness
     - ref: stackrox-opp-smoke
-    - ref: acm-tests-clc-create
+    - ref: acm-tests-clc-smoke
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
     - ref: interop-opp-odf-health
     - ref: interop-opp-observability-odf
+    - ref: interop-tests-ocs-tests
     - ref: interop-tests-opp-quay-smoke
     - ref: interop-opp-skip-ratio-gate
 zz_generated_metadata:

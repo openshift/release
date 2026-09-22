@@ -909,6 +909,34 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
                 fi
             done <<< "${STUCK_PKGS}"
         fi
+
+        # ClusterPackage Available check: detect any ClusterPackage with Available != True.
+        # This catches degraded CPs that the "refusing adoption" check above does not cover,
+        # matching the health check's ClusterPackage backstop stamp format.
+        if [[ "${PKO_CHECK_FAILED}" != "true" ]]; then
+            DEGRADED_CP=$(oc get clusterpackage -l "hive.openshift.io/managed=true" \
+                -o json --kubeconfig="${PKO_KUBECONFIG}" 2>/dev/null \
+                | jq -r '.items[] |
+                    select(any(.status.conditions[]?;
+                        .type == "Available" and .status == "True") | not) |
+                    .metadata.name' 2>/dev/null | head -n1) || true
+            if [[ -n "${DEGRADED_CP}" ]]; then
+                log "UNHEALTHY: ${CM_NAME} ClusterPackage ${DEGRADED_CP} has Available != True"
+                if [[ "${STATUS}" != "error" ]] && ! dry_run_guard "Would mark ${CM_NAME} as error (ClusterPackage degraded)"; then
+                    lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                        "metadata": {
+                            "labels": { "rosa-cluster-lease/status": "error" },
+                            "annotations": { "rosa-cluster-lease/error-reason": "ClusterPackage: degraded:'"${DEGRADED_CP}"'", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
+                        }
+                    }'
+                fi
+                rm -f "${PKO_KUBECONFIG}"
+                trap - EXIT
+                UNHEALTHY=$((UNHEALTHY + 1))
+                echo "UNHEALTHY: ${CM_NAME} (ClusterPackage: degraded:${DEGRADED_CP})" >> "${REPORT}"
+                continue
+            fi
+        fi
     else
         log "WARNING: ${CM_NAME} could not retrieve cluster kubeconfig for PKO check, skipping"
     fi
@@ -931,16 +959,22 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
 
     # Restore clusters that recovered from error
     if [[ "${STATUS}" == "error" ]]; then
-        log "RESTORED: ${CM_NAME} is healthy again"
-        if ! dry_run_guard "Would restore ${CM_NAME} to available"; then
-            lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-                "metadata": {
-                    "labels": { "rosa-cluster-lease/status": "available" },
-                    "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "" }
-                }
-            }' || true
+        ERROR_REASON=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/error-reason"] // ""')
+        if [[ "${ERROR_REASON}" == ClusterPackage:* ]]; then
+            log "SKIPPING RESTORE: ${CM_NAME} has health-check ClusterPackage error-reason, deferring to health check for recovery"
+            echo "SKIPPED RESTORE: ${CM_NAME} (error-reason: ${ERROR_REASON})" >> "${REPORT}"
+        else
+            log "RESTORED: ${CM_NAME} is healthy again"
+            if ! dry_run_guard "Would restore ${CM_NAME} to available"; then
+                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                    "metadata": {
+                        "labels": { "rosa-cluster-lease/status": "available" },
+                        "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "" }
+                    }
+                }' || true
+            fi
+            echo "RESTORED: ${CM_NAME}" >> "${REPORT}"
         fi
-        echo "RESTORED: ${CM_NAME}" >> "${REPORT}"
     fi
 
     HEALTHY=$((HEALTHY + 1))

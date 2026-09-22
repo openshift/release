@@ -30,8 +30,7 @@ images:
           dnf clean all
       COPY . /go/src/github.com/openshift/console/
       WORKDIR /go/src/github.com/openshift/console
-      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
-          CYPRESS_INSTALL_BINARY=0
+      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
       RUN YARN_PATH="frontend/$(awk '/yarnPath:/{print $2}' frontend/.yarnrc.yml)" && \
           printf '%s\n' '#!/bin/sh' "exec node /go/src/github.com/openshift/console/$YARN_PATH \"\$@\"" > /usr/local/bin/yarn && \
           chmod +x /usr/local/bin/yarn
@@ -44,12 +43,10 @@ images:
         paths:
         - destination_dir: .
           source_path: /go/src/github.com/openshift/console/.
-    to: console-playwright-runner
+    to: console-tests
 promotion:
   to:
-  - additional_images:
-      console-tests: src
-    disabled: true
+  - disabled: true
     name: "5.1"
     namespace: ocp-priv
 prowgen:
@@ -78,7 +75,7 @@ resources:
     requests:
       cpu: "2"
       memory: 10Gi
-  console-playwright-runner:
+  console-tests:
     requests:
       cpu: "1"
       memory: 12Gi
@@ -128,38 +125,12 @@ tests:
       dependencies:
       - env: PLUGIN_PULL_SPEC
         name: console-plugin-demo
-      from: console-playwright-runner
+      from: console-tests
       resources:
         requests:
           cpu: "4"
           memory: 10Gi
       timeout: 2h0m0s
-    workflow: ipi-gcp
-- always_run: false
-  as: e2e-cypress
-  optional: true
-  pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
-  steps:
-    cluster_profile: openshift-org-gcp
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export CYPRESS_RECORD_KEY="$(cat /var/run/cypress-secrets/record-key)"
-        ./test-prow-e2e-cypress.sh
-      credentials:
-      - collection: console-cypress
-        group: cypress-record-key
-        mount_path: /var/run/cypress-secrets
-      dependencies:
-      - env: CYPRESS_PLUGIN_PULL_SPEC
-        name: console-plugin-demo
-      from: src
-      resources:
-        requests:
-          cpu: "4"
-          memory: 10Gi
-      timeout: 6h0m0s
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-console-techpreview
@@ -177,7 +148,7 @@ tests:
       dependencies:
       - env: PLUGIN_PULL_SPEC
         name: console-plugin-demo
-      from: console-playwright-runner
+      from: console-tests
       resources:
         requests:
           cpu: "4"

@@ -1,10 +1,17 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   upi-installer:
     name: "4.22"
     namespace: ocp
     tag: upi-installer
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: builder
+    namespace: medik8s
+    tag: go1.27
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -28,7 +35,8 @@ tests:
   - intranet
   optional: true
   steps:
-    cluster_profile: medik8s-aws
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
@@ -38,7 +46,10 @@ tests:
       ECO_TEST_LABELS: tier:upgrade
       OCP_VERSION: "422"
       SKIP_IDMS: "true"
+      TEST_NAME: e2e-far-upgrade-presubmit-aws
+      TEST_STEPS: e2e-upgrade-test
     post:
+    - ref: medik8s-analyze-e2e-failure
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre-stableinitial
@@ -73,7 +84,8 @@ tests:
   - intranet
   cron: 0 8 * * 5
   steps:
-    cluster_profile: medik8s-aws
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
@@ -83,7 +95,10 @@ tests:
       ECO_TEST_LABELS: tier:upgrade
       OCP_VERSION: "422"
       SKIP_IDMS: "true"
+      TEST_NAME: e2e-far-upgrade-aws
+      TEST_STEPS: e2e-upgrade-test
     post:
+    - ref: medik8s-analyze-e2e-failure
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre-stableinitial
