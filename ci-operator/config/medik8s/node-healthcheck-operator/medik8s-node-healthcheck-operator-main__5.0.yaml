@@ -69,15 +69,6 @@ tests:
     test:
     - as: inspect-nhc-src-and-build
       cli: latest
-      dependencies:
-      - name: src
-        env: NHC_SRC_IMAGE
-      from: nhc-upgrade-test-runner
-      nested_podman: true
-      resources:
-        requests:
-          cpu: 100m
-          memory: 500Mi
       commands: |
         set -o errexit -o nounset -o pipefail
         echo '==> Verify injected oc and inspect CI-selected source'
@@ -161,6 +152,15 @@ tests:
           CATALOG_IMG="${prefix}-catalog:1h"
         podman push --digestfile "$digest_dir/catalog.digest" "${prefix}-catalog:1h"
         echo "==> Catalog pushed: ${prefix}-catalog@$(cat "$digest_dir/catalog.digest")"
+      dependencies:
+      - env: NHC_SRC_IMAGE
+        name: src
+      from: nhc-upgrade-test-runner
+      nested_podman: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 500Mi
 - always_run: false
   as: e2e-system-tests-nhc-upgrade
   capabilities:
