@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   system-tests-builder:
     name: builder
     namespace: medik8s
@@ -16,17 +20,20 @@ images:
     from: base
     to: node-healthcheck-operator
   - dockerfile_literal: |
-      FROM quay.io/medik8s/node-remediation-console@sha256:384d35e7aed7be24f8837e33cfd1e94a683a1cdcafb7da58f813ae233e957ff7
-    to: nhc-console-plugin
-  - dockerfile_literal: |
-      # system-tests needs Go 1.27, skopeo, and the exact Operator SDK version;
-      # no existing CI base image provides all three.
+      FROM system-tests-builder AS go-builder
       FROM quay.io/operator-framework/operator-sdk@sha256:1b37b208f424e5abec0dc2045b54d3942e2eb03e085f48baf19aff7e5a333d84 AS operator-sdk
-      FROM system-tests-builder
+      FROM nested-podman
       USER 0
-      RUN dnf install -y skopeo && dnf clean all
+      RUN dnf install -y git make skopeo jq findutils curl tar gzip && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
       COPY --from=operator-sdk /usr/local/bin/operator-sdk /usr/local/bin/operator-sdk
-    from: system-tests-builder
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+    from: nested-podman
+    inputs:
+      system-tests-builder:
+        as:
+        - system-tests-builder
     to: nhc-upgrade-test-runner
 operator:
   bundles:
@@ -36,8 +43,6 @@ operator:
   substitutions:
   - pullspec: quay.io/medik8s/node-healthcheck-operator:.*
     with: pipeline:node-healthcheck-operator
-  - pullspec: quay.io/medik8s/node-remediation-console:.*
-    with: pipeline:nhc-console-plugin
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -56,7 +61,37 @@ resources:
       memory: 500Mi
 tests:
 - always_run: false
+  as: nhc-upgrade-build-smoke
+  capabilities:
+  - nested-podman
+  optional: true
+  commands: |
+    set -o errexit -o nounset -o pipefail
+    id
+    podman info
+
+    git clone --depth=1 https://github.com/medik8s/node-healthcheck-operator.git /tmp/nhc-source
+    cd /tmp/nhc-source
+    NHC_VERSION="$(sed -n 's/^[[:space:]]*Version = "\([^"]*\)".*/\1/p' version/version.go)"
+    makefile_version="$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)"
+    test -n "$NHC_VERSION" && test "$NHC_VERSION" = "$makefile_version"
+    NHC_PREVIOUS_VERSION="$(skopeo list-tags docker://registry.redhat.io/workload-availability/node-healthcheck-operator-bundle |
+      jq -r '.Tags[] | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))' | sort -V | tail -n 1)"
+    test -n "$NHC_PREVIOUS_VERSION"
+    NHC_PREVIOUS_VERSION="${NHC_PREVIOUS_VERSION#v}"
+    test "$NHC_VERSION" != "$NHC_PREVIOUS_VERSION"
+    printf 'Candidate: %s; latest GA: %s\n' "$NHC_VERSION" "$NHC_PREVIOUS_VERSION"
+
+    probe_image="ttl.sh/nhc-prow-smoke-$(date +%Y%m%d-%H%M%S)-${BUILD_ID:-local}:1h"
+    NHC_SKIP_TEST=true make docker-build VERSION="$NHC_VERSION" IMG="$probe_image"
+    podman push "$probe_image"
+  container:
+    from: nhc-upgrade-test-runner
+  nested_podman: true
+- always_run: false
   as: e2e-system-tests-nhc-upgrade
+  capabilities:
+  - nested-podman
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -74,72 +109,133 @@ tests:
         : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
         exec > >(tee "$ARTIFACT_DIR/nhc-upgrade-tests.log") 2>&1
 
-        # Reuse the cluster pull secret so skopeo can discover the released
-        # Red Hat bundle versions without exposing registry credentials.
-        export XDG_RUNTIME_DIR=/tmp/nhc-xdg-runtime
-        mkdir -p "$XDG_RUNTIME_DIR/containers"
-        oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' |
-          base64 --decode > "$XDG_RUNTIME_DIR/containers/auth.json"
-        chmod 0600 "$XDG_RUNTIME_DIR/containers/auth.json"
-        export REGISTRY_AUTH_FILE="$XDG_RUNTIME_DIR/containers/auth.json"
+        export CONSOLE_PLUGIN_IMAGE=quay.io/medik8s/node-remediation-console@sha256:384d35e7aed7be24f8837e33cfd1e94a683a1cdcafb7da58f813ae233e957ff7
+        export MUST_GATHER_IMAGE=quay.io/medik8s/must-gather@sha256:a3ba0753e60517c2a7cff68eca778c23198787af36e8214e8838d2c7fc676b97
 
-        # OpenShift runs test containers as an arbitrary non-root UID. Keep Go
-        # downloads and build caches out of the image's read-only GOPATH.
-        export GOPATH=/tmp/nhc-go
-        export GOMODCACHE="$GOPATH/pkg/mod"
-        export GOCACHE=/tmp/nhc-go-build-cache
-        mkdir -p "$GOMODCACHE" "$GOCACHE"
+        prepare_runtime() {
+          # Give skopeo the cluster's Red Hat registry credentials.
+          local auth_dir=/tmp/nhc-registry-auth
+          mkdir -p "$auth_dir"
+          oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' |
+            base64 --decode > "$auth_dir/auth.json"
+          chmod 0600 "$auth_dir/auth.json"
+          export REGISTRY_AUTH_FILE="$auth_dir/auth.json"
 
-        go version
-        skopeo --version
-        operator-sdk version
-        # The SDK defaults to Docker for remote bundle unpacking. CI does not
-        # run a container daemon, so use its daemonless registry client.
-        operator-sdk bundle validate --image-builder=none "$OO_BUNDLE"
-        # Before merging this PR, switch back to medik8s/system-tests main
-        # after medik8s/system-tests #120 merges.
-        git clone --depth=1 --branch fix/nhc-prow-rehearsal \
-          https://github.com/JonahSussman/medik8s-system-tests.git /tmp/system-tests
-        git -C /tmp/system-tests show --no-patch --format=fuller HEAD
+          # The test container runs as an arbitrary UID.
+          export GOPATH=/tmp/nhc-go
+          export GOMODCACHE="$GOPATH/pkg/mod"
+          export GOCACHE=/tmp/nhc-go-build-cache
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
 
-        candidate_bundle_dir="$(mktemp -d)"
-        oc image extract "$OO_BUNDLE" --path="/manifests/:$candidate_bundle_dir" --confirm
-        candidate_csv="$(find "$candidate_bundle_dir" -name '*clusterserviceversion.yaml' -print -quit)"
-        : "${candidate_csv:?candidate bundle must contain a ClusterServiceVersion}"
-        candidate_version="$(sed -n 's/^  version: *//p' "$candidate_csv" | tr -d '"')"
-        : "${candidate_version:?NHC bundle CSV must specify spec.version}"
+          go version
+          skopeo --version
+          operator-sdk version
+          podman version
+          podman info
+        }
 
-        export NHC_UPGRADE_CANDIDATE_NHC_BUNDLE="$OO_BUNDLE"
-        export NHC_UPGRADE_CANDIDATE_NHC_IMAGE="$NHC_CANDIDATE_OPERATOR"
-        export NHC_UPGRADE_CANDIDATE_NHC_VERSION="$candidate_version"
-        export NHC_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
-        export ECO_TEST_FEATURES=nhc-operator
-        export WORKLOAD_IMAGE=unused-by-nhc-upgrade-tests
+        build_candidate() {
+          # Match build-and-push.sh: build operator, bundle, then catalog.
+          git clone --depth=1 https://github.com/medik8s/node-healthcheck-operator.git /tmp/nhc-source
+          local revision prefix operator_tag bundle_tag catalog_tag
+          revision="$(git -C /tmp/nhc-source rev-parse HEAD)"
+          git -C /tmp/nhc-source show --no-patch --format=fuller HEAD
+          printf '%s\n' "$revision" > "$ARTIFACT_DIR/nhc-source-commit.txt"
 
-        failed_tiers=()
-        for tier in upgrade-operator fresh-install; do
-          export ECO_TEST_LABELS="tier:${tier}"
-          export ECO_REPORTS_DUMP_DIR="$ARTIFACT_DIR/$tier"
-          mkdir -p "$ECO_REPORTS_DUMP_DIR"
-          if ! make -C /tmp/system-tests run-tests 2>&1 | tee "$ECO_REPORTS_DUMP_DIR/run.log"; then
-            failed_tiers+=("$tier")
+          cd /tmp/nhc-source
+          export NHC_VERSION
+          NHC_VERSION="$(sed -n 's/^[[:space:]]*Version = "\([^"]*\)".*/\1/p' version/version.go)"
+          local makefile_version
+          makefile_version="$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)"
+          test -n "$NHC_VERSION" && test "$NHC_VERSION" = "$makefile_version"
+          export NHC_PREVIOUS_VERSION
+          NHC_PREVIOUS_VERSION="$(skopeo list-tags docker://registry.redhat.io/workload-availability/node-healthcheck-operator-bundle |
+            jq -r '.Tags[] | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))' | sort -V | tail -n 1)"
+          test -n "$NHC_PREVIOUS_VERSION"
+          NHC_PREVIOUS_VERSION="${NHC_PREVIOUS_VERSION#v}"
+          test "$NHC_VERSION" != "$NHC_PREVIOUS_VERSION"
+          printf 'Candidate: %s; latest GA: %s\n' "$NHC_VERSION" "$NHC_PREVIOUS_VERSION"
+
+          prefix="ttl.sh/nhc-prow-$(date +%Y%m%d-%H%M%S)-${revision:0:7}"
+          operator_tag="${prefix}-operator:24h"
+          bundle_tag="${prefix}-bundle:24h"
+          catalog_tag="${prefix}-catalog:24h"
+
+          make docker-build VERSION="$NHC_VERSION" IMG="$operator_tag"
+          podman push --digestfile "$ARTIFACT_DIR/operator.digest" "$operator_tag"
+          export NHC_UPGRADE_CANDIDATE_NHC_IMAGE="${prefix}-operator@$(cat "$ARTIFACT_DIR/operator.digest")"
+
+          make bundle-build-ocp \
+            VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
+            SKIP_RANGE_LOWER=0.1.0 DOCS_RHWA_VERSION=5.0 \
+            IMG="$NHC_UPGRADE_CANDIDATE_NHC_IMAGE" BUNDLE_IMG="$bundle_tag" \
+            CONSOLE_PLUGIN_IMAGE="$CONSOLE_PLUGIN_IMAGE" MUST_GATHER_IMAGE="$MUST_GATHER_IMAGE"
+          podman push --digestfile "$ARTIFACT_DIR/bundle.digest" "$bundle_tag"
+          export NHC_UPGRADE_CANDIDATE_NHC_BUNDLE="${prefix}-bundle@$(cat "$ARTIFACT_DIR/bundle.digest")"
+
+          make catalog-build \
+            VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
+            SKIP_RANGE_LOWER=0.1.0 BUNDLE_IMG="$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE" \
+            CATALOG_IMG="$catalog_tag"
+          podman push --digestfile "$ARTIFACT_DIR/catalog.digest" "$catalog_tag"
+          export NHC_UPGRADE_CANDIDATE_NHC_CATALOG="${prefix}-catalog@$(cat "$ARTIFACT_DIR/catalog.digest")"
+
+          printf 'NHC_UPGRADE_CANDIDATE_NHC_IMAGE=%s\nNHC_UPGRADE_CANDIDATE_NHC_BUNDLE=%s\nNHC_UPGRADE_CANDIDATE_NHC_CATALOG=%s\n' \
+            "$NHC_UPGRADE_CANDIDATE_NHC_IMAGE" "$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE" \
+            "$NHC_UPGRADE_CANDIDATE_NHC_CATALOG" | tee "$ARTIFACT_DIR/candidate-images.txt"
+        }
+
+        verify_candidate() {
+          operator-sdk bundle validate --image-builder=none "$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE"
+          local bundle_dir candidate_csv candidate_version
+          bundle_dir="$(mktemp -d)"
+          oc image extract "$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE" --path="/manifests/:$bundle_dir" --confirm
+          candidate_csv="$(find "$bundle_dir" -name '*clusterserviceversion.yaml' -print -quit)"
+          : "${candidate_csv:?candidate bundle must contain a ClusterServiceVersion}"
+          candidate_version="$(sed -n 's/^  version: *//p' "$candidate_csv" | tr -d '"')"
+          : "${candidate_version:?NHC bundle CSV must specify spec.version}"
+          test "$candidate_version" = "$NHC_VERSION"
+          grep -Fq "$CONSOLE_PLUGIN_IMAGE" "$candidate_csv"
+          export NHC_UPGRADE_CANDIDATE_NHC_VERSION="$candidate_version"
+        }
+
+        run_tests() {
+          # Before merging, switch back to medik8s/system-tests main after #120 merges.
+          git clone --depth=1 --branch fix/nhc-prow-rehearsal \
+            https://github.com/JonahSussman/medik8s-system-tests.git /tmp/system-tests
+          git -C /tmp/system-tests show --no-patch --format=fuller HEAD
+
+          export NHC_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
+          export ECO_TEST_FEATURES=nhc-operator
+          export WORKLOAD_IMAGE=unused-by-nhc-upgrade-tests
+
+          local tier
+          local -a failed_tiers=()
+          for tier in upgrade-operator fresh-install; do
+            export ECO_TEST_LABELS="tier:${tier}"
+            export ECO_REPORTS_DUMP_DIR="$ARTIFACT_DIR/$tier"
+            mkdir -p "$ECO_REPORTS_DUMP_DIR"
+            if ! make -C /tmp/system-tests run-tests 2>&1 | tee "$ECO_REPORTS_DUMP_DIR/run.log"; then
+              failed_tiers+=("$tier")
+            fi
+          done
+
+          if (( ${#failed_tiers[@]} > 0 )); then
+            printf 'Failed tiers: %s\n' "${failed_tiers[*]}"
+            return 1
           fi
-        done
+        }
 
-        if (( ${#failed_tiers[@]} > 0 )); then
-          printf 'Failed tiers: %s\n' "${failed_tiers[*]}"
-          exit 1
-        fi
-      dependencies:
-      - env: OO_BUNDLE
-        name: my-bundle
-      - env: NHC_CANDIDATE_OPERATOR
-        name: node-healthcheck-operator
+        prepare_runtime
+        build_candidate
+        verify_candidate
+        run_tests
       from: nhc-upgrade-test-runner
+      nested_podman: true
       resources:
         requests:
-          cpu: 100m
-          memory: 500Mi
+          cpu: "2"
+          memory: 4Gi
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
