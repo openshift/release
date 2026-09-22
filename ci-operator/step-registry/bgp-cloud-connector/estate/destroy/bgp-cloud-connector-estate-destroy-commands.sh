@@ -110,9 +110,24 @@ if ! az network routeserver show -g "${NET_RG}" -n "${ROUTE_SERVER}" --output no
   echo "  not there"
 else
   err="$(mktemp)"
-  if az network routeserver delete -g "${NET_RG}" -n "${ROUTE_SERVER}" --yes --output none 2>"${err}"; then
-    echo "  gone after $(( (SECONDS - started) / 60 )) minutes"
-  else
+  # AnotherOperationInProgress is a wait, not a refusal. The operator
+  # reconciles its peerings on a short loop, so a delete issued while one
+  # is in flight is rejected on a resource that is perfectly deletable a
+  # moment later. Measured: this took a classic run red after every fact
+  # had already been gathered.
+  deleted=no
+  for attempt in 1 2 3 4 5 6 7 8; do
+    if az network routeserver delete -g "${NET_RG}" -n "${ROUTE_SERVER}" \
+         --yes --output none 2>"${err}"; then
+      deleted=yes
+      echo "  gone after $(( (SECONDS - started) / 60 )) minutes, on attempt ${attempt}"
+      break
+    fi
+    grep -q 'AnotherOperationInProgress' "${err}" || break
+    echo "  another operation is in progress; waiting (attempt ${attempt})"
+    sleep 30
+  done
+  if [[ "${deleted}" != yes ]]; then
     removal_failed "Route Server ${ROUTE_SERVER}" "${err}"
   fi
   rm -f "${err}"
