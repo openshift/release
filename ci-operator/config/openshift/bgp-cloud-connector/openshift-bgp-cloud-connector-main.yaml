@@ -1004,6 +1004,1459 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: hypershift-azure-aks-conformance
+- always_run: false
+  as: aro-classic-probe
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ARO_CLUSTER_VERSION: "4.21"
+    post:
+    - as: probe-operator
+      best_effort: true
+      cli: latest
+      commands: |
+        # What the operator does once it is running on ARO against a Route
+        # Server that really exists. Everything before this measured the
+        # cluster and built the estate; this is the only step that exercises
+        # the operator's own path end to end, and it is as close to the
+        # end-to-end job as this can get without the suite.
+        # errexit off explicitly, rather than merely left alone. These commands
+        # are wrapped before they run, set -uo pipefail does not clear -e if
+        # that wrapper set it, and a bare command that fails would then abandon
+        # the step where it stands. Measured in the first rehearsal: one
+        # Forbidden ended a step after a single line, before the echo on the
+        # next line or the step's own exit. A probe that stops at its first
+        # unanswerable question is the thing this file exists to avoid.
+        set +e
+        set -uo pipefail
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        # Logging in is both the call most likely to fail and the one whose
+        # failure text is most likely to name the tenant, the principal, the
+        # subscription or the request, and prow logs are public for openshift
+        # repositories. Captured and redacted like everything else.
+        az_login() {
+          local sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" err rc=0
+          err="$(mktemp)"
+          # --password=VALUE, not --password VALUE. A client secret
+          # beginning with a hyphen is read by az as another flag, and
+          # the login fails with "argument --password/-p: expected one
+          # argument" for a secret that is perfectly good. Measured: CCO
+          # issued exactly such a secret and it cost this probe its
+          # interface write test.
+          az login --service-principal \
+            --username "$(jq -er .clientId "${sp}")" \
+            --password="$(jq -er .clientSecret "${sp}")" \
+            --tenant "$(jq -er .tenantId "${sp}")" \
+            --output none 2>"${err}" || rc=$?
+          if (( rc == 0 )); then
+            az account set --subscription "$(jq -er .subscriptionId "${sp}")" 2>>"${err}" || rc=$?
+          fi
+          if (( rc != 0 )); then
+            echo "  could not log in with the cluster profile's service principal:"
+            redact <"${err}" | sed 's/^/    /'
+          fi
+          rm -f "${err}"
+          return "${rc}"
+        }
+
+        # Key names, and the values never land in a shell variable on the way.
+        # A variable holding a client secret can be printed by an error path or
+        # a stray trace, and prow logs are public for openshift repositories;
+        # jq reads the stream and emits nothing but the names. --ignore-not-found
+        # so an absent secret is an answer rather than a failed read.
+        secret_keys() {
+          oc -n "$1" get secret "$2" -o json --ignore-not-found \
+            | jq -r 'if .data then (.data | keys | @json) else empty end'
+        }
+        section() { echo; echo "=== $* ==="; }
+        dump() {
+          local name="$1" err; shift
+          err="$(mktemp)"
+          # Raw stderr is captured outside the artifact directory and only a
+          # redacted copy is put into it. Artifacts are published exactly as
+          # the logs are, and a failed Azure or Kubernetes call names the
+          # subscription, the tenant, the principal or the request URL in its
+          # error text -- which is the very thing redact exists to remove.
+          if "$@" 2>"${err}" | redact >"${ARTIFACT_DIR}/${name}"; then
+            echo "  saved ${name}"
+          else
+            redact <"${err}" >"${ARTIFACT_DIR}/${name}.err"
+            echo "  FAILED ${name}: $(head -1 "${ARTIFACT_DIR}/${name}.err")"
+          fi
+          rm -f "${err}"
+        }
+
+        ns=openshift-bgp-cloud-connector
+
+        # A post step runs whatever the test did, which is the point of putting
+        # this one here: a failed enable-frr or a failed install should still
+        # leave the operator measured. It also runs when provisioning never
+        # happened at all, and then there is no cluster kubeconfig -- oc falls
+        # through to the build cluster as the job's own service account, and
+        # every read below is refused against entirely the wrong cluster.
+        #
+        # Measured in the first rehearsal, where aro-provision-cluster failed
+        # and this step reported Forbidden on networks.operator.openshift.io
+        # against the build farm. aro-provision-cluster writes this file last,
+        # so its absence means no cluster was ever handed over.
+        if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
+          echo "no cluster was provisioned, so there is nothing here to measure"
+          exit 0
+        fi
+
+        section "did the FRR patch survive the install"
+        # ARO reverts configuration it manages, and it has had the length of
+        # the install step to do so. If this does not stick, the first step of
+        # every other cloud's job does not work here.
+        oc get network.operator.openshift.io cluster \
+          -o jsonpath='  additionalRoutingCapabilities: {.spec.additionalRoutingCapabilities}{"\n"}  routeAdvertisements: {.spec.defaultNetwork.ovnKubernetesConfig.routeAdvertisements}{"\n"}'
+        oc get crd frrconfigurations.frrk8s.metallb.io routeadvertisements.k8s.ovn.org 2>&1 | sed 's/^/    /'
+        oc -n openshift-frr-k8s get daemonset frr-k8s 2>&1 | sed 's/^/    /'
+        dump network-operator-after.yaml oc get network.operator.openshift.io cluster -o yaml
+        dump co-network.yaml oc get co network -o yaml
+
+        section "the operator"
+        oc -n "${ns}" get csv 2>&1 | sed 's/^/  /'
+        oc -n "${ns}" get deployment 2>&1 | sed 's/^/  /'
+        oc -n "${ns}" get pods 2>&1 | sed 's/^/  /'
+        dump operator-csv.yaml oc -n "${ns}" get csv -o yaml
+        dump operator-pods.yaml oc -n "${ns}" get pods -o yaml
+
+        section "did it ask for credentials, and did it get any"
+        oc -n openshift-cloud-credential-operator get credentialsrequest 2>&1 \
+          | grep -i bgp | sed 's/^/  /' || echo "  it created no CredentialsRequest"
+        keys="$(secret_keys "${ns}" bgp-cloud-connector-azure-credentials)"
+        echo "  secret keys in ${ns}: ${keys:-<none: CCO wrote nothing for the operator>}"
+        dump operator-credentialsrequests.yaml oc -n openshift-cloud-credential-operator get credentialsrequest -o yaml
+
+        section "a router node"
+        node="$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)"
+        if [[ -z "${node}" ]]; then
+          echo "  no worker node to label" >&2
+        else
+          oc label node "${node}" bgp_router=true --overwrite 2>&1 | sed 's/^/  /'
+        fi
+
+        section "reconcile against the Route Server that was built"
+        if [[ ! -f "${SHARED_DIR}/bgp-cloud-connector-estate" ]]; then
+          echo "  no estate step ran, so there is nothing to reconcile against"
+          exit 0
+        fi
+        # Sourced rather than parsed, and then checked: a step killed partway
+        # through writing this leaves a file that exists and says nothing, and
+        # under nounset an unset name further down is a hard error in the
+        # middle of the work rather than a message here.
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/bgp-cloud-connector-estate"
+        : "${NET_RG:=}" "${VNET:=}" "${ROUTE_SERVER:=}" "${ROUTE_SERVER_PIP:=}" "${ROUTE_SERVER_BUILT:=no}"
+        if [[ "${ROUTE_SERVER_BUILT}" != yes || -z "${NET_RG}" || -z "${ROUTE_SERVER}" ]]; then
+          echo "  no Route Server was built, so a reconcile would only repeat what that step already said"
+          exit 0
+        fi
+        subscription="$(jq -er .subscriptionId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")"
+
+        # Applied without echoing it: the subscription is in the body, and
+        # prow logs are public. The dump below is redacted.
+        oc apply -f - >/dev/null <<EOF
+        apiVersion: networking.openshift.io/v1beta1
+        kind: BGPCloudConfiguration
+        metadata:
+          name: cluster
+        spec:
+          platform: Azure
+          bgp:
+            localASN: 65001
+            livenessDetection: bgp-keepalive
+          routerNodeSelector:
+            bgp_router: "true"
+          azure:
+            subscriptionID: ${subscription}
+            resourceGroup: ${NET_RG}
+            routeServerName: ${ROUTE_SERVER}
+        EOF
+
+        echo "  waiting up to fifteen minutes for a verdict..."
+        deadline=$((SECONDS + 900))
+        reason=""
+        while (( SECONDS < deadline )); do
+          reason="$(oc get bgpcloudconfiguration cluster \
+            -o jsonpath='{.status.conditions[?(@.type=="CloudEndpointsDiscovered")].reason}' 2>/dev/null)"
+          case "${reason}" in
+            ""|WaitingForCloudCredentials) ;;
+            *) break ;;
+          esac
+          sleep 15
+        done
+        case "${reason}" in
+          CloudCredentialsInvalid)
+            echo "  CloudCredentialsInvalid: the operator could not use what it was given" ;;
+          ""|WaitingForCloudCredentials)
+            echo "  still ${reason:-unset} after fifteen minutes: no credentials ever reached it" ;;
+          *)
+            echo "  ${reason}" ;;
+        esac
+        oc get bgpcloudconfiguration cluster -o json | jq '.status' | redact | sed 's/^/  /'
+
+        section "did the operator write a BGP connection to the Route Server"
+        # The one thing only a working credential path can produce. Reading it
+        # from Azure rather than from the cluster, because the cluster only
+        # says what the operator believes.
+        if az_login; then
+          # The command's status decides, not whether it printed something:
+          # 2>&1 here would turn a refusal into what looks like a peering list.
+          peer_err="$(mktemp)"
+          if peerings="$(az network routeserver peering list -g "${NET_RG}" \
+               --routeserver "${ROUTE_SERVER}" \
+               --query "[].{name:name, peerAsn:peerAsn, peerIp:peerIp, state:provisioningState}" \
+               -o json 2>"${peer_err}")"; then
+            printf '%s\n' "${peerings}" | redact | sed 's/^/  /'
+          else
+            echo "  could not list the peerings:"
+            redact <"${peer_err}" | sed 's/^/    /'
+          fi
+          rm -f "${peer_err}"
+        fi
+
+        section "and did FRR hear about it"
+        oc get frrconfigurations.frrk8s.metallb.io -A 2>&1 | sed 's/^/  /'
+        oc get routeadvertisements.k8s.ovn.org -A 2>&1 | sed 's/^/  /'
+        dump frrconfigurations.yaml oc get frrconfigurations.frrk8s.metallb.io -A -o yaml
+        dump bgpcloudconfiguration.yaml oc get bgpcloudconfiguration cluster -o yaml
+        dump operator-logs.txt oc -n "${ns}" logs deployment/openshift-bgp-cloud-connector-controller-manager --tail=500
+
+        section "everything else worth keeping"
+        dump events.txt oc get events -A --sort-by=.lastTimestamp
+        dump clusteroperators-final.txt oc get clusteroperators
+
+        section "done"
+        exit 0
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h0m0s
+    - as: identity-teardown
+      best_effort: true
+      cli: latest
+      commands: |
+        # Remove the federated credentials probe-identity added, and say
+        # honestly what could not be removed.
+        #
+        # A post step rather than a test step, because a test step that never
+        # runs leaves a Route Server behind, and a Route Server holds the
+        # subnet, which holds the virtual network, which the group delete then
+        # cannot remove. It also runs after a cancellation, which is the case
+        # that matters most: the federated credential this removes is attached
+        # to an identity ARO manages, and the support policy is explicit about
+        # not leaving those altered.
+        #
+        # aro-deprovision deletes the whole resource group afterwards and is
+        # the backstop for anything missed here, but a delete that fails is
+        # reported rather than glossed: "gone" printed over a failure is how a
+        # leak becomes invisible.
+        # errexit off explicitly, rather than merely left alone. These commands
+        # are wrapped before they run, set -uo pipefail does not clear -e if
+        # that wrapper set it, and a bare command that fails would then abandon
+        # the step where it stands. Measured in the first rehearsal: one
+        # Forbidden ended a step after a single line, before the echo on the
+        # next line or the step's own exit. A probe that stops at its first
+        # unanswerable question is the thing this file exists to avoid.
+        set +e
+        set -uo pipefail
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        # Logging in is both the call most likely to fail and the one whose
+        # failure text is most likely to name the tenant, the principal or the
+        # subscription, and prow logs are public for openshift repositories.
+        az_login() {
+          local sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" err rc=0
+          if [[ ! -f "${sp}" ]]; then
+            echo "the cluster profile has no osServicePrincipal.json"
+            return 1
+          fi
+          err="$(mktemp)"
+          # --password=VALUE, not --password VALUE. A client secret
+          # beginning with a hyphen is read by az as another flag, and
+          # the login fails with "argument --password/-p: expected one
+          # argument" for a secret that is perfectly good. Measured: CCO
+          # issued exactly such a secret and it cost this probe its
+          # interface write test.
+          az login --service-principal \
+            --username "$(jq -er .clientId "${sp}")" \
+            --password="$(jq -er .clientSecret "${sp}")" \
+            --tenant "$(jq -er .tenantId "${sp}")" \
+            --output none 2>"${err}" || rc=$?
+          if (( rc == 0 )); then
+            az account set --subscription "$(jq -er .subscriptionId "${sp}")" 2>>"${err}" || rc=$?
+          fi
+          if (( rc != 0 )); then
+            echo "could not log in with the cluster profile's service principal:"
+            redact <"${err}" | sed 's/^/  /'
+          fi
+          rm -f "${err}"
+          return "${rc}"
+        }
+
+        failures=0
+        # Every removal reports, and one that fails does not stop the next: a
+        # subnet that cannot go is no reason to leave a federated credential
+        # attached to somebody else's managed identity.
+        removal_failed() {
+          echo "    COULD NOT REMOVE: $1"
+          redact <"$2" | sed 's/^/      /'
+          failures=$((failures + 1))
+        }
+
+        az_login || exit 1
+
+        echo "=== federated credentials ==="
+        # probe-identity records these before it creates them, so a step killed
+        # between the two is still cleaned up here. The one that matters is any
+        # credential added to an ARO platform identity: that identity outlives
+        # nothing this job owns, and ARO's support policy says not to leave its
+        # federated credentials altered.
+        if [[ -f "${SHARED_DIR}/bgp-probe-identity" ]]; then
+          while IFS='|' read -r fc_rg fc_identity fc_name; do
+            [[ -z "${fc_rg}" || -z "${fc_identity}" || -z "${fc_name}" ]] && continue
+            if ! az identity federated-credential show --name "${fc_name}" \
+                   --identity-name "${fc_identity}" -g "${fc_rg}" --output none 2>/dev/null; then
+              echo "  ${fc_name} on ${fc_identity}: not there"
+              continue
+            fi
+            err="$(mktemp)"
+            if az identity federated-credential delete --name "${fc_name}" \
+                 --identity-name "${fc_identity}" -g "${fc_rg}" --yes --output none 2>"${err}"; then
+              # Verified rather than assumed: this is the one removal whose
+              # failure would leave a managed identity trusting a service
+              # account in a cluster that no longer exists.
+              if az identity federated-credential show --name "${fc_name}" \
+                   --identity-name "${fc_identity}" -g "${fc_rg}" --output none 2>/dev/null; then
+                printf 'the delete reported success but %s is still there\n' "${fc_name}" >"${err}"
+                removal_failed "${fc_name} on ${fc_identity}" "${err}"
+              else
+                echo "  ${fc_name} on ${fc_identity}: removed, and confirmed gone"
+              fi
+            else
+              removal_failed "${fc_name} on ${fc_identity}" "${err}"
+            fi
+            rm -f "${err}"
+          done <"${SHARED_DIR}/bgp-probe-identity"
+        else
+          echo "  none were recorded"
+        fi
+
+        (( failures == 0 )) || exit 1
+        exit 0
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 45m0s
+    - ref: bgp-cloud-connector-estate-destroy
+    - ref: aro-deprovision
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: aro-provision-vnet
+    - ref: aro-provision-cluster
+    - ref: ipi-install-rbac
+    test:
+    - as: probe-cloud
+      cli: latest
+      commands: |
+        # The Azure side of an ARO cluster: which resource groups exist, what
+        # is in them, what this principal may write where, and whether the
+        # estate the operator needs can be built. Measured once so the e2e job
+        # is written against facts rather than against what the documentation
+        # and the RP source imply.
+        #
+        # Deliberately no errexit, and it exits zero unless the cluster cannot
+        # be read at all. A probe that stops at the first unanswerable question
+        # reports one fact where it could have reported ten, and every question
+        # here is independent of the others.
+        # errexit off explicitly, rather than merely left alone. These commands
+        # are wrapped before they run, set -uo pipefail does not clear -e if
+        # that wrapper set it, and a bare command that fails would then abandon
+        # the step where it stands. Measured in the first rehearsal: one
+        # Forbidden ended a step after a single line, before the echo on the
+        # next line or the step's own exit. A probe that stops at its first
+        # unanswerable question is the thing this file exists to avoid.
+        set +e
+        set -uo pipefail
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+
+        # Both prow logs and published artifacts are public for openshift
+        # repositories, and Azure names subscriptions, tenants and principals
+        # in its output and its error text.
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        # Logging in is both the call most likely to fail and the one whose
+        # failure text is most likely to name the tenant, the principal, the
+        # subscription or the request. Letting az write that to stderr puts it
+        # straight into a prow log, which for openshift repositories is public,
+        # so it is captured and redacted like everything else.
+        #
+        # Reports and returns rather than exiting, so a step that cannot log in
+        # still hands the run to the next step with a reason recorded.
+        az_login() {
+          local sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" err rc=0
+          if [[ ! -f "${sp}" ]]; then
+            echo "the cluster profile has no osServicePrincipal.json"
+            return 1
+          fi
+          err="$(mktemp)"
+          # --password=VALUE, not --password VALUE. A client secret
+          # beginning with a hyphen is read by az as another flag, and
+          # the login fails with "argument --password/-p: expected one
+          # argument" for a secret that is perfectly good. Measured: CCO
+          # issued exactly such a secret and it cost this probe its
+          # interface write test.
+          az login --service-principal \
+            --username "$(jq -er .clientId "${sp}")" \
+            --password="$(jq -er .clientSecret "${sp}")" \
+            --tenant "$(jq -er .tenantId "${sp}")" \
+            --output none 2>"${err}" || rc=$?
+          if (( rc == 0 )); then
+            az account set --subscription "$(jq -er .subscriptionId "${sp}")" 2>>"${err}" || rc=$?
+          fi
+          if (( rc != 0 )); then
+            echo "could not log in with the cluster profile's service principal:"
+            redact <"${err}" | sed 's/^/  /'
+          fi
+          rm -f "${err}"
+          return "${rc}"
+        }
+        section() { echo; echo "=== $* ==="; }
+
+        # Three outcomes, told apart: a value, nothing, or a refusal. Reporting
+        # the last two the same way turns an access problem into a statement of
+        # fact about the cloud, and they need different people to fix them.
+        read_value() {
+          local label="$1" when_empty="$2"; shift 2
+          local out err rc=0
+          err="$(mktemp)"
+          out="$("$@" 2>"${err}")" || rc=$?
+          if (( rc != 0 )); then
+            printf '  %-26s <read FAILED: %s>\n' "${label}" "$(head -1 "${err}" | redact)"
+          else
+            printf '  %-26s %s\n' "${label}" "${out:-<${when_empty}>}"
+          fi
+          rm -f "${err}"
+          (( rc == 0 ))
+        }
+        dump() {
+          local name="$1" err; shift
+          err="$(mktemp)"
+          # Raw stderr is captured outside the artifact directory and only a
+          # redacted copy is put into it. Artifacts are published exactly as
+          # the logs are, and a failed Azure or Kubernetes call names the
+          # subscription, the tenant, the principal or the request URL in its
+          # error text -- which is the very thing redact exists to remove.
+          if "$@" 2>"${err}" | redact >"${ARTIFACT_DIR}/${name}"; then
+            echo "  saved ${name}"
+          else
+            redact <"${err}" >"${ARTIFACT_DIR}/${name}.err"
+            echo "  FAILED ${name}: $(head -1 "${ARTIFACT_DIR}/${name}.err")"
+          fi
+          rm -f "${err}"
+        }
+
+        subscription="$(jq -er .subscriptionId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")"
+        az_login || exit 0
+
+        section "resource groups, as the cluster reports them"
+        # The estate scripts read these to decide where the Route Server goes
+        # and where its subnet goes. On IPI they are the same group. The
+        # prediction for ARO is that resourceGroupName is the RP-managed group,
+        # which carries a deny assignment, and networkResourceGroupName is the
+        # group this job created and owns.
+        oc get infrastructure cluster -o json | jq '{
+          infrastructureName: .status.infrastructureName,
+          platform: .status.platformStatus.type,
+          resourceGroupName: .status.platformStatus.azure.resourceGroupName,
+          networkResourceGroupName: .status.platformStatus.azure.networkResourceGroupName,
+          cloudName: .status.platformStatus.azure.cloudName
+        }'
+        infra="$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')"
+        rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')"
+        net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}')"
+        : "${net_rg:=${rg}}"
+        if [[ -z "${infra}" || -z "${rg}" ]]; then
+          # Reported and abandoned, not failed. Everything below needs the
+          # resource group, but the steps after this one do not need this one,
+          # and a run that stops here gathers a single fact where it could have
+          # gathered the cluster, the identities and the estate as well.
+          echo "the cluster reported no infrastructure name or resource group,"
+          echo "so the rest of this step has nothing to ask about"
+          exit 0
+        fi
+        # From the group, because Azure's infrastructure status carries no
+        # region.
+        read_value "region" "the group reports none" \
+          az group show -n "${rg}" --query location -o tsv
+
+        section "the ARO resource itself"
+        # Says which flavour of cluster the provisioning step actually made:
+        # a cluster service principal one or a managed identity one. That
+        # decides which credential path the operator can use.
+        #
+        # Scoped to the group this job created. An unscoped az aro list is
+        # subscription wide, and this subscription is shared: [0] could be
+        # another job's cluster, which would put its details in a public log
+        # and answer questions about the wrong machine.
+        az aro list -g "${net_rg}" --query "[?name!=null].{
+          name: name,
+          version: clusterProfile.version,
+          fipsMode: clusterProfile.fipsValidatedModules,
+          apiVisibility: apiserverProfile.visibility,
+          ingressVisibility: ingressProfiles[0].visibility,
+          outboundType: networkProfile.outboundType,
+          usesWorkloadIdentity: platformWorkloadIdentityProfile != null,
+          usesServicePrincipal: servicePrincipalProfile != null
+        }" -o json 2>&1 | redact
+        dump aro-show.json az aro list -g "${net_rg}" --query "[].{
+          version: clusterProfile.version,
+          domain: clusterProfile.domain,
+          fipsValidatedModules: clusterProfile.fipsValidatedModules,
+          apiserverVisibility: apiserverProfile.visibility,
+          ingressVisibility: ingressProfiles[0].visibility,
+          outboundType: networkProfile.outboundType,
+          podCidr: networkProfile.podCidr,
+          serviceCidr: networkProfile.serviceCidr,
+          masterVmSize: masterProfile.vmSize,
+          workerVmSize: workerProfiles[0].vmSize,
+          workerCount: workerProfiles[0].count,
+          usesWorkloadIdentity: platformWorkloadIdentityProfile != null,
+          usesServicePrincipal: servicePrincipalProfile != null,
+          provisioningState: provisioningState
+        }"
+
+        section "the deny assignment on ${rg}"
+        # ARO refuses */write in the cluster's own group to every principal but
+        # the cluster's own. Read it rather than trust the RP source: the
+        # NotActions list and the excluded principals are what decide whether
+        # the operator, and this job, can write there.
+        az rest --method get --output json \
+          --url "https://management.azure.com/subscriptions/${subscription}/resourceGroups/${rg}/providers/Microsoft.Authorization/denyAssignments?api-version=2022-04-01" \
+          --query "value[].{
+            name: properties.denyAssignmentName,
+            actions: properties.permissions[0].actions,
+            notActions: properties.permissions[0].notActions,
+            excludedPrincipalCount: length(properties.excludePrincipals)
+          }" 2>&1 | redact
+        dump denyassignments.json az rest --method get --output json \
+          --url "https://management.azure.com/subscriptions/${subscription}/resourceGroups/${rg}/providers/Microsoft.Authorization/denyAssignments?api-version=2022-04-01"
+
+        section "what the cluster's own principal may do"
+        # Under passthrough the operator is handed this principal, so its role
+        # assignments are the operator's permissions. Whether it reaches the
+        # group holding the vnet matters as much as the cluster group: the
+        # Route Server subnet lives in the former.
+        # --ignore-not-found so a cluster with no service principal answers
+        # cleanly, while a refusal still surfaces as an error.
+        cluster_client_id="$(oc -n kube-system get secret azure-credentials \
+          -o jsonpath='{.data.azure_client_id}' --ignore-not-found | base64 -d)"
+        if [[ -n "${cluster_client_id}" ]]; then
+          az role assignment list --all --assignee "${cluster_client_id}" \
+            --query "[].{role: roleDefinitionName, scopeKind: scope}" -o json 2>&1 \
+            | sed -E "s#/subscriptions/[^\"]*/resourceGroups/#resourceGroup: #" | redact
+        else
+          echo "  no kube-system/azure-credentials, so this cluster has no service principal"
+        fi
+
+        section "is the cluster's own principal one the deny assignment excludes"
+        # The whole passthrough argument rests on this one fact: if CCO hands
+        # the operator the cluster's own principal, and that principal is
+        # excluded, the interface writes in the managed group succeed. Both
+        # sides are object ids, so they are compared here and only the answer
+        # is printed.
+        if [[ -n "${cluster_client_id}" ]]; then
+          # Its failure is reported rather than swallowed: reading a service
+          # principal needs directory permission this principal may not have,
+          # and that is a different answer from "the principal is not excluded".
+          sp_err="$(mktemp)"
+          cluster_object_id="$(az ad sp show --id "${cluster_client_id}" --query id -o tsv 2>"${sp_err}")" || {
+            echo "  could not read the principal in the directory:"
+            redact <"${sp_err}" | head -2 | sed 's/^/    /'
+          }
+          rm -f "${sp_err}"
+          excluded="$(az rest --method get --output json \
+            --url "https://management.azure.com/subscriptions/${subscription}/resourceGroups/${rg}/providers/Microsoft.Authorization/denyAssignments?api-version=2022-04-01" \
+            --query "value[].properties.excludePrincipals[].id" -o tsv 2>/dev/null)"
+          if [[ -z "${cluster_object_id}" ]]; then
+            echo "  the principal could not be resolved, so this cannot be answered here"
+          elif grep -qiF "${cluster_object_id}" <<<"${excluded}"; then
+            echo "  YES: the cluster's principal is excluded, so credentials passed"
+            echo "  through from it can write in ${rg}"
+          else
+            echo "  NO: the cluster's principal is not among the excluded ones"
+          fi
+          echo "  excluded principals in total: $(grep -c . <<<"${excluded}")"
+        else
+          echo "  this cluster has no service principal, so the question is moot"
+        fi
+
+        section "what is in each resource group"
+        # Names and types only. A full listing carries resource ids, and those
+        # carry the subscription.
+        for group in "${rg}" "${net_rg}"; do
+          echo "--- ${group} ---"
+          az resource list -g "${group}" \
+            --query "sort_by([].{name:name, type:type}, &type)" -o table 2>&1 | redact | sed 's/^/  /'
+        done
+        dump resources-cluster-group.json az resource list -g "${rg}" --query "[].{name:name,type:type}"
+        dump resources-network-group.json az resource list -g "${net_rg}" --query "[].{name:name,type:type}"
+
+        section "the virtual network, and the tag the scripts select on"
+        # azure_cluster_vnet picks the vnet by the tag the installer puts on
+        # what it owns, and falls back to <infra>-vnet. An ARO vnet is created
+        # by this job rather than by an installer, so both are expected to
+        # miss, and the fallback would name a vnet that does not exist.
+        az network vnet list -g "${net_rg}" --query "[].{
+          name: name,
+          addressSpace: addressSpace.addressPrefixes,
+          ownedTag: tags.\"sigs.k8s.io_cluster-api-provider-azure_cluster_${infra}\"
+        }" -o json 2>&1 | redact
+        vnet="$(az network vnet list -g "${net_rg}" --query "[0].name" -o tsv 2>/dev/null)"
+        echo "subnets in ${vnet:-<none>}:"
+        az network vnet subnet list -g "${net_rg}" --vnet-name "${vnet}" \
+          --query "[].{name:name, prefix:addressPrefix}" -o table 2>&1 | redact | sed 's/^/  /'
+
+        section "where this principal may write"
+        # A public IP is the cheapest resource that answers it, and it is
+        # removed either way. The asymmetry is the point: the group we created
+        # should accept the write and the group ARO manages should refuse it.
+        for group in "${rg}" "${net_rg}"; do
+          echo "--- ${group} ---"
+          err="$(mktemp)"
+          if az network public-ip create -g "${group}" -n bgp-probe-ip \
+               --sku Standard --output none 2>"${err}"; then
+            echo "  write allowed"
+            az network public-ip delete -g "${group}" -n bgp-probe-ip --output none 2>&1 | redact
+          else
+            echo "  write refused:"
+            redact <"${err}" >"${ARTIFACT_DIR}/pip-${group}.err"
+            sed 's/^/    /' <"${ARTIFACT_DIR}/pip-${group}.err"
+          fi
+          rm -f "${err}"
+        done
+
+        section "done"
+        exit 0
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: probe-cluster
+      cli: latest
+      commands: "# The OpenShift side of an ARO cluster: what the operator will find\n#
+        when it starts, and whether the things every other cloud's job takes\n# for
+        granted are there. Reports and never asserts, and exits zero\n# unless the
+        cluster cannot be read, so one unanswerable question does\n# not hide the
+        nine that follow it.\n# errexit off explicitly, rather than merely left alone.
+        These commands\n# are wrapped before they run, set -uo pipefail does not clear
+        -e if\n# that wrapper set it, and a bare command that fails would then abandon\n#
+        the step where it stands. Measured in the first rehearsal: one\n# Forbidden
+        ended a step after a single line, before the echo on the\n# next line or the
+        step's own exit. A probe that stops at its first\n# unanswerable question
+        is the thing this file exists to avoid.\nset +e\nset -uo pipefail\n\nredact()
+        {\n  sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'\n}\n\n#
+        Key names, and the values never land in a shell variable on the way.\n# A
+        variable holding a client secret can be printed by an error path or\n# a stray
+        trace, and prow logs are public for openshift repositories;\n# jq reads the
+        stream and emits nothing but the names. --ignore-not-found\n# so an absent
+        secret is an answer rather than a failed read.\n# Reached through root_secret_keys
+        and read_value.\n# shellcheck disable=SC2329\nsecret_keys() {\n  oc -n \"$1\"
+        get secret \"$2\" -o json --ignore-not-found \\\n    | jq -r 'if .data then
+        (.data | keys | @json) else empty end'\n}\nsection() { echo; echo \"=== $*
+        ===\"; }\n\n# Three outcomes, told apart. A read can succeed with a value,
+        succeed\n# with nothing, or fail -- and reporting the last two the same way
+        is\n# how \"you may not look at this\" becomes \"there is nothing there\".
+        They\n# need different people to fix them, so the status is kept and the\n#
+        error is printed rather than discarded.\n#\n# The command is passed as arguments,
+        not a string, so nothing is\n# re-parsed. Where a value needs post-processing,
+        pass a function: it\n# is a command like any other and pipefail carries the
+        failure out of\n# it.\nread_value() {\n  local label=\"$1\" when_empty=\"$2\";
+        shift 2\n  local out err rc=0\n  err=\"$(mktemp)\"\n  out=\"$(\"$@\" 2>\"${err}\")\"
+        || rc=$?\n  if (( rc != 0 )); then\n    printf '  %-30s <read FAILED: %s>\\n'
+        \"${label}\" \"$(head -1 \"${err}\" | redact)\"\n  else\n    printf '  %-30s
+        %s\\n' \"${label}\" \"${out:-<${when_empty}>}\"\n  fi\n  rm -f \"${err}\"\n}\ndump()
+        {\n  local name=\"$1\" err; shift\n  err=\"$(mktemp)\"\n  # Raw stderr is
+        captured outside the artifact directory and only a\n  # redacted copy is put
+        into it. Artifacts are published exactly as\n  # the logs are, and a failed
+        Azure or Kubernetes call names the\n  # subscription, the tenant, the principal
+        or the request URL in its\n  # error text -- which is the very thing redact
+        exists to remove.\n  if \"$@\" 2>\"${err}\" | redact >\"${ARTIFACT_DIR}/${name}\";
+        then\n    echo \"  saved ${name}\"\n  else\n    redact <\"${err}\" >\"${ARTIFACT_DIR}/${name}.err\"\n
+        \   echo \"  FAILED ${name}: $(head -1 \"${ARTIFACT_DIR}/${name}.err\")\"\n
+        \ fi\n  rm -f \"${err}\"\n}\n\nsection \"version\"\noc get clusterversion
+        version -o jsonpath='desired:  {.status.desired.version}{\"\\n\"}channel:
+        {.spec.channel}{\"\\n\"}'\noc get clusterversion version -o json | jq -r '.status.history[]
+        | \"  \\(.state) \\(.version) \\(.completionTime // \"\")\"'\ndump clusterversion.yaml
+        oc get clusterversion -o yaml\n\nsection \"cluster operators\"\noc get clusteroperators
+        2>&1 | sed 's/^/  /'\necho \"not Available, or Degraded:\"\nunhealthy=\"$(oc
+        get clusteroperators -o json | jq -r '\n  .items[]\n  | select(any(.status.conditions[];\n
+        \     (.type == \"Available\" and .status != \"True\")\n      or (.type ==
+        \"Degraded\" and .status == \"True\")))\n  | .metadata.name')\"\nif [[ -n
+        \"${unhealthy}\" ]]; then\n  printf '%s\\n' \"${unhealthy}\" | sed 's/^/  /'\nelse\n
+        \ echo \"  none\"\nfi\ndump clusteroperators.yaml oc get clusteroperators
+        -o yaml\n\nsection \"nodes\"\n# providerID is not decoration here: internal/platform/azure/providerid.go\n#
+        parses the virtual machine out of it and matches interfaces on their\n# VirtualMachine.ID.
+        An ARO providerID that is shaped differently from\n# an IPI one breaks node
+        reconciliation before anything else.\noc get nodes -o json | jq -r '.items[]
+        | \"  \\(.metadata.name)\\n    roles:      \\([.metadata.labels | keys[] |
+        select(startswith(\"node-role\"))] | join(\",\"))\\n    instance:   \\(.metadata.labels[\"node.kubernetes.io/instance-type\"]
+        // \"?\")\\n    zone:       \\(.metadata.labels[\"topology.kubernetes.io/zone\"]
+        // \"?\")\\n    providerID: \\(.spec.providerID)\"' | redact\ndump nodes.yaml
+        oc get nodes -o yaml\n\nsection \"machine API\"\n# Whether the cluster has
+        one at all. ARO manages its own machines, and\n# a job that expects to label
+        or scale through machinesets would find\n# nothing to talk to.\noc -n openshift-machine-api
+        get machinesets 2>&1 | sed 's/^/  /'\noc -n openshift-machine-api get machines
+        2>&1 | sed 's/^/  /'\noc get machineconfigpools 2>&1 | sed 's/^/  /'\n\nsection
+        \"feature gates\"\nread_value \"featureSet\" \"empty, which means Default\"
+        \\\n  oc get featuregate cluster -o jsonpath='{.spec.featureSet}'\n# ARO does
+        not support what OpenShift ships as Technology Preview, so\n# anything the
+        operator needs had better be enabled by default here.\noc get featuregate
+        cluster -o json \\\n  | jq -r '[.status.featureGates[]?.enabled[]?.name] |
+        map(select(test(\"Route|BGP|FRR\"; \"i\"))) | \"  enabled and relevant: \\(.)\"'
+        || true\n\nsection \"network\"\noc get network.config.openshift.io cluster
+        -o jsonpath='networkType: {.spec.networkType}{\"\\n\"}clusterNetwork: {.spec.clusterNetwork}{\"\\n\"}serviceNetwork:
+        {.spec.serviceNetwork}{\"\\n\"}'\necho \"routing capabilities and advertisements,
+        before anything touches them:\"\nread_value \"additionalRoutingCapabilities\"
+        \"unset, which is what enable-frr changes\" \\\n  oc get network.operator.openshift.io
+        cluster \\\n  -o jsonpath='{.spec.additionalRoutingCapabilities}'\nread_value
+        \"routeAdvertisements\" \"unset\" \\\n  oc get network.operator.openshift.io
+        cluster \\\n  -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.routeAdvertisements}'\ndump
+        network-config.yaml oc get network.config.openshift.io cluster -o yaml\ndump
+        network-operator.yaml oc get network.operator.openshift.io cluster -o yaml\n\nsection
+        \"cloud credentials\"\n# Which mode CCO settled in decides whether a CredentialsRequest
+        yields\n# a client secret, a federated token file, or nothing at all.\n# The
+        effective mode is the annotation CCO puts on the root secret,\n# not spec.credentialsMode.
+        That field is the administrator's request\n# and is empty on almost every
+        cluster, meaning \"you decide\"; the\n# annotation is what CCO decided, and
+        mint, passthrough and manual\n# lead to three entirely different jobs.\n#
+        The last segment of the issuer is elided: it names the cluster's\n# storage
+        account, and artifacts are public.\n# Invoked indirectly, by read_value.\n#
+        shellcheck disable=SC2329\nissuer_elided() {\n  oc get authentication cluster
+        -o jsonpath='{.spec.serviceAccountIssuer}' \\\n    | sed 's|/[^/]*$|/<id>|'\n}\n#
+        Key names only. The values are credentials.\n# Invoked indirectly, by read_value.\n#
+        shellcheck disable=SC2329\nroot_secret_keys() { secret_keys kube-system azure-credentials;
+        }\nread_value \"effective mode\" \"no annotation: CCO has claimed no mode
+        here\" \\\n  oc -n kube-system get secret azure-credentials --ignore-not-found
+        \\\n  -o jsonpath='{.metadata.annotations.cloudcredential\\.openshift\\.io/mode}'\nread_value
+        \"requested mode\" \"empty, which means default\" \\\n  oc get cloudcredential
+        cluster -o jsonpath='{.spec.credentialsMode}'\nread_value \"serviceAccountIssuer\"
+        \"none, so this cluster cannot federate\" issuer_elided\nread_value \"root
+        secret keys\" \"no kube-system/azure-credentials\" root_secret_keys\nread_value
+        \"pod identity webhook\" \"absent, so this cluster does not federate\" \\\n
+        \ oc -n openshift-cloud-credential-operator get deployment pod-identity-webhook
+        \\\n  -o name --ignore-not-found\ndump cloudcredential.yaml oc get cloudcredential
+        cluster -o yaml\ndump co-cloud-credential.yaml oc get co cloud-credential
+        -o yaml\n\nsection \"OLM\"\n# operator-sdk run bundle brings its own catalogue,
+        but it still needs\n# OLM itself and it still has to pull an image this job
+        built.\noc get catalogsources -A 2>&1 | sed 's/^/  /'\noc -n openshift-operator-lifecycle-manager
+        get deployments 2>&1 | sed 's/^/  /'\n\nsection \"can this cluster pull an
+        image this job built\"\n# ipi-install-rbac grants the test namespace's images
+        to unauthenticated\n# pullers so the cluster can reach the build farm registry.
+        An ARO\n# cluster sits in a subscription of its own and reaches it over the\n#
+        internet; if that does not work, the install step fails opaquely\n# minutes
+        later with ImagePullBackOff.\noc create namespace bgp-probe --dry-run=client
+        -o yaml | oc apply -f -\noc -n bgp-probe run pullcheck --image=\"${OO_BUNDLE}\"
+        --restart=Never \\\n  --command -- /bin/true >/dev/null 2>&1\n\n# imageID
+        is the signal, not the phase. A bundle image is metadata on\n# a near empty
+        filesystem and very often has no /bin/true, so the\n# container can fail to
+        start having pulled perfectly well: waiting for\n# Running or Succeeded would
+        time out and report a pull problem that\n# did not happen. imageID is set
+        once kubelet has the image, whatever\n# happens next.\n# Ten minutes, not
+        five: the first run reached neither a pull failure\n# nor an imageID in five
+        and reported a timeout, which is the least\n# useful thing it could have said.
+        Whatever happens, the pod's own view\n# is printed afterwards, so a verdict
+        that is still inconclusive at\n# least comes with the reason the cluster would
+        give.\nverdict=\"\"\ndeadline=$((SECONDS + 600))\nwhile (( SECONDS < deadline
+        )); do\n  reason=\"$(oc -n bgp-probe get pod pullcheck \\\n    -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}'
+        2>/dev/null)\"\n  case \"${reason}\" in\n    ImagePullBackOff|ErrImagePull|InvalidImageName)\n
+        \     verdict=\"CANNOT PULL: ${reason}\"\n      break ;;\n  esac\n  if [[
+        -n \"$(oc -n bgp-probe get pod pullcheck \\\n       -o jsonpath='{.status.containerStatuses[0].imageID}'
+        2>/dev/null)\" ]]; then\n    verdict=\"pulled (container state after that
+        does not matter here)\"\n    break\n  fi\n  phase=\"$(oc -n bgp-probe get
+        pod pullcheck -o jsonpath='{.status.phase}' 2>/dev/null)\"\n  if [[ \"${phase}\"
+        == Succeeded || \"${phase}\" == Failed ]]; then\n    verdict=\"pulled and
+        ran to completion: phase ${phase}\"\n    break\n  fi\n  sleep 10\ndone\necho
+        \"  ${verdict:-no verdict within ten minutes}\"\noc -n bgp-probe get pod pullcheck
+        \\\n  -o jsonpath='  phase={.status.phase} waiting={.status.containerStatuses[0].state.waiting.reason}{\"\\n\"}'
+        2>/dev/null\necho \"  what the cluster said about it:\"\noc -n bgp-probe get
+        events --field-selector involvedObject.name=pullcheck \\\n  -o custom-columns=REASON:.reason,MESSAGE:.message
+        --no-headers 2>/dev/null | head -8 | sed 's/^/    /' \n\nsection \"pod security\"\n#
+        The install step asks operator-sdk for the restricted security\n# context
+        config, which only works if the namespace admits it.\noc get namespace bgp-probe
+        -o jsonpath='  labels: {.metadata.labels}{\"\\n\"}'\noc get scc restricted-v2
+        -o name 2>&1 | sed 's/^/  /'\n\nsection \"does CCO answer a request shaped
+        like the operator's\"\n# The operator's own CredentialsRequest under another
+        name. What comes\n# back says which mode is really in force: a client secret
+        means mint\n# or passthrough, a federated token file means workload identity,
+        and\n# nothing at all means manual.\noc apply -f - <<'CR'\napiVersion: cloudcredential.openshift.io/v1\nkind:
+        CredentialsRequest\nmetadata:\n  name: bgp-probe\n  namespace: openshift-cloud-credential-operator\nspec:\n
+        \ providerSpec:\n    apiVersion: cloudcredential.openshift.io/v1\n    kind:
+        AzureProviderSpec\n    permissions:\n    - Microsoft.Network/virtualHubs/read\n
+        \   - Microsoft.Network/virtualHubs/bgpConnections/read\n    - Microsoft.Network/virtualHubs/bgpConnections/write\n
+        \   - Microsoft.Network/virtualHubs/bgpConnections/delete\n    - Microsoft.Network/networkInterfaces/read\n
+        \   - Microsoft.Network/networkInterfaces/write\n  secretRef:\n    name: bgp-probe-credentials\n
+        \   namespace: bgp-probe\n  serviceAccountNames:\n  - default\nCR\ndeadline=$((SECONDS
+        + 300))\nuntil oc -n bgp-probe get secret bgp-probe-credentials >/dev/null
+        2>&1; do\n  if (( SECONDS >= deadline )); then\n    echo \"  CCO wrote no
+        secret within five minutes\"\n    break\n  fi\n  sleep 10\ndone\n# Key names
+        only. The values are credentials.\nread_value \"secret keys\" \"CCO wrote
+        no secret\" secret_keys bgp-probe bgp-probe-credentials\ndump credentialsrequest.yaml
+        oc -n openshift-cloud-credential-operator get credentialsrequest bgp-probe
+        -o yaml\n\nsection \"can the credentials CCO issued write a node interface\"\n#
+        ensureNodesCanForward turns on IP forwarding on the router nodes'\n# interfaces,
+        and those live in the cluster's own resource group behind\n# the deny assignment.
+        Whether the principal CCO handed out is one of\n# the excluded ones is the
+        single fact the whole design turns on, so it\n# is exercised rather than reasoned
+        about. A node interface is left\n# exactly as the operator would leave it.\nrg=\"$(oc
+        get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')\"\nnet_rg=\"$(oc
+        get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}')\"\n:
+        \"${net_rg:=${rg}}\"\nclient_id=\"$(oc -n bgp-probe get secret bgp-probe-credentials
+        -o jsonpath='{.data.azure_client_id}' 2>/dev/null | base64 -d)\"\nclient_secret=\"$(oc
+        -n bgp-probe get secret bgp-probe-credentials -o jsonpath='{.data.azure_client_secret}'
+        2>/dev/null | base64 -d)\"\ntenant_id=\"$(oc -n bgp-probe get secret bgp-probe-credentials
+        -o jsonpath='{.data.azure_tenant_id}' 2>/dev/null | base64 -d)\"\nif [[ -z
+        \"${client_id}\" || -z \"${client_secret}\" ]]; then\n  echo \"  CCO issued
+        no client secret, so there is nothing to try it with\"\nelse\n  cfg=\"$(mktemp
+        -d)\"\n  export AZURE_CONFIG_DIR=\"${cfg}\"\n  # Retried, because a principal
+        CCO has only just minted is not usable\n  # the instant it exists: Entra is
+        eventually consistent and the first\n  # login comes back as a bad credential,
+        which is indistinguishable\n  # from one that really is bad. Four attempts
+        over a minute tell the\n  # two apart.\n  logged_in=false\n  login_err=\"$(mktemp)\"\n
+        \ for attempt in 1 2 3 4; do\n    # --password=VALUE, not --password VALUE.
+        A secret beginning with a\n    # hyphen is read by az as another flag and
+        the login fails with\n    # \"argument --password/-p: expected one argument\"
+        for a secret that\n    # is perfectly good. That is exactly what CCO issued
+        here the first\n    # time this ran, and it cost the whole interface write
+        test.\n    if az login --service-principal --username \"${client_id}\" \\\n
+        \        --password=\"${client_secret}\" --tenant \"${tenant_id}\" \\\n         --output
+        none 2>\"${login_err}\"; then\n      logged_in=true\n      echo \"  logged
+        in on attempt ${attempt}\"\n      break\n    fi\n    sleep 20\n  done\n  if
+        [[ \"${logged_in}\" != true ]]; then\n    echo \"  the last attempt said:\"\n
+        \   redact <\"${login_err}\" | sed 's/^/    /'\n  fi\n  rm -f \"${login_err}\"\n
+        \ if [[ \"${logged_in}\" == true ]]; then\n    # The interface of a router
+        node, found the way the operator finds\n    # it: the virtual machine is parsed
+        out of the node's providerID and\n    # interfaces are matched on their VirtualMachine.ID.
+        Taking the\n    # first interface in the group instead picks a control plane
+        node,\n    # which is not what the operator ever writes to and which on a\n
+        \   # managed cluster may not be governed by the same rules.\n    provider_id=\"$(oc
+        get nodes -l node-role.kubernetes.io/worker \\\n      -o jsonpath='{.items[0].spec.providerID}'
+        2>/dev/null)\"\n    vm=\"${provider_id##*/}\"\n    nic=\"\"\n    if [[ -n
+        \"${vm}\" ]]; then\n      nic=\"$(az network nic list -g \"${rg}\" \\\n        --query
+        \"[?virtualMachine.id != null && contains(virtualMachine.id, '${vm}')].name
+        | [0]\" \\\n        -o tsv 2>/dev/null)\"\n    fi\n    if [[ -z \"${nic}\"
+        || \"${nic}\" == \"None\" ]]; then\n      echo \"  no interface found for
+        worker ${vm:-<none>}; nothing to try\"\n    else\n      echo \"  trying ${nic},
+        the interface of worker ${vm}\"\n      nic_err=\"$(mktemp)\"\n      if az
+        network nic update -g \"${rg}\" -n \"${nic}\" \\\n           --set enableIPForwarding=true
+        --output none 2>\"${nic_err}\"; then\n        # Stated as what was observed.
+        What it means depends on the\n        # cluster: where a deny assignment governs
+        this group, a write\n        # that succeeds says the principal is one of
+        the excluded ones,\n        # and that is the whole basis of the passthrough
+        design. Where\n        # there is no deny assignment the write proves only
+        that the\n        # credentials carry the permission.\n        echo \"  interface
+        write ALLOWED\"\n      else\n        echo \"  interface write REFUSED:\"\n
+        \       redact <\"${nic_err}\" >\"${ARTIFACT_DIR}/nic.err\"\n        sed 's/^/
+        \   /' <\"${ARTIFACT_DIR}/nic.err\"\n      fi\n      rm -f \"${nic_err}\"\n
+        \     # Against the group the Route Server will be built in, not the\n      #
+        group the interfaces are in. On ARO those differ, and a read of\n      # the
+        managed group says nothing about whether these credentials\n      # can reach
+        the estate the operator actually discovers.\n      #\n      # Nothing is there
+        yet -- probe-estate runs after this step -- so\n      # what is being asked
+        is whether the read is permitted at all, and\n      # the command's status
+        is what answers that. Folding stderr into\n      # the value would make a
+        refusal look like a list of hubs.\n      echo \"  and may it read virtual
+        hubs in ${net_rg}, which is what discovery does:\"\n      hub_err=\"$(mktemp)\"\n
+        \     if hubs=\"$(az network routeserver list -g \"${net_rg}\" --query \"[].name\"
+        -o tsv 2>\"${hub_err}\")\"; then\n        if [[ -n \"${hubs}\" ]]; then\n
+        \         printf '%s\\n' \"${hubs}\" | redact | sed 's/^/    /'\n        else\n
+        \         echo \"    permitted, and none exist yet, which is expected before
+        probe-estate\"\n        fi\n      else\n        echo \"    REFUSED:\"\n        redact
+        <\"${hub_err}\" | sed 's/^/      /'\n      fi\n      rm -f \"${hub_err}\"\n
+        \   fi\n  else\n    echo \"  the issued credentials would not log in after
+        four attempts\"\n  fi\n  unset AZURE_CONFIG_DIR\n  rm -rf \"${cfg}\"\nfi\n\nsection
+        \"done\"\nexit 0\n"
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: probe-identity
+      cli: latest
+      commands: |
+        # Which identity can do what, which is the question AzureConfig's
+        # NetworkInterfaceClientID was added for: on ARO the router nodes'
+        # interfaces sit in a resource group the cluster does not own, and the
+        # identity with write access there is not one this operator can be
+        # handed. Naming it works only if a federated credential trusting our
+        # service account can be added to it, and whether that is permitted is
+        # the fact this step exists to establish.
+        # errexit off explicitly, rather than merely left alone. These commands
+        # are wrapped before they run, set -uo pipefail does not clear -e if
+        # that wrapper set it, and a bare command that fails would then abandon
+        # the step where it stands. Measured in the first rehearsal: one
+        # Forbidden ended a step after a single line, before the echo on the
+        # next line or the step's own exit. A probe that stops at its first
+        # unanswerable question is the thing this file exists to avoid.
+        set +e
+        set -uo pipefail
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        # Anything created here is recorded before it is created, not after, so
+        # that a step killed between the two still leaves the post teardown
+        # something to find. The teardown treats a name that was never built as
+        # already gone, so recording something that failed costs it one read.
+        record_federation() {
+          printf '%s|%s|%s\n' "$1" "$2" "$3" >>"${SHARED_DIR}/bgp-probe-identity"
+        }
+
+        # Says whether it is really gone, rather than trusting the delete. This
+        # is the one removal whose failure leaves a managed identity trusting a
+        # service account in a cluster that will not exist an hour from now.
+        confirm_federation_gone() {
+          local rg="$1" identity="$2" name="$3"
+          if az identity federated-credential show --name "${name}" \
+               --identity-name "${identity}" -g "${rg}" --output none 2>/dev/null; then
+            echo "    STILL THERE after the delete; the post teardown will try again"
+            return 1
+          fi
+          echo "    removed, and confirmed gone"
+        }
+
+        # Logging in is both the call most likely to fail and the one whose
+        # failure text is most likely to name the tenant, the principal, the
+        # subscription or the request. Letting az write that to stderr puts it
+        # straight into a prow log, which for openshift repositories is public,
+        # so it is captured and redacted like everything else.
+        #
+        # Reports and returns rather than exiting, so a step that cannot log in
+        # still hands the run to the next step with a reason recorded.
+        az_login() {
+          local sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" err rc=0
+          if [[ ! -f "${sp}" ]]; then
+            echo "the cluster profile has no osServicePrincipal.json"
+            return 1
+          fi
+          err="$(mktemp)"
+          # --password=VALUE, not --password VALUE. A client secret
+          # beginning with a hyphen is read by az as another flag, and
+          # the login fails with "argument --password/-p: expected one
+          # argument" for a secret that is perfectly good. Measured: CCO
+          # issued exactly such a secret and it cost this probe its
+          # interface write test.
+          az login --service-principal \
+            --username "$(jq -er .clientId "${sp}")" \
+            --password="$(jq -er .clientSecret "${sp}")" \
+            --tenant "$(jq -er .tenantId "${sp}")" \
+            --output none 2>"${err}" || rc=$?
+          if (( rc == 0 )); then
+            az account set --subscription "$(jq -er .subscriptionId "${sp}")" 2>>"${err}" || rc=$?
+          fi
+          if (( rc != 0 )); then
+            echo "could not log in with the cluster profile's service principal:"
+            redact <"${err}" | sed 's/^/  /'
+          fi
+          rm -f "${err}"
+          return "${rc}"
+        }
+        section() { echo; echo "=== $* ==="; }
+        dump() {
+          local name="$1" err; shift
+          err="$(mktemp)"
+          # Raw stderr is captured outside the artifact directory and only a
+          # redacted copy is put into it. Artifacts are published exactly as
+          # the logs are, and a failed Azure or Kubernetes call names the
+          # subscription, the tenant, the principal or the request URL in its
+          # error text -- which is the very thing redact exists to remove.
+          if "$@" 2>"${err}" | redact >"${ARTIFACT_DIR}/${name}"; then
+            echo "  saved ${name}"
+          else
+            redact <"${err}" >"${ARTIFACT_DIR}/${name}.err"
+            echo "  FAILED ${name}: $(head -1 "${ARTIFACT_DIR}/${name}.err")"
+          fi
+          rm -f "${err}"
+        }
+
+        subscription="$(jq -er .subscriptionId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")"
+        az_login || exit 0
+
+        rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')"
+        net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}')"
+        : "${net_rg:=${rg}}"
+        region="$(az group show -n "${net_rg}" --query location -o tsv 2>/dev/null)"
+
+        section "which flavour of cluster this is"
+        # A managed identity cluster federates and a service principal cluster
+        # does not, and the operator's credential path differs entirely
+        # between them.
+        az aro list -g "${net_rg}" --query "[0].{
+          usesWorkloadIdentity: platformWorkloadIdentityProfile != null,
+          usesServicePrincipal: servicePrincipalProfile != null
+        }" -o json 2>&1 | redact | sed 's/^/  /'
+
+        section "the platform identities, if this cluster has any"
+        # Named here so the one that owns interface writes can be recognised.
+        az aro list -g "${net_rg}" --query "[0].platformWorkloadIdentityProfile.platformWorkloadIdentities" \
+          -o json 2>&1 | redact | sed -E 's#/subscriptions/[^"]*/userAssignedIdentities/#userAssignedIdentity: #' | sed 's/^/  /'
+        dump platform-identities.json az aro list -g "${net_rg}" --query "[0].platformWorkloadIdentityProfile"
+
+        section "user assigned identities in each group"
+        for group in "${rg}" "${net_rg}"; do
+          echo "--- ${group} ---"
+          az identity list -g "${group}" --query "[].{name:name}" -o table 2>&1 | redact | sed 's/^/  /'
+        done
+
+        section "the OIDC issuer, without which nothing can federate"
+        issuer="$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')"
+        if [[ -n "${issuer}" ]]; then
+          echo "  present (host shown, path elided): ${issuer%%/*}//$(echo "${issuer}" | cut -d/ -f3)/<path>"
+          echo "  is it reachable and does it serve a discovery document:"
+          if curl -sfL --max-time 30 "${issuer}/.well-known/openid-configuration" \
+               | jq -r '{issuer: "<elided>", jwks: (.jwks_uri != null), algs: .id_token_signing_alg_values_supported}' 2>/dev/null | sed 's/^/    /'; then
+            :
+          else
+            echo "    the discovery document could not be fetched from this container"
+          fi
+        else
+          echo "  the cluster declares no serviceAccountIssuer, so it cannot federate at all"
+        fi
+
+        section "can a new identity be created in the group we own"
+        # The straightforward shape, if it is allowed: our own identity, with a
+        # role over the group holding the vnet and the Route Server.
+        probe_identity="bgp-probe-identity"
+        if az identity create -g "${net_rg}" -n "${probe_identity}" -l "${region}" --output none 2>&1 | redact | sed 's/^/  /'; then
+          echo "  created ${probe_identity} in ${net_rg}"
+          probe_principal="$(az identity show -g "${net_rg}" -n "${probe_identity}" --query principalId -o tsv 2>/dev/null)"
+
+          echo "  can it be given a role over ${net_rg}, which we own:"
+          if az role assignment create --assignee-object-id "${probe_principal}" \
+               --assignee-principal-type ServicePrincipal --role "Network Contributor" \
+               --scope "/subscriptions/${subscription}/resourceGroups/${net_rg}" \
+               --output none 2>&1 | redact | sed 's/^/    /'; then
+            echo "    yes"
+          else
+            echo "    no, so even the vnet side would need another identity"
+          fi
+
+          echo "  can it be given a role over ${rg}, which ARO manages:"
+          if az role assignment create --assignee-object-id "${probe_principal}" \
+               --assignee-principal-type ServicePrincipal --role "Network Contributor" \
+               --scope "/subscriptions/${subscription}/resourceGroups/${rg}" \
+               --output none 2>&1 | redact | sed 's/^/    /'; then
+            echo "    yes, which would make NetworkInterfaceClientID unnecessary"
+          else
+            echo "    no, which is why NetworkInterfaceClientID exists"
+          fi
+
+          if [[ -n "${issuer}" ]]; then
+            echo "  can it be federated to the operator's service account:"
+            record_federation "${net_rg}" "${probe_identity}" bgp-probe-federation
+            fed_err="$(mktemp)"
+            if az identity federated-credential create --name bgp-probe-federation \
+                 --identity-name "${probe_identity}" -g "${net_rg}" \
+                 --issuer "${issuer}" \
+                 --subject "system:serviceaccount:openshift-bgp-cloud-connector:openshift-bgp-cloud-connector-controller-manager" \
+                 --audiences openshift --output none 2>"${fed_err}"; then
+              echo "    yes, so NetworkInterfaceClientID could name an identity of our own"
+            else
+              echo "    no:"
+              redact <"${fed_err}" | sed 's/^/      /'
+            fi
+            rm -f "${fed_err}"
+          fi
+
+          az identity delete -g "${net_rg}" -n "${probe_identity}" --output none 2>&1 | redact | sed 's/^/  /'
+          echo "  removed ${probe_identity}"
+        else
+          echo "  cannot create a user assigned identity in ${net_rg}"
+        fi
+
+        section "can a federated credential be added to a platform identity"
+        # The shape NetworkInterfaceClientID assumes. ARO's support policy says
+        # not to modify the federated identity credentials configured at
+        # install time; adding one is a different act from modifying one, and
+        # whether Azure permits it at all is what is asked here. It is removed
+        # immediately either way.
+        platform_identity_rg=""
+        platform_identity_name=""
+        while read -r resource_id; do
+          [[ -z "${resource_id}" || "${resource_id}" == null ]] && continue
+          case "${resource_id}" in
+            */userAssignedIdentities/*)
+              platform_identity_rg="$(echo "${resource_id}" | sed -E 's#.*/resourceGroups/([^/]+)/.*#\1#')"
+              platform_identity_name="${resource_id##*/}"
+              ;;
+          esac
+          # The one that touches interfaces is the machine api identity where
+          # the naming makes it obvious; otherwise the first is enough to learn
+          # whether the operation is permitted at all.
+          [[ "${platform_identity_name}" == *machine* ]] && break
+        done <<<"$(az aro list -g "${net_rg}" \
+          --query "[0].platformWorkloadIdentityProfile.platformWorkloadIdentities.*.resourceId" \
+          -o tsv 2>/dev/null)"
+
+        if [[ -z "${platform_identity_name}" ]]; then
+          echo "  this cluster has no platform workload identities"
+        elif [[ -z "${issuer}" ]]; then
+          echo "  no issuer, so federation is moot"
+        else
+          echo "  trying ${platform_identity_name} in ${platform_identity_rg}"
+          record_federation "${platform_identity_rg}" "${platform_identity_name}" bgp-probe-federation
+          plat_err="$(mktemp)"
+          if az identity federated-credential create --name bgp-probe-federation \
+               --identity-name "${platform_identity_name}" -g "${platform_identity_rg}" \
+               --issuer "${issuer}" \
+               --subject "system:serviceaccount:openshift-bgp-cloud-connector:openshift-bgp-cloud-connector-controller-manager" \
+               --audiences openshift --output none 2>"${plat_err}"; then
+            echo "    ALLOWED: NetworkInterfaceClientID is workable on ARO"
+            if az identity federated-credential delete --name bgp-probe-federation \
+                 --identity-name "${platform_identity_name}" -g "${platform_identity_rg}" \
+                 --yes --output none 2>"${plat_err}"; then
+              confirm_federation_gone "${platform_identity_rg}" "${platform_identity_name}" bgp-probe-federation
+            else
+              echo "    the delete FAILED; the post teardown will try again:"
+              redact <"${plat_err}" | sed 's/^/      /'
+            fi
+          else
+            echo "    REFUSED: the interface write would need another route entirely:"
+            redact <"${plat_err}" | sed 's/^/      /'
+          fi
+          rm -f "${plat_err}"
+        fi
+
+        section "done"
+        exit 0
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: bgp-cloud-connector-estate-create
+    - as: probe-estate-access
+      cli: latest
+      commands: |
+        # Can the credentials CCO hands the operator actually reach the estate?
+        #
+        # This is the question the cluster's role assignments raise. The
+        # principal passthrough passes through holds Network Contributor on the
+        # virtual network resource and Contributor on the group ARO manages.
+        # The Route Server is neither: it is a separate resource in the group
+        # this job owns. If that means the operator cannot see or peer it, then
+        # passthrough alone does not work on ARO however well the rest does,
+        # and an end-to-end job would have to grant the principal a role first.
+        #
+        # The operator reads the Route Server and writes its BGP connections
+        # and nothing else, so those are the two calls made here, as it would
+        # make them. Then, if they are refused, the same calls are tried again
+        # after granting a role, to show whether a step could repair this
+        # itself or whether it needs someone with more rights than the job has.
+        # errexit off explicitly, rather than merely left alone. These commands
+        # are wrapped before they run, set -uo pipefail does not clear -e if
+        # that wrapper set it, and a bare command that fails would then abandon
+        # the step where it stands. Measured in the first rehearsal: one
+        # Forbidden ended a step after a single line, before the echo on the
+        # next line or the step's own exit. A probe that stops at its first
+        # unanswerable question is the thing this file exists to avoid.
+        set +e
+        set -uo pipefail
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+        section() { echo; echo "=== $* ==="; }
+
+        if [[ ! -f "${SHARED_DIR}/bgp-cloud-connector-estate" ]]; then
+          echo "no estate step ran, so there is nothing to reach"
+          exit 0
+        fi
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/bgp-cloud-connector-estate"
+        : "${NET_RG:=}" "${ROUTE_SERVER:=}" "${ROUTE_SERVER_BUILT:=no}"
+        if [[ "${ROUTE_SERVER_BUILT}" != yes || -z "${NET_RG}" || -z "${ROUTE_SERVER}" ]]; then
+          echo "no Route Server was built, so there is nothing to reach"
+          exit 0
+        fi
+
+        # The credentials CCO issued, from the throwaway request probe-cluster
+        # made. Read into variables because az login needs them as arguments;
+        # nothing here prints them.
+        client_id="$(oc -n bgp-probe get secret bgp-probe-credentials \
+          -o jsonpath='{.data.azure_client_id}' --ignore-not-found | base64 -d)"
+        client_secret="$(oc -n bgp-probe get secret bgp-probe-credentials \
+          -o jsonpath='{.data.azure_client_secret}' --ignore-not-found | base64 -d)"
+        tenant_id="$(oc -n bgp-probe get secret bgp-probe-credentials \
+          -o jsonpath='{.data.azure_tenant_id}' --ignore-not-found | base64 -d)"
+        if [[ -z "${client_id}" || -z "${client_secret}" ]]; then
+          echo "CCO issued no client secret, so there is nothing to try with"
+          exit 0
+        fi
+
+        # Separate config directories, so the two logins do not evict
+        # each other and each call is made as the principal it names.
+        issued_cfg="$(mktemp -d)"
+        profile_cfg="$(mktemp -d)"
+
+        # --password=VALUE, not --password VALUE: a secret beginning with a
+        # hyphen is read by az as another flag.
+        login_as_issued() {
+          local err rc=0
+          err="$(mktemp)"
+          AZURE_CONFIG_DIR="${issued_cfg}" az login --service-principal \
+            --username "${client_id}" --password="${client_secret}" \
+            --tenant "${tenant_id}" --output none 2>"${err}" || rc=$?
+          if (( rc != 0 )); then
+            echo "  could not log in as the issued principal:"
+            redact <"${err}" | sed 's/^/    /'
+          fi
+          rm -f "${err}"
+          return "${rc}"
+        }
+
+        # Runs one call as the issued principal and says which of the three
+        # things happened: it worked, it was refused, or it failed for some
+        # other reason worth reading.
+        as_issued() {
+          local what="$1"; shift
+          local err rc=0 out
+          err="$(mktemp)"
+          out="$(AZURE_CONFIG_DIR="${issued_cfg}" "$@" 2>"${err}")" || rc=$?
+          if (( rc == 0 )); then
+            echo "  ${what}: ALLOWED"
+            [[ -n "${out}" ]] && printf '%s\n' "${out}" | redact | sed 's/^/    /'
+          else
+            echo "  ${what}: REFUSED or failed"
+            redact <"${err}" | head -4 | sed 's/^/    /'
+          fi
+          rm -f "${err}"
+          return "${rc}"
+        }
+
+        section "logging in as the credentials CCO issued"
+        login_as_issued || exit 0
+        echo "  ok"
+
+        # A router node's address, because a BGP connection has to name a peer
+        # and the operator names the router nodes.
+        peer_ip="$(oc get nodes -l node-role.kubernetes.io/worker \
+          -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null)"
+        echo "  peer would be ${peer_ip:-<no worker address found>}"
+
+        section "what the operator does: read the Route Server"
+        # DiscoverEndpoints reads the virtual hub to learn the neighbour
+        # addresses and the far side's ASN. Without this the operator cannot
+        # begin.
+        as_issued "read ${ROUTE_SERVER}" \
+          az network routeserver show -g "${NET_RG}" -n "${ROUTE_SERVER}" \
+          --query "{asn:virtualRouterAsn, ips:virtualRouterIps}" -o json
+        read_rc=$?
+
+        section "what the operator does: write a BGP connection"
+        wrote=false
+        if [[ -z "${peer_ip}" ]]; then
+          echo "  no worker address, so there is nothing to peer with"
+        else
+          if as_issued "create a peering to ${peer_ip}" \
+               az network routeserver peering create -g "${NET_RG}" \
+               --routeserver "${ROUTE_SERVER}" -n bgp-probe-peering \
+               --peer-ip "${peer_ip}" --peer-asn 65001 --output none; then
+            wrote=true
+          fi
+        fi
+
+        if (( read_rc == 0 )) && [[ "${wrote}" == true ]]; then
+          section "verdict"
+          echo "  passthrough is sufficient on this cluster: the principal CCO"
+          echo "  hands the operator can both read the Route Server and write"
+          echo "  its BGP connections"
+          # The teardown removes peerings before the Route Server, so this is
+          # left for it rather than removed here.
+          exit 0
+        fi
+
+        section "could a step repair this itself"
+        # Granting the cluster's own principal a role over the group holding
+        # the Route Server is the obvious repair, and whether the cluster
+        # profile's principal may grant it is the whole question: if it may,
+        # an end-to-end job can do this for itself; if it may not, this needs
+        # somebody with more rights than any job has.
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        err="$(mktemp)"
+        if ! AZURE_CONFIG_DIR="${profile_cfg}" az login --service-principal \
+             --username "$(jq -er .clientId "${sp}")" \
+             --password="$(jq -er .clientSecret "${sp}")" \
+             --tenant "$(jq -er .tenantId "${sp}")" --output none 2>"${err}"; then
+          echo "  could not log in with the cluster profile's principal:"
+          redact <"${err}" | sed 's/^/    /'
+          rm -f "${err}"; exit 0
+        fi
+        subscription="$(jq -er .subscriptionId "${sp}")"
+        AZURE_CONFIG_DIR="${profile_cfg}" az account set --subscription "${subscription}" 2>/dev/null
+
+        object_id="$(AZURE_CONFIG_DIR="${profile_cfg}" az ad sp show --id "${client_id}" \
+          --query id -o tsv 2>"${err}")"
+        if [[ -z "${object_id}" ]]; then
+          echo "  could not resolve the issued principal in the directory:"
+          redact <"${err}" | head -2 | sed 's/^/    /'
+          rm -f "${err}"; exit 0
+        fi
+
+        if AZURE_CONFIG_DIR="${profile_cfg}" az role assignment create \
+             --assignee-object-id "${object_id}" --assignee-principal-type ServicePrincipal \
+             --role "Network Contributor" \
+             --scope "/subscriptions/${subscription}/resourceGroups/${NET_RG}" \
+             --output none 2>"${err}"; then
+          echo "  granted Network Contributor over ${NET_RG}"
+        else
+          echo "  could NOT grant a role, so no step could repair this:"
+          redact <"${err}" | head -4 | sed 's/^/    /'
+          rm -f "${err}"; exit 0
+        fi
+        rm -f "${err}"
+
+        # Role assignments are not usable the instant they exist, so the retry
+        # distinguishes propagation from a grant that does not help.
+        echo "  waiting for the grant to take effect..."
+        for attempt in 1 2 3 4 5 6; do
+          sleep 20
+          if AZURE_CONFIG_DIR="${issued_cfg}" az network routeserver show \
+               -g "${NET_RG}" -n "${ROUTE_SERVER}" --output none 2>/dev/null; then
+            echo "  the read works after the grant, on attempt ${attempt}"
+            break
+          fi
+        done
+
+        section "after the grant"
+        as_issued "read ${ROUTE_SERVER}" \
+          az network routeserver show -g "${NET_RG}" -n "${ROUTE_SERVER}" \
+          --query "{asn:virtualRouterAsn, ips:virtualRouterIps}" -o json
+        if [[ -n "${peer_ip}" ]]; then
+          as_issued "create a peering to ${peer_ip}" \
+            az network routeserver peering create -g "${NET_RG}" \
+            --routeserver "${ROUTE_SERVER}" -n bgp-probe-peering \
+            --peer-ip "${peer_ip}" --peer-asn 65001 --output none
+        fi
+
+        section "verdict"
+        echo "  passthrough alone was not sufficient here. Whether the grant"
+        echo "  above fixed it is the answer immediately preceding this line,"
+        echo "  and it decides whether an end-to-end job can set itself up or"
+        echo "  needs a role assigned outside CI."
+        exit 0
+      from: e2e-runner
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: enable-frr
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # Both controllers watch FRRConfiguration and RouteAdvertisements
+        # from SetupWithManager, and CNO creates those two CRDs only in
+        # response to this patch. Without them the caches never sync, the
+        # manager exits after two minutes, and the CSV never installs.
+        # The operator applies this same patch itself as the first phase
+        # of reconcile, but it cannot stay alive long enough to do so;
+        # when that is fixed, this step comes out and the job proves the
+        # install a catalogue user actually performs.
+        oc patch network.operator.openshift.io cluster --type=merge \
+          -p '{"spec":{"additionalRoutingCapabilities":{"providers":["FRR"]},"defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+
+        deadline=$((SECONDS + 900))
+
+        for crd in frrconfigurations.frrk8s.metallb.io routeadvertisements.k8s.ovn.org; do
+          echo "waiting for crd/${crd}..."
+          until oc wait --for=condition=Established "crd/${crd}" --timeout=10s >/dev/null 2>&1; do
+            if (( SECONDS >= deadline )); then
+              oc get network.operator.openshift.io cluster -o yaml >&2
+              echo "timed out waiting for crd/${crd}" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+        done
+
+        # The rollout is what says CNO finished rather than that it
+        # started. Measured at about two minutes on 4.22.
+        echo "waiting for the frr-k8s rollout..."
+        until oc -n openshift-frr-k8s rollout status daemonset/frr-k8s --timeout=2m >/dev/null 2>&1; do
+          if (( SECONDS >= deadline )); then
+            oc -n openshift-frr-k8s get pods >&2
+            echo "timed out waiting for the frr-k8s daemonset" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+
+        oc -n openshift-frr-k8s get daemonset frr-k8s
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
