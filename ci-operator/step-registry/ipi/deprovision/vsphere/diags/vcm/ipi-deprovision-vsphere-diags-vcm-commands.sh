@@ -245,8 +245,17 @@ function collect_diagnostic_data {
                       JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$HOST_METRIC_FILE" --arg host "$hostname" '.hosts[.hosts | length] |= .+ {"file": $file, "name": $host}')
                   fi
               fi
-              echo "Collecting VM metrics for ${vm}"
               vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)
+              if [ -f "${vcenter_state}/${vmname}.metrics.json" ]; then
+                # Multi-network jobs put each VM on more than one network, so the
+                # outer network loop revisits the same VM once per network it's
+                # attached to. Skip re-collecting (and re-appending to JSON_DATA)
+                # a VM we've already processed, same as the host dedup above.
+                echo "Already collected metrics for ${vmname}, skipping"
+                continue
+              fi
+
+              echo "Collecting VM metrics for ${vm}"
               govc metric.sample -dc="${datacenter}" -d=80 -n=180 $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.txt
               govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.json
 
@@ -263,7 +272,7 @@ function collect_diagnostic_data {
               # attempt to get and clean up node journals
               curl -H "node-id: ${vmname}" -o "${vcenter_state}/${vmname}-journal.log" http://log-gather.vmc.ci.openshift.org:8000
               curl -X DELETE -H "node-id: ${vmname}" http://log-gather.vmc.ci.openshift.org:8000
-              
+
               METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
               JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" --arg screenshot "$(cat ${vcenter_state}/${vmname}.png | base64 -w0)" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm, "screenshot": $screenshot}')
           done
