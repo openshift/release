@@ -440,9 +440,9 @@ Write `${ARTIFACT_DIR}/qe-agent-analysis.md` after each diagnosis and overwrite 
 ## Notes for CI context
 
 - The cluster is already provisioned with COO and the Tracing UI console plugin installed — do not reinstall them
-- The qe-agent runs in a fresh pod, so `/tmp/` is empty at start; Step 0b clones the test repo there
-- `$KUBECONFIG` points to the test cluster; `oc`, `kubectl`, `jq` and `npm`/`npx` are in PATH
+- The qe-agent runs in a fresh pod — `/tmp/` is empty at start; Step 0b clones the test repo there
+- `$KUBECONFIG` points to the test cluster; `oc`, `kubectl`, `jq`, `npm`/`npx` are in PATH
 - Do **not** copy screenshots/videos to `$SHARED_DIR` (1 MiB Secret limit); only JUnit XML is safe there. Write output to `$ARTIFACT_DIR` (GCS) or `$SHARED_DIR` (shared with other steps)
-- **Namespace restriction**: You MUST NOT access, read, list, or modify any resource in the `kube-system` namespace (cloud provider credentials, platform-critical components) — no `oc` or `kubectl` command may target it. Filter `kube-system` out of all-namespace output (e.g. `oc get pods -A`) before analysis
+- **Namespace restriction**: MUST NOT access, read, list, or modify any `kube-system` resource — an all-namespaces query filtered afterward still fetches it, so scope every command to named namespaces or a label selector that excludes it (e.g. `-l app.kubernetes.io/name=...`, as used above), not `-A` piped to `grep -v kube-system`
 - Do not call external APIs (Jira, GitHub, Slack); the wrapper script handles integrations after exit
-- This step runs `best_effort: true` — always exit 0 even if analysis is incomplete
+- This step runs `best_effort: true` — always exit 0, even incomplete
