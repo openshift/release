@@ -386,7 +386,15 @@ function WaitVmiRunning () {
     )
 
     SpokeOc wait "virtualmachineinstance/${vmName}" -n "${CNV_TEST_VM_NAMESPACE}" \
-        --for=jsonpath='{.status.phase}'=Running --timeout="${CNV_TEST_VM_VMI_WAIT_TIMEOUT}"
+        --for=jsonpath='{.status.phase}'=Running --timeout="${CNV_TEST_VM_VMI_WAIT_TIMEOUT}" 1>/dev/null
+
+    # For RHEL VMs, cloud-init runcmd installs qemu-guest-agent asynchronously.
+    # Wait for AgentConnected before exiting so the migration step doesn't race
+    # the guest agent startup and post-migration verification finds GA ready.
+    if [[ "${CNV_TEST_VM_IMAGE_TYPE}" == 'rhel' ]]; then
+        SpokeOc wait "virtualmachineinstance/${vmName}" -n "${CNV_TEST_VM_NAMESPACE}" \
+            --for=condition=AgentConnected --timeout="${CNV_TEST_VM_VMI_WAIT_TIMEOUT}" 1>/dev/null
+    fi
 }
 
 trap - ERR
