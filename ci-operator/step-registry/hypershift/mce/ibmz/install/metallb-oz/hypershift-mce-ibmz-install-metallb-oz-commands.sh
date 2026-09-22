@@ -47,22 +47,40 @@ EOF
 # ICSP changes trigger a MachineConfig rollout — nodes reboot to apply the new
 # mirror config. OLM catalog pods won't be able to pull registry.redhat.io
 # until every node has the updated registries.conf. Wait for MCP to settle.
-echo "Waiting for MachineConfigPool to finish applying ICSP..."
+echo "$(date) Waiting for MachineConfigPool to finish applying ICSP..."
+MCP_OK=false
 for i in $(seq 1 30); do
   UPDATED=$(oc get mcp worker -o jsonpath='{.status.updatedMachineCount}' 2>/dev/null || echo "0")
   TOTAL=$(oc get mcp worker -o jsonpath='{.status.machineCount}' 2>/dev/null || echo "1")
   DEGRADED=$(oc get mcp worker -o jsonpath='{.status.degradedMachineCount}' 2>/dev/null || echo "0")
   if [[ "$UPDATED" == "$TOTAL" && "$DEGRADED" == "0" && "$TOTAL" != "0" ]]; then
-    echo "  MCP worker is fully updated ($UPDATED/$TOTAL)"
+    echo "$(date) MCP worker is fully updated ($UPDATED/$TOTAL)"
+    MCP_OK=true
     break
   fi
-  echo "  [${i}/30] MCP worker: updated=${UPDATED}, total=${TOTAL}, degraded=${DEGRADED} — retrying in 20s"
+  echo "$(date) [${i}/30] MCP worker: updated=${UPDATED}, total=${TOTAL}, degraded=${DEGRADED} — retrying in 20s"
   sleep 20
 done
+if [[ "${MCP_OK}" != "true" ]]; then
+  echo "$(date) ERROR: MachineConfigPool worker did not converge after ICSP within timeout"
+  oc get mcp -o wide || true
+  oc describe mcp worker || true
+  exit 1
+fi
 
-# ── Create redhat-operators-stage CatalogSource (same pattern as metallb-commands.sh) ──
-echo "Creating redhat-operators-stage CatalogSource..."
-oc apply -f - <<EOF
+# Catalog selection (matches ref docs; same OZ fallback pattern as metallb-commands.sh):
+# 1. Honor an explicit non-default METALLB_OPERATOR_SUB_SOURCE from the caller.
+# 2. Otherwise create redhat-operators-stage (IIB) — required on OZ where the
+#    built-in redhat-operators catalog cannot pull metallb-operator reliably.
+REQUESTED_SOURCE="${METALLB_OPERATOR_SUB_SOURCE:-redhat-operators}"
+echo "$(date) Requested METALLB_OPERATOR_SUB_SOURCE=${REQUESTED_SOURCE}"
+
+if [[ "${REQUESTED_SOURCE}" != "redhat-operators" && "${REQUESTED_SOURCE}" != "redhat-operators-stage" ]]; then
+  echo "$(date) Using caller-provided CatalogSource as-is: ${REQUESTED_SOURCE}"
+  METALLB_OPERATOR_SUB_SOURCE="${REQUESTED_SOURCE}"
+else
+  echo "$(date) Creating redhat-operators-stage CatalogSource (OZ fallback)..."
+  oc apply -f - <<EOF
 ---
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -79,40 +97,31 @@ spec:
       interval: 15m
 EOF
 
-# Wait for the CatalogSource to become READY
-echo "Waiting for CatalogSource redhat-operators-stage to become READY..."
-for i in $(seq 1 30); do
+  echo "$(date) Waiting for CatalogSource redhat-operators-stage to become READY..."
+  for i in $(seq 1 30); do
+    STATE=$(oc get catalogsource -n openshift-marketplace redhat-operators-stage \
+              -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+    [[ "${STATE}" == "READY" ]] && echo "$(date) CatalogSource is READY" && break
+    echo "$(date) [${i}/30] state=${STATE:-unknown}, retrying in 15s"
+    sleep 15
+  done
+
   STATE=$(oc get catalogsource -n openshift-marketplace redhat-operators-stage \
             -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
-  [[ "${STATE}" == "READY" ]] && echo "  CatalogSource is READY" && break
-  echo "  [${i}/30] state=${STATE:-unknown}, retrying in 15s"
-  sleep 15
-done
-
-STATE=$(oc get catalogsource -n openshift-marketplace redhat-operators-stage \
-          -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
-if [[ "${STATE}" != "READY" ]]; then
-  echo "ERROR: CatalogSource redhat-operators-stage did not reach READY (last state: ${STATE})"
-  echo "--- CatalogSource YAML ---"
-  oc get catalogsource redhat-operators-stage -n openshift-marketplace -o yaml
-  echo "--- CatalogSource pod logs ---"
-  CS_POD=$(oc get pods -n openshift-marketplace \
-    -l "olm.catalogSource=redhat-operators-stage" \
-    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-  if [[ -n "${CS_POD}" ]]; then
-    oc logs -n openshift-marketplace "${CS_POD}" || true
-  else
-    echo "  No pod found for CatalogSource redhat-operators-stage"
+  if [[ "${STATE}" != "READY" ]]; then
+    echo "$(date) ERROR: CatalogSource redhat-operators-stage did not reach READY (last state: ${STATE})"
+    oc get catalogsource redhat-operators-stage -n openshift-marketplace -o yaml || true
+    CS_POD=$(oc get pods -n openshift-marketplace \
+      -l "olm.catalogSource=redhat-operators-stage" \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    [[ -n "${CS_POD}" ]] && oc logs -n openshift-marketplace "${CS_POD}" || true
+    oc get catalogsource -n openshift-marketplace || true
+    oc get pods -n openshift-marketplace -o wide || true
+    exit 1
   fi
-  echo "--- All CatalogSources ---"
-  oc get catalogsource -n openshift-marketplace
-  echo "--- openshift-marketplace pods ---"
-  oc get pods -n openshift-marketplace -o wide
-  exit 1
+  METALLB_OPERATOR_SUB_SOURCE="redhat-operators-stage"
 fi
-
-METALLB_OPERATOR_SUB_SOURCE="redhat-operators-stage"
-echo "Using CatalogSource: ${METALLB_OPERATOR_SUB_SOURCE}"
+echo "$(date) Using CatalogSource: ${METALLB_OPERATOR_SUB_SOURCE}"
 
 # ── Install metallb-operator via OLM ─────────────────────────────────────────
 echo "Installing metallb-operator (stable, ${METALLB_OPERATOR_SUB_SOURCE}) into metallb-system"
@@ -208,19 +217,25 @@ echo "Configure IPAddressPool"
 #      as new environments are added).
 if [[ -n "${METALLB_MGMT_IPS:-}" ]]; then
   IP_POOL="${METALLB_MGMT_IPS}"
+  echo "$(date) Using METALLB_MGMT_IPS override: ${IP_POOL}"
 else
-  # Auto-detect the IP subnet from the first node's INTERNAL-IP reported by
-  # 'oc get no -o wide', then pick the matching pool range.
-  NODE_IP=$(oc get nodes -o wide --no-headers 2>/dev/null \
-    | awk '{print $6}' | grep -v '^$' | head -1)
-  echo "  Detected node IP: ${NODE_IP}"
+  # Prefer InternalIP from the API (column layout of `oc get no -o wide` varies).
+  NODE_IP=$(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
+  echo "$(date) Detected node InternalIP: ${NODE_IP:-<empty>}"
+  oc get nodes -o wide || true
+  # Only the two known OZ libvirt lease subnets are valid. Never default to
+  # 192.168.3.* on unknown input — a wrong VIP makes the guest API unreachable.
   if [[ "${NODE_IP}" == 192.168.2.* ]]; then
     IP_POOL="192.168.2.53-192.168.2.54"
-  else
+  elif [[ "${NODE_IP}" == 192.168.3.* ]]; then
     IP_POOL="192.168.3.53-192.168.3.54"
+  else
+    echo "$(date) ERROR: Unrecognised node InternalIP '${NODE_IP}' — expected 192.168.2.x or 192.168.3.x"
+    echo "$(date) Set METALLB_MGMT_IPS explicitly if this environment uses a different subnet."
+    exit 1
   fi
 fi
-echo "  IPAddressPool range: ${IP_POOL}"
+echo "$(date) IPAddressPool range: ${IP_POOL}"
 
 oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1

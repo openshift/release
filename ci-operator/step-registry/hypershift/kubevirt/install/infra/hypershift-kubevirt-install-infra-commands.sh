@@ -28,6 +28,11 @@ function add_pullsecret() {
   local USERNAME=$2
   local PASSWORD=$3
 
+  # Disable xtrace so registry credentials are not written to CI logs (CWE-532).
+  local WAS_TRACING=false
+  [[ $- == *x* ]] && WAS_TRACING=true
+  set +x
+
   oc extract secret/pull-secret -n openshift-config --keys=.dockerconfigjson --to=/tmp --confirm
 
   jq --arg reg "$REGISTRY" --arg user "$USERNAME" --arg pass "$PASSWORD" \
@@ -36,13 +41,16 @@ function add_pullsecret() {
 
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/.dockerconfigjson.new
 
-  rm /tmp/.dockerconfigjson /tmp/.dockerconfigjson.new
+  rm -f /tmp/.dockerconfigjson /tmp/.dockerconfigjson.new
+  $WAS_TRACING && set -x
+  echo "Updated pull-secret auth for registry ${REGISTRY}"
 }
 
 
-# Get yq tool
+# Get yq tool (pin version; do not follow mutable /latest)
 YQ="/tmp/yq"
-curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+YQ_VERSION="v4.44.3"
+curl -fsSL -o ${YQ} "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
 chmod +x ${YQ}
 
 # Dynamically get CNV catalog image and channel that were provided to the job via gangway API.
@@ -85,8 +93,11 @@ fi
 if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
 then
   if [[ "${CNV_PRERELEASE_CATALOG_IMAGE}" == *"brew"* ]]; then
-    # Add brew registry pull secret
+    # Add brew registry pull secret (disable xtrace before token expansion)
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     add_pullsecret "brew.registry.redhat.io" "${BREW_IMAGE_REGISTRY_USERNAME}" "$(cat "${BREW_IMAGE_REGISTRY_TOKEN_PATH}")"
+    $WAS_TRACING && set -x
 
     # Deploy IDMS for brew registry
     cat <<EOF | oc apply -f -
@@ -103,8 +114,12 @@ EOF
   elif [[ "${CNV_PRERELEASE_CATALOG_IMAGE}" == *"quay"* ]]; then
     # Add quay registry pull secret for cnv nightly channel
     QUAY_USERNAME=openshift-cnv+openshift_ci
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     QUAY_PASSWORD=$(cat /etc/cnv-nightly-pull-credentials/openshift_cnv_pullsecret)
     add_pullsecret "quay.io/openshift-cnv" "${QUAY_USERNAME}" "${QUAY_PASSWORD}"
+    unset QUAY_PASSWORD
+    $WAS_TRACING && set -x
   fi
 
   # Wait for MCPs to reach stable state after pull secret change

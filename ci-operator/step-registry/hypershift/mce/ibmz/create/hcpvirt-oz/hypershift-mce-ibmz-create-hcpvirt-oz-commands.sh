@@ -44,7 +44,12 @@ echo "$(date) Installing hcp CLI"
 mkdir -p /tmp/hcp_cli
 downloadURL=$(oc get ConsoleCLIDownload hcp-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
 echo "$(date) hcp CLI download URL: ${downloadURL}"
-curl -k --output /tmp/hcp.tar.gz "${downloadURL}"
+# Prefer TLS verification. ConsoleCLIDownload on some clusters serves a
+# self-signed/service-CA cert; fall back to -k only if the verified fetch fails.
+if ! curl -fsSL --connect-timeout 30 --max-time 300 --output /tmp/hcp.tar.gz "${downloadURL}"; then
+  echo "$(date) WARNING: TLS-verified hcp download failed; retrying with curl -k (cluster service CA mismatch is common)"
+  curl -fkSL --connect-timeout 30 --max-time 300 --output /tmp/hcp.tar.gz "${downloadURL}"
+fi
 tar -xvf /tmp/hcp.tar.gz -C /tmp/hcp_cli
 chmod +x /tmp/hcp_cli/hcp
 export PATH=$PATH:/tmp/hcp_cli
