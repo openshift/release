@@ -16,13 +16,13 @@ images:
       # Pin both sides of ai-helpers PR #765; never use the release diff base.
       ENV EVAL_SMOKE_BASE=b3ec8bbc4d7b947fd6f18dd13339d9acbb8c37ce \
           EVAL_SMOKE_HEAD=da76969fe72f0bd8b560383a93d48fa96dc15815
-      RUN git init /workspace && \
+      RUN git config --system --add safe.directory /workspace && \
+          git init /workspace && \
           git -C /workspace remote add origin https://github.com/openshift-eng/ai-helpers.git && \
           git -C /workspace fetch --depth=50 origin "$EVAL_SMOKE_BASE" "$EVAL_SMOKE_HEAD" && \
           git -C /workspace checkout --detach "$EVAL_SMOKE_HEAD" && \
           git -C /workspace merge-base --is-ancestor "$EVAL_SMOKE_BASE" HEAD && \
-          chown -R 1000:0 /workspace && chmod -R g+rwX /workspace && \
-          git config --system --add safe.directory /workspace
+          chown -R 1000:0 /workspace && chmod -R g+rwX /workspace
       COPY hack/claude-agent-eval/workflow-smoke/consumer-env.sh /usr/local/share/manifest-smoke-env.sh
       WORKDIR /workspace
       USER 1000
