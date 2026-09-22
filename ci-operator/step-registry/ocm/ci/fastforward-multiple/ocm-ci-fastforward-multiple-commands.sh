@@ -1865,7 +1865,9 @@ for owner_repo in "${!PROCESSED_REPO_MAP[@]}"; do
   owner=${owner_repo%/*}
   repo=${owner_repo#*/}
 
-  if ! (cleanup_stale_branches_for_repo "${owner}" "${repo}"); then
+  if (cleanup_stale_branches_for_repo "${owner}" "${repo}"); then
+    :
+  else
     cleanup_status=$?
     echo "WARNING: Cleanup for ${owner_repo} exited unexpectedly (status ${cleanup_status}), continuing with remaining repos"
   fi
