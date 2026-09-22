@@ -64,71 +64,103 @@ tests:
   as: nhc-upgrade-build-smoke
   capabilities:
   - nested-podman
-  commands: |
-    set -o errexit -o nounset -o pipefail
-    echo '==> Check nested Podman and its UID mapping'
-    id
-    podman info
-
-    # Preserve nested-podman's overlay settings while allowing the opm image's
-    # UID 65532 to be unpacked with this test container's smaller UID map.
-    storage_config="$(podman info --format '{{.Store.ConfigFile}}')"
-    test -r "$storage_config"
-    export CONTAINERS_STORAGE_CONF=/tmp/nhc-storage.conf
-    awk '
-      /^\[storage.options.overlay\]$/ {
-        in_overlay=1; found=1; print; print "ignore_chown_errors = \"true\""; next
-      }
-      /^\[/ { in_overlay=0 }
-      in_overlay && /^[[:space:]]*ignore_chown_errors[[:space:]]*=/ { next }
-      { print }
-      END { if (!found) { print "[storage.options.overlay]"; print "ignore_chown_errors = \"true\"" } }
-    ' "$storage_config" > "$CONTAINERS_STORAGE_CONF"
-    test "$(podman info --format '{{.Store.ConfigFile}}')" = "$CONTAINERS_STORAGE_CONF"
-    echo '==> Pull catalog base image with the corrected storage setting'
-    podman pull quay.io/operator-framework/opm:latest
-
-    echo '==> Clone NHC and read its candidate version'
-    git clone --depth=1 https://github.com/medik8s/node-healthcheck-operator.git /tmp/nhc-source
-    cd /tmp/nhc-source
-    NHC_VERSION="$(sed -n 's/^[[:space:]]*Version = "\([^"]*\)".*/\1/p' version/version.go)"
-    makefile_version="$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)"
-    test -n "$NHC_VERSION" && test "$NHC_VERSION" = "$makefile_version"
-    # The smoke job has no cluster pull secret to discover the GA release.
-    NHC_PREVIOUS_VERSION=0.12.1
-    test "$NHC_VERSION" != "$NHC_PREVIOUS_VERSION"
-    printf 'Candidate: %s; smoke baseline: %s\n' "$NHC_VERSION" "$NHC_PREVIOUS_VERSION"
-
-    prefix="ttl.sh/nhc-prow-smoke-$(date +%Y%m%d-%H%M%S)-${BUILD_ID:-local}"
-    digest_dir="$(mktemp -d)"
-    export CONSOLE_PLUGIN_IMAGE=quay.io/medik8s/node-remediation-console@sha256:384d35e7aed7be24f8837e33cfd1e94a683a1cdcafb7da58f813ae233e957ff7
-    export MUST_GATHER_IMAGE=quay.io/medik8s/must-gather@sha256:a3ba0753e60517c2a7cff68eca778c23198787af36e8214e8838d2c7fc676b97
-
-    echo '==> Build and push operator'
-    NHC_SKIP_TEST=true make docker-build VERSION="$NHC_VERSION" IMG="${prefix}-operator:1h"
-    podman push --digestfile "$digest_dir/operator.digest" "${prefix}-operator:1h"
-    operator_image="${prefix}-operator@$(cat "$digest_dir/operator.digest")"
-
-    echo '==> Build and push bundle'
-    make bundle-build-ocp \
-      VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
-      SKIP_RANGE_LOWER=0.1.0 DOCS_RHWA_VERSION=5.0 \
-      IMG="$operator_image" BUNDLE_IMG="${prefix}-bundle:1h" \
-      CONSOLE_PLUGIN_IMAGE="$CONSOLE_PLUGIN_IMAGE" MUST_GATHER_IMAGE="$MUST_GATHER_IMAGE"
-    podman push --digestfile "$digest_dir/bundle.digest" "${prefix}-bundle:1h"
-    bundle_image="${prefix}-bundle@$(cat "$digest_dir/bundle.digest")"
-
-    echo '==> Build and push catalog (the step that failed in the full job)'
-    make catalog-build \
-      VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
-      SKIP_RANGE_LOWER=0.1.0 BUNDLE_IMG="$bundle_image" \
-      CATALOG_IMG="${prefix}-catalog:1h"
-    podman push --digestfile "$digest_dir/catalog.digest" "${prefix}-catalog:1h"
-    echo "==> Catalog pushed: ${prefix}-catalog@$(cat "$digest_dir/catalog.digest")"
-  container:
-    from: nhc-upgrade-test-runner
-  nested_podman: true
   optional: true
+  steps:
+    test:
+    - as: inspect-nhc-src-and-build
+      cli: latest
+      dependencies:
+      - name: src
+        env: NHC_SRC_IMAGE
+      from: nhc-upgrade-test-runner
+      nested_podman: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 500Mi
+      commands: |
+        set -o errexit -o nounset -o pipefail
+        echo '==> Verify injected oc and inspect CI-selected source'
+        command -v oc
+        oc version --client
+        printf 'CI source image: %s\n' "$NHC_SRC_IMAGE"
+        mkdir -p /tmp/nhc-ci-src
+        oc image extract "$NHC_SRC_IMAGE" \
+          --path="/go/src/github.com/medik8s/node-healthcheck-operator/:/tmp/nhc-ci-src" --confirm
+
+        echo '==> Clone NHC independently'
+        git clone --depth=1 https://github.com/medik8s/node-healthcheck-operator.git /tmp/nhc-source
+
+        echo '==> Inspect both source directories'
+        for checkout in /tmp/nhc-ci-src /tmp/nhc-source; do
+          printf 'Top-level entries in %s:\n' "$checkout"
+          find "$checkout" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort
+          if test -e "$checkout/.git"; then
+            printf 'Git metadata: present; HEAD: '
+            git -C "$checkout" rev-parse HEAD
+          else
+            echo 'Git metadata: absent'
+          fi
+        done
+
+        echo '==> Check nested Podman and its UID mapping'
+        id
+        podman info
+
+        # Preserve nested-podman's overlay settings while allowing the opm image's
+        # UID 65532 to be unpacked with this test container's smaller UID map.
+        storage_config="$(podman info --format '{{.Store.ConfigFile}}')"
+        test -r "$storage_config"
+        export CONTAINERS_STORAGE_CONF=/tmp/nhc-storage.conf
+        awk '
+          /^\[storage.options.overlay\]$/ {
+            in_overlay=1; found=1; print; print "ignore_chown_errors = \"true\""; next
+          }
+          /^\[/ { in_overlay=0 }
+          in_overlay && /^[[:space:]]*ignore_chown_errors[[:space:]]*=/ { next }
+          { print }
+          END { if (!found) { print "[storage.options.overlay]"; print "ignore_chown_errors = \"true\"" } }
+        ' "$storage_config" > "$CONTAINERS_STORAGE_CONF"
+        test "$(podman info --format '{{.Store.ConfigFile}}')" = "$CONTAINERS_STORAGE_CONF"
+        echo '==> Pull catalog base image with the corrected storage setting'
+        podman pull quay.io/operator-framework/opm:latest
+
+        echo '==> Read NHC candidate version from the fresh clone'
+        cd /tmp/nhc-source
+        NHC_VERSION="$(sed -n 's/^[[:space:]]*Version = "\([^"]*\)".*/\1/p' version/version.go)"
+        makefile_version="$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)"
+        test -n "$NHC_VERSION" && test "$NHC_VERSION" = "$makefile_version"
+        # The smoke job has no cluster pull secret to discover the GA release.
+        NHC_PREVIOUS_VERSION=0.12.1
+        test "$NHC_VERSION" != "$NHC_PREVIOUS_VERSION"
+        printf 'Candidate: %s; smoke baseline: %s\n' "$NHC_VERSION" "$NHC_PREVIOUS_VERSION"
+
+        prefix="ttl.sh/nhc-prow-smoke-$(date +%Y%m%d-%H%M%S)-${BUILD_ID:-local}"
+        digest_dir="$(mktemp -d)"
+        export CONSOLE_PLUGIN_IMAGE=quay.io/medik8s/node-remediation-console@sha256:384d35e7aed7be24f8837e33cfd1e94a683a1cdcafb7da58f813ae233e957ff7
+        export MUST_GATHER_IMAGE=quay.io/medik8s/must-gather@sha256:a3ba0753e60517c2a7cff68eca778c23198787af36e8214e8838d2c7fc676b97
+
+        echo '==> Build and push operator'
+        NHC_SKIP_TEST=true make docker-build VERSION="$NHC_VERSION" IMG="${prefix}-operator:1h"
+        podman push --digestfile "$digest_dir/operator.digest" "${prefix}-operator:1h"
+        operator_image="${prefix}-operator@$(cat "$digest_dir/operator.digest")"
+
+        echo '==> Build and push bundle'
+        make bundle-build-ocp \
+          VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
+          SKIP_RANGE_LOWER=0.1.0 DOCS_RHWA_VERSION=5.0 \
+          IMG="$operator_image" BUNDLE_IMG="${prefix}-bundle:1h" \
+          CONSOLE_PLUGIN_IMAGE="$CONSOLE_PLUGIN_IMAGE" MUST_GATHER_IMAGE="$MUST_GATHER_IMAGE"
+        podman push --digestfile "$digest_dir/bundle.digest" "${prefix}-bundle:1h"
+        bundle_image="${prefix}-bundle@$(cat "$digest_dir/bundle.digest")"
+
+        echo '==> Build and push catalog (the step that failed in the full job)'
+        make catalog-build \
+          VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
+          SKIP_RANGE_LOWER=0.1.0 BUNDLE_IMG="$bundle_image" \
+          CATALOG_IMG="${prefix}-catalog:1h"
+        podman push --digestfile "$digest_dir/catalog.digest" "${prefix}-catalog:1h"
+        echo "==> Catalog pushed: ${prefix}-catalog@$(cat "$digest_dir/catalog.digest")"
 - always_run: false
   as: e2e-system-tests-nhc-upgrade
   capabilities:
