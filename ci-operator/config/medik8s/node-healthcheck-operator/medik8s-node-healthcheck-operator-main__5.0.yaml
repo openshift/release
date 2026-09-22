@@ -35,7 +35,6 @@ images:
       src:
         paths:
         - destination_dir: nhc-src/
-          # /. copies the checkout contents without nesting the repository directory.
           source_path: /go/src/github.com/medik8s/node-healthcheck-operator/.
       system-tests-builder:
         as:
@@ -228,8 +227,9 @@ tests:
 
         build_candidate() {
           # Match build-and-push.sh: build operator, bundle, then catalog.
-          echo '==> Clone NHC main'
-          git clone --depth=1 https://github.com/medik8s/node-healthcheck-operator.git /tmp/nhc-source
+          echo '==> Copy the CI-selected NHC checkout into a writable build directory'
+          test -f /opt/nhc-ci-src/Makefile
+          cp -R /opt/nhc-ci-src /tmp/nhc-source
           local revision prefix operator_tag bundle_tag catalog_tag
           revision="$(git -C /tmp/nhc-source rev-parse HEAD)"
           git -C /tmp/nhc-source show --no-patch --format=fuller HEAD
@@ -301,10 +301,9 @@ tests:
         }
 
         run_tests() {
-          # Before merging, switch back to medik8s/system-tests main after #120 merges.
-          echo '==> Clone system-tests'
-          git clone --depth=1 --branch fix/nhc-prow-rehearsal \
-            https://github.com/JonahSussman/medik8s-system-tests.git /tmp/system-tests
+          echo '==> Clone system-tests main'
+          git clone --depth=1 --branch main \
+            https://github.com/medik8s/system-tests.git /tmp/system-tests
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
 
           export NHC_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
