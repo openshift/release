@@ -27,6 +27,35 @@ if [[ -z "${HOSTNAME}" ]]; then
   exit 1
 fi
 
+# This function checks for the following machineconfig yamls in SHARED_DIR and saves them to the given install directory:
+#   - the node tuning yaml config
+#   - the chrony machineconfig for the worker nodes
+#   - the chrony machineconfig for the master nodes
+#   - the master mcp yaml config
+#   - the worker mcp yaml config
+#   - the etcd on ramdisk yaml config
+#   - the static pod controller degraded yaml config
+#   - the kdump worker yaml config
+function apply_machineconfigs () {
+  local target_dir="${1}"
+  local files=(
+    "${SHARED_DIR}/99-sysctl-worker.yaml"
+    "${SHARED_DIR}/99-chrony-worker.yaml"
+    "${SHARED_DIR}/99-chrony-master.yaml"
+    "${SHARED_DIR}/manifest_master.machineconfigpool.yaml"
+    "${SHARED_DIR}/manifest_worker.machineconfigpool.yaml"
+    "${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
+    "${SHARED_DIR}/manifest_static-pod-check-workaround-master-mc.yml"
+    "${SHARED_DIR}/manifest_99_worker_kdump.yml"
+  )
+  for f in "${files[@]}"; do
+    if [ -f "${f}" ]; then
+      echo "Copying $(basename "${f}") to ${target_dir}..."
+      cp "${f}" "${target_dir}/"
+    fi
+  done
+}
+
 function save_credentials () {
   # Save credentials for diagnostic steps going forward
   echo "Saving authentication files for next steps..."
@@ -177,6 +206,9 @@ cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
   cp ${SHARED_DIR}/agent-config.yaml ${INSTALL_DIR}
+  # MachineConfigs must be injected before pxe-files so they are baked into the boot image
+  mkdir -p "${INSTALL_DIR}/openshift"
+  apply_machineconfigs "${INSTALL_DIR}/openshift"
   ${OCPINSTALL} --dir ${INSTALL_DIR} agent create pxe-files
   save_credentials
 
@@ -363,61 +395,7 @@ else
   # Generate manifests for cluster modifications
   echo "Generating manifests..."
   ${OCPINSTALL} --dir "${INSTALL_DIR}" create manifests
-fi
-
-# Check for the node tuning yaml config, and save it in the installation directory
-NODE_TUNING_YAML="${SHARED_DIR}/99-sysctl-worker.yaml"
-if [ -f "${NODE_TUNING_YAML}" ]; then
-  echo "Saving ${NODE_TUNING_YAML} to the install directory..."
-  cp ${NODE_TUNING_YAML} "${INSTALL_DIR}/manifests"
-fi
-
-# Sets up the chrony machineconfig for the worker nodes
-CHRONY_WORKER_YAML="${SHARED_DIR}/99-chrony-worker.yaml"
-if [ -f "${CHRONY_WORKER_YAML}" ]; then
-  echo "Saving ${CHRONY_WORKER_YAML} to the install directory..."
-  cp ${CHRONY_WORKER_YAML} "${INSTALL_DIR}/manifests"
-fi
-
-# Sets up the chrony machineconfig for the master nodes
-CHRONY_MASTER_YAML="${SHARED_DIR}/99-chrony-master.yaml"
-if [ -f "${CHRONY_MASTER_YAML}" ]; then
-  echo "Saving ${CHRONY_MASTER_YAML} to the install directory..."
-  cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
-fi
-
-# Check for the master mcp yaml config, and save it in the installation directory
-MCP_MASTER_YAML="${SHARED_DIR}/manifest_master.machineconfigpool.yaml"
-if [[ -f "${MCP_MASTER_YAML}" ]]; then
-  echo "Saving ${MCP_MASTER_YAML} to the install manifests directory..."
-  cp ${MCP_MASTER_YAML} "${INSTALL_DIR}/manifests/"
-fi
-
-# Check for the worker mcp yaml config, and save it in the installation directory
-MCP_WORKER_YAML="${SHARED_DIR}/manifest_worker.machineconfigpool.yaml"
-if [[ -f "${MCP_WORKER_YAML}" ]]; then
-  echo "Saving ${MCP_WORKER_YAML} to the install manifests directory..."
-  cp ${MCP_WORKER_YAML} "${INSTALL_DIR}/manifests/"
-fi
-# Check for the etcd on ramdisk yaml config, and save it in the installation directory
-ETCD_RAMDISK_YAML="${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
-if [ -f "${ETCD_RAMDISK_YAML}" ]; then
-  echo "Saving ${ETCD_RAMDISK_YAML} to the install directory..."
-  cp ${ETCD_RAMDISK_YAML} "${INSTALL_DIR}/manifests"
-fi
-
-# Check for static pod controller degraded yaml config, and save it in the installation directory
-STATIC_POD_DEGRADED_YAML="${SHARED_DIR}/manifest_static-pod-check-workaround-master-mc.yml"
-if [ -f "${STATIC_POD_DEGRADED_YAML}" ]; then
-  echo "Saving ${STATIC_POD_DEGRADED_YAML} to the install directory..."
-  cp ${STATIC_POD_DEGRADED_YAML} "${INSTALL_DIR}/manifests"
-fi
-
-# Check for kdump worker yaml config, and save it in the installation directory
-KDUMP_WORKER_YAML="${SHARED_DIR}/manifest_99_worker_kdump.yml"
-if [ -f "${KDUMP_WORKER_YAML}" ]; then
-  echo "Saving ${KDUMP_WORKER_YAML} to the install directory..."
-  cp ${KDUMP_WORKER_YAML} /tmp/manifests
+  apply_machineconfigs "${INSTALL_DIR}/manifests"
 fi
 
 if [ "${INSTALLER_TYPE}" == "default" ]; then
