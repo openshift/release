@@ -94,12 +94,13 @@ Export the `env` vars, then run the script's setup section (up to the first `npx
 
 | Script pattern | Adaptation |
 |---|---|
-| `cp -R /tmp/<name>` (image mount) | `git clone <repo> <dest>` — repo URL from the step script or CI config |
-| `kubectl create -f <url>` (CRDs) | `kubectl apply -f <url>` — `create` fails if the CRD exists |
+| `cp -R /tmp/<name>` (image mount) | `git clone <repo> <dest>` — URL from the step script |
+| `kubectl create -f <url>` (CRDs) | `kubectl apply -f <url>` — `create` fails if it exists |
 | `oc patch csv ...` | Skip — already patched; verify with `oc get csv -n openshift-cluster-observability-operator` |
 | `CYPRESS_SKIP_TESTS` block | Keep it; reruns use it (Step 3) |
-| htpasswd / oauth setup | Create the secret only if `oc get secret htpass-secret -n openshift-config` fails; patch oauth only if the htpasswd IDP is missing |
-| Operator installs / OperatorGroups | Already installed by the original run — check `oc get csv -A`, do not reinstall. Check `oc get operatorgroup -n <ns>` before creating one; a second OperatorGroup fails the CSV ("csv created in namespace with multiple operatorgroups") |
+| htpasswd / oauth setup | Create the secret only if `oc get secret htpass-secret -n openshift-config` fails; patch oauth only if the IDP is missing |
+| Operator installs / OperatorGroups | Verify — check `oc get csv -A`; install only if missing (`after()` can delete COO/OTel/Tempo/Lightspeed). Check `oc get operatorgroup -n <ns>` first; a second one fails the CSV |
+| Cypress binary | `npx cypress version` can pass while the binary is only under `/root/.cache/Cypress/`, not `$CYPRESS_CACHE_FOLDER`. If empty: `cp -r /root/.cache/Cypress/*/ /tmp/Cypress/` |
 
 Then continue with Steps 1–6 in the cloned repo. If `qe-agent-context.json` is missing, infer the suite from the JUnit prefix, skip the rerun, and diagnose from the JUnit content and cluster state.
 
@@ -109,7 +110,7 @@ Read `${SHARED_DIR}/qe-agent-junit-*.xml`. For each file extract the suite name 
 
 ### High-failure triage: more than 5 failures total
 
-More than 5 failures usually share one root cause (console plugin not loaded, auth failure, UI not responding, network error, or a failed `before` hook). Look for a common pattern: the same error string (`Cannot read properties of null`, `element not found`, `401 Unauthorized`, `plugin not enabled`), the same failing Cypress command (`cy.visit`, `cy.get`, `cy.findByText`), or tightly clustered failure times.
+More than 5 failures usually share one root cause (plugin not loaded, auth failure, UI not responding, network error, or a failed `before` hook). Look for a common pattern: the same error string (`Cannot read properties of null`, `401 Unauthorized`), the same failing Cypress command (`cy.visit`, `cy.get`), or tightly clustered failure times.
 
 - **Clear pattern**: pick the simplest failing test as the representative and run Steps 2–5 for it only.
 - **No clear pattern**: process failures individually, cap at 3 tests, and note this in the summary.
@@ -120,7 +121,7 @@ Write the pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.
 
 ## Step 2 — Locate Test Source Files
 
-The repo root is the clone destination from the step script — do not scan `/tmp/` broadly. All tests are in one spec, `tests/e2e/dt-plugin-tests.cy.ts`: a single `describe` whose `before` hook installs/verifies the operators, sets up Lightspeed and creates the UIPlugin, then one `it` per capability. A `before` hook failure skips every test. Locate the `it` block with `grep -n "<test-name>"`. Supporting files under `tests/`: Cypress config, `cypress/support/` custom commands (e.g. `cy.runChainsawTest`), `views/` page objects, `fixtures/` chainsaw tests.
+The repo root is the clone destination — do not scan `/tmp/` broadly. All tests are in one spec, `tests/e2e/dt-plugin-tests.cy.ts`: a single `describe` whose `before` hook installs/verifies the operators, sets up Lightspeed and creates the UIPlugin, then one `it` per capability. A `before` hook failure skips every test. Locate the `it` block with `grep -n "<test-name>"`. Supporting files under `tests/`: Cypress config, `cypress/support/` custom commands (e.g. `cy.runChainsawTest`), `views/` page objects, `fixtures/` chainsaw tests.
 
 ---
 
@@ -163,7 +164,7 @@ Run the rerun block 3 more times with `RUN=2`, `3` and `4` (one JUnit file each)
 
 ## Step 4 — Diagnose: Product Bug vs Test Issue
 
-Run the diagnostics below before classifying — logs and resource status, read with the failure message and test source, are the primary evidence.
+Run the diagnostics below first; logs and resource status are the primary evidence alongside the failure message and test source.
 
 ### Cluster Observability Operator Diagnostics
 
