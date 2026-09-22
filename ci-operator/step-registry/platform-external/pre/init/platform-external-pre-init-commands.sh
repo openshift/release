@@ -137,6 +137,9 @@ function collect_bootstrap_handler() {
   log "[\${handler_name}]: Attempting to collect bootstrap logs..."
   {
     make_install_dir
+    # gather writes .openshift_install.log into the working directory, which is
+    # not writable on every step image.
+    cd "\${INSTALL_DIR}"
     if ! command -v openshift-install &> /dev/null; then
       log "[\${handler_name}]: ERROR: openshift-install not found, cannot gather bootstrap logs"
     else

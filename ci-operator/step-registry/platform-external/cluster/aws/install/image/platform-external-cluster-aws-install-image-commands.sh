@@ -32,5 +32,17 @@ else
   RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.amis[$region].hvm' /var/lib/openshift-install/rhcos.json)"
 fi
 
+# TEMPORARY EXPERIMENT - MUST NOT MERGE.
+# This step runs from the upi-installer image, which in an upgrade job is pinned
+# to the target release (5.0), so print-stream-json returns 5.0's bootimage pin
+# even though the payload being installed is the initial release (4.22).
+# Observed: booted ami-0badc1f21372efea6 / RHCOS 10.2.20260423-0 = release-5.0 pin.
+# Below forces release-4.22's us-west-2 pin to test whether that is what hangs
+# bootstrap. Region guarded so other regions keep the current behaviour.
+if [[ "${AWS_REGION}" == "us-west-2" ]]; then
+  log "EXPERIMENT: overriding discovered AMI ${RHCOS_AMI} with release-4.22 pin"
+  RHCOS_AMI="ami-09d49112a1306f262"
+fi
+
 log "Discovered RHCOS image ${RHCOS_AMI}, saving to artifact ${SHARED_DIR}/image_id.txt"
 echo "${RHCOS_AMI}" > "${SHARED_DIR}/image_id.txt"
