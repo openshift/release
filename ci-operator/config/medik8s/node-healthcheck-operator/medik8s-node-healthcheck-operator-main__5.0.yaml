@@ -29,8 +29,13 @@ images:
       COPY --from=operator-sdk /usr/local/bin/operator-sdk /usr/local/bin/operator-sdk
       ENV GOROOT=/opt/app-root/src/go
       ENV PATH=/opt/app-root/src/go/bin:$PATH
+      COPY nhc-src/ /opt/nhc-ci-src/
     from: nested-podman
     inputs:
+      src:
+        paths:
+        - destination_dir: nhc-src/
+          source_path: /go/src/github.com/medik8s/node-healthcheck-operator
       system-tests-builder:
         as:
         - system-tests-builder
@@ -74,22 +79,18 @@ tests:
         echo '==> Verify injected oc and inspect CI-selected source'
         command -v oc
         oc version --client
-        printf 'CI source image: %s\n' "$NHC_SRC_IMAGE"
-        mkdir -p /tmp/nhc-ci-src
-        oc image extract "$NHC_SRC_IMAGE" \
-          --path="/go/src/github.com/medik8s/node-healthcheck-operator/:/tmp/nhc-ci-src" \
-          --registry-config=/etc/ci-pull-credentials/.dockerconfigjson --confirm
+        test -f /opt/nhc-ci-src/Makefile
 
         echo '==> Clone NHC independently'
         git clone --depth=1 https://github.com/medik8s/node-healthcheck-operator.git /tmp/nhc-source
 
         echo '==> Inspect both source directories'
-        for checkout in /tmp/nhc-ci-src /tmp/nhc-source; do
+        for checkout in /opt/nhc-ci-src /tmp/nhc-source; do
           printf 'Top-level entries in %s:\n' "$checkout"
           find "$checkout" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort
           if test -e "$checkout/.git"; then
             printf 'Git metadata: present; HEAD: '
-            git -C "$checkout" rev-parse HEAD
+            git -c safe.directory="$checkout" -C "$checkout" rev-parse HEAD
           else
             echo 'Git metadata: absent'
           fi
@@ -153,13 +154,6 @@ tests:
           CATALOG_IMG="${prefix}-catalog:1h"
         podman push --digestfile "$digest_dir/catalog.digest" "${prefix}-catalog:1h"
         echo "==> Catalog pushed: ${prefix}-catalog@$(cat "$digest_dir/catalog.digest")"
-      credentials:
-      - bundle: ci-pull-credentials
-        mount_path: /etc/ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: NHC_SRC_IMAGE
-        name: src
       from: nhc-upgrade-test-runner
       nested_podman: true
       resources:
