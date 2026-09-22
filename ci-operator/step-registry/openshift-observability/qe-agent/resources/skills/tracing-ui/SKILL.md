@@ -29,10 +29,10 @@ Read `${SHARED_DIR}/qe-agent-context.json`, written by the test step at exit:
 }
 ```
 
-- `step_script_ref` — path relative to `ci-operator/step-registry/` in openshift/release
+- `step_script_ref` — path relative to `ci-operator/step-registry/`
 - `env` — job-time env values needed to reproduce setup; `CYPRESS_SKIP_TESTS` is the job's `@cypress/grep` pattern (empty = all tests), applied to reruns in Step 3
 
-Fetch `https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/<step_script_ref>`. Everything before the first `npx cypress run` / `npm run` is **setup** (repo clone, IDP/htpasswd, env vars, `npm install`); the rest is **test execution**.
+Fetch `https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/<step_script_ref>`. Everything before the first `npx cypress run` / `npm run` is **setup** (clone, IDP/htpasswd, env vars, `npm install`); the rest is **test execution**.
 
 ## Step 0a — Verify Cluster Stability
 
@@ -94,12 +94,12 @@ Export the `env` vars, then run the script's setup section (up to the first `npx
 
 | Script pattern | Adaptation |
 |---|---|
-| `cp -R /tmp/<name>` (image mount) | `git clone <repo> <dest>` — URL from the step script |
+| `cp -R /tmp/<name>` (image mount) | `git clone --branch main --single-branch <repo> <dest>` — URL/branch from the step script |
 | `kubectl create -f <url>` (CRDs) | `kubectl apply -f <url>` — `create` fails if it exists |
 | `oc patch csv ...` | Skip — already patched; verify with `oc get csv -n openshift-cluster-observability-operator` |
 | `CYPRESS_SKIP_TESTS` block | Keep it; reruns use it (Step 3) |
 | htpasswd / oauth setup | Create the secret only if `oc get secret htpass-secret -n openshift-config` fails; patch oauth only if the IDP is missing |
-| Operator installs / OperatorGroups | Verify — check `oc get csv -A`; install only if missing (`after()` can delete COO/OTel/Tempo/Lightspeed). Check `oc get operatorgroup -n <ns>` first; a second one fails the CSV |
+| Operator installs / OperatorGroups | Verify readiness, not just presence — require CSV phase `Succeeded`; (re)install if missing or not Succeeded (`after()` can delete or fail COO/OTel/Tempo/Lightspeed). Check `oc get operatorgroup -n <ns>` first; a second one fails the CSV |
 | Cypress binary | `npx cypress version` can pass while the binary is only under `/root/.cache/Cypress/`, not `$CYPRESS_CACHE_FOLDER`. If empty: `cp -r /root/.cache/Cypress/*/ /tmp/Cypress/` |
 
 Then continue with Steps 1–6 in the cloned repo. If `qe-agent-context.json` is missing, infer the suite from the JUnit prefix, skip the rerun, and diagnose from the JUnit content and cluster state.
@@ -134,7 +134,7 @@ Before rerunning, inspect the RBAC test's `chainsaw-*` namespaces and `verify-tr
 ```bash
 cd "<repo root>/tests"
 export NO_COLOR=1 CYPRESS_CACHE_FOLDER=/tmp/Cypress CYPRESS_SKIP_COO_INSTALL=true
-# Fresh shell: also re-export the CYPRESS_* vars from the step script setup (base URL, login, kubeconfig, Lightspeed)
+# Fresh shell: also re-export the CYPRESS_* vars from Step 0b setup
 CYPRESS_SKIP_TESTS=$(jq -r '.env.CYPRESS_SKIP_TESTS // ""' "${SHARED_DIR}/qe-agent-context.json" 2>/dev/null)
 GREP="<unique part of the failing test title>"
 [[ -n "${CYPRESS_SKIP_TESTS}" ]] && GREP="${GREP}; ${CYPRESS_SKIP_TESTS}"
@@ -147,9 +147,9 @@ npx cypress run --browser chrome --headless --spec "e2e/dt-plugin-tests.cy.ts" \
 ### Selecting what to rerun
 
 - Keep `CYPRESS_SKIP_TESTS` in the grep (`;` separates, `-` excludes): the `before` hook reads it too, e.g. `-Lightspeed` skips the Lightspeed install where it's not published.
-- Tests are order-dependent: `Capability:RBAC` creates the Tempo instances (`chainsaw-rbac / simplst`, `chainsaw-mmo-rbac / mmo-rbac`) and traces that every later test uses except `Capability:TLSCertRotation` and `Capability:Installation`. Include it for those tests (`GREP="Capability:RBAC; Capability:TraceLimits"`), otherwise the rerun fails on `input[placeholder="Select a Tempo instance"]`.
-- For a `before` hook failure, set `GREP` to only the `CYPRESS_SKIP_TESTS` value (empty runs every test).
-- `CYPRESS_SKIP_COO_INSTALL=true` skips the OperatorHub install path (`CYPRESS_COO_UI_INSTALL`, the job default). A passing rerun does not verify an install-path fix — mark it "not re-verified" in `CHANGES.md`.
+- Tests are order-dependent: `Capability:RBAC` creates the Tempo instances (`chainsaw-rbac / simplst`, `chainsaw-mmo-rbac / mmo-rbac`) and traces every later test uses except `Capability:TLSCertRotation`/`Capability:Installation`. Include it for others (`GREP="Capability:RBAC; Capability:TraceLimits"`), otherwise the rerun fails on `input[placeholder="Select a Tempo instance"]`.
+- For a `before` hook failure, set `GREP` to just `CYPRESS_SKIP_TESTS` (empty runs every test).
+- `CYPRESS_SKIP_COO_INSTALL=true` skips the OperatorHub install path (`CYPRESS_COO_UI_INSTALL`, the job default). A passing rerun doesn't verify an install-path fix — mark it "not re-verified" in `CHANGES.md`.
 
 Read the rerun JUnit XML:
 - **Same failure** → Step 4
