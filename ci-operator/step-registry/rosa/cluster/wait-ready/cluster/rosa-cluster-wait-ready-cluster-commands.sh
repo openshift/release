@@ -14,9 +14,14 @@ ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 STALL_TIMEOUT=${STALL_TIMEOUT:-3600}
 PROVISIONER_LAUNCH_TIMEOUT=${PROVISIONER_LAUNCH_TIMEOUT:-900}
+OCM_RECONCILIATION_TIMEOUT=${OCM_RECONCILIATION_TIMEOUT:-600}
 if [[ ! "${PROVISIONER_LAUNCH_TIMEOUT}" =~ ^[0-9]+$ ]]; then
   log "ERROR: PROVISIONER_LAUNCH_TIMEOUT must be a non-negative integer, got '${PROVISIONER_LAUNCH_TIMEOUT}'. Using default 900."
   PROVISIONER_LAUNCH_TIMEOUT=900
+fi
+if [[ ! "${OCM_RECONCILIATION_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: OCM_RECONCILIATION_TIMEOUT must be a non-negative integer, got '${OCM_RECONCILIATION_TIMEOUT}'. Using default 600." >&2
+  OCM_RECONCILIATION_TIMEOUT=600
 fi
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
@@ -247,11 +252,15 @@ dyn_start_time=${start_time}
 CLUSTER_PREVIOUS_STATE="claim"
 record_cluster "timers" "status" "claim"
 loop_count=0
+install_complete_seen_at=0
 while true; do
   retry_cmd 3 10 rosa describe cluster -c "${CLUSTER_ID}" -o json > "${cluster_info_json}"
   CLUSTER_STATE=$(cat ${cluster_info_json} | jq -r '.state')
   log "Cluster state: ${CLUSTER_STATE}"
   current_time=$(date +"%s")
+  if [[ "${CLUSTER_STATE}" != "installing" ]]; then
+    install_complete_seen_at=0
+  fi
   if [[ "${CLUSTER_STATE}" == "error" ]] || (( "${current_time}" - "${start_time}" >= "${CLUSTER_TIMEOUT}" )); then
     record_cluster "timers" "status" "${CLUSTER_STATE}"
     FAILED_INSTALL="yes"
@@ -269,11 +278,15 @@ while true; do
       # Stall detection: fail early if state is stuck for too long
       stall_elapsed=$(( current_time - dyn_start_time ))
       if (( stall_elapsed >= STALL_TIMEOUT )) && [[ "${CLUSTER_STATE}" == "installing" || "${CLUSTER_STATE}" == "pending" ]]; then
-        log "ERROR: Cluster state '${CLUSTER_STATE}' has not changed for $(( stall_elapsed / 60 )) minutes (stall timeout: $(( STALL_TIMEOUT / 60 )) minutes)"
-        log "Cluster appears to be stalled. Failing early."
-        record_cluster "timers" "status" "${CLUSTER_STATE}"
-        FAILED_INSTALL="yes"
-        break
+        if [[ "${CLUSTER_STATE}" == "installing" ]] && (( install_complete_seen_at > 0 )); then
+          log "Cluster has exceeded the general stall timeout, but installer completion was detected; applying the OCM reconciliation timeout."
+        else
+          log "ERROR: Cluster state '${CLUSTER_STATE}' has not changed for $(( stall_elapsed / 60 )) minutes (stall timeout: $(( STALL_TIMEOUT / 60 )) minutes)"
+          log "Cluster appears to be stalled. Failing early."
+          record_cluster "timers" "status" "${CLUSTER_STATE}"
+          FAILED_INSTALL="yes"
+          break
+        fi
       fi
 
       # Install log health check: every 5 iterations, check for fatal errors
@@ -282,11 +295,11 @@ while true; do
         log "Checking install logs for fatal errors..."
         install_log_output=$(retry_cmd 3 10 timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
         fatal_pattern=$(echo "${install_log_output}" | grep -E "ProvisionFailed|failed to create|InvalidSubnet|LimitExceeded|QuotaExceeded|InsufficientFreeAddresses|UnauthorizedAccess" || true)
-        # Filter out KMS provider x509 false positive (OCPBUGS-49661): the admin-kubeconfig CA
-        # does not trust the Let's Encrypt CA on ROSA HCP API servers, so "failed to create token
-        # for KMS provider service account" with an x509 error always fires early but is transient.
+        # Filter known transient errors. The KMS provider x509 error (OCPBUGS-49661) is caused by
+        # the admin-kubeconfig CA not trusting the Let's Encrypt CA on ROSA HCP API servers. CAPI
+        # also reports the guest cluster as unreachable while its API server is still bootstrapping.
         if [[ -n "${fatal_pattern}" ]]; then
-          fatal_pattern=$(echo "${fatal_pattern}" | grep -v -E 'kms-provider.*x509|x509.*kms-provider' || true)
+          fatal_pattern=$(echo "${fatal_pattern}" | grep -v -E 'kms-provider.*x509|x509.*kms-provider|failed to create cluster accessor.*cluster is not reachable' || true)
         fi
         if [[ -n "${fatal_pattern}" ]]; then
           log "ERROR: Fatal error detected in install logs:"
@@ -315,18 +328,27 @@ while true; do
             fi
           fi
 
-          # OCM state reconciliation detection: installer completed but OCM state stuck
-          if [[ "${infra_id_check}" != "null" ]] && (( installing_elapsed >= PROVISIONER_LAUNCH_TIMEOUT )); then
-            install_log_check=$(retry_cmd 3 10 timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
-            if echo "${install_log_check}" | grep -Eiq 'install complete!|install completed successfully'; then
+          # Installer completion can precede the OCM state transition by a short period.
+          # Measure reconciliation independently from provisioner launch and install duration.
+          if [[ "${infra_id_check}" != "null" ]] && echo "${install_log_output}" | grep -Eiq 'install complete!|install completed successfully'; then
+            reconciliation_now=$(date +"%s")
+            if (( install_complete_seen_at == 0 )); then
+              install_complete_seen_at=${reconciliation_now}
+              log "Installer completed while OCM state is still 'installing'; starting the reconciliation timeout."
+            fi
+
+            reconciliation_elapsed=$(( reconciliation_now - install_complete_seen_at ))
+            if (( reconciliation_elapsed >= OCM_RECONCILIATION_TIMEOUT )); then
               log "FATAL: OCM state reconciliation failure detected."
               log "  infra_id is set (provisioner launched) but cluster is still in 'installing' state"
-              log "  after $(( installing_elapsed / 60 )) minutes, despite install logs showing completion."
+              log "  $(( reconciliation_elapsed / 60 )) minutes after install logs showed completion."
               log "  This indicates OCM failed to reconcile the cluster state from 'installing' to 'ready'."
               record_cluster "timers" "status" "ocm_state_stall"
               FAILED_INSTALL="yes"
               break
             fi
+
+            log "Waiting for OCM state reconciliation ($(( reconciliation_elapsed / 60 ))/$(( OCM_RECONCILIATION_TIMEOUT / 60 )) minutes)."
           fi
         fi
       fi
