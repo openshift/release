@@ -103,16 +103,40 @@ function print_quayregistry_conditions() {
   fi
 }
 
+# Resolve a digest pullspec through the cluster's configured mirrors, most specific
+# first, with the original pullspec last. The kubelet reports the quay-app image
+# under its SOURCE pullspec (registry.redhat.io/quay/quay-rhel9@<digest>), but on
+# the nightly jobs that digest is only ever published in the Konflux repo the
+# ImageContentSourcePolicy created by quay-enable-catalogsource points at. CRI-O
+# rewrites the pull; `oc image info` is a plain client-side registry call and does
+# not, so asking registry.redhat.io for it returns "manifest unknown".
+function mirror_pullspecs() {
+  local pullspec="$1" repo digest
+  if [[ "${pullspec}" == *@* ]]; then
+    repo="${pullspec%@*}"
+    digest="${pullspec#*@}"
+    oc get imagecontentsourcepolicies,imagedigestmirrorsets -o json 2>/dev/null \
+      | jq -r --arg repo "${repo}" --arg digest "${digest}" '
+          .items[]?.spec
+          | (.repositoryDigestMirrors // .imageDigestMirrors // [])[]?
+          | select(.source == $repo)
+          | .mirrors[]?
+          | "\(.)@\($digest)"' 2>/dev/null || true
+  fi
+  printf '%s\n' "${pullspec}"
+}
+
 # Derive the Playwright test ref from the deployed Quay app image so the e2e suite
 # is version-matched to the product with no manual pin. The app image is pinned by
 # digest; its source-commit label (org.opencontainers.image.revision / vcs-ref)
 # points at the quay/quay commit it was built from. Written to
 # ${SHARED_DIR}/playwright_git_ref for the test-e2e step; best-effort (the test step
-# falls back to a branch if it is absent). This script runs without `set -x`, so the
-# pull-secret authfile below is never traced; it is also removed immediately.
+# falls back to a branch if it is absent or not fetchable). This script runs without
+# `set -x`, so the pull-secret authfile below is never traced; it is also removed
+# immediately.
 function derive_playwright_ref() {
   local ns="${QUAY_NS}"
-  local app_img authfile commit
+  local app_img authfile errfile commit candidate info=""
   app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
     -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
   if [[ -z "${app_img}" ]]; then
@@ -121,11 +145,28 @@ function derive_playwright_ref() {
   fi
   echo "Deployed Quay app image: ${app_img}" >&2
   authfile=$(mktemp)
+  errfile=$(mktemp)
   oc get secret/pull-secret -n openshift-config \
     --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
-  commit=$(oc image info "${app_img}" --filter-by-os linux/amd64 --registry-config="${authfile}" -o json \
-    | jq -r '.config.config.Labels["org.opencontainers.image.revision"] // .config.config.Labels["vcs-ref"] // ""' 2>/dev/null || true)
-  rm -f "${authfile}"
+  # stderr is captured separately, never merged into ${info}: a stray warning on the
+  # success path would be prepended to the JSON, jq would return an empty label, and
+  # the step would report a missing label for what is really a readable image.
+  for candidate in $(mirror_pullspecs "${app_img}"); do
+    if info=$(oc image info "${candidate}" --filter-by-os linux/amd64 \
+                --registry-config="${authfile}" -o json 2>"${errfile}"); then
+      echo "Read deployed image metadata from ${candidate}" >&2
+      break
+    fi
+    echo "Could not read ${candidate}: $(tr '\n' ' ' < "${errfile}")" >&2
+    info=""
+  done
+  rm -f "${authfile}" "${errfile}"
+  if [[ -z "${info}" ]]; then
+    echo "WARNING: deployed image not readable from any configured mirror; Playwright ref will fall back" >&2
+    return 0
+  fi
+  commit=$(jq -r '.config.config.Labels["org.opencontainers.image.revision"]
+                  // .config.config.Labels["vcs-ref"] // ""' <<<"${info}" 2>/dev/null || true)
   if [[ "${commit}" =~ ^[0-9a-f]{40}$ ]]; then
     echo "Derived Playwright git ref from deployed image: ${commit}" >&2
     echo "${commit}" > "${SHARED_DIR}/playwright_git_ref"
