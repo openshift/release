@@ -1,0 +1,41 @@
+ref:
+  as: redhat-developer-rhdh-plugin-export-overlays-ocp-helm-osl-rc
+  cli: latest
+  commands: redhat-developer-rhdh-plugin-export-overlays-ocp-helm-osl-rc-commands.sh
+  credentials:
+  - collection: openshift-qe
+    group: mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  - collection: rhdh-plugin-export-overlays
+    group: osl-rc
+    mount_path: /var/run/vault/osl-rc
+  from_image:
+    name: rhdh-e2e-runner
+    namespace: ci
+    tag: main
+  grace_period: 5m
+  resources:
+    limits:
+      cpu: "10"
+      memory: 5Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+  timeout: 1h55m0s
+  documentation: |-
+    Runs the OSL RC smoke test on an OCP cluster.
+
+    The release.json manifest at /var/run/vault/osl-rc must provide:
+    - rhdhVersion and ocpVersion.
+    - A digest-pinned Logic IIB image in logic.iib.
+    - Exact Logic subscription and CSV expectations: logic.package,
+      logic.channel, logic.startingCSV, and logic.expectedVersion.
+    - Exact Serverless subscription and CSV expectations: serverless.package,
+      serverless.channel, serverless.source, serverless.sourceNamespace,
+      serverless.expectedVersion, and serverless.expectedCSV.
+    - The test grep in tests.grep.
+
+    Credentials are mounted from openshift-qe/mirror-registry at
+    /var/run/vault/mirror-registry and must provide registry_brew.json and
+    registry_stage.json. The OSL-specific rhdh-plugin-export-overlays/osl-rc
+    mount is at /var/run/vault/osl-rc and must provide release.json.
