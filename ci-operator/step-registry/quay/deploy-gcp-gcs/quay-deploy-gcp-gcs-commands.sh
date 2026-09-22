@@ -127,16 +127,31 @@ function mirror_pullspecs() {
 }
 
 # Derive the Playwright test ref from the deployed Quay app image so the e2e suite
-# is version-matched to the product with no manual pin. The app image is pinned by
-# digest; its source-commit label (org.opencontainers.image.revision / vcs-ref)
-# points at the quay/quay commit it was built from. Written to
+# is version-matched to the product with no manual pin. Written to
 # ${SHARED_DIR}/playwright_git_ref for the test-e2e step; best-effort (the test step
-# falls back to a branch if it is absent or not fetchable). This script runs without
-# `set -x`, so the pull-secret authfile below is never traced; it is also removed
-# immediately.
+# keeps its own fallback for a ref that turns out not to be fetchable). This script
+# runs without `set -x`, so the pull-secret authfile below is never traced; it is
+# also removed immediately.
+#
+# The source-commit labels (org.opencontainers.image.revision / vcs-ref) are NOT
+# usable here. The deployed image is built midstream, so that commit is a midstream
+# commit and is never present in the upstream PLAYWRIGHT_GIT_REPO: eleven product
+# digests spanning 3.16-3.18 were checked and none of them resolved upstream. That
+# is how the label is built, not a bad digest, so there is nothing to recover.
+#
+# The version label does resolve. Upstream carries a vX.Y.Z tag for 12 of the 13
+# released versions those images report (v3.16.6 is the lone exception), so:
+#   a. version X.Y.Z with an upstream tag vX.Y.Z  -> pin that tag.
+#   b. anything else -> deliberately pin branch redhat-X.Y for the image's series.
+#      This is the expected path for a nightly, which has no upstream commit or tag
+#      equivalent at all, so it is logged as a deliberate pin rather than a warning:
+#      a warning that fires on correct behaviour teaches people to ignore warnings.
+# The labels actually read are logged verbatim every run, so a build whose labels
+# do not match these expectations says so in its own log.
 function derive_playwright_ref() {
   local ns="${QUAY_NS}"
-  local app_img authfile errfile commit candidate info=""
+  local app_img authfile errfile candidate info="" version release series ref
+  local repo="${PLAYWRIGHT_GIT_REPO:-https://github.com/quay/quay.git}"
   app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
     -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
   if [[ -z "${app_img}" ]]; then
@@ -165,14 +180,35 @@ function derive_playwright_ref() {
     echo "WARNING: deployed image not readable from any configured mirror; Playwright ref will fall back" >&2
     return 0
   fi
-  commit=$(jq -r '.config.config.Labels["org.opencontainers.image.revision"]
-                  // .config.config.Labels["vcs-ref"] // ""' <<<"${info}" 2>/dev/null || true)
-  if [[ "${commit}" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "Derived Playwright git ref from deployed image: ${commit}" >&2
-    echo "${commit}" > "${SHARED_DIR}/playwright_git_ref"
-  else
-    echo "WARNING: no 40-char source-commit label on deployed image (got '${commit}'); Playwright ref will fall back" >&2
+  version=$(jq -r '.config.config.Labels["version"] // ""' <<<"${info}" 2>/dev/null || true)
+  release=$(jq -r '.config.config.Labels["release"] // ""' <<<"${info}" 2>/dev/null || true)
+  echo "Deployed image labels: version='${version}' release='${release}' revision='$(
+    jq -r '.config.config.Labels["org.opencontainers.image.revision"] // ""' <<<"${info}" 2>/dev/null || true)'" >&2
+  if [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+     && git ls-remote --exit-code "${repo}" "refs/tags/v${version}" >/dev/null 2>&1; then
+    ref="v${version}"
+    echo "Pinning Playwright ref to upstream tag ${ref}, matching the deployed version label" >&2
+    echo "${ref}" > "${SHARED_DIR}/playwright_git_ref"
+    return 0
   fi
+  # The version label's X.Y prefix is the product series, so it is the first choice
+  # even when the version itself carries a suffix a tag would never match. Release is
+  # only X.Y on product builds - a build-id release such as 6.1759012345 also matches
+  # an X.Y shape - so it is consulted only when version yields nothing.
+  series=""
+  if [[ "${version}" =~ ^([0-9]+\.[0-9]+) ]]; then
+    series="${BASH_REMATCH[1]}"
+  elif [[ "${release}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    series="${release}"
+  fi
+  if [[ -z "${series}" ]]; then
+    echo "WARNING: deployed image has no usable version or release label (version='${version}' release='${release}'); Playwright ref will fall back" >&2
+    return 0
+  fi
+  ref="redhat-${series}"
+  echo "No upstream tag matches the deployed image; deliberately pinning Playwright ref to branch ${ref}." >&2
+  echo "This is the expected outcome for a build with no released upstream tag, not a degraded one." >&2
+  echo "${ref}" > "${SHARED_DIR}/playwright_git_ref"
 }
 
 function print_failing_pod_logs() {

@@ -64,9 +64,10 @@ else
 # The Playwright suite is cloned from PLAYWRIGHT_GIT_REPO at a ref resolved in this
 # order (first match wins):
 #   1. PLAYWRIGHT_GIT_BRANCH        - explicit override from the ci-operator config.
-#   2. ${SHARED_DIR}/playwright_git_ref - commit auto-derived by the deploy step from
-#      the deployed Quay app image's source-commit label, so the suite is version-
-#      matched to the product with no manual upkeep.
+#   2. ${SHARED_DIR}/playwright_git_ref - ref auto-derived by the deploy step from the
+#      deployed Quay app image's version/release labels (the upstream vX.Y.Z tag when
+#      one matches, otherwise the redhat-X.Y branch), so the suite is version-matched
+#      to the product with no manual upkeep.
 #   3. PLAYWRIGHT_GIT_FALLBACK_BRANCH - last-resort branch so the run still executes
 #      (with a warning) instead of hard-failing when nothing else is available.
 # PLAYWRIGHT_GIT_REPO stays required. The resolved ref may be a branch, tag, or commit
