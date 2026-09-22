@@ -68,6 +68,8 @@ else
   echo "WARN: Failed to clone e2e-benchmarking — fingerprints will be skipped"
 fi
 
+# ── Helper functions ──────────────────────────────────────────────────
+
 # Function to log job fingerprint to Orion via e2e-benchmarking index.sh
 log_fingerprint() {
   if [[ "${E2E_BENCH_AVAILABLE}" != "true" ]]; then
@@ -95,6 +97,7 @@ run_or_fail() {
     job_status="failure"
     job_end=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     log_fingerprint
+    cleanup
     exit 1
   fi
 }
@@ -109,16 +112,18 @@ job_terminal_state() {
   fi
 }
 
+# ── Per-iteration functions ───────────────────────────────────────────
 
-# Create namespace and monitoring prerequisites
+deploy_monitoring() {
+  echo "=== Deploying monitoring prerequisites ==="
 
-oc create namespace "${LCS_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+  oc create namespace "${LCS_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
-# Required for platform Prometheus to scrape ServiceMonitor in openshift-* ns
-oc label namespace "${LCS_NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite
+  # Required for platform Prometheus to scrape ServiceMonitor in openshift-* ns
+  oc label namespace "${LCS_NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite
 
-# RBAC for Prometheus to scrape pods in this namespace
-cat <<'PROM_RBAC' | envsubst | oc apply -f -
+  # RBAC for Prometheus to scrape pods in this namespace
+  cat <<'PROM_RBAC' | envsubst | oc apply -f -
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -145,8 +150,8 @@ subjects:
     namespace: openshift-monitoring
 PROM_RBAC
 
-# ServiceMonitor for LCS metrics
-cat <<'SVCMON' | envsubst | oc apply -f -
+  # ServiceMonitor for LCS metrics
+  cat <<'SVCMON' | envsubst | oc apply -f -
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -161,11 +166,11 @@ spec:
       path: /metrics
       interval: 30s
 SVCMON
+}
 
+deploy_pyroscope() {
+  echo "=== Deploying Pyroscope ==="
 
-# Deploy Pyroscope (if enabled)
-
-if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
   oc create namespace "${PYROSCOPE_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
   cat <<'PYROSCOPE' | envsubst | oc apply -n "${PYROSCOPE_NAMESPACE}" -f -
@@ -232,13 +237,13 @@ PYROSCOPE
     echo "WARN: Pyroscope failed to become ready — disabling profiling and continuing"
     ENABLE_PYROSCOPE="false"
   fi
-fi
+}
 
+deploy_lcs() {
+  echo "=== Deploying LCS (library mode + mock LLM sidecar) ==="
 
-# Deploy LCS (library mode + mock LLM sidecar)
-
-# Create ConfigMaps from heredocs
-cat <<'LCS_STACK_CONFIG' | envsubst | oc apply -f -
+  # Create ConfigMaps from heredocs
+  cat <<'LCS_STACK_CONFIG' | envsubst | oc apply -f -
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -316,20 +321,20 @@ data:
         provider_model_id: llama-guard-3-8b
 LCS_STACK_CONFIG
 
-# Deploy LCS with mock LLM sidecar
-PYROSCOPE_ENV=""
-if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
-  PYROSCOPE_ENV="
+  # Deploy LCS with mock LLM sidecar
+  local pyroscope_env=""
+  if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
+    pyroscope_env="
             - name: PYROSCOPE_SERVER_ADDRESS
               value: \"${PYROSCOPE_URL}\""
-fi
+  fi
 
-LCS_COMMAND_OVERRIDE='          command: ["python3", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
-if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
-  LCS_COMMAND_OVERRIDE='          command: ["memray", "run", "--output", "/mnt/profiling/memray-output.bin", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
-fi
+  local lcs_command_override='          command: ["python3", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
+  if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
+    lcs_command_override='          command: ["memray", "run", "--output", "/mnt/profiling/memray-output.bin", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
+  fi
 
-cat <<DEPLOYMENT | oc apply -f -
+  cat <<DEPLOYMENT | oc apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -359,7 +364,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-${LCS_COMMAND_OVERRIDE}
+${lcs_command_override}
           ports:
             - containerPort: 8080
           env:
@@ -368,7 +373,7 @@ ${LCS_COMMAND_OVERRIDE}
             - name: LIGHTSPEED_STACK_SYNTHESIZED_CONFIG_PATH
               value: "/tmp/.generated/run.yaml"
             - name: HOME
-              value: "/tmp"${PYROSCOPE_ENV}
+              value: "/tmp"${pyroscope_env}
           volumeMounts:
             - name: config-volume
               mountPath: /app-config
@@ -439,75 +444,60 @@ spec:
       targetPort: 8080
 DEPLOYMENT
 
-if ! oc rollout status deployment/lcs -n "${LCS_NAMESPACE}" --timeout=300s; then
-  echo "ERROR: LCS deployment failed to become ready"
-  mkdir -p "${ARTIFACT_DIR}/logs"
-  {
-    oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o wide || true
-    oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c lcs --tail=100 || true
-    oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c mock-llm --tail=50 || true
-    oc describe pod -n "${LCS_NAMESPACE}" -l app=lcs || true
-    oc get events -n "${LCS_NAMESPACE}" --sort-by='.lastTimestamp' | tail -30 || true
-  } 2>&1 | tee "${ARTIFACT_DIR}/logs/lcs-diagnostic.log"
-  exit 1
-fi
+  if ! oc rollout status deployment/lcs -n "${LCS_NAMESPACE}" --timeout=300s; then
+    echo "ERROR: LCS deployment failed to become ready"
+    mkdir -p "${ARTIFACT_DIR}/logs"
+    {
+      oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o wide || true
+      oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c lcs --tail=100 || true
+      oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c mock-llm --tail=50 || true
+      oc describe pod -n "${LCS_NAMESPACE}" -l app=lcs || true
+      oc get events -n "${LCS_NAMESPACE}" --sort-by='.lastTimestamp' | tail -30 || true
+    } 2>&1 | tee "${ARTIFACT_DIR}/logs/lcs-diagnostic.log"
+    return 1
+  fi
 
-# Verify LCS is responding
-LCS_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
-echo "LCS pod: ${LCS_POD}"
-oc exec -n "${LCS_NAMESPACE}" "${LCS_POD}" -c lcs -- \
-  curl -sf http://localhost:8080/readiness || {
-    echo "ERROR: LCS readiness check failed"
-    oc logs -n "${LCS_NAMESPACE}" "${LCS_POD}" -c lcs --tail=50
-    exit 1
-  }
+  # Verify LCS is responding
+  local lcs_pod
+  lcs_pod=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
+  echo "LCS pod: ${lcs_pod}"
+  oc exec -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs -- \
+    curl -sf http://localhost:8080/readiness || {
+      echo "ERROR: LCS readiness check failed"
+      oc logs -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs --tail=50
+      return 1
+    }
 
+  # Create kubeconfig secret for load generator Job
+  oc create secret generic kubeconfig-secret \
+    -n "${LCS_NAMESPACE}" \
+    --from-file=kubeconfig="${KUBECONFIG}" \
+    --dry-run=client -o yaml | oc apply -f -
 
-# Create kubeconfig secret for load generator Job
+  oc delete secret lcs-load-generator-es-credentials \
+    -n "${LCS_NAMESPACE}" --ignore-not-found=true
+  oc create secret generic lcs-load-generator-es-credentials \
+    -n "${LCS_NAMESPACE}" \
+    --from-file=username=/secret/username \
+    --from-file=password=/secret/password
+}
 
-oc create secret generic kubeconfig-secret \
-  -n "${LCS_NAMESPACE}" \
-  --from-file=kubeconfig="${KUBECONFIG}" \
-  --dry-run=client -o yaml | oc apply -f -
+run_load_test() {
+  local duration=$1
+  echo "=== Running load test (duration=${duration}) ==="
 
-oc delete secret lcs-load-generator-es-credentials \
-  -n "${LCS_NAMESPACE}" --ignore-not-found=true
-oc create secret generic lcs-load-generator-es-credentials \
-  -n "${LCS_NAMESPACE}" \
-  --from-file=username=/secret/username \
-  --from-file=password=/secret/password
+  # Record start time for profiling collection window
+  TEST_START_EPOCH=$(date +%s)
 
+  # Set env vars for envsubst in the Job manifest
+  export LCS_NAMESPACE LCS_LOADGEN_IMAGE LCS_HOST LCS_TOKEN
+  export LCS_PROVIDER LCS_MODEL ES_INDEX ES_SERVER_HOST
+  export LOCUST_USERS="${NUM_USERS}"
+  export LOCUST_PROCESSES REQUEST_TIMEOUT METRIC_STEP
+  export LOCUST_RUN_TIME="${duration}"
 
-# Run load tests
-
-# Record start time for profiling collection window
-TEST_START_EPOCH=$(date +%s)
-
-# Set env vars for envsubst in the Job manifest
-export LCS_NAMESPACE LCS_LOADGEN_IMAGE LCS_HOST LCS_TOKEN
-export LCS_PROVIDER LCS_MODEL ES_INDEX ES_SERVER_HOST
-export LOCUST_USERS="${NUM_USERS}"
-export LOCUST_PROCESSES REQUEST_TIMEOUT METRIC_STEP
-
-# Start the test loop
-IFS=',' read -ra DURATIONS <<< "${TEST_DURATION}"
-for duration in "${DURATIONS[@]}"; do
-
-# Reset per-iteration metadata for Orion fingerprinting
-uuid=$(uuidgen)
-job_status="success"
-job_start=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-job_end=""
-additional_attributes='{"lcsTestWorkers": "'"${NUM_USERS}"'", "lcsTestDuration": "'"${duration}"'"}'
-export TEST_UUID="${uuid}"
-
-# Delete previous Job if it exists (for iterations after the first)
-oc delete job lcs-load-generator -n "${LCS_NAMESPACE}" --ignore-not-found=true
-
-export LOCUST_RUN_TIME="${duration}"
-
-# Apply the dedicated ServiceAccount and Job manifests inline.
-cat <<JOBMANIFEST | oc apply -f -
+  # Apply the dedicated ServiceAccount and Job manifests inline.
+  cat <<JOBMANIFEST | oc apply -f -
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -627,146 +617,190 @@ spec:
             secretName: lcs-load-generator-es-credentials
 JOBMANIFEST
 
-# Wait for Job to complete or fail, reserving time for diagnostics.
-JOB_WAIT_DEADLINE=$((STEP_START_EPOCH + STEP_TIMEOUT_SECONDS - DIAGNOSTIC_GRACE_SECONDS))
-JOB_FINISHED=""
-while [[ -z "${JOB_FINISHED}" ]]; do
-  JOB_CONDITIONS=$(oc get job lcs-load-generator -n "${LCS_NAMESPACE}" \
-    -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' 2>/dev/null || true)
-  JOB_FINISHED=$(job_terminal_state "${JOB_CONDITIONS}")
-  if [[ -n "${JOB_FINISHED}" ]]; then
-    continue
-  elif [[ $(date +%s) -ge ${JOB_WAIT_DEADLINE} ]]; then
-    JOB_FINISHED="timeout"
-  else
-    sleep 30
-  fi
-done
-
-if [[ "${JOB_FINISHED}" != "complete" ]]; then
-  echo "ERROR: Load generator Job ${JOB_FINISHED} (duration=${duration})"
-  oc describe job lcs-load-generator -n "${LCS_NAMESPACE}" || true
-  JOB_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
-  if [[ -n "${JOB_POD}" ]]; then
-    oc logs -n "${LCS_NAMESPACE}" "${JOB_POD}" --tail=200 || true
-  fi
-  job_status="failure"
-  job_end=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  log_fingerprint
-  exit 1
-fi
-
-# Collect Job logs to artifacts
-JOB_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
-if [[ -n "${JOB_POD}" ]]; then
-  mkdir -p "${ARTIFACT_DIR}/logs"
-  oc logs -n "${LCS_NAMESPACE}" "${JOB_POD}" > "${ARTIFACT_DIR}/logs/lcs-load-generator-${duration}.log" 2>&1 || true
-fi
-
-# Log Orion fingerprint for this iteration
-job_end=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-log_fingerprint
-
-sleep 60  # stabilize between iterations
-
-done
-
-TEST_END_EPOCH=$(date +%s)
-TEST_DURATION_SECONDS=$((TEST_END_EPOCH - TEST_START_EPOCH))
-
-
-# Collect profiling data
-
-mkdir -p "${ARTIFACT_DIR}/profiling-data"
-
-# Pyroscope CPU profiles
-if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
-  PROF_DIR="${ARTIFACT_DIR}/profiling-data/pyroscope"
-  mkdir -p "${PROF_DIR}"
-
-  echo "  Collecting Pyroscope profiles (${TEST_START_EPOCH} -> ${TEST_END_EPOCH})"
-
-  # The test step pod runs on the build cluster, not the provisioned cluster,
-  # so cluster-internal DNS (pyroscope.pyroscope.svc) is unreachable.
-  # Use oc port-forward to tunnel through KUBECONFIG to the provisioned cluster.
-  oc port-forward -n "${PYROSCOPE_NAMESPACE}" svc/pyroscope 4040:4040 &
-  PF_PID=$!
-  # Give port-forward a moment to establish
-  sleep 3
-
-  PYROSCOPE_LOCAL="http://localhost:4040"
-
-  # grafana/pyroscope query parameters:
-  #   Route:  /pyroscope/render
-  #   Query:  process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="lightspeed-stack"}
-  #   Formats: pprof, json
-  PYRO_QUERY="process_cpu%3Acpu%3Ananoseconds%3Acpu%3Ananoseconds%7Bservice_name%3D%22lightspeed-stack%22%7D"
-
-  # Fetch profile formats; each fetch is non-fatal so a profiling
-  # hiccup never crashes the pipeline.
-  for fmt_pair in "pprof:cpu-profile.pprof" "json:cpu-profile.json"; do
-    FMT="${fmt_pair%%:*}"
-    FNAME="${fmt_pair##*:}"
-    RESP_CODE=$(curl -sS -o "${PROF_DIR}/${FNAME}" -w '%{http_code}' \
-      "${PYROSCOPE_LOCAL}/pyroscope/render?query=${PYRO_QUERY}&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=${FMT}") || true
-    if [[ "${RESP_CODE}" != "200" ]] || [[ ! -s "${PROF_DIR}/${FNAME}" ]]; then
-      echo "WARN: Pyroscope ${FMT} export failed (HTTP ${RESP_CODE})"
-      rm -f "${PROF_DIR}/${FNAME}"
+  # Wait for Job to complete or fail, reserving time for diagnostics.
+  local job_wait_deadline=$((STEP_START_EPOCH + STEP_TIMEOUT_SECONDS - DIAGNOSTIC_GRACE_SECONDS))
+  local job_finished=""
+  while [[ -z "${job_finished}" ]]; do
+    local job_conditions
+    job_conditions=$(oc get job lcs-load-generator -n "${LCS_NAMESPACE}" \
+      -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' 2>/dev/null || true)
+    job_finished=$(job_terminal_state "${job_conditions}")
+    if [[ -n "${job_finished}" ]]; then
+      continue
+    elif [[ $(date +%s) -ge ${job_wait_deadline} ]]; then
+      job_finished="timeout"
     else
-      echo "  Saved ${FNAME} ($(wc -c < "${PROF_DIR}/${FNAME}") bytes)"
+      sleep 30
     fi
   done
 
-  # Clean up port-forward
-  kill "${PF_PID}" 2>/dev/null || true
-  wait "${PF_PID}" 2>/dev/null || true
-
-  echo "  Pyroscope profiles saved to ${PROF_DIR}"
-fi
-
-# Memray memory profiles (if enabled)
-if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
-  MEM_DIR="${ARTIFACT_DIR}/profiling-data/memray"
-  mkdir -p "${MEM_DIR}"
-
-  LCS_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
-  if [[ -n "${LCS_POD}" ]]; then
-    echo "  Collecting Memray profiles from ${LCS_POD}"
-
-    # Generate flamegraph HTML
-    oc exec -n "${LCS_NAMESPACE}" "${LCS_POD}" -c lcs -- \
-      memray flamegraph -o /tmp/memray-flamegraph.html /mnt/profiling/memray-output.bin 2>/dev/null || true
-    oc cp "${LCS_NAMESPACE}/${LCS_POD#pod/}:/tmp/memray-flamegraph.html" \
-      "${MEM_DIR}/memray-flamegraph.html" 2>/dev/null || true
-
-    # Generate stats
-    oc exec -n "${LCS_NAMESPACE}" "${LCS_POD}" -c lcs -- \
-      memray stats /mnt/profiling/memray-output.bin > "${MEM_DIR}/memray-stats.txt" 2>/dev/null || true
-
-    # Generate summary
-    oc exec -n "${LCS_NAMESPACE}" "${LCS_POD}" -c lcs -- \
-      memray summary /mnt/profiling/memray-output.bin > "${MEM_DIR}/memray-summary.txt" 2>/dev/null || true
-
-    # Copy raw binary (for offline analysis)
-    oc cp "${LCS_NAMESPACE}/${LCS_POD#pod/}:/mnt/profiling/memray-output.bin" \
-      "${MEM_DIR}/memray-output.bin" 2>/dev/null || true
-
-    echo "  Memray profiles saved to ${MEM_DIR}"
-  else
-    echo "WARN: Could not find LCS pod for Memray collection"
+  if [[ "${job_finished}" != "complete" ]]; then
+    echo "ERROR: Load generator Job ${job_finished} (duration=${duration})"
+    oc describe job lcs-load-generator -n "${LCS_NAMESPACE}" || true
+    local job_pod
+    job_pod=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
+    if [[ -n "${job_pod}" ]]; then
+      oc logs -n "${LCS_NAMESPACE}" "${job_pod}" --tail=200 || true
+    fi
+    return 1
   fi
-fi
 
-# Collect LCS pod logs
-echo "  Collecting LCS pod logs"
-LCS_POD=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
-if [[ -n "${LCS_POD}" ]]; then
-  oc logs -n "${LCS_NAMESPACE}" "${LCS_POD}" -c lcs > "${ARTIFACT_DIR}/logs/lcs-app.log" 2>&1 || true
-  oc logs -n "${LCS_NAMESPACE}" "${LCS_POD}" -c mock-llm > "${ARTIFACT_DIR}/logs/mock-llm.log" 2>&1 || true
-fi
+  # Collect Job logs to artifacts
+  local job_pod
+  job_pod=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
+  if [[ -n "${job_pod}" ]]; then
+    mkdir -p "${ARTIFACT_DIR}/logs"
+    oc logs -n "${LCS_NAMESPACE}" "${job_pod}" > "${ARTIFACT_DIR}/logs/lcs-load-generator-${duration}.log" 2>&1 || true
+  fi
 
+  TEST_END_EPOCH=$(date +%s)
+}
+
+collect_profiles() {
+  echo "=== Collecting profiling data ==="
+
+  mkdir -p "${ARTIFACT_DIR}/profiling-data"
+
+  # Pyroscope CPU profiles
+  if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
+    local prof_dir="${ARTIFACT_DIR}/profiling-data/pyroscope"
+    mkdir -p "${prof_dir}"
+
+    echo "  Collecting Pyroscope profiles (${TEST_START_EPOCH} -> ${TEST_END_EPOCH})"
+
+    # The test step pod runs on the build cluster, not the provisioned cluster,
+    # so cluster-internal DNS (pyroscope.pyroscope.svc) is unreachable.
+    # Use oc port-forward to tunnel through KUBECONFIG to the provisioned cluster.
+    oc port-forward -n "${PYROSCOPE_NAMESPACE}" svc/pyroscope 4040:4040 &
+    local pf_pid=$!
+    # Give port-forward a moment to establish
+    sleep 3
+
+    local pyroscope_local="http://localhost:4040"
+
+    # grafana/pyroscope query parameters:
+    #   Route:  /pyroscope/render
+    #   Query:  process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="lightspeed-stack"}
+    #   Formats: pprof, json
+    local pyro_query="process_cpu%3Acpu%3Ananoseconds%3Acpu%3Ananoseconds%7Bservice_name%3D%22lightspeed-stack%22%7D"
+
+    # Fetch profile formats; each fetch is non-fatal so a profiling
+    # hiccup never crashes the pipeline.
+    for fmt_pair in "pprof:cpu-profile.pprof" "json:cpu-profile.json"; do
+      local fmt="${fmt_pair%%:*}"
+      local fname="${fmt_pair##*:}"
+      local resp_code
+      resp_code=$(curl -sS -o "${prof_dir}/${fname}" -w '%{http_code}' \
+        "${pyroscope_local}/pyroscope/render?query=${pyro_query}&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=${fmt}") || true
+      if [[ "${resp_code}" != "200" ]] || [[ ! -s "${prof_dir}/${fname}" ]]; then
+        echo "WARN: Pyroscope ${fmt} export failed (HTTP ${resp_code})"
+        rm -f "${prof_dir}/${fname}"
+      else
+        echo "  Saved ${fname} ($(wc -c < "${prof_dir}/${fname}") bytes)"
+      fi
+    done
+
+    # Clean up port-forward
+    kill "${pf_pid}" 2>/dev/null || true
+    wait "${pf_pid}" 2>/dev/null || true
+
+    echo "  Pyroscope profiles saved to ${prof_dir}"
+  fi
+
+  # Memray memory profiles (if enabled)
+  if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
+    local mem_dir="${ARTIFACT_DIR}/profiling-data/memray"
+    mkdir -p "${mem_dir}"
+
+    local lcs_pod
+    lcs_pod=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
+    if [[ -n "${lcs_pod}" ]]; then
+      echo "  Collecting Memray profiles from ${lcs_pod}"
+
+      # Generate flamegraph HTML
+      oc exec -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs -- \
+        memray flamegraph -o /tmp/memray-flamegraph.html /mnt/profiling/memray-output.bin 2>/dev/null || true
+      oc cp "${LCS_NAMESPACE}/${lcs_pod#pod/}:/tmp/memray-flamegraph.html" \
+        "${mem_dir}/memray-flamegraph.html" 2>/dev/null || true
+
+      # Generate stats
+      oc exec -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs -- \
+        memray stats /mnt/profiling/memray-output.bin > "${mem_dir}/memray-stats.txt" 2>/dev/null || true
+
+      # Generate summary
+      oc exec -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs -- \
+        memray summary /mnt/profiling/memray-output.bin > "${mem_dir}/memray-summary.txt" 2>/dev/null || true
+
+      # Copy raw binary (for offline analysis)
+      oc cp "${LCS_NAMESPACE}/${lcs_pod#pod/}:/mnt/profiling/memray-output.bin" \
+        "${mem_dir}/memray-output.bin" 2>/dev/null || true
+
+      echo "  Memray profiles saved to ${mem_dir}"
+    else
+      echo "WARN: Could not find LCS pod for Memray collection"
+    fi
+  fi
+
+  # Collect LCS pod logs
+  echo "  Collecting LCS pod logs"
+  local lcs_pod
+  lcs_pod=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
+  if [[ -n "${lcs_pod}" ]]; then
+    mkdir -p "${ARTIFACT_DIR}/logs"
+    oc logs -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs > "${ARTIFACT_DIR}/logs/lcs-app.log" 2>&1 || true
+    oc logs -n "${LCS_NAMESPACE}" "${lcs_pod}" -c mock-llm > "${ARTIFACT_DIR}/logs/mock-llm.log" 2>&1 || true
+  fi
+}
+
+cleanup() {
+  echo "=== Cleaning up namespaces ==="
+
+  oc delete namespace "${LCS_NAMESPACE}" --ignore-not-found=true
+  oc wait --for=delete namespace/"${LCS_NAMESPACE}" --timeout=120s 2>/dev/null || true
+
+  if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
+    oc delete namespace "${PYROSCOPE_NAMESPACE}" --ignore-not-found=true
+    oc wait --for=delete namespace/"${PYROSCOPE_NAMESPACE}" --timeout=120s 2>/dev/null || true
+  fi
+
+  echo "  Cleanup complete"
+}
+
+# ── Main duration loop ────────────────────────────────────────────────
+
+IFS=',' read -ra DURATIONS <<< "${TEST_DURATION}"
+for duration in "${DURATIONS[@]}"; do
+
+  echo ""
+  echo "================================================================"
+  echo "  Starting iteration: duration=${duration}"
+  echo "================================================================"
+
+  # Reset per-iteration metadata for Orion fingerprinting
+  uuid=$(uuidgen)
+  export TEST_UUID="${uuid}"
+  job_status="success"
+  job_start=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  job_end=""
+  additional_attributes='{"lcsTestWorkers": "'"${NUM_USERS}"'", "lcsTestDuration": "'"${duration}"'"}'
+
+  # Full deploy → test → collect → fingerprint → cleanup per iteration
+  run_or_fail deploy_monitoring
+  [[ "${ENABLE_PYROSCOPE}" == "true" ]] && run_or_fail deploy_pyroscope
+  run_or_fail deploy_lcs
+  run_or_fail run_load_test "${duration}"
+  collect_profiles
+
+  job_end=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  log_fingerprint
+  cleanup
+
+  sleep 60  # stabilize between iterations
+
+done
 
 # Summary
-
+echo ""
+echo "=== All iterations complete ==="
 ls -la "${ARTIFACT_DIR}/profiling-data/" 2>/dev/null || true
 ls -la "${ARTIFACT_DIR}/logs/" 2>/dev/null || true
