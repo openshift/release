@@ -31,6 +31,7 @@ def load_sibling(name):
 
 
 load_sibling("eval_plan")
+report = load_sibling("eval_report")
 runner = load_sibling("manifest_runner")
 sync_commands = load_sibling("sync_commands")
 
@@ -562,7 +563,7 @@ class ExecutionTests(Fixture):
         self.change_skill()
         result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "missing_result"}))
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("<td>failed</td>", self.index())
+        self.assertEqual(json.loads((self.artifacts / "evals-summary.json").read_text())["evals"][0]["status"], "failed")
         with tarfile.open(self.eval_artifacts() / "eval-run.tar") as archive:
             self.assertIn("run/report.html", archive.getnames())
             self.assertNotIn("run/run_result.json", archive.getnames())
@@ -679,7 +680,7 @@ class ExecutionTests(Fixture):
         self.assertEqual(process.returncode, 143, stdout + stderr)
         self.assertIn("interrupted by signal", stdout)
         self.assertGreater(int(self.junit().attrib["failures"]), 0)
-        self.assertIn("<td>failed</td>", self.index())
+        self.assertEqual(json.loads((self.artifacts / "evals-summary.json").read_text())["evals"][0]["status"], "failed")
         self.assertIn("interrupted by signal", self.index())
         self.assertEqual(list(bundle_tmp.iterdir()), [])
         with self.assertRaises(ProcessLookupError):
@@ -711,7 +712,7 @@ class ExecutionTests(Fixture):
                          {"junit_claude-eval.xml", "evals-summary.html", "evals-summary.json"})
         for href in re.findall(r'href="([^"]+)"', self.index()):
             self.assertTrue((self.artifacts / unquote(href)).exists(), href)
-        self.assertEqual(self.index().count("<td>passed</td>"), 2)
+        self.assertEqual(json.loads((self.artifacts / "evals-summary.json").read_text())["counts"]["passed"], 2)
 
     def test_same_setup_script_runs_for_each_eval_with_its_own_snapshot(self):
         self.put("setup.sh", 'echo setup >> setup-count\n'
@@ -764,7 +765,7 @@ class ExecutionTests(Fixture):
         self.assertNotEqual(self.run_step(CLONE_EXIT="1").returncode, 0)
         self.assertEqual(self.claude_calls(), [])
         self.assertEqual(self.junit().attrib["failures"], "1")
-        self.assertIn("<td>not run</td>", self.index())
+        self.assertEqual(json.loads((self.artifacts / "evals-summary.json").read_text())["evals"][0]["status"], "not_run")
         self.assertIn("runner/harness-install.log", self.index())
 
     def test_junit_escapes_config_paths(self):
@@ -835,6 +836,30 @@ class SummaryTests(Fixture):
             runner.write_reports(self.artifacts, results, [], errors)
         self.assertIn("JSON unavailable", self.index())
         self.assertEqual(self.junit().attrib["failures"], "1")
+
+    def test_html_renders_saved_json_without_inspecting_eval_files(self):
+        self.artifacts.mkdir()
+        entry = {"config": '<img src=x onerror=alert(1)>', "name": 'a & "b"',
+                 "run_id": "run-a", "status": "failed", "failure": "bad </script>"}
+        summary = runner.summary_data(self.artifacts, [entry], ["runner <error>"])
+        summary["evals"][0]["artifacts"] = {"log": 'evals/a & "b"/claude-eval.log'}
+        source = self.artifacts / "evals-summary.json"
+        source.write_text(json.dumps(summary))
+        output = self.artifacts / "evals-summary.html"
+        subprocess.run([sys.executable, str(Path(report.__file__)), str(source), str(output)], check=True)
+        html = output.read_text()
+        self.assertEqual(html, report.render_report(summary))
+        self.assertIn('class="fail">Failed', html)
+        self.assertIn('&lt;img src=x onerror=alert(1)&gt;', html)
+        self.assertIn('bad &lt;/script&gt;', html)
+        self.assertIn('evals/a%20%26%20%22b%22/claude-eval.log', html)
+        self.assertNotIn(entry["config"], html)
+        self.assertIn('href="evals-summary.json"', html)
+        self.assertIn('gcs.ci.openshift.org', html)
+        with self.assertRaises(ValueError):
+            report.artifact_link("../outside.log", "log")
+        with self.assertRaises(ValueError):
+            report.render_report({**summary, "schema_version": 2})
 
 
 class PackagingTests(unittest.TestCase):

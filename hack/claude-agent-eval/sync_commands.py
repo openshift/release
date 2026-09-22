@@ -9,7 +9,8 @@ HERE = Path(__file__).resolve().parent
 COMMANDS = HERE.parents[1] / (
     "ci-operator/step-registry/openshift/claude/agent-eval/manifest/"
     "openshift-claude-agent-eval-manifest-commands.sh")
-SOURCES = ("eval_plan.py", "manifest_runner.py", "eval_metrics.py")
+SOURCES = ("eval_plan.py", "manifest_runner.py", "eval_metrics.py", "eval_report.py",
+           "eval-report.html", "eval-report.css")
 
 
 def generated_script():

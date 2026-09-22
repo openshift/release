@@ -6,7 +6,6 @@ the commands file, not sibling Python files. Only PyYAML and the stdlib are need
 """
 
 import json
-from html import escape
 import os
 from pathlib import Path, PurePosixPath
 import shlex
@@ -19,13 +18,14 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from urllib.parse import quote
 
 import yaml
 
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
+    from .eval_report import render_report
     from .eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
 except ImportError:
+    from eval_report import render_report
     from eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
 
 
@@ -33,37 +33,6 @@ MANIFEST = "evals.yaml"
 STEP_TIMEOUT = 13800  # Leave ten minutes inside the Prow step's four-hour limit.
 EVAL_TIMEOUT = 12600
 
-# Spyglass embeds HTML in srcdoc, which otherwise resolves relative links against
-# /spyglass/static/html/. Its lens request and document index identify the actual
-# artifact, including the bucket and step directory. Outside that lens, retain
-# relative links so downloaded artifact bundles still work.
-PROW_ARTIFACT_LINKS = r'''<script>
-(() => {
-  try {
-    if (!window.frameElement) return;
-    const lens = new URL(window.parent.location.href);
-    if (lens.pathname !== "/spyglass/lens/html/iframe") return;
-    const request = JSON.parse(lens.searchParams.get("req"));
-    const index = window.frameElement.id.match(/-(\d+)$/);
-    if (!index || !request || !Array.isArray(request.artifacts)) return;
-    const artifact = request.artifacts[Number(index[1])];
-    if (typeof artifact !== "string" || !artifact.endsWith("/evals-summary.html")
-        || typeof request.src !== "string" || !request.src.startsWith("gs/")) return;
-    const path = request.src.slice(3) + "/" + artifact;
-    const report = new URL("https://gcs.ci.openshift.org/gcs/"
-      + path.split("/").map(encodeURIComponent).join("/"));
-    for (const link of document.querySelectorAll("a[href]")) {
-      link.href = new URL(link.getAttribute("href"), report).href;
-      // Open outside the sandboxed report iframe; the artifact browser handles
-      // both individual files and directory listings.
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-    }
-  } catch (error) {
-    console.warn("Cannot resolve Prow artifact links", error);
-  }
-})();
-</script>'''
 
 
 class Interrupted(BaseException):
@@ -347,33 +316,14 @@ def write_summary(artifacts, entries, errors):
 
 
 def write_index(artifacts, entries, errors):
-    """Write a small index linking only artifacts that actually exist."""
-    rows = []
-    filenames = ("report-summary.html", "summary.yaml", "run_result.json", "claude-eval.log",
-                 "setup.log", "regression.log", "metrics.log", "eval-run.tar")
-    for entry in entries:
-        relative = Path("evals") / entry["name"]
-        links = []
-        if (artifacts / relative).is_dir():
-            links.append(f'<a href="{quote(relative.as_posix())}/">All artifacts</a>')
-        for filename in filenames:
-            path = relative / filename
-            if (artifacts / path).is_file():
-                links.append(f'<a href="{quote(path.as_posix())}">{filename}</a>')
-        cells = [escape(str(entry[key])) for key in ("config", "run_id", "status", "failure")]
-        rows.append("<tr>" + "".join(f"<td>{cell}</td>" for cell in cells)
-                    + f'<td>{" | ".join(links)}</td></tr>')
-    errors_html = "".join(f"<li>{escape(error)}</li>" for error in errors)
-    install_log = artifacts / "runner/harness-install.log"
-    install_link = ('<p><a href="runner/harness-install.log">Harness installation log</a></p>'
-                    if install_log.is_file() else "")
-    table = ("<table><thead><tr><th>Eval config</th><th>Run ID</th><th>Status</th>"
-             "<th>Failure</th><th>Artifacts</th></tr></thead><tbody>"
-             + "".join(rows) + "</tbody></table>" if rows else "<p>No evaluations selected.</p>")
-    document = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
-                '<title>Eval results</title></head><body><h1>Eval results</h1>'
-                + (f"<ul>{errors_html}</ul>" if errors else "")
-                + install_link + table + PROW_ARTIFACT_LINKS + "</body></html>\n")
+    """Render the published JSON; retain HTML diagnostics if JSON writing failed."""
+    try:
+        summary = json.loads((artifacts / "evals-summary.json").read_text(encoding="utf-8"))
+        if summary["errors"] != errors:
+            summary = summary_data(artifacts, entries, errors)
+    except (OSError, ValueError):
+        summary = summary_data(artifacts, entries, errors)
+    document = render_report(summary, link_json=(artifacts / "evals-summary.json").is_file())
     destination = artifacts / "evals-summary.html"
     temporary = destination.with_suffix(".tmp")
     temporary.write_text(document, encoding="utf-8")
