@@ -145,7 +145,7 @@ npx cypress run --browser chrome --headless --spec "e2e/dt-plugin-tests.cy.ts" \
 
 ### Selecting what to rerun
 
-- Keep `CYPRESS_SKIP_TESTS` in the grep (`;` separates patterns, `-` excludes): the `before` hook reads it too, e.g. `-Lightspeed` skips the Lightspeed install on OCP versions where Lightspeed is not published.
+- Keep `CYPRESS_SKIP_TESTS` in the grep (`;` separates, `-` excludes): the `before` hook reads it too, e.g. `-Lightspeed` skips the Lightspeed install where it's not published.
 - Tests are order-dependent: `Capability:RBAC` creates the Tempo instances (`chainsaw-rbac / simplst`, `chainsaw-mmo-rbac / mmo-rbac`) and traces that every later test uses except `Capability:TLSCertRotation` and `Capability:Installation`. Include it for those tests (`GREP="Capability:RBAC; Capability:TraceLimits"`), otherwise the rerun fails on `input[placeholder="Select a Tempo instance"]`.
 - For a `before` hook failure, set `GREP` to only the `CYPRESS_SKIP_TESTS` value (empty runs every test).
 - `CYPRESS_SKIP_COO_INSTALL=true` skips the OperatorHub install path (`CYPRESS_COO_UI_INSTALL`, the job default). A passing rerun does not verify an install-path fix — mark it "not re-verified" in `CHANGES.md`.
@@ -157,7 +157,7 @@ Read the rerun JUnit XML:
 
 ### Flakiness confirmation loop
 
-Run the rerun block 3 more times with `RUN=2`, `3` and `4` (one JUnit file each) and record the pass/fail pattern (e.g. `PFPP`). Look for missing `cy.intercept()` or condition-based waits before asserting UI state, `cy.get()` without a visibility wait, or a changed URL path. A failure in even 1 of 4 runs is `FLAKY` → Step 5c. An incomplete loop is tentative, never `FLAKY`.
+Run the rerun block 3 more times with `RUN=2`, `3` and `4` (one JUnit file each) and record the pass/fail pattern (e.g. `PFPP`). Look for missing `cy.intercept()` or condition-based waits before asserting UI state, `cy.get()` without a visibility wait, or a changed URL path. A failure in even 1 of 4 runs still goes through Step 4 first — call it `FLAKY` → Step 5c only if that finds no other explanation. An incomplete loop is tentative, never `FLAKY`.
 
 ---
 
@@ -193,7 +193,7 @@ oc get csv -n "${COO_NS}" -o jsonpath='{range .items[*]}{.metadata.name}: {.stat
 ### CRD and API availability check
 
 ```bash
-# Missing CRDs cause plugin registration failures
+# Missing CRDs cause registration failures
 oc get crd | grep -E 'observability|uiplugin|monitoringstack'
 oc api-resources | grep observability
 ```
@@ -213,7 +213,7 @@ A package missing from the catalog on a pre-GA OCP version is `JOB_CONFIG` (Step
 
 ### Suppressed exception check
 
-`e2e.js`'s `uncaught:exception` handler swallows crashes like `'Cannot read prop'` — they surface as a timeout, invisible to `qe-agent-commands.log`/JUnit; a clean rerun doesn't rule it out. Before `FLAKY`/`TEST_ISSUE`, re-run with the filter commented out, or diff the API response against what the frontend expects.
+`e2e.js`'s `uncaught:exception` handler swallows crashes like `'Cannot read prop'` — they surface as a timeout, invisible to `qe-agent-commands.log`/JUnit. Before `FLAKY`/`TEST_ISSUE`, re-run with the filter commented out, or diff the API response against what the frontend expects.
 
 ### Product Bug indicators
 Classify as `PRODUCT_BUG` when the operator, plugin, or console itself misbehaved:
