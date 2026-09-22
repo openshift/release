@@ -60,6 +60,9 @@ export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-export
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
+if [[ "${LOKI_INSTALL_MODE}" == "guest-cluster" ]]; then
+  export OPENSHIFT_INSTALL_INVOKER="${OPENSHIFT_INSTALL_INVOKER}/hosted"
+fi
 
 cat > "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml" << EOF
 apiVersion: v1
