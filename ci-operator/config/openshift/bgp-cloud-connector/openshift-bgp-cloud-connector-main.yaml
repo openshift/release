@@ -2541,10 +2541,13 @@ tests:
         # Role assignments are not usable the instant they exist, so the retry
         # distinguishes propagation from a grant that does not help.
         echo "  waiting for the grant to take effect..."
-        # Measured twice: usable after about twenty seconds on one run and
-        # still refused after two minutes on the next. Azure documents up
-        # to several minutes, so two is too short to call it a refusal.
-        for attempt in $(seq 1 18); do
+        # Measured three times: usable after about twenty seconds on one
+        # run, still refused after two minutes on another, and only on the
+        # eighteenth attempt -- six minutes -- on a third. Six was the
+        # limit then and the answer arrived on the last attempt, so this
+        # allows twelve. Anything built on such a grant has to wait
+        # minutes rather than seconds.
+        for attempt in $(seq 1 36); do
           sleep 20
           if AZURE_CONFIG_DIR="${issued_cfg}" az network routeserver show \
                -g "${NET_RG}" -n "${ROUTE_SERVER}" --output none 2>/dev/null; then
