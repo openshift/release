@@ -14,6 +14,19 @@ if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
 fi
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+METADATA_FILE="${SHARED_DIR}/metadata.json"
+
+if [[ ! -s "${METADATA_FILE}" ]]; then
+  echo "ERROR: Metadata file ${METADATA_FILE} not found or empty" >&2
+  exit 1
+fi
+
+CLUSTER_NAME=$(jq -r '.clusterName // empty' "${METADATA_FILE}")
+if [[ -z "${CLUSTER_NAME}" ]]; then
+  echo "ERROR: No cluster name found in ${METADATA_FILE}" >&2
+  exit 1
+fi
+
 STACK_NAME="${CLUSTER_NAME}-apps-dns"
 
 stack_status() {
