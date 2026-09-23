@@ -175,6 +175,8 @@ wait_for_worker_mcp_rollout() {
             and any(.status.conditions[]?; .type == "Updating" and .status == "False")
             and (.status.machineCount // 0) > 0
             and .status.updatedMachineCount == .status.machineCount
+            and .status.readyMachineCount == .status.machineCount
+            and .status.unavailableMachineCount == 0
             and .status.degradedMachineCount == 0
         ' <<< "${state}" >/dev/null 2>&1; then
             return 0
