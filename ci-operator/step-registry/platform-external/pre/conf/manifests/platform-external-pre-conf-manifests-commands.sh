@@ -191,25 +191,25 @@ log "# << Injecting bootstrap serial-console diagnostics >> #"
 # --latest`, which the error handler collects) is the only channel that reliably
 # reaches us.
 #
-# Every prior attempt to inject a diagnostic unit FAILED TO LOAD, so it never ran:
-# a multi-line ExecStart carrying the script directly is corrupted by three
-# independent layers — systemd treats `%` as a specifier (%{http_code}), systemd
-# expands `$` before bash sees it, and line-continuation + Ignition JSON escaping
-# mangle the rest. This revision base64-encodes the entire script and decodes it
-# at runtime, so systemd only ever parses a single clean ExecStart line whose
-# payload is pure base64 (no %, $, quotes or newlines). All metacharacters live
-# inside the blob and are seen only by bash after `base64 -d`.
+# Every prior attempt failed the diagnostic unit for a DIFFERENT reason, in order:
+# `After=network-online.target` (never activates this boot), then `%{http_code}`
+# read as a systemd specifier in an inline ExecStart, then a base64-in-ExecStart
+# rewrite that tripped Ignition's 2048-byte-per-line limit on unit contents and
+# invalidated the WHOLE config (node dropped to emergency mode, run 2102701410549239808).
 #
-# Belt-and-suspenders — this injects TWO capture paths in one run:
+# The 2048-byte limit applies to systemd unit CONTENTS lines only. storage.files
+# has no such limit, so the fix is: ship the script as a file via storage.files
+# (base64 data URL — one JSON string, no line cap) and keep the unit tiny, with
+# ExecStart pointing at the file. The earlier "storage.files silently dropped the
+# file" was a misdiagnosis: that run's unit used `After=network-online.target` and
+# never started, so the file was never read — it was not missing.
+#
+# TWO capture paths in one run:
 #   1. opct-debug-console.service: loops every 25s dumping unit state, deps,
 #      journals (node-image-pull last, so it stays inside the 64K --latest
-#      window), crictl, disk, DNS, routes and registry reachability to
-#      /dev/ttyS0.
+#      window), crictl, disk, DNS, routes and registry reachability to /dev/ttyS0.
 #   2. a drop-in on the native node-image-pull.service that sends its OWN
-#      stdout/stderr to /dev/ttyS0, so its real-time output is captured even if
-#      journald never flushes it.
-# The unit + drop-in are both added via .systemd.units (which Ignition applies
-# reliably) — NOT storage.files, which was silently dropped in an earlier attempt.
+#      stdout/stderr to /dev/ttyS0, captured even if journald never flushes.
 install_jq
 
 # The diagnostic script, kept readable here and base64-encoded at step runtime.
@@ -241,9 +241,9 @@ done
 DEBUG_SCRIPT_EOF
 )"
 
-# Unit heredoc is unquoted so ${DEBUG_SCRIPT_B64} expands; the resulting unit file
-# contains only the base64 payload — no $ or % for systemd to misinterpret.
-DEBUG_UNIT="$(cat << DEBUG_UNIT_EOF
+# Unit is tiny and static: it just runs the file dropped by storage.files. No $ or
+# % inside, and every line is well under Ignition's 2048-byte unit-content limit.
+DEBUG_UNIT="$(cat << 'DEBUG_UNIT_EOF'
 [Unit]
 Description=OPCT bootstrap serial console diagnostics
 After=network.target
@@ -253,7 +253,7 @@ Wants=network.target
 Type=simple
 Restart=always
 RestartSec=10
-ExecStart=/bin/bash -c 'echo ${DEBUG_SCRIPT_B64} | base64 -d | bash'
+ExecStart=/usr/local/bin/opct-debug-console.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -270,9 +270,16 @@ NIP_DROPIN_EOF
 )"
 
 jq \
+  --arg b64 "${DEBUG_SCRIPT_B64}" \
   --arg unit "${DEBUG_UNIT}" \
   --arg nipdropin "${NIP_DROPIN}" \
-  '.systemd.units += [
+  '.storage.files += [{
+     "path": "/usr/local/bin/opct-debug-console.sh",
+     "mode": 493,
+     "overwrite": true,
+     "contents": {"source": ("data:text/plain;base64," + $b64)}
+   }]
+   | .systemd.units += [
      {"name": "opct-debug-console.service", "enabled": true, "contents": $unit},
      {"name": "node-image-pull.service", "dropins": [{"name": "10-opct-console.conf", "contents": $nipdropin}]}
    ]' \
