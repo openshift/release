@@ -1,0 +1,84 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  obs-tests-runner:
+    name: obs-tests-runner
+    namespace: logging
+    tag: main
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: aws-ipi-f14-logging-clo
+  cron: 0 9 * * 3
+  steps:
+    cluster_profile: aws-observability
+    env:
+      AGENT_SKILL: cluster-logging
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+      JIRA_PROJECT: LOG
+      LOGGING_TEST_VERSION: "6.6"
+      OPERATORS: |
+        [
+            {"name": "cluster-logging", "source": "cluster-logging-operator-registry", "channel": "stable-6.6", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "loki-operator", "source": "loki-operator-registry", "channel": "stable-6.6", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_MAX_CONCURRENCY: "3"
+      TEST_SUITE: openshift-logging-e2e-tests/cluster-logging-operator
+    post:
+    - ref: openshift-observability-qe-agent
+    test:
+    - ref: openshift-logging-catalogsources
+    - ref: install-operators
+    - ref: openshift-observability-logging-e2e-tests
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+- as: aws-ipi-f14-logging-loki
+  cron: 0 9 * * 4
+  steps:
+    cluster_profile: aws-observability
+    env:
+      AGENT_SKILL: loki
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+      JIRA_PROJECT: LOG
+      LOGGING_TEST_VERSION: "6.6"
+      OPERATORS: |
+        [
+            {"name": "cluster-logging", "source": "cluster-logging-operator-registry", "channel": "stable-6.6", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "loki-operator", "source": "loki-operator-registry", "channel": "stable-6.6", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_MAX_CONCURRENCY: "3"
+      TEST_SUITE: openshift-logging-e2e-tests/loki-operator
+    post:
+    - ref: openshift-observability-qe-agent
+    test:
+    - ref: openshift-logging-catalogsources
+    - ref: install-operators
+    - ref: openshift-observability-logging-e2e-tests
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: openshift-logging-e2e-tests
+  variant: amd64-stable-openshift-logging-6.6
