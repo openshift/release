@@ -151,16 +151,24 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
 
   storage_create
 
-  # perform a minor update if it is the openstack-operator
+  # perform an OLM based minor update if it is the openstack-operator
   if [ ${SERVICE_NAME} == "openstack" ]; then
-    OPENSTACK_IMG_BKP=${OPENSTACK_IMG}
+    # Upgrade edge CSV names baked into the PR index by the build step.
+    BASE_CSV=$(cat "${SHARED_DIR}/olm-base-csv")
+    PR_CSV=$(cat "${SHARED_DIR}/olm-pr-csv")
+    export TIMEOUT=${TIMEOUT:="600s"}
 
-    # deploy operators and ctlplane, to be updated
-    export OPENSTACK_IMG=${OPENSTACK_IMG_BASE_RELEASE:="quay.io/openstack-k8s-operators/openstack-operator-index:18.0-fr2-latest"}
+    # Install the base release first and gate upgrades behind manual approval so
+    # OLM walks ${BASE_CSV} -> ${PR_CSV} within the PR index (${OPENSTACK_IMG}).
+    export INSTALLPLAN_APPROVAL=Manual
+    export STARTING_CSV=${BASE_CSV}
     # use fr1 oscp yaml sample with deprecated rabbitMqInstanceBus parameters
     export OPENSTACK_CTLPLANE="config/samples/core_v1beta1_openstackcontrolplane_galera_fr1.yaml"
-    export TIMEOUT=${TIMEOUT:="600s"}
-    make openstack_wait || exit 1
+
+    # create catalogsource/subscription pinned to the base CSV (pending approval)
+    make openstack || exit 1
+    # approve the base version and wait for it to install
+    APPROVE_CSV=${BASE_CSV} make openstack_approve_installplan || exit 1
 
     # if the new initialization resource exists install it
     # this will also wait for operators to deploy
@@ -168,17 +176,14 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
       make openstack_init
     fi
 
+    # deploy ctlplane and dataplane CRs on the base version, to be updated
     make openstack_wait_deploy || exit 1
-    # Create the dataplane CRs to check their update
     make edpm_deploy_baremetal || exit 1
-    make openstack_cleanup || exit 1
 
-    # update operators and ctlplane to the PR
-    export OPENSTACK_IMG=${OPENSTACK_IMG_BKP}
-    # revert to default oscp sample
+    # trigger the OLM upgrade to the PR version and wait for it to install
+    APPROVE_CSV=${PR_CSV} make openstack_approve_installplan || exit 1
+    # revert to default oscp sample for subsequent steps
     unset OPENSTACK_CTLPLANE
-    make openstack_wait || exit 1
-    sleep 10
     # if the new initialization resource exists install it
     # this will also wait for operators to deploy
     if oc get crd openstacks.operator.openstack.org &> /dev/null; then
