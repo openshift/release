@@ -163,14 +163,42 @@ verify_subscription() {
     fi
 }
 
+wait_for_worker_mcp_rollout() {
+    local baseline="$1"
+    local state
+    echo "Waiting for worker MachineConfigPool to apply a new rendered configuration"
+    for _ in $(seq 1 60); do
+        if state=$(oc get mcp worker -o json 2>/dev/null) && jq -e --arg baseline "${baseline}" '
+            (.status.configuration.name | strings | length > 0)
+            and .status.configuration.name != $baseline
+            and any(.status.conditions[]?; .type == "Updated" and .status == "True")
+            and any(.status.conditions[]?; .type == "Updating" and .status == "False")
+            and (.status.machineCount // 0) > 0
+            and .status.updatedMachineCount == .status.machineCount
+            and .status.degradedMachineCount == 0
+        ' <<< "${state}" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 10
+    done
+    echo "ERROR: worker MachineConfigPool did not finish applying a new rendered configuration within 10m" >&2
+    oc get mcp worker -o yaml >&2 || true
+    return 1
+}
+
 if [[ ! -s "${MANIFEST}" ]]; then
     echo "ERROR: expected OSL RC manifest at ${MANIFEST}" >&2
+    exit 1
+fi
+require_manifest_string '.rhdhVersion'
+RHDH_VERSION=$(jq -r '.rhdhVersion' "${MANIFEST}")
+if [[ "${RHDH_VERSION}" != "2.0" ]]; then
+    echo "ERROR: OSL RC smoke requires RHDH 2.0; release.json specifies ${RHDH_VERSION}" >&2
     exit 1
 fi
 require_registry_credentials "${BREW_REGISTRY}" registry_brew.json
 require_registry_credentials "${STAGE_REGISTRY}" registry_stage.json
 
-require_manifest_string '.rhdhVersion'
 require_manifest_string '.ocpVersion'
 require_digest '.logic.iib'
 require_manifest_string '.logic.package'
@@ -185,7 +213,6 @@ require_manifest_string '.serverless.expectedVersion'
 require_manifest_string '.serverless.expectedCSV'
 require_manifest_string '.tests.grep'
 
-RHDH_VERSION=$(jq -r '.rhdhVersion' "${MANIFEST}")
 OCP_VERSION=$(jq -r '.ocpVersion' "${MANIFEST}")
 LOGIC_IIB=$(jq -r '.logic.iib' "${MANIFEST}")
 LOGIC_PACKAGE=$(jq -r '.logic.package' "${MANIFEST}")
@@ -217,6 +244,14 @@ jq --slurpfile brew "${BREW_REGISTRY}" --slurpfile stage "${STAGE_REGISTRY}" '
         })
     }
 ' "${CLUSTER_AUTH}" > "${AUTHFILE}"
+if ! MCP_BASELINE=$(oc get mcp worker -o jsonpath='{.status.configuration.name}'); then
+    echo "ERROR: failed to capture worker MachineConfigPool configuration before cluster updates" >&2
+    exit 1
+fi
+if [[ -z "${MCP_BASELINE}" ]]; then
+    echo "ERROR: worker MachineConfigPool has no rendered configuration before cluster updates" >&2
+    exit 1
+fi
 oc -n openshift-config set data secret/pull-secret --from-file=.dockerconfigjson="${AUTHFILE}"
 
 oc apply -f - <<'EOF'
@@ -233,18 +268,18 @@ spec:
     - brew.registry.redhat.io
     source: registry.stage.redhat.io
 EOF
-oc wait machineconfigpool/worker --for=condition=Updated=True --timeout=10m
+wait_for_worker_mcp_rollout "${MCP_BASELINE}"
 
 create_catalogsource "${LOGIC_CATALOG}" "${LOGIC_IIB}"
 wait_for_catalogsource "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}"
 
 wait_for_catalogsource "${SERVERLESS_SOURCE}" "${SERVERLESS_SOURCE_NAMESPACE}"
-install_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_PACKAGE}" "${LOGIC_CHANNEL}" "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}" "${LOGIC_STARTING_CSV}"
-verify_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_CHANNEL}" "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}" "${LOGIC_STARTING_CSV}"
-wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" "${LOGIC_STARTING_CSV}"
 install_subscription "${SERVERLESS_PACKAGE}" openshift-operators "${SERVERLESS_PACKAGE}" "${SERVERLESS_CHANNEL}" "${SERVERLESS_SOURCE}" "${SERVERLESS_SOURCE_NAMESPACE}"
 verify_subscription "${SERVERLESS_PACKAGE}" openshift-operators "${SERVERLESS_CHANNEL}" "${SERVERLESS_SOURCE}" "${SERVERLESS_SOURCE_NAMESPACE}"
 wait_for_subscription "${SERVERLESS_PACKAGE}" openshift-operators "${SERVERLESS_VERSION}" "${SERVERLESS_EXPECTED_CSV}"
+install_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_PACKAGE}" "${LOGIC_CHANNEL}" "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}" "${LOGIC_STARTING_CSV}"
+verify_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_CHANNEL}" "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}" "${LOGIC_STARTING_CSV}"
+wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" "${LOGIC_STARTING_CSV}"
 
 export E2E_COLLECT_COVERAGE=false RHDH_VERSION
 git clone --depth 1 --branch main https://github.com/redhat-developer/rhdh-plugin-export-overlays.git "${WORKDIR}/rhdh-plugin-export-overlays"
