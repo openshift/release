@@ -1,0 +1,46 @@
+base_images:
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  initial:
+    release:
+      channel: candidate
+      version: "4.19"
+  latest:
+    release:
+      channel: candidate
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: opct-platform-external-aws-upgrade
+  cron: '@weekly'
+  reporter_config:
+    channel: '#forum-opct-updates'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      OPCT_RUN_MODE: upgrade
+      UPGRADE_TO_CHANNEL_TYPE: candidate
+    workflow: opct-conformance-external-aws
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: stable-4.20-upgrade-from-stable-4.19
