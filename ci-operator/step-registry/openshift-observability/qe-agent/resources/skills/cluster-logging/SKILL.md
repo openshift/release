@@ -90,7 +90,7 @@ done
 echo "All MCPs ready — proceeding."
 ```
 
-If Phase 2 also times out, don't hard-stop — skip to Step 6 and write `${ARTIFACT_DIR}/qe-agent-analysis.md` with the MCP status snapshot, a `CLUSTER_INSTABILITY` classification, and a rerun recommendation (Step 5d's contract).
+If Phase 2 also times out, don't hard-stop — skip to Step 6. If the `oc get machineconfigpools` output above lists pools (not-ready), classify as `CLUSTER_INSTABILITY` (Step 5d's contract); if the query itself failed (no pools printed), record the MCP status as unavailable and set Outcome to a rerun recommendation instead.
 
 ## Step 0b — Re-establish the Test Environment
 
@@ -257,7 +257,7 @@ oc logs -n openshift-logging deploy/cluster-logging-operator --tail=500 \
 
 Classify as `CLUSTER_INSTABILITY` only when **all four** hold: (1) MCPs were updating at original test time, or the operator pod shows `RESTARTS > 0` correlated with MCP rollout; (2) all reruns pass cleanly with shorter duration than the original; (3) no fixable test defect (timeout, missing wait, or unscoped selector) found above; (4) no tight reconciliation loop found above.
 
-`CLUSTER_INSTABILITY` takes precedence over `FLAKY` when all four hold — proceed to Step 5d. Otherwise: a failed run (original or a Step 3 rerun) is `FLAKY` — proceed to Step 5c. If all 4 Step 3 reruns passed, it's `NOT_REPRODUCED` — go to Step 6, recording the pass/fail pattern as evidence and setting Outcome to a rerun recommendation (no code change, no bug report).
+Diagnostics identifying `TEST_ISSUE` go to Step 5a; `PRODUCT_BUG` goes to Step 5b. Otherwise: `CLUSTER_INSTABILITY` (all four above) takes precedence over `FLAKY` — proceed to Step 5d. If all 4 Step 3 reruns passed, classify `NOT_REPRODUCED` and go to Step 6 (pass/fail pattern as evidence, Outcome = rerun recommendation, no code change). Otherwise classify `FLAKY` and proceed to Step 5c.
 
 When genuinely ambiguous, gather more cluster evidence before deciding. Explain your reasoning explicitly in the output.
 
@@ -365,7 +365,7 @@ After writing the bug report(s), also write one `${ARTIFACT_DIR}/jira-payload.js
 ```bash
 _SUMMARY="[qe-agent] <one-sentence summary — for multiple bugs, e.g. 'N product bugs found in <suite>'>"
 _SUMMARY="${_SUMMARY:0:255}"
-_DESCRIPTION="<bug report(s) in Jira wiki notation; for multiple bugs, concatenate each under its own 'h2. <test case>' heading>"
+_DESCRIPTION="<bug report(s) in Jira wiki notation, starting with '*Severity:* <level>' (the wrapper ignores the severity field below); for multiple bugs, concatenate each under its own 'h2. <test case>' heading>"
 
 jq -n \
   --arg summary "${_SUMMARY}" \
