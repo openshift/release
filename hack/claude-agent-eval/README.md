@@ -185,6 +185,11 @@ fails the step. Deadline-expired evals are recorded as failures. SIGTERM/SIGINT
 stop scheduling and terminate child processes while preserving available artifacts
 when possible. Collection or archive failures fail that eval, retain existing
 logs, and allow subsequent evals to run.
+The regression check reads `summary.yaml` from the verified physical run
+directory and uses the cloned harness's `detect_regressions()` threshold rules.
+It does not derive a second path from the eval or skill name, or depend on
+temporary directory aliases created by the orchestrator. Missing summaries or
+thresholded judges still fail the eval.
 Python emits AutoDL metrics for orchestrator and harness model usage;
 metrics failures remain warnings and do not replace the eval verdict.
 

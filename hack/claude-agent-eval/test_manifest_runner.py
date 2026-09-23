@@ -44,9 +44,21 @@ if sys.argv[1] == "clone":
     dest = pathlib.Path(sys.argv[-1])
     script = dest / "skills/eval-run/scripts/score.py"
     script.parent.mkdir(parents=True)
-    script.write_text("import os, sys\n" +
-                      "with open(os.environ['CALLS'], 'a') as out: out.write('regression\\n')\n" +
-                      "sys.exit(int(os.environ.get('REGRESSION_EXIT', '0')))\n")
+    script.write_text("""import os
+from pathlib import Path
+from types import SimpleNamespace
+import yaml
+class EvalConfig:
+    @classmethod
+    def from_yaml(cls, path):
+        return SimpleNamespace(thresholds=yaml.safe_load(Path(path).read_text()).get('thresholds', {}))
+def detect_regressions(judges, thresholds):
+    with open(os.environ['CALLS'], 'a') as out: out.write('regression\\n')
+    return [SimpleNamespace(judge_name=name, metric='pass_rate', baseline_value=limit['min_pass_rate'],
+                            current_value=judges[name]['pass_rate'])
+            for name, limit in thresholds.items()
+            if judges[name]['pass_rate'] < limit['min_pass_rate']]
+""")
     sys.exit(int(os.environ.get("CLONE_EXIT", "0")))
 os.execv(os.environ["REAL_GIT"], [os.environ["REAL_GIT"], *sys.argv[1:]])
 '''
@@ -81,7 +93,12 @@ if behavior != "missing_result":
     result = {"exit_code": 1 if behavior == "case_failure" else 0}
     (run / "run_result.json").write_text(json.dumps(result))
 if behavior != "missing_summary":
-    (run / "summary.yaml").write_text('judges: {quality: {pass_rate: 1.0}}\n')
+    rate = 0.0 if behavior == "threshold_failure" else 1.0
+    (run / "summary.yaml").write_text('judges: {quality: {pass_rate: ' + str(rate) + '}}\n')
+if behavior == "removed_alias":
+    alias = root / "example:foo"
+    alias.symlink_to(run.parent, target_is_directory=True)
+    alias.unlink()
 if behavior != "missing_report":
     (run / "report.html").write_text(config)
 if behavior == "stale_result":
@@ -749,10 +766,21 @@ class ExecutionTests(Fixture):
 
     def test_threshold_failure_changes_ci_verdict(self):
         self.change_skill()
-        result = self.run_step(REGRESSION_EXIT="1")
+        result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "threshold_failure"}))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("harness regression check failed", result.stdout)
         self.assertEqual(self.junit().attrib["failures"], "1")
+        self.assertIn("REGRESSIONS: 1", (self.eval_artifacts() / "regression.log").read_text())
+
+    def test_regression_uses_actual_run_after_orchestrator_removes_alias(self):
+        self.change_skill()
+        result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "removed_alias"}))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse((self.repo / "eval/runs/example:foo").exists())
+        log = (self.eval_artifacts() / "regression.log").read_text()
+        self.assertIn("/skill-name-not-config-name/", log)
+        self.assertIn("REGRESSIONS: 0", log)
+        self.assertEqual(self.junit().attrib["failures"], "0")
 
     def test_missing_thresholded_judge_is_failure(self):
         self.put(self.entry["config"], "models: {skill: model}\nthresholds: {missing: {min_mean: 1}}")

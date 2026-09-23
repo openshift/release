@@ -548,8 +548,11 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                     verify_result(directory, config)
                     # Deterministic threshold check using the harness itself: do
                     # not trust an outer Claude exit code as the eval verdict.
-                    status = command([sys.executable, str(harness / "skills/eval-run/scripts/score.py"),
-                                      "regression", "--config", entry.config, "--run-id", run_id],
+                    # Use the verified physical directory: the orchestrator can
+                    # write under config.name while score.py derives a skill name.
+                    status = command([sys.executable, str(Path(__file__).with_name("eval_regression.py")),
+                                      "--harness", str(harness), "--config", entry.config,
+                                      "--run-dir", str(directory)],
                                      repo, run_env, eval_artifacts / "regression.log", min(60, remaining()))
                     if status:
                         raise EvalError("harness regression check failed; see regression log")
@@ -1022,7 +1025,52 @@ def main():
 if __name__ == "__main__":
     main()
 PYTHON_SOURCE_3
-cat > "${runner_dir}/eval-report.html" <<'PYTHON_SOURCE_4'
+cat > "${runner_dir}/eval_regression.py" <<'PYTHON_SOURCE_4'
+#!/usr/bin/env python3
+"""Apply harness thresholds to the run directory already verified by the runner."""
+
+import argparse
+import importlib
+from pathlib import Path
+import sys
+
+import yaml
+
+
+def main():
+    """Use the cloned harness's scoring rules without repeating its path lookup."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--harness", type=Path, required=True)
+    parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--run-dir", type=Path, required=True)
+    args = parser.parse_args()
+
+    # Keep harness imports in this bounded child process. Import from the same
+    # scripts directory as the score.py CLI, including its agent_eval package.
+    sys.path.insert(0, str(args.harness / "skills/eval-run/scripts"))
+    score = importlib.import_module("score")
+    config = score.EvalConfig.from_yaml(args.config)
+    summary_path = args.run_dir / "summary.yaml"
+    print(f"SUMMARY: {summary_path}", flush=True)
+    with summary_path.open(encoding="utf-8") as stream:
+        summary = yaml.safe_load(stream)
+    if not isinstance(summary, dict) or not isinstance(summary.get("judges"), dict):
+        raise ValueError("harness did not produce a judges summary")
+    for judge in config.thresholds:
+        if judge not in summary["judges"]:
+            raise ValueError(f"missing thresholded judge in summary: {judge}")
+    regressions = score.detect_regressions(summary["judges"], config.thresholds)
+    print(f"REGRESSIONS: {len(regressions)}")
+    for regression in regressions:
+        print(f"  [{regression.judge_name}] {regression.metric}: "
+              f"{regression.baseline_value} -> {regression.current_value}")
+    return 1 if regressions else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+PYTHON_SOURCE_4
+cat > "${runner_dir}/eval-report.html" <<'PYTHON_SOURCE_5'
 <!doctype html>
 <html lang="en">
 <head>
@@ -1071,8 +1119,8 @@ $body
 $artifact_links
 </body>
 </html>
-PYTHON_SOURCE_4
-cat > "${runner_dir}/eval-report.css" <<'PYTHON_SOURCE_5'
+PYTHON_SOURCE_5
+cat > "${runner_dir}/eval-report.css" <<'PYTHON_SOURCE_6'
 /* Colors, typography, chips, cards, and theme control adapted from
  * opendatahub-io/agent-eval-harness, Apache-2.0 (see repository LICENSE).
  * skills/eval-run/scripts/report.py at 3c4165bbfdd4a20f4472eec9c1c85e62f5167fba.
@@ -1203,7 +1251,7 @@ a:hover { text-decoration: underline; }
 .report-note { color: var(--text-muted); font-size: .9em; }
 @media (max-width: 600px) { body { padding: 1em; } .section { padding: 1em; } .eval-heading { flex-direction: column; gap: .5em; } }
 @media print { #theme-toggle { display: none; } .section { break-inside: avoid; } }
-PYTHON_SOURCE_5
+PYTHON_SOURCE_6
 
 # Forward termination so Python can stop its children and preserve artifacts
 # before the temporary source files are removed.
