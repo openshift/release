@@ -379,6 +379,12 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
     log "Saving Classic cluster resources..."
     capture_classic_resources || true
   fi
+  # Save machinepool/NodePool status for HCP clusters.
+  if [[ "${HOSTED_CP}" == "true" ]]; then
+    log "Saving HCP machinepool status..."
+    rosa list machinepools -c "${CLUSTER_ID}" -o json > "${ARTIFACT_DIR}/machinepools.json" 2> "${ARTIFACT_DIR}/machinepools.json.stderr" || true
+    rosa describe machinepool -c "${CLUSTER_ID}" --machinepool workers -o json > "${ARTIFACT_DIR}/machinepool-workers-describe.json" 2> "${ARTIFACT_DIR}/machinepool-workers-describe.json.stderr" || true
+  fi
   # DNS diagnostics: when the failure involves DNS resolution errors ("no such host" or
   # "dial tcp: lookup"), capture Route 53 record state and resolver output as artifacts.
   # This helps triage DNS propagation / hosted-zone issues without needing to reproduce.
