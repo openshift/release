@@ -2672,6 +2672,247 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- always_run: false
+  as: e2e-aro-operator
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: azure-qe
+    env:
+      ARO_CLUSTER_VERSION: "4.21"
+    post:
+    - as: estate-sweep
+      best_effort: true
+      cli: latest
+      commands: |
+        # Remove any Route Server left in the network resource group, whoever
+        # made it. The suite builds its own estate on every other cloud, and if
+        # it does so here this job did not record it and cannot name it, but a
+        # Route Server still holds the subnet, which holds the virtual network,
+        # which takes the group delete with it. aro-deprovision runs next and
+        # would fail on exactly that.
+        set +e
+        set -uo pipefail
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}' 2>/dev/null)"
+        if [[ -z "${net_rg}" ]]; then
+          echo "no cluster to ask, so nothing can be swept"
+          exit 0
+        fi
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        err="$(mktemp)"
+        if ! az login --service-principal \
+             --username "$(jq -er .clientId "${sp}")" \
+             --password="$(jq -er .clientSecret "${sp}")" \
+             --tenant "$(jq -er .tenantId "${sp}")" --output none 2>"${err}"; then
+          echo "could not log in:"; redact <"${err}" | sed 's/^/  /'; exit 0
+        fi
+        az account set --subscription "$(jq -er .subscriptionId "${sp}")" 2>/dev/null
+
+        found="$(az network routeserver list -g "${net_rg}" --query "[].name" -o tsv 2>/dev/null)"
+        if [[ -z "${found}" ]]; then
+          echo "no Route Server in ${net_rg}"
+          exit 0
+        fi
+
+        while read -r rs; do
+          [[ -z "${rs}" ]] && continue
+          echo "=== ${rs} ==="
+          peerings="$(az network routeserver peering list -g "${net_rg}" --routeserver "${rs}" \
+            --query "[].name" -o tsv 2>/dev/null)"
+          while read -r peering; do
+            [[ -z "${peering}" ]] && continue
+            az network routeserver peering delete -g "${net_rg}" --routeserver "${rs}" \
+              -n "${peering}" --yes --output none 2>/dev/null \
+              && echo "  peering ${peering}: removed" \
+              || echo "  peering ${peering}: would not go"
+          done <<<"${peerings}"
+          # AnotherOperationInProgress is a wait, not a refusal.
+          for attempt in $(seq 1 8); do
+            if az network routeserver delete -g "${net_rg}" -n "${rs}" --yes --output none 2>"${err}"; then
+              echo "  removed on attempt ${attempt}"
+              break
+            fi
+            grep -q 'AnotherOperationInProgress' "${err}" || { echo "  COULD NOT REMOVE:"; redact <"${err}" | head -3 | sed 's/^/    /'; break; }
+            sleep 30
+          done
+        done <<<"${found}"
+        rm -f "${err}"
+        exit 0
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 45m0s
+    - ref: aro-deprovision
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: aro-provision-vnet
+    - ref: aro-provision-cluster
+    - ref: ipi-install-rbac
+    test:
+    - as: grant-network-role
+      cli: latest
+      commands: |
+        # The principal passthrough hands the operator holds Network Contributor
+        # on the virtual network resource and Contributor on the group ARO
+        # manages. The Route Server is neither: it is a separate resource in the
+        # group this job owns, so the operator is refused when it tries to
+        # discover or peer it. Measured, twice.
+        #
+        # Granting that principal a role over the network resource group is the
+        # repair, and the cluster profile's principal may make it. This is the
+        # step an ARO job needs that no other cloud's job does.
+        set -euo pipefail
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}')"
+        if [[ -z "${net_rg}" ]]; then
+          net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')"
+        fi
+        echo "the group holding the estate: ${net_rg}"
+
+        # Passthrough hands out the cluster's own principal, so the grant goes to
+        # whoever kube-system/azure-credentials names rather than to a principal
+        # minted per CredentialsRequest. That secret exists before the operator
+        # does, which is why this can run before the install.
+        client_id="$(oc -n kube-system get secret azure-credentials \
+          -o jsonpath='{.data.azure_client_id}' | base64 -d)"
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        # --password=VALUE, not --password VALUE: a secret beginning with a
+        # hyphen is otherwise read as another flag.
+        az login --service-principal \
+          --username "$(jq -er .clientId "${sp}")" \
+          --password="$(jq -er .clientSecret "${sp}")" \
+          --tenant "$(jq -er .tenantId "${sp}")" --output none
+        subscription="$(jq -er .subscriptionId "${sp}")"
+        az account set --subscription "${subscription}"
+
+        object_id="$(az ad sp show --id "${client_id}" --query id -o tsv)"
+        az role assignment create --assignee-object-id "${object_id}" \
+          --assignee-principal-type ServicePrincipal --role "Network Contributor" \
+          --scope "/subscriptions/${subscription}/resourceGroups/${net_rg}" \
+          --output none 2>&1 | redact
+        echo "granted Network Contributor over ${net_rg}"
+
+        # A role assignment is not usable the instant it exists. Measured on
+        # three runs at about twenty seconds, over two minutes, and six minutes,
+        # so this waits for it to be observably usable rather than sleeping a
+        # guess and hoping.
+        echo "waiting for it to become usable..."
+        for attempt in $(seq 1 36); do
+          if az role assignment list --assignee "${object_id}" \
+               --scope "/subscriptions/${subscription}/resourceGroups/${net_rg}" \
+               --query "[?roleDefinitionName=='Network Contributor'] | length(@)" -o tsv 2>/dev/null \
+               | grep -qv '^0$'; then
+            echo "  visible after $(( attempt * 20 )) seconds"
+            break
+          fi
+          sleep 20
+        done
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: enable-frr
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # Both controllers watch FRRConfiguration and RouteAdvertisements
+        # from SetupWithManager, and CNO creates those two CRDs only in
+        # response to this patch. Without them the caches never sync, the
+        # manager exits after two minutes, and the CSV never installs.
+        # The operator applies this same patch itself as the first phase
+        # of reconcile, but it cannot stay alive long enough to do so;
+        # when that is fixed, this step comes out and the job proves the
+        # install a catalogue user actually performs.
+        oc patch network.operator.openshift.io cluster --type=merge \
+          -p '{"spec":{"additionalRoutingCapabilities":{"providers":["FRR"]},"defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+
+        deadline=$((SECONDS + 900))
+
+        for crd in frrconfigurations.frrk8s.metallb.io routeadvertisements.k8s.ovn.org; do
+          echo "waiting for crd/${crd}..."
+          until oc wait --for=condition=Established "crd/${crd}" --timeout=10s >/dev/null 2>&1; do
+            if (( SECONDS >= deadline )); then
+              oc get network.operator.openshift.io cluster -o yaml >&2
+              echo "timed out waiting for crd/${crd}" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+        done
+
+        # The rollout is what says CNO finished rather than that it
+        # started. Measured at about two minutes on 4.22.
+        echo "waiting for the frr-k8s rollout..."
+        until oc -n openshift-frr-k8s rollout status daemonset/frr-k8s --timeout=2m >/dev/null 2>&1; do
+          if (( SECONDS >= deadline )); then
+            oc -n openshift-frr-k8s get pods >&2
+            echo "timed out waiting for the frr-k8s daemonset" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+
+        oc -n openshift-frr-k8s get daemonset frr-k8s
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: hack/ci-e2e-azure.sh
+      from: e2e-runner
+      grace_period: 1h0m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
