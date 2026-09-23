@@ -302,6 +302,18 @@ function write_html() {
   write_results_html
 }
 
+function format_duration_seconds() {
+  local total_seconds=$1
+  local minutes=$((total_seconds / 60))
+  local seconds=$((total_seconds % 60))
+
+  if [[ ${minutes} -gt 0 ]]; then
+    echo "${minutes}m ${seconds}s"
+  else
+    echo "${seconds}s"
+  fi
+}
+
 function embed_topology_data() {
   echo "<hr>" >> "${RESULT_HTML}"
   for LEASE in "${SHARED_DIR}"/LEASE_*; do
@@ -311,6 +323,20 @@ function embed_topology_data() {
 
     NAME=$(jq --compact-output -r .metadata.name < "${LEASE}")
     echo "Lease: ${NAME}<br>" >> "${RESULT_HTML}"
+
+    CREATED=$(jq -r '.metadata.creationTimestamp // empty' < "${LEASE}")
+    FULFILLED=$(jq -r '[.status.conditions[]? | select(.type == "Fulfilled" and .status == "True")][0].lastTransitionTime // empty' < "${LEASE}")
+
+    # The lease's "Fulfilled" condition only tells us when it last became
+    # fulfilled, not how long the job waited for it, so pair it with the
+    # lease's creation time (when the job requested it) to get the actual
+    # wait duration.
+    FULFILLMENT_TIME="N/A"
+    if [[ -n "${CREATED}" && -n "${FULFILLED}" ]]; then
+      created_epoch=$(date -u -d "${CREATED}" +%s)
+      fulfilled_epoch=$(date -u -d "${FULFILLED}" +%s)
+      FULFILLMENT_TIME=$(format_duration_seconds $((fulfilled_epoch - created_epoch)))
+    fi
 
     pool_info_count=$(jq '.status.poolInfo | length' < "${LEASE}")
     if [[ "${pool_info_count}" != "null" && "${pool_info_count}" -gt 0 ]]; then
@@ -344,6 +370,7 @@ function embed_topology_data() {
       echo "- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
       echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
     fi
+    echo "- Time to Fulfill Lease Request: ${FULFILLMENT_TIME}<br>" >> "${RESULT_HTML}"
     echo "<br>" >> "${RESULT_HTML}"
   done
 
