@@ -4,7 +4,7 @@
  
 set -o errexit 
  
-if [ -z ${MAPPING_FILE_PREFIX} ]; then >&2 echo "MAPPING_FILE_PREFIX is unset or empty" && exit 1; else echo "MAPPING_FILE_PREFIX is set to $MAPPING_FILE_PREFIX"; fi 
+if [ -z "${MAPPING_FILE_PREFIX}" ]; then >&2 echo "MAPPING_FILE_PREFIX is unset or empty" && exit 1; else echo "MAPPING_FILE_PREFIX is set to $MAPPING_FILE_PREFIX"; fi
  
 dry_run="${dry_run:-true}" 
 
@@ -126,17 +126,75 @@ prepare_mapping() {
 		*) echo "${_line}" >>"${_dst}"; continue ;;
 		esac
 		echo "Expanding QCI ${_prefix}_* -> ${_to}:<tag>" >&2
-		expand_qci_prefix_line "${_from}" "${_to}" >>"${_dst}" || { rm -f "${_dst}"; return 1; }
+		expand_qci_prefix_line "${_from}" "${_to}" >>"${_dst}" || {
+			echo "ERROR: Failed to expand source ${_from} to destination ${_to} in ${_src}" >&2
+			rm -f "${_dst}"
+			return 1
+		}
 	done <"${_src}"
 	echo "${_dst}"
 }
 
+mirror_mapping_file() {
+	mapping="$1"
+	mirror_file="$2"
+	if [ ! -r "${mirror_file}" ]; then
+		echo "ERROR: Prepared mapping file ${mirror_file} from ${mapping} is not readable"
+		return 1
+	fi
+	processed_sources="$(mktemp)" || {
+		echo "ERROR: Failed to create source tracking file for ${mapping}"
+		return 1
+	}
+	source_mapping="$(mktemp)" || {
+		echo "ERROR: Failed to create source mapping file for ${mapping}"
+		rm -f "${processed_sources}"
+		return 1
+	}
+	mapping_failures=0
+
+	# source_mapping is a separate mktemp-created file, never mirror_file.
+	# shellcheck disable=SC2094
+	while IFS= read -r line || [ -n "${line}" ]; do
+		case "${line}" in
+		''|'#'*) continue ;;
+		esac
+		source="$(printf '%s\n' "${line}" | awk '{print $1}')"
+		[ -n "${source}" ] || continue
+		if grep -Fqx "${source}" "${processed_sources}"; then
+			continue
+		fi
+		if ! printf '%s\n' "${source}" >>"${processed_sources}"; then
+			echo "ERROR: Failed to track source ${source} from ${mapping}"
+			mapping_failures=1
+			continue
+		fi
+		if ! awk -v source="${source}" '$1 == source { print }' "${mirror_file}" >"${source_mapping}"; then
+			echo "ERROR: Failed to prepare mappings for source ${source} from ${mapping}"
+			mapping_failures=1
+			continue
+		fi
+		if ! destinations="$(awk '{ printf "%s%s", separator, $2; separator=", " } END { print "" }' "${source_mapping}")"; then
+			echo "ERROR: Failed to list destinations for source ${source} from ${mapping}"
+			mapping_failures=1
+			continue
+		fi
+		echo "Running: oc image mirror --dry-run=${dry_run} --keep-manifest-list -f=${source_mapping} --skip-multiple-scopes for source ${source} to destinations: ${destinations}"
+		if ! oc image mirror --dry-run="${dry_run}" --keep-manifest-list -a /tmp/config.json -f="${source_mapping}" --skip-multiple-scopes; then
+			echo "ERROR: Failed to mirror source ${source} from ${mapping} to destinations: ${destinations}"
+			mapping_failures=1
+		fi
+	done <"${mirror_file}"
+
+	rm -f "${processed_sources}" "${source_mapping}"
+	return "${mapping_failures}"
+}
+
 failures=0 
-for mapping in /etc/imagemirror/${MAPPING_FILE_PREFIX}*; do 
+for mapping in "/etc/imagemirror/${MAPPING_FILE_PREFIX}"*; do
   mirror_file="$(prepare_mapping "${mapping}")" || { echo "ERROR: Failed to expand mapping $mapping"; failures=$((failures+1)); continue; }
-  echo "Running: oc image mirror --dry-run=${dry_run} --keep-manifest-list -f=$mirror_file --skip-multiple-scopes" 
-  if ! oc image mirror --dry-run=${dry_run} --keep-manifest-list -a /tmp/config.json -f="$mirror_file" --skip-multiple-scopes; then 
-    echo "ERROR: Failed to mirror images from $mapping" 
+  if ! mirror_mapping_file "${mapping}" "${mirror_file}"; then
+    echo "ERROR: Failed to mirror one or more sources from ${mapping}"
     failures=$((failures+1)) 
   fi 
   if [ "${mirror_file}" != "${mapping}" ]; then
