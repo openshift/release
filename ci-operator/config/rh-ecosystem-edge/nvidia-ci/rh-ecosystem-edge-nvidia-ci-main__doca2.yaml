@@ -8,6 +8,11 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+  run_if_changed: x^
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -47,11 +52,128 @@ tests:
     cluster_profile: metal-nno-doca2
     env:
       DPF_DEPLOY_MAKE_TARGET: create-base-cluster
+      DUMP_FAILED_TESTS: "true"
+      NNO_DAY2_PR: "697"
+      NVIDIANETWORK_CLEANUP: "false"
+      NVIDIANETWORK_RDMA_LINK_TYPE: ethernet
+      NVIDIANETWORK_RDMA_NETWORK_TYPE: shared-device
+      NVIDIANETWORK_RDMA_WORKLOAD_NAMESPACE: default
+      TEST_FEATURES: nvidianetwork
+      TEST_LABELS: deploy || rdma-shared-dev
+      TEST_TRACE: "true"
       TIMEOUT: 120m
+      VERBOSE_LEVEL: "100"
+    post:
+    - ref: gather-extra
+    - ref: gather-must-gather
     test:
     - ref: dpf-hypervisor-deploy-cluster
     - ref: dpf-hypervisor-load-kubeconfig
+    - as: apply-nno-day2
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        if [[ ! -f "${KUBECONFIG}" ]]; then
+          echo "Missing kubeconfig at SHARED_DIR/kubeconfig"
+          exit 1
+        fi
+
+        udev_file="${CLUSTER_PROFILE_DIR}/doca1-udev-network-rules-base64"
+        e2e_env="${CLUSTER_PROFILE_DIR}/nno-e2e-env"
+        if [[ -f "${udev_file}" ]]; then
+          DOCA1_UDEV_NETWORK_RULES_BASE64="$(tr -d '\n' < "${udev_file}")"
+          export DOCA1_UDEV_NETWORK_RULES_BASE64
+        elif [[ -f "${e2e_env}" ]]; then
+          udev_line="$(grep -E '^DOCA1_UDEV_NETWORK_RULES_BASE64=' "${e2e_env}" || true)"
+          if [[ -n "${udev_line}" ]]; then
+            export "${udev_line}"
+          fi
+        fi
+        if [[ -z "${DOCA1_UDEV_NETWORK_RULES_BASE64:-}" ]]; then
+          echo "DOCA1_UDEV_NETWORK_RULES_BASE64 is not set (need ${udev_file} or that key in nno-e2e-env)"
+          exit 1
+        fi
+
+        NNO_DAY2_PR="${NNO_DAY2_PR:-697}"
+        work="$(mktemp -d)"
+        echo "Fetching nvidia-ci PR #${NNO_DAY2_PR} for day-2 manifests"
+        curl -fsSL "https://codeload.github.com/rh-ecosystem-edge/nvidia-ci/tar.gz/refs/pull/${NNO_DAY2_PR}/head" | tar -xz -C "${work}" --strip-components=1
+        if [[ ! -d "${work}/manifests" || ! -f "${work}/scripts/apply-manifests.sh" ]]; then
+          echo "Unpacked PR #${NNO_DAY2_PR} is missing manifests/ or scripts/apply-manifests.sh"
+          exit 1
+        fi
+
+        if ! command -v envsubst >/dev/null 2>&1; then
+          mkdir -p /tmp/bin
+          {
+            echo '#!/usr/bin/env bash'
+            echo 'set -euo pipefail'
+            echo 'while IFS= read -r line || [[ -n "${line}" ]]; do'
+            echo '  while [[ "${line}" =~ \$\{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do'
+            echo '    _var="${BASH_REMATCH[1]}"'
+            echo '    _val="${!_var-}"'
+            echo '    line="${line//\$\{${_var}\}/${_val}}"'
+            echo '  done'
+            echo '  printf "%s\n" "${line}"'
+            echo 'done'
+          } > /tmp/bin/envsubst
+          chmod +x /tmp/bin/envsubst
+          export PATH="/tmp/bin:${PATH}"
+        fi
+
+        cd "${work}"
+        export WAIT_FOR_WORKER_MCP=true
+        export WORKER_MCP_ROLLOUT_START_TIMEOUT=4m
+        export WORKER_MCP_ROLLOUT_TIMEOUT=40m
+        export WORKER_MCP_NAME=worker
+        if command -v make >/dev/null 2>&1; then
+          make apply-manifests
+        else
+          bash scripts/apply-manifests.sh apply
+        fi
+      env:
+      - name: NNO_DAY2_PR
+      from: dpf-ci
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
     - ref: openshift-qe-cluster-health
+    - as: network-operator-e2e-shared-device
+      commands: |
+        set -euo pipefail
+        export REPORTS_DUMP_DIR="${ARTIFACT_DIR}"
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        if [[ ! -f "${KUBECONFIG}" ]]; then
+          echo "Missing kubeconfig at SHARED_DIR/kubeconfig"
+          exit 1
+        fi
+        e2e_env="${CLUSTER_PROFILE_DIR}/nno-e2e-env"
+        if [[ ! -f "${e2e_env}" ]]; then
+          echo "Missing cluster-profile file nno-e2e-env"
+          exit 1
+        fi
+        set -o allexport
+        source "${e2e_env}"
+        set +o allexport
+        make run-tests
+      env:
+      - name: DUMP_FAILED_TESTS
+      - name: NVIDIANETWORK_CLEANUP
+      - name: NVIDIANETWORK_RDMA_LINK_TYPE
+      - name: NVIDIANETWORK_RDMA_NETWORK_TYPE
+      - name: NVIDIANETWORK_RDMA_WORKLOAD_NAMESPACE
+      - name: TEST_FEATURES
+      - name: TEST_LABELS
+      - name: TEST_TRACE
+      - name: VERBOSE_LEVEL
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: main

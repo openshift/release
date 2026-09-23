@@ -6896,7 +6896,8 @@ presubmits:
     context: ci/prow/doca2-deploy-cluster
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Containerfile
       timeout: 6h0m0s
     labels:
       capability/intranet: intranet
@@ -7007,6 +7008,65 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(doca2-deploy-cluster|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build06
+    context: ci/prow/doca2-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+    labels:
+      ci-operator.openshift.io/variant: doca2
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-doca2-images
+    rerun_command: /test doca2-images
+    run_if_changed: x^
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=doca2
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )doca2-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
