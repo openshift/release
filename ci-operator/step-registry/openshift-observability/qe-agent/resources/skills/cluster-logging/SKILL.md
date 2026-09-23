@@ -90,6 +90,8 @@ done
 echo "All MCPs ready — proceeding."
 ```
 
+If Phase 2 also times out, don't hard-stop — skip to Step 6 and write `${ARTIFACT_DIR}/qe-agent-analysis.md` with the MCP status snapshot, a `CLUSTER_INSTABILITY` classification, and a rerun recommendation (Step 5d's contract).
+
 ## Step 0b — Re-establish the Test Environment
 
 The extension binary `openshift-logging-e2e-tests-tests-ext` is already on `PATH` in this pod's image (same base image as the test step). There is no repo to clone and no build step. Required adaptation from the fetched script:
@@ -181,7 +183,7 @@ for i in 2 3 4; do
 done
 ```
 
-After all 4 runs, count how many passed vs failed. Record the pass/fail pattern (e.g., `PFPP`). If the failure is reproducible even 1 out of 4 runs, classify as `FLAKY` and proceed to Step 5c. If all 4 runs pass, classify as `NOT_REPRODUCED` — skip Steps 4–5 and go directly to Step 6, recording the pass/fail pattern as evidence and setting Outcome to a rerun recommendation (no code change, no bug report).
+After all 4 runs, count how many passed vs failed. Record the pass/fail pattern (e.g., `PFPP`) and proceed to Step 4 for diagnosis in every case — including when all 4 runs passed, so the Cluster Instability criteria can still be evaluated before ruling the failure not reproduced.
 
 ---
 
@@ -255,7 +257,7 @@ oc logs -n openshift-logging deploy/cluster-logging-operator --tail=500 \
 
 Classify as `CLUSTER_INSTABILITY` only when **all four** hold: (1) MCPs were updating at original test time, or the operator pod shows `RESTARTS > 0` correlated with MCP rollout; (2) all reruns pass cleanly with shorter duration than the original; (3) no fixable test defect (timeout, missing wait, or unscoped selector) found above; (4) no tight reconciliation loop found above.
 
-`CLUSTER_INSTABILITY` takes precedence over `FLAKY` when all four hold. Proceed to Step 5d.
+`CLUSTER_INSTABILITY` takes precedence over `FLAKY` when all four hold — proceed to Step 5d. Otherwise: a failed run (original or a Step 3 rerun) is `FLAKY` — proceed to Step 5c. If all 4 Step 3 reruns passed, it's `NOT_REPRODUCED` — go to Step 6, recording the pass/fail pattern as evidence and setting Outcome to a rerun recommendation (no code change, no bug report).
 
 When genuinely ambiguous, gather more cluster evidence before deciding. Explain your reasoning explicitly in the output.
 
@@ -302,7 +304,7 @@ Rerun result after fix: [PASS / FAIL / not re-verified]
 
 ## Step 5b — If PRODUCT_BUG: Write Bug Report
 
-Do not attempt to fix the operator code. Instead, write `${ARTIFACT_DIR}/bug-report.md`. If Step 1's "No pattern" branch is diagnosing more than one test individually, use a distinct `${ARTIFACT_DIR}/bug-report-<case-id>.md` and `${ARTIFACT_DIR}/jira-payload-<case-id>.json` per `PRODUCT_BUG` test instead, so multiple diagnoses don't overwrite each other:
+Do not attempt to fix the operator code. Instead, write `${ARTIFACT_DIR}/bug-report.md`. If Step 1's "No pattern" branch is diagnosing more than one test individually, write a distinct `${ARTIFACT_DIR}/bug-report-<case-id>.md` per `PRODUCT_BUG` test instead, so multiple diagnoses don't overwrite each other:
 
 ````markdown
 > **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
@@ -346,7 +348,7 @@ Do not attempt to fix the operator code. Instead, write `${ARTIFACT_DIR}/bug-rep
 <Critical / Major / Minor — based on whether this blocks a release gate>
 ````
 
-After writing `bug-report.md`, also write `${ARTIFACT_DIR}/jira-payload.json` for automated Jira filing. Convert the bug report to **Jira wiki notation**:
+After writing the bug report(s), also write one `${ARTIFACT_DIR}/jira-payload.json` — the wrapper only reads this fixed filename, so combine multiple `PRODUCT_BUG` reports into a single Jira issue (one subsection per test) rather than per-test payloads. Convert to **Jira wiki notation**:
 
 | Markdown | Jira wiki notation |
 |---|---|
@@ -361,19 +363,19 @@ After writing `bug-report.md`, also write `${ARTIFACT_DIR}/jira-payload.json` fo
 | `> quote` | `bq. quote` |
 
 ```bash
-_SUMMARY="[qe-agent] <one-sentence summary from the bug report>"
+_SUMMARY="[qe-agent] <one-sentence summary — for multiple bugs, e.g. 'N product bugs found in <suite>'>"
 _SUMMARY="${_SUMMARY:0:255}"
-_DESCRIPTION="<full bug report content converted to Jira wiki notation>"
+_DESCRIPTION="<bug report(s) in Jira wiki notation; for multiple bugs, concatenate each under its own 'h2. <test case>' heading>"
 
 jq -n \
   --arg summary "${_SUMMARY}" \
   --arg description "${_DESCRIPTION}" \
-  --arg severity "<Critical / Major / Minor>" \
+  --arg severity "<Critical / Major / Minor — highest severity among the combined bugs>" \
   '{summary: $summary, description: $description, severity: $severity}' \
   > "${ARTIFACT_DIR}/jira-payload.json"
 ```
 
-Neither `bug-report.md` nor the Jira description may contain raw credentials, tokens, passwords, or SHA-256 digests — redact them as `[REDACTED]` in every evidence excerpt (operator logs, cluster events, JUnit failure text) before writing either file.
+Neither the bug report(s) nor the Jira description may contain raw credentials, tokens, passwords, or SHA-256 digests — redact them as `[REDACTED]` in every evidence excerpt (operator logs, cluster events, JUnit failure text) before writing any of these files.
 
 ---
 
@@ -393,9 +395,9 @@ Write `${ARTIFACT_DIR}/cluster-instability-report.md` with: a one-sentence summa
 
 ## Step 6 — Write Analysis Summary
 
-Write `${ARTIFACT_DIR}/qe-agent-analysis.md` immediately after each test is diagnosed — do not wait until the end. Overwrite it after each subsequent test.
+Write `${ARTIFACT_DIR}/qe-agent-analysis.md` immediately after each test is diagnosed — do not wait until the end. Preserve earlier entries when adding later tests: one section per diagnosed test, never overwrite a previous test's entry.
 
-Required sections: **Failed Tests** (table: suite / test case / JUnit file); **Rerun Result** (one line); **Diagnosis** (bold classification + 2–3 sentences citing specific evidence); **Rerun Summary** (5 rows: Original CI run + Reruns 1–4; use `PASS`/`FAIL` for executed runs and `N/A` for reruns skipped because an earlier run already reached a diagnosis); **Outcome** (test fix path, bug report path, or rerun recommendation); **Skill Improvement Recommendations** (deviations from skill steps — `None.` if all worked as written); **Evidence Sources** (JUnit XML filename + failure line, operator logs namespace/deployment + excerpt, cluster state checks, test source file path + finding).
+Required per-test sections: **Failed Tests** (suite / test case / JUnit file); **Rerun Result** (one line); **Diagnosis** (bold classification + 2–3 sentences with evidence); **Rerun Summary** (5 rows: Original + Reruns 1–4; `PASS`/`FAIL`, or `N/A` for skipped reruns); **Outcome** (fix path, bug report path, or rerun recommendation); **Evidence Sources** (JUnit file+line, operator logs excerpt, cluster checks, test source path+finding). One document-level **Skill Improvement Recommendations** section at the end (deviations from skill steps — `None.` if none).
 
 Begin the document with: `> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.`
 
