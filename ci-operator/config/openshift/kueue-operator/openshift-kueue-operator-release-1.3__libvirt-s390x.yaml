@@ -38,21 +38,9 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: src-with-oc-and-kubectl
-operator:
-  bundles:
-  - as: kueue-bundle
-    context_dir: .
-    dockerfile_path: bundle.Dockerfile
-    skip_building_index: true
-  substitutions:
-  - pullspec: registry.redhat.io/kueue/kueue-rhel9-operator:latest
-    with: pipeline:kueue-operator
-  - pullspec: registry.redhat.io/kueue/kueue-rhel9:latest
-    with: pipeline:kueue-operand
-  - pullspec: registry.redhat.io/kueue/kueue-must-gather-rhel9:latest
-    with: pipeline:kueue-must-gather
 prowgen:
   disable_sparse_checkout: true
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -115,6 +103,7 @@ tests:
     env:
       BRANCH: "4.18"
       BUNDLE_COMPONENT: kueue-bundle-1-3
+      CONTAINER_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
       OPERAND_COMPONENT: kueue-operand-1-3
       OPERATOR_COMPONENT: kueue-operator-1-3
     post:
@@ -124,7 +113,6 @@ tests:
     - ref: gather-audit-logs
     - ref: upi-libvirt-cleanup-post
     test:
-    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
     - chain: kueue-operator-libvirt-s390x-test-e2e
     workflow: kueue-operator-libvirt-s390x
 - as: test-e2e-4-19
@@ -146,6 +134,7 @@ tests:
     env:
       BRANCH: "4.19"
       BUNDLE_COMPONENT: kueue-bundle-1-3
+      CONTAINER_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
       OPERAND_COMPONENT: kueue-operand-1-3
       OPERATOR_COMPONENT: kueue-operator-1-3
     post:
@@ -155,7 +144,6 @@ tests:
     - ref: gather-audit-logs
     - ref: upi-libvirt-cleanup-post
     test:
-    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
     - chain: kueue-operator-libvirt-s390x-test-e2e
     workflow: kueue-operator-libvirt-s390x
 - as: test-e2e-downstream-4-20
@@ -177,6 +165,7 @@ tests:
     env:
       BRANCH: "4.20"
       BUNDLE_COMPONENT: kueue-bundle-1-3
+      CONTAINER_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
       OPERAND_COMPONENT: kueue-operand-1-3
       OPERATOR_COMPONENT: kueue-operator-1-3
     post:
@@ -186,7 +175,6 @@ tests:
     - ref: gather-audit-logs
     - ref: upi-libvirt-cleanup-post
     test:
-    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
     - chain: kueue-operator-test-e2e-downstream
     workflow: kueue-operator-libvirt-s390x
 - always_run: false
@@ -195,6 +183,7 @@ tests:
   - intranet
   cluster: build12
   minimum_interval: 96h
+  optional: true
   presubmit: true
   reporter_config:
     channel: '#forum-node-jira'
@@ -219,7 +208,6 @@ tests:
     - ref: gather-audit-logs
     - ref: upi-libvirt-cleanup-post
     test:
-    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
     - chain: kueue-operator-test-e2e-downstream-disruptive
     workflow: kueue-operator-libvirt-s390x
 - as: test-e2e-upstream-4-20
@@ -250,7 +238,6 @@ tests:
     - ref: gather-audit-logs
     - ref: upi-libvirt-cleanup-post
     test:
-    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
     - chain: kueue-operator-libvirt-s390x-test-e2e-upstream
     workflow: kueue-operator-libvirt-s390x
 - as: test-e2e-downstream-4-21
@@ -272,6 +259,7 @@ tests:
     env:
       BRANCH: "4.21"
       BUNDLE_COMPONENT: kueue-bundle-1-3
+      CONTAINER_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
       OPERAND_COMPONENT: kueue-operand-1-3
       OPERATOR_COMPONENT: kueue-operator-1-3
     post:
@@ -281,7 +269,6 @@ tests:
     - ref: gather-audit-logs
     - ref: upi-libvirt-cleanup-post
     test:
-    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
     - chain: kueue-operator-test-e2e-downstream
     workflow: kueue-operator-libvirt-s390x
 - always_run: false
@@ -290,6 +277,7 @@ tests:
   - intranet
   cluster: build12
   minimum_interval: 96h
+  optional: true
   presubmit: true
   reporter_config:
     channel: '#forum-node-jira'
@@ -314,7 +302,6 @@ tests:
     - ref: gather-audit-logs
     - ref: upi-libvirt-cleanup-post
     test:
-    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
     - chain: kueue-operator-test-e2e-downstream-disruptive
     workflow: kueue-operator-libvirt-s390x
 - as: test-e2e-upstream-4-21
@@ -345,7 +332,6 @@ tests:
     - ref: gather-audit-logs
     - ref: upi-libvirt-cleanup-post
     test:
-    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
     - chain: kueue-operator-libvirt-s390x-test-e2e-upstream
     workflow: kueue-operator-libvirt-s390x
 - as: test-e2e-downstream-4-22
@@ -367,6 +353,7 @@ tests:
     env:
       BRANCH: "4.22"
       BUNDLE_COMPONENT: kueue-bundle-1-3
+      CONTAINER_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
       OPERAND_COMPONENT: kueue-operand-1-3
       OPERATOR_COMPONENT: kueue-operator-1-3
     post:
@@ -376,7 +363,6 @@ tests:
     - ref: gather-audit-logs
     - ref: upi-libvirt-cleanup-post
     test:
-    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
     - chain: kueue-operator-test-e2e-downstream
     workflow: kueue-operator-libvirt-s390x
 - as: test-e2e-upstream-4-22
@@ -407,7 +393,6 @@ tests:
     - ref: gather-audit-logs
     - ref: upi-libvirt-cleanup-post
     test:
-    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
     - chain: kueue-operator-libvirt-s390x-test-e2e-upstream
     workflow: kueue-operator-libvirt-s390x
 zz_generated_metadata:
