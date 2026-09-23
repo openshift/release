@@ -1,5 +1,25 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM builder AS compile
+      RUN CGO_ENABLED=0 GOFLAGS="-mod=mod" go test ./test/e2e -v -c --tags=osde2e -o /usr/local/bin/e2e.test
+      FROM runtime
+      COPY --from=compile /usr/local/bin/e2e.test /usr/local/bin/e2e.test
+    inputs:
+      rosa-aws-cli:
+        as:
+        - runtime
+      src:
+        as:
+        - builder
+    to: operator-e2e
 prowgen:
   enable_secrets_store_csi_driver: true
 resources:
@@ -47,6 +67,56 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: e2e-binary-build-success
+  commands: |
+    CGO_ENABLED=0 GOFLAGS="-mod=mod" go test ./test/e2e -v -c --tags=osde2e -o /dev/null
+  container:
+    from: src
+  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: rosa-int-e2e
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{- end}}'
+  run_if_changed: ^(cmd|pkg|test/e2e)/
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      LEASE_ENV: integration
+      OCM_LOGIN_ENV: integration
+    post:
+    - ref: rosa-cluster-lease-checkin
+    test:
+    - ref: rosa-cad-e2e
+    workflow: rosa-cluster-lease-cli-e2e
+- as: rosa-stage-e2e
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{- end}}'
+  run_if_changed: ^(cmd|pkg|test/e2e)/
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      LEASE_ENV: staging
+      OCM_LOGIN_ENV: staging
+    post:
+    - ref: rosa-cluster-lease-checkin
+    test:
+    - ref: rosa-cad-e2e
+    workflow: rosa-cluster-lease-cli-e2e
 zz_generated_metadata:
   branch: main
   org: openshift
