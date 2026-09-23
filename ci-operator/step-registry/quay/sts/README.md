@@ -91,15 +91,7 @@ account after `SHARED_DIR` is discarded. Resources are named
 `quay-sts-run=<run-id>`; administrators must locate and delete leftovers
 manually.
 
-Offline validation:
-
-```console
-python3 hack/test-quay-sts.py
-```
-
-The offline suite executes the embedded Python with mocked cluster/AWS APIs and
-checks account/issuer rejection, namespace collisions, ownership protection,
-partial provisioning, operator configuration, versioned S3 cleanup, sanitized
-output, and ephemeral job registration. A successful live `e2e-sts` Prow run is
-still required before merge to prove IAM permissions, OLM/CCO reconciliation,
-image transfer, and complete post cleanup.
+After this registration merges, a successful live `e2e-sts` Prow run against
+the Quay Operator feature PR is required before that feature merges. The live
+run proves IAM permissions, OLM/CCO reconciliation, image transfer, and complete
+post cleanup.
