@@ -1,0 +1,38 @@
+base_images:
+  ubi-python-311:
+    name: ubi-python-311
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.20
+images:
+  items:
+  - dockerfile_literal: |
+      FROM ubi-python-311
+      USER 0
+      RUN dnf install -y git gcc krb5-devel libcurl-devel openssl-devel \
+       && dnf clean all
+      RUN pip install --no-cache-dir uv
+      USER 1001
+    to: art-build-data-validator
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: art-build-data-validate
+  optional: true
+  run_if_changed: ^(group|streams|releases|bug)\.yml$|^(images|rpms)/.*\.ya?ml$
+  steps:
+    test:
+    - ref: ocp-art-validate-schema
+zz_generated_metadata:
+  branch: logging-6.3
+  org: openshift-eng
+  repo: ocp-build-data
