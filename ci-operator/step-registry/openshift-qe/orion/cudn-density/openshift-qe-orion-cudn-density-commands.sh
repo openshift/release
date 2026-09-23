@@ -48,6 +48,8 @@ fi
 
 case "$ES_TYPE" in
   qe)
+    # Disable xtrace: reading QE ElasticSearch credentials and JIRA token
+    set +x
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
@@ -59,14 +61,20 @@ case "$ES_TYPE" in
         # We use orion's default JIRA project and components
         ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
     fi
+    set -x
     ;;
   quay-qe)
+    # Disable xtrace: reading quay-qe ElasticSearch credentials
+    set +x
     ES_PASSWORD=$(<"/secret/quay-qe/password")
     ES_USERNAME=$(<"/secret/quay-qe/username")
     ES_HOST=$(<"/secret/quay-qe/hostname")
     ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
+    set -x
     ;;
   stackrox)
+    # Disable xtrace: reading StackRox ElasticSearch credentials
+    set +x
     ES_SECRETS_PATH='/secret_stackrox'
     ES_PASSWORD=$(<"${ES_SECRETS_PATH}/password")
     ES_USERNAME=$(<"${ES_SECRETS_PATH}/username")
@@ -74,11 +82,15 @@ case "$ES_TYPE" in
         ES_HOST=$(<"${ES_SECRETS_PATH}/host")
     fi
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+    set -x
     ;;
   *)
+    # Disable xtrace: reading credentials and constructing authenticated URL
+    set +x
     ES_PASSWORD=$(<"/secret/internal/password")
     ES_USERNAME=$(<"/secret/internal/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
+    set -x
     ;;
 esac
 
@@ -302,37 +314,6 @@ process_change_point() {
 process_change_point
 
 cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
-
-# Experimental: run orion with original e-divisive binary (safe block, never breaks main execution)
-(
-    EXP_DIR="/tmp/orion-original-edivisive"
-    rm -rf "$EXP_DIR"
-    mkdir -p "$EXP_DIR"
-    pushd "$EXP_DIR"
-    python -m virtualenv ./venv_exp
-    source ./venv_exp/bin/activate
-
-    cp -a /tmp/orion ./orion
-    pushd orion
-    git fetch origin orig-edivisive-exp
-    git checkout FETCH_HEAD
-
-    pip install -q --retries "$MAX_RETRIES" -r requirements.txt
-    pip install -q --retries "$MAX_RETRIES" .
-
-    echo "Running experimental orion (original e-divisive)..."
-    # Strip JIRA flags for experimental run
-    EXTRA_FLAGS_NO_JIRA="${EXTRA_FLAGS//" --jira-ack --jira-auto-create"/}"
-    orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS_NO_JIRA} --viz | tee orion-exp-output.txt || true
-
-    # Copy all results except .xml files into the experimental artifacts subdirectory
-    mkdir -p "$ARTIFACT_DIR/orion-original-edivisive"
-    cp *.csv *.json *.txt *.html "$ARTIFACT_DIR/orion-original-edivisive/" 2>/dev/null || true
-    deactivate
-    popd
-    popd
-    echo "Experimental orion run complete."
-) || echo "Experimental orion block failed, continuing."
 
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
