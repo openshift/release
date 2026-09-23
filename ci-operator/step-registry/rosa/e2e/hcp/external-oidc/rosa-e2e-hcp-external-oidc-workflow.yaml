@@ -15,16 +15,29 @@ workflow:
       # external auth configured, so it verifies rather than skips.
       LABEL_FILTER: Platform:HCP
     pre:
-      - chain: rosa-aws-sts-hcp-provision
-      - ref: rosa-cluster-wait-ready-hosted-cp
-      - ref: rosa-cluster-wait-ready-nodes
+      # External-auth (external OIDC) HCP clusters have no built-in OAuth, so the
+      # standard rosa-aws-sts-hcp-provision chain cannot be reused as-is: it bakes
+      # in HTPasswd IDP creation and a guest `oc get clusteroperators` wait, both
+      # of which require the OAuth stack these clusters do not have. The provision
+      # steps are therefore composed individually below, omitting those two, and
+      # readiness is verified via OCM state and the management cluster instead.
+      - ref: aws-provision-vpc-shared
+      - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+      - chain: rosa-sts-oidc-config-create
+      # Provision the HCP cluster with external authentication enabled
+      # (EXTERNAL_AUTH_PROVIDERS_ENABLED=true is set on rosa-cluster-provision).
+      - ref: rosa-cluster-provision
+      # OCM-state based readiness (no guest login), safe for external-auth clusters.
+      - ref: rosa-cluster-wait-ready-cluster
+      - ref: rosa-cluster-notify-error
+      - ref: aws-provision-tags-for-byo-vpc
       # Configure the external auth (external OIDC) provider on the ready cluster.
       - ref: rosa-conf-external-oidc-create
-      # Enabling external auth rolls out the hosted control plane (kube-apiserver
-      # restart), and `rosa create external-auth-provider` can return before the
-      # provider is fully effective. Wait for the hosted control plane to become
-      # ready again so the external OIDC provider is reconciled before testing.
-      - ref: rosa-cluster-wait-ready-hosted-cp
+      # Enabling external auth reconfigures/rolls out the hosted control plane
+      # kube-apiserver, and `rosa create external-auth-provider` can return before
+      # the provider is reconciled. Verify the provider is configured and the
+      # kube-apiserver has rolled out (via the management cluster) before testing.
+      - ref: rosa-cluster-wait-ready-external-oidc
       - ref: rosa-cluster-credentials-hypershift-mgmt
     test:
       - ref: rosa-e2e-test
