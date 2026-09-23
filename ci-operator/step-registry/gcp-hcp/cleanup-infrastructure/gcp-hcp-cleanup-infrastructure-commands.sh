@@ -298,35 +298,123 @@ delete_project() {
 }
 
 # ========================================================================
-# Phase 5b: Delete the per-run E2E folder
+# Phase 5b: Delete the per-run E2E folder through HCP Terraform
 # ========================================================================
-delete_folder() {
+destroy_e2e_folder_in_tfc() {
   local folder_id=$1
-  local label=$2
+  local workspace_name
+  local tfc_token
+  local tfc_org="${TFC_ORGANIZATION:-hp-platform-engineering}"
+  local workspace_response
+  local workspace_id
+  local target_address="module.region.google_folder.region"
+  local run_payload
+  local run_response
+  local run_id
   local attempt
-  local output
+  local run_status
 
   if [[ -z "${folder_id}" ]]; then
-    log "  ERROR: No folder ID available for ${label} cleanup"
+    return 0
+  fi
+
+  if [[ ! -f "${SHARED_DIR}/workspace-name" ]]; then
+    log "  ERROR: No workspace-name available for folder cleanup"
+    return 1
+  fi
+  if [[ ! -f "/etc/terraform-cloud/token" ]]; then
+    log "  ERROR: TFC token not found for folder cleanup"
     return 1
   fi
 
-  log "--- [${label}] Deleting folder: ${folder_id} ---"
-  for attempt in 1 2 3; do
-    if output=$(gcloud resource-manager folders delete "${folder_id}" --quiet 2>&1); then
-      echo "${output}" | tee -a "${LOG}"
-      log "  Folder ${folder_id} deletion initiated"
-      return 0
-    fi
+  workspace_name=$(<"${SHARED_DIR}/workspace-name")
+  tfc_token=$(<"/etc/terraform-cloud/token")
 
-    echo "${output}" | tee -a "${LOG}"
-    if [[ ${attempt} -lt 3 ]]; then
-      log "  Folder deletion failed; waiting for project deletion to propagate (attempt ${attempt}/3)"
-      sleep 5
+  log "--- Deleting E2E folder ${folder_id} through HCP Terraform workspace ${workspace_name} ---"
+
+  if ! workspace_response=$(curl -fsS --max-time 30 --connect-timeout 10 \
+    --header "Authorization: Bearer ${tfc_token}" \
+    --header "Content-Type: application/vnd.api+json" \
+    "https://app.terraform.io/api/v2/organizations/${tfc_org}/workspaces/${workspace_name}"); then
+    log "  ERROR: Could not resolve TFC workspace for folder cleanup"
+    return 1
+  fi
+  workspace_id=$(jq -r '.data.id // empty' <<<"${workspace_response}")
+  if [[ -z "${workspace_id}" ]]; then
+    log "  ERROR: TFC workspace response did not include an ID"
+    return 1
+  fi
+
+  # The folder is managed by the E2E workspace's remote execution identity.
+  # Targeting only this resource preserves the fast state removal below while
+  # avoiding the prohibited folder-IAM mutation in the E2E configuration.
+  run_payload=$(jq -n \
+    --arg workspace_id "${workspace_id}" \
+    --arg target_address "${target_address}" \
+    --arg message "E2E cleanup: destroy per-run folder ${folder_id}" \
+    '{
+      data: {
+        type: "runs",
+        attributes: {
+          "is-destroy": true,
+          "target-addrs": [$target_address],
+          "auto-apply": true,
+          message: $message
+        },
+        relationships: {
+          workspace: {
+            data: {
+              type: "workspaces",
+              id: $workspace_id
+            }
+          }
+        }
+      }
+    }')
+
+  if ! run_response=$(curl -fsS --max-time 30 --connect-timeout 10 \
+    --header "Authorization: Bearer ${tfc_token}" \
+    --header "Content-Type: application/vnd.api+json" \
+    --request POST \
+    --data "${run_payload}" \
+    "https://app.terraform.io/api/v2/runs"); then
+    log "  ERROR: Could not queue targeted folder destroy run"
+    return 1
+  fi
+  run_id=$(jq -r '.data.id // empty' <<<"${run_response}")
+  if [[ -z "${run_id}" ]]; then
+    log "  ERROR: TFC did not return a run ID for folder cleanup"
+    return 1
+  fi
+  log "  TFC run: https://app.terraform.io/app/${tfc_org}/workspaces/${workspace_name}/runs/${run_id}"
+
+  for attempt in {1..60}; do
+    if ! run_response=$(curl -fsS --max-time 30 --connect-timeout 10 \
+      --header "Authorization: Bearer ${tfc_token}" \
+      --header "Content-Type: application/vnd.api+json" \
+      "https://app.terraform.io/api/v2/runs/${run_id}"); then
+      log "  ERROR: Could not read targeted folder destroy run status"
+      return 1
     fi
+    run_status=$(jq -r '.data.attributes.status // empty' <<<"${run_response}")
+
+    case "${run_status}" in
+      applied|planned_and_finished)
+        log "  Folder ${folder_id} deletion completed through HCP Terraform"
+        return 0
+        ;;
+      errored|canceled|force_canceled|discarded)
+        log "  ERROR: Targeted folder destroy run finished with status ${run_status}"
+        return 1
+        ;;
+      *)
+        log "  Targeted folder destroy run status: ${run_status:-unknown} (attempt ${attempt}/60)"
+        sleep 10
+        ;;
+    esac
   done
 
-  log "  ERROR: Failed to delete folder ${folder_id} after 3 attempts"
+  log "  ERROR: Timed out waiting for targeted folder destroy run"
   return 1
 }
 
@@ -704,7 +792,7 @@ if [[ -n "${CUSTOMER_PROJECT}" ]]; then
 fi
 
 if [[ -n "${REGION_FOLDER_ID}" ]]; then
-  delete_folder "${REGION_FOLDER_ID}" "E2E Region" || CLEANUP_FAILED=1
+  destroy_e2e_folder_in_tfc "${REGION_FOLDER_ID}" || CLEANUP_FAILED=1
 fi
 
 # Phase 6: Clear TFC workspace state
