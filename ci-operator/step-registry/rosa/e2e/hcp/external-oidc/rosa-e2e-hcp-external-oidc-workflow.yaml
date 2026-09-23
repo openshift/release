@@ -20,6 +20,11 @@ workflow:
       - ref: rosa-cluster-wait-ready-nodes
       # Configure the external auth (external OIDC) provider on the ready cluster.
       - ref: rosa-conf-external-oidc-create
+      # Enabling external auth rolls out the hosted control plane (kube-apiserver
+      # restart), and `rosa create external-auth-provider` can return before the
+      # provider is fully effective. Wait for the hosted control plane to become
+      # ready again so the external OIDC provider is reconciled before testing.
+      - ref: rosa-cluster-wait-ready-hosted-cp
       - ref: rosa-cluster-credentials-hypershift-mgmt
     test:
       - ref: rosa-e2e-test
