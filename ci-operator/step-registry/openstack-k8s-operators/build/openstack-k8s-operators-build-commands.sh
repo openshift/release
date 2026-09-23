@@ -137,15 +137,60 @@ function build_push_operator_images {
   IMAGE_TAG_BASE="$3"
   IMAGE_TAG="$4"
 
-  export VERSION=0.0.1
   export IMG=${IMAGE_TAG_BASE}:${IMAGE_TAG}
+
+  # Service operators ship a single-version, install-only index.
+  export VERSION=0.0.1
+  unset REPLACES
 
   unset GOFLAGS
   pushd ${OP_DIR}
 
   # custom per project ENV variables
+  # (may override OPENSTACK_IMG_BASE_RELEASE, so source before deriving the edge)
   if [ -f .prow_ci.env ]; then
     source .prow_ci.env
+  fi
+
+  # For the meta operator, build a two-version (base -> PR) index so kuttl can
+  # exercise a real OLM update. The base release index (lower edge) is set via
+  # the OPENSTACK_IMG_BASE_RELEASE step env / the operator's .prow_ci.env, never
+  # hardcoded here. The PR bundle uses the operator's own Makefile major.minor
+  # with a .99 patch (e.g. 19.0.0 -> 19.0.99): a recognizable version that always
+  # sorts above real z-stream releases of that minor, so any same-minor base
+  # (up to and including the main index) yields a valid replaces edge. The build
+  # fails below if the base already is that .99 version (nothing to upgrade).
+  if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
+    if [[ -z "${OPENSTACK_IMG_BASE_RELEASE:-}" ]]; then
+      echo "OPENSTACK_IMG_BASE_RELEASE must be set (step env or .prow_ci.env) to build the OLM upgrade index" >&2
+      exit 1
+    fi
+    # Pin to the channel install_yamls subscribes to (alpha); channel names are
+    # unique per package, so this matches exactly one head.
+    OPERATOR_CHANNEL=${OPERATOR_CHANNEL:-alpha}
+    # Render the base index once and pull the channel head CSV and its bundle out.
+    BASE_RENDER=$(opm render "${OPENSTACK_IMG_BASE_RELEASE}")
+    BASE_CSV=$(echo "$BASE_RENDER" | jq -r --arg ch "$OPERATOR_CHANNEL" 'select(.schema=="olm.channel" and .package=="openstack-operator" and .name==$ch) | .entries[-1].name')
+    # set -ex has no pipefail, so a failed opm/jq yields an empty BASE_CSV and a
+    # silent no-op upgrade edge; fail fast instead.
+    if [[ -z "$BASE_CSV" ]]; then
+      echo "Could not derive base CSV (channel head) from ${OPENSTACK_IMG_BASE_RELEASE}" >&2
+      exit 1
+    fi
+    # The base bundle is added directly to a fresh index below (not --from-index),
+    # so pull its image ref from the render too.
+    BASE_RELEASE_BUNDLE=$(echo "$BASE_RENDER" | jq -r --arg csv "$BASE_CSV" 'select(.schema=="olm.bundle" and .name==$csv) | .image')
+    if [[ -z "$BASE_RELEASE_BUNDLE" ]]; then
+      echo "Could not derive base bundle image for ${BASE_CSV} from ${OPENSTACK_IMG_BASE_RELEASE}" >&2
+      exit 1
+    fi
+    export REPLACES=${BASE_CSV}
+    MAKE_VERSION=$(grep -E '^VERSION[[:space:]]*\??=' Makefile | head -1 | sed -E 's/.*=[[:space:]]*//; s/[[:space:]#].*//')
+    if [[ -z "$MAKE_VERSION" ]]; then
+      echo "Could not read VERSION from openstack-operator Makefile" >&2
+      exit 1
+    fi
+    export VERSION=${MAKE_VERSION%.*}.99
   fi
 
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
@@ -161,6 +206,19 @@ function build_push_operator_images {
   check_build_result ${OPERATOR}
 
   GOWORK='' make bundle
+
+  # Hand the OLM upgrade edge to the deploy/kuttl/chainsaw steps: the base
+  # release channel head and the PR bundle CSV (read from the generated manifest,
+  # so it is the exact version OLM will see) drive STARTING_CSV / approvals.
+  if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
+    PR_CSV=$(awk '/^  name: openstack-operator\.v/{print $2; exit}' bundle/manifests/openstack-operator.clusterserviceversion.yaml)
+    if [[ -z "$PR_CSV" || "$PR_CSV" == "$BASE_CSV" ]]; then
+      echo "PR bundle CSV (${PR_CSV:-empty}) must exist and differ from base ${BASE_CSV}; the operator VERSION must be higher than the OPENSTACK_IMG_BASE_RELEASE version" >&2
+      exit 1
+    fi
+    echo "${BASE_CSV}" > "${SHARED_DIR}/olm-base-csv"
+    echo "${PR_CSV}" > "${SHARED_DIR}/olm-pr-csv"
+  fi
 
   # Build and push bundle image
   oc new-build --binary --strategy=docker --name ${OPERATOR}-bundle --to=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
@@ -192,7 +250,13 @@ function build_push_operator_images {
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
     local OPENSTACK_BUNDLES
     OPENSTACK_BUNDLES=$(/bin/bash hack/pin-bundle-images.sh)
-    opm index add --bundles "${BASE_BUNDLE}${OPENSTACK_BUNDLES}" --out-dockerfile "${INDEX_DOCKERFILE}" --generate
+    # Fresh index holding the base and PR bundles with a base -> PR upgrade edge.
+    # --mode semver derives that edge from the version order (base < PR, the PR is
+    # the operator major.minor with a .99 patch so it always sorts above the base),
+    # so it does not depend on a spec.replaces field in the generated PR bundle. The
+    # base bundle is added directly rather than via --from-index, whose deprecated
+    # sqlite prune rejects the File-Based Catalog base index.
+    opm index add --mode semver --bundles "${BASE_RELEASE_BUNDLE},${BASE_BUNDLE}${OPENSTACK_BUNDLES}" --out-dockerfile "${INDEX_DOCKERFILE}" --generate
   else
     opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${INDEX_DOCKERFILE}" --generate
   fi
