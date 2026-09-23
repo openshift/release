@@ -1,0 +1,51 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+  run_if_changed: x^
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.22.0-0
+        stream: 4-stable
+        upper: 4.23.0-0
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-aws-nodes-check
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+    test:
+    - as: get-nodes
+      cli: latest
+      commands: oc get nodes
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 4.22-stable-ovs-doca
