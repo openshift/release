@@ -19,7 +19,7 @@ tests:
       commands: |
         tee -a /tmp/run.log <<< "no-op end step for startup timing test"
         date -u
-        ls -latr ./ /tmp/
+        ls -latr ./ work* /tmp/
       from: root
       resources:
         requests:
@@ -31,7 +31,11 @@ tests:
       commands: |
         tee -a /tmp/run.log <<< "no-op begin step for startup timing test"
         date -u
+        pwd
         ls -latr ./ /tmp/
+        mkdir work
+        git clone https://github.com/"${REPO_OWNER}/${REPO_NAME}.git" --branch="$PULL_HEAD_REF" --revision="$PULL_PULL_SHA" work
+        cd work && ls -latr
       from: root
       resources:
         requests:
@@ -44,7 +48,7 @@ tests:
         tee -a /tmp/run.log <<< "no-op e2e step for startup timing test"
         date -u
         ls -latr ./ /tmp/
-        make tag
+        cd work && make tag
       from: root
       resources:
         requests:
