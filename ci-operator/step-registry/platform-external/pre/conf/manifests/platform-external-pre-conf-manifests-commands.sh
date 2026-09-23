@@ -258,14 +258,18 @@ install_jq
 # The diagnostic script, kept readable here and base64-encoded at step runtime.
 DEBUG_SCRIPT_B64="$(base64 -w0 << 'DEBUG_SCRIPT_EOF'
 #!/bin/bash
-exec > /dev/ttyS0 2>&1
+# Do NOT redirect to /dev/ttyS0 here: serial-getty@ttyS0 owns the tty once
+# multi-user is reached, so `exec > /dev/ttyS0` fails to open and the script
+# exits with no output (observed run 2102773345794658304: zero OPCT-DEBUG lines).
+# Output reaches serial via the unit's StandardOutput=tty/TTYPath instead, which
+# works even with getty active (proven by node-image-pull's own drop-in).
 echo "===== OPCT-DEBUG START $(date -u --rfc-3339=seconds) ====="
 echo "### ip addr ###"; ip -o addr 2>&1
 echo "### ip route ###"; ip route 2>&1
 echo "### resolv.conf ###"; cat /etc/resolv.conf 2>&1
 echo "### node-image-pull unit ###"; systemctl cat node-image-pull.service 2>&1
 echo "### node-image-pull props ###"; systemctl show node-image-pull.service -p After -p Before -p Requires -p Wants -p BindsTo -p Conditions -p ConditionResult -p AssertResult -p ExecStart -p ExecMainPID -p ActiveState -p SubState -p Result 2>&1
-U="node-image-pull.service release-image.service bootkube.service crio.service crio-configure.service kubelet.service machine-config-daemon-firstboot.service"
+U="release-image.service node-image-pull.service node-image-overlay.service node-image-finish.service bootkube.service crio.service crio-configure.service kubelet.service machine-config-daemon-firstboot.service"
 while true; do
   echo "===== OPCT-DEBUG $(date -u --rfc-3339=seconds) ====="
   for u in $U; do echo "unit $u: $(systemctl is-active $u 2>/dev/null)/$(systemctl show -p SubState --value $u 2>/dev/null) result=$(systemctl show -p Result --value $u 2>/dev/null)"; done
@@ -276,9 +280,13 @@ while true; do
   echo "### disk ###"; df -h / /var /run 2>&1
   echo "### registry ###"; for h in quay.io registry.ci.openshift.org; do echo "  $h: $(curl -sS -m 8 -o /dev/null -w %{http_code} https://$h/v2/ 2>&1)"; done
   echo "### dns ###"; getent hosts quay.io registry.ci.openshift.org 2>&1
-  echo "### journal release-image/bootkube/crio ###"; journalctl -u release-image.service -u bootkube.service -u crio.service -u crio-configure.service --no-pager --no-hostname -o short-precise 2>&1 | tail -40
+  # Context first (may scroll off the 64K serial ring); prime suspects LAST so
+  # they always survive in the final --latest window.
   echo "### journal boot tail ###"; journalctl -b --no-pager --no-hostname -o short-precise 2>&1 | tail -40
-  echo "### journal node-image-pull (full, last) ###"; journalctl -u node-image-pull.service --no-pager --no-hostname -o short-precise 2>&1 | tail -80
+  echo "### journal bootkube/crio ###"; journalctl -u bootkube.service -u crio.service -u crio-configure.service --no-pager --no-hostname -o short-precise 2>&1 | tail -40
+  echo "### issue.d release-image ###"; cat /etc/issue.d/50_release-image.issue 2>/dev/null || echo "(none)"
+  echo "### journal node-image-pull.service FULL ###"; journalctl -u node-image-pull.service --no-pager --no-hostname -o short-precise 2>&1 | tail -80
+  echo "### journal release-image.service FULL (PRIME SUSPECT: did podman pull of the override succeed?) — printed LAST ###"; journalctl -u release-image.service --no-pager --no-hostname -o short-precise 2>&1 | tail -120
   sleep 25
 done
 DEBUG_SCRIPT_EOF
@@ -297,6 +305,9 @@ Type=simple
 Restart=always
 RestartSec=10
 ExecStart=/usr/local/bin/opct-debug-console.sh
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/ttyS0
 
 [Install]
 WantedBy=multi-user.target
