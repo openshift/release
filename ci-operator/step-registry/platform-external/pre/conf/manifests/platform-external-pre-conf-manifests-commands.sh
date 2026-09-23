@@ -49,27 +49,36 @@ if [[ "$(dirname "$(dirname "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}")")" !=
 fi
 
 # EXPERIMENT (DO NOT MERGE, OPCT-486): resolve the release image to a pullspec the
-# EXTERNAL bootstrap node can actually pull.
+# EXTERNAL bootstrap node can actually pull by digest.
 #
-# node-image-pull.service on the bootstrap node pulls the release image by digest
-# from OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE, which the installer bakes into
+# node-image-pull.service on the bootstrap node pulls the release image from
+# OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE, which the installer bakes into
 # bootstrap.ign. In the upgrade job that override is the ci-operator build-farm
-# image (registry.build*.ci.openshift.org/ci-op-*/release@sha256:...), which the
-# real AWS bootstrap node cannot reach — the pull fails with "no such object" and
-# the API never comes up (confirmed run 2102722534163091456 via serial console).
+# image for `release:initial` (registry.build*.ci.openshift.org/ci-op-*/release@sha256:...).
+# The bootstrap node CAN reach that registry (the passing non-upgrade job pulls its
+# `release:latest` image from the same host), but the IMPORTED initial image's blobs
+# are not servable by digest from the integrated registry, so the external pull
+# fails with "no such object" and the API never comes up (confirmed run
+# 2102722534163091456 via serial console). The pipeline `release:latest` works
+# because ci-operator assembles it locally (blobs present); `release:initial` is
+# imported, so only a manifest reference exists.
 #
-# GA/candidate payloads are content-addressed, so the SAME manifest digest is also
-# published publicly at quay.io/openshift-release-dev/ocp-release@<digest>. Rewrite
-# the override to that public pullspec when the current one is a build-farm image
-# and the public pullspec is actually pullable.
+# Work around it by pointing the bootstrap at the ORIGINAL, externally-pullable
+# source for the same version: nightlies live at
+# registry.ci.openshift.org/ocp/release:<version>; GA/candidate at
+# quay.io/openshift-release-dev/ocp-release:<version>-x86_64. Guard on the candidate
+# actually being pullable before rewriting.
 if [[ "$(dirname "$(dirname "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}")")" != "quay.io" ]]; then
-  REL_DIGEST="$(oc adm release info -a "${PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.digest}' 2>/dev/null || true)"
-  if [[ -z "${REL_DIGEST}" && "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" == *@sha256:* ]]; then
-    REL_DIGEST="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE##*@}"
+  REL_VERSION="$(oc adm release info -a "${PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}' 2>/dev/null || true)"
+  log "EXPERIMENT: build-farm override ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}, version=${REL_VERSION:-<unknown>}"
+  PUBLIC_RELEASE=""
+  if [[ "${REL_VERSION}" == *nightly* || "${REL_VERSION}" == *"-0.ci"* ]]; then
+    PUBLIC_RELEASE="registry.ci.openshift.org/ocp/release:${REL_VERSION}"
+  elif [[ "${REL_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+    PUBLIC_RELEASE="quay.io/openshift-release-dev/ocp-release:${REL_VERSION}-x86_64"
   fi
-  if [[ "${REL_DIGEST}" == sha256:* ]]; then
-    PUBLIC_RELEASE="quay.io/openshift-release-dev/ocp-release@${REL_DIGEST}"
-    log "EXPERIMENT: build-farm override ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}; probing public ${PUBLIC_RELEASE}"
+  if [[ -n "${PUBLIC_RELEASE}" ]]; then
+    log "EXPERIMENT: probing public pullspec ${PUBLIC_RELEASE}"
     if oc adm release info -a "${PULL_SECRET}" "${PUBLIC_RELEASE}" >/dev/null 2>&1; then
       log "EXPERIMENT: public pullspec is pullable; rewriting override to ${PUBLIC_RELEASE}"
       export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${PUBLIC_RELEASE}"
@@ -78,7 +87,7 @@ if [[ "$(dirname "$(dirname "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}")")" !=
       log "EXPERIMENT: public pullspec NOT pullable; leaving override unchanged"
     fi
   else
-    log "EXPERIMENT: could not resolve a sha256 digest; leaving override unchanged"
+    log "EXPERIMENT: could not derive a public pullspec from version; leaving override unchanged"
   fi
 fi
 
