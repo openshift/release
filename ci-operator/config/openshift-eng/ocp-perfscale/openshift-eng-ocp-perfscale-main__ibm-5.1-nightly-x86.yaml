@@ -10,7 +10,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: "5.1"
 resources:
   '*':
     requests:
@@ -52,6 +52,41 @@ tests:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+- as: control-plane-24nodes
+  cron: 0 7 * * 2,6
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "24"
+      BASE_DOMAIN: ibmcloud-perfscale.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency
+      COMPUTE_NODE_TYPE: bxf-16x64
+      CONTROL_PLANE_INSTANCE_TYPE: bx3d-24x120
+      DISK_NAME: vdb
+      ENABLE_LAYER_3: "false"
+      KB_FLAGS: --set=metricsEndpoints.0.step=2m --set=metricsEndpoints.1.step=2m
+        --local-indexing
+      NODE_DENSITY_GC: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: bxf-64x256
+      RESOURCE_GROUP: ocp-cpt
+      SET_ENV_BY_PLATFORM: custom
+      UDN_ITERATION_MULTIPLIER: "1"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
 - as: control-plane-120nodes
   cron: 0 6 * * 2,6
   reporter_config:
@@ -68,7 +103,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-perfscale
     env:
-      ADDITIONAL_WORKER_NODES: "117"
+      ADDITIONAL_WORKER_NODES: "120"
       BASE_DOMAIN: ibmcloud-perfscale.devcluster.openshift.com
       CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency
       COMPUTE_NODE_TYPE: bxf-16x64
@@ -123,7 +158,7 @@ tests:
       RUN_ORION: deferred
       SET_ENV_BY_PLATFORM: custom
       UDN_ITERATION_MULTIPLIER: "12"
-      VERSION: "5.0"
+      VERSION: "5.1"
       WORKER_POD_DISK_NAME: vdb
       ZONES_COUNT: "3"
     test:
@@ -135,4 +170,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-perfscale
-  variant: ibm-5.0-nightly-x86
+  variant: ibm-5.1-nightly-x86
