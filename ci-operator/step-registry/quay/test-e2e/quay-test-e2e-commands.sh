@@ -64,9 +64,10 @@ else
 # The Playwright suite is cloned from PLAYWRIGHT_GIT_REPO at a ref resolved in this
 # order (first match wins):
 #   1. PLAYWRIGHT_GIT_BRANCH        - explicit override from the ci-operator config.
-#   2. ${SHARED_DIR}/playwright_git_ref - commit auto-derived by the deploy step from
-#      the deployed Quay app image's source-commit label, so the suite is version-
-#      matched to the product with no manual upkeep.
+#   2. ${SHARED_DIR}/playwright_git_ref - ref auto-derived by the deploy step from the
+#      deployed Quay app image's version/release labels (the upstream vX.Y.Z tag when
+#      one matches, otherwise the redhat-X.Y branch), so the suite is version-matched
+#      to the product with no manual upkeep.
 #   3. PLAYWRIGHT_GIT_FALLBACK_BRANCH - last-resort branch so the run still executes
 #      (with a warning) instead of hard-failing when nothing else is available.
 # PLAYWRIGHT_GIT_REPO stays required. The resolved ref may be a branch, tag, or commit
@@ -78,11 +79,13 @@ if [[ -z "${PLAYWRIGHT_GIT_REPO}" ]]; then
   echo "ERROR: PLAYWRIGHT_GIT_REPO must be set" >&2
   exit 1
 fi
+PLAYWRIGHT_REF_IS_DERIVED=false
 if [[ -n "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
   PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_BRANCH}"
   echo "Using explicitly configured Playwright ref: ${PLAYWRIGHT_GIT_REF}"
 elif [[ -s "${SHARED_DIR}/playwright_git_ref" ]]; then
   PLAYWRIGHT_GIT_REF="$(cat "${SHARED_DIR}/playwright_git_ref")"
+  PLAYWRIGHT_REF_IS_DERIVED=true
   echo "Using Playwright ref auto-derived from the deployed image: ${PLAYWRIGHT_GIT_REF}"
 else
   PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
@@ -107,7 +110,10 @@ clone_playwright_sources() {
     if [[ "${ref}" =~ ^[0-9a-f]{40}$ ]]; then
       git init -q "${dest}"
       git -C "${dest}" remote add origin "${repo}"
-      git -C "${dest}" fetch --depth 1 origin "${ref}"
+      # The commit a product image was built from is not guaranteed to exist in
+      # ${repo}; return non-zero so the caller can fall back to a branch rather
+      # than failing the whole e2e run on an unfetchable derived ref.
+      git -C "${dest}" fetch --depth 1 origin "${ref}" || return 1
       git -C "${dest}" checkout -q FETCH_HEAD
     else
       git clone --depth 1 --branch "${ref}" "${repo}" "${dest}"
@@ -129,14 +135,23 @@ clone_playwright_sources() {
   else
     echo "ERROR: failed to download ${repo} at ${ref}" >&2
     rm -f "${archive}"
-    exit 1
+    return 1
   fi
   tar -xzf "${archive}" --strip-components=1 -C "${dest}"
   rm -f "${archive}"
 }
 
 echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (ref ${PLAYWRIGHT_GIT_REF})"
-clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
+if ! clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"; then
+  if [[ "${PLAYWRIGHT_REF_IS_DERIVED}" != true ]]; then
+    echo "ERROR: failed to clone ${PLAYWRIGHT_GIT_REPO} at ${PLAYWRIGHT_GIT_REF}" >&2
+    exit 1
+  fi
+  echo "WARNING: derived ref ${PLAYWRIGHT_GIT_REF} is not present in ${PLAYWRIGHT_GIT_REPO};" >&2
+  echo "         falling back to branch ${PLAYWRIGHT_GIT_FALLBACK_BRANCH}" >&2
+  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
+  clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
+fi
 PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
 if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
   echo "ERROR: cloned sources have no web/ directory at ${PLAYWRIGHT_WORKDIR}" >&2
