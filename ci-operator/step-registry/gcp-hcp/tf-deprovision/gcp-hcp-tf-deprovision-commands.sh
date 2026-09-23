@@ -73,9 +73,23 @@ export PATH="/tmp:${PATH}"
 cd "${REPO_ROOT}"  # gcp-hcp-infra repo root (from: src)
 
 REGION="${GCP_REGION:-us-central1}"
+TESTED_SHA_PATH="${SHARED_DIR}/gcp-hcp-tested-sha"
+
+if [[ ! -s "${TESTED_SHA_PATH}" ]]; then
+  log "ERROR: Tested gcp-hcp-infra SHA is missing or empty: ${TESTED_SHA_PATH}"
+  log "Auto-destroy will clean up resources in 24h"
+  exit 0  # Don't fail job
+fi
+GIT_REVISION="$(<"${TESTED_SHA_PATH}")"
+
+if [[ ! "${GIT_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+  log "ERROR: Tested gcp-hcp-infra SHA is not a full lowercase Git SHA"
+  log "Auto-destroy will clean up resources in 24h"
+  exit 0  # Don't fail job
+fi
 
 log "Re-rendering template for run ID: ${RUN_ID}"
-RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}")"
+RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}" "${GIT_REVISION}")"
 
 if [[ ! -d "${RENDERED_DIR}" ]]; then
   log "ERROR: Render script failed - directory not created"

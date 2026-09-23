@@ -2770,37 +2770,6 @@ tests:
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
-- as: opct-platform-external-aws-ccm
-  cron: '@monthly'
-  reporter_config:
-    channel: '#forum-opct-updates'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: |
-      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      OPCT_CLI_IMAGE: quay.io/opct/opct:latest
-      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
-    workflow: opct-conformance-external-aws
-  timeout: 6h0m0s
-- as: opct-platform-external-aws
-  cron: '@monthly'
-  reporter_config:
-    channel: '#forum-opct-updates'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: |
-      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      OPCT_CLI_IMAGE: quay.io/opct/opct:latest
-    workflow: opct-conformance-external-aws
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-kube-apiserver-rollout
   interval: 168h
   steps:
@@ -2943,7 +2912,12 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     env:
-      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
+      AZURE_MULTIDISK_COMPUTE_DISKS: |
+        user-defined:containers:32:0:Premium_LRS:/var/lib/containers
+        user-defined:kubelet:16:1:StandardSSD_LRS:/var/lib/kubelet
+      AZURE_MULTIDISK_CONTROL_PLANE_DISKS: |
+        etcd:etcddisk:64:0:Premium_LRS:
+        user-defined:containers:32:1:StandardSSD_LRS:/var/lib/containers
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:

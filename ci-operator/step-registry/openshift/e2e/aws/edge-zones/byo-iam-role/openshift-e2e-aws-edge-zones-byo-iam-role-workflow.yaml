@@ -1,0 +1,35 @@
+workflow:
+  as: openshift-e2e-aws-edge-zones-byo-iam-role
+  steps:
+    leases:
+    - resource_type: aws-edge-zones-quota-slice
+      env: LEASED_RESOURCE
+    pre:
+    - ref: ipi-aws-pre-edge-zones-opt-in
+    - ref: aws-provision-iam-role
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-byo-iam-role
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - ref: ipi-aws-pre-edge-zones-csi-default
+    test:
+    - ref: aws-verify-iam-role
+    - ref: openshift-e2e-test
+    - ref: edge-nodes-deploy-app
+    post:
+    - chain: ipi-aws-post
+    - ref: aws-deprovision-iam-role
+    env:
+      AWS_EDGE_POOL_ENABLED: "yes"
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      EDGE_ZONE_TYPES: "local-zone"
+      PROVISION_EDGE_IAM_ROLE: "yes"
+      ENABLE_BYO_IAM_ROLE_EDGE: "true"
+  documentation: |-
+    The E2E AWS edge zones BYO IAM role workflow executes the common end-to-end test
+    suite with OVNKubernetes network plugin on an AWS cluster whose compute nodes
+    extend to AWS edge zones, using bring-your-own (BYO) IAM roles for the control
+    plane, compute, and edge compute pools. By default only AWS Local Zones are used;
+    set EDGE_ZONE_TYPES (e.g. "local-zone,wavelength-zone") at the job level to also
+    include AWS Wavelength Zones.

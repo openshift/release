@@ -37,7 +37,41 @@ function cleanup_vpc()
     local vpc_id=$1
     echo "Cleaning up VPC ${vpc_id} dependencies ..."
 
+    local nat_ids
+    nat_ids=$(aws --region "$REGION" ec2 describe-nat-gateways \
+        --filter "Name=vpc-id,Values=${vpc_id}" \
+        --query "NatGateways[?State!='deleted'].NatGatewayId" --output text 2>/dev/null)
+    for nat_id in ${nat_ids}; do
+        echo "  Deleting NAT gateway ${nat_id} ..."
+        aws --region "$REGION" ec2 delete-nat-gateway --nat-gateway-id "${nat_id}" 2>/dev/null || true
+        aws --region "$REGION" ec2 wait nat-gateway-deleted --nat-gateway-ids "${nat_id}" 2>/dev/null || true
+    done
+
+    local rt_ids
+    rt_ids=$(aws --region "$REGION" ec2 describe-route-tables \
+        --filters "Name=vpc-id,Values=${vpc_id}" \
+        --query "RouteTables[?Associations[?Main!=\`true\`] || !Associations].RouteTableId" --output text 2>/dev/null)
+    for rt_id in ${rt_ids}; do
+        local rt_assocs
+        rt_assocs=$(aws --region "$REGION" ec2 describe-route-tables \
+            --route-table-ids "${rt_id}" \
+            --query "RouteTables[0].Associations[?Main==\`false\`].RouteTableAssociationId" --output text 2>/dev/null)
+        for assoc in ${rt_assocs}; do
+            aws --region "$REGION" ec2 disassociate-route-table --association-id "${assoc}" 2>/dev/null || true
+        done
+        aws --region "$REGION" ec2 delete-route-table --route-table-id "${rt_id}" 2>/dev/null || true
+    done
+
     delete_enis "vpc-id" "${vpc_id}"
+
+    local sg_ids
+    sg_ids=$(aws --region "$REGION" ec2 describe-security-groups \
+        --filters "Name=vpc-id,Values=${vpc_id}" \
+        --query "SecurityGroups[?GroupName!='default'].GroupId" --output text 2>/dev/null)
+    for sg_id in ${sg_ids}; do
+        echo "  Deleting security group ${sg_id} ..."
+        aws --region "$REGION" ec2 delete-security-group --group-id "${sg_id}" 2>/dev/null || true
+    done
 
     local subnet_ids
     subnet_ids=$(aws --region "$REGION" ec2 describe-subnets \
@@ -56,40 +90,6 @@ function cleanup_vpc()
         echo "  Detaching and deleting IGW ${igw_id} ..."
         aws --region "$REGION" ec2 detach-internet-gateway --internet-gateway-id "${igw_id}" --vpc-id "${vpc_id}" 2>/dev/null || true
         aws --region "$REGION" ec2 delete-internet-gateway --internet-gateway-id "${igw_id}" 2>/dev/null || true
-    done
-
-    local nat_ids
-    nat_ids=$(aws --region "$REGION" ec2 describe-nat-gateways \
-        --filter "Name=vpc-id,Values=${vpc_id}" \
-        --query "NatGateways[?State!='deleted'].NatGatewayId" --output text 2>/dev/null)
-    for nat_id in ${nat_ids}; do
-        echo "  Deleting NAT gateway ${nat_id} ..."
-        aws --region "$REGION" ec2 delete-nat-gateway --nat-gateway-id "${nat_id}" 2>/dev/null || true
-        aws --region "$REGION" ec2 wait nat-gateway-deleted --nat-gateway-ids "${nat_id}" 2>/dev/null || true
-    done
-
-    local sg_ids
-    sg_ids=$(aws --region "$REGION" ec2 describe-security-groups \
-        --filters "Name=vpc-id,Values=${vpc_id}" \
-        --query "SecurityGroups[?GroupName!='default'].GroupId" --output text 2>/dev/null)
-    for sg_id in ${sg_ids}; do
-        echo "  Deleting security group ${sg_id} ..."
-        aws --region "$REGION" ec2 delete-security-group --group-id "${sg_id}" 2>/dev/null || true
-    done
-
-    local rt_ids
-    rt_ids=$(aws --region "$REGION" ec2 describe-route-tables \
-        --filters "Name=vpc-id,Values=${vpc_id}" \
-        --query "RouteTables[?Associations[?Main!=\`true\`] || !Associations].RouteTableId" --output text 2>/dev/null)
-    for rt_id in ${rt_ids}; do
-        local rt_assocs
-        rt_assocs=$(aws --region "$REGION" ec2 describe-route-tables \
-            --route-table-ids "${rt_id}" \
-            --query "RouteTables[0].Associations[?Main==\`false\`].RouteTableAssociationId" --output text 2>/dev/null)
-        for assoc in ${rt_assocs}; do
-            aws --region "$REGION" ec2 disassociate-route-table --association-id "${assoc}" 2>/dev/null || true
-        done
-        aws --region "$REGION" ec2 delete-route-table --route-table-id "${rt_id}" 2>/dev/null || true
     done
 
     aws --region "$REGION" ec2 delete-vpc --vpc-id "${vpc_id}" 2>/dev/null || true

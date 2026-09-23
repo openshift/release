@@ -113,6 +113,38 @@ yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.digest = \"${EXPORTER_DIGEST}\"
 " > "${OVERRIDE_CONFIG_FILE}"
 
+# Reuse one stable certificate set per exclusive DEV E2E slot instead of
+# accumulating certificates named after Prow build IDs.
+if [[ "${DEPLOY_ENV}" == "ci00" || "${DEPLOY_ENV}" == "ci01" ]]; then
+  : "${ARO_HCP_E2E_SLOT_NAME:?DEV E2E provisioning requires ARO_HCP_E2E_SLOT_NAME}"
+  if [[ ! "${ARO_HCP_E2E_SLOT_NAME}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]; then
+    echo "ERROR: ARO_HCP_E2E_SLOT_NAME must be a lowercase DNS label, got '${ARO_HCP_E2E_SLOT_NAME}'"
+    exit 1
+  fi
+  if (( ${#ARO_HCP_E2E_SLOT_NAME} > 41 )); then
+    echo "ERROR: ARO_HCP_E2E_SLOT_NAME is too long for the certificate DNS labels"
+    exit 1
+  fi
+
+  export CERTIFICATE_SLOT_NAME="${ARO_HCP_E2E_SLOT_NAME}"
+  yq -i "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.dns.regionalSubdomain = strenv(CERTIFICATE_SLOT_NAME) |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.cert.name = \"frontend-cert-${DEPLOY_ENV}-\" + strenv(CERTIFICATE_SLOT_NAME) |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.cert.san = \"rp.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.cert.name = \"admin-api-cert-${DEPLOY_ENV}-\" + strenv(CERTIFICATE_SLOT_NAME) |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.cert.san = \"admin.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.cert.name = \"sessiongate-cert-${DEPLOY_ENV}-\" + strenv(CERTIFICATE_SLOT_NAME) |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.cert.san = \"sessiongate.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.server.mqttClientName = \"maestro-server-\" + strenv(CERTIFICATE_SLOT_NAME) |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.server.certSAN = \"maestro-server-\" + strenv(CERTIFICATE_SLOT_NAME) + \".maestro.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.server.certCN = \"server.maestro.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.agent.consumerName = \"hcp-underlay-\" + strenv(CERTIFICATE_SLOT_NAME) + \"-mgmt-{{ .ctx.stamp }}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.agent.certSAN = \"hcp-underlay-\" + strenv(CERTIFICATE_SLOT_NAME) + \"-mgmt-{{ .ctx.stamp }}.maestro.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.maestro.agent.certCN = \"mgmt-{{ .ctx.stamp }}.maestro.\" + strenv(CERTIFICATE_SLOT_NAME) + \".hcpsvc.osadev.cloud\"
+  " "${OVERRIDE_CONFIG_FILE}"
+  unset CERTIFICATE_SLOT_NAME
+fi
+
 # MSI mock SP overrides (if provided)
 if [[ -n "${LEASED_MSI_MOCK_SP:-}" ]]; then
   MSI_MOCK_CLIENT_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".clientId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)

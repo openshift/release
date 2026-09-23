@@ -1,3 +1,6 @@
-# ci-operator-configresolver
+# ci-operator-configresolver (app.ci remnant)
 
-This directory contains the manifests required to run the ci-operator-configresolver in the CI cluster.
+Public traffic lives on **core-ci** (`config.ci` / `steps.ci`).
+
+This directory keeps only the ServiceAccount and `ocp-priv` Role/RoleBinding.
+core-ci mounts `sa.ci-operator-configresolver.app.ci.config` for `/integratedStream`.
