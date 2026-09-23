@@ -32,6 +32,7 @@ class AWS:  # pylint: disable=too-many-instance-attributes
         self.tags = []
         self.fail = None
         self.transient = {}
+        self.no_tag_set = False
         self.pages = {}
 
     def __getattr__(self, name):
@@ -51,6 +52,8 @@ class AWS:  # pylint: disable=too-many-instance-attributes
             if name == 'put_bucket_tagging':
                 self.tags = kwargs['Tagging']['TagSet']
             if name == 'get_bucket_tagging':
+                if self.no_tag_set:
+                    raise ClientError('NoSuchTagSet')
                 return {'TagSet': self.tags}
             if name == 'create_role':
                 self.role = {'Arn': f'arn:aws:iam::{self.account}:role/' + kwargs['RoleName'],
@@ -199,6 +202,15 @@ class Tests(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
         self.aws.fail = None
         self.execute('cleanup')
         self.assertIn('delete_role', self.names())
+        self.assertIn('delete_bucket', self.names())
+
+    def test_bucket_without_tag_set_is_cleaned_up(self):
+        self.aws.fail = 'put_bucket_tagging'
+        with self.assertRaises(ClientError):
+            self.execute('provision')
+        self.aws.fail = None
+        self.aws.no_tag_set = True
+        self.execute('cleanup')
         self.assertIn('delete_bucket', self.names())
 
     def test_iam_eventual_consistency_is_retried(self):

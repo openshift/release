@@ -73,9 +73,15 @@ if state['role_created']:
 if state['bucket_created']:
     try:
         s3.head_bucket(Bucket=state['bucket'], ExpectedBucketOwner=state['account'])
-        tags = s3.get_bucket_tagging(
-            Bucket=state['bucket'], ExpectedBucketOwner=state['account'])['TagSet']
-        if {'Key': 'quay-sts-run', 'Value': state['run_id']} not in tags:
+        try:
+            tags = s3.get_bucket_tagging(
+                Bucket=state['bucket'], ExpectedBucketOwner=state['account'])['TagSet']
+        except ClientError as error:
+            if error.response['Error']['Code'] != 'NoSuchTagSet':
+                raise
+            tags = None
+        if (tags is not None and
+                {'Key': 'quay-sts-run', 'Value': state['run_id']} not in tags):
             raise RuntimeError('Bucket ownership tag mismatch')
         for page in s3.get_paginator('list_multipart_uploads').paginate(Bucket=state['bucket']):
             for upload in page.get('Uploads', []):
