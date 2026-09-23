@@ -14,7 +14,7 @@ case "${LOKI_INSTALL_MODE}" in
   installer-manifests)
     LOKI_MANIFEST_DIR="${SHARED_DIR}"
     ;;
-  guest-cluster)
+  guest-cluster|guest-cluster-multi)
     LOKI_MANIFEST_DIR="${SHARED_DIR}/hosted-loki-manifests"
     mkdir -p "${LOKI_MANIFEST_DIR}"
     rm -f "${LOKI_MANIFEST_DIR}"/manifest_*.yml "${LOKI_MANIFEST_DIR}"/manifest_*.yaml
@@ -60,7 +60,7 @@ export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-export
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
-if [[ "${LOKI_INSTALL_MODE}" == "guest-cluster" ]]; then
+if [[ "${LOKI_INSTALL_MODE}" == "guest-cluster" || "${LOKI_INSTALL_MODE}" == "guest-cluster-multi" ]]; then
   export OPENSHIFT_INSTALL_INVOKER="${OPENSHIFT_INSTALL_INVOKER}/hosted"
 fi
 
@@ -783,22 +783,64 @@ spec:
       app: event-exporter
 EOF
 
-if [[ "${LOKI_INSTALL_MODE}" == "guest-cluster" ]]; then
-  GUEST_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-  if [[ ! -s "${GUEST_KUBECONFIG}" ]]; then
-    echo "Guest cluster kubeconfig not found at ${GUEST_KUBECONFIG}" >&2
-    exit 1
-  fi
+apply_loki_manifests() {
+  local guest_kubeconfig="$1"
 
-  echo "Applying Loki manifests to the guest cluster using ${GUEST_KUBECONFIG}"
-  oc --kubeconfig="${GUEST_KUBECONFIG}" apply -f "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml"
+  echo "Applying Loki manifests to the guest cluster using ${guest_kubeconfig}"
+  oc --kubeconfig="${guest_kubeconfig}" apply -f "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml"
   for manifest in "${LOKI_MANIFEST_DIR}"/manifest_*.yml "${LOKI_MANIFEST_DIR}"/manifest_*.yaml; do
     [[ "${manifest}" == "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml" ]] && continue
     [[ -f "${manifest}" ]] || continue
-    oc --kubeconfig="${GUEST_KUBECONFIG}" apply -f "${manifest}"
+    oc --kubeconfig="${guest_kubeconfig}" apply -f "${manifest}"
   done
+}
 
-  echo "Loki manifests applied to the guest cluster; Promtail will start when eligible nodes become ready."
+case "${LOKI_INSTALL_MODE}" in
+  guest-cluster)
+    GUEST_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+    if [[ ! -s "${GUEST_KUBECONFIG}" ]]; then
+      echo "Guest cluster kubeconfig not found at ${GUEST_KUBECONFIG}" >&2
+      exit 1
+    fi
+    apply_loki_manifests "${GUEST_KUBECONFIG}"
+    ;;
+  guest-cluster-multi)
+    CLUSTER_MANIFEST="${SHARED_DIR}/cluster-manifests.json"
+    if [[ ! -s "${CLUSTER_MANIFEST}" ]]; then
+      echo "Cluster manifest not found at ${CLUSTER_MANIFEST}" >&2
+      exit 1
+    fi
+    if ! jq -e '.clusters | type == "array" and length > 0' "${CLUSTER_MANIFEST}" >/dev/null; then
+      echo "Cluster manifest does not contain a non-empty clusters array: ${CLUSTER_MANIFEST}" >&2
+      exit 1
+    fi
+
+    guest_count=0
+    while IFS= read -r cluster_name; do
+      if [[ -z "${cluster_name}" ]]; then
+        echo "Cluster manifest contains an entry without a name" >&2
+        exit 1
+      fi
+
+      GUEST_KUBECONFIG="${SHARED_DIR}/${cluster_name}_kubeconfig"
+      if [[ ! -s "${GUEST_KUBECONFIG}" ]]; then
+        echo "Guest cluster kubeconfig not found at ${GUEST_KUBECONFIG}" >&2
+        exit 1
+      fi
+
+      apply_loki_manifests "${GUEST_KUBECONFIG}"
+      guest_count=$((guest_count + 1))
+    done < <(jq -r '.clusters[] | .name' "${CLUSTER_MANIFEST}")
+
+    if (( guest_count == 0 )); then
+      echo "No hosted clusters found in ${CLUSTER_MANIFEST}" >&2
+      exit 1
+    fi
+    ;;
+esac
+
+if [[ "${LOKI_INSTALL_MODE}" == "guest-cluster" || "${LOKI_INSTALL_MODE}" == "guest-cluster-multi" ]]; then
+  echo "Loki manifests applied to the guest cluster(s); Promtail will start when eligible nodes become ready."
 fi
 
 echo "Promtail configuration prepared, the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${OPENSHIFT_INSTALL_INVOKER}\"} | unpack' query. See https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8 for Loki cheat sheet."
