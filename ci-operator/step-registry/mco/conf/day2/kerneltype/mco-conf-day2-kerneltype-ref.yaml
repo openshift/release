@@ -1,0 +1,30 @@
+ref:
+  as: mco-conf-day2-kerneltype
+  from: cli
+  commands: mco-conf-day2-kerneltype-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: MCO_CONF_DAY2_INSTALL_KERNEL_MCPS
+      default: "worker"
+      documentation: |
+        Space-separated list containing the names of the MachineConfigPools
+        where the kerneltype will be installed
+    - name: MCO_CONF_DAY2_INSTALL_KERNEL_TYPE
+      default: ""
+      documentation: |
+        Name of the kerneltype that will be installed. Allowed values ['realtime', '64k-pages']
+        * 'realtime' - Install real time kernel
+        * '64k-pages' - Install huge pages kernel
+        If the value is empty, no MachineConfig will be created and this step will be skipped
+    - name: MCO_CONF_DAY2_INSTALL_KERNEL_TIMEOUT
+      default: "20m"
+      documentation: |
+        Maximum time that we will wait for a single pool to be updated with the new kernel.
+        The default 20m value is valid for pools with 2 or 3 workers.
+        If we need to install the kernel in pools with more workers or in master pool we should increase its value.
+  documentation: |-
+    This step creates new MachineConfig resources in order to install a new kerneltype in the 
+    given MachineConfigPools and waits for the configuration to be applied

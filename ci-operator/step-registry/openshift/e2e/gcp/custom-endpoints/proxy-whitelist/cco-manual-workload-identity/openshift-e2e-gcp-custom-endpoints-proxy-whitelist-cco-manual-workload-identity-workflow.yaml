@@ -1,0 +1,34 @@
+workflow:
+  as: openshift-e2e-gcp-custom-endpoints-proxy-whitelist-cco-manual-workload-identity
+  steps:
+    pre:
+    - ref: gcp-provision-minimal-permission
+    - ref: gcp-provision-vpc
+    - ref: gcp-provision-custom-endpoints
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - chain: proxy-whitelist-gcp
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-proxy
+    - ref: ipi-conf-gcp-custom-endpoints
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-gcp-oidc-creds-provision
+    - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install-in-bastion
+    - ref: ipi-install-times-collection
+    - ref: nodes-readiness
+    - ref: multiarch-validate-nodes
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-gcp-credentials-mode
+    post:
+    - ref: ipi-deprovision-deprovision-in-bastion
+    - ref: gather-proxy
+    - ref: gcp-deprovision-custom-endpoints
+    - ref: gcp-deprovision-bastionhost
+    - ref: gcp-deprovision-vpc
+    - ref: ipi-conf-gcp-oidc-creds-deprovision
+  documentation: |-
+    The Openshift E2E Cilium workflow executes the common end-to-end test suite with a disconnected cluster using custom endpoints configuration.

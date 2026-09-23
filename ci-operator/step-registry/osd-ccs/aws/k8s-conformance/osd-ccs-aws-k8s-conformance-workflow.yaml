@@ -1,0 +1,22 @@
+workflow:
+  as: osd-ccs-aws-k8s-conformance
+  steps:
+    env:
+      COMPUTE_MACHINE_TYPE: "m5.xlarge"
+      MULTI_AZ: "true"
+      COMPUTE_NODES: "4"
+      ETCD_ENCRYPTION: "true"
+      DISABLE_WORKLOAD_MONITORING: "false"
+    pre:
+    - ref: osd-ccs-cluster-provision-aws
+    - ref: osd-ccs-conf-idp-htpasswd
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: osd-ccs-cluster-operators-wait-ready
+    test:
+    - ref: openshift-k8s-conformance
+    post:
+    - chain: gather
+    - ref: osd-ccs-cluster-deprovision
+  documentation: |-
+    Provisions an OSD AWS cluster and runs the CNCF Kubernetes conformance
+    test suite. Generates results suitable for k8s-conformance submissions.

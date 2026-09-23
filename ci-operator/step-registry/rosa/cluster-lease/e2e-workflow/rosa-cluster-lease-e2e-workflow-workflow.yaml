@@ -1,0 +1,40 @@
+workflow:
+  as: rosa-cluster-lease-e2e-workflow
+  steps:
+    env:
+      OCM_LOGIN_ENV: staging
+      LEASE_TYPE: classic-sts
+    pre:
+      - ref: rosa-cluster-lease-checkout
+      - ref: rosa-operator-install
+    test:
+      - ref: rosa-operator-e2e
+    post:
+      - ref: rosa-operator-cleanup
+      - ref: rosa-cluster-lease-checkin
+  documentation: |-
+    Checks out a pre-provisioned ROSA cluster from the lease inventory,
+    installs an operator via PKO ClusterPackage, runs the operator e2e
+    tests, cleans up, then returns the cluster to the inventory.
+
+    This is the lease-based variant of rosa-operator-e2e-workflow. Instead
+    of provisioning an ephemeral cluster (30+ min), it checks out a
+    pre-provisioned cluster (~1 min) and returns it after testing.
+
+    Required env vars per operator:
+      OPERATOR_NAME: short name (e.g. route-monitor-operator)
+
+    Optional overrides:
+      OPERATOR_DEPLOYMENT_NAME: defaults to OPERATOR_NAME
+      OPERATOR_NAMESPACE: defaults to openshift-OPERATOR_NAME
+      OPERATOR_CRDS: comma-separated CRDs to preserve across reinstall
+      GINKGO_FOCUS: filter to specific test suite
+      LEASE_TYPE: cluster type filter (default: classic-sts)
+      LEASE_ENV: OCM environment filter (e.g. integration, staging; default: any)
+      LEASE_REGION: region filter (default: any)
+      LEASE_VERSION: version filter (default: any)
+      LEASE_CHECKOUT_TIMEOUT_MINUTES: max wait time (default: 30)
+
+    Required dependencies:
+      OPERATOR_IMAGE: pipeline:<operator-image-name>
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko

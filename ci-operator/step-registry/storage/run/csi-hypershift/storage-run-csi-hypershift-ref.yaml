@@ -1,0 +1,57 @@
+ref:
+  as: storage-run-csi-hypershift
+  from: tests
+  grace_period: 10m
+  commands: storage-run-csi-hypershift-commands.sh
+  timeout: 14400s
+  env:
+  - name: TEST_ARGS
+    default: ""
+    documentation: Additional arguments to be passed to 'openshift-tests'.
+  - name: TEST_SUITE
+    default: openshift/csi
+    documentation: The test suite to run. Defaults to openshift/csi.
+  - name: TEST_SKIPS
+    default: ""
+    documentation: |
+      Regular expression (POSIX basic regular expression) of tests to skip.
+      It is suggested to test the regex to make sure that it matches with the available tests.
+      Tests can be listed by using 'openshift-tests run --dry-run (...)'.
+  - name: TEST_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      Name of the CSI driver manifest file to use. Used by the 'openshift-tests'
+      program as TEST_CSI_DRIVER_FILES env. var. The file must be present in ${SHARED_DIR}.
+  - name: TEST_OCP_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      Name of the OCP-specific CSI driver manifest file to use. Used by the 'openshift-tests'
+      program as TEST_OCP_CSI_DRIVER_FILES env. var. The file must be present in ${SHARED_DIR}.
+  - name: SKIP_MONITOR_TEST
+    default: ""
+    documentation: |-
+      If non-empty, ignores job failure caused by MonitorTest failures.
+      MonitorTest failures are expected on HyperShift guest clusters where some monitors
+      (machine watcher, cloud service availability checks) are not applicable.
+      All CSI test cases must still pass for the job to succeed.
+  - name: TEST_PROVIDER
+    default: ""
+    documentation: |-
+      The test provider JSON string passed to 'openshift-tests --provider'.
+      If not set, the platform is auto-detected from the guest cluster's Infrastructure object.
+      Examples:
+        '{"type":"azure"}'
+        '{"type":"aws","region":"us-east-1","zone":"us-east-1a","multizone":true,"multimaster":true}'
+  resources:
+    requests:
+      cpu: "3"
+      memory: 600Mi
+    limits:
+      memory: 10Gi
+  documentation: |-
+    Runs the openshift/csi end-to-end test suite on a HyperShift hosted (guest) cluster.
+    Unlike openshift-e2e-test, this step skips the machine/node count check, which is not
+    applicable to HyperShift guest clusters where Machine objects reside in the management
+    cluster namespace rather than the guest cluster.
+    TEST_PROVIDER is auto-detected from the guest cluster's Infrastructure status if not set,
+    making this step reusable across Azure, AWS, GCP, and other platforms.

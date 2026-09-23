@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-gcp-csi-image-snapshot
+  steps:
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: storage-conf-csi-gcp-pd
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-obj-check
+    - chain: ipi-gcp-post
+    env:
+      IMAGE_VOLUME_SNAPSHOT_MANIFEST: image-snapshot
+      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-pd.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-gcp-pd.yaml
+      TEST_SUITE: openshift/csi
+      # Limit to upstream-style snapshot tests; default e2e-gcp-csi covers the full openshift/csi suite.
+      TEST_ARGS: --run VolumeSnapshotDataSource
+  documentation: |-
+    Same topology as openshift-e2e-gcp-csi, using gcp-pd-csi-driver-operator test/e2e/image-snapshot-manifest.yaml
+    and openshift/csi with a narrow --run filter for snapshot-related tests only.
+    Periodics are configured only for release-4.22+ operator branches.
+    storage-conf uses IMAGE_VOLUME_SNAPSHOT_MANIFEST=image-snapshot to select these files.

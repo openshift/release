@@ -1,0 +1,15 @@
+workflow:
+  as: openshift-e2e-azure-csi-extended
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy-provision
+    test:
+    - ref: openshift-extended-test
+    post:
+    - chain: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy-deprovision
+    env:
+      TEST_SCENARIOS: '\[CSI-Driver\]|\[Azure-Disk-CSI-Driver\]'
+      TEST_FILTERS: "~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;~LSO&;STORAGE&"
+      FORCE_SUCCESS_EXIT: "no"
+  documentation: |-
+    The Openshift E2E Azure CSI extended workflow executes the `openshift csi extended end-to-end test suite` end-to-end test suite on Azure Disk CSI driver that was installed during cluster setup.

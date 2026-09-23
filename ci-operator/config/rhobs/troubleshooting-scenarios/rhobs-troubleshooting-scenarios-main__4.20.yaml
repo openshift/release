@@ -1,0 +1,67 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 4Gi
+tests:
+- as: troubleshooting-rhoai-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+      variant: gpu
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  cron: 10 8 * * 0
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: rhoai-test
+      cli: latest
+      commands: |
+        export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
+        export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/token)
+        export VLLM_API_KEY=$(cat /var/run/vllm/key)
+        export RHOAI_PROVISION=true
+
+        tests/scripts/test-troubleshooting-scenarios-rhoai.sh
+      credentials:
+      - collection: obsinta
+        group: obsinta-openai-apitoken
+        mount_path: /var/run/openai
+      - collection: obsinta
+        group: obsinta-huggingface-token
+        mount_path: /var/run/huggingface
+      - collection: obsinta
+        group: obsinta-vllm-api-key
+        mount_path: /var/run/vllm
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: troubleshooting-scenarios
+  variant: "4.20"

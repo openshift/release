@@ -1,0 +1,67 @@
+binary_build_commands: ./build.sh
+build_root:
+  project_image:
+    dockerfile_path: docker/Dockerfile.ci-operator-buildroot
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 250Mi
+tests:
+- as: all-packages
+  steps:
+    test:
+    - as: all-packages
+      commands: |
+        export CODECOV_TOKEN=$(cat /tmp/secret/SDK_CODECOV_TOKEN)
+        ./test.sh
+      credentials:
+      - collection: hac-core
+        group: deploy-tokens
+        mount_path: /tmp/secret
+      from: src
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: 100m
+          memory: 4Gi
+      timeout: 30m0s
+    - as: e2e
+      commands: ./test-prow-e2e.sh
+      from: src
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: 100m
+          memory: 4Gi
+      timeout: 30m0s
+- as: all-packages-coverage-upload
+  postsubmit: true
+  steps:
+    test:
+    - as: all-packages-coverage-upload
+      commands: |
+        export CODECOV_TOKEN=$(cat /tmp/secret/SDK_CODECOV_TOKEN)
+        ./test.sh
+      credentials:
+      - collection: hac-core
+        group: deploy-tokens
+        mount_path: /tmp/secret
+      from: src
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: 100m
+          memory: 250Mi
+      timeout: 30m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: dynamic-plugin-sdk

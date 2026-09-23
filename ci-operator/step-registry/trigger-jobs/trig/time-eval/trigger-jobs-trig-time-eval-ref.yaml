@@ -1,0 +1,30 @@
+ref:
+  as: trigger-jobs-trig-time-eval
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: trigger-jobs-trig-time-eval-commands.sh
+  env:
+  - name: JT__TRIG_JOB_LIST
+    documentation: |-
+      See documentation of this Env. Var. under the `trigger-jobs` Step.
+
+      JSON Schema for `trigCondPars`:
+      ```json
+      {
+        "trigCondFlag": "<file-name-to-indicate-the-trigger-condition-is-met>",  # File name only, no directory.
+        "datePars": ["<array-of-parameters-for-date-command>"],                  # See [README](README.md) for details.
+        "mathExpr": ["<array-of-arithmetic-expressions>"]                        # See [README](README.md) for details.
+      }
+      ```
+  - name: JT__TRIG_COND_EXEC_FLGS
+    documentation: |-
+      See documentation of this Env. Var. under the `trigger-jobs` Step.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Trigger condition Step to evaluates the given time condition and creates or deletes `${SHARED_DIR}/${trigCondFlag}`
+    for use by the `trigger-jobs` Step to conditionally trigger Jobs based on checking for its existence.

@@ -1,0 +1,31 @@
+ref:
+  as: telcov10n-functional-cnf-compute-nrop-create-network-policy
+  from: cli
+  cli: latest
+  commands: telcov10n-functional-cnf-compute-nrop-create-network-policy-commands.sh
+  env:
+  - name: SCAN_NAMESPACE
+    default: "openshift-numaresources"
+    documentation: "NROP namespace that hosts the pods to be scanned and where the NetworkPolicy is created."
+  - name: SCANNER_NAMESPACE
+    default: "tls-scanner"
+    documentation: "Namespace the TLS scanner pod runs in. Must match the scan step's namespace so its ingress is allowed."
+  - name: SCHEDULER_POD_LABEL_KEY
+    default: "app"
+    documentation: "Pod label key used to select the scheduler pods the scanner needs to reach."
+  - name: SCHEDULER_POD_LABEL_VALUE
+    default: "secondary-scheduler"
+    documentation: "Pod label value used to select the scheduler pods the scanner needs to reach."
+  - name: SCHEDULER_PORT
+    default: "10259"
+    documentation: "TCP port on the scheduler pods that the scanner connects to."
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 10m0s
+  documentation: |-
+    Creates an additive NetworkPolicy in the NROP namespace that allows the TLS
+    scanner namespace to reach the secondary scheduler pods on their metrics port,
+    so the TLS scanner can probe endpoints that are otherwise isolated by the
+    namespace's existing NetworkPolicy.

@@ -1,0 +1,34 @@
+#!/bin/bash
+set -o errexit
+set -o nounset
+set -o pipefail
+
+export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
+
+slot_manager_args=(
+    --deploy-env "${ARO_HCP_DEPLOY_ENV}"
+    --shared-dir "${SHARED_DIR}"
+)
+
+if [[ -n "${CLUSTER_PROFILE_DIRS:-}" ]]; then
+    slot_manager_args+=(--cluster-profile-dirs "${CLUSTER_PROFILE_DIRS}")
+fi
+
+effective_allowed_subscriptions="${MULTISTAGE_PARAM_OVERRIDE_ALLOWED_SUBSCRIPTIONS:-${ALLOWED_SUBSCRIPTIONS:-}}"
+if [[ -n "${effective_allowed_subscriptions}" ]]; then
+    slot_manager_args+=(--allowed-subscriptions "${effective_allowed_subscriptions}")
+fi
+
+if [[ -n "${ALLOWED_LOCATIONS:-}" ]]; then
+    slot_manager_args+=(--allowed-locations "${ALLOWED_LOCATIONS}")
+fi
+
+if [[ -n "${ARO_HCP_SLOT_MANAGER_MAX_WAIT_FOR_LEASE:-}" ]]; then
+    slot_manager_args+=(--max-wait-for-lease "${ARO_HCP_SLOT_MANAGER_MAX_WAIT_FOR_LEASE}")
+fi
+
+if [[ -n "${ARO_HCP_SLOT_MANAGER_LEASE_WAIT_INTERVAL:-}" ]]; then
+    slot_manager_args+=(--lease-wait-interval "${ARO_HCP_SLOT_MANAGER_LEASE_WAIT_INTERVAL}")
+fi
+
+./test/aro-hcp-tests slot-manager acquire "${slot_manager_args[@]}"

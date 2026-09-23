@@ -1,0 +1,174 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=101
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
+
+if [ ! -f "${SHARED_DIR}/user_tags_sa.json" ]; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to find the key file of the IAM service-account for userTags testing on GCP."
+  exit 1
+fi
+
+# release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines 
+# release:initial image, once that, use 'oc get istag release:inital' to workaround it.
+echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
+if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
+  tmp_release_image_initial=${RELEASE_IMAGE_INITIAL}
+  echo "Getting inital release image from RELEASE_IMAGE_INITIAL..."
+elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
+  tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
+  echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
+fi
+# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and 
+# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has 
+# higher priority than RELEASE_IMAGE_LATEST
+TESTING_RELEASE_IMAGE=""
+if [[ -n ${tmp_release_image_initial:-} ]]; then
+  TESTING_RELEASE_IMAGE=${tmp_release_image_initial}
+else
+  TESTING_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
+fi
+echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
+
+if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
+  export KUBECONFIG=${SHARED_DIR}/kubeconfig
+fi
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+INFRA_ID="$(oc get infrastructures.config.openshift.io cluster -o jsonpath='{.status.infrastructureName}')"
+GCP_REGION="${LEASED_RESOURCE}"
+
+GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+export GCP_SHARED_CREDENTIALS_FILE="${SHARED_DIR}/user_tags_sa.json"
+sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
+if ! gcloud auth list | grep -E "\*\s+${sa_email}"
+then
+  gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+  gcloud config set project "${GOOGLE_PROJECT_ID}"
+fi
+
+validation_result_file=$(mktemp)
+current_tags_file=$(mktemp)
+
+# User-defined tags validation. It will check if each user-defined tag is applied. 
+# Return non-zero is one or more user-defined tag absent. 
+function validate_user_tags() {
+  local cnt=0 a_tag_value
+  echo "" > "${validation_result_file}"
+  printf '%s' "${USER_TAGS:-}" | while read -r PARENT KEY VALUE || [ -n "${PARENT}" ]
+  do
+    a_tag_value="namespacedTagValue: ${PARENT}/${KEY}/${VALUE}"
+    cnt=$(( $cnt + 1 ))
+    if grep -Fq "${a_tag_value}" "${current_tags_file}"; then
+      echo "$(date -u --rfc-3339=seconds) - Found tag ${cnt} '${a_tag_value}' (PARENT/KEY/VALUE)."
+      echo 0 >> "${validation_result_file}"
+      continue
+    else
+      echo "$(date -u --rfc-3339=seconds) - Failed to find ${cnt} tag '${a_tag_value}' (PARENT/KEY/VALUE)."
+      echo 1 >> "${validation_result_file}"
+    fi
+  done
+}
+
+# Get OCP version for checking
+function get_ocp_version() {
+  local dir
+  dir=$(mktemp -d)
+  pushd "${dir}" > /dev/null
+
+  cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
+  KUBECONFIG="" oc registry login --to pull-secret
+  ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+  rm pull-secret
+
+  popd > /dev/null
+  echo "${ocp_version}"
+}
+
+## Try the validation
+ret=0
+
+ocp_version=$(get_ocp_version)
+echo "[DEBUG] current OCP version: '${ocp_version}'"
+
+if version_ge "${ocp_version}" "4.17"; then
+
+  echo "$(date -u --rfc-3339=seconds) - Checking userTags of machines..."
+  readarray -t items < <(gcloud compute instances list --filter="name~${INFRA_ID}" --format="table(name,zone)" | grep -v NAME)
+  for line in "${items[@]}"; do
+    name="${line%% *}"
+    zone="${line##* }"
+    gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/instances/${name} --location=${zone} --effective > "${current_tags_file}"
+    echo "$(date -u --rfc-3339=seconds) - Saving the machine's resource-manager tags..."
+    cp "${current_tags_file}" "${ARTIFACT_DIR}/${name}.machine_user_tags"
+    validate_user_tags
+    if grep -q "1" "${validation_result_file}"; then
+      echo "$(date -u --rfc-3339=seconds) - FAILED for machine '${name}'."
+      ret=1
+    else
+      echo "$(date -u --rfc-3339=seconds) - PASSED for machine '${name}'."
+    fi
+  done
+
+  echo "$(date -u --rfc-3339=seconds) - Checking userTags of disks..."
+  readarray -t items < <(gcloud compute disks list --filter="name~${INFRA_ID}" --format="table(name,zone)" | grep -v NAME)
+  for line in "${items[@]}"; do
+    name="${line%% *}"
+    zone="${line##* }"
+    zone=$(basename ${zone})
+    disk_id=$(gcloud compute disks describe ${name} --zone ${zone} --format json | jq -r -c .id)
+    gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/disks/${disk_id} --location=${zone} --effective > "${current_tags_file}"
+    echo "$(date -u --rfc-3339=seconds) - Saving the disk's resource-manager tags..."
+    cp "${current_tags_file}" "${ARTIFACT_DIR}/${name}.disk_user_tags"
+    validate_user_tags
+    if grep -q "1" "${validation_result_file}"; then
+      echo "$(date -u --rfc-3339=seconds) - FAILED for disk '${name}'."
+      ret=1
+    else
+      echo "$(date -u --rfc-3339=seconds) - PASSED for disk '${name}'."
+    fi
+  done
+
+else
+  echo "$(date -u --rfc-3339=seconds) - Skipped checking userTags of machines and disks"
+fi
+
+echo "$(date -u --rfc-3339=seconds) - Checking userTags of image-registry buckets..."
+readarray -t items < <(gsutil ls | grep "${INFRA_ID}-image-registry")
+for line in "${items[@]}"; do
+  name=$(basename "${line}")
+  gcloud resource-manager tags bindings list --parent=//storage.googleapis.com/projects/_/buckets/${name} --location=${GCP_REGION} --effective > "${current_tags_file}"
+  echo "$(date -u --rfc-3339=seconds) - Saving the bucket's resource-manager tags..."
+  cp "${current_tags_file}" "${ARTIFACT_DIR}/${name}.bucket_user_tags"
+  validate_user_tags
+  if grep -q "1" "${validation_result_file}"; then
+    echo "$(date -u --rfc-3339=seconds) - FAILED for bucket '${name}'."
+    ret=1
+  else
+    echo "$(date -u --rfc-3339=seconds) - PASSED for bucket '${name}'."
+  fi
+done
+
+rm -f "${validation_result_file}" "${current_tags_file}"
+echo "$(date -u --rfc-3339=seconds) - exit code '${ret}'"
+exit ${ret}

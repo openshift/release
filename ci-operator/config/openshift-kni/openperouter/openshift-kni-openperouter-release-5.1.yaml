@@ -1,0 +1,85 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+canonical_go_repository: github.com/openperouter/openperouter
+images:
+  items:
+  - dockerfile_path: Dockerfile.edge.openshift
+    to: openperouter-operator
+  - context_dir: operator
+    dockerfile_path: bundle.Dockerfile
+    to: openperouter-operator-bundle
+  - build_args:
+    - name: BASE_IMAGE
+      value: quay.io/centos/centos:stream10
+    dockerfile_path: Dockerfile.edge.openshift
+    to: openperouter-operator-edge
+operator:
+  bundles:
+  - as: operator-bundle
+    context_dir: operator
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openperouter/router:main
+    with: pipeline:openperouter-operator
+promotion:
+  to:
+  - disabled: true
+    name: "5.1"
+    namespace: ocp
+prowgen:
+  disable_sparse_checkout: true
+  enable_secrets_store_csi_driver: true
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: openperouter-e2e-metal
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=2
+        ENABLE_LOCAL_REGISTRY=true
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-openperouter
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: openperouter-e2e
+    workflow: baremetalds-e2e
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift-kni
+  repo: openperouter

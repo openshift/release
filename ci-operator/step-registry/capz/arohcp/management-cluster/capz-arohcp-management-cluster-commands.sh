@@ -1,0 +1,1 @@
+../../test/management-cluster/capz-test-management-cluster-commands.sh

@@ -1,0 +1,32 @@
+ref:
+  as: rosa-hive-backplane-login
+  from: rosa-aws-cli
+  grace_period: 5m
+  commands: rosa-hive-backplane-login-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 10m0s
+  env:
+  - name: BACKPLANE_CLUSTER_ID
+    documentation: OCM internal cluster ID of the hive cluster to access via backplane.
+  - name: OCM_LOGIN_ENV
+    default: "production"
+    documentation: OCM environment where the hive cluster is registered. Hive clusters are always in production.
+  - name: BACKPLANE_PROXY_URL
+    default: "http://squid.corp.redhat.com:3128"
+    documentation: Corp proxy for backplane access from the build farm.
+  - name: BACKPLANE_CLI_VERSION
+    default: "0.11.0"
+    documentation: ocm-backplane CLI version to install.
+  - name: BACKPLANE_ELEVATE_REASON
+    default: ""
+    documentation: Trackable reason for elevated access (Jira key or PD URL). Empty skips elevation.
+  documentation: |-
+    Logs into a hive cluster via OCM backplane and saves the kubeconfig
+    to SHARED_DIR/kubeconfig for downstream steps. Requires
+    capabilities: [intranet] for squid proxy access on the build farm.
+
+    Uses OCM SSO credentials from the cluster profile for authentication.
+    Hive clusters are registered in the production OCM environment.

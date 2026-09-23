@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: 5m
+  name: search
+  namespace: ci-search
+spec:
+  ingressClassName: openshift-default
+  tls:
+    - secretName: search-tls
+      hosts:
+        - search.ci.openshift.org
+  rules:
+  - host: search.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: ci-search-redirect
+            port:
+              number: 8080
+        pathType: ImplementationSpecific

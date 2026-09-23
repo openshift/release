@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: "90s"
+  name: pod-scaler
+  namespace: ci
+spec:
+  ingressClassName: openshift-default
+  tls:
+    - secretName: pod-scaler-tls
+      hosts:
+        - resources.ci.openshift.org
+  rules:
+  - host: resources.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: pod-scaler-ui
+            port:
+              number: 80
+        pathType: ImplementationSpecific

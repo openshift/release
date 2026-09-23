@@ -1,0 +1,38 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: ams-ci
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_ams-ci_latest
+  source:
+    dockerfile: |
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ci_nested-podman_latest
+      USER root
+      RUN dnf install -y git make gcc jq python3 python3-pip && dnf clean all
+      RUN pip3 install yamllint
+      ARG GOLANGCI_LINT_VERSION=v2.9.0
+      RUN curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b /usr/local/bin ${GOLANGCI_LINT_VERSION}
+      ARG GO_VERSION=1.26.3
+      ARG GO_SHA256=2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556
+      ARG GOTESTSUM_VERSION=v1.13.0
+      RUN curl -fsSLO --retry 5 https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz && \
+          echo "${GO_SHA256}  go${GO_VERSION}.linux-amd64.tar.gz" | sha256sum -c - && \
+          tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz && \
+          rm go${GO_VERSION}.linux-amd64.tar.gz
+      ENV PATH="/usr/local/go/bin:${PATH}"
+      RUN GOBIN=/usr/local/bin go install gotest.tools/gotestsum@${GOTESTSUM_VERSION}
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+  - type: ConfigChange

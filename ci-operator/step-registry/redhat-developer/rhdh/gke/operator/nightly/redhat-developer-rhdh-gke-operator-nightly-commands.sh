@@ -1,0 +1,1 @@
+../../helm/nightly/redhat-developer-rhdh-gke-helm-nightly-commands.sh

@@ -1,0 +1,41 @@
+ref:
+  as: agent-qe-baremetal-install-ove-disconnected-run-validation-checkup
+  from_image:
+    namespace: ci
+    name: tests-private-base
+    tag: latest
+  cli: latest
+  grace_period: 10m
+  timeout: 7h0m0s
+  commands: agent-qe-baremetal-install-ove-disconnected-run-validation-checkup-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: TARGET_NAMESPACE
+    default: openshift-cnv
+    documentation: |-
+      Namespace where CNV (OpenShift Virtualization) is installed.
+  - name: STORAGE_CLASS
+    default: ocs-storagecluster-ceph-rbd-virtualization
+    documentation: |-
+      ODF StorageClass to set as default and use for validation checkup PVCs.
+  - name: TEST_SKIPS
+    default: ""
+    documentation: |-
+      Pipe-separated list of test IDs to skip during validation.
+  - name: OCP_VIRT_VALIDATION_TIMEOUT
+    default: "360m"
+    documentation: |-
+      Timeout for the validation Job to complete.
+  - name: DRY_RUN
+    default: "false"
+    documentation: |-
+      If true, run validation in dry-run mode.
+  documentation: |-
+    Run the ocp-virt-validation-checkup against the cluster using the
+    official image workflow (generate | oc apply). Sets ODF as the default
+    StorageClass, waits for the validation Job to complete, and exits
+    non-zero if any test failed. Saves TIMESTAMP and image path to
+    SHARED_DIR for artifact collection by the post step.

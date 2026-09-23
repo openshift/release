@@ -1,0 +1,19 @@
+workflow:
+  as: openshift-e2e-aws-csi-efs-fips-sts-extended
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-provision
+    - chain: storage-conf-csi-optional-aws-efs-sts
+    test:
+    - ref: openshift-extended-test
+    post:
+    - ref: storage-destroy-csi-aws-efs-sts-operator-role
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service-deprovision
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      TEST_SCENARIOS: '\[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]'
+      TEST_FILTERS: "~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;~LSO&;STORAGE&"
+      FORCE_SUCCESS_EXIT: "no"
+  documentation: |-
+    The Openshift E2E AWS EFS STS CSI extended workflow executes the `openshift csi extended end-to-end test suite` on AWS EFS CSI driver and operator working is STS mode.

@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-aws-ovn-multi-cidr
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf-multi-cidr
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    env:
+      FAIL_ON_CORE_DUMP: "false"
+  documentation: |-
+    The Openshift E2E OVN multi-CIDR workflow installs a cluster with three
+    IPv4 clusterNetwork CIDRs and runs the standard e2e conformance suite.
+    This validates cross-CIDR pod-to-pod connectivity including EgressIP
+    no-reroute policies.

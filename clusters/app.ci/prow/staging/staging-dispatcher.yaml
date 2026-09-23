@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci-staging
+  name: staging-dispatcher
+  labels:
+    app: staging-dispatcher
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: staging-dispatcher
+  template:
+    metadata:
+      labels:
+        app: staging-dispatcher
+    spec:
+      containers:
+      - name: staging-dispatcher
+        image: quay.io/prucek/testing:staging-dispatcher
+        imagePullPolicy: Always
+        args:
+        - --cluster=build09
+        ports:
+        - name: http
+          containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci-staging
+  name: staging-dispatcher
+  labels:
+    app: staging-dispatcher
+spec:
+  selector:
+    app: staging-dispatcher
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP

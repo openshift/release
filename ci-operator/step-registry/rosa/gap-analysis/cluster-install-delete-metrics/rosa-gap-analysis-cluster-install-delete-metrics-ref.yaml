@@ -1,0 +1,42 @@
+ref:
+  as: rosa-gap-analysis-cluster-install-delete-metrics
+  from: rosa-aws-cli
+  grace_period: 10m
+  timeout: 30m
+  commands: rosa-gap-analysis-cluster-install-delete-metrics-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for OCM login.
+  - name: REGION
+    default: ""
+    documentation: Cloud region for the cluster. Falls back to LEASED_RESOURCE if empty.
+  - name: HOSTED_CP
+    default: "false"
+    documentation: true means Hosted Control Plane. false is Classic or OSD GCP (see CLUSTER_TOPOLOGY).
+  - name: CLUSTER_TOPOLOGY
+    default: ""
+    documentation: Distinguishes classic vs osd-gcp when HOSTED_CP is false. Ignored when HOSTED_CP is true.
+  - name: CHANNEL_GROUP
+    default: ""
+    documentation: ROSA channel group used to provision the cluster (stable, candidate, nightly).
+  - name: OPENSHIFT_VERSION
+    default: ""
+    documentation: Requested OpenShift minor version (e.g. 4.21).
+  documentation: |-
+    Runs gap-analysis validation tests against a ROSA cluster (Classic, HCP, or OSD GCP).
+    Validates ClusterOperators and nodes health on the cluster kubeconfig.
+    Collects cluster logs and generates validation report.
+    Also writes metadata.json, clusteroperators.json, and nodes.json for
+    rosa-gap-analysis Check #11.
+    Classic and OSD GCP: captures the single cluster.
+    HCP: also captures the management cluster (Red Hat control plane) under
+    ARTIFACT_DIR/management/. Management capture is informational and does not
+    fail the step.
+    Runs in the workflow post phase while the cluster is still up, before deprovision.
+    Expects CLUSTER_ID in SHARED_DIR/cluster-id. Classic/HCP need AWS credentials
+    in the cluster profile; OSD GCP uses OCM plus the cluster kubeconfig.
