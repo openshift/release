@@ -775,6 +775,41 @@ ExtractClusterCredentials() {
     true
 }
 
+# Polls until every MachineConfigPool on the spoke is fully synchronized:
+#   - status.configuration.name == spec.configuration.name
+#   - Updated condition is True
+# Fails closed if the deadline is exceeded.
+# Args: <kubeconfig> <clusterName> [<timeoutSeconds=1200>]
+WaitMcpFullSync() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+    typeset -i syncTimeout="${1:-1200}"; (($#)) && shift
+
+    # Subshell isolates the SECONDS reset from the caller.
+    ( SECONDS=0
+    typeset -i syncInterval=30 pendingCnt=0
+    while ((SECONDS < syncTimeout)); do
+        pendingCnt=$(
+            oc --kubeconfig="${kubeconfig}" get machineconfigpool -o json |
+            jq '[.items[] | select(
+                .spec.configuration.name != .status.configuration.name or
+                ([.status.conditions[]? |
+                    select(.type == "Updated" and .status == "True")
+                ] | length == 0)
+            )] | length'
+        )
+        ((pendingCnt == 0)) && break
+        sleep "${syncInterval}"
+    done
+    if ((pendingCnt != 0)); then
+        : "FATAL: Spoke ${clusterName}: ${pendingCnt} MCPs not fully synchronized within ${syncTimeout}s"
+        exit 1
+    fi
+    true )
+
+    true
+}
+
 # Marks the 'openshift' ClusterImagePolicy unmanaged on the spoke ClusterVersion
 # so CVO does not revert it during upgrade (unsigned nightlies, OCPBUGS-114622).
 # No-op when the policy is absent or does not enforce ocp-v4.0-art-dev.
@@ -806,21 +841,7 @@ DisableClusterImagePolicySignatureEnforcement() {
             .unmanaged==true)' \
             <<<"${currentOverrides}" >/dev/null; then
         : "ClusterImagePolicy already unmanaged on ${clusterName} — ensuring MCP rollout is complete"
-        # CIP may have been deleted earlier but MCO rollout may still be in progress.
-        oc --kubeconfig="${kubeconfig}" wait machineconfigpool --all \
-            --for=condition=Updated=True --timeout=20m 1>/dev/null
-        # Verify every pool is fully synchronized.
-        typeset arMcpName='' arMcpSpec='' arMcpStatus=''
-        while IFS='=' read -r arMcpName arMcpSpec arMcpStatus; do
-            [[ -n "${arMcpName}" ]] || continue
-            if [[ "${arMcpSpec}" != "${arMcpStatus}" ]]; then
-                : "FATAL: Spoke ${clusterName}: MCP ${arMcpName} status config ${arMcpStatus} != spec config ${arMcpSpec}"
-                return 1
-            fi
-        done < <(
-            oc --kubeconfig="${kubeconfig}" get machineconfigpool \
-                -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}={.status.configuration.name}{"\n"}{end}'
-        )
+        WaitMcpFullSync "${kubeconfig}" "${clusterName}"
         return 0
     fi
     newOverrides="$(jq -c \
@@ -891,25 +912,10 @@ DisableClusterImagePolicySignatureEnforcement() {
     fi
     true )
 
-    # All pools have a new rendered config. Now wait for each pool to
-    # finish rolling out: status.configuration.name must equal
-    # spec.configuration.name and the Updated condition must be True.
-    oc --kubeconfig="${kubeconfig}" wait machineconfigpool --all \
-        --for=condition=Updated=True --timeout=20m 1>/dev/null
-
-    # Final gate: confirm every pool's status.configuration.name matches
-    # its spec.configuration.name (nodes fully synchronized).
-    typeset mcpSpec='' mcpStatus=''
-    while IFS='=' read -r mcpName mcpSpec mcpStatus; do
-        [[ -n "${mcpName}" ]] || continue
-        if [[ "${mcpSpec}" != "${mcpStatus}" ]]; then
-            : "FATAL: Spoke ${clusterName}: MCP ${mcpName} status config ${mcpStatus} != spec config ${mcpSpec}"
-            return 1
-        fi
-    done < <(
-        oc --kubeconfig="${kubeconfig}" get machineconfigpool \
-            -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}={.status.configuration.name}{"\n"}{end}'
-    )
+    # All pools have a new spec. Wait for full rollout: every pool's
+    # status.configuration.name must equal spec.configuration.name and
+    # the Updated condition must be True.
+    WaitMcpFullSync "${kubeconfig}" "${clusterName}"
 
     : "ClusterImagePolicy signature enforcement disabled on spoke ${clusterName}"
     true
