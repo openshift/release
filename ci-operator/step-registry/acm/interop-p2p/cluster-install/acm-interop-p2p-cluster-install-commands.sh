@@ -805,7 +805,22 @@ DisableClusterImagePolicySignatureEnforcement() {
             .namespace=="" and
             .unmanaged==true)' \
             <<<"${currentOverrides}" >/dev/null; then
-        : "ClusterImagePolicy already unmanaged on ${clusterName}"
+        : "ClusterImagePolicy already unmanaged on ${clusterName} — ensuring MCP rollout is complete"
+        # CIP may have been deleted earlier but MCO rollout may still be in progress.
+        oc --kubeconfig="${kubeconfig}" wait machineconfigpool --all \
+            --for=condition=Updated=True --timeout=20m 1>/dev/null
+        # Verify every pool is fully synchronized.
+        typeset arMcpName='' arMcpSpec='' arMcpStatus=''
+        while IFS='=' read -r arMcpName arMcpSpec arMcpStatus; do
+            [[ -n "${arMcpName}" ]] || continue
+            if [[ "${arMcpSpec}" != "${arMcpStatus}" ]]; then
+                : "FATAL: Spoke ${clusterName}: MCP ${arMcpName} status config ${arMcpStatus} != spec config ${arMcpSpec}"
+                return 1
+            fi
+        done < <(
+            oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+                -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}={.status.configuration.name}{"\n"}{end}'
+        )
         return 0
     fi
     newOverrides="$(jq -c \
@@ -832,11 +847,70 @@ DisableClusterImagePolicySignatureEnforcement() {
         return 1
     fi
 
+    # Snapshot each MCP spec.configuration.name BEFORE deleting the CIP.
+    # After deletion MCO re-renders every pool; we must wait for ALL pools
+    # to pick up the new rendered config before proceeding, otherwise nodes
+    # still carrying the old policy.json will reject unsigned images.
+    typeset -A preRenderedArr=()
+    typeset mcpName='' mcpRendered=''
+    while IFS='=' read -r mcpName mcpRendered; do
+        [[ -n "${mcpName}" ]] && preRenderedArr["${mcpName}"]="${mcpRendered}"
+    done < <(
+        oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+            -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
+    )
+
     # CVO no longer manages the CIP — delete it so MCO removes the signature
     # requirement from each node's /etc/containers/policy.json.
-    # Without this CIP, CRI-O permits unsigned nightly image pulls by default.
     oc --kubeconfig="${kubeconfig}" delete clusterimagepolicy openshift \
         --ignore-not-found 1>/dev/null
+
+    # Wait for MCO to re-render EVERY pool. Isolated in a subshell so
+    # the SECONDS reset does not leak into the caller.
+    ( SECONDS=0
+    typeset -i mcpWaitMax=300 mcpWaitInt=15
+    typeset isAllChanged='false'
+    while ((SECONDS < mcpWaitMax)); do
+        isAllChanged='true'
+        while IFS='=' read -r mcpName mcpRendered; do
+            [[ -n "${mcpName}" ]] || continue
+            if [[ "${preRenderedArr[${mcpName}]:-}" == "${mcpRendered}" ]]; then
+                isAllChanged='false'
+                break
+            fi
+        done < <(
+            oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+                -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
+        )
+        "${isAllChanged}" && break
+        sleep "${mcpWaitInt}"
+    done
+    if ! "${isAllChanged}"; then
+        : "FATAL: Spoke ${clusterName}: not all MCPs re-rendered within ${mcpWaitMax}s — failing closed"
+        exit 1
+    fi
+    true )
+
+    # All pools have a new rendered config. Now wait for each pool to
+    # finish rolling out: status.configuration.name must equal
+    # spec.configuration.name and the Updated condition must be True.
+    oc --kubeconfig="${kubeconfig}" wait machineconfigpool --all \
+        --for=condition=Updated=True --timeout=20m 1>/dev/null
+
+    # Final gate: confirm every pool's status.configuration.name matches
+    # its spec.configuration.name (nodes fully synchronized).
+    typeset mcpSpec='' mcpStatus=''
+    while IFS='=' read -r mcpName mcpSpec mcpStatus; do
+        [[ -n "${mcpName}" ]] || continue
+        if [[ "${mcpSpec}" != "${mcpStatus}" ]]; then
+            : "FATAL: Spoke ${clusterName}: MCP ${mcpName} status config ${mcpStatus} != spec config ${mcpSpec}"
+            return 1
+        fi
+    done < <(
+        oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+            -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}={.status.configuration.name}{"\n"}{end}'
+    )
+
     : "ClusterImagePolicy signature enforcement disabled on spoke ${clusterName}"
     true
 }
