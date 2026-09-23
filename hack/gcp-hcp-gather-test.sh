@@ -288,6 +288,20 @@ test_credential_quarantine() {
   assert_no_file "${gather_dir}/customer-project.tar.gz"
 }
 
+test_workflow_order() {
+  local workflow_file="${repo_root}/ci-operator/step-registry/gcp-hcp/e2e/gcp-hcp-e2e-workflow.yaml"
+  local expected_post actual_post
+  expected_post=$'    - ref: gcp-hcp-gather\n    - ref: gcp-hcp-cleanup-infrastructure\n    - ref: gcp-hcp-finalize-commit-status'
+  actual_post="$(awk '
+    /^    post:$/ { in_post = 1; next }
+    in_post && /^  documentation:/ { exit }
+    in_post { print }
+  ' "${workflow_file}")"
+
+  grep -qx '    allow_best_effort_post_steps: true' "${workflow_file}" || fail "workflow must allow every best-effort post step to run"
+  [[ "${actual_post}" == "${expected_post}" ]] || fail "unexpected workflow post-step order: ${actual_post}"
+}
+
 main() {
   [[ "${1:-all}" == "all" ]] || fail "usage: $0 all"
   [[ -f "${gather_script}" ]] || fail "gather script does not exist: ${gather_script}"
@@ -300,6 +314,7 @@ main() {
   test_hosted_login_failure_is_isolated
   test_size_boundary
   test_credential_quarantine
+  test_workflow_order
   echo "PASS: gcp-hcp gather harness"
 }
 
