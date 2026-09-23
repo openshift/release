@@ -38,11 +38,6 @@ echo "CLUSTER_NAME=${CLUSTER_NAME}"
 echo "Processing common group_vars"
 mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
 
-find /var/group_variables/common/ -mindepth 1 -type d | while read -r dir; do
-  echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
-done
-
 echo "Processing cluster group_vars (${CLUSTER_NAME})"
 find "/var/group_variables/${CLUSTER_NAME}/" -mindepth 1 -type d | while read -r dir; do
   echo "  group_var: $(basename "${dir}")"
