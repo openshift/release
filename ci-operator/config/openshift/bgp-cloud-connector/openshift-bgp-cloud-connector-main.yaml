@@ -1023,6 +1023,154 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: probe-federation
+      cli: latest
+      commands: |
+        # Whether the credential path ARO HCP leaves open actually works: an
+        # identity of our own, federated to a ServiceAccount in the guest, used
+        # to make the call the operator makes. Classic cannot do this at all --
+        # it has no issuer -- so this is the question that decides the shape of
+        # an HCP job.
+        set +e
+        set -uo pipefail
+
+        if [[ ! -s "${SHARED_DIR}/bgp-cloud-connector-estate" ]]; then
+          echo "no estate was recorded, so there is nothing to reach"
+          exit 0
+        fi
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/bgp-cloud-connector-estate"
+        : "${NET_RG:=}" "${ROUTE_SERVER:=}" "${ROUTE_SERVER_BUILT:=no}"
+        if [[ "${ROUTE_SERVER_BUILT}" != "yes" || -z "${NET_RG}" ]]; then
+          echo "no Route Server was built, so there is nothing to reach"
+          exit 0
+        fi
+        if [[ ! -s "${SHARED_DIR}/nested_kubeconfig" ]]; then
+          echo "no guest kubeconfig, so nothing can present a token"
+          exit 0
+        fi
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        fed_cfg="$(mktemp -d)"
+        err="$(mktemp)"
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+        section() { echo; echo "=== $* ==="; }
+
+        creds="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        if [[ ! -f "${creds}" ]]; then
+          creds="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        fi
+        if ! az login --service-principal \
+             --username "$(jq -er .clientId "${creds}")" \
+             --password="$(jq -er .clientSecret "${creds}")" \
+             --tenant "$(jq -er .tenantId "${creds}")" --output none 2>"${err}"; then
+          echo "could not log in:"; redact <"${err}" | sed 's/^/  /'; exit 0
+        fi
+        subscription="$(jq -er .subscriptionId "${creds}")"
+        tenant="$(jq -er .tenantId "${creds}")"
+        az account set --subscription "${subscription}" 2>/dev/null
+
+        issuer="$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" \
+          oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}' 2>/dev/null)"
+        if [[ -z "${issuer}" ]]; then
+          echo "the guest declares no serviceAccountIssuer, so it cannot federate"
+          exit 0
+        fi
+
+        ident=bgp-probe-federated
+        ns=bgp-probe
+        sa=bgp-probe
+
+        section "an identity in the group holding the Route Server"
+        if ! az identity create -g "${NET_RG}" -n "${ident}" --output none 2>"${err}"; then
+          echo "  could NOT create one:"; redact <"${err}" | head -3 | sed 's/^/    /'; exit 0
+        fi
+        # Recorded before anything trusts it, so a cancellation still leaves
+        # something the teardown could find.
+        echo "IDENTITY_RG=${NET_RG}" >"${SHARED_DIR}/bgp-probe-federated-identity"
+        echo "IDENTITY_NAME=${ident}" >>"${SHARED_DIR}/bgp-probe-federated-identity"
+        client_id="$(az identity show -g "${NET_RG}" -n "${ident}" --query clientId -o tsv 2>/dev/null)"
+        object_id="$(az identity show -g "${NET_RG}" -n "${ident}" --query principalId -o tsv 2>/dev/null)"
+        echo "  created"
+
+        section "a role over ${NET_RG}"
+        if az role assignment create --assignee-object-id "${object_id}" \
+             --assignee-principal-type ServicePrincipal --role "Network Contributor" \
+             --scope "/subscriptions/${subscription}/resourceGroups/${NET_RG}" \
+             --output none 2>"${err}"; then
+          echo "  granted Network Contributor"
+        else
+          echo "  could NOT grant a role:"; redact <"${err}" | head -3 | sed 's/^/    /'
+        fi
+
+        section "federating it to a ServiceAccount in the guest"
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        oc create namespace "${ns}" --dry-run=client -o yaml 2>/dev/null | oc apply -f - >/dev/null 2>&1
+        oc -n "${ns}" create serviceaccount "${sa}" --dry-run=client -o yaml 2>/dev/null | oc apply -f - >/dev/null 2>&1
+        subject="system:serviceaccount:${ns}:${sa}"
+        unset KUBECONFIG
+        if az identity federated-credential create --name bgp-probe-federation \
+             --identity-name "${ident}" -g "${NET_RG}" \
+             --issuer "${issuer}" --subject "${subject}" \
+             --audiences api://AzureADTokenExchange --output none 2>"${err}"; then
+          echo "  federated ${subject}"
+        else
+          echo "  could NOT federate:"; redact <"${err}" | head -4 | sed 's/^/    /'
+        fi
+
+        section "using it: the call the operator makes"
+        # A federated credential is not usable the instant it exists, and neither
+        # is the role, so this is retried rather than called once.
+        token="$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" \
+          oc -n "${ns}" create token "${sa}" --audience api://AzureADTokenExchange --duration=1h 2>/dev/null)"
+        if [[ -z "${token}" ]]; then
+          echo "  the guest would not mint a token for ${sa}"
+        else
+          worked=no
+          for attempt in $(seq 1 12); do
+            if AZURE_CONFIG_DIR="${fed_cfg}" az login --service-principal \
+                 --username "${client_id}" --tenant "${tenant}" \
+                 --federated-token "${token}" --output none 2>"${err}"; then
+              if AZURE_CONFIG_DIR="${fed_cfg}" az network routeserver show \
+                   -g "${NET_RG}" -n "${ROUTE_SERVER}" \
+                   --query "{asn:virtualRouterAsn, ips:virtualRouterIps}" -o json 2>"${err}"; then
+                echo "  the federated identity READ the Route Server, on attempt ${attempt}"
+                worked=yes
+                break
+              fi
+            fi
+            sleep 20
+          done
+          if [[ "${worked}" != yes ]]; then
+            echo "  the federated identity could not read it:"
+            redact <"${err}" | head -4 | sed 's/^/    /'
+          fi
+        fi
+
+        section "removing what this step made"
+        az identity federated-credential delete --name bgp-probe-federation \
+          --identity-name "${ident}" -g "${NET_RG}" --yes --output none 2>/dev/null \
+          && echo "  federated credential removed" || echo "  federated credential: already gone or would not go"
+        az identity delete -g "${NET_RG}" -n "${ident}" --output none 2>/dev/null \
+          && echo "  identity removed" || echo "  identity: already gone or would not go"
+        rm -f "${SHARED_DIR}/bgp-probe-federated-identity"
+
+        rm -f "${err}"
+        section "done"
+        exit 0
+      credentials:
+      - collection: hypershift-team
+        group: ops/hypershift-ci-jobs-azurecreds
+        mount_path: /etc/hypershift-ci-jobs-azurecreds
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: hypershift-azure-aks-conformance
 - always_run: false
   as: aro-classic-probe
@@ -2393,7 +2541,10 @@ tests:
         # Role assignments are not usable the instant they exist, so the retry
         # distinguishes propagation from a grant that does not help.
         echo "  waiting for the grant to take effect..."
-        for attempt in 1 2 3 4 5 6; do
+        # Measured twice: usable after about twenty seconds on one run and
+        # still refused after two minutes on the next. Azure documents up
+        # to several minutes, so two is too short to call it a refusal.
+        for attempt in $(seq 1 18); do
           sleep 20
           if AZURE_CONFIG_DIR="${issued_cfg}" az network routeserver show \
                -g "${NET_RG}" -n "${ROUTE_SERVER}" --output none 2>/dev/null; then
@@ -2420,8 +2571,12 @@ tests:
         # HubBgpConnectionPeerIpConflict against exactly this one, so
         # proving the write and then leaving it behind denies the thing
         # the run exists to observe.
-        if az network routeserver peering delete -g "${NET_RG}" \
-             --routeserver "${ROUTE_SERVER}" -n bgp-probe-peering \
+        # As the cluster profile's principal, which owns this group: the
+        # issued one may not be able to delete what it just created, and a
+        # bare az here has no account at all -- every login in this step
+        # goes into a config directory of its own.
+        if AZURE_CONFIG_DIR="${profile_cfg}" az network routeserver peering delete \
+             -g "${NET_RG}" --routeserver "${ROUTE_SERVER}" -n bgp-probe-peering \
              --yes --output none 2>"${err}"; then
           echo "  removed, so the operator may peer ${peer_ip} itself"
         else
