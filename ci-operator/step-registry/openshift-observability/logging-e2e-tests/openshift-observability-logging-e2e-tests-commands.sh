@@ -39,9 +39,15 @@ function notify_qe_agent() {
 
     # Write the context file the openshift-observability-qe-agent post step reads.
     # The agent skips unless has_test_failures is true.
+    # step_script_ref and env.TEST_SUITE are used by the skill to fetch the
+    # step script and identify the suite for triage and test reruns.
     cat > "${SHARED_DIR}/qe-agent-context.json" <<EOF
 {
+  "step_script_ref": "openshift-observability/logging-e2e-tests/openshift-observability-logging-e2e-tests-commands.sh",
   "has_test_failures": ${has_failures},
+  "env": {
+    "TEST_SUITE": "${TEST_SUITE}"
+  },
   "suite": "${TEST_SUITE}",
   "jiraProject": "${JIRA_PROJECT:-}",
   "agentSkill": "${AGENT_SKILL:-}"
@@ -57,4 +63,4 @@ echo "=== Listing tests in suite: ${TEST_SUITE} ==="
 echo "=== Running suite: ${TEST_SUITE} (max-concurrency=${TEST_MAX_CONCURRENCY:-1}) ==="
 "${TESTS_EXT}" run-suite "${TEST_SUITE}" \
     --max-concurrency "${TEST_MAX_CONCURRENCY:-1}" \
-    --junit-path "${ARTIFACT_DIR}/${report_name}" || true
+    --junit-path "${ARTIFACT_DIR}/${report_name}"
