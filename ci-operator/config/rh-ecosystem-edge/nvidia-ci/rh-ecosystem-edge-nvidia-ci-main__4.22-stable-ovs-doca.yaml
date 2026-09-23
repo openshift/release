@@ -38,11 +38,10 @@ tests:
     - as: get-nodes
       cli: latest
       commands: |
-        # Report node count and readiness only; do not print node names
-        # (hostnames can leak internal AWS data into CI logs).
-        echo "Total nodes: $(oc get nodes --no-headers | wc -l)"
-        echo "Status counts:"
-        oc get nodes --no-headers | awk '{print $2}' | sort | uniq -c
+        # Print node roles (master/worker) grouped by count; do not print node
+        # names (hostnames can leak internal AWS data into CI logs).
+        echo "Node roles:"
+        oc get nodes --no-headers | awk '{print $3}' | sort | uniq -c
       from: src
       resources:
         requests:
