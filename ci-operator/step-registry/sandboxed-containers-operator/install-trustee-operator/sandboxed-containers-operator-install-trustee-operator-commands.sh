@@ -78,6 +78,11 @@ function exit_handler() {
     oc get all -n "${TRUSTEE_NAMESPACE}" || true
     echo ">>> Operator logs:"
     oc logs -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager --tail=50 || true
+    echo ">>> Trustee deployment pod logs (last 100 lines):"
+    oc logs -n "${TRUSTEE_NAMESPACE}" -l app=kbs --tail=100 --prefix 2>/dev/null || \
+      oc logs -n "${TRUSTEE_NAMESPACE}" deployment/trustee-deployment --tail=100 2>/dev/null || true
+    echo ">>> Trustee deployment pod events:"
+    oc describe pods -n "${TRUSTEE_NAMESPACE}" -l app=kbs 2>/dev/null | grep -A 20 "^Events:" | tail -25 || true
   fi
 }
 trap 'exit_handler' EXIT
@@ -506,7 +511,7 @@ PUBKEY
   fi
 }
 
-# Wait for operand deployments to become available
+# Wait for operand deployments to become available and their pods to be ready
 function wait_for_operands() {
   sleep 10
 
@@ -520,6 +525,18 @@ function wait_for_operands() {
         echo ">>> ERROR: ${deployment} not ready after timeout" >&2
         oc get "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
         oc describe "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
+        exit 1
+      fi
+
+      # Verify pods are actually Ready (Available condition can pass transiently
+      # before a CrashLoopBackOff pod crashes again).
+      local deploy_name="${deployment#deployment.apps/}"
+      if ! wait_until "${deployment} pods Ready" 150 15 \
+        "ready=\$(oc get pods -n '${TRUSTEE_NAMESPACE}' -l app=kbs -o jsonpath='{.items[*].status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | tr ' ' '\n' | grep -c '^True$' || echo 0); desired=\$(oc get '${deployment}' -n '${TRUSTEE_NAMESPACE}' -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 1); [[ \"\${ready}\" -ge \"\${desired}\" && \"\${desired}\" -gt 0 ]]"; then
+        echo ">>> ERROR: ${deployment} pods not Ready after timeout (possible CrashLoopBackOff)" >&2
+        oc get pods -n "${TRUSTEE_NAMESPACE}" || true
+        oc logs -n "${TRUSTEE_NAMESPACE}" -l app=kbs --tail=50 --prefix 2>/dev/null || \
+          oc logs -n "${TRUSTEE_NAMESPACE}" "${deployment}" --tail=50 2>/dev/null || true
         exit 1
       fi
     done
