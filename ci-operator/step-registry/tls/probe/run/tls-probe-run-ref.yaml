@@ -15,12 +15,6 @@ ref:
     - name: PROBE_CAPTURE_DURATION
       default: "180"
       documentation: "Seconds to capture TLS traffic before collecting results."
-    - name: TLS_ADHERENCE_ENFORCE
-      default: "false"
-      documentation: |-
-        Set to 'true' to fail CI when below-TLS-1.3 handshakes are observed and
-        the cluster TLSAdherencePolicy enforces compliance. Default is observe-only:
-        findings are recorded in JUnit but do not fail the job.
   dependencies:
     - env: PROBE_IMAGE
       name: tls-probe
@@ -31,15 +25,13 @@ ref:
   timeout: 30m0s
   grace_period: 5m0s
   documentation: |-
-    Deploys the tls-probe eBPF DaemonSet across all cluster nodes, captures
-    TLS handshakes for a bounded window, collects per-node JSONL, and emits
-    [OCPFeatureGate:TLSAdherence]-tagged JUnit to ARTIFACT_DIR.
+    Deploys the tls-probe eBPF DaemonSet for a bounded capture and generates
+    client TLS traffic. Retains public artifacts under ARTIFACT_DIR/tls-probe/captures:
+    capture-*.jsonl contains the probe's unchanged JSON event lines, and
+    capture-*.log contains the original container output, including diagnostics.
+    No event-type, port, or TLS-version filtering; no compliance verdict or JUnit.
+    Deployment, capture, retrieval failures, or no events across all pods fail
+    this smoke test. Collection is attempted before cleanup even on failure.
 
-    The probe is a passive observer (zero added load, no synthetic connections).
-    It captures real in-cluster client negotiations including image pulls,
-    detecting downgrades and PQC gaps that active scanners cannot see.
-
-    Start with TLS_ADHERENCE_ENFORCE=false (observe-only) to gather signal before
-    gating. PROBE_IMAGE is supplied by ci-operator as the pipeline image built
-    from this repo's Dockerfile (see images: in the ci-operator config), so
-    each job/PR tests the probe image built from its own source.
+    PROBE_IMAGE is supplied by ci-operator from the Containerfile.ci source
+    build in stolostron/tls-probe. Downstream consumers interpret the events.

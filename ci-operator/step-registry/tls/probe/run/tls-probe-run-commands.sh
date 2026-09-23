@@ -1,29 +1,17 @@
 #!/bin/bash
-# tls-probe-run-commands.sh
-#
-# Deploys the tls-probe eBPF DaemonSet, fires a bounded burst of internal +
-# external TLS client traffic (so a claimed, otherwise-idle cluster still has
-# real handshakes to capture), collects per-node JSONL, and emits
-# [OCPFeatureGate:TLSAdherence]-tagged JUnit to ARTIFACT_DIR.
-#
-# Verdict is keyed by destination port on ServerHello events. For full workload
-# identity resolution and richer analysis (client negotiations, certs, PQC),
-# see pkg/monitortests/security/tlsprobe in openshift/origin.
+# Deploy the probe, generate TLS traffic, and retain native JSONL and logs.
+# TLS policy evaluation belongs to downstream consumers, not this smoke test.
 set -o nounset
 set -o errexit
 set -o pipefail
 
 # ── constants ─────────────────────────────────────────────────────────────────
 readonly NS="${PROBE_NAMESPACE:-tls-probe}"
-readonly PROBE_IMG="${PROBE_IMAGE:-ghcr.io/smith-xyz/tls-probe@sha256:8beefaa4040a4d49ae338b94c7d9ebbaaccefee0015214ad04c5059693e7c32d}"
+readonly PROBE_IMG="${PROBE_IMAGE:?PROBE_IMAGE must be supplied by ci-operator from the stolostron/tls-probe source build}"
 readonly CAPTURE_SECS="${PROBE_CAPTURE_DURATION:-180}"
-readonly ENFORCE="${TLS_ADHERENCE_ENFORCE:-false}"
 readonly ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 readonly PROBE_DIR="${ARTIFACT_DIR}/tls-probe"
-SCRATCH_DIR="$(mktemp -d)"
-readonly SCRATCH_DIR
-readonly CAPTURES_DIR="${SCRATCH_DIR}/captures"
-readonly JUNIT_CLASSNAME="tls.probe.adherence.runtime"
+readonly CAPTURES_DIR="${PROBE_DIR}/captures"
 readonly SCC_NAME="tls-probe-capture-${NS}"  # cluster-scoped; suffix with NS so concurrent runs on a shared/long-lived cluster don't race on the same SCC
 readonly TRAFFIC_JOB_NAME="tls-probe-client-traffic"
 readonly TRAFFIC_JOB_TIMEOUT="60s"
@@ -42,7 +30,7 @@ log() { echo "=== tls-probe: $* ==="; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 # ── setup ─────────────────────────────────────────────────────────────────────
-# Source the CI proxy config (if present) and create scratch directories.
+# Source the CI proxy config (if present) and create artifact directories.
 setup() {
   if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     # shellcheck disable=SC1090
@@ -52,12 +40,16 @@ setup() {
 }
 
 # ── cleanup ───────────────────────────────────────────────────────────────────
-# Tear down the probe namespace and its scoped SCC; never fails the step.
+# Collect before deleting pods, including when capture fails.
 cleanup() {
+  local status=$?
+  trap - EXIT
+  set +e
+  collect_jsonl || { if (( status == 0 )); then status=1; fi; }
   log "cleanup"
   oc delete namespace "${NS}" --ignore-not-found --wait=false || true
   oc delete scc "${SCC_NAME}" --ignore-not-found || true
-  rm -rf "${SCRATCH_DIR}" || true
+  exit "${status}"
 }
 
 # ── 1. namespace + service account + scoped SCC ─────────────────────────────
@@ -304,7 +296,7 @@ EOF
 # instead of just restartCount: exitCode==0 means the capture finished
 # cleanly; any non-zero exit fails the step immediately instead of silently
 # collecting partial/garbage logs. Timing out (no pod finishing in time) also
-# fails the step rather than continuing on to write a false-pass JUnit.
+# fails the step; cleanup still collects any available logs.
 wait_for_capture() {
   log "waiting for ${CAPTURE_SECS}s capture to complete (detected via container exit)"
   local deadline=$(( $(date +%s) + CAPTURE_SECS + 60 ))
@@ -342,189 +334,39 @@ wait_for_capture() {
 }
 
 # ── 5. collect JSONL ──────────────────────────────────────────────────────────
-# Reads the completed capture from each pod's previous (restarted) container.
-# Falls back to the live container if the pod never restarted in time.
-# Files are kept in SCRATCH_DIR (not ARTIFACT_DIR) and named by ordinal, not
-# node name, so no node identity or address data reaches published artifacts.
+# Preserve the complete container log and extract JSON lines without rewriting
+# events or selecting TLS versions, ports, or handshake types.
 collect_jsonl() {
-  log "collecting JSONL from DaemonSet pods"
-  local pod_count=0
+  log "collecting JSONL and logs from DaemonSet pods"
+  local pods pod raw out pod_count=0 total_events=0 failed=0
+  pods=$(oc get pods -n "${NS}" -l "${CAPTURE_SELECTOR}" \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}') || return 1
 
-  while IFS= read -r pod; do
-    [[ -z "${pod}" ]] && continue
-    local out="${CAPTURES_DIR}/capture-${pod_count}.jsonl"
-    # Pod stdout mixes probe log lines with JSON events; keep only JSON lines.
-    { oc logs "${pod}" -n "${NS}" --previous 2>/dev/null \
-        || oc logs "${pod}" -n "${NS}" 2>/dev/null; } \
-      | grep -E '^\{' > "${out}" || true
+  for pod in ${pods}; do
+    raw="${CAPTURES_DIR}/capture-${pod_count}.log"
+    out="${CAPTURES_DIR}/capture-${pod_count}.jsonl"
+    log "${pod} -> capture-${pod_count}"
+    if ! oc logs "${pod}" -n "${NS}" -c capture --previous > "${raw}"; then
+      log "${pod}: completed capture unavailable; retaining current logs separately"
+      failed=1
+      oc logs "${pod}" -n "${NS}" -c capture > "${CAPTURES_DIR}/capture-${pod_count}.current.log" || true
+    fi
+    # grep returns 1 for an empty capture, checked across all pods below.
+    grep -E '^\{' "${raw}" > "${out}" || { [[ $? -eq 1 ]] || failed=1; }
+    total_events=$(( total_events + $(wc -l < "${out}") ))
     pod_count=$(( pod_count + 1 ))
-  done < <(oc get pods -n "${NS}" -l "${CAPTURE_SELECTOR}" \
-    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)
+  done
 
-  cat "${CAPTURES_DIR}"/*.jsonl > "${SCRATCH_DIR}/all-events.jsonl" 2>/dev/null \
-    || touch "${SCRATCH_DIR}/all-events.jsonl"
-  log "collected from ${pod_count} pod(s) — $(wc -l < "${SCRATCH_DIR}/all-events.jsonl") events"
-}
-
-# ── 6. read cluster TLS policy ────────────────────────────────────────────────
-# Prints the cluster's configured TLSAdherencePolicy, or empty if unset.
-read_adherence_policy() {
-  oc get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null || echo ""
-}
-
-# Decides whether below-TLS-1.3 findings should fail the job.
-should_enforce() {
-  local policy="$1"
-  [[ "${ENFORCE}" == "true" ]] \
-    && [[ "${policy}" != "" ]] \
-    && [[ "${policy}" != "NoOpinion" ]] \
-    && [[ "${policy}" != "LegacyAdheringComponentsOnly" ]] \
-    && echo "true" || echo "false"
-}
-
-# ── 7. verdict ───────────────────────────────────────────────────────────────
-# Aggregates ServerHello events by server (source) port — the negotiated
-# version and the serving port are both on the ServerHello's .src side; .dst
-# is the client's ephemeral port. ClientHello data (offered versions, cipher
-# suites, key share groups) is present in the capture but not evaluated here;
-# client negotiation analysis requires pairing CH→SH per connection.
-# Two filters keep the Spyglass testcase count manageable:
-#   - ephemeral server-side ports (>= 32768) are excluded
-#   - per-port testcases only for ports seen >= 2 times (recurring services)
-# A summary testcase covers all below-TLS-1.3 flows so nothing is silently dropped.
-build_verdict() {
-  local all_events="${SCRATCH_DIR}/all-events.jsonl"
-
-  jq -rsc '
-    map(select(.handshake_type == "ServerHello")) |
-    map(select((.src | split(":")[-1] // "0" | tonumber) < 32768)) |
-    group_by(.src | split(":")[-1] // "0") |
-    map({
-      dst_port: (.[0].src | split(":")[-1] // "0"),
-      handshake_count: length,
-      tls_versions: (map(.tls_version) | unique | sort),
-      worst_tls: (
-        map(.tls_version) |
-        if any(. == "TLS 1.0" or . == "TLS 1.1") then "TLS 1.1"
-        elif any(. == "TLS 1.2") then "TLS 1.2"
-        else "TLS 1.3" end
-      )
-    })
-  ' "${all_events}" 2>/dev/null || echo "[]"
-}
-
-# ── 8. emit JUnit ─────────────────────────────────────────────────────────────
-# Appends one <testcase> block (pass/fail/observe) to the caller's XML
-# accumulator, using bash namerefs rather than eval so shellcheck can see the
-# read/write and the caller's counter/buffer are updated in place.
-emit_testcase() {
-  local name="$1" verdict="$2" message="$3" detail="$4"
-  local -n failure_count_ref="$5"
-  local -n xml_ref="$6"
-
-  local xml
-  if [[ "${verdict}" == "fail" ]]; then
-    failure_count_ref=$(( failure_count_ref + 1 ))
-    xml="  <testcase name=\"${name}\" classname=\"${JUNIT_CLASSNAME}\" time=\"0\">
-    <failure message=\"${message}\">${detail}</failure>
-  </testcase>"
-  else
-    xml="  <testcase name=\"${name}\" classname=\"${JUNIT_CLASSNAME}\" time=\"0\">
-    <system-out>${detail}</system-out>
-  </testcase>"
+  log "collected from ${pod_count} pod(s) — ${total_events} events in ${CAPTURES_DIR}"
+  if (( total_events == 0 )); then
+    log "ERROR: no probe events captured"
+    failed=1
   fi
-
-  xml_ref+="${xml}"$'\n'
-}
-
-# Writes junit_tls_probe.xml from the aggregated verdict. Test names are
-# static (no runtime-derived destination port) so Spyglass/Sippy test
-# identity stays stable across runs; per-port detail lives in the single
-# summary testcase's body instead of one dynamically-named testcase per port.
-write_junit() {
-  local policy="$1" enforce="$2" total_events="$3"
-  local full_verdict="$4"
-
-  local junit_failures=0
-  local tc_xml=""
-
-  local total_ports below13_ports below13_detail all_ports_detail
-
-  total_ports=$(echo "${full_verdict}" | jq 'length')
-  below13_ports=$(echo "${full_verdict}" | jq '[.[] | select(.worst_tls != "TLS 1.3")] | length')
-  below13_detail=$(echo "${full_verdict}" | jq -r '
-    [.[] | select(.worst_tls != "TLS 1.3")]
-    | map("port/\(.dst_port)(\(.worst_tls)x\(.handshake_count))")
-    | join(", ")')
-  all_ports_detail=$(echo "${full_verdict}" | jq -r '
-    map("port/\(.dst_port)(\(.worst_tls)x\(.handshake_count))")
-    | join(", ")')
-
-  echo "${full_verdict}" > "${PROBE_DIR}/server-summary.json"
-
-  log "ports observed (<32768): ${total_ports} | below-TLS-1.3: ${below13_ports}"
-
-  # No traffic captured → skipped testcase.
-  if [[ "${total_ports}" -eq 0 ]]; then
-    cat > "${PROBE_DIR}/junit_tls_probe.xml" <<XMLEOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="tls-probe" tests="1" failures="0" skipped="1" time="0">
-  <properties>
-    <property name="adherence-policy" value="${policy}"/>
-    <property name="enforce" value="${enforce}"/>
-    <property name="total-events" value="${total_events}"/>
-  </properties>
-  <testcase name="[OCPFeatureGate:TLSAdherence] tls-probe: capture [phase:runtime]" classname="${JUNIT_CLASSNAME}" time="0">
-    <skipped message="No ServerHello events captured in ${CAPTURE_SECS}s window."/>
-  </testcase>
-</testsuite>
-XMLEOF
-    cp "${PROBE_DIR}/junit_tls_probe.xml" "${ARTIFACT_DIR}/junit_tls_probe.xml"
-    log "JUnit: skipped (no traffic)"
-    return
-  fi
-
-  # Single static-named summary testcase; all per-port detail is in its body.
-  local summary_name="[OCPFeatureGate:TLSAdherence] tls-probe: server handshake adherence [phase:runtime]"
-  if [[ "${below13_ports}" -eq 0 ]]; then
-    emit_testcase "${summary_name}" pass "" \
-      "PASS: all captured handshakes TLS 1.3. events=${total_events} ports=[${all_ports_detail}]" \
-      junit_failures tc_xml
-  elif [[ "${enforce}" == "true" ]]; then
-    emit_testcase "${summary_name}" fail \
-      "${below13_ports} port(s) with below-TLS-1.3 handshakes" \
-      "below-TLS-1.3: ${below13_detail} | all ports: [${all_ports_detail}] | policy=${policy} | events=${total_events}" \
-      junit_failures tc_xml
-  else
-    emit_testcase "${summary_name}" observe "" \
-      "OBSERVE: ${below13_ports} port(s) below TLS 1.3: ${below13_detail} | all ports: [${all_ports_detail}] | events=${total_events}" \
-      junit_failures tc_xml
-  fi
-
-  cat > "${PROBE_DIR}/junit_tls_probe.xml" <<XMLEOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="tls-probe" tests="1" failures="${junit_failures}" time="0">
-  <properties>
-    <property name="adherence-policy" value="${policy}"/>
-    <property name="enforce" value="${enforce}"/>
-    <property name="total-events" value="${total_events}"/>
-    <property name="probe-image" value="${PROBE_IMG}"/>
-    <property name="capture-duration-secs" value="${CAPTURE_SECS}"/>
-  </properties>
-${tc_xml}</testsuite>
-XMLEOF
-
-  cp "${PROBE_DIR}/junit_tls_probe.xml" "${ARTIFACT_DIR}/junit_tls_probe.xml"
-  log "JUnit written: failures=${junit_failures} enforce=${enforce}"
-
-  if [[ "${junit_failures}" -gt 0 ]] && [[ "${enforce}" == "true" ]]; then
-    die "${junit_failures} testcase(s) failed (enforce=true)"
-  fi
+  return "${failed}"
 }
 
 # ── main ──────────────────────────────────────────────────────────────────────
-# Orchestrates deploy → capture → collect → verdict → JUnit, always cleaning
-# up the namespace and scoped SCC on exit.
+# Collection and cleanup run on exit, including on operational failure.
 main() {
   setup
   trap cleanup EXIT
@@ -533,19 +375,6 @@ main() {
   deploy_daemonset
   generate_traffic
   wait_for_capture
-  collect_jsonl
-
-  local policy enforce total_events full_verdict
-  policy=$(read_adherence_policy)
-  enforce=$(should_enforce "${policy}")
-  total_events=$(wc -l < "${SCRATCH_DIR}/all-events.jsonl" || echo 0)
-  full_verdict=$(build_verdict)
-
-  log "policy=${policy} enforce=${enforce} events=${total_events}"
-
-  write_junit "${policy}" "${enforce}" "${total_events}" "${full_verdict}"
-
-  log "complete"
 }
 
 main "$@"
