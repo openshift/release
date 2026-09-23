@@ -107,6 +107,138 @@ ansible-playbook playbooks/ran/hub-sno-configure-acm.yml \
   -i ./inventories/ocp-deployment/build-inventory.py \
   --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
 
+
+# Keep this block identical in the seed and target hub-config steps.
+if [[ "${ENSURE_IBI_HUB_READY:-false}" == "true" ]]; then
+  READY_SCRIPT=$(mktemp /tmp/ibi-hub-ready.XXXXXX.py)
+  cat > "${READY_SCRIPT}" <<'PY'
+import json
+import subprocess
+import sys
+import time
+
+kubeconfig = sys.argv[1]
+
+
+def oc(*args):
+    result = subprocess.run(
+        ['oc', '--kubeconfig', kubeconfig, '--request-timeout=30s', *args],
+        text=True, capture_output=True,
+    )
+    if result.returncode and args[:2] == ('auth', 'can-i') and result.stdout.strip() == 'no':
+        return 'no'
+    if result.returncode:
+        # Do not print server addresses or credential-bearing command arguments.
+        raise RuntimeError('Hub API command failed: ' + ' '.join(args[:2]))
+    return result.stdout.strip()
+
+
+def read(*args):
+    return json.loads(oc('get', *args, '-o', 'json'))
+
+
+def wait_for(description, check):
+    deadline = time.monotonic() + 600
+    while True:
+        if check():
+            print(description + ': ready', flush=True)
+            return
+        if time.monotonic() >= deadline:
+            raise RuntimeError(description + ': timed out after 600 seconds')
+        time.sleep(10)
+
+
+def deployment_ready(namespace, name):
+    raw = oc('get', 'deployment', name, '-n', namespace,
+             '--ignore-not-found', '-o', 'json')
+    if not raw:
+        return False
+    obj = json.loads(raw)
+    status = obj.get('status', {})
+    desired = obj.get('spec', {}).get('replicas', 1)
+    return (desired > 0
+            and status.get('observedGeneration', 0) >= obj['metadata']['generation']
+            and status.get('updatedReplicas', 0) == desired
+            and status.get('replicas', 0) == desired
+            and status.get('availableReplicas', 0) == desired)
+
+
+mch = read('multiclusterhub', 'multiclusterhub', '-n', 'open-cluster-management')
+overrides = mch['spec'].get('overrides', {})
+components = overrides.get('components', [])
+siteconfig = [item for item in components if item.get('name') == 'siteconfig']
+if len(siteconfig) > 1:
+    raise RuntimeError('Multiple SiteConfig component entries in MultiClusterHub')
+if not siteconfig or siteconfig[0].get('enabled') is not True:
+    components = [dict(item, enabled=True) if item.get('name') == 'siteconfig'
+                  else item for item in components]
+    if not siteconfig:
+        components.append({'name': 'siteconfig', 'enabled': True})
+    # Resource version prevents overwriting a concurrent controller update.
+    patch = {'metadata': {'resourceVersion': mch['metadata']['resourceVersion']},
+             'spec': {'overrides': {'components': components}}}
+    oc('patch', 'multiclusterhub', 'multiclusterhub', '-n', 'open-cluster-management',
+       '--type=merge', '-p', json.dumps(patch))
+
+wait_for('SiteConfig controller', lambda: deployment_ready(
+    'multicluster-engine', 'siteconfig-controller-manager'))
+
+
+def crd_ready():
+    raw = oc('get', 'crd', 'clusterinstances.siteconfig.open-cluster-management.io',
+             '--ignore-not-found', '-o', 'json')
+    return bool(raw) and any(c.get('type') == 'Established' and c.get('status') == 'True'
+                            for c in json.loads(raw).get('status', {}).get('conditions', []))
+
+
+wait_for('ClusterInstance CRD', crd_ready)
+csv = None
+
+
+def talm_installed():
+    global csv
+    subscriptions = read('subscriptions.operators.coreos.com', '-n', 'openshift-operators')
+    matches = [s for s in subscriptions['items']
+               if s.get('spec', {}).get('name') == 'topology-aware-lifecycle-manager']
+    if len(matches) != 1:
+        raise RuntimeError('Expected exactly one TALM Subscription in openshift-operators')
+    name = matches[0].get('status', {}).get('installedCSV')
+    if not name:
+        return False
+    raw = oc('get', 'csv', name, '-n', 'openshift-operators', '--ignore-not-found', '-o', 'json')
+    csv = json.loads(raw) if raw else None
+    return csv is not None and csv.get('status', {}).get('phase') == 'Succeeded'
+
+
+wait_for('TALM installed CSV', talm_installed)
+deployments = csv['spec']['install']['spec']['deployments']
+if not deployments:
+    raise RuntimeError('TALM CSV contains no deployments')
+for deployment in deployments:
+    name = deployment['name']
+    wait_for('TALM deployment ' + name,
+             lambda: deployment_ready('openshift-operators', name))
+    live = read('deployment', name, '-n', 'openshift-operators')
+    account = live['spec']['template']['spec'].get('serviceAccountName', 'default')
+    for resource in ('policies.policy.open-cluster-management.io',
+                     'clustergroupupgrades.ran.openshift.io'):
+        # A denied check is a hard failure, not a reason to grant extra privileges.
+        answer = oc('auth', 'can-i', 'list', resource, '--all-namespaces',
+                    '--as=system:serviceaccount:openshift-operators:' + account)
+        if answer != 'yes':
+            raise RuntimeError('TALM service account cannot list ' + resource)
+print('IBI hub prerequisites verified', flush=True)
+PY
+  if ansible bastion -i ./inventories/ocp-deployment/build-inventory.py \
+    -m ansible.builtin.script \
+    -a "${READY_SCRIPT} ${KUBECONFIG_PATH} executable=python3"; then
+    rm -f "${READY_SCRIPT}"
+  else
+    rm -f "${READY_SCRIPT}"
+    exit 1
+  fi
+fi
+
 echo "Configuring kustomize plugin"
 ansible-playbook playbooks/ran/hub-sno-configure-kustomize-plugin.yml \
   -i ./inventories/ocp-deployment/build-inventory.py \
