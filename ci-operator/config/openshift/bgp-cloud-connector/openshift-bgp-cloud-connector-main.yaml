@@ -2356,6 +2356,158 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: probe-nic-forwarding
+      cli: latest
+      commands: |
+        # Whether the operator can turn on IP forwarding where the e2e suite
+        # cannot. The suite failed doing exactly this, and the interesting part
+        # is that it failed on a linked scope rather than on the interface:
+        #
+        #   has permission to perform 'networkInterfaces/write' on the NIC;
+        #   however, it does not have permission to perform
+        #   'loadBalancers/backendAddressPools/join/action' and is blocked by
+        #   deny assignments on the linked scope
+        #
+        # The operator and the suite do not use the same principal. The operator
+        # uses what the cloud credential operator issues, which on passthrough
+        # is the cluster's own and is the single principal the deny assignment
+        # excludes. The suite authenticates with DefaultAzureCredential, which
+        # finds the az session this job logged in with, which is the cluster
+        # profile's. So the same request should be allowed for one and refused
+        # for the other, and that is what this measures: one PUT, two
+        # principals, the full interface body either way, exactly as the
+        # operator's SDK sends it.
+        set +e
+        set -uo pipefail
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        profile_cfg="$(mktemp -d)"
+        issued_cfg="$(mktemp -d)"
+        err="$(mktemp)"
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+        section() { echo; echo "=== $* ==="; }
+
+        rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')"
+        if [[ -z "${rg}" ]]; then
+          echo "no cluster to ask"; exit 0
+        fi
+
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        if ! AZURE_CONFIG_DIR="${profile_cfg}" az login --service-principal \
+             --username "$(jq -er .clientId "${sp}")" \
+             --password="$(jq -er .clientSecret "${sp}")" \
+             --tenant "$(jq -er .tenantId "${sp}")" --output none 2>"${err}"; then
+          echo "could not log in with the cluster profile's principal:"
+          redact <"${err}" | sed 's/^/  /'; exit 0
+        fi
+        subscription="$(jq -er .subscriptionId "${sp}")"
+        AZURE_CONFIG_DIR="${profile_cfg}" az account set --subscription "${subscription}" 2>/dev/null
+
+        section "the interface the operator would write"
+        # Found the way the operator finds it: the virtual machine is parsed out
+        # of the node's providerID and interfaces are matched on their
+        # VirtualMachine.ID.
+        provider_id="$(oc get nodes -l node-role.kubernetes.io/worker \
+          -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null)"
+        vm="${provider_id##*/}"
+        nic_id="$(AZURE_CONFIG_DIR="${profile_cfg}" az network nic list -g "${rg}" \
+          --query "[?virtualMachine.id != null && contains(virtualMachine.id, '${vm}')].id | [0]" \
+          -o tsv 2>/dev/null)"
+        if [[ -z "${nic_id}" || "${nic_id}" == "None" ]]; then
+          echo "  no interface found for worker ${vm:-<none>}"; exit 0
+        fi
+        echo "  $(redact <<<"${nic_id}")"
+
+        section "is it joined to a load balancer backend pool"
+        # The linked scope the suite was refused on. If it is empty the refusal
+        # had nothing to link to and this whole reading is wrong.
+        pools="$(AZURE_CONFIG_DIR="${profile_cfg}" az network nic show --ids "${nic_id}" \
+          --query "ipConfigurations[].loadBalancerBackendAddressPools[].id" -o tsv 2>/dev/null)"
+        if [[ -z "${pools}" ]]; then
+          echo "  no: it is in no backend pool"
+        else
+          echo "  yes:"; redact <<<"${pools}" | sed 's/^/    /'
+        fi
+
+        body="$(mktemp)"
+        AZURE_CONFIG_DIR="${profile_cfg}" az network nic show --ids "${nic_id}" -o json 2>/dev/null >"${body}"
+        original="$(jq -r '.enableIPForwarding // false' "${body}")"
+        echo "  enableIPForwarding is currently ${original}"
+
+        # The whole interface, written back whole, which is what the operator's
+        # SDK does and what carries the backend pool linkage into the request.
+        put_body="$(mktemp)"
+        jq '{location: .location, tags: .tags, properties: (.  | del(.location, .tags, .id, .name, .type, .etag, .resourceGroup))}' \
+          "${body}" >"${put_body}" 2>/dev/null
+        jq --argjson v true '.properties.enableIPForwarding = $v' "${put_body}" >"${put_body}.on" 2>/dev/null
+
+        api="2024-05-01"
+        try_put() {
+          local cfg="$1" who="$2"
+          if AZURE_CONFIG_DIR="${cfg}" az rest --method put \
+               --url "https://management.azure.com${nic_id}?api-version=${api}" \
+               --body "@${put_body}.on" --output none 2>"${err}"; then
+            echo "  ${who}: ALLOWED"
+            return 0
+          fi
+          echo "  ${who}: REFUSED"
+          redact <"${err}" | grep -oE '"code":"[^"]+"|LinkedAuthorizationFailed|AuthorizationFailed|DenyAssignment[A-Za-z]*' | head -3 | sed 's/^/    /'
+          return 1
+        }
+
+        section "the same PUT as the cluster profile's principal"
+        # The suite's principal. Expected to be refused, which is the failure
+        # E2E-AZURE-03 hit.
+        try_put "${profile_cfg}" "cluster profile principal"
+
+        section "the same PUT as the principal the operator is given"
+        client_id="$(oc -n bgp-probe get secret bgp-probe-credentials -o jsonpath='{.data.azure_client_id}' 2>/dev/null | base64 -d)"
+        client_secret="$(oc -n bgp-probe get secret bgp-probe-credentials -o jsonpath='{.data.azure_client_secret}' 2>/dev/null | base64 -d)"
+        tenant_id="$(oc -n bgp-probe get secret bgp-probe-credentials -o jsonpath='{.data.azure_tenant_id}' 2>/dev/null | base64 -d)"
+        if [[ -z "${client_id}" || -z "${client_secret}" ]]; then
+          echo "  no issued credential to try; probe-cluster has to run first"
+        else
+          logged_in=false
+          for _ in 1 2 3 4; do
+            if AZURE_CONFIG_DIR="${issued_cfg}" az login --service-principal \
+                 --username "${client_id}" --password="${client_secret}" \
+                 --tenant "${tenant_id}" --output none 2>"${err}"; then
+              logged_in=true; break
+            fi
+            sleep 20
+          done
+          if [[ "${logged_in}" != true ]]; then
+            echo "  could not log in as the issued principal:"
+            redact <"${err}" | head -3 | sed 's/^/    /'
+          else
+            AZURE_CONFIG_DIR="${issued_cfg}" az account set --subscription "${subscription}" 2>/dev/null
+            try_put "${issued_cfg}" "issued principal"
+          fi
+        fi
+
+        section "putting it back"
+        jq --argjson v "${original}" '.properties.enableIPForwarding = $v' "${put_body}" >"${put_body}.off" 2>/dev/null
+        for cfg in "${issued_cfg}" "${profile_cfg}"; do
+          if AZURE_CONFIG_DIR="${cfg}" az rest --method put \
+               --url "https://management.azure.com${nic_id}?api-version=${api}" \
+               --body "@${put_body}.off" --output none 2>/dev/null; then
+            echo "  restored enableIPForwarding=${original}"
+            break
+          fi
+        done
+
+        rm -f "${err}" "${body}" "${put_body}" "${put_body}.on" "${put_body}.off"
+        section "done"
+        exit 0
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - ref: bgp-cloud-connector-estate-create
     - as: probe-estate-access
       cli: latest
