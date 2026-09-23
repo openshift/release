@@ -67,6 +67,15 @@ rosa-marketplace-release-publish
         +-- enabled  -> staging-only generator invocation
 ```
 
+### Trigger choice
+
+This design uses a four-hour periodic and release-controller API polling. It
+does not add a release-controller informing job. An informing job is evaluated
+for individual payloads, while this monitor needs to observe a future y-stream
+before it exists and act on the first payload whose image is built. The
+periodic also provides bounded retries for normal lifecycle wait states without
+running once for every later payload in the same y-stream.
+
 ## Component structure
 
 ### CI source configuration
@@ -115,6 +124,12 @@ The current periodic explicitly sets publishing to `false`. Its CLI image does
 not supply the Marketplace generator or Marketplace AWS credentials. Before the
 publisher can be enabled, the consuming job must use an approved immutable or
 protected generator image and mount the required staging credentials.
+
+The `openshift-online/rosa-marketplace-release-generator` repository is
+onboarded separately in OpenShift CI. It is not a runtime dependency of this
+observation-only phase: the disabled publisher returns before looking for the
+generator executable. Enabling publication requires a separately reviewed,
+immutable build of that repository.
 
 ### Tests and fixtures
 
