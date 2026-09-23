@@ -324,10 +324,20 @@ function suite() {
     fi
 
     if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/conformance/serial" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
-        TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")" &&
-        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
-        echo "Tests to be skipped:" &&
-        echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
+        TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")" || return $?
+        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests || return $?
+        echo "Tests to be skipped:"
+        if echo "${TESTS}" | grep "${TEST_SKIPS}"; then
+            :
+        else
+            exit_code=$?
+            if [[ ${exit_code} -eq 1 ]]; then
+                echo 'Warning: no tests were found matching the TEST_SKIPS regex:'
+                echo "${TEST_SKIPS}"
+            else
+                return ${exit_code}
+            fi
+        fi
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
         scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
 
