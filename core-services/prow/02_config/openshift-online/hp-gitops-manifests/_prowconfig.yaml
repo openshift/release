@@ -12,9 +12,13 @@ branch-protection:
             - gitops-automator
 tide:
   queries:
-  - includedBranches:
-    - main
-    - overlays/prod
+  # Branches are app-scoped paths (e.g. hp-delivery/delivery-dashboard/overlays/prod),
+  # so match the overlays/<env> suffix on any prefix rather than exact names, mirroring
+  # the branch-protection regex above. Exact includedBranches never matched the full
+  # branch names, leaving promotion PRs stuck ("No Tide query for branch ... found").
+  - includedBranchesRe:
+    - ^main$
+    - (^|/)overlays/prod$
     labels:
     - approved
     - lgtm
@@ -25,12 +29,9 @@ tide:
     - jira/invalid-bug
     repos:
     - openshift-online/hp-gitops-manifests
-  - includedBranches:
-    - overlays/int
-    - overlays/int-next
-    - overlays/prod-next
-    - overlays/stage
-    - overlays/stage-next
+  - includedBranchesRe:
+    - (^|/)overlays/(int|stage)$
+    - (^|/)overlays/(int|stage|prod)-next$
     missingLabels:
     - do-not-merge/hold
     - do-not-merge/invalid-owners-file
