@@ -175,14 +175,3 @@ run_command "az network firewall application-rule create --collection-name azure
 if [[ X"${RESTRICTED_NETWORK}" != X"yes" ]]; then
     run_command "az network firewall application-rule create --collection-name redhat --firewall-name ${FW} --name redhat --protocols Http=80 Https=443 --resource-group ${RESOURCE_GROUP} --target-fqdns ${redhat_fqdns_list} --source-addresses ${addressPrefix} --priority 400 --action Allow"
 fi
-
-echo "=== firewall-route debug: dump resources ==="
-run_command "az network vnet peering list -g ${RESOURCE_GROUP} --vnet-name ${vnet_name} -o json"
-run_command "az network vnet peering list -g ${RESOURCE_GROUP} --vnet-name fw-vnet -o json"
-run_command "az network firewall show -g ${RESOURCE_GROUP} -n ${FW} -o json"
-run_command "az network firewall ip-config list -g ${RESOURCE_GROUP} -f ${FW} -o json"
-run_command "az network firewall application-rule collection list -g ${RESOURCE_GROUP} --firewall-name ${FW} -o json"
-run_command "az network route-table show -g ${RESOURCE_GROUP} -n Firewall-rt-table -o json"
-run_command "az network vnet subnet show -g ${RESOURCE_GROUP} --vnet-name ${vnet_name} -n ${master_subnet_name} -o json"
-run_command "az network vnet subnet show -g ${RESOURCE_GROUP} --vnet-name ${vnet_name} -n ${worker_subnet_name} -o json"
-echo "=== firewall-route debug: done ==="
