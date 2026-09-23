@@ -84,8 +84,11 @@ workload role. The boundary must be a policy in the same AWS account.
 State is persisted after each resource creation. Namespace UID/label, AWS
 account, role tag, and bucket owner/tag checks prevent adopted-resource
 cleanup. S3 versions, delete markers, and incomplete multipart uploads are
-removed. Cleanup failures retain state so administrators can investigate and
-retry without weakening ownership checks.
+removed. If cleanup fails, any remaining resources stay in the leased AWS
+account after `SHARED_DIR` is discarded. Resources are named
+`quay-sts-<run-id>` and, once initialization completes, tagged
+`quay-sts-run=<run-id>`; administrators must locate and delete leftovers
+manually.
 
 Offline validation:
 
