@@ -29,3 +29,4 @@ do
     aws ec2 authorize-security-group-ingress --group-id $sg --protocol tcp --port 10000-61000 --cidr 0.0.0.0/0
     aws ec2 authorize-security-group-ingress --group-id $sg --protocol udp --port 10000-61000 --cidr 0.0.0.0/0
 done
+
