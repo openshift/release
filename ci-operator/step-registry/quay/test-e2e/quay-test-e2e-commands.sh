@@ -137,6 +137,14 @@ clone_playwright_sources() {
 
 echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (ref ${PLAYWRIGHT_GIT_REF})"
 clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
+
+# Quote the commit actually under test instead of leaving a triager to infer it from
+# the requested ref. PLAYWRIGHT_GIT_REF may be a branch or tag, so resolve it. The
+# archive fallback in clone_playwright_sources leaves no git metadata; report that
+# rather than failing. One greppable line in this step's build-log.txt.
+PLAYWRIGHT_GIT_SHA="$(git -C "${CLONE_DIR}" rev-parse HEAD 2>/dev/null || echo unknown)"
+echo "PLAYWRIGHT_SOURCE_PROVENANCE repo=${PLAYWRIGHT_GIT_REPO} ref=${PLAYWRIGHT_GIT_REF} sha=${PLAYWRIGHT_GIT_SHA}"
+
 PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
 if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
   echo "ERROR: cloned sources have no web/ directory at ${PLAYWRIGHT_WORKDIR}" >&2
