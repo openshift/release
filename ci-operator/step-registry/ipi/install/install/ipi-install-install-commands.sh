@@ -551,6 +551,82 @@ EOF
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
+function inject_multinic_secondary_nic_bootstrap() {
+  # vSphere assigns predictable PCI slots (192, 224, ...) to successive
+  # vmxnet3 NICs, and MULTI_NIC_IPI always attaches exactly two networks
+  # (see ipi-conf-vsphere-check-vcm-commands.sh), so the secondary interface
+  # on the bootstrap host is always ens224. It receives a DHCP lease just
+  # like the primary (ens192); without pinning it here, that lease can
+  # install a competing default route / extra DNS servers on the bootstrap
+  # host, causing ambiguous address selection and hostname churn.
+  # Control-plane/worker nodes get the equivalent fix via a MachineConfig
+  # from ipi-conf-vsphere-multi-nic-secondary-network, which does not reach
+  # the ephemeral bootstrap host, hence this separate bootstrap.ign patch.
+  local secondary_nic="ens224"
+  local config_dir=/tmp/multinic-bootstrap
+  mkdir -p "${config_dir}"
+
+  local nm_config
+  nm_config=$(cat <<EOF | base64 -w0
+[connection]
+id=${secondary_nic}-secondary-no-default
+type=ethernet
+interface-name=${secondary_nic}
+autoconnect=true
+autoconnect-priority=-999
+
+[ipv4]
+method=auto
+never-default=true
+ignore-auto-dns=true
+route-metric=1024
+
+[ipv6]
+method=auto
+never-default=true
+ignore-auto-dns=true
+route-metric=1024
+EOF
+)
+
+  cat >> "${config_dir}/fcct.yml" << EOF
+variant: fcos
+version: 1.1.0
+ignition:
+  config:
+    merge:
+      - local: bootstrap_initial.ign
+storage:
+  files:
+    - path: /etc/NetworkManager/system-connections/${secondary_nic}-secondary.nmconnection
+      mode: 0600
+      overwrite: true
+      contents:
+        source: data:text/plain;charset=utf-8;base64,${nm_config}
+EOF
+
+  cp "${dir}/bootstrap.ign" "${config_dir}/bootstrap_initial.ign"
+  # Fetch butane from the internal mirror, like the other vsphere
+  # step-registry scripts do, instead of github.com directly.
+  local butane_filename="butane"
+  if [[ "$(uname -m)" == "x86_64" ]]; then
+    butane_filename="butane-amd64"
+  else
+    butane_filename="butane-$(uname -m)"
+  fi
+  # SSL_CERT_FILE is set to the vCenter-only CA bundle earlier in this
+  # script (for talking to vCenter's API), which breaks TLS verification
+  # of this public mirror's normal certificate. Use the system trust
+  # store for this call instead.
+  if ! retry-ipi-install-command "fcct download" env -u SSL_CERT_FILE curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
+    "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/butane/latest/${butane_filename}" -o /tmp/fcct; then
+    echo "ERROR: failed to download butane/fcct for the multinic bootstrap patch" >&2
+    exit 1
+  fi
+  chmod ug+x /tmp/fcct
+  /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
+}
+
 function is_yq_usable() {
   if [[ ! -x /tmp/yq ]]; then
     return 1
@@ -960,9 +1036,8 @@ done <   <( find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -n
 case "${CLUSTER_TYPE}" in
 azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-true} ;;
 esac
-if [ "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" == "true" ]; then
+if [ "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" == "true" ] || [ "${MULTI_NIC_IPI:-}" == "true" ]; then
   set +o errexit
-  # Inject promtail in bootstrap.ign
   ${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &
   wait "$!"
   ret="$?"
@@ -971,7 +1046,16 @@ if [ "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" == "true" ]; then
 	  exit "${ret}"
   fi
   set -o errexit
-  inject_promtail_service
+
+  if [ "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" == "true" ]; then
+    # Inject promtail in bootstrap.ign
+    inject_promtail_service
+  fi
+
+  if [ "${MULTI_NIC_IPI:-}" == "true" ]; then
+    # Pin the secondary NIC off the default route / DNS path in bootstrap.ign
+    inject_multinic_secondary_nic_bootstrap
+  fi
 fi
 
 if [ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-}" == "true" ]; then

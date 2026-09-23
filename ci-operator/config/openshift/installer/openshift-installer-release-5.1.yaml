@@ -148,7 +148,7 @@ prowgen:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      curl http://base-openstack-5-0.ocp.svc/ > /etc/yum.repos.art/ci/base-openstack-5-0.repo
+      curl http://base-openstack-5-0.ocp.svc/ > /etc/yum.repos.d/base-openstack-5-0.repo
     from: ocp_base-rhel9
     to: openstack-base
 releases:
@@ -797,8 +797,13 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     env:
-      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_MULTIDISK_COMPUTE_DISKS: |
+        user-defined:containers:32:0:Premium_LRS:/var/lib/containers
+        user-defined:kubelet:16:1:StandardSSD_LRS:/var/lib/kubelet
+      AZURE_MULTIDISK_CONTROL_PLANE_DISKS: |
+        etcd:etcddisk:64:0:Premium_LRS:
+        user-defined:containers:32:1:StandardSSD_LRS:/var/lib/containers
       FEATURE_SET: TechPreviewNoUpgrade
       USER_TAGS: |
         keyA valueA

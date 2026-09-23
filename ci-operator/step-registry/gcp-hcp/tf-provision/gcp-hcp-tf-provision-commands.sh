@@ -93,11 +93,24 @@ fi
 
 WORKSPACE_NAME="platform-e2e-${RUN_ID}"
 REGION="${GCP_REGION:-us-central1}"
+TESTED_SHA_PATH="${SHARED_DIR}/gcp-hcp-tested-sha"
+
+if [[ ! -s "${TESTED_SHA_PATH}" ]]; then
+  log "ERROR: Tested gcp-hcp-infra SHA is missing or empty: ${TESTED_SHA_PATH}"
+  exit 1
+fi
+GIT_REVISION="$(<"${TESTED_SHA_PATH}")"
+
+if [[ ! "${GIT_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+  log "ERROR: Tested gcp-hcp-infra SHA is not a full lowercase Git SHA"
+  exit 1
+fi
 
 log "Configuration:"
 log "  Run ID:      ${RUN_ID}"
 log "  Workspace:   ${WORKSPACE_NAME}"
 log "  Region:      ${REGION}"
+log "  Git revision: ${GIT_REVISION}"
 log "  BUILD_ID:    ${BUILD_ID}"
 log "  JOB_NAME:    ${JOB_NAME:-unknown}"
 
@@ -106,7 +119,7 @@ log "  JOB_NAME:    ${JOB_NAME:-unknown}"
 cd "${REPO_ROOT}"  # gcp-hcp-infra repo root (from: src)
 
 log "Rendering e2e template..."
-RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}")"
+RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}" "${GIT_REVISION}")"
 
 if [[ ! -d "${RENDERED_DIR}" ]]; then
   log "ERROR: Render script failed - directory not created"
