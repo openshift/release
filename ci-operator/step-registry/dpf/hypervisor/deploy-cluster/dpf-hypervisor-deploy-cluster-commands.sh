@@ -149,7 +149,12 @@ echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hyp
 
 echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
 # Pass the CI release payload (resolved by ci-operator from the releases.latest config)
-PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
+if [[ "${DPF_SKIP_CI_PAYLOAD:-false}" == "true" ]]; then
+  PAYLOAD_URL=""
+  echo "DPF_SKIP_CI_PAYLOAD is set; skipping CI release payload injection"
+else
+  PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
+fi
 echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
 
 # Merge CI registry credentials into the pull secret so the cluster can
