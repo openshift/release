@@ -44,12 +44,12 @@ wait_for_deletion() {
   if status=$(stack_status); then
     echo "ERROR: Timed out waiting for apps DNS stack ${STACK_NAME} deletion; current status: ${status}" >&2
     return 1
-  fi
-
-  rc=$?
-  if [[ "${rc}" -eq 2 ]]; then
-    echo "Apps DNS stack ${STACK_NAME} is already absent"
-    return 0
+  else
+    rc=$?
+    if [[ "${rc}" -eq 2 ]]; then
+      echo "Apps DNS stack ${STACK_NAME} is already absent"
+      return 0
+    fi
   fi
 
   return 1
