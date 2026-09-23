@@ -25,11 +25,9 @@ The `e2e-sts` job in the Quay Operator `master__ocp-latest` configuration runs:
    `make test-e2e-sts` from the operator PR source. The Chainsaw test validates
    the CredentialRequest and projected-token configuration and exercises Quay
    image push, pull, and repository mirroring.
-5. `quay-sts-teardown` deletes only `quayregistry/sts-cco` and the run-owned
-   namespace while the operator is available to process finalizers.
-6. `ipi-aws-post-manual-oidc-sts` destroys the cluster and removes the OIDC and
+5. `ipi-aws-post-manual-oidc-sts` destroys the cluster and removes the OIDC and
    platform IAM infrastructure created by `ccoctl`.
-7. `quay-sts-cleanup` verifies AWS account and resource ownership tags, then
+6. `quay-sts-cleanup` verifies AWS account and resource ownership tags, then
    deletes the run-owned role, bucket contents, and bucket.
 
 All cleanup actions run in the job's post phase. The existing Quay `e2e` and

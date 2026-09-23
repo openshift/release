@@ -270,7 +270,7 @@ class Tests(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
         self.assertIn('chain: ipi-aws-pre-manual-oidc-sts', config)
         self.assertIn('chain: ipi-aws-post-manual-oidc-sts', config)
         self.assertIn('ref: quay-sts-install', config)
-        self.assertIn('ref: quay-sts-teardown', config)
+        self.assertNotIn('ref: quay-sts-teardown', config)
         for ref in ('provision', 'test', 'cleanup'):
             self.assertNotIn('collection: quay-qe',
                              (ROOT / ref / f'quay-sts-{ref}-ref.yaml').read_text())
@@ -284,11 +284,6 @@ class Tests(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
         self.assertIn('ROLEARN', script)
         self.assertNotIn('oc set env deployment', script)
 
-    def test_teardown_targets_only_the_run_registry(self):
-        script = (ROOT / 'teardown/quay-sts-teardown-commands.sh').read_text()
-        self.assertIn("'delete', 'quayregistry/sts-cco'", script)
-        self.assertNotIn('quayregistries --all', script)
-        self.assertNotIn('delete crd', script)
 
 
 if __name__ == '__main__':
