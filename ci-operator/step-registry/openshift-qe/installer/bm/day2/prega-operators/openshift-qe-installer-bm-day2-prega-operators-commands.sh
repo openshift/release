@@ -17,8 +17,11 @@ get_idms_manifest() {
   echo "Getting the ImageDigestMirrorSet manifest from the PREGA build server"
   QUAY_URL="https://quay.io/api/v1/repository/prega/prega-operator-index/tag/?limit=100&page=1"
   OCP_VERSION=$(oc get clusterversion --no-headers | grep -oE '[0-9]+\.[0-9]+' | head -1 | awk '{print "v"$0}')
+  # Disable xtrace: curl requests use QUAY_ACCESS_TOKEN in Authorization header
+  set +x
   DIGEST=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg tag "$OCP_VERSION" '.tags[] | select(.name == $tag) | .manifest_digest' | head -1)
   OPERATOR_PREGA_VERSION=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg digest "$DIGEST" --arg tag "$OCP_VERSION" '.tags[] | select(.manifest_digest == $digest and .name != $tag) | .name' | sort -u)
+  set -x
   if [[ -z "${OPERATOR_PREGA_VERSION}" ]]; then
     echo "OPERATOR_PREGA_VERSION could not be resolved from Quay; falling back to OCP_VERSION: ${OCP_VERSION}"
     OPERATOR_PREGA_VERSION="${OCP_VERSION}"
