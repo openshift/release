@@ -162,13 +162,13 @@ function collect_stack_deletion_diagnostics()
     aws --region "${REGION}" cloudformation describe-stacks \
         --stack-name "${stack_name}" \
         --query 'Stacks[0].{StackStatus:StackStatus,StackStatusReason:StackStatusReason}' \
-        --output json > "${artifact_prefix}-status.json" 2>&1 || true
+        --output json > "${artifact_prefix}-status.json" 2> "${artifact_prefix}-status.err" || true
 
     aws --region "${REGION}" cloudformation describe-stack-events \
         --stack-name "${stack_name}" \
         --max-items 20 \
         --query 'StackEvents[].{Timestamp:Timestamp,LogicalResourceId:LogicalResourceId,ResourceType:ResourceType,ResourceStatus:ResourceStatus,ResourceStatusReason:ResourceStatusReason}' \
-        --output json > "${artifact_prefix}-events.json" 2>&1 || true
+        --output json > "${artifact_prefix}-events.json" 2> "${artifact_prefix}-events.err" || true
 }
 
 function delete_stacks()
