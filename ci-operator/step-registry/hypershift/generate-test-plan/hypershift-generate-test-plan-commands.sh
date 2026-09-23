@@ -38,17 +38,42 @@ run_claude_metered() {
   local raw rc=0 timeout_cmd=()
   raw="$(mktemp)"
   [ -n "${CLAUDE_TIMEOUT:-}" ] && timeout_cmd=(timeout "${CLAUDE_TIMEOUT}")
-  "${timeout_cmd[@]}" agentic-ci run \
+
+  # Security: Unset sensitive env vars and block access to service account tokens
+  # to prevent the LLM agent from accessing cluster credentials or making
+  # unauthorized API calls during test plan generation
+  local SENSITIVE_VARS=(
+    "KUBECONFIG"
+    "AWS_SHARED_CREDENTIALS_FILE"
+    "AWS_ACCESS_KEY_ID"
+    "AWS_SECRET_ACCESS_KEY"
+    "AZURE_CREDENTIALS"
+    "GOOGLE_APPLICATION_CREDENTIALS"
+  )
+  local unset_cmd=""
+  for var in "${SENSITIVE_VARS[@]}"; do
+    unset_cmd+="unset ${var}; "
+  done
+
+  "${timeout_cmd[@]}" bash -c "${unset_cmd} exec agentic-ci run \
     --backend local \
     --harness claude-code \
-    --model "${CLAUDE_MODEL}" \
-    --workdir "${PWD}" \
+    --model \"${CLAUDE_MODEL}\" \
+    --workdir \"${PWD}\" \
     --no-streaming \
-    "${prompt}" \
+    \"${prompt}\" \
     -- \
     --verbose \
     --output-format stream-json \
-    "$@" \
+    --permission Bash:ask \
+    --permission Edit:allow \
+    --permission Read:allow \
+    --permission Write:allow \
+    --deny-tool WebFetch \
+    --deny-tool WebSearch \
+    --deny-tool Agent \
+    --deny-tool SendMessage \
+    $(printf '%q ' "$@")" \
     > "${raw}" 2>>"${ARTIFACT_DIR}/claude-agentic-ci.log" || rc=$?
   grep '^{' "${raw}" > "${out_file}" || true
   rm -f "${raw}"
@@ -76,12 +101,28 @@ if ! command -v claude &>/dev/null; then
 fi
 echo "Claude Code CLI: $(claude --version 2>/dev/null || echo 'unknown')"
 
-# Clone the PR head so Claude can inspect the diff and source
-echo "Cloning ${REPO_ORG}/${REPO_NAME} at PR head..."
+# Clone the PR at Prow's scheduled revision so Claude inspects the exact tested commit
+echo "Cloning ${REPO_ORG}/${REPO_NAME} at PR #${PR_NUMBER}..."
 git clone "https://github.com/${REPO_ORG}/${REPO_NAME}.git" /tmp/hypershift
 cd /tmp/hypershift
-git fetch origin "pull/${PR_NUMBER}/head:pr-${PR_NUMBER}"
-git checkout "pr-${PR_NUMBER}"
+
+# Use Prow's scheduled SHA (PULL_PULL_SHA) to ensure we analyze the exact commit being tested
+PULL_SHA="${PULL_PULL_SHA:-}"
+if [[ -z "${PULL_SHA}" ]]; then
+  echo "ERROR: PULL_PULL_SHA is not set — cannot determine the exact revision Prow scheduled"
+  exit 1
+fi
+
+echo "Fetching and checking out Prow's scheduled revision: ${PULL_SHA}"
+git fetch origin "${PULL_SHA}"
+git checkout "${PULL_SHA}"
+
+# Verify we're on the expected commit
+CURRENT_SHA=$(git rev-parse HEAD)
+if [[ "${CURRENT_SHA}" != "${PULL_SHA}" ]]; then
+  echo "ERROR: Checked-out commit ${CURRENT_SHA} does not match Prow's scheduled revision ${PULL_SHA}"
+  exit 1
+fi
 
 BASE_REF="${PULL_BASE_SHA:-}"
 if [[ -n "${BASE_REF}" ]] && git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null; then
@@ -158,7 +199,6 @@ Rules:
 echo "Invoking Claude to generate test plan..."
 set +e
 run_claude_metered "${PROMPT}" "${ARTIFACT_DIR}/claude-generate-test-plan.json" \
-  --allowedTools "Bash,Read,Write,Edit,Grep,Glob" \
   --max-turns 60
 CLAUDE_EXIT=$?
 set -e
@@ -186,35 +226,8 @@ if fence:
 open(path, "w", encoding="utf-8").write(text + "\n")
 PY
 
-# Validate minimal schema (prefer yq; fall back to PyYAML / JSON)
-if command -v yq &>/dev/null; then
-  NAME=$(yq -r '.name // ""' "${OUTPUT_PLAN}")
-  PLAN_PLATFORM=$(yq -r '.platform // ""' "${OUTPUT_PLAN}")
-  PARALLEL_LEN=$(yq -r '.testMatrix.parallel | length' "${OUTPUT_PLAN}")
-  if [[ -z "${NAME}" || "${NAME}" == "null" ]]; then
-    echo "ERROR: test plan missing required field: name"
-    exit 1
-  fi
-  if [[ "${PLAN_PLATFORM}" != "${HYPERSHIFT_PLATFORM}" ]]; then
-    echo "ERROR: platform must be '${HYPERSHIFT_PLATFORM}', got '${PLAN_PLATFORM}'"
-    exit 1
-  fi
-  if [[ -z "${PARALLEL_LEN}" || "${PARALLEL_LEN}" == "null" || "${PARALLEL_LEN}" -lt 1 ]]; then
-    echo "ERROR: testMatrix.parallel must be a non-empty list"
-    exit 1
-  fi
-  for ((i=0; i<PARALLEL_LEN; i++)); do
-    for key in name variant labelFilter; do
-      val=$(yq -r ".testMatrix.parallel[${i}].${key} // \"\"" "${OUTPUT_PLAN}")
-      if [[ -z "${val}" || "${val}" == "null" ]]; then
-        echo "ERROR: parallel[${i}] missing required field: ${key}"
-        exit 1
-      fi
-    done
-  done
-  echo "Test plan schema validation passed (yq)"
-else
-  python3 - "${OUTPUT_PLAN}" "${HYPERSHIFT_PLATFORM}" <<'PY'
+# Validate schema strictly (reject unknown fields, enforce types) matching HyperShift's ParseTestPlan
+python3 - "${OUTPUT_PLAN}" "${HYPERSHIFT_PLATFORM}" <<'PY'
 import json
 import sys
 
@@ -233,35 +246,95 @@ except Exception:
 if not isinstance(data, dict):
     print("ERROR: test plan root must be a mapping", file=sys.stderr)
     sys.exit(1)
-for key in ("name", "platform", "testMatrix"):
-    if key not in data:
-        print(f"ERROR: test plan missing required field: {key}", file=sys.stderr)
-        sys.exit(1)
-if data.get("platform") != platform:
-    print(f"ERROR: platform must be {platform!r}, got {data.get('platform')!r}", file=sys.stderr)
+
+# Validate top-level fields (name, platform, testMatrix only)
+ALLOWED_TOP_LEVEL = {"name", "platform", "testMatrix"}
+unknown = set(data.keys()) - ALLOWED_TOP_LEVEL
+if unknown:
+    print(f"ERROR: unknown top-level fields: {', '.join(sorted(unknown))}", file=sys.stderr)
     sys.exit(1)
+
+# Required top-level fields with type checks
+if "name" not in data:
+    print("ERROR: test plan missing required field: name", file=sys.stderr)
+    sys.exit(1)
+if not isinstance(data["name"], str):
+    print(f"ERROR: name must be a string, got {type(data['name']).__name__}", file=sys.stderr)
+    sys.exit(1)
+
+if "platform" not in data:
+    print("ERROR: test plan missing required field: platform", file=sys.stderr)
+    sys.exit(1)
+if not isinstance(data["platform"], str):
+    print(f"ERROR: platform must be a string, got {type(data['platform']).__name__}", file=sys.stderr)
+    sys.exit(1)
+if data["platform"] != platform:
+    print(f"ERROR: platform must be {platform!r}, got {data['platform']!r}", file=sys.stderr)
+    sys.exit(1)
+
+if "testMatrix" not in data:
+    print("ERROR: test plan missing required field: testMatrix", file=sys.stderr)
+    sys.exit(1)
+
 matrix = data["testMatrix"]
-if not isinstance(matrix, dict) or "parallel" not in matrix:
+if not isinstance(matrix, dict):
+    print(f"ERROR: testMatrix must be a mapping, got {type(matrix).__name__}", file=sys.stderr)
+    sys.exit(1)
+
+# Validate testMatrix fields (parallel only)
+ALLOWED_MATRIX_FIELDS = {"parallel"}
+unknown = set(matrix.keys()) - ALLOWED_MATRIX_FIELDS
+if unknown:
+    print(f"ERROR: unknown testMatrix fields: {', '.join(sorted(unknown))}", file=sys.stderr)
+    sys.exit(1)
+
+if "parallel" not in matrix:
     print("ERROR: testMatrix.parallel is required", file=sys.stderr)
     sys.exit(1)
+
 parallel = matrix["parallel"]
-if not isinstance(parallel, list) or not parallel:
+if not isinstance(parallel, list):
+    print(f"ERROR: testMatrix.parallel must be a list, got {type(parallel).__name__}", file=sys.stderr)
+    sys.exit(1)
+if not parallel:
     print("ERROR: testMatrix.parallel must be a non-empty list", file=sys.stderr)
     sys.exit(1)
+
+# Validate each parallel entry
+ALLOWED_PARALLEL_FIELDS = {"name", "variant", "labelFilter"}
 for i, entry in enumerate(parallel):
     if not isinstance(entry, dict):
-        print(f"ERROR: parallel[{i}] must be a mapping", file=sys.stderr)
+        print(f"ERROR: parallel[{i}] must be a mapping, got {type(entry).__name__}", file=sys.stderr)
         sys.exit(1)
+
+    # Check for unknown fields
+    unknown = set(entry.keys()) - ALLOWED_PARALLEL_FIELDS
+    if unknown:
+        print(f"ERROR: parallel[{i}] has unknown fields: {', '.join(sorted(unknown))}", file=sys.stderr)
+        sys.exit(1)
+
+    # Validate required fields with type checks
     for key in ("name", "variant", "labelFilter"):
-        if not entry.get(key):
+        if key not in entry:
             print(f"ERROR: parallel[{i}] missing required field: {key}", file=sys.stderr)
             sys.exit(1)
-print("Test plan schema validation passed")
+        if not isinstance(entry[key], str):
+            print(f"ERROR: parallel[{i}].{key} must be a string, got {type(entry[key]).__name__}", file=sys.stderr)
+            sys.exit(1)
+        if not entry[key]:  # Empty string check
+            print(f"ERROR: parallel[{i}].{key} cannot be empty", file=sys.stderr)
+            sys.exit(1)
+
+print("Test plan schema validation passed (strict)")
 PY
-fi
 
 cp "${OUTPUT_PLAN}" "${SHARED_DIR}/test-plan.yaml"
 cp "${OUTPUT_PLAN}" "${ARTIFACT_DIR}/generated-test-plan.yaml"
 echo "Wrote generated test plan to ${SHARED_DIR}/test-plan.yaml"
 echo "--- generated-test-plan.yaml ---"
 cat "${OUTPUT_PLAN}"
+
+# NOTE: The run-tests binary (from openshift/hypershift repo) MUST pass
+# --ginkgo.fail-on-empty when using labelFilter to ensure a filter that
+# selects no specs fails the test run rather than passing silently.
+# This is a requirement for the HyperShift test framework, not configurable here.
