@@ -224,7 +224,7 @@ while true; do \
   systemctl list-jobs --no-legend 2>/dev/null | head -10; \
   echo "--- registry reachability:"; \
   for host in quay.io registry.ci.openshift.org; do \
-    echo "  $host: $(curl -sS -m 10 -o /dev/null -w %{http_code} https://$host/v2/ 2>&1)"; \
+    echo "  $host: $(curl -sS -m 10 -o /dev/null -w %%{http_code} https://$host/v2/ 2>&1)"; \
   done; \
   echo "--- journal (node-image-pull, release-image, bootkube):"; \
   journalctl -n 25 --no-pager --no-hostname -o short-precise \
