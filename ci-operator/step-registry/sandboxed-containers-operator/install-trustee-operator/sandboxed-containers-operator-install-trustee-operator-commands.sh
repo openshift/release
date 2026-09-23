@@ -384,9 +384,9 @@ function wait_for_operator() {
     echo ">>> Using existing CatalogSource redhat-operators"
   fi
 
-  # Stage 2: Wait for Subscription to reference an InstallPlan (300s)
+  # Stage 2: Wait for Subscription to reference an InstallPlan (600s)
   local installplan_ref=""
-  if ! wait_until "Subscription to reference InstallPlan" 300 5 \
+  if ! wait_until "Subscription to reference InstallPlan" 600 5 \
     "installplan_ref=\$(oc get subscription -n '${TRUSTEE_NAMESPACE}' trustee-operator -o jsonpath='{.status.installplan.name}' 2>/dev/null); [[ -n \"\${installplan_ref}\" ]]"; then
     echo ">>> ERROR: Subscription has no InstallPlan reference" >&2
     oc get subscription -n "${TRUSTEE_NAMESPACE}" trustee-operator -o yaml || true
@@ -572,8 +572,13 @@ function wait_for_operands() {
 
   if [[ -n "${operand_deployments}" ]]; then
     for deployment in ${operand_deployments}; do
-      if ! wait_until "${deployment} Available" 150 15 \
-        "oc get '${deployment}' -n '${TRUSTEE_NAMESPACE}' -o jsonpath='{.status.conditions[?(@.type==\"Available\")].status}' 2>/dev/null | grep -q 'True'"; then
+      # Use `oc rollout status` instead of polling the Available condition:
+      # a KbsConfig secret patch (see register_acr_kbs_secret) can trigger a
+      # new rollout, and the Available condition may still read "True" from
+      # the previous generation before the new pod is actually ready.
+      # rollout status waits for the current generation to be observed.
+      echo ">>> Waiting for ${deployment} rollout to complete (timeout: 150s)..." >&2
+      if ! oc rollout status "${deployment}" -n "${TRUSTEE_NAMESPACE}" --timeout=150s; then
         echo ">>> ERROR: ${deployment} not ready after timeout" >&2
         oc get "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
         oc describe "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
