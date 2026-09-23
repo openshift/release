@@ -86,10 +86,6 @@ done
 mkdir -p /tmp/quay-sts-bin
 ln -sf "$(command -v oc)" /tmp/quay-sts-bin/kubectl
 export PATH="/tmp/quay-sts-bin:${PATH}"
-# Pin helper versions; the source image contains Go and curl but not jq.
-GOFLAGS="" GOBIN=/tmp/quay-sts-bin go install github.com/google/go-containerregistry/cmd/crane@v0.20.3
-GOFLAGS="" GOBIN=/tmp/quay-sts-bin go install github.com/itchyny/gojq/cmd/gojq@v0.12.17
-ln -sf /tmp/quay-sts-bin/gojq /tmp/quay-sts-bin/jq
 for command in kubectl jq curl crane base64; do
   command -v "$command" >/dev/null
 done

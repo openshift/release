@@ -57,11 +57,12 @@ kubeconfigs, or credential values.
 `quay-sts-tools` is built by the Quay Operator ci-operator configuration from
 UBI Python 3.11 with `boto3==1.35.99`; `cli: latest` supplies `oc` where needed.
 The test step runs from `src-oc`, which contains the PR source, Go, make, curl,
-base64, and `oc`. It installs pinned crane v0.20.3 and gojq v0.12.17 for the
-source Chainsaw test. The operator Makefile supplies Chainsaw.
+base64, `oc`, and pinned crane v0.20.3 and gojq v0.12.17 binaries for the source
+Chainsaw test. The operator Makefile supplies Chainsaw.
 
-The job requires network access to the cluster API, AWS endpoints, registry
-routes, and the pinned Go module sources.
+Building `src-oc` requires access to the pinned Go module sources before cluster
+provisioning starts. The running job requires network access to the cluster API,
+AWS endpoints, and registry routes.
 
 ## AWS permissions
 
