@@ -8,17 +8,21 @@ if [ -z "${MAPPING_FILE_PREFIX}" ]; then >&2 echo "MAPPING_FILE_PREFIX is unset 
  
 dry_run="${dry_run:-true}" 
 
+config_dir="$(mktemp -d)" || { echo "ERROR: Failed to create registry config directory"; exit 1; }
+trap 'rm -rf "${config_dir}"' 0
+config_file="${config_dir}/config.json"
+
 if [ -f /tmp/user/.docker/config.json ]; then
-    cp /tmp/user/.docker/config.json /tmp/config.json
+    cp /tmp/user/.docker/config.json "${config_file}"
 else
     echo "WARN: /tmp/user/.docker/config.json has not been provided"
 fi
 
-oc registry login --to /tmp/config.json 
+oc registry login --to "${config_file}"
 
 if [ -d /etc/qci-robot-credentials ]; then
   cred="$(cat /etc/qci-robot-credentials/username):$(cat /etc/qci-robot-credentials/password)"
-  oc registry login --auth-basic="$cred" --to=/tmp/config.json --registry=quay.io/openshift/ci
+  oc registry login --auth-basic="$cred" --to="${config_file}" --registry=quay.io/openshift/ci
 else
   echo "WARN: /etc/qci-robot-credentials has not been provided"
 fi
@@ -102,6 +106,7 @@ prepare_mapping() {
 		return 0
 	fi
 	_dst="$(mktemp)"
+	_expand_failed=0
 	while IFS= read -r _line || [ -n "${_line}" ]; do
 		case "${_line}" in
 		''|'#'*) continue ;;
@@ -128,11 +133,11 @@ prepare_mapping() {
 		echo "Expanding QCI ${_prefix}_* -> ${_to}:<tag>" >&2
 		expand_qci_prefix_line "${_from}" "${_to}" >>"${_dst}" || {
 			echo "ERROR: Failed to expand source ${_from} to destination ${_to} in ${_src}" >&2
-			rm -f "${_dst}"
-			return 1
+			_expand_failed=1
 		}
 	done <"${_src}"
 	echo "${_dst}"
+	[ "${_expand_failed}" -eq 0 ] || return 2
 }
 
 mirror_mapping_file() {
@@ -142,6 +147,11 @@ mirror_mapping_file() {
 		echo "ERROR: Prepared mapping file ${mirror_file} from ${mapping} is not readable"
 		return 1
 	fi
+	echo "Running: oc image mirror --dry-run=${dry_run} --keep-manifest-list -f=${mirror_file} --skip-multiple-scopes"
+	if oc image mirror --dry-run="${dry_run}" --keep-manifest-list -a "${config_file}" -f="${mirror_file}" --skip-multiple-scopes; then
+		return 0
+	fi
+	echo "WARNING: Batch mirror of ${mapping} failed; retrying each source separately"
 	processed_sources="$(mktemp)" || {
 		echo "ERROR: Failed to create source tracking file for ${mapping}"
 		return 1
@@ -180,7 +190,7 @@ mirror_mapping_file() {
 			continue
 		fi
 		echo "Running: oc image mirror --dry-run=${dry_run} --keep-manifest-list -f=${source_mapping} --skip-multiple-scopes for source ${source} to destinations: ${destinations}"
-		if ! oc image mirror --dry-run="${dry_run}" --keep-manifest-list -a /tmp/config.json -f="${source_mapping}" --skip-multiple-scopes; then
+		if ! oc image mirror --dry-run="${dry_run}" --keep-manifest-list -a "${config_file}" -f="${source_mapping}" --skip-multiple-scopes; then
 			echo "ERROR: Failed to mirror source ${source} from ${mapping} to destinations: ${destinations}"
 			mapping_failures=1
 		fi
@@ -192,7 +202,28 @@ mirror_mapping_file() {
 
 failures=0 
 for mapping in "/etc/imagemirror/${MAPPING_FILE_PREFIX}"*; do
-  mirror_file="$(prepare_mapping "${mapping}")" || { echo "ERROR: Failed to expand mapping $mapping"; failures=$((failures+1)); continue; }
+  if mirror_file="$(prepare_mapping "${mapping}")"; then
+    prepare_status=0
+  else
+    prepare_status=$?
+  fi
+  case "${prepare_status}" in
+  0) ;;
+  2)
+    echo "ERROR: Failed to expand one or more mappings from ${mapping}; mirroring valid entries"
+    failures=$((failures+1))
+    if [ ! -s "${mirror_file}" ]; then
+      echo "ERROR: No valid mappings remain after expansion failures in ${mapping}"
+      rm -f "${mirror_file}"
+      continue
+    fi
+    ;;
+  *)
+    echo "ERROR: Failed to expand mapping ${mapping}"
+    failures=$((failures+1))
+    continue
+    ;;
+  esac
   if ! mirror_mapping_file "${mapping}" "${mirror_file}"; then
     echo "ERROR: Failed to mirror one or more sources from ${mapping}"
     failures=$((failures+1)) 
