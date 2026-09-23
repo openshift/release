@@ -3,8 +3,22 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
 build_root:
   from_repository: true
+  use_build_cache: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: karpenter-operator
+promotion:
+  to:
+  - disabled: true
+    name: "5.1"
+    namespace: ocp
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -24,6 +38,18 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  karpenter-operator:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  verify:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
 tests:
 - as: e2e-karpenter-core-regression
   cron: 0 6 * * 6
@@ -41,7 +67,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-      timeout: 2h0m0s
+      timeout: 4h0m0s
     workflow: hypershift-aws-e2e-cluster
 zz_generated_metadata:
   branch: main
