@@ -32,7 +32,7 @@ elif [[ -n "${CAD_E2E_CLUSTER_ID:-}" ]]; then
         exit 1
     fi
 
-    log "Getting kubeconfig for cluster ${CAD_E2E_CLUSTER_ID} via backplane"
+    log "Getting kubeconfig via backplane"
     ocm backplane login "${CAD_E2E_CLUSTER_ID}"
 else
     log "ERROR: No cluster access method available (no SHARED_DIR/kubeconfig or CAD_E2E_CLUSTER_ID)"
