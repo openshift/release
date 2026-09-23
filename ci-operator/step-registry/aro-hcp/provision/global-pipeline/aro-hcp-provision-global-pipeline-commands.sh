@@ -8,8 +8,8 @@ export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
-export CUSTOMER_SUBSCRIPTION; CUSTOMER_SUBSCRIPTION=$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")
-export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")
+export GLOBAL_SUBSCRIPTION_ID; GLOBAL_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-global-subscription-id")
+export GLOBAL_SUBSCRIPTION_NAME; GLOBAL_SUBSCRIPTION_NAME=$(cat "${CLUSTER_PROFILE_DIR}/infra-global-subscription-name")
 export KUSTO_LOCATION; KUSTO_LOCATION="${KUSTO_LOCATION:-eastus2}"
 export DEPLOY_ENV="ci00"
 
@@ -41,23 +41,6 @@ resolve_config_from_templatize() {
     printf '%s\n' "${resolved_value}"
 }
 
-resolve_subscription_id_from_name() {
-    local subscription_name="$1"
-    local subscription_id
-
-    subscription_id="$(
-        az account list --output json \
-        | jq -r --arg name "${subscription_name}" 'map(select(.name == $name) | .id) | first // ""'
-    )"
-
-    if [[ -z "${subscription_id}" ]]; then
-        echo "ERROR: Could not resolve subscription ID for '${subscription_name}'"
-        exit 1
-    fi
-
-    printf '%s\n' "${subscription_id}"
-}
-
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 unset GOFLAGS
 
@@ -73,7 +56,10 @@ make -o tooling/templatize/templatize pipeline/Global DEPLOY_ENV="${DEPLOY_ENV}"
 # Apply DEV ACR customizations after global infra has converged.
 GLOBAL_RESOURCE_GROUP="$(resolve_config_from_templatize "global.rg" "${LOCATION}")"
 GLOBAL_SUBSCRIPTION_KEY="$(resolve_config_from_templatize "global.subscription.key" "${LOCATION}")"
-GLOBAL_SUBSCRIPTION_ID="$(resolve_subscription_id_from_name "${GLOBAL_SUBSCRIPTION_KEY}")"
+if [[ "${GLOBAL_SUBSCRIPTION_KEY}" != "${GLOBAL_SUBSCRIPTION_NAME}" ]]; then
+    echo "ERROR: Config global subscription ${GLOBAL_SUBSCRIPTION_KEY} does not match cluster profile ${GLOBAL_SUBSCRIPTION_NAME}"
+    exit 1
+fi
 
 # Keep generated bicepparam under dev-infrastructure/configurations so the
 # relative "using '../templates/dev-acr.bicep'" path resolves correctly.
