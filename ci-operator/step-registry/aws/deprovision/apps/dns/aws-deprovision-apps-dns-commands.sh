@@ -21,7 +21,12 @@ if [[ ! -e "${stack_list}" ]]; then
   exit 0
 fi
 
-mapfile -t apps_dns_stacks < <(awk '/-apps-dns$/ { print }' "${stack_list}" | sort -u)
+if ! stack_list_contents=$(cat -- "${stack_list}"); then
+  echo "ERROR: Unable to read CloudFormation stack list ${stack_list}" >&2
+  exit 1
+fi
+
+mapfile -t apps_dns_stacks < <(printf '%s\n' "${stack_list_contents}" | awk '/-apps-dns$/ { print }' | sort -u)
 case "${#apps_dns_stacks[@]}" in
   0)
     echo "No apps DNS stack recorded for this job; skipping cleanup"
