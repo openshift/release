@@ -880,6 +880,10 @@ DisableClusterImagePolicySignatureEnforcement() {
         oc --kubeconfig="${kubeconfig}" get machineconfigpool \
             -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
     )
+    if ((${#preRenderedArr[@]} == 0)); then
+        : "FATAL: Spoke ${clusterName}: failed to snapshot MCP rendered configs"
+        return 1
+    fi
 
     # CVO no longer manages the CIP — delete it so MCO removes the signature
     # requirement from each node's /etc/containers/policy.json.
@@ -888,13 +892,16 @@ DisableClusterImagePolicySignatureEnforcement() {
 
     # Wait for MCO to re-render EVERY pool. Isolated in a subshell so
     # the SECONDS reset does not leak into the caller.
+    typeset -i snapshotCnt=${#preRenderedArr[@]}
     ( SECONDS=0
-    typeset -i mcpWaitMax=300 mcpWaitInt=15
+    typeset -i mcpWaitMax=300 mcpWaitInt=15 readCnt=0
     typeset isAllChanged='false'
     while ((SECONDS < mcpWaitMax)); do
         isAllChanged='true'
+        readCnt=0
         while IFS='=' read -r mcpName mcpRendered; do
             [[ -n "${mcpName}" ]] || continue
+            ((++readCnt))
             if [[ "${preRenderedArr[${mcpName}]:-}" == "${mcpRendered}" ]]; then
                 isAllChanged='false'
                 break
@@ -903,6 +910,10 @@ DisableClusterImagePolicySignatureEnforcement() {
             oc --kubeconfig="${kubeconfig}" get machineconfigpool \
                 -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
         )
+        # An empty or incomplete read must not pass as "all changed".
+        if ((readCnt < snapshotCnt)); then
+            isAllChanged='false'
+        fi
         "${isAllChanged}" && break
         sleep "${mcpWaitInt}"
     done
