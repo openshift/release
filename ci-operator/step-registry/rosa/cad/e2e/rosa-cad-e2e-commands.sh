@@ -39,10 +39,14 @@ else
     exit 1
 fi
 
-# Verify cluster access
+# Verify cluster access (do not log identity or API URL — sensitive data)
 if command -v oc &>/dev/null; then
-    oc whoami
-    log "Connected to cluster: $(oc whoami --show-server)"
+    if oc whoami >/dev/null 2>&1; then
+        log "Cluster access verified"
+    else
+        log "ERROR: Unable to access cluster"
+        exit 1
+    fi
 else
     log "oc not available, skipping cluster verification (e2e binary uses kubeconfig directly)"
 fi
@@ -51,7 +55,7 @@ fi
 if [[ -f "${SHARED_DIR}/cluster-id" ]]; then
     export OCM_CLUSTER_ID
     OCM_CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-    log "OCM_CLUSTER_ID set to ${OCM_CLUSTER_ID}"
+    log "OCM_CLUSTER_ID set from SHARED_DIR/cluster-id"
 fi
 
 # Export OCM credentials so CAD e2e tests can interact with OCM API
