@@ -1,14 +1,14 @@
 binary_build_commands: "true"
 build_root:
-  use_build_cache: true
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
     tag: stackrox-ui-test-stable
+  use_build_cache: true
 promotion:
   to:
-  - namespace: stackrox
-    name: stackrox-cache
+  - name: stackrox-cache
+    namespace: stackrox
 prowgen:
   enable_secrets_store_csi_driver: true
 resources:
@@ -20,6 +20,18 @@ tests:
 - always_run: true
   as: gke-qa-e2e-tests
   steps:
+    post:
+    - as: stackrox-stackrox-end
+      commands: |
+        tee -a run.log <<< "no-op end step for startup timing test"
+        date -u
+        ls -latr
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 5m0s
     pre:
     - as: stackrox-stackrox-begin
       commands: |
@@ -39,18 +51,6 @@ tests:
         date -u
         ls -latr
         make tag
-      from: bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 256Mi
-      timeout: 5m0s
-    post:
-    - as: stackrox-stackrox-end
-      commands: |
-        tee -a run.log <<< "no-op end step for startup timing test"
-        date -u
-        ls -latr
       from: bin
       resources:
         requests:

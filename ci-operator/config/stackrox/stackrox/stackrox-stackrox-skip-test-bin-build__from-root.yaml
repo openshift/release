@@ -14,6 +14,18 @@ tests:
 - always_run: true
   as: gke-qa-e2e-tests
   steps:
+    post:
+    - as: stackrox-stackrox-end
+      commands: |
+        tee -a run.log <<< "no-op end step for startup timing test"
+        date -u
+        ls -latr
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 5m0s
     pre:
     - as: stackrox-stackrox-begin
       commands: |
@@ -33,18 +45,6 @@ tests:
         date -u
         ls -latr
         make tag
-      from: root
-      resources:
-        requests:
-          cpu: 100m
-          memory: 256Mi
-      timeout: 5m0s
-    post:
-    - as: stackrox-stackrox-end
-      commands: |
-        tee -a run.log <<< "no-op end step for startup timing test"
-        date -u
-        ls -latr
       from: root
       resources:
         requests:
