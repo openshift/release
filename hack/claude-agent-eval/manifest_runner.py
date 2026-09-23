@@ -449,8 +449,11 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                     verify_result(directory, config)
                     # Deterministic threshold check using the harness itself: do
                     # not trust an outer Claude exit code as the eval verdict.
-                    status = command([sys.executable, str(harness / "skills/eval-run/scripts/score.py"),
-                                      "regression", "--config", entry.config, "--run-id", run_id],
+                    # Use the verified physical directory: the orchestrator can
+                    # write under config.name while score.py derives a skill name.
+                    status = command([sys.executable, str(Path(__file__).with_name("eval_regression.py")),
+                                      "--harness", str(harness), "--config", entry.config,
+                                      "--run-dir", str(directory)],
                                      repo, run_env, eval_artifacts / "regression.log", min(60, remaining()))
                     if status:
                         raise EvalError("harness regression check failed; see regression log")
