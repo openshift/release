@@ -14,20 +14,28 @@ if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
 fi
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-METADATA_FILE="${SHARED_DIR}/metadata.json"
 
-if [[ ! -s "${METADATA_FILE}" ]]; then
-  echo "ERROR: Metadata file ${METADATA_FILE} not found or empty" >&2
-  exit 1
+stack_list="${SHARED_DIR}/to_be_removed_cf_stack_list"
+if [[ ! -e "${stack_list}" ]]; then
+  echo "No CloudFormation stack list found; skipping apps DNS stack cleanup"
+  exit 0
 fi
 
-CLUSTER_NAME=$(jq -r '.clusterName // empty' "${METADATA_FILE}")
-if [[ -z "${CLUSTER_NAME}" ]]; then
-  echo "ERROR: No cluster name found in ${METADATA_FILE}" >&2
-  exit 1
-fi
-
-STACK_NAME="${CLUSTER_NAME}-apps-dns"
+mapfile -t apps_dns_stacks < <(awk '/-apps-dns$/ { print }' "${stack_list}" | sort -u)
+case "${#apps_dns_stacks[@]}" in
+  0)
+    echo "No apps DNS stack recorded for this job; skipping cleanup"
+    exit 0
+    ;;
+  1)
+    STACK_NAME="${apps_dns_stacks[0]}"
+    ;;
+  *)
+    echo "ERROR: Multiple apps DNS stacks recorded for this job; refusing to choose one:" >&2
+    printf '  %s\n' "${apps_dns_stacks[@]}" >&2
+    exit 1
+    ;;
+esac
 
 stack_status() {
   local output
