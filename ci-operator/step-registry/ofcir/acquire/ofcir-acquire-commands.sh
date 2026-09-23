@@ -7,6 +7,10 @@ set -o pipefail
 echo "************ ofcir setup command ************"
 
 function send_slack(){
+    if [[ ! -f "$CLUSTER_PROFILE_DIR/slackhook" ]]; then
+        echo "No slackhook found in cluster profile, skipping Slack notification"
+        return
+    fi
     echo "Sending Slack message"
     SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat "$CLUSTER_PROFILE_DIR/slackhook")"
 
