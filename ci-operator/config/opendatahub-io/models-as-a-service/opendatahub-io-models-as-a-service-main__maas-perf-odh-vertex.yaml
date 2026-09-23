@@ -1,0 +1,44 @@
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: maas-perf-odh-vertex
+  cron: 0 2 * * 2
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      BENCHMARK_DURATION: 180s
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      CONCURRENCY_LEVELS: 2,4,8,16,32,64,128,256,512,1024
+      EXTRA_FLAGS: --metrics-profile=maas-gateway-perf-metrics.yml,metrics.yml --local-indexing=true
+        --profile-type=regular --timeout=7h
+      OPERATOR_TYPE: odh
+      PARALLELISM: "1"
+      PAUSE: 0s
+      PAYLOAD_SIZES: small,medium,large,very-large
+      PROVIDERS: claude-sonnet-vertex
+      RUN_ORION: "true"
+      SAMPLES: "1"
+      WARMUP: 60s
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-maas-gateway-perf
+    - ref: openshift-qe-orion-maas-gateway-perf
+    workflow: ipi-aws
+  timeout: 10h0m0s
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: models-as-a-service
+  variant: maas-perf-odh-vertex
