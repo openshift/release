@@ -187,22 +187,63 @@ log "# << Injecting bootstrap serial-console diagnostics >> #"
 
 # The bootstrap node has repeatedly hung with node-image-pull.service started and
 # never finishing, and SSH resets during handshake make `openshift-install gather
-# bootstrap` useless. The serial console is the only channel that still works, but
-# nothing writes to it after the login prompt. Inject a unit that periodically
-# dumps unit state and journal excerpts to /dev/ttyS0, so the failure is visible in
-# `aws ec2 get-console-output --latest`, which the error handler already collects.
+# bootstrap` useless. The serial console (captured by `aws ec2 get-console-output
+# --latest`, which the error handler collects) is the only channel that reliably
+# reaches us.
 #
-# Previous attempt used a storage.files entry for the script + a systemd unit
-# pointing to it. Ignition wrote and enabled the unit but silently dropped the
-# file, so ExecStart pointed at a missing path. This revision embeds the entire
-# diagnostic script inline in the unit via ExecStart=/bin/bash -c, eliminating
-# the storage.files dependency entirely.
+# Every prior attempt to inject a diagnostic unit FAILED TO LOAD, so it never ran:
+# a multi-line ExecStart carrying the script directly is corrupted by three
+# independent layers — systemd treats `%` as a specifier (%{http_code}), systemd
+# expands `$` before bash sees it, and line-continuation + Ignition JSON escaping
+# mangle the rest. This revision base64-encodes the entire script and decodes it
+# at runtime, so systemd only ever parses a single clean ExecStart line whose
+# payload is pure base64 (no %, $, quotes or newlines). All metacharacters live
+# inside the blob and are seen only by bash after `base64 -d`.
+#
+# Belt-and-suspenders — this injects TWO capture paths in one run:
+#   1. opct-debug-console.service: loops every 25s dumping unit state, deps,
+#      journals (node-image-pull last, so it stays inside the 64K --latest
+#      window), crictl, disk, DNS, routes and registry reachability to
+#      /dev/ttyS0.
+#   2. a drop-in on the native node-image-pull.service that sends its OWN
+#      stdout/stderr to /dev/ttyS0, so its real-time output is captured even if
+#      journald never flushes it.
+# The unit + drop-in are both added via .systemd.units (which Ignition applies
+# reliably) — NOT storage.files, which was silently dropped in an earlier attempt.
 install_jq
 
-# Build the unit content with the diagnostic script inline.
-# The script is a single long bash -c string. Newlines inside the -c '...' are
-# fine for systemd — it reads the whole ExecStart value.
-DEBUG_UNIT="$(cat << 'DEBUG_UNIT_EOF'
+# The diagnostic script, kept readable here and base64-encoded at step runtime.
+DEBUG_SCRIPT_B64="$(base64 -w0 << 'DEBUG_SCRIPT_EOF'
+#!/bin/bash
+exec > /dev/ttyS0 2>&1
+echo "===== OPCT-DEBUG START $(date -u --rfc-3339=seconds) ====="
+echo "### ip addr ###"; ip -o addr 2>&1
+echo "### ip route ###"; ip route 2>&1
+echo "### resolv.conf ###"; cat /etc/resolv.conf 2>&1
+echo "### node-image-pull unit ###"; systemctl cat node-image-pull.service 2>&1
+echo "### node-image-pull props ###"; systemctl show node-image-pull.service -p After -p Before -p Requires -p Wants -p BindsTo -p Conditions -p ConditionResult -p AssertResult -p ExecStart -p ExecMainPID -p ActiveState -p SubState -p Result 2>&1
+U="node-image-pull.service release-image.service bootkube.service crio.service crio-configure.service kubelet.service machine-config-daemon-firstboot.service"
+while true; do
+  echo "===== OPCT-DEBUG $(date -u --rfc-3339=seconds) ====="
+  for u in $U; do echo "unit $u: $(systemctl is-active $u 2>/dev/null)/$(systemctl show -p SubState --value $u 2>/dev/null) result=$(systemctl show -p Result --value $u 2>/dev/null)"; done
+  echo "### list-jobs ###"; systemctl list-jobs --no-legend 2>&1 | head -20
+  echo "### procs ###"; ps -eo pid,etimes,stat,cmd 2>&1 | grep -Ei 'node-image|image-pull|crio|podman|ostree|bootkube|rpm-ostree|machine-config' | grep -v grep | head
+  echo "### crictl ps ###"; crictl ps -a 2>&1 | head -15
+  echo "### crictl images ###"; crictl images 2>&1 | head -15
+  echo "### disk ###"; df -h / /var /run 2>&1
+  echo "### registry ###"; for h in quay.io registry.ci.openshift.org; do echo "  $h: $(curl -sS -m 8 -o /dev/null -w %{http_code} https://$h/v2/ 2>&1)"; done
+  echo "### dns ###"; getent hosts quay.io registry.ci.openshift.org 2>&1
+  echo "### journal release-image/bootkube/crio ###"; journalctl -u release-image.service -u bootkube.service -u crio.service -u crio-configure.service --no-pager --no-hostname -o short-precise 2>&1 | tail -40
+  echo "### journal boot tail ###"; journalctl -b --no-pager --no-hostname -o short-precise 2>&1 | tail -40
+  echo "### journal node-image-pull (full, last) ###"; journalctl -u node-image-pull.service --no-pager --no-hostname -o short-precise 2>&1 | tail -80
+  sleep 25
+done
+DEBUG_SCRIPT_EOF
+)"
+
+# Unit heredoc is unquoted so ${DEBUG_SCRIPT_B64} expands; the resulting unit file
+# contains only the base64 payload — no $ or % for systemd to misinterpret.
+DEBUG_UNIT="$(cat << DEBUG_UNIT_EOF
 [Unit]
 Description=OPCT bootstrap serial console diagnostics
 After=network.target
@@ -212,44 +253,33 @@ Wants=network.target
 Type=simple
 Restart=always
 RestartSec=10
-ExecStart=/bin/bash -c '\
-exec > /dev/ttyS0 2>&1; \
-UNITS="node-image-pull.service release-image.service bootkube.service kubelet.service crio.service sshd.service"; \
-while true; do \
-  echo "===== OPCT-DEBUG $(date -u --rfc-3339=seconds) ====="; \
-  for u in $UNITS; do \
-    echo "unit $u: active=$(systemctl is-active $u 2>/dev/null) sub=$(systemctl show -p SubState --value $u 2>/dev/null)"; \
-  done; \
-  echo "--- systemd jobs still running:"; \
-  systemctl list-jobs --no-legend 2>/dev/null | head -10; \
-  echo "--- registry reachability:"; \
-  for host in quay.io registry.ci.openshift.org; do \
-    echo "  $host: $(curl -sS -m 10 -o /dev/null -w %%{http_code} https://$host/v2/ 2>&1)"; \
-  done; \
-  echo "--- journal (node-image-pull, release-image, bootkube):"; \
-  journalctl -n 25 --no-pager --no-hostname -o short-precise \
-    -u node-image-pull.service -u release-image.service -u bootkube.service 2>/dev/null; \
-  echo "--- journal (sshd):"; \
-  journalctl -n 10 --no-pager --no-hostname -o short-precise -u sshd.service 2>/dev/null; \
-  sleep 30; \
-done'
+ExecStart=/bin/bash -c 'echo ${DEBUG_SCRIPT_B64} | base64 -d | bash'
 
 [Install]
 WantedBy=multi-user.target
 DEBUG_UNIT_EOF
 )"
 
+# Drop-in on the native node-image-pull.service to mirror its own output to serial.
+NIP_DROPIN="$(cat << 'NIP_DROPIN_EOF'
+[Service]
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/ttyS0
+NIP_DROPIN_EOF
+)"
+
 jq \
   --arg unit "${DEBUG_UNIT}" \
-  '.systemd.units += [{
-     "name": "opct-debug-console.service",
-     "enabled": true,
-     "contents": $unit
-   }]' \
+  --arg nipdropin "${NIP_DROPIN}" \
+  '.systemd.units += [
+     {"name": "opct-debug-console.service", "enabled": true, "contents": $unit},
+     {"name": "node-image-pull.service", "dropins": [{"name": "10-opct-console.conf", "contents": $nipdropin}]}
+   ]' \
   "${INSTALL_DIR}/bootstrap.ign" > "${INSTALL_DIR}/bootstrap.ign.new"
 
 mv -vf "${INSTALL_DIR}/bootstrap.ign.new" "${INSTALL_DIR}/bootstrap.ign"
-log "Injected opct-debug-console.service into bootstrap.ign"
+log "Injected opct-debug-console.service + node-image-pull console drop-in into bootstrap.ign"
 
 log "# << Saving to shared dir >> #"
 
