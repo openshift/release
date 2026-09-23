@@ -14,11 +14,22 @@ images:
         as:
         - osdk-builder
     to: osdk-helm-e2e
+  - dockerfile_path: release/helm/Dockerfile.coverage
+    to: helm-operator-coverage
+  - dockerfile_path: ci/dockerfiles/helm-e2e-coverage.Dockerfile
+    from: helm-operator-coverage
+    inputs:
+      osdk-builder:
+        as:
+        - osdk-builder
+    to: osdk-helm-e2e-coverage
 promotion:
   to:
   - excluded_images:
     - osdk-builder
     - osdk-helm-e2e
+    - helm-operator-coverage
+    - osdk-helm-e2e-coverage
     - memcached-operator
     - nginx-operator
     name: "5.1"
@@ -145,6 +156,85 @@ tests:
         name: osdk-helm-e2e
       - env: IMAGE_FORMAT
         name: osdk-helm-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-helm-coverage
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    post:
+    - as: collect-coverage
+      best_effort: true
+      cli: latest
+      commands: hack/e2e-coverage.sh collect
+      credentials:
+      - collection: osdk-ci-secrets
+        group: codecov-token
+        mount_path: /var/run/secrets/codecov
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    test:
+    - as: test-e2e-helm
+      cli: latest
+      commands: make -f ci/prow.Makefile test-e2e-helm
+      dependencies:
+      - env: COVERAGE_IMAGE
+        name: osdk-helm-e2e-coverage
+      - env: HELM_IMAGE
+        name: osdk-helm-e2e-coverage
+      - env: IMAGE_FORMAT
+        name: osdk-helm-e2e-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: publish-e2e-coverage
+  cron: 0 6 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    post:
+    - as: collect-coverage
+      best_effort: true
+      cli: latest
+      commands: hack/e2e-coverage.sh collect
+      credentials:
+      - collection: osdk-ci-secrets
+        group: codecov-token
+        mount_path: /var/run/secrets/codecov
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    pre:
+    - as: check-coverage-freshness
+      commands: hack/e2e-coverage.sh check-freshness
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+      timeout: 5m0s
+    test:
+    - as: test-e2e-helm
+      cli: latest
+      commands: make -f ci/prow.Makefile test-e2e-helm
+      dependencies:
+      - env: COVERAGE_IMAGE
+        name: osdk-helm-e2e-coverage
+      - env: HELM_IMAGE
+        name: osdk-helm-e2e-coverage
+      - env: IMAGE_FORMAT
+        name: osdk-helm-e2e-coverage
       from: src
       resources:
         requests:
