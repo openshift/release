@@ -1,3 +1,8 @@
+base_images:
+  aro-hcp-e2e-tests:
+    name: aro-hcp-e2e-tests
+    namespace: aro-hcp
+    tag: latest
 build_root:
   project_image:
     dockerfile_literal: |
@@ -82,25 +87,27 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters - Prod - 00,ARO HCP E2E Hosted
+        Clusters - Prod - 01
+      ARO_HCP_DEPLOY_ENV: prod
       ARO_REPO_BRANCH: aro-hcp-2026-09-01-preview
       ARO_REPO_DIR: /tmp/cluster-api-installer-pro
       ARO_REPO_URL: https://github.com/stolostron/cluster-api-installer.git
       DEPLOY_CHARTS: "true"
       LOCATION: uksouth
       USE_KIND: "true"
-      VAULT_SECRET_PROFILE: prod
+      VAULT_SECRET_PROFILE: prod-rh
       WORKLOAD_CLUSTER_NAMESPACE: capz-test-prow
     leases:
     - count: 1
       env: ENV_QUOTA_LEASED_RESOURCE
       resource_type: aro-hcp-prod-quota-slice
-    - count: 1
-      env: LEASED_MSI_CONTAINERS
-      resource_type: aro-hcp-test-msi-containers-prod
     post:
     - ref: capz-arohcp-summary
     - ref: capz-arohcp-aks-deprovision
+    - ref: aro-hcp-lease-release
     pre:
+    - ref: aro-hcp-lease-acquire
     - ref: capz-arohcp-write-env
     - ref: capz-arohcp-aks-provision
     - ref: capz-arohcp-check-dependencies

@@ -5,22 +5,25 @@ set -o pipefail
 
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
+# CAPZ DEV is slot-managed. Use the customer subscription and credentials
+# selected by the same runtime contract as provisioning and tests.
+env_file="${SHARED_DIR}/aro-hcp-slot.env"
+if [[ ! -f "${env_file}" ]]; then
+  echo "ERROR: slot-manager runtime contract not found at ${env_file}"
+  exit 1
+fi
+# shellcheck disable=SC1090
+source "${env_file}"
+: "${CUSTOMER_SUBSCRIPTION_ID:?slot-manager did not export CUSTOMER_SUBSCRIPTION_ID}"
+: "${SELECTED_CLUSTER_PROFILE_DIR:?slot-manager did not export SELECTED_CLUSTER_PROFILE_DIR}"
+CLUSTER_PROFILE_DIR="${SELECTED_CLUSTER_PROFILE_DIR}"
+
 { set +o xtrace; } 2>/dev/null
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
 export INFRA_SUBSCRIPTION_ID; INFRA_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-${ARO_HCP_DEPLOY_ENV}-subscription-id")
 export DEPLOY_ENV="${ARO_HCP_DEPLOY_ENV}"
-
-# Source slot-manager env to get CUSTOMER_SUBSCRIPTION (shard subscription).
-# This mirrors the pattern used in aro-hcp-test-local.
-env_file="${SHARED_DIR}/aro-hcp-slot.env"
-if [[ -f "${env_file}" ]]; then
-  # shellcheck disable=SC1090
-  source "${env_file}"
-else
-  export CUSTOMER_SUBSCRIPTION; CUSTOMER_SUBSCRIPTION=$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")
-fi
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 
@@ -42,7 +45,7 @@ SVC_NSG_RG=$(make frontend-grant-ingress DEPLOY_ENV="${DEPLOY_ENV}" 2>&1 | tee /
 if [[ -n "${SVC_NSG_RG}" && -f "${SHARED_DIR}/resourcegroup_aks" && -f "${SHARED_DIR}/cluster-name" ]]; then
   AKS_RG=$(cat "${SHARED_DIR}/resourcegroup_aks")
   AKS_NAME=$(cat "${SHARED_DIR}/cluster-name")
-  az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+  az account set --subscription "${CUSTOMER_SUBSCRIPTION_ID}"
   AKS_PIP_ID=$(az aks show -g "${AKS_RG}" -n "${AKS_NAME}" \
     --query "networkProfile.loadBalancerProfile.effectiveOutboundIPs[0].id" -o tsv)
   AKS_OUTBOUND_IP=$(az network public-ip show --ids "${AKS_PIP_ID}" --query "ipAddress" -o tsv)
@@ -61,7 +64,7 @@ if [[ -n "${SVC_NSG_RG}" && -f "${SHARED_DIR}/resourcegroup_aks" && -f "${SHARED
 fi
 
 # This block runs against CUSTOMER_SUBSCRIPTION.
-az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+az account set --subscription "${CUSTOMER_SUBSCRIPTION_ID}"
 make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 
 # Write frontend address for subsequent CAPZ test steps
