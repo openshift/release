@@ -47,14 +47,34 @@ done < <(yq e '.networking.machineNetwork[].cidr' "${NETWORK_PATCH}")
 [[ -n "${SERVICE_CIDRS}" ]] && NO_PROXY="${NO_PROXY},${SERVICE_CIDRS}"
 [[ -n "${MACHINE_CIDRS}" ]] && NO_PROXY="${NO_PROXY},${MACHINE_CIDRS}"
 
-# API names from install-config (like old ipi-conf-proxy)
-BASE_DOMAIN="$(yq e '.baseDomain' "${CONFIG}")"
-CLUSTER_NAME="$(yq e '.metadata.name' "${CONFIG}")"
-
-[[ -n "${BASE_DOMAIN}" ]] && NO_PROXY="${NO_PROXY},.${BASE_DOMAIN}"
-if [[ -n "${CLUSTER_NAME}" && -n "${BASE_DOMAIN}" ]]; then
-  NO_PROXY="${NO_PROXY},api.${CLUSTER_NAME}.${BASE_DOMAIN},api-int.${CLUSTER_NAME}.${BASE_DOMAIN}"
+# Prefer profile / SHARED_DIR — install-config may not have baseDomain yet at this step
+if [[ ! -f "${CLUSTER_PROFILE_DIR}/base_domain" ]]; then
+  echo "ERROR: ${CLUSTER_PROFILE_DIR}/base_domain not found"
+  exit 1
 fi
+if [[ ! -f "${SHARED_DIR}/cluster_name" ]]; then
+  echo "ERROR: ${SHARED_DIR}/cluster_name not found"
+  exit 1
+fi
+
+BASE_DOMAIN="$(<"${CLUSTER_PROFILE_DIR}/base_domain")"
+CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+
+# Trim whitespace / newlines just in case
+BASE_DOMAIN="${BASE_DOMAIN//$'\n'/}"
+CLUSTER_NAME="${CLUSTER_NAME//$'\n'/}"
+
+if [[ -z "${BASE_DOMAIN}" || "${BASE_DOMAIN}" == "null" ]]; then
+  echo "ERROR: empty or invalid BASE_DOMAIN='${BASE_DOMAIN}'"
+  exit 1
+fi
+if [[ -z "${CLUSTER_NAME}" || "${CLUSTER_NAME}" == "null" ]]; then
+  echo "ERROR: empty or invalid CLUSTER_NAME='${CLUSTER_NAME}'"
+  exit 1
+fi
+
+NO_PROXY="${NO_PROXY},.${BASE_DOMAIN}"
+NO_PROXY="${NO_PROXY},api.${CLUSTER_NAME}.${BASE_DOMAIN},api-int.${CLUSTER_NAME}.${BASE_DOMAIN}"
 
 echo "Configured noProxy: ${NO_PROXY}"
 
