@@ -230,6 +230,64 @@ spec:
   type: LoadBalancer
 SVCEOF
 
+# --- Step 5b: Wait for MetalLB EXTERNAL-IP and bypass konnectivity for ingress canary ---
+# Ingress-operator (CP on mgmt) health-checks *.apps via HTTPS_PROXY=127.0.0.1:8090
+# (konnectivity). On this OZ/libvirt+MetalLB topology, CONNECT to the apps VIP hangs
+# even though direct curls from mgmt CP pods and guest hosts succeed. Extending
+# NO_PROXY so canary dials the LB directly clears CanaryChecksSucceeding / ingress Degraded.
+# Do NOT set guest Proxy noProxy-only — that invalidates proxy.config.openshift.io.
+echo "$(date) Waiting for test-apps LoadBalancer EXTERNAL-IP"
+LB_IP=""
+for i in {1..60}; do
+  LB_IP=$(oc get svc test-apps -n "${HC_NS}-${HC_NAME}" \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+  if [[ -n "${LB_IP}" && "${LB_IP}" != "<pending>" ]]; then
+    break
+  fi
+  echo "$(date) test-apps EXTERNAL-IP not ready yet, retrying... ($i/60)"
+  sleep 5
+done
+if [[ -z "${LB_IP}" || "${LB_IP}" == "<pending>" ]]; then
+  echo "$(date) ERROR: test-apps never received an EXTERNAL-IP"
+  oc get svc test-apps -n "${HC_NS}-${HC_NAME}" -o yaml || true
+  exit 1
+fi
+echo "$(date) test-apps EXTERNAL-IP: ${LB_IP}"
+
+APPS_DOMAIN="apps.${HC_NAME}.phc-cicd.cis.ibm.net"
+CANARY_URL="https://canary-openshift-ingress-canary.${APPS_DOMAIN}"
+CP_NS="${HC_NS}-${HC_NAME}"
+
+echo "$(date) Setting ingress-operator NO_PROXY so canary bypasses konnectivity for ${APPS_DOMAIN}"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+oc set env deploy/ingress-operator -n "${CP_NS}" -c ingress-operator \
+  "NO_PROXY=kube-apiserver,${LB_IP},.${APPS_DOMAIN},phc-cicd.cis.ibm.net,127.0.0.1,localhost"
+oc rollout status deploy/ingress-operator -n "${CP_NS}" --timeout=120s
+
+echo "$(date) Verifying canary URL from ingress-operator without konnectivity proxy"
+oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
+  curl -vk --connect-timeout 10 "${CANARY_URL}" || true
+
+echo "$(date) Waiting for CanaryChecksSucceeding on default IngressController"
+CANARY_WAIT=300
+CANARY_ELAPSED=0
+while [[ ${CANARY_ELAPSED} -lt ${CANARY_WAIT} ]]; do
+  CANARY_STATUS=$(oc get ingresscontroller default -n openshift-ingress-operator \
+    --kubeconfig "${VIRT_KC}" \
+    -o jsonpath='{.status.conditions[?(@.type=="CanaryChecksSucceeding")].status}' 2>/dev/null || true)
+  if [[ "${CANARY_STATUS}" == "True" ]]; then
+    echo "$(date) CanaryChecksSucceeding=True"
+    break
+  fi
+  echo "$(date) CanaryChecksSucceeding=${CANARY_STATUS:-unknown} (${CANARY_ELAPSED}s/${CANARY_WAIT}s)"
+  sleep 30
+  CANARY_ELAPSED=$((CANARY_ELAPSED + 30))
+done
+oc get co ingress --kubeconfig "${VIRT_KC}" || true
+oc get ingresscontroller default -n openshift-ingress-operator \
+  --kubeconfig "${VIRT_KC}" \
+  -o jsonpath='{.status.conditions[?(@.type=="CanaryChecksSucceeding")]}{"\n"}' || true
+
 # --- Step 6: Wait for all guest cluster ClusterOperators to be Available ---
 echo "$(date) Waiting for all ClusterOperators to be Available"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
