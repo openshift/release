@@ -1,0 +1,52 @@
+workflow:
+  as: rosa-e2e-hcp-external-oidc
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      REPLICAS: "2"
+      # Provision the HCP cluster with external authentication (external OIDC)
+      # enabled. This is an HCP-only, day-1 immutable feature, so it must be set
+      # at provision time; rosa-conf-external-oidc-create then configures the
+      # external auth provider once the cluster is ready.
+      EXTERNAL_AUTH_PROVIDERS_ENABLED: "true"
+      # Run the full HCP suite; the external OIDC verification spec
+      # (Area:CustomerFeatures) is exercised against a cluster that actually has
+      # external auth configured, so it verifies rather than skips.
+      LABEL_FILTER: Platform:HCP
+    pre:
+      - chain: rosa-aws-sts-hcp-provision
+      - ref: rosa-cluster-wait-ready-hosted-cp
+      - ref: rosa-cluster-wait-ready-nodes
+      # Configure the external auth (external OIDC) provider on the ready cluster.
+      - ref: rosa-conf-external-oidc-create
+      - ref: rosa-cluster-credentials-hypershift-mgmt
+    test:
+      - ref: rosa-e2e-test
+    post:
+      - ref: rosa-gap-analysis-api-resources-and-crd
+        best_effort: true
+      - ref: rosa-gap-analysis-critical-alerts
+        best_effort: true
+      - ref: rosa-gap-analysis-cluster-install-delete-metrics
+        best_effort: true
+      - chain: rosa-cluster-deprovision
+        best_effort: true
+      - chain: rosa-sts-oidc-config-delete
+        best_effort: true
+      - ref: rosa-e2e-cleanup-vpc
+        best_effort: true
+      - ref: aws-deprovision-stacks
+        best_effort: true
+      - chain: rosa-gather-hcp-diagnostics
+        best_effort: true
+  documentation: |-
+    This workflow provisions a ROSA HCP cluster with external authentication
+    (external OIDC) enabled at provision time, configures an external auth
+    provider via rosa-conf-external-oidc-create once the cluster is ready, then
+    runs the rosa-e2e managed service validation suite. Because the cluster has
+    external auth configured, the Customer Features external OIDC verification
+    spec verifies the provider (ExternalAuthEnabled / VerifyExternalAuthProviders)
+    rather than skipping. rosa-gap-analysis snapshots (API/CRDs, alerts, and
+    cluster install health) are written while the cluster is still up, then the
+    cluster is torn down.
