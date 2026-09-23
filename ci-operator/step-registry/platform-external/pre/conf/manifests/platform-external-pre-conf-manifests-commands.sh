@@ -205,8 +205,8 @@ install_jq
 DEBUG_UNIT="$(cat << 'DEBUG_UNIT_EOF'
 [Unit]
 Description=OPCT bootstrap serial console diagnostics
-After=network-online.target
-Wants=network-online.target
+After=network.target
+Wants=network.target
 
 [Service]
 Type=simple
