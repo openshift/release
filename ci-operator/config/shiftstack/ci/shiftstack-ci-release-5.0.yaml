@@ -1,24 +1,28 @@
 base_images:
   manila-csi-driver-operator-test:
-    name: "4.17"
+    name: "5.0"
     namespace: ocp
     tag: manila-csi-driver-operator-test
   openstack-cinder-csi-driver-operator-test:
-    name: "4.17"
+    name: "5.0"
     namespace: ocp
     tag: openstack-cinder-csi-driver-operator-test
   openstack-installer:
-    name: "4.17"
+    name: "5.0"
     namespace: ocp
     tag: openstack-installer
   openstack-tests:
-    name: "4.17"
+    name: "5.0"
     namespace: ocp
     tag: openstack-tests
   stolostron:
     name: builder
     namespace: stolostron
     tag: go1.21-linux
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -27,12 +31,12 @@ releases:
       product: ocp
       relative: 1
       stream: nightly
-      version: "4.17"
+      version: "5.0"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -54,10 +58,13 @@ tests:
     cluster_profile: openstack-vexxhost
     env:
       FIPS_ENABLED: "true"
-      TEST_SUITE: experimental/reliability/minimal
+      TEST_ARGS: --disable-monitor=termination-message-policy
     pre:
     - chain: ipi-openstack-pre
     - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-proxy
   minimum_interval: 144h
@@ -70,6 +77,11 @@ tests:
       <{{.Status.URL}}|View logs> :volcano:'
   steps:
     cluster_profile: openstack-vh-bm-rhos
+    env:
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-proxy
 - as: e2e-openstack-externallb
   minimum_interval: 168h
@@ -82,6 +94,11 @@ tests:
       <{{.Status.URL}}|View logs> :volcano:'
   steps:
     cluster_profile: openstack-vh-bm-rhos
+    env:
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-external-lb
 - as: e2e-openstack-nfv-intel
   minimum_interval: 144h
@@ -94,7 +111,7 @@ tests:
       <{{.Status.URL}}|View logs> :volcano:'
   steps:
     cluster_profile: openstack-nfv
-    workflow: openshift-e2e-openstack-nfv-cgroupsv1
+    workflow: openshift-e2e-openstack-nfv
 - as: e2e-openstack-nfv-mellanox
   minimum_interval: 144h
   reporter_config:
@@ -110,7 +127,7 @@ tests:
       ADDITIONAL_WORKERS_NETWORKS: mellanox-dpdk
       OPENSTACK_DPDK_NETWORK: mellanox-dpdk
       OPENSTACK_SRIOV_NETWORK: mellanox-sriov
-    workflow: openshift-e2e-openstack-nfv-cgroupsv1
+    workflow: openshift-e2e-openstack-nfv
 - as: e2e-openstack-additional-ipv6-network
   minimum_interval: 144h
   reporter_config:
@@ -163,7 +180,11 @@ tests:
     cluster_profile: openstack-vexxhost
     env:
       ROTATE_CLOUD_CREDENTIALS: "true"
+      TEST_ARGS: --disable-monitor=termination-message-policy
       TEST_SUITE: openshift/conformance/parallel
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn-serial
   minimum_interval: 48h
@@ -178,7 +199,11 @@ tests:
     cluster_profile: openstack-vexxhost
     env:
       ROTATE_CLOUD_CREDENTIALS: "true"
+      TEST_ARGS: --disable-monitor=termination-message-policy
       TEST_SUITE: openshift/conformance/serial
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-dualstack-upi
   minimum_interval: 240h
@@ -196,9 +221,12 @@ tests:
       OPENSTACK_COMPUTE_FLAVOR: m1.xlarge
       OPENSTACK_TEST_SKIPS: The OpenStack platform creates Worker nodes in a server
         group\|The OpenStack platform creates Control plane nodes in a server group
+      TEST_ARGS: --disable-monitor=termination-message-policy
       TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for service
         endpoints using hostNetwork
-      TEST_SUITE: experimental/reliability/minimal
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-upi
 - as: e2e-openstack-ovn-password
   minimum_interval: 48h
@@ -213,6 +241,10 @@ tests:
     cluster_profile: openstack-vexxhost
     env:
       OPENSTACK_AUTHENTICATION_METHOD: password
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn-etcd-scaling
   minimum_interval: 168h
@@ -240,6 +272,11 @@ tests:
       <{{.Status.URL}}|View logs> :volcano:'
   steps:
     cluster_profile: openstack-vh-bm-rhos
+    env:
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-dualstack
 - as: e2e-openstack-dualstack-v6primary
   minimum_interval: 96h
@@ -254,7 +291,31 @@ tests:
     cluster_profile: openstack-vh-bm-rhos
     env:
       CONFIG_TYPE: dualstack-v6primary
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-dualstack
+- as: e2e-openstack-singlestackv6
+  minimum_interval: 96h
+  reporter_config:
+    channel: '#shiftstack-bot'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> :volcano:'
+  steps:
+    cluster_profile: openstack-vh-bm-rhos
+    env:
+      CONFIG_TYPE: singlestackv6
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openstack-test-e2e-images
+    - ref: mirror-images-qe-test-images
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
+    workflow: openshift-e2e-openstack-singlestackv6
 - as: e2e-openstack-ccpmso
   minimum_interval: 240h
   reporter_config:
@@ -267,12 +328,12 @@ tests:
   steps:
     cluster_profile: openstack-vexxhost
     env:
-      TEST_SUITE: experimental/reliability/minimal
+      TEST_ARGS: --disable-monitor=termination-message-policy
     test:
     - as: openstack-test-cpms
       commands: |
         dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
-        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.17 --depth=1 $dir
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-5.0 --depth=1 $dir
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         cd $dir
         make e2e-periodic
@@ -280,9 +341,9 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 7h0m0s
     - ref: openshift-e2e-test
-    - ref: openstack-test-openstack
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ccpmso-zone
   minimum_interval: 240h
@@ -297,13 +358,13 @@ tests:
     cluster_profile: openstack-vh-bm-rhos
     env:
       ETCD_ON_LOCAL_DISK: "true"
-      TEST_SUITE: experimental/reliability/minimal
+      TEST_ARGS: --disable-monitor=termination-message-policy
       USE_RAMFS: "false"
     test:
     - as: openstack-test-cpms
       commands: |
         dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
-        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.17 --depth=1 $dir
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-5.0 --depth=1 $dir
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         cd $dir
         test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
@@ -312,11 +373,11 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 7h0m0s
     - ref: openshift-e2e-test
-    - ref: openstack-test-openstack
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
-  branch: release-4.17
+  branch: release-5.0
   org: shiftstack
   repo: ci
