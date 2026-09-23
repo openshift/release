@@ -10,17 +10,32 @@ ref:
   - name: IPECHO_PORT
     default: "9095"
     documentation: "TCP port on which the ipecho HTTP server listens."
+  - name: IPECHO_HOST_IP
+    default: "192.168.111.1"
+    documentation: |-
+      Address the guest cluster should use to reach the echo server. Defaults to the
+      baremetal bridge. Set it to an extra network's gateway (e.g. 192.168.221.1, the
+      .1 of the subnet in EXTRA_NETWORK_CONFIG) when testing EgressIP on a secondary
+      host interface, so the target is reached over that NIC rather than over br-ex.
+      The address must already exist on the dev-scripts host; the step fails if not.
   timeout: 10m0s
   grace_period: 5m0s
   documentation: |-
     Provisions a Python3 ipecho HTTP server on the Equinix/dev-scripts provisioning
-    host (192.168.111.1) as a systemd service. The server returns the caller's
-    source IP, used as an off-cluster destination for OVN-Kubernetes EgressIP tests.
+    host as a systemd service. The server returns the caller's source IP, used as an
+    off-cluster destination for OVN-Kubernetes EgressIP tests.
 
-    Runs on the ostestbm libvirt bridge (192.168.111.0/24), on the same L2 segment
-    as assisted HyperShift agent worker VMs, so EgressIP SNAT traffic reaches it
-    without extra routing.
+    It binds 0.0.0.0, so it answers on every libvirt bridge; IPECHO_HOST_IP only
+    selects which address downstream steps target. By default that is the ostestbm
+    bridge (192.168.111.0/24), on the same L2 segment as the assisted HyperShift agent
+    worker VMs, so EgressIP SNAT traffic reaches it without extra routing. For
+    secondary-NIC EgressIP, point it at the extra network's gateway so the traffic is
+    forced out of that interface.
+
+    The step opens IPECHO_PORT in the firewalld zone owning the bridge that holds
+    IPECHO_HOST_IP. libvirt places NAT network bridges in the "libvirt" zone, which
+    otherwise permits only DHCP/DNS/SSH/TFTP.
 
     Outputs saved to ${SHARED_DIR}:
-    - ipecho_host_ip: Bridge IP of the provisioning host (192.168.111.1)
-    - ipecho_url: Full URL (http://192.168.111.1:<port>)
+    - ipecho_host_ip: Address of the echo server (IPECHO_HOST_IP)
+    - ipecho_url: Full URL (http://<IPECHO_HOST_IP>:<port>)

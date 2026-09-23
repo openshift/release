@@ -8,15 +8,19 @@ echo "Provisioning ipecho server on dev-scripts host"
 
 source "${SHARED_DIR}/packet-conf.sh"
 
-IPECHO_HOST_IP="192.168.111.1"
+# Defaults to the baremetal bridge. Point it at an extra network's gateway
+# (e.g. 192.168.221.1) when testing EgressIP on a secondary host interface, so the
+# echo target is reached over that NIC instead of over br-ex.
+IPECHO_HOST_IP="${IPECHO_HOST_IP:-192.168.111.1}"
 IPECHO_PORT="${IPECHO_PORT:-9095}"
 
 # Deploy ipecho server on the provisioning host via SSH
 # shellcheck disable=SC2087
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${IPECHO_PORT}" << 'EOF'
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${IPECHO_PORT}" "${IPECHO_HOST_IP}" << 'EOF'
 set -euxo pipefail
 
 IPECHO_PORT="$1"
+IPECHO_HOST_IP="$2"
 
 # Write the ipecho Python HTTP server
 cat > /usr/local/bin/ipecho.py << 'PYEOF'
@@ -68,11 +72,34 @@ SVCEOF
 systemctl daemon-reload
 systemctl enable --now ipecho.service
 
+# The server binds 0.0.0.0, but the address we advertise has to actually be on the
+# host, and firewalld has to let the guests reach the port on that bridge. libvirt
+# puts NAT network bridges in the "libvirt" zone, which only permits DHCP/DNS/SSH/TFTP,
+# so an extra network needs the port opened explicitly.
+IPECHO_BRIDGE="$(ip -o -4 addr show | awk -v pfx="${IPECHO_HOST_IP}/" '$4 ~ "^"pfx {print $2; exit}')"
+if [[ -z "${IPECHO_BRIDGE}" ]]; then
+    echo "ERROR: no interface on this host holds ${IPECHO_HOST_IP}"
+    ip -o -4 addr show
+    exit 1
+fi
+echo "ipecho address ${IPECHO_HOST_IP} is on ${IPECHO_BRIDGE}"
+
+if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+    zone="$(firewall-cmd --get-zone-of-interface="${IPECHO_BRIDGE}" 2>/dev/null || true)"
+    if [[ -z "${zone}" || "${zone}" == "no zone" ]]; then
+        zone="$(firewall-cmd --get-default-zone)"
+    fi
+    firewall-cmd --zone="${zone}" --add-port="${IPECHO_PORT}/tcp" || true
+    firewall-cmd --zone="${zone}" --list-ports || true
+else
+    echo "firewalld not running; relying on the host's default filtering"
+fi
+
 # Verify the service is running
 for i in $(seq 1 30); do
-    if curl -sf "http://192.168.111.1:${IPECHO_PORT}" >/dev/null 2>&1; then
+    if curl -sf "http://${IPECHO_HOST_IP}:${IPECHO_PORT}" >/dev/null 2>&1; then
         echo "ipecho server is ready on port ${IPECHO_PORT}"
-        curl -s "http://192.168.111.1:${IPECHO_PORT}"
+        curl -s "http://${IPECHO_HOST_IP}:${IPECHO_PORT}"
         exit 0
     fi
     echo "Waiting for ipecho server... attempt ${i}/30"

@@ -1,0 +1,66 @@
+ref:
+  as: hypershift-agent-ovn-egressip-multinic
+  from: cli
+  cli: latest
+  commands: hypershift-agent-ovn-egressip-multinic-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 45m0s
+  grace_period: 5m0s
+  env:
+  - name: HYPERSHIFT_NAMESPACE
+    default: "local-cluster"
+    documentation: "Namespace holding the HostedCluster and its NodePools on the management cluster."
+  - name: EGRESSIP_SECONDARY_SUBNET
+    default: "192.168.221.0/24"
+    documentation: |-
+      IPv4 CIDR of the extra libvirt network created by baremetalds-devscripts-conf-extranetwork.
+      Must match <NAME>_NETWORK_SUBNET_V4 in the job's EXTRA_NETWORK_CONFIG. Used to identify
+      which host interface is the egress interface.
+  - name: EGRESSIP_SECONDARY_NEVER_DEFAULT
+    default: "true"
+    documentation: |-
+      Set ipv4.never-default on the secondary interface. The extra libvirt network is
+      forward_mode=nat, so its dnsmasq advertises a default gateway and the node would
+      otherwise end up with two default routes.
+  - name: TUNED_CONFIGMAP_NAME
+    default: "egressip-multinic-forwarding"
+    documentation: "Name of the ConfigMap holding the Tuned object referenced from NodePool.spec.tuningConfig."
+  documentation: |-
+    Prepares a HyperShift Agent guest cluster to run EgressIP on a secondary host
+    interface, as requested for OCP Bare Metal / HCP managed clusters.
+
+    Requires the guest nodes to already have a second addressed NIC. On baremetalds
+    that comes from dev-scripts EXTRA_NETWORK_NAMES, so the job must set
+    EXTRA_NETWORK_CONFIG and run baremetalds-devscripts-conf-extranetwork before
+    provisioning. Every VM flavor, including extraworker, gets a NIC on the extra
+    network with a static libvirt DHCP reservation.
+
+    The step:
+
+    1. Discovers the secondary interface by looking for an address inside
+       EGRESSIP_SECONDARY_SUBNET, and fails if the nodes disagree on its name.
+    2. Sets gatewayConfig.ipForwarding=Global on the guest CNO. The default of
+       Restricted leaves the kernel FORWARD policy at DROP with an allowlist that does
+       not cover pod traffic entering on ovn-k8s-mp0 and leaving on a secondary NIC.
+       routingViaHost is intentionally left alone: a secondary-interface EgressIP
+       reroutes the selected pods to the management port irrespective of gateway mode,
+       so local gateway mode is not a prerequisite.
+    3. Delivers net.ipv4.conf.<iface>.forwarding=1 (plus loose rp_filter) through a Tuned
+       object attached to NodePool.spec.tuningConfig. ipForwarding=Global does not cover
+       this: OVN-Kubernetes only sets the per-interface sysctl on br-ex and ovn-k8s-mp0.
+    4. Sets ipv4.never-default on the secondary NIC so the NAT'd libvirt network's DHCP
+       gateway does not compete with the default route via br-ex. This is a runtime fix
+       suitable for CI; the supported production equivalent is day-1 NIC configuration.
+    5. Waits for k8s.ovn.org/host-cidrs to advertise the secondary subnet, which is what
+       the hosted control plane's ovnkube-cluster-manager uses to pick an egress node.
+
+    Outputs saved to ${SHARED_DIR}:
+    - egressip_secondary_iface:    interface name, e.g. enp3s0
+    - egressip_secondary_subnet:   the CIDR that EgressIP objects should draw from
+    - egressip_secondary_node_ips: "<node> <address>" per line, read from host-cidrs
+
+    Addresses are allocated by libvirt in flavor-iteration order rather than hostname
+    order, so tests must read them from these files instead of hardcoding.

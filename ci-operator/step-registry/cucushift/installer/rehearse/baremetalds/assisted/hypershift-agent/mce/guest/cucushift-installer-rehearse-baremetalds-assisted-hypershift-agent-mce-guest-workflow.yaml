@@ -2,8 +2,13 @@ workflow:
   as: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
   steps:
     pre:
+      # Must precede baremetalds-ofcir-pre (the first step of the provision chain):
+      # it appends to dev-scripts-additional-config, which dev-scripts reads when it
+      # defines the libvirt networks and attaches NICs to every VM flavor.
+      - ref: baremetalds-devscripts-conf-extranetwork
       - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-provision
       - ref: cucushift-hypershift-extended-enable-guest
+      - ref: hypershift-agent-ovn-egressip-multinic
       - ref: cucushift-installer-reportportal-marker
     post:
       - ref: hypershift-agent-ovn-ipecho-deprovision
@@ -15,6 +20,13 @@ workflow:
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
       HYPERSHIFT_NAMESPACE: "local-cluster"
+      # Second libvirt network, attached to every VM flavor including extraworker
+      # (the HCP guest nodes), so EgressIP can be tested on a secondary host NIC.
+      # Keep the subnet in sync with EGRESSIP_SECONDARY_SUBNET below.
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="egressnet"
+        EGRESSNET_NETWORK_SUBNET_V4='192.168.221.0/24'
+      EGRESSIP_SECONDARY_SUBNET: "192.168.221.0/24"
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NUM_WORKERS=3
@@ -30,3 +42,12 @@ workflow:
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
   documentation: |-
     This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow
+
+    Provisions a second libvirt network (egressnet, 192.168.221.0/24) and prepares the
+    guest cluster to run EgressIP on the resulting secondary host NIC: ipForwarding is
+    set to Global, a Tuned profile delivered via NodePool.spec.tuningConfig enables
+    forwarding on the interface, and the interface is stopped from installing a second
+    default route. See hypershift-agent-ovn-egressip-multinic for details.
+
+    Jobs that want the echo target reachable over the secondary NIC should also set
+    IPECHO_HOST_IP=192.168.221.1.
