@@ -149,9 +149,32 @@ function has_retainable_apps_dns_failure()
        "${resource_status_reason}" == *"Status Code: 404"* ]]
 }
 
+function collect_stack_deletion_diagnostics()
+{
+    local stack_name=$1
+    local account=$2
+    local attempt=$3
+    local artifact_prefix="${ARTIFACT_DIR}/cloudformation-delete-${account}-${stack_name}-${attempt}"
+
+    mkdir -p "${ARTIFACT_DIR}" || true
+    echo "Capturing CloudFormation deletion diagnostics for stack ${stack_name} (${account}, ${attempt})"
+
+    aws --region "${REGION}" cloudformation describe-stacks \
+        --stack-name "${stack_name}" \
+        --query 'Stacks[0].{StackStatus:StackStatus,StackStatusReason:StackStatusReason}' \
+        --output json > "${artifact_prefix}-status.json" 2>&1 || true
+
+    aws --region "${REGION}" cloudformation describe-stack-events \
+        --stack-name "${stack_name}" \
+        --max-items 20 \
+        --query 'StackEvents[].{Timestamp:Timestamp,LogicalResourceId:LogicalResourceId,ResourceType:ResourceType,ResourceStatus:ResourceStatus,ResourceStatusReason:ResourceStatusReason}' \
+        --output json > "${artifact_prefix}-events.json" 2>&1 || true
+}
+
 function delete_stacks()
 {
     local stack_list=$1
+    local account=$2
     local rc=0
     for stack_name in $(tac "${stack_list}"); do
         echo "Deleting stack ${stack_name} ..."
@@ -164,6 +187,7 @@ function delete_stacks()
             echo "Stack ${stack_name} deleted successfully"
             continue
         fi
+        collect_stack_deletion_diagnostics "${stack_name}" "${account}" "initial"
 
         local attempt
         for attempt in 1 2; do
@@ -186,6 +210,7 @@ function delete_stacks()
                 echo "Stack ${stack_name} deleted successfully on retry"
                 break
             fi
+            collect_stack_deletion_diagnostics "${stack_name}" "${account}" "retry-${attempt}"
         done
 
         if ! check_stack_deleted "${stack_name}"; then
@@ -203,7 +228,7 @@ if [ -e "${stack_list}" ]; then
     echo "Deleting stacks:"
     cat "${stack_list}"
     export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-    delete_stacks "${stack_list}" || rc=1
+    delete_stacks "${stack_list}" "default-account" || rc=1
 fi
 
 stack_list="${SHARED_DIR}/to_be_removed_cf_stack_list_shared_account"
@@ -211,7 +236,7 @@ if [ -e "${stack_list}" ]; then
     echo "Deleting stacks in shared account:"
     cat "${stack_list}"
     export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
-    delete_stacks "${stack_list}" || rc=1
+    delete_stacks "${stack_list}" "shared-account" || rc=1
 fi
 
 exit ${rc:-0}
