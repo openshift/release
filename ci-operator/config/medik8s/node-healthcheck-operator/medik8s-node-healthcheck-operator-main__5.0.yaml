@@ -13,8 +13,8 @@ base_images:
     tag: latest
   system-tests-builder:
     name: builder
-    namespace: medik8s
-    tag: go1.27
+    namespace: konveyor
+    tag: ubi9-v1.27
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -76,7 +76,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: medik8s-aws
+    cluster_profile: openshift-org-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       TEST_NAME: e2e-system-tests-nhc-upgrade
@@ -137,7 +137,7 @@ tests:
         }
 
         build_candidate() {
-          # Match build-and-push.sh: build operator, bundle, then catalog.
+          # Build operator, bundle, then catalog.
           echo '==> Copy the CI-selected NHC checkout into a writable build directory'
           test -f /opt/nhc-ci-src/Makefile
           cp -R /opt/nhc-ci-src /tmp/nhc-source
@@ -214,7 +214,7 @@ tests:
         run_tests() {
           echo '==> Clone system-tests main'
           git clone --depth=1 --branch main \
-            https://github.com/medik8s/system-tests.git /tmp/system-tests
+            https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
 
           export NHC_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
