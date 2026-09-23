@@ -12,7 +12,11 @@ readonly GCP_REGION_VALUE="${GCP_REGION:-us-central1}"
 
 mkdir -p "${GATHER_ROOT}"
 temp_root="$(mktemp -d)"
-trap 'rm -rf "${temp_root}"' EXIT
+cleanup_temp_files() {
+  rm -rf "${temp_root}"
+  find "${GATHER_ROOT}" -maxdepth 1 -type f -name '.*.tmp' -delete
+}
+trap cleanup_temp_files EXIT
 
 read_shared() {
   local name="$1"
@@ -96,6 +100,8 @@ collect_gke() {
   local scope_dir="$2"
   local namespaces_json="${scope_dir}/cluster/namespaces.json"
   local candidates="${scope_dir}/candidate-namespaces.txt"
+  local application_candidates="${scope_dir}/application-namespaces.txt"
+  local supplemental_candidates="${scope_dir}/supplemental-namespaces.txt"
   local existing="${scope_dir}/existing-namespaces.txt"
   local selected="${scope_dir}/selected-namespaces.txt"
   local output exit_code namespace kind safe_kind pid
@@ -103,6 +109,8 @@ collect_gke() {
 
   mkdir -p "${scope_dir}/cluster" "${scope_dir}/custom-resources" "${scope_dir}/inspect"
   : >"${candidates}"
+  : >"${application_candidates}"
+  : >"${supplemental_candidates}"
 
   output="${scope_dir}/cluster/api-resources.txt"
   run_capture "${scope_dir}" "api-resources" "${output}" 30s \
@@ -117,8 +125,12 @@ collect_gke() {
     return 0
   fi
 
-  jq -r '.items[].metadata.name // empty' "${namespaces_json}" | sort -u >"${existing}"
-  jq -r '
+  if ! jq -r '.items[].metadata.name // empty' "${namespaces_json}" | sort -u >"${existing}"; then
+    record_error "${scope_dir}" "namespaces-json" 1
+    touch "${scope_dir}/.unavailable"
+    return 0
+  fi
+  if ! jq -r '
     .items[]
     | select(
         .metadata.annotations["argocd.argoproj.io/tracking-id"] != null
@@ -127,21 +139,34 @@ collect_gke() {
         or .metadata.labels["hypershift.openshift.io/hosted-control-plane"] == "true"
       )
     | .metadata.name
-  ' "${namespaces_json}" >>"${candidates}"
+  ' "${namespaces_json}" >>"${supplemental_candidates}"; then
+    record_error "${scope_dir}" "namespace-metadata" 1
+  fi
 
   output="${scope_dir}/custom-resources/applications.argoproj.io.json"
   timeout 30s kubectl --kubeconfig="${kubeconfig}" get applications.argoproj.io --all-namespaces -o json >"${output}" 2>"${output}.stderr"
   exit_code=$?
   if (( exit_code == 0 )); then
-    jq -r '
+    if ! jq -r '
       .items[]
       | select(
           .spec.destination.server == "https://kubernetes.default.svc"
           or .spec.destination.name == "in-cluster"
         )
-      | .metadata.namespace,
-        (.spec.destination.namespace // empty)
-    ' "${output}" >>"${candidates}"
+      | .metadata.namespace
+    ' "${output}" >>"${supplemental_candidates}"; then
+      record_error "${scope_dir}" "applications-json" 1
+    fi
+    if ! jq -r '
+      .items[]
+      | select(
+          .spec.destination.server == "https://kubernetes.default.svc"
+          or .spec.destination.name == "in-cluster"
+        )
+      | .spec.destination.namespace // empty
+    ' "${output}" >>"${application_candidates}"; then
+      record_error "${scope_dir}" "application-destinations-json" 1
+    fi
   else
     record_error "${scope_dir}" "applications.argoproj.io" "${exit_code}"
   fi
@@ -150,11 +175,15 @@ collect_gke() {
   timeout 30s kubectl --kubeconfig="${kubeconfig}" get hostedclusters.hypershift.openshift.io --all-namespaces -o json >"${output}" 2>"${output}.stderr"
   exit_code=$?
   if (( exit_code == 0 )); then
-    jq -r '.items[].metadata.namespace // empty' "${output}" >>"${candidates}"
+    if ! jq -r '.items[].metadata.namespace // empty' "${output}" >>"${supplemental_candidates}"; then
+      record_error "${scope_dir}" "hostedclusters-json" 1
+    fi
   else
     record_error "${scope_dir}" "hostedclusters.hypershift.openshift.io" "${exit_code}"
   fi
 
+  cat "${application_candidates}" >>"${candidates}"
+  grep -Ev '^(default|kube-system)$' "${supplemental_candidates}" >>"${candidates}" || true
   sort -u "${candidates}" -o "${candidates}"
   comm -12 "${existing}" "${candidates}" >"${selected}"
 
@@ -201,7 +230,7 @@ collect_gke_bounded() {
   local name="$1"
   local kubeconfig="$2"
   local scope_dir="$3"
-  timeout 240s bash -c 'collect_gke "$@"' _ "${kubeconfig}" "${scope_dir}"
+  timeout 240s bash -c 'set -uo pipefail; collect_gke "$@"' _ "${kubeconfig}" "${scope_dir}"
   local exit_code=$?
   if (( exit_code != 0 )); then
     record_error "${scope_dir}" "${name}" "${exit_code}"
@@ -261,17 +290,24 @@ collect_customer_project() {
     return 0
   fi
 
+  # Keep customer-project output diagnostic but bounded to structured fields.
+  # In particular, do not archive instance metadata or arbitrary log payloads.
   run_capture "${scope_dir}" "cloud-asset" "${scope_dir}/assets.json" 90s \
-    gcloud asset search-all-resources --scope="projects/${customer_project}" --format=json
+    gcloud asset search-all-resources --scope="projects/${customer_project}" \
+      --format='json(name,assetType,project,location,displayName,state,createTime,updateTime)'
   run_capture "${scope_dir}" "managed-instance-groups" "${scope_dir}/managed-instance-groups.json" 60s \
-    gcloud compute instance-groups managed list --project="${customer_project}" --format=json
+    gcloud compute instance-groups managed list --project="${customer_project}" \
+      --format='json(name,zone,region,status,targetSize,currentActions,instanceTemplate,versions,baseInstanceName)'
   run_capture "${scope_dir}" "instances" "${scope_dir}/instances.json" 60s \
-    gcloud compute instances list --project="${customer_project}" --format=json
+    gcloud compute instances list --project="${customer_project}" \
+      --format='json(name,id,zone,status,machineType,creationTimestamp,lastStartTimestamp,lastStopTimestamp,cpuPlatform,networkInterfaces,disks,scheduling)'
   run_capture "${scope_dir}" "compute-operations" "${scope_dir}/compute-operations.json" 60s \
-    gcloud compute operations list --project="${customer_project}" --format=json --limit=200
+    gcloud compute operations list --project="${customer_project}" --limit=200 \
+      --format='json(name,operationType,status,statusMessage,error,targetLink,zone,region,startTime,endTime,httpErrorStatusCode,httpErrorMessage,progress)'
   run_capture "${scope_dir}" "worker-logs" "${scope_dir}/worker-logs.json" 90s \
-    gcloud logging read '(resource.type="gce_instance" OR protoPayload.resourceName=~"/(instances|instanceGroupManagers)/")' \
-      --project="${customer_project}" --freshness=3h --limit=500 --format=json
+    gcloud logging read 'logName:"cloudaudit.googleapis.com" AND (resource.type="gce_instance" OR protoPayload.resourceName=~"/(instances|instanceGroupManagers)/")' \
+      --project="${customer_project}" --freshness=3h --limit=500 \
+      --format='json(timestamp,severity,logName,resource,operation,protoPayload.methodName,protoPayload.resourceName,protoPayload.status,errorGroups,insertId)'
 }
 
 cap_text_files() {
@@ -288,11 +324,16 @@ cap_text_files() {
   done < <(find "${scope_dir}" -type f -print0)
 }
 
-contains_credentials() {
+scope_is_safe() {
   local scope_dir="$1"
-  grep -IRqlE -- \
-    '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|["[:space:]](private_key|access_token|refresh_token|client_secret)["[:space:]]*[:=]' \
+  grep -raqiE -- \
+    '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|(^|[^[:alnum:]_])(private_key|access_token|refresh_token|client_secret)["[:space:]]*[:=]|authorization["[:space:]]*:[[:space:]]*bearer[[:space:]]+|(^|[^[:alnum:]_-])ya29\.[[:alnum:]_.-]+|(^|[^[:alnum:]_-])eyJ[[:alnum:]_-]{10,}\.[[:alnum:]_-]{10,}\.[[:alnum:]_-]{10,}' \
     "${scope_dir}"
+  local exit_code=$?
+  if (( exit_code == 1 )); then
+    return 0
+  fi
+  return 1
 }
 
 sha256_file() {
@@ -310,6 +351,8 @@ finalize_scope() {
   local record_file="$3"
   local status="success"
   local archive_path="${GATHER_ROOT}/${name}.tar.gz"
+  local archive_temp
+  local archive_publish_temp="${GATHER_ROOT}/.${name}.tar.gz.tmp"
   local archive_json="null"
   local bytes=0
   local digest=""
@@ -327,7 +370,7 @@ finalize_scope() {
   find "${scope_dir}" -type f -path '*/core/secrets.yaml' -delete
   cap_text_files "${scope_dir}"
 
-  if [[ "${status}" != "unavailable" ]] && contains_credentials "${scope_dir}"; then
+  if [[ "${status}" != "unavailable" ]] && ! scope_is_safe "${scope_dir}"; then
     status="unavailable"
     errors_json="$(jq -c '. + ["safety-scan: credential marker detected"]' <<<"${errors_json}")"
   fi
@@ -336,15 +379,22 @@ finalize_scope() {
     find "${scope_dir}" \( -type f -o -type d \) -exec touch -t 198001010000 {} +
     scope_parent="$(dirname "${scope_dir}")"
     scope_base="$(basename "${scope_dir}")"
+    archive_temp="${scope_parent}/.${name}.tar.gz"
     if (
       cd "${scope_parent}" || exit 1
-      find "${scope_base}" -print0 | LC_ALL=C sort -z | tar --null -T - -cf -
-    ) | gzip -n >"${archive_path}"; then
-      bytes="$(wc -c <"${archive_path}" | tr -d ' ')"
-      digest="$(sha256_file "${archive_path}")"
-      archive_json="gather/${name}.tar.gz"
-      if (( bytes < CHAI_MAX_BYTES )); then
-        chai_readable="true"
+      find "${scope_base}" \( -type f -o -type l \) -print0 | LC_ALL=C sort -z | tar --null -T - -cf -
+    ) | gzip -n >"${archive_temp}"; then
+      if cp "${archive_temp}" "${archive_publish_temp}" && mv "${archive_publish_temp}" "${archive_path}"; then
+        bytes="$(wc -c <"${archive_path}" | tr -d ' ')"
+        digest="$(sha256_file "${archive_path}")"
+        archive_json="gather/${name}.tar.gz"
+        if (( bytes < CHAI_MAX_BYTES )); then
+          chai_readable="true"
+        fi
+      else
+        rm -f "${archive_publish_temp}" "${archive_path}"
+        status="unavailable"
+        errors_json="$(jq -c '. + ["archive-publish: exit=1 timeout=false"]' <<<"${errors_json}")"
       fi
     else
       rm -f "${archive_path}"
@@ -369,7 +419,9 @@ finalize_scope() {
     >"${record_file}"
 }
 
+export GATHER_ROOT TEXT_FILE_MAX_BYTES CHAI_MAX_BYTES
 export -f collect_gke inspect_namespace record_error run_capture
+export -f cap_text_files scope_is_safe sha256_file finalize_scope
 
 region_project="$(read_shared region-project-id)"
 region_cluster="$(read_shared region-cluster-name)"
@@ -377,7 +429,7 @@ mc_project="$(read_shared mc-project-id)"
 mc_cluster="$(read_shared mc-cluster-name)"
 customer_project="$(read_shared customer-project-id)"
 hosted_cluster="$(read_shared hosted-cluster-name)"
-tested_sha="$(read_shared tested-sha)"
+tested_sha="$(read_shared gcp-hcp-tested-sha)"
 [[ -n "${tested_sha}" ]] || tested_sha="${PULL_PULL_SHA:-${PULL_BASE_SHA:-}}"
 
 export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
@@ -393,43 +445,71 @@ customer_dir="${temp_root}/customer-project"
 mkdir -p "${region_dir}" "${management_dir}" "${hosted_dir}" "${customer_dir}"
 
 auth_ok=true
-if [[ ! -s "${SHARED_DIR}/wif-cred.json" ]] || ! gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet >/dev/null 2>&1; then
+auth_exit=0
+if [[ ! -s "${SHARED_DIR}/wif-cred.json" ]]; then
   auth_ok=false
+  auth_exit=1
+else
+  timeout 30s gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet >/dev/null 2>&1
+  auth_exit=$?
+  (( auth_exit == 0 )) || auth_ok=false
 fi
 
 region_kubeconfig="$(mktemp "${temp_root}/region-kubeconfig.XXXXXX")"
 management_kubeconfig="$(mktemp "${temp_root}/management-kubeconfig.XXXXXX")"
 hosted_kubeconfig="$(mktemp "${temp_root}/hosted-kubeconfig.XXXXXX")"
 
-if [[ "${auth_ok}" == "true" && -n "${region_project}" && -n "${region_cluster}" ]]; then
-  region_project_number="$(gcloud projects describe "${region_project}" --format='value(projectNumber)' 2>/dev/null)"
-  access_token="$(gcloud auth print-access-token 2>/dev/null)"
-  if [[ -n "${region_project_number}" && -n "${access_token}" ]]; then
+if [[ "${auth_ok}" == "true" && -n "${region_project}" ]]; then
+  region_project_number="$(timeout 30s gcloud projects describe "${region_project}" --format='value(projectNumber)' 2>/dev/null)"
+  project_lookup_exit=$?
+  access_token="$(timeout 30s gcloud auth print-access-token 2>/dev/null)"
+  access_token_exit=$?
+
+  if (( project_lookup_exit == 0 && access_token_exit == 0 )) && \
+    [[ -n "${region_project_number}" && -n "${access_token}" && -n "${region_cluster}" ]]; then
     write_connect_kubeconfig "${region_kubeconfig}" \
       "${GCP_REGION_VALUE}-connectgateway.googleapis.com/v1/projects/${region_project_number}/locations/${GCP_REGION_VALUE}/gkeMemberships/${region_cluster}" \
       "${access_token}"
     collect_gke_bounded "region-cluster" "${region_kubeconfig}" "${region_dir}" &
     region_pid=$!
   else
-    printf '%s\n' 'connect-gateway: exit=1 timeout=false' >"${region_dir}/.errors"
+    if (( project_lookup_exit != 0 )); then
+      record_error "${region_dir}" "fleet-project-lookup" "${project_lookup_exit}"
+    elif (( access_token_exit != 0 )); then
+      record_error "${region_dir}" "access-token" "${access_token_exit}"
+    else
+      record_error "${region_dir}" "region-metadata" 1
+    fi
     touch "${region_dir}/.unavailable"
     region_pid=""
   fi
 
-  if [[ -n "${mc_project}" && -n "${mc_cluster}" && -n "${region_project_number}" && -n "${access_token}" ]]; then
+  if (( project_lookup_exit == 0 && access_token_exit == 0 )) && \
+    [[ -n "${region_project_number}" && -n "${access_token}" && -n "${mc_project}" && -n "${mc_cluster}" ]]; then
     write_connect_kubeconfig "${management_kubeconfig}" \
       "${GCP_REGION_VALUE}-connectgateway.googleapis.com/v1/projects/${region_project_number}/locations/${GCP_REGION_VALUE}/gkeMemberships/${mc_cluster}" \
       "${access_token}"
     collect_gke_bounded "management-cluster" "${management_kubeconfig}" "${management_dir}" &
     management_pid=$!
   else
-    printf '%s\n' 'connect-gateway: exit=1 timeout=false' >"${management_dir}/.errors"
+    if (( project_lookup_exit != 0 )); then
+      record_error "${management_dir}" "fleet-project-lookup" "${project_lookup_exit}"
+    elif (( access_token_exit != 0 )); then
+      record_error "${management_dir}" "access-token" "${access_token_exit}"
+    else
+      record_error "${management_dir}" "management-metadata" 1
+    fi
     touch "${management_dir}/.unavailable"
     management_pid=""
   fi
 else
-  printf '%s\n' 'gcloud-auth: exit=1 timeout=false' >"${region_dir}/.errors"
-  printf '%s\n' 'gcloud-auth: exit=1 timeout=false' >"${management_dir}/.errors"
+  if [[ "${auth_ok}" == "true" ]]; then
+    record_error "${region_dir}" "region-project-metadata" 1
+    record_error "${management_dir}" "region-project-metadata" 1
+  else
+    record_error "${region_dir}" "gcloud-auth" "${auth_exit}"
+    record_error "${management_dir}" "gcloud-auth" "${auth_exit}"
+  fi
   touch "${region_dir}/.unavailable" "${management_dir}/.unavailable"
   region_pid=""
   management_pid=""
@@ -442,7 +522,7 @@ if [[ "${auth_ok}" == "true" ]]; then
   collect_customer_project "${customer_dir}" "${customer_project}" &
   customer_pid=$!
 else
-  printf '%s\n' 'gcloud-auth: exit=1 timeout=false' >"${customer_dir}/.errors"
+  record_error "${customer_dir}" "gcloud-auth" "${auth_exit}"
   touch "${customer_dir}/.unavailable"
   customer_pid=""
 fi
@@ -451,11 +531,35 @@ for pid in "${region_pid}" "${management_pid}" "${hosted_pid}" "${customer_pid}"
   [[ -n "${pid}" ]] && wait "${pid}"
 done
 
+finalize_scope_bounded() {
+  local name="$1"
+  local scope_dir="$2"
+  local record="$3"
+
+  timeout 180s bash -c 'set -uo pipefail; finalize_scope "$@"' _ \
+    "${name}" "${scope_dir}" "${record}"
+  local finalize_exit=$?
+  if (( finalize_exit != 0 )); then
+    rm -f "${GATHER_ROOT}/${name}.tar.gz" "${GATHER_ROOT}/.${name}.tar.gz.tmp"
+    jq -n \
+      --arg name "${name}" \
+      --arg error "finalize: exit=${finalize_exit} timeout=$([[ "${finalize_exit}" == "124" ]] && printf true || printf false)" \
+      '{name: $name, status: "unavailable", archive: null, bytes: 0, sha256: "", chai_readable: false, errors: [$error]}' \
+      >"${record}"
+  fi
+  return 0
+}
+
 scope_records=()
+finalize_pids=()
 for name in region-cluster management-cluster hosted-cluster customer-project; do
   record="${temp_root}/${name}.json"
-  finalize_scope "${name}" "${temp_root}/${name}" "${record}"
   scope_records+=("${record}")
+  finalize_scope_bounded "${name}" "${temp_root}/${name}" "${record}" &
+  finalize_pids+=("$!")
+done
+for pid in "${finalize_pids[@]}"; do
+  wait "${pid}"
 done
 
 finished_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
