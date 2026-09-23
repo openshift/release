@@ -85,6 +85,13 @@ hcp create kubeconfig kubevirt --name "${HC_NAME}" --namespace "${HC_NS}" > "${S
 # Persist management cluster kubeconfig separately so conformance steps can reference it
 cp "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/mgmt_kubeconfig"
 
+# Persist cluster identity so hypershift-conformance-chain can resolve
+# HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE correctly.
+# The conformance chain derives CLUSTER_NAME from PROW_JOB_ID (sha256), which does
+# not match our static HC_NAME. Writing these files lets the chain use the real name.
+echo -n "${HC_NAME}" > "${SHARED_DIR}/cluster-name"
+echo -n "${HC_NS}"   > "${SHARED_DIR}/cluster-namespace"
+
 # Allow time for the KubeVirt VMs to be scheduled and begin booting before polling nodes
 echo "$(date) Sleeping 20 minutes to allow KubeVirt VMs to boot before checking node readiness..."
 sleep 1200
