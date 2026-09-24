@@ -1,3 +1,8 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   project_image:
     dockerfile_path: Dockerfile.prow
@@ -31,6 +36,43 @@ tests:
     report_template: |
       Weekly check-links job has found broken URLs in <https://github.com/openshift/managed-cluster-config|Managed Cluster Config repository >.
       To see list of broken URLs, <{{.Status.URL}}|see log>.
+- as: hive-e2e-sss-dryrun
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      BACKPLANE_CLUSTER_ID: 1g268u7pp694gj152nj16me4sv615lpv
+      BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-63154
+    pre:
+    - ref: rosa-hive-backplane-login
+    test:
+    - ref: rosa-hive-sss-dryrun
+- as: hive-e2e-sss-dryrun-daily
+  capabilities:
+  - intranet
+  cron: 0 6 * * *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
+  restrict_network_access: false
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      BACKPLANE_CLUSTER_ID: 1g268u7pp694gj152nj16me4sv615lpv
+      BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-63154
+    pre:
+    - ref: rosa-hive-backplane-login
+    test:
+    - ref: rosa-hive-sss-dryrun
 zz_generated_metadata:
   branch: master
   org: openshift

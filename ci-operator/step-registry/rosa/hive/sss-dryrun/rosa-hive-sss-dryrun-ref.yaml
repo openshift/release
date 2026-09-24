@@ -1,0 +1,34 @@
+ref:
+  as: rosa-hive-sss-dryrun
+  from: src
+  grace_period: 10s
+  commands: rosa-hive-sss-dryrun-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: BACKPLANE_CLI_VERSION
+    default: "0.11.0"
+    documentation: Version of the ocm-backplane CLI to install.
+  - name: BACKPLANE_PROXY_URL
+    default: "http://squid.corp.redhat.com:3128"
+    documentation: HTTP proxy for backplane API access from build clusters.
+  - name: OCM_LOGIN_ENV
+    default: "production"
+    documentation: OCM environment to login to.
+  documentation: |-
+    Validates managed-cluster-config SelectorSyncSet templates with
+    server-side dry-run against a Hive cluster via backplane.
+
+    Runs 'make' to generate the SSS OpenShift Template, processes the
+    integration template with 'oc process' (ENV=int, using integration
+    parameter values), then validates the resulting SelectorSyncSets with
+    'oc apply --dry-run=server' using elevated backplane access. All three
+    generated env templates are identical, so only the integration one is
+    processed. hivei01ue1 is the integration Hive shard.
+
+    Requires the rosa-hive-backplane-login pre step. Each step is a
+    separate pod, so this step re-establishes OCM/backplane auth.
+    BACKPLANE_CLUSTER_ID and BACKPLANE_ELEVATE_REASON must be set in the
+    ci-operator config.
