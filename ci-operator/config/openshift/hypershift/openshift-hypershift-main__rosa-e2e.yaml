@@ -40,7 +40,7 @@ resources:
       memory: 200Mi
 tests:
 - as: rosa-hcp-e2e-staging-stable-4-22
-  cron: 0 8 * * *
+  cron: 0 0 31 2 *
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: rosa-e2e-01
@@ -52,43 +52,6 @@ tests:
       LABEL_FILTER: Platform:HCP
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.22"
-      OPERATOR_TYPE: ho
-      REGION: us-west-2
-      REPLICAS: "3"
-    post:
-    - ref: rosa-gap-analysis-api-resources-and-crd
-    - ref: rosa-gap-analysis-critical-alerts
-    - ref: rosa-gap-analysis-cluster-install-delete-metrics
-    - chain: rosa-cluster-deprovision
-    - chain: rosa-sts-oidc-config-delete
-    - ref: rosa-e2e-cleanup-vpc
-    - ref: aws-deprovision-stacks
-    - chain: rosa-gather-hcp-diagnostics
-    - ref: rosa-operator-restore
-    pre:
-    - ref: rosa-operator-deploy-pr
-    - chain: rosa-aws-sts-hcp-provision
-    - ref: rosa-cluster-wait-ready-hosted-cp
-    - ref: rosa-cluster-wait-ready-nodes
-    - ref: rosa-cluster-credentials-hypershift-mgmt
-    workflow: rosa-e2e-hcp
-  timeout: 3h0m0s
-- as: rosa-hcp-e2e-staging-stable-4-22-cpo
-  cron: 0 10 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    cluster_profile: rosa-e2e-01
-    dependencies:
-      OPERATOR_IMAGE: hypershift
-    env:
-      CHANNEL_GROUP: stable
-      CLUSTER_SECTOR: hypershift-ci
-      ENABLE_BILLING_ACCOUNT: "yes"
-      HOSTED_CP: "true"
-      LABEL_FILTER: Platform:HCP
-      OCM_LOGIN_ENV: staging
-      OPENSHIFT_VERSION: "4.22"
-      OPERATOR_TYPE: cpo
       REGION: us-west-2
       REPLICAS: "3"
     post:
