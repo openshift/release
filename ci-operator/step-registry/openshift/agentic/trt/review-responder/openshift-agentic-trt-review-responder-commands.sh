@@ -403,7 +403,8 @@ push_current_branch() {
     refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
     branch_name=$(git branch --show-current 2>/dev/null || echo "")
     if [[ -z "${branch_name}" ]]; then
-        return 0
+        echo "ERROR: cannot push from a detached HEAD"
+        return 1
     fi
     echo "Pushing ${branch_name}..."
     if git push fork "${branch_name}"; then
@@ -421,6 +422,7 @@ push_current_branch() {
         echo "ERROR: push failed ${push_failures} consecutive times; giving up"
         exit 1
     fi
+    return 1
 }
 
 iteration=0
@@ -520,6 +522,7 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
         idle_streak=0
         review_rounds=$(( review_rounds + 1 ))
         REVIEW_EXIT=0
+        ci_evaluated=false
 
         if [[ "${has_review}" == "true" ]]; then
             echo "Invoking worker to address review comments..."
@@ -552,18 +555,23 @@ Your GitHub login is ${BOT_LOGIN}." \
                 REVIEW_EXIT="${CI_EXIT}"
             fi
             # A successful worker evaluated the failure even if it was deemed
-            # unrelated or made no branch change. On worker failure, leave the
-            # run pending so a later polling cycle can retry it.
+            # unrelated or made no branch change. Record it only after the
+            # branch push succeeds, so an unpublished fix remains retryable.
             if [[ "${CI_EXIT}" -eq 0 ]]; then
-                if ! ci_failure_state record "${pending_ci}" "${current_head}" "${EVALUATED_CI_STATE}"; then
-                    echo "WARNING: failed to record evaluated CI failures; they may be re-evaluated."
-                fi
+                ci_evaluated=true
             else
                 echo "CI worker failed; leaving failures pending for retry."
             fi
         fi
 
-        push_current_branch
+        if push_current_branch; then
+            if [[ "${ci_evaluated}" == "true" ]] && \
+               ! ci_failure_state record "${pending_ci}" "${current_head}" "${EVALUATED_CI_STATE}"; then
+                echo "WARNING: failed to record evaluated CI failures; they may be re-evaluated."
+            fi
+        else
+            echo "WARNING: branch push failed; leaving CI failures pending for retry."
+        fi
     fi
 
     if [[ "${EVAL_MODE:-}" == "true" ]]; then
