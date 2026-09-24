@@ -78,6 +78,10 @@ function exit_handler() {
     oc get all -n "${TRUSTEE_NAMESPACE}" || true
     echo ">>> Operator logs:"
     oc logs -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager --tail=50 || true
+    echo ">>> Trustee deployment pod logs (last 100 lines):"
+    oc logs -n "${TRUSTEE_NAMESPACE}" -l app=kbs --tail=100 --prefix 2>/dev/null || true
+    echo ">>> Trustee deployment pod events:"
+    oc describe pods -n "${TRUSTEE_NAMESPACE}" -l app=kbs 2>/dev/null | grep -A 20 "^Events:" | tail -25 || true
   fi
 }
 trap 'exit_handler' EXIT
