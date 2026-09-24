@@ -148,6 +148,19 @@ tests:
             -- hack/auto-rebase.sh
         git push -f origin demo-e2e-base
 
+        # Diagnostic: which builder probe sources are visible in this pod?
+        echo "==> DIAG: oc=$(command -v oc || echo MISSING)"
+        oc whoami 2>&1 | head -1 || true
+        echo "==> DIAG: ocp/builder golang-1.26 tags:"
+        oc get is builder -n ocp -o jsonpath='{.status.tags[*].tag}' 2>&1 \
+          | tr ' ' '\n' | grep 'golang-1.26' | head -5 || echo "(none or error)"
+        echo "==> DIAG: openshift/release golang-1.26 tags:"
+        oc get is release -n openshift -o jsonpath='{.status.tags[*].tag}' 2>&1 \
+          | tr ' ' '\n' | grep 'golang-1.26' | head -5 || echo "(none or error)"
+        echo "==> DIAG: oc image info 1.26/5.0:"
+        oc image info registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0 \
+          --filter-by-os=linux/amd64 2>&1 | head -3 || true
+
         # Reset prior demo PR/branch so open_pr_exists does not skip.
         gh pr list --repo openshift/ocp-release-operator-sdk \
           --head v1.42.3-rebase-demo-e2e-base --state open --json number -q '.[].number' \
