@@ -11,7 +11,17 @@ ref:
       documentation: |-
         Install topology variant. When the value contains "externallb"
         (for example proxy-externallb), this step verifies Infrastructure
-        status for External DNS and UserManaged LB. Otherwise the step is skipped.
+        status for External DNS and UserManaged LB. Otherwise those checks
+        are skipped (MCS api-int verification can still run when enabled).
+    - name: VERIFY_MCS_API_INT
+      default: "false"
+      documentation: |-
+        When "true", assert worker Ignition/user-data uses api-int for the
+        MCS endpoint (OCPBUGS-112483). Can run without an externallb topology
+        (e.g. standard IPI). Enable only on payloads that include the fix.
   documentation: |-
-    For externallb jobs, verify the cluster Infrastructure status reflects external DNS
-    (dnsRecordsType: External) and a user-managed load balancer.
+    For externallb jobs, verify Infrastructure status reflects external DNS
+    (dnsRecordsType: External) and a user-managed load balancer. Optionally
+    (VERIFY_MCS_API_INT=true), assert worker Ignition/user-data uses the
+    api-int FQDN for the MCS endpoint (OCPBUGS-112483), including on
+    non-externallb installs.
