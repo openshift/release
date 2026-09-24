@@ -4,6 +4,94 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+ci_failure_state() {
+    local action=$1
+    local failures_json=$2
+    local head_ref_oid=$3
+    local state_file=$4
+
+    python3 - "${action}" "${failures_json}" "${head_ref_oid}" "${state_file}" <<'PY'
+import json
+import os
+import sys
+import tempfile
+
+action, failures_json, head_ref_oid, state_file = sys.argv[1:]
+failures = json.loads(failures_json)
+if not isinstance(failures, list) or not all(isinstance(item, dict) for item in failures):
+    raise SystemExit("failures must be a JSON array of objects")
+
+
+def identity(failure):
+    result = {
+        "name": str(failure.get("name", "")),
+        "state": str(failure.get("state", "")),
+    }
+    link = str(failure.get("link", ""))
+    if link:
+        # A check URL identifies the concrete Prow/check run, even if the PR
+        # head changes before GitHub refreshes its check suite.
+        result["link"] = link
+    else:
+        # Some check providers omit links. The head SHA prevents a failure on
+        # a later revision from being mistaken for one already evaluated.
+        result["head_ref_oid"] = head_ref_oid
+    return result
+
+
+try:
+    with open(state_file, encoding="utf-8") as stream:
+        evaluated = json.load(stream)
+except FileNotFoundError:
+    evaluated = []
+if not isinstance(evaluated, list) or not all(isinstance(item, dict) for item in evaluated):
+    raise SystemExit(f"invalid CI failure state in {state_file}")
+
+evaluated_keys = {
+    json.dumps(item, sort_keys=True, separators=(",", ":")) for item in evaluated
+}
+
+if action == "filter":
+    pending = [
+        failure
+        for failure in failures
+        if json.dumps(identity(failure), sort_keys=True, separators=(",", ":"))
+        not in evaluated_keys
+    ]
+    print(json.dumps(pending, separators=(",", ":")))
+elif action == "record":
+    for failure in failures:
+        failure_identity = identity(failure)
+        key = json.dumps(failure_identity, sort_keys=True, separators=(",", ":"))
+        if key not in evaluated_keys:
+            evaluated.append(failure_identity)
+            evaluated_keys.add(key)
+
+    state_dir = os.path.dirname(state_file) or "."
+    os.makedirs(state_dir, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=state_dir, delete=False
+    ) as stream:
+        json.dump(evaluated, stream, sort_keys=True, separators=(",", ":"))
+        stream.write("\n")
+        temporary_file = stream.name
+    os.replace(temporary_file, state_file)
+else:
+    raise SystemExit(f"unknown CI failure state action: {action}")
+PY
+}
+
+# Internal entry point used by the focused state regression test. Prow invokes
+# this script without arguments and follows the normal path below.
+if [[ "${1:-}" == "__ci_failure_state" ]]; then
+    if [[ "$#" -ne 5 ]]; then
+        echo "usage: $0 __ci_failure_state <filter|record> <failures-json> <head-ref-oid> <state-file>" >&2
+        exit 2
+    fi
+    ci_failure_state "$2" "$3" "$4" "$5"
+    exit 0
+fi
+
 echo "=== TRT Review Responder ==="
 
 # Token helpers live on SHARED_DIR (step-registry refs cannot share extra files).
@@ -320,6 +408,7 @@ review_rounds=0
 PHASE_REVIEW_START=$(date +%s)
 PREV_FAILING='[]'
 PREV_HEAD=""
+EVALUATED_CI_STATE="${SHARED_DIR}/review-responder-evaluated-ci-${PR_NUM}.json"
 GATE_FAILURE_THRESHOLD="${GATE_FAILURE_THRESHOLD:-3}"
 PUSH_FAILURE_THRESHOLD="${PUSH_FAILURE_THRESHOLD:-3}"
 gate_failures=0
@@ -385,8 +474,18 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
 
     has_review=false
     [[ "${comment_decision}" == "COMMENT_WORK=yes" ]] && has_review=true
+
+    # The model gate discovers the current actionable failures, but the
+    # responder owns the authoritative evaluated-state decision. This makes a
+    # repeated poll deterministic and also recognizes a rerun of the same job
+    # name when its check URL changes.
+    pending_ci=$(ci_failure_state filter "${extracted}" "${current_head}" "${EVALUATED_CI_STATE}")
     has_ci=false
-    [[ "${ci_decision}" == "CI_WORK=yes" ]] && has_ci=true
+    if [[ "$(jq 'length' <<< "${pending_ci}")" -gt 0 ]]; then
+        has_ci=true
+    elif [[ "${ci_decision}" == "CI_WORK=yes" ]]; then
+        echo "Gate reported CI work, but every current failure was already evaluated."
+    fi
 
     PREV_FAILING="${extracted}"
     PREV_HEAD="${current_head}"
@@ -415,8 +514,9 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
 
         if [[ "${has_ci}" == "true" ]]; then
             CHECKS_FILE="${WORKDIR}/artifacts/failing-checks-${iteration}.json"
-            printf '%s\n' "${extracted}" > "${CHECKS_FILE}"
+            printf '%s\n' "${pending_ci}" > "${CHECKS_FILE}"
             echo "Invoking worker to triage CI failures..."
+            CI_EXIT=0
             agentic_ci --timeout 1800 \
                 "Triage CI failures on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the CI Failure Process instructions in your system prompt. This is CI mode (--ci).
 
@@ -426,7 +526,14 @@ Your GitHub login is ${BOT_LOGIN}." \
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${CI_PROMPT}" \
-                || REVIEW_EXIT=$?
+                || CI_EXIT=$?
+            if [[ "${CI_EXIT}" -ne 0 ]]; then
+                REVIEW_EXIT="${CI_EXIT}"
+            fi
+            # Record after the worker returns so the same concrete run is not
+            # evaluated again on the next poll, even if it was deemed unrelated
+            # or the worker posted its explanation without changing the branch.
+            ci_failure_state record "${pending_ci}" "${current_head}" "${EVALUATED_CI_STATE}"
         fi
 
         push_current_branch
