@@ -12,6 +12,7 @@ ci_failure_state() {
 
     python3 - "${action}" "${failures_json}" "${head_ref_oid}" "${state_file}" <<'PY'
 import json
+import fcntl
 import os
 import sys
 import tempfile
@@ -27,8 +28,8 @@ def identity(failure):
         "name": str(failure.get("name", "")),
         "state": str(failure.get("state", "")),
     }
-    link = str(failure.get("link", ""))
-    if link:
+    link = failure.get("link")
+    if isinstance(link, str) and link.strip():
         # A check URL identifies the concrete Prow/check run, even if the PR
         # head changes before GitHub refreshes its check suite.
         result["link"] = link
@@ -39,45 +40,73 @@ def identity(failure):
     return result
 
 
-try:
-    with open(state_file, encoding="utf-8") as stream:
-        evaluated = json.load(stream)
-except FileNotFoundError:
-    evaluated = []
-if not isinstance(evaluated, list) or not all(isinstance(item, dict) for item in evaluated):
-    raise SystemExit(f"invalid CI failure state in {state_file}")
-
-evaluated_keys = {
-    json.dumps(item, sort_keys=True, separators=(",", ":")) for item in evaluated
-}
-
-if action == "filter":
-    pending = [
-        failure
-        for failure in failures
-        if json.dumps(identity(failure), sort_keys=True, separators=(",", ":"))
-        not in evaluated_keys
-    ]
-    print(json.dumps(pending, separators=(",", ":")))
-elif action == "record":
-    for failure in failures:
-        failure_identity = identity(failure)
-        key = json.dumps(failure_identity, sort_keys=True, separators=(",", ":"))
-        if key not in evaluated_keys:
-            evaluated.append(failure_identity)
-            evaluated_keys.add(key)
-
-    state_dir = os.path.dirname(state_file) or "."
-    os.makedirs(state_dir, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=state_dir, delete=False
-    ) as stream:
-        json.dump(evaluated, stream, sort_keys=True, separators=(",", ":"))
-        stream.write("\n")
-        temporary_file = stream.name
-    os.replace(temporary_file, state_file)
-else:
+if action not in {"filter", "record"}:
     raise SystemExit(f"unknown CI failure state action: {action}")
+
+state_dir = os.path.dirname(state_file) or "."
+os.makedirs(state_dir, exist_ok=True)
+with open(f"{state_file}.lock", mode="a+", encoding="utf-8") as lock_stream:
+    # A responder is normally the only writer, but locking prevents a lost
+    # update if overlapping invocations record different failures.
+    fcntl.flock(lock_stream, fcntl.LOCK_EX)
+    try:
+        with open(state_file, encoding="utf-8") as stream:
+            evaluated = json.load(stream)
+    except FileNotFoundError:
+        evaluated = []
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"invalid CI failure state in {state_file}: {error}")
+    if not isinstance(evaluated, list) or not all(
+        isinstance(item, dict) for item in evaluated
+    ):
+        raise SystemExit(f"invalid CI failure state in {state_file}")
+
+    evaluated_keys = {
+        json.dumps(item, sort_keys=True, separators=(",", ":"))
+        for item in evaluated
+    }
+
+    if action == "filter":
+        pending = [
+            failure
+            for failure in failures
+            if json.dumps(identity(failure), sort_keys=True, separators=(",", ":"))
+            not in evaluated_keys
+        ]
+        print(json.dumps(pending, separators=(",", ":")))
+    else:
+        for failure in failures:
+            failure_identity = identity(failure)
+            key = json.dumps(
+                failure_identity, sort_keys=True, separators=(",", ":")
+            )
+            if key not in evaluated_keys:
+                evaluated.append(failure_identity)
+                evaluated_keys.add(key)
+
+        temporary_file = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=state_dir, delete=False
+            ) as stream:
+                json.dump(evaluated, stream, sort_keys=True, separators=(",", ":"))
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+                temporary_file = stream.name
+            os.replace(temporary_file, state_file)
+            temporary_file = None
+            directory_fd = os.open(state_dir, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            if temporary_file is not None:
+                try:
+                    os.unlink(temporary_file)
+                except FileNotFoundError:
+                    pass
 PY
 }
 
@@ -530,10 +559,14 @@ Your GitHub login is ${BOT_LOGIN}." \
             if [[ "${CI_EXIT}" -ne 0 ]]; then
                 REVIEW_EXIT="${CI_EXIT}"
             fi
-            # Record after the worker returns so the same concrete run is not
-            # evaluated again on the next poll, even if it was deemed unrelated
-            # or the worker posted its explanation without changing the branch.
-            ci_failure_state record "${pending_ci}" "${current_head}" "${EVALUATED_CI_STATE}"
+            # A successful worker evaluated the failure even if it was deemed
+            # unrelated or made no branch change. On worker failure, leave the
+            # run pending so a later polling cycle can retry it.
+            if [[ "${CI_EXIT}" -eq 0 ]]; then
+                ci_failure_state record "${pending_ci}" "${current_head}" "${EVALUATED_CI_STATE}"
+            else
+                echo "CI worker failed; leaving failures pending for retry."
+            fi
         fi
 
         push_current_branch
