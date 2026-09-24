@@ -929,13 +929,29 @@ if [[ -f "/usr/bin/python3" ]]; then
   # the runtime of just about any job. There's no risk over overloading the UI or seeing logs you don't want because we filter by invoker (this job).
   LOKI_EPOCH_MILLIS_FROM="$(date -d '-2 hours' +%s%N | cut -b1-13)"
   LOKI_EPOCH_MILLIS_TO="$(date -d '+8 hours' +%s%N | cut -b1-13)"
+  LOKI_CHEAT_SHEET_URL="https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8"
 
   for invoker in "${LOKI_INVOKERS[@]}"; do
     ENCODED_INVOKER="$(INVOKER="${invoker}" python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["INVOKER"]))')"
+    LOKI_LINK_LABEL="Loki"
+    case "${LOKI_INSTALL_MODE}" in
+      guest-cluster)
+        LOKI_LINK_LABEL="Loki hosted"
+        ;;
+      guest-cluster-multi)
+        LOKI_LINK_LABEL="Loki ${invoker##*/}"
+        ;;
+    esac
     if [[ ! -f "${SHARED_DIR}/custom-links.txt" ]] || ! grep -Fq "${ENCODED_INVOKER}" "${SHARED_DIR}/custom-links.txt"; then
       cat >> "${SHARED_DIR}/custom-links.txt" << EOF
-    <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%7B%22datasource%22:%22PCEB727DF2F34084E%22,%22queries%22:%5B%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%22,%22refId%22:%22A%22,%22editorMode%22:%22code%22,%22queryType%22:%22range%22%7D%5D,%22range%22:%7B%22from%22:%22${LOKI_EPOCH_MILLIS_FROM}%22,%22to%22:%22${LOKI_EPOCH_MILLIS_TO}%22%7D%7D" title="Loki is a log aggregation system for examining CI logs. This is most useful with upgrades, which do not contain pre-upgrade logs in the must-gather.">Loki</a>&nbsp;<a target="_blank" href="https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8" title="Cheat sheet for Loki search queries">Loki cheat sheet</a>
+    <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%7B%22datasource%22:%22PCEB727DF2F34084E%22,%22queries%22:%5B%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%22,%22refId%22:%22A%22,%22editorMode%22:%22code%22,%22queryType%22:%22range%22%7D%5D,%22range%22:%7B%22from%22:%22${LOKI_EPOCH_MILLIS_FROM}%22,%22to%22:%22${LOKI_EPOCH_MILLIS_TO}%22%7D%7D" title="Loki is a log aggregation system for examining CI logs. This is most useful with upgrades, which do not contain pre-upgrade logs in the must-gather.">${LOKI_LINK_LABEL}</a>
 EOF
     fi
   done
+
+  if (( ${#LOKI_INVOKERS[@]} > 0 )) && { [[ ! -f "${SHARED_DIR}/custom-links.txt" ]] || ! grep -Fq "${LOKI_CHEAT_SHEET_URL}" "${SHARED_DIR}/custom-links.txt"; }; then
+    cat >> "${SHARED_DIR}/custom-links.txt" << EOF
+    <a target="_blank" href="${LOKI_CHEAT_SHEET_URL}" title="Cheat sheet for Loki search queries">Loki cheat sheet</a>
+EOF
+  fi
 fi
