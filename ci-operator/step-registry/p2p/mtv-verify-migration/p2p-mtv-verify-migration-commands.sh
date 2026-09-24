@@ -38,6 +38,7 @@ typeset destKubeconfig="${MTV_DEST_SPOKE_KUBECONFIG}"
 typeset targetNs="${MTV_TEST_VM_TARGET_NAMESPACE}"
 typeset vmSshVerify="${MTV_VM_SSH_VERIFY}"
 typeset vmGuestExec="${MTV_VM_GUEST_EXEC}"
+typeset agentWaitTimeout="${MTV_VM_AGENT_WAIT_TIMEOUT}"
 typeset migrationSuffix="${MTV_MIGRATION_SUFFIX:-}"
 typeset diagDir=""
 
@@ -329,6 +330,28 @@ function VirtctlReadVmFile () {
     printf '%s' "${statusResult}" | jq -r '.return."out-data" // ""' | base64 -d
     true
   )
+}
+
+# WaitDestAgentConnected — wait for QEMU Guest Agent to reconnect on each destination VMI.
+# After CCLM the agent process migrates with the VM memory but takes a moment to
+# re-register with the destination libvirt. Without this gate the QEMU GA checks
+# (VerifyVmDataIntegrity, VerifyGuestDiskIo, VerifyGuestNetwork) race the reconnect
+# and find the agent absent, causing all VMs to be skipped and the step to hard-fail.
+# Skipped (return 77) when both MTV_VM_DATA_INTEGRITY and MTV_VM_GUEST_EXEC are false,
+# i.e. no QEMU GA check is actually needed for this run.
+function WaitDestAgentConnected () {
+  if [[ "${MTV_VM_DATA_INTEGRITY}" != 'true' && "${vmGuestExec}" != 'true' ]]; then
+    return 77
+  fi
+
+  typeset -i i
+  for (( i = 1; i <= vmCount; i++ )); do
+    typeset vmName; vmName="$(VmName "${i}")"
+    : "Waiting for AgentConnected on destination VMI ${vmName} in ${targetNs}"
+    DestOc wait "virtualmachineinstance/${vmName}" -n "${targetNs}" \
+      --for=condition=AgentConnected --timeout="${agentWaitTimeout}" 1>/dev/null
+  done
+  true
 }
 
 # VerifyVmDataIntegrity — verify that cloud-init marker files survive migration intact.
@@ -714,6 +737,7 @@ typeset -i verifyStepRc=0
   JStep "Verification: Destination VM runStrategy" VerifyDestVmsRunStrategy || _rc=$?
   JStep "Verification: Source VMIM Not Failed" VerifySourceVmimNotFailed || _rc=$?
   JStep "Verification: VM SSH Port Probe" VerifyAllVmsSsh || _rc=$?
+  JStep "Verification: Destination Agent Connected" WaitDestAgentConnected || _rc=$?
   JStep "Verification: VM Data Integrity" VerifyVmDataIntegrity || _rc=$?
   JStep "Verification: Guest Disk I/O" VerifyGuestDiskIo || _rc=$?
   JStep "Verification: Guest Network Reachability" VerifyGuestNetwork || _rc=$?
