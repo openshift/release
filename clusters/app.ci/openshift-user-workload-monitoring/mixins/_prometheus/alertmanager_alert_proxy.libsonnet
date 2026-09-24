@@ -35,6 +35,18 @@
         },
       ],
     },
+    // Deliberately separate from alert-proxy-watchdog rather than a second config on it, so the
+    // Slack leg can be routed with continue: true and the PagerDuty leg can terminate. Both legs
+    // reach their destination without traversing the proxy webhook, which is the whole point: these
+    // four alerts are how an operator learns the proxy itself is broken.
+    {
+      name: 'alert-proxy-watchdog-pagerduty',
+      pagerduty_configs: [
+        {
+          service_key: '${PAGERDUTY_INTEGRATION_KEY}',
+        },
+      ],
+    },
   ],
 
   alertmanagerRoutes+:: [
@@ -45,12 +57,20 @@
       },
       repeat_interval: '15m',
     },
-    // Terminal on purpose: the alert-proxy watchdogs must not fall through to
-    // the default severity routes, which would page for a service that is
-    // still being rolled out. The PagerDuty leg is added once the probe has
-    // been green, before the slack-criticals cutover.
+    // These two must stay adjacent and in this order, and the pair must stay ahead of every
+    // team and severity route. The Slack leg continues so the same alert also reaches the
+    // PagerDuty leg; the PagerDuty leg terminates so the watchdogs never fall through to
+    // slack-criticals. Dropping the terminal route, or letting either fall through, is how
+    // alert-proxy-EndToEndDelivery-Down paged through slack-criticals on 2026-09-24.
     {
       receiver: 'alert-proxy-watchdog',
+      match_re: {
+        alertname: '^alert-proxy-(Singleton-Down|EndToEndDelivery-Down|Webhook4xx|SlackOutboxFailed)$',
+      },
+      continue: true,
+    },
+    {
+      receiver: 'alert-proxy-watchdog-pagerduty',
       match_re: {
         alertname: '^alert-proxy-(Singleton-Down|EndToEndDelivery-Down|Webhook4xx|SlackOutboxFailed)$',
       },
