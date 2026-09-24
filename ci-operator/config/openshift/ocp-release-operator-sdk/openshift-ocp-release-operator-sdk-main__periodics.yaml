@@ -61,6 +61,73 @@ tests:
         requests:
           cpu: 200m
           memory: 2Gi
+- as: auto-rebase-demo
+  cron: 0 6 * * 1
+  steps:
+    test:
+    - as: auto-rebase-demo
+      commands: |
+        set -euo pipefail
+
+        # --- Mint a GitHub App installation token (openshift-app-platform-shift-bot) ---
+        APP_ID=$(cat /var/run/github-app/app-id)
+        PEM_PATH="/var/run/github-app/private-key.pem"
+        HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        NOW=$(date +%s); IAT=$((NOW - 60)); EXP=$((NOW + 300))
+        PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$IAT" "$EXP" "$APP_ID" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        SIGNATURE=$(printf '%s' "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$PEM_PATH" -binary | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+
+        REPO_OWNER="openshift"
+        REPO_NAME="ocp-release-operator-sdk"
+
+        INSTALL_RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time 30 \
+          -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/installation")
+        HTTP_CODE=$(echo "$INSTALL_RESPONSE" | tail -1)
+        INSTALL_BODY=$(echo "$INSTALL_RESPONSE" | sed '$d')
+        if [[ "$HTTP_CODE" -ne 200 ]]; then
+          echo "ERROR: GitHub App not installed on ${REPO_OWNER}/${REPO_NAME} (HTTP ${HTTP_CODE})" >&2
+          exit 1
+        fi
+        INST_ID=$(echo "$INSTALL_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+        TOKEN_RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time 30 -X POST \
+          -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/app/installations/${INST_ID}/access_tokens")
+        T_CODE=$(echo "$TOKEN_RESPONSE" | tail -1)
+        T_BODY=$(echo "$TOKEN_RESPONSE" | sed '$d')
+        if [[ "$T_CODE" -ne 201 ]]; then
+          echo "ERROR: Failed to mint installation token (HTTP ${T_CODE})" >&2
+          exit 1
+        fi
+        export GITHUB_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+        # --- Demo: switch to pre-staged branch at v1.42.1 for E2E ---
+        git config --global --add safe.directory "$(pwd)" || true
+        git remote add demo-fork https://x-access-token:${GITHUB_TOKEN}@github.com/neha037/ocp-release-operator-sdk.git
+        git fetch demo-fork demo-e2e-base
+        git checkout -B demo-e2e-base demo-fork/demo-e2e-base
+        git branch --set-upstream-to=demo-fork/demo-e2e-base demo-e2e-base
+
+        export DEST_ORG_REPO=neha037/ocp-release-operator-sdk
+        export ORIGIN_URL=https://github.com/neha037/ocp-release-operator-sdk.git
+        export ORIGIN_REMOTE=demo-fork
+        export REBASE_BRANCH=demo-e2e-base
+        export FORCE_REMOTE_URLS=1
+        export SKIP_BUILD=1
+        ./hack/auto-rebase.sh
+      credentials:
+      - mount_path: /var/run/github-app
+        name: openshift-app-platform-shift-github-bot
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 200m
+          memory: 2Gi
 zz_generated_metadata:
   branch: main
   org: openshift
