@@ -518,7 +518,10 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
     # responder owns the authoritative evaluated-state decision. This makes a
     # repeated poll deterministic and also recognizes a rerun of the same job
     # name when its check URL changes.
-    pending_ci=$(ci_failure_state filter "${extracted}" "${current_head}" "${EVALUATED_CI_STATE}")
+    if ! pending_ci=$(ci_failure_state filter "${extracted}" "${current_head}" "${EVALUATED_CI_STATE}"); then
+        echo "WARNING: failed to filter evaluated CI failures; treating all current failures as pending."
+        pending_ci="${extracted}"
+    fi
     has_ci=false
     if [[ "$(jq 'length' <<< "${pending_ci}")" -gt 0 ]]; then
         has_ci=true
