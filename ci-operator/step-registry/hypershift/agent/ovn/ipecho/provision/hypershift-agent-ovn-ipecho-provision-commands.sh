@@ -32,12 +32,17 @@ import sys
 
 class IPEchoHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
+        # The body is the bare address with no trailing newline. The test helper
+        # verifyEgressIPWithIPEcho compares the unmodified stdout of curl against the
+        # expected address, so a newline here makes every comparison fail. This matches
+        # the quay.io/openshifttest/ip-echo image the cloud jobs use.
         client_ip = self.client_address[0]
+        body = client_ip.encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(client_ip.encode("utf-8"))
-        self.wfile.write(b"\n")
+        self.wfile.write(body)
 
     def log_message(self, fmt, *args):
         sys.stderr.write("%s - - [%s] %s\n" %
