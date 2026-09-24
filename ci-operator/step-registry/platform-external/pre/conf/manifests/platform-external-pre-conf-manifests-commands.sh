@@ -10,9 +10,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ -n "${PLATFORM_EXTERNAL_OVERRIDE_RELEASE-}" ]]; then
-  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${PLATFORM_EXTERNAL_OVERRIDE_RELEASE}"
-fi
 echo "Using release image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 STEP_WORKDIR=${STEP_WORKDIR:-/tmp}
