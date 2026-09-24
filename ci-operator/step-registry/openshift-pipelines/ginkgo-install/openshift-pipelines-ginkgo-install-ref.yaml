@@ -1,0 +1,42 @@
+ref:
+  as: openshift-pipelines-ginkgo-install
+  from: openshift-pipelines-runner
+  commands: openshift-pipelines-ginkgo-install-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  credentials:
+    - mount_path: /usr/local/ci-secrets/osp-ci-secrets
+      collection: openshift-pipelines
+      group: osp-ci-secrets
+  env:
+    - name: GINKGO_TEST_PATH
+      default: "./tests/olm/"
+      documentation: |-
+        Ginkgo package path to run. Scoped to the OLM suite so only the
+        operator-install spec is compiled and executed.
+    - name: GINKGO_LABEL_FILTER
+      default: "install"
+      documentation: |-
+        Ginkgo label filter selecting the operator-install spec within
+        GINKGO_TEST_PATH (mirrors gauge TAGS=install).
+    - name: GINKGO_TIMEOUT
+      default: "30m"
+      documentation: |-
+        Timeout for the ginkgo install run.
+    - name: OLM_CHANNEL
+      default: latest
+      documentation: |-
+        OLM channel selected for the openshift-pipelines operator (exported as CHANNEL).
+    - name: CATALOG_SOURCE
+      default: redhat-operators
+      documentation: |-
+        CatalogSource providing the operator (exported as CATALOG_SOURCE).
+  documentation: |-
+    Installs the openshift-pipelines operator by running the Ginkgo v2 install
+    spec from the release-tests-ginkgo repo (label filter "install"), with no
+    dependency on gauge. The install logic is owned by the test repo, mirroring
+    how the gauge-based step runs `gauge run --tags install`. Expects the repo
+    checked out at /tmp/release-tests-ginkgo.
