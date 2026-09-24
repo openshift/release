@@ -24,8 +24,10 @@ QUADS_SSO_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/quads_sso_token_${LAB} 2>/dev/null 
 export QUADS_SSO_TOKEN
 CURL_AUTH=""
 if [[ -n "$QUADS_SSO_TOKEN" ]]; then
+  # shellcheck disable=SC2089
   CURL_AUTH="-H 'Authorization: Bearer ${QUADS_SSO_TOKEN}'"
 fi
+# shellcheck disable=SC2090
 export CURL_AUTH
 set -x
 
