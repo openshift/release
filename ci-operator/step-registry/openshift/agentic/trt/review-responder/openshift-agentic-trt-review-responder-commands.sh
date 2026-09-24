@@ -563,7 +563,9 @@ Your GitHub login is ${BOT_LOGIN}." \
             # unrelated or made no branch change. On worker failure, leave the
             # run pending so a later polling cycle can retry it.
             if [[ "${CI_EXIT}" -eq 0 ]]; then
-                ci_failure_state record "${pending_ci}" "${current_head}" "${EVALUATED_CI_STATE}"
+                if ! ci_failure_state record "${pending_ci}" "${current_head}" "${EVALUATED_CI_STATE}"; then
+                    echo "WARNING: failed to record evaluated CI failures; they may be re-evaluated."
+                fi
             else
                 echo "CI worker failed; leaving failures pending for retry."
             fi
