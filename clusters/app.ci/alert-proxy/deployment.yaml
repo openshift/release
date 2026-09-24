@@ -1,0 +1,162 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-proxy
+  namespace: ci
+  labels:
+    app: alert-proxy
+spec:
+  selector:
+    app: alert-proxy
+  ports:
+  - name: main
+    port: 8080
+    protocol: TCP
+    targetPort: main
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: alert-proxy
+  namespace: ci
+  labels:
+    app: alert-proxy
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: alert-proxy
+  endpoints:
+  - interval: 30s
+    path: /metrics
+    port: main
+    scheme: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-proxy
+  namespace: ci
+  labels:
+    app: alert-proxy
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: alert-proxy
+  template:
+    metadata:
+      labels:
+        app: alert-proxy
+    spec:
+      serviceAccountName: alert-proxy
+      containers:
+      - name: alert-proxy
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_alert-proxy_latest
+        imagePullPolicy: Always
+        args:
+        - --port=8080
+        - --channel-id=CHY2E1BL4
+        - --slack-token-path=/etc/slack/oauth_token
+        - --slack-signing-secret-path=/etc/slack/signing_secret
+        - --webhook-token-path=/etc/webhook/token
+        - --forwarder-secret-path=/etc/forwarder/hmac_secret
+        - --slack-identity-map-path=/etc/alert-proxy/slack-identities.yaml
+        - --repeat-interval=2h
+        - --group-interval=5m
+        - --namespace=ci
+        - --state-configmap=alert-proxy-state
+        - --delivery-log-ttl=8m
+        - --silence-config-path=/etc/alert-proxy/silence.yaml
+        - --escalation-threshold=24h
+        - --enable-silences=false
+        - --privileged-group=test-platform-ci-admins
+        - --alertmanager-url=https://alertmanager-user-workload.openshift-user-workload-monitoring.svc:9095
+        - --alertmanager-ca-file=/etc/alertmanager-ca/service-ca.crt
+        - --alertmanager-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
+        ports:
+        - name: main
+          containerPort: 8080
+          protocol: TCP
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: main
+          failureThreshold: 30
+          periodSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: main
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: main
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        volumeMounts:
+        - name: slack
+          mountPath: /etc/slack
+          readOnly: true
+        - name: webhook
+          mountPath: /etc/webhook
+          readOnly: true
+        - name: forwarder
+          mountPath: /etc/forwarder
+          readOnly: true
+        - name: alert-proxy-config
+          mountPath: /etc/alert-proxy
+          readOnly: true
+        - name: alertmanager-ca
+          mountPath: /etc/alertmanager-ca
+          readOnly: true
+      volumes:
+      - name: slack
+        secret:
+          secretName: slack-credentials-dptp-bot
+          items:
+          - key: oauth_token
+            path: oauth_token
+          - key: signing_secret
+            path: signing_secret
+      - name: webhook
+        secret:
+          secretName: alert-proxy-alertmanager-webhook
+          items:
+          - key: token
+            path: token
+      - name: forwarder
+        secret:
+          secretName: alert-proxy-forwarder
+          items:
+          - key: hmac_secret
+            path: hmac_secret
+      - name: alert-proxy-config
+        projected:
+          sources:
+          - configMap:
+              name: alert-proxy-config
+              items:
+              - key: silence.yaml
+                path: silence.yaml
+          - configMap:
+              name: alert-proxy-slack-identities
+              items:
+              - key: slack-identities.yaml
+                path: slack-identities.yaml
+      - name: alertmanager-ca
+        configMap:
+          name: alert-proxy-alertmanager-ca
