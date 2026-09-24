@@ -213,7 +213,10 @@ Verify the resolved URL is the in-cluster `/webhook/alertmanager?source=app-ci-u
 Then land only the `slack-criticals` receiver change in
 `alertmanager_default_receivers.libsonnet` and its regenerated artifact. The receiver must retain
 `pagerduty_configs`, remove `slack_configs`, and add one webhook with `send_resolved: true`,
-`timeout: 10s`, bearer authorization, and `follow_redirects: false`.
+bearer authorization, and `follow_redirects: false`. It must carry no `timeout`, for the reason
+given above: `amtool check-config` on v0.27.0 rejects the entire file with `field timeout not found
+in type config.plain`, which would break delivery for every alert on the cluster, not just this
+receiver.
 
 Do not cut over until the stage-3 probe has succeeded for three consecutive 15-minute cycles, its
 counter increment has been observed only after Slack acceptance, the probe-only route has been
