@@ -248,7 +248,7 @@ if [[ -z "${BASTION_BOOT_IMAGE}" ]]; then
     # 'account_name' must have length less than 24, so hardcode the basion sa name
     sa_name_prefix=$(echo "${NAMESPACE}" | sed "s/ci-op-//" | sed 's/[-_]//g')
     sa_name="${sa_name_prefix}${UNIQUE_HASH}basa"
-    run_command_with_retries "az storage account create -g ${bastion_rg} --name ${sa_name} --kind Storage --sku Standard_LRS" "5"
+    run_command_with_retries "az storage account create -g ${bastion_rg} --name ${sa_name} --kind StorageV2 --sku Standard_LRS" "5"
     account_key=$(az storage account keys list -g "${bastion_rg}" --account-name "${sa_name}" --query "[0].value" -o tsv)
 
     echo "Copy bastion vhd from public blob URI to the bastion Storage Account"
