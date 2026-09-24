@@ -812,7 +812,7 @@ WaitMcpFullSync() {
 
 # Marks the 'openshift' ClusterImagePolicy unmanaged on the spoke ClusterVersion
 # so CVO does not revert it during upgrade (unsigned nightlies, OCPBUGS-114622).
-# No-op when the policy is absent or does not enforce ocp-v4.0-art-dev.
+# No-op when the policy is absent or does not enforce openshift-release-dev images.
 DisableClusterImagePolicySignatureEnforcement() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
@@ -824,9 +824,9 @@ DisableClusterImagePolicySignatureEnforcement() {
         : "Spoke ${clusterName}: no openshift ClusterImagePolicy found — skipping"
         return 0
     fi
-    if ! jq -e '.spec.scopes[]? | select(contains("ocp-v4.0-art-dev"))' \
+    if ! jq -e '.spec.scopes[]? | select(contains("openshift-release-dev"))' \
             <<<"${cipJson}" >/dev/null; then
-        : "Spoke ${clusterName}: ClusterImagePolicy does not enforce ocp-v4.0-art-dev — skipping"
+        : "Spoke ${clusterName}: ClusterImagePolicy does not enforce openshift-release-dev — skipping"
         return 0
     fi
 
