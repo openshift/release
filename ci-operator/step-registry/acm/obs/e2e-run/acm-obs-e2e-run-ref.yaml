@@ -1,7 +1,6 @@
 ref:
   as: acm-obs-e2e-run
   from: observability-e2e-test
-  best_effort: true
   commands: acm-obs-e2e-run-commands.sh
   timeout: 2h0m0s
   grace_period: 10m0s
@@ -26,11 +25,10 @@ ref:
     Runs the maintained ACM observability Ginkgo test suite from the
     stolostron/multicluster-observability-operator test image.
 
-    best_effort: true is intentional — this is a test-phase ref in a
-    multi-product P2P job; a suite failure must not abort downstream LP
-    test steps (GRC, CNV, ODF health, etc.). Firewatch classifies the
-    failure separately. This matches peer ACM test refs (acm-tests-grc,
-    acm-opp-app, acm-tests-observability).
+    Exit policy: infra/setup failures (missing JUnit, zero specs, runner
+    crash) exit nonzero. Test-only failures (valid JUnit with <failure>
+    elements) exit 0 so downstream LP test steps continue; Firewatch
+    classifies the test signal from JUnit.
 
     Requires acm-obs-odf-setup (or equivalent) to have already deployed
     MCO with ODF storage and created the mco-e2e-testing-sa RBAC resources.

@@ -4,13 +4,13 @@ set -euxo pipefail; shopt -s inherit_errexit
 # shellcheck disable=SC2317
 PropagateJunit () {
     mkdir -p "${SHARED_DIR}/junit"
-    find /results "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+    find /results "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
     true
 }
 
 # shellcheck disable=SC2317
 CollectArtifacts () {
-    cp -r /results/* "${ARTIFACT_DIR}/" 2>/dev/null || true
+    cp -r /results/* "${ARTIFACT_DIR}/" || true
     true
 }
 
@@ -130,5 +130,16 @@ testCnt="$(grep -c '<testcase' /results/results.xml || true)"
 }
 
 cp /results/results.xml "${ARTIFACT_DIR}/junit_acm-observability.xml"
+
+# Exit policy — fail on infra/setup errors, succeed on test-only failures
+# so downstream LP test steps continue. Firewatch handles the test signal
+# from JUnit classification.
+typeset -i failCnt=0
+failCnt="$(grep -c '<failure' /results/results.xml || true)"
+
+if ((ginkgoRc != 0 && failCnt > 0)); then
+    : "Ginkgo exit=${ginkgoRc} with ${failCnt} test failure(s) — returning 0 for downstream steps"
+    exit 0
+fi
 
 exit "${ginkgoRc}"
