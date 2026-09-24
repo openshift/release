@@ -81,6 +81,19 @@ tests:
     - ref: openshift-e2e-test
     - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
+# Temporary job to verify OCPBUGS-112483 on 5.1 (UserManaged + External DNS path).
+# Not intended for long-term periodics.
+- as: e2e-openstack-externallb-techpreview
+  minimum_interval: 168h
+  steps:
+    cluster_profile: openstack-vh-bm-rhos
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=termination-message-policy
+      VERIFY_MCS_API_INT: "true"
+    test:
+    - ref: openstack-conf-externallb-verify
+    workflow: openshift-e2e-openstack-external-lb
 zz_generated_metadata:
   branch: release-5.1
   org: shiftstack
