@@ -3,7 +3,22 @@ build_root:
 images:
   items:
   - dockerfile_path: build/Dockerfile
-    to: unused
+    to: pagerduty-operator
+  - dockerfile_literal: |
+      FROM scratch
+      COPY deploy_pko/ /manifests
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/pagerduty-operator/deploy_pko
+    to: operator-pko
+  - dockerfile_literal: |
+      FROM src
+      RUN cd /go/src/github.com/openshift/pagerduty-operator && \
+          go test -tags osde2e -c -o /usr/local/bin/pagerduty-operator-tests ./test/e2e/
+    from: src
+    to: operator-e2e
 prowgen:
   enable_secrets_store_csi_driver: true
 resources:
@@ -53,6 +68,58 @@ tests:
   commands: make validate
   container:
     from: src
+- as: rosa-sts-e2e
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      GINKGO_FOCUS: '\[Suite: operators\]'
+      OPERATOR_CRDS: pagerdutyintegrations.pagerduty.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: pagerduty-operator
+      OPERATOR_NAME: pagerduty-operator
+      OPERATOR_REQUIRED_CRS: '{}'
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: rosa-sts-e2e-promotion-int
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :done_it_is: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :red_jenkins_circle:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      GINKGO_FOCUS: '\[Suite: operators\]'
+      OCM_LOGIN_ENV: integration
+      OPERATOR_CRDS: pagerdutyintegrations.pagerduty.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: pagerduty-operator
+      OPERATOR_NAME: pagerduty-operator
+      OPERATOR_REQUIRED_CRS: '{}'
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: rosa-sts-e2e-promotion-stage
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :done_it_is: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :red_jenkins_circle:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      GINKGO_FOCUS: '\[Suite: operators\]'
+      OCM_LOGIN_ENV: stage
+      OPERATOR_CRDS: pagerdutyintegrations.pagerduty.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: pagerduty-operator
+      OPERATOR_NAME: pagerduty-operator
+      OPERATOR_REQUIRED_CRS: '{}'
+    workflow: rosa-cluster-lease-e2e-workflow
 zz_generated_metadata:
   branch: master
   org: openshift
