@@ -32,25 +32,37 @@ else
   RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.amis[$region].hvm' /var/lib/openshift-install/rhcos.json)"
 fi
 
-# DO NOT MERGE — OPCT-486 decisive test: force the release-4.22 bootimage AMI to prove the
-# bootimage/bootc mismatch end-to-end. The upi-installer container is pinned to 5.0, so AMI
-# discovery above returns the 5.0 bootimage (RHCOS 10.2.20260423-0, bootc-1.13.0-1.el10) which
-# SIGABRTs/core-dumps in node-image-pull; the 4.22 bootimage (10.2.20260715-0,
-# bootc-1.15.2-1.el10_2) boots. Paired with the release-image override (commit d0e86529ba4) so
-# release-image.service can actually pull. This combo (4.22 bootimage + override) has never run
-# together. Values from openshift/installer data/data/coreos/coreos-rhel-10.json?ref=release-4.22.
+# DO NOT MERGE — OPCT-486: force the release-4.22 el9 bootimage AMI.
+#
+# The upi-installer container is pinned to 5.0, so the discovery above runs the 5.0 binary and
+# returns 5.0's el10 bootimage (RHCOS 10.2.x). But the payload being installed is 4.22, whose
+# rhel-coreos StreamTag is el9 (machine-os 9.8.x). node-image-pull.sh then tries to
+# `ostree container image pull` an el9 OS image onto an el10 host — skipping an OS major version.
+# That needs the SELinux install_t domain to write cross-major security.selinux xattrs, which the
+# unit does not get, so the import dies with
+#   fsetxattr(security.selinux): Invalid argument
+# (RHEL-117251 / RHEL-117256). On the older 5.0 bootimage the same skew instead SIGABRTs inside
+# bootc-1.13.0.
+#
+# The passing non-upgrade 4.22 job discovers ami-0399f6912ea26e33c in us-west-1 — which is the
+# el9 stream — so it is el9 bootimage + el9 machine-os, matched, and it works.
+#
+# An earlier revision of this block pinned AMIs from coreos-rhel-10.json, which kept the el10/el9
+# skew intact and so tested nothing. Values below are from
+# openshift/installer data/data/coreos/coreos-rhel-9.json?ref=release-4.22, release 9.8.20260715-1.
+# Paired with the release-image override (commit d0e86529ba4) so release-image.service can pull.
 case "${AWS_REGION}" in
-  us-east-1) RHCOS_AMI_4_22="ami-026c3565b2e140a8f" ;;
-  us-east-2) RHCOS_AMI_4_22="ami-00bceb1d4863de8d5" ;;
-  us-west-1) RHCOS_AMI_4_22="ami-030623e6ced67aefc" ;;
-  us-west-2) RHCOS_AMI_4_22="ami-09d49112a1306f262" ;;
+  us-east-1) RHCOS_AMI_4_22="ami-0980843632a1c3a66" ;;
+  us-east-2) RHCOS_AMI_4_22="ami-03b58703d4e9ea61a" ;;
+  us-west-1) RHCOS_AMI_4_22="ami-0399f6912ea26e33c" ;;
+  us-west-2) RHCOS_AMI_4_22="ami-01d48aa6b50f9d0df" ;;
   *)         RHCOS_AMI_4_22="" ;;
 esac
 if [[ -n "${RHCOS_AMI_4_22}" ]]; then
-  log "EXPERIMENT: region ${AWS_REGION}, overriding discovered AMI ${RHCOS_AMI} with release-4.22 pin ${RHCOS_AMI_4_22}"
+  log "EXPERIMENT: region ${AWS_REGION}, overriding discovered AMI ${RHCOS_AMI} with release-4.22 el9 pin ${RHCOS_AMI_4_22}"
   RHCOS_AMI="${RHCOS_AMI_4_22}"
 else
-  log "EXPERIMENT: region ${AWS_REGION} has no release-4.22 pin; leaving discovered AMI ${RHCOS_AMI} (test INCONCLUSIVE this run)"
+  log "EXPERIMENT: region ${AWS_REGION} has no release-4.22 el9 pin; leaving discovered AMI ${RHCOS_AMI} (test INCONCLUSIVE this run)"
 fi
 
 log "Discovered RHCOS image ${RHCOS_AMI}, saving to artifact ${SHARED_DIR}/image_id.txt"
