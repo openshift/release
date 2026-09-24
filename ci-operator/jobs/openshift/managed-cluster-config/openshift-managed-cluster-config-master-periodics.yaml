@@ -11,6 +11,7 @@ periodics:
     repo: managed-cluster-config
   labels:
     ci.openshift.io/generator: prowgen
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-managed-cluster-config-master-checklinks-weekly
   reporter_config:
@@ -84,6 +85,7 @@ periodics:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: rosa-e2e-01
     ci.openshift.io/generator: prowgen
+    job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-managed-cluster-config-master-hive-e2e-sss-dryrun-daily
   reporter_config:
@@ -108,6 +110,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=hive-e2e-sss-dryrun-daily
       command:
       - ci-operator
@@ -128,6 +131,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -155,6 +161,9 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - configMap:
         name: gsm-config
       name: gsm-config
