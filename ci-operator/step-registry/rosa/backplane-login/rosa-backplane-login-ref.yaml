@@ -1,0 +1,35 @@
+ref:
+  as: rosa-backplane-login
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-backplane-login-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: OCM environment the cluster lives in. Supported values are [production, staging, integration].
+  - name: BACKPLANE_PROXY_URL
+    default: "http://squid.corp.redhat.com:3128"
+    documentation: Corp proxy used to reach the backplane API from the build farm.
+  - name: BACKPLANE_ELEVATE_REASON
+    default: "https://issues.redhat.com/browse/ROSAENG-67580"
+    documentation: Audit reason (trackable URL/Jira key) passed to ocm-backplane elevate.
+  - name: BACKPLANE_CLI_VERSION
+    default: "0.12.0"
+    documentation: ocm-backplane CLI version to install.
+  - name: REQUIRE_SC
+    default: "false"
+    documentation: When true, fail if the service cluster kubeconfig cannot be produced. When false, sc-kubeconfig is best-effort.
+  documentation: |-
+    Platform-plane access step for the unified ROSA E2E architecture (ROSAENG-67580).
+    Logs into OCM with the cluster profile credentials and uses ocm-backplane to
+    obtain kubeconfigs for the management and service clusters backing the hosted
+    cluster in ${SHARED_DIR}/cluster-id, writing ${SHARED_DIR}/mc-kubeconfig and
+    ${SHARED_DIR}/sc-kubeconfig (plus ${SHARED_DIR}/mc-cluster-id and
+    ${SHARED_DIR}/mc-cluster-name). Consumed by rosa-e2e-validate-platform.
+    Requires corp-network reachability: the job must run with
+    capabilities: [intranet] and restrict_network_access: false, and the PR must
+    carry the network-access-rehearsals-ok label.
