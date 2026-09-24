@@ -1,0 +1,29 @@
+ref:
+  as: rosa-e2e-validate-customer
+  from: rosa-e2e
+  grace_period: 10m
+  commands: rosa-e2e-validate-customer-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: OCM environment the cluster lives in.
+  - name: LABEL_FILTER
+    default: "Area:DataPlane || Area:CustomerFeatures"
+    documentation: Ginkgo label filter selecting the customer-plane areas.
+  - name: REGION
+    default: ""
+    documentation: Cloud region for the cluster. Falls back to LEASED_RESOURCE if empty.
+  dependencies:
+  - name: rosa-e2e
+    env: ROSA_E2E_IMAGE
+  documentation: |-
+    Customer-plane validation for the unified ROSA E2E architecture (ROSAENG-67580).
+    Reads the guest cluster kubeconfig from ${SHARED_DIR}/kubeconfig and the feature
+    flags from ${SHARED_DIR}/cluster-metadata.json, then runs the rosa-e2e suite for
+    the customer-facing areas (DataPlane, CustomerFeatures). Provisioner-agnostic:
+    any provisioner that satisfies the SHARED_DIR contract can feed it. No corp
+    network reachability required.

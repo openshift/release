@@ -1,0 +1,21 @@
+chain:
+  as: rosa-e2e-hcp-ocm-provision
+  env:
+  - name: HOSTED_CP
+    default: "true"
+  - name: ENABLE_BYOVPC
+    default: "true"
+  - name: STS
+    default: "true"
+  steps:
+  - ref: aws-provision-vpc-shared
+  - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+  - chain: rosa-sts-oidc-config-create
+  - ref: rosa-e2e-ocm-provision
+  - ref: aws-provision-tags-for-byo-vpc
+  documentation: >-
+    Provisions a ROSA HCP cluster with the rosa-e2e OCM Go SDK provisioner into a
+    BYO shared VPC with an STS OIDC config, and publishes the SHARED_DIR
+    provisioner-to-validator contract (cluster-id, kubeconfig, cluster-metadata.json)
+    defined in ROSAENG-67580. This is the swappable "head" of the provision x
+    validate matrix; the validation tail is provisioner-agnostic.
