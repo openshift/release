@@ -131,6 +131,40 @@ tests:
           memory: 200Mi
       timeout: 2h0m0s
     - ref: openshift-qe-cluster-health
+    - as: network-operator-e2e-shared-device
+      commands: |
+        set -euo pipefail
+        export REPORTS_DUMP_DIR="${ARTIFACT_DIR}"
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        if [[ ! -f "${KUBECONFIG}" ]]; then
+          echo "Missing kubeconfig at SHARED_DIR/kubeconfig"
+          exit 1
+        fi
+        e2e_env="${CLUSTER_PROFILE_DIR}/nno-e2e-env"
+        if [[ ! -f "${e2e_env}" ]]; then
+          echo "Missing cluster-profile file nno-e2e-env"
+          exit 1
+        fi
+        set -o allexport
+        source "${e2e_env}"
+        set +o allexport
+        export TEST_FEATURES=nvidianetwork
+        export TEST_LABELS='deploy || rdma-shared-dev'
+        export NVIDIANETWORK_CLEANUP=false
+        export NVIDIANETWORK_RDMA_LINK_TYPE=ethernet
+        export NVIDIANETWORK_RDMA_NETWORK_TYPE=shared-device
+        export NVIDIANETWORK_RDMA_WORKLOAD_NAMESPACE=default
+        export NVIDIANETWORK_RDMA_GPUDIRECT=false
+        make run-tests
+      env:
+      - name: DUMP_FAILED_TESTS
+      - name: TEST_TRACE
+      - name: VERBOSE_LEVEL
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
     - as: gpu-operator-e2e
       commands: |
         set -euo pipefail
@@ -157,7 +191,7 @@ tests:
           cpu: 2000m
           memory: 2Gi
       timeout: 2h0m0s
-    - as: network-operator-e2e-shared-device
+    - as: network-operator-e2e-gpudirect
       commands: |
         set -euo pipefail
         export REPORTS_DUMP_DIR="${ARTIFACT_DIR}"
@@ -175,7 +209,7 @@ tests:
         source "${e2e_env}"
         set +o allexport
         export TEST_FEATURES=nvidianetwork
-        export TEST_LABELS='deploy || rdma-shared-dev'
+        export TEST_LABELS=rdma-shared-dev
         export NVIDIANETWORK_CLEANUP=false
         export NVIDIANETWORK_RDMA_LINK_TYPE=ethernet
         export NVIDIANETWORK_RDMA_NETWORK_TYPE=shared-device
