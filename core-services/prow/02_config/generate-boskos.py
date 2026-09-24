@@ -444,12 +444,6 @@ CONFIG = {
     'openstack-hwoffload-quota-slice': {
         'default': 3,
     },
-    'openstack-rhoso-quota-slice': {
-        'serval71.lab.eng.tlv2.redhat.com': 1,
-    },
-    'openstack-rhos-ci-quota-slice': {
-        'default': 1,
-    },
     'openstack-nfv-quota-slice': {
         'default': 4,
     },
