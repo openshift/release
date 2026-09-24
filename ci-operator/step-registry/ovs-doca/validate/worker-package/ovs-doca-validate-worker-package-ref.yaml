@@ -1,0 +1,49 @@
+ref:
+  as: ovs-doca-validate-worker-package
+  from: cli
+  commands: ovs-doca-validate-worker-package-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: OVS_DOCA_VALIDATE_NODE_ROLES
+    default: "worker"
+    documentation: |-
+      Space-separated list of node-role names to validate.
+  documentation: |-
+    Validates, per node in the given role(s), that the ovs-doca layered
+    RHCOS image built at ci-operator's image-build stage (day0 layering,
+    substituted into the release payload via `include_built_images`) is
+    actually running -- the image is already booted at install time, there
+    is no day2 rollout to wait on. Runs four read-only checks via
+    `oc debug node/<n> -- chroot /host`, exactly as verified against a real
+    ovs-doca-layered node:
+
+      1. `rpm -qa | grep doca-openvswitch` -- the DOCA-enabled package is
+         installed (distinct from the stock, version-suffixed `openvswitch`
+         Fast Datapath package it replaces).
+      2. `ovs-vsctl list open_vswitch | grep datapath_types` -- the
+         advertised datapath_types list includes `doca`.
+      3. `systemctl is-enabled doca-init.service` and
+         `systemctl is-active doca-init.service` -- the offload-tuning
+         service installed by the image build ran successfully at boot.
+      4. `ovs-vsctl get Open_vSwitch . other_config:hw-offload` is `false`
+         -- confirms OVS is running like a normal, non-offloaded switch.
+         This cluster has no DOCA-capable NIC, so hardware offload is
+         deliberately kept disabled even though the DOCA-enabled
+         binary/datapath is installed; doca-init.service exists to assert
+         this explicitly rather than relying on it being unset.
+
+    IMPORTANT SCOPE NOTE: these checks only prove the DOCA-enabled OVS
+    package/binary is installed and recognized by the running daemon, and
+    that offload is (correctly) disabled. They do NOT prove hardware
+    offload is functional -- that requires a real NVIDIA ConnectX/BlueField
+    NIC (ASAP^2/switchdev), which AWS instances do not have. Do not read a
+    pass here as "hardware offload works."
+
+    KNOWN GAP: does not assert the installed doca-openvswitch package
+    version specifically matches the DOCA version baked into the image
+    (3.4.1) -- only that the package exists at all. Also does not check
+    `systemctl is-active openvswitch` as a basic health gate before the
+    package/datapath checks.
