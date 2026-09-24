@@ -354,6 +354,9 @@ CONFIG = {
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
     'aro-hcp-arm-helper-sp-dev': {},
+    # Global, independent AMW pools; names match ARO-HCP's amw-pool.yaml.
+    'aro-hcp-services-amw-dev': {'services-ci-pool-0': 1},
+    'aro-hcp-hcps-amw-dev': {'hcps-ci-pool-0': 1},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },

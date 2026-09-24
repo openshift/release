@@ -3,6 +3,12 @@ workflow:
   steps:
     allow_best_effort_post_steps: true
     leases:
+      - count: 1
+        env: SVC_AMW_LEASE
+        resource_type: aro-hcp-services-amw-dev
+      - count: 1
+        env: HCP_AMW_LEASE
+        resource_type: aro-hcp-hcps-amw-dev
       - env: LEASED_MSI_MOCK_SP
         resource_type: aro-hcp-msi-mock-cs-sp-dev
       - count: 2
@@ -29,3 +35,6 @@ workflow:
     aro-hcp-provision-from-main (ACR images from images-push), run
     upgrade/in-place on the PR head with OVERRIDE_CONFIG_FILE built from PR
     pipeline images and hypershift config.
+    Both phases hold the same workflow-scoped AMW and identity leases through
+    cleanup. The selected baseline source and published artifacts must include
+    ARO-HCP shared-AMW support before enabling this workflow; see ../README.md.
