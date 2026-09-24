@@ -4,7 +4,7 @@ set -euo pipefail; shopt -s inherit_errexit
 # === Known-Issue Skip Framework ===
 # This script uses _detect_known_issue() to emit JUnit SKIPPED results
 # for tracked bugs instead of failing the job. Unknown failures still FAIL.
-# Tracked issues: INTEROP-9518
+# Tracked issues: INTEROP-9518, INTEROP-9519
 # See PR review Fix 3 for rationale.
 
 # --- Trace-to-file: always capture, dump on failure only ---
@@ -846,7 +846,7 @@ function Main () {
     for _idx in "${!tcResultsArr[@]}"; do
         if [[ "${tcResultsArr[$_idx]}" == "fail" ]]; then
             if ${_known_issue_active:-false}; then
-                _detect_known_issue "${tcMessagesArr[$_idx]}" "INTEROP-9518" \
+                _detect_known_issue "${tcMessagesArr[$_idx]}" "INTEROP-9519" \
                     "Cascaded skip: ${tcNamesArr[$_idx]} failed — downstream of known convergence issue"
                 tcResultsArr[$_idx]="skip"
             else
@@ -857,6 +857,7 @@ function Main () {
     if ${_has_genuine_fail}; then
         exit 1
     fi
+    : "ACM Observability + ODF Interop: ALL CHECKS PASSED OR SKIPPED (known issue)"
     exit 0
 }
 
