@@ -6,6 +6,11 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+# This step writes token-bearing kubeconfigs. Make every file it creates private
+# from the moment it is created so a redirection never leaves a secret readable
+# by other users before an explicit chmod runs.
+umask 0077
+
 log() {
   echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
