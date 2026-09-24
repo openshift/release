@@ -1,0 +1,34 @@
+workflow:
+  as: medik8s-system-tests-s390x
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    test:
+    - chain: medik8s-system-tests-s390x-test
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: medik8s-system-tests-s390x-cleanup
+    - ref: medik8s-analyze-e2e-failure
+    - ref: upi-libvirt-cleanup-post
+  documentation: |-
+    End-to-end workflow for medik8s system-tests (RHWA operators NHC, NMO, SNR)
+    on s390x (IBM Z) in the Orange Zone libvirt environment.
+
+    Cluster lifecycle matches openshift-e2e-libvirt-vpn (same UPI/libvirt pre and
+    post). Product steps replace openshift-e2e-libvirt-test:
+      pre  — provision OCP on libvirt-s390x-vpn-oz
+      test — install RHWA operators (OPERATORS env) → optional SSH bastion →
+             make run-tests
+      post — gather → operator cleanup → analyze → deprovision
+
+    Jobs enable operators with minimal config changes: set OPERATORS,
+    OO_CHANNEL, OCP_VERSION, ECO_TEST_FEATURES / ECO_TEST_LABELS, and optionally
+    MEDIK8S_S390X_SSH_BASTION=true. Do not fork openshift-e2e-libvirt-vpn for
+    product installs; use this dedicated workflow (same pattern as
+    cluster-resource-override-s390x / quay-tests-libvirt-s390x).
