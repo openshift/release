@@ -394,6 +394,73 @@ WaitVmiRunning() {
         --timeout="${P2P_HS_VM_VMI_WAIT_TIMEOUT}"
 }
 
+# ApplyDataDisk — create a secondary data DataVolume for P2P_HS_VM_DATA_DISK_ENABLED=true.
+# Supports both Filesystem (CephFS RWX) and Block (RBD RWX) modes to cover the cross-product
+# gap of migrating VMs whose disks span multiple ODF storage modes.
+ApplyDataDisk() {
+    typeset kc="${1:?}"
+    typeset vmName="${2:?}"
+    typeset ns="${3:?}"
+
+    typeset dvName="${vmName}-datadisk"
+    typeset sc="${P2P_HS_VM_DATA_DISK_STORAGE_CLASS}"
+    typeset vMode="${P2P_HS_VM_DATA_DISK_VOLUME_MODE}"
+    typeset aMode="${P2P_HS_VM_DATA_DISK_ACCESS_MODE}"
+    typeset capacity="${P2P_HS_VM_DATA_DISK_SIZE}"
+
+    : "Creating data disk DataVolume ${dvName} (${sc}, ${vMode}, ${capacity}) on ${ns}"
+
+    jq -n \
+        --arg name  "${dvName}" \
+        --arg ns    "${ns}" \
+        --arg sc    "${sc}" \
+        --arg aMode "${aMode}" \
+        --arg vMode "${vMode}" \
+        --arg size  "${capacity}" \
+        '{
+            apiVersion: "cdi.kubevirt.io/v1beta1",
+            kind: "DataVolume",
+            metadata: {name: $name, namespace: $ns},
+            spec: {
+                source: {blank: {}},
+                storage: {
+                    storageClassName: $sc,
+                    accessModes: [$aMode],
+                    volumeMode: $vMode,
+                    resources: {requests: {storage: $size}}
+                }
+            }
+        }' | oc --kubeconfig="${kc}" apply -f -
+}
+
+# AddDataDiskToVM — patch a VirtualMachine CR to add the secondary data disk and volume.
+# Called after the VM is created so it can use oc patch rather than re-generating the full spec.
+AddDataDiskToVM() {
+    typeset kc="${1:?}"
+    typeset vmName="${2:?}"
+    typeset ns="${3:?}"
+
+    typeset dvName="${vmName}-datadisk"
+
+    : "Patching VM ${vmName} to attach data disk ${dvName}"
+    oc --kubeconfig="${kc}" patch "virtualmachine/${vmName}" -n "${ns}" \
+        --type=json \
+        --patch="$(jq -n --arg dvName "${dvName}" '
+            [
+                {
+                    op: "add",
+                    path: "/spec/template/spec/domain/devices/disks/-",
+                    value: {name: "datadisk", disk: {bus: "virtio"}}
+                },
+                {
+                    op: "add",
+                    path: "/spec/template/spec/volumes/-",
+                    value: {name: "datadisk", dataVolume: {name: $dvName}}
+                }
+            ]
+        ')"
+}
+
 # CreateOneVm create DataVolume + VirtualMachine for a single test VM.
 CreateOneVm() {
     typeset kc="${1:?}"
@@ -424,6 +491,17 @@ CreateOneVm() {
         cirros) ApplyCirrosVirtualMachine "${kc}" "${vmName}" "${dvName}" "${ns}" ;;
         rhel)   ApplyRhelVirtualMachine   "${kc}" "${vmName}" "${dvName}" "${ns}" ;;
     esac
+
+    # Optionally attach a secondary data disk (P2P_HS_VM_DATA_DISK_ENABLED=true).
+    # This is the cross-product gap: VMs with disks spanning multiple ODF storage modes
+    # (e.g. root on ocs-storagecluster-ceph-rbd-virtualization block, data on ocs-storagecluster-cephfs
+    # filesystem). MTV must map both source SCs in its StorageMap (see MTV_ADDITIONAL_SOURCE_STORAGE_NAME).
+    if [[ "${P2P_HS_VM_DATA_DISK_ENABLED:-false}" == "true" ]]; then
+        ApplyDataDisk "${kc}" "${vmName}" "${ns}"
+        oc --kubeconfig="${kc}" wait "datavolume/${vmName}-datadisk" -n "${ns}" \
+            --for=condition=Ready --timeout="${P2P_HS_VM_DATAVOLUME_WAIT_TIMEOUT}"
+        AddDataDiskToVM "${kc}" "${vmName}" "${ns}"
+    fi
 
     WaitVmiRunning "${kc}" "${vmName}" "${ns}"
 }

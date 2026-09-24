@@ -1,0 +1,92 @@
+ref:
+  as: p2p-install-mtv-hub
+  from: cli
+  commands: p2p-install-mtv-hub-commands.sh
+  timeout: 1h0m0s
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Install MTV (Migration Toolkit for Virtualization / Forklift) on the ACM hub cluster via
+    ACM Policy targeting local-cluster.
+
+    The hub cluster is represented in ACM as the ManagedCluster "local-cluster", which resides
+    in the "default" ManagedClusterSet. By binding that ClusterSet to the policy namespace and
+    using a Placement with a name predicate matching "local-cluster", ACM pushes the MTV Policy
+    exclusively to the hub — the same declarative path used for CNV hub installation in
+    p2p-install-cnv-hub and for CNV spoke installation in p2p-acm-cnv-install-policy.
+
+    This step replaces BOTH:
+      - The MTV entry in install-operators (direct OLM Subscription applied on hub)
+      - p2p-mtv-additional-config (direct oc apply of ForkliftController on hub)
+    Both are now managed declaratively through ACM's policy engine.
+
+    What this step does:
+      1. Resolves the mtv-operator startingCSV from the hub PackageManifest when
+         MTV_HUB_INSTALL_MAJOR_MINOR is set (pins to latest patch of that major.minor).
+      2. Creates the MTV policy namespace on the hub.
+      3. Binds the "default" ManagedClusterSet to the policy namespace.
+      4. Applies an ACM Policy with two ConfigurationPolicy templates:
+           - mtv-hub-olm-subscription: enforces Namespace(openshift-mtv),
+             OperatorGroup(openshift-mtv-operatorgroup), and Subscription(mtv-operator)
+             targeting local-cluster via ACM ConfigurationPolicy remediationAction: enforce.
+           - mtv-hub-forklift-controller: enforces a ForkliftController CR with
+             feature_ocp_live_migration=true (required for CCLM / OCP live migration mode).
+      5. Creates a Placement targeting local-cluster by name predicate in the default ClusterSet.
+      6. Creates a PlacementBinding wiring the Policy to the Placement.
+      7. Waits for forklift-controller Deployment Available on the hub.
+      8. Verifies FEATURE_OCP_LIVE_MIGRATION=true is set on the forklift-controller deployment.
+
+    Prerequisites:
+      - acm-mch must complete first: ACM MultiClusterHub must be Available for the Policy
+        reconciliation loop to run and enforce the subscription on local-cluster.
+
+    Writes diagnostics to ${ARTIFACT_DIR}/mtv-hub/ on failure and on success.
+  env:
+  - name: MTV_HUB_POLICY_NAMESPACE
+    default: "install-mtv-hub"
+    documentation: |-
+      Namespace on the hub for Policy, Placement, PlacementBinding, and ManagedClusterSetBinding
+      resources. Intentionally separate from the MTV operator install namespace (openshift-mtv)
+      to keep ACM policy objects distinct from operator-managed resources.
+  - name: MTV_HUB_CHANNEL
+    default: "release-v2.12"
+    documentation: |-
+      OLM channel for the mtv-operator Subscription on the hub (e.g. "release-v2.12").
+  - name: MTV_HUB_SOURCE
+    default: "redhat-operators"
+    documentation: OLM CatalogSource name for the mtv-operator Subscription on hub.
+  - name: MTV_HUB_SOURCE_NAMESPACE
+    default: "openshift-marketplace"
+    documentation: Namespace of the OLM CatalogSource for the mtv-operator Subscription.
+  - name: MTV_HUB_INSTALL_MAJOR_MINOR
+    default: ""
+    documentation: |-
+      When non-empty (e.g. "2.12"), pins the MTV install to the latest patch release of
+      that major.minor by resolving startingCSV from the hub PackageManifest. Leave empty
+      to install the channel's current head version.
+  - name: MTV_HUB_INSTALL_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV operator and ForkliftController live on the hub.
+  - name: MTV_HUB_FORKLIFT_CONTROLLER_NAME
+    default: "forklift-controller"
+    documentation: ForkliftController CR name (must match the operator's expected CR name).
+  - name: MTV_HUB_OLM_MANAGED
+    default: "true"
+    documentation: ForkliftController spec.olm_managed (Red Hat MTV install path default).
+  - name: MTV_HUB_FEATURE_OCP_LIVE_MIGRATION
+    default: "true"
+    documentation: |-
+      ForkliftController feature_ocp_live_migration value. Must be "true" to enable CCLM
+      (Cross-Cluster Live Migration) via OCP live migration mode in MTV 2.11+.
+  - name: MTV_HUB_WAIT_TIMEOUT
+    default: "30m"
+    documentation: Timeout for forklift-controller Deployment Available wait.
+  - name: MTV_HUB_CONTROLLER_CREATE_WAIT_TIMEOUT
+    default: "10m"
+    documentation: oc wait --for=create timeout for forklift-controller Deployment.
+  - name: MTV_HUB_ENV_WAIT_TIMEOUT
+    default: "10m"
+    documentation: Max wait for FEATURE_OCP_LIVE_MIGRATION=true on forklift-controller after ForkliftController policy apply.

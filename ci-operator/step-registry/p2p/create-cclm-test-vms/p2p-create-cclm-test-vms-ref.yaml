@@ -96,6 +96,29 @@ ref:
   - name: P2P_HS_VM_CLEAN
     default: "false"
     documentation: Set to "true" to delete prior VM/DV/prime-* PVCs before create (idempotent re-run).
+  - name: P2P_HS_VM_DATA_DISK_ENABLED
+    default: "false"
+    documentation: |-
+      When "true", attach a secondary data disk to every test VM in addition to the root disk.
+      The data disk uses P2P_HS_VM_DATA_DISK_STORAGE_CLASS and P2P_HS_VM_DATA_DISK_VOLUME_MODE,
+      enabling cross-product testing of VMs with mixed ODF storage modes (e.g. root on RBD block,
+      data on CephFS filesystem). MTV must have a StorageMap entry for the data disk SC; set
+      MTV_ADDITIONAL_SOURCE_STORAGE_NAME in p2p-mtv-create-migration-maps to cover it.
+  - name: P2P_HS_VM_DATA_DISK_STORAGE_CLASS
+    default: "ocs-storagecluster-cephfs"
+    documentation: |-
+      StorageClass for the secondary data disk. Defaults to ODF CephFS (filesystem mode / ReadWriteMany).
+      Use "ocs-storagecluster-ceph-rbd" for a second block-mode disk instead.
+  - name: P2P_HS_VM_DATA_DISK_VOLUME_MODE
+    default: "Filesystem"
+    documentation: |-
+      volumeMode for the secondary data disk DataVolume: "Filesystem" (CephFS default) or "Block" (RBD).
+  - name: P2P_HS_VM_DATA_DISK_ACCESS_MODE
+    default: "ReadWriteMany"
+    documentation: accessMode for the secondary data disk (ReadWriteMany required for live migration).
+  - name: P2P_HS_VM_DATA_DISK_SIZE
+    default: "5Gi"
+    documentation: Capacity of the secondary data disk DataVolume.
   - name: P2P_CCLM_DEBUG_MODE
     default: "false"
     documentation: |-

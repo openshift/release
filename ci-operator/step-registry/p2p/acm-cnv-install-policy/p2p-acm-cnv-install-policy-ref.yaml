@@ -38,6 +38,24 @@ ref:
   - name: CNV_POLICY_NAMESPACE
     default: "install-cnv"
     documentation: Namespace on the hub for Policy, Placement, and PlacementBinding resources.
+  - name: CNV_POLICY_TARGET_SPOKE_INDICES
+    default: ""
+    documentation: |-
+      Comma-separated 1-based indices into the spoke cluster list to target (e.g. "1" or "2" or "1,2").
+      When set, only spokes at those positions (as ordered in SHARED_DIR managed-cluster-names / managed-cluster-name-N)
+      receive the CNV policy. Empty (default) targets all spokes.
+      For installing DIFFERENT CNV versions on different spokes, use CNV_POLICY_VERSION_SKEW_MAP instead.
+  - name: CNV_POLICY_VERSION_SKEW_MAP
+    default: ""
+    documentation: |-
+      When set, installs different CNV versions on different spokes in a single step invocation.
+      Format: semicolon-separated entries of "SPOKE_INDEX,CHANNEL,MAJOR_MINOR,UPGRADE_APPROVAL,POLICY_NAMESPACE"
+      Example: "1,stable-4.21,4.21,Manual,install-cnv-spoke1;2,stable,4.22,Automatic,install-cnv-spoke2"
+      Each entry runs the full policy-create+wait cycle for the specified spoke.
+      Use this instead of calling the step twice with step-level env overrides (which is not
+      supported in ci-operator config YAMLs — only in chain/workflow registry YAMLs).
+      CNV_POLICY_TARGET_SPOKE_INDICES, CNV_POLICY_CHANNEL, CNV_POLICY_INSTALL_MAJOR_MINOR,
+      CNV_POLICY_UPGRADE_APPROVAL, and CNV_POLICY_NAMESPACE are all overridden per-entry.
   - name: CNV_POLICY_CHANNEL
     default: "stable"
     documentation: OLM channel for the kubevirt-hyperconverged Subscription (e.g. "stable").
