@@ -66,6 +66,13 @@ kind: Role
 metadata:
   name: alert-proxy-alertmanager-edit
   namespace: openshift-user-workload-monitoring
+# The proxy runs with `--enable-silences=false` until stage 5 of ROLLOUT.md, so this Role carries
+# only the verbs that flag never gates. `get` and `list` back silence inventory and read-back, and
+# `delete` backs silence expiry and the drain and rollback path; all of them are required from
+# stage 2 onward and must not be deferred. Stage 5 adds exactly one more verb, `create`: the
+# Alertmanager v2 API expresses creating, extending, replacing, and broadening suppression alike as
+# a POST to /api/v2/silences carrying an optional existing id, and the proxy issues no PUT or
+# PATCH, so `update` is never exercised and must not be granted.
 rules:
 - apiGroups:
   - monitoring.coreos.com
@@ -76,8 +83,6 @@ rules:
   verbs:
   - get
   - list
-  - create
-  - update
   - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1

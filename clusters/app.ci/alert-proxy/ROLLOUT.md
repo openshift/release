@@ -66,8 +66,13 @@ That second target must be synced before stage 3 adds the secret to the `alertma
 list. Mounting a secret that does not exist yet leaves the Alertmanager pods in
 `ContainerCreating`, which is an Alertmanager outage rather than a failed rollout step.
 
-Trigger or wait for a `ci-tools-standalone` main postsubmit after the image configuration is live.
-Verify `ImageStreamTag/alert-proxy:latest` exists in namespace `ci`. Verify, without printing secret
+Trigger or wait for a `ci-tools-standalone` main postsubmit after the image configuration is live,
+then confirm the job's promotion step succeeded and record the digest it published. Do not gate on
+`ImageStreamTag/alert-proxy:latest` in namespace `ci`: promotion targets
+`quay.io/openshift/ci:ci_alert-proxy_latest`, and the app.ci `ci` imagestreams have been frozen
+since 2026-08-05, so that tag never appears however many postsubmits succeed. Promotion is also
+all-or-nothing, so an unrelated failure elsewhere in the job skips it while the alert-proxy build
+itself is green; read the job result rather than inferring it from the build. Verify, without printing secret
 values, that `Secret/alert-proxy-alertmanager-webhook` has exactly the required `url` and `token`
 keys in both `ci` and `openshift-user-workload-monitoring`, and that `Secret/alert-proxy-forwarder`
 has `hmac_secret`. The webhook credential must not be present in `slack-bot`; the forwarder
@@ -106,6 +111,45 @@ Only after the successful scrape in stage 2, land release PR 3 containing:
 - `alert-proxy-alertmanager-webhook` on the `alertmanager.secrets` list in
   `openshift-user-workload-monitoring_cm.yaml`; and
 - generated Alertmanager and PrometheusRule artifacts produced by the mixin Makefile at this stage.
+
+Adding the secret to the `alertmanager.secrets` list mutates the Alertmanager StatefulSet spec, so
+prometheus-operator rolls both `alertmanager-user-workload` replicas when this stage is applied.
+That restart is expected and brief; it is not an incident. Confirm the rollout has completed, with
+both pods Running and ready, before starting the probe and watchdog observations below.
+
+Merging this stage does not put it into effect. ArgoCD's `app-cluster-app.ci` Application syncs
+`clusters/app.ci/` recursively and applies
+`mixins/prometheus_out/alertmanager-user-workload-secret_template.yaml` as a `Template` object in
+namespace `openshift`. Nothing in the pipeline runs `oc process`, so `Secret/alertmanager-user-workload`
+keeps whatever content it had before the merge and every receiver and route added here stays inert.
+Merging and walking away leaves the probe undelivered, and because the watchdog routes are absent
+too, sends `alert-proxy-EndToEndDelivery-Down` to `slack-criticals` and PagerDuty instead of the
+dedicated receiver. That is exactly what happened on 2026-09-24.
+
+Render and apply it explicitly after the merge. All four parameters are already on the cluster, so
+nothing has to be fetched from Google Secret Manager by hand:
+
+```bash
+T=clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/alertmanager-user-workload-secret_template.yaml
+oc --context app.ci process --local -f "$T" \
+  -p SLACK_API_URL="$(oc --context app.ci -n ci get secret ci-slack-api-url -o jsonpath='{.data.url}' | base64 -d)" \
+  -p PAGERDUTY_INTEGRATION_KEY="$(oc --context app.ci -n ci get secret pagerduty -o jsonpath='{.data.integration_key}' | base64 -d)" \
+  -p CHAI_BOT_WEBHOOK_URL="$(oc --context app.ci -n ci get secret chai-bot-alertmanager-webhook -o jsonpath='{.data.url}' | base64 -d)" \
+  -p CHAI_BOT_WEBHOOK_TOKEN="$(oc --context app.ci -n ci get secret chai-bot-alertmanager-webhook -o jsonpath='{.data.token}' | base64 -d)" \
+  -o yaml > rendered.yaml
+```
+
+Use `--local`. Server-side `oc process` needs `create` on `processedtemplates` in the caller's
+current namespace, which cluster admins do not generally have in `default`. This template declares
+no `generate: expression` parameters, so client-side rendering is equivalent.
+
+Validate before applying, because a bad apply breaks Slack and PagerDuty delivery for every alert on
+the cluster, not just for alert-proxy. Extract the `alertmanager.yaml` value from the rendered
+Secret and run the pinned `amtool check-config` from stage 4 against it. Then confirm the diff
+against the live Secret is purely additive — only the alert-proxy receivers and their routes, no
+removals, and `slack-criticals` byte-identical — before `oc apply -f rendered.yaml`. Alertmanager
+reloads within about ten seconds; confirm in the `config-reloader` container log. Delete the
+rendered file afterwards: it contains all four secrets in plaintext.
 
 The receiver deliberately uses no template parameters. The webhook URL is an in-cluster literal and
 the bearer token is read with `http_config.authorization.credentials_file` from
@@ -188,6 +232,15 @@ Do not bundle this with stage 4. After delivery and restart recovery have been o
 iteration-12 Alertmanager API, service-CA, `alertmanagers/api` RBAC, authorization-cache, inventory,
 and crash-recovery checks. Only then may a separate release PR change
 `--enable-silences=false` to `true`.
+
+That same release PR must also add `create`, and only `create`, to the
+`alert-proxy-alertmanager-edit` Role in `rbac.yaml`. Until this stage the Role carries only `get`,
+`list`, and `delete`, because those back silence inventory, silence read-back, and silence expiry,
+which `--enable-silences` never gates and which the drain and rollback path depends on. Do not add
+`update`: the Alertmanager v2 API expresses creating, extending, replacing, and broadening
+suppression alike as a POST to `/api/v2/silences` carrying an optional existing id, and the proxy
+issues no PUT or PATCH, so an `update` grant would never be exercised. Flipping the flag without the
+`create` grant leaves every suppressing operation failing on authorization.
 
 ## Rollback
 
