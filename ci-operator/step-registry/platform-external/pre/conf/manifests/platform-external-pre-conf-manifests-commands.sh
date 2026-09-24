@@ -314,12 +314,23 @@ WantedBy=multi-user.target
 DEBUG_UNIT_EOF
 )"
 
-# Drop-in on the native node-image-pull.service to mirror its own output to serial.
+# Drop-in on the native node-image-pull.service.
+# Two changes vs. the old ttyS0-only redirect:
+#   1. StandardOutput/Error=journal+console so the output lands in journald (and
+#      thus the installer log-bundle, which captures the journal but NOT the serial
+#      ring). The old TTYPath=/dev/ttyS0 sent everything to serial only, so the
+#      script's own echoes/errors never appeared in the log-bundle journal and the
+#      exit-1 looked "silent". (Same mechanism the kubelet-providerid unit uses.)
+#   2. Run the script under `bash -x` so every command is traced to stderr ->
+#      journal. This names the exact command that exits non-zero (the script uses
+#      `set -euo pipefail`, so a failed command aborts with no message of its own).
+# Reset ExecStart (empty line) before overriding it, per systemd drop-in rules.
 NIP_DROPIN="$(cat << 'NIP_DROPIN_EOF'
 [Service]
-StandardOutput=tty
-StandardError=tty
-TTYPath=/dev/ttyS0
+StandardOutput=journal+console
+StandardError=journal+console
+ExecStart=
+ExecStart=/bin/bash -x /usr/local/bin/node-image-pull.sh
 NIP_DROPIN_EOF
 )"
 
