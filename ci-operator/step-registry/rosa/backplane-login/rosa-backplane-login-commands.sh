@@ -19,7 +19,7 @@ read_profile_file() {
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 proxy_url="${BACKPLANE_PROXY_URL:-http://squid.corp.redhat.com:3128}"
-elevate_reason="${BACKPLANE_ELEVATE_REASON:-rosa-ci}"
+elevate_reason="CI elevation : ${BACKPLANE_ELEVATE_REASON:-rosa-ci}"
 log "Obtaining platform-plane (MC/SC) access for hosted cluster ${CLUSTER_ID}"
 
 # Install the pinned ocm-backplane release (rosa-aws-cli provides ocm, oc, curl,
