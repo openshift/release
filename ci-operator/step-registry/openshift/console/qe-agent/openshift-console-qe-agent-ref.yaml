@@ -1,0 +1,47 @@
+ref:
+  as: openshift-console-qe-agent
+  from: console-tests
+  cli: latest
+  best_effort: true
+  commands: openshift-console-qe-agent-commands.sh
+  timeout: 1h40m0s
+  grace_period: 2m0s
+  env:
+  - name: CONSOLE_FLAKE_AGENT_ENABLED
+    default: "false"
+    documentation: Enables the agent when true, or only for a matching openshift/release PR rehearsal when set to rehearsal.
+  - name: CONSOLE_FLAKE_SKILL_REVISION
+    default: ""
+    documentation: Full 40-character openshift/release commit SHA containing the approved standalone skill and Python driver.
+  - name: CONSOLE_FLAKE_HISTORY_DAYS
+    default: "14"
+    documentation: Dashboard history window, from 1 to 90 days.
+  - name: CONSOLE_FLAKE_VERIFY_RUNS
+    default: "5"
+    documentation: Consecutive retry-free passes required for each proposed fix.
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+    documentation: Use Vertex AI for Claude Code.
+  - name: CLOUD_ML_REGION
+    default: "global"
+    documentation: Google Cloud region for Vertex AI.
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "openshift-ci-prow-agents"
+    documentation: Vertex AI project for model requests.
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/google-token"
+    documentation: Mounted Vertex AI service account credential path.
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+    documentation: Claude model for failure investigation.
+  credentials:
+  - collection: ci-claude-code
+    group: claude-openshift-ci
+    mount_path: /var/run/claude-code-service-account
+  resources:
+    requests:
+      cpu: "4"
+      memory: 10Gi
+  documentation: |-
+    Investigates Console Playwright failures and independently verifies proposed
+    test fixes before ipi-gcp-post deprovisions the existing test cluster.
