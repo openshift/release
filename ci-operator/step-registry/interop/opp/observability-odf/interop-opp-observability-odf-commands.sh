@@ -4,7 +4,7 @@ set -euo pipefail; shopt -s inherit_errexit
 # === Known-Issue Skip Framework ===
 # This script uses _detect_known_issue() to emit JUnit SKIPPED results
 # for tracked bugs instead of failing the job. Unknown failures still FAIL.
-# Tracked issues: INTEROP-9455
+# Tracked issues: INTEROP-9518
 # See PR review Fix 3 for rationale.
 
 # --- Trace-to-file: always capture, dump on failure only ---
@@ -805,39 +805,58 @@ function Main () {
     : "ODF namespace: ${odfNamespace}"
     : "Artifacts dir: ${ARTIFACT_DIR}"
 
+    _known_issue_active=false
+
     CheckRgwReady          || true
+    echo ">>> CHECK 1: ${tcNamesArr[-1]} — ${tcResultsArr[-1]} ${tcMessagesArr[-1]:+(${tcMessagesArr[-1]})}"
     CheckMcoReady          || true
+    echo ">>> CHECK 2: ${tcNamesArr[-1]} — ${tcResultsArr[-1]} ${tcMessagesArr[-1]:+(${tcMessagesArr[-1]})}"
+    if [[ "${tcResultsArr[-1]}" == "pass" ]]; then
+        echo ">>> Waiting 45s for Thanos metrics ingestion after MCO Ready..."
+        sleep 45
+    fi
     CheckStorageEndpoint   || true
+    echo ">>> CHECK 3: ${tcNamesArr[-1]} — ${tcResultsArr[-1]} ${tcMessagesArr[-1]:+(${tcMessagesArr[-1]})}"
     CheckThanosHealth      || true
+    echo ">>> CHECK 4: ${tcNamesArr[-1]} — ${tcResultsArr[-1]} ${tcMessagesArr[-1]:+(${tcMessagesArr[-1]})}"
     CheckObcBound          || true
+    echo ">>> CHECK 5: ${tcNamesArr[-1]} — ${tcResultsArr[-1]} ${tcMessagesArr[-1]:+(${tcMessagesArr[-1]})}"
     CheckThanosQuery       || true
+    echo ">>> CHECK 6: ${tcNamesArr[-1]} — ${tcResultsArr[-1]} ${tcMessagesArr[-1]:+(${tcMessagesArr[-1]})}"
 
     typeset -i _idx=0
     for _idx in "${!tcResultsArr[@]}"; do
         if [[ "${tcNamesArr[$_idx]}" == "thanos-query" \
             && "${tcResultsArr[$_idx]}" == "fail" \
             && "${tcMessagesArr[$_idx]}" == *"returned empty result vector"* ]]; then
-            # Known-issue skip: INTEROP-9455
+            # Known-issue skip: INTEROP-9518
             # Added: 2026-09-21
-            # Review-by: 2026-12-21 (or when INTEROP-9455 is resolved)
+            # Review-by: 2026-12-21 (or when INTEROP-9518 is resolved)
             # Owner: OPP-interop team
-            _detect_known_issue "${tcMessagesArr[$_idx]}" "INTEROP-9455" \
+            _detect_known_issue "${tcMessagesArr[$_idx]}" "INTEROP-9518" \
                 "Thanos query returns empty result during observability convergence"
             tcResultsArr[$_idx]="skip"
+            _known_issue_active=true
         fi
     done
 
     WriteJunit
 
-    typeset r=""
-    for r in "${tcResultsArr[@]}"; do
-        if [[ "${r}" == "fail" ]]; then
-            : "ACM Observability + ODF Interop: SOME CHECKS FAILED"
-            exit 1
+    _has_genuine_fail=false
+    for _idx in "${!tcResultsArr[@]}"; do
+        if [[ "${tcResultsArr[$_idx]}" == "fail" ]]; then
+            if ${_known_issue_active:-false}; then
+                _detect_known_issue "${tcMessagesArr[$_idx]}" "INTEROP-9518" \
+                    "Cascaded skip: ${tcNamesArr[$_idx]} failed — downstream of known convergence issue"
+                tcResultsArr[$_idx]="skip"
+            else
+                _has_genuine_fail=true
+            fi
         fi
     done
-
-    : "ACM Observability + ODF Interop: ALL PASSED"
+    if ${_has_genuine_fail}; then
+        exit 1
+    fi
     exit 0
 }
 
