@@ -135,6 +135,28 @@ tests:
         curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
           | tar -xz -C /tmp
         export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
+        export GH_TOKEN="$GITHUB_TOKEN"
+
+        # Overlay unmerged builder-probe fix onto demo-e2e-base and push so
+        # auto-rebase.sh's re-checkout of REBASE_BRANCH keeps the new script.
+        # Remove this block after the fix PR merges.
+        git fetch demo-src fix-builder-probe
+        git checkout demo-src/fix-builder-probe -- hack/auto-rebase.sh
+        git -c user.name=openshift-app-platform-shift-bot \
+            -c user.email=267347085+openshift-app-platform-shift-bot@users.noreply.github.com \
+            commit -m "TEMP: overlay unmerged builder-probe fix for CI validation" \
+            -- hack/auto-rebase.sh
+        git push -f origin demo-e2e-base
+
+        # Reset prior demo PR/branch so open_pr_exists does not skip.
+        gh pr list --repo openshift/ocp-release-operator-sdk \
+          --head v1.42.3-rebase-demo-e2e-base --state open --json number -q '.[].number' \
+          | while read -r n; do
+              [[ -n "$n" ]] || continue
+              gh pr close "$n" --repo openshift/ocp-release-operator-sdk \
+                --comment "Closing to re-test unmerged builder-probe overlay." || true
+            done
+        git push origin --delete v1.42.3-rebase-demo-e2e-base 2>/dev/null || true
 
         export REBASE_BRANCH=demo-e2e-base
         export FORCE_REMOTE_URLS=1
