@@ -61,9 +61,12 @@ fi
 $WAS_TRACING && set -x
 
 # ---- Management cluster kubeconfig (${SHARED_DIR}/mc-kubeconfig) ----
-# Resolve the management cluster for the hosted cluster and fetch its kubeconfig
-# from OCM. This is the canonical contract name (consolidating the older
-# hs-mc.kubeconfig / mc-kubeconfig divergence).
+# Resolve the management cluster identity from OCM (name/id only), then obtain an
+# elevated kubeconfig via backplane. Backplane is used instead of the OCM
+# credentials API so this works for private management clusters (reached through
+# the corp proxy) and produces an audited, elevated (backplane-cluster-admin)
+# session in production. mc-kubeconfig is the canonical contract name
+# (consolidating the older hs-mc.kubeconfig / mc-kubeconfig divergence).
 MC_NAME=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/hypershift" 2>/dev/null | jq -r '.management_cluster // empty')
 if [[ -z "${MC_NAME}" ]]; then
   MC_NAME=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/provision_shard" 2>/dev/null | jq -r '.management_cluster // empty')
@@ -83,8 +86,27 @@ echo -n "${MC_NAME}" > "${SHARED_DIR}/mc-cluster-name"
 echo -n "${MC_CLUSTER_ID}" > "${SHARED_DIR}/mc-cluster-id"
 
 mc_kubeconfig="${SHARED_DIR}/mc-kubeconfig"
-ocm get "/api/clusters_mgmt/v1/clusters/${MC_CLUSTER_ID}/credentials" | jq -r '.kubeconfig' > "${mc_kubeconfig}"
+log "Running ocm-backplane login for management cluster ${MC_NAME} (${MC_CLUSTER_ID})"
+mc_login_kubeconfig="$(mktemp /tmp/backplane-mc-login.XXXXXX)"
+if ! KUBECONFIG="${mc_login_kubeconfig}" ocm-backplane login "${MC_CLUSTER_ID}"; then
+  log "ERROR: ocm-backplane login failed for management cluster ${MC_CLUSTER_ID}"
+  rm -f "${mc_login_kubeconfig}"
+  exit 1
+fi
+# Verify elevation works before dumping the static kubeconfig.
+KUBECONFIG="${mc_login_kubeconfig}" ocm-backplane elevate "${elevate_reason}" -- whoami
+if ! KUBECONFIG="${mc_login_kubeconfig}" ocm-backplane elevate "${elevate_reason}" -- config view --raw --minify > "${mc_kubeconfig}"; then
+  log "ERROR: failed to dump elevated management cluster kubeconfig"
+  rm -f "${mc_kubeconfig}" "${mc_login_kubeconfig}"
+  exit 1
+fi
+rm -f "${mc_login_kubeconfig}"
 chmod 0600 "${mc_kubeconfig}"
+if ! grep -q 'backplane-cluster-admin' "${mc_kubeconfig}"; then
+  log "ERROR: management cluster kubeconfig missing backplane-cluster-admin impersonation"
+  rm -f "${mc_kubeconfig}"
+  exit 1
+fi
 if KUBECONFIG="${mc_kubeconfig}" oc whoami &>/dev/null; then
   log "Management cluster kubeconfig ready: ${MC_NAME} (${MC_CLUSTER_ID})"
 else
