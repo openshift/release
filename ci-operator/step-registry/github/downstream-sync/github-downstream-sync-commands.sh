@@ -12,6 +12,43 @@ b64url() {
     | tr -d '\n'
 }
 
+# Delete all remote branches whose names start with "d/s-merge".
+# Any branch names passed as arguments are skipped (e.g. heads of open PRs).
+delete_ds_merge_branches() {
+  local skip_branches=("$@")
+  local refs branch keep skip
+
+  echo "🧹 Cleaning up d/s-merge branches…"
+  refs=$(
+    curl -sS -H "Authorization: token ${GITHUB_TOKEN}" \
+      "https://api.github.com/repos/${DOWNSTREAM_REPO}/git/matching-refs/heads/d/s-merge" |
+      jq -r '.[].ref // empty' | sed 's|^refs/heads/||'
+  )
+
+  if [[ -z "${refs}" ]]; then
+    echo "ℹ️  No d/s-merge branches found."
+    return 0
+  fi
+
+  while IFS= read -r branch; do
+    [[ -z "${branch}" ]] && continue
+    skip=false
+    for keep in "${skip_branches[@]}"; do
+      if [[ "${branch}" == "${keep}" ]]; then
+        skip=true
+        break
+      fi
+    done
+    if [[ "${skip}" == "true" ]]; then
+      echo "⏭️  Skipping branch ${branch} (associated with open PR)"
+      continue
+    fi
+    echo "🗑️  Deleting branch ${branch}…"
+    curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X DELETE \
+      "https://api.github.com/repos/${DOWNSTREAM_REPO}/git/refs/heads/${branch}" || true
+  done <<< "${refs}"
+}
+
 echo "🔐 Generating JWT…"
 # create the JWT needed to get an app install token needed for API requests
 # the token is short-lived and will expire after EXP below
@@ -59,15 +96,28 @@ echo "🔍 Checking for open downstream-merge PR…"
 # format, then we will still get a new one created with this script. Another person
 # or process that uses this format is still ok and this automation will recognize it
 # and exit early if there’s already an *open* d/s merge PR
-OPEN_PR_NUM=$(
+OPEN_PR_INFO=$(
   curl -sS -H "Authorization: token $GITHUB_TOKEN" \
     "https://api.github.com/repos/${DOWNSTREAM_REPO}/pulls?state=open&base=${DEFAULT_BRANCH}&per_page=100&sort=created&direction=desc" |
-    jq -r '.[] | select(.title|test("DownStream Merge \\[[0-9]{2}-[0-9]{2}-[0-9]{4}\\]")) | .number' | head -n1
+    jq -r '.[] | select(.title|test("DownStream Merge \\[[0-9]{2}-[0-9]{2}-[0-9]{4}\\]")) | "\(.number)\t\(.head.ref)"'
 )
-if [[ -n "$OPEN_PR_NUM" ]]; then
-  echo "ℹ️  Found open downstream-merge PR #${OPEN_PR_NUM}; exiting."
+OPEN_PR_NUMS=()
+OPEN_PR_BRANCHES=()
+while IFS=$'\t' read -r pr_num pr_branch; do
+  [[ -z "${pr_num}" ]] && continue
+  OPEN_PR_NUMS+=("${pr_num}")
+  OPEN_PR_BRANCHES+=("${pr_branch}")
+done <<< "${OPEN_PR_INFO}"
+
+if [[ ${#OPEN_PR_NUMS[@]} -gt 0 ]]; then
+  echo "ℹ️  Found open downstream-merge PR(s): ${OPEN_PR_NUMS[*]} (branches: ${OPEN_PR_BRANCHES[*]})"
+  delete_ds_merge_branches "${OPEN_PR_BRANCHES[@]}"
+  echo "ℹ️  Exiting without creating a new merge PR."
   exit 0
 fi
+
+# no open PRs: remove every leftover d/s-merge branch before creating a new one
+delete_ds_merge_branches
 
 echo "📊 Counting new commits upstream…"
 # to save on overhead we don't need to open a new d/s merge PR until we have enough commits to bring in
@@ -76,10 +126,6 @@ echo "Found $NEW_COMMITS new commits upstream."
 (( NEW_COMMITS < MIN_COMMITS )) && { echo "⚠️  Not enough commits (min=${MIN_COMMITS}); exiting."; exit 0; }
 
 BRANCH="d/s-merge-$(date +%m-%d-%Y)"
-echo "🧹 Deleting stale branch ${BRANCH}, if any…"
-# if an earlier failed run left the branch behind, delete it now
-curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X DELETE \
-  "https://api.github.com/repos/${DOWNSTREAM_REPO}/git/refs/heads/${BRANCH}" || true
 
 echo "🌿 Creating merge branch ${BRANCH} and merging…"
 # if we made it this far, we can create the merge and push the PR
