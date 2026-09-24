@@ -99,6 +99,19 @@ s3Host="$(oc get "configmap/${obcName}" -n "${odfNamespace}" \
     -o jsonpath='{.data.BUCKET_HOST}')"
 [[ -z "${s3Host}" ]] && { : "ERROR: OBC ConfigMap ${obcName} missing BUCKET_HOST"; exit 1; }
 
+typeset s3Port=''
+s3Port="$(oc get "configmap/${obcName}" -n "${odfNamespace}" \
+    -o jsonpath='{.data.BUCKET_PORT}')"
+
+# Thanos endpoint: BUCKET_HOST:BUCKET_PORT.
+# NooBaa OBC defaults to the S3 service ClusterIP with HTTPS port (443).
+# We use insecure: true because the internal service TLS cert is signed by
+# the cluster CA which Thanos does not trust by default. The traffic stays
+# cluster-internal so plain HTTP over the service port is acceptable.
+typeset s3Endpoint="${s3Host}"
+[[ -n "${s3Port}" && "${s3Port}" != '443' && "${s3Port}" != '80' ]] && \
+    s3Endpoint="${s3Host}:${s3Port}"
+
 # ---------------------------------------------------------------------------
 # 6. Build thanos-object-storage secret — jq marshals credentials safely
 # ---------------------------------------------------------------------------
@@ -114,7 +127,7 @@ s3Host="$(oc get "configmap/${obcName}" -n "${odfNamespace}" \
     thanosFile="$(mktemp)"
     jq -cnr \
         --arg bucket "${bucketName}" \
-        --arg endpoint "${s3Host}" \
+        --arg endpoint "${s3Endpoint}" \
         --arg accessKey "${awsAccessKey}" \
         --arg secretKey "${awsSecretKey}" \
         '{

@@ -57,24 +57,27 @@ mkdir -p /resources
 
 if [[ -f "${SHARED_DIR}/managed.cluster.name" ]]; then
     typeset mcName='' mcDomain=''
-    mcName="$(cat "${SHARED_DIR}/managed.cluster.name" 2>/dev/null || true)"
-    mcDomain="$(cat "${SHARED_DIR}/managed.cluster.base.domain" 2>/dev/null || true)"
+    mcName="$(cat "${SHARED_DIR}/managed.cluster.name")"
+    mcDomain="$(cat "${SHARED_DIR}/managed.cluster.base.domain")"
 
-    if [[ -n "${mcName}" && -n "${mcDomain}" ]]; then
-        {
-            yq -o json eval . /resources/options.yaml |
-            jq -c \
-                --arg mcName "${mcName}" \
-                --arg mcDomain "${mcDomain}" \
-                '.options.clusters = [{name: $mcName, baseDomain: $mcDomain}]' |
-            yq -p json -o yaml eval .
-        } > /resources/options.yaml.tmp
-        mv /resources/options.yaml.tmp /resources/options.yaml
+    [[ -n "${mcName}" ]] || { : 'ERROR: managed.cluster.name is empty'; exit 1; }
+    [[ -n "${mcDomain}" ]] || { : 'ERROR: managed.cluster.base.domain is empty'; exit 1; }
+    [[ -f "${SHARED_DIR}/managed.cluster.kubeconfig" ]] || {
+        : 'ERROR: managed.cluster.kubeconfig missing — name+domain+kubeconfig must be a complete set'
+        exit 1
+    }
 
-        if [[ -f "${SHARED_DIR}/managed.cluster.kubeconfig" ]]; then
-            cp "${SHARED_DIR}/managed.cluster.kubeconfig" /workspace/.kube/import-kubeconfig
-        fi
-    fi
+    {
+        yq -o json eval . /resources/options.yaml |
+        jq -c \
+            --arg mcName "${mcName}" \
+            --arg mcDomain "${mcDomain}" \
+            '.options.clusters = [{name: $mcName, baseDomain: $mcDomain}]' |
+        yq -p json -o yaml eval .
+    } > /resources/options.yaml.tmp
+    mv /resources/options.yaml.tmp /resources/options.yaml
+
+    cp "${SHARED_DIR}/managed.cluster.kubeconfig" /workspace/.kube/import-kubeconfig
 fi
 
 # ---------------------------------------------------------------------------
