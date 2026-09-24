@@ -2437,24 +2437,27 @@ tests:
         original="$(jq -r '.enableIPForwarding // false' "${body}")"
         echo "  enableIPForwarding is currently ${original}"
 
-        # The whole interface, written back whole, which is what the operator's
-        # SDK does and what carries the backend pool linkage into the request.
-        put_body="$(mktemp)"
-        jq '{location: .location, tags: .tags, properties: (.  | del(.location, .tags, .id, .name, .type, .etag, .resourceGroup))}' \
-          "${body}" >"${put_body}" 2>/dev/null
-        jq --argjson v true '.properties.enableIPForwarding = $v' "${put_body}" >"${put_body}.on" 2>/dev/null
-
-        api="2024-05-01"
+        # az network nic update reads the interface and writes it back
+        # whole, which is what the operator's SDK does and what carries the
+        # backend pool linkage into the request. The document cannot be
+        # built by hand from az output: az flattens ARM's properties
+        # wrapper at every level, so the nested ipConfigurations come back
+        # in a shape ARM refuses with
+        #
+        #   InvalidJson: Could not find member
+        #   'loadBalancerBackendAddressPools' on object of type
+        #   'NetworkInterfaceIpConfiguration'
+        #
+        # which answers nothing about who may write.
         try_put() {
           local cfg="$1" who="$2"
-          if AZURE_CONFIG_DIR="${cfg}" az rest --method put \
-               --url "https://management.azure.com${nic_id}?api-version=${api}" \
-               --body "@${put_body}.on" --output none 2>"${err}"; then
+          if AZURE_CONFIG_DIR="${cfg}" az network nic update --ids "${nic_id}" \
+               --set enableIPForwarding=true --output none 2>"${err}"; then
             echo "  ${who}: ALLOWED"
             return 0
           fi
           echo "  ${who}: REFUSED"
-          redact <"${err}" | grep -oE '"code":"[^"]+"|LinkedAuthorizationFailed|AuthorizationFailed|DenyAssignment[A-Za-z]*' | head -3 | sed 's/^/    /'
+          redact <"${err}" | head -3 | sed 's/^/    /'
           return 1
         }
 
@@ -2489,17 +2492,15 @@ tests:
         fi
 
         section "putting it back"
-        jq --argjson v "${original}" '.properties.enableIPForwarding = $v' "${put_body}" >"${put_body}.off" 2>/dev/null
         for cfg in "${issued_cfg}" "${profile_cfg}"; do
-          if AZURE_CONFIG_DIR="${cfg}" az rest --method put \
-               --url "https://management.azure.com${nic_id}?api-version=${api}" \
-               --body "@${put_body}.off" --output none 2>/dev/null; then
+          if AZURE_CONFIG_DIR="${cfg}" az network nic update --ids "${nic_id}" \
+               --set enableIPForwarding="${original}" --output none 2>/dev/null; then
             echo "  restored enableIPForwarding=${original}"
             break
           fi
         done
 
-        rm -f "${err}" "${body}" "${put_body}" "${put_body}.on" "${put_body}.off"
+        rm -f "${err}" "${body}"
         section "done"
         exit 0
       from: e2e-runner
