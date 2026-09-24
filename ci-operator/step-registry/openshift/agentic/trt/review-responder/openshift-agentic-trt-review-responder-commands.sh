@@ -414,7 +414,8 @@ push_current_branch() {
     echo "ERROR: git push fork ${branch_name} failed"
     if git push origin "${branch_name}"; then
         push_failures=0
-        return 0
+        echo "WARNING: upstream push succeeded, but the PR-head fork was not updated"
+        return 1
     fi
     echo "ERROR: git push origin ${branch_name} failed"
     push_failures=$(( push_failures + 1 ))
