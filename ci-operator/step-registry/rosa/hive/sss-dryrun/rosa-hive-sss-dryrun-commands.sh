@@ -2,10 +2,9 @@
 # Server-side dry-run validation of MCC SelectorSyncSet templates
 # against a Hive cluster via backplane.
 #
-# Parameter values (Option A hybrid): real integration scalar values from
-# app-interface saas-managed-cluster-config.yaml; representative single
-# values for ROUTER_REPLICA_* lists; IMAGE_TAG=latest. These only need to
-# be valid-format for server-side schema validation of the SelectorSyncSets.
+# Parameter values: dummy placeholder values (not real integration IDs,
+# keys, or internal URLs). These only need to be valid-format for
+# server-side schema validation of the SelectorSyncSets.
 
 set -o nounset
 set -o errexit
@@ -60,7 +59,8 @@ ocm-backplane login "${BACKPLANE_CLUSTER_ID}" >/dev/null 2>&1
 
 # ---- Generate SSS template ----
 log "Generating SelectorSyncSet template via make"
-IN_CONTAINER=true make
+export IN_CONTAINER=true
+make
 
 # ---- Process integration template + server-side dry-run ----
 # The .tmpl is a kind: Template needing oc process. All three env files are
@@ -80,19 +80,19 @@ oc process --local --ignore-unknown-parameters=true -f "${FIXED_TEMPLATE}" \
     -p ENV=int \
     -p IMAGE_TAG=latest \
     -p REPO_NAME=managed-cluster-config \
-    -p TELEMETER_SERVER_URL=https://infogw.api.integration.openshift.com \
-    -p OCM_BASE_URL=https://api.integration.openshift.com \
-    -p CONSOLE_BASE_URL=https://console.redhat.com \
-    -p SREP_LEGAL_ENTITY_ID=1Os4bwGWzUrgiS9svdWjfsFO14y \
-    -p LOG_LINKING_ENTITY_IDS=2KTqK5rHHBIsNlOBzgRpSsFRHqP \
-    -p 'ALLOWED_CIDR_BLOCKS=10.29.0.0/18' \
-    -p 'ROUTER_REPLICA_CLUSTER_IDS=["1Hm1byJSRvROV1pCYbVTIEvLGMS"]' \
-    -p 'ROUTER_REPLICA_ORG_IDS=["1Hm1byJSRvROV1pCYbVTIEvLGMS"]' \
-    -p SEGMENT_API_KEY=F24PIOXaJhcshtmPGucjkZi8mGR9IhNa \
-    -p OBSERVATORIUM_URL=https://observatorium-mst.api.stage.openshift.com/api/metrics/v1/osd/api/v1/receive \
+    -p TELEMETER_SERVER_URL=https://telemeter.example.com \
+    -p OCM_BASE_URL=https://api.example.com \
+    -p CONSOLE_BASE_URL=https://console.example.com \
+    -p SREP_LEGAL_ENTITY_ID=dummy-legal-entity-id \
+    -p LOG_LINKING_ENTITY_IDS=dummy-log-entity-id \
+    -p 'ALLOWED_CIDR_BLOCKS=10.0.0.0/8' \
+    -p 'ROUTER_REPLICA_CLUSTER_IDS=["dummy-cluster-id"]' \
+    -p 'ROUTER_REPLICA_ORG_IDS=["dummy-org-id"]' \
+    -p SEGMENT_API_KEY=dummy-segment-api-key \
+    -p OBSERVATORIUM_URL=https://observatorium.example.com \
     -o yaml > "${PROCESSED}"
 
 log "Server-side dry-run apply of processed SelectorSyncSets"
-ocm-backplane elevate "${BACKPLANE_ELEVATE_REASON}" -- oc apply --dry-run=server -f "${PROCESSED}"
+ocm-backplane elevate "${BACKPLANE_ELEVATE_REASON}" -- apply --dry-run=server -f "${PROCESSED}"
 
 log "SSS server-side dry-run validation passed"
