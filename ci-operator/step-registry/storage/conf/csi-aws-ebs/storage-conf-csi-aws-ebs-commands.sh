@@ -35,6 +35,16 @@ else
     cp test/e2e/manifest.yaml ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
 fi
 
+if [ ! -s "${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}" ]; then
+    echo "Required CSI driver manifest ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} is missing or empty" >&2
+    exit 1
+fi
+
+if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ] && [ ! -s "${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}" ]; then
+    echo "Required OCP CSI driver manifest ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST} is missing or empty" >&2
+    exit 1
+fi
+
 # For debugging
 echo "Using ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}:"
 cat ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
