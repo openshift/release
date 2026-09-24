@@ -25,10 +25,11 @@ ref:
     Runs the maintained ACM observability Ginkgo test suite from the
     stolostron/multicluster-observability-operator test image.
 
-    Exit policy: infra/setup failures (missing JUnit, zero specs, runner
-    crash) exit nonzero. Test-only failures (valid JUnit with <failure>
-    elements) exit 0 so downstream LP test steps continue; Firewatch
-    classifies the test signal from JUnit.
+    Exit policy: if Ginkgo exits nonzero but JUnit contains recorded
+    <failure> elements, the suite ran and its failures are observability-
+    specific — exit 0 so downstream LP test steps continue. Firewatch
+    classifies failures from JUnit. If Ginkgo fails without producing
+    JUnit failures (runner crash, image pull, timeout), exit nonzero.
 
     Requires acm-obs-odf-setup (or equivalent) to have already deployed
     MCO with ODF storage and created the mco-e2e-testing-sa RBAC resources.

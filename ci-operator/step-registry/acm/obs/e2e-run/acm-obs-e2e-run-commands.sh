@@ -131,14 +131,17 @@ testCnt="$(grep -c '<testcase' /results/results.xml || true)"
 
 cp /results/results.xml "${ARTIFACT_DIR}/junit_acm-observability.xml"
 
-# Exit policy — fail on infra/setup errors, succeed on test-only failures
-# so downstream LP test steps continue. Firewatch handles the test signal
-# from JUnit classification.
+# Exit policy: if Ginkgo failed but produced JUnit with recorded failures,
+# the suite ran and the failures are observability-specific — not an infra
+# problem that other LP tests depend on. Return 0 so downstream steps
+# continue; Firewatch classifies the failures from JUnit.
+# If Ginkgo failed without producing any <failure> elements (e.g. runner
+# crash, image pull error, timeout with no output), exit nonzero.
 typeset -i failCnt=0
 failCnt="$(grep -c '<failure' /results/results.xml || true)"
 
 if ((ginkgoRc != 0 && failCnt > 0)); then
-    : "Ginkgo exit=${ginkgoRc} with ${failCnt} test failure(s) — returning 0 for downstream steps"
+    : "Ginkgo exit=${ginkgoRc} with ${failCnt} failure(s) in JUnit — returning 0 for downstream steps"
     exit 0
 fi
 
