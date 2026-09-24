@@ -1,0 +1,36 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-jira-agent
+  cron: 0 9 * * *
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: splat-jira-agent-opct
+- as: periodic-review-agent
+  cron: '@yearly'
+  steps:
+    workflow: splat-review-agent-opct
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: splat-review-agent-opct-trigger
+zz_generated_metadata:
+  branch: main
+  org: redhat-openshift-ecosystem
+  repo: opct
