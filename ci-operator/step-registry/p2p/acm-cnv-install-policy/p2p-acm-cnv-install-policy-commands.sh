@@ -243,6 +243,28 @@ WaitForCNV() {
 typeset -a clusterNamesArr=()
 mapfile -t clusterNamesArr < <(LoadSpokeClusterNames)
 
+# CNV_POLICY_TARGET_SPOKE_INDICES — optionally restrict to specific spokes by 1-based position.
+# Enables running this step twice with different CNV versions for the cross-product CNV-skew scenario
+# (e.g. spoke-1 gets CNV 4.21, spoke-2 gets CNV 4.22).  Each invocation must use a distinct
+# CNV_POLICY_NAMESPACE so the two Policy+Placement objects coexist on the hub.
+if [[ -n "${CNV_POLICY_TARGET_SPOKE_INDICES:-}" ]]; then
+    typeset -a _idxArr=()
+    IFS=',' read -ra _idxArr <<< "${CNV_POLICY_TARGET_SPOKE_INDICES}"
+    typeset -a _filteredArr=()
+    for _idx in "${_idxArr[@]}"; do
+        # Convert 1-based index to 0-based array offset.
+        typeset _off=$(( _idx - 1 ))
+        (( _off >= 0 && _off < ${#clusterNamesArr[@]} )) || {
+            : "ERROR: CNV_POLICY_TARGET_SPOKE_INDICES index ${_idx} is out of range (have ${#clusterNamesArr[@]} spoke(s))"
+            false
+        }
+        _filteredArr+=("${clusterNamesArr[${_off}]}")
+    done
+    (( ${#_filteredArr[@]} >= 1 ))
+    clusterNamesArr=("${_filteredArr[@]}")
+    : "CNV_POLICY_TARGET_SPOKE_INDICES=${CNV_POLICY_TARGET_SPOKE_INDICES}: targeting spokes [${clusterNamesArr[*]}]"
+fi
+
 # Resolve latest kubevirt-hyperconverged version for major.minor from the spoke catalog.
 ResolveCnvLatestVersion() {
     typeset majorMinor="$1"

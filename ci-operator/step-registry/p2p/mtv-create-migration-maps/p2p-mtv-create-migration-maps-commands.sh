@@ -74,24 +74,37 @@ function ApplyNetworkMap () {
 }
 
 # ApplyStorageMap — map source ODF virt StorageClass to destination (RWX required for live migration).
+# When MTV_ADDITIONAL_SOURCE_STORAGE_NAME is set, a second spec.map entry covers a different source SC
+# (e.g. cephfs for data disks). MTV matches each VM disk to the entry whose source.name matches its SC.
 # Uses jq --arg to safely marshal values; avoids raw heredoc expansion of YAML-special chars.
 function ApplyStorageMap () {
-    jq -n \
-        --arg name     "${MTV_STORAGE_MAP_NAME}" \
-        --arg ns       "${MTV_NAMESPACE}" \
+    # Build the spec.map array — always includes the primary (root disk) entry.
+    # When MTV_ADDITIONAL_SOURCE_STORAGE_NAME is set, appends the data disk entry.
+    typeset mapJson
+    mapJson="$(jq -n \
         --arg srcName  "${MTV_SOURCE_STORAGE_NAME}" \
         --arg dstClass "${MTV_DESTINATION_STORAGE_CLASS}" \
-        --arg srcProv  "${MTV_SOURCE_PROVIDER}" \
-        --arg dstProv  "${MTV_DESTINATION_PROVIDER}" \
+        --arg addSrc   "${MTV_ADDITIONAL_SOURCE_STORAGE_NAME:-}" \
+        --arg addDst   "${MTV_ADDITIONAL_DESTINATION_STORAGE_CLASS:-}" \
+        '
+            [{ source: {name: $srcName}, destination: {storageClass: $dstClass} }]
+            + (if ($addSrc != "" and $addDst != "")
+               then [{ source: {name: $addSrc}, destination: {storageClass: $addDst} }]
+               else [] end)
+        ')"
+
+    jq -n \
+        --arg  name     "${MTV_STORAGE_MAP_NAME}" \
+        --arg  ns       "${MTV_NAMESPACE}" \
+        --arg  srcProv  "${MTV_SOURCE_PROVIDER}" \
+        --arg  dstProv  "${MTV_DESTINATION_PROVIDER}" \
+        --argjson map   "${mapJson}" \
         '{
             apiVersion: "forklift.konveyor.io/v1beta1",
             kind: "StorageMap",
             metadata: {name: $name, namespace: $ns},
             spec: {
-                map: [{
-                    source:      {name: $srcName},
-                    destination: {storageClass: $dstClass}
-                }],
+                map: $map,
                 provider: {
                     source:      {name: $srcProv, namespace: $ns},
                     destination: {name: $dstProv, namespace: $ns}
