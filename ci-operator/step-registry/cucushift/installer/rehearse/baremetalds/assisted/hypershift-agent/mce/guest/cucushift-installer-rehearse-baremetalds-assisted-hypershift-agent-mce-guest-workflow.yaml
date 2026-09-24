@@ -27,6 +27,17 @@ workflow:
         EXTRA_NETWORK_NAMES="egressnet"
         EGRESSNET_NETWORK_SUBNET_V4='192.168.221.0/24'
       EGRESSIP_SECONDARY_SUBNET: "192.168.221.0/24"
+      # Egress leaves over an 802.1Q interface on that NIC rather than over the NIC
+      # itself, which is how the deployments this covers are built: the physical link
+      # only carries the tag and the egress subnet lives on the VLAN.
+      #
+      # The VLAN subnet is a /24 even though the real ones tend to be much smaller. Each
+      # node keeps the host part it already holds on the untagged network, and that comes
+      # from libvirt's DHCP range, which is not guaranteed to stay inside a /27 across
+      # provisions. The step fails cleanly when a host part does not fit; a /24 means it
+      # never has to.
+      EGRESSIP_VLAN_ID: "3686"
+      EGRESSIP_VLAN_SUBNET: "192.168.222.0/24"
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NUM_WORKERS=3
@@ -49,5 +60,20 @@ workflow:
     forwarding on the interface, and the interface is stopped from installing a second
     default route. See hypershift-agent-ovn-egressip-multinic for details.
 
-    Jobs that want the echo target reachable over the secondary NIC should also set
-    IPECHO_HOST_IP=192.168.221.1.
+    On top of that NIC the workflow builds an 802.1Q interface (vlan-egress, VLAN 3686,
+    192.168.222.0/24) and the EgressIP is taken from the tagged subnet. This is the shape
+    the requirement describes: worker nodes with a host-level VLAN interface dedicated to
+    egress, rather than a spare physical port. The untagged address stays in place
+    because it is how the step finds the link; it does not compete, since the EgressIP
+    comes from the VLAN subnet and OVN-Kubernetes binds it to whichever interface owns
+    that subnet. Unset EGRESSIP_VLAN_ID to fall back to egressing over the untagged NIC.
+
+    hypershift-agent-ovn-ipecho-provision is added per job rather than here, so a job
+    that runs it has to carry the matching echo-side settings itself:
+
+      IPECHO_HOST_IP: 192.168.221.1      # bridge to build the subinterface on
+      IPECHO_VLAN_ID: "3686"             # same tag as EGRESSIP_VLAN_ID
+      IPECHO_VLAN_CIDR: 192.168.222.1/24 # inside EGRESSIP_VLAN_SUBNET
+
+    Without the last two the echo server keeps the untagged bridge address, which a
+    tagged frame from a guest node never reaches.

@@ -28,6 +28,29 @@ ref:
   - name: TUNED_CONFIGMAP_NAME
     default: "egressip-multinic-forwarding"
     documentation: "Name of the ConfigMap holding the Tuned object referenced from NodePool.spec.tuningConfig."
+  - name: EGRESSIP_VLAN_ID
+    default: ""
+    documentation: |-
+      802.1Q tag. When set, the step builds a VLAN interface on top of the discovered
+      secondary NIC and the EgressIP is taken from EGRESSIP_VLAN_SUBNET instead of from
+      EGRESSIP_SECONDARY_SUBNET. This models deployments where the egress network is a
+      tagged interface rather than a dedicated physical port. Leave empty to keep using
+      the untagged NIC.
+  - name: EGRESSIP_VLAN_SUBNET
+    default: ""
+    documentation: |-
+      IPv4 CIDR carried by the VLAN, e.g. 192.168.222.0/27. Required with
+      EGRESSIP_VLAN_ID. Nothing serves DHCP on the tagged segment, so each node is
+      given a static address formed from this subnet plus the host part it already
+      holds on the untagged network; the step fails if that host part does not fit.
+      The echo server must have an address in here too - see IPECHO_VLAN_CIDR.
+  - name: EGRESSIP_VLAN_IFNAME
+    default: "vlan-egress"
+    documentation: |-
+      Name of the VLAN interface. Must not contain a dot: sysctl(8) treats '.' as a
+      separator, which would make net.ipv4.conf.<iface>.forwarding ambiguous and the
+      Tuned [sysctl] keys a silent no-op. The step rejects a dotted name rather than
+      let that happen.
   documentation: |-
     Prepares a HyperShift Agent guest cluster to run EgressIP on a secondary host
     interface, as requested for OCP Bare Metal / HCP managed clusters.
@@ -42,6 +65,12 @@ ref:
 
     1. Discovers the secondary interface by looking for an address inside
        EGRESSIP_SECONDARY_SUBNET, and fails if the nodes disagree on its name.
+    1b. When EGRESSIP_VLAN_ID is set, creates a VLAN interface on top of it with a
+       static address out of EGRESSIP_VLAN_SUBNET, and treats that as the egress
+       interface for everything below. The untagged address is deliberately left in
+       place: it is how the link is found, and it does not interfere, since the EgressIP
+       is drawn from the VLAN subnet and OVN-Kubernetes binds it to whichever interface
+       owns that subnet.
     2. Sets gatewayConfig.ipForwarding=Global on the guest CNO. The default of
        Restricted leaves the kernel FORWARD policy at DROP with an allowlist that does
        not cover pod traffic entering on ovn-k8s-mp0 and leaving on a secondary NIC.
@@ -58,9 +87,13 @@ ref:
        the hosted control plane's ovnkube-cluster-manager uses to pick an egress node.
 
     Outputs saved to ${SHARED_DIR}:
-    - egressip_secondary_iface:    interface name, e.g. enp3s0
+    - egressip_secondary_iface:    interface name, e.g. enp3s0 or vlan-egress
     - egressip_secondary_subnet:   the CIDR that EgressIP objects should draw from
     - egressip_secondary_node_ips: "<node> <address>" per line, read from host-cidrs
+    - egressip_secondary_vlan_id:  written only in the tagged topology
+
+    The first two describe whichever topology the job asked for, so a consumer does not
+    branch on tagged versus untagged.
 
     Addresses are allocated by libvirt in flavor-iteration order rather than hostname
     order, so tests must read them from these files instead of hardcoding.
