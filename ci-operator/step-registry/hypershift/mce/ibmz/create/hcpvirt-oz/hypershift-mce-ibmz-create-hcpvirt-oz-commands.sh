@@ -69,11 +69,7 @@ hcp create cluster kubevirt \
   --release-image ${OCP_IMAGE_MULTI} \
   --annotations "resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m" \
   --annotations "resource-request-override.hypershift.openshift.io/kube-scheduler.kube-scheduler=memory=512Mi,cpu=500m" \
-  --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m" \
-  --annotations "resource-request-override.hypershift.openshift.io/konnectivity-agent.konnectivity-agent=memory=512Mi,cpu=500m" \
-  --annotations "resource-request-override.hypershift.openshift.io/oauth-openshift.oauth-openshift=memory=256Mi,cpu=300m" \
-  --annotations "resource-request-override.hypershift.openshift.io/ingress-operator.ingress-operator=memory=256Mi,cpu=300m" \
-  --annotations "resource-request-override.hypershift.openshift.io/openshift-apiserver.openshift-apiserver=memory=512Mi,cpu=300m"
+  --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m" 
  #--vm-node-selector role=kubevirt \
 oc wait --timeout=45m --for=condition=Available --namespace="${HC_NS}" hostedclusters.hypershift.openshift.io/"${HC_NAME}"
 echo "$(date) Kubevirt cluster is available"
