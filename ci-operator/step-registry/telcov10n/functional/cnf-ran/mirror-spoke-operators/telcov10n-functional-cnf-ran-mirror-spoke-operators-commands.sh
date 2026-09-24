@@ -29,4 +29,6 @@ cd /eco-ci-cd
 echo "Mirroring spoke operators (VERSION=${VERSION})"
 ansible-playbook ./playbooks/deploy-ocp-operators.yml \
   -i ./inventories/ocp-deployment/build-inventory.py \
-  --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=${VERSION} disconnected=true mirror_only=true operators='$SPOKE_OPERATORS' ocp_operator_mirror_skip_internal_registry_cleanup=true"
+  --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=${VERSION} \
+  disconnected=true mirror_only=true operators='$SPOKE_OPERATORS' ocp_operator_mirror_skip_internal_registry_cleanup=true \
+  arch=${SPOKE_ARCH}"
