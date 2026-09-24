@@ -1,0 +1,108 @@
+ref:
+  as: hypershift-agent-ovn-egressip-multinic-vlan
+  from: cli
+  cli: latest
+  commands: hypershift-agent-ovn-egressip-multinic-vlan-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 45m0s
+  grace_period: 5m0s
+  env:
+  - name: EGRESSIP_VLAN_ID
+    default: ""
+    documentation: |-
+      802.1Q tag for the egress VLAN. The step is a no-op when empty, so the untagged
+      jobs sharing this workflow are unaffected. Must match IPECHO_VLAN_ID on
+      hypershift-agent-ovn-ipecho-provision, or the guests' tagged frames reach nothing.
+  - name: EGRESSIP_VLAN_SUBNET
+    default: "192.168.222.0/24"
+    documentation: |-
+      IPv4 CIDR carried on the VLAN. EgressIP objects draw from it, and each node gets
+      <prefix>.<host part of its untagged address> so the numbering matches the untagged
+      network. Must contain IPECHO_VLAN_CIDR.
+  - name: EGRESSIP_VLAN_IFACE
+    default: "vlan-egress"
+    documentation: |-
+      Name of the VLAN subinterface. Deliberately free of dots: an interface called
+      enp3s0.3686 makes net.ipv4.conf.enp3s0.3686.forwarding ambiguous and the Tuned
+      [sysctl] block silently does nothing.
+  - name: EGRESSIP_VLAN_GATEWAY
+    default: ""
+    documentation: |-
+      Next hop on the VLAN, i.e. the echo host's VLAN address. Defaults to the .1 of
+      EGRESSIP_VLAN_SUBNET, which is what IPECHO_VLAN_CIDR normally is.
+  - name: EGRESSIP_REMOTE_SUBNET
+    default: ""
+    documentation: |-
+      CIDR containing the echo server's off-subnet address (IPECHO_REMOTE_CIDR), e.g.
+      192.168.223.0/24. When set, a route to it via EGRESSIP_VLAN_GATEWAY is added to the
+      node's MAIN routing table. That route is what makes a secondary-NIC EgressIP able to
+      reach anything beyond its own subnet; see the note in the step for why it cannot
+      live in the dedicated table.
+  - name: EGRESSIP_VLAN_TABLE_ID
+    default: "3686"
+    documentation: |-
+      Dedicated routing table holding the VLAN's connected route and default route. This
+      reproduces the customer's configuration. It is deliberately not table 7, which
+      OVN-Kubernetes already owns at rule priority 30.
+  - name: EGRESSIP_VLAN_RULE_PRIORITY
+    default: "30000"
+    documentation: |-
+      Priority of the "from <vlan address> lookup <table>" rule. Well above
+      OVN-Kubernetes' rules so they keep winning, and below main's 32766 so this one is
+      still consulted. That coexistence is part of what the job exercises.
+  - name: NMSTATE_SUB_SOURCE
+    default: "redhat-operators"
+    documentation: |-
+      Preferred CatalogSource for kubernetes-nmstate-operator. If it does not serve the
+      operator, the step falls back to whichever catalog in the guest cluster does.
+  - name: NMSTATE_SUB_CHANNEL
+    default: "stable"
+    documentation: "Subscription channel for kubernetes-nmstate-operator."
+  - name: HYPERSHIFT_NAMESPACE
+    default: "local-cluster"
+    documentation: "Namespace holding the HostedCluster and its NodePools on the management cluster."
+  - name: TUNED_CONFIGMAP_NAME
+    default: "egressip-multinic-forwarding"
+    documentation: |-
+      ConfigMap holding the Tuned object referenced from NodePool.spec.tuningConfig.
+      Must match the value given to hypershift-agent-ovn-egressip-multinic, which creates
+      it; this step re-renders it to cover the VLAN interface as well.
+  documentation: |-
+    Moves a HyperShift Agent guest cluster's EgressIP egress path onto an 802.1Q VLAN,
+    configured day-2 with kubernetes-nmstate. This reproduces the mechanism the customer
+    asked about - a tagged subinterface with its own routing table and a route rule
+    steering that interface's traffic into it - rather than approximating it with nmcli
+    at install time.
+
+    Runs after hypershift-agent-ovn-egressip-multinic and layers on top of what that step
+    left behind. Whether the VLAN is created at install time or afterwards makes no
+    difference to the result: ovnkube-node picks the new subinterface up dynamically and
+    advertises it in k8s.ovn.org/host-cidrs without a restart, which the step verifies.
+
+    The step:
+
+    1. Installs kubernetes-nmstate on the guest cluster, choosing the catalog that
+       actually serves it, and creates the NMState CR so the handler DaemonSet exists.
+    2. Applies one NodeNetworkConfigurationPolicy per node - the addresses are static and
+       differ, and an NNCP applies identical desiredState to everything it matches.
+    3. Splits the routes deliberately. The dedicated table and the route rule are the
+       customer's configuration and OVN-Kubernetes ignores both: for a
+       secondary-host-network EgressIP it builds its own table at <ifindex>+1000 and fills
+       it by copying routes out of the link from MAIN only, filtered on output interface.
+       If nothing gatewayed is copied it synthesises an on-link default with no next hop
+       and every off-subnet destination blackholes. EGRESSIP_REMOTE_SUBNET therefore goes
+       in main, as a specific prefix so it never competes with the default via br-ex.
+    4. Re-renders the Tuned ConfigMap so forwarding and loose rp_filter also apply to the
+       VLAN interface.
+    5. Confirms no default route appeared on the egress path, and that host-cidrs now
+       advertises the VLAN subnet - which is what the hosted control plane's
+       ovnkube-cluster-manager uses to pick an egress node.
+
+    Outputs saved to ${SHARED_DIR}, overwriting the untagged values:
+    - egressip_secondary_iface:    the VLAN interface name
+    - egressip_secondary_subnet:   the CIDR EgressIP objects should draw from
+    - egressip_secondary_vlan_id:  the 802.1Q tag
+    - egressip_secondary_node_ips: "<node> <address>" per line, read from host-cidrs

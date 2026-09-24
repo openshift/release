@@ -18,6 +18,31 @@ ref:
       .1 of the subnet in EXTRA_NETWORK_CONFIG) when testing EgressIP on a secondary
       host interface, so the target is reached over that NIC rather than over br-ex.
       The address must already exist on the dev-scripts host; the step fails if not.
+  - name: IPECHO_VLAN_ID
+    default: ""
+    documentation: |-
+      802.1Q tag. When set, the step creates <bridge>.<tag> on the bridge holding
+      IPECHO_HOST_IP and moves the advertised echo address onto it. Required when the
+      guest nodes egress over a VLAN, because a tagged frame is only delivered to a host
+      netdev carrying the same tag. Must be set together with IPECHO_VLAN_CIDR.
+  - name: IPECHO_VLAN_CIDR
+    default: ""
+    documentation: |-
+      Address and prefix for the VLAN subinterface, e.g. 192.168.222.1/24. It has to be
+      inside the subnet the guest nodes are given on the same VLAN, and it is the address
+      their egress route points at as a next hop.
+  - name: IPECHO_REMOTE_CIDR
+    default: ""
+    documentation: |-
+      Address and prefix for a dummy link carrying a second identity for the same server,
+      e.g. 192.168.223.1/32. Deliberately outside IPECHO_VLAN_CIDR's subnet. When set,
+      this becomes the advertised echo address.
+
+      Use it whenever the point of the job is to prove that a secondary-NIC EgressIP can
+      actually route: an address inside the VLAN subnet is resolved by the connected
+      route, so it is reached even by a node that has no usable next hop out of that
+      interface. The guest side needs a matching gatewayed route in its main routing
+      table for this to be reachable.
   timeout: 10m0s
   grace_period: 5m0s
   documentation: |-
@@ -32,10 +57,29 @@ ref:
     secondary-NIC EgressIP, point it at the extra network's gateway so the traffic is
     forced out of that interface.
 
-    The step opens IPECHO_PORT in the firewalld zone owning the bridge that holds
-    IPECHO_HOST_IP. libvirt places NAT network bridges in the "libvirt" zone, which
-    otherwise permits only DHCP/DNS/SSH/TFTP.
+    The step opens IPECHO_PORT in the firewalld zone owning each interface it uses.
+    libvirt places NAT network bridges in the "libvirt" zone, which otherwise permits
+    only DHCP/DNS/SSH/TFTP.
+
+    Setting IPECHO_VLAN_ID and IPECHO_VLAN_CIDR additionally builds an 802.1Q
+    subinterface on that bridge and advertises its address instead. This is needed when
+    the guest nodes reach the outside world over a VLAN on a secondary NIC: the untagged
+    bridge address is unreachable from a tagged egress path. It relies on the bridge
+    having vlan_filtering=0, which is how libvirt creates NAT network bridges, and the
+    step fails loudly rather than silently blackholing if that is not the case.
+
+    Setting IPECHO_REMOTE_CIDR adds a dummy link holding an address outside the VLAN
+    subnet and advertises that instead, so reaching the echo requires the guest to make
+    a real next-hop decision. That address must be on this host specifically. The last
+    assertion in the EgressIP tests checks that a pod which no longer matches the
+    EgressIP still reaches the echo from its ordinary source address, and in shared
+    gateway mode that traffic bypasses the node's routing tables entirely - OVN's gateway
+    router SNATs it to the node IP and sends it out br-ex to the baremetal gateway, which
+    is this host. Hosting the address anywhere else leaves that path with no route and
+    the assertion times out.
 
     Outputs saved to ${SHARED_DIR}:
-    - ipecho_host_ip: Address of the echo server (IPECHO_HOST_IP)
-    - ipecho_url: Full URL (http://<IPECHO_HOST_IP>:<port>)
+    - ipecho_host_ip: Address of the echo server, most specific of remote/VLAN/bridge
+    - ipecho_url: Full URL (http://<address>:<port>)
+    - ipecho_vlan_id: Written only when tagged, so deprovision can remove the link
+    - ipecho_remote_iface: Written only when a dummy was created, for the same reason

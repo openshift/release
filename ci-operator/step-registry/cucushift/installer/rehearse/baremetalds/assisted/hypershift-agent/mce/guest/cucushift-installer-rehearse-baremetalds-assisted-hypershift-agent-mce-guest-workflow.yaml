@@ -9,6 +9,9 @@ workflow:
       - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-provision
       - ref: cucushift-hypershift-extended-enable-guest
       - ref: hypershift-agent-ovn-egressip-multinic
+      # No-op unless the job sets EGRESSIP_VLAN_ID, so the untagged jobs sharing this
+      # workflow are unaffected.
+      - ref: hypershift-agent-ovn-egressip-multinic-vlan
       - ref: cucushift-installer-reportportal-marker
     post:
       - ref: hypershift-agent-ovn-ipecho-deprovision
@@ -49,5 +52,17 @@ workflow:
     forwarding on the interface, and the interface is stopped from installing a second
     default route. See hypershift-agent-ovn-egressip-multinic for details.
 
+    The cluster is installed with the secondary NIC untagged. A job that wants the
+    customer's 802.1Q topology instead adds it afterwards with kubernetes-nmstate by
+    setting EGRESSIP_VLAN_ID, which switches on
+    hypershift-agent-ovn-egressip-multinic-vlan. Creating the VLAN day-2 rather than at
+    install time changes nothing that the tests observe: ovnkube-node picks the
+    subinterface up dynamically and advertises its subnet in k8s.ovn.org/host-cidrs
+    without a restart.
+
     Jobs that want the echo target reachable over the secondary NIC should also set
-    IPECHO_HOST_IP=192.168.221.1.
+    IPECHO_HOST_IP=192.168.221.1, and add hypershift-agent-ovn-ipecho-provision to their
+    test sequence. For the VLAN topology that step additionally needs IPECHO_VLAN_ID and
+    IPECHO_VLAN_CIDR matching EGRESSIP_VLAN_ID and EGRESSIP_VLAN_GATEWAY, plus
+    IPECHO_REMOTE_CIDR inside EGRESSIP_REMOTE_SUBNET - without an off-subnet echo address
+    the tests pass over the connected route and prove nothing about routing.
