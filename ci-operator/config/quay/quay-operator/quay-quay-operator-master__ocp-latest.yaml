@@ -21,6 +21,10 @@ images:
   - dockerfile_literal: |
       FROM src
       COPY oc /usr/bin/oc
+      RUN mkdir -p /tmp/quay-sts-bin && \
+          GOFLAGS="" GOBIN=/tmp/quay-sts-bin go install github.com/google/go-containerregistry/cmd/crane@v0.20.3 && \
+          GOFLAGS="" GOBIN=/tmp/quay-sts-bin go install github.com/itchyny/gojq/cmd/gojq@v0.12.17 && \
+          ln -s /tmp/quay-sts-bin/gojq /tmp/quay-sts-bin/jq
     from: src
     inputs:
       cli:
@@ -28,6 +32,10 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: src-oc
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/python-311:1
+      RUN pip install --no-cache-dir boto3==1.35.99
+    to: quay-sts-tools
   - dockerfile_literal: |
       FROM quay.io/projectquay/quay:3.16.2
     to: quay-app
@@ -49,6 +57,7 @@ promotion:
       quay-operator-bundle: quay
     excluded_images:
     - quay-app
+    - quay-sts-tools
     - src-oc
     namespace: quay
     tag: latest
@@ -88,6 +97,23 @@ tests:
     test:
     - ref: quay-test-chainsaw
     workflow: ipi-aws
+- always_run: false
+  as: e2e-sts
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    post:
+    - ref: quay-gather
+    - chain: ipi-aws-post-manual-oidc-sts
+    - ref: quay-sts-cleanup
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
+    - ref: quay-sts-provision
+    - ref: quay-sts-install
+    test:
+    - ref: quay-sts-test
 - always_run: false
   as: e2e-upgrade
   optional: true
