@@ -9,9 +9,8 @@ set -euo pipefail
 #   - Egress OpenShift Route name egress-bk (avoid clash with session backend)
 #   - Authorino cluster-trust-bundle + Vault tools-vault (Phase 2 credential injection)
 #   - Authorino/OIDC dataplane-ready soft-wait patch
-#   - Authorino follow-ups: dinosaur /dinosaurs wait, Keycloak 26 UMA _id +
-#     JWT-only decode, MockServer cache settle, gateway/defaults AuthPolicy wait
-#     (test-local, not autouse)
+#   - Authorino follow-ups: dinosaur /dinosaurs wait, Keycloak 26 UMA _id,
+#     MockServer cache settle, gateway AuthPolicy wait (test-local, not autouse)
 #   - dnspython zone queries via kuadrant-coredns (DNSRecord A lookup)
 #   - protobuf==6.32.1 pin (broken s390x upb ≥6.33.0)
 #   - CFSSL ensure (baked in Dockerfile.s390x; fallback download if missing)
@@ -559,20 +558,18 @@ def patch_uma_eval() -> None:
         '"method":"post","headers":{{"Authorization":',
         '"method":"post","raise_error":false,"headers":{{"Authorization":',
     )
-    if "default allow = false" not in text:
-        text = text.replace('default rpt = ""', 'default rpt = ""\ndefault allow = false', 1)
     old = """allow {{
   permissions := object.get(io.jwt.decode(rpt)[1], "authorization", {{ "permissions": [] }}).permissions
 """
-    new = """rpt_claims := io.jwt.decode(rpt)[1] {{ count(split(rpt, ".")) == 3; startswith(rpt, "eyJ") }}
-allow {{
-  # s390x-authorino-fix: uma-allow — Keycloak 26 RPT may be JWE; decode only 3-part JWTs
-  permissions := object.get(rpt_claims, "authorization", {{ "permissions": [] }}).permissions
+    new = """allow {{
+  # s390x-authorino-fix: uma-allow — empty rpt must not jwt.decode (Authorino 500)
+  rpt != ""
+  permissions := object.get(io.jwt.decode(rpt)[1], "authorization", {{ "permissions": [] }}).permissions
 """
     if old not in text:
         print("WARN uma allow block not found")
         return
-    _write(path, text.replace(old, new, 1), "uma JWT-only decode + default allow false")
+    _write(path, text.replace(old, new, 1), "uma raise_error posts + empty rpt guard")
 
 
 def patch_cache() -> None:
@@ -651,34 +648,6 @@ def patch_gateway() -> None:
         print("WARN gateway unauth 401 assert not found")
         return
     _write(path, text.replace(old, new, 1), "gateway AuthPolicy 401 wait")
-
-
-def patch_basic_authorization() -> None:
-    path = Path("testsuite/tests/singlecluster/defaults/test_basic_authorization.py")
-    if not path.exists():
-        print("SKIP basic authorization test missing")
-        return
-    text = path.read_text()
-    if f"{MARKER}: basic-authz" in text:
-        print("SKIP basic authorization already patched")
-        return
-    old = """    assert client.get("/get").status_code == 401
-    assert client.get("/get", auth=auth).status_code == 200  # assert that AuthPolicy is enforced
-"""
-    new = """    import time
-    deadline = time.time() + 60
-    unauth = client.get("/get")
-    # s390x-authorino-fix: basic-authz — gateway-attached defaults fail-open until wasm catches up
-    while unauth.status_code != 401 and time.time() < deadline:
-        time.sleep(1)
-        unauth = client.get("/get")
-    assert unauth.status_code == 401
-    assert client.get("/get", auth=auth).status_code == 200  # assert that AuthPolicy is enforced
-"""
-    if old not in text:
-        print("WARN basic authorization unauth 401 assert not found")
-        return
-    _write(path, text.replace(old, new, 1), "defaults basic authorization 401 wait")
 
 
 def patch_section_route_auth() -> None:
@@ -961,7 +930,6 @@ if __name__ == "__main__":
     patch_uma_eval()
     patch_cache()
     patch_gateway()
-    patch_basic_authorization()
     patch_section_route_auth()
     patch_authpolicy_retarget()
     patch_identical_hostnames()
