@@ -2,17 +2,10 @@
 
 set -euo pipefail
 
-readonly RELEASE_CONTROLLER_API="${RELEASE_CONTROLLER_API:-https://amd64.ocp.releases.ci.openshift.org}"
-readonly RELEASE_CONTROLLER_RETRIES="${RELEASE_CONTROLLER_RETRIES:-3}"
-readonly RELEASE_CONTROLLER_RETRY_DELAY_SECONDS="${RELEASE_CONTROLLER_RETRY_DELAY_SECONDS:-2}"
-readonly RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS="${RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS:-30}"
-readonly RELEASE_CONTROLLER_MAX_RESPONSE_BYTES="${RELEASE_CONTROLLER_MAX_RESPONSE_BYTES:-10485760}"
 readonly RELEASE_PAYLOAD_AUTH_FILE="${RELEASE_PAYLOAD_AUTH_FILE:-/etc/pull-secret/.dockerconfigjson}"
 readonly RHCOS_AWS_REGION="${RHCOS_AWS_REGION:-us-east-1}"
-readonly CURL_BIN="${CURL_BIN:-curl}"
 readonly PYTHON_BIN="${PYTHON_BIN:-python3}"
 readonly OC_BIN="${OC_BIN:-oc}"
-readonly SLEEP_BIN="${SLEEP_BIN:-sleep}"
 readonly SHARED_DIR="${SHARED_DIR:-/tmp}"
 readonly ARTIFACT_DIR="${ARTIFACT_DIR:-${SHARED_DIR}}"
 
@@ -43,31 +36,15 @@ write_value() {
   printf '%s\n' "${value}" > "${destination}"
 }
 
-set_wait_state() {
-  local reason="$1"
-
-  write_value "wait:${reason}" "${STATE_FILE}"
-  log "No action: ${reason}"
-}
-
 validate_settings() {
-  [[ -n "${TARGET_OCP_Y_STREAM:-}" ]] || fail "TARGET_OCP_Y_STREAM is required"
-  [[ "${TARGET_OCP_Y_STREAM}" =~ ^[0-9]+\.[0-9]+$ ]] || fail "TARGET_OCP_Y_STREAM must have major.minor form"
-  [[ "${RELEASE_CONTROLLER_API}" == https://* ]] || fail "RELEASE_CONTROLLER_API must use https://"
-  [[ "${RELEASE_CONTROLLER_API}" != *'@'* ]] || fail "RELEASE_CONTROLLER_API must not contain userinfo"
-  [[ "${RELEASE_CONTROLLER_API}" != *'?'* && "${RELEASE_CONTROLLER_API}" != *'#'* ]] \
-    || fail "RELEASE_CONTROLLER_API must not contain a query or fragment"
-  [[ "${RELEASE_CONTROLLER_RETRIES}" =~ ^[1-9][0-9]*$ ]] || fail "RELEASE_CONTROLLER_RETRIES must be a positive integer"
-  [[ "${RELEASE_CONTROLLER_RETRY_DELAY_SECONDS}" =~ ^[0-9]+$ ]] || fail "RELEASE_CONTROLLER_RETRY_DELAY_SECONDS must be a non-negative integer"
-  [[ "${RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS}" =~ ^[1-9][0-9]*$ ]] || fail "RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS must be a positive integer"
-  [[ "${RELEASE_CONTROLLER_MAX_RESPONSE_BYTES}" =~ ^[1-9][0-9]*$ ]] || fail "RELEASE_CONTROLLER_MAX_RESPONSE_BYTES must be a positive integer"
-  (( RELEASE_CONTROLLER_RETRY_DELAY_SECONDS <= RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS )) \
-    || fail "RELEASE_CONTROLLER_RETRY_DELAY_SECONDS must not exceed RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS"
+  [[ -n "${RELEASE_IMAGE_LATEST:-}" ]] || fail "RELEASE_IMAGE_LATEST is required"
+  [[ "${RELEASE_IMAGE_LATEST}" != *[[:space:]]* ]] || fail "RELEASE_IMAGE_LATEST must not contain whitespace"
+  [[ -s "${RELEASE_PAYLOAD_AUTH_FILE}" ]] \
+    || fail "release payload auth file is missing or empty: ${RELEASE_PAYLOAD_AUTH_FILE}"
 
   mkdir -p "${SHARED_DIR}" "${ARTIFACT_DIR}"
-  require_command "${CURL_BIN}"
+  require_command "${OC_BIN}"
   require_command "${PYTHON_BIN}"
-  require_command "${SLEEP_BIN}"
 }
 
 json_tool() {
@@ -100,185 +77,16 @@ action = sys.argv[1]
 input_path = sys.argv[2]
 data = load_json(input_path)
 
-if action == "validate-config":
-    expected_stream = sys.argv[3]
-    if not isinstance(data, dict) or data.get("name") != expected_stream:
-        sys.exit(2)
-elif action == "select-ready-payload":
-    expected_stream = sys.argv[3]
-    output_path = sys.argv[4]
-    if not isinstance(data, dict):
-        sys.exit(2)
-    ready_tags = data.get(expected_stream, [])
-    if ready_tags is None:
-        ready_tags = []
-    if not isinstance(ready_tags, list):
-        sys.exit(2)
-    for tag_name in ready_tags:
-        if (
-            not isinstance(tag_name, str)
-            or not tag_name
-            or not tag_name.startswith(expected_stream + "-")
-        ):
-            sys.exit(2)
-    if not ready_tags:
-        sys.exit(3)
-    selected = sorted(ready_tags)[0]
-    try:
-        with open(output_path, "w", encoding="utf-8") as destination:
-            destination.write(selected + "\n")
-    except OSError as error:
-        print("cannot write {}: {}".format(output_path, error), file=sys.stderr)
-        sys.exit(2)
-elif action == "resolve-payload":
-    expected_stream = sys.argv[3]
-    expected_tag = sys.argv[4]
-    output_path = sys.argv[5]
-    if not isinstance(data, dict) or data.get("name") != expected_stream:
-        sys.exit(2)
-    tags = data.get("tags", [])
-    if tags is None:
-        tags = []
-    if not isinstance(tags, list):
-        sys.exit(2)
-    matches = []
-    for tag in tags:
-        if not isinstance(tag, dict):
-            sys.exit(2)
-        if tag.get("name") == expected_tag:
-            matches.append(tag)
-    if len(matches) != 1:
-        sys.exit(2)
-    selected = matches[0]
-    if selected.get("phase") not in ("Ready", "Accepted", "Rejected"):
-        sys.exit(2)
-    if not isinstance(selected.get("pullSpec"), str) or not selected["pullSpec"]:
-        sys.exit(2)
-    try:
-        with open(output_path, "w", encoding="utf-8") as destination:
-            json.dump(selected, destination, sort_keys=True)
-            destination.write("\n")
-    except OSError as error:
-        print("cannot write {}: {}".format(output_path, error), file=sys.stderr)
-        sys.exit(2)
-elif action == "payload-field":
-    field = sys.argv[3]
-    if not isinstance(data, dict):
-        sys.exit(2)
-    value = data.get(field)
-    if not isinstance(value, str) or not value:
-        sys.exit(2)
-    if field == "phase" and value not in ("Ready", "Accepted", "Rejected"):
-        sys.exit(2)
-    print(value)
+if action == "release-version":
+    nested_string(data, ("metadata", "version"))
 elif action == "rhcos-version":
     nested_string(data, ("architectures", "x86_64", "artifacts", "metal", "release"))
 elif action == "rhcos-ami":
-    region = sys.argv[3]
-    nested_string(data, ("architectures", "x86_64", "images", "aws", "regions", region, "image"))
+    nested_string(data, ("architectures", "x86_64", "images", "aws", "regions", sys.argv[3], "image"))
 else:
     print("unknown JSON action: {}".format(action), file=sys.stderr)
     sys.exit(2)
 PYTHON
-}
-
-http_get() {
-  local url="$1"
-  local destination="$2"
-  local request_name="$3"
-  local attempt=1
-  local curl_rc=0
-  local http_code=""
-  local response_size=0
-  local retry_delay="${RELEASE_CONTROLLER_RETRY_DELAY_SECONDS}"
-
-  while (( attempt <= RELEASE_CONTROLLER_RETRIES )); do
-    if http_code=$("${CURL_BIN}" \
-      --silent \
-      --proto '=https' \
-      --proto-redir '=https' \
-      --location \
-      --connect-timeout 10 \
-      --max-time 30 \
-      --max-filesize "${RELEASE_CONTROLLER_MAX_RESPONSE_BYTES}" \
-      --output "${destination}" \
-      --write-out '%{http_code}' \
-      "${url}"); then
-      curl_rc=0
-    else
-      curl_rc=$?
-    fi
-
-    if (( curl_rc == 0 )) && [[ -f "${destination}" ]]; then
-      response_size=$(wc -c < "${destination}")
-      if (( response_size > RELEASE_CONTROLLER_MAX_RESPONSE_BYTES )); then
-        curl_rc=63
-        http_code=""
-        : > "${destination}"
-      fi
-    fi
-
-    if (( curl_rc == 0 )) && [[ "${http_code}" =~ ^[0-9]{3}$ ]]; then
-      case "${http_code}" in
-        429|5??)
-          ;;
-        *)
-          HTTP_CODE="${http_code}"
-          return 0
-          ;;
-      esac
-    fi
-
-    if (( attempt == RELEASE_CONTROLLER_RETRIES )); then
-      fail "${request_name} request failed after ${RELEASE_CONTROLLER_RETRIES} attempts (curl_rc=${curl_rc}, http_code=${http_code:-none})"
-    fi
-
-    log "${request_name} request failed (attempt ${attempt}/${RELEASE_CONTROLLER_RETRIES}); retrying"
-    if (( retry_delay > 0 )); then
-      "${SLEEP_BIN}" "${retry_delay}"
-      retry_delay=$((retry_delay * 2))
-      if (( retry_delay > RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS )); then
-        retry_delay="${RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS}"
-      fi
-    fi
-    attempt=$((attempt + 1))
-  done
-}
-
-validate_stream_config() {
-  local stream="$1"
-  local config_file="$2"
-
-  json_tool validate-config "${config_file}" "${stream}" \
-    || fail "release-controller returned an invalid or mismatched stream config"
-}
-
-select_ready_payload() {
-  local stream="$1"
-  local ready_file="$2"
-  local selected_tag_file="$3"
-  local json_rc=0
-
-  if json_tool select-ready-payload "${ready_file}" "${stream}" "${selected_tag_file}"; then
-    return 0
-  else
-    json_rc=$?
-  fi
-
-  if (( json_rc == 3 )); then
-    return 1
-  fi
-  fail "release-controller returned an invalid ready streams response"
-}
-
-resolve_payload() {
-  local stream="$1"
-  local payload_tag="$2"
-  local tags_file="$3"
-  local selected_file="$4"
-
-  json_tool resolve-payload "${tags_file}" "${stream}" "${payload_tag}" "${selected_file}" \
-    || fail "release-controller tags response did not resolve the selected ready payload"
 }
 
 extract_rhcos_metadata() {
@@ -290,9 +98,6 @@ extract_rhcos_metadata() {
   if [[ -n "${ROSA_MARKETPLACE_INSTALLER_BIN:-}" ]]; then
     installer_bin="${ROSA_MARKETPLACE_INSTALLER_BIN}"
   else
-    require_command "${OC_BIN}"
-    [[ -s "${RELEASE_PAYLOAD_AUTH_FILE}" ]] || fail "release payload auth file is missing or empty: ${RELEASE_PAYLOAD_AUTH_FILE}"
-
     installer_dir=$(mktemp -d "${SHARED_DIR}/rosa-marketplace-installer.XXXXXX")
     "${OC_BIN}" adm release extract \
       -a "${RELEASE_PAYLOAD_AUTH_FILE}" \
@@ -307,78 +112,28 @@ extract_rhcos_metadata() {
 }
 
 main() {
-  local stream
-  local config_file="${ARTIFACT_DIR}/rosa-marketplace-release-config.json"
-  local ready_file="${ARTIFACT_DIR}/rosa-marketplace-ready-streams.json"
-  local selected_tag_file="${ARTIFACT_DIR}/rosa-marketplace-selected-ready-tag"
-  local tags_file="${ARTIFACT_DIR}/rosa-marketplace-release-tags.json"
-  local selected_file="${ARTIFACT_DIR}/rosa-marketplace-selected-payload.json"
+  local release_info_file="${ARTIFACT_DIR}/rosa-marketplace-release-info.json"
   local coreos_stream_file="${ARTIFACT_DIR}/rosa-marketplace-coreos-stream.json"
-  local payload_tag
-  local payload_pullspec
-  local payload_phase
+  local payload_version
+  local ocp_y_stream
   local rhcos_version
   local rhcos_ami
 
   validate_settings
-  stream="${TARGET_OCP_Y_STREAM}.0-0.nightly"
-  write_value "${TARGET_OCP_Y_STREAM}" "${OCP_VERSION_FILE}"
-  log "Checking release stream ${stream}"
 
-  http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestream/${stream}/config" "${config_file}" "stream-config"
-  case "${HTTP_CODE}" in
-    200)
-      validate_stream_config "${stream}" "${config_file}"
-      ;;
-    400|404)
-      set_wait_state "stream-config-unavailable"
-      return 0
-      ;;
-    *)
-      fail "stream config returned unexpected HTTP ${HTTP_CODE}"
-      ;;
-  esac
+  "${OC_BIN}" adm release info \
+    -a "${RELEASE_PAYLOAD_AUTH_FILE}" \
+    -o json \
+    "${RELEASE_IMAGE_LATEST}" > "${release_info_file}"
 
-  http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestreams/ready" "${ready_file}" "ready-streams"
-  case "${HTTP_CODE}" in
-    200)
-      ;;
-    *)
-      fail "ready streams returned unexpected HTTP ${HTTP_CODE}"
-      ;;
-  esac
+  payload_version=$(json_tool release-version "${release_info_file}") \
+    || fail "release payload metadata does not contain a version"
+  [[ "${payload_version}" =~ ^([0-9]+\.[0-9]+)\.[0-9]+([-+.][A-Za-z0-9._+-]+)?$ ]] \
+    || fail "release payload version has an invalid format"
+  ocp_y_stream="${BASH_REMATCH[1]}"
 
-  if ! select_ready_payload "${stream}" "${ready_file}" "${selected_tag_file}"; then
-    set_wait_state "built-nightly-unavailable"
-    return 0
-  fi
-
-  payload_tag=$(<"${selected_tag_file}")
-
-  http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestream/${stream}/tags" "${tags_file}" "stream-tags"
-  case "${HTTP_CODE}" in
-    200)
-      ;;
-    404)
-      set_wait_state "stream-tags-unavailable"
-      return 0
-      ;;
-    *)
-      fail "stream tags returned unexpected HTTP ${HTTP_CODE}"
-      ;;
-  esac
-
-  resolve_payload "${stream}" "${payload_tag}" "${tags_file}" "${selected_file}"
-
-  payload_tag=$(json_tool payload-field "${selected_file}" name) \
-    || fail "selected payload has no name"
-  payload_pullspec=$(json_tool payload-field "${selected_file}" pullSpec) \
-    || fail "selected payload has no pullSpec"
-  payload_phase=$(json_tool payload-field "${selected_file}" phase) \
-    || fail "selected payload has an ineligible phase"
-
-  log "Selected first built payload ${payload_tag} (phase=${payload_phase})"
-  extract_rhcos_metadata "${payload_pullspec}" "${coreos_stream_file}"
+  log "Processing release-controller payload version=${payload_version}"
+  extract_rhcos_metadata "${RELEASE_IMAGE_LATEST}" "${coreos_stream_file}"
 
   rhcos_version=$(json_tool rhcos-version "${coreos_stream_file}") \
     || fail "RHCOS version is missing from installer stream metadata"
@@ -388,13 +143,14 @@ main() {
   [[ "${rhcos_version}" =~ ^[A-Za-z0-9._-]+$ ]] || fail "RHCOS version contains unexpected characters"
   [[ "${rhcos_ami}" =~ ^ami-[0-9a-f]+$ ]] || fail "RHCOS AMI has an invalid format: ${rhcos_ami}"
 
-  write_value "${payload_tag}" "${PAYLOAD_TAG_FILE}"
-  write_value "${payload_pullspec}" "${PAYLOAD_PULLSPEC_FILE}"
+  write_value "${ocp_y_stream}" "${OCP_VERSION_FILE}"
+  write_value "${payload_version}" "${PAYLOAD_TAG_FILE}"
+  write_value "${RELEASE_IMAGE_LATEST}" "${PAYLOAD_PULLSPEC_FILE}"
   write_value "${rhcos_version}" "${RHCOS_VERSION_FILE}"
   write_value "${rhcos_ami}" "${RHCOS_AMI_FILE}"
   write_value "ready" "${STATE_FILE}"
 
-  log "Ready: ocp_version=${TARGET_OCP_Y_STREAM} payload=${payload_tag} rhcos_version=${rhcos_version} aws_region=${RHCOS_AWS_REGION} ami=${rhcos_ami}"
+  log "Ready: ocp_version=${ocp_y_stream} payload=${payload_version} rhcos_version=${rhcos_version} aws_region=${RHCOS_AWS_REGION} ami=${rhcos_ami}"
 }
 
 main "$@"

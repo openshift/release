@@ -1,103 +1,41 @@
-# ROSA Marketplace Release Monitor: Usage and Typical Cases
+# ROSA Marketplace Release: Usage and Covered Cases
 
 ## Current operating mode
 
-The monitor runs every four hours for the configured OpenShift y-stream. It
-detects a built nightly payload and validates its RHCOS metadata. Marketplace
-publishing is currently disabled, so a successful run observes and records data
-without invoking a generator.
+Release-controller invokes `rosa-marketplace-release` for a concrete OpenShift
+payload and supplies that payload through `RELEASE_IMAGE_LATEST`. The detector
+derives the OCP y-stream and RHCOS metadata from the payload. Marketplace
+publishing is disabled, so the publisher currently exits successfully without
+looking for or invoking the generator.
 
 Do not enable publishing merely by changing `MARKETPLACE_PUBLISH_ENABLED`. The
-current job has neither an approved Marketplace generator image nor mounted
-Marketplace AWS credentials. See the enablement checklist below.
+job still needs an approved generator image and mounted staging credentials.
 
-## Normal scheduled usage
+## Runtime flow
 
-The source configuration is:
+```text
+release-controller payload
+  -> optional rosa-marketplace-release ProwJob
+  -> inspect RELEASE_IMAGE_LATEST
+  -> derive OCP y-stream
+  -> extract installer and RHCOS metadata
+  -> disabled publisher no-op
+```
+
+The job registration is maintained in two versioned inputs:
 
 ```text
 ci-operator/config/openshift/release/
-  openshift-release-main__rosa-marketplace-release.yaml
+  openshift-release-main__nightly-5.1.yaml
+
+core-services/release-controller/_releases/
+  release-ocp-5.1.json
 ```
 
-Its important settings are:
-
-```yaml
-tests:
-- as: rosa-marketplace-release-detect
-  interval: 4h
-  steps:
-    env:
-      MARKETPLACE_PUBLISH_ENABLED: "false"
-      TARGET_OCP_Y_STREAM: "5.2"
-    test:
-    - ref: rosa-marketplace-release-detect
-    - ref: rosa-marketplace-release-publish
-```
-
-The steps share `SHARED_DIR`, so the publisher reads the detector's state and
-validated values automatically.
-
-## Changing the monitored release
-
-To move the monitor from 5.2 to 5.3:
-
-1. Change `TARGET_OCP_Y_STREAM` in the source CI configuration.
-2. Update the corresponding assertion in
-   `hack/rosa-marketplace-release-monitor-tests.sh`.
-3. Regenerate the Prow jobs.
-4. Run the full fixture suite and configuration validators.
-5. Rehearse the periodic on the pull request.
-
-Example source change:
-
-```yaml
-TARGET_OCP_Y_STREAM: "5.3"
-```
-
-No detector branch, version-specific parser, or new fixture set is required when
-the upstream contracts remain unchanged.
-
-## Inspecting the upstream API manually
-
-Set the stream explicitly:
-
-```bash
-BASE_URL="https://amd64.ocp.releases.ci.openshift.org/api/v1"
-Y_STREAM="5.1"
-STREAM="${Y_STREAM}.0-0.nightly"
-```
-
-Confirm the stream configuration:
-
-```bash
-curl --fail --silent --show-error \
-  --proto '=https' --proto-redir '=https' \
-  "${BASE_URL}/releasestream/${STREAM}/config" |
-  jq '{name, hide, endOfLife, to}'
-```
-
-Inspect the ready-stream signal used by the detector:
-
-```bash
-curl --fail --silent --show-error \
-  --proto '=https' --proto-redir '=https' \
-  "${BASE_URL}/releasestreams/ready" |
-  jq --arg stream "${STREAM}" '{($stream): .[$stream]}'
-```
-
-Resolve a selected ready tag to its pullspec:
-
-```bash
-curl --fail --silent --show-error \
-  --proto '=https' --proto-redir '=https' \
-  "${BASE_URL}/releasestream/${STREAM}/tags" |
-  jq --arg tag "<selected-ready-tag>" \
-    '{name, tags: [.tags[] | select(.name == $tag) | {name, phase, pullSpec}]}'
-```
-
-These commands are diagnostic only. The values change as upstream payloads are
-created and processed.
+The standard OCP pre-branch automation carries these entries forward when a
+new y-stream is created. There is no fixed `TARGET_OCP_Y_STREAM` in the job or
+script. Review the automated pre-branch change to confirm both entries were
+copied; do not add a runtime version switch.
 
 ## Running local validation
 
@@ -107,24 +45,25 @@ Run the deterministic suite:
 bash hack/rosa-marketplace-release-monitor-tests.sh
 ```
 
-The suite covers:
+The suite does not need a cluster, network, registry, or AWS credentials. It
+uses fake `oc`, installer, and generator commands.
 
-| Area | Coverage |
+Covered cases:
+
+| Area | Cases |
 |---|---|
-| `release-controller-api` | Settings, HTTPS, response validation, HTTP behavior, retries and size limits |
-| `payload-selection` | Empty and malformed ready responses, deterministic ready-tag selection, exact tag resolution, and phase-transition races |
-| `rhcos-extraction` | Installer extraction, RHCOS release and regional AMI handling |
-| `prow-contract` | Step references, source CI configuration and generated Prow wiring |
-| `publisher` | State handoff, safety gates, generator arguments and exit propagation |
+| Payload input | Exact payload is recorded; missing or whitespace-containing input fails |
+| Version derivation | Full nightly version produces the correct y-stream; missing, malformed, or invalid versions fail |
+| Payload inspection | `oc adm release info` failure propagates |
+| RHCOS extraction | Version and regional AMI succeed; missing fields and installer failure propagate |
+| Publisher disabled | Ready input exits successfully without generator discovery |
+| Publisher safety | Legacy/non-ready state and production environment fail |
+| Idempotency | Generator receives `--skip-if-version-exists` and duplicate AMI copying remains disabled |
+| Dry run | Dry run is default; explicit non-dry-run arguments are covered |
+| Failure propagation | Generator failure fails the step |
+| CI contract | Versioned nightly job and optional release-controller registration reference the same ProwJob |
 
-The fixture tests do not require a cluster, network access, AWS credentials, or
-a real release payload. They use fake curl, sleep, installer, and generator
-commands.
-
-## Regenerating and validating repository configuration
-
-After changing source CI or step-registry configuration, run the applicable
-repository generators and validators:
+After configuration changes, run the repository checks:
 
 ```bash
 make registry-metadata
@@ -135,50 +74,43 @@ make checkconfig
 git diff --check
 ```
 
-Container-backed targets require a working local container runtime. If they
-cannot run locally, report that limitation and rely on the repository presubmit
-and Prow rehearsal for the equivalent validation.
+Container-backed targets require a working local container runtime. Report any
+environmental limitation instead of treating it as a successful validation.
 
-Generated files under `ci-operator/jobs/openshift/release/` must match their
-source configuration. Do not place detailed behavior directly in generated job
-files.
+## Prow rehearsal
 
-## Rehearsing the CI jobs
-
-Run the deterministic presubmit and live periodic from the pull request:
+On the pull request, comment:
 
 ```text
-/pj-rehearse pull-ci-openshift-release-main-rosa-marketplace-release-monitor-test periodic-ci-openshift-release-main-rosa-marketplace-release-rosa-marketplace-release-detect
+/pj-rehearse periodic-ci-openshift-release-main-nightly-5.1-rosa-marketplace-release
 ```
 
-Run only the live periodic when debugging detector integration:
+The rehearsal should start:
 
 ```text
-/pj-rehearse periodic-ci-openshift-release-main-rosa-marketplace-release-rosa-marketplace-release-detect
+periodic-ci-openshift-release-main-nightly-5.1-rosa-marketplace-release
 ```
 
-A successful live rehearsal should show the detector and publisher steps both
-succeeding. With publishing disabled, publisher success means a safe no-op, not
-a Marketplace release.
+Expected behavior:
 
-## Reading detector results
+1. ci-operator resolves the current 5.1 nightly candidate.
+2. `RELEASE_IMAGE_LATEST` is available to the detector.
+3. The detector inspects that payload and extracts its installer.
+4. RHCOS version and the `us-east-1` AMI are validated.
+5. The publisher logs a disabled no-op and exits successfully.
 
-Start with:
+Publishing remains disabled during rehearsal, so the job does not need AWS
+Marketplace credentials and cannot change Marketplace state.
+
+## Reading results
+
+The primary detector state is:
 
 ```text
 ${SHARED_DIR}/rosa-marketplace-release-state
 ```
 
-Interpret it as follows:
-
-| Value | Operator interpretation | Action |
-|---|---|---|
-| `ready` | A built payload and required RHCOS metadata were found | Inspect output values and publisher result |
-| `wait:stream-config-unavailable` | The configured future stream does not exist | No action unless the stream should already exist |
-| `wait:stream-tags-unavailable` | The stream exists but tags are not available | Wait; investigate if persistent |
-| `wait:built-nightly-unavailable` | The ready response contains no tag for the target stream | Normal lifecycle wait |
-
-For `ready`, inspect:
+Its only successful value is `ready`. Inspect these associated files:
 
 ```text
 rosa-marketplace-ocp-version
@@ -188,74 +120,43 @@ rosa-marketplace-rhcos-version
 rosa-marketplace-rhcos-ami
 ```
 
-Downloaded config, ready-streams, and tags responses and the CoreOS stream
-document are retained in `ARTIFACT_DIR` for troubleshooting.
+The release-info and CoreOS stream JSON documents are retained in
+`ARTIFACT_DIR`. Never include pull-secret or AWS credential contents in a bug
+report.
 
 ## Typical cases
 
-### Case 1: Monitoring a future release before its nightly stream exists
+### New payload for an enabled y-stream
 
-Configuration:
+Release-controller starts the optional job with the exact payload. The detector
+derives the y-stream without calling release-controller APIs. With publication
+disabled, the job validates inputs and safely stops.
 
-```yaml
-TARGET_OCP_Y_STREAM: "5.2"
-MARKETPLACE_PUBLISH_ENABLED: "false"
-```
+### Later payload for the same y-stream
 
-Expected result:
+The same job runs with a different immutable payload. When publication is
+eventually enabled, `--skip-if-version-exists` tells the generator to return
+success if that OCP y-stream already exists in Marketplace.
 
-```text
-wait:stream-config-unavailable
-```
+### New OCP y-stream
 
-The job succeeds and the publisher skips. This is an expected lifecycle state.
+The OCP pre-branch automation creates the next versioned nightly and
+release-controller configurations. Confirm that `rosa-marketplace-release` is
+present in both generated files. No detector, fixture, or environment-variable
+change is needed.
 
-### Case 2: Stream exists but no payload has been built
+### Y-stream not enabled for this ROSA workflow
 
-The config request succeeds, but the target stream is absent from the ready
-response or its ready-tag list is empty.
+Do not register `rosa-marketplace-release` in that stream's release-controller
+definition. The release-controller configuration is the policy boundary; the
+runtime script does not guess ROSA support from version numbers.
 
-Expected result:
+### Missing or malformed payload metadata
 
-```text
-wait:built-nightly-unavailable
-```
+The detector fails. A release-controller invocation always represents a
+concrete payload, so there is no normal `wait:*` lifecycle state.
 
-The next four-hour run checks again.
-
-### Case 3: More than one built payload is present
-
-If the target stream has multiple tags in the ready response, the detector
-sorts their names and selects the earliest one. It then resolves only that tag
-in the stream tags response. This provides a stable choice independent of
-response order.
-
-Expected outputs include `ready`, the selected tag and pullspec, and the RHCOS
-version and regional AMI extracted from that payload.
-
-### Case 4: A ready payload changes phase during resolution
-
-The ready endpoint and tags endpoint are separate requests. A selected payload
-may move from `Ready` to `Accepted` or `Rejected` between them. The detector
-accepts either transition because the ready response already established that
-the payload image was built. It does not claim that a rejected payload is an
-accepted OpenShift release or independently authorize Marketplace publication.
-
-### Case 5: Upstream returns malformed or mismatched data
-
-Examples include invalid JSON, a response naming another stream, a selected
-payload without a pullspec, or invalid RHCOS fields.
-
-Expected result: the detector fails. These are contract or integrity errors, not
-normal lifecycle waits.
-
-### Case 6: Transient release-controller failure
-
-HTTP 429, HTTP 5xx, or curl failure is retried with exponential backoff up to
-the configured attempt count and delay ceiling. The detector continues when a
-later attempt succeeds and fails when all attempts are exhausted.
-
-### Case 7: Detector is ready but publishing remains disabled
+### Publishing remains disabled
 
 Expected publisher log:
 
@@ -263,25 +164,11 @@ Expected publisher log:
 No action: publishing is disabled for ocp_version=<major.minor>
 ```
 
-The publisher exits successfully without looking for or invoking the generator.
-This is the expected production behavior of the initial monitor.
+The generator executable is not discovered or invoked.
 
-### Case 8: Production Marketplace is configured
+### Enabled staging dry run
 
-Expected result: the publisher fails with `only the staging Marketplace
-environment is allowed`. Production is intentionally unsupported.
-
-### Case 9: Enabled staging dry-run after prerequisites are supplied
-
-Only after the enablement checklist is complete, set:
-
-```yaml
-MARKETPLACE_PUBLISH_ENABLED: "true"
-MARKETPLACE_DRY_RUN: "true"
-MARKETPLACE_ENVIRONMENT: staging
-```
-
-The publisher validates detector values and invokes:
+After every enablement prerequisite is satisfied, the publisher invokes:
 
 ```text
 marketplace-release-generator release
@@ -290,54 +177,38 @@ marketplace-release-generator release
   --rhcos-version <rhcos-release>
   --aws-profile <profile>
   --copy-if-duplicate=false
+  --skip-if-version-exists
   --timeout <duration>
   --dry-run
 ```
 
-Any generator failure propagates as a failed step.
-
-## Publishing enablement checklist
-
-Before setting `MARKETPLACE_PUBLISH_ENABLED=true` in a real CI job:
-
-- Replace the publisher's generic CLI runtime with an approved immutable digest
-  or protected image-stream tag containing the generator.
-- Mount the reviewed staging AWS credentials.
-- Verify the AWS profile name and least-privilege permissions.
-- Keep `MARKETPLACE_ENVIRONMENT=staging`.
-- Run and review a dry-run rehearsal.
-- Agree on duplicate handling, rollback, alerting, and operational ownership.
-- Obtain required ROSA, Technical Release Team, and DPTP reviews for the files
-  changed by the enablement work.
+Production is intentionally rejected.
 
 ## Fixture maintenance
 
-Fixtures are maintained per consumed contract, not per OpenShift release.
+Fixtures model the payload, installer, and publisher contracts. They are not
+snapshots for individual OCP releases. Update them only when a consumed schema
+changes, behavior changes, or a production defect needs a regression test. A
+new y-stream alone does not require fixture changes.
 
-Do not refresh them simply because the target changes from 5.2 to 5.3. Update or
-add fixtures only when:
-
-- The fields consumed from release-controller or installer output change.
-- The eligible payload policy changes.
-- A defect needs a deterministic regression case.
-
-Keep fixtures minimal. Do not replace them with responses downloaded from a
-moving upstream branch during presubmit execution. The existing four-hour
-periodic is responsible for detecting live upstream integration drift.
-
-## Troubleshooting guide
+## Troubleshooting
 
 | Symptom | Check first |
 |---|---|
-| `stream-config-unavailable` persists | Confirm the exact `<major>.<minor>.0-0.nightly` stream exists |
-| `stream-tags-unavailable` persists | Query the stream's `/tags` endpoint and inspect HTTP status |
-| `built-nightly-unavailable` persists | Inspect the target stream's array in `/api/v1/releasestreams/ready` |
-| Payload extraction fails | Verify pull-secret mount, pullspec access, and `oc` availability |
-| RHCOS version or AMI missing | Run the selected payload's installer with `coreos print-stream-json` |
-| Publisher reports missing output | Confirm the detector reached `ready` and both steps share `SHARED_DIR` |
-| Generator not found | Publishing was enabled without the approved generator image |
-| Prow cannot pull `stable:cli-artifacts` | Do not add `cli: latest` unless the job configures the corresponding release input |
+| `RELEASE_IMAGE_LATEST is required` | Confirm ci-operator release input or release-controller invocation |
+| Payload version is invalid | Inspect `rosa-marketplace-release-info.json` metadata version |
+| Payload inspection/extraction fails | Verify pull-secret mount, registry access, and `oc` availability |
+| RHCOS version or AMI missing | Run the payload's installer with `coreos print-stream-json` |
+| Publisher reports missing output | Confirm detector completed with `ready` and both steps share `SHARED_DIR` |
+| Generator not found | Publishing was enabled without an approved generator image |
+| Duplicate y-stream is attempted | Confirm the generator supports and receives `--skip-if-version-exists` |
 
-When reporting a failure, include the detector state, relevant step log, selected
-payload tag, and uploaded artifacts. Never include registry authentication or
-AWS credential contents.
+## Publishing enablement checklist
+
+- Use an approved immutable or protected image containing the generator.
+- Mount reviewed staging AWS credentials with least privilege.
+- Verify the AWS profile and Marketplace product configuration.
+- Keep `MARKETPLACE_ENVIRONMENT=staging`.
+- Run and review a dry-run rehearsal.
+- Agree on duplicate handling, rollback, alerting, and operational ownership.
+- Obtain ROSA, Technical Release Team, and DPTP reviews for their owned areas.

@@ -6,6 +6,8 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
 readonly DETECTOR="${REPO_ROOT}/ci-operator/step-registry/rosa/marketplace/release/detect/rosa-marketplace-release-detect-commands.sh"
 readonly PUBLISHER="${REPO_ROOT}/ci-operator/step-registry/rosa/marketplace/release/publish/rosa-marketplace-release-publish-commands.sh"
+readonly NIGHTLY_CONFIG="${REPO_ROOT}/ci-operator/config/openshift/release/openshift-release-main__nightly-5.1.yaml"
+readonly RELEASE_CONFIG="${REPO_ROOT}/core-services/release-controller/_releases/release-ocp-5.1.json"
 readonly TEST_ROOT="${REPO_ROOT}/hack/rosa-marketplace-release-monitor"
 readonly FIXTURES="${TEST_ROOT}/fixtures"
 
@@ -26,328 +28,145 @@ assert_file_value() {
 
 run_detector() {
   local output_dir="$1"
+  local auth_file="${output_dir}/pull-secret"
 
-  TARGET_OCP_Y_STREAM=5.2 \
-  RELEASE_CONTROLLER_API="${TEST_RELEASE_CONTROLLER_API:-https://release-controller.test}" \
-  RELEASE_CONTROLLER_RETRIES="${TEST_RELEASE_CONTROLLER_RETRIES:-1}" \
-  RELEASE_CONTROLLER_RETRY_DELAY_SECONDS="${TEST_RELEASE_CONTROLLER_RETRY_DELAY_SECONDS:-0}" \
-  RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS="${TEST_RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS:-30}" \
-  RELEASE_CONTROLLER_MAX_RESPONSE_BYTES="${TEST_RELEASE_CONTROLLER_MAX_RESPONSE_BYTES:-10485760}" \
+  mkdir -p "${output_dir}/shared" "${output_dir}/artifacts"
+  printf '{}\n' > "${auth_file}"
+
+  RELEASE_IMAGE_LATEST="${TEST_RELEASE_IMAGE_LATEST:-registry.ci.openshift.org/ocp/release@sha256:0123456789abcdef}" \
+  RELEASE_PAYLOAD_AUTH_FILE="${auth_file}" \
   SHARED_DIR="${output_dir}/shared" \
   ARTIFACT_DIR="${output_dir}/artifacts" \
-  CURL_BIN="${TEST_ROOT}/mock-curl.sh" \
-  SLEEP_BIN="${TEST_SLEEP_BIN:-sleep}" \
+  OC_BIN="${TEST_ROOT}/mock-oc.sh" \
   ROSA_MARKETPLACE_INSTALLER_BIN="${TEST_ROOT}/mock-openshift-install.sh" \
-  TEST_CONFIG_FIXTURE="${TEST_CONFIG_FIXTURE:-${FIXTURES}/config.json}" \
-  TEST_READY_FIXTURE="${TEST_READY_FIXTURE:-${FIXTURES}/ready-built.json}" \
-  TEST_TAGS_FIXTURE="${TEST_TAGS_FIXTURE}" \
-  TEST_CONFIG_HTTP_CODE="${TEST_CONFIG_HTTP_CODE:-200}" \
-  TEST_READY_HTTP_CODE="${TEST_READY_HTTP_CODE:-200}" \
-  TEST_TAGS_HTTP_CODE="${TEST_TAGS_HTTP_CODE:-200}" \
-  TEST_CONFIG_TRANSIENT_FAILURES="${TEST_CONFIG_TRANSIENT_FAILURES:-0}" \
-  TEST_CONFIG_ATTEMPT_FILE="${TEST_CONFIG_ATTEMPT_FILE:-}" \
-  TEST_SLEEP_ARGS_FILE="${TEST_SLEEP_ARGS_FILE:-}" \
-  TEST_EXPECTED_MAX_FILESIZE="${TEST_RELEASE_CONTROLLER_MAX_RESPONSE_BYTES:-10485760}" \
+  TEST_RELEASE_INFO_FIXTURE="${TEST_RELEASE_INFO_FIXTURE:-${FIXTURES}/release-info.json}" \
+  TEST_OC_INFO_EXIT_CODE="${TEST_OC_INFO_EXIT_CODE:-0}" \
   TEST_COREOS_FIXTURE="${TEST_COREOS_FIXTURE:-${FIXTURES}/coreos-stream.json}" \
   TEST_INSTALLER_EXIT_CODE="${TEST_INSTALLER_EXIT_CODE:-0}" \
   "${DETECTOR}"
 }
 
-test_unknown_stream_waits() {
+test_payload_drives_detector() {
   local output_dir
   output_dir=$(mktemp -d)
-  TEST_CONFIG_HTTP_CODE=400 TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" run_detector "${output_dir}"
-  assert_file_value "wait:stream-config-unavailable" "${output_dir}/shared/rosa-marketplace-release-state"
-}
 
-test_empty_ready_stream_waits() {
-  local output_dir
-  output_dir=$(mktemp -d)
-  TEST_READY_FIXTURE="${FIXTURES}/ready-empty.json" \
-    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
-      run_detector "${output_dir}"
-  assert_file_value "wait:built-nightly-unavailable" "${output_dir}/shared/rosa-marketplace-release-state"
-}
-
-test_stream_absent_from_ready_response_waits() {
-  local output_dir
-  output_dir=$(mktemp -d)
-  TEST_READY_FIXTURE="${FIXTURES}/ready-wrong-stream.json" \
-    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
-      run_detector "${output_dir}"
-  assert_file_value "wait:built-nightly-unavailable" "${output_dir}/shared/rosa-marketplace-release-state"
-}
-
-test_first_built_payload_is_ready() {
-  local output_dir
-  output_dir=$(mktemp -d)
-  TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" run_detector "${output_dir}"
+  run_detector "${output_dir}"
 
   assert_file_value "ready" "${output_dir}/shared/rosa-marketplace-release-state"
-  assert_file_value "5.2" "${output_dir}/shared/rosa-marketplace-ocp-version"
-  assert_file_value "5.2.0-0.nightly-2026-09-09-010101" "${output_dir}/shared/rosa-marketplace-payload-tag"
-  assert_file_value "registry.ci.openshift.org/ocp/release:ready" "${output_dir}/shared/rosa-marketplace-payload-pullspec"
+  assert_file_value "5.1" "${output_dir}/shared/rosa-marketplace-ocp-version"
+  assert_file_value "5.1.0-0.nightly-2026-09-09-010101" "${output_dir}/shared/rosa-marketplace-payload-tag"
+  assert_file_value "registry.ci.openshift.org/ocp/release@sha256:0123456789abcdef" "${output_dir}/shared/rosa-marketplace-payload-pullspec"
   assert_file_value "10.2.20260909-0" "${output_dir}/shared/rosa-marketplace-rhcos-version"
   assert_file_value "ami-0123456789abcdef0" "${output_dir}/shared/rosa-marketplace-rhcos-ami"
 }
 
-test_ready_payload_transitioned_to_accepted_is_eligible() {
-  local output_dir
-  output_dir=$(mktemp -d)
-  TEST_TAGS_FIXTURE="${FIXTURES}/tags-accepted.json" run_detector "${output_dir}"
-  assert_file_value "ready" "${output_dir}/shared/rosa-marketplace-release-state"
-}
-
-test_ready_payload_transitioned_to_rejected_is_eligible() {
-  local output_dir
-  output_dir=$(mktemp -d)
-  TEST_TAGS_FIXTURE="${FIXTURES}/tags-rejected.json" run_detector "${output_dir}"
-  assert_file_value "ready" "${output_dir}/shared/rosa-marketplace-release-state"
-}
-
-test_failed_payload_without_ready_signal_waits() {
-  local output_dir
-  output_dir=$(mktemp -d)
-  TEST_READY_FIXTURE="${FIXTURES}/ready-empty.json" \
-    TEST_TAGS_FIXTURE="${FIXTURES}/tags-failed.json" \
-      run_detector "${output_dir}"
-  assert_file_value "wait:built-nightly-unavailable" "${output_dir}/shared/rosa-marketplace-release-state"
-}
-
-test_malformed_ready_response_fails() {
+test_missing_payload_fails() {
   local output_dir
   output_dir=$(mktemp -d)
 
-  if TEST_READY_FIXTURE="${FIXTURES}/ready-malformed.json" \
-    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
-      run_detector "${output_dir}"; then
-    fail "malformed ready streams response unexpectedly succeeded"
-  fi
-}
-
-test_ready_endpoint_error_fails() {
-  local output_dir
-  output_dir=$(mktemp -d)
-
-  if TEST_READY_HTTP_CODE=404 \
-    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
-      run_detector "${output_dir}"; then
-    fail "ready endpoint error unexpectedly succeeded"
-  fi
-}
-
-test_ready_tag_missing_from_tags_fails() {
-  local output_dir
-  output_dir=$(mktemp -d)
-
-  if TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" run_detector "${output_dir}"; then
-    fail "ready payload missing from tags response unexpectedly succeeded"
-  fi
-}
-
-test_invalid_target_fails() {
-  local output_dir
-  output_dir=$(mktemp -d)
-
-  if TARGET_OCP_Y_STREAM=release-5.2 \
+  if RELEASE_IMAGE_LATEST= \
+    RELEASE_PAYLOAD_AUTH_FILE="${FIXTURES}/release-info.json" \
     SHARED_DIR="${output_dir}/shared" \
     ARTIFACT_DIR="${output_dir}/artifacts" \
-    CURL_BIN="${TEST_ROOT}/mock-curl.sh" \
-    "${DETECTOR}"; then
-    fail "invalid target unexpectedly succeeded"
+    OC_BIN="${TEST_ROOT}/mock-oc.sh" \
+      "${DETECTOR}"; then
+    fail "missing release payload unexpectedly succeeded"
   fi
 }
 
-test_insecure_release_controller_api_fails() {
+test_payload_with_whitespace_fails() {
   local output_dir
   output_dir=$(mktemp -d)
 
-  if TARGET_OCP_Y_STREAM=5.2 \
-    RELEASE_CONTROLLER_API=http://release-controller.test \
-    SHARED_DIR="${output_dir}/shared" \
-    ARTIFACT_DIR="${output_dir}/artifacts" \
-    CURL_BIN="${TEST_ROOT}/mock-curl.sh" \
-    "${DETECTOR}"; then
-    fail "insecure release-controller API unexpectedly succeeded"
+  if TEST_RELEASE_IMAGE_LATEST='registry.invalid/release:tag with-space' run_detector "${output_dir}"; then
+    fail "release payload containing whitespace unexpectedly succeeded"
   fi
 }
 
-test_release_controller_credentials_are_not_logged() {
-  local api
-  local log_file
-  local log_output
-  local output_dir
-  local secret="do-not-log-this-secret"
-
-  for api in \
-    "https://user:${secret}@release-controller.test" \
-    "https://release-controller.test?token=${secret}"; do
-    output_dir=$(mktemp -d)
-    log_file="${output_dir}/detector.log"
-    if TEST_RELEASE_CONTROLLER_API="${api}" \
-      TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" \
-      run_detector "${output_dir}" >"${log_file}" 2>&1; then
-      fail "release-controller API containing credentials unexpectedly succeeded"
-    fi
-    log_output=$(<"${log_file}")
-    [[ "${log_output}" != *"${secret}"* ]] || fail "release-controller credentials were logged"
-  done
-}
-
-test_oversized_response_fails_before_parsing() {
+test_missing_payload_version_fails() {
   local output_dir
   output_dir=$(mktemp -d)
 
-  if TEST_RELEASE_CONTROLLER_MAX_RESPONSE_BYTES=1 \
-    TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" \
-    run_detector "${output_dir}"; then
-    fail "oversized release-controller response unexpectedly succeeded"
-  fi
-  [[ ! -s "${output_dir}/artifacts/rosa-marketplace-release-config.json" ]] \
-    || fail "oversized response was retained for parsing"
-}
-
-test_malformed_tags_fail() {
-  local output_dir
-  output_dir=$(mktemp -d)
-
-  if TEST_TAGS_FIXTURE="${FIXTURES}/tags-malformed.json" run_detector "${output_dir}"; then
-    fail "malformed tags response unexpectedly succeeded"
+  if TEST_RELEASE_INFO_FIXTURE="${FIXTURES}/release-info-missing-version.json" run_detector "${output_dir}"; then
+    fail "release info without a version unexpectedly succeeded"
   fi
 }
 
-test_wrong_stream_name_fails() {
+test_invalid_payload_version_fails() {
   local output_dir
   output_dir=$(mktemp -d)
 
-  if TEST_TAGS_FIXTURE="${FIXTURES}/tags-wrong-stream.json" run_detector "${output_dir}"; then
-    fail "mismatched tags stream unexpectedly succeeded"
+  if TEST_RELEASE_INFO_FIXTURE="${FIXTURES}/release-info-invalid-version.json" run_detector "${output_dir}"; then
+    fail "invalid release version unexpectedly succeeded"
   fi
 }
 
-test_missing_pullspec_fails() {
+test_malformed_release_info_fails() {
   local output_dir
   output_dir=$(mktemp -d)
 
-  if TEST_TAGS_FIXTURE="${FIXTURES}/tags-missing-pullspec.json" run_detector "${output_dir}"; then
-    fail "payload without pullSpec unexpectedly succeeded"
+  if TEST_RELEASE_INFO_FIXTURE="${FIXTURES}/release-info-malformed.json" run_detector "${output_dir}"; then
+    fail "malformed release info unexpectedly succeeded"
   fi
+}
+
+test_release_info_failure_stops_detection() {
+  local output_dir
+  output_dir=$(mktemp -d)
+
+  if TEST_OC_INFO_EXIT_CODE=41 run_detector "${output_dir}"; then
+    fail "oc release info failure unexpectedly succeeded"
+  fi
+  [[ ! -e "${output_dir}/shared/rosa-marketplace-release-state" ]] \
+    || fail "oc release info failure wrote an actionable state"
 }
 
 test_missing_rhcos_version_fails() {
   local output_dir
   output_dir=$(mktemp -d)
 
-  if TEST_COREOS_FIXTURE="${FIXTURES}/coreos-stream-missing-version.json" \
-    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
-      run_detector "${output_dir}"; then
+  if TEST_COREOS_FIXTURE="${FIXTURES}/coreos-stream-missing-version.json" run_detector "${output_dir}"; then
     fail "missing RHCOS version unexpectedly succeeded"
   fi
   [[ ! -e "${output_dir}/shared/rosa-marketplace-release-state" ]] \
-    || fail "missing RHCOS version wrote an actionable detector state"
+    || fail "missing RHCOS version wrote an actionable state"
 }
 
 test_missing_rhcos_ami_fails() {
   local output_dir
   output_dir=$(mktemp -d)
 
-  if TEST_COREOS_FIXTURE="${FIXTURES}/coreos-stream-missing-ami.json" \
-    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
-      run_detector "${output_dir}"; then
+  if TEST_COREOS_FIXTURE="${FIXTURES}/coreos-stream-missing-ami.json" run_detector "${output_dir}"; then
     fail "missing regional RHCOS AMI unexpectedly succeeded"
   fi
   [[ ! -e "${output_dir}/shared/rosa-marketplace-release-state" ]] \
-    || fail "missing regional RHCOS AMI wrote an actionable detector state"
+    || fail "missing regional RHCOS AMI wrote an actionable state"
 }
 
 test_installer_failure_stops_detection() {
   local output_dir
   output_dir=$(mktemp -d)
 
-  if TEST_INSTALLER_EXIT_CODE=41 \
-    TEST_TAGS_FIXTURE="${FIXTURES}/tags-built.json" \
-      run_detector "${output_dir}"; then
+  if TEST_INSTALLER_EXIT_CODE=42 run_detector "${output_dir}"; then
     fail "installer failure unexpectedly succeeded"
   fi
   [[ ! -e "${output_dir}/shared/rosa-marketplace-release-state" ]] \
-    || fail "installer failure wrote an actionable detector state"
+    || fail "installer failure wrote an actionable state"
 }
 
-test_transient_api_failures_retry_then_succeed() {
-  local output_dir
-  output_dir=$(mktemp -d)
+write_ready_outputs() {
+  local shared_dir="$1"
 
-  TEST_CONFIG_ATTEMPT_FILE="${output_dir}/config-attempts" \
-  TEST_CONFIG_TRANSIENT_FAILURES=2 \
-  TEST_RELEASE_CONTROLLER_RETRIES=3 \
-  TEST_RELEASE_CONTROLLER_RETRY_DELAY_SECONDS=2 \
-  TEST_RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS=8 \
-  TEST_SLEEP_BIN="${TEST_ROOT}/mock-sleep.sh" \
-  TEST_SLEEP_ARGS_FILE="${output_dir}/sleep-args" \
-  TEST_READY_FIXTURE="${FIXTURES}/ready-empty.json" \
-  TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" \
-    run_detector "${output_dir}"
-
-  assert_file_value "3" "${output_dir}/config-attempts"
-  assert_file_value $'2\n4' "${output_dir}/sleep-args"
-  assert_file_value "wait:built-nightly-unavailable" "${output_dir}/shared/rosa-marketplace-release-state"
-}
-
-test_transient_api_failures_exhaust_retries() {
-  local output_dir
-  output_dir=$(mktemp -d)
-
-  if TEST_CONFIG_ATTEMPT_FILE="${output_dir}/config-attempts" \
-    TEST_CONFIG_TRANSIENT_FAILURES=3 \
-    TEST_RELEASE_CONTROLLER_RETRIES=3 \
-    TEST_TAGS_FIXTURE="${FIXTURES}/tags-empty.json" \
-      run_detector "${output_dir}"; then
-    fail "persistent API failures unexpectedly succeeded"
-  fi
-
-  assert_file_value "3" "${output_dir}/config-attempts"
-  [[ ! -e "${output_dir}/shared/rosa-marketplace-release-state" ]] \
-    || fail "persistent API failure wrote an actionable detector state"
-}
-
-test_publisher_skips_wait_state() {
-  local output_dir
-  output_dir=$(mktemp -d)
-  mkdir -p "${output_dir}/shared"
-  printf 'wait:stream-config-unavailable\n' > "${output_dir}/shared/rosa-marketplace-release-state"
-
-  SHARED_DIR="${output_dir}/shared" \
-  MARKETPLACE_GENERATOR_BIN="${output_dir}/generator-is-intentionally-absent" \
-  "${PUBLISHER}"
-
-  [[ ! -e "${output_dir}/generator-args" ]] || fail "publisher invoked generator for a wait state"
-}
-
-test_publisher_dry_run_arguments() {
-  local output_dir
-  local expected_args
-  output_dir=$(mktemp -d)
-  mkdir -p "${output_dir}/shared"
-  printf 'ready\n' > "${output_dir}/shared/rosa-marketplace-release-state"
-  printf '5.2\n' > "${output_dir}/shared/rosa-marketplace-ocp-version"
-  printf '10.2.20260909-0\n' > "${output_dir}/shared/rosa-marketplace-rhcos-version"
-
-  SHARED_DIR="${output_dir}/shared" \
-  MARKETPLACE_PUBLISH_ENABLED=true \
-  MARKETPLACE_GENERATOR_BIN="${TEST_ROOT}/mock-marketplace-release-generator.sh" \
-  TEST_GENERATOR_ARGS_FILE="${output_dir}/generator-args" \
-  "${PUBLISHER}"
-
-  expected_args=$'release\n--environment\nstaging\n--ocp-version\n5.2\n--rhcos-version\n10.2.20260909-0\n--aws-profile\nmarketplacestaging\n--copy-if-duplicate=false\n--timeout\n2h\n--dry-run'
-  assert_file_value "${expected_args}" "${output_dir}/generator-args"
+  mkdir -p "${shared_dir}"
+  printf 'ready\n' > "${shared_dir}/rosa-marketplace-release-state"
+  printf '5.1\n' > "${shared_dir}/rosa-marketplace-ocp-version"
+  printf '10.2.20260909-0\n' > "${shared_dir}/rosa-marketplace-rhcos-version"
 }
 
 test_publisher_ready_but_disabled() {
   local output_dir
   output_dir=$(mktemp -d)
-  mkdir -p "${output_dir}/shared"
-  printf 'ready\n' > "${output_dir}/shared/rosa-marketplace-release-state"
-  printf '5.2\n' > "${output_dir}/shared/rosa-marketplace-ocp-version"
+  write_ready_outputs "${output_dir}/shared"
 
   SHARED_DIR="${output_dir}/shared" \
   MARKETPLACE_GENERATOR_BIN="${output_dir}/generator-is-intentionally-absent" \
@@ -356,50 +175,66 @@ test_publisher_ready_but_disabled() {
   [[ ! -e "${output_dir}/generator-args" ]] || fail "disabled publisher invoked generator"
 }
 
-test_publisher_refuses_production() {
+test_publisher_rejects_non_ready_state() {
   local output_dir
   output_dir=$(mktemp -d)
   mkdir -p "${output_dir}/shared"
-  printf 'ready\n' > "${output_dir}/shared/rosa-marketplace-release-state"
-  printf '5.2\n' > "${output_dir}/shared/rosa-marketplace-ocp-version"
+  printf 'wait:built-nightly-unavailable\n' > "${output_dir}/shared/rosa-marketplace-release-state"
+
+  if SHARED_DIR="${output_dir}/shared" "${PUBLISHER}"; then
+    fail "publisher accepted a legacy wait state"
+  fi
+}
+
+test_publisher_refuses_production() {
+  local output_dir
+  output_dir=$(mktemp -d)
+  write_ready_outputs "${output_dir}/shared"
 
   if SHARED_DIR="${output_dir}/shared" \
     MARKETPLACE_ENVIRONMENT=production \
-    MARKETPLACE_GENERATOR_BIN="${TEST_ROOT}/mock-marketplace-release-generator.sh" \
-    TEST_GENERATOR_ARGS_FILE="${output_dir}/generator-args" \
       "${PUBLISHER}"; then
     fail "publisher unexpectedly permitted production"
   fi
-  [[ ! -e "${output_dir}/generator-args" ]] || fail "production refusal invoked generator"
+}
+
+test_publisher_dry_run_arguments() {
+  local output_dir
+  local expected_args
+  output_dir=$(mktemp -d)
+  write_ready_outputs "${output_dir}/shared"
+
+  SHARED_DIR="${output_dir}/shared" \
+  MARKETPLACE_PUBLISH_ENABLED=true \
+  MARKETPLACE_GENERATOR_BIN="${TEST_ROOT}/mock-marketplace-release-generator.sh" \
+  TEST_GENERATOR_ARGS_FILE="${output_dir}/generator-args" \
+  "${PUBLISHER}"
+
+  expected_args=$'release\n--environment\nstaging\n--ocp-version\n5.1\n--rhcos-version\n10.2.20260909-0\n--aws-profile\nmarketplacestaging\n--copy-if-duplicate=false\n--skip-if-version-exists\n--timeout\n2h\n--dry-run'
+  assert_file_value "${expected_args}" "${output_dir}/generator-args"
 }
 
 test_publisher_non_dry_run_arguments() {
   local output_dir
   local expected_args
   output_dir=$(mktemp -d)
-  mkdir -p "${output_dir}/shared"
-  printf 'ready\n' > "${output_dir}/shared/rosa-marketplace-release-state"
-  printf '5.2\n' > "${output_dir}/shared/rosa-marketplace-ocp-version"
-  printf '10.2.20260909-0\n' > "${output_dir}/shared/rosa-marketplace-rhcos-version"
+  write_ready_outputs "${output_dir}/shared"
 
   SHARED_DIR="${output_dir}/shared" \
   MARKETPLACE_PUBLISH_ENABLED=true \
   MARKETPLACE_DRY_RUN=false \
   MARKETPLACE_GENERATOR_BIN="${TEST_ROOT}/mock-marketplace-release-generator.sh" \
   TEST_GENERATOR_ARGS_FILE="${output_dir}/generator-args" \
-    "${PUBLISHER}"
+  "${PUBLISHER}"
 
-  expected_args=$'release\n--environment\nstaging\n--ocp-version\n5.2\n--rhcos-version\n10.2.20260909-0\n--aws-profile\nmarketplacestaging\n--copy-if-duplicate=false\n--timeout\n2h'
+  expected_args=$'release\n--environment\nstaging\n--ocp-version\n5.1\n--rhcos-version\n10.2.20260909-0\n--aws-profile\nmarketplacestaging\n--copy-if-duplicate=false\n--skip-if-version-exists\n--timeout\n2h'
   assert_file_value "${expected_args}" "${output_dir}/generator-args"
 }
 
 test_generator_failure_propagates() {
   local output_dir
   output_dir=$(mktemp -d)
-  mkdir -p "${output_dir}/shared"
-  printf 'ready\n' > "${output_dir}/shared/rosa-marketplace-release-state"
-  printf '5.2\n' > "${output_dir}/shared/rosa-marketplace-ocp-version"
-  printf '10.2.20260909-0\n' > "${output_dir}/shared/rosa-marketplace-rhcos-version"
+  write_ready_outputs "${output_dir}/shared"
 
   if SHARED_DIR="${output_dir}/shared" \
     MARKETPLACE_PUBLISH_ENABLED=true \
@@ -412,33 +247,44 @@ test_generator_failure_propagates() {
   [[ -s "${output_dir}/generator-args" ]] || fail "failing generator was not invoked"
 }
 
-test_unknown_stream_waits
-test_empty_ready_stream_waits
-test_stream_absent_from_ready_response_waits
-test_first_built_payload_is_ready
-test_ready_payload_transitioned_to_accepted_is_eligible
-test_ready_payload_transitioned_to_rejected_is_eligible
-test_failed_payload_without_ready_signal_waits
-test_malformed_ready_response_fails
-test_ready_endpoint_error_fails
-test_ready_tag_missing_from_tags_fails
-test_invalid_target_fails
-test_insecure_release_controller_api_fails
-test_release_controller_credentials_are_not_logged
-test_oversized_response_fails_before_parsing
-test_malformed_tags_fail
-test_wrong_stream_name_fails
-test_missing_pullspec_fails
+test_ci_contract_is_payload_driven() {
+  [[ ! -e "${REPO_ROOT}/ci-operator/config/openshift/release/openshift-release-main__rosa-marketplace-release.yaml" ]] \
+    || fail "fixed-stream monitor configuration still exists"
+  grep -q -- '- as: rosa-marketplace-release' "${NIGHTLY_CONFIG}" \
+    || fail "nightly configuration does not define rosa-marketplace-release"
+  ! grep -q 'TARGET_OCP_Y_STREAM' "${NIGHTLY_CONFIG}" \
+    || fail "nightly configuration still fixes an OCP y-stream"
+
+  "${PYTHON_BIN:-python3}" - "${RELEASE_CONFIG}" <<'PYTHON'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as source:
+    config = json.load(source)
+
+job = config["verify"]["rosa-marketplace-release"]
+expected = "periodic-ci-openshift-release-main-nightly-5.1-rosa-marketplace-release"
+if job.get("optional") is not True or job.get("prowJob", {}).get("name") != expected:
+    raise SystemExit("release-controller informing job contract is invalid")
+PYTHON
+}
+
+test_payload_drives_detector
+test_missing_payload_fails
+test_payload_with_whitespace_fails
+test_missing_payload_version_fails
+test_invalid_payload_version_fails
+test_malformed_release_info_fails
+test_release_info_failure_stops_detection
 test_missing_rhcos_version_fails
 test_missing_rhcos_ami_fails
 test_installer_failure_stops_detection
-test_transient_api_failures_retry_then_succeed
-test_transient_api_failures_exhaust_retries
-test_publisher_skips_wait_state
 test_publisher_ready_but_disabled
+test_publisher_rejects_non_ready_state
 test_publisher_refuses_production
 test_publisher_dry_run_arguments
 test_publisher_non_dry_run_arguments
 test_generator_failure_propagates
+test_ci_contract_is_payload_driven
 
 printf 'PASS: rosa marketplace release monitor tests\n'

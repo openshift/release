@@ -41,10 +41,6 @@ main() {
 
   state=$(read_required_value "${STATE_FILE}")
   case "${state}" in
-    wait:*)
-      log "No action: detector state is ${state}"
-      return 0
-      ;;
     ready)
       ;;
     *)
@@ -82,6 +78,7 @@ main() {
     --rhcos-version "${rhcos_version}"
     --aws-profile "${MARKETPLACE_AWS_PROFILE}"
     --copy-if-duplicate=false
+    --skip-if-version-exists
     --timeout "${MARKETPLACE_RELEASE_TIMEOUT}"
   )
 

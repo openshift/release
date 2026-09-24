@@ -1,251 +1,190 @@
-# ROSA Marketplace Release Monitor: Design
+# ROSA Marketplace Release: Payload-Driven Design
 
 ## Purpose
 
-The ROSA Marketplace release monitor connects OpenShift nightly payload
-availability to the ROSA Marketplace release workflow. It periodically checks a
-configured OpenShift y-stream, identifies the earliest payload whose image was
-built, extracts the RHCOS metadata embedded in that payload, and passes validated
-values to a separately gated publisher.
+The ROSA Marketplace release job connects a newly built OpenShift payload to
+the staging Marketplace workflow without maintaining a fixed OCP version in a
+standalone polling job. Release-controller supplies the exact payload, the job
+derives its y-stream and RHCOS metadata, and the publisher safely decides
+whether a staging Marketplace version is needed.
 
-The initial deployment is intentionally observation-only: publishing is disabled
-by default. This allows the detection path to run against the real release
-controller and release payloads before Marketplace credentials or a generator
-image are introduced.
+Publishing remains disabled by default. The first deployment validates the
+payload-driven integration without invoking the generator or requiring AWS
+Marketplace credentials.
 
 ## Goals
 
-- Poll one configured OpenShift nightly y-stream every four hours.
-- Distinguish a normal lifecycle wait from an operational or data error.
-- Select the earliest built payload deterministically.
-- Derive RHCOS version and AWS AMI data from the selected payload, rather than
-  maintaining a release-specific mapping in this repository.
-- Pass detector results to a publisher through an explicit file contract.
-- Prevent accidental production publication.
-- Provide deterministic fixture tests and a rehearsable live integration job.
+- Run for release-controller payloads instead of discovering payloads by API polling.
+- Derive the OCP y-stream from immutable payload metadata.
+- Carry the job into a new OCP release through the standard pre-branch process.
+- Extract RHCOS version and regional AMI data from the payload's installer.
+- Make repeated payloads and retries safe with an idempotent generator guard.
+- Keep the job optional so it cannot reject an OpenShift payload.
+- Prevent production publication.
 
 ## Non-goals
 
-- Deciding OpenShift release policy or payload acceptance policy.
+- Defining OpenShift payload acceptance policy.
+- Polling release-controller `/config`, `/ready`, `/latest`, or `/tags` APIs.
+- Keeping a repository mapping from OCP versions to RHCOS versions or AMIs.
 - Publishing to the production Marketplace environment.
-- Storing a permanent catalog of payloads, RHCOS versions, or AMIs.
-- Maintaining separate detector implementations for every OpenShift release.
-- Enabling publishing before an approved generator image and credentials are
-  available.
+- Enabling publication before an approved generator image and credentials exist.
 
 ## Architecture
 
 ```text
-4-hour Prow periodic
+OCP pre-branch automation
         |
+        | carries nightly CI and release-controller job configuration forward
+        v
+release-controller builds a payload
+        |
+        | starts optional/informing ProwJob
+        | supplies RELEASE_IMAGE_LATEST
         v
 rosa-marketplace-release-detect
         |
-        |  GET /api/v1/releasestream/<stream>/config
-        |  GET /api/v1/releasestreams/ready
+        | oc adm release info -> payload version -> OCP y-stream
+        | oc adm release extract --command=openshift-install
+        | openshift-install coreos print-stream-json
         v
-OpenShift release controller
-        |
-        |  earliest ready tag name
-        |  GET /api/v1/releasestream/<stream>/tags
-        |  selected payload pullspec
-        v
-oc adm release extract --command=openshift-install
-        |
-        v
-openshift-install coreos print-stream-json
-        |
-        |  state, OCP version, payload, RHCOS version, AWS AMI
-        v
-SHARED_DIR file contract
+SHARED_DIR: payload, OCP y-stream, RHCOS version, regional AMI
         |
         v
 rosa-marketplace-release-publish
         |
-        +-- wait:*  -> successful no-op
         +-- disabled -> successful no-op
-        +-- enabled  -> staging-only generator invocation
+        +-- enabled  -> staging generator with --skip-if-version-exists
 ```
 
-### Trigger choice
+## Trigger and release-version lifecycle
 
-This design uses a four-hour periodic and release-controller API polling. It
-does not add a release-controller informing job. An informing job is evaluated
-for individual payloads, while this monitor needs to observe a future y-stream
-before it exists and act on the first payload whose image is built. The
-periodic also provides bounded retries for normal lifecycle wait states without
-running once for every later payload in the same y-stream.
+The source job is named `rosa-marketplace-release` in
+`ci-operator/config/openshift/release/openshift-release-main__nightly-5.1.yaml`.
+It is registered as an optional verification job in
+`core-services/release-controller/_releases/release-ocp-5.1.json`.
 
-## Component structure
+The periodic definition gives Prow a reusable job object and makes manual
+`/pj-rehearse` possible. Release-controller is the operational trigger and
+injects the payload being evaluated. The annual schedule is not used for
+release discovery; if it runs, ci-operator supplies the current nightly
+candidate through the same `RELEASE_IMAGE_LATEST` contract.
 
-### CI source configuration
+The normal OCP pre-branch change, such as the automated 5.0-to-5.1 change,
+copies versioned nightly configurations and release-controller definitions to
+the next y-stream. Consequently, ROSA code has no `TARGET_OCP_Y_STREAM` switch
+to edit for each release. Reviewers of the generated pre-branch change must
+still confirm that both Marketplace job entries were carried forward. That is
+a configuration-generation contract, not a runtime version switch.
 
-`ci-operator/config/openshift/release/openshift-release-main__rosa-marketplace-release.yaml`
-defines the four-hour periodic, its input image, target y-stream, and ordered
-detector and publisher steps.
+The presence of the optional job in a release definition is the policy signal
+that the y-stream participates in this ROSA workflow. Removing that entry
+disables the integration for a stream without adding policy to the script.
 
-`ci-operator/config/openshift/release/openshift-release-main.yaml` defines the
-change-triggered fixture presubmit.
+## Components
 
-Files under `ci-operator/jobs/openshift/release/` are generated Prow
-configuration. They mirror the source configuration and must be regenerated,
-not edited as the source of truth.
+### CI and release-controller configuration
 
-### Detector step
+- The versioned nightly configuration defines the reusable ProwJob and release
+  input that provides `RELEASE_IMAGE_LATEST` during manual rehearsal.
+- The release-controller definition registers that ProwJob as optional.
+- Generated files under `ci-operator/jobs/` mirror the CI source and are not
+  edited as the source of truth.
+- The fixture presubmit in `openshift-release-main.yaml` validates scripts and
+  the cross-file configuration contract.
 
-`ci-operator/step-registry/rosa/marketplace/release/detect/` contains the
-step-registry reference, metadata, ownership, and detector implementation.
+### Detector
 
-The detector performs five operations:
+The detector:
 
-1. Validate settings and construct `<major>.<minor>.0-0.nightly` from
-   `TARGET_OCP_Y_STREAM`.
-2. Confirm that the release-controller stream exists and that its response
-   identifies the expected stream.
-3. Read `/api/v1/releasestreams/ready` and choose the lexically earliest ready
-   tag for the target stream. Read the stream tags only to resolve that exact
-   tag's pullspec. If its phase changes to `Accepted` or `Rejected` between the
-   two requests, the already-observed ready signal remains valid.
-4. Extract `openshift-install` from the resolved payload and execute
-   `coreos print-stream-json`.
-5. Validate and record the x86_64 RHCOS release and the AMI for the configured
-   AWS region.
+1. Requires the `RELEASE_IMAGE_LATEST` payload supplied by ci-operator.
+2. Inspects it with `oc adm release info -o json`.
+3. Validates the full payload version and derives `<major>.<minor>`.
+4. Extracts that payload's `openshift-install`.
+5. Runs `coreos print-stream-json` and validates the x86_64 RHCOS release and
+   configured regional AMI.
+6. Writes a `ready` state and validated values to `SHARED_DIR`.
 
-### Publisher step
+There are no lifecycle wait states. A release-controller invocation already
+has a concrete payload, so missing or malformed payload data is an actionable
+failure.
 
-`ci-operator/step-registry/rosa/marketplace/release/publish/` contains the
-step-registry reference, metadata, ownership, and publisher implementation.
+### Publisher
 
-The publisher consumes the detector contract. It skips lifecycle wait states,
-accepts only the `staging` environment, and invokes the generator only when
-`MARKETPLACE_PUBLISH_ENABLED=true`.
+The publisher accepts only detector state `ready` and only the `staging`
+environment. It exits successfully before generator discovery when
+`MARKETPLACE_PUBLISH_ENABLED=false`.
 
-The current periodic explicitly sets publishing to `false`. Its CLI image does
-not supply the Marketplace generator or Marketplace AWS credentials. Before the
-publisher can be enabled, the consuming job must use an approved immutable or
-protected generator image and mount the required staging credentials.
+When explicitly enabled, it invokes the generator with both
+`--copy-if-duplicate=false` and `--skip-if-version-exists`. The latter makes
+later payloads for the same y-stream and release-controller retries successful
+no-ops after a Marketplace version exists.
 
-The `openshift-online/rosa-marketplace-release-generator` repository is
-onboarded separately in OpenShift CI. It is not a runtime dependency of this
-observation-only phase: the disabled publisher returns before looking for the
-generator executable. Enabling publication requires a separately reviewed,
-immutable build of that repository.
+The current CLI image does not contain the Marketplace generator or mounted
+AWS credentials. Publication cannot be enabled until an approved immutable or
+protected generator image and reviewed staging credentials are configured.
 
-### Tests and fixtures
+## Data contract
 
-`hack/rosa-marketplace-release-monitor-tests.sh` provides fixture and
-configuration-contract tests. `hack/rosa-marketplace-release-monitor/` contains
-minimal JSON inputs and fake external commands.
+Input supplied by CI:
 
-Fixtures model contracts and edge conditions; they are not snapshots of each
-OpenShift release. A new y-stream does not require a new fixture set when the
-API shape and detector rules are unchanged.
-
-The four-hour periodic supplies the complementary live contract test: it calls
-the real release controller and uses the real payload's installer. Keeping the
-fixture presubmit and live periodic separate prevents temporary upstream state
-or network failures from making deterministic PR validation unreliable.
-
-## Detector input contract
-
-| Variable | Required/default | Meaning |
+| Value | Required/default | Meaning |
 |---|---|---|
-| `TARGET_OCP_Y_STREAM` | Required | Major/minor stream such as `5.2` |
-| `RELEASE_CONTROLLER_API` | `https://amd64.ocp.releases.ci.openshift.org` | HTTPS release-controller base URL |
-| `RELEASE_CONTROLLER_RETRIES` | `3` | Maximum transient request attempts |
-| `RELEASE_CONTROLLER_RETRY_DELAY_SECONDS` | `2` | Initial retry delay |
-| `RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS` | `30` | Backoff ceiling |
-| `RELEASE_CONTROLLER_MAX_RESPONSE_BYTES` | `10485760` | Maximum accepted response size |
-| `RELEASE_PAYLOAD_AUTH_FILE` | `/etc/pull-secret/.dockerconfigjson` | Registry authentication used by `oc` |
-| `RHCOS_AWS_REGION` | `us-east-1` | Region whose AMI is required |
+| `RELEASE_IMAGE_LATEST` | Required, injected by ci-operator | Exact payload pullspec under evaluation |
+| `RELEASE_PAYLOAD_AUTH_FILE` | `/etc/pull-secret/.dockerconfigjson` | Registry authentication for payload inspection |
+| `RHCOS_AWS_REGION` | `us-east-1` | Region whose installer-provided AMI is required |
 
-The API URL must be HTTPS and cannot contain user information, a query, or a
-fragment. Redirects are restricted to HTTPS. Transient HTTP responses are
-retried with capped exponential backoff, and response data is rejected before
-JSON parsing when it exceeds the configured limit.
+Detector outputs are single-line files under `SHARED_DIR`:
 
-## Detector output contract
-
-All outputs are written to `SHARED_DIR` as single-line files.
-
-| File | Written when | Meaning |
-|---|---|---|
-| `rosa-marketplace-release-state` | Always for normal lifecycle outcomes | `ready` or `wait:<reason>` |
-| `rosa-marketplace-ocp-version` | After settings validation | Requested major/minor version |
-| `rosa-marketplace-payload-tag` | `ready` | Selected payload tag |
-| `rosa-marketplace-payload-pullspec` | `ready` | Selected payload pullspec |
-| `rosa-marketplace-rhcos-version` | `ready` | Installer-provided RHCOS release |
-| `rosa-marketplace-rhcos-ami` | `ready` | Installer-provided regional AMI |
-
-`ARTIFACT_DIR` also receives the downloaded config, ready-streams, and tags
-documents, the selected ready tag and payload object, and the installer-generated
-CoreOS stream document for debugging.
-
-## State and failure model
-
-Normal lifecycle conditions are successful no-ops:
-
-| State | Cause |
+| File | Meaning |
 |---|---|
-| `wait:stream-config-unavailable` | The requested nightly stream does not exist yet |
-| `wait:stream-tags-unavailable` | The stream exists but its tags endpoint is unavailable |
-| `wait:built-nightly-unavailable` | The target stream has no tag in the `/ready` response |
-| `ready` | Payload and required RHCOS metadata were validated |
+| `rosa-marketplace-release-state` | `ready` after complete validation |
+| `rosa-marketplace-ocp-version` | Derived OCP y-stream, such as `5.1` |
+| `rosa-marketplace-payload-tag` | Full version from payload metadata |
+| `rosa-marketplace-payload-pullspec` | Exact `RELEASE_IMAGE_LATEST` value |
+| `rosa-marketplace-rhcos-version` | Installer-provided RHCOS release |
+| `rosa-marketplace-rhcos-ami` | Installer-provided AMI for the configured region |
 
-Unexpected HTTP status codes, invalid JSON, mismatched stream names, missing
-required fields, failed payload extraction, invalid RHCOS data, and invalid
-configuration fail the detector. This distinction keeps an unreleased future
-stream quiet while making broken contracts visible.
+`ARTIFACT_DIR` retains the release-info and CoreOS stream JSON documents for
+troubleshooting. Credentials are never copied or logged.
 
-## Publisher safety model
+## Safety and failure model
 
-The publisher evaluates controls in this order:
+- Missing payload, registry authentication, version, RHCOS data, or AMI fails.
+- Invalid JSON and invalid version/value formats fail.
+- `oc`, installer, and generator failures propagate.
+- Production Marketplace configuration fails before generator invocation.
+- Publishing and non-dry-run operation require separate explicit controls.
+- Existing Marketplace y-streams are skipped by the generator's idempotency guard.
+- The release-controller job is optional and therefore does not block payload acceptance.
 
-1. Skip every `wait:*` detector state.
-2. Reject states other than `ready` or `wait:*`.
-3. Refuse any environment except `staging`.
-4. Validate that the enable flag is exactly `true` or `false`.
-5. Return successfully before generator discovery when publishing is disabled.
-6. When enabled, validate dry-run, profile, timeout, detector values, and the
-   generator executable before invocation.
+## Test strategy
 
-The generator receives validated arguments and `--copy-if-duplicate=false`.
-Dry-run defaults to `true`. Production is not an accepted configuration.
+The local fixture suite covers payload-version derivation, malformed and
+missing metadata, `oc` and installer failures, RHCOS validation, publisher
+safety gates, idempotent generator arguments, failure propagation, and the
+nightly/release-controller configuration link.
+
+`/pj-rehearse periodic-ci-openshift-release-main-nightly-5.1-rosa-marketplace-release`
+complements fixtures by resolving a real candidate payload, running both
+step-registry steps in CI, and verifying the pull-secret and payload extraction
+paths. Publishing remains disabled, so this rehearsal cannot modify
+Marketplace state.
 
 ## Ownership boundaries
-
-OWNERS files route review and approval; they do not define release rules.
 
 | Area | Effective owner |
 |---|---|
 | `ci-operator/config/openshift/release/` | Technical Release Team |
 | `ci-operator/jobs/openshift/release/` | Technical Release Team |
-| `ci-operator/step-registry/rosa/` | ROSA team, with nearer subdirectory OWNERS taking precedence |
+| `core-services/release-controller/_releases/` | Technical Release Team / DPTP |
+| `ci-operator/step-registry/rosa/` | ROSA team, subject to nearer OWNERS files |
 | `hack/` | Repository-root DPTP ownership unless a nearer OWNERS file exists |
 
-The feature consequently crosses ROSA, Technical Release Team, and DPTP review
-boundaries.
+## Publication enablement requirements
 
-## Release-version maintenance
-
-The version is data, not a code switch. Moving from 5.2 to 5.3 changes
-`TARGET_OCP_Y_STREAM` in the CI source configuration and its configuration
-assertion. The detector automatically constructs the corresponding nightly
-stream and uses the same parser and selection rules.
-
-Fixtures change only when the consumed response contract, the selection policy,
-or a regression case changes. They do not change merely because a new release
-is created.
-
-## Future enablement requirements
-
-Publishing must remain disabled until all of the following are agreed and
-implemented:
-
-- An approved immutable digest or protected image-stream tag containing the
-  Marketplace generator.
-- A reviewed AWS credential secret and mount owned by the appropriate team.
-- Confirmation of the staging AWS profile and generator argument contract.
-- A successful staging dry-run rehearsal followed by an explicitly reviewed
-  non-dry-run rehearsal.
-- Operational ownership, alerting, rollback, and duplicate-publication policy.
+- Approved immutable digest or protected image-stream tag containing the generator.
+- Reviewed staging AWS credentials and least-privilege permissions.
+- Confirmed staging profile and generator CLI contract.
+- Successful disabled rehearsal, staging dry run, and explicitly reviewed non-dry run.
+- Agreed operational ownership, alerting, rollback, and duplicate policy.
