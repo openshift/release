@@ -65,6 +65,9 @@ export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
 LOKI_INVOKER="${LOKI_BASE_INVOKER}"
 LOKI_INVOKERS=()
+LOKI_GUEST_API_UNREACHABLE=10
+LOKI_APPLIED_GUESTS=0
+LOKI_SKIPPED_GUESTS=0
 
 cat > "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml" << EOF
 apiVersion: v1
@@ -785,21 +788,66 @@ spec:
       app: event-exporter
 EOF
 
+apply_loki_manifest() {
+  local guest_kubeconfig="$1"
+  shift
+
+  local output
+  if output="$(oc --kubeconfig="${guest_kubeconfig}" apply "$@" 2>&1)"; then
+    printf '%s\n' "${output}"
+    return 0
+  fi
+
+  printf '%s\n' "${output}" >&2
+  if [[ "${output}" == *"dial tcp "* && "${output}" == *"i/o timeout"* ]]; then
+    return "${LOKI_GUEST_API_UNREACHABLE}"
+  fi
+  return 1
+}
+
 apply_loki_manifests() {
   local guest_kubeconfig="$1"
   local invoker="$2"
+  local status
 
   echo "Applying Loki manifests to the guest cluster using ${guest_kubeconfig} with invoker ${invoker}"
-  oc --kubeconfig="${guest_kubeconfig}" apply -f "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml"
+  if apply_loki_manifest "${guest_kubeconfig}" -f "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml"; then
+    :
+  else
+    status=$?
+    return "${status}"
+  fi
   for manifest in "${LOKI_MANIFEST_DIR}"/manifest_*.yml "${LOKI_MANIFEST_DIR}"/manifest_*.yaml; do
     [[ "${manifest}" == "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml" ]] && continue
     [[ -f "${manifest}" ]] || continue
     if [[ "${manifest}" == "${LOKI_MANIFEST_DIR}/manifest_ds.yml" ]]; then
-      sed "s|__LOKI_INVOKER__|${invoker}|g" "${manifest}" | oc --kubeconfig="${guest_kubeconfig}" apply -f -
+      if sed "s|__LOKI_INVOKER__|${invoker}|g" "${manifest}" | apply_loki_manifest "${guest_kubeconfig}" -f -; then
+        :
+      else
+        status=$?
+        return "${status}"
+      fi
     else
-      oc --kubeconfig="${guest_kubeconfig}" apply -f "${manifest}"
+      if apply_loki_manifest "${guest_kubeconfig}" -f "${manifest}"; then
+        :
+      else
+        status=$?
+        return "${status}"
+      fi
     fi
   done
+}
+
+handle_loki_apply_failure() {
+  local status="$1"
+  local guest_kubeconfig="$2"
+
+  if (( status == LOKI_GUEST_API_UNREACHABLE )); then
+    echo "Guest API at ${guest_kubeconfig} is unreachable; skipping Loki installation for this guest cluster."
+    LOKI_SKIPPED_GUESTS=$((LOKI_SKIPPED_GUESTS + 1))
+    return 0
+  fi
+  return "${status}"
 }
 
 case "${LOKI_INSTALL_MODE}" in
@@ -812,8 +860,13 @@ case "${LOKI_INSTALL_MODE}" in
       echo "Guest cluster kubeconfig not found at ${GUEST_KUBECONFIG}" >&2
       exit 1
     fi
-    LOKI_INVOKERS+=("${LOKI_INVOKER}")
-    apply_loki_manifests "${GUEST_KUBECONFIG}" "${LOKI_INVOKER}"
+    if apply_loki_manifests "${GUEST_KUBECONFIG}" "${LOKI_INVOKER}"; then
+      LOKI_INVOKERS+=("${LOKI_INVOKER}")
+      LOKI_APPLIED_GUESTS=$((LOKI_APPLIED_GUESTS + 1))
+    else
+      status=$?
+      handle_loki_apply_failure "${status}" "${GUEST_KUBECONFIG}" || exit "${status}"
+    fi
     ;;
   guest-cluster-multi)
     CLUSTER_MANIFEST="${SHARED_DIR}/cluster-manifests.json"
@@ -840,8 +893,13 @@ case "${LOKI_INSTALL_MODE}" in
       fi
 
       LOKI_INVOKER="${LOKI_BASE_INVOKER}/${cluster_name}"
-      LOKI_INVOKERS+=("${LOKI_INVOKER}")
-      apply_loki_manifests "${GUEST_KUBECONFIG}" "${LOKI_INVOKER}"
+      if apply_loki_manifests "${GUEST_KUBECONFIG}" "${LOKI_INVOKER}"; then
+        LOKI_INVOKERS+=("${LOKI_INVOKER}")
+        LOKI_APPLIED_GUESTS=$((LOKI_APPLIED_GUESTS + 1))
+      else
+        status=$?
+        handle_loki_apply_failure "${status}" "${GUEST_KUBECONFIG}" || exit "${status}"
+      fi
       guest_count=$((guest_count + 1))
     done < <(jq -r '.clusters[] | .name' "${CLUSTER_MANIFEST}")
 
@@ -853,7 +911,12 @@ case "${LOKI_INSTALL_MODE}" in
 esac
 
 if [[ "${LOKI_INSTALL_MODE}" == "guest-cluster" || "${LOKI_INSTALL_MODE}" == "guest-cluster-multi" ]]; then
-  echo "Loki manifests applied to the guest cluster(s); Promtail will start when eligible nodes become ready."
+  if (( LOKI_APPLIED_GUESTS > 0 )); then
+    echo "Loki manifests applied to ${LOKI_APPLIED_GUESTS} guest cluster(s); Promtail will start when eligible nodes become ready."
+  fi
+  if (( LOKI_SKIPPED_GUESTS > 0 )); then
+    echo "Skipped Loki installation for ${LOKI_SKIPPED_GUESTS} guest cluster(s) because their API was unreachable."
+  fi
 fi
 
 for invoker in "${LOKI_INVOKERS[@]}"; do
