@@ -35,6 +35,14 @@ CollectDiagnostics () {
 trap CollectDiagnostics EXIT
 
 # ---------------------------------------------------------------------------
+# 0. Preflight — verify required CRDs, NooBaa readiness, StorageClass
+# ---------------------------------------------------------------------------
+oc get crd objectbucketclaims.objectbucket.io 1>/dev/null
+oc get crd multiclusterobservabilities.observability.open-cluster-management.io 1>/dev/null
+oc get noobaa -n "${odfNamespace}" -o jsonpath='{.items[0].status.phase}' | grep -qw Ready
+oc get storageclass "${obcStorageClass}" 1>/dev/null
+
+# ---------------------------------------------------------------------------
 # 1. Observability namespace
 # ---------------------------------------------------------------------------
 oc create namespace "${obsNamespace}" \
@@ -78,36 +86,28 @@ oc wait "obc/${obcName}" -n "${odfNamespace}" \
 
 # ---------------------------------------------------------------------------
 # 5. Extract S3 credentials from the OBC-generated Secret + ConfigMap
+#    The OBC provisioner creates a ConfigMap (BUCKET_HOST, BUCKET_PORT,
+#    BUCKET_NAME) and a Secret (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+#    both named after the OBC in the same namespace.
 # ---------------------------------------------------------------------------
 typeset bucketName=''
-bucketName="$(oc get "obc/${obcName}" -n "${odfNamespace}" \
-    -o jsonpath='{.spec.bucketName}')"
-
-typeset obcSecretName=''
-obcSecretName="$(oc get "obc/${obcName}" -n "${odfNamespace}" \
-    -o jsonpath='{.spec.secretName}')"
-[[ -z "${obcSecretName}" ]] && obcSecretName="${obcName}"
-
-# NooBaa internal S3 endpoint — strip scheme for thanos config.
-# NooBaa service exposes HTTP on port 80, HTTPS on port 443.
-# Use HTTP (insecure: true) to match the MinIO pattern and avoid TLS cert issues.
-typeset s3EndpointRaw=''
-s3EndpointRaw="$(oc get noobaa -n "${odfNamespace}" -o json | \
-    jq -r '.items[0].status.services.serviceS3.internalDNS[0] // empty')" || true
-[[ -z "${s3EndpointRaw}" ]] && s3EndpointRaw="https://s3.${odfNamespace}.svc:443"
+bucketName="$(oc get "configmap/${obcName}" -n "${odfNamespace}" \
+    -o jsonpath='{.data.BUCKET_NAME}')"
 
 typeset s3Host=''
-s3Host="$(printf '%s' "${s3EndpointRaw}" | sed -E 's|^https?://||; s|:[0-9]+$||')"
+s3Host="$(oc get "configmap/${obcName}" -n "${odfNamespace}" \
+    -o jsonpath='{.data.BUCKET_HOST}')"
+[[ -z "${s3Host}" ]] && { : "ERROR: OBC ConfigMap ${obcName} missing BUCKET_HOST"; exit 1; }
 
 # ---------------------------------------------------------------------------
 # 6. Build thanos-object-storage secret — jq marshals credentials safely
 # ---------------------------------------------------------------------------
 ( set +x
     typeset awsAccessKey=''
-    awsAccessKey="$(oc get secret "${obcSecretName}" -n "${odfNamespace}" \
+    awsAccessKey="$(oc get "secret/${obcName}" -n "${odfNamespace}" \
         -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"
     typeset awsSecretKey=''
-    awsSecretKey="$(oc get secret "${obcSecretName}" -n "${odfNamespace}" \
+    awsSecretKey="$(oc get "secret/${obcName}" -n "${odfNamespace}" \
         -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"
 
     typeset thanosFile=''
@@ -221,15 +221,6 @@ jq -cn \
 oc wait "secret/${mcoTokenSecretName}" -n "${obsNamespace}" \
     --for=jsonpath='{.data.token}' \
     --timeout=2m 1>/dev/null
-
-# ---------------------------------------------------------------------------
-# 10. Write bearer token to SHARED_DIR for downstream steps
-# ---------------------------------------------------------------------------
-( set +x
-    oc get "secret/${mcoTokenSecretName}" -n "${obsNamespace}" \
-        -o jsonpath='{.data.token}' | base64 -d \
-        > "${SHARED_DIR}/obs-bearer-token"
-true )
 
 : 'ACM Observability deployed with ODF NooBaa storage — MCO Ready'
 

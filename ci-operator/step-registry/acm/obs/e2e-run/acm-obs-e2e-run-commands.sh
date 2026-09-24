@@ -40,34 +40,36 @@ cp "${SHARED_DIR}/kubeconfig" /workspace/.kube/config
 export KUBECONFIG='/workspace/.kube/config'
 
 # ---------------------------------------------------------------------------
-# 2. Generate options.yaml
+# 2. Generate options.yaml — jq/yq marshalling for safe value handling
 # ---------------------------------------------------------------------------
 typeset baseDomain=''
 baseDomain="$(oc get ingress.config.openshift.io/cluster \
     -o jsonpath='{.spec.domain}' | sed 's/^apps\.//')"
 
-typeset hubClusterName='local-cluster'
-
 mkdir -p /resources
-cat > /resources/options.yaml <<OPTIONS_YAML
-options:
-  hub:
-    name: ${hubClusterName}
-    baseDomain: ${baseDomain}
-OPTIONS_YAML
+{
+    jq -cn \
+        --arg hubName 'local-cluster' \
+        --arg hubDomain "${baseDomain}" \
+        '{options: {hub: {name: $hubName, baseDomain: $hubDomain}}}' |
+    yq -p json -o yaml eval .
+} > /resources/options.yaml
 
-# Add managed cluster info if available from SHARED_DIR
 if [[ -f "${SHARED_DIR}/managed.cluster.name" ]]; then
     typeset mcName='' mcDomain=''
     mcName="$(cat "${SHARED_DIR}/managed.cluster.name" 2>/dev/null || true)"
     mcDomain="$(cat "${SHARED_DIR}/managed.cluster.base.domain" 2>/dev/null || true)"
 
     if [[ -n "${mcName}" && -n "${mcDomain}" ]]; then
-        cat >> /resources/options.yaml <<MC_YAML
-  clusters:
-  - name: ${mcName}
-    baseDomain: ${mcDomain}
-MC_YAML
+        {
+            yq -o json eval . /resources/options.yaml |
+            jq -c \
+                --arg mcName "${mcName}" \
+                --arg mcDomain "${mcDomain}" \
+                '.options.clusters = [{name: $mcName, baseDomain: $mcDomain}]' |
+            yq -p json -o yaml eval .
+        } > /resources/options.yaml.tmp
+        mv /resources/options.yaml.tmp /resources/options.yaml
 
         if [[ -f "${SHARED_DIR}/managed.cluster.kubeconfig" ]]; then
             cp "${SHARED_DIR}/managed.cluster.kubeconfig" /workspace/.kube/import-kubeconfig
@@ -87,23 +89,11 @@ export REPORT_FILE='/results/results.xml'
 # ---------------------------------------------------------------------------
 # 4. Run the compiled Ginkgo test binary
 # ---------------------------------------------------------------------------
-typeset ginkgoBin=''
-if type -t ginkgo 1>/dev/null; then
-    ginkgoBin='ginkgo'
-elif [[ -x /usr/local/bin/ginkgo ]]; then
-    ginkgoBin='/usr/local/bin/ginkgo'
-else
-    ginkgoBin="$(find / -name ginkgo -type f -executable 2>/dev/null | head -1)"
-fi
-[[ -z "${ginkgoBin}" ]] && { : 'ERROR: ginkgo binary not found in image'; exit 1; }
+typeset ginkgoBin='/usr/local/bin/ginkgo'
+[[ -x "${ginkgoBin}" ]] || { : "ERROR: ginkgo binary not found at ${ginkgoBin}"; exit 1; }
 
-typeset testBin=''
-if [[ -f /workspace/opt/tests/observability-e2e-test.test ]]; then
-    testBin='/workspace/opt/tests/observability-e2e-test.test'
-else
-    testBin="$(find / -name '*.test' -path '*/observability*' -type f 2>/dev/null | head -1)"
-fi
-[[ -z "${testBin}" ]] && { : 'ERROR: compiled test binary not found in image'; exit 1; }
+typeset testBin='/workspace/opt/tests/observability-e2e-test.test'
+[[ -f "${testBin}" ]] || { : "ERROR: compiled test binary not found at ${testBin}"; exit 1; }
 
 mkdir -p /results
 
@@ -112,7 +102,7 @@ typeset -i ginkgoRc=0
     --v \
     --focus="${GINKGO_FOCUS}" \
     --skip="${GINKGO_SKIP}" \
-    --timeout=7200s \
+    --timeout=6300s \
     --no-color \
     -nodes=1 \
     --junit-report=/results/results.xml \
