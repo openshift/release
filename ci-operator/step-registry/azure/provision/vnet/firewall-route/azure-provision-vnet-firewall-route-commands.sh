@@ -85,6 +85,14 @@ fi
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 FW="myFirewall"
+echo "=== firewall-route debug: start ==="
+echo "RESOURCE_GROUP=${RESOURCE_GROUP}"
+echo "vnet_name=${vnet_name}"
+echo "master_subnet_name=${master_subnet_name}"
+echo "worker_subnet_name=${worker_subnet_name}"
+echo "CLUSTER_NAME=${CLUSTER_NAME}"
+echo "RESTRICTED_NETWORK=${RESTRICTED_NETWORK}"
+echo "ENABLE_FIREWALL_FULLLIST=${ENABLE_FIREWALL_FULLLIST}"
 # Create vnet for FW
 run_command "az network vnet create -g ${RESOURCE_GROUP} -n fw-vnet --address-prefix 10.1.0.0/16 --subnet-name AzureFirewallSubnet --subnet-prefix 10.1.1.0/24"
 
@@ -110,6 +118,7 @@ run_command "az network firewall update --name ${FW} --resource-group ${RESOURCE
 
 # Get private ip of FW
 fwprivaddr=$(az network firewall ip-config list -g ${RESOURCE_GROUP} -f ${FW} --query "[?name=='FW-config'].privateIpAddress" --output tsv)
+echo "=== firewall-route debug: fwprivaddr=${fwprivaddr} ==="
 
 # Create new table route
 run_command "az network route-table create --name Firewall-rt-table --resource-group ${RESOURCE_GROUP} --disable-bgp-route-propagation true"
