@@ -14,7 +14,7 @@ LOCK_ACQUIRED=""
 MC_KUBECONFIG=""
 
 lock_name() {
-  echo "${OPERATOR_TYPE}-deploy-lock"
+  echo "ho-deploy-lock"
 }
 
 pull_secret_name() {

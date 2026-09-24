@@ -11,7 +11,7 @@ MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 JOB_ID="${JOB_NAME:-unknown}-${BUILD_ID:-unknown}"
 
 lock_name() {
-  echo "${OPERATOR_TYPE}-deploy-lock"
+  echo "ho-deploy-lock"
 }
 
 pull_secret_name() {
@@ -95,8 +95,14 @@ DEPLOYED=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment "${HO_DEPLOY}" -n "${
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="operator")].image}')
 echo "HyperShift operator image after restore: ${DEPLOYED}"
 
-# Release the lock.
-KUBECONFIG="${MC_KUBECONFIG}" oc delete configmap "${LOCK_NAME}" -n "${HO_NS}" --ignore-not-found
-echo "Released lock (${LOCK_NAME})"
+# Release the lock, verifying ownership before deleting.
+LOCK_OWNER=$(KUBECONFIG="${MC_KUBECONFIG}" oc get configmap "${LOCK_NAME}" -n "${HO_NS}" \
+  -o jsonpath='{.data.job}' 2>/dev/null || true)
+if [[ "${LOCK_OWNER}" == "${JOB_ID}" ]]; then
+  KUBECONFIG="${MC_KUBECONFIG}" oc delete configmap "${LOCK_NAME}" -n "${HO_NS}" --ignore-not-found
+  echo "Released lock (${LOCK_NAME})"
+else
+  echo "Lock (${LOCK_NAME}) not owned by this job (owner: ${LOCK_OWNER}), skipping delete"
+fi
 
 echo "${OPERATOR_TYPE} operator restored successfully"
