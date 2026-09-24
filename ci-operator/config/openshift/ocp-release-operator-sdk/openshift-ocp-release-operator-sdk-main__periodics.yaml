@@ -116,7 +116,12 @@ tests:
         chmod 600 "$_cred_file"
         printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" >"$_cred_file"
         git config credential.helper "store --file=${_cred_file}"
-        git remote set-url origin "https://github.com/openshift/ocp-release-operator-sdk.git"
+        # ci-operator src checkout has no 'origin' remote — add or rewrite it.
+        if git remote get-url origin >/dev/null 2>&1; then
+          git remote set-url origin "https://github.com/openshift/ocp-release-operator-sdk.git"
+        else
+          git remote add origin "https://github.com/openshift/ocp-release-operator-sdk.git"
+        fi
         git remote add demo-src https://github.com/neha037/ocp-release-operator-sdk.git 2>/dev/null || true
         git fetch demo-src demo-e2e-base
         git push -f origin "refs/remotes/demo-src/demo-e2e-base:refs/heads/demo-e2e-base"
