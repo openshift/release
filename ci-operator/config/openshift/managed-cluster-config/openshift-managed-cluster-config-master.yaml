@@ -55,26 +55,31 @@ tests:
     - ref: rosa-hive-backplane-login
     test:
     - ref: rosa-hive-sss-dryrun
-- as: hive-e2e-sss-dryrun-daily
+- as: hive-e2e-sss-dryrun-promotion-int
   capabilities:
   - intranet
-  cron: 0 6 * * *
-  reporter_config:
-    channel: '#rosa-prow-info'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
-      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
+  cron: 0 0 31 2 *
   restrict_network_access: false
   steps:
     cluster_profile: rosa-e2e-01
     env:
       BACKPLANE_CLUSTER_ID: 1g268u7pp694gj152nj16me4sv615lpv
-      BACKPLANE_CLUSTER_IDS: 1g268u7pp694gj152nj16me4sv615lpv,1farlonnersks14ohfp155uoonupr9id,1dn9fsn53b9vh3m63n8ajr679cslbkhd
+      BACKPLANE_CLUSTER_IDS: 1g268u7pp694gj152nj16me4sv615lpv
+      BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-63154
+    pre:
+    - ref: rosa-hive-backplane-login
+    test:
+    - ref: rosa-hive-sync-health
+- as: hive-e2e-sss-dryrun-promotion-stage
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  restrict_network_access: false
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      BACKPLANE_CLUSTER_ID: 1farlonnersks14ohfp155uoonupr9id
+      BACKPLANE_CLUSTER_IDS: 1farlonnersks14ohfp155uoonupr9id,1dn9fsn53b9vh3m63n8ajr679cslbkhd
       BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-63154
     pre:
     - ref: rosa-hive-backplane-login
