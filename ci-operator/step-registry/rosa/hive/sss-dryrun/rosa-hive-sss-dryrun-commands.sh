@@ -10,6 +10,8 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+# Keep tracing disabled while handling credentials and internal endpoints.
+set +x
 
 log() { echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") $*\033[0m" >&2; }
 
@@ -36,31 +38,29 @@ mkdir -p "${HOME}/.config/backplane"
 printf '{"proxy-url":"%s"}\n' "${BACKPLANE_PROXY_URL}" > "${HOME}/.config/backplane/config.json"
 
 # ---- OCM login using cluster profile credentials ----
-set +x
 SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
 SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
 
 if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-    log "OCM login (${OCM_LOGIN_ENV}) via SSO"
-    ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+    log "Logging into OCM via SSO"
+    ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" >/dev/null 2>&1
 elif [[ -n "${OCM_TOKEN}" ]]; then
-    log "OCM login (${OCM_LOGIN_ENV}) via token"
-    ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+    log "Logging into OCM via token"
+    ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}" >/dev/null 2>&1
 else
     log "ERROR: No OCM credentials found in cluster profile"
     exit 1
 fi
-set -x
 
 # ---- Backplane login ----
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-log "Backplane login to ${BACKPLANE_CLUSTER_ID}"
-ocm-backplane login "${BACKPLANE_CLUSTER_ID}"
+log "Logging into the cluster via backplane"
+ocm-backplane login "${BACKPLANE_CLUSTER_ID}" >/dev/null 2>&1
 
 # ---- Generate SSS template ----
 log "Generating SelectorSyncSet template via make"
-make
+IN_CONTAINER=true make
 
 # ---- Process integration template + server-side dry-run ----
 # The .tmpl is a kind: Template needing oc process. All three env files are
