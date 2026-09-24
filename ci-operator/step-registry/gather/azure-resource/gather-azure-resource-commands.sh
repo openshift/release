@@ -132,11 +132,16 @@ function getResourceGroup() {
     export RESOURCE_GROUP
 }
 
-cli_Login
-
 OUTPUT_DIR="${ARTIFACT_DIR}"
 
+# Resolve the resource group first: it only reads files from SHARED_DIR, and
+# logging in is pointless when there is nothing to gather. cli_Login itself
+# depends on pre steps having run (the azurestack branch reads
+# SHARED_DIR/AZURESTACK_ENDPOINT), so doing it first would fail the step before
+# the skip below can take effect.
 getResourceGroup
+
+cli_Login
 echo ""
 run_command "az group show --name $RESOURCE_GROUP" || true
 echo ""
