@@ -42,7 +42,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'IPI-Deprovision Failures',
-        description='rate(prowjob_state_transitions{job_name="periodic-ipi-deprovision",state="failure"}[30m])',
+        description='rate(prowjob_state_transitions{job_name=~"periodic-ipi-deprovision-.*|periodic-ci-openshift-release-main-deprovision-.*",state="failure"}[30m])',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -50,7 +50,7 @@ dashboard.new(
         legend_current=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'rate(prowjob_state_transitions{job_name="periodic-ipi-deprovision",state="failure"}[30m])',
+        'rate(prowjob_state_transitions{job_name=~"periodic-ipi-deprovision-.*|periodic-ci-openshift-release-main-deprovision-.*",state="failure"}[30m])',
         legendFormat='{{pod}}',
     )), gridPos={
     h: 9,
