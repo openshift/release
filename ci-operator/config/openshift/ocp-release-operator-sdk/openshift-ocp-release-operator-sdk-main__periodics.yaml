@@ -48,17 +48,24 @@ tests:
         fi
         export GITHUB_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
-        # Install gh CLI (not in the base src image)
+        # Install gh + oc CLIs (not in the base src image).
+        # oc is required by update_golang_builder / _resolve_builder_ocp.
         GH_VERSION=2.62.0
         curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
           | tar -xz -C /tmp
-        export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
+        mkdir -p /tmp/bin
+        curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" \
+          | tar -xz -C /tmp/bin oc
+        export PATH="/tmp/bin:/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
 
         export FORCE_REMOTE_URLS=1
         ./hack/auto-rebase.sh
       credentials:
       - mount_path: /var/run/github-app
         name: openshift-app-platform-shift-github-bot
+        namespace: test-credentials
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
         namespace: test-credentials
       from: src
       resources:
@@ -130,11 +137,15 @@ tests:
         git fetch origin demo-e2e-base
         git checkout -B demo-e2e-base origin/demo-e2e-base
 
-        # Install gh CLI (not in the base src image)
+        # Install gh + oc CLIs (not in the base src image).
+        # oc is required by update_golang_builder / _resolve_builder_ocp.
         GH_VERSION=2.62.0
         curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
           | tar -xz -C /tmp
-        export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
+        mkdir -p /tmp/bin
+        curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" \
+          | tar -xz -C /tmp/bin oc
+        export PATH="/tmp/bin:/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
         export GH_TOKEN="$GITHUB_TOKEN"
 
         # Overlay unmerged builder-probe fix onto demo-e2e-base and push so
@@ -150,7 +161,11 @@ tests:
 
         # Diagnostic: which builder probe sources are visible in this pod?
         echo "==> DIAG: oc=$(command -v oc || echo MISSING)"
+        oc version --client 2>&1 | head -1 || true
         oc whoami 2>&1 | head -1 || true
+        echo "==> DIAG: pull-secret files:"
+        ls -la /var/run/secrets/ci-pull-credentials/.dockerconfigjson \
+               /var/run/secrets/registry-pull--build-farms/.dockerconfigjson 2>&1 || true
         echo "==> DIAG: ocp/builder golang-1.26 tags:"
         oc get is builder -n ocp -o jsonpath='{.status.tags[*].tag}' 2>&1 \
           | tr ' ' '\n' | grep 'golang-1.26' | head -5 || echo "(none or error)"
@@ -158,8 +173,13 @@ tests:
         oc get is release -n openshift -o jsonpath='{.status.tags[*].tag}' 2>&1 \
           | tr ' ' '\n' | grep 'golang-1.26' | head -5 || echo "(none or error)"
         echo "==> DIAG: oc image info 1.26/5.0:"
+        REG_ARGS=()
+        for s in /var/run/secrets/ci-pull-credentials/.dockerconfigjson \
+                 /var/run/secrets/registry-pull--build-farms/.dockerconfigjson; do
+          if [[ -f "$s" ]]; then REG_ARGS=(--registry-config="$s"); break; fi
+        done
         oc image info registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0 \
-          --filter-by-os=linux/amd64 2>&1 | head -3 || true
+          --filter-by-os=linux/amd64 "${REG_ARGS[@]}" 2>&1 | head -5 || true
 
         # Reset prior demo PR/branch so open_pr_exists does not skip.
         gh pr list --repo openshift/ocp-release-operator-sdk \
@@ -178,6 +198,9 @@ tests:
       credentials:
       - mount_path: /var/run/github-app
         name: openshift-app-platform-shift-github-bot
+        namespace: test-credentials
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
         namespace: test-credentials
       from: src
       resources:
