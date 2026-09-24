@@ -88,9 +88,11 @@ CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 log "Provisioned cluster id: ${CLUSTER_ID}"
 
 # ---- Contract artifact: ${SHARED_DIR}/kubeconfig (customer plane) ----
-# Public clusters expose a guest kubeconfig through OCM. Private clusters are not
-# reachable from the build farm, so rosa-backplane-login writes the kubeconfig
-# later; a fetch miss here is therefore non-fatal.
+# The provisioner owns the guest kubeconfig: PROVISION_ENTRYPOINT is expected to
+# write it. As a fallback we fetch it from OCM here, which succeeds only for
+# public clusters that are already reachable. A miss is non-fatal (the entrypoint
+# may have written it, or a private cluster is reached later via proxy-conf.sh);
+# the customer-plane validation step fails loudly if the kubeconfig is still absent.
 if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
   if ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" \
        | jq -re '.kubeconfig' > "${SHARED_DIR}/kubeconfig" 2>/dev/null; then

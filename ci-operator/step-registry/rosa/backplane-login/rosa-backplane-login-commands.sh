@@ -61,35 +61,17 @@ fi
 $WAS_TRACING && set -x
 
 # ---- Management cluster kubeconfig (${SHARED_DIR}/mc-kubeconfig) ----
-# Resolve the management cluster identity from OCM (name/id only), then obtain an
-# elevated kubeconfig via backplane. Backplane is used instead of the OCM
-# credentials API so this works for private management clusters (reached through
-# the corp proxy) and produces an audited, elevated (backplane-cluster-admin)
-# session in production. mc-kubeconfig is the canonical contract name
-# (consolidating the older hs-mc.kubeconfig / mc-kubeconfig divergence).
-MC_NAME=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/hypershift" 2>/dev/null | jq -r '.management_cluster // empty')
-if [[ -z "${MC_NAME}" ]]; then
-  MC_NAME=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/provision_shard" 2>/dev/null | jq -r '.management_cluster // empty')
-fi
-if [[ -z "${MC_NAME}" ]]; then
-  log "ERROR: could not resolve management cluster for ${CLUSTER_ID} (is this an HCP cluster?)"
-  exit 1
-fi
-MC_CLUSTER_ID=$(ocm get /api/clusters_mgmt/v1/clusters \
-                  --parameter search="name='${MC_NAME}'" --parameter size=1 \
-                | jq -r '.items[0].id // empty')
-if [[ -z "${MC_CLUSTER_ID}" ]]; then
-  log "ERROR: could not resolve management cluster id for ${MC_NAME}"
-  exit 1
-fi
-echo -n "${MC_NAME}" > "${SHARED_DIR}/mc-cluster-name"
-echo -n "${MC_CLUSTER_ID}" > "${SHARED_DIR}/mc-cluster-id"
-
+# backplane --manager resolves and logs into the management cluster of the hosted
+# cluster itself, so no OCM management-cluster lookup is required. Backplane also
+# reaches private management clusters (through the corp proxy) and produces an
+# audited, elevated (backplane-cluster-admin) session. mc-kubeconfig is the
+# canonical contract name (consolidating the older hs-mc.kubeconfig / mc-kubeconfig
+# divergence).
 mc_kubeconfig="${SHARED_DIR}/mc-kubeconfig"
-log "Running ocm-backplane login for management cluster ${MC_NAME} (${MC_CLUSTER_ID})"
 mc_login_kubeconfig="$(mktemp /tmp/backplane-mc-login.XXXXXX)"
-if ! KUBECONFIG="${mc_login_kubeconfig}" ocm-backplane login "${MC_CLUSTER_ID}"; then
-  log "ERROR: ocm-backplane login failed for management cluster ${MC_CLUSTER_ID}"
+log "Running ocm-backplane login --manager for hosted cluster ${CLUSTER_ID}"
+if ! KUBECONFIG="${mc_login_kubeconfig}" ocm-backplane login "${CLUSTER_ID}" --manager; then
+  log "ERROR: ocm-backplane login --manager failed for ${CLUSTER_ID} (is this an HCP cluster?)"
   rm -f "${mc_login_kubeconfig}"
   exit 1
 fi
@@ -108,36 +90,43 @@ if ! grep -q 'backplane-cluster-admin' "${mc_kubeconfig}"; then
   exit 1
 fi
 if KUBECONFIG="${mc_kubeconfig}" oc whoami &>/dev/null; then
-  log "Management cluster kubeconfig ready: ${MC_NAME} (${MC_CLUSTER_ID})"
+  log "Management cluster kubeconfig ready for hosted cluster ${CLUSTER_ID}"
 else
   log "ERROR: management cluster kubeconfig failed validation (oc whoami)"
   rm -f "${mc_kubeconfig}"
   exit 1
 fi
 
+# Record the management cluster identity for downstream metadata (best-effort;
+# not required for platform-plane access).
+MC_NAME=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/hypershift" 2>/dev/null | jq -r '.management_cluster // empty')
+if [[ -z "${MC_NAME}" ]]; then
+  MC_NAME=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/provision_shard" 2>/dev/null | jq -r '.management_cluster // empty')
+fi
+if [[ -n "${MC_NAME}" ]]; then
+  echo -n "${MC_NAME}" > "${SHARED_DIR}/mc-cluster-name"
+  MC_CLUSTER_ID=$(ocm get /api/clusters_mgmt/v1/clusters \
+                    --parameter search="name='${MC_NAME}'" --parameter size=1 \
+                  | jq -r '.items[0].id // empty')
+  [[ -n "${MC_CLUSTER_ID}" ]] && echo -n "${MC_CLUSTER_ID}" > "${SHARED_DIR}/mc-cluster-id"
+fi
+
 # ---- Service cluster kubeconfig (${SHARED_DIR}/sc-kubeconfig) ----
-# The management cluster is itself managed by a service cluster. Use backplane
-# multi-login to reach it. SC capture is net-new; keep it best-effort unless
-# REQUIRE_SC=true so customer/MC validation still proceeds where SC is not exposed.
+# backplane --service logs into the service cluster of the hosted cluster. SC
+# capture is net-new; keep it best-effort unless REQUIRE_SC=true so customer/MC
+# validation still proceeds where the SC is not exposed.
 sc_kubeconfig="${SHARED_DIR}/sc-kubeconfig"
 sc_ok=false
-multi_kubeconfig="$(mktemp /tmp/backplane-multi.XXXXXX)"
-if KUBECONFIG="${multi_kubeconfig}" ocm-backplane login "${MC_CLUSTER_ID}" --multi &>/dev/null; then
-  # The --multi kubeconfig carries a context per reachable cluster; pick the one
-  # that is not the management cluster as the service cluster.
-  sc_ctx=$(KUBECONFIG="${multi_kubeconfig}" oc config get-contexts -o name 2>/dev/null \
-             | grep -viE "${MC_CLUSTER_ID}|${MC_NAME}" | head -n1 || true)
-  if [[ -n "${sc_ctx}" ]]; then
-    if KUBECONFIG="${multi_kubeconfig}" oc config use-context "${sc_ctx}" &>/dev/null \
-       && KUBECONFIG="${multi_kubeconfig}" oc config view --raw --minify > "${sc_kubeconfig}" 2>/dev/null \
-       && KUBECONFIG="${sc_kubeconfig}" oc whoami &>/dev/null; then
-      chmod 0600 "${sc_kubeconfig}"
-      sc_ok=true
-      log "Service cluster kubeconfig ready (context ${sc_ctx})"
-    fi
+sc_login_kubeconfig="$(mktemp /tmp/backplane-sc-login.XXXXXX)"
+if KUBECONFIG="${sc_login_kubeconfig}" ocm-backplane login "${CLUSTER_ID}" --service &>/dev/null; then
+  if KUBECONFIG="${sc_login_kubeconfig}" oc config view --raw --minify > "${sc_kubeconfig}" 2>/dev/null \
+     && KUBECONFIG="${sc_kubeconfig}" oc whoami &>/dev/null; then
+    chmod 0600 "${sc_kubeconfig}"
+    sc_ok=true
+    log "Service cluster kubeconfig ready"
   fi
 fi
-rm -f "${multi_kubeconfig}"
+rm -f "${sc_login_kubeconfig}"
 
 if [[ "${sc_ok}" != "true" ]]; then
   rm -f "${sc_kubeconfig}"
