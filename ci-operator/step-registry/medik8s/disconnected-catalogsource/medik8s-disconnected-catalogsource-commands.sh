@@ -22,9 +22,11 @@ fi
 WORKLOAD_IMAGE=$(sed 's/:[^/]*$//' "${SHARED_DIR}/workload_image")
 declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation}"
 # Must-gather image used by the observability/must-gather e2e specs. It must be
-# mirrored here so the disconnected cluster can pull it. The default tag-valued
-# ref is redirected by the oc-mirror ITMS; a digest-valued ref uses the IDMS.
-declare MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-quay.io/medik8s/must-gather:latest}"
+# mirrored here so the disconnected cluster can pull it, and exported to
+# SHARED_DIR so the test step pulls the same ref. Single source of truth is the
+# ref default (downstream RHWA image); the default tag-valued ref is redirected
+# by the oc-mirror ITMS, a digest-valued ref uses the IDMS.
+declare MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/workload-availability/node-healthcheck-must-gather-rhel9:v0.12}"
 
 collect_artifacts() {
     log "Collecting debug artifacts..."
@@ -357,6 +359,9 @@ main() {
 
     echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_commit_sha"
     echo "${CATALOG_SOURCE_NAME}" > "${SHARED_DIR}/catsrc_name"
+    # Export the resolved must-gather ref so the e2e-test step pulls the same
+    # image that was mirrored above (kept in one place: the ref default).
+    echo "${MUST_GATHER_IMAGE}" > "${SHARED_DIR}/must_gather_image"
     log "=== Done. Disconnected CatalogSource ${CATALOG_SOURCE_NAME} is READY ==="
 }
 main
