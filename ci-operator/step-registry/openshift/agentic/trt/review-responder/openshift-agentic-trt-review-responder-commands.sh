@@ -442,7 +442,22 @@ while true; do
     iteration=$(( iteration + 1 ))
     echo "Checking (iteration ${iteration})..."
 
-    current_head=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json headRefOid -q .headRefOid 2>/dev/null || echo "")
+    if ! current_head=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json headRefOid -q .headRefOid 2>/dev/null) || \
+       [[ -z "${current_head}" ]]; then
+        gate_failures=$(( gate_failures + 1 ))
+        echo "Unable to determine the current PR head SHA (${gate_failures}/${GATE_FAILURE_THRESHOLD})"
+        if [[ "${EVAL_MODE:-}" == "true" ]]; then
+            REVIEW_EXIT=1
+            break
+        fi
+        if [[ "${gate_failures}" -ge "${GATE_FAILURE_THRESHOLD}" ]]; then
+            echo "ERROR: PR head lookup failed ${gate_failures} consecutive times; giving up"
+            exit 1
+        fi
+        echo "Waiting 5 minutes before next check..."
+        sleep 300
+        continue
+    fi
 
     echo "Running gate (${GATE_MODEL})..."
     GATE_LOG="${WORKDIR}/artifacts/gate-${iteration}.log"
@@ -572,6 +587,7 @@ Your GitHub login is ${BOT_LOGIN}." \
             fi
         else
             echo "WARNING: branch push failed; leaving CI failures pending for retry."
+            REVIEW_EXIT=1
         fi
     fi
 
