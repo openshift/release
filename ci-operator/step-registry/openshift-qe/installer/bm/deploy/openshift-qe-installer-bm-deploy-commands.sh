@@ -35,6 +35,16 @@ export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
 
+set +x
+QUADS_SSO_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/quads_sso_token_${LAB} 2>/dev/null || echo "")
+export QUADS_SSO_TOKEN
+CURL_AUTH=""
+if [[ -n "$QUADS_SSO_TOKEN" ]]; then
+  CURL_AUTH="-H 'Authorization: Bearer ${QUADS_SSO_TOKEN}'"
+fi
+export CURL_AUTH
+set -x
+
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
 echo "Removing bastion self-reference from resolv.conf ..."
@@ -75,6 +85,11 @@ sed -i "s/^lab_cloud:$/lab_cloud: $LAB_CLOUD/" /tmp/all.yml
 sed -i "s/^cluster_type:$/cluster_type: $TYPE/" /tmp/all.yml
 sed -i "s/^worker_node_count:$/worker_node_count: $NUM_WORKER_NODES/" /tmp/all.yml
 sed -i "s|^smcipmitool_url:$|smcipmitool_url: \"file:///root/smcipmitool.tar.gz\"|" /tmp/all.yml
+set +x
+if [[ -n "$QUADS_SSO_TOKEN" ]]; then
+  sed -i "s/^quads_api_token: .*/quads_api_token: \"$QUADS_SSO_TOKEN\"/" /tmp/all.yml
+fi
+set -x
 
 # Variables with defaults that need overriding
 sed -i "s/^public_vlan: .*/public_vlan: $PUBLIC_VLAN/" /tmp/all.yml
@@ -245,7 +260,7 @@ if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
    bastion2=$(jq -r ".nodes[0].name" $OCPINV)
 else
    OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
-   bastion2=$(curl -sSk $OCPINV | jq -r ".nodes[0].name")
+   bastion2=$(eval curl -sSk $CURL_AUTH $OCPINV | jq -r ".nodes[0].name")
 fi
 ssh ${SSH_ARGS} root@${bastion} "
    ssh-keygen -R ${bastion2}

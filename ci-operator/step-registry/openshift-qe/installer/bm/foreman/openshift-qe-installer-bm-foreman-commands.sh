@@ -14,6 +14,16 @@ QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
+
+set +x
+QUADS_SSO_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/quads_sso_token_${LAB} 2>/dev/null || echo "")
+export QUADS_SSO_TOKEN
+CURL_AUTH=""
+if [[ -n "$QUADS_SSO_TOKEN" ]]; then
+  CURL_AUTH="-H 'Authorization: Bearer ${QUADS_SSO_TOKEN}'"
+fi
+export CURL_AUTH
+set -x
 FOREMAN_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/foreman_instance_${LAB})
 export FOREMAN_INSTANCE
 
@@ -22,9 +32,9 @@ export FOREMAN_INSTANCE
 cat > /tmp/foreman-deploy.sh << 'EOF'
 echo 'Running foreman-deploy.sh'
 OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
-USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
-PSWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
-for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
+USER=$(curl -sSk $CURL_AUTH $OCPINV | jq -r ".nodes[0].pm_user")
+PSWD=$(curl -sSk $CURL_AUTH $OCPINV  | jq -r ".nodes[0].pm_password")
+for i in $(curl -sSk $CURL_AUTH $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
   echo "Processing host: $i"
 
   # Determine boot mode using badfish
@@ -71,7 +81,7 @@ done
 # Collect node lists and identify Dell vs SuperMicro
 ALL_NODES=()
 DELL_NODES=()
-for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
+for i in $(curl -sSk $CURL_AUTH $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
   ALL_NODES+=("$i")
   if ! echo "$i" | grep -qE "(1029u|1029p|5039ms|6018r|6029p|6029r|6048p|6048r|6049p)"; then
     DELL_NODES+=("$i")
@@ -179,13 +189,13 @@ else
   echo "All nodes came up successfully, no recovery needed"
 fi
 EOF
-envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${LAB},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-deploy.sh > /tmp/foreman-deploy_updated-$LAB_CLOUD.sh
+envsubst '${CURL_AUTH},${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${LAB},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-deploy.sh > /tmp/foreman-deploy_updated-$LAB_CLOUD.sh
 
 # Wait until the newly deployed servers are accessible via ssh
 cat > /tmp/foreman-wait.sh << 'EOF'
 echo 'Running foreman-wait.sh'
 OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
-for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
+for i in $(curl -sSk $CURL_AUTH $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
   # Wait for SSH to be available and check hostname
   while true; do
     echo "Trying SSH connection to host $i ..."
@@ -203,11 +213,11 @@ for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$N
   ssh-keyscan $i >> ~/.ssh/known_hosts
 done
 EOF
-envsubst '${NUM_NODES},${LOGIN},${LAB_CLOUD},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-wait.sh > /tmp/foreman-wait_updated-$LAB_CLOUD.sh
+envsubst '${CURL_AUTH},${NUM_NODES},${LOGIN},${LAB_CLOUD},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-wait.sh > /tmp/foreman-wait_updated-$LAB_CLOUD.sh
 
 # Generate the foreman_config.yml file
 OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
-PSWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
+PSWD=$(eval curl -sSk $CURL_AUTH $OCPINV  | jq -r ".nodes[0].pm_password")
 export PSWD
 cat > /tmp/foreman_config.yml << 'EOF'
 :modules:

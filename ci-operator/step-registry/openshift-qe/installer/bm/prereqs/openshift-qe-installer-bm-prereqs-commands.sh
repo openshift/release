@@ -19,6 +19,16 @@ export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
 
+set +x
+QUADS_SSO_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/quads_sso_token_${LAB} 2>/dev/null || echo "")
+export QUADS_SSO_TOKEN
+CURL_AUTH=""
+if [[ -n "$QUADS_SSO_TOKEN" ]]; then
+  CURL_AUTH="-H 'Authorization: Bearer ${QUADS_SSO_TOKEN}'"
+fi
+export CURL_AUTH
+set -x
+
 if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
   OCPINV=$(cat ${CLUSTER_PROFILE_DIR}/ocp_inventory_path)
   export OCPINV
@@ -42,12 +52,12 @@ if [[ "$OCP_INVENTORY_OVERRIDE" == "true" ]]; then
   fi
 else
   OCPINV=${OCPINV}
-  USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
-  PWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
+  USER=$(curl -sSk $CURL_AUTH $OCPINV | jq -r ".nodes[0].pm_user")
+  PWD=$(curl -sSk $CURL_AUTH $OCPINV  | jq -r ".nodes[0].pm_password")
   if [[ "$TYPE" == "mno" ]]; then
-    HOSTS=$(curl -sSk $OCPINV | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].name")
+    HOSTS=$(curl -sSk $CURL_AUTH $OCPINV | jq -r ".nodes[1:4+"$NUM_WORKER_NODES"][].name")
   elif [[ "$TYPE" == "sno" ]]; then
-    HOSTS=$(curl -sSk $OCPINV | jq -r ".nodes[1:2][].name")
+    HOSTS=$(curl -sSk $CURL_AUTH $OCPINV | jq -r ".nodes[1:2][].name")
   fi
 fi
 echo "Hosts to be prepared: $HOSTS"
@@ -102,7 +112,7 @@ if [[ "$PRE_UEFI" == "true" ]]; then
   done
 fi
 EOF
-envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_PXE_LOADER},${PRE_UEFI},${QUADS_INSTANCE},${TYPE},${OCP_INVENTORY_OVERRIDE},${OCPINV}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${CURL_AUTH},${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_PXE_LOADER},${PRE_UEFI},${QUADS_INSTANCE},${TYPE},${OCP_INVENTORY_OVERRIDE},${OCPINV}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Generate the foreman_config.yml file
 if [[ "$PRE_PXE_LOADER" == "true" ]]; then
@@ -113,7 +123,7 @@ if [[ "$PRE_PXE_LOADER" == "true" ]]; then
     PSWD=$(ssh ${SSH_ARGS} root@${bastion} "jq -r '.nodes[0].pm_password' ${OCPINV}")
   else
     OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
-    PSWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
+    PSWD=$(eval curl -sSk $CURL_AUTH $OCPINV  | jq -r ".nodes[0].pm_password")
   fi
   export PSWD
   cat > /tmp/foreman_config.yml << 'EOF'
