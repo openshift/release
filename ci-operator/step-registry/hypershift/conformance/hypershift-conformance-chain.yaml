@@ -209,18 +209,60 @@ chain:
       fi
 
       if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
-        export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+        TEST_CSI_DRIVER_FILES="${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}"
+        if [[ ! -s "${TEST_CSI_DRIVER_FILES}" ]]; then
+          echo "Required CSI driver manifest ${TEST_CSI_DRIVER_FILES} is missing or empty" >&2
+          exit 1
+        fi
+        export TEST_CSI_DRIVER_FILES
+      fi
+
+      if [[ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ]]; then
+        TEST_OCP_CSI_DRIVER_FILES="${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}"
+        if [[ ! -s "${TEST_OCP_CSI_DRIVER_FILES}" ]]; then
+          echo "Required OCP CSI driver manifest ${TEST_OCP_CSI_DRIVER_FILES} is missing or empty" >&2
+          exit 1
+        fi
+        export TEST_OCP_CSI_DRIVER_FILES
+      fi
+
+      if [[ -n "${VERIFY_PAYLOAD_COMPONENT_IMAGE}" ]]; then
+        EXPECTED_IMAGE="$(oc adm release info "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}" --image-for="${VERIFY_PAYLOAD_COMPONENT_IMAGE}")"
+        if [[ -z "${EXPECTED_IMAGE}" ]]; then
+          echo "The hosted-cluster payload has no ${VERIFY_PAYLOAD_COMPONENT_IMAGE} image" >&2
+          exit 1
+        fi
+        CONTROLLER_IMAGE="$(oc --kubeconfig="${HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG}" \
+          -n "${HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE}" \
+          get deployment/aws-ebs-csi-driver-controller \
+          -o jsonpath='{.spec.template.spec.containers[?(@.name=="csi-driver")].image}')"
+        NODE_IMAGE="$(oc -n openshift-cluster-csi-drivers \
+          get daemonset/aws-ebs-csi-driver-node \
+          -o jsonpath='{.spec.template.spec.containers[?(@.name=="csi-driver")].image}')"
+        if [[ "${CONTROLLER_IMAGE}" != "${EXPECTED_IMAGE}" ]]; then
+          echo "EBS controller uses ${CONTROLLER_IMAGE}; expected PR payload image ${EXPECTED_IMAGE}" >&2
+          exit 1
+        fi
+        if [[ "${NODE_IMAGE}" != "${EXPECTED_IMAGE}" ]]; then
+          echo "EBS node uses ${NODE_IMAGE}; expected PR payload image ${EXPECTED_IMAGE}" >&2
+          exit 1
+        fi
+        echo "Verified the EBS controller and node use PR payload image ${EXPECTED_IMAGE}"
+      fi
+
+      TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
+      if [[ -z "${TESTS//[[:space:]]/}" ]]; then
+        echo "Test suite ${TEST_SUITE} selected no tests" >&2
+        exit 1
       fi
 
       if [[ -n "${TEST_INCLUDES}" ]]; then
-          TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
           echo "${TESTS}" | grep "${TEST_INCLUDES}" >/tmp/test_includes
       fi
 
       if [[ -n "${TEST_SKIPS}" ]]; then
           # Strip whitespace around \| separators injected by YAML >- folding
           TEST_SKIPS=$(echo "$TEST_SKIPS" | sed 's/ *\\|/\\|/g; s/\\| */\\|/g')
-          TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
           echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
           if [[ -n "${TEST_INCLUDES}" ]]; then
             TEST_SKIPS_SPECIFIC=$(echo "$TEST_SKIPS" | sed 's/\\\[Suite:openshift\/conformance\/parallel\\\]$//')
@@ -239,6 +281,10 @@ chain:
             fi
           }
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+          if [[ ! -s /tmp/tests ]]; then
+            echo "Test suite ${TEST_SUITE} selected no tests after applying TEST_SKIPS" >&2
+            exit 1
+          fi
 
           # Warn about individual skip patterns that match nothing.
           # Assumes \| is only used as a top-level OR (true for all known usages at the time of writing).
@@ -320,6 +366,17 @@ chain:
         Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
         program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
         details. The file must be present in ${SHARED_DIR}.
+    - name: TEST_OCP_CSI_DRIVER_MANIFEST
+      default: ""
+      documentation: |-
+        Name of the OCP-specific CSI driver manifest file to use. Used by the
+        `openshift-tests` program as TEST_OCP_CSI_DRIVER_FILES. The file must be
+        present in ${SHARED_DIR}.
+    - name: VERIFY_PAYLOAD_COMPONENT_IMAGE
+      default: ""
+      documentation: |-
+        Payload component whose image must match the CSI driver controller and
+        node workloads on the hosted cluster. Currently supports aws-ebs-csi-driver.
     - name: MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT
       documentation: |-
         Optional. Used to override openshift-tests CLI, CLI extracts from 'HOSTEDCLUSTER_RELEASE_IMAGE_LATEST'.

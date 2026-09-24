@@ -1,7 +1,15 @@
 base_images:
+  aws-ebs-csi-driver-operator-test:
+    name: "4.23"
+    namespace: ocp
+    tag: aws-ebs-csi-driver-operator-test
   commitchecker:
     name: commitchecker
     namespace: ci
+    tag: latest
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
     tag: latest
   hypershift-tests:
     name: hypershift-tests
@@ -66,6 +74,24 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
+- always_run: false
+  as: e2e-aws-csi-hypershift
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      EXTRA_ARGS: --use-rosa-managed-policies --shared-role
+      PUBLIC_ONLY: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-aws-ebs.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-aws-ebs.yaml
+      TEST_SUITE: openshift/csi
+      VERIFY_PAYLOAD_COMPONENT_IMAGE: aws-ebs-csi-driver
+      VERIFY_ROSA_MANAGED_POLICIES: "true"
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-root-management-cluster
+    - chain: hypershift-aws-create
+    - ref: storage-conf-csi-aws-ebs
+    workflow: hypershift-aws-conformance
 - always_run: false
   as: e2e-aws-csi-extended
   optional: true

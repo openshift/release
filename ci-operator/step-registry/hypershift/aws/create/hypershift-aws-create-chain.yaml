@@ -33,6 +33,9 @@ chain:
     - name: EXTRA_ARGS
       default: ""
       documentation: "Extra args to pass to the create cluster aws command"
+    - name: VERIFY_ROSA_MANAGED_POLICIES
+      default: "false"
+      documentation: "Fail unless ROSA managed EBS and worker policies were attached during cluster creation."
     - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
@@ -209,12 +212,28 @@ chain:
         cp ${hosted_cluster_info_file} ${ARTIFACT_DIR}/aws-hosted-cluster-info-user-tag
       fi
 
-      # Execute the command
+      # Execute the command and retain its IAM setup output for policy verification.
+      CREATE_LOG="${ARTIFACT_DIR}/hypershift-create-cluster.log"
       # When using np_skew (different release images), we need eval to properly handle shell operators
       if [[ -n "$RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
-        eval "${COMMAND[*]} $(support_np_skew)"
+        eval "${COMMAND[*]} $(support_np_skew)" 2>&1 | tee "${CREATE_LOG}"
       else
-        "${COMMAND[@]}"
+        "${COMMAND[@]}" 2>&1 | tee "${CREATE_LOG}"
+      fi
+
+      if [[ "${VERIFY_ROSA_MANAGED_POLICIES}" == "true" ]]; then
+        if ! grep -F "Attached managed policy to shared role" "${CREATE_LOG}" |
+          grep -F "ROSAAmazonEBSCSIDriverOperatorPolicy" |
+          grep -F "${CLUSTER_NAME}-shared-role" >/dev/null; then
+          echo "The ROSA EBS CSI managed policy was not attached to ${CLUSTER_NAME}-shared-role" >&2
+          exit 1
+        fi
+        if ! grep -E "(Created|Found existing) role" "${CREATE_LOG}" |
+          grep -F "${CLUSTER_NAME}-worker-ROSA-Worker-Role" >/dev/null; then
+          echo "The expected ROSA worker role ${CLUSTER_NAME}-worker-ROSA-Worker-Role was not created" >&2
+          exit 1
+        fi
+        echo "Verified ROSAAmazonEBSCSIDriverOperatorPolicy on the shared role and the ROSA worker role"
       fi
 
       echo "Waiting for cluster to become available"

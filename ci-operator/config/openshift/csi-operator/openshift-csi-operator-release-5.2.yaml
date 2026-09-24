@@ -162,6 +162,25 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
+- always_run: false
+  as: e2e-aws-csi-hypershift
+  run_if_changed: ^(Dockerfile\.aws-ebs|assets\/overlays\/aws-ebs\/.*|pkg\/driver\/aws-ebs\/.*|pkg\/operator\/.*)
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      EXTRA_ARGS: --use-rosa-managed-policies --shared-role
+      PUBLIC_ONLY: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-aws-ebs.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-aws-ebs.yaml
+      TEST_SUITE: openshift/csi
+      VERIFY_PAYLOAD_COMPONENT_IMAGE: aws-ebs-csi-driver
+      VERIFY_ROSA_MANAGED_POLICIES: "true"
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-root-management-cluster
+    - chain: hypershift-aws-create
+    - ref: storage-conf-csi-aws-ebs
+    workflow: hypershift-aws-conformance
 - as: hypershift-aws-e2e-external
   steps:
     cluster_profile: hypershift-aws
