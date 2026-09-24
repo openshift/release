@@ -15,17 +15,23 @@ fi
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+# The install-time DNS watcher appends the apps DNS stack it creates to this
+# shared cleanup list, so it is the source of truth for this job's stack name.
 stack_list="${SHARED_DIR}/to_be_removed_cf_stack_list"
 if [[ ! -e "${stack_list}" ]]; then
   echo "No CloudFormation stack list found; skipping apps DNS stack cleanup"
   exit 0
 fi
 
+# An unreadable list makes the cleanup target unknown, so fail rather than
+# risking deletion of an inferred stack name.
 if ! stack_list_contents=$(cat -- "${stack_list}"); then
   echo "ERROR: Unable to read CloudFormation stack list ${stack_list}" >&2
   exit 1
 fi
 
+# The list may contain other installer stacks or duplicate writes; select one
+# distinct apps DNS entry and reject ambiguity instead of choosing arbitrarily.
 mapfile -t apps_dns_stacks < <(printf '%s\n' "${stack_list_contents}" | awk '/-apps-dns$/ { print }' | sort -u)
 case "${#apps_dns_stacks[@]}" in
   0)
@@ -81,6 +87,8 @@ wait_for_deletion() {
   return 1
 }
 
+# Retries can observe an absent stack or a deletion already in progress. Both
+# are idempotent cleanup states; lookup failures other than absence remain errors.
 status=""
 if status=$(stack_status); then
   case "${status}" in
@@ -103,6 +111,8 @@ else
   exit 1
 fi
 
+# This ref runs before ipi-deprovision because this stack owns records in the
+# cluster private Route53 hosted zone, which must still exist for stack deletion.
 echo "Deleting apps DNS stack ${STACK_NAME} before cluster deprovisioning"
 if ! aws --region "${REGION}" cloudformation delete-stack --stack-name "${STACK_NAME}"; then
   if status=$(stack_status); then
