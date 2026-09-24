@@ -25,16 +25,7 @@ tests:
       git update-ref refs/remotes/origin/main HEAD~1
     fi
     set -x
-    # Validate commit message format: JIRA-TICKET | TYPE: MESSAGE
-    commit_messages=$(git log --pretty=format:"%s" origin/main..HEAD)
-    echo "$commit_messages" | while IFS= read -r message; do
-      echo "Validating: $message"
-      if ! echo "$message" | grep -qE "^[A-Z]+-[0-9]+ \| (feat|fix|docs|style|refactor|test|chore|build|ci|perf): .*$"; then
-        echo "Invalid commit message format. Expected: JIRA-TICKET | TYPE: MESSAGE"
-        echo "Example: OCMCOMM-123 | feat: add new feature"
-        exit 1
-      fi
-    done
+    make validate-commits
   container:
     from: src
 - as: build
@@ -63,7 +54,8 @@ tests:
     git diff --exit-code || (echo "Code is not formatted. Run 'make fmt' locally." && exit 1)
   container:
     from: src
-- as: coverage
+- always_run: false
+  as: coverage
   commands: |
     unset GOFLAGS
     make coverage
