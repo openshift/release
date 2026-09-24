@@ -12,6 +12,7 @@
 #   CATALOG_SOURCE_IMAGE      - Custom catalog image (optional)
 #   OSC_CHARTS_REPO               - Charts repo URL
 #   OSC_CHARTS_REF                - Charts git ref (default: main)
+#   PEERPODS_CREDENTIALS_MODE     - Credentials mode when peer-pods enabled (default: cco)
 #   ENABLEPEERPODS                - "true" to enable peer-pods (default: false)
 #   WORKLOAD_TO_TEST              - "kata", "peer-pods", or "coco" (default: kata)
 #   RUST_RUNTIME                  - "true" to use the Rust runtime (default: false)
@@ -34,6 +35,7 @@ OSC_NAMESPACE=${OSC_NAMESPACE:-openshift-sandboxed-containers-operator}
 CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE:-}
 OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
+PEERPODS_CREDENTIALS_MODE="${PEERPODS_CREDENTIALS_MODE:-cco}"
 ENABLEPEERPODS=${ENABLEPEERPODS:-false}
 WORKLOAD_TO_TEST=${WORKLOAD_TO_TEST:-kata}
 OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
@@ -591,18 +593,15 @@ function create_peer_pods_secret() {
     return 0
   fi
 
-  # Detect identity mode from osc-config or default to manual
-  local identity_mode
-  identity_mode=$(oc get configmap osc-config -n default -o jsonpath='{.data.identityMode}' 2>/dev/null || echo "manual")
-
-  case "${identity_mode}" in
+  case "${PEERPODS_CREDENTIALS_MODE}" in
     cco)
       echo ">>> Identity mode: cco (Cloud Credential Operator handles credentials)"
       return 0
       ;;
     sts)
       echo ">>> Identity mode: sts (credentials via subscription environment)"
-      return 0
+      echo ">>> ERROR: sts handler not implemented yet"
+      return 1
       ;;
     manual|*)
       echo ">>> Identity mode: manual (copying credentials from peerpods-param-secret)"
@@ -651,18 +650,8 @@ function create_peer_pods_secret() {
       fi
       ;;
     aws)
-      # Extract AWS credentials
-      local auth_json
-      auth_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.auth\.json}' 2>/dev/null || echo "")
-      if [[ -n "${auth_json}" ]]; then
-        echo "${auth_json}" | base64 -d > "${SCRATCH}/auth.json"
-        oc_with_retry oc create secret generic peer-pods-secret \
-          -n "${OSC_NAMESPACE}" \
-          --from-file="${SCRATCH}/auth.json"
-        rm -f "${SCRATCH}/auth.json"
-      else
-        echo ">>> WARNING: Could not extract AWS credentials from peerpods-param-secret"
-      fi
+      echo ">>> ERROR: manual credentials handler not implemented for AWS"
+      return 1
       ;;
     *)
       echo ">>> WARNING: peer-pods-secret creation not implemented for provider: ${provider}"

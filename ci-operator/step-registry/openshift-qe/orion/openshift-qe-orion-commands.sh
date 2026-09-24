@@ -48,6 +48,8 @@ fi
 
 case "$ES_TYPE" in
   qe)
+    # Disable xtrace: reading QE ElasticSearch credentials and JIRA token
+    set +x
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
@@ -59,14 +61,20 @@ case "$ES_TYPE" in
         # We use orion's default JIRA project and components
         ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
     fi
+    set -x
     ;;
   quay-qe)
+    # Disable xtrace: reading quay-qe ElasticSearch credentials
+    set +x
     ES_PASSWORD=$(<"/secret/quay-qe/password")
     ES_USERNAME=$(<"/secret/quay-qe/username")
     ES_HOST=$(<"/secret/quay-qe/hostname")
     ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
+    set -x
     ;;
   stackrox)
+    # Disable xtrace: reading StackRox ElasticSearch credentials
+    set +x
     ES_SECRETS_PATH='/secret_stackrox'
     ES_PASSWORD=$(<"${ES_SECRETS_PATH}/password")
     ES_USERNAME=$(<"${ES_SECRETS_PATH}/username")
@@ -74,11 +82,15 @@ case "$ES_TYPE" in
         ES_HOST=$(<"${ES_SECRETS_PATH}/host")
     fi
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+    set -x
     ;;
   *)
+    # Disable xtrace: reading credentials and constructing authenticated URL
+    set +x
     ES_PASSWORD=$(<"/secret/internal/password")
     ES_USERNAME=$(<"/secret/internal/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
+    set -x
     ;;
 esac
 
