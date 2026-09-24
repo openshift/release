@@ -92,7 +92,25 @@ oc process --local --ignore-unknown-parameters=true -f "${FIXED_TEMPLATE}" \
     -p OBSERVATORIUM_URL=https://observatorium.example.com \
     -o yaml > "${PROCESSED}"
 
+# Dump elevated kubeconfig (proven operator-e2e pattern)
+log "Dumping elevated backplane kubeconfig..."
+ELEVATED_KUBECONFIG="$(mktemp /tmp/elevated-kubeconfig.XXXXXX)"
+chmod 0600 "${ELEVATED_KUBECONFIG}"
+if ! ocm-backplane elevate "${BACKPLANE_ELEVATE_REASON}" -- \
+    config view --raw --minify > "${ELEVATED_KUBECONFIG}"; then
+    log "ERROR: failed to dump elevated backplane kubeconfig"
+    rm -f "${ELEVATED_KUBECONFIG}"
+    exit 1
+fi
+
+if ! grep -q 'backplane-cluster-admin' "${ELEVATED_KUBECONFIG}"; then
+    log "ERROR: elevated kubeconfig missing backplane-cluster-admin impersonation"
+    exit 1
+fi
+
+export KUBECONFIG="${ELEVATED_KUBECONFIG}"
+
 log "Server-side dry-run apply of processed SelectorSyncSets"
-ocm-backplane elevate "${BACKPLANE_ELEVATE_REASON}" -- apply --dry-run=server -f "${PROCESSED}"
+oc apply --dry-run=server -f "${PROCESSED}"
 
 log "SSS server-side dry-run validation passed"
