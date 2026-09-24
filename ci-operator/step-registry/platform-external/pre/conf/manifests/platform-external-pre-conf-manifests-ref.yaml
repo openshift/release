@@ -1,7 +1,6 @@
 ref:
   as: platform-external-pre-conf-manifests
   from: installer
-  cli: latest
   commands: platform-external-pre-conf-manifests-commands.sh
   grace_period: 30m
   resources:
@@ -10,13 +9,12 @@ ref:
       memory: 100Mi
   documentation: |-
     Step to customize installer manifests required by Platform External for each platform.
-    Extracts openshift-install from OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE (so bootstrap
-    matches the install payload), creates manifests, and writes ignition configs to SHARED_DIR.
-    Upgrade jobs should override INSTALL to release:initial (same as openshift-e2e-external-aws).
+    The step creates manifests (openshift-install create manifests) and generate the ignition
+    config files (create ignition-configs), saving in a the shared storage.
   dependencies:
     - name: "release:latest"
       env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
-    - name: "release:latest"
+    - name: "release:initial"
       env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
   env:
   - name: PROVIDER_NAME
@@ -27,14 +25,12 @@ ref:
     default: ""
     documentation: |-
       When set to "yes" the CCM parameters will be set in the install-config.yaml.
+  - name: PLATFORM_EXTERNAL_OVERRIDE_RELEASEAdd a comment on  line L28Add diff commentMarkdown input:  edit mode selected.WritePreviewHeadingBold(control b) control⌃ bBItalic(control i) control⌃ iIQuote(control shift right angle bracket) control⌃ shift⇧ right angle bracket>Code(control e) control⌃ eELink(control k) control⌃ kKUnordered list(control 8) control⌃ 88Numbered list(control shift ampersand) control⌃ shift⇧ ampersand&Task list(control shift l) control⌃ shift⇧ lLMentionReferenceSlash commandsMore itemsSaved repliesAdd FilesPaste, drop, or click to add filesCancelCommentStart a review
+    default: ""
+    documentation: |-
+      Override release image.
   - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
     default: "true"
     documentation: |-
       Set to true to disable the Sigstore image signature policy to allow the installation of
       an unsigned release image. This is for internal CI testing only"
-  - name: REGISTRY_AUTH_FILE
-    default: ""
-    documentation: |-
-      Pull-secret path used for `oc adm release extract`. When empty (default), uses
-      ${SHARED_DIR}/pull-secret-with-ci written by platform-external-pre-conf (with CI
-      registry credentials already appended). This step does not re-login.

@@ -18,22 +18,18 @@ source "${SHARED_DIR}/init-fn.sh" || true
 install_yq4
 
 #
-# Append CI credentials to pull-secret (once, shared across later steps)
+# Append CI credentials to pull-secret
 #
-# Each multi-stage step runs in a new container, so /tmp is not shared.
-# Write the enriched pull-secret under SHARED_DIR so manifests, CCM, and
-# openshift-tests can reuse it without repeating `oc registry login`.
-#
-REGISTRY_AUTH_FILE="${REGISTRY_AUTH_FILE:-${SHARED_DIR}/pull-secret-with-ci}"
-mkdir -p "$(dirname "${REGISTRY_AUTH_FILE}")"
+# The REGISTRY_AUTH_FILE environment variable is used to authenticateAdd a comment on  line L23Add diff commentMarkdown input:  edit mode selected.WritePreviewHeadingBold(control b) control⌃ bBItalic(control i) control⌃ iIQuote(control shift right angle bracket) control⌃ shift⇧ right angle bracket>Code(control e) control⌃ eELink(control k) control⌃ kKUnordered list(control 8) control⌃ 88Numbered list(control shift ampersand) control⌃ shift⇧ ampersand&Task list(control shift l) control⌃ shift⇧ lLMentionReferenceSlash commandsMore itemsSaved repliesAdd FilesPaste, drop, or click to add filesCancelCommentStart a review
+# openshift-tests to the CI registry.
+# We must clone the CI-operator provided credentials to the shared directory
+# to be used by the openshift-tests and upper steps to consumed CI image.
 cp -v "${CLUSTER_PROFILE_DIR}"/pull-secret "${REGISTRY_AUTH_FILE}"
 
 if [[ $(dirname "$(dirname "${RELEASE_IMAGE_LATEST}" )") != "quay.io" ]]; then
-  log "Logging to CI registry for later steps (extract/CCM/tests): $(dirname "$(dirname $RELEASE_IMAGE_LATEST )")"
-  # Prefer build-cluster SA token over any SHARED_DIR kubeconfig.
-  KUBECONFIG="" oc registry login --to "${REGISTRY_AUTH_FILE}"
+  log "Logging to CI registry to later to extract CCM image info: $(dirname "$(dirname $RELEASE_IMAGE_LATEST )")"Add a comment on  line L30Add diff commentMarkdown input:  edit mode selected.WritePreviewHeadingBold(control b) control⌃ bBItalic(control i) control⌃ iIQuote(control shift right angle bracket) control⌃ shift⇧ right angle bracket>Code(control e) control⌃ eELink(control k) control⌃ kKUnordered list(control 8) control⌃ 88Numbered list(control shift ampersand) control⌃ shift⇧ ampersand&Task list(control shift l) control⌃ shift⇧ lLMentionReferenceSlash commandsMore itemsSaved repliesAdd FilesPaste, drop, or click to add filesCancelCommentStart a review
+  oc registry login --to "${REGISTRY_AUTH_FILE}"
 fi
-
 #
 # Enable CCM
 #

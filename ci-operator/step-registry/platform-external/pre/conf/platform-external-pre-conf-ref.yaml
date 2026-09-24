@@ -26,12 +26,16 @@ ref:
       A fully-qualified domain or subdomain name to fallback from cluster-profile.
       The base domain of the cloud provider is used for setting baseDomain variable
       of the install configuration of the cluster.
-  - name: REGISTRY_AUTH_FILE
+  - name: PLATFORM_EXTERNAL_OVERRIDE_RELEASE
     default: ""
     documentation: |-
-      Writable path for the pull-secret after CI registry credentials are appended.
-      When empty (default), uses ${SHARED_DIR}/pull-secret-with-ci so later steps
-      (manifests extract, CCM image discovery, openshift-tests) can reuse the same
-      file across container boundaries. When the release is not on quay.io, this
-      step runs `oc registry login` once into that path.
-
+      Override the release image.
+  - name: REGISTRY_AUTH_FILE
+    default: "/tmp/secret/pull-secret-with-ci"
+    documentation: |-
+      The path of copy of the registry auth file provided by CI-operator.
+      When the release payload is not the quay.io, it will force login to the
+      build cluster registry to append the credentials to be available to:
+      A) mount the install-config.yaml,
+      B) pull the CCM image, when CCM is enabled, to mount the CCM deployment manifest,
+      C) openshift-tests pulls tests image.

@@ -49,8 +49,5 @@ fi
 
 log "API Healthy check done!"
 
-log "#> Infrastructure object:"
-oc get infrastructure -o yaml || true
-
-log "#> Cluster Version:"
-oc get clusterversion || true
+log "Dumping infrastructure object:"
+oc get infrastructure -o yaml
