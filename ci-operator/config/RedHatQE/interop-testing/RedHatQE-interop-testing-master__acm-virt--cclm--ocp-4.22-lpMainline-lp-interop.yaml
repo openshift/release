@@ -223,8 +223,8 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       MTV_HUB_CHANNEL: release-v2.12
+      MTV_HS_MIGRATION_TIMEOUT: 6h
       MTV_HS_SPOKE_VM_PREFIX: test-vm
-      MTV_MIGRATION_TIMEOUT: 6h
       MTV_PROVIDER_NAMES: spoke-1
       ODF_OPERATOR_CHANNEL: stable-4.22
       ODF_SPOKE_OPERATOR_CHANNEL: stable-4.22
@@ -346,8 +346,8 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       MTV_HUB_CHANNEL: release-v2.12
+      MTV_HS_MIGRATION_TIMEOUT: 6h
       MTV_HS_SPOKE_VM_PREFIX: test-vm
-      MTV_MIGRATION_TIMEOUT: 6h
       MTV_PROVIDER_NAMES: spoke-1
       ODF_OPERATOR_CHANNEL: stable-4.22
       ODF_SPOKE_OPERATOR_CHANNEL: stable-4.22
@@ -426,6 +426,7 @@ tests:
       ACM_SPOKE_WORKER_TYPE: c5n.metal
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       CNV_ENABLE_CCLM: "true"
+      CNV_POLICY_VERSION_SKEW_MAP: "1,stable-4.21,4.21,Manual,install-cnv-spoke1;2,stable,4.22,Automatic,install-cnv-spoke2"
       COMPUTE_NODE_TYPE: c5n.metal
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       DR__RP__CR_COMP_NAME: lp-interop--ACM-Virt
@@ -504,34 +505,9 @@ tests:
     - ref: acm-mch
     - ref: acm-interop-p2p-cluster-install
     - ref: acm-fetch-managed-clusters
-    # spoke-1 gets CNV 4.21 (pinned/Manual) — tests migration SOURCE at lower CNV version.
+    # Single invocation installs CNV 4.21 on spoke-1 and CNV 4.22 on spoke-2 via the
+    # CNV_POLICY_VERSION_SKEW_MAP dispatcher — no step-level env overrides needed.
     - ref: p2p-acm-cnv-install-policy
-      env:
-      - name: CNV_ENABLE_CCLM
-        value: "true"
-      - name: CNV_POLICY_CHANNEL
-        value: stable-4.21
-      - name: CNV_POLICY_INSTALL_MAJOR_MINOR
-        value: "4.21"
-      - name: CNV_POLICY_NAMESPACE
-        value: install-cnv-spoke1
-      - name: CNV_POLICY_TARGET_SPOKE_INDICES
-        value: "1"
-      - name: CNV_POLICY_UPGRADE_APPROVAL
-        value: Manual
-    # spoke-2 gets CNV 4.22 (latest stable) — tests migration DESTINATION at current version.
-    - ref: p2p-acm-cnv-install-policy
-      env:
-      - name: CNV_ENABLE_CCLM
-        value: "true"
-      - name: CNV_POLICY_CHANNEL
-        value: stable
-      - name: CNV_POLICY_INSTALL_MAJOR_MINOR
-        value: "4.22"
-      - name: CNV_POLICY_NAMESPACE
-        value: install-cnv-spoke2
-      - name: CNV_POLICY_TARGET_SPOKE_INDICES
-        value: "2"
     - ref: p2p-install-odf-spokes
     - chain: acm-interop-p2p-submariner-install
     - ref: p2p-cnv-exchange-kubevirt-ca

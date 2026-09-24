@@ -240,6 +240,36 @@ WaitForCNV() {
     }
 }
 
+# CNV_POLICY_VERSION_SKEW_MAP dispatcher — when set, loop over per-spoke version configs in a
+# single step invocation rather than requiring unsupported step-level env overrides in ci-operator
+# config YAMLs (the ref+env combination is not valid in test configs, only in chain/workflow YAMLs).
+#
+# Format: "SPOKE_INDEX,CHANNEL,MAJOR_MINOR,UPGRADE_APPROVAL,POLICY_NAMESPACE[;...]"
+# Example: "1,stable-4.21,4.21,Manual,install-cnv-spoke1;2,stable,4.22,Automatic,install-cnv-spoke2"
+#
+# Each semicolon-separated entry is re-invoked as a new bash process with the relevant env vars
+# overridden and CNV_POLICY_VERSION_SKEW_MAP cleared (prevents infinite recursion).
+if [[ -n "${CNV_POLICY_VERSION_SKEW_MAP:-}" ]]; then
+    : "CNV_POLICY_VERSION_SKEW_MAP set — running multi-version spoke CNV policy installs"
+    IFS=';' read -ra _skewEntries <<< "${CNV_POLICY_VERSION_SKEW_MAP}"
+    for _entry in "${_skewEntries[@]}"; do
+        # Strip any surrounding whitespace from the entry.
+        _entry="${_entry#"${_entry%%[![:space:]]*}"}"
+        _entry="${_entry%"${_entry##*[![:space:]]}"}"
+        IFS=',' read -r _spokeIdx _channel _minorVer _approval _ns <<< "${_entry}"
+        : "Skew entry: spoke_index=${_spokeIdx} channel=${_channel} version=${_minorVer} approval=${_approval} namespace=${_ns}"
+        CNV_POLICY_CHANNEL="${_channel}" \
+        CNV_POLICY_INSTALL_MAJOR_MINOR="${_minorVer}" \
+        CNV_POLICY_UPGRADE_APPROVAL="${_approval}" \
+        CNV_POLICY_NAMESPACE="${_ns}" \
+        CNV_POLICY_TARGET_SPOKE_INDICES="${_spokeIdx}" \
+        CNV_POLICY_VERSION_SKEW_MAP="" \
+            bash "${BASH_SOURCE[0]}"
+    done
+    : "All CNV_POLICY_VERSION_SKEW_MAP entries processed successfully"
+    exit 0
+fi
+
 typeset -a clusterNamesArr=()
 mapfile -t clusterNamesArr < <(LoadSpokeClusterNames)
 
