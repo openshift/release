@@ -7,6 +7,7 @@ set -o pipefail
 # The ref is best_effort so report failures cannot change the test verdict.
 python - <<'PYTHON_NETOBSERV_REPORT'
 import datetime
+import hashlib
 import html
 import json
 import math
@@ -20,12 +21,24 @@ from urllib.parse import quote, urlencode
 env = os.environ
 artifacts = Path(env["ARTIFACT_DIR"])
 artifacts.mkdir(parents=True, exist_ok=True)
-escape = lambda value: html.escape(str(value), quote=True)
 parts = []
 warnings = []
 
 
+def escape(value):
+    """Escape a value for HTML text and attributes."""
+    return html.escape(str(value), quote=True)
+
+
+def sample_reference(uuid):
+    """Return a stable display reference without revealing the workload UUID."""
+    if not uuid:
+        return "Unavailable"
+    return "sample-" + hashlib.sha256(str(uuid).encode()).hexdigest()[:12]
+
+
 def read_json(path):
+    """Read local run identity, recording a notice if it is unavailable."""
     try:
         return json.loads(path.read_text())
     except (OSError, ValueError) as error:
@@ -34,6 +47,7 @@ def read_json(path):
 
 
 def timestamp(value):
+    """Format a Unix timestamp in UTC, handling missing or invalid values."""
     try:
         return datetime.datetime.fromtimestamp(float(value), datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     except (TypeError, ValueError, OverflowError, OSError):
@@ -41,12 +55,14 @@ def timestamp(value):
 
 
 def number(value):
+    """Format finite metric values and label missing measurements unavailable."""
     if not isinstance(value, (int, float)) or not math.isfinite(value):
         return "Unavailable"
     return f"{value:,.6g}"
 
 
 def table(headers, rows):
+    """Build a scrollable table with escaped headers and cell contents."""
     return '<div class="scroll"><table><thead><tr>' + ''.join(
         f"<th>{escape(h)}</th>" for h in headers
     ) + '</tr></thead><tbody>' + ''.join(
@@ -55,6 +71,7 @@ def table(headers, rows):
 
 
 def link(url, label):
+    """Build an escaped artifact link that opens in a separate tab."""
     return f'<a href="{escape(url)}" target="_blank" rel="noopener noreferrer">{escape(label)}</a>'
 
 
@@ -92,6 +109,7 @@ else:
 # next step starts. The public mirror can lag, so wait briefly for finished.json.
 # This post step also runs when Orion failed or was never reached.
 def fetch_json(url):
+    """Fetch a public artifact or object listing with a bounded socket timeout."""
     with urlopen(url, timeout=20) as response:
         return json.load(response)
 
@@ -139,7 +157,7 @@ parts.append(f'<p class="status">{escape(status)}</p>')
 parts.append(table(["Detail", "Value"], [
     ("Job", job or "Unknown"), ("Build", build or "Unknown"), ("Test", test or "Unknown"),
     ("Workload", (identity or {}).get("workload", "Unknown") if isinstance(identity, dict) else "Unknown"),
-    ("Workload UUID", current_uuid or "Unavailable"),
+    ("Sample reference", sample_reference(current_uuid)),
     ("Configuration", env.get("ORION_CONFIG", "")),
     ("Parameters", env.get("ORION_ENVS", "")),
     ("OpenShift version filter", env.get("VERSION", "")),
@@ -207,19 +225,19 @@ for path, rows in datasets:
     for row in rows:
         for name, metric in row["metrics"].items():
             if isinstance(metric, dict) and metric.get("is_changepoint") is True:
-                changes.append((timestamp(row.get("timestamp")), row.get("uuid", "Unknown"),
+                changes.append((timestamp(row.get("timestamp")), sample_reference(row.get("uuid")),
                                 "This run" if current_uuid and row.get("uuid") == current_uuid else "Historical sample",
                                 name, number(metric.get("percentage_change")) + "%"))
     if changes:
         parts.append('<details><summary>Change points in the lookback window</summary><p>Detected shifts may include improvements or acknowledged changes; they are not all new regressions in this run.</p>')
-        parts.append(table(["Sample time", "UUID", "Scope", "Metric", "Change"], changes) + '</details>')
+        parts.append(table(["Sample time", "Sample reference", "Scope", "Metric", "Change"], changes) + '</details>')
     else:
         parts.append('<p>No change points recorded in this dataset.</p>')
 if not datasets:
     parts.append('<p>No structured analysis results available. Check the step log for details.</p>')
 
 graphs = [Path(name) for name in artifact_names if name.endswith("_viz.html")]
-graph_context = "Use the current sample timestamp and UUID above to locate this run." if matched else "No current-run sample was matched; these graphs provide historical context only."
+graph_context = "Use the current sample timestamp above to locate this run." if matched else "No current-run sample was matched; these graphs provide historical context only."
 for path in graphs:
     if not base:
         continue
