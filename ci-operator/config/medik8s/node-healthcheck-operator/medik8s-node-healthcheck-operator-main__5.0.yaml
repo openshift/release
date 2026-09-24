@@ -161,34 +161,25 @@ tests:
           printf 'Candidate: %s; latest GA: %s\n' "$NHC_VERSION" "$NHC_PREVIOUS_VERSION"
 
           prefix="ttl.sh/nhc-prow-$(date +%Y%m%d-%H%M%S)-${revision:0:7}"
-          operator_tag="${prefix}-operator:24h"
-          bundle_tag="${prefix}-bundle:24h"
-          catalog_tag="${prefix}-catalog:24h"
+          operator_tag="${prefix}:3h"
+          bundle_tag="${prefix}-bundle:3h"
+          catalog_tag="${prefix}-catalog:3h"
 
-          echo "==> Build and push operator: $operator_tag"
-          make docker-build VERSION="$NHC_VERSION" IMG="$operator_tag"
-          podman push --digestfile "$ARTIFACT_DIR/operator.digest" "$operator_tag"
-          export NHC_UPGRADE_CANDIDATE_NHC_IMAGE="${prefix}-operator@$(cat "$ARTIFACT_DIR/operator.digest")"
-          echo "==> Operator pushed: $NHC_UPGRADE_CANDIDATE_NHC_IMAGE"
-
-          echo "==> Build and push bundle: $bundle_tag"
-          make bundle-build-ocp \
+          echo '==> Build and push operator, bundle, and catalog with the shared target'
+          make dev-olm-catalog-push \
+            DEV_REGISTRY=ttl.sh TTL_SH_TTL=3h CONTAINER_TOOL=podman \
+            DEV_IMG="$operator_tag" \
             VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
             SKIP_RANGE_LOWER=0.1.0 DOCS_RHWA_VERSION=5.0 \
-            IMG="$NHC_UPGRADE_CANDIDATE_NHC_IMAGE" BUNDLE_IMG="$bundle_tag" \
             CONSOLE_PLUGIN_IMAGE="$CONSOLE_PLUGIN_IMAGE" MUST_GATHER_IMAGE="$MUST_GATHER_IMAGE"
-          podman push --digestfile "$ARTIFACT_DIR/bundle.digest" "$bundle_tag"
-          export NHC_UPGRADE_CANDIDATE_NHC_BUNDLE="${prefix}-bundle@$(cat "$ARTIFACT_DIR/bundle.digest")"
-          echo "==> Bundle pushed: $NHC_UPGRADE_CANDIDATE_NHC_BUNDLE"
 
-          echo "==> Build and push catalog: $catalog_tag"
-          make catalog-build \
-            VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
-            SKIP_RANGE_LOWER=0.1.0 BUNDLE_IMG="$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE" \
-            CATALOG_IMG="$catalog_tag"
-          podman push --digestfile "$ARTIFACT_DIR/catalog.digest" "$catalog_tag"
+          echo '==> Resolve pushed candidate images to immutable digests'
+          skopeo inspect --format '{{.Digest}}' "docker://$operator_tag" > "$ARTIFACT_DIR/operator.digest"
+          skopeo inspect --format '{{.Digest}}' "docker://$bundle_tag" > "$ARTIFACT_DIR/bundle.digest"
+          skopeo inspect --format '{{.Digest}}' "docker://$catalog_tag" > "$ARTIFACT_DIR/catalog.digest"
+          export NHC_UPGRADE_CANDIDATE_NHC_IMAGE="${prefix}@$(cat "$ARTIFACT_DIR/operator.digest")"
+          export NHC_UPGRADE_CANDIDATE_NHC_BUNDLE="${prefix}-bundle@$(cat "$ARTIFACT_DIR/bundle.digest")"
           export NHC_UPGRADE_CANDIDATE_NHC_CATALOG="${prefix}-catalog@$(cat "$ARTIFACT_DIR/catalog.digest")"
-          echo "==> Catalog pushed: $NHC_UPGRADE_CANDIDATE_NHC_CATALOG"
 
           printf 'NHC_UPGRADE_CANDIDATE_NHC_IMAGE=%s\nNHC_UPGRADE_CANDIDATE_NHC_BUNDLE=%s\nNHC_UPGRADE_CANDIDATE_NHC_CATALOG=%s\n' \
             "$NHC_UPGRADE_CANDIDATE_NHC_IMAGE" "$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE" \
