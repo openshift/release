@@ -413,10 +413,12 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
-    # Orange zone (OZ) VPN heterogeneous: s390x control plane + ARM64 workers (akvmocp03)
-    'libvirt-s390x-vpn-arm64-quota-slice': {
-        'libvirt-s390x-arm64-0-0': 1
-    },
+    # Orange zone (OZ) VPN heterogeneous: s390x CP/compute + amd64 workers (xkvm);
+    # lease carved from lnxocp11 (oz-0-*) below.
+    'libvirt-s390x-amd64-vpn-quota-slice': {},
+    # Orange zone (OZ) VPN heterogeneous: s390x CP/compute + ARM64 workers (akvmocp03);
+    # lease carved from lnxocp11 (oz-0-*) below.
+    'libvirt-s390x-vpn-arm64-quota-slice': {},
     'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-s390x-vpn-oz-quota-slice': {},
     'libvirt-s390x-vpn-hcp-quota-slice': {},
@@ -744,10 +746,18 @@ for i in range(4):
 # Move lnxocp14 slots 2-3 from vpn-oz to the HCP VPN profile (same lease names / host)
 del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-2']
 del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-3']
+# Move lnxocp11 slots 2-3 from vpn-oz to heterogeneous VPN profiles (same lease names / host)
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-2']
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-3']
 
 # HCP on OZ lnxocp14: reuse former vpn-oz leases oz-3-2 and oz-3-3
 CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-2'] = 1
 CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-3'] = 1
+
+# Heterogeneous on OZ lnxocp11: reuse former vpn-oz leases oz-0-2 (ARM) and oz-0-3 (x86)
+# Z control-plane + compute stay on lnxocp11; day-2 workers on akvmocp03 / xkvm.
+CONFIG['libvirt-s390x-vpn-arm64-quota-slice']['libvirt-s390x-oz-0-2'] = 1
+CONFIG['libvirt-s390x-amd64-vpn-quota-slice']['libvirt-s390x-oz-0-3'] = 1
 
 # Orange zone (OZ) kubevirt06 (0) + kubevirt07 (1), 1 HA + 1 SNO lease each
 for i in range(2):
