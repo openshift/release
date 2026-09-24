@@ -83,9 +83,14 @@ for variable in STS_TEST_NAMESPACE STS_S3_BUCKET STS_S3_REGION STS_ROLE_ARN; do
   [[ -n "$value" ]] || { echo "Missing ${variable}" >&2; exit 1; }
   export "${variable}=${value}"
 done
-mkdir -p /tmp/quay-sts-bin
-ln -sf "$(command -v oc)" /tmp/quay-sts-bin/kubectl
-export PATH="/tmp/quay-sts-bin:${PATH}"
+KUBECTL_WRAPPER_DIR="${SHARED_DIR}/quay-sts-bin"
+mkdir -p "${KUBECTL_WRAPPER_DIR}"
+cat >"${KUBECTL_WRAPPER_DIR}/kubectl" <<'EOF'
+#!/bin/sh
+exec oc "$@"
+EOF
+chmod +x "${KUBECTL_WRAPPER_DIR}/kubectl"
+export PATH="${KUBECTL_WRAPPER_DIR}:/tmp/quay-sts-bin:${PATH}"
 for command in kubectl jq curl crane base64; do
   command -v "$command" >/dev/null
 done
