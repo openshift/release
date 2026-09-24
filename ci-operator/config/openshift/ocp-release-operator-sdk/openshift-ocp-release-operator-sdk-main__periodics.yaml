@@ -109,12 +109,17 @@ tests:
         fi
         export GITHUB_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
-        # --- Demo: switch to pre-staged branch at v1.42.1 for E2E ---
+        # App installation tokens only write to openshift/* — stage the fork's
+        # pre-baked demo-e2e-base (v1.42.1 + scripts) onto openshift, then rebase.
         git config --global --add safe.directory "$(pwd)" || true
-        git remote add demo-fork https://x-access-token:${GITHUB_TOKEN}@github.com/neha037/ocp-release-operator-sdk.git
-        git fetch demo-fork demo-e2e-base
-        git checkout -B demo-e2e-base demo-fork/demo-e2e-base
-        git branch --set-upstream-to=demo-fork/demo-e2e-base demo-e2e-base
+        _cred_file=$(mktemp)
+        chmod 600 "$_cred_file"
+        printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" >"$_cred_file"
+        git config credential.helper "store --file=${_cred_file}"
+        git remote set-url origin "https://github.com/openshift/ocp-release-operator-sdk.git"
+        git remote add demo-src https://github.com/neha037/ocp-release-operator-sdk.git 2>/dev/null || true
+        git fetch demo-src demo-e2e-base
+        git push -f origin "refs/remotes/demo-src/demo-e2e-base:refs/heads/demo-e2e-base"
 
         # Install gh CLI (not in the base src image)
         GH_VERSION=2.62.0
@@ -122,9 +127,6 @@ tests:
           | tar -xz -C /tmp
         export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
 
-        export DEST_ORG_REPO=neha037/ocp-release-operator-sdk
-        export ORIGIN_URL=https://github.com/neha037/ocp-release-operator-sdk.git
-        export ORIGIN_REMOTE=demo-fork
         export REBASE_BRANCH=demo-e2e-base
         export FORCE_REMOTE_URLS=1
         export SKIP_BUILD=1
