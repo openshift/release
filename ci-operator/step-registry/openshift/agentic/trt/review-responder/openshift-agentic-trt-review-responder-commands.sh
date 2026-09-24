@@ -26,8 +26,10 @@ ci_failure_state() {
         return 1
     fi
 
-    state_dir=$(dirname "${state_file}")
-    mkdir -p "${state_dir}"
+    if ! state_dir=$(dirname "${state_file}") || ! mkdir -p "${state_dir}"; then
+        echo "failed to create CI failure state directory" >&2
+        return 1
+    fi
     (
         local evaluated='[]'
         local temporary_file
@@ -35,7 +37,10 @@ ci_failure_state() {
 
         # A responder is normally the only writer, but locking prevents a lost
         # update if overlapping invocations record different failures.
-        flock -x 9
+        if ! flock -x 9; then
+            echo "failed to lock CI failure state" >&2
+            exit 1
+        fi
         if [[ -e "${state_file}" ]]; then
             if ! evaluated=$(jq -ce \
                 'if type == "array" and all(.[]; type == "object") then . else error("invalid") end' \
@@ -46,7 +51,7 @@ ci_failure_state() {
         fi
 
         if [[ "${action}" == "filter" ]]; then
-            jq -cn \
+            if ! jq -cn \
                 --argjson failures "${failures}" \
                 --argjson evaluated "${evaluated}" \
                 --arg head_ref_oid "${head_ref_oid}" '
@@ -60,11 +65,14 @@ ci_failure_state() {
                     | ($failure | identity($head_ref_oid)) as $identity
                     | select(($evaluated | index($identity)) == null)
                     | $failure]
-            '
-            exit
+            '; then
+                echo "failed to filter CI failure state" >&2
+                exit 1
+            fi
+            exit 0
         fi
 
-        updated=$(jq -cn \
+        if ! updated=$(jq -cn \
             --argjson failures "${failures}" \
             --argjson evaluated "${evaluated}" \
             --arg head_ref_oid "${head_ref_oid}" '
@@ -76,8 +84,14 @@ ci_failure_state() {
                   end;
             reduce ($failures[] | identity($head_ref_oid)) as $identity
                 ($evaluated; if index($identity) == null then . + [$identity] else . end)
-        ')
-        temporary_file=$(mktemp "${state_file}.tmp.XXXXXX")
+        '); then
+            echo "failed to build updated CI failure state" >&2
+            exit 1
+        fi
+        if ! temporary_file=$(mktemp "${state_file}.tmp.XXXXXX"); then
+            echo "failed to create temporary CI failure state" >&2
+            exit 1
+        fi
         if ! printf '%s\n' "${updated}" > "${temporary_file}" || \
            ! sync -f "${temporary_file}" || \
            ! mv -f "${temporary_file}" "${state_file}" || \
