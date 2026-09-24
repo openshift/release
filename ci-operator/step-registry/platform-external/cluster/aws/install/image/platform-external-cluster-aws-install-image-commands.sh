@@ -53,12 +53,16 @@ if [[ -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
     fi
   fi
 
-  CONTAINER_VERSION="$(openshift-install version | awk '/^openshift-install/ {print $2; exit}' | cut -d. -f1,2)"
+  # Both lookups are best-effort: a failure here must fall through to the upi-installer binary
+  # rather than kill the step, so neither may trip `set -e`. `oc adm release info` stderr goes to
+  # an artifact instead of the job log, which also keeps the release pullspec out of stdout.
+  CONTAINER_VERSION="$(openshift-install version | awk '/^openshift-install/ {print $2; exit}' | cut -d. -f1,2 || true)"
   PAYLOAD_VERSION="$(oc adm release info -a "${PULL_SECRET}" \
-    "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}' 2>/dev/null | cut -d. -f1,2)"
+    "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}' \
+    2> "${ARTIFACT_DIR}/release-info-err.txt" | cut -d. -f1,2 || true)"
 
   if [[ -z "${PAYLOAD_VERSION}" ]]; then
-    log "WARNING: could not read the version of ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}; using the upi-installer binary (${CONTAINER_VERSION:-unknown})"
+    log "WARNING: could not read the install payload version, see ${ARTIFACT_DIR}/release-info-err.txt; using the upi-installer binary (${CONTAINER_VERSION:-unknown})"
   elif [[ "${PAYLOAD_VERSION}" == "${CONTAINER_VERSION}" ]]; then
     log "upi-installer and install payload are both ${PAYLOAD_VERSION}; using the upi-installer binary"
   else
