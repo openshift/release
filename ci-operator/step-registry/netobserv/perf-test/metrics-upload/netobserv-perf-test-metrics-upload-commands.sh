@@ -54,6 +54,11 @@ ingress_perf_index_results=$(get_es_data "ingress-perf")
 
 UUID=$(jq '.hits.hits[0]._source.uuid' "$workload_index_results")
 export UUID=${UUID//\"/}
+# Identify this build's workload sample for the Orion Spyglass report. Do not
+# infer the current run from the newest sample in Orion's lookback window.
+jq -n --arg uuid "$UUID" --arg build_id "$BUILD_ID" --arg workload "$WORKLOAD" \
+    '{uuid: $uuid, build_id: $build_id, workload: $workload}' \
+    > "${SHARED_DIR}/orion-current-run.json"
 NOO_BUNDLE_VERSION=$(jq '.hits.hits[0]._source.noo_bundle_info' "$workload_index_results")
 export NOO_BUNDLE_VERSION=${NOO_BUNDLE_VERSION//\"/}
 
