@@ -394,6 +394,8 @@ destroy_e2e_folder_in_tfc() {
       --header "Content-Type: application/vnd.api+json" \
       "https://app.terraform.io/api/v2/runs/${run_id}"); then
       log "  ERROR: Could not read targeted folder destroy run status"
+      stop_tfc_run "${tfc_token}" "${run_id}" "${run_status:-unknown}" || \
+        log "  ERROR: Could not confirm targeted folder destroy run is inactive"
       return 1
     fi
     run_status=$(jq -r '.data.attributes.status // empty' <<<"${run_response}")
@@ -407,6 +409,12 @@ destroy_e2e_folder_in_tfc() {
         log "  ERROR: Targeted folder destroy run finished with status ${run_status}"
         return 1
         ;;
+      policy_soft_failed)
+        log "  ERROR: Targeted folder destroy run is paused by a soft policy failure"
+        stop_tfc_run "${tfc_token}" "${run_id}" "${run_status}" || \
+          log "  ERROR: Could not confirm targeted folder destroy run is inactive"
+        return 1
+        ;;
       *)
         log "  Targeted folder destroy run status: ${run_status:-unknown} (attempt ${attempt}/60)"
         sleep 10
@@ -415,7 +423,94 @@ destroy_e2e_folder_in_tfc() {
   done
 
   log "  ERROR: Timed out waiting for targeted folder destroy run"
+  stop_tfc_run "${tfc_token}" "${run_id}" "${run_status:-unknown}" || \
+    log "  ERROR: Could not confirm targeted folder destroy run is inactive"
   return 1
+}
+
+# Stop an active targeted run before touching its workspace state. A status
+# read can fail transiently, so unknown runs first try cancel and then discard.
+stop_tfc_run() {
+  local tfc_token=$1
+  local run_id=$2
+  local run_status=${3:-unknown}
+  local action
+  local fallback_action=""
+  local attempt
+  local run_response
+
+  case "${run_status}" in
+    pending|plan_queued|planned|policy_checked|policy_override|policy_soft_failed)
+      action="discard"
+      ;;
+    planning|applying)
+      action="cancel"
+      ;;
+    *)
+      action="cancel"
+      fallback_action="discard"
+      ;;
+  esac
+
+  log "  Requesting TFC run ${action} after status ${run_status}"
+  if ! curl -fsS --max-time 30 --connect-timeout 10 \
+    --header "Authorization: Bearer ${tfc_token}" \
+    --header "Content-Type: application/vnd.api+json" \
+    --request POST \
+    "https://app.terraform.io/api/v2/runs/${run_id}/actions/${action}" >/dev/null; then
+    if [[ -z "${fallback_action}" ]]; then
+      log "  ERROR: Could not ${action} targeted folder destroy run"
+      return 1
+    fi
+    log "  WARNING: Could not cancel targeted folder destroy run; trying discard"
+    if ! curl -fsS --max-time 30 --connect-timeout 10 \
+      --header "Authorization: Bearer ${tfc_token}" \
+      --header "Content-Type: application/vnd.api+json" \
+      --request POST \
+      "https://app.terraform.io/api/v2/runs/${run_id}/actions/${fallback_action}" >/dev/null; then
+      log "  ERROR: Could not discard targeted folder destroy run"
+      return 1
+    fi
+  fi
+
+  for attempt in {1..30}; do
+    if ! run_response=$(curl -fsS --max-time 30 --connect-timeout 10 \
+      --header "Authorization: Bearer ${tfc_token}" \
+      --header "Content-Type: application/vnd.api+json" \
+      "https://app.terraform.io/api/v2/runs/${run_id}"); then
+      log "  WARNING: Could not confirm targeted folder destroy run status (attempt ${attempt}/30)"
+    else
+      run_status=$(jq -r '.data.attributes.status // empty' <<<"${run_response}")
+      case "${run_status}" in
+        applied|planned_and_finished|errored|canceled|force_canceled|discarded)
+          log "  Targeted folder destroy run is inactive (${run_status})"
+          return 0
+          ;;
+        *)
+          log "  Waiting for targeted folder destroy run to become inactive: ${run_status:-unknown} (attempt ${attempt}/30)"
+          ;;
+      esac
+    fi
+    sleep 10
+  done
+
+  log "  ERROR: Timed out waiting for targeted folder destroy run to become inactive"
+  return 1
+}
+
+# Preserve the workspace state whenever folder destruction did not complete.
+# In particular, do not force-unlock a workspace if its targeted run could
+# still be active or its terminal state is unknown.
+clear_tfc_workspace_after_folder_destroy() {
+  local folder_id=$1
+
+  if [[ -n "${folder_id}" ]] && ! destroy_e2e_folder_in_tfc "${folder_id}"; then
+    CLEANUP_FAILED=1
+    log "  ERROR: Skipping TFC workspace state cleanup because folder destruction did not complete"
+    return 1
+  fi
+
+  clear_tfc_workspace || CLEANUP_FAILED=1
 }
 
 # ========================================================================
@@ -791,13 +886,9 @@ if [[ -n "${CUSTOMER_PROJECT}" ]]; then
   delete_project "${CUSTOMER_PROJECT}" "Customer" || CLEANUP_FAILED=1
 fi
 
-if [[ -n "${REGION_FOLDER_ID}" ]]; then
-  destroy_e2e_folder_in_tfc "${REGION_FOLDER_ID}" || CLEANUP_FAILED=1
-fi
-
 # Phase 6: Clear TFC workspace state
 log ""
-clear_tfc_workspace || CLEANUP_FAILED=1
+clear_tfc_workspace_after_folder_destroy "${REGION_FOLDER_ID}" || true
 
 log ""
 if [[ "${CLEANUP_FAILED}" -ne 0 ]]; then
