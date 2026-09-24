@@ -526,6 +526,16 @@ function wait_for_operands() {
         oc describe "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
         exit 1
       fi
+
+      # Verify pods are actually Ready — the Available condition can pass transiently
+      # before a CrashLoopBackOff pod crashes again.
+      if ! oc wait pods -n "${TRUSTEE_NAMESPACE}" -l app=kbs \
+        --for=condition=Ready --timeout=150s; then
+        echo ">>> ERROR: ${deployment} pods not Ready" >&2
+        oc get pods -n "${TRUSTEE_NAMESPACE}" || true
+        oc logs -n "${TRUSTEE_NAMESPACE}" -l app=kbs --tail=50 --prefix 2>/dev/null || true
+        exit 1
+      fi
     done
   fi
 }
