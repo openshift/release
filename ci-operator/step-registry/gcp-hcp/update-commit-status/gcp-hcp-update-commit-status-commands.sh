@@ -13,14 +13,18 @@ if [[ -z "${JOB_SPEC:-}" ]]; then
 fi
 
 target_ref="$(jq -cer --arg org "${target_org}" --arg repo "${target_repo}" '
+  .type as $job_type
+  |
   [
     (.refs? | select(. != null) | . + {"_prow_primary_ref": true}),
     (.extra_refs[]? | . + {"_prow_primary_ref": false})
-  ]
-  | map(select(.org == $org and .repo == $repo))
-  | if length == 1 then
-      .[0]
-    elif length == 0 then
+  ] as $refs
+  | ($refs | map(select(.org == $org and .repo == $repo))) as $target_refs
+  | if ($target_refs | length) == 1 then
+      $target_refs[0] + {
+        "_prow_only_periodic_ref": ($job_type == "periodic" and ($refs | length) == 1)
+      }
+    elif ($target_refs | length) == 0 then
       error("target repository not found in JOB_SPEC")
     else
       error("target repository appears more than once in JOB_SPEC")
@@ -37,11 +41,11 @@ else
   tested_sha="$(jq -r '.base_sha // empty' <<<"${target_ref}")"
 fi
 
-# Periodic extra refs are resolved by clonerefs at runtime, so their ProwJob
-# metadata can omit base_sha. In that case use HEAD only after verifying this
-# step is running in the target repository checkout.
+# Generated periodic jobs represent their source repository as the only extra
+# ref, without base_sha or workdir. Since this step runs from that ref's src
+# image, HEAD is the exact checkout selected by clonerefs.
 if [[ -z "${tested_sha}" ]]; then
-  if [[ "$(jq -r '._prow_primary_ref == true or .workdir == true' <<<"${target_ref}")" != "true" ]]; then
+  if [[ "$(jq -r '._prow_primary_ref == true or .workdir == true or ._prow_only_periodic_ref == true' <<<"${target_ref}")" != "true" ]]; then
     echo "ERROR: target ref has no SHA and is not the active checkout" >&2
     exit 1
   fi
