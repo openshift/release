@@ -36,6 +36,95 @@ GITHUB_TOKEN=$(curl -sS -H "Authorization: Bearer $JWT" -H "Accept: application/
     "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens" | jq -r .token)
 echo "✅ Received install token (ID: ${INSTALLATION_ID})"
 
+cleanup_stale_branches() {
+  local had_errexit=false
+  [[ $- == *e* ]] && had_errexit=true
+  set +o errexit
+
+  local deleted=0 skipped=0 failed=0
+  if (( STALE_BRANCH_AGE_DAYS == 0 )); then
+    echo "ℹ️  STALE_BRANCH_AGE_DAYS=0; skipping stale branch cleanup"
+    $had_errexit && set -o errexit
+    return
+  fi
+
+  echo "🧹 Scanning ${REPO} for stale sync-${SOURCE_BRANCH}-to-${TARGET_BRANCH} branches…"
+  local current_branch="sync-${SOURCE_BRANCH}-to-${TARGET_BRANCH}-$(date +%m-%d-%Y)"
+  local pattern="^sync-${SOURCE_BRANCH}-to-${TARGET_BRANCH}-[0-9]{2}-[0-9]{2}-[0-9]{4}$"
+  local cutoff owner url headers resp
+  cutoff=$(date -d "-${STALE_BRANCH_AGE_DAYS} days" +%s)
+  owner="${REPO%%/*}"
+  url="https://api.github.com/repos/${REPO}/branches?per_page=100"
+
+  local branches=()
+  while [[ -n "$url" ]]; do
+    headers=$(mktemp)
+    resp=$(curl -sS -D "$headers" -H "Authorization: token ${GITHUB_TOKEN}" "$url")
+    if [[ -z "$resp" ]]; then
+      echo "⚠️  Failed to list branches from ${url}"
+      ((failed++))
+      rm -f "$headers"
+      break
+    fi
+    while IFS= read -r name; do
+      [[ -n "$name" ]] && branches+=("$name")
+    done < <(echo "$resp" | jq -r '.[].name' | grep -E "$pattern")
+    url=$(grep -i '^link:' "$headers" | tr ',' '\n' | grep 'rel="next"' | sed -E 's/.*<([^>]+)>.*/\1/')
+    rm -f "$headers"
+  done
+
+  for branch in "${branches[@]}"; do
+    [[ "$branch" == "$current_branch" ]] && continue
+    [[ "$branch" =~ ([0-9]{2})-([0-9]{2})-([0-9]{4})$ ]] || continue
+
+    local branch_epoch
+    branch_epoch=$(date -d "${BASH_REMATCH[3]}-${BASH_REMATCH[1]}-${BASH_REMATCH[2]}" +%s 2>/dev/null)
+    if [[ -z "$branch_epoch" ]]; then
+      echo "⚠️  Could not parse date from branch ${branch}"
+      ((failed++))
+      continue
+    fi
+    (( branch_epoch >= cutoff )) && continue
+
+    local pr_json
+    pr_json=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" \
+      "https://api.github.com/repos/${REPO}/pulls?state=all&head=${owner}:${branch}&per_page=100")
+    if [[ -z "$pr_json" ]]; then
+      echo "⚠️  Failed to look up PRs for branch ${branch}"
+      ((failed++))
+      continue
+    fi
+
+    if [[ "$(echo "$pr_json" | jq -r '[.[] | select(.state=="open")] | length')" != "0" ]]; then
+      echo "⏭️  Skipping ${branch}: open PR exists"
+      ((skipped++))
+      continue
+    fi
+
+    local reason
+    reason=$(echo "$pr_json" | jq -r 'if ([.[] | select(.merged_at != null)] | length) > 0 then "merged" elif length > 0 then "closed" else "no PR" end')
+
+    if [[ "${STALE_BRANCH_DRY_RUN}" == "true" ]]; then
+      echo "🔍 [dry-run] would delete ${branch} (${reason})"
+      ((skipped++))
+      continue
+    fi
+
+    if curl -sS -f -H "Authorization: token ${GITHUB_TOKEN}" -X DELETE \
+      "https://api.github.com/repos/${REPO}/git/refs/heads/${branch}" > /dev/null; then
+      echo "🗑️  Deleted ${branch} (${reason})"
+      ((deleted++))
+    else
+      echo "⚠️  Failed to delete ${branch}"
+      ((failed++))
+    fi
+  done
+
+  echo "🧹 Stale branch cleanup: deleted=${deleted} skipped=${skipped} failed=${failed}"
+  $had_errexit && set -o errexit
+}
+cleanup_stale_branches || true
+
 echo "📥 Cloning repo and setting up remotes…"
 # get the repo
 WORKDIR="$(mktemp -d)"
