@@ -2,6 +2,11 @@ ref:
   as: ovs-doca-validate-worker-package
   from: cli
   commands: ovs-doca-validate-worker-package-commands.sh
+  # The script traps EXIT to close the <testsuites> root it opens around the
+  # JUnit file (needed so Prow's JUnit lens parses all four checks per node,
+  # not just the first). 30s is ample -- the trap only appends one line, no
+  # in-flight child process to wait on.
+  grace_period: 30s
   resources:
     requests:
       cpu: 10m

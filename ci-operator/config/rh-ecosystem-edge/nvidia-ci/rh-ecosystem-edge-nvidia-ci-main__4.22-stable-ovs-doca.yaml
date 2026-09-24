@@ -77,7 +77,12 @@ images:
 
       if [ "$CONFIGURATION_CHANGED" = true ]; then
         log "Configuration changed, restarting openvswitch"
-        systemctl restart openvswitch
+        # --no-block: doca-init.service Requires=openvswitch.service, so this
+        # restart is propagated back to doca-init.service itself while its
+        # own ExecStart (this script) is still running. Blocking here would
+        # wait on that transaction and could delay kubelet.service, which is
+        # ordered After=doca-init.service.
+        systemctl --no-block restart openvswitch
       fi
       log "Done."
       SCRIPT
