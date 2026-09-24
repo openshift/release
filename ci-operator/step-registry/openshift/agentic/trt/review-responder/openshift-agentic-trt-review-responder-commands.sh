@@ -9,109 +9,87 @@ ci_failure_state() {
     local failures_json=$2
     local head_ref_oid=$3
     local state_file=$4
+    local failures
+    local state_dir
 
-    python3 - "${action}" "${failures_json}" "${head_ref_oid}" "${state_file}" <<'PY'
-import json
-import fcntl
-import os
-import sys
-import tempfile
+    case "${action}" in
+        filter|record) ;;
+        *)
+            echo "unknown CI failure state action: ${action}" >&2
+            return 1
+            ;;
+    esac
+    if ! failures=$(jq -ce \
+        'if type == "array" and all(.[]; type == "object") then . else error("invalid") end' \
+        <<< "${failures_json}" 2>/dev/null); then
+        echo "failures must be a JSON array of objects" >&2
+        return 1
+    fi
 
-action, failures_json, head_ref_oid, state_file = sys.argv[1:]
-failures = json.loads(failures_json)
-if not isinstance(failures, list) or not all(isinstance(item, dict) for item in failures):
-    raise SystemExit("failures must be a JSON array of objects")
+    state_dir=$(dirname "${state_file}")
+    mkdir -p "${state_dir}"
+    (
+        local evaluated='[]'
+        local temporary_file
+        local updated
 
+        # A responder is normally the only writer, but locking prevents a lost
+        # update if overlapping invocations record different failures.
+        flock -x 9
+        if [[ -e "${state_file}" ]]; then
+            if ! evaluated=$(jq -ce \
+                'if type == "array" and all(.[]; type == "object") then . else error("invalid") end' \
+                "${state_file}" 2>/dev/null); then
+                echo "invalid CI failure state in ${state_file}" >&2
+                exit 1
+            fi
+        fi
 
-def identity(failure):
-    result = {
-        "name": str(failure.get("name", "")),
-        "state": str(failure.get("state", "")),
-    }
-    link = failure.get("link")
-    if isinstance(link, str) and link.strip():
-        # A check URL identifies the concrete Prow/check run, even if the PR
-        # head changes before GitHub refreshes its check suite.
-        result["link"] = link
-    else:
-        # Some check providers omit links. The head SHA prevents a failure on
-        # a later revision from being mistaken for one already evaluated.
-        result["head_ref_oid"] = head_ref_oid
-    return result
+        if [[ "${action}" == "filter" ]]; then
+            jq -cn \
+                --argjson failures "${failures}" \
+                --argjson evaluated "${evaluated}" \
+                --arg head_ref_oid "${head_ref_oid}" '
+                def identity($head):
+                    {name: ((.name // "") | tostring), state: ((.state // "") | tostring)}
+                    + if ((.link | type) == "string" and ((.link | test("^\\s*$")) | not))
+                      then {link: .link}
+                      else {head_ref_oid: $head}
+                      end;
+                [$failures[] as $failure
+                    | ($failure | identity($head_ref_oid)) as $identity
+                    | select(($evaluated | index($identity)) == null)
+                    | $failure]
+            '
+            exit
+        fi
 
-
-if action not in {"filter", "record"}:
-    raise SystemExit(f"unknown CI failure state action: {action}")
-
-state_dir = os.path.dirname(state_file) or "."
-os.makedirs(state_dir, exist_ok=True)
-with open(f"{state_file}.lock", mode="a+", encoding="utf-8") as lock_stream:
-    # A responder is normally the only writer, but locking prevents a lost
-    # update if overlapping invocations record different failures.
-    fcntl.flock(lock_stream, fcntl.LOCK_EX)
-    try:
-        with open(state_file, encoding="utf-8") as stream:
-            evaluated = json.load(stream)
-    except FileNotFoundError:
-        evaluated = []
-    except json.JSONDecodeError as error:
-        raise SystemExit(f"invalid CI failure state in {state_file}: {error}")
-    if not isinstance(evaluated, list) or not all(
-        isinstance(item, dict) for item in evaluated
-    ):
-        raise SystemExit(f"invalid CI failure state in {state_file}")
-
-    evaluated_keys = {
-        json.dumps(item, sort_keys=True, separators=(",", ":"))
-        for item in evaluated
-    }
-
-    if action == "filter":
-        pending = [
-            failure
-            for failure in failures
-            if json.dumps(identity(failure), sort_keys=True, separators=(",", ":"))
-            not in evaluated_keys
-        ]
-        print(json.dumps(pending, separators=(",", ":")))
-    else:
-        for failure in failures:
-            failure_identity = identity(failure)
-            key = json.dumps(
-                failure_identity, sort_keys=True, separators=(",", ":")
-            )
-            if key not in evaluated_keys:
-                evaluated.append(failure_identity)
-                evaluated_keys.add(key)
-
-        temporary_file = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w", encoding="utf-8", dir=state_dir, delete=False
-            ) as stream:
-                json.dump(evaluated, stream, sort_keys=True, separators=(",", ":"))
-                stream.write("\n")
-                stream.flush()
-                os.fsync(stream.fileno())
-                temporary_file = stream.name
-            os.replace(temporary_file, state_file)
-            temporary_file = None
-            directory_fd = os.open(state_dir, os.O_RDONLY)
-            try:
-                os.fsync(directory_fd)
-            finally:
-                os.close(directory_fd)
-        finally:
-            if temporary_file is not None:
-                try:
-                    os.unlink(temporary_file)
-                except FileNotFoundError:
-                    pass
-PY
+        updated=$(jq -cn \
+            --argjson failures "${failures}" \
+            --argjson evaluated "${evaluated}" \
+            --arg head_ref_oid "${head_ref_oid}" '
+            def identity($head):
+                {name: ((.name // "") | tostring), state: ((.state // "") | tostring)}
+                + if ((.link | type) == "string" and ((.link | test("^\\s*$")) | not))
+                  then {link: .link}
+                  else {head_ref_oid: $head}
+                  end;
+            reduce ($failures[] | identity($head_ref_oid)) as $identity
+                ($evaluated; if index($identity) == null then . + [$identity] else . end)
+        ')
+        temporary_file=$(mktemp "${state_file}.tmp.XXXXXX")
+        if ! printf '%s\n' "${updated}" > "${temporary_file}" || \
+           ! sync -f "${temporary_file}" || \
+           ! mv -f "${temporary_file}" "${state_file}" || \
+           ! sync -f "${state_dir}"; then
+            rm -f "${temporary_file}"
+            exit 1
+        fi
+    ) 9> "${state_file}.lock"
 }
 
-# Internal entry point used by the focused state regression test. Prow invokes
-# this script without arguments and follows the normal path below.
+# Internal entry point for focused state validation. Prow invokes this script
+# without arguments and follows the normal path below.
 if [[ "${1:-}" == "__ci_failure_state" ]]; then
     if [[ "$#" -ne 5 ]]; then
         echo "usage: $0 __ci_failure_state <filter|record> <failures-json> <head-ref-oid> <state-file>" >&2
