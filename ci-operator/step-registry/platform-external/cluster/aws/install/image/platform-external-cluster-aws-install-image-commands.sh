@@ -21,13 +21,10 @@ export AWS_SHARED_CREDENTIALS_FILE
 
 INSTALLER_BINARY="openshift-install"
 
-if ! openshift-install coreos print-stream-json 2> "${ARTIFACT_DIR}/err.txt" > /tmp/coreos.json; then
+if ! openshift-install coreos print-stream-json 2> "${ARTIFACT_DIR}/err.txt" > ${SHARED_DIR}/coreos.json; then
   log "Failed to discover RHCOS image: $(cat "${ARTIFACT_DIR}/err.txt")"
   exit 1
 fi
 
 log "openshift-install version used for bootimage discovery:"
-"${INSTALLER_BINARY}" version
-
-jq -r --arg region "$AWS_REGION" '.architectures.x86_64.images.aws.regions[$region].image' /tmp/coreos.json | tee "${SHARED_DIR}/image_id.txt"
-log "Discovered RHCOS Image ID: $(cat "${SHARED_DIR}/image_id.txt")"
+"${INSTALLER_BINARY}" version | grep -E "(openshift-install|build|release|architecture)"
