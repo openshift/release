@@ -23,9 +23,11 @@ WORKLOAD_IMAGE=$(sed 's/:[^/]*$//' "${SHARED_DIR}/workload_image")
 declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation}"
 # Must-gather image used by the observability/must-gather e2e specs. It must be
 # mirrored here so the disconnected cluster can pull it, and exported to
-# SHARED_DIR so the test step pulls the same ref. Single source of truth is the
-# ref default (downstream RHWA image); the default tag-valued ref is redirected
-# by the oc-mirror ITMS, a digest-valued ref uses the IDMS.
+# SHARED_DIR so the test step pulls the same ref. The default is the latest
+# downstream GA image; the intended primary source is the latest downstream
+# build's must-gather from the FBC catalog (TODO: scrape it instead of pinning
+# by hand, falling back to this GA image). The default tag-valued ref is
+# redirected by the oc-mirror ITMS, a digest-valued ref uses the IDMS.
 declare MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/workload-availability/node-healthcheck-must-gather-rhel9:v0.12}"
 
 collect_artifacts() {
