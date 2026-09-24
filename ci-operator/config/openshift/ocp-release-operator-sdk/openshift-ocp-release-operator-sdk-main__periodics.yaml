@@ -48,6 +48,12 @@ tests:
         fi
         export GITHUB_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
+        # Install gh CLI (not in the base src image)
+        GH_VERSION=2.62.0
+        curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+          | tar -xz -C /tmp
+        export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
+
         export FORCE_REMOTE_URLS=1
         ./hack/auto-rebase.sh
       credentials:
@@ -109,6 +115,12 @@ tests:
         git fetch demo-fork demo-e2e-base
         git checkout -B demo-e2e-base demo-fork/demo-e2e-base
         git branch --set-upstream-to=demo-fork/demo-e2e-base demo-e2e-base
+
+        # Install gh CLI (not in the base src image)
+        GH_VERSION=2.62.0
+        curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+          | tar -xz -C /tmp
+        export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
 
         export DEST_ORG_REPO=neha037/ocp-release-operator-sdk
         export ORIGIN_URL=https://github.com/neha037/ocp-release-operator-sdk.git
