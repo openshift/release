@@ -141,9 +141,24 @@ tests:
           echo '==> Copy the CI-selected NHC checkout into a writable build directory'
           test -f /opt/nhc-ci-src/Makefile
           cp -R /opt/nhc-ci-src /tmp/nhc-source
+
+          # TODO: Revert this rehearsal-only commit after node-healthcheck-operator#453,
+          # medik8s/tools#41, and openshift/rhwa-system-tests#10 merge.
+          echo '==> Check out node-healthcheck-operator PR 453'
+          git -C /tmp/nhc-source fetch --depth=1 \
+            https://github.com/medik8s/node-healthcheck-operator.git refs/pull/453/head
+          git -C /tmp/nhc-source checkout --detach FETCH_HEAD
+
+          echo '==> Check out medik8s/tools PR 41'
+          git clone --depth=1 https://github.com/medik8s/tools.git /tmp/medik8s-tools
+          git -C /tmp/medik8s-tools fetch --depth=1 \
+            https://github.com/medik8s/tools.git refs/pull/41/head
+          git -C /tmp/medik8s-tools checkout --detach FETCH_HEAD
+
           local revision prefix operator_tag bundle_tag catalog_tag
           revision="$(git -C /tmp/nhc-source rev-parse HEAD)"
           git -C /tmp/nhc-source show --no-patch --format=fuller HEAD
+          git -C /tmp/medik8s-tools show --no-patch --format=fuller HEAD
           printf '%s\n' "$revision" > "$ARTIFACT_DIR/nhc-source-commit.txt"
 
           cd /tmp/nhc-source
@@ -167,11 +182,15 @@ tests:
 
           echo '==> Build and push operator, bundle, and catalog with the shared target'
           make dev-olm-catalog-push \
-            DEV_REGISTRY=ttl.sh TTL_SH_TTL=3h CONTAINER_TOOL=podman \
+            TOOLS_DIR=/tmp/medik8s-tools \
+            DEV_REGISTRY=ttl.sh \
+            TTL_SH_TTL=3h \
+            CONTAINER_TOOL=podman \
             DEV_IMG="$operator_tag" \
             VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
             SKIP_RANGE_LOWER=0.1.0 DOCS_RHWA_VERSION=5.0 \
-            CONSOLE_PLUGIN_IMAGE="$CONSOLE_PLUGIN_IMAGE" MUST_GATHER_IMAGE="$MUST_GATHER_IMAGE"
+            CONSOLE_PLUGIN_IMAGE="$CONSOLE_PLUGIN_IMAGE" \
+            MUST_GATHER_IMAGE="$MUST_GATHER_IMAGE"
 
           echo '==> Resolve pushed candidate images to immutable digests'
           skopeo inspect --format '{{.Digest}}' "docker://$operator_tag" > "$ARTIFACT_DIR/operator.digest"
@@ -203,9 +222,13 @@ tests:
         }
 
         run_tests() {
-          echo '==> Clone system-tests main'
+          # TODO: Revert this rehearsal-only commit after the referenced PRs merge.
+          echo '==> Check out openshift/rhwa-system-tests PR 10'
           git clone --depth=1 --branch main \
             https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
+          git -C /tmp/system-tests fetch --depth=1 \
+            https://github.com/openshift/rhwa-system-tests.git refs/pull/10/head
+          git -C /tmp/system-tests checkout --detach FETCH_HEAD
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
 
           export NHC_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
