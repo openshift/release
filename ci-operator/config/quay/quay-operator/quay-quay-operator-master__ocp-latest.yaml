@@ -21,10 +21,6 @@ images:
   - dockerfile_literal: |
       FROM src
       COPY oc /usr/bin/oc
-      RUN mkdir -p /tmp/quay-sts-bin && \
-          GOFLAGS="" GOBIN=/tmp/quay-sts-bin go install github.com/google/go-containerregistry/cmd/crane@v0.20.3 && \
-          GOFLAGS="" GOBIN=/tmp/quay-sts-bin go install github.com/itchyny/gojq/cmd/gojq@v0.12.17 && \
-          ln -s /tmp/quay-sts-bin/gojq /tmp/quay-sts-bin/jq
     from: src
     inputs:
       cli:
@@ -32,6 +28,14 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: src-oc
+  - dockerfile_literal: |
+      FROM pipeline:src-oc
+      RUN mkdir -p /tmp/quay-sts-bin && \
+          GOFLAGS="" GOBIN=/tmp/quay-sts-bin go install github.com/google/go-containerregistry/cmd/crane@v0.20.3 && \
+          GOFLAGS="" GOBIN=/tmp/quay-sts-bin go install github.com/itchyny/gojq/cmd/gojq@v0.12.17 && \
+          ln -s /tmp/quay-sts-bin/gojq /tmp/quay-sts-bin/jq
+    from: src-oc
+    to: src-oc-sts
   - dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/python-311:1
       RUN pip install --no-cache-dir boto3==1.35.99
@@ -59,6 +63,7 @@ promotion:
     - quay-app
     - quay-sts-tools
     - src-oc
+    - src-oc-sts
     namespace: quay
     tag: latest
     tag_by_commit: true
