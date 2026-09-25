@@ -54,7 +54,7 @@ _junit_emit() {
 JUNITEOF
 }
 
-trap '_jrc=$?; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; exit ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -99,7 +99,7 @@ TimeoutMonitor() {
 # Start timeout monitor in background
 TimeoutMonitor &
 typeset timeoutPid=$!
-trap '_jrc=$?; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; kill ${timeoutPid} || true' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; kill ${timeoutPid} || true; exit ${_jrc}' EXIT
 trap 'kill ${timeoutPid} || true; exit 124' TERM
 
 echo ">>> PHASE: Pre-Upgrade Cluster Backup"
