@@ -311,6 +311,8 @@ checkout_pr_head() {
     local expected_fork_url="https://github.com/${FORK_REPO}.git"
     local expected_ref="refs/heads/${PR_HEAD_BRANCH}"
     local fetched_head
+    local status_entry
+    local worktree_status
     local -a fork_fetch_urls fork_push_urls
 
     if [[ ! "${FORK_REPO}" =~ ^[^/]+/[^/]+$ ]] || \
@@ -322,6 +324,16 @@ checkout_pr_head() {
         echo "ERROR: PR head branch is invalid"
         return 1
     fi
+    if ! worktree_status=$(git status --porcelain=v1 --untracked-files=all); then
+        echo "ERROR: unable to verify that the worktree is clean"
+        return 1
+    fi
+    while IFS= read -r status_entry; do
+        # Gate/worker logs are pipeline-owned and intentionally live here.
+        [[ -z "${status_entry}" || "${status_entry}" == "?? artifacts/"* ]] && continue
+        echo "ERROR: refusing to check out the PR head with worktree changes"
+        return 1
+    done <<< "${worktree_status}"
     # get-url applies pushurl and url.* rewrite rules. Both effective
     # destinations must remain the configured fork before any fetch occurs.
     mapfile -t fork_fetch_urls < <(git remote get-url --all fork 2>/dev/null || true)
@@ -342,9 +354,9 @@ checkout_pr_head() {
         echo "ERROR: fetched PR head does not match the expected PR head SHA"
         return 1
     fi
-    if ! git checkout --force -B "${PR_HEAD_BRANCH}" "${fetched_head}" || \
-       ! git reset --hard "${fetched_head}"; then
-        echo "ERROR: unable to check out and reset the verified PR head"
+    if ! git checkout --no-recurse-submodules --no-overwrite-ignore \
+        -B "${PR_HEAD_BRANCH}" "${fetched_head}"; then
+        echo "ERROR: unable to check out the verified PR head"
         return 1
     fi
 }
@@ -400,7 +412,7 @@ note_push_failure() {
 
 push_current_branch() {
     local history_rc
-    local push_log
+    local history_rewritten=false
     local remote_head
 
     refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
@@ -412,27 +424,8 @@ push_current_branch() {
         return 1
     fi
 
-    echo "Pushing HEAD to fork ${EXPECTED_PR_HEAD_REF}..."
-    push_log=$(mktemp)
-    if LC_ALL=C git push --porcelain fork "HEAD:${EXPECTED_PR_HEAD_REF}" > "${push_log}" 2>&1; then
-        cat "${push_log}"
-        rm -f "${push_log}"
-        push_failures=0
-        return 0
-    fi
-    cat "${push_log}"
-    if ! grep -Eq '^!.*\[rejected\] \((non-fast-forward|fetch first)\)$' "${push_log}"; then
-        rm -f "${push_log}"
-        echo "ERROR: fork push failed without an unambiguous non-fast-forward rejection"
-        note_push_failure
-        return 1
-    fi
-    rm -f "${push_log}"
-
     if git merge-base --is-ancestor "${EXPECTED_REMOTE_HEAD}" HEAD; then
-        echo "ERROR: refusing lease push because local history was not rewritten"
-        note_push_failure
-        return 1
+        :
     else
         history_rc=$?
         if [[ "${history_rc}" -ne 1 ]]; then
@@ -440,6 +433,7 @@ push_current_branch() {
             note_push_failure
             return 1
         fi
+        history_rewritten=true
     fi
 
     if ! read_pr_head; then
@@ -457,7 +451,13 @@ push_current_branch() {
         return 1
     fi
 
-    echo "Rewritten history verified; pushing with a lease on ${EXPECTED_REMOTE_HEAD}..."
+    if [[ "${history_rewritten}" == "true" ]]; then
+        echo "Rewritten history verified; pushing with a lease on ${EXPECTED_REMOTE_HEAD}..."
+    else
+        echo "Pushing HEAD with a lease on ${EXPECTED_REMOTE_HEAD}..."
+    fi
+    # Pin even fast-forward updates so movement between API revalidation and
+    # publication cannot be overwritten.
     if git push --porcelain \
         "--force-with-lease=${EXPECTED_PR_HEAD_REF}:${EXPECTED_REMOTE_HEAD}" \
         fork "HEAD:${EXPECTED_PR_HEAD_REF}"; then
