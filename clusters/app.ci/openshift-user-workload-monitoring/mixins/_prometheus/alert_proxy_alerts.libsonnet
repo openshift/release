@@ -17,6 +17,13 @@
           },
           {
             alert: 'alert-proxy-EndToEndDelivery-Down',
+            // "Has not delivered in 45 minutes" presupposes it ever delivered. The up offset 45m
+            // guard only proves the process was running, not that the delivery path was ever
+            // wired, so a proxy that is deployed but unreachable satisfies it. On 2026-09-24
+            // stage 3 merged without the Alertmanager Secret being rendered, so nothing could
+            // reach the proxy; this alert fired, found no alert-proxy-watchdog route either, and
+            // paged through slack-criticals. max_over_time arms the alert only once the pipeline
+            // has been proven, which is what the rule already meant.
             expr: |||
               (
                 sum(increase(alert_proxy_end_to_end_deliveries_total[45m])) < 1
@@ -26,6 +33,8 @@
               (up{job="alert-proxy"} offset 45m == 1)
               and on()
               (up{job="alert-proxy"} == 1)
+              and on()
+              (max_over_time(alert_proxy_end_to_end_deliveries_total[7d]) > 0)
             |||,
             labels: {
               severity: 'critical',

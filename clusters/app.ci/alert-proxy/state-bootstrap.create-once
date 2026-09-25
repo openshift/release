@@ -1,10 +1,18 @@
+# The missing `.yaml` suffix is the only thing that keeps this file out of applyconfig and out of
+# `oc apply -f <dir>`. applyconfig selects manifests by their `.yaml` suffix; there is no
+# annotation-based or in-file opt-out, so nothing inside this object protects it.
+#
+# This ConfigMap is runtime-owned state. Create it exactly once with
+# `oc create -f clusters/app.ci/alert-proxy/state-bootstrap.create-once`, and never with
+# `oc apply`, `oc replace`, or `oc create --save-config`.
+#
+# Renaming this file to `.yaml` is destructive. It would be reconciled on every apply and would
+# overwrite the durable Slack outbox, idempotency, and silence-operation state of the running proxy.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: alert-proxy-state
   namespace: ci
-  annotations:
-    ci.openshift.io/apply-mode: create-once
 data:
   state.json: >-
     {"schemaVersion":1,"mode":"active","groups":{},"silenceRefs":{},"silenceOperations":{},"outbox":{},"requests":{},"nextOutboxSequence":0}

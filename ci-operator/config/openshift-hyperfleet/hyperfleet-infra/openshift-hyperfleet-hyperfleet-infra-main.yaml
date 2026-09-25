@@ -92,24 +92,20 @@ tests:
         if [ "$CI_ID" != "unknown" ]; then
           TF_DIR="terraform"
 
-          # Regenerate config files from template (not shared across containers)
-          cp "${TF_DIR}/envs/gke/dev-prow.tfbackend" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
-          sed -i "s|^prefix.*|prefix = \"ci/infra/${CI_ID}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
-
-          cp "${TF_DIR}/envs/gke/dev-prow.tfvars" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
-          sed -i "s|^developer_name.*|developer_name = \"ci-infra-${CI_ID}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
-          sed -i "s|^kubernetes_suffix.*|kubernetes_suffix = \"default\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
-          sed -i "s|^enable_deletion_protection.*|enable_deletion_protection = false|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+          # Regenerate config files from the CI templates (not shared across containers)
+          make ci-tf-env CI_ID="${CI_ID}"
 
           # Retrieve cluster credentials for uninstall
           (cd "$TF_DIR" && terraform init -backend-config="envs/gke/ci-${CI_ID}.tfbackend") || true
           eval $(cd "$TF_DIR" && terraform output -raw connect_command) || true
 
-          make ci-cleanup \
-            TF_ENV="ci-${CI_ID}" || true
-
-          # Clean up GCS state
-          gsutil rm -r "gs://hyperfleet-terraform-state/ci/infra/${CI_ID}" || true
+          # Only drop the GCS state once destroy succeeded, otherwise keep it
+          # so the cluster can still be destroyed by hand.
+          if make ci-cleanup TF_ENV="ci-${CI_ID}"; then
+            gsutil rm -r "gs://hyperfleet-terraform-state/ci/infra/${CI_ID}" || true
+          else
+            echo "ci-cleanup failed, keeping gs://hyperfleet-terraform-state/ci/infra/${CI_ID} for a manual destroy"
+          fi
         fi
       credentials:
       - collection: hyperfleet
@@ -135,17 +131,9 @@ tests:
 
         # --- Generate ephemeral cluster config ---
         CI_ID="${BUILD_ID:(-8)}"
-        CI_NAME="ci-infra-${CI_ID}"
-        TF_DIR="terraform"
 
-        # Copy from existing template and override CI-specific values
-        cp "${TF_DIR}/envs/gke/dev-prow.tfbackend" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
-        sed -i "s|^prefix.*|prefix = \"ci/infra/${CI_ID}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
-
-        cp "${TF_DIR}/envs/gke/dev-prow.tfvars" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
-        sed -i "s|^developer_name.*|developer_name = \"${CI_NAME}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
-        sed -i "s|^kubernetes_suffix.*|kubernetes_suffix = \"default\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
-        sed -i "s|^enable_deletion_protection.*|enable_deletion_protection = false|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+        # Render ci-<id>.tfvars and .tfbackend from the CI templates in hyperfleet-infra
+        make ci-tf-env CI_ID="${CI_ID}"
 
         # Store CI_ID for cleanup step
         echo "${CI_ID}" > "${SHARED_DIR}/ci_id"
