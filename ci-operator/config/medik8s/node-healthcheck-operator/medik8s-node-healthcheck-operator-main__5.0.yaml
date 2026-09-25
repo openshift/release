@@ -142,18 +142,9 @@ tests:
           test -f /opt/nhc-ci-src/Makefile
           cp -R /opt/nhc-ci-src /tmp/nhc-source
 
-          # TODO: Revert this rehearsal-only commit after medik8s/tools#41 and
-          # openshift/rhwa-system-tests#10 merge.
-          echo '==> Check out medik8s/tools PR 41'
-          git clone --depth=1 https://github.com/medik8s/tools.git /tmp/medik8s-tools
-          git -C /tmp/medik8s-tools fetch --depth=1 \
-            https://github.com/medik8s/tools.git refs/pull/41/head
-          git -C /tmp/medik8s-tools checkout --detach FETCH_HEAD
-
           local revision prefix operator_tag bundle_tag catalog_tag
           revision="$(git -C /tmp/nhc-source rev-parse HEAD)"
           git -C /tmp/nhc-source show --no-patch --format=fuller HEAD
-          git -C /tmp/medik8s-tools show --no-patch --format=fuller HEAD
           printf '%s\n' "$revision" > "$ARTIFACT_DIR/nhc-source-commit.txt"
 
           cd /tmp/nhc-source
@@ -177,7 +168,6 @@ tests:
 
           echo '==> Build and push operator, bundle, and catalog with the shared target'
           make dev-olm-catalog-push \
-            TOOLS_DIR=/tmp/medik8s-tools \
             DEV_REGISTRY=ttl.sh \
             TTL_SH_TTL=3h \
             CONTAINER_TOOL=podman \
@@ -217,7 +207,7 @@ tests:
         }
 
         run_tests() {
-          # TODO: Revert this rehearsal-only commit after the referenced PRs merge.
+          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#10 merges.
           echo '==> Check out openshift/rhwa-system-tests PR 10'
           git clone --depth=1 --branch main \
             https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
