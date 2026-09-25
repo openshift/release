@@ -48,13 +48,20 @@ oc process --local -f "${TEMPLATE}" \
 log "Processed template saved to ${PROCESSED}"
 
 # Install ocm-backplane CLI for elevation (the pre step's image may not be this pod)
-BACKPLANE_CLI_VERSION="${BACKPLANE_CLI_VERSION:-0.11.0}"
-log "Installing ocm-backplane v${BACKPLANE_CLI_VERSION}"
 BIN_DIR="${HOME}/bin"
 mkdir -p "${BIN_DIR}"
+export PATH="${BIN_DIR}:${PATH}"
+
+# Install ocm CLI (not available in the src image)
+log "Installing ocm CLI"
+curl -sSfL "https://github.com/openshift-online/ocm-cli/releases/latest/download/ocm-linux-amd64" \
+    -o "${BIN_DIR}/ocm"
+chmod +x "${BIN_DIR}/ocm"
+
+BACKPLANE_CLI_VERSION="${BACKPLANE_CLI_VERSION:-0.11.0}"
+log "Installing ocm-backplane v${BACKPLANE_CLI_VERSION}"
 curl -sSfL "https://github.com/openshift/backplane-cli/releases/download/v${BACKPLANE_CLI_VERSION}/ocm-backplane_${BACKPLANE_CLI_VERSION}_Linux_x86_64.tar.gz" \
     | tar xzf - -C "${BIN_DIR}" ocm-backplane
-export PATH="${BIN_DIR}:${PATH}"
 
 # Configure proxy for backplane access
 BACKPLANE_PROXY_URL="${BACKPLANE_PROXY_URL:-http://squid.corp.redhat.com:3128}"
