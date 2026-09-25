@@ -22,43 +22,57 @@ if [[ ! -f "${govc_sh}" ]]; then
   exit 0
 fi
 
-# ---------- extract credential values ----------
-# Disable tracing so we never log the password.
+# ---------- scrub credential values from all files ----------
+# Disable tracing so we never log credentials.
 set +x
 
-# Source govc.sh in a subshell to capture GOVC_PASSWORD and GOVC_USERNAME
-# without polluting the current environment beyond what we need.
-govc_password=$(bash -c 'source "'"${govc_sh}"'" 2>/dev/null; echo "${GOVC_PASSWORD:-}"')
-govc_username=$(bash -c 'source "'"${govc_sh}"'" 2>/dev/null; echo "${GOVC_USERNAME:-}"')
-
-if [[ -z "${govc_password}" ]]; then
-  echo "INFO: GOVC_PASSWORD is empty after sourcing govc.sh -- nothing to scrub"
-  exit 0
-fi
-
-# ---------- scrub credential values from all files ----------
 REDACT_MARKER="***REDACTED***"
-# Keep credentials out of arguments and replace exact byte sequences so regex
-# metacharacters are always treated literally.
+# Read assignments without sourcing them so shell metacharacters stay literal.
 scrubbed=$(
-  SCRUB_PASSWORD="${govc_password}" \
-  SCRUB_USERNAME="${govc_username}" \
   SCRUB_MARKER="${REDACT_MARKER}" \
   python3 - <<'PYTHON'
 import os
+import re
 import stat
 
 shared_dir = os.environb[b"SHARED_DIR"]
-secrets = tuple(
-    value
-    for value in (
-        os.environb[b"SCRUB_PASSWORD"],
-        os.environb[b"SCRUB_USERNAME"],
-    )
-    if value
-)
 marker = os.environb[b"SCRUB_MARKER"]
+assignment = re.compile(
+    rb"^[ \t]*(?:export[ \t]+)?(?:GOVC_PASSWORD|GOVC_USERNAME)=(.*)\r?$",
+    re.MULTILINE,
+)
+credential_files = set()
+secrets = set()
 scrubbed = 0
+
+with os.scandir(shared_dir) as entries:
+    for entry in entries:
+        name = entry.name
+        is_generated_govc = name == b"govc.sh" or (
+            name.startswith(b"govc_") and name.endswith(b".sh")
+        )
+        is_credential_context = name in (b"vsphere_context.sh", b"vsphere_info.json")
+        if not (is_generated_govc or is_credential_context):
+            continue
+        try:
+            if not entry.is_file(follow_symlinks=False):
+                continue
+            credential_files.add(entry.path)
+            if not name.endswith(b".sh"):
+                continue
+            with open(entry.path, "rb") as stream:
+                contents = stream.read()
+            for match in assignment.finditer(contents):
+                value = match.group(1)
+                if len(value) >= 2 and value[:1] == value[-1:] and value[:1] in (b"'", b'"'):
+                    value = value[1:-1]
+                if value:
+                    secrets.add(value)
+        except OSError:
+            continue
+
+# Replace longer values first when one credential contains another.
+secrets = tuple(sorted(secrets, key=len, reverse=True))
 
 for directory, subdirectories, filenames in os.walk(shared_dir):
     relative_directory = os.path.relpath(directory, shared_dir)
@@ -88,6 +102,14 @@ for directory, subdirectories, filenames in os.walk(shared_dir):
             scrubbed += 1
         except OSError:
             continue
+
+# These files exist only to pass credentials between vSphere consumers. The
+# scrub step runs after the post chain, so remove them before artifact upload.
+for path in credential_files:
+    try:
+        os.remove(path)
+    except OSError:
+        continue
 
 print(scrubbed)
 PYTHON
