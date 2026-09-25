@@ -280,3 +280,6 @@ EOF
 
 echo "Syncing back the external_vips.yaml file"
 scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/$(<"${SHARED_DIR}/cluster_name")/external_vips.yaml" "${SHARED_DIR}/"
+if [ "${MULTIPLE_MACHINE_NETWORK:-false}" = "true" ]; then
+  cp "$SHARED_DIR/external_vips.yaml" "$SHARED_DIR/vips.yaml"
+fi
