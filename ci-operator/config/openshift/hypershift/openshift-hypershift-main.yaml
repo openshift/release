@@ -782,6 +782,30 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-azure-aks-external-oidc
+- always_run: false
+  as: e2e-rosa-hyperfleet
+  optional: true
+  steps:
+    dependencies:
+      CI_IMAGE_1: hypershift-operator
+      CI_IMAGE_2: hypershift
+    env:
+      ROSA_REGIONAL_EXTRA_COMPONENTS: |
+        - image: CI_IMAGE_1
+          repo: quay.io/rrp-dev-ci/hypershift-operator
+          target: argocd/config/management-cluster/hypershift/values.yaml
+          override:
+            hypershift:
+              hypershift:
+                image: IMAGE_REPO:IMAGE_TAG
+        - image: CI_IMAGE_2
+          repo: quay.io/rrp-dev-ci/control-plane-operator
+          target: argocd/config/management-cluster/hypershift/values.yaml
+          override:
+            hypershift:
+              hypershift:
+                controlPlaneOperatorImage: IMAGE_REPO:IMAGE_TAG
+    workflow: rosa-hyperfleet-ephemeral-e2e
 zz_generated_metadata:
   branch: main
   org: openshift

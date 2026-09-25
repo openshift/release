@@ -24,6 +24,28 @@ ref:
     env: CI_ZOA_LAMBDA_IMAGE
   - name: src
     env: CI_ZOA_RUNNER_IMAGE
+  # Generic image pool: repo-agnostic dependency slots for jobs that need to
+  # push arbitrary CI-built images. A consumer maps only the slots it needs
+  # (e.g. CI_IMAGE_1: hypershift-operator) and references them from
+  # ROSA_REGIONAL_EXTRA_COMPONENTS. Unused slots default to the job's `src`
+  # image and are ignored by the command script. Prefer these over adding new
+  # repo-specific dependency names.
+  - name: src
+    env: CI_IMAGE_1
+  - name: src
+    env: CI_IMAGE_2
+  - name: src
+    env: CI_IMAGE_3
+  - name: src
+    env: CI_IMAGE_4
+  - name: src
+    env: CI_IMAGE_5
+  - name: src
+    env: CI_IMAGE_6
+  - name: src
+    env: CI_IMAGE_7
+  - name: src
+    env: CI_IMAGE_8
   env:
   - name: ROSA_REGIONAL_QUAY_DEST_REPO
     default: ""
@@ -39,6 +61,11 @@ ref:
       and 'override' (YAML with IMAGE_REPO/IMAGE_TAG placeholders).
       Per-image tags are written to SHARED_DIR/extra-component-images
       for the provision step.
+      For 'image', prefer the generic pool slots CI_IMAGE_1..CI_IMAGE_8
+      (map each slot to a pipeline image via the test's
+      steps.dependencies) instead of adding repo-specific dependency
+      names to this ref. The legacy names (CI_API_IMAGE, CI_OPERATOR_IMAGE,
+      CI_ZOA_*) remain valid for existing consumers.
       Example:
         - image: CI_API_IMAGE
           repo: quay.io/rrp-dev-ci/platform-api
