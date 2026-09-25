@@ -27,22 +27,24 @@ $WAS_TRACING && set -x
 echo "Using LOCALNET_PORT=${LOCALNET_PORT} LOCALNET_BRIDGE=${LOCALNET_BRIDGE} LOCALNET=${LOCALNET}"
 
 NNCP_NAME="${LOCALNET_PORT}-ovs-underlay"
-# Secondary-NIC L2 underlay: apply to all workers at once. The default 50%
-# maxUnavailable left nodes Pending (MaxUnavailableLimitReached) while the
-# in-flight enactments retried, so Available never went True within 10m.
+# Rolling apply: 100% maxUnavailable made every worker reconfigure OVS/OVN at
+# once, and NMState then rolled back on ping-probe failure. Default 50% is
+# enough once apply succeeds. Keep a long wait so a slow batch cannot hide
+# behind MaxUnavailableLimitReached.
 NNCP_WAIT_TIMEOUT="20m"
 
 dump_nncp() {
   echo "=== Nodes ==="
   oc get nodes -o wide || true
-  echo "=== ${LOCALNET_PORT} in NodeNetworkState ==="
+  echo "=== ${LOCALNET_PORT} and default routes in NodeNetworkState ==="
   oc get nns -o custom-columns=NODE:.metadata.name --no-headers | while read -r node; do
-    iface_state="$(oc get nns "${node}" -o jsonpath="{range .status.currentState.interfaces[?(@.name=='${LOCALNET_PORT}')]}name={.name} type={.type} state={.state} ipv4={.ipv4.enabled} ipv6={.ipv6.enabled}{end}" 2>/dev/null || true)"
+    iface_state="$(oc get nns "${node}" -o jsonpath="{range .status.currentState.interfaces[?(@.name=='${LOCALNET_PORT}')]}name={.name} type={.type} state={.state} ipv4={.ipv4.enabled} ipv6={.ipv6.enabled} addrs={.ipv4.address}{end}" 2>/dev/null || true)"
     if [ -z "${iface_state}" ]; then
       echo "${node}: ${LOCALNET_PORT} NOT FOUND"
     else
       echo "${node}: ${iface_state}"
     fi
+    oc get nns "${node}" -o jsonpath="{range .status.currentState.routes.running[?(@.destination=='0.0.0.0/0')]}${node} default via {.next-hop-address} dev {.next-hop-interface} metric={.metric}{\"\\n\"}{end}" 2>/dev/null || true
   done
   echo "=== NNCP ${NNCP_NAME} ==="
   oc get nncp "${NNCP_NAME}" -o yaml || true
@@ -50,11 +52,11 @@ dump_nncp() {
   oc get nnce -o wide || true
   oc get nnce -o yaml || true
   echo "=== nmstate-handler logs ==="
-  oc logs -n openshift-nmstate -l component=kubernetes-nmstate-handler --tail=80 --prefix=true || true
+  oc logs -n openshift-nmstate -l component=kubernetes-nmstate-handler --tail=200 --prefix=true || true
 }
 
-echo "=== Cluster nodes before NNCP ==="
-oc get nodes -o wide || true
+echo "=== Cluster state before NNCP ==="
+dump_nncp
 
 oc apply -f - <<EOF
 apiVersion: nmstate.io/v1
@@ -64,24 +66,18 @@ metadata:
 spec:
   nodeSelector:
     node-role.kubernetes.io/worker: ""
-  maxUnavailable: 100%
   desiredState:
     interfaces:
-      - name: ${LOCALNET_PORT}
-        type: ethernet
-        state: up
-        ipv4:
-          enabled: false
-        ipv6:
-          enabled: false
       - name: ${LOCALNET_BRIDGE}
         description: "OVS Bridge dedicated to ${LOCALNET_PORT} for CUDN Localnets"
         type: ovs-bridge
         state: up
         ipv4:
           enabled: false
+          dhcp: false
         ipv6:
           enabled: false
+          dhcp: false
         bridge:
           allow-extra-patch-ports: true
           options:
@@ -115,7 +111,6 @@ metadata:
 spec:
   nodeSelector:
     node-role.kubernetes.io/worker: ""
-  maxUnavailable: 100%
   desiredState:
     interfaces:
       - name: ${LOCALNET_BRIDGE}
