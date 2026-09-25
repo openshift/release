@@ -1,0 +1,54 @@
+ref:
+  as: hypershift-generate-test-plan
+  from: claude-ai-helpers
+  commands: hypershift-generate-test-plan-commands.sh
+  timeout: 20m0s
+  env:
+  - name: GENERATE_TEST_PLAN_FROM_PR
+    default: "false"
+    documentation: |-
+      When "true", use Claude to generate a TEST_PLAN YAML from the PR under
+      test and write it to SHARED_DIR/test-plan.yaml for create-guests and
+      run-tests. When "false" (default), this step is a no-op. Skipped if
+      SHARED_DIR/test-plan.yaml already exists (e.g. from an explicit TEST_PLAN
+      via hypershift-write-test-plan).
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+    documentation: |-
+      Enable Vertex AI for Claude Code.
+  - name: CLOUD_ML_REGION
+    default: "global"
+    documentation: |-
+      Google Cloud region for Vertex AI.
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "openshift-ci-prow-agents"
+    documentation: |-
+      Google Cloud project ID for Vertex AI authentication.
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/google-token"
+    documentation: |-
+      Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+    documentation: |-
+      Claude model to use for generating the test plan.
+  - name: CLAUDE_TIMEOUT
+    default: "15m"
+    documentation: |-
+      Timeout for the Claude/agentic-ci invocation (timeout(1) duration).
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  credentials:
+  - collection: hypershift-team
+    group: claude-prow
+    mount_path: /var/run/claude-code-service-account
+  documentation: |-
+    Optionally generate a HyperShift e2e-v2 TEST_PLAN YAML from the PR under
+    test using Claude. No-ops unless GENERATE_TEST_PLAN_FROM_PR=true.
+
+    When enabled, clones the PR head, inspects the diff and hypershift source
+    (test plan schema, variants, Ginkgo labels), and writes
+    SHARED_DIR/test-plan.yaml for consumption by create-guests and run-tests.
+    Fails the step if generation or validation fails.
