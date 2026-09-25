@@ -1,6 +1,7 @@
 workflow:
   as: gcp-hcp-e2e
   steps:
+    allow_best_effort_post_steps: true
     pre:
     - ref: gcp-hcp-update-commit-status
     - ref: hypershift-gcp-wif-auth
@@ -10,6 +11,7 @@ workflow:
     - ref: gcp-hcp-verify-argocd-sync
     - ref: gcp-hcp-verify-hc-lifecycle
     post:
+    - ref: gcp-hcp-gather
     - ref: gcp-hcp-cleanup-infrastructure
     - ref: gcp-hcp-finalize-commit-status
   documentation: |-
@@ -22,6 +24,7 @@ workflow:
       via WIF, provision infrastructure with ArgoCD pinned to that commit, and
       generate kubeconfigs
     - Test: Validate ArgoCD application sync, then run HC lifecycle test
-      (create cluster, verify, deploy workload, tear down)
-    - Post: Force-delete GCP projects, clear TFC workspace state, and publish
-      the final GitHub commit status
+      (create cluster, verify, deploy workload). Failed hosted resources are
+      preserved for diagnostics.
+    - Post: Gather bounded diagnostics, force-delete all GCP projects and clear
+      TFC workspace state, then publish the final GitHub commit status
