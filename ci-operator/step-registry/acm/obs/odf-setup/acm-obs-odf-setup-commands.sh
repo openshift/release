@@ -252,17 +252,18 @@ jq -cn \
     '{options: {hub: {name: $hubName, baseDomain: $hubDomain}}}' \
     > "${SHARED_DIR}/acm-obs-options.json"
 
-if [[ -f "${SHARED_DIR}/managed.cluster.name" ]]; then
-    typeset mcName='' mcDomain=''
-    mcName="$(cat "${SHARED_DIR}/managed.cluster.name")"
-    mcDomain="$(cat "${SHARED_DIR}/managed.cluster.base.domain")"
+typeset mcNameFile="${SHARED_DIR}/managed.cluster.name"
+typeset mcDomainFile="${SHARED_DIR}/managed.cluster.base.domain"
+typeset mcKubeFile="${SHARED_DIR}/managed.cluster.kubeconfig"
 
-    [[ -n "${mcName}" ]] || { : 'ERROR: managed.cluster.name is empty'; exit 1; }
-    [[ -n "${mcDomain}" ]] || { : 'ERROR: managed.cluster.base.domain is empty'; exit 1; }
-    [[ -f "${SHARED_DIR}/managed.cluster.kubeconfig" ]] || {
-        : 'ERROR: managed.cluster.kubeconfig missing — name+domain+kubeconfig must be a complete set'
-        exit 1
-    }
+if [[ -e "${mcNameFile}" || -e "${mcDomainFile}" || -e "${mcKubeFile}" ]]; then
+    [[ -s "${mcNameFile}" ]] || { : 'ERROR: managed cluster name missing or empty'; exit 1; }
+    [[ -s "${mcDomainFile}" ]] || { : 'ERROR: managed cluster base domain missing or empty'; exit 1; }
+    [[ -s "${mcKubeFile}" ]] || { : 'ERROR: managed cluster kubeconfig missing or empty'; exit 1; }
+
+    typeset mcName='' mcDomain=''
+    mcName="$(cat "${mcNameFile}")"
+    mcDomain="$(cat "${mcDomainFile}")"
 
     jq -c \
         --arg mcName "${mcName}" \
