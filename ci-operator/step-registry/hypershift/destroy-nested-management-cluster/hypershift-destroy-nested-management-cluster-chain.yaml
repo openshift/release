@@ -19,16 +19,69 @@ chain:
         export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       fi
 
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-10)-mgmt"
-      mkdir -p "${ARTIFACT_DIR}/output"
-      bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir="${ARTIFACT_DIR}/output" --name="${CLUSTER_NAME}" --namespace="${HYPERSHIFT_NAMESPACE}"
+      # Fail fast so only a fully sanitized and verified archive is published.
+      set -e
 
-      # Azure dump logs trigger leaktk/gcs-filter censoring of tarballs; skip tarring for Azure
-      # so individual files upload directly and only the sensitive ones get censored
-      if [[ "${CLOUD_PROVIDER}" != "Azure" ]]; then
-        tar -cvzf "${ARTIFACT_DIR}/artifacts.tar.gz" "${ARTIFACT_DIR}/output"
-        rm -rf "${ARTIFACT_DIR}/output"
-      fi
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-10)-mgmt"
+      # Keep raw dump files outside ARTIFACT_DIR until sanitization and archive
+      # verification succeed.
+      DUMP_WORK_DIR="$(mktemp -d /tmp/hypershift-dump.XXXXXX)"
+      trap 'rm -rf -- "${DUMP_WORK_DIR}"' EXIT
+      mkdir -p "${DUMP_WORK_DIR}/output"
+      # --archive-dump=false: skip creating hypershift-dump.tar.gz inside the output
+      # dir; sed cannot redact inside a compressed archive and leaktk/gcs-filter
+      # would match secrets embedded in it. The shell tar below archives instead.
+      bin/hypershift dump cluster --dump-guest-cluster=true --archive-dump=false --artifact-dir="${DUMP_WORK_DIR}/output" --name="${CLUSTER_NAME}" --namespace="${HYPERSHIFT_NAMESPACE}"
+
+      # Redact sensitive data before archiving and upload (OCPBUGS-84684, OCPBUGS-109626).
+      #
+      # 1. Delete Secret resource YAMLs — their base64-encoded .data fields trigger
+      #    gitleaks generic-api-key / private-key rules. oc adm inspect writes them
+      #    under <namespace>/core/secrets/.
+      find "${DUMP_WORK_DIR}/output" -type f \( -path '*/secrets/*' -o -name 'secrets.yaml' -path '*/core/*' \) -delete
+      # 2. Remove artifact classes which can contain arbitrary credential values.
+      #    These can contain arbitrary credentials and are not needed to retain
+      #    the structured resource snapshot.
+      find "${DUMP_WORK_DIR}/output" -type f \( \
+        -path '*/configmaps/*' \
+        -o -path '*/pods/*' \
+        -o -path '*/core/configmaps.yaml' \
+        -o -path '*/core/pods.yaml' \
+        -o -path '*/apps/daemonsets/*' \
+        -o -path '*/apps/daemonsets.yaml' \
+        -o -path '*/apps/deployments/*' \
+        -o -path '*/apps/deployments.yaml' \
+        -o -path '*/apps/replicasets/*' \
+        -o -path '*/apps/replicasets.yaml' \
+        -o -path '*/serviceaccounts/*' \
+        -o -path '*/namespaces/openshift-ingress/core/services.yaml' \
+        -o -path '*/network_logs/*' \
+        -o -name '*.log' \
+        -o -name 'event-filter.html' \
+        -o -name '*.kubeconfig' \
+        -o -name '*.tar' \
+        -o -name '*.tar.gz' \
+      \) -delete
+      # 3. Strip PEM certificate/key blocks, authorization headers, bearer tokens,
+      #    JWTs, cloud access keys, and long encoded/token-like values from the
+      #    remaining text files.
+      find "${DUMP_WORK_DIR}/output" -type f -exec sed -i.bak -E \
+        -e '/-----BEGIN [A-Z0-9 ]+-----/,/-----END [A-Z0-9 ]+-----/d' \
+        -e 's#[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]:[[:space:]]*.*#Authorization: REDACTED#g' \
+        -e 's|[Bb][Ee][Aa][Rr][Ee][Rr][[:space:]]+[A-Za-z0-9._~+/=-]+|Bearer REDACTED|g' \
+        -e 's|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_.-]*|REDACTED_JWT|g' \
+        -e 's#(AKIA|ASIA)[0-9A-Z]{16}#REDACTED_AWS_ACCESS_KEY#g' \
+        -e 's|[A-Za-z0-9+/]{32,}={0,2}|REDACTED_BASE64|g' \
+        -e 's|[A-Za-z0-9._-]{32,}|REDACTED_TOKEN|g' \
+        {} +
+      find "${DUMP_WORK_DIR}/output" -type f -name '*.bak' -delete
+      find "${DUMP_WORK_DIR}/output" -mindepth 1 -type d -empty -delete
+
+      tar -cvzf "${DUMP_WORK_DIR}/artifacts.tar.gz" -C "${DUMP_WORK_DIR}" output
+      tar -tzf "${DUMP_WORK_DIR}/artifacts.tar.gz" >/dev/null
+      # Publish only the sanitized, verified archive.
+      mkdir -p "${ARTIFACT_DIR}"
+      mv "${DUMP_WORK_DIR}/artifacts.tar.gz" "${ARTIFACT_DIR}/artifacts.tar.gz"
     credentials:
     - mount_path: /etc/hypershift-kubeconfig
       group: ops/clusters/hypershift-ci-2
