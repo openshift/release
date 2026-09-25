@@ -376,6 +376,7 @@ fi
 # Write individual outputs to SHARED_DIR for downstream steps
 jq -r '.region.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-project-id"
 jq -r '.region.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-cluster-name"
+jq -r '.region.value.folder_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-folder-id"
 jq -r '.management_cluster.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-project-id"
 jq -r '.management_cluster.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-name"
 jq -r '.management_cluster.value.cluster_endpoint // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-endpoint"
@@ -393,7 +394,7 @@ if [[ -n "${INFRA_ID}" ]]; then
 fi
 
 # Validate critical outputs were written (early writes + terraform outputs)
-for output_file in region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id api-endpoint oidc-endpoint workspace-name run-id; do
+for output_file in region-project-id region-cluster-name region-folder-id mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id api-endpoint oidc-endpoint workspace-name run-id; do
   if [[ ! -s "${SHARED_DIR}/${output_file}" ]]; then
     log "ERROR: Output file ${output_file} is empty or missing"
     exit 1
@@ -403,6 +404,7 @@ done
 log ""
 log "=== Provision Complete ==="
 log "  Region Project:   $(<${SHARED_DIR}/region-project-id)"
+log "  Region Folder:    $(<${SHARED_DIR}/region-folder-id)"
 log "  MC Project:       $(<${SHARED_DIR}/mc-project-id)"
 log "  MC Cluster:       $(<${SHARED_DIR}/mc-cluster-name)"
 log "  TFC Workspace:    ${WORKSPACE_NAME}"
