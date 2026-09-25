@@ -243,6 +243,20 @@ if [[ ! -f "${GATE_SKILL}" ]]; then
     exit 1
 fi
 
+# Keep canonical read-only helpers/API calls, but enforce the prompt's bans on
+# embedded Python and GitHub API mutations at the gate's tool boundary.
+GATE_DISALLOWED_TOOLS=(
+    "${DISALLOWED_TOOLS[@]}"
+    "Bash(*python* -c*)"
+    "Bash(*python* -)"
+    "Bash(*gh api *--method*)"
+    "Bash(*gh api *-X*)"
+    "Bash(*gh api *--input*)"
+    "Bash(*gh api */* *-f*)"
+    "Bash(*gh api */* *-F*)"
+    "Bash(*gh api graphql*mutation*)"
+)
+
 GATE_MODEL="${GATE_MODEL:-claude-haiku-4-5}"
 
 GATE_PROMPT="/tmp/agentic-review-gate-prompt-$(basename "${WORKDIR}").md"
@@ -517,7 +531,7 @@ while true; do
     timeout 120 claude \
         --model "${GATE_MODEL}" \
         --allowedTools "Bash" \
-        --disallowedTools "${DISALLOWED_TOOLS[@]}" \
+        --disallowedTools "${GATE_DISALLOWED_TOOLS[@]}" \
         --max-turns 20 \
         --output-format text \
         --no-session-persistence \
