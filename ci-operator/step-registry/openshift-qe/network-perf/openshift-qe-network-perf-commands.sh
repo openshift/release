@@ -20,9 +20,6 @@ fi
 
 pushd /tmp
 
-ES_PASSWORD=$(cat "/secret/password")
-ES_USERNAME=$(cat "/secret/username")
-
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
@@ -41,7 +38,12 @@ if [ ${VM} == "true" ]; then
 fi
 
 # Only store the results from the full run versus the smoke test.
+# Disable xtrace while reading and composing Elasticsearch credentials.
+set +x
+ES_PASSWORD=$(cat "/secret/password")
+ES_USERNAME=$(cat "/secret/username")
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+set -x
 
 export LOCAL=$LOCAL; export EXTERNAL_SERVER_ADDRESS=$EXTERNAL_SERVER_ADDRESS; export WORKLOAD=$WORKLOAD; export CLEAN_UP=$CLEAN_UP;
 ./run.sh

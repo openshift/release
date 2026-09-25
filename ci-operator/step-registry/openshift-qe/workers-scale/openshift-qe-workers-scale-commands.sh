@@ -11,9 +11,6 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
-ES_PASSWORD=$(cat "/secret/password")
-ES_USERNAME=$(cat "/secret/username")
-
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
@@ -62,7 +59,12 @@ else
   echo "Non-ROSA cluster detected (cluster-type: ${CLUSTER_TYPE:-not set}), skipping rosa login"
 fi
 
+# Disable xtrace while reading and composing Elasticsearch credentials.
+set +x
+ES_PASSWORD=$(cat "/secret/password")
+ES_USERNAME=$(cat "/secret/username")
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+set -x
 
 run_scale() {
   local worker_count="$1"
