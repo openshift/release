@@ -238,6 +238,40 @@ oc wait "secret/${mcoTokenSecretName}" -n "${obsNamespace}" \
     --for=jsonpath='{.data.token}' \
     --timeout=2m 1>/dev/null
 
+# ---------------------------------------------------------------------------
+# 10. Generate options.yaml for the Ginkgo suite via SHARED_DIR
+#     Built here (cli-jq has jq) so e2e-run needs no jq dependency.
+# ---------------------------------------------------------------------------
+typeset baseDomain=''
+baseDomain="$(oc get ingress.config.openshift.io/cluster \
+    -o jsonpath='{.spec.domain}' | sed 's/^apps\.//')"
+
+jq -cn \
+    --arg hubName 'local-cluster' \
+    --arg hubDomain "${baseDomain}" \
+    '{options: {hub: {name: $hubName, baseDomain: $hubDomain}}}' \
+    > "${SHARED_DIR}/acm-obs-options.json"
+
+if [[ -f "${SHARED_DIR}/managed.cluster.name" ]]; then
+    typeset mcName='' mcDomain=''
+    mcName="$(cat "${SHARED_DIR}/managed.cluster.name")"
+    mcDomain="$(cat "${SHARED_DIR}/managed.cluster.base.domain")"
+
+    [[ -n "${mcName}" ]] || { : 'ERROR: managed.cluster.name is empty'; exit 1; }
+    [[ -n "${mcDomain}" ]] || { : 'ERROR: managed.cluster.base.domain is empty'; exit 1; }
+    [[ -f "${SHARED_DIR}/managed.cluster.kubeconfig" ]] || {
+        : 'ERROR: managed.cluster.kubeconfig missing — name+domain+kubeconfig must be a complete set'
+        exit 1
+    }
+
+    jq -c \
+        --arg mcName "${mcName}" \
+        --arg mcDomain "${mcDomain}" \
+        '.options.clusters = [{name: $mcName, baseDomain: $mcDomain}]' \
+        "${SHARED_DIR}/acm-obs-options.json" > "${SHARED_DIR}/acm-obs-options.json.tmp"
+    mv "${SHARED_DIR}/acm-obs-options.json.tmp" "${SHARED_DIR}/acm-obs-options.json"
+fi
+
 : 'ACM Observability deployed with ODF NooBaa storage — MCO Ready'
 
 true
