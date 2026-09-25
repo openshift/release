@@ -7,12 +7,25 @@
           {
             alert: 'ci-tools-postsubmit-failures',
             expr: |||
-              sum by (job_name) (
-                rate(
-                  prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[5m]
+              (
+                sum by (job_name) (
+                  increase(
+                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[24h]
+                  )
                 )
+                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_metadata_target="e2e-oo-post"})
+                > 0
               )
-              * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_metadata_target="e2e-oo-post"}) > 0
+              unless on (job_name)
+              (
+                sum by (job_name) (
+                  increase(
+                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[12h]
+                  )
+                )
+                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_metadata_target="e2e-oo-post"})
+                > 0
+              )
             |||,
             'for': '1m',
             labels: {
@@ -25,12 +38,25 @@
           {
             alert: 'infrastructure-job-failures',
             expr: |||
-              sum by (job_name) (
-                rate(
-                  prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state="failure"}[5m]
+              (
+                sum by (job_name) (
+                  increase(
+                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state="failure"}[13h]
+                  )
                 )
+                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"})
+                > 0
               )
-              * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"}) > 0
+              unless on (job_name)
+              (
+                sum by (job_name) (
+                  increase(
+                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state="success"}[7h]
+                  )
+                )
+                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"})
+                > 0
+              )
             |||,
             'for': '1m',
             labels: {
@@ -43,12 +69,25 @@
           {
             alert: 'plank-job-with-infra-internal-role-failures',
             expr: |||
-              sum by (job_name) (
-                rate(
-                  prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[5m]
+              (
+                sum by (job_name) (
+                  increase(
+                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[13h]
+                  )
                 )
+                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"})
+                > 0
               )
-              * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"}) > 0
+              unless on (job_name)
+              (
+                sum by (job_name) (
+                  increase(
+                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[7h]
+                  )
+                )
+                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"})
+                > 0
+              )
             |||,
             'for': '1m',
             labels: {
