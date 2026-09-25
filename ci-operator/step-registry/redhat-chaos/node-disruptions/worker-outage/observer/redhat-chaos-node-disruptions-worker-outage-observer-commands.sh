@@ -61,6 +61,8 @@ elif [ "$platform" = "Azure" ]; then
     export CLOUD_TYPE="azure"
     export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
     # jq is not available in the ci image...
+    # Disable xtrace
+    set +x
     AZURE_SUBSCRIPTION_ID="$(jq -r .subscriptionId ${AZURE_AUTH_LOCATION})"
     export AZURE_SUBSCRIPTION_ID
     AZURE_TENANT_ID="$(jq -r .tenantId ${AZURE_AUTH_LOCATION})"
@@ -69,6 +71,7 @@ elif [ "$platform" = "Azure" ]; then
     export AZURE_CLIENT_ID
     AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
     export AZURE_CLIENT_SECRET
+    set -x
 elif [ "$platform" = "IBMCloud" ]; then
 # https://github.com/openshift/release/blob/3afc9cb376776ca27fbb1a4927281e84295f4810/ci-operator/step-registry/openshift-extended/upgrade/pre/openshift-extended-upgrade-pre-commands.sh#L158
     IBMCLOUD_CLI=ibmcloud
@@ -81,8 +84,11 @@ elif [ "$platform" = "IBMCloud" ]; then
     export region
     IBMC_URL="https://${region}.iaas.cloud.ibm.com/v1"
     export IBMC_URL
+    # Disable xtrace
+    set +x
     IBMC_APIKEY=$(cat ${CLUSTER_PROFILE_DIR}/ibmcloud-api-key)
     export IBMC_APIKEY
+    set -x
     ACTION="$CLOUD_TYPE-node-reboot"
     export ACTION
     NODE_NAME=$(oc get nodes -l $LABEL_SELECTOR --no-headers | head -1 | awk '{printf $1}' )
