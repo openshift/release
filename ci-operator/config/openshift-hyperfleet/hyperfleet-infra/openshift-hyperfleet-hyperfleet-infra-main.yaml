@@ -86,26 +86,29 @@ tests:
         gcloud auth activate-service-account --key-file="$GCP_CREDENTIALS_FILE"
         gcloud config set project "$PROJECT_ID"
 
+        # --- Generate ephemeral cluster config ---
+        CI_ID="${BUILD_ID:(-8)}"
+        TF_DIR="terraform"
+
+        # Render ci-<id>.tfvars and .tfbackend from the CI templates in hyperfleet-infra
+        make ci-tf-env CI_ID="${CI_ID}"
+
+        # Retrieve cluster credentials for uninstall
+        (cd "$TF_DIR" && terraform init -backend-config="envs/gke/ci-${CI_ID}.tfbackend") || true
+        eval $(cd "$TF_DIR" && terraform output -raw connect_command) || true
+
         # --- Cleanup ---
-        CI_ID=$(cat "${SHARED_DIR}/ci_id" 2>/dev/null || echo "unknown")
+        # Uninstall maestro before destroying the cluster
+        # Tolerate failure in case the cluster isn't reachable
+        # (e.g. setup was aborted before provisioning finished).
+        make uninstall-maestro || true
 
-        if [ "$CI_ID" != "unknown" ]; then
-          TF_DIR="terraform"
-
-          # Regenerate config files from the CI templates (not shared across containers)
-          make ci-tf-env CI_ID="${CI_ID}"
-
-          # Retrieve cluster credentials for uninstall
-          (cd "$TF_DIR" && terraform init -backend-config="envs/gke/ci-${CI_ID}.tfbackend") || true
-          eval $(cd "$TF_DIR" && terraform output -raw connect_command) || true
-
-          # Only drop the GCS state once destroy succeeded, otherwise keep it
-          # so the cluster can still be destroyed by hand.
-          if make ci-cleanup TF_ENV="ci-${CI_ID}"; then
-            gsutil rm -r "gs://hyperfleet-terraform-state/ci/infra/${CI_ID}" || true
-          else
-            echo "ci-cleanup failed, keeping gs://hyperfleet-terraform-state/ci/infra/${CI_ID} for a manual destroy"
-          fi
+        # Only drop the GCS state once destroy succeeded, otherwise keep it
+        # so the cluster can still be destroyed by hand.
+        if make destroy-terraform TF_ENV="ci-${CI_ID}"; then
+          gsutil rm -r "gs://hyperfleet-terraform-state/ci/infra/${CI_ID}" || true
+        else
+          echo "destroy-terraform failed, keeping gs://hyperfleet-terraform-state/ci/infra/${CI_ID} for a manual destroy"
         fi
       credentials:
       - collection: hyperfleet
@@ -117,8 +120,8 @@ tests:
           cpu: 100m
           memory: 300Mi
       timeout: 15m0s
-    test:
-    - as: deploy-and-test
+    pre:
+    - as: setup
       commands: |
         set -euo pipefail
 
@@ -135,13 +138,58 @@ tests:
         # Render ci-<id>.tfvars and .tfbackend from the CI templates in hyperfleet-infra
         make ci-tf-env CI_ID="${CI_ID}"
 
-        # Store CI_ID for cleanup step
-        echo "${CI_ID}" > "${SHARED_DIR}/ci_id"
+        # --- Run terraform apply ---
+        cd terraform
+        terraform init -backend-config="envs/gke/ci-${CI_ID}.tfbackend"
+        terraform apply -var-file="envs/gke/ci-${CI_ID}.tfvars" -auto-approve -lock=false &
 
-        # --- Run integration test ---
-        make ci-test \
-          TF_ENV="ci-${CI_ID}" \
-          AUTO_APPROVE=true
+        # Forward SIGTERM to terraform so it can save state to GCS on job abort.
+        # Without this, bash exits on SIGTERM without notifying terraform, and
+        # terraform gets SIGKILLed with no state saved, preventing cleanup.
+        TF_PID=$!
+        trap 'echo "SIGTERM received, forwarding to terraform (PID $TF_PID)..."; kill -TERM "$TF_PID" 2>/dev/null || true' TERM INT
+        set +e
+        wait "$TF_PID"; rc=$?
+        # wait returns early when the trap fires, keep waiting until terraform has saved state
+        while kill -0 "$TF_PID" 2>/dev/null; do wait "$TF_PID"; rc=$?; done
+        set -e
+        exit "$rc"
+      credentials:
+      - collection: hyperfleet
+        group: hyperfleet-e2e
+        mount_path: /var/run/hyperfleet-e2e
+      from: src
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+      timeout: 15m0s
+    test:
+    - as: component-install
+      commands: |
+        set -euo pipefail
+
+        # --- GCP Auth ---
+        GCP_CREDENTIALS_FILE="/var/run/hyperfleet-e2e/hcm-hyperfleet-e2e.json"
+        export GOOGLE_APPLICATION_CREDENTIALS="$GCP_CREDENTIALS_FILE"
+        PROJECT_ID=$(jq -r .project_id "$GCP_CREDENTIALS_FILE")
+        gcloud auth activate-service-account --key-file="$GCP_CREDENTIALS_FILE"
+        gcloud config set project "$PROJECT_ID"
+
+        # --- Generate ephemeral cluster config ---
+        CI_ID="${BUILD_ID:(-8)}"
+        TF_DIR="terraform"
+
+        # Render ci-<id>.tfvars and .tfbackend from the CI templates in hyperfleet-infra
+        make ci-tf-env CI_ID="${CI_ID}"
+
+        # Connect to cluster
+        (cd "$TF_DIR" && terraform init -backend-config="envs/gke/ci-${CI_ID}.tfbackend") || true
+        eval $(cd "$TF_DIR" && terraform output -raw connect_command) || true
+
+        # --- Run install tests ---
+        make install-priority-classes install-maestro-all health-check-maestro
       credentials:
       - collection: hyperfleet
         group: hyperfleet-e2e
@@ -151,7 +199,7 @@ tests:
         requests:
           cpu: 100m
           memory: 300Mi
-      timeout: 1h0m0s
+      timeout: 15m0s
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet
