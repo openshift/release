@@ -4,92 +4,69 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-ci_failure_state() {
+ci_head_state() {
     local action=$1
-    local failures_json=$2
-    local head_ref_oid=$3
-    local state_file=$4
-    local failures
+    local head_ref_oid=$2
+    local state_file=$3
     local state_dir
 
     case "${action}" in
-        filter|record) ;;
+        check|record) ;;
         *)
-            echo "unknown CI failure state action: ${action}" >&2
+            echo "unknown CI HEAD state action: ${action}" >&2
             return 1
             ;;
     esac
-    if ! failures=$(jq -ce \
-        'if type == "array" and all(.[]; type == "object") then . else error("invalid") end' \
-        <<< "${failures_json}" 2>/dev/null); then
-        echo "failures must be a JSON array of objects" >&2
+    if [[ ! "${head_ref_oid}" =~ ^[[:xdigit:]]{40}$ ]]; then
+        echo "PR head SHA must be a 40 character hexadecimal string" >&2
         return 1
     fi
 
     if ! state_dir=$(dirname "${state_file}") || ! mkdir -p "${state_dir}"; then
-        echo "failed to create CI failure state directory" >&2
+        echo "failed to create evaluated CI HEAD state directory" >&2
         return 1
     fi
     (
-        local evaluated='[]'
+        local evaluated_head=""
         local temporary_file
         local updated
 
-        # A responder is normally the only writer, but locking prevents a lost
-        # update if overlapping invocations record different failures.
+        # A responder is normally the only writer, but locking keeps checks and
+        # atomic replacement consistent across overlapping invocations.
         if ! flock -x 9; then
-            echo "failed to lock CI failure state" >&2
+            echo "failed to lock evaluated CI HEAD state" >&2
             exit 1
         fi
         if [[ -e "${state_file}" ]]; then
-            if ! evaluated=$(jq -ce \
-                'if type == "array" and all(.[]; type == "object") then . else error("invalid") end' \
+            if ! evaluated_head=$(jq -er \
+                'if type == "object" and (.head_ref_oid | type) == "string" and
+                    (.head_ref_oid | test("^[0-9A-Fa-f]{40}$"))
+                 then .head_ref_oid else error("invalid") end' \
                 "${state_file}" 2>/dev/null); then
-                echo "invalid CI failure state in ${state_file}" >&2
-                exit 1
+                if [[ "${action}" == "check" ]]; then
+                    echo "invalid evaluated CI HEAD state in ${state_file}" >&2
+                    exit 1
+                fi
+                echo "WARNING: replacing invalid evaluated CI HEAD state in ${state_file}" >&2
             fi
         fi
 
-        if [[ "${action}" == "filter" ]]; then
-            if ! jq -cn \
-                --argjson failures "${failures}" \
-                --argjson evaluated "${evaluated}" \
-                --arg head_ref_oid "${head_ref_oid}" '
-                def identity($head):
-                    {name: ((.name // "") | tostring), state: ((.state // "") | tostring)}
-                    + if ((.link | type) == "string" and ((.link | test("^\\s*$")) | not))
-                      then {link: .link}
-                      else {head_ref_oid: $head}
-                      end;
-                [$failures[] as $failure
-                    | ($failure | identity($head_ref_oid)) as $identity
-                    | select(($evaluated | index($identity)) == null)
-                    | $failure]
-            '; then
-                echo "failed to filter CI failure state" >&2
-                exit 1
+        if [[ "${action}" == "check" ]]; then
+            if [[ "${evaluated_head}" == "${head_ref_oid}" ]]; then
+                printf '%s\n' true
+            else
+                printf '%s\n' false
             fi
             exit 0
         fi
 
-        if ! updated=$(jq -cn \
-            --argjson failures "${failures}" \
-            --argjson evaluated "${evaluated}" \
-            --arg head_ref_oid "${head_ref_oid}" '
-            def identity($head):
-                {name: ((.name // "") | tostring), state: ((.state // "") | tostring)}
-                + if ((.link | type) == "string" and ((.link | test("^\\s*$")) | not))
-                  then {link: .link}
-                  else {head_ref_oid: $head}
-                  end;
-            reduce ($failures[] | identity($head_ref_oid)) as $identity
-                ($evaluated; if index($identity) == null then . + [$identity] else . end)
-        '); then
-            echo "failed to build updated CI failure state" >&2
+        if ! updated=$(jq -cn --arg head_ref_oid "${head_ref_oid}" \
+            '{head_ref_oid: $head_ref_oid}'); then
+            echo "failed to build evaluated CI HEAD state" >&2
             exit 1
         fi
         if ! temporary_file=$(mktemp "${state_file}.tmp.XXXXXX"); then
-            echo "failed to create temporary CI failure state" >&2
+            echo "failed to create temporary evaluated CI HEAD state" >&2
             exit 1
         fi
         if ! printf '%s\n' "${updated}" > "${temporary_file}" || \
@@ -102,14 +79,167 @@ ci_failure_state() {
     ) 9> "${state_file}.lock"
 }
 
-# Internal entry point for focused state validation. Prow invokes this script
+ci_worker_needed() {
+    local failures_json=$1
+    local head_ref_oid=$2
+    local state_file=$3
+    local failure_count
+    local head_evaluated=false
+
+    if ! failure_count=$(jq -er \
+        'if type == "array" and all(.[]; type == "object") then length else error("invalid") end' \
+        <<< "${failures_json}" 2>/dev/null); then
+        echo "failing checks must be a JSON array of objects" >&2
+        return 1
+    fi
+    if [[ "${failure_count}" -eq 0 ]]; then
+        printf '%s\n' false
+        return 0
+    fi
+    if ! head_evaluated=$(ci_head_state check "${head_ref_oid}" "${state_file}"); then
+        echo "WARNING: failed to read evaluated CI HEAD state; treating current failures as pending." >&2
+        printf '%s\n' true
+        return 0
+    fi
+    if [[ "${head_evaluated}" == "true" ]]; then
+        printf '%s\n' false
+    else
+        printf '%s\n' true
+    fi
+}
+
+record_ci_head_if_complete() {
+    local worker_succeeded=$1
+    local publication_succeeded=$2
+    local head_ref_oid=$3
+    local state_file=$4
+
+    case "${worker_succeeded}:${publication_succeeded}" in
+        true:true)
+            ci_head_state record "${head_ref_oid}" "${state_file}"
+            ;;
+        true:false|false:true|false:false)
+            return 0
+            ;;
+        *)
+            echo "worker and publication state must be true or false" >&2
+            return 1
+            ;;
+    esac
+}
+
+run_ci_head_state_tests() {
+    local state_dir
+    local state_file
+    local head_a=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    local head_b=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    local failures='[{"name":"required-job","state":"FAILURE"}]'
+    local different_failures='[{"name":"different-required-job","state":"ERROR"}]'
+    local pass_count=0
+    local fail_count=0
+
+    state_dir=$(mktemp -d)
+    state_file="${state_dir}/evaluated-head.json"
+
+    test_pass() {
+        echo "PASS: $1"
+        pass_count=$(( pass_count + 1 ))
+    }
+    test_fail() {
+        echo "FAIL: $1 — $2"
+        fail_count=$(( fail_count + 1 ))
+    }
+    assert_equal() {
+        local name=$1
+        local expected=$2
+        local actual=$3
+        if [[ "${actual}" == "${expected}" ]]; then
+            test_pass "${name}"
+        else
+            test_fail "${name}" "expected ${expected}, got ${actual}"
+        fi
+    }
+    assert_fails() {
+        local name=$1
+        shift
+        if "$@" >/dev/null 2>&1; then
+            test_fail "${name}" "command unexpectedly succeeded"
+        else
+            test_pass "${name}"
+        fi
+    }
+
+    assert_equal "missing state leaves HEAD eligible" true \
+        "$(ci_worker_needed "${failures}" "${head_a}" "${state_file}")"
+
+    record_ci_head_if_complete true true "${head_a}" "${state_file}"
+    assert_equal "successful evaluation suppresses the same HEAD" false \
+        "$(ci_worker_needed "${failures}" "${head_a}" "${state_file}")"
+    assert_equal "different failing run on the same HEAD stays suppressed" false \
+        "$(ci_worker_needed "${different_failures}" "${head_a}" "${state_file}")"
+    assert_equal "changed HEAD becomes eligible" true \
+        "$(ci_worker_needed "${failures}" "${head_b}" "${state_file}")"
+
+    rm -f "${state_file}"
+    record_ci_head_if_complete false true "${head_a}" "${state_file}"
+    assert_equal "worker failure leaves HEAD eligible for retry" true \
+        "$(ci_worker_needed "${failures}" "${head_a}" "${state_file}")"
+
+    rm -f "${state_file}"
+    record_ci_head_if_complete true false "${head_a}" "${state_file}"
+    assert_equal "publication failure leaves HEAD eligible for retry" true \
+        "$(ci_worker_needed "${failures}" "${head_a}" "${state_file}")"
+
+    printf '%s\n' '{not-json' > "${state_file}"
+    assert_fails "malformed state fails closed" \
+        ci_head_state check "${head_a}" "${state_file}"
+    assert_equal "malformed state leaves HEAD eligible" true \
+        "$(ci_worker_needed "${failures}" "${head_a}" "${state_file}")"
+    record_ci_head_if_complete true true "${head_a}" "${state_file}"
+    assert_equal "successful evaluation repairs invalid state" true \
+        "$(ci_head_state check "${head_a}" "${state_file}")"
+
+    assert_equal "evaluated HEAD persists across process restart" true \
+        "$(bash "$0" __ci_head_state check "${head_a}" "${state_file}")"
+
+    rm -rf "${state_dir}"
+    echo ""
+    echo "Results: ${pass_count} passed, ${fail_count} failed"
+    [[ "${fail_count}" -eq 0 ]]
+}
+
+# Internal entry points for focused state validation. Prow invokes this script
 # without arguments and follows the normal path below.
-if [[ "${1:-}" == "__ci_failure_state" ]]; then
-    if [[ "$#" -ne 5 ]]; then
-        echo "usage: $0 __ci_failure_state <filter|record> <failures-json> <head-ref-oid> <state-file>" >&2
+if [[ "${1:-}" == "__test_ci_head_state" ]]; then
+    if [[ "$#" -ne 1 ]]; then
+        echo "usage: $0 __test_ci_head_state" >&2
         exit 2
     fi
-    ci_failure_state "$2" "$3" "$4" "$5"
+    run_ci_head_state_tests
+    exit 0
+fi
+if [[ "${1:-}" == "__ci_head_state" ]]; then
+    if [[ "$#" -ne 4 ]]; then
+        echo "usage: $0 __ci_head_state <check|record> <head-ref-oid> <state-file>" >&2
+        exit 2
+    fi
+    ci_head_state "$2" "$3" "$4"
+    exit 0
+fi
+if [[ "${1:-}" == "__ci_worker_needed" ]]; then
+    if [[ "$#" -ne 4 ]]; then
+        echo "usage: $0 __ci_worker_needed <failures-json> <head-ref-oid> <state-file>" >&2
+        exit 2
+    fi
+    ci_worker_needed "$2" "$3" "$4"
+    exit 0
+fi
+if [[ "${1:-}" == "__record_ci_head_if_complete" ]]; then
+    if [[ "$#" -ne 5 ]]; then
+        echo "usage: $0 __record_ci_head_if_complete <worker-succeeded> <publication-succeeded> <head-ref-oid> <state-file>" >&2
+        exit 2
+    fi
+    record_ci_head_if_complete "$2" "$3" "$4" "$5"
     exit 0
 fi
 
@@ -432,7 +562,7 @@ review_rounds=0
 PHASE_REVIEW_START=$(date +%s)
 PREV_FAILING='[]'
 PREV_HEAD=""
-EVALUATED_CI_STATE="${SHARED_DIR}/review-responder-evaluated-ci-${PR_NUM}.json"
+EVALUATED_CI_HEAD_STATE="${SHARED_DIR}/review-responder-evaluated-ci-${PR_NUM}.json"
 GATE_FAILURE_THRESHOLD="${GATE_FAILURE_THRESHOLD:-3}"
 PUSH_FAILURE_THRESHOLD="${PUSH_FAILURE_THRESHOLD:-3}"
 gate_failures=0
@@ -514,19 +644,14 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
     has_review=false
     [[ "${comment_decision}" == "COMMENT_WORK=yes" ]] && has_review=true
 
-    # The model gate discovers the current actionable failures, but the
-    # responder owns the authoritative evaluated-state decision. This makes a
-    # repeated poll deterministic and also recognizes a rerun of the same job
-    # name when its check URL changes.
-    if ! pending_ci=$(ci_failure_state filter "${extracted}" "${current_head}" "${EVALUATED_CI_STATE}"); then
-        echo "WARNING: failed to filter evaluated CI failures; treating all current failures as pending."
-        pending_ci="${extracted}"
-    fi
-    has_ci=false
-    if [[ "$(jq 'length' <<< "${pending_ci}")" -gt 0 ]]; then
+    if ! has_ci=$(ci_worker_needed "${extracted}" "${current_head}" "${EVALUATED_CI_HEAD_STATE}"); then
+        echo "WARNING: failed to determine whether CI work is needed; treating current failures as pending."
         has_ci=true
-    elif [[ "${ci_decision}" == "CI_WORK=yes" ]]; then
-        echo "Gate reported CI work, but every current failure was already evaluated."
+    fi
+    if [[ "${has_ci}" == "false" && "$(jq 'length' <<< "${extracted}")" -gt 0 ]]; then
+        echo "Failing required CI for HEAD ${current_head} was already evaluated; skipping the CI worker."
+    elif [[ "${has_ci}" == "false" && "${ci_decision}" == "CI_WORK=yes" ]]; then
+        echo "Gate reported CI work, but no failing checks were extracted."
     fi
 
     PREV_FAILING="${extracted}"
@@ -541,7 +666,7 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
         idle_streak=0
         review_rounds=$(( review_rounds + 1 ))
         REVIEW_EXIT=0
-        ci_evaluated=false
+        ci_worker_succeeded=false
 
         if [[ "${has_review}" == "true" ]]; then
             echo "Invoking worker to address review comments..."
@@ -557,7 +682,7 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
 
         if [[ "${has_ci}" == "true" ]]; then
             CHECKS_FILE="${WORKDIR}/artifacts/failing-checks-${iteration}.json"
-            printf '%s\n' "${pending_ci}" > "${CHECKS_FILE}"
+            printf '%s\n' "${extracted}" > "${CHECKS_FILE}"
             echo "Invoking worker to triage CI failures..."
             CI_EXIT=0
             agentic_ci --timeout 1800 \
@@ -573,24 +698,28 @@ Your GitHub login is ${BOT_LOGIN}." \
             if [[ "${CI_EXIT}" -ne 0 ]]; then
                 REVIEW_EXIT="${CI_EXIT}"
             fi
-            # A successful worker evaluated the failure even if it was deemed
-            # unrelated or made no branch change. Record it only after the
-            # branch push succeeds, so an unpublished fix remains retryable.
+            # A successful worker evaluated the failing CI for this revision,
+            # even if it was unrelated or required no branch change.
             if [[ "${CI_EXIT}" -eq 0 ]]; then
-                ci_evaluated=true
+                ci_worker_succeeded=true
             else
-                echo "CI worker failed; leaving failures pending for retry."
+                echo "CI worker failed; leaving this HEAD pending for retry."
             fi
         fi
 
+        publication_succeeded=false
         if push_current_branch; then
-            if [[ "${ci_evaluated}" == "true" ]] && \
-               ! ci_failure_state record "${pending_ci}" "${current_head}" "${EVALUATED_CI_STATE}"; then
-                echo "WARNING: failed to record evaluated CI failures; they may be re-evaluated."
-            fi
+            publication_succeeded=true
         else
-            echo "WARNING: branch push failed; leaving CI failures pending for retry."
+            echo "WARNING: branch push failed; leaving this HEAD pending for retry."
             REVIEW_EXIT=1
+        fi
+        if ! record_ci_head_if_complete \
+            "${ci_worker_succeeded}" \
+            "${publication_succeeded}" \
+            "${current_head}" \
+            "${EVALUATED_CI_HEAD_STATE}"; then
+            echo "WARNING: failed to record evaluated CI HEAD; it may be re-evaluated."
         fi
     fi
 
