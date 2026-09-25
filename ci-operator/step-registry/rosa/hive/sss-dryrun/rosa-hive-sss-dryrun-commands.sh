@@ -37,7 +37,7 @@ oc process --local -f "${TEMPLATE}" \
     -p OCM_BASE_URL=https://api.example.com \
     -p CONSOLE_BASE_URL=https://console.example.com \
     -p SREP_LEGAL_ENTITY_ID=dummy-legal-entity-id \
-    -p LOG_LINKING_ENTITY_IDS=dummy-log-linking-id \
+    -p 'LOG_LINKING_ENTITY_IDS=["dummy-log-linking-id"]' \
     -p 'ALLOWED_CIDR_BLOCKS=10.0.0.0/8' \
     -p 'ROUTER_REPLICA_CLUSTER_IDS=["dummy-cluster-id"]' \
     -p 'ROUTER_REPLICA_ORG_IDS=["dummy-org-id"]' \
@@ -114,7 +114,7 @@ log "Elevated as: $(oc whoami 2>/dev/null || echo 'unknown')"
 
 # Server-side dry-run apply
 log "Server-side dry-run apply of processed SelectorSyncSets"
-oc apply --dry-run=server -f "${PROCESSED}"
+oc apply --server-side --dry-run=server -f "${PROCESSED}"
 
 log "All SelectorSyncSets passed server-side dry-run validation"
 
