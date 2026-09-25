@@ -253,9 +253,9 @@ This is CI mode (--ci). Do not modify files, post replies, commit, or push.
 The Gate Process below is the full skill text, already inlined. Do not invoke
 the Skill tool, slash commands, or `/openshift-developer:has-review-work`.
 Execute the entire Gate Process in exactly one Bash tool invocation so all
-shell variables and temporary files remain in one shell. In that invocation,
-write any multi-line Python helper to a temporary file before running it. Never
-pipe JSON to `python3 - <<'PY'`: the heredoc would replace the piped stdin.
+shell variables and temporary files remain in one shell. Use jq and the
+canonical helper scripts exactly as directed. Do not embed Python source or run
+`python`/`python3` with `-`; a heredoc would replace piped JSON on standard input.
 Do not print fetched review data or helper output. Print only the --ci output
 lines specified in the skill.
 
@@ -281,13 +281,16 @@ matches = list(re.finditer(r"^FAILING_CHECKS=", text, re.M))
 if not matches:
     sys.exit(1)
 try:
-    obj, _ = json.JSONDecoder().raw_decode(text[matches[-1].end():].lstrip())
+    payload = text[matches[-1].end():].lstrip()
+    obj, end = json.JSONDecoder().raw_decode(payload)
 except json.JSONDecodeError:
     sys.exit(1)
-if not isinstance(obj, list):
+if payload[end:].strip() or not isinstance(obj, list):
     sys.exit(1)
 for entry in obj:
-    if not isinstance(entry, dict) or not all(k in entry for k in ("name", "state", "bucket")):
+    if not isinstance(entry, dict) or not all(
+        isinstance(entry.get(k), str) for k in ("name", "state", "bucket", "link")
+    ):
         sys.exit(1)
 print(json.dumps(obj, separators=(",", ":")))
 ' "$1"
@@ -543,9 +546,33 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
 
     comment_decision=$(grep -Eo '^COMMENT_WORK=(yes|no)$' "${GATE_LOG}" | tail -1 || true)
     ci_decision=$(grep -Eo '^CI_WORK=(yes|no)$' "${GATE_LOG}" | tail -1 || true)
-    if [[ -z "${comment_decision}" || -z "${ci_decision}" ]]; then
+    work_decision=$(grep -Eo '^WORK=(yes|no)$' "${GATE_LOG}" | tail -1 || true)
+    if [[ -z "${comment_decision}" || -z "${ci_decision}" || -z "${work_decision}" ]]; then
         gate_failures=$(( gate_failures + 1 ))
-        echo "Gate did not emit COMMENT_WORK= and CI_WORK= (${gate_failures}/${GATE_FAILURE_THRESHOLD})"
+        echo "Gate did not emit COMMENT_WORK=, CI_WORK=, and WORK= (${gate_failures}/${GATE_FAILURE_THRESHOLD})"
+        if [[ "${gate_failures}" -ge "${GATE_FAILURE_THRESHOLD}" ]]; then
+            echo "ERROR: gate failed ${gate_failures} consecutive times; giving up"
+            exit 1
+        fi
+        continue
+    fi
+    if ! extracted=$(extract_failing_checks "${GATE_LOG}"); then
+        gate_failures=$(( gate_failures + 1 ))
+        echo "Gate did not emit valid FAILING_CHECKS= JSON (${gate_failures}/${GATE_FAILURE_THRESHOLD})"
+        if [[ "${gate_failures}" -ge "${GATE_FAILURE_THRESHOLD}" ]]; then
+            echo "ERROR: gate failed ${gate_failures} consecutive times; giving up"
+            exit 1
+        fi
+        continue
+    fi
+    expected_work="WORK=no"
+    if [[ "${comment_decision}" == "COMMENT_WORK=yes" || "${ci_decision}" == "CI_WORK=yes" ]]; then
+        expected_work="WORK=yes"
+    fi
+    if [[ "${work_decision}" != "${expected_work}" ]] || \
+       [[ "${ci_decision}" == "CI_WORK=yes" && "${extracted}" == '[]' ]]; then
+        gate_failures=$(( gate_failures + 1 ))
+        echo "Gate emitted inconsistent decisions (${gate_failures}/${GATE_FAILURE_THRESHOLD})"
         if [[ "${gate_failures}" -ge "${GATE_FAILURE_THRESHOLD}" ]]; then
             echo "ERROR: gate failed ${gate_failures} consecutive times; giving up"
             exit 1
@@ -553,10 +580,6 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
         continue
     fi
     gate_failures=0
-    extracted='[]'
-    if got_checks=$(extract_failing_checks "${GATE_LOG}"); then
-        extracted="${got_checks}"
-    fi
 
     has_review=false
     [[ "${comment_decision}" == "COMMENT_WORK=yes" ]] && has_review=true
