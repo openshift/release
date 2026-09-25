@@ -30,6 +30,10 @@ _junit_emit() {
   </testcase>
 </testsuite>
 JUNITEOF
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
 }
 
 trap '_jrc=$?; _junit_emit ${_jrc}' EXIT

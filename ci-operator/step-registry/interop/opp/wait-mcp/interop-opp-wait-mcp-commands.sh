@@ -53,6 +53,10 @@ _junit_emit() {
   </testcase>
 </testsuite>
 JUNITEOF
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
 }
 
 trap '_jrc=$?; set +e; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; exit ${_jrc}' EXIT
