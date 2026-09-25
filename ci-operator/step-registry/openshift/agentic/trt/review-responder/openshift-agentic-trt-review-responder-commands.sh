@@ -307,6 +307,48 @@ read_pr_head() {
     fi
 }
 
+checkout_pr_head() {
+    local expected_fork_url="https://github.com/${FORK_REPO}.git"
+    local expected_ref="refs/heads/${PR_HEAD_BRANCH}"
+    local fetched_head
+    local -a fork_fetch_urls fork_push_urls
+
+    if [[ ! "${FORK_REPO}" =~ ^[^/]+/[^/]+$ ]] || \
+       [[ "${PR_HEAD_OWNER}/${PR_HEAD_REPO}" != "${FORK_REPO}" ]]; then
+        echo "ERROR: PR head repository does not match the configured fork"
+        return 1
+    fi
+    if ! git check-ref-format --branch "${PR_HEAD_BRANCH}" >/dev/null 2>&1; then
+        echo "ERROR: PR head branch is invalid"
+        return 1
+    fi
+    # get-url applies pushurl and url.* rewrite rules. Both effective
+    # destinations must remain the configured fork before any fetch occurs.
+    mapfile -t fork_fetch_urls < <(git remote get-url --all fork 2>/dev/null || true)
+    mapfile -t fork_push_urls < <(git remote get-url --push --all fork 2>/dev/null || true)
+    if [[ "${#fork_fetch_urls[@]}" -ne 1 ]] || \
+       [[ "${fork_fetch_urls[0]}" != "${expected_fork_url}" ]] || \
+       [[ "${#fork_push_urls[@]}" -ne 1 ]] || \
+       [[ "${fork_push_urls[0]}" != "${expected_fork_url}" ]]; then
+        echo "ERROR: fork remote does not match the configured fork"
+        return 1
+    fi
+    if ! git fetch --no-tags --no-recurse-submodules fork "${expected_ref}"; then
+        echo "ERROR: unable to fetch the PR head branch from the configured fork"
+        return 1
+    fi
+    if ! fetched_head=$(git rev-parse --verify 'FETCH_HEAD^{commit}') || \
+       [[ "${fetched_head}" != "${PR_HEAD_SHA}" ]]; then
+        echo "ERROR: fetched PR head does not match the expected PR head SHA"
+        return 1
+    fi
+    if ! git checkout --force -B "${PR_HEAD_BRANCH}" "${fetched_head}" || \
+       ! git reset --hard "${fetched_head}"; then
+        echo "ERROR: unable to check out and reset the verified PR head"
+        return 1
+    fi
+}
+
 verify_push_target() {
     local expected_ref="refs/heads/${PR_HEAD_BRANCH}"
     local local_ref
@@ -335,6 +377,7 @@ capture_expected_pr_head() {
     local local_head
 
     read_pr_head || return 1
+    checkout_pr_head || return 1
     verify_push_target || return 1
     if ! local_head=$(git rev-parse --verify 'HEAD^{commit}') || [[ "${local_head}" != "${PR_HEAD_SHA}" ]]; then
         echo "ERROR: checked-out HEAD does not match the expected PR head SHA"
