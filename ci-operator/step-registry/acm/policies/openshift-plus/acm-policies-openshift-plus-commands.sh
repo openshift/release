@@ -85,6 +85,8 @@ fi
   done
 } > "${ARTIFACT_DIR}/skip-policies.txt"
 
+typeset -i complianceFailed=0
+
 if (( ${#skipPoliciesArr[@]} > 0 )); then
   # Validate that skip-listed policies actually exist in the cluster
   typeset allPolicies=""
@@ -117,11 +119,11 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
       xargs oc wait -n policies \
         --for jsonpath='{.status.compliant}'=Compliant \
         --timeout=40m; then
+      complianceFailed=1
       : "Non-skipped policies failed to become compliant:"
-      oc get policies -n policies --ignore-not-found | grep -Ev "/(${skipRegex})$"
-      oc get policies -n policies --ignore-not-found -o yaml
-      oc describe policies -n policies
-      exit 1
+      oc get policies -n policies --ignore-not-found | grep -Ev "/(${skipRegex})$" || true
+      oc get policies -n policies --ignore-not-found -o yaml || true
+      oc describe policies -n policies || true
     fi
   else
     printf '[%s] All policies are in the skip list — no policies to wait for\n' \
@@ -133,12 +135,68 @@ else
   if ! oc wait policies --all -n policies \
     --for jsonpath='{.status.compliant}'=Compliant \
     --timeout=40m; then
+    complianceFailed=1
     : "Policies failed to become compliant:"
-    oc get policies -n policies --ignore-not-found
-    oc get policies -n policies --ignore-not-found -o yaml
-    oc describe policies -n policies
-    exit 1
+    oc get policies -n policies --ignore-not-found || true
+    oc get policies -n policies --ignore-not-found -o yaml || true
+    oc describe policies -n policies || true
   fi
 fi
 
-true
+# ── Generate per-policy JUnit XML ────────────────────────────────────
+# Emit one <testcase> per policy so CI dashboards show individual
+# policy compliance rather than a single aggregate pass/fail.
+typeset junitFile="${ARTIFACT_DIR}/junit_acm_policies.xml"
+typeset -r SUITE_NAME="lp-interop--OPP--acm-policies"
+typeset -i junitTests=0
+typeset -i junitFailures=0
+typeset -i junitSkipped=0
+typeset testcaseXml=""
+
+# Query per-policy compliance status
+typeset policyStatusJson=""
+policyStatusJson="$(oc get policies -n policies -o json 2>/dev/null)" || true
+
+if [[ -n "${policyStatusJson}" ]]; then
+  while IFS='|' read -r pName pCompliant; do
+    [[ -z "${pName}" ]] && continue
+    junitTests+=1
+
+    # Check whether this policy was skipped
+    typeset _skip=false
+    for _sp in "${skipPoliciesArr[@]}"; do
+      [[ "${_sp}" == "${pName}" ]] && { _skip=true; break; }
+    done
+
+    if [[ "${_skip}" == "true" ]]; then
+      junitSkipped+=1
+      testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\">
+      <skipped message=\"Policy in SKIP_POLICIES list\"/>
+    </testcase>
+"
+    elif [[ "${pCompliant}" == "Compliant" ]]; then
+      testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\"/>
+"
+    else
+      junitFailures+=1
+      testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\">
+      <failure message=\"Policy status: ${pCompliant:-unknown}\">Policy ${pName} is ${pCompliant:-unknown}</failure>
+    </testcase>
+"
+    fi
+  done < <(echo "${policyStatusJson}" | jq -r '.items[] | "\(.metadata.name)|\(.status.compliant // "unknown")"')
+fi
+
+cat > "${junitFile}" <<JUNIT_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${SUITE_NAME}" tests="${junitTests}" failures="${junitFailures}" skipped="${junitSkipped}">
+${testcaseXml}</testsuite>
+JUNIT_EOF
+
+printf '[%s] JUnit: %d tests, %d failures, %d skipped → %s\n' \
+  "$(date -u +%FT%TZ)" "${junitTests}" "${junitFailures}" "${junitSkipped}" "${junitFile}"
+
+# ── Exit with the original compliance outcome ────────────────────────
+if (( complianceFailed )); then
+  exit 1
+fi
