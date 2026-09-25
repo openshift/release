@@ -1,0 +1,112 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: "3.4"
+  use_build_cache: true
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: cargo-build
+  steps:
+    test:
+    - as: build
+      cli: latest
+      commands: |
+        ./ossm/ci/pre-submit.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 1h0m0s
+  timeout: 1h30m0s
+- as: cargo-build-and-push
+  postsubmit: true
+  steps:
+    test:
+    - as: build-and-push
+      cli: latest
+      commands: |
+        GOOGLE_APPLICATION_CREDENTIALS='/maistra-secrets/service-account.json' ./ossm/ci/post-submit.sh
+      credentials:
+      - collection: maistra-dev-prow
+        group: gcs
+        mount_path: /maistra-secrets
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 1h0m0s
+  timeout: 2h0m0s
+- as: update-istio
+  commands: |
+    # load test-infra automator.sh script
+    export ISTIO_ZTUNNEL_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/ztunnel"
+    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
+    cd test-infra
+    ./tools/automator.sh \
+      -o openshift-service-mesh \
+      -r istio \
+      -f /creds-github/token \
+      "-c bin/update_ztunnel.sh ${PULL_BASE_SHA}" \
+      '-t [release-1.30] Automator: Update ztunnel' \
+      -m bump-ztunnel-1.30 \
+      -b release-1.30
+  container:
+    from: src
+  postsubmit: true
+  reporter_config:
+    channel: '#team-ossm-release-maintenance'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  secrets:
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
+  timeout: 8h0m0s
+- as: sync-upstream-ztunnel-1.30
+  commands: |
+    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
+    cd test-infra
+    export GITHUB_TOKEN_PATH=/creds-github/token
+    export MERGE_BRANCH=release-1.30
+    ./tools/automator-main.sh \
+    --org=openshift-service-mesh \
+    --repo=ztunnel \
+    --branch=release-1.30 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    --modifier=merge_upstream_ztunnel_1.30 \
+    --cmd=./ossm/merge_upstream.sh
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
+zz_generated_metadata:
+  branch: release-1.30
+  org: openshift-service-mesh
+  repo: ztunnel

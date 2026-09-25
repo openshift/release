@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci-staging
+  name: in-repo-config-plugin
+  labels:
+    app: prow
+    component: in-repo-config-plugin
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      app: prow
+      component: in-repo-config-plugin
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: in-repo-config-plugin
+    spec:
+      containers:
+      - name: in-repo-config-plugin
+        image: quay.io/prucek/testing:in-repo-config-plugin
+        imagePullPolicy: Always
+        args:
+        - --endpoint=/
+        - --log-level=debug
+        - --hmac-secret-file=/etc/github/hmac
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --job-config-dir=/etc/jobs
+        - --prowgen-image=quay.io/prucek/testing:ci-operator-prowgen
+        - --checkconfig-image=quay.io/prucek/testing:ci-operator-checkconfig-v3
+        - --namespace=ci-staging
+        - --prow-config-path=/etc/config/config.yaml
+        - --dispatcher-url=http://staging-dispatcher
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-ci-staging-prow-app
+              key: appid
+        ports:
+        - name: main
+          containerPort: 8888
+        volumeMounts:
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: job-configs
+          mountPath: /etc/jobs
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-ci-staging-prow-app
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+      - name: config
+        configMap:
+          name: config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci-staging
+  name: in-repo-config-plugin
+  labels:
+    app: prow
+    component: in-repo-config-plugin
+spec:
+  selector:
+    app: prow
+    component: in-repo-config-plugin
+  ports:
+  - port: 80
+    targetPort: 8888
+  type: ClusterIP

@@ -1,0 +1,39 @@
+ref:
+  as: acm-interop-p2p-cluster-upgrade
+  from: cli
+  commands: acm-interop-p2p-cluster-upgrade-commands.sh
+  timeout: 5h0m0s
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  dependencies:
+  - name: "release:target"
+    env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: ACM_CLUSTER_UPGRADE_TARGET_CHANNEL
+    default: ""
+    documentation: |-
+      OCP update channel to set before upgrading (e.g. stable-4.22).
+      When empty, the cluster's existing channel is left unchanged.
+  - name: ACM_UPGRADE_TIMEOUT
+    default: "2h"
+    documentation: |-
+      Time to wait per cluster for the upgrade to complete (e.g. "2h", "120m", "7200s").
+      Passed directly to oc wait --timeout.
+  documentation: |-
+    Upgrades the hub cluster to the version resolved from
+    OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE (provided by CI via the release:target dependency).
+
+    When ACM_CLUSTER_UPGRADE_TARGET_CHANNEL is non-empty, patches clusterversion.spec.channel before
+    initiating the upgrade. Patches admin-ack ConfigMap when the Upgradeable condition
+    requires it. The upgrade uses a pinned image digest obtained from
+    'oc adm release info' to avoid floating-tag race conditions.
+
+    Waits via 'oc wait' for clusterversion history[0].version and history[0].state=Completed.
+
+    Env vars consumed:
+      ACM_CLUSTER_UPGRADE_TARGET_CHANNEL      - update channel (default: ""; leaves channel unchanged)
+      ACM_UPGRADE_TIMEOUT                     - upgrade wait limit (default: 2h)
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE - release image to upgrade to (injected by CI via release:target)
+      SHARED_DIR                              - shared artifact directory (provides hub kubeconfig)

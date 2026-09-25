@@ -1,0 +1,246 @@
+base_images:
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp-priv
+    tag: tls-scanner-tool
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp-priv
+    tag: rhel-9-golang-1.26-openshift-4.23
+canonical_go_repository: github.com/openshift/file-integrity-operator
+images:
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: file-integrity-operator
+operator:
+  bundles:
+  - as: file-integrity-operator-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/file-integrity-operator/file-integrity-operator:1.3.0
+    with: pipeline:file-integrity-operator
+  - pullspec: quay.io/file-integrity-operator/file-integrity-operator:latest
+    with: pipeline:file-integrity-operator
+promotion:
+  to:
+  - name: "5.2"
+    namespace: ocp-priv
+prowgen:
+  enable_secrets_store_csi_driver: true
+  private: true
+releases:
+  initial:
+    integration:
+      name: "5.2"
+      namespace: ocp-priv
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.2"
+      namespace: ocp-priv
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: go-build
+  commands: make
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: ^(?:\.github|\.tekton)|\.md$|bundle-hack|^(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-rosa
+  optional: true
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BYO_OIDC: "true"
+      CHANNEL_GROUP: stable
+      ENABLE_BILLING_ACCOUNT: "yes"
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-east-2
+    test:
+    - ref: ipi-install-rbac
+    - as: test-rosa
+      cli: latest
+      commands: oc adm wait-for-stable-cluster --minimum-stable-period 5m --timeout
+        30m; make e2e-rosa
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
+- always_run: false
+  as: e2e-bundle-aws
+  optional: true
+  pipeline_run_if_changed: ^(config|bundle)
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-file-integrity
+        operator-sdk run bundle --security-context-config restricted -n openshift-file-integrity "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-file-integrity deployment file-integrity-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: file-integrity-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-bundle
+      cli: latest
+      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=openshift-file-integrity
+        TEST_OPERATOR_NAMESPACE=openshift-file-integrity make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-bundle-aws-upgrade
+  optional: true
+  pipeline_run_if_changed: ^(config|bundle)
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-file-integrity
+        operator-sdk run bundle --security-context-config restricted -n openshift-file-integrity quay.io/file-integrity-operator/file-integrity-operator-bundle:latest
+        oc wait --timeout=10m --for condition=Available -n openshift-file-integrity deployment file-integrity-operator
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade --security-context-config restricted -n openshift-file-integrity "$OO_BUNDLE"
+        oc wait --timeout=10m --for condition=Available -n openshift-file-integrity deployment file-integrity-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: file-integrity-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=openshift-file-integrity
+        TEST_OPERATOR_NAMESPACE=openshift-file-integrity make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-tls-scanner
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-file-integrity
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_REQUEST: 1Gi
+      SCANNER_NAMESPACE: openshift-file-integrity
+    test:
+    - as: deploy
+      cli: latest
+      commands: |
+        # The Makefile's install/deploy targets shell out to "kubectl" directly
+        # (kubebuilder-scaffolded boilerplate); the CI cli image only has "oc".
+        mkdir -p /tmp/bin
+        ln -sf "$(command -v oc)" /tmp/bin/kubectl
+        export PATH="/tmp/bin:$PATH"
+        # NOTE: do not chain "e2e-set-image deploy" -- deploy's own recipe
+        # unconditionally re-runs "kustomize edit set image ...=${IMG}",
+        # clobbering whatever e2e-set-image just set back to IMG's default
+        # (the public quay.io release image). Pass IMG directly instead.
+        make deploy IMG="${IMAGE_FROM_CI}"
+        oc wait --timeout=5m --for=condition=Available -n openshift-file-integrity deployment/file-integrity-operator
+        # deployment.yaml has no readiness/liveness probe, so "Available" above
+        # only means the container process started -- it says nothing about the
+        # metrics HTTPS listener on :8585, which pkg/controller/metrics/metrics.go
+        # deliberately brings up later, after blocking (up to 5m) for the
+        # service-ca-issued serving cert to be mounted. Wait for that same file
+        # to actually appear in the running container before scanning, otherwise
+        # tls-scanner's /proc/net/tcp-based port discovery (this Deployment
+        # declares no containerPorts) races it and only ever sees the two plain
+        # HTTP ports (8081 health, 8383 controller-runtime metrics) that are up
+        # immediately -- silently skipping the one HTTPS endpoint under test.
+        for i in $(seq 1 36); do
+          if oc exec -n openshift-file-integrity deploy/file-integrity-operator -- test -f /var/run/secrets/serving-cert/tls.crt 2>/dev/null; then
+            echo "metrics serving cert is mounted, endpoint should be listening"
+            sleep 5
+            break
+          fi
+          echo "waiting for metrics serving cert to be mounted (attempt $i/36)..."
+          sleep 5
+        done
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-5.2
+  org: openshift-priv
+  repo: file-integrity-operator

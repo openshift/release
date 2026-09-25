@@ -1,0 +1,120 @@
+ref:
+  as: p2p-mtv-verify-hub-spoke-migration
+  from: cli-with-ssh
+  commands: p2p-mtv-verify-hub-spoke-migration-commands.sh
+  timeout: 30m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Verify post-migration VM state after the hub↔spoke round-trip CCLM produced by
+    p2p-mtv-execute-hub-spoke-migration (P2P_MIGRATION_DIRECTION=both).
+
+    Verifies the final state: VMs returned to the spoke (hub→spoke return leg complete).
+    Source cluster is the hub (KUBECONFIG, MTV_SOURCE_SPOKE_INDEX=0 sentinel).
+    Destination cluster is the spoke (SHARED_DIR/managed-cluster-kubeconfig-1).
+
+    Checks performed (each recorded as a JUnit test case; all are hard failures):
+    1. Destination (spoke) VMIs Running
+    2. Destination VM runStrategy==Always (OCPBUGS-101771)
+    3. Source (hub) VMIM not Failed (OCPBUGS-99403)
+    4. SSH port 22 reachable from a peer virt-launcher (requires MTV_TEST_VM_COUNT>1)
+    5. SSH login to every destination VM (virtctl ssh, key from p2p-create-cclm-test-vms)
+    6. Cloud-init marker file intact (read over SSH)
+    7. Guest disk I/O over SSH (write + fsync + checksum + unlink)
+    8. Guest network reachability over SSH (ping a peer VM IP from inside the guest)
+
+    virtctl is downloaded from the destination cluster's CNV cli-download route; the step
+    runs from the cli-with-ssh image (cli + openssh-clients).
+
+    Writes ${ARTIFACT_DIR}/junit_cclm_migration_verify_hub_spoke.xml;
+    diagnostics under mtv-migration-verify-hub-spoke-diagnostics/.
+
+    Set MTV_TEST_VM_COUNT to match P2P_HS_VM_COUNT used in p2p-create-cclm-test-vms.
+  env:
+  - name: MTV_TEST_VM_COUNT
+    default: "2"
+    documentation: |-
+      Number of VMs to verify. Must match P2P_HS_VM_COUNT used in p2p-create-cclm-test-vms.
+  - name: MTV_TEST_VM_NAME
+    default: "test-vm-1"
+    documentation: VM name to verify (single-VM path; ignored when MTV_TEST_VM_COUNT>1).
+  - name: P2P_HS_SPOKE_VM_PREFIX
+    default: "test-vm"
+    documentation: |-
+      VM name prefix used when MTV_TEST_VM_COUNT>1 (VMs are <prefix>-1..N).
+      Must match P2P_HS_SPOKE_VM_PREFIX in p2p-create-cclm-test-vms.
+  - name: MTV_TEST_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Source namespace of the migrated VM on the hub (used to check source VMIM).
+  - name: MTV_TEST_VM_TARGET_NAMESPACE
+    default: ""
+    documentation: Destination namespace on the spoke. Empty uses MTV_TEST_VM_NAMESPACE.
+  - name: MTV_SOURCE_SPOKE_INDEX
+    default: "0"
+    documentation: |-
+      Hub sentinel (0) — use KUBECONFIG directly as source kubeconfig (hub cluster is
+      the source of the hub→spoke return leg). Set to a positive integer to override with
+      a SHARED_DIR spoke kubeconfig.
+  - name: MTV_DEST_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the destination spoke.
+  - name: MTV_SOURCE_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional explicit source kubeconfig path. Overrides MTV_SOURCE_SPOKE_INDEX.
+  - name: MTV_DEST_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional explicit destination kubeconfig path. Overrides MTV_DEST_SPOKE_INDEX.
+  - name: MTV_CNV_NAMESPACE
+    default: "openshift-cnv"
+    documentation: OpenShift Virtualization namespace on hub and spoke (used for diagnostics).
+  - name: MTV_PLAN_TYPE
+    default: "live"
+    documentation: Plan type — live or cold. SSH probe only runs for live migrations.
+  - name: MTV_VM_SSH_VERIFY
+    default: "true"
+    documentation: |-
+      When true, probe SSH port 22 on each migrated VM from a peer
+      virt-launcher. Failure fails the step. Requires MTV_TEST_VM_COUNT>1.
+  - name: MTV_VM_DATA_INTEGRITY
+    default: "true"
+    documentation: |-
+      When true, verify cloud-init marker files survive migration (read over SSH).
+      Any missing or mismatched marker fails the step. Set false for cirros guests.
+  - name: MTV_VM_GUEST_EXEC
+    default: "true"
+    documentation: |-
+      When true, run in-guest checks over SSH: guest disk I/O (VerifyGuestDiskIo) and
+      guest network reachability (VerifyGuestNetwork). Set false for cirros or other
+      guest images without the cloud-init SSH key; the checks are recorded as
+      SKIPPED in JUnit instead of FAILED.
+  - name: MTV_MIGRATION_SUFFIX
+    default: "-hub-spoke"
+    documentation: |-
+      Suffix applied to artifact names (JUnit XML, diagnostics dir).
+      Default "-hub-spoke" → junit_cclm_migration_verify_hub_spoke.xml.
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV Plan and Migration CRs live on the hub (used for diagnostics).
+  - name: MTV_PLAN_NAME
+    default: "cclm-hub-to-spoke-plan"
+    documentation: Hub→spoke Plan metadata.name on the hub (used for diagnostics).
+  - name: MTV_MIGRATION_NAME
+    default: "cclm-hub-to-spoke-run-1"
+    documentation: Hub→spoke Migration metadata.name on the hub (used for diagnostics).
+  - name: MTV_VM_SSH_WAIT_SECONDS
+    default: "600"
+    documentation: |-
+      Total seconds (shared by all VMs) to keep retrying the SSH login on the
+      destination VMs before the in-guest checks (data integrity, guest disk I/O,
+      guest network) are attempted. Keep below the step timeout.
+  - name: MTV_VM_SSH_USER
+    default: "cloud-user"
+    documentation: Guest user for virtctl ssh (the cloud-init default user).
+  - name: MTV_VM_SSH_KEY_NAME
+    default: "cclm-vm-ssh-key"
+    documentation: |-
+      SHARED_DIR file name of the SSH private key authorized on the test VMs.
+      Must match P2P_HS_VM_SSH_KEY_NAME in p2p-create-cclm-test-vms.

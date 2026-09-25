@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: ci
+  name: prow-jobs-sparse-checkout
+data:
+  # git-sync sparse-checkout pattern for the /etc/jobs job-config-path mount.
+  # ONLY ci-operator/jobs — nothing else. core-services and other trees must NOT
+  # be under --job-config-path: Prow's config agent fatals on non-job YAML there
+  # (duplicate basenames, files that don't parse as JobConfig). Components that
+  # read core-services configs get them from the separate full checkout at
+  # /var/repo, which is not under --job-config-path.
+  sparse-checkout: |
+    /ci-operator/jobs/

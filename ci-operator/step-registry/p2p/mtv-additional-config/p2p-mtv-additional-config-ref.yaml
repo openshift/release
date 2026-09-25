@@ -1,0 +1,46 @@
+ref:
+  as: p2p-mtv-additional-config
+  from: cli
+  commands: p2p-mtv-additional-config-commands.sh
+  timeout: 30m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Configure MTV on the ACM hub after install-operators deploys mtv-operator (Subscription/CSV).
+    Applies ForkliftController with feature_ocp_live_migration=true (CCLM), waits for
+    forklift-controller deployment Available, and verifies the feature gate. Targets KUBECONFIG (hub).
+    Re-runnable.
+  env:
+  - name: MTV_INSTALL_NAMESPACE
+    default: openshift-mtv
+    documentation: Namespace for ForkliftController (must match install-operators mtv-operator install_namespace).
+  - name: MTV_FORKLIFT_CONTROLLER_NAME
+    default: forklift-controller
+    documentation: ForkliftController CR name.
+  - name: MTV_OLM_MANAGED
+    default: "true"
+    documentation: ForkliftController spec.olm_managed (Red Hat MTV 2.11 default install path).
+  - name: MTV_FEATURE_UI_PLUGIN
+    default: "true"
+    documentation: ForkliftController feature_ui_plugin (string "true" or "false").
+  - name: MTV_FEATURE_VALIDATION
+    default: "true"
+    documentation: ForkliftController feature_validation (string "true" or "false").
+  - name: MTV_FEATURE_VOLUME_POPULATOR
+    default: "true"
+    documentation: ForkliftController feature_volume_populator (string "true" or "false").
+  - name: MTV_FEATURE_OCP_LIVE_MIGRATION
+    default: "true"
+    documentation: Required for CCLM per MTV 2.11 docs (string "true" or "false").
+  - name: MTV_CONTROLLER_CREATE_WAIT_TIMEOUT
+    default: 10m
+    documentation: oc wait --for=create timeout for forklift-controller deployment.
+  - name: MTV_CONTROLLER_WAIT_TIMEOUT
+    default: 10m
+    documentation: oc wait timeout for forklift-controller deployment Available.
+  - name: MTV_CONTROLLER_ENV_WAIT_TIMEOUT
+    default: 10m
+    documentation: Max wait for FEATURE_OCP_LIVE_MIGRATION=true on forklift-controller deployment after ForkliftController patch.
