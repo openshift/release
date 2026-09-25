@@ -334,6 +334,7 @@ if [[ -n "${UNAVAILABLE}" ]]; then
   oc get po -n ${HC_NS}-${HC_NAME} || true
   oc get vmi -A || true
   oc describe vmi -A || true
+  oc adm top pods -n ${HC_NS}-${HC_NAME} || true 
   
   exit 1
 fi
@@ -345,6 +346,8 @@ echo "$(date) Control-plane deploy/statefulset resource requests:"
 oc get deploy,statefulset -n ${HC_NS}-${HC_NAME} \
   --kubeconfig="${SHARED_DIR}/kubeconfig" \
   -o custom-columns='KIND:.kind,NAME:.metadata.name,CPU:.spec.template.spec.containers[0].resources.requests.cpu,MEM:.spec.template.spec.containers[0].resources.requests.memory' || true
+
+oc adm top pods -n ${HC_NS}-${HC_NAME} || true 
 
 # --- Step 10: Switch KUBECONFIG to the guest cluster for downstream conformance steps ---
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
