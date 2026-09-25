@@ -1,0 +1,243 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  system-tests-builder:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.27
+binary_build_commands: make manager
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: storage-based-remediation
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM quay.io/operator-framework/operator-sdk@sha256:1b37b208f424e5abec0dc2045b54d3942e2eb03e085f48baf19aff7e5a333d84 AS operator-sdk
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      COPY --from=operator-sdk /usr/local/bin/operator-sdk /usr/local/bin/operator-sdk
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+      COPY sbr-src/ /opt/sbr-ci-src/
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: sbr-src/
+          source_path: /go/src/github.com/medik8s/storage-based-remediation/.
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: sbr-upgrade-test-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 500Mi
+tests:
+- always_run: false
+  as: e2e-system-tests-sbr-upgrade
+  capabilities:
+  - nested-podman
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      TEST_NAME: e2e-system-tests-sbr-upgrade
+      TEST_STEPS: run-sbr-upgrade-tests
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
+    - as: run-sbr-upgrade-tests
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+
+        : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
+        exec > >(tee "$ARTIFACT_DIR/sbr-upgrade-tests.log") 2>&1
+
+        prepare_runtime() {
+          # Give skopeo the cluster's Red Hat registry credentials.
+          echo '==> Read cluster pull secret for Red Hat registry access'
+          local auth_dir=/tmp/sbr-registry-auth
+          mkdir -p "$auth_dir"
+          oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' |
+            base64 --decode > "$auth_dir/auth.json"
+          chmod 0600 "$auth_dir/auth.json"
+          export REGISTRY_AUTH_FILE="$auth_dir/auth.json"
+
+          # The test container runs as an arbitrary UID.
+          export GOPATH=/tmp/sbr-go
+          export GOMODCACHE="$GOPATH/pkg/mod"
+          export GOCACHE=/tmp/sbr-go-build-cache
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
+
+          go version
+          skopeo --version
+          operator-sdk version
+          podman version
+          podman info
+
+          echo '==> Configure rootless Podman for the catalog base image UID'
+          local storage_config
+          storage_config="$(podman info --format '{{.Store.ConfigFile}}')"
+          test -r "$storage_config"
+          export CONTAINERS_STORAGE_CONF=/tmp/sbr-storage.conf
+          awk '
+            /^\[storage.options.overlay\]$/ {
+              in_overlay=1; found=1; print; print "ignore_chown_errors = \"true\""; next
+            }
+            /^\[/ { in_overlay=0 }
+            in_overlay && /^[[:space:]]*ignore_chown_errors[[:space:]]*=/ { next }
+            { print }
+            END { if (!found) { print "[storage.options.overlay]"; print "ignore_chown_errors = \"true\"" } }
+          ' "$storage_config" > "$CONTAINERS_STORAGE_CONF"
+          test "$(podman info --format '{{.Store.ConfigFile}}')" = "$CONTAINERS_STORAGE_CONF"
+          echo '==> Pull catalog base image before building the candidate'
+          podman pull quay.io/operator-framework/opm:latest
+        }
+
+        build_candidate() {
+          # Build operator, agent, bundle, then catalog.
+          echo '==> Copy the CI-selected SBR checkout into a writable build directory'
+          test -f /opt/sbr-ci-src/Makefile
+          cp -R /opt/sbr-ci-src /tmp/sbr-source
+          local revision prefix operator_tag agent_tag bundle_tag catalog_tag
+          revision="$(git -C /tmp/sbr-source rev-parse HEAD)"
+          git -C /tmp/sbr-source show --no-patch --format=fuller HEAD
+          printf '%s\n' "$revision" > "$ARTIFACT_DIR/sbr-source-commit.txt"
+
+          cd /tmp/sbr-source
+          export SBR_VERSION
+          SBR_VERSION="$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)"
+          test -n "$SBR_VERSION"
+          export SBR_PREVIOUS_VERSION
+          SBR_PREVIOUS_VERSION="$(skopeo list-tags docker://registry.redhat.io/workload-availability/storage-based-remediation-operator-bundle |
+            jq -r '.Tags[] | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))' | sort -V | tail -n 1)"
+          test -n "$SBR_PREVIOUS_VERSION"
+          SBR_PREVIOUS_VERSION="${SBR_PREVIOUS_VERSION#v}"
+          test "$SBR_VERSION" != "$SBR_PREVIOUS_VERSION"
+          printf 'Candidate: %s; latest GA: %s\n' "$SBR_VERSION" "$SBR_PREVIOUS_VERSION"
+
+          prefix="ttl.sh/sbr-prow-$(date +%Y%m%d-%H%M%S)-${revision:0:7}"
+          operator_tag="${prefix}:3h"
+          agent_tag="${prefix}-agent:3h"
+          bundle_tag="${prefix}-bundle:3h"
+          catalog_tag="${prefix}-catalog:3h"
+
+          echo '==> Build and push operator, agent, bundle, and catalog with the shared target'
+          make dev-olm-catalog-push \
+            DEV_REGISTRY=ttl.sh \
+            TTL_SH_TTL=3h \
+            CONTAINER_TOOL=podman \
+            DEV_IMG="$operator_tag" \
+            VERSION="$SBR_VERSION" PREVIOUS_VERSION="$SBR_PREVIOUS_VERSION"
+
+          echo '==> Resolve pushed candidate images to immutable digests'
+          skopeo inspect --format '{{.Digest}}' "docker://$operator_tag" > "$ARTIFACT_DIR/operator.digest"
+          skopeo inspect --format '{{.Digest}}' "docker://$agent_tag" > "$ARTIFACT_DIR/agent.digest"
+          skopeo inspect --format '{{.Digest}}' "docker://$bundle_tag" > "$ARTIFACT_DIR/bundle.digest"
+          skopeo inspect --format '{{.Digest}}' "docker://$catalog_tag" > "$ARTIFACT_DIR/catalog.digest"
+          export SBR_UPGRADE_CANDIDATE_SBR_IMAGE="${prefix}@$(cat "$ARTIFACT_DIR/operator.digest")"
+          export SBR_UPGRADE_CANDIDATE_SBR_BUNDLE="${prefix}-bundle@$(cat "$ARTIFACT_DIR/bundle.digest")"
+          SBR_CANDIDATE_AGENT_IMAGE="${prefix}-agent@$(cat "$ARTIFACT_DIR/agent.digest")"
+          SBR_CANDIDATE_CATALOG_IMAGE="${prefix}-catalog@$(cat "$ARTIFACT_DIR/catalog.digest")"
+
+          printf 'SBR_UPGRADE_CANDIDATE_SBR_IMAGE=%s\nSBR_CANDIDATE_AGENT_IMAGE=%s\nSBR_UPGRADE_CANDIDATE_SBR_BUNDLE=%s\nSBR_CANDIDATE_CATALOG_IMAGE=%s\n' \
+            "$SBR_UPGRADE_CANDIDATE_SBR_IMAGE" "$SBR_CANDIDATE_AGENT_IMAGE" \
+            "$SBR_UPGRADE_CANDIDATE_SBR_BUNDLE" "$SBR_CANDIDATE_CATALOG_IMAGE" |
+            tee "$ARTIFACT_DIR/candidate-images.txt"
+        }
+
+        verify_candidate() {
+          echo '==> Validate candidate bundle'
+          operator-sdk bundle validate --image-builder=none "$SBR_UPGRADE_CANDIDATE_SBR_BUNDLE"
+          local bundle_dir candidate_csv candidate_version
+          bundle_dir="$(mktemp -d)"
+          oc image extract "$SBR_UPGRADE_CANDIDATE_SBR_BUNDLE" --path="/manifests/:$bundle_dir" --confirm
+          candidate_csv="$(find "$bundle_dir" -name '*clusterserviceversion.yaml' -print -quit)"
+          : "${candidate_csv:?candidate bundle must contain a ClusterServiceVersion}"
+          candidate_version="$(sed -n 's/^  version: *//p' "$candidate_csv" | tr -d '"')"
+          : "${candidate_version:?SBR bundle CSV must specify spec.version}"
+          test "$candidate_version" = "$SBR_VERSION"
+          export SBR_UPGRADE_CANDIDATE_SBR_VERSION="$candidate_version"
+          echo "==> Candidate bundle verified: version $candidate_version"
+        }
+
+        run_tests() {
+          echo '==> Clone system-tests main'
+          git clone --depth=1 --branch main \
+            https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
+          git -C /tmp/system-tests show --no-patch --format=fuller HEAD
+
+          export SBR_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
+          export SBR_STORAGE_CLASS=nfs-sbr-dynamic
+          export ECO_TEST_FEATURES=sbr-operator
+          export WORKLOAD_IMAGE=unused-by-sbr-upgrade-tests
+
+          local tier
+          local -a failed_tiers=()
+          for tier in upgrade-operator fresh-install; do
+            echo "==> Start system-tests tier: $tier"
+            export ECO_TEST_LABELS="tier:${tier}"
+            export ECO_REPORTS_DUMP_DIR="$ARTIFACT_DIR/$tier"
+            mkdir -p "$ECO_REPORTS_DUMP_DIR"
+            if ! make -C /tmp/system-tests run-tests 2>&1 | tee "$ECO_REPORTS_DUMP_DIR/run.log"; then
+              failed_tiers+=("$tier")
+              echo "==> System-tests tier failed: $tier"
+            else
+              echo "==> System-tests tier passed: $tier"
+            fi
+          done
+
+          if (( ${#failed_tiers[@]} > 0 )); then
+            printf 'Failed tiers: %s\n' "${failed_tiers[*]}"
+            return 1
+          fi
+        }
+
+        prepare_runtime
+        build_candidate
+        verify_candidate
+        run_tests
+      from: sbr-upgrade-test-runner
+      nested_podman: true
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: storage-based-remediation
+  variant: "5.0"
