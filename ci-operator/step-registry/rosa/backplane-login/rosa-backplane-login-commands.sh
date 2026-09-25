@@ -25,7 +25,7 @@ read_profile_file() {
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 proxy_url="${BACKPLANE_PROXY_URL:-http://squid.corp.redhat.com:3128}"
 elevate_reason="CI elevation : ${BACKPLANE_ELEVATE_REASON:-rosa-ci}"
-log "Obtaining platform-plane (MC/SC) access for hosted cluster ${CLUSTER_ID}"
+log "Obtaining backplane access (hosted + MC/SC) for cluster ${CLUSTER_ID}"
 
 # Install the pinned ocm-backplane release (rosa-aws-cli provides ocm, oc, curl,
 # tar, jq).
@@ -64,6 +64,35 @@ else
   exit 1
 fi
 $WAS_TRACING && set -x
+
+# ---- Hosted-cluster kubeconfig via backplane (${SHARED_DIR}/bp-kubeconfig) ----
+# The OCM credentials API cannot hand out a usable guest kubeconfig for
+# private-link hosted clusters: their API server is not reachable from the build
+# farm, so the provisioner-written ${SHARED_DIR}/kubeconfig is missing there.
+# Backplane reaches the hosted cluster through the corp proxy, so bp-kubeconfig is
+# the customer-plane kubeconfig that works regardless of cluster privacy.
+bp_kubeconfig="${SHARED_DIR}/bp-kubeconfig"
+bp_login_kubeconfig="$(mktemp /tmp/backplane-hosted-login.XXXXXX)"
+log "Running ocm-backplane login for hosted cluster ${CLUSTER_ID}"
+if ! KUBECONFIG="${bp_login_kubeconfig}" ocm-backplane login "${CLUSTER_ID}"; then
+  log "ERROR: ocm-backplane login failed for hosted cluster ${CLUSTER_ID}"
+  rm -f "${bp_login_kubeconfig}"
+  exit 1
+fi
+if ! KUBECONFIG="${bp_login_kubeconfig}" oc config view --raw --minify > "${bp_kubeconfig}"; then
+  log "ERROR: failed to dump hosted-cluster kubeconfig from backplane"
+  rm -f "${bp_kubeconfig}" "${bp_login_kubeconfig}"
+  exit 1
+fi
+rm -f "${bp_login_kubeconfig}"
+chmod 0600 "${bp_kubeconfig}"
+if KUBECONFIG="${bp_kubeconfig}" oc whoami &>/dev/null; then
+  log "Hosted-cluster kubeconfig (backplane) ready: ${bp_kubeconfig}"
+else
+  log "ERROR: hosted-cluster kubeconfig failed validation (oc whoami)"
+  rm -f "${bp_kubeconfig}"
+  exit 1
+fi
 
 # ---- Management cluster kubeconfig (${SHARED_DIR}/mc-kubeconfig) ----
 # backplane --manager resolves and logs into the management cluster of the hosted
@@ -142,4 +171,4 @@ if [[ "${sc_ok}" != "true" ]]; then
   log "WARNING: service cluster kubeconfig unavailable; platform-plane SC checks will be skipped"
 fi
 
-log "Platform-plane access complete (mc-kubeconfig$([[ "${sc_ok}" == "true" ]] && echo ', sc-kubeconfig'))"
+log "Backplane access complete (bp-kubeconfig, mc-kubeconfig$([[ "${sc_ok}" == "true" ]] && echo ', sc-kubeconfig'))"
