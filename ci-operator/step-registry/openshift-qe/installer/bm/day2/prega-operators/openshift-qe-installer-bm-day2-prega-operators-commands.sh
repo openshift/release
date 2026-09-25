@@ -8,8 +8,11 @@ cat /etc/os-release
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server.
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   # shellcheck disable=SC1090
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 PREGA_BUILD_SERVER_IP=$(cat ${CLUSTER_PROFILE_DIR}/prega_build_server)
