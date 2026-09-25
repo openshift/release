@@ -2,19 +2,21 @@
 
 set -euo pipefail
 
-readonly RELEASE_PAYLOAD_AUTH_FILE="${RELEASE_PAYLOAD_AUTH_FILE:-/etc/pull-secret/.dockerconfigjson}"
-readonly RHCOS_AWS_REGION="${RHCOS_AWS_REGION:-us-east-1}"
+readonly RELEASE_CONTROLLER_API="${RELEASE_CONTROLLER_API:-https://amd64.ocp.releases.ci.openshift.org}"
+readonly RELEASE_CONTROLLER_RETRIES="${RELEASE_CONTROLLER_RETRIES:-3}"
+readonly RELEASE_CONTROLLER_RETRY_DELAY_SECONDS="${RELEASE_CONTROLLER_RETRY_DELAY_SECONDS:-2}"
+readonly RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS="${RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS:-30}"
+readonly RELEASE_CONTROLLER_MAX_RESPONSE_BYTES="${RELEASE_CONTROLLER_MAX_RESPONSE_BYTES:-10485760}"
+readonly OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-production}"
+readonly ROSA_CREDENTIALS_DIR="${ROSA_CREDENTIALS_DIR:-/etc/rosa-credentials}"
+readonly CURL_BIN="${CURL_BIN:-curl}"
+readonly OCM_BIN="${OCM_BIN:-ocm}"
 readonly PYTHON_BIN="${PYTHON_BIN:-python3}"
-readonly OC_BIN="${OC_BIN:-oc}"
+readonly SLEEP_BIN="${SLEEP_BIN:-sleep}"
 readonly SHARED_DIR="${SHARED_DIR:-/tmp}"
-readonly ARTIFACT_DIR="${ARTIFACT_DIR:-${SHARED_DIR}}"
 
 readonly STATE_FILE="${SHARED_DIR}/rosa-marketplace-release-state"
 readonly OCP_VERSION_FILE="${SHARED_DIR}/rosa-marketplace-ocp-version"
-readonly PAYLOAD_TAG_FILE="${SHARED_DIR}/rosa-marketplace-payload-tag"
-readonly PAYLOAD_PULLSPEC_FILE="${SHARED_DIR}/rosa-marketplace-payload-pullspec"
-readonly RHCOS_VERSION_FILE="${SHARED_DIR}/rosa-marketplace-rhcos-version"
-readonly RHCOS_AMI_FILE="${SHARED_DIR}/rosa-marketplace-rhcos-ami"
 
 log() {
   printf '[rosa-marketplace-release-detect] %s\n' "$*"
@@ -36,20 +38,127 @@ write_value() {
   printf '%s\n' "${value}" > "${destination}"
 }
 
-validate_settings() {
-  [[ -n "${RELEASE_IMAGE_LATEST:-}" ]] || fail "RELEASE_IMAGE_LATEST is required"
-  [[ "${RELEASE_IMAGE_LATEST}" != *[[:space:]]* ]] || fail "RELEASE_IMAGE_LATEST must not contain whitespace"
-  [[ -s "${RELEASE_PAYLOAD_AUTH_FILE}" ]] \
-    || fail "release payload auth file is missing or empty: ${RELEASE_PAYLOAD_AUTH_FILE}"
+set_wait_state() {
+  local reason="$1"
 
-  mkdir -p "${SHARED_DIR}" "${ARTIFACT_DIR}"
-  require_command "${OC_BIN}"
-  require_command "${PYTHON_BIN}"
+  write_value "wait:${reason}" "${STATE_FILE}"
+  log "No action: ${reason}"
 }
 
-json_tool() {
-  "${PYTHON_BIN}" - "$@" <<'PYTHON'
+validate_settings() {
+  [[ "${RELEASE_CONTROLLER_API}" == https://* ]] || fail "RELEASE_CONTROLLER_API must use https://"
+  [[ "${RELEASE_CONTROLLER_API}" != *'@'* ]] || fail "RELEASE_CONTROLLER_API must not contain userinfo"
+  [[ "${RELEASE_CONTROLLER_API}" != *'?'* && "${RELEASE_CONTROLLER_API}" != *'#'* ]] \
+    || fail "RELEASE_CONTROLLER_API must not contain a query or fragment"
+  [[ "${RELEASE_CONTROLLER_RETRIES}" =~ ^[1-9][0-9]*$ ]] || fail "RELEASE_CONTROLLER_RETRIES must be a positive integer"
+  [[ "${RELEASE_CONTROLLER_RETRY_DELAY_SECONDS}" =~ ^[0-9]+$ ]] || fail "RELEASE_CONTROLLER_RETRY_DELAY_SECONDS must be a non-negative integer"
+  [[ "${RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS}" =~ ^[1-9][0-9]*$ ]] || fail "RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS must be a positive integer"
+  [[ "${RELEASE_CONTROLLER_MAX_RESPONSE_BYTES}" =~ ^[1-9][0-9]*$ ]] || fail "RELEASE_CONTROLLER_MAX_RESPONSE_BYTES must be a positive integer"
+  (( RELEASE_CONTROLLER_RETRY_DELAY_SECONDS <= RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS )) \
+    || fail "RELEASE_CONTROLLER_RETRY_DELAY_SECONDS must not exceed RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS"
+  case "${OCM_LOGIN_ENV}" in
+    production|staging|integration)
+      ;;
+    *)
+      fail "OCM_LOGIN_ENV must be production, staging, or integration"
+      ;;
+  esac
+
+  mkdir -p "${SHARED_DIR}"
+  require_command "${CURL_BIN}"
+  require_command "${OCM_BIN}"
+  require_command "${PYTHON_BIN}"
+  require_command "${SLEEP_BIN}"
+}
+
+login_ocm() {
+  local client_id=""
+  local client_secret=""
+  local offline_token=""
+
+  [[ -f "${ROSA_CREDENTIALS_DIR}/sso-client-id" ]] \
+    && client_id=$(<"${ROSA_CREDENTIALS_DIR}/sso-client-id")
+  [[ -f "${ROSA_CREDENTIALS_DIR}/sso-client-secret" ]] \
+    && client_secret=$(<"${ROSA_CREDENTIALS_DIR}/sso-client-secret")
+  [[ -f "${ROSA_CREDENTIALS_DIR}/ocm-token" ]] \
+    && offline_token=$(<"${ROSA_CREDENTIALS_DIR}/ocm-token")
+
+  if [[ -n "${client_id}" && -n "${client_secret}" ]]; then
+    log "Logging into OCM ${OCM_LOGIN_ENV} with SSO credentials"
+    "${OCM_BIN}" login --url "${OCM_LOGIN_ENV}" \
+      --client-id "${client_id}" --client-secret "${client_secret}"
+  elif [[ -n "${offline_token}" ]]; then
+    log "Logging into OCM ${OCM_LOGIN_ENV} with an offline token"
+    "${OCM_BIN}" login --url "${OCM_LOGIN_ENV}" --token "${offline_token}"
+  else
+    fail "no OCM credentials found in ${ROSA_CREDENTIALS_DIR}"
+  fi
+}
+
+http_get() {
+  local url="$1"
+  local destination="$2"
+  local request_name="$3"
+  local attempt=1
+  local curl_rc=0
+  local http_code=""
+  local response_size=0
+  local retry_delay="${RELEASE_CONTROLLER_RETRY_DELAY_SECONDS}"
+
+  while (( attempt <= RELEASE_CONTROLLER_RETRIES )); do
+    if http_code=$("${CURL_BIN}" \
+      --silent \
+      --show-error \
+      --proto '=https' \
+      --proto-redir '=https' \
+      --location \
+      --connect-timeout 10 \
+      --max-time 30 \
+      --max-filesize "${RELEASE_CONTROLLER_MAX_RESPONSE_BYTES}" \
+      --output "${destination}" \
+      --write-out '%{http_code}' \
+      "${url}"); then
+      curl_rc=0
+    else
+      curl_rc=$?
+    fi
+
+    if (( curl_rc == 0 )) && [[ -f "${destination}" ]]; then
+      response_size=$(wc -c < "${destination}")
+      if (( response_size > RELEASE_CONTROLLER_MAX_RESPONSE_BYTES )); then
+        curl_rc=63
+        http_code=""
+        : > "${destination}"
+      fi
+    fi
+
+    if (( curl_rc == 0 )) && [[ "${http_code}" == "200" ]]; then
+      return 0
+    fi
+
+    if (( attempt == RELEASE_CONTROLLER_RETRIES )); then
+      fail "${request_name} request failed after ${RELEASE_CONTROLLER_RETRIES} attempts (curl_rc=${curl_rc}, http_code=${http_code:-none})"
+    fi
+
+    log "${request_name} request failed (attempt ${attempt}/${RELEASE_CONTROLLER_RETRIES}); retrying"
+    if (( retry_delay > 0 )); then
+      "${SLEEP_BIN}" "${retry_delay}"
+      retry_delay=$((retry_delay * 2))
+      if (( retry_delay > RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS )); then
+        retry_delay="${RELEASE_CONTROLLER_MAX_RETRY_DELAY_SECONDS}"
+      fi
+    fi
+    attempt=$((attempt + 1))
+  done
+}
+
+select_missing_rosa_y_stream() {
+  local ready_file="$1"
+  local rosa_versions_file="$2"
+
+  "${PYTHON_BIN}" - "${ready_file}" "${rosa_versions_file}" <<'PYTHON'
 import json
+import re
 import sys
 
 
@@ -62,95 +171,87 @@ def load_json(path):
         sys.exit(2)
 
 
-def nested_string(data, keys):
-    value = data
-    for key in keys:
-        if not isinstance(value, dict) or key not in value:
-            sys.exit(2)
-        value = value[key]
-    if not isinstance(value, str) or not value:
-        sys.exit(2)
-    print(value)
+ready = load_json(sys.argv[1])
+rosa_versions = load_json(sys.argv[2])
+nightly_pattern = re.compile(r"^(\d+)\.(\d+)\.0-0\.nightly$")
+version_pattern = re.compile(r"^(\d+)\.(\d+)(?:\.|$)")
 
-
-action = sys.argv[1]
-input_path = sys.argv[2]
-data = load_json(input_path)
-
-if action == "release-version":
-    nested_string(data, ("metadata", "version"))
-elif action == "rhcos-version":
-    nested_string(data, ("architectures", "x86_64", "artifacts", "metal", "release"))
-elif action == "rhcos-ami":
-    nested_string(data, ("architectures", "x86_64", "images", "aws", "regions", sys.argv[3], "image"))
-else:
-    print("unknown JSON action: {}".format(action), file=sys.stderr)
+if not isinstance(ready, dict):
     sys.exit(2)
+
+ocp_y_streams = set()
+for stream, payloads in ready.items():
+    match = nightly_pattern.fullmatch(stream)
+    if not match:
+        continue
+    if payloads is None:
+        payloads = []
+    if not isinstance(payloads, list) or any(not isinstance(item, str) for item in payloads):
+        sys.exit(2)
+    if payloads:
+        ocp_y_streams.add((int(match.group(1)), int(match.group(2))))
+
+if not ocp_y_streams:
+    sys.exit(4)
+
+if not isinstance(rosa_versions, dict) or not isinstance(rosa_versions.get("items"), list):
+    sys.exit(2)
+
+rosa_y_streams = set()
+for item in rosa_versions["items"]:
+    if not isinstance(item, dict):
+        sys.exit(2)
+    raw_id = item.get("raw_id")
+    if not isinstance(raw_id, str):
+        continue
+    match = version_pattern.match(raw_id)
+    if match:
+        rosa_y_streams.add((int(match.group(1)), int(match.group(2))))
+
+latest_ocp = max(ocp_y_streams)
+if latest_ocp in rosa_y_streams:
+    sys.exit(3)
+
+print("{}.{}".format(*latest_ocp))
 PYTHON
 }
 
-extract_rhcos_metadata() {
-  local pullspec="$1"
-  local coreos_stream_file="$2"
-  local installer_dir
-  local installer_bin
-
-  if [[ -n "${ROSA_MARKETPLACE_INSTALLER_BIN:-}" ]]; then
-    installer_bin="${ROSA_MARKETPLACE_INSTALLER_BIN}"
-  else
-    installer_dir=$(mktemp -d "${SHARED_DIR}/rosa-marketplace-installer.XXXXXX")
-    "${OC_BIN}" adm release extract \
-      -a "${RELEASE_PAYLOAD_AUTH_FILE}" \
-      --command=openshift-install \
-      --to="${installer_dir}" \
-      "${pullspec}"
-    installer_bin="${installer_dir}/openshift-install"
-  fi
-
-  [[ -x "${installer_bin}" ]] || fail "openshift-install is not executable: ${installer_bin}"
-  "${installer_bin}" coreos print-stream-json > "${coreos_stream_file}"
-}
-
 main() {
-  local release_info_file="${ARTIFACT_DIR}/rosa-marketplace-release-info.json"
-  local coreos_stream_file="${ARTIFACT_DIR}/rosa-marketplace-coreos-stream.json"
-  local payload_version
-  local ocp_y_stream
-  local rhcos_version
-  local rhcos_ami
+  local ready_file="${SHARED_DIR}/rosa-marketplace-ready-nightlies.json"
+  local rosa_versions_file="${SHARED_DIR}/rosa-marketplace-rosa-versions.json"
+  local ocp_version=""
+  local selection_rc=0
 
   validate_settings
+  http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestreams/ready" \
+    "${ready_file}" "ready-nightlies"
 
-  "${OC_BIN}" adm release info \
-    -a "${RELEASE_PAYLOAD_AUTH_FILE}" \
-    -o json \
-    "${RELEASE_IMAGE_LATEST}" > "${release_info_file}"
+  login_ocm
+  "${OCM_BIN}" get "/api/clusters_mgmt/v1/versions" \
+    --parameter "search=rosa_enabled = 'true'" \
+    --parameter "size=1000" > "${rosa_versions_file}" \
+    || fail "failed to query ROSA-enabled OCM versions"
 
-  payload_version=$(json_tool release-version "${release_info_file}") \
-    || fail "release payload metadata does not contain a version"
-  [[ "${payload_version}" =~ ^([0-9]+\.[0-9]+)\.[0-9]+([-+.][A-Za-z0-9._+-]+)?$ ]] \
-    || fail "release payload version has an invalid format"
-  ocp_y_stream="${BASH_REMATCH[1]}"
+  if ocp_version=$(select_missing_rosa_y_stream "${ready_file}" "${rosa_versions_file}"); then
+    write_value "${ocp_version}" "${OCP_VERSION_FILE}"
+    write_value "ready" "${STATE_FILE}"
+    log "Detected OCP nightly y-stream without a ROSA-enabled OCM version: ${ocp_version}"
+    return 0
+  else
+    selection_rc=$?
+  fi
 
-  log "Processing release-controller payload version=${payload_version}"
-  extract_rhcos_metadata "${RELEASE_IMAGE_LATEST}" "${coreos_stream_file}"
-
-  rhcos_version=$(json_tool rhcos-version "${coreos_stream_file}") \
-    || fail "RHCOS version is missing from installer stream metadata"
-  rhcos_ami=$(json_tool rhcos-ami "${coreos_stream_file}" "${RHCOS_AWS_REGION}") \
-    || fail "RHCOS AMI is missing for AWS region ${RHCOS_AWS_REGION}"
-
-  [[ "${rhcos_version}" =~ ^[A-Za-z0-9._-]+$ ]] || fail "RHCOS version contains unexpected characters"
-  [[ "${rhcos_ami}" =~ ^ami-[0-9a-f]+$ ]] || fail "RHCOS AMI has an invalid format: ${rhcos_ami}"
-
-  write_value "${ocp_y_stream}" "${OCP_VERSION_FILE}"
-  write_value "${payload_version}" "${PAYLOAD_TAG_FILE}"
-  write_value "${RELEASE_IMAGE_LATEST}" "${PAYLOAD_PULLSPEC_FILE}"
-  write_value "${rhcos_version}" "${RHCOS_VERSION_FILE}"
-  write_value "${rhcos_ami}" "${RHCOS_AMI_FILE}"
-  write_value "ready" "${STATE_FILE}"
-
-  log "Ready: ocp_version=${ocp_y_stream} payload=${payload_version} rhcos_version=${rhcos_version} aws_region=${RHCOS_AWS_REGION} ami=${rhcos_ami}"
+  case "${selection_rc}" in
+    3)
+      set_wait_state "rosa-release-current"
+      ;;
+    4)
+      set_wait_state "ready-nightly-unavailable"
+      ;;
+    *)
+      fail "release or OCM version response has an invalid schema"
+      ;;
+  esac
 }
 
 main "$@"

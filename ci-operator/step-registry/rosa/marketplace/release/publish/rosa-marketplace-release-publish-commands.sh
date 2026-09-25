@@ -12,7 +12,6 @@ readonly MARKETPLACE_GENERATOR_BIN="${MARKETPLACE_GENERATOR_BIN:-marketplace-rel
 
 readonly STATE_FILE="${SHARED_DIR}/rosa-marketplace-release-state"
 readonly OCP_VERSION_FILE="${SHARED_DIR}/rosa-marketplace-ocp-version"
-readonly RHCOS_VERSION_FILE="${SHARED_DIR}/rosa-marketplace-rhcos-version"
 
 log() {
   printf '[rosa-marketplace-release-publish] %s\n' "$*"
@@ -36,11 +35,14 @@ read_required_value() {
 main() {
   local state
   local ocp_version
-  local rhcos_version
   local -a args
 
   state=$(read_required_value "${STATE_FILE}")
   case "${state}" in
+    wait:*)
+      log "No action: detector state is ${state}"
+      return 0
+      ;;
     ready)
       ;;
     *)
@@ -48,12 +50,14 @@ main() {
       ;;
   esac
 
+  ocp_version=$(read_required_value "${OCP_VERSION_FILE}")
+  [[ "${ocp_version}" =~ ^[0-9]+\.[0-9]+$ ]] || fail "detector OCP version is invalid"
   [[ "${MARKETPLACE_ENVIRONMENT}" == "staging" ]] \
     || fail "only the staging Marketplace environment is allowed"
   [[ "${MARKETPLACE_PUBLISH_ENABLED}" == "true" || "${MARKETPLACE_PUBLISH_ENABLED}" == "false" ]] \
     || fail "MARKETPLACE_PUBLISH_ENABLED must be true or false"
   if [[ "${MARKETPLACE_PUBLISH_ENABLED}" == "false" ]]; then
-    log "No action: publishing is disabled for ocp_version=$(read_required_value "${OCP_VERSION_FILE}")"
+    log "No action: publishing is disabled for ocp_version=${ocp_version}"
     return 0
   fi
 
@@ -63,11 +67,6 @@ main() {
   [[ "${MARKETPLACE_RELEASE_TIMEOUT}" =~ ^[1-9][0-9]*(s|m|h)$ ]] \
     || fail "MARKETPLACE_RELEASE_TIMEOUT must be a positive duration using s, m, or h"
 
-  ocp_version=$(read_required_value "${OCP_VERSION_FILE}")
-  rhcos_version=$(read_required_value "${RHCOS_VERSION_FILE}")
-  [[ "${ocp_version}" =~ ^[0-9]+\.[0-9]+$ ]] || fail "detector OCP version is invalid"
-  [[ "${rhcos_version}" =~ ^[A-Za-z0-9._-]+$ ]] || fail "detector RHCOS version is invalid"
-
   command -v "${MARKETPLACE_GENERATOR_BIN}" >/dev/null 2>&1 \
     || fail "marketplace generator not found: ${MARKETPLACE_GENERATOR_BIN}"
 
@@ -75,10 +74,8 @@ main() {
     release
     --environment "${MARKETPLACE_ENVIRONMENT}"
     --ocp-version "${ocp_version}"
-    --rhcos-version "${rhcos_version}"
     --aws-profile "${MARKETPLACE_AWS_PROFILE}"
     --copy-if-duplicate=false
-    --skip-if-version-exists
     --timeout "${MARKETPLACE_RELEASE_TIMEOUT}"
   )
 
@@ -86,7 +83,7 @@ main() {
     args+=(--dry-run)
   fi
 
-  log "Invoking generator for ocp_version=${ocp_version} rhcos_version=${rhcos_version} environment=${MARKETPLACE_ENVIRONMENT} dry_run=${MARKETPLACE_DRY_RUN}"
+  log "Invoking generator for ocp_version=${ocp_version} environment=${MARKETPLACE_ENVIRONMENT} dry_run=${MARKETPLACE_DRY_RUN}"
   "${MARKETPLACE_GENERATOR_BIN}" "${args[@]}"
 }
 

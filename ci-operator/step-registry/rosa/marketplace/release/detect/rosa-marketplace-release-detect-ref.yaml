@@ -1,6 +1,6 @@
 ref:
   as: rosa-marketplace-release-detect
-  from: cli
+  from: rosa-aws-cli
   grace_period: 1m
   commands: rosa-marketplace-release-detect-commands.sh
   resources:
@@ -8,19 +8,15 @@ ref:
       cpu: 10m
       memory: 100Mi
   env:
-  - name: RELEASE_PAYLOAD_AUTH_FILE
-    default: /etc/pull-secret/.dockerconfigjson
-    documentation: Registry auth file used to inspect the release-controller payload and extract openshift-install.
-  - name: RHCOS_AWS_REGION
-    default: us-east-1
-    documentation: AWS region whose installer-provided RHCOS AMI must be present.
+  - name: OCM_LOGIN_ENV
+    default: production
+    documentation: OCM environment whose ROSA-enabled versions are compared with OCP nightly y-streams.
   credentials:
-  - namespace: test-credentials
-    bundle: ci-pull-credentials
-    mount_path: /etc/pull-secret
+  - namespace: ci
+    bundle: cluster-secrets-rosa-e2e-01
+    mount_path: /etc/rosa-credentials
   documentation: |-
-    Consumes the exact RELEASE_IMAGE_LATEST payload supplied by ci-operator and
-    release-controller. It derives the OCP y-stream from payload metadata,
-    extracts openshift-install, records the x86_64 RHCOS version and regional
-    AWS AMI, and writes validated values to SHARED_DIR for the Marketplace
-    release step.
+    Reads ready OCP nightly streams and compares the newest available y-stream
+    with OCM versions where rosa_enabled is true. It writes a ready state and
+    the missing major.minor version to SHARED_DIR only when a new ROSA release
+    is required.
