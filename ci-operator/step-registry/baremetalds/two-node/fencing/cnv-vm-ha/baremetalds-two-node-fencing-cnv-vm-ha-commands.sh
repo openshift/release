@@ -366,6 +366,7 @@ if [[ "${VMI_STATUS}" != "Running" || "${VMI_CURRENT_NODE}" != "${SURVIVE_NODE}"
   collect_rbd_diagnostics "migration-failure"
   oc get vmi -n default -o yaml || true
   oc get events -n default --sort-by='.lastTimestamp' || true
+  touch "${SHARED_DIR}/SKIP_DESTROY_CLUSTER"
   exit 1
 fi
 
