@@ -6,13 +6,15 @@ images:
       FROM src AS builder
       WORKDIR /go/src/github.com/openshift/cluster-authentication-operator
       RUN git clone --depth 1 --branch master https://github.com/openshift/cluster-authentication-operator.git . && \
-          rm -rf vendor/github.com/openshift/library-go && \
           cp -a /go/src/github.com/openshift/library-go ./library-go && \
+          rm -rf vendor ./library-go/vendor && \
           API_VERSION=$$(go list -m -f '{{.Version}}' -modfile=./library-go/go.mod github.com/openshift/api) && \
-          echo "bumping github.com/openshift/api to $${API_VERSION} (from library-go)" && \
-          go get github.com/openshift/api@$${API_VERSION} && \
+          CLIENT_GO_VERSION=$$(go list -m -f '{{.Version}}' -modfile=./library-go/go.mod github.com/openshift/client-go) && \
+          echo "bumping github.com/openshift/api to $${API_VERSION} and github.com/openshift/client-go to $${CLIENT_GO_VERSION} (from library-go)" && \
+          go get github.com/openshift/api@$${API_VERSION} github.com/openshift/client-go@$${CLIENT_GO_VERSION} && \
           go mod edit -dropreplace github.com/openshift/library-go || true && \
           go mod edit -replace github.com/openshift/library-go=./library-go && \
+          go mod tidy && \
           go mod vendor
       ARG TAGS=ocp
       ENV GO_PACKAGE=github.com/openshift/cluster-authentication-operator
@@ -36,13 +38,15 @@ images:
       FROM src AS builder
       WORKDIR /go/src/github.com/openshift/cluster-kube-apiserver-operator
       RUN git clone --depth 1 --branch main https://github.com/openshift/cluster-kube-apiserver-operator.git . && \
-          rm -rf vendor/github.com/openshift/library-go && \
           cp -a /go/src/github.com/openshift/library-go ./library-go && \
+          rm -rf vendor ./library-go/vendor && \
           API_VERSION=$$(go list -m -f '{{.Version}}' -modfile=./library-go/go.mod github.com/openshift/api) && \
-          echo "bumping github.com/openshift/api to $${API_VERSION} (from library-go)" && \
-          go get github.com/openshift/api@$${API_VERSION} && \
+          CLIENT_GO_VERSION=$$(go list -m -f '{{.Version}}' -modfile=./library-go/go.mod github.com/openshift/client-go) && \
+          echo "bumping github.com/openshift/api to $${API_VERSION} and github.com/openshift/client-go to $${CLIENT_GO_VERSION} (from library-go)" && \
+          go get github.com/openshift/api@$${API_VERSION} github.com/openshift/client-go@$${CLIENT_GO_VERSION} && \
           go mod edit -dropreplace github.com/openshift/library-go || true && \
           go mod edit -replace github.com/openshift/library-go=./library-go && \
+          go mod tidy && \
           go mod vendor
       ENV GO_PACKAGE=github.com/openshift/cluster-kube-apiserver-operator
       RUN make build --warn-undefined-variables && \
@@ -69,13 +73,15 @@ images:
       FROM src AS builder
       WORKDIR /go/src/github.com/openshift/cluster-openshift-apiserver-operator
       RUN git clone --depth 1 --branch main https://github.com/openshift/cluster-openshift-apiserver-operator.git . && \
-          rm -rf vendor/github.com/openshift/library-go && \
           cp -a /go/src/github.com/openshift/library-go ./library-go && \
+          rm -rf vendor ./library-go/vendor && \
           API_VERSION=$$(go list -m -f '{{.Version}}' -modfile=./library-go/go.mod github.com/openshift/api) && \
-          echo "bumping github.com/openshift/api to $${API_VERSION} (from library-go)" && \
-          go get github.com/openshift/api@$${API_VERSION} && \
+          CLIENT_GO_VERSION=$$(go list -m -f '{{.Version}}' -modfile=./library-go/go.mod github.com/openshift/client-go) && \
+          echo "bumping github.com/openshift/api to $${API_VERSION} and github.com/openshift/client-go to $${CLIENT_GO_VERSION} (from library-go)" && \
+          go get github.com/openshift/api@$${API_VERSION} github.com/openshift/client-go@$${CLIENT_GO_VERSION} && \
           go mod edit -dropreplace github.com/openshift/library-go || true && \
           go mod edit -replace github.com/openshift/library-go=./library-go && \
+          go mod tidy && \
           go mod vendor
       RUN GODEBUG=tls13=1 make build && \
           make tests-ext-build && \
