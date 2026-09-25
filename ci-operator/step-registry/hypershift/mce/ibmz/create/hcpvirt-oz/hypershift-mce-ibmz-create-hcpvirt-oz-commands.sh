@@ -158,18 +158,18 @@ wait_for_nodes() {
     READYZ=$(curl -sk "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>&1 || true)
     echo "$(date) [retry ${retries}] /readyz: ${READYZ}"
 
-    READY_NODES=$(oc get no --kubeconfig "${VIRT_KC}" --no-headers 2>/dev/null \
+    READY_NODES=$(oc get no --kubeconfig "${VIRT_KC}" --no-headers --request-timeout=300s 2>/dev/null \
       | grep -c " Ready" || true)
     echo "$(date) Ready nodes: ${READY_NODES}/${REQUIRED_NODES}"
     if [[ ${READY_NODES} -ge ${REQUIRED_NODES} ]]; then
       echo "$(date) ${REQUIRED_NODES} nodes are Ready"
-      oc get no --kubeconfig "${VIRT_KC}" -o wide -v6
+      oc get no --kubeconfig "${VIRT_KC}" -o wide --request-timeout=300s -v6
       return 0
     fi
 
     echo "$(date) Nodes not ready yet — printing debug status"
     echo "$(date) DEBUG: All nodes in guest cluster:"
-    oc get no --kubeconfig "${VIRT_KC}" -o wide || true
+    oc get no --kubeconfig "${VIRT_KC}" -o wide --request-timeout=300s || true
     echo "$(date) DEBUG: KubeVirt VMs on mgmt cluster:"
     oc get vmi -n ${HC_NS}-${HC_NAME} 2>/dev/null || true
 
@@ -320,7 +320,7 @@ if [[ -n "${UNAVAILABLE}" ]]; then
   echo "$(date) DEBUG: Degraded CO details:"
   oc get co --kubeconfig "${VIRT_KC}" -o yaml || true
   echo "$(date) DEBUG: Guest cluster nodes:"
-  oc get no --kubeconfig "${VIRT_KC}" -o wide || true
+  oc get no --kubeconfig "${VIRT_KC}" -o wide --request-timeout=300s || true
   echo "$(date) DEBUG: Guest cluster pods with issues:"
   oc get pods -A --kubeconfig "${VIRT_KC}" --field-selector=status.phase!=Running,status.phase!=Succeeded 2>/dev/null || true
 
