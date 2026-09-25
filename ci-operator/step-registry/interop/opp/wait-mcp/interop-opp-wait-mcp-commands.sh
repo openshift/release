@@ -11,8 +11,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  # Save xtrace log with credentials scrubbed when the step exits non-zero.
-  _exit_code=${1:-$?}
+  _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -33,15 +32,13 @@ _junit_start=$(date +%s)
 _junit_emitted=0
 _jrc=0  # initialized here, assigned inside trap string
 _junit_emit() {
-  # Emit a JUnit XML result for the wait-mcp step and propagate
-  # it to SHARED_DIR so downstream steps can aggregate results.
   (( _junit_emitted )) && return 0
   _junit_emitted=1
   local _jr=${1:-0}
   local _je
   _je=$(date +%s) || _je=${_junit_start}
   local _jd=$((_je - _junit_start))
-  local _jn="wait-mcp"
+  local _jn="interop-opp-wait-mcp"
   local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
   local _fc=0 _fx=""
   if (( _jr != 0 )); then
@@ -56,15 +53,9 @@ _junit_emit() {
   </testcase>
 </testsuite>
 JUNITEOF
-  if [[ -n "${SHARED_DIR:-}" ]]; then
-    local _step_prefix
-    _step_prefix="$(basename "${BASH_SOURCE[0]:-$0}" .sh | sed 's/-commands$//')"
-    cp "${_jf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_jf}")" 2>/dev/null || true
-  fi
 }
 
-trap '_jrc=$?; set +e; if [[ ${_in_product_test} -eq 1 ]]; then _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit 0; else _opp_cleanup ${_jrc}; exit ${_jrc}; fi' EXIT
-_in_product_test=0
+trap '_jrc=$?; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -76,7 +67,6 @@ typeset -ri pollInterval=30
 typeset -a readyHistory=()
 
 function IsReadyCountProgressing () {
-    # Check if the MCP ready count is trending upward over the last 6 polls.
     typeset -i len=${#readyHistory[@]}
     (( len < 3 )) && return 1
     typeset -i windowStart=$(( len > 6 ? len - 6 : 0 ))
@@ -93,7 +83,6 @@ function IsReadyCountProgressing () {
 }
 
 function AssertClusterHealthy () {
-    # Verify ClusterOperators and nodes are healthy before declaring MCP success.
     typeset -i failures=0
 
     echo ""
@@ -165,7 +154,6 @@ if bad:
 }
 
 function ClassifyMcpState () {
-    # Classify the MCP timeout as DEGRADED, UPDATING, or UNKNOWN from the JSON state.
     typeset json="${1}"
     echo "${json}" | python3 -c "
 import sys, json
@@ -208,8 +196,6 @@ typeset -ri deadline=$(( SECONDS + mcpWaitTimeout ))
 typeset -i consecutivePasses=0
 
 echo "Polling MCPs for up to ${mcpWaitTimeout}s (need ${consecutiveRequired} consecutive clean polls)..."
-
-_in_product_test=1
 
 while (( SECONDS < deadline )); do
     typeset -i remaining=$(( deadline - SECONDS ))

@@ -16,8 +16,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  # Save xtrace log with credentials scrubbed when the step exits non-zero.
-  _exit_code=${1:-$?}
+  _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
@@ -32,15 +31,13 @@ _junit_start=$(date +%s)
 _junit_emitted=0
 _jrc=0  # initialized here, assigned inside trap string
 _junit_emit() {
-  # Emit a JUnit XML result for the ACM upgrade step and propagate
-  # it to SHARED_DIR so downstream steps can aggregate results.
   (( _junit_emitted )) && return 0
   _junit_emitted=1
   local _jr=${1:-0}
   local _je
   _je=$(date +%s) || _je=${_junit_start}
   local _jd=$((_je - _junit_start))
-  local _jn="acm-upgrade"
+  local _jn="interop-opp-product-upgrade-acm"
   local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
   local _fc=0 _fx=""
   if (( _jr != 0 )); then
@@ -55,14 +52,9 @@ _junit_emit() {
   </testcase>
 </testsuite>
 JUNITEOF
-  if [[ -n "${SHARED_DIR:-}" ]]; then
-    local _step_prefix
-    _step_prefix="$(basename "${BASH_SOURCE[0]:-$0}" .sh | sed 's/-commands$//')"
-    cp "${_jf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_jf}")" 2>/dev/null || true
-  fi
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit 0' EXIT
+trap '_jrc=$?; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -79,7 +71,6 @@ ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
 
 function CollectDiagnostics () {
-    # Dump ACM subscription, CSV, MCE, and pod state to artifacts for debugging.
     typeset artifactFile="${ARTIFACT_DIR}/acm-upgrade-diagnostics.txt"
     {
         printf '=== ACM Operator Upgrade Diagnostics ===\n\n'
@@ -98,17 +89,15 @@ function CollectDiagnostics () {
     true
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; if (( _jrc != 0 )); then CollectDiagnostics; fi; exit 0' EXIT
+trap '_jrc=$?; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; if (( _exit_code != 0 )); then CollectDiagnostics; fi' EXIT
 
 function GetCurrentCsv () {
-    # Return the currentCSV name from the operator subscription status.
     oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.currentCSV}' || true
 }
 
 function GetCsvPhase () {
-    # Return the status phase of the given CSV in the operator namespace.
     typeset csvName="$1"
     oc get csv "${csvName}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
@@ -116,7 +105,6 @@ function GetCsvPhase () {
 }
 
 function GetInstalledVersion () {
-    # Return the installed operator version from the current CSV spec.
     typeset csvName
     csvName="$(GetCurrentCsv)"
     if [[ -z "${csvName}" ]]; then
@@ -128,14 +116,12 @@ function GetInstalledVersion () {
 }
 
 function GetCurrentChannel () {
-    # Return the current subscription channel for the operator.
     oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.channel}' || true
 }
 
 function ResolveTargetChannel () {
-    # Determine the next higher channel to upgrade to from the packagemanifest.
     if [[ -n "${ACM_TARGET_CHANNEL}" ]]; then
         echo "${ACM_TARGET_CHANNEL}"
         return 0
@@ -216,7 +202,6 @@ function ResolveTargetChannel () {
 }
 
 function WaitForCsvSucceeded () {
-    # Poll until a new CSV (different from previousCsv) reaches Succeeded phase or timeout.
     typeset previousCsv="$1"
     typeset timeoutSeconds
     timeoutSeconds="$(ParseTimeout "${ACM_UPGRADE_TIMEOUT}")"
@@ -255,7 +240,6 @@ function WaitForCsvSucceeded () {
 }
 
 function ParseTimeout () {
-    # Convert a human-readable timeout string (e.g. 30m, 300s) to seconds.
     typeset input="$1"
     typeset minutes=0 seconds=0
     if [[ "${input}" =~ ^([0-9]+)m$ ]]; then
@@ -275,7 +259,6 @@ function ParseTimeout () {
 }
 
 function ValidateMceUpgrade () {
-    # Verify the MCE (MultiCluster Engine) CSV reached Succeeded phase.
     echo "Validating MCE (MultiCluster Engine) upgrade..."
     typeset mceCsv
     mceCsv="$(oc get csv -n multicluster-engine \
@@ -318,7 +301,6 @@ function ValidateMceUpgrade () {
 }
 
 function ValidateHubHealth () {
-    # Check MultiClusterHub phase, policy propagator readiness, and managed cluster availability.
     echo "Validating ACM hub health post-upgrade..."
 
     typeset mchStatus
@@ -401,7 +383,6 @@ function ValidateHubHealth () {
 # by default, changing how ${var//pattern/replacement} handles & and \ in
 # the replacement string. Without escaping, JUnit XML output is malformed.
 _xml_escape() {
-    # Replace XML special characters with their entity equivalents.
     local text="$1"
     text="${text//&/\&amp;}"
     text="${text//</\&lt;}"
@@ -415,7 +396,6 @@ _xml_escape() {
 # standalone <testcase> fragments and full <testsuite>-wrapped documents.
 # Fragments are appended to junit_known_issues.xml and consumed correctly.
 _detect_known_issue() {
-    # Emit a JUnit SKIPPED testcase fragment for a tracked known issue.
     local error_output="$1"
     local bug_id="$2"
     local bug_description="$3"
@@ -441,7 +421,6 @@ JUNIT_EOF
 # === Main ===
 
 function Main () {
-    # Orchestrate the ACM operator upgrade: resolve channel, patch subscription, wait, validate.
     typeset currentCsv currentVersion currentChannel targetChannel
     typeset prePatchPlan planPhase installPlan localApproval
     typeset newCsv newVersion
@@ -584,6 +563,3 @@ function Main () {
 }
 
 Main "$@"
-
-# Rename JUnit suite for dashboard visibility
-find "${ARTIFACT_DIR}" -name "*.xml" -exec sed -i 's/name="product-upgrade-acm"/name="lp-interop--OPP--acm-upgrade"/g; s/classname="product-upgrade-acm"/classname="lp-interop--OPP--acm-upgrade"/g' {} + 2>/dev/null || true

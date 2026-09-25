@@ -4,6 +4,37 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# --- JUnit XML wrapper: emit result for skip-ratio-gate ---
+_junit_start=$(date +%s)
+_junit_emitted=0
+_jrc=0  # initialized here, assigned inside trap string
+_junit_emit() {
+  (( _junit_emitted )) && return 0
+  _junit_emitted=1
+  local _jr=${1:-0}
+  local _je
+  _je=$(date +%s) || _je=${_junit_start}
+  local _jd=$((_je - _junit_start))
+  local _jn="install-operators"
+  local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
+  local _fc=0 _fx=""
+  if (( _jr != 0 )); then
+    _fc=1
+    _fx="<failure message=\"${_jn} exited with code ${_jr}\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
+  fi
+  cat > "${_jf}" <<JUNITEOF || true
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="${_fc}" errors="0" skipped="0" time="${_jd}">
+  <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
+    ${_fx}
+  </testcase>
+</testsuite>
+JUNITEOF
+}
+
+trap '_jrc=$?; _junit_emit ${_jrc}' EXIT
+
+
 # Set the cluster proxy configuration, if its present.
 if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
     echo "setting the proxy"

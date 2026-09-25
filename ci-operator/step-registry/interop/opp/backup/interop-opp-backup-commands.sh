@@ -10,8 +10,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  # Save xtrace log with credentials scrubbed when the step exits non-zero.
-  _exit_code=${1:-$?}
+  _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -32,14 +31,13 @@ _junit_start=$(date +%s)
 _junit_emitted=0
 _jrc=0  # initialized here, assigned inside trap string
 _junit_emit() {
-  # Emit a JUnit XML result for the backup step and propagate to SHARED_DIR.
   (( _junit_emitted )) && return 0
   _junit_emitted=1
   local _jr=${1:-0}
   local _je
   _je=$(date +%s) || _je=${_junit_start}
   local _jd=$((_je - _junit_start))
-  local _jn="backup"
+  local _jn="interop-opp-backup"
   local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
   local _fc=0 _fx=""
   if (( _jr != 0 )); then
@@ -54,14 +52,9 @@ _junit_emit() {
   </testcase>
 </testsuite>
 JUNITEOF
-  if [[ -n "${SHARED_DIR:-}" ]]; then
-    local _step_prefix
-    _step_prefix="$(basename "${BASH_SOURCE[0]:-$0}" .sh | sed 's/-commands$//')"
-    cp "${_jf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_jf}")" 2>/dev/null || true
-  fi
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit 0' EXIT
+trap '_jrc=$?; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -80,7 +73,6 @@ typeset -i failures=0
 typeset -i captured=0
 
 Capture() {
-    # Run a command and save its output to an artifact file, tracking success/failure counts.
     typeset description="${1:-}"; (($#)) && shift
     typeset outputFile="${1:-}"; (($#)) && shift
     : "Capturing ${description}..."
@@ -94,7 +86,6 @@ Capture() {
 }
 
 TimeoutMonitor() {
-    # Background watchdog that sends SIGTERM to the main process after BACKUP_TIMEOUT seconds.
     typeset -i startTime=0
     startTime=$(date +%s)
     typeset -i deadline=$(( startTime + BACKUP_TIMEOUT ))
@@ -108,7 +99,7 @@ TimeoutMonitor() {
 # Start timeout monitor in background
 TimeoutMonitor &
 typeset timeoutPid=$!
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; kill ${timeoutPid} || true; exit 0' EXIT
+trap '_jrc=$?; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; kill ${timeoutPid} || true' EXIT
 trap 'kill ${timeoutPid} || true; exit 124' TERM
 
 echo ">>> PHASE: Pre-Upgrade Cluster Backup"
