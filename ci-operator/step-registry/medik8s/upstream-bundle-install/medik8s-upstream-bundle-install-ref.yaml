@@ -1,0 +1,41 @@
+ref:
+  as: medik8s-upstream-bundle-install
+  from: operator-sdk
+  cli: latest
+  grace_period: 10m
+  commands: medik8s-upstream-bundle-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: MEDIK8S_BUNDLE_IMAGES
+    documentation: |-
+      Comma-separated OLM package names (and optional =bundle-image overrides) to install
+      via operator-sdk run bundle. Bare package names resolve to Quay main:
+        <pkg>-operator-bundle:latest, or <pkg>-bundle:latest if pkg already ends in -operator
+        (NHC/NMO).
+      Examples:
+        fence-agents-remediation
+        self-node-remediation,node-healthcheck-operator
+        storage-based-remediation=quay.io/medik8s/storage-based-remediation-operator-bundle:v0.3.1
+    default: ""
+  - name: OO_PACKAGE
+    documentation: |-
+      OLM package name when installing a single bundle via OO_BUNDLE (e.g. storage-based-remediation).
+      Ignored when MEDIK8S_BUNDLE_IMAGES is set. Bare OO_PACKAGE (without OO_BUNDLE) uses the
+      default Quay latest image (see MEDIK8S_BUNDLE_IMAGES naming rules).
+    default: ""
+  - name: OO_BUNDLE
+    documentation: |-
+      Single bundle image URL. Optional when OO_PACKAGE is set (defaults to Quay latest).
+      Use MEDIK8S_BUNDLE_IMAGES for multiple operators.
+    default: ""
+  - name: OO_INSTALL_NAMESPACE
+    documentation: Namespace name for the OLM install command via `operator-sdk run bundle`.
+    default: "openshift-workload-availability"
+  - name: OO_INSTALL_TIMEOUT_MINUTES
+    documentation: Timeout in minutes for operator-sdk run bundle and CSV Succeeded wait.
+    default: "10"
+  documentation: |-
+    Installs medik8s operators from pre-built OLM Quay main bundle images.
