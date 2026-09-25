@@ -55,7 +55,7 @@ _junit_emit() {
 JUNITEOF
 }
 
-trap '_jrc=$?; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; exit ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
