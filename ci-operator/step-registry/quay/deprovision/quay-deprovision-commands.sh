@@ -36,12 +36,23 @@ fi
 
 if [[ "$QUAY_STORAGE_PROVIDER" == 'azure' ]]; then
     # The deploy step keeps Azure service-principal credentials out of the
-    # archived Terraform files. Restore them from the mounted credential for
-    # terraform destroy; this script does not enable command tracing.
-    ARM_SUBSCRIPTION_ID=$(cat /var/run/quay-qe-azure-secret/subscription_id)
-    ARM_TENANT_ID=$(cat /var/run/quay-qe-azure-secret/tenant_id)
-    ARM_CLIENT_SECRET=$(cat /var/run/quay-qe-azure-secret/client_secret)
-    ARM_CLIENT_ID=$(cat /var/run/quay-qe-azure-secret/client_id)
+    # archived Terraform files. Restore them for terraform destroy from the same
+    # source the deploy step used: the azure-quay-qe cluster profile's
+    # osServicePrincipal.json (the installer SP that created the storage). Fall
+    # back to the legacy mounted secret if the profile is not present. This script
+    # does not enable command tracing.
+    AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+    if [[ -r "${AZURE_AUTH_LOCATION}" ]]; then
+        ARM_SUBSCRIPTION_ID=$(jq -r .subscriptionId "${AZURE_AUTH_LOCATION}")
+        ARM_TENANT_ID=$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")
+        ARM_CLIENT_SECRET=$(jq -r .clientSecret "${AZURE_AUTH_LOCATION}")
+        ARM_CLIENT_ID=$(jq -r .clientId "${AZURE_AUTH_LOCATION}")
+    else
+        ARM_SUBSCRIPTION_ID=$(cat /var/run/quay-qe-azure-secret/subscription_id)
+        ARM_TENANT_ID=$(cat /var/run/quay-qe-azure-secret/tenant_id)
+        ARM_CLIENT_SECRET=$(cat /var/run/quay-qe-azure-secret/client_secret)
+        ARM_CLIENT_ID=$(cat /var/run/quay-qe-azure-secret/client_id)
+    fi
     export ARM_SUBSCRIPTION_ID ARM_TENANT_ID ARM_CLIENT_SECRET ARM_CLIENT_ID
 
     mkdir -p QUAY_AZURE && cd QUAY_AZURE
@@ -51,11 +62,21 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'azure' ]]; then
     QUAY_AZURE_STORAGE_ID=$(cat ${SHARED_DIR}/QUAY_AZURE_STORAGE_ID)
     echo "Start to destroy quay azure bucket $QUAY_AZURE_STORAGE_ID ..."
 
-    export TF_VAR_resource_group="${QUAY_AZURE_STORAGE_ID}"
+    # The storage account lives in the cluster's resource group (created there by
+    # the deploy step, which is a terraform data source and is therefore never
+    # destroyed here). Point terraform at that same RG so it can resolve and delete
+    # the storage account/container. Fall back to the storage ID for older state
+    # that used a dedicated RG.
+    if [[ -s "${SHARED_DIR}/QUAY_AZURE_RESOURCE_GROUP" ]]; then
+        TF_VAR_resource_group=$(cat "${SHARED_DIR}/QUAY_AZURE_RESOURCE_GROUP")
+    else
+        TF_VAR_resource_group="${QUAY_AZURE_STORAGE_ID}"
+    fi
+    export TF_VAR_resource_group
     export TF_VAR_storage_account="${QUAY_AZURE_STORAGE_ID}"
     export TF_VAR_storage_container="${QUAY_AZURE_STORAGE_ID}"
     terraform init
-    terraform destroy -auto-approve || true          
+    terraform destroy -auto-approve || true
 fi
 
 

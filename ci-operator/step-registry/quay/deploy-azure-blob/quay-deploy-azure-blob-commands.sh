@@ -111,14 +111,44 @@ QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 
-# Azure service-principal credentials used by Terraform. Keep them in environment
-# variables so they are not embedded in the Terraform source archived in SHARED_DIR.
-# This script deliberately runs without set -x and never prints these values.
-ARM_SUBSCRIPTION_ID=$(cat /var/run/quay-qe-azure-secret/subscription_id)
-ARM_TENANT_ID=$(cat /var/run/quay-qe-azure-secret/tenant_id)
-ARM_CLIENT_SECRET=$(cat /var/run/quay-qe-azure-secret/client_secret)
-ARM_CLIENT_ID=$(cat /var/run/quay-qe-azure-secret/client_id)
+# Azure service-principal credentials used by Terraform. Reuse the installer
+# service principal from the azure-quay-qe cluster profile (the same SP that
+# installed this cluster, mounted at ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json)
+# instead of a separate secret. That SP is Contributor on the subscription, so it
+# can create the storage account/container. Its JSON keys are
+# clientId/clientSecret/tenantId/subscriptionId (the standard installer format
+# consumed by ipi-conf-azure and the aks/aro/azure steps). Keep the values in
+# environment variables so they are not embedded in the Terraform source archived
+# in SHARED_DIR. This script deliberately runs without set -x and never prints
+# these values.
+AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ ! -r "${AZURE_AUTH_LOCATION}" ]]; then
+  echo "ERROR: ${AZURE_AUTH_LOCATION} not found or unreadable." >&2
+  echo "       This step requires the azure-quay-qe cluster profile, whose" >&2
+  echo "       osServicePrincipal.json provides the credentials to create Azure blob storage." >&2
+  exit 1
+fi
+ARM_SUBSCRIPTION_ID=$(jq -r .subscriptionId "${AZURE_AUTH_LOCATION}")
+ARM_TENANT_ID=$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")
+ARM_CLIENT_SECRET=$(jq -r .clientSecret "${AZURE_AUTH_LOCATION}")
+ARM_CLIENT_ID=$(jq -r .clientId "${AZURE_AUTH_LOCATION}")
 export ARM_SUBSCRIPTION_ID ARM_TENANT_ID ARM_CLIENT_SECRET ARM_CLIENT_ID
+
+# Create the blob storage inside the OpenShift cluster's own resource group rather
+# than a dedicated one, so it lives and dies with the cluster. The RG is read from
+# the live cluster's infrastructure status (covers both installer-created
+# "<infraID>-rg" and user-provided RG names). Terraform references it as a data
+# source (below), so it is never created or destroyed by this step. The RG name is
+# also shared with quay-deprovision so it can target the same RG on teardown.
+CLUSTER_RESOURCE_GROUP=$(oc get infrastructure cluster \
+  -o jsonpath='{.status.platformStatus.azure.resourceGroupName}' 2>/dev/null || true)
+if [[ -z "${CLUSTER_RESOURCE_GROUP}" ]]; then
+  echo "ERROR: could not determine the cluster's Azure resource group from" >&2
+  echo "       infrastructure/cluster .status.platformStatus.azure.resourceGroupName." >&2
+  exit 1
+fi
+echo "Creating Quay Azure blob storage in cluster resource group ${CLUSTER_RESOURCE_GROUP}"
+printf '%s' "${CLUSTER_RESOURCE_GROUP}" > "${SHARED_DIR}/QUAY_AZURE_RESOURCE_GROUP"
 
 # Azure storage-account names are globally unique, 3-24 characters, lowercase,
 # and alphanumeric only. Include CI identity plus time/randomness and truncate.
@@ -166,15 +196,17 @@ provider "azurerm" {
   features {}
 }
 
-resource "azurerm_resource_group" "quayazure" {
-  name     = var.resource_group
-  location = "westus"
+# Reuse the cluster's existing resource group instead of creating our own. It is a
+# data source, so terraform never creates or destroys it; only the storage account
+# and container below are managed by this state.
+data "azurerm_resource_group" "quayazure" {
+  name = var.resource_group
 }
 
 resource "azurerm_storage_account" "quayazure" {
   name                     = var.storage_account
-  resource_group_name      = azurerm_resource_group.quayazure.name
-  location                 = azurerm_resource_group.quayazure.location
+  resource_group_name      = data.azurerm_resource_group.quayazure.name
+  location                 = data.azurerm_resource_group.quayazure.location
   account_tier             = "Standard"
   account_replication_type = "GRS"
 }
@@ -231,11 +263,13 @@ output "primary_access_key" {
 EOF
 
 terraform init
+# The resource group is fixed to the cluster's RG; only the storage account/container
+# name is regenerated on retry (storage-account names are globally unique).
+export TF_VAR_resource_group="${CLUSTER_RESOURCE_GROUP}"
 tf_apply_rc=1
 for _ in 1 2 3 4 5; do
   QUAY_AZURE_STORAGE_ID="$(new_azure_storage_name)"
   echo "Quay Azure storage account is ${QUAY_AZURE_STORAGE_ID}"
-  export TF_VAR_resource_group="${QUAY_AZURE_STORAGE_ID}"
   export TF_VAR_storage_account="${QUAY_AZURE_STORAGE_ID}"
   export TF_VAR_storage_container="${QUAY_AZURE_STORAGE_ID}"
   tf_apply_rc=0
