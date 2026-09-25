@@ -127,12 +127,12 @@ function WriteJunit () {
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"lp-interop--ODF\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        echo "<testsuite name=\"lp-interop--OPP--odf-health\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         typeset -i i=0
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
-            echo "  <testcase classname=\"lp-interop--ODF\" name=\"${name}\">"
+            echo "  <testcase classname=\"lp-interop--OPP--odf-health\" name=\"${name}\">"
             if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
                 typeset msg=""
                 msg="$(XmlEscape "${tcMessagesArr[$i]}")"
