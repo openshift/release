@@ -40,20 +40,18 @@ cp "${SHARED_DIR}/kubeconfig" /workspace/.kube/config
 export KUBECONFIG='/workspace/.kube/config'
 
 # ---------------------------------------------------------------------------
-# 2. Generate options.yaml — jq/yq marshalling for safe value handling
+# 2. Generate options.yaml — jq marshalling (JSON is valid YAML)
 # ---------------------------------------------------------------------------
 typeset baseDomain=''
 baseDomain="$(oc get ingress.config.openshift.io/cluster \
     -o jsonpath='{.spec.domain}' | sed 's/^apps\.//')"
 
 mkdir -p /resources
-{
-    jq -cn \
-        --arg hubName 'local-cluster' \
-        --arg hubDomain "${baseDomain}" \
-        '{options: {hub: {name: $hubName, baseDomain: $hubDomain}}}' |
-    yq -p json -o yaml eval .
-} > /resources/options.yaml
+jq -cn \
+    --arg hubName 'local-cluster' \
+    --arg hubDomain "${baseDomain}" \
+    '{options: {hub: {name: $hubName, baseDomain: $hubDomain}}}' \
+    > /resources/options.yaml
 
 if [[ -f "${SHARED_DIR}/managed.cluster.name" ]]; then
     typeset mcName='' mcDomain=''
@@ -67,14 +65,11 @@ if [[ -f "${SHARED_DIR}/managed.cluster.name" ]]; then
         exit 1
     }
 
-    {
-        yq -o json eval . /resources/options.yaml |
-        jq -c \
-            --arg mcName "${mcName}" \
-            --arg mcDomain "${mcDomain}" \
-            '.options.clusters = [{name: $mcName, baseDomain: $mcDomain}]' |
-        yq -p json -o yaml eval .
-    } > /resources/options.yaml.tmp
+    jq -c \
+        --arg mcName "${mcName}" \
+        --arg mcDomain "${mcDomain}" \
+        '.options.clusters = [{name: $mcName, baseDomain: $mcDomain}]' \
+        /resources/options.yaml > /resources/options.yaml.tmp
     mv /resources/options.yaml.tmp /resources/options.yaml
 
     cp "${SHARED_DIR}/managed.cluster.kubeconfig" /workspace/.kube/import-kubeconfig

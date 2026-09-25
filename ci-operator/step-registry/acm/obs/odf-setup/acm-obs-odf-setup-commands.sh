@@ -2,7 +2,6 @@
 set -euxo pipefail; shopt -s inherit_errexit
 
 command -v jq 1>/dev/null
-command -v yq 1>/dev/null
 command -v oc 1>/dev/null
 
 typeset obsNamespace="${ACM_OBS__NAMESPACE}"
@@ -143,7 +142,7 @@ typeset s3Endpoint="${s3Host}"
                 access_key: $accessKey,
                 secret_key: $secretKey
             }
-        }' | yq -p json -o yaml eval . > "${thanosFile}"
+        }' > "${thanosFile}"
 
     oc create secret generic "${thanosSecretName}" \
         -n "${obsNamespace}" \
