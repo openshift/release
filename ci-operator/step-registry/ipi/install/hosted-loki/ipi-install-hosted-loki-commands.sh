@@ -9,6 +9,26 @@ then
   exit 0
 fi
 
+LOKI_INSTALL_MODE="${LOKI_INSTALL_MODE:-installer-manifests}"
+LOKI_BASE_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
+case "${LOKI_INSTALL_MODE}" in
+  installer-manifests)
+    LOKI_MANIFEST_DIR="${SHARED_DIR}"
+    LOKI_MANIFEST_INVOKER="${LOKI_BASE_INVOKER}"
+    ;;
+  guest-cluster|guest-cluster-multi)
+    LOKI_MANIFEST_DIR="${SHARED_DIR}/hosted-loki-manifests"
+    mkdir -p "${LOKI_MANIFEST_DIR}"
+    rm -f "${LOKI_MANIFEST_DIR}"/manifest_*.yml "${LOKI_MANIFEST_DIR}"/manifest_*.yaml
+    LOKI_BASE_INVOKER="${LOKI_BASE_INVOKER}/hosted"
+    LOKI_MANIFEST_INVOKER="__LOKI_INVOKER__"
+    ;;
+  *)
+    echo "Unsupported LOKI_INSTALL_MODE: ${LOKI_INSTALL_MODE}" >&2
+    exit 1
+    ;;
+esac
+
 
 PROXYCFGLINE=
 PROXYLINE=
@@ -43,9 +63,13 @@ export LOKI_ENDPOINT=https://logging-loki-openshift-operators-redhat.apps.cr.j7t
 export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-exporter"
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
-export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
+LOKI_INVOKER="${LOKI_BASE_INVOKER}"
+LOKI_INVOKERS=()
+LOKI_GUEST_API_UNREACHABLE=10
+LOKI_APPLIED_GUESTS=0
+LOKI_SKIPPED_GUESTS=0
 
-cat >> "${SHARED_DIR}/manifest_01_ns.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml" << EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -55,7 +79,7 @@ metadata:
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/warn: privileged
 EOF
-cat >> "${SHARED_DIR}/manifest_clusterrole.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_clusterrole.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -89,7 +113,7 @@ rules:
   verbs:
   - use
 EOF
-cat >> "${SHARED_DIR}/manifest_clusterrolebinding.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_clusterrolebinding.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -103,7 +127,7 @@ subjects:
   name: loki-promtail
   namespace: openshift-e2e-loki
 EOF
-cat >> "${SHARED_DIR}/manifest_cm.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_cm.yml" << EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -352,7 +376,7 @@ $PROXYCFGLINE
       sync_period: 10s
 EOF
 
-cat >> "${SHARED_DIR}/manifest_creds.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_creds.yml" << EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -363,7 +387,7 @@ data:
   client-secret: "$(cat /var/run/loki-secret/client-secret | base64 -w 0)"
   audience: "$(cat /var/run/loki-secret/audience | base64 -w 0)"
 EOF
-cat >> "${SHARED_DIR}/manifest_ds.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_ds.yml" << EOF
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -400,7 +424,7 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         - name: INVOKER
-          value: "${OPENSHIFT_INSTALL_INVOKER}"
+          value: "${LOKI_MANIFEST_INVOKER}"
         image: ${PROMTAIL_IMAGE}:${PROMTAIL_VERSION}
         imagePullPolicy: IfNotPresent
         resources:
@@ -550,7 +574,7 @@ $PROXYLINE
       maxUnavailable: 10%
       maxSurge: 0
 EOF
-cat >> "${SHARED_DIR}/manifest_promtail_cookie_secret.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_promtail_cookie_secret.yml" << EOF
 kind: Secret
 apiVersion: v1
 metadata:
@@ -560,7 +584,7 @@ data:
   cookie-secret: Y2I3YzljNmJxaGQ5dndwdjV3ZHQ2YzVwY3B6MnI0Zmo=
 type: Opaque
 EOF
-cat >> "${SHARED_DIR}/manifest_promtail_service.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_promtail_service.yml" << EOF
 kind: Service
 apiVersion: v1
 metadata:
@@ -578,7 +602,7 @@ spec:
     app.kubernetes.io/name: promtail
   type: ClusterIP
 EOF
-cat >> "${SHARED_DIR}/manifest_oauth_role.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_oauth_role.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -600,7 +624,7 @@ rules:
   verbs:
   - create
 EOF
-cat >> "${SHARED_DIR}/manifest_oauth_clusterrolebinding.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_oauth_clusterrolebinding.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -614,7 +638,7 @@ subjects:
   name: loki-promtail
   namespace: openshift-e2e-loki
 EOF
-cat >> "${SHARED_DIR}/manifest_sa.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_sa.yml" << EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -623,7 +647,7 @@ metadata:
 EOF
 if [ -n "${LOKI_USE_SERVICEMONITOR:-}" ]; then
   echo "Including Loki servicemonitor manifests (LOKI_USE_SERVICEMONITOR='${LOKI_USE_SERVICEMONITOR}')"
-  cat >> "${SHARED_DIR}/manifest_metrics.yml" << EOF
+  cat > "${LOKI_MANIFEST_DIR}/manifest_metrics.yml" << EOF
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -648,7 +672,7 @@ spec:
       - openshift-e2e-loki
   selector: {}
 EOF
-  cat >> "${SHARED_DIR}/manifest_metrics_role.yml" << EOF
+  cat > "${LOKI_MANIFEST_DIR}/manifest_metrics_role.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -666,7 +690,7 @@ rules:
   - list
   - watch
 EOF
-  cat >> "${SHARED_DIR}/manifest_metrics_rb.yml" << EOF
+  cat > "${LOKI_MANIFEST_DIR}/manifest_metrics_rb.yml" << EOF
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -683,14 +707,14 @@ subjects:
 EOF
 fi
 
-cat >> "${SHARED_DIR}/manifest_eventexporter_sa.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_eventexporter_sa.yml" << EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   namespace: openshift-e2e-loki
   name: event-exporter
 EOF
-cat >> "${SHARED_DIR}/manifest_eventexporter_crb.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_eventexporter_crb.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -704,7 +728,7 @@ subjects:
     namespace: openshift-e2e-loki
     name: event-exporter
 EOF
-cat >> "${SHARED_DIR}/manifest_eventexporter_config.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_eventexporter_config.yml" << EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -722,7 +746,7 @@ data:
       - name: "dump"
         stdout: {}
 EOF
-cat >> "${SHARED_DIR}/manifest_eventexporter_deployment.yml" << EOF
+cat > "${LOKI_MANIFEST_DIR}/manifest_eventexporter_deployment.yml" << EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -764,8 +788,140 @@ spec:
       app: event-exporter
 EOF
 
-echo "Promtail manifests created, the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${OPENSHIFT_INSTALL_INVOKER}\"} | unpack' query. See https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8 for Loki cheat sheet."
+apply_loki_manifest() {
+  local guest_kubeconfig="$1"
+  shift
 
+  local output
+  if output="$(oc --kubeconfig="${guest_kubeconfig}" apply "$@" 2>&1)"; then
+    printf '%s\n' "${output}"
+    return 0
+  fi
+
+  printf '%s\n' "${output}" >&2
+  if [[ "${output}" == *"dial tcp "* && "${output}" == *"i/o timeout"* ]]; then
+    return "${LOKI_GUEST_API_UNREACHABLE}"
+  fi
+  return 1
+}
+
+apply_loki_manifests() {
+  local guest_kubeconfig="$1"
+  local invoker="$2"
+  local status
+
+  echo "Applying Loki manifests to the guest cluster using ${guest_kubeconfig} with invoker ${invoker}"
+  if apply_loki_manifest "${guest_kubeconfig}" -f "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml"; then
+    :
+  else
+    status=$?
+    return "${status}"
+  fi
+  for manifest in "${LOKI_MANIFEST_DIR}"/manifest_*.yml "${LOKI_MANIFEST_DIR}"/manifest_*.yaml; do
+    [[ "${manifest}" == "${LOKI_MANIFEST_DIR}/manifest_01_ns.yml" ]] && continue
+    [[ -f "${manifest}" ]] || continue
+    if [[ "${manifest}" == "${LOKI_MANIFEST_DIR}/manifest_ds.yml" ]]; then
+      if sed "s|__LOKI_INVOKER__|${invoker}|g" "${manifest}" | apply_loki_manifest "${guest_kubeconfig}" -f -; then
+        :
+      else
+        status=$?
+        return "${status}"
+      fi
+    else
+      if apply_loki_manifest "${guest_kubeconfig}" -f "${manifest}"; then
+        :
+      else
+        status=$?
+        return "${status}"
+      fi
+    fi
+  done
+}
+
+handle_loki_apply_failure() {
+  local status="$1"
+  local guest_kubeconfig="$2"
+
+  if (( status == LOKI_GUEST_API_UNREACHABLE )); then
+    echo "Guest API at ${guest_kubeconfig} is unreachable; skipping Loki installation for this guest cluster."
+    LOKI_SKIPPED_GUESTS=$((LOKI_SKIPPED_GUESTS + 1))
+    return 0
+  fi
+  return "${status}"
+}
+
+case "${LOKI_INSTALL_MODE}" in
+  installer-manifests)
+    LOKI_INVOKERS+=("${LOKI_INVOKER}")
+    ;;
+  guest-cluster)
+    GUEST_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+    if [[ ! -s "${GUEST_KUBECONFIG}" ]]; then
+      echo "Guest cluster kubeconfig not found at ${GUEST_KUBECONFIG}" >&2
+      exit 1
+    fi
+    if apply_loki_manifests "${GUEST_KUBECONFIG}" "${LOKI_INVOKER}"; then
+      LOKI_INVOKERS+=("${LOKI_INVOKER}")
+      LOKI_APPLIED_GUESTS=$((LOKI_APPLIED_GUESTS + 1))
+    else
+      status=$?
+      handle_loki_apply_failure "${status}" "${GUEST_KUBECONFIG}" || exit "${status}"
+    fi
+    ;;
+  guest-cluster-multi)
+    CLUSTER_MANIFEST="${SHARED_DIR}/cluster-manifests.json"
+    if [[ ! -s "${CLUSTER_MANIFEST}" ]]; then
+      echo "Cluster manifest not found at ${CLUSTER_MANIFEST}" >&2
+      exit 1
+    fi
+    if ! jq -e '.clusters | type == "array" and length > 0' "${CLUSTER_MANIFEST}" >/dev/null; then
+      echo "Cluster manifest does not contain a non-empty clusters array: ${CLUSTER_MANIFEST}" >&2
+      exit 1
+    fi
+
+    guest_count=0
+    while IFS= read -r cluster_name; do
+      if [[ -z "${cluster_name}" ]]; then
+        echo "Cluster manifest contains an entry without a name" >&2
+        exit 1
+      fi
+
+      GUEST_KUBECONFIG="${SHARED_DIR}/${cluster_name}_kubeconfig"
+      if [[ ! -s "${GUEST_KUBECONFIG}" ]]; then
+        echo "Guest cluster kubeconfig not found at ${GUEST_KUBECONFIG}" >&2
+        exit 1
+      fi
+
+      LOKI_INVOKER="${LOKI_BASE_INVOKER}/${cluster_name}"
+      if apply_loki_manifests "${GUEST_KUBECONFIG}" "${LOKI_INVOKER}"; then
+        LOKI_INVOKERS+=("${LOKI_INVOKER}")
+        LOKI_APPLIED_GUESTS=$((LOKI_APPLIED_GUESTS + 1))
+      else
+        status=$?
+        handle_loki_apply_failure "${status}" "${GUEST_KUBECONFIG}" || exit "${status}"
+      fi
+      guest_count=$((guest_count + 1))
+    done < <(jq -r '.clusters[] | .name' "${CLUSTER_MANIFEST}")
+
+    if (( guest_count == 0 )); then
+      echo "No hosted clusters found in ${CLUSTER_MANIFEST}" >&2
+      exit 1
+    fi
+    ;;
+esac
+
+if [[ "${LOKI_INSTALL_MODE}" == "guest-cluster" || "${LOKI_INSTALL_MODE}" == "guest-cluster-multi" ]]; then
+  if (( LOKI_APPLIED_GUESTS > 0 )); then
+    echo "Loki manifests applied to ${LOKI_APPLIED_GUESTS} guest cluster(s); Promtail will start when eligible nodes become ready."
+  fi
+  if (( LOKI_SKIPPED_GUESTS > 0 )); then
+    echo "Skipped Loki installation for ${LOKI_SKIPPED_GUESTS} guest cluster(s) because their API was unreachable."
+  fi
+fi
+
+for invoker in "${LOKI_INVOKERS[@]}"; do
+  echo "Promtail configuration prepared for ${invoker}; the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${invoker}\"} | unpack' query. See https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8 for Loki cheat sheet."
+done
 
 if [[ -f "/usr/bin/python3" ]]; then
   # Try to prepopulate the loki time window to match the job (with some leeway), so the user is never staring at no logs when they're actually there.
@@ -773,9 +929,29 @@ if [[ -f "/usr/bin/python3" ]]; then
   # the runtime of just about any job. There's no risk over overloading the UI or seeing logs you don't want because we filter by invoker (this job).
   LOKI_EPOCH_MILLIS_FROM="$(date -d '-2 hours' +%s%N | cut -b1-13)"
   LOKI_EPOCH_MILLIS_TO="$(date -d '+8 hours' +%s%N | cut -b1-13)"
+  LOKI_CHEAT_SHEET_URL="https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8"
 
-  ENCODED_INVOKER="$(python3 -c "import urllib.parse; print(urllib.parse.quote('${OPENSHIFT_INSTALL_INVOKER}'))")"
-  cat >> ${SHARED_DIR}/custom-links.txt << EOF
-  <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%7B%22datasource%22:%22PCEB727DF2F34084E%22,%22queries%22:%5B%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%22,%22refId%22:%22A%22,%22editorMode%22:%22code%22,%22queryType%22:%22range%22%7D%5D,%22range%22:%7B%22from%22:%22${LOKI_EPOCH_MILLIS_FROM}%22,%22to%22:%22${LOKI_EPOCH_MILLIS_TO}%22%7D%7D" title="Loki is a log aggregation system for examining CI logs. This is most useful with upgrades, which do not contain pre-upgrade logs in the must-gather.">Loki</a>&nbsp;<a target="_blank" href="https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8" title="Cheat sheet for Loki search queries">Loki cheat sheet</a>
+  for invoker in "${LOKI_INVOKERS[@]}"; do
+    ENCODED_INVOKER="$(INVOKER="${invoker}" python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["INVOKER"]))')"
+    LOKI_LINK_LABEL="Loki"
+    case "${LOKI_INSTALL_MODE}" in
+      guest-cluster)
+        LOKI_LINK_LABEL="Loki hosted"
+        ;;
+      guest-cluster-multi)
+        LOKI_LINK_LABEL="Loki ${invoker##*/}"
+        ;;
+    esac
+    if [[ ! -f "${SHARED_DIR}/custom-links.txt" ]] || ! grep -Fq "${ENCODED_INVOKER}" "${SHARED_DIR}/custom-links.txt"; then
+      cat >> "${SHARED_DIR}/custom-links.txt" << EOF
+    <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%7B%22datasource%22:%22PCEB727DF2F34084E%22,%22queries%22:%5B%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%22,%22refId%22:%22A%22,%22editorMode%22:%22code%22,%22queryType%22:%22range%22%7D%5D,%22range%22:%7B%22from%22:%22${LOKI_EPOCH_MILLIS_FROM}%22,%22to%22:%22${LOKI_EPOCH_MILLIS_TO}%22%7D%7D" title="Loki is a log aggregation system for examining CI logs. This is most useful with upgrades, which do not contain pre-upgrade logs in the must-gather.">${LOKI_LINK_LABEL}</a>
 EOF
+    fi
+  done
+
+  if (( ${#LOKI_INVOKERS[@]} > 0 )) && { [[ ! -f "${SHARED_DIR}/custom-links.txt" ]] || ! grep -Fq "${LOKI_CHEAT_SHEET_URL}" "${SHARED_DIR}/custom-links.txt"; }; then
+    cat >> "${SHARED_DIR}/custom-links.txt" << EOF
+    <a target="_blank" href="${LOKI_CHEAT_SHEET_URL}" title="Cheat sheet for Loki search queries">Loki cheat sheet</a>
+EOF
+  fi
 fi
