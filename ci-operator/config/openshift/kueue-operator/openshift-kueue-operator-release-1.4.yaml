@@ -547,6 +547,7 @@ tests:
         EOF
 
         echo "Waiting for CatalogSource to be READY..."
+        STATE=""
         RETRIES=30
         for i in $(seq 1 $RETRIES); do
           STATE=$(oc get catalogsource qe-app-registry -n openshift-marketplace -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
@@ -557,6 +558,11 @@ tests:
           fi
           sleep 10
         done
+        if [[ "$STATE" != "READY" ]]; then
+          echo "ERROR: CatalogSource qe-app-registry never became READY"
+          oc get catalogsource -n openshift-marketplace -o yaml
+          exit 1
+        fi
 
         echo "Creating Kueue operator namespace and OperatorGroup..."
         oc create ns openshift-kueue-operator || true
@@ -587,6 +593,7 @@ tests:
         EOF
 
         echo "Waiting for Kueue CSV to succeed..."
+        PHASE=""
         RETRIES=60
         for i in $(seq 1 $RETRIES); do
           CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
@@ -676,6 +683,7 @@ tests:
         EOF
 
         echo "Waiting for Kueue CSV to succeed..."
+        PHASE=""
         RETRIES=60
         for i in $(seq 1 $RETRIES); do
           CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
@@ -763,6 +771,7 @@ tests:
         EOF
 
         echo "Waiting for Kueue CSV to succeed..."
+        PHASE=""
         RETRIES=60
         for i in $(seq 1 $RETRIES); do
           CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
