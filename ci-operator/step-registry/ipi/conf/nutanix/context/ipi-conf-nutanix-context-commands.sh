@@ -81,17 +81,67 @@ fi
 
 subnet_ip=$(echo "${subnets_json}" | jq ".entities[] | select(.spec.name==\"${subnet_name}\") | .spec.resources.ip_config.subnet_ip")
 
+api_vip_is_in_use() {
+  local candidate="${1:?API VIP candidate is required}"
+  local probe_state
+
+  # A stale cluster may present the wrong SAN; only connection-refused means free.
+  probe_state=$(python -c '
+import errno
+import socket
+import sys
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.settimeout(2)
+result = sock.connect_ex((sys.argv[1], 6443))
+sock.close()
+print("free" if result == errno.ECONNREFUSED else "occupied")
+' "${candidate}" 2>/dev/null) || return 0
+
+  [[ "${probe_state}" != "free" ]]
+}
+
 if [[ -z "${API_VIP}" ]]; then
   if [[ -z "${subnet_ip}" ]]; then
     echo "$(date -u --rfc-3399=seconds) - Cannot get VIP for API"
     exit 1
   fi
-  RANDOM_API_VIP_BLOCK=$(( RANDOM % 254 ))
-  API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -v random=${RANDOM_API_VIP_BLOCK} -F. '{printf "%d.%d.%d.%d", $1, $2, $3, random}')
 
-  if [[ ! -z  "${awk_ip_program}" ]]; then
+  if [[ -n "${awk_ip_program:-}" ]]; then
     API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="api" "${awk_ip_program}")
+    if api_vip_is_in_use "${API_VIP}"; then
+      echo "$(date -u --rfc-3339=seconds) - Profile-selected API VIP is occupied or could not be verified; refusing to reuse it"
+      exit 1
+    fi
+  else
+    for attempt in {1..10}; do
+      RANDOM_API_VIP_BLOCK=$(( RANDOM % 254 ))
+      candidate=$(echo "${subnet_ip}" | sed 's/"//g' | awk -v random=${RANDOM_API_VIP_BLOCK} -F. '{printf "%d.%d.%d.%d", $1, $2, $3, random}')
+
+      if api_vip_is_in_use "${candidate}"; then
+        echo "$(date -u --rfc-3339=seconds) - Random API VIP candidate is occupied or could not be verified; retry ${attempt}/10"
+        continue
+      fi
+
+      API_VIP="${candidate}"
+      break
+    done
+
+    if [[ -z "${API_VIP}" ]]; then
+      echo "$(date -u --rfc-3339=seconds) - No unused API VIP found after 10 candidates"
+      exit 1
+    fi
   fi
+else
+  if api_vip_is_in_use "${API_VIP}"; then
+    echo "$(date -u --rfc-3339=seconds) - Configured API VIP is occupied or could not be verified; refusing to reuse it"
+    exit 1
+  fi
+fi
+
+if [[ -z "${API_VIP}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Cannot determine VIP for API"
+  exit 1
 fi
 
 if [[ -z "${INGRESS_VIP}" ]]; then
