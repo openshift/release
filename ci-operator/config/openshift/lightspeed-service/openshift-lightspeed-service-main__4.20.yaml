@@ -106,50 +106,6 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: lseval-periodic-rhoai
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-      variant: gpu
-    owner: obs
-    product: ocp
-    timeout: 3h0m0s
-    version: "4.20"
-  cron: 10 8 * * 0
-  steps:
-    allow_skip_on_success: true
-    post:
-    - ref: gather-must-gather
-    test:
-    - as: e2e
-      cli: latest
-      commands: |
-        export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
-        export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/token)
-        export VLLM_API_KEY=$(cat /var/run/vllm/token)
-        export RHOAI_PROVISION=true
-
-        tests/scripts/test-lseval-periodic.sh
-      credentials:
-      - collection: openshift-lightspeed-service-creds
-        group: openai
-        mount_path: /var/run/openai
-      - collection: openshift-lightspeed-service-creds
-        group: huggingface
-        mount_path: /var/run/huggingface
-      - collection: openshift-lightspeed-service-creds
-        group: vllm-apikey
-        mount_path: /var/run/vllm
-      dependencies:
-      - env: OLS_IMAGE
-        name: lightspeed-service-api
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
