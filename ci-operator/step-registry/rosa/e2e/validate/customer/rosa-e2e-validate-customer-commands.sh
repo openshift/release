@@ -18,12 +18,19 @@ if [[ -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Customer plane validates from the guest cluster kubeconfig.
+# Customer plane validates from the guest cluster kubeconfig. Prefer the
+# provisioner-written kubeconfig (direct API), and fall back to the backplane
+# hosted-cluster kubeconfig (bp-kubeconfig) written by rosa-backplane-login, which
+# is the only one reachable for private-link clusters (ROSAENG-67580 contract).
 if [[ -s "${SHARED_DIR}/kubeconfig" ]]; then
   export KUBECONFIG="${SHARED_DIR}/kubeconfig"
   log "Using customer-plane kubeconfig at ${KUBECONFIG}"
+elif [[ -s "${SHARED_DIR}/bp-kubeconfig" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/bp-kubeconfig"
+  log "Direct kubeconfig absent; using backplane hosted-cluster kubeconfig at ${KUBECONFIG}"
 else
-  log "ERROR: ${SHARED_DIR}/kubeconfig not found; provisioner did not publish a guest kubeconfig"
+  log "ERROR: neither ${SHARED_DIR}/kubeconfig nor ${SHARED_DIR}/bp-kubeconfig found;"
+  log "       run the provisioner and rosa-backplane-login before this step"
   exit 1
 fi
 
