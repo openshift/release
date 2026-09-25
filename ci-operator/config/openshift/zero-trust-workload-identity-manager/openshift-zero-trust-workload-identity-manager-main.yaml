@@ -97,6 +97,46 @@ tests:
           cpu: 100m
     workflow: generic-claim
 - always_run: false
+  as: e2e-operator-tls
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.22"
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      ZTWIM_CLUSTER_NAME: test01
+      ZTWIM_OIDC_MANAGED_ROUTE: "false"
+      ZTWIM_WAIT_OPERANDS_AVAILABLE: "true"
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace zero-trust-workload-identity-manager
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n zero-trust-workload-identity-manager "$OO_BUNDLE" --verbose
+        oc wait --for=condition=Available -n zero-trust-workload-identity-manager deployment/zero-trust-workload-identity-manager-controller-manager --timeout=180s
+      dependencies:
+      - env: OO_BUNDLE
+        name: zero-trust-workload-identity-manager-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: ztwim-deploy-spire-operands
+    - as: test
+      cli: latest
+      commands: E2E_TIMEOUT=120m make test-e2e-tls
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h15m0s
+    workflow: generic-claim
+- always_run: false
   as: e2e-operator-fips
   optional: true
   steps:
