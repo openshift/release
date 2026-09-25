@@ -113,6 +113,11 @@ run_analysis() {
     # before assessing whether the remaining aggregate change is empty.
     git -C "${WORKTREE_DIR}" restore --source="${TARGET_SHA}" --staged --worktree -- "${PROTECTED_PATHS[@]}"
     log "RESTORE ${merge} protected paths from ${TARGET_SHA}"
+    if ! git -C "${WORKTREE_DIR}" diff --quiet "${TARGET_SHA}" -- "${PROTECTED_PATHS[@]}"; then
+      log "ERROR ${merge} protected paths differ from the pinned target after restoration"
+      exit 1
+    fi
+    log "VERIFY ${merge} protected paths match the pinned target"
     if git -C "${WORKTREE_DIR}" diff --cached --quiet && git -C "${WORKTREE_DIR}" diff --quiet; then
       skipped_count=$((skipped_count + 1))
       log "SKIP ${merge} empty after restoring protected paths"
@@ -144,6 +149,7 @@ run_self_test() {
   printf 'base\n' > "${repository}/conflict-file"
   printf 'target\n' > "${repository}/.tekton/config"
   printf 'target\n' > "${repository}/.konflux/config"
+  printf 'target\n' > "${repository}/.konflux/deleted"
   printf 'target\n' > "${repository}/Dockerfile.openshift"
   printf 'target\n' > "${repository}/Dockerfile.edge.openshift"
   printf 'target\n' > "${repository}/openshift/package"
@@ -169,6 +175,15 @@ run_self_test() {
   git -C "${repository}" switch release-5.1
   git -C "${repository}" merge --no-ff protected-only -m 'Merge protected-only'
 
+  git -C "${repository}" switch -c eligible-protected-additions
+  printf 'eligible protected additions\n' > "${repository}/application-two"
+  rm "${repository}/.konflux/deleted"
+  printf 'source-only\n' > "${repository}/.konflux/source-only"
+  git -C "${repository}" add -A
+  git -C "${repository}" commit -m eligible-protected-additions
+  git -C "${repository}" switch release-5.1
+  git -C "${repository}" merge --no-ff eligible-protected-additions -m 'Merge eligible protected additions'
+
   git -C "${repository}" switch release-5.0
   printf 'target conflict\n' > "${repository}/conflict-file"
   git -C "${repository}" add conflict-file
@@ -185,6 +200,7 @@ run_self_test() {
   env BACKPORT_ANALYSIS_TEST_MODE=false REPOSITORY_URL="${remote}" SOURCE_BRANCH=release-5.1 TARGET_BRANCH=release-5.0 ARTIFACT_DIR="${fixture}/artifacts" "$0"
   grep -q 'APPLY ' "${fixture}/artifacts/openperouter-backport-release-dry-run.txt"
   grep -q 'RESTORE ' "${fixture}/artifacts/openperouter-backport-release-dry-run.txt"
+  grep -q 'VERIFY ' "${fixture}/artifacts/openperouter-backport-release-dry-run.txt"
   grep -q 'protected-only' "${fixture}/artifacts/openperouter-backport-release-dry-run.txt"
   grep -q 'CONFLICT ' "${fixture}/artifacts/openperouter-backport-release-dry-run.txt"
   printf 'self-test passed\n'
