@@ -288,17 +288,43 @@ class SelectionTests(Fixture):
         self.assertEqual(runner.select_evals([literal], ["skills/a1/file"]), [])
         self.assertEqual(runner.select_evals([literal], ["skills/a[1]/file"]), [literal])
 
-    def test_periodic_and_manual_are_rejected_before_execution(self):
+    def test_periodic_and_manual_are_skipped_without_execution(self):
+        self.put("setup.sh", "exit 99\n")
         for mode in ("periodic", "manual"):
             with self.subTest(mode=mode):
-                entry = self.make_entry(f"evals/{mode}.yaml", run=mode)
+                entry = self.make_entry(f"evals/{mode}.yaml", run=mode, setup_script="setup.sh")
+                entry.pop("triggers")
                 self.write_manifest([entry])
                 result = self.run_step(PULL_BASE_SHA="")
-                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("run must be pr", result.stdout)
-                self.assertIn("run must be pr", self.index())
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(f"run: {mode} is not executed", result.stdout)
                 self.assertEqual(self.calls(), [])
-                self.assertEqual(self.junit().attrib["failures"], "1")
+                self.assertEqual(self.junit().attrib["tests"], "0")
+                summary = json.loads((self.artifacts / "evals-summary.json").read_text())
+                self.assertEqual(summary["status"], "no_evals")
+
+    def test_mixed_modes_only_execute_pr_eval(self):
+        self.put("setup.sh", "exit 99\n")
+        entries = [self.entry]
+        for mode in ("periodic", "manual"):
+            entry = self.make_entry(f"evals/{mode}.yaml", run=mode, setup_script="setup.sh")
+            entries.append(entry)
+        entries[1].pop("triggers")
+        self.write_manifest(entries)
+        self.change_skill()
+        result = self.run_step()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(len(self.claude_calls()), 1)
+        self.assertEqual(self.junit().attrib["tests"], "1")
+        for mode in ("periodic", "manual"):
+            self.assertIn(f"run: {mode} is not executed", result.stdout)
+
+    def test_pr_entries_still_require_triggers(self):
+        entry = dict(self.entry)
+        entry.pop("triggers")
+        self.write_manifest([entry])
+        self.assertNotEqual(self.run_step().returncode, 0)
+        self.assertEqual(self.calls(), [])
 
     def test_empty_manifest(self):
         self.write_manifest([])

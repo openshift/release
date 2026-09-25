@@ -4,7 +4,10 @@ import contextlib
 import json
 from unittest import mock
 
-import test_manifest_runner as support
+try:
+    from . import test_manifest_runner as support
+except ImportError:
+    import test_manifest_runner as support
 
 runner = support.runner
 

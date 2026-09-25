@@ -201,8 +201,8 @@ def load_manifest(repo):
         if PurePosixPath(config).suffix not in (".yaml", ".yml") or config in seen:
             raise EvalError(f"{label}.config must be a unique YAML config path")
         seen.add(config)
-        if entry["run"] != "pr":
-            raise EvalError(f"{label}.run must be pr; periodic/manual evals are not supported")
+        if entry["run"] not in ("pr", "periodic", "manual"):
+            raise EvalError(f"{label}.run must be pr, periodic, or manual")
         for field in ("parallelism", "max_turns"):
             if (not isinstance(entry[field], int) or isinstance(entry[field], bool)
                     or entry[field] <= 0):
@@ -214,8 +214,8 @@ def load_manifest(repo):
         if "eval_cases_dir" in entry:
             repo_directory(repo, cases_dir, f"{label}.eval_cases_dir")
         triggers = entry.get("triggers", [])
-        if not isinstance(triggers, list) or not triggers:
-            raise EvalError(f"{label}.triggers must be a nonempty list")
+        if not isinstance(triggers, list) or (entry["run"] == "pr" and not triggers):
+            raise EvalError(f"{label}.triggers must be a list, nonempty for run: pr")
         for trigger in triggers:
             relative_path(trigger, f"{label}.triggers")
         entries.append(Eval(config, entry["run"], entry["parallelism"],
@@ -226,6 +226,9 @@ def load_manifest(repo):
 def select_evals(entries, files):
     selected = []
     for entry in entries:
+        if entry.run != "pr":
+            print(f"SKIP {entry.config}: run: {entry.run} is not executed in PR mode", flush=True)
+            continue
         match = next((path for path in files if path.startswith(entry.triggers)), None)
         if match is None:
             print(f"SKIP {entry.config}: no changed file matches triggers {entry.triggers}", flush=True)
@@ -629,7 +632,7 @@ def manifest_plans(repo, env):
     if env.get("JOB_TYPE", "presubmit") != "presubmit":
         raise EvalError("manifest mode currently supports PR runs only (periodic/manual are follow-on work)")
     entries = load_manifest(repo)
-    files = changed_files(repo, env.get("PULL_BASE_SHA", "")) if entries else []
+    files = changed_files(repo, env.get("PULL_BASE_SHA", "")) if any(e.run == "pr" for e in entries) else []
     plans = []
     for entry in select_evals(entries, files):
         config, model = read_eval(repo, entry)

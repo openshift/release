@@ -30,8 +30,11 @@ evals:
 
 `config`, `run`, `parallelism`, and `max_turns` are required; the latter two
 are positive integers. `setup_script` and `eval_cases_dir` are optional.
-`run` must be `pr`; `periodic` and `manual` entries are rejected before execution.
-`triggers` is a nonempty list of literal path prefixes. `evals: []` is valid.
+`run` accepts `pr`, `periodic`, or `manual`. This workflow executes only `pr`
+entries; other recognized modes are logged and skipped, without setup or model
+calls. A manifest containing only non-PR entries is a successful no-op.
+`triggers` is a nonempty list of literal path prefixes for `run: pr`; it is
+optional for other modes. Unknown modes are invalid. `evals: []` is valid.
 Unknown fields, duplicate YAML keys/configs, invalid types, missing paths,
 and paths escaping the repository fail before any model calls.
 
@@ -47,6 +50,9 @@ or failed diff is an error. No match exits 0 with a zero-test JUnit file,
 without setup, harness installation, or Claude calls.
 
 ### Changed-case selection
+
+`eval_cases_dir` is optional. Omit it to run the complete dataset whenever an
+eval is selected; providing it enables the case selection behavior below.
 
 After triggers select an eval, `eval_cases_dir` allows case-only changes to
 select exact case IDs via `--cases`. IDs are sorted, deduplicated names of
