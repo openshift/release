@@ -311,7 +311,6 @@ verify_push_target() {
     local expected_ref="refs/heads/${PR_HEAD_BRANCH}"
     local local_ref
     local -a fork_push_urls
-    local -a fork_urls
 
     if [[ ! "${FORK_REPO}" =~ ^[^/]+/[^/]+$ ]] || \
        [[ "${PR_HEAD_OWNER}/${PR_HEAD_REPO}" != "${FORK_REPO}" ]]; then
@@ -322,11 +321,11 @@ verify_push_target() {
         echo "ERROR: PR head branch does not match the checked-out local branch"
         return 1
     fi
-    mapfile -t fork_urls < <(git config --get-all remote.fork.url || true)
-    mapfile -t fork_push_urls < <(git config --get-all remote.fork.pushurl || true)
-    if [[ "${#fork_urls[@]}" -ne 1 ]] || \
-       [[ "${fork_urls[0]}" != "https://github.com/${FORK_REPO}.git" ]] || \
-       [[ "${#fork_push_urls[@]}" -ne 0 ]]; then
+    # get-url applies pushurl and url.* rewrite rules, so compare the effective
+    # destination rather than trusting the remote's configured fetch URL.
+    mapfile -t fork_push_urls < <(git remote get-url --push --all fork 2>/dev/null || true)
+    if [[ "${#fork_push_urls[@]}" -ne 1 ]] || \
+       [[ "${fork_push_urls[0]}" != "https://github.com/${FORK_REPO}.git" ]]; then
         echo "ERROR: fork remote does not match the configured fork"
         return 1
     fi
