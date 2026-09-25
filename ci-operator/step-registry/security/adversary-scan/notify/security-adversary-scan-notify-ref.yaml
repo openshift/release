@@ -1,0 +1,34 @@
+ref:
+  as: security-adversary-scan-notify
+  best_effort: true
+  from: cli
+  commands: security-adversary-scan-notify-commands.sh
+  env:
+  - name: SLACK_WEBHOOK_PATH
+    default: "/var/run/slack-webhook/url"
+    documentation: "Path to the file containing the Slack incoming webhook URL."
+  - name: ADVERSARY_TEST_NAME
+    default: "weekly-adversary-scan"
+    documentation: |-
+      The ci-operator test name (the `as:` value in the test's config)
+      this notify step is attached to as a post step. Used to build the
+      GCS artifact link. Override this if the periodic test that runs
+      the scan + notify pair is named differently in your repo's config.
+  credentials:
+  - namespace: test-credentials
+    name: adversary-scan-slack-webhook
+    mount_path: /var/run/slack-webhook
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 5m0s
+  documentation: |-
+    Posts adversary scan results to Slack. Reads the findings summary
+    written by security-adversary-scan to SHARED_DIR and sends a
+    traffic-light notification:
+      Red    — CRITICAL or HIGH findings present.
+      Yellow — only MEDIUM or LOW findings.
+      Green  — no findings.
+    Skips sending if no webhook is configured or the scan did not complete.
+    Runs as a post step so it executes even if the scan step fails.
