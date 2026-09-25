@@ -2,20 +2,19 @@
 #
 # Create a KubeVirt HostedCluster on the IBM Z OZ libvirt management cluster.
 #
-# RCA notes (PR #84152 / #85270 rehearsals):
-# - HostedCluster/NodePool can be healthy while CI cannot reach the guest API.
-# - CI reaches guest API via LPAR_HOST_IP:NodePort (default 10.0.1.15:<np>) over
-#   VPN. That path is flaky (empty /readyz / TLS handshake timeout) on both
-#   oz-3-2 and oz-3-3 leases. MetalLB VIP / node InternalIP are L2-only and
-#   usually unreachable from the build-farm pod — still probed for RCA.
-# - Prefer LPAR:NodePort first (only historically CI-reachable path), then
-#   nodeIP:NodePort, then MetalLB VIP / hcp original.
-# - Port-forward to svc/kube-apiserver on mgmt proves CP health independently
-#   of VPN/LPAR forwarding.
-# - Downstream steps run on a *new* CI pod + VPN; create success does not
-#   guarantee the next step can TLS to the same LPAR URL (see ibmz-test chain).
-# - Omit --base-domain so HyperShift enables baseDomainPassthrough for *.apps;
-#   custom base-domain + manual test-apps LB caused ingress-canary timeouts.
+# Stability model (learned from other-arch HCP jobs + OZ rehearsals):
+# - AWS/Azure/Agent/Power expose guest API via DNS hostname (LB or Route).
+# - KubeVirt defaults to MetalLB LoadBalancer without --external-dns-domain;
+#   that VIP is L2-only on OZ and not CI-routable (same class as BM without
+#   squid proxy-url).
+# - KubeVirt supports APIServer=Route (hostname required). CI already reaches
+#   management *.apps over VPN (hcp-cli-download, mgmt API). Publishing the
+#   guest API on that same ingress path is the durable CI endpoint.
+# - LPAR:NodePort remains a fallback (flaky across CI pods/VPN); MetalLB VIP /
+#   nodeIP are RCA-only.
+# - Downstream steps get a new CI pod + VPN; a hostname on mgmt ingress is far
+#   more stable across steps than 10.0.1.15:NodePort.
+# - Omit --base-domain so HyperShift enables baseDomainPassthrough for *.apps.
 #
 set -x
 set -e
@@ -106,9 +105,29 @@ echo "${HC_NAME}" > "${SHARED_DIR}/cluster-name"
 echo -n "${HC_NS}" > "${SHARED_DIR}/cluster-namespace"
 echo "$(date) Wrote ${SHARED_DIR}/cluster-name and ${SHARED_DIR}/cluster-namespace"
 
-# Omit --base-domain so HyperShift enables baseDomainPassthrough and creates the
-# management-cluster wildcard Route/Service/EndpointSlice for guest *.apps ingress.
-echo "$(date) Creating KubeVirt HostedCluster (baseDomainPassthrough; no --base-domain)"
+# Management *.apps domain is already CI-reachable over VPN (same path as hcp CLI
+# download). Publish guest APIServer via Route on that domain — matches how other
+# platforms give CI a DNS hostname instead of a private VIP/NodePort.
+# See https://hypershift.pages.dev/reference/service-publishing-strategies/ (KubeVirt).
+APPS_DOMAIN=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>/dev/null || true)
+if [[ -z "${APPS_DOMAIN}" ]]; then
+  echo "$(date) ERROR: could not read ingresses.config.openshift.io/cluster .spec.domain"
+  oc get ingresses.config.openshift.io cluster -o yaml || true
+  exit 1
+fi
+API_ROUTE_HOSTNAME="api-${HC_NAME}.${APPS_DOMAIN}"
+echo "$(date) Management apps domain: ${APPS_DOMAIN}"
+echo "$(date) Guest API Route hostname: ${API_ROUTE_HOSTNAME}"
+
+echo "$(date) Installing yq (render/patch HostedCluster services like Power/Agent HCP creates)"
+mkdir -p /tmp/bin /tmp/hc-manifests
+curl -fsSL -o /tmp/bin/yq https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64
+chmod +x /tmp/bin/yq
+export PATH="/tmp/bin:${PATH}"
+
+# Omit --base-domain so HyperShift enables baseDomainPassthrough for guest *.apps.
+# Render + patch APIServer→Route before apply (publishing strategy is immutable).
+echo "$(date) Rendering KubeVirt HostedCluster (baseDomainPassthrough; APIServer=Route)"
 hcp create cluster kubevirt \
   --name "${HC_NAME}" \
   --node-pool-replicas 2 \
@@ -126,12 +145,36 @@ hcp create cluster kubevirt \
   --annotations "resource-request-override.hypershift.openshift.io/konnectivity-agent.konnectivity-agent=memory=512Mi,cpu=500m" \
   --annotations "resource-request-override.hypershift.openshift.io/oauth-openshift.oauth-openshift=memory=256Mi,cpu=300m" \
   --annotations "resource-request-override.hypershift.openshift.io/ingress-operator.ingress-operator=memory=256Mi,cpu=300m" \
-  --annotations "resource-request-override.hypershift.openshift.io/openshift-apiserver.openshift-apiserver=memory=512Mi,cpu=300m"
+  --annotations "resource-request-override.hypershift.openshift.io/openshift-apiserver.openshift-apiserver=memory=512Mi,cpu=300m" \
+  --render --render-sensitive > /tmp/hcpvirt-oz-render.yaml
+
+echo "$(date) Splitting render and patching APIServer → Route/${API_ROUTE_HOSTNAME}"
+# Power/Agent pattern: csplit multi-doc render, patch HostedCluster services, apply.
+csplit -s -f /tmp/hc-manifests/manifest_ -b '%02d.yaml' /tmp/hcpvirt-oz-render.yaml '/^---$/' '{*}' || true
+shopt -s nullglob
+for file in /tmp/hc-manifests/manifest_*.yaml; do
+  if grep -q 'kind: HostedCluster' "${file}"; then
+    yq eval -i \
+      "(.spec.services[] | select(.service == \"APIServer\") | .servicePublishingStrategy) = {\"type\": \"Route\", \"route\": {\"hostname\": \"${API_ROUTE_HOSTNAME}\"}}" \
+      "${file}"
+    echo "$(date) Patched ${file} services:"
+    yq eval '.spec.services' "${file}" || true
+  fi
+done
+
+echo "$(date) Applying rendered manifests"
+for file in /tmp/hc-manifests/manifest_*.yaml; do
+  [[ -s "${file}" ]] || continue
+  oc apply -f "${file}"
+done
+shopt -u nullglob
 
 echo "$(date) Waiting up to 45m for HostedCluster/${HC_NAME} Available"
 oc wait --timeout=45m --for=condition=Available --namespace="${HC_NS}" "hostedclusters.hypershift.openshift.io/${HC_NAME}"
 echo "$(date) HostedCluster is Available"
-oc get hc -n "${HC_NS}" "${HC_NAME}" -o yaml | grep -E 'type:|status:|reason:|message:' | head -80 || true
+oc get hc -n "${HC_NS}" "${HC_NAME}" -o yaml | grep -E 'type:|status:|reason:|message:|controlPlaneEndpoint|hostname' | head -100 || true
+echo "$(date) API-related Routes/Services in control-plane namespace ${HC_NS}-${HC_NAME}:"
+oc get route,svc -n "${HC_NS}-${HC_NAME}" -o wide || true
 
 # --- Step 2: Retrieve the guest cluster kubeconfig ---
 echo "$(date) Retrieving guest cluster kubeconfig via hcp create kubeconfig"
@@ -165,17 +208,24 @@ oc --kubeconfig "${VIRT_KC}" config view || true
 
 patch_guest_server() {
   local server="$1"
-  # Prefer tls-server-name (original Route/API hostname) over blanket insecure skip.
-  # Fall back to insecure-skip when the original server had no usable hostname
-  # (e.g. already an IP) — IP endpoints never match the apiserver cert SAN.
-  if [[ -n "${ORIG_TLS_SERVER_NAME}" && "${ORIG_TLS_SERVER_NAME}" != "${ORIG_SERVER}" && "${ORIG_TLS_SERVER_NAME}" =~ [a-zA-Z] ]]; then
+  local host
+  host=$(printf '%s' "${server}" | sed -E 's#^https://([^:/]+).*#\1#')
+  # Prefer SNI matching the endpoint hostname (Route cert SAN). Fall back to the
+  # original kubeconfig hostname, then insecure-skip for bare IPs (LPAR/VIP).
+  if [[ -n "${host}" && "${host}" =~ [a-zA-Z] ]]; then
+    echo "$(date) Patching guest server → ${server} (tls-server-name=${host})"
+    oc --kubeconfig "${VIRT_KC}" config set-cluster "${CLSTR_NAME}" \
+      --server="${server}" \
+      --tls-server-name="${host}" \
+      --insecure-skip-tls-verify=false
+  elif [[ -n "${ORIG_TLS_SERVER_NAME}" && "${ORIG_TLS_SERVER_NAME}" =~ [a-zA-Z] ]]; then
     echo "$(date) Patching guest server → ${server} (tls-server-name=${ORIG_TLS_SERVER_NAME})"
     oc --kubeconfig "${VIRT_KC}" config set-cluster "${CLSTR_NAME}" \
       --server="${server}" \
       --tls-server-name="${ORIG_TLS_SERVER_NAME}" \
       --insecure-skip-tls-verify=false
   else
-    echo "$(date) Patching guest server → ${server} (insecure-skip-tls-verify; no usable ORIG hostname)"
+    echo "$(date) Patching guest server → ${server} (insecure-skip-tls-verify; IP-only endpoint)"
     oc --kubeconfig "${VIRT_KC}" config set-cluster "${CLSTR_NAME}" \
       --server="${server}" \
       --insecure-skip-tls-verify=true
@@ -184,20 +234,16 @@ patch_guest_server() {
 
 # --- Discover reachable guest API endpoints ---
 #
-# Topology note (OZ libvirt + CI pod on build farm):
-# - hcp create kubeconfig often returns the MetalLB VIP (e.g. 192.168.3.53:6443).
-# - That VIP and node InternalIPs are L2 on the libvirt bridge — usually NOT
-#   routed to the Prow CI pod. Probing them from CI burns connect-timeouts.
-# - The path CI historically reaches is LPAR_HOST_IP:NodePort (VPN/port-forward),
-#   which is flaky but is the endpoint nested_kubeconfig must use for later steps.
-# - Prefer LPAR:NodePort first for CI reachability; still try VIP/nodeIP in case
-#   the job network can reach them; dedupe identical URLs.
+# Preference (CI-stable first), learned from other-arch HCP + OZ rehearsals:
+# 1) Management ingress Route hostname — same *.apps path CI already uses
+# 2) LPAR:NodePort — historical VPN path (flaky across pods)
+# 3) nodeIP:NodePort / MetalLB VIP — on-bridge only; RCA
 #
 LPAR_HOST_IP="${LPAR_HOST_IP:-10.0.1.15}"
-echo "$(date) Discovering kube-apiserver endpoints (LPAR=${LPAR_HOST_IP})"
-echo "$(date) Preference order (CI-reachable first): LPAR:NodePort → nodeIP:NodePort → MetalLB VIP → hcp original"
+echo "$(date) Discovering kube-apiserver endpoints (LPAR=${LPAR_HOST_IP} route=${API_ROUTE_HOSTNAME})"
+echo "$(date) Preference order: mgmt Route → LPAR:NodePort → nodeIP:NodePort → MetalLB VIP → hcp original"
 
-echo "$(date) Restarting MetalLB speaker daemonset once to refresh VIP ARP announcements"
+echo "$(date) Restarting MetalLB speaker daemonset once (guest ingress / residual LB services)"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 oc get pods -n metallb-system -o wide 2>/dev/null || true
 oc rollout restart daemonset speaker -n metallb-system || true
@@ -273,12 +319,15 @@ add_candidate() {
 }
 
 # Build / refresh candidate list each poll.
-# Order: CI-reachable paths first (LPAR NodePort), then on-bridge addresses.
+# Order: mgmt Route (CI-stable) → LPAR NodePort → on-bridge addresses (RCA).
 build_api_candidates() {
   local nodeport=""
   local lb_ip=""
   local node_ip=""
   local svc_type=""
+  local cp_host=""
+  local cp_port=""
+  local route_host=""
 
   nodeport=$(oc get svc kube-apiserver -n "${HCP_NS}" \
     -o jsonpath="{.spec.ports[?(@.port==6443)].nodePort}" 2>/dev/null || true)
@@ -286,24 +335,39 @@ build_api_candidates() {
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
   svc_type=$(oc get svc kube-apiserver -n "${HCP_NS}" -o jsonpath='{.spec.type}' 2>/dev/null || true)
   node_ip=$(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
+  cp_host=$(oc get hc -n "${HC_NS}" "${HC_NAME}" -o jsonpath='{.status.controlPlaneEndpoint.host}' 2>/dev/null || true)
+  cp_port=$(oc get hc -n "${HC_NS}" "${HC_NAME}" -o jsonpath='{.status.controlPlaneEndpoint.port}' 2>/dev/null || true)
+  # kube-apiserver Route host (passthrough on mgmt ingress) — primary CI path.
+  route_host=$(oc get route -n "${HCP_NS}" -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.host}{"\n"}{end}' 2>/dev/null \
+    | awk '/kube-apiserver|kas/ {print $2; exit}')
+  if [[ -z "${route_host}" ]]; then
+    route_host="${API_ROUTE_HOSTNAME}"
+  fi
 
   API_CANDIDATES=()
-  # 1) LPAR:NodePort — path the CI pod can use via VPN (Shweta rehearsals)
+  # 1) Management ingress Route — same *.apps path CI already uses successfully
+  if [[ -n "${route_host}" ]]; then
+    add_candidate "https://${route_host}"
+  fi
+  if [[ -n "${cp_host}" && "${cp_host}" =~ [a-zA-Z] ]]; then
+    add_candidate "https://${cp_host}:${cp_port:-443}"
+  fi
+  # 2) LPAR:NodePort — historical VPN path (flaky across CI pods)
   if [[ -n "${LPAR_HOST_IP}" && -n "${nodeport}" ]]; then
     add_candidate "https://${LPAR_HOST_IP}:${nodeport}"
   fi
-  # 2) mgmt node InternalIP:NodePort — sometimes reachable on same VPN segment
+  # 3) mgmt node InternalIP:NodePort — on-bridge / RCA
   if [[ -n "${node_ip}" && -n "${nodeport}" ]]; then
     add_candidate "https://${node_ip}:${nodeport}"
   fi
-  # 3) MetalLB VIP — works on-bridge; often NOT routed to CI (still try)
+  # 4) MetalLB VIP — on-bridge only; RCA
   if [[ -n "${lb_ip}" ]]; then
     add_candidate "https://${lb_ip}:6443"
   fi
-  # 4) Original hcp kubeconfig server (often equals VIP — deduped)
+  # 5) Original hcp kubeconfig server (often VIP — deduped)
   add_candidate "${ORIG_SERVER}"
 
-  echo "$(date) Candidates type=${svc_type:-?} nodePort=${nodeport:-none} lb=${lb_ip:-none} nodeIP=${node_ip:-none} lpar=${LPAR_HOST_IP}"
+  echo "$(date) Candidates type=${svc_type:-?} nodePort=${nodeport:-none} lb=${lb_ip:-none} nodeIP=${node_ip:-none} lpar=${LPAR_HOST_IP} route=${route_host:-none} cp=${cp_host:-none}:${cp_port:-}"
   local i=0
   for c in "${API_CANDIDATES[@]:-}"; do
     echo "$(date)   [$i] ${c}"
@@ -311,9 +375,10 @@ build_api_candidates() {
   done
 
   # Once per ~2 minutes, probe guest API via port-forward for RCA
-  # (distinguishes "VIP not routed to CI" from "guest apiserver down").
-  if [[ -n "${nodeport}" && $((${API_ELAPSED:-0} % 120)) -eq 0 ]]; then
+  # (distinguishes "external path down" from "guest apiserver down").
+  if [[ $((${API_ELAPSED:-0} % 120)) -eq 0 ]]; then
     probe_readyz_via_portforward "${HCP_NS}" || true
+    oc get route -n "${HCP_NS}" -o wide 2>/dev/null || true
   fi
 }
 

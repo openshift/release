@@ -7,16 +7,18 @@ chain:
         set -euo pipefail
         set -x
 
-        # Guest-facing step on a NEW CI pod + VPN vs create. Rehearsals show create
-        # can reach 10.0.1.15:NodePort while this step immediately gets TLS handshake
-        # timeouts on the same URL. Do not treat failed oc as "operators ready"
-        # (empty awk|wc -l == 0 was a confirmed false positive on PR #84152).
+        # Guest-facing step on a NEW CI pod + VPN vs create. Prefer the mgmt
+        # ingress Route hostname written into nested_kubeconfig (same *.apps path
+        # CI uses for mgmt). LPAR:NodePort remains flaky across pods (#84152 RCA).
+        # Do not treat failed oc as "operators ready" (empty awk|wc was a false
+        # positive on PR #84152).
 
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 
         echo "$(date) ===== guest API path diagnostics (post-VPN) ====="
         echo "$(date) hostname=$(hostname -f 2>/dev/null || hostname)"
-        echo "$(date) nested server=$(oc --kubeconfig="${KUBECONFIG}" config view -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo unknown)"
+        GUEST_SERVER=$(oc --kubeconfig="${KUBECONFIG}" config view -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo unknown)
+        echo "$(date) nested server=${GUEST_SERVER}"
         if [[ -f "${SHARED_DIR}/guest-api-server" ]]; then
           echo "$(date) SHARED_DIR/guest-api-server=$(cat "${SHARED_DIR}/guest-api-server")"
         fi
@@ -34,9 +36,15 @@ chain:
           done
           [[ -e /tmp/vpn/up ]] && echo "$(date) VPN marker appeared" || echo "$(date) WARNING: VPN marker still missing"
         fi
+        # Route hostnames use mgmt *.apps; LPAR IP is fallback-only.
         ip route get 10.0.1.15 2>/dev/null || true
+        if [[ "${GUEST_SERVER}" == https://* ]]; then
+          GUEST_HOST=$(printf '%s' "${GUEST_SERVER}" | sed -E 's#^https://([^:/]+).*#\1#')
+          echo "$(date) ip route get ${GUEST_HOST}:"
+          ip route get "${GUEST_HOST}" 2>/dev/null || true
+          getent hosts "${GUEST_HOST}" 2>/dev/null || true
+        fi
         ip link show 2>/dev/null | head -40 || true
-        # MTU on default / tunnel interfaces helps RCA MTU vs routing hypotheses.
         ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | while read -r ifc; do
           [[ -z "${ifc}" || "${ifc}" == *"@"* ]] && continue
           echo "$(date) MTU $(ip -o link show "${ifc}" 2>/dev/null | head -1 || true)"
