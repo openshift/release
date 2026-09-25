@@ -92,6 +92,11 @@ oc process --local --ignore-unknown-parameters=true -f "${FIXED_TEMPLATE}" \
     -p OBSERVATORIUM_URL=https://observatorium.example.com \
     -o yaml > "${PROCESSED}"
 
+# Diagnostics: verify pre-elevate cluster context
+log "Diagnostic: pre-elevate KUBECONFIG=${KUBECONFIG}"
+log "Diagnostic: pre-elevate server=$(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo 'unknown')"
+log "Diagnostic: pre-elevate whoami=$(oc whoami 2>&1 || echo 'failed')"
+
 # Dump elevated kubeconfig (proven operator-e2e pattern)
 log "Dumping elevated backplane kubeconfig..."
 ELEVATED_KUBECONFIG="$(mktemp /tmp/elevated-kubeconfig.XXXXXX)"
@@ -109,6 +114,14 @@ if ! grep -q 'backplane-cluster-admin' "${ELEVATED_KUBECONFIG}"; then
 fi
 
 export KUBECONFIG="${ELEVATED_KUBECONFIG}"
+
+# Diagnostics: verify target cluster and CRD availability
+log "Diagnostic: KUBECONFIG=${KUBECONFIG}"
+log "Diagnostic: server=$(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo 'unknown')"
+log "Diagnostic: user=$(oc whoami 2>&1 || echo 'whoami failed')"
+log "Diagnostic: show-server=$(oc whoami --show-server 2>&1 || echo 'show-server failed')"
+log "Diagnostic: api-resources (hive)=$(oc api-resources 2>/dev/null | grep -i hive || echo 'no hive CRDs found')"
+log "Diagnostic: raw /apis check=$(oc get --raw /apis 2>&1 | grep -o 'hive.openshift.io' || echo 'hive.openshift.io not in /apis')"
 
 log "Server-side dry-run apply of processed SelectorSyncSets"
 oc apply --dry-run=server -f "${PROCESSED}"
