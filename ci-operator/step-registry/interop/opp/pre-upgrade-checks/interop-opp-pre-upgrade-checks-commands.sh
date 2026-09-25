@@ -10,8 +10,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  # Save xtrace log with credentials scrubbed when the step exits non-zero.
-  _exit_code="${1:-$?}"
+  _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -27,98 +26,39 @@ _opp_cleanup() {
   fi
 }
 
-# --- JUnit from cluster-state checks ---
-# Accumulators for JUnit generation
-typeset -a tcNamesArr=()
-typeset -a tcResultsArr=()    # "pass" or "fail"
-typeset -a tcMessagesArr=()   # failure message (empty when pass)
-
-AddResult() {
-    # Append a test-case name, result, and optional message to the JUnit accumulators.
-    typeset name="${1:-}"; (($#)) && shift
-    typeset result="${1:-}"; (($#)) && shift
-    typeset message="${1:-}"; (($#)) && shift
-    tcNamesArr+=("${name}")
-    tcResultsArr+=("${result}")
-    tcMessagesArr+=("${message}")
-    true
-}
-
-# XmlEscape: Required for bash 5.x where patsub_replacement is enabled
-# by default, changing how ${var//pattern/replacement} handles & and \ in
-# the replacement string. Without escaping, JUnit XML output is malformed.
-XmlEscape() {
-    # Escape XML special characters for safe embedding in JUnit output.
-    typeset text="${1:-}"; (($#)) && shift
-    if shopt -q patsub_replacement 2>/dev/null; then
-        shopt -u patsub_replacement
-        local _restore_patsub=true
-    fi
-    text="${text//&/&amp;}"
-    text="${text//</&lt;}"
-    text="${text//>/&gt;}"
-    text="${text//\"/&quot;}"
-    text="${text//\'/&apos;}"
-    [[ "${_restore_patsub:-}" == true ]] && shopt -s patsub_replacement
-    printf '%s' "${text}"
-}
-
-WriteJunit() {
-    # Write accumulated test-case results to the JUnit XML file.
-    typeset -i total=${#tcNamesArr[@]}
-    typeset -i failCount=0
-    typeset -i skipCount=0
-    for r in "${tcResultsArr[@]}"; do
-        if [[ "${r}" == "fail" ]]; then
-            (( failCount++ )) || true
-        elif [[ "${r}" == "skip" ]]; then
-            (( skipCount++ )) || true
-        fi
-    done
-
-    {
-        echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"opp-pre-upgrade-checks\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
-        for i in "${!tcNamesArr[@]}"; do
-            typeset name=""
-            name="$(XmlEscape "${tcNamesArr[$i]}")"
-            echo "  <testcase classname=\"opp-pre-upgrade-checks\" name=\"${name}\">"
-            if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
-                typeset msg=""
-                msg="$(XmlEscape "${tcMessagesArr[$i]}")"
-                echo "    <failure message=\"${msg}\"></failure>"
-            elif [[ "${tcResultsArr[$i]}" == "skip" ]]; then
-                typeset msg=""
-                msg="$(XmlEscape "${tcMessagesArr[$i]}")"
-                echo "    <skipped message=\"${msg}\"/>"
-            fi
-            echo "  </testcase>"
-        done
-        echo "</testsuite>"
-    } > "${junitFile}"
-    : "JUnit XML written to ${junitFile}"
-}
-
-# shellcheck disable=SC2317  # invoked via trap
-CollectExitArtifacts() {
-    # Dump cluster state to artifacts on exit for post-mortem analysis.
-    : "Collecting exit diagnostics..."
-    oc get clusterversion version -o yaml > "${ARTIFACT_DIR}/pre-upgrade-clusterversion.yaml" || true
-    oc get clusteroperators -o yaml > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.yaml" || true
-    oc get csv -A -o yaml > "${ARTIFACT_DIR}/pre-upgrade-csvs.yaml" || true
-}
-
-# shellcheck disable=SC2317
-_propagate_junit () {
-    local _step_prefix
-    _step_prefix="$(basename "${BASH_SOURCE[1]:-$0}" .sh | sed 's/-commands$//')"
-    find "${ARTIFACT_DIR}" -name '*.xml' -print0 2>/dev/null | while IFS= read -r -d '' _xf; do
-        cp "${_xf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_xf}")" 2>/dev/null || true
-    done
-}
-
+# --- JUnit XML wrapper: emit result for skip-ratio-gate ---
+_junit_start=$(date +%s)
+_junit_emitted=0
 _jrc=0
-trap '_jrc=$?; set +e; WriteJunit || true; _opp_cleanup "${_jrc}"; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
+_junit_emit() {
+  (( _junit_emitted )) && return 0
+  _junit_emitted=1
+  local _jr=${1:-0}
+  local _je
+  _je=$(date +%s) || _je=${_junit_start}
+  local _jd=$((_je - _junit_start))
+  local _jn="pre-upgrade"
+  local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
+  local _fc=0 _fx=""
+  if (( _jr != 0 )); then
+    _fc=1
+    _fx="<failure message=\"${_jn} exited with code ${_jr}\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
+  fi
+  cat > "${_jf}" <<JUNITEOF || true
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="${_fc}" errors="0" skipped="0" time="${_jd}">
+  <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
+    ${_fx}
+  </testcase>
+</testsuite>
+JUNITEOF
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; exit ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -130,10 +70,11 @@ fi
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
-typeset junitFile="${ARTIFACT_DIR}/junit_opp_pre_upgrade_checks.xml"
 
 echo ">>> PHASE: Pre-Upgrade Checks"
 : "Start time: $(date '+%F %T')"
+
+typeset -i checksFailed=0
 
 # --- Record current cluster state ---
 echo ">>> PHASE: Cluster State Snapshot"
@@ -143,33 +84,24 @@ clusterVersion=$(oc get clusterversion version -o jsonpath='{.status.desired.ver
 
 # --- Verify MCP stability ---
 echo ">>> PHASE: MachineConfigPool Stability"
-typeset mcpFailMsg=""
 typeset updatingMCPs=""
 updatingMCPs=$(oc get machineconfigpools -o json | jq -r \
     '[.items[] | select(.status.conditions[]? | select(.type=="Updating" and .status=="True")) | .metadata.name] | join(",")') || true
 if [[ -n "${updatingMCPs}" ]]; then
-    mcpFailMsg="MCPs still updating: ${updatingMCPs}"
-    : "FAIL: ${mcpFailMsg}"
+    echo "ERROR: MCPs still updating: ${updatingMCPs}"
+    (( checksFailed += 1 ))
 fi
 
 typeset degradedMCPs=""
 degradedMCPs=$(oc get machineconfigpools -o json | jq -r \
     '[.items[] | select(.status.conditions[]? | select(.type=="Degraded" and .status=="True")) | .metadata.name] | join(",")') || true
 if [[ -n "${degradedMCPs}" ]]; then
-    typeset degradeMsg="Degraded MCPs: ${degradedMCPs}"
-    : "FAIL: ${degradeMsg}"
-    if [[ -n "${mcpFailMsg}" ]]; then mcpFailMsg="${mcpFailMsg}; ${degradeMsg}"; else mcpFailMsg="${degradeMsg}"; fi
-fi
-
-if [[ -z "${mcpFailMsg}" ]]; then
-    AddResult "mcp-stability" "pass"
-else
-    AddResult "mcp-stability" "fail" "${mcpFailMsg}"
+    echo "ERROR: Degraded MCPs: ${degradedMCPs}"
+    (( checksFailed += 1 ))
 fi
 
 # --- Verify operator health ---
 echo ">>> PHASE: Operator Health"
-typeset opFailMsg=""
 typeset -a opListArr=()
 IFS=',' read -ra opListArr <<< "${OPP_OPERATORS}"
 for op in "${opListArr[@]}"; do
@@ -178,23 +110,16 @@ for op in "${opListArr[@]}"; do
         '[.items[] | select(.metadata.name | contains($op))][0].status.phase // "not-found"') || true
     : "Operator ${op}: phase=${csvPhase}"
     if [[ "${csvPhase}" != "Succeeded" ]]; then
-        typeset opMsg="Operator ${op} not healthy (phase=${csvPhase})"
-        : "FAIL: ${opMsg}"
-        if [[ -n "${opFailMsg}" ]]; then opFailMsg="${opFailMsg}; ${opMsg}"; else opFailMsg="${opMsg}"; fi
+        echo "WARNING: Operator ${op} not healthy before upgrade (phase=${csvPhase})"
+        (( checksFailed += 1 ))
     fi
 done
-if [[ -z "${opFailMsg}" ]]; then
-    AddResult "operator-health" "pass"
-else
-    AddResult "operator-health" "fail" "${opFailMsg}"
-fi
 
 # --- Save pre-upgrade state ---
 echo ">>> PHASE: Saving Pre-Upgrade State"
-typeset -i checksFailed=0
-for r in "${tcResultsArr[@]}"; do
-    [[ "${r}" == "fail" ]] && (( checksFailed++ )) || true
-done
+oc get clusterversion version -o yaml > "${ARTIFACT_DIR}/pre-upgrade-clusterversion.yaml" 2>&1 || true
+oc get clusteroperators -o yaml > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.yaml" 2>&1 || true
+oc get csv -A -o yaml > "${ARTIFACT_DIR}/pre-upgrade-csvs.yaml" 2>&1 || true
 
 cat > "${ARTIFACT_DIR}/pre-upgrade-checks.json" <<EOF
 {
