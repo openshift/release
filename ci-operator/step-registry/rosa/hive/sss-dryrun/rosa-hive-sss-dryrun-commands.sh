@@ -114,7 +114,7 @@ log "Elevated as: $(oc whoami 2>/dev/null || echo 'unknown')"
 
 # Server-side dry-run apply
 log "Server-side dry-run apply of processed SelectorSyncSets"
-oc apply --server-side --dry-run=server -f "${PROCESSED}"
+oc apply --dry-run=server -f "${PROCESSED}"
 
 log "All SelectorSyncSets passed server-side dry-run validation"
 
