@@ -27,6 +27,7 @@ ALLOWED = (
 )
 GENERATED = (
     'frontend/test-results/', 'frontend/playwright-report/',
+    'frontend/e2e/test-results/',
     'frontend/e2e/.auth/', 'frontend/e2e/.test-config.json',
 )
 HISTORY_URL = 'https://console-dashboard-squared.apps.rosa.hcmais01ue1.s9m2.p3.openshiftapps.com/api/bulk-prompt'
