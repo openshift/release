@@ -37,7 +37,7 @@ _junit_emit() {
   local _je
   _je=$(date +%s) || _je=${_junit_start}
   local _jd=$((_je - _junit_start))
-  local _jn="interop-opp-backup"
+  local _jn="backup"
   local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
   local _fc=0 _fx=""
   if (( _jr != 0 )); then
