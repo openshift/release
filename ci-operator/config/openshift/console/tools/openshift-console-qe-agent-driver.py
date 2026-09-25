@@ -236,10 +236,13 @@ def init():
         'patch': None,
         'reason': 'no failure context',
     }
-    if context.get('has_test_failures'):
+    if context.get('test_step_passed') is True:
+        state['reason'] = 'original e2e test passed; agent skipped'
+    elif context.get('has_test_failures'):
         state['reason'] = ('investigation pending' if context.get('failed_tests') or context.get('flaked_tests')
                            else 'original step failed without identifiable Playwright tests')
-    report('Investigation did not complete.')
+    report('Original e2e test passed; no failure analysis was needed.'
+           if context.get('test_step_passed') is True else 'Investigation did not complete.')
     save(state)
     return bool(context.get('has_test_failures') and (context.get('failed_tests') or context.get('flaked_tests')))
 
@@ -762,6 +765,8 @@ def finalize():
         print('  Detailed results:   console-flake-result.json\n')
         print('  The original CI failure remains unchanged.\n')
         print('=' * 70 + '\n' + '=' * 70, flush=True)
+    elif state.get('reason') == 'original e2e test passed; agent skipped':
+        print('Original e2e test passed; Console QE Agent skipped.', flush=True)
     elif state.get('patch'):
         print('Candidate patch produced, but verification did not complete successfully.', flush=True)
     else:

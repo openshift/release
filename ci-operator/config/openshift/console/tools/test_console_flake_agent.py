@@ -187,6 +187,10 @@ class DriverTests(unittest.TestCase):
         self.assertEqual(len(fetched), 1)
         self.assertTrue(fetched[0].endswith('/finished.json'))
         self.assertFalse(self.driver.read(self.driver.CONTEXT)['has_test_failures'])
+        self.assertEqual(self.driver.read(self.driver.STATE)['reason'],
+                         'original e2e test passed; agent skipped')
+        self.assertIn('no failure analysis was needed',
+                      (self.artifacts / 'console-flake-analysis.md').read_text())
 
     def test_failed_step_reads_junit_and_preserves_failure_status(self):
         env = {'JOB_NAME': 'pull-ci-openshift-console-main-e2e-gcp-console',
