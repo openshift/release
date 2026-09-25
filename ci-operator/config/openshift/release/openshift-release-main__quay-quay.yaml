@@ -1,0 +1,20 @@
+build_root:
+  project_image:
+    dockerfile_literal: FROM registry.access.redhat.com/ubi9/python-312
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: quay-quay-check
+  commands: |
+    XDG_CACHE_HOME=/tmp make -C ci-operator/config/quay/quay/_generator check
+  container:
+    from: src
+  run_if_changed: ^ci-operator/(config|jobs)/quay/quay/
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: quay-quay
