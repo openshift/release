@@ -8,7 +8,7 @@ unset BASH_ENV
 test "${REPO_OWNER}/${REPO_NAME}" = openshift/release
 test "${EVAL_WORKDIR}" = /workspace
 test "${EVAL_SMOKE_PR}" = 51
-test -s "${GITHUB_TOKEN_PATH}"
+test -s /usr/local/github-credentials/oauth
 cd "${EVAL_WORKDIR}"
 test ! -e .git
 mkdir -p "${ARTIFACT_DIR}/runner"
@@ -22,7 +22,7 @@ mkdir -p "${ARTIFACT_DIR}/runner"
 #!/bin/sh
 case "$1" in
     *Username*) printf '%s\n' x-access-token ;;
-    *Password*) cat "${GITHUB_TOKEN_PATH}" ;;
+    *Password*) cat /usr/local/github-credentials/oauth ;;
     *) exit 1 ;;
 esac
 ASKPASS
@@ -34,7 +34,7 @@ ASKPASS
     timeout 180 git -c credential.helper= fetch --no-tags --depth=50 origin \
         "${EVAL_SMOKE_BASE}" "${EVAL_SMOKE_HEAD}"
 ) > "${ARTIFACT_DIR}/runner/consumer-checkout.log" 2>&1 || {
-    echo 'PIXAA checkout failed; see runner/consumer-checkout.log. Check CI token access to openshift-eng/pixaa.' >&2
+    echo 'PIXAA checkout failed; see runner/consumer-checkout.log. Check private-git-cloner access to openshift-eng/pixaa.' >&2
     exit 1
 }
 
