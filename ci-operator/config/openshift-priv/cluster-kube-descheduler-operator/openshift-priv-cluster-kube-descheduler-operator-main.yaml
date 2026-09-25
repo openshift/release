@@ -1,3 +1,8 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-kube-descheduler-operator
@@ -5,6 +10,14 @@ images:
   items:
   - dockerfile_path: Dockerfile.rhel7
     to: cluster-kube-descheduler-operator
+operator:
+  bundles:
+  - as: cluster-kube-descheduler-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: registry.ci.openshift.org/ocp/.*:cluster-kube-descheduler-operator
+    with: pipeline:cluster-kube-descheduler-operator
 promotion:
   to:
   - name: "5.1"
@@ -57,15 +70,19 @@ tests:
     cluster_profile: openshift-org-aws
     dependencies:
       EXTENSION_IMAGE: cluster-kube-descheduler-operator
+      OO_BUNDLE: cluster-kube-descheduler-operator-bundle
     env:
       EXTENSION_BINARY_PATH: /usr/bin/cluster-kube-descheduler-operator-tests-ext.gz
       EXTENSION_COMPONENT_NAME: cluster-kube-descheduler-operator
       FIPS_ENABLED: "true"
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-kube-descheduler-operator
+      OO_INSTALL_TIMEOUT_MINUTES: "15"
+      OO_SECURITY_CONTEXT: restricted
       TEST_SUITE: openshift/cluster-kube-descheduler-operator/operator/serial
-    pre:
-    - chain: ipi-aws-pre
-    - ref: fips-check
     test:
+    - ref: fips-check
+    - ref: optional-operators-operator-sdk
     - ref: openshift-tests-extension-setup-out-of-payload
     - ref: openshift-e2e-test
     workflow: ipi-aws
