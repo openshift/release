@@ -266,10 +266,15 @@ cat > "${GATE_PROMPT}" <<'GATE_HDR'
 This is CI mode (--ci). Do not modify files, post replies, commit, or push.
 The Gate Process below is the full skill text, already inlined. Do not invoke
 the Skill tool, slash commands, or `/openshift-developer:has-review-work`.
+Bash is available in CI mode. Before invoking it, inspect the planned command
+for the forbidden Python and mutating `gh` forms.
 Execute the entire Gate Process in exactly one Bash tool invocation so all
 shell variables and temporary files remain in one shell. Use jq and the
 canonical helper scripts exactly as directed. Do not embed Python source or run
 `python`/`python3` with `-`; a heredoc would replace piped JSON on standard input.
+If a Bash call is denied, correct it to use canonical jq, helper-script, and
+read-only `gh` operations, then retry. "One Bash invocation" means one
+successful Gate Process invocation; denied attempts do not count.
 Do not print fetched review data or helper output. Print only the --ci output
 lines specified in the skill.
 
