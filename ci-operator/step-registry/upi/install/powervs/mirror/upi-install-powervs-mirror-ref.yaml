@@ -1,0 +1,32 @@
+ref:
+  as: upi-install-powervs-mirror
+  from: upi-installer
+  timeout: 2h0m0s
+  grace_period: 30m0s
+  commands: upi-install-powervs-mirror-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: SPARSE_MANIFEST_ARCHES
+    default: "linux/ppc64le|linux/amd64"
+    documentation: |-
+      Pipe-separated list of OS/arch pairs to include in the sparse manifest mirror.
+      Defaults to ppc64le (Power) and amd64 (Intel) for the p-px heterogeneous job.
+  - name: MIRROR_REGISTRY_PORT
+    default: "5000"
+    documentation: |-
+      Port on which the local mirror registry listens on the PowerVS bastion.
+  documentation: |-
+    Sets up a local mirror registry on the PowerVS bastion host, mirrors the
+    OpenShift release image using sparse manifest filtering (OCPSTRAT-1808),
+    and applies the resulting ImageDigestMirrorSet to the running cluster.
+    Only the architectures specified in SPARSE_MANIFEST_ARCHES are mirrored,
+    reducing mirror size and bandwidth compared to a full multi-arch mirror.
+    Requires upi-install-powervs-cluster to have run first (reads BASTION_PUBLIC_IP
+    and bastion_known_hosts from SHARED_DIR, and uses the bastion's ~/.kube/config
+    to apply the IDMS to the running cluster).
