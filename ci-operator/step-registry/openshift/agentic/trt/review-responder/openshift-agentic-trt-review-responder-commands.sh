@@ -247,8 +247,8 @@ fi
 # embedded Python and GitHub API mutations at the gate's tool boundary.
 GATE_DISALLOWED_TOOLS=(
     "${DISALLOWED_TOOLS[@]}"
-    "Bash(*python* -c*)"
-    "Bash(*python* -)"
+    "Bash(*python -*)"
+    "Bash(*python3 -*)"
     "Bash(*gh api *--method*)"
     "Bash(*gh api *-X*)"
     "Bash(*gh api *--input*)"
