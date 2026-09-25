@@ -75,6 +75,39 @@ class WrapperTests(unittest.TestCase):
                              ['verification_status'], 'skipped')
             self.assertNotIn('PROPOSED SOLUTION', result.stdout)
 
+    def test_successful_job_exits_zero_when_ci_shell_uses_errexit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            bin_dir = root / 'bin'
+            bin_dir.mkdir()
+            fake_python = bin_dir / 'python3'
+            fake_python.write_text('''#!/bin/sh
+if [ "$1" = "-" ]; then
+  printf 'print("stub")\\n' > "$3"
+  exit 0
+fi
+if [ "$2" = "init" ]; then
+  exit 2
+fi
+if [ "$2" = "finalize" ]; then
+  printf 'finalized\\n' > "$TEST_MARKER"
+  exit 0
+fi
+exit 1
+''')
+            fake_python.chmod(0o755)
+            env = {**os.environ, 'PATH': str(bin_dir) + os.pathsep + os.environ['PATH'],
+                   'TEST_MARKER': str(root / 'finalized'),
+                   'ARTIFACT_DIR': str(root / 'artifacts'),
+                   'CONSOLE_FLAKE_AGENT_ENABLED': 'rehearsal',
+                   'JOB_NAME': 'rehearse-98765-pull-ci-openshift-console-main-e2e-gcp-console',
+                   'JOB_SPEC': json.dumps({'refs': {'org': 'openshift', 'repo': 'release',
+                                                    'pulls': [{'number': 98765, 'sha': 'a' * 40}]}})}
+            result = subprocess.run(['bash', '-e', str(WRAPPER)], env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((root / 'finalized').is_file())
+
 
 class DriverTests(unittest.TestCase):
     def setUp(self):
