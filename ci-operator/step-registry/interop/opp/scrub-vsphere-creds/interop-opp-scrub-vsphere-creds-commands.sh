@@ -38,45 +38,60 @@ fi
 
 # ---------- scrub credential values from all files ----------
 REDACT_MARKER="***REDACTED***"
-scrubbed=0
+# Keep credentials out of arguments and replace exact byte sequences so regex
+# metacharacters are always treated literally.
+scrubbed=$(
+  SCRUB_PASSWORD="${govc_password}" \
+  SCRUB_USERNAME="${govc_username}" \
+  SCRUB_MARKER="${REDACT_MARKER}" \
+  python3 - <<'PYTHON'
+import os
+import stat
 
-# Build a list of files that contain the password value.
-# grep -r on binary-safe mode; skip non-text files gracefully.
-matching_files=()
-while IFS= read -r -d '' fpath; do
-  # Only process regular files
-  [[ -f "${fpath}" ]] || continue
-  # Use grep -F (fixed string) to avoid regex interpretation of the password
-  if grep -qF -- "${govc_password}" "${fpath}" 2>/dev/null; then
-    matching_files+=("${fpath}")
-  fi
-done < <(find "${SHARED_DIR}" -maxdepth 3 -type f -print0 2>/dev/null)
+shared_dir = os.environb[b"SHARED_DIR"]
+secrets = tuple(
+    value
+    for value in (
+        os.environb[b"SCRUB_PASSWORD"],
+        os.environb[b"SCRUB_USERNAME"],
+    )
+    if value
+)
+marker = os.environb[b"SCRUB_MARKER"]
+scrubbed = 0
 
-for fpath in "${matching_files[@]}"; do
-  # Build a sed-safe replacement: escape sed special chars in the password
-  # (the password could contain /, &, \, etc.)
-  escaped_pw=$(printf '%s\n' "${govc_password}" | sed 's/[&/\]/\\&/g')
-  if sed -i "s/${escaped_pw}/${REDACT_MARKER}/g" "${fpath}" 2>/dev/null; then
-    scrubbed=$((scrubbed + 1))
-  fi
-done
+for directory, subdirectories, filenames in os.walk(shared_dir):
+    relative_directory = os.path.relpath(directory, shared_dir)
+    depth = 0 if relative_directory == b"." else relative_directory.count(b"/") + 1
+    if depth >= 3:
+        subdirectories.clear()
+        continue
 
-# Also scrub the username if present (less critical but good hygiene)
-if [[ -n "${govc_username}" ]]; then
-  for fpath in "${matching_files[@]}"; do
-    escaped_user=$(printf '%s\n' "${govc_username}" | sed 's/[&/\]/\\&/g')
-    sed -i "s/${escaped_user}/${REDACT_MARKER}/g" "${fpath}" 2>/dev/null || true
-  done
-  # Check for username in files that didn't have the password
-  while IFS= read -r -d '' fpath; do
-    [[ -f "${fpath}" ]] || continue
-    if grep -qF -- "${govc_username}" "${fpath}" 2>/dev/null; then
-      escaped_user=$(printf '%s\n' "${govc_username}" | sed 's/[&/\]/\\&/g')
-      sed -i "s/${escaped_user}/${REDACT_MARKER}/g" "${fpath}" 2>/dev/null || true
-      scrubbed=$((scrubbed + 1))
-    fi
-  done < <(find "${SHARED_DIR}" -maxdepth 3 -type f -print0 2>/dev/null)
-fi
+    for filename in filenames:
+        path = os.path.join(directory, filename)
+        try:
+            if not stat.S_ISREG(os.stat(path, follow_symlinks=False).st_mode):
+                continue
+            with open(path, "rb") as stream:
+                original = stream.read()
+            redacted = original
+            for secret in secrets:
+                redacted = redacted.replace(secret, marker)
+            if redacted == original:
+                continue
+            with open(path, "wb") as stream:
+                stream.write(redacted)
+            with open(path, "rb") as stream:
+                verified = stream.read()
+            if any(secret in verified for secret in secrets):
+                raise RuntimeError("credential redaction verification failed")
+            scrubbed += 1
+        except OSError:
+            continue
+
+print(scrubbed)
+PYTHON
+)
 
 echo ">>> interop-opp-scrub-vsphere-creds: scrubbed credentials from ${scrubbed} file(s) in \${SHARED_DIR}"
 exit 0
