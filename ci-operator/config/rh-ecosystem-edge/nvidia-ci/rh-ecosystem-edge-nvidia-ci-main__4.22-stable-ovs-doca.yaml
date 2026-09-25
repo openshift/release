@@ -1,0 +1,162 @@
+base_images:
+  rhel-coreos-base:
+    name: "4.22"
+    namespace: ocp
+    tag: rhel-coreos
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+  - dockerfile_literal: |
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
+
+      # DOCA version is pinned (always 3.4.1); only the RHEL major varies,
+      # depending on which OCP version's RHCOS this gets layered onto. Detect
+      # it from the base image itself (same technique the old runtime build
+      # step used), so the DOCA repo and EPEL rpm always match this config's
+      # base image without needing a hardcoded major version bumped by hand
+      # for every future OCP branch.
+      #
+      # NOTE: linux.mellanox.com/public/repo/doca/3.4.1/ only publishes
+      # rhel9 and rhel10 trees (no rhel8) as of this writing -- if this
+      # config is ever branched onto a RHEL8-based RHCOS (older OCP), this
+      # pinned version won't resolve and will need revisiting.
+      RUN source /etc/os-release && \
+          RHEL_MAJOR="${VERSION_ID%%.*}" && \
+          echo "Detected RHEL major version: ${RHEL_MAJOR}" && \
+          cat > /etc/yum.repos.d/doca.repo <<EOF && \
+          dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-${RHEL_MAJOR}.noarch.rpm
+      [doca]
+      name=DOCA Online Repo
+      baseurl=https://linux.mellanox.com/public/repo/doca/3.4.1/rhel${RHEL_MAJOR}/x86_64/
+      enabled=1
+      gpgcheck=0
+      EOF
+
+      # Undocumented workaround: the doca package install fails partway through
+      # without this directory present.
+      RUN mkdir -p /var/opt
+
+      # libibverbs/rdma-core are part of the immutable base ostree commit and
+      # must go through rpm-ostree's override mechanism rather than plain dnf.
+      RUN rpm-ostree override replace libibverbs rdma-core --experimental --from repo='doca'
+
+      # doca-openvswitch replaces the stock, version-suffixed Fast Datapath
+      # package (e.g. openvswitch3.5); the glob avoids hardcoding its exact
+      # version so this stays correct across RHCOS releases.
+      RUN dnf -y remove 'openvswitch[0-9]*' && \
+          dnf -y install doca-openvswitch && \
+          dnf -y install mft && \
+          rm -rf /etc/yum.repos.d/doca.repo
+
+      # Ensures OVS runs like a normal (non-offloaded) switch: this cluster has
+      # no DOCA-capable NIC, so hardware offload must stay explicitly disabled
+      # even though the DOCA-enabled binary/datapath is installed.
+      RUN cat > /usr/bin/doca-init.sh <<'SCRIPT'
+      #!/bin/bash
+      set -euo pipefail
+      log() { echo "[doca-init] $*"; }
+
+      CONFIGURATION_CHANGED=false
+      declare -A DESIRED=(
+        [hw-offload]=false
+      )
+      for key in "${!DESIRED[@]}"; do
+        current=$(ovs-vsctl get Open_vSwitch . other_config:"$key" 2>/dev/null | tr -d '"' || echo "")
+        if [ "$current" != "${DESIRED[$key]}" ]; then
+          log "Setting $key=${DESIRED[$key]} (was: ${current:-unset})"
+          ovs-vsctl set Open_vSwitch . other_config:"$key"="${DESIRED[$key]}"
+          CONFIGURATION_CHANGED=true
+        fi
+      done
+
+      if [ "$CONFIGURATION_CHANGED" = true ]; then
+        log "Configuration changed, restarting openvswitch"
+        # --no-block: doca-init.service Requires=openvswitch.service, so this
+        # restart is propagated back to doca-init.service itself while its
+        # own ExecStart (this script) is still running. Blocking here would
+        # wait on that transaction and could delay kubelet.service, which is
+        # ordered After=doca-init.service.
+        systemctl --no-block restart openvswitch
+      fi
+      log "Done."
+      SCRIPT
+      RUN chmod +x /usr/bin/doca-init.sh
+
+      RUN mkdir -p /etc/systemd/system
+
+      RUN cat > /etc/systemd/system/doca-init.service <<'UNIT'
+      [Unit]
+      Description=Initialize OVS-DOCA hardware offload
+      After=openvswitch.service network-online.target
+      Before=kubelet.service
+      Requires=openvswitch.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/doca-init.sh
+      RemainAfterExit=yes
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+      UNIT
+      RUN systemctl enable doca-init.service
+
+      RUN ostree container commit
+    inputs:
+      rhel-coreos-base:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+    to: rhel-coreos
+  run_if_changed: x^
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-aws-nodes-check
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+    test:
+    - ref: ovs-doca-validate-worker-package
+    - as: get-nodes
+      cli: latest
+      commands: |
+        # Print node roles (master/worker) grouped by count; do not print node
+        # names (hostnames can leak internal AWS data into CI logs).
+        echo "Node roles:"
+        oc get nodes --no-headers | awk '{print $3}' | sort | uniq -c
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 4.22-stable-ovs-doca
