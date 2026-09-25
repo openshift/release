@@ -99,12 +99,19 @@ if [[ -n "${EXTRA_IMAGES}" ]]; then
     echo "Mirroring extra images..."
     for img in $(echo "${EXTRA_IMAGES}" | tr ',' ' '); do
         dest_path=$(echo "${img}" | sed 's|.*/||' | sed 's|:.*||')
-        dest="docker://${MIRROR_REGISTRY_HOST}/extra/${dest_path}"
+        # Preserve the source tag on the mirror side too (default to "latest"
+        # only when the source reference itself has no tag), otherwise a
+        # tagged source (e.g. ":cosign-signed") would silently land on the
+        # mirror as ":latest" and any registry_config mirror lookup for that
+        # specific tag would 404.
+        img_tag=$(echo "${img}" | grep -o ':[^/]*$' | sed 's|:||' || echo "latest")
+        [[ -z "${img_tag}" ]] && img_tag="latest"
+        dest="docker://${MIRROR_REGISTRY_HOST}/extra/${dest_path}:${img_tag}"
         if skopeo inspect "${dest}" "${DEST_TLS_ARGS[@]}" &>/dev/null; then
-            echo "  ${dest_path} already mirrored, skipping"
+            echo "  ${dest_path}:${img_tag} already mirrored, skipping"
             continue
         fi
-        echo "  Copying ${img} -> ${MIRROR_REGISTRY_HOST}/extra/${dest_path}"
+        echo "  Copying ${img} -> ${MIRROR_REGISTRY_HOST}/extra/${dest_path}:${img_tag}"
         skopeo copy --all \
             "docker://${img}" \
             "${dest}" \

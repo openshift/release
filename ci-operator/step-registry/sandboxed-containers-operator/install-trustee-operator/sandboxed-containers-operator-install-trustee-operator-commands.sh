@@ -728,6 +728,29 @@ function create_initdata() {
     registry_auth_uri_line="authenticated_registry_credentials_uri = \"kbs:///default/${ACR_KBS_SECRET_NAME}/auth.json\""
   fi
 
+  # Disconnected-only: redirect CDH's guest-side pull of the ghcr.io test
+  # image (used by the "cosigned pod" test, C00316) to our ACR mirror,
+  # since ghcr.io is not reachable from a restricted-network cluster and
+  # the cluster-wide ImageTagMirrorSet (a host/CRI-O mechanism) is not
+  # consulted by CDH's own guest-pull. Only wired up when a mirror registry
+  # actually exists (i.e. mirror-operator ran), so connected jobs are
+  # unaffected.
+  local registry_mirror_block=""
+  if [[ -f "${SHARED_DIR}/mirror_registry_url" ]]; then
+    local cdh_mirror_host
+    cdh_mirror_host=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+    registry_mirror_block=$(cat <<REGEOF
+
+[image.registry_config]
+[[image.registry_config.registry]]
+prefix = "ghcr.io/confidential-containers/test-container-image-rs"
+location = "ghcr.io/confidential-containers/test-container-image-rs"
+[[image.registry_config.registry.mirror]]
+location = "${cdh_mirror_host}/extra/test-container-image-rs"
+REGEOF
+)
+  fi
+
   cat > "${initdata_file}" <<EOF
 algorithm = "sha256"
 version = "0.1.0"
@@ -755,6 +778,7 @@ kbs_cert = """${tls_cert}"""
 [image]
 image_security_policy = '${policy_json}'
 ${registry_auth_uri_line}
+${registry_mirror_block}
 '''
 
 "policy.rego" = '''
