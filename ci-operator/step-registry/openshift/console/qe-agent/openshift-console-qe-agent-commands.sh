@@ -67,8 +67,7 @@ fi
 _driver_source="$(cat "${CONSOLE_AGENT_RUNROOT}/driver.py")"
 _driver_digest="$(sha256sum "${CONSOLE_AGENT_RUNROOT}/driver.py")"
 
-python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" init
-if [[ $? -ne 0 ]]; then
+if ! python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" init; then
   python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" finalize || true
   exit 0
 fi
