@@ -271,7 +271,7 @@ function install_required_tools() {
 
   echo "Installing PowerVS-DHCP-report"
   DHCP_TAR="PowerVS-DHCP-report-v1.3-linux-amd64.tar.gz"
-  curl --location --output /tmp/${DHCP_TAR} https://github.com/hamzy/PowerVS-DHCP-report/releases/download/v1.3/${DHCP_TAR}
+  for i in {1..3}; do curl --location --output /tmp/${DHCP_TAR} https://github.com/hamzy/PowerVS-DHCP-report/releases/download/v1.3/${DHCP_TAR} && break || sleep 2; done
   (cd /tmp/; tar xzvf ${DHCP_TAR}; mv PowerVS-DHCP-report /tmp/bin/)
 
   hash jq || exit 1

@@ -62,7 +62,7 @@ else
   butane_filename="butane-$(uname -m)"
 fi
   
-curl -sSL https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/butane/latest/$butane_filename --output "/tmp/butane" && chmod +x "/tmp/butane"
+for i in {1..3}; do curl -sSLf https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/butane/latest/$butane_filename --output "/tmp/butane" && chmod +x "/tmp/butane" && break || sleep 2; done
 /tmp/butane "${SHARED_DIR}/manifest_99_${node_role}_kdump.bu" -o "${SHARED_DIR}/manifest_99_${node_role}_kdump.yml"
 
 echo "Printing final base-64 encoded config"
