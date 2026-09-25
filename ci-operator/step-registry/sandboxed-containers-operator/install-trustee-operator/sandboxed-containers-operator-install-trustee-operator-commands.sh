@@ -536,6 +536,17 @@ function wait_for_operands() {
         oc logs -n "${TRUSTEE_NAMESPACE}" -l app=kbs --tail=50 --prefix 2>/dev/null || true
         exit 1
       fi
+
+      # Wait for the rollout to fully complete. The TrusteeConfig reconciler can
+      # update the deployment (smart-merge) shortly after the initial pods become
+      # Ready, which triggers a second rollout. Without this wait the connectivity
+      # test races the new pod startup and gets ECONNREFUSED.
+      echo ">>> Waiting for ${deployment} rollout to complete..." >&2
+      if ! oc rollout status "${deployment}" -n "${TRUSTEE_NAMESPACE}" --timeout=150s; then
+        echo ">>> ERROR: ${deployment} rollout did not complete" >&2
+        oc get "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
+        exit 1
+      fi
     done
   fi
 }
