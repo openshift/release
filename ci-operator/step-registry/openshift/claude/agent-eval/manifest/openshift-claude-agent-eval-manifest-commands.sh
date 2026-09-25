@@ -53,6 +53,16 @@ def read_config(path):
     return config
 
 
+def validate_thresholds(thresholds):
+    """Validate container types; leave scoring rules to the harness."""
+    if not isinstance(thresholds, dict):
+        raise EvalError("thresholds must be a mapping; omit it or use {} for no thresholds")
+    for judge, limits in thresholds.items():
+        if not isinstance(judge, str) or not judge.strip() or not isinstance(limits, dict):
+            raise EvalError("thresholds must map nonempty judge names to mappings")
+    return thresholds
+
+
 def relative_path(value, field):
     if not isinstance(value, str) or not value or any(ord(c) < 32 for c in value):
         raise EvalError(f"{field} must be a nonempty relative path")
@@ -123,9 +133,11 @@ import yaml
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
     from .eval_report import render_report
     from .eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
+    from .eval_plan import validate_thresholds
 except ImportError:
     from eval_report import render_report
     from eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
+    from eval_plan import validate_thresholds
 
 
 MANIFEST = "evals.yaml"
@@ -263,6 +275,7 @@ def select_cases(repo, entry, files):
 
 def read_eval(repo, entry):
     config = read_config(repo_file(repo, entry.config, "config"))
+    validate_thresholds(config.get("thresholds", {}))
     models = config.get("models") if isinstance(config, dict) else None
     model = models.get("skill") if isinstance(models, dict) else None
     if not isinstance(model, str) or not model.strip():
@@ -344,6 +357,7 @@ def collect_result(directory, artifacts):
 
 
 def verify_result(directory, config):
+    thresholds = validate_thresholds(config.get("thresholds", {}))
     try:
         result = json.loads((directory / "run_result.json").read_text(encoding="utf-8"))
         summary = yaml.safe_load((directory / "summary.yaml").read_text(encoding="utf-8"))
@@ -358,7 +372,7 @@ def verify_result(directory, config):
         raise EvalError("harness did not produce report.html")
     # score.py regression currently ignores a completely absent judge. Treat
     # missing thresholded judges as incomplete; let the harness interpret limits.
-    for judge in config.get("thresholds", {}):
+    for judge in thresholds:
         if judge not in summary["judges"]:
             raise EvalError(f"missing thresholded judge in summary: {judge}")
 
@@ -1036,6 +1050,11 @@ import sys
 
 import yaml
 
+try:
+    from .eval_plan import read_config, validate_thresholds
+except ImportError:
+    from eval_plan import read_config, validate_thresholds
+
 
 def main():
     """Use the cloned harness's scoring rules without repeating its path lookup."""
@@ -1044,22 +1063,24 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run-dir", type=Path, required=True)
     args = parser.parse_args()
+    validate_thresholds(read_config(args.config).get("thresholds", {}))
 
     # Keep harness imports in this bounded child process. Import from the same
     # scripts directory as the score.py CLI, including its agent_eval package.
     sys.path.insert(0, str(args.harness / "skills/eval-run/scripts"))
     score = importlib.import_module("score")
     config = score.EvalConfig.from_yaml(args.config)
+    thresholds = validate_thresholds(config.thresholds)
     summary_path = args.run_dir / "summary.yaml"
     print(f"SUMMARY: {summary_path}", flush=True)
     with summary_path.open(encoding="utf-8") as stream:
         summary = yaml.safe_load(stream)
     if not isinstance(summary, dict) or not isinstance(summary.get("judges"), dict):
         raise ValueError("harness did not produce a judges summary")
-    for judge in config.thresholds:
+    for judge in thresholds:
         if judge not in summary["judges"]:
             raise ValueError(f"missing thresholded judge in summary: {judge}")
-    regressions = score.detect_regressions(summary["judges"], config.thresholds)
+    regressions = score.detect_regressions(summary["judges"], thresholds)
     print(f"REGRESSIONS: {len(regressions)}")
     for regression in regressions:
         print(f"  [{regression.judge_name}] {regression.metric}: "

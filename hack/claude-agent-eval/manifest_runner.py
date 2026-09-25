@@ -24,9 +24,11 @@ import yaml
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
     from .eval_report import render_report
     from .eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
+    from .eval_plan import validate_thresholds
 except ImportError:
     from eval_report import render_report
     from eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
+    from eval_plan import validate_thresholds
 
 
 MANIFEST = "evals.yaml"
@@ -164,6 +166,7 @@ def select_cases(repo, entry, files):
 
 def read_eval(repo, entry):
     config = read_config(repo_file(repo, entry.config, "config"))
+    validate_thresholds(config.get("thresholds", {}))
     models = config.get("models") if isinstance(config, dict) else None
     model = models.get("skill") if isinstance(models, dict) else None
     if not isinstance(model, str) or not model.strip():
@@ -245,6 +248,7 @@ def collect_result(directory, artifacts):
 
 
 def verify_result(directory, config):
+    thresholds = validate_thresholds(config.get("thresholds", {}))
     try:
         result = json.loads((directory / "run_result.json").read_text(encoding="utf-8"))
         summary = yaml.safe_load((directory / "summary.yaml").read_text(encoding="utf-8"))
@@ -259,7 +263,7 @@ def verify_result(directory, config):
         raise EvalError("harness did not produce report.html")
     # score.py regression currently ignores a completely absent judge. Treat
     # missing thresholded judges as incomplete; let the harness interpret limits.
-    for judge in config.get("thresholds", {}):
+    for judge in thresholds:
         if judge not in summary["judges"]:
             raise EvalError(f"missing thresholded judge in summary: {judge}")
 

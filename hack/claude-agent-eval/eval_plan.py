@@ -46,6 +46,16 @@ def read_config(path):
     return config
 
 
+def validate_thresholds(thresholds):
+    """Validate container types; leave scoring rules to the harness."""
+    if not isinstance(thresholds, dict):
+        raise EvalError("thresholds must be a mapping; omit it or use {} for no thresholds")
+    for judge, limits in thresholds.items():
+        if not isinstance(judge, str) or not judge.strip() or not isinstance(limits, dict):
+            raise EvalError("thresholds must map nonempty judge names to mappings")
+    return thresholds
+
+
 def relative_path(value, field):
     if not isinstance(value, str) or not value or any(ord(c) < 32 for c in value):
         raise EvalError(f"{field} must be a nonempty relative path")

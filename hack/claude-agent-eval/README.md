@@ -85,6 +85,11 @@ dataset remain harness-owned. In case mode, `execution.max_budget_usd` limits
 each case invocation, not total CI spend or judge/orchestrator calls.
 `CLAUDE_MODEL` chooses the outer orchestrator model.
 
+`thresholds`, when present, must map judge names to mappings of scoring limits.
+Omit it or use `{}` for no thresholds; null and other non-mapping shapes are
+rejected before setup, harness installation, or model calls. The harness still
+interprets the scoring limits.
+
 The new step exposes no legacy scheduling/runner overrides. `EVAL_DISCOVER`,
 an explicit non-default `EVAL_CONFIG`, and `EVAL_EXTRA_ARGS` are rejected.
 Other legacy runner overrides do not override manifest/eval settings.

@@ -463,6 +463,36 @@ class CaseSelectionTests(Fixture):
 
 
 class ValidationTests(Fixture):
+    def test_invalid_thresholds_fail_before_any_calls(self):
+        other = self.make_entry("evals/other.yaml")
+        self.write_manifest([self.entry, other])
+        self.change_skill()
+        config = yaml.safe_load((self.repo / self.entry["config"]).read_text())
+        for value in (None, [], "quality", False, {"quality": None}, {"": {}}):
+            with self.subTest(thresholds=value):
+                self.put(self.entry["config"], yaml.safe_dump({**config, "thresholds": value}))
+                result = self.run_step()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.calls(), [])
+                self.assertEqual(self.junit().attrib["failures"], "1")
+                summary = json.loads((self.artifacts / "evals-summary.json").read_text())
+                self.assertEqual(summary["status"], "failed")
+                self.assertEqual(summary["counts"]["passed"], 0)
+                self.assertIn("thresholds must", result.stdout)
+
+    def test_threshold_validation_at_verification_and_regression_boundaries(self):
+        regression = load_sibling("eval_regression")
+        self.put(self.entry["config"], "thresholds: null\n")
+        with self.assertRaisesRegex(runner.EvalError, "thresholds must"):
+            runner.verify_result(self.repo, {"thresholds": None})
+        with mock.patch.object(sys, "argv", ["eval_regression", "--harness", str(self.root),
+                               "--config", str(self.repo / self.entry["config"]),
+                               "--run-dir", str(self.root)]), \
+                mock.patch.object(regression.importlib, "import_module") as loader:
+            with self.assertRaisesRegex(runner.EvalError, "thresholds must"):
+                regression.main()
+            loader.assert_not_called()
+
     def test_invalid_manifest_entries(self):
         updates = [
             {"parallelism": 0}, {"parallelism": True}, {"parallelism": "5"},
