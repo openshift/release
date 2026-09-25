@@ -231,7 +231,12 @@ vsphere)
     if [ "W${error_code}W" == "W0W" ]; then
         # The test suite requires a vSphere config file with explicit user and password fields.
         sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
+        # Disable tracing due to vCenter credential in the sed argument
+        [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+        set +x
         sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+        # Restore previous tracing state
+        $WAS_TRACING && set -x
     fi
     export TEST_PROVIDER=vsphere;;
 openstack*)
