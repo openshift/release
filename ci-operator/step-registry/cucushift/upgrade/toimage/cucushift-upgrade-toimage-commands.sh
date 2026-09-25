@@ -511,6 +511,8 @@ function check_upgrade_status() {
             echo -e "Upgrade checking end at $(date "+%F %T") - succeed\n"
             end_time=$(date "+%s")
             echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
+            echo "DEBUG: Upgrade succeeded. Waiting for /tmp/continue to resume..."
+            while [ ! -f /tmp/continue ]; do sleep 30; done
             return 0
         fi
         if [[ ${progress} == "True" ]] && \
@@ -522,6 +524,8 @@ function check_upgrade_status() {
             echo "Error: ${case_id} As OTA-861 designed, Upgradeable should be set to False when an upgrade is in progress, but actually not"
             export UPGRADE_FAILURE_TYPE="${case_id}"
             export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${case_id}"
+            echo "DEBUG: Upgrade failed (OTA-861). Waiting for /tmp/continue to resume..."
+            while [ ! -f /tmp/continue ]; do sleep 30; done
             return 1
         fi
         if [ "${wait_upgrade}" == "$(( TIMEOUT - 10 ))" ] &&  check_ota_case_enabled "OCP-73352"; then
@@ -529,6 +533,8 @@ function check_upgrade_status() {
             # and "TIMEOUT - 10" is used to make sure upgrade is started
             if ! check_upgrade_recommend_when_upgrade_inprogress; then
                 echo "OCP-73352: failed"
+                echo "DEBUG: Upgrade failed (OCP-73352). Waiting for /tmp/continue to resume..."
+                while [ ! -f /tmp/continue ]; do sleep 30; done
                 return 1
             fi
         fi
@@ -543,6 +549,8 @@ function check_upgrade_status() {
         end_time=$(date "+%s")
         echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
         check_failed_operator
+        echo "DEBUG: Upgrade timed out. Waiting for /tmp/continue to resume..."
+        while [ ! -f /tmp/continue ]; do sleep 30; done
         return 1
     fi
 }

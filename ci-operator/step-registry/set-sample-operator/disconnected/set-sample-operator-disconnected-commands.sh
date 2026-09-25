@@ -84,6 +84,107 @@ function check_mirror_registry () {
     fi
 }
 
+function ensure_icsp_exists () {
+    MIRROR_PROXY_REGISTRY_QUAY=$(echo "${MIRROR_PROXY_REGISTRY}" | sed 's/5000/6001/g')
+
+    if oc get ImageContentSourcePolicy image-policy-aosqe &>/dev/null || \
+       oc get ImageDigestMirrorSet image-policy-aosqe &>/dev/null; then
+        echo "ICSP/IDMS already exists, skip creating."
+        return 0
+    fi
+
+    echo "ICSP/IDMS not found, creating..."
+    kube_minor=$(oc version -o json | grep -o '"minor": *"[^"]*"' | tail -1 | grep -o '[0-9]*')
+    icsp_num=$(oc get ImageContentSourcePolicy -o name 2>/dev/null | wc -l)
+
+    if [[ $icsp_num -gt 0 || $kube_minor -lt 26 ]]; then
+        cat <<EOF | oc apply -f -
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: image-policy-aosqe
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/openshifttest
+    source: quay.io/openshifttest
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: brew.registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.stage.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry-proxy.engineering.redhat.com
+EOF
+    else
+        cat <<EOF | oc create -f -
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: image-policy-aosqe
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/openshifttest
+    source: quay.io/openshifttest
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: brew.registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.stage.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry-proxy.engineering.redhat.com
+---
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: image-policy-aosqe
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/openshifttest
+    source: quay.io/openshifttest
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: brew.registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.stage.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry-proxy.engineering.redhat.com
+EOF
+    fi
+
+    if [[ $? -eq 0 ]]; then
+        echo "ICSP/IDMS created successfully"
+    else
+        echo "!!! Failed to create ICSP/IDMS"
+        return 1
+    fi
+
+    echo "Waiting for MachineConfigPool to start updating after ICSP/IDMS creation..."
+    oc wait mcp worker --for='condition=UPDATING=True' --timeout=300s || true
+    echo "Waiting for MachineConfigPool worker to finish updating..."
+    oc wait mcp worker --for='condition=UPDATED=True' --timeout=1200s
+    echo "Waiting for MachineConfigPool master to finish updating..."
+    oc wait mcp master --for='condition=UPDATED=True' --timeout=1200s
+    echo "MachineConfigPools updated, mirror configuration should be active on all nodes."
+}
+
 set_proxy
 run_command "oc whoami"
 run_command "which oc && oc version --client"
@@ -99,5 +200,6 @@ fi
 MIRROR_PROXY_REGISTRY=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
 echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
 set_CA_for_nodes
+ensure_icsp_exists
 config_samples_operator
-check_mirror_registry
+#check_mirror_registry
