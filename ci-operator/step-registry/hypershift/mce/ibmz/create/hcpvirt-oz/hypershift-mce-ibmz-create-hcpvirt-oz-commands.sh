@@ -164,7 +164,8 @@ done
 
 echo "$(date) Applying rendered manifests"
 for file in /tmp/hc-manifests/manifest_*.yaml; do
-  [[ -s "${file}" ]] || continue
+  # csplit often leaves a trailing file with only "---"/whitespace → "no objects passed to apply"
+  grep -q '^kind:' "${file}" || continue
   oc apply -f "${file}"
 done
 shopt -u nullglob
