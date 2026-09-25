@@ -1,0 +1,76 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  cli:
+    name: "5.1"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "5.1"
+    namespace: ocp
+    tag: libvirt-installer
+  upi-installer:
+    name: "5.1"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.27
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.1"
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "5.1"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- always_run: false
+  as: e2e-rhwa-s390x-oz-smoke
+  capabilities:
+  - intranet
+  cluster: build12
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "5.1"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: operator:nhc && tier:smoke
+      ECO_TEST_TIMEOUT: 1h
+      ECO_TEST_VERBOSE: "true"
+      ETCD_DISK_SPEED: slow
+      INSTALL_NAMESPACE: openshift-workload-availability
+      NODE_TUNING: "true"
+      OCP_VERSION: "51"
+      OO_CHANNEL: stable
+      OPERATORS: node-healthcheck-operator,node-maintenance-operator,self-node-remediation
+      TEST_NAME: e2e-rhwa-s390x-oz-smoke
+      TEST_STEPS: medik8s-system-tests-s390x-run-tests
+      USE_EXTERNAL_DNS: "true"
+    workflow: medik8s-system-tests-s390x
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: rhwa-system-tests
+  variant: 5.1-s390x-oz
