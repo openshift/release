@@ -332,13 +332,16 @@ function VirtctlReadVmFile () {
   )
 }
 
-# WaitDestAgentConnected — wait for QEMU Guest Agent to reconnect on each destination VMI.
-# After CCLM the agent process migrates with the VM memory but takes a moment to
-# re-register with the destination libvirt. Without this gate the QEMU GA checks
-# (VerifyVmDataIntegrity, VerifyGuestDiskIo, VerifyGuestNetwork) race the reconnect
-# and find the agent absent, causing all VMs to be skipped and the step to hard-fail.
-# Skipped (return 77) when both MTV_VM_DATA_INTEGRITY and MTV_VM_GUEST_EXEC are false,
-# i.e. no QEMU GA check is actually needed for this run.
+# WaitDestAgentConnected — gate QEMU GA checks until the agent is reachable post-CCLM.
+#
+# Probes the KubeVirt guestosinfo subresource API via `oc get --raw`:
+#   GET /apis/subresources.kubevirt.io/v1/namespaces/{ns}/virtualmachineinstances/{name}/guestosinfo
+# This is the same call virtctl guestosinfo makes and exercises the full path:
+#   API server → virt-handler → virt-launcher → libvirt → QEMU GA
+# If it returns JSON (non-empty kernelVersion / id), the GA is fully operational
+# and VirtctlReadVmFile / VirtctlGuestExec can safely proceed.
+#
+# Skipped (return 77) when both MTV_VM_DATA_INTEGRITY and MTV_VM_GUEST_EXEC are false.
 function WaitDestAgentConnected () {
   if [[ "${MTV_VM_DATA_INTEGRITY}" != 'true' && "${vmGuestExec}" != 'true' ]]; then
     return 77
@@ -347,9 +350,28 @@ function WaitDestAgentConnected () {
   typeset -i i
   for (( i = 1; i <= vmCount; i++ )); do
     typeset vmName; vmName="$(VmName "${i}")"
-    : "Waiting for AgentConnected on destination VMI ${vmName} in ${targetNs}"
-    DestOc wait "virtualmachineinstance/${vmName}" -n "${targetNs}" \
-      --for=condition=AgentConnected --timeout="${agentWaitTimeout}" 1>/dev/null
+    : "Waiting for QEMU GA readiness on destination VMI ${vmName} (guestosinfo subresource)"
+
+    typeset -i elapsed=0 gaReady=0
+    while (( elapsed < 300 )); do
+      typeset response
+      response="$(DestOc get --raw \
+        "/apis/subresources.kubevirt.io/v1/namespaces/${targetNs}/virtualmachineinstances/${vmName}/guestosinfo" \
+        2>/dev/null || true)"
+      # A successful response has os info nested under .os — check .os.id or .os.kernelVersion.
+      if [[ -n "${response}" ]] && printf '%s' "${response}" | jq -e '.os.id // .os.kernelVersion' 1>/dev/null 2>&1; then
+        gaReady=1
+        break
+      fi
+      sleep 5
+      (( elapsed += 5 )) || true
+    done
+
+    if (( gaReady == 0 )); then
+      printf 'ERROR: QEMU GA not responsive for %s after %ds (guestosinfo subresource timed out)\n' \
+        "${vmName}" "${elapsed}" >&2
+      return 1
+    fi
   done
   true
 }
