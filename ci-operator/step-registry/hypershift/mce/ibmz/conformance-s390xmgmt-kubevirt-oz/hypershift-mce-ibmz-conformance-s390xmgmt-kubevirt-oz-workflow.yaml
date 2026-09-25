@@ -14,12 +14,13 @@ workflow:
       COMPUTE_COUNT: "2"
       CNV_SUBSCRIPTION_SOURCE: 'redhat-operators'
       # Sizes apply to the libvirt mgmt cluster VMs only (nested topology; no ext-infra).
-      DOMAIN_MEMORY: "65536"   # 64 GiB per mgmt cluster VM
-      DOMAIN_VCPUS: "16"       # 16 vCPUs per mgmt cluster VM
+      # Bumped toward #84152 rehearsals (resource pressure on nested HCP was observed).
+      DOMAIN_MEMORY: "73356"
+      DOMAIN_VCPUS: "24"
       VOLUME_CAPACITY: "200G"  # 200 GB root disk per mgmt cluster VM
       # Guest apps are served via HyperShift baseDomainPassthrough on mgmt ingress.
       # Skip monitor/alert noise and known KubeVirt/Hypershift flakes (aligned with
-      # hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt).
+      # hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt + #84152 rehearsals).
       SKIP_MONITOR_TEST: "true"
       TEST_SKIPS: >-
         etcd leader changes are not excessive\|
@@ -38,6 +39,7 @@ workflow:
         services when running openshift cluster on KubeVirt virtual machines should allow connections to pods from infra cluster pod via NodePort across different infra nodes\|
         \[sig-kubevirt\] migration when running openshift cluster on KubeVirt virtual machines and live migrate hosted control plane workers \[Early\] should maintain node readiness \[Suite:openshift/conformance/parallel\]\|
         \[sig-network\] Services should be rejected for evicted pods\|
+        \[sig-api-machinery\] OpenAPIV3 should round trip OpenAPI V3 for all built-in group versions\|
         Metrics should report short attach times\|
         Metrics should report short mount times
     pre:
@@ -52,6 +54,8 @@ workflow:
     - ref: hypershift-mce-ibmz-create-hcpvirt-oz
 
     test:
+    # Gate guest API on the *next* CI pod/VPN before long conformance (#84152 RCA).
+    - chain: hypershift-mce-ibmz-test
     - chain: hypershift-conformance
 
     post:

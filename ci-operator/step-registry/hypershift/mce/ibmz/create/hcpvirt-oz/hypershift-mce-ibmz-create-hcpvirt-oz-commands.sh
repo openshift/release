@@ -2,12 +2,18 @@
 #
 # Create a KubeVirt HostedCluster on the IBM Z OZ libvirt management cluster.
 #
-# RCA notes (learned from PR #84152 rehearsals):
+# RCA notes (PR #84152 / #85270 rehearsals):
 # - HostedCluster/NodePool can be healthy while CI cannot reach the guest API.
-# - LPAR IP:NodePort (default 10.0.1.15:<np>) is flaky: sometimes /readyz=ok,
-#   sometimes empty response + TLS handshake timeout.
-# - Prefer stable endpoints (hcp Route, MetalLB VIP, node InternalIP) and only
-#   fall back to LPAR last.
+# - CI reaches guest API via LPAR_HOST_IP:NodePort (default 10.0.1.15:<np>) over
+#   VPN. That path is flaky (empty /readyz / TLS handshake timeout) on both
+#   oz-3-2 and oz-3-3 leases. MetalLB VIP / node InternalIP are L2-only and
+#   usually unreachable from the build-farm pod — still probed for RCA.
+# - Prefer LPAR:NodePort first (only historically CI-reachable path), then
+#   nodeIP:NodePort, then MetalLB VIP / hcp original.
+# - Port-forward to svc/kube-apiserver on mgmt proves CP health independently
+#   of VPN/LPAR forwarding.
+# - Downstream steps run on a *new* CI pod + VPN; create success does not
+#   guarantee the next step can TLS to the same LPAR URL (see ibmz-test chain).
 # - Omit --base-domain so HyperShift enables baseDomainPassthrough for *.apps;
 #   custom base-domain + manual test-apps LB caused ingress-canary timeouts.
 #
@@ -97,7 +103,8 @@ fi
 echo "$(date) Using HC_NAME=${HC_NAME} (PROW_JOB_ID hash for hypershift-conformance)"
 echo "$(date) Using HC_NS=${HC_NS} (lease-specific namespace)"
 echo "${HC_NAME}" > "${SHARED_DIR}/cluster-name"
-echo "$(date) Wrote ${SHARED_DIR}/cluster-name"
+echo -n "${HC_NS}" > "${SHARED_DIR}/cluster-namespace"
+echo "$(date) Wrote ${SHARED_DIR}/cluster-name and ${SHARED_DIR}/cluster-namespace"
 
 # Omit --base-domain so HyperShift enables baseDomainPassthrough and creates the
 # management-cluster wildcard Route/Service/EndpointSlice for guest *.apps ingress.
@@ -141,7 +148,9 @@ echo "$(date) Wrote ${SHARED_DIR}/mgmt_kubeconfig"
 VIRT_KC="${SHARED_DIR}/nested_kubeconfig"
 REQUIRED_NODES=2
 MAX_RETRIES=30
-API_MAX_WAIT=7200
+# LPAR VPN flake either recovers in minutes or never (#84152). Cap wait so we
+# fail with diagnostics instead of burning ~2h of empty probes.
+API_MAX_WAIT=2400
 API_INTERVAL=30
 HCP_NS="${HC_NS}-${HC_NAME}"
 
@@ -194,6 +203,16 @@ oc get pods -n metallb-system -o wide 2>/dev/null || true
 oc rollout restart daemonset speaker -n metallb-system || true
 oc rollout status daemonset speaker -n metallb-system --timeout=120s || true
 
+dump_ci_to_lpar_path() {
+  # Record CI→LPAR path details for VPN/MTU/routing RCA (best-effort).
+  echo "$(date) ===== CI→LPAR path diagnostics ====="
+  echo "$(date) hostname=$(hostname -f 2>/dev/null || hostname)"
+  [[ -e /tmp/vpn/up ]] && echo "$(date) VPN marker /tmp/vpn/up present" || echo "$(date) VPN marker /tmp/vpn/up MISSING"
+  ip route get "${LPAR_HOST_IP}" 2>/dev/null || true
+  ip -o link show 2>/dev/null | head -30 || true
+  echo "$(date) ===== END CI→LPAR path diagnostics ====="
+}
+
 # Confirm guest API health via mgmt kube-apiserver tunnel (works from CI even when
 # the MetalLB VIP is not routed to the build farm). Uses no extra images (s390x-safe).
 probe_readyz_via_portforward() {
@@ -224,8 +243,22 @@ probe_readyz_via_portforward() {
 
 probe_readyz() {
   local url="$1"
+  local body=""
+  local http_code="000"
+  local rc=0
   # Short timeouts: unreachable private VIPs must fail fast so LPAR is tried soon.
-  curl -sk --connect-timeout 5 --max-time 10 "${url%/}/readyz" 2>/dev/null || true
+  # Log curl_rc/http_code on stderr so empty bodies are distinguishable (timeout vs refuse).
+  set +e
+  body=$(curl -sk --connect-timeout 5 --max-time 10 -w '\n%{http_code}' "${url%/}/readyz" 2>/tmp/hcpvirt-oz-probe.err)
+  rc=$?
+  set -e
+  http_code=$(printf '%s\n' "${body}" | tail -n1)
+  body=$(printf '%s\n' "${body}" | sed '$d')
+  echo "$(date) probe ${url} curl_rc=${rc} http=${http_code} body=${body:-<empty>}" >&2
+  if [[ ${rc} -ne 0 ]]; then
+    cat /tmp/hcpvirt-oz-probe.err >&2 || true
+  fi
+  printf '%s' "${body}"
 }
 
 # Append URL if non-empty and not already present.
@@ -308,6 +341,8 @@ select_reachable_api() {
       if [[ -n "${selected}" ]]; then
         echo "$(date) SUCCESS: reachable guest API endpoint selected: ${selected}"
         patch_guest_server "${selected}"
+        printf '%s' "${selected}" > "${SHARED_DIR}/guest-api-server"
+        echo "$(date) Wrote ${SHARED_DIR}/guest-api-server=${selected}"
         echo "$(date) Post-patch nested_kubeconfig:"
         oc --kubeconfig "${VIRT_KC}" config view || true
         # Confirm oc can talk to the guest with the patched kubeconfig
@@ -316,9 +351,14 @@ select_reachable_api() {
           return 0
         fi
         echo "$(date) WARNING: /readyz via curl was ok but oc get --raw=/readyz failed; dumping and continuing to retry"
+        dump_ci_to_lpar_path
         dump_guest_debug
         selected=""
       fi
+    fi
+    # Path dump every ~5 minutes while waiting (VPN/MTU RCA).
+    if [[ $((elapsed % 300)) -eq 0 ]]; then
+      dump_ci_to_lpar_path
     fi
     sleep ${API_INTERVAL}
     elapsed=$((elapsed + API_INTERVAL))
@@ -327,14 +367,18 @@ select_reachable_api() {
   echo "$(date) ERROR: No guest API endpoint returned /readyz=ok within ${API_MAX_WAIT}s"
   echo "$(date) DEBUG: kube-apiserver Service YAML:"
   oc get svc kube-apiserver -n "${HCP_NS}" -o yaml || true
+  echo "$(date) DEBUG: EndpointSlices for kube-apiserver:"
+  oc get endpointslice -n "${HCP_NS}" -o wide 2>/dev/null || true
   echo "$(date) DEBUG: final port-forward probe (mgmt tunnel):"
   probe_readyz_via_portforward "${HCP_NS}" || true
+  dump_ci_to_lpar_path
   dump_mgmt_debug
   dump_guest_debug
   return 1
 }
 
 echo "$(date) NodePool status before API/node waits:"
+dump_ci_to_lpar_path
 oc get np -A -o wide || true
 oc describe np -A || true
 
@@ -472,4 +516,5 @@ oc get deploy,statefulset -n "${HCP_NS}" \
   --kubeconfig="${SHARED_DIR}/kubeconfig" \
   -o custom-columns='KIND:.kind,NAME:.metadata.name,CPU:.spec.template.spec.containers[0].resources.requests.cpu,MEM:.spec.template.spec.containers[0].resources.requests.memory' || true
 
-echo "$(date) Create step complete — hypershift-conformance will load ${SHARED_DIR}/nested_kubeconfig"
+echo "$(date) Create step complete — next steps (ibmz-test, then conformance) load ${SHARED_DIR}/nested_kubeconfig"
+echo "$(date) NOTE: next CI pods get a fresh VPN; guest API may flake across steps even if create succeeded"
