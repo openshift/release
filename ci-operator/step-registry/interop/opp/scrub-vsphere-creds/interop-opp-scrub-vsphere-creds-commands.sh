@@ -38,7 +38,7 @@ import stat
 shared_dir = os.environb[b"SHARED_DIR"]
 marker = os.environb[b"SCRUB_MARKER"]
 assignment = re.compile(
-    rb"^[ \t]*(?:export[ \t]+)?(?:GOVC_PASSWORD|GOVC_USERNAME)=(.*)\r?$",
+    rb"^[ \t]*(?:export[ \t]+)?(?:GOVC_PASSWORD|GOVC_USERNAME)=([^\r\n]*)\r?$",
     re.MULTILINE,
 )
 credential_files = set()
@@ -108,8 +108,18 @@ for directory, subdirectories, filenames in os.walk(shared_dir):
 for path in credential_files:
     try:
         os.remove(path)
-    except OSError:
+    except FileNotFoundError:
         continue
+    except OSError:
+        pass
+
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        continue
+    except OSError:
+        pass
+    raise SystemExit("ERROR: credential file remains before artifact upload")
 
 print(scrubbed)
 PYTHON
