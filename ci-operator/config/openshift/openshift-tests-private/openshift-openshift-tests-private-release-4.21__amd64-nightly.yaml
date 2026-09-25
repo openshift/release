@@ -986,8 +986,14 @@ tests:
     cluster_profile: equinix-ocp-hcp
     env:
       EGRESSIP_REMOTE_SUBNET: 192.168.223.0/24
+      EGRESSIP_SECONDARY_SUBNET_2: 192.168.224.0/24
       EGRESSIP_VLAN_ID: "3686"
       EGRESSIP_VLAN_SUBNET: 192.168.222.0/24
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="egressnet egressnet2"
+        EGRESSNET_NETWORK_SUBNET_V4='192.168.221.0/24'
+        EGRESSNET2_NETWORK_SUBNET_V4='192.168.224.0/24'
+      IPECHO_EXTRA_HOST_IPS: 192.168.224.1
       IPECHO_HOST_IP: 192.168.221.1
       IPECHO_REMOTE_CIDR: 192.168.223.1/32
       IPECHO_VLAN_CIDR: 192.168.222.1/24
@@ -999,6 +1005,7 @@ tests:
       TIMEOUT: +24 hours
     test:
     - ref: hypershift-agent-ovn-ipecho-provision
+    - ref: hypershift-agent-ovn-egressip-multinic-verify
     - ref: wait
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest

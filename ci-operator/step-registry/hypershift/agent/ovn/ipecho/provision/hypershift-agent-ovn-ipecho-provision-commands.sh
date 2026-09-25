@@ -38,6 +38,14 @@ IPECHO_VLAN_CIDR="${IPECHO_VLAN_CIDR:-}"
 IPECHO_REMOTE_CIDR="${IPECHO_REMOTE_CIDR:-}"
 IPECHO_REMOTE_IFACE="ipecho-remote"
 
+# Bridge addresses of any FURTHER extra networks whose guests must also reach the echo,
+# space separated, e.g. "192.168.224.1" for a second secondary NIC. The server binds
+# 0.0.0.0 so it already answers on every host address; what is missing is the firewalld
+# permission. libvirt puts each NAT network's bridge in the "libvirt" zone, and the zone
+# is per interface, so opening the port on the first bridge does nothing for the second -
+# the symptom is one NIC reaching the echo and the other timing out.
+IPECHO_EXTRA_HOST_IPS="${IPECHO_EXTRA_HOST_IPS:-}"
+
 if [[ -n "${IPECHO_VLAN_ID}" && -z "${IPECHO_VLAN_CIDR}" ]] ||
    [[ -z "${IPECHO_VLAN_ID}" && -n "${IPECHO_VLAN_CIDR}" ]]; then
   echo "ERROR: IPECHO_VLAN_ID and IPECHO_VLAN_CIDR must be set together"
@@ -58,7 +66,8 @@ fi
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- \
   "${IPECHO_PORT}" "${IPECHO_HOST_IP}" "${IPECHO_VLAN_ID}" "${IPECHO_VLAN_CIDR}" \
-  "${IPECHO_REMOTE_CIDR}" "${IPECHO_REMOTE_IFACE}" "${IPECHO_SERVICE_IP}" << 'EOF'
+  "${IPECHO_REMOTE_CIDR}" "${IPECHO_REMOTE_IFACE}" "${IPECHO_SERVICE_IP}" \
+  "${IPECHO_EXTRA_HOST_IPS}" << 'EOF'
 set -euxo pipefail
 
 IPECHO_PORT="$1"
@@ -68,6 +77,7 @@ IPECHO_VLAN_CIDR="$4"
 IPECHO_REMOTE_CIDR="$5"
 IPECHO_REMOTE_IFACE="$6"
 IPECHO_SERVICE_IP="$7"
+IPECHO_EXTRA_HOST_IPS="$8"
 
 # Write the ipecho Python HTTP server
 cat > /usr/local/bin/ipecho.py << 'PYEOF'
@@ -177,6 +187,19 @@ if [[ -n "${IPECHO_REMOTE_CIDR}" ]]; then
 
     IPECHO_IFACES="${IPECHO_IFACES} ${IPECHO_REMOTE_IFACE}"
 fi
+
+for extra_ip in ${IPECHO_EXTRA_HOST_IPS}; do
+    # Nothing is created here - these bridges already exist, put there by libvirt for the
+    # further extra networks. They are listed only so the port gets opened in their zone.
+    extra_bridge="$(ip -o -4 addr show | awk -v pfx="${extra_ip}/" '$4 ~ "^"pfx {print $2; exit}')"
+    if [[ -z "${extra_bridge}" ]]; then
+        echo "ERROR: no interface on this host holds ${extra_ip}"
+        ip -o -4 addr show
+        exit 1
+    fi
+    echo "additional guest-facing bridge for ${extra_ip}: ${extra_bridge}"
+    IPECHO_IFACES="${IPECHO_IFACES} ${extra_bridge}"
+done
 
 if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
     # The VLAN and dummy netdevs are created outside NetworkManager, so they land in the

@@ -1,0 +1,46 @@
+ref:
+  as: hypershift-agent-ovn-egressip-multinic-verify
+  from: cli
+  cli: latest
+  commands: hypershift-agent-ovn-egressip-multinic-verify-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 20m0s
+  grace_period: 5m0s
+  documentation: |-
+    Checks that the echo target the EgressIP tests will use is reachable from every guest
+    node over every egress interface, and fails the job with a precise diagnosis if it is
+    not.
+
+    Belongs in the job's test sequence immediately after
+    hypershift-agent-ovn-ipecho-provision and before the e2e chain, since the echo server
+    does not exist until that step has run.
+
+    Topology-independent by design. Whether the egress path is the untagged secondary NIC
+    (hypershift-agent-ovn-egressip-multinic), an 802.1Q subinterface on top of it
+    (hypershift-agent-ovn-egressip-multinic-vlan), or a second independent NIC
+    (EGRESSIP_SECONDARY_SUBNET_2), and whether the echo target sits inside that subnet or
+    beyond a next hop, the requirement is the same: a main-table lookup for the target must
+    resolve out of that egress interface, because ovnkube-node builds a
+    secondary-host-network EgressIP's routing table by copying routes out of the link from
+    main, filtered on output interface.
+
+    Per node and per interface it asserts that "ip route get <target> oif <iface>"
+    resolves, that the echo answers a request bound to that interface, and that what the
+    echo reports as the source is that node's address on the matching egress subnet.
+
+    Both checks are constrained to one interface at a time on purpose. An unqualified
+    lookup consults main as a whole and answers for whichever route has the lowest metric,
+    so with two secondary NICs pointed at one target it would report success for both while
+    only one of them has a route of its own - which is precisely the failure mode worth
+    catching. Without this step it surfaces much later as an EgressIP test timing out with
+    "sourceIP was still included in [...]", which names neither the route nor the target.
+
+    A no-op when ${SHARED_DIR}/ipecho_url or ${SHARED_DIR}/egressip_secondary_iface is
+    absent, so it is safe to leave in a job that does not configure either.
+
+    Reads from ${SHARED_DIR}: ipecho_url, egressip_secondary_iface,
+    egressip_secondary_subnet, egressip_secondary_node_ips, and the _2 suffixed variants
+    of the last three when a second secondary NIC was provisioned.

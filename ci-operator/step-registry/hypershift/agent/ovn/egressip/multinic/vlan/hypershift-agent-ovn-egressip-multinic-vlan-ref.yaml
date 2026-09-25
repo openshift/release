@@ -41,6 +41,13 @@ ref:
       node's MAIN routing table. That route is what makes a secondary-NIC EgressIP able to
       reach anything beyond its own subnet; see the note in the step for why it cannot
       live in the dedicated table.
+  - name: EGRESSIP_REMOTE_ROUTE_METRIC_BASE
+    default: "100"
+    documentation: |-
+      Metric of the EGRESSIP_REMOTE_SUBNET route on the VLAN interface. Must match the
+      value given to hypershift-agent-ovn-egressip-multinic, which derives the second
+      secondary NIC's metric from it. Two routes for one prefix at the same metric are
+      rejected by the kernel, so they have to differ when a job has both.
   - name: EGRESSIP_VLAN_TABLE_ID
     default: "3686"
     documentation: |-
@@ -106,3 +113,7 @@ ref:
     - egressip_secondary_subnet:   the CIDR EgressIP objects should draw from
     - egressip_secondary_vlan_id:  the 802.1Q tag
     - egressip_secondary_node_ips: "<node> <address>" per line, read from host-cidrs
+
+    If the job provisioned a second secondary NIC (EGRESSIP_SECONDARY_SUBNET_2), the VLAN
+    is layered only on the first and the _2 outputs are left untouched - so a job running
+    this step has one tagged egress path and one untagged one.

@@ -19,12 +19,66 @@ ref:
       IPv4 CIDR of the extra libvirt network created by baremetalds-devscripts-conf-extranetwork.
       Must match <NAME>_NETWORK_SUBNET_V4 in the job's EXTRA_NETWORK_CONFIG. Used to identify
       which host interface is the egress interface.
+  - name: EGRESSIP_SECONDARY_SUBNET_2
+    default: ""
+    documentation: |-
+      IPv4 CIDR of a SECOND extra libvirt network, e.g. 192.168.224.0/24. Optional. When
+      set, the job must list two names in EXTRA_NETWORK_CONFIG's EXTRA_NETWORK_NAMES with a
+      <NAME>_NETWORK_SUBNET_V4 for each, and the nodes get a second independent secondary
+      NIC configured identically to the first.
+
+      This NIC is deliberately never the one the VLAN is layered on: slot 1 carries the
+      tagged subinterface when EGRESSIP_VLAN_ID is set, slot 2 stays untagged. Two
+      independent secondary host networks is what lets a job exercise the parts of
+      OVN-Kubernetes that only misbehave with more than one - per-link routing table
+      allocation, the longest-prefix-match that picks which link hosts an EgressIP, and
+      contention for one destination prefix in the main table.
   - name: EGRESSIP_SECONDARY_NEVER_DEFAULT
     default: "true"
     documentation: |-
-      Set ipv4.never-default on the secondary interface. The extra libvirt network is
-      forward_mode=nat, so its dnsmasq advertises a default gateway and the node would
-      otherwise end up with two default routes.
+      Set ipv4.never-default on every secondary interface. The extra libvirt networks are
+      forward_mode=nat, so their dnsmasq advertises a default gateway and the node would
+      otherwise end up with one default route per extra network competing with br-ex.
+  - name: EGRESSIP_REMOTE_SUBNET
+    default: ""
+    documentation: |-
+      CIDR containing the echo server's off-subnet address (IPECHO_REMOTE_CIDR), e.g.
+      192.168.223.0/24. When set, a route to it is added to the node's MAIN routing table
+      on every secondary interface. That route is what makes a secondary-NIC EgressIP able
+      to reach anything beyond its own subnet: OVN-Kubernetes fills the EgressIP's routing
+      table by copying routes out of the link from main only. Without it every off-subnet
+      destination blackholes.
+
+      With two secondary NICs both need to reach the same target for the test to prove
+      anything, so both get a route to this prefix at distinct metrics - the kernel refuses
+      two routes for one prefix at the same metric, and the per-link copy still gives each
+      EgressIP table its own.
+  - name: EGRESSIP_REMOTE_GATEWAY
+    default: ""
+    documentation: |-
+      Next hop for EGRESSIP_REMOTE_SUBNET on the first secondary interface. Defaults to the
+      .1 of EGRESSIP_SECONDARY_SUBNET, which is that extra libvirt network's bridge address
+      on the dev-scripts host, i.e. where IPECHO_REMOTE_CIDR lives.
+  - name: EGRESSIP_REMOTE_GATEWAY_2
+    default: ""
+    documentation: |-
+      Next hop for EGRESSIP_REMOTE_SUBNET on the second secondary interface. Defaults to the
+      .1 of EGRESSIP_SECONDARY_SUBNET_2. Ignored unless that is set.
+  - name: EGRESSIP_REMOTE_ROUTE_METRIC_BASE
+    default: "100"
+    documentation: |-
+      Metric of the EGRESSIP_REMOTE_SUBNET route on the first secondary interface; the
+      second gets this plus 100. Only the relative order matters, and only for the node's
+      own traffic - each EgressIP routing table receives its own copy regardless. Keep both
+      above br-ex's default route metric.
+  - name: EGRESSIP_VLAN_ID
+    default: ""
+    documentation: |-
+      Read only to decide who owns the EGRESSIP_REMOTE_SUBNET route on the FIRST secondary
+      interface. When set, the job is running the tagged topology and
+      hypershift-agent-ovn-egressip-multinic-vlan writes that route on the VLAN
+      subinterface instead, so this step leaves slot 1 alone. Slot 2 is untagged in both
+      topologies and is always written here.
   - name: TUNED_CONFIGMAP_NAME
     default: "egressip-multinic-forwarding"
     documentation: "Name of the ConfigMap holding the Tuned object referenced from NodePool.spec.tuningConfig."
@@ -32,16 +86,22 @@ ref:
     Prepares a HyperShift Agent guest cluster to run EgressIP on a secondary host
     interface, as requested for OCP Bare Metal / HCP managed clusters.
 
-    Requires the guest nodes to already have a second addressed NIC. On baremetalds
-    that comes from dev-scripts EXTRA_NETWORK_NAMES, so the job must set
+    Requires the guest nodes to already have one or two extra addressed NICs. On
+    baremetalds those come from dev-scripts EXTRA_NETWORK_NAMES, so the job must set
     EXTRA_NETWORK_CONFIG and run baremetalds-devscripts-conf-extranetwork before
-    provisioning. Every VM flavor, including extraworker, gets a NIC on the extra
+    provisioning. Every VM flavor, including extraworker, gets a NIC on each extra
     network with a static libvirt DHCP reservation.
+
+    Handles one secondary NIC by default and a second when EGRESSIP_SECONDARY_SUBNET_2 is
+    set. The two are kept distinct on purpose: the VLAN step layers its tagged
+    subinterface on the first, so the second is always a plain untagged NIC on its own L2
+    segment.
 
     The step:
 
-    1. Discovers the secondary interface by looking for an address inside
-       EGRESSIP_SECONDARY_SUBNET, and fails if the nodes disagree on its name.
+    1. Discovers each secondary interface by looking for an address inside the
+       corresponding subnet, and fails if the nodes disagree on its name or if two
+       subnets resolve to the same link.
     2. Sets gatewayConfig.ipForwarding=Global on the guest CNO. The default of
        Restricted leaves the kernel FORWARD policy at DROP with an allowlist that does
        not cover pod traffic entering on ovn-k8s-mp0 and leaving on a secondary NIC.
@@ -51,16 +111,25 @@ ref:
     3. Delivers net.ipv4.conf.<iface>.forwarding=1 (plus loose rp_filter) through a Tuned
        object attached to NodePool.spec.tuningConfig. ipForwarding=Global does not cover
        this: OVN-Kubernetes only sets the per-interface sysctl on br-ex and ovn-k8s-mp0.
-    4. Sets ipv4.never-default on the secondary NIC so the NAT'd libvirt network's DHCP
-       gateway does not compete with the default route via br-ex. This is a runtime fix
+    4. Sets ipv4.never-default on each secondary NIC so the NAT'd libvirt networks' DHCP
+       gateways do not compete with the default route via br-ex. This is a runtime fix
        suitable for CI; the supported production equivalent is day-1 NIC configuration.
-    5. Waits for k8s.ovn.org/host-cidrs to advertise the secondary subnet, which is what
+    5. Adds a main-table route to EGRESSIP_REMOTE_SUBNET out of each secondary NIC, at
+       distinct metrics, so every interface expected to carry an EgressIP can reach the
+       off-subnet echo target.
+    6. Waits for k8s.ovn.org/host-cidrs to advertise every secondary subnet, which is what
        the hosted control plane's ovnkube-cluster-manager uses to pick an egress node.
 
     Outputs saved to ${SHARED_DIR}:
     - egressip_secondary_iface:    interface name, e.g. enp3s0
     - egressip_secondary_subnet:   the CIDR that EgressIP objects should draw from
     - egressip_secondary_node_ips: "<node> <address>" per line, read from host-cidrs
+
+    and, only when EGRESSIP_SECONDARY_SUBNET_2 is set, the same three for the second NIC
+    under egressip_secondary_iface_2, egressip_secondary_subnet_2 and
+    egressip_secondary_node_ips_2. The unsuffixed names always describe the first
+    interface, so a consumer that knows about only one is unaffected by the second
+    appearing.
 
     Addresses are allocated by libvirt in flavor-iteration order rather than hostname
     order, so tests must read them from these files instead of hardcoding.

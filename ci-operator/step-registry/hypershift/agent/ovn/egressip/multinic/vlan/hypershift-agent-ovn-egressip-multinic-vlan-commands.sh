@@ -48,11 +48,23 @@ BASE_IFACE="$(cat "${SHARED_DIR}/egressip_secondary_iface")"
 BASE_SUBNET="$(cat "${SHARED_DIR}/egressip_secondary_subnet")"
 BASE_PREFIX="${BASE_SUBNET%.*/*}."
 
+# A job may provision a second, independent secondary NIC. The VLAN is layered only on
+# the first; the second stays untagged and keeps the EgressIP configuration the previous
+# step gave it. It matters here for two things only: the Tuned profile is a single object
+# covering every egress interface, and the default-route assertion has to cover it too.
+SECOND_IFACE=""
+if [[ -f "${SHARED_DIR}/egressip_secondary_iface_2" ]]; then
+  SECOND_IFACE="$(cat "${SHARED_DIR}/egressip_secondary_iface_2")"
+fi
+
 VLAN_PREFIX="${EGRESSIP_VLAN_SUBNET%.*/*}."
 VLAN_MASK="${EGRESSIP_VLAN_SUBNET#*/}"
 VLAN_GATEWAY="${EGRESSIP_VLAN_GATEWAY:-${VLAN_PREFIX}1}"
 
 echo "Base interface: ${BASE_IFACE} on ${BASE_SUBNET}"
+if [[ -n "${SECOND_IFACE}" ]]; then
+  echo "Second untagged secondary interface (left alone): ${SECOND_IFACE}"
+fi
 echo "VLAN ${EGRESSIP_VLAN_ID}: ${EGRESSIP_VLAN_IFACE} on ${EGRESSIP_VLAN_SUBNET}, next hop ${VLAN_GATEWAY}"
 echo "Dedicated table ${EGRESSIP_VLAN_TABLE_ID}, rule priority ${EGRESSIP_VLAN_RULE_PRIORITY}"
 echo "Off-subnet echo route: ${EGRESSIP_REMOTE_SUBNET:-<none>}"
@@ -150,7 +162,30 @@ kind: NMState
 metadata:
   name: nmstate
 EOF
+
+# The handler DaemonSet and the webhook are created by the operator in response to that
+# CR, a few seconds later. "oc rollout status" on a resource that does not exist yet
+# errors out immediately rather than waiting for it, so poll for creation first.
+echo "Waiting for the nmstate operands to appear..."
+operands_ok=""
+for _ in $(seq 1 60); do
+  if guest -n openshift-nmstate get ds nmstate-handler >/dev/null 2>&1 &&
+     guest -n openshift-nmstate get deploy nmstate-webhook >/dev/null 2>&1; then
+    operands_ok="yes"
+    break
+  fi
+  sleep 5
+done
+if [[ -z "${operands_ok}" ]]; then
+  echo "ERROR: the nmstate operator never created ds/nmstate-handler and deploy/nmstate-webhook"
+  guest get -n openshift-nmstate nmstate,deploy,ds,pods || true
+  exit 1
+fi
+
 guest -n openshift-nmstate rollout status ds/nmstate-handler --timeout=10m
+# The webhook mutates NodeNetworkConfigurationPolicy on admission, so applying a policy
+# before it has endpoints fails the call outright.
+guest -n openshift-nmstate rollout status deploy/nmstate-webhook --timeout=5m
 
 #
 # 2. One NodeNetworkConfigurationPolicy per node. An NNCP applies the same desiredState
@@ -184,12 +219,18 @@ for node in ${NODES}; do
   # That is why the route to the echo server's off-subnet address goes in main. It is a
   # specific prefix rather than a default, so it never competes with the default route via
   # br-ex.
+  #
+  # The metric is explicit because a second secondary NIC, when the job has one, holds a
+  # route to this same prefix out of its own link. The kernel refuses two routes for one
+  # prefix at the same metric, so they have to differ; both then sit in main and the
+  # per-link filter hands each EgressIP table its own.
   remote_route=""
   if [[ -n "${EGRESSIP_REMOTE_SUBNET}" ]]; then
     remote_route="
       - destination: ${EGRESSIP_REMOTE_SUBNET}
         next-hop-interface: ${EGRESSIP_VLAN_IFACE}
-        next-hop-address: ${VLAN_GATEWAY}"
+        next-hop-address: ${VLAN_GATEWAY}
+        metric: ${EGRESSIP_REMOTE_ROUTE_METRIC_BASE}"
   fi
 
   cat <<EOF | guest apply -f -
@@ -245,8 +286,21 @@ guest get nncp
 # 3. Extend the Tuned profile to the VLAN. Re-rendered rather than patched because
 #    NodePool.spec.tuningConfig already points at this ConfigMap by name and a second
 #    Tuned object matching the same nodes would simply lose the priority contest.
-#    Keep in sync with hypershift-agent-ovn-egressip-multinic, which creates it.
+#    Keep in sync with hypershift-agent-ovn-egressip-multinic, which creates it - which
+#    also means re-emitting the second NIC's sysctls when the job provisioned one, since
+#    re-rendering replaces the whole object.
 #
+TUNED_IFACES=("${BASE_IFACE}" "${EGRESSIP_VLAN_IFACE}")
+if [[ -n "${SECOND_IFACE}" ]]; then
+  TUNED_IFACES+=("${SECOND_IFACE}")
+fi
+sysctl_lines=""
+for iface in "${TUNED_IFACES[@]}"; do
+  sysctl_lines+="          net.ipv4.conf.${iface}.forwarding=1"$'\n'
+  sysctl_lines+="          net.ipv4.conf.${iface}.rp_filter=2"$'\n'
+done
+sysctl_lines="${sysctl_lines%$'\n'}"
+
 cat <<EOF | mgmt apply -f -
 apiVersion: v1
 kind: ConfigMap
@@ -265,18 +319,15 @@ data:
       - name: egressip-multinic
         data: |
           [main]
-          summary=Enable forwarding on the EgressIP secondary interface
+          summary=Enable forwarding on the EgressIP secondary interfaces
           include=openshift-node
           [sysctl]
-          net.ipv4.conf.${BASE_IFACE}.forwarding=1
-          net.ipv4.conf.${BASE_IFACE}.rp_filter=2
-          net.ipv4.conf.${EGRESSIP_VLAN_IFACE}.forwarding=1
-          net.ipv4.conf.${EGRESSIP_VLAN_IFACE}.rp_filter=2
+${sysctl_lines}
       recommend:
       - priority: 20
         profile: egressip-multinic
 EOF
-echo "Re-rendered ${TUNED_CONFIGMAP_NAME} covering ${BASE_IFACE} and ${EGRESSIP_VLAN_IFACE}"
+echo "Re-rendered ${TUNED_CONFIGMAP_NAME} covering ${TUNED_IFACES[*]}"
 
 echo "Waiting for the sysctl to land on every guest node..."
 for node in ${NODES}; do
@@ -304,14 +355,20 @@ done
 #    a competing default route.
 #
 echo "Checking the default route is still single and via br-ex..."
+EGRESS_PATH_IFACES=("${BASE_IFACE}" "${EGRESSIP_VLAN_IFACE}")
+if [[ -n "${SECOND_IFACE}" ]]; then
+  EGRESS_PATH_IFACES+=("${SECOND_IFACE}")
+fi
 for node in ${NODES}; do
   routes="$(guest debug -n default "node/${node}" --quiet -- \
     chroot /host ip -4 route show default 2>/dev/null)" || true
   echo "  ${node}: $(echo "${routes}" | tr '\n' '|')"
-  if echo "${routes}" | grep -q "dev ${EGRESSIP_VLAN_IFACE}\|dev ${BASE_IFACE}"; then
-    echo "ERROR: ${node} has a default route via the egress path; it would take over node traffic"
-    exit 1
-  fi
+  for iface in "${EGRESS_PATH_IFACES[@]}"; do
+    if echo "${routes}" | grep -q "dev ${iface}"; then
+      echo "ERROR: ${node} has a default route via ${iface}; it would take over node traffic"
+      exit 1
+    fi
+  done
 done
 
 #
@@ -341,7 +398,8 @@ done
 #
 # 6. Repoint the outputs at the VLAN. The untagged values written by the previous step
 #    are overwritten, so the tests draw EgressIPs from the tagged subnet and assert
-#    against the tagged interface.
+#    against the tagged interface. The _2 outputs, if the job provisioned a second NIC,
+#    are deliberately left as they are: that interface is untagged in both topologies.
 #
 echo "${EGRESSIP_VLAN_IFACE}" > "${SHARED_DIR}/egressip_secondary_iface"
 echo "${EGRESSIP_VLAN_SUBNET}" > "${SHARED_DIR}/egressip_secondary_subnet"

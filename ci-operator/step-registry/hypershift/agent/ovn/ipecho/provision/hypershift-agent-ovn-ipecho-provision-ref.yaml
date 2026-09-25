@@ -43,6 +43,17 @@ ref:
       route, so it is reached even by a node that has no usable next hop out of that
       interface. The guest side needs a matching gatewayed route in its main routing
       table for this to be reachable.
+  - name: IPECHO_EXTRA_HOST_IPS
+    default: ""
+    documentation: |-
+      Space-separated bridge addresses of any FURTHER extra networks whose guests must
+      reach the echo, e.g. "192.168.224.1" when the job gives the nodes a second secondary
+      NIC. Nothing is created for them; the port is opened in each one's firewalld zone.
+
+      Needed because the server already answers on every host address - it binds 0.0.0.0 -
+      but firewalld zones are per interface, so opening the port on the first extra
+      network's bridge does nothing for the second. Without this one NIC reaches the echo
+      and the other times out, which downstream looks like an EgressIP failure.
   timeout: 10m0s
   grace_period: 5m0s
   documentation: |-
