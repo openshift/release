@@ -451,18 +451,19 @@ def write_reports(artifacts, results, entries, errors):
                                 ("JUnit", write_junit, (artifacts, results))):
         try:
             writer(*args)
-        except OSError as error:
-            message = f"cannot write {label}: {error}"
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            message = f"cannot write {label}: {type(error).__name__}: {error}"
             if message not in errors:
                 errors.append(message)
                 results.append(("artifact reporting", 0, message))
             print(f"ERROR: {message}", flush=True)
     if len(errors) != previous_errors:
-        # Keep machine-readable status accurate if HTML or JUnit failed to write.
-        try:
-            write_summary(artifacts, entries, errors)
-        except OSError:
-            pass  # The original reporting error is already recorded above.
+        # Refresh both indexes if a later report writer failed.
+        for writer in (write_summary, write_index):
+            try:
+                writer(artifacts, entries, errors)
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass  # The original reporting error is already recorded above.
 
 
 def emit_metrics(env, repo, artifacts, eval_artifacts, *, stream_log, result, run_id, prompt):  # pylint: disable=too-many-arguments
@@ -476,7 +477,7 @@ def emit_metrics(env, repo, artifacts, eval_artifacts, *, stream_log, result, ru
                          repo, env, eval_artifacts / "metrics.log", 60)
         if status:
             print(f"WARNING: metrics extraction failed for {run_id}", flush=True)
-    except (OSError, subprocess.TimeoutExpired) as error:
+    except Exception as error:  # pylint: disable=broad-exception-caught
         print(f"WARNING: metrics extraction failed: {error}", flush=True)
 
 
@@ -523,6 +524,7 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                 run_env["ARTIFACT_DIR"] = str(eval_artifacts)
                 begin = time.monotonic()
                 failures = []
+                execution_completed = False
                 invoked = False
                 directory = None
                 stream_log = eval_artifacts / "claude-eval.log"
@@ -570,35 +572,44 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                                      repo, run_env, eval_artifacts / "regression.log", min(60, remaining()))
                     if status:
                         raise EvalError("harness regression check failed; see regression log")
-                except (EvalError, OSError, ValueError, subprocess.TimeoutExpired) as error:
-                    failures.append(str(error))
+                    execution_completed = True
+                except Exception as error:  # pylint: disable=broad-exception-caught
+                    failures.append(f"{type(error).__name__}: {error}")
                 except Interrupted as error:
                     failures.append(str(error))
                     raise
                 finally:
-                    if invoked:
-                        directory = None
-                        try:
-                            directory = run_directory(runs, run_id)
-                        except (EvalError, OSError) as error:
-                            failures.append(str(error))
-                        if directory is not None:
-                            for label, action in (("collect results", collect_result), ("archive run", archive)):
-                                try:
-                                    action(directory, eval_artifacts)
-                                except (EvalError, OSError, tarfile.TarError) as error:
-                                    failures.append(f"{label}: {error}")
-                        emit_metrics(env, repo, artifacts, eval_artifacts, stream_log=stream_log,
-                                     result=directory / "run_result.json" if directory else None,
-                                     run_id=run_id, prompt=prompt)
-                    failure = "; ".join(dict.fromkeys(failures))
-                    record.update(status="failed" if failure else "passed", failure=failure)
-                    results.append((entry.config, time.monotonic() - begin, failure))
-                    write_reports(artifacts, results, index, errors)
+                    finalized = False
+                    try:
+                        if invoked:
+                            directory = None
+                            try:
+                                directory = run_directory(runs, run_id)
+                            except Exception as error:  # pylint: disable=broad-exception-caught
+                                failures.append(f"locate run: {type(error).__name__}: {error}")
+                            if directory is not None:
+                                for label, action in (("collect results", collect_result), ("archive run", archive)):
+                                    try:
+                                        action(directory, eval_artifacts)
+                                    except Exception as error:  # pylint: disable=broad-exception-caught
+                                        failures.append(f"{label}: {type(error).__name__}: {error}")
+                            emit_metrics(env, repo, artifacts, eval_artifacts, stream_log=stream_log,
+                                         result=directory / "run_result.json" if directory else None,
+                                         run_id=run_id, prompt=prompt)
+                        finalized = True
+                    finally:
+                        # Escaping control-flow exceptions must not become success.
+                        if not (execution_completed and finalized) and not failures:
+                            failures.append("eval did not complete")
+                        failure = "; ".join(dict.fromkeys(failures))
+                        record.update(status="failed" if failure else "passed", failure=failure)
+                        results.append((entry.config, time.monotonic() - begin, failure))
+                        write_reports(artifacts, results, index, errors)
                 print(f"{'FAIL' if failure else 'PASS'} {entry.config}: {failure or 'complete'}", flush=True)
-    except (EvalError, Interrupted, OSError, ValueError, subprocess.TimeoutExpired) as error:
-        errors.append(str(error))
-        results.append(("eval runner", time.monotonic() - started, str(error)))
+    except (Exception, Interrupted) as error:  # pylint: disable=broad-exception-caught
+        message = f"{type(error).__name__}: {error}"
+        errors.append(message)
+        results.append(("eval runner", time.monotonic() - started, message))
         print(f"ERROR: {error}", flush=True)
     finally:
         write_reports(artifacts, results, index, errors)

@@ -190,6 +190,9 @@ fails the step. Deadline-expired evals are recorded as failures. SIGTERM/SIGINT
 stop scheduling and terminate child processes while preserving available artifacts
 when possible. Collection or archive failures fail that eval, retain existing
 logs, and allow subsequent evals to run.
+Ordinary unexpected exceptions also fail the affected eval. Success requires
+completed execution and finalization; an empty error list alone is insufficient.
+Report writers are attempted independently, and reporting errors fail the step.
 The regression check reads `summary.yaml` from the verified physical run
 directory and uses the cloned harness's `detect_regressions()` threshold rules.
 It does not derive a second path from the eval or skill name, or depend on
