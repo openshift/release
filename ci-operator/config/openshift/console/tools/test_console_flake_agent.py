@@ -408,6 +408,16 @@ Context (generated 2026-09-24T18:40:20.154Z)
         paths, patch = self.driver.candidate_patch()
         self.assertEqual(paths, ['frontend/e2e/tests/console/a.spec.ts'])
         self.assertIn(b'toBe(2)', patch)
+        generated = work / 'frontend/e2e/test-results/.last-run.json'
+        generated.parent.mkdir(parents=True)
+        generated.write_text('{"status":"passed"}\n')
+        paths, patch = self.driver.candidate_patch()
+        self.assertEqual(paths, ['frontend/e2e/tests/console/a.spec.ts'])
+        self.assertNotIn(b'.last-run.json', patch)
+        forbidden = work / 'frontend/e2e/runner-config.ts'
+        forbidden.write_text('export const retries = 2;\n')
+        with self.assertRaisesRegex(ValueError, 'outside test code'):
+            self.driver.candidate_patch()
 
     def test_independent_verification_accepts_only_real_passes(self):
         source = self.root / 'source'
