@@ -33,11 +33,15 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 OSC_INSTALL=${OSC_INSTALL:-false}
 OSC_NAMESPACE=${OSC_NAMESPACE:-openshift-sandboxed-containers-operator}
 CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE:-}
+if [[ -z "${CATALOG_SOURCE_IMAGE}" && -f "${SHARED_DIR}/catalog-source-image" ]]; then
+  CATALOG_SOURCE_IMAGE=$(cat "${SHARED_DIR}/catalog-source-image")
+fi
 OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
 PEERPODS_CREDENTIALS_MODE="${PEERPODS_CREDENTIALS_MODE:-cco}"
 ENABLEPEERPODS=${ENABLEPEERPODS:-false}
 WORKLOAD_TO_TEST=${WORKLOAD_TO_TEST:-kata}
+USE_OLMV1=${USE_OLMV1:-false}
 OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
 
 OC_RETRY_COUNT=${OC_RETRY_COUNT:-3}
@@ -56,11 +60,24 @@ if ! command -v helm &> /dev/null; then
   exit 1
 fi
 
+# OLM v1 requires OpenShift 4.22+
+if [[ "${USE_OLMV1}" == "true" ]]; then
+  OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || echo "")
+  OCP_MAJOR=$(echo "${OCP_VERSION}" | cut -d. -f1)
+  OCP_MINOR=$(echo "${OCP_VERSION}" | cut -d. -f2)
+  if [[ -n "${OCP_MAJOR}" && -n "${OCP_MINOR}" ]] && \
+     [[ ${OCP_MAJOR} -lt 4 || ( ${OCP_MAJOR} -eq 4 && ${OCP_MINOR} -lt 22 ) ]]; then
+    echo ">>> ERROR: OLM v1 requires OpenShift 4.22 or newer (detected: ${OCP_VERSION})"
+    exit 1
+  fi
+fi
+
 # Show configuration
 echo ">>> OSC charts: ${OSC_CHARTS_REPO} (ref: ${OSC_CHARTS_REF})"
 echo ">>> Namespace: ${OSC_NAMESPACE}"
 echo ">>> Workload: ${WORKLOAD_TO_TEST}"
 echo ">>> Peer-pods: ${ENABLEPEERPODS}"
+echo ">>> OLM v1: ${USE_OLMV1}"
 if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
   echo ">>> Catalog source: ${OSC_DEV_CATALOG_NAME} (image: ${CATALOG_SOURCE_IMAGE})"
 else
@@ -289,6 +306,48 @@ function get_cloud_provider() {
   echo "${provider}"
 }
 
+function patch_catalog_for_allnamespaces() {
+  local source_image="$1"
+  local work_dir
+  work_dir=$(mktemp -d)
+
+  echo ">>> Extracting FBC configs from catalog image: ${source_image}" >&2
+  mkdir -p "${work_dir}/configs"
+  if ! oc image extract "${source_image}" --path /configs/:"${work_dir}/configs/" --confirm; then
+    echo ">>> ERROR: Failed to extract catalog image: ${source_image}" >&2
+    rm -rf "${work_dir}"
+    return 1
+  fi
+
+  echo ">>> Patching FBC to enable AllNamespaces install mode" >&2
+  find "${work_dir}/configs" -type f | while read -r fbc_file; do
+    sed -i '/"type".*"AllNamespaces"/{n;s/"supported".*false/"supported": true/}' "$fbc_file"
+  done
+
+  echo ">>> Patched installModes (grep -A10 -B10):" >&2
+  grep -r -A10 -B10 "AllNamespaces" "${work_dir}/configs/" >&2 || echo ">>> WARNING: AllNamespaces not found in FBC configs" >&2
+
+  cat > "${work_dir}/Dockerfile" <<'EOF'
+FROM quay.io/operator-framework/opm:latest
+COPY configs /configs
+RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
+ENTRYPOINT ["/bin/opm"]
+CMD ["serve", "/configs", "--cache-dir=/tmp/cache"]
+LABEL operators.operatorframework.io.index.configs.v1=/configs
+EOF
+
+  echo ">>> Building patched catalog image via oc new-build" >&2
+  oc new-build --binary --name=patched-osc-catalog -n "${OSC_NAMESPACE}" \
+    --to=patched-osc-catalog:latest || true
+  oc start-build patched-osc-catalog --from-dir="${work_dir}" -n "${OSC_NAMESPACE}" --wait --follow || {
+    echo ">>> ERROR: Failed to build patched catalog image" >&2
+    rm -rf "${work_dir}"
+    return 1
+  }
+
+  rm -rf "${work_dir}"
+}
+
 function render_osc_operator_chart() {
   local charts_dir="$1"
   local operator_chart="${charts_dir}/osc-operator"
@@ -315,6 +374,20 @@ function render_osc_operator_chart() {
     echo ">>> Helm: dev.enabled=true, dev.image=${CATALOG_SOURCE_IMAGE}" >&2
   else
     helm_args+=("--set" "dev.enabled=false")
+  fi
+
+  if [[ "${USE_OLMV1}" == "true" ]]; then
+    if [[ -z "${CATALOG_SOURCE_IMAGE}" ]]; then
+      echo ">>> ERROR: USE_OLMV1=true requires CATALOG_SOURCE_IMAGE to be set" >&2
+      return 1
+    fi
+    if [[ -z "${PATCHED_CATALOG_IMAGE:-}" ]]; then
+      echo ">>> ERROR: PATCHED_CATALOG_IMAGE not set. Call patch_catalog_for_allnamespaces before render." >&2
+      return 1
+    fi
+    helm_args+=("--set" "olmv1.enabled=true" "--set" "dev.enabled=true" "--set-string" "dev.image=${PATCHED_CATALOG_IMAGE}")
+    helm_args+=("--api-versions" "olm.operatorframework.io/v1/ClusterExtension" "--api-versions" "olm.operatorframework.io/v1/ClusterCatalog")
+    echo ">>> Helm: olmv1.enabled=true, dev.image=${PATCHED_CATALOG_IMAGE}" >&2
   fi
 
   local helm_output
@@ -449,6 +522,14 @@ function install_osc_operator() {
   echo ">>> Creating namespace ${OSC_NAMESPACE}"
   oc create namespace "${OSC_NAMESPACE}" 2>/dev/null || true
 
+  if [[ "${USE_OLMV1}" == "true" ]]; then
+    patch_catalog_for_allnamespaces "${CATALOG_SOURCE_IMAGE}" || return 1
+    PATCHED_CATALOG_IMAGE="$(oc get is patched-osc-catalog -n "${OSC_NAMESPACE}" \
+      -o jsonpath='{.status.dockerImageRepository}'):latest"
+    echo ">>> Patched catalog image: ${PATCHED_CATALOG_IMAGE}"
+    oc policy add-role-to-group system:image-puller system:serviceaccounts -n "${OSC_NAMESPACE}"
+  fi
+
   local operator_yaml="${SCRATCH}/operator-manifests.yaml"
   if ! render_osc_operator_chart "${charts_dir}" > "${operator_yaml}"; then
     echo ">>> ERROR: Failed to render operator chart"
@@ -470,7 +551,7 @@ function install_osc_operator() {
   fi
 }
 
-function wait_for_operator() {
+function wait_for_operator_olmv0() {
   # Stage 0: Wait for ALL CatalogSources to be READY (600s)
   echo ">>> Waiting for all CatalogSources to be READY..."
   local all_catalogs_ready=false
@@ -546,6 +627,53 @@ function wait_for_operator() {
   local csv_name
   csv_name=$(oc get csv -n "${OSC_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
   echo ">>> CSV ${csv_name} is Succeeded"
+}
+
+function wait_for_operator_olmv1() {
+  # Stage 1: Wait for ClusterCatalog to be Serving (300s)
+  if ! wait_until "ClusterCatalog ${OSC_DEV_CATALOG_NAME} Serving" 300 10 \
+    "[[ \"\$(oc get clustercatalog '${OSC_DEV_CATALOG_NAME}' -o jsonpath='{.status.conditions[?(@.type==\"Serving\")].status}' 2>/dev/null)\" == \"True\" ]]"; then
+    echo ">>> ERROR: ClusterCatalog ${OSC_DEV_CATALOG_NAME} not ready" >&2
+    oc get clustercatalog "${OSC_DEV_CATALOG_NAME}" -o yaml || true
+    return 1
+  fi
+
+  # Stage 2: Wait for ClusterExtension Installed (600s)
+  if ! wait_until "ClusterExtension sandboxed-containers Installed" 600 10 \
+    "[[ \"\$(oc get clusterextension sandboxed-containers -o jsonpath='{.status.conditions[?(@.type==\"Installed\")].status}' 2>/dev/null)\" == \"True\" ]]"; then
+    echo ">>> ERROR: ClusterExtension not installed" >&2
+    oc get clusterextension sandboxed-containers -o yaml || true
+    return 1
+  fi
+
+  # Stage 3: Wait for CSV and patch installModes to support AllNamespaces
+  if ! wait_until "CSV exists" 120 5 \
+    "[[ -n \"\$(oc get csv -n '${OSC_NAMESPACE}' -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)\" ]]"; then
+    echo ">>> ERROR: CSV not found in ${OSC_NAMESPACE}" >&2
+    return 1
+  fi
+
+  local csv_name
+  csv_name=$(oc get csv -n "${OSC_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}')
+  echo ">>> Patching CSV ${csv_name} to support AllNamespaces install mode" >&2
+  local idx
+  idx=$(oc get csv -n "${OSC_NAMESPACE}" "${csv_name}" -o json | \
+    jq '.spec.installModes | to_entries[] | select(.value.type == "AllNamespaces") | .key')
+  if [[ -n "${idx}" ]]; then
+    oc patch csv -n "${OSC_NAMESPACE}" "${csv_name}" --type=json \
+      -p "[{\"op\": \"replace\", \"path\": \"/spec/installModes/${idx}/supported\", \"value\": true}]"
+    echo ">>> CSV ${csv_name} AllNamespaces install mode patched to supported=true" >&2
+  else
+    echo ">>> WARNING: AllNamespaces install mode entry not found in CSV ${csv_name}" >&2
+  fi
+}
+
+function wait_for_operator() {
+  if [[ "${USE_OLMV1}" == "true" ]]; then
+    wait_for_operator_olmv1
+  else
+    wait_for_operator_olmv0
+  fi
 
   # Stage 5: Wait for controller-manager Deployment to be Available (900s)
   if ! wait_until "controller-manager deployment Available" 900 5 \
@@ -763,6 +891,7 @@ echo "========================================="
 echo ">>> OSC Operator Installation"
 echo ">>> Workload: ${WORKLOAD_TO_TEST}"
 echo ">>> Peer-pods: ${ENABLEPEERPODS}"
+echo ">>> OLM v1: ${USE_OLMV1}"
 echo "========================================="
 
 # Phase 1: Set up CatalogSource (if Pre-GA)
@@ -771,6 +900,25 @@ setup_catalog_source
 # Phase 2: Fetch charts
 CHARTS_DIR=$(fetch_osc_charts)
 echo ">>> Charts directory: ${CHARTS_DIR}"
+
+# Temp patch: fix OLMv1 catalog selection (catalog.name → catalog.selector)
+# The ClusterExtension CRD uses spec.source.catalog.selector (LabelSelector),
+# not spec.source.catalog.name. Without this, operator-controller resolves from
+# ALL catalogs including openshift-redhat-operators (unpatched AllNamespaces).
+# See: https://github.com/operator-framework/operator-controller/blob/main/api/v1/clusterextension_types.go
+if [[ "${USE_OLMV1}" == "true" ]]; then
+  echo ">>> Patching OLMv1 chart templates for catalog selector API"
+  catalog_tpl="${CHARTS_DIR}/osc-operator/templates/clustercatalog.yaml"
+  ext_tpl="${CHARTS_DIR}/osc-operator/templates/clusterextension.yaml"
+  # Add label to ClusterCatalog
+  sed -i '/^  name: {{ .Values.olmv1.catalogName }}/a\  labels:\n    olm.operatorframework.io/catalog: {{ .Values.olmv1.catalogName }}' "${catalog_tpl}"
+  # Replace name with selector in ClusterExtension
+  sed -i 's|      name: {{ if .Values.dev.enabled }}{{ .Values.olmv1.catalogName }}{{ else }}openshift-redhat-operators{{ end }}|      selector:\n        matchLabels:\n          olm.operatorframework.io/catalog: {{ if .Values.dev.enabled }}{{ .Values.olmv1.catalogName }}{{ else }}openshift-redhat-operators{{ end }}|' "${ext_tpl}"
+  echo ">>> ClusterCatalog template:"
+  cat "${catalog_tpl}"
+  echo ">>> ClusterExtension template:"
+  cat "${ext_tpl}"
+fi
 
 # Phase 3: Install operator
 install_osc_operator "${CHARTS_DIR}"
