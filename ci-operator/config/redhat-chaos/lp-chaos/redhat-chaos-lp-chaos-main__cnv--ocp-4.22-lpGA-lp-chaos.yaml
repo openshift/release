@@ -1,0 +1,123 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  cnv-ci:
+    name: "4.22"
+    namespace: cnv
+    tag: cnv-ci-src
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: image/container/ocp-test/Dockerfile.lp-chaos--ocp-test
+    from: cli
+    to: lp-chaos--ocp-test
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cr--cnv--outage-pod--aws
+  cron: 0 6,18 * * *
+  reporter_config:
+    channel: '#lp-chaos--triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      COMPUTE_NODE_TYPE: m5.metal
+      CONTAINER_ETCD_RECOVERY_TIME: "120"
+      LPC_LP_CNV__VM__REPLICA_COUNT: "3"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      OCP_VERSION: "4.22"
+      OPERATORS: |
+        [
+            {"name": "kubevirt-hyperconverged", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-cnv", "target_namespaces": "!install", "operator_group": "openshift-cnv-operator-group"}
+        ]
+      TELEMETRY_GROUP: ocp-4.22-lpGA-lp-chaos
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - ref: install-operators
+    - ref: redhat-lp-chaos-lp-cnv-vm-create
+    - chain: redhat-chaos-krkn-hub-cr-tests
+    - ref: interop-tests-openshift-virtualization-tests
+    - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
+  timeout: 6h0m0s
+- as: cr--cnv--outage-node--aws
+  cron: 0 3,15 * * *
+  reporter_config:
+    channel: '#lp-chaos--triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      COMPUTE_NODE_TYPE: m5.metal
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      NODE_OUTAGE_TIMEOUT: "1200"
+      OCP_VERSION: "4.22"
+      OPERATORS: |
+        [
+            {"name": "kubevirt-hyperconverged", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-cnv", "target_namespaces": "!install", "operator_group": "openshift-cnv-operator-group"}
+        ]
+      POWER_OUTAGE_TIMEOUT: "1200"
+      TELEMETRY_GROUP: ocp-4.22-lpGA-lp-chaos
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - ref: install-operators
+    - ref: redhat-lp-chaos-lp-cnv-vm-create
+    - chain: redhat-chaos-krkn-hub-node-tests
+    - ref: interop-tests-openshift-virtualization-tests
+    - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: cnv--ocp-4.22-lpGA-lp-chaos
