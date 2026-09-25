@@ -26,20 +26,14 @@ metadata:
   name: openshift-cluster-csi-drivers
 EOF
 
-cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml" << EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
+cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-pc-secret.yaml" << EOF
+apiVersion: v1
+kind: Secret
 metadata:
-  name: nutanix-csi-operator-beta
-  namespace: openshift-marketplace
-spec:
-  displayName: Nutanix Beta
-  publisher: Nutanix-dev
-  sourceType: grpc
-  image: quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest
-  updateStrategy:
-    registryPoll:
-      interval: 5m
+  name: ntnx-pc-secret
+  namespace: openshift-cluster-csi-drivers
+stringData:
+  key: ${NUTANIX_HOST}:${NUTANIX_PORT}:${NUTANIX_USERNAME}:${NUTANIX_PASSWORD}
 EOF
 
 cat > "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml" << EOF
@@ -70,10 +64,10 @@ metadata:
   name: nutanixcsioperator
   namespace: openshift-cluster-csi-drivers
 spec:
-  channel: stable
+  channel: stable-3.x
   name: nutanixcsioperator
   installPlanApproval: Automatic
-  source: nutanix-csi-operator-beta
+  source: certified-operators
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -84,12 +78,8 @@ metadata:
   name: nutanixcsistorage
   namespace: openshift-cluster-csi-drivers
 spec:
-  namespace: openshift-cluster-csi-drivers
-  tolerations:
-    - key: "node-role.kubernetes.io/infra"
-      operator: "Exists"
-      value: ""
-      effect: "NoSchedule"
+  ntnxInitConfigMap:
+    usePC: true
 EOF
 
 cat > "${SHARED_DIR}/manifest_0006-nutanix-csi-storage-class.yaml" << EOF
@@ -107,6 +97,8 @@ parameters:
   csi.storage.k8s.io/node-publish-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/controller-expand-secret-name: ntnx-secret
   csi.storage.k8s.io/controller-expand-secret-namespace: openshift-cluster-csi-drivers
+  csi.storage.k8s.io/controller-publish-secret-name: ntnx-secret
+  csi.storage.k8s.io/controller-publish-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/fstype: ext4
   storageContainer: ${PE_STORAGE_CONTAINER}
   storageType: NutanixVolumes
@@ -115,7 +107,7 @@ reclaimPolicy: Delete
 EOF
 
 oc apply -f "${SHARED_DIR}/manifest_0000-nutanix-csi-openshift-cluster-csi-drivers-namespace.yaml"
-oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml"
+oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-pc-secret.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0003-nutanix-csi-operator-group.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0004-nutanix-csi-subscription.yaml"
