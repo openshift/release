@@ -5,6 +5,7 @@ set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
 readonly DETECTOR="${REPO_ROOT}/ci-operator/step-registry/rosa/marketplace/release/detect/rosa-marketplace-release-detect-commands.sh"
+readonly DETECTOR_REF="${REPO_ROOT}/ci-operator/step-registry/rosa/marketplace/release/detect/rosa-marketplace-release-detect-ref.yaml"
 readonly PUBLISHER="${REPO_ROOT}/ci-operator/step-registry/rosa/marketplace/release/publish/rosa-marketplace-release-publish-commands.sh"
 readonly NIGHTLY_CONFIG="${REPO_ROOT}/ci-operator/config/openshift/release/openshift-release-main__nightly-5.1.yaml"
 readonly RELEASE_CONFIG="${REPO_ROOT}/core-services/release-controller/_releases/release-ocp-5.1.json"
@@ -254,6 +255,10 @@ test_ci_contract_is_payload_driven() {
     || fail "nightly configuration does not define rosa-marketplace-release"
   ! grep -q 'TARGET_OCP_Y_STREAM' "${NIGHTLY_CONFIG}" \
     || fail "nightly configuration still fixes an OCP y-stream"
+  grep -q 'bundle: ci-pull-credentials' "${DETECTOR_REF}" \
+    || fail "detector does not mount the ci-pull-credentials bundle"
+  ! grep -q 'name: ci-pull-credentials' "${DETECTOR_REF}" \
+    || fail "detector uses an invalid named credential reference"
 
   "${PYTHON_BIN:-python3}" - "${RELEASE_CONFIG}" <<'PYTHON'
 import json
