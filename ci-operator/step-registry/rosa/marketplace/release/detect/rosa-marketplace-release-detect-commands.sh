@@ -18,6 +18,14 @@ readonly SHARED_DIR="${SHARED_DIR:-/tmp}"
 readonly STATE_FILE="${SHARED_DIR}/rosa-marketplace-release-state"
 readonly OCP_VERSION_FILE="${SHARED_DIR}/rosa-marketplace-ocp-version"
 
+WORK_DIR=""
+
+cleanup() {
+  if [[ -n "${WORK_DIR}" ]]; then
+    rm -rf -- "${WORK_DIR}"
+  fi
+}
+
 log() {
   printf '[rosa-marketplace-release-detect] %s\n' "$*"
 }
@@ -66,8 +74,10 @@ validate_settings() {
 
   mkdir -p "${SHARED_DIR}"
   require_command "${CURL_BIN}"
+  require_command mktemp
   require_command "${OCM_BIN}"
   require_command "${PYTHON_BIN}"
+  require_command rm
   require_command "${SLEEP_BIN}"
 }
 
@@ -217,12 +227,18 @@ PYTHON
 }
 
 main() {
-  local ready_file="${SHARED_DIR}/rosa-marketplace-ready-nightlies.json"
-  local rosa_versions_file="${SHARED_DIR}/rosa-marketplace-rosa-versions.json"
+  local ready_file
+  local rosa_versions_file
   local ocp_version=""
   local selection_rc=0
 
   validate_settings
+  WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/rosa-marketplace-release-detect.XXXXXX") \
+    || fail "failed to create temporary work directory"
+  trap cleanup EXIT
+  ready_file="${WORK_DIR}/ready-nightlies.json"
+  rosa_versions_file="${WORK_DIR}/rosa-versions.json"
+
   http_get "${RELEASE_CONTROLLER_API}/api/v1/releasestreams/ready" \
     "${ready_file}" "ready-nightlies"
 
