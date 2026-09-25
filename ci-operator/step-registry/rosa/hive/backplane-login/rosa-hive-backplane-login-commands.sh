@@ -6,6 +6,28 @@ set -o pipefail
 
 log() { echo -e "\033[1m$(date "+%H:%M:%S") $*\033[0m" >&2; }
 
+retry_with_backoff() {
+    local max_attempts=3
+    local -a delays=(10 30 60)
+    local attempt
+    local rc
+
+    for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+        log "Attempt ${attempt}/${max_attempts}: $*"
+        rc=0
+        "$@" || rc=$?
+        if (( rc == 0 )); then
+            return 0
+        fi
+        if (( attempt < max_attempts )); then
+            log "Command failed (exit code ${rc}), retrying in ${delays[$((attempt-1))]}s..."
+            sleep "${delays[$((attempt-1))]}"
+        fi
+    done
+    log "ERROR: Command failed after ${max_attempts} attempts"
+    return "${rc}"
+}
+
 if [[ -z "${BACKPLANE_CLUSTER_ID:-}" ]]; then
     log "ERROR: BACKPLANE_CLUSTER_ID is required"
     exit 1
@@ -51,7 +73,16 @@ set -x
 # Backplane login writes kubeconfig to SHARED_DIR for downstream steps
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 log "Backplane login to ${BACKPLANE_CLUSTER_ID}"
-ocm-backplane login "${BACKPLANE_CLUSTER_ID}"
+
+# Quick connectivity probe for diagnostic output (never fails the job)
+log "Connectivity probe: testing backplane API reachability via proxy"
+if curl -sSf --max-time 10 --proxy "${BACKPLANE_PROXY_URL}" "https://api.openshift.com/" &>/dev/null; then
+    log "Probe: API endpoint reachable through proxy"
+else
+    log "Probe: API endpoint unreachable through proxy (informational only, proceeding with login)"
+fi
+
+retry_with_backoff ocm-backplane login "${BACKPLANE_CLUSTER_ID}"
 
 oc whoami
 log "Connected to $(oc whoami --show-server) via backplane"
