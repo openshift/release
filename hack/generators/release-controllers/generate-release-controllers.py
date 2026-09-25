@@ -97,6 +97,13 @@ def generate_app_ci_content(config, git_clone_dir):
 
     context = Context(config, "x86_64", False, config.ocp)
 
+    # HyperShift release-controller
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-hypershift-controller.yaml'), context) as gendoc:
+        content.generate_hypershift_admin_resources(gendoc)
+
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-hypershift-controller.yaml'), context) as gendoc:
+        content.generate_hypershift_resources(gendoc)
+
     # Signer
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-ci-signer.yaml'), context) as gendoc:
         content.generate_signer_resources(gendoc)
