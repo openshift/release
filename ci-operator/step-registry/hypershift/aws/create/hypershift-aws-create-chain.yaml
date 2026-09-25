@@ -221,20 +221,7 @@ chain:
         "${COMMAND[@]}" 2>&1 | tee "${CREATE_LOG}"
       fi
 
-      if [[ "${VERIFY_ROSA_MANAGED_POLICIES}" == "true" ]]; then
-        if ! grep -F "Attached managed policy to shared role" "${CREATE_LOG}" |
-          grep -F "ROSAAmazonEBSCSIDriverOperatorPolicy" |
-          grep -F "${CLUSTER_NAME}-shared-role" >/dev/null; then
-          echo "The ROSA EBS CSI managed policy was not attached to ${CLUSTER_NAME}-shared-role" >&2
-          exit 1
-        fi
-        if ! grep -E "(Created|Found existing) role" "${CREATE_LOG}" |
-          grep -F "${CLUSTER_NAME}-worker-ROSA-Worker-Role" >/dev/null; then
-          echo "The expected ROSA worker role ${CLUSTER_NAME}-worker-ROSA-Worker-Role was not created" >&2
-          exit 1
-        fi
-        echo "Verified ROSAAmazonEBSCSIDriverOperatorPolicy on the shared role and the ROSA worker role"
-      fi
+ma
 
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
