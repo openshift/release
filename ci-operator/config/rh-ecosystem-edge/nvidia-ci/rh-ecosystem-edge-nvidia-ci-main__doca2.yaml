@@ -1,0 +1,233 @@
+base_images:
+  dpf-ci:
+    name: openshift-dpf
+    namespace: ci
+    tag: dpf-ci
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+  run_if_changed: x^
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- always_run: false
+  as: deploy-cluster
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: metal-nno-doca2
+    env:
+      DPF_DEPLOY_MAKE_TARGET: create-base-cluster
+      DUMP_FAILED_TESTS: "true"
+      NNO_DAY2_PR: "697"
+      TEST_TRACE: "true"
+      TIMEOUT: 120m
+      VERBOSE_LEVEL: "100"
+    post:
+    - ref: gather-extra
+    - ref: gather-must-gather
+    test:
+    - ref: dpf-hypervisor-deploy-cluster
+    - ref: dpf-hypervisor-load-kubeconfig
+    - as: apply-nno-day2
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        if [[ ! -f "${KUBECONFIG}" ]]; then
+          echo "Missing kubeconfig at SHARED_DIR/kubeconfig"
+          exit 1
+        fi
+        udev_file="${CLUSTER_PROFILE_DIR}/doca1-udev-network-rules-base64"
+        e2e_env="${CLUSTER_PROFILE_DIR}/nno-e2e-env"
+        if [[ -f "${udev_file}" ]]; then
+          DOCA1_UDEV_NETWORK_RULES_BASE64="$(tr -d '\n' < "${udev_file}")"
+          export DOCA1_UDEV_NETWORK_RULES_BASE64
+        elif [[ -f "${e2e_env}" ]]; then
+          udev_line="$(grep -E '^DOCA1_UDEV_NETWORK_RULES_BASE64=' "${e2e_env}" || true)"
+          if [[ -n "${udev_line}" ]]; then
+            export "${udev_line}"
+          fi
+        fi
+        if [[ -z "${DOCA1_UDEV_NETWORK_RULES_BASE64:-}" ]]; then
+          echo "DOCA1_UDEV_NETWORK_RULES_BASE64 is not set (need ${udev_file} or that key in nno-e2e-env)"
+          exit 1
+        fi
+        NNO_DAY2_PR="${NNO_DAY2_PR:-697}"
+        work="$(mktemp -d)"
+        echo "Fetching nvidia-ci PR #${NNO_DAY2_PR} for day-2 manifests"
+        curl -fsSL "https://codeload.github.com/rh-ecosystem-edge/nvidia-ci/tar.gz/refs/pull/${NNO_DAY2_PR}/head" | tar -xz -C "${work}" --strip-components=1
+        if [[ ! -d "${work}/manifests" || ! -f "${work}/scripts/apply-manifests.sh" ]]; then
+          echo "Unpacked PR #${NNO_DAY2_PR} is missing manifests/ or scripts/apply-manifests.sh"
+          exit 1
+        fi
+        if ! command -v envsubst >/dev/null 2>&1; then
+          mkdir -p /tmp/bin
+          {
+            echo '#!/usr/bin/env bash'
+            echo 'set -euo pipefail'
+            echo 'while IFS= read -r line || [[ -n "${line}" ]]; do'
+            echo '  while [[ "${line}" =~ \$\{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do'
+            echo '    _var="${BASH_REMATCH[1]}"'
+            echo '    _val="${!_var-}"'
+            echo '    line="${line//\$\{${_var}\}/${_val}}"'
+            echo '  done'
+            echo '  printf "%s\n" "${line}"'
+            echo 'done'
+          } > /tmp/bin/envsubst
+          chmod +x /tmp/bin/envsubst
+          export PATH="/tmp/bin:${PATH}"
+        fi
+        cd "${work}"
+        export WAIT_FOR_WORKER_MCP=true
+        export WORKER_MCP_ROLLOUT_START_TIMEOUT=4m
+        export WORKER_MCP_ROLLOUT_TIMEOUT=40m
+        export WORKER_MCP_NAME=worker
+        if command -v make >/dev/null 2>&1; then
+          make apply-manifests
+        else
+          bash scripts/apply-manifests.sh apply
+        fi
+      env:
+      - name: NNO_DAY2_PR
+      from: dpf-ci
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    - ref: openshift-qe-cluster-health
+    - as: network-operator-e2e-shared-device
+      commands: |
+        set -euo pipefail
+        export REPORTS_DUMP_DIR="${ARTIFACT_DIR}"
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        if [[ ! -f "${KUBECONFIG}" ]]; then
+          echo "Missing kubeconfig at SHARED_DIR/kubeconfig"
+          exit 1
+        fi
+        e2e_env="${CLUSTER_PROFILE_DIR}/nno-e2e-env"
+        if [[ ! -f "${e2e_env}" ]]; then
+          echo "Missing cluster-profile file nno-e2e-env"
+          exit 1
+        fi
+        set -o allexport
+        source "${e2e_env}"
+        set +o allexport
+        export TEST_FEATURES=nvidianetwork
+        export TEST_LABELS='deploy'
+        export NVIDIANETWORK_CLEANUP=false
+        export NVIDIANETWORK_RDMA_LINK_TYPE=ethernet
+        export NVIDIANETWORK_RDMA_NETWORK_TYPE=shared-device
+        export NVIDIANETWORK_RDMA_WORKLOAD_NAMESPACE=default
+        export NVIDIANETWORK_RDMA_GPUDIRECT=false
+        make run-tests
+      env:
+      - name: DUMP_FAILED_TESTS
+      - name: TEST_TRACE
+      - name: VERBOSE_LEVEL
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: gpu-operator-e2e
+      commands: |
+        set -euo pipefail
+        export REPORTS_DUMP_DIR="${ARTIFACT_DIR}"
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        if [[ ! -f "${KUBECONFIG}" ]]; then
+          echo "Missing kubeconfig at SHARED_DIR/kubeconfig"
+          exit 1
+        fi
+        export TEST_FEATURES=nvidiagpu
+        export TEST_LABELS=nvidia-ci,gpu
+        export TEST_VERBOSE=true
+        export NVIDIAGPU_CLEANUP=false
+        export NVIDIAGPU_DEPLOY_FROM_BUNDLE=false
+        export NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH='[{"op": "add", "path": "/spec/driver/rdma", "value": {"enabled": true} }]'
+        make run-tests
+      env:
+      - name: DUMP_FAILED_TESTS
+      - name: TEST_TRACE
+      - name: VERBOSE_LEVEL
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+      timeout: 2h0m0s
+    - as: network-operator-e2e-gpudirect
+      commands: |
+        set -euo pipefail
+        export REPORTS_DUMP_DIR="${ARTIFACT_DIR}"
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        if [[ ! -f "${KUBECONFIG}" ]]; then
+          echo "Missing kubeconfig at SHARED_DIR/kubeconfig"
+          exit 1
+        fi
+        e2e_env="${CLUSTER_PROFILE_DIR}/nno-e2e-env"
+        if [[ ! -f "${e2e_env}" ]]; then
+          echo "Missing cluster-profile file nno-e2e-env"
+          exit 1
+        fi
+        set -o allexport
+        source "${e2e_env}"
+        set +o allexport
+        export TEST_FEATURES=nvidianetwork
+        export TEST_LABELS=rdma-shared-dev
+        export NVIDIANETWORK_CLEANUP=false
+        export NVIDIANETWORK_RDMA_LINK_TYPE=ethernet
+        export NVIDIANETWORK_RDMA_NETWORK_TYPE=shared-device
+        export NVIDIANETWORK_RDMA_WORKLOAD_NAMESPACE=default
+        export NVIDIANETWORK_RDMA_GPUDIRECT=true
+        make run-tests
+      env:
+      - name: DUMP_FAILED_TESTS
+      - name: TEST_TRACE
+      - name: VERBOSE_LEVEL
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: doca2
