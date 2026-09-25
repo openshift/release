@@ -189,4 +189,7 @@ if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 	oc apply -f /tmp/acm-policy-subscription-backup.yaml
 fi
 
+# Rename JUnit suite for dashboard visibility
+find "${ARTIFACT_DIR}" -name "*.xml" -exec sed -i 's/name="interop-tests-ocs-tests"/name="lp-interop--OPP--ocs"/g; s/classname="interop-tests-ocs-tests"/classname="lp-interop--OPP--ocs"/g' {} + 2>/dev/null || true
+
 true
