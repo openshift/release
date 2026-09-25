@@ -124,6 +124,39 @@ function check_stack_deleted()
     return 1
 }
 
+function report_failed_stack_resources()
+{
+    local stack_name=$1
+    local resources logical_resource_id resource_type resource_status_reason reason_category
+
+    resources=$(aws --region "${REGION}" cloudformation list-stack-resources \
+        --stack-name "${stack_name}" \
+        --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED'].[LogicalResourceId,ResourceType,ResourceStatusReason]" \
+        --output text 2>/dev/null) || return
+
+    while IFS=$'\t' read -r logical_resource_id resource_type resource_status_reason; do
+        [[ -n "${logical_resource_id}" ]] || continue
+        reason_category="unclassified"
+        if [[ "${logical_resource_id}" == "InternalAppsRecord" && "${resource_type}" == "AWS::Route53::RecordSet" && "${resource_status_reason}" == *"No hosted zone found with ID"* && "${resource_status_reason}" == *"Route53"* && "${resource_status_reason}" == *"Status Code: 404"* ]]; then
+            reason_category="route53_hosted_zone_missing_404"
+        fi
+        echo "CloudFormation DELETE_FAILED resource: reason_category=${reason_category}"
+    done <<< "${resources}"
+}
+
+function has_retainable_failed_stack_resource()
+{
+    local stack_name=$1
+    local resource_status_reason
+
+    resource_status_reason=$(aws --region "${REGION}" cloudformation list-stack-resources \
+        --stack-name "${stack_name}" \
+        --query "StackResourceSummaries[?ResourceStatus=='DELETE_FAILED' && LogicalResourceId=='InternalAppsRecord' && ResourceType=='AWS::Route53::RecordSet'].ResourceStatusReason | [0]" \
+        --output text 2>/dev/null) || return 1
+
+    [[ "${resource_status_reason}" == *"No hosted zone found with ID"* && "${resource_status_reason}" == *"Route53"* && "${resource_status_reason}" == *"Status Code: 404"* ]]
+}
+
 function delete_stacks()
 {
     local stack_list=$1
@@ -142,11 +175,18 @@ function delete_stacks()
 
         local attempt
         for attempt in 1 2; do
+            report_failed_stack_resources "${stack_name}"
             echo "Stack ${stack_name} deletion failed, cleaning up VPC resources (attempt ${attempt}/2) ..."
             cleanup_failed_stack "${stack_name}"
 
             echo "Retrying stack deletion for ${stack_name} ..."
-            aws --region "$REGION" cloudformation delete-stack --stack-name "${stack_name}" &
+            if has_retainable_failed_stack_resource "${stack_name}"; then
+                echo "Retaining confirmed DELETE_FAILED resource: reason_category=route53_hosted_zone_missing_404"
+                # DeleteStack can retain only named logical resources from a DELETE_FAILED stack.
+                aws --region "$REGION" cloudformation delete-stack --stack-name "${stack_name}" --retain-resources "InternalAppsRecord" &
+            else
+                aws --region "$REGION" cloudformation delete-stack --stack-name "${stack_name}" &
+            fi
             wait "$!"
             aws --region "$REGION" cloudformation wait stack-delete-complete --stack-name "${stack_name}" &
             wait "$!"
@@ -158,6 +198,7 @@ function delete_stacks()
         done
 
         if ! check_stack_deleted "${stack_name}"; then
+            report_failed_stack_resources "${stack_name}"
             echo "ERROR: Failed to delete stack ${stack_name} after 2 cleanup attempts"
             rc=1
         fi
@@ -183,4 +224,4 @@ if [ -e "${stack_list}" ]; then
     delete_stacks "${stack_list}" || rc=1
 fi
 
-exit ${rc:-0}
+exit "${rc:-0}"
