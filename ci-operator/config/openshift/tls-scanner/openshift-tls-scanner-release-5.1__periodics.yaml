@@ -151,6 +151,31 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: baremetalds-e2e
+- as: periodic-tls-curves-groups-policy
+  interval: 24h
+  reporter_config:
+    channel: '#forum-case'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :warning:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      FEATURE_SET: TechPreviewNoUpgrade
+      PQC_CHECK: "true"
+      TLS_GROUPS: SecP384r1MLKEM1024
+    test:
+    - ref: tls-groups-configure
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-5.1
   org: openshift
