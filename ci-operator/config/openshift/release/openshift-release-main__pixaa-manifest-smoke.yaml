@@ -1,0 +1,50 @@
+base_images:
+  claude-runtime:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM claude-runtime
+      USER root
+      RUN mkdir -p /workspace && chown 1000:0 /workspace && chmod g+rwX /workspace && \
+          git config --system --add safe.directory /workspace
+      COPY hack/claude-agent-eval/pixaa-smoke/consumer-env.sh /usr/local/share/pixaa-smoke-env.sh
+      WORKDIR /workspace
+      USER 1000
+      # Source is fetched at runtime, after the unchanged eval ref mounts credentials.
+      ENV EVAL_SMOKE_BASE=c88c63715cdc84e3fb5360c6094a5c49468e3e8c \
+          EVAL_SMOKE_HEAD=46d6e223ddca841abb7217ab236acedf1ab52b0d \
+          EVAL_SMOKE_PR=51 \
+          BASH_ENV=/usr/local/share/pixaa-smoke-env.sh
+    from: claude-runtime
+    optional: true
+    to: claude-ai-helpers
+  skip_if_only_changed: .*
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- always_run: false
+  as: eval-pixaa-smoke
+  optional: true
+  steps:
+    env:
+      EVAL_WORKDIR: /workspace
+    workflow: openshift-claude-agent-eval-manifest
+  timeout: 30m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: pixaa-manifest-smoke
