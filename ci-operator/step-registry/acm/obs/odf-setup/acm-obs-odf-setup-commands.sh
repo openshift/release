@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+command -v jq 1>/dev/null
+command -v yq 1>/dev/null
+command -v oc 1>/dev/null
+
 typeset obsNamespace="${ACM_OBS__NAMESPACE}"
 typeset odfNamespace="${ACM_OBS__ODF_NAMESPACE}"
 typeset obcStorageClass="${ACM_OBS__OBC_STORAGE_CLASS}"
