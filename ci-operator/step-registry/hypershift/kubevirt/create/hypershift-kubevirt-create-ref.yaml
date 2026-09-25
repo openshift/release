@@ -36,9 +36,12 @@ ref:
     - name: ATTACH_DEFAULT_NETWORK
       default: ""
       documentation: |-
-        if true, config additional network for hostedcluster and attach-default-network true;
-        if false, config additional network for hostedcluster and attach-default-network false
-        if the default empty string will skip all additional network config.
+        Controls network attachment for KubeVirt hosted cluster VMs:
+        - "true": create macvlan additional network, attach-default-network=true (dual network)
+        - "false": create macvlan additional network, attach-default-network=false (macvlan only)
+        - "localnet": create OVN localnet additional network, attach-default-network=true (Model 3)
+        - "localnet-multi": 2-network localnet, attach-default-network=false (multi-localnet architecture)
+        - "": skip all additional network config (default, uses pod network - Model 1)
     - name: ETCD_STORAGE_CLASS
       default: ""
       documentation: |-
@@ -69,6 +72,40 @@ ref:
     - name: HYPERSHIFT_NP_AUTOREPAIR
       default: "false"
       documentation: "Enables machine autorepair with machine health checks."
+    - name: LOCALNET_MULTI_NETWORK_COUNT
+      default: "2"
+      documentation: "Number of localnet networks for the multi-localnet architecture. First network gets the default gateway."
+    - name: LOCALNET_MULTI_SUBNETS
+      default: "192.168.111.128/25,192.168.224.0/24"
+      documentation: |-
+        Comma-separated list of subnets for multi-localnet networks. Must have at least
+        LOCALNET_MULTI_NETWORK_COUNT entries. First subnet gets default gateway and DNS.
+        On baremetal dev-scripts clusters the primary subnet must avoid 192.168.111.4
+        (ingress VIP), .5 (api VIP), node br-ex (.20-.25), and MetalLB/HC API (.30-.32).
+        Default 192.168.111.128/25 keeps worker IPAM in the upper half of the /24 on br-ex.
+    - name: LOCALNET_MULTI_PRIMARY_GATEWAY
+      default: "192.168.111.1"
+      documentation: "Gateway IP for the primary localnet in the multi-localnet architecture (also used as DNS server)."
+    - name: LOCALNET_MULTI_PRIMARY_DNS
+      default: "192.168.111.1"
+      documentation: "DNS server IP for the primary localnet in the multi-localnet architecture."
+    - name: LOCALNET_MULTI_EXCLUDE_SUBNETS
+      default: ""
+      documentation: |-
+        Optional comma-separated CIDRs excluded from OVN IPAM on the primary localnet NAD
+        (in addition to choosing a non-overlapping primary subnet). Use when the primary
+        subnet must be a full /24 but must not assign dev-scripts VIP addresses.
+    - name: LOCALNET_MULTI_DISABLE_IPV6_BOOT
+      default: "true"
+      documentation: |-
+        When true and IP_STACK is dual-stack (v4v6/v6v4), strip IPv6 from localnet LSPs and
+        disable IPv6 on worker enp*s0 during bootstrap so initrd Ignition reaches the IPv4
+        ingress VIP instead of timing out on IPv6.
+    - name: LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE
+      default: "true"
+      documentation: |-
+        When true, verify each worker VMI has an IPv4 default route via LOCALNET_MULTI_PRIMARY_GATEWAY
+        after guest-exec/SSH renewal. Fail the create step if verification fails post-Available.
   commands: hypershift-kubevirt-create-commands.sh
   resources:
     requests:
