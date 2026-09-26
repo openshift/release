@@ -2,6 +2,18 @@ workflow:
   as: aro-hcp-hypershift-e2e
   steps:
     allow_best_effort_post_steps: true
+    leases:
+      - count: 1
+        env: SVC_AMW_LEASE
+        resource_type: aro-hcp-services-amw-dev
+      - count: 1
+        env: HCP_AMW_LEASE
+        resource_type: aro-hcp-hcps-amw-dev
+      - env: LEASED_MSI_MOCK_SP
+        resource_type: aro-hcp-msi-mock-cs-sp-dev
+      - count: 2
+        env: LEASED_ARM_HELPER_SP
+        resource_type: aro-hcp-arm-helper-sp-dev
     pre:
       - ref: aro-hcp-lease-acquire
       - ref: aro-hcp-write-config
@@ -49,3 +61,5 @@ workflow:
 
     Each PR gets its own isolated environment, so concurrent runs do not
     interfere with each other.
+    AMW and service-principal leases are held by ci-operator for the entire
+    workflow, including gathering and deprovisioning, not just deployment.

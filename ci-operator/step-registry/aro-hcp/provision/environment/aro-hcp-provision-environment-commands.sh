@@ -113,6 +113,54 @@ yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.digest = \"${EXPORTER_DIGEST}\"
 " > "${OVERRIDE_CONFIG_FILE}"
 
+# External AMWs are independent opt-ins; no input retains config defaults.
+resolve_amw_id() {
+  local purpose="$2" lease_var="${1}_AMW_LEASE" id_var="${1}_AMW_RESOURCE_ID"
+  local lease="${!lease_var:-}" resource_id="${!id_var:-}"
+  local catalog="${AMW_POOL_CATALOG:-dev-infrastructure/openshift-ci/amw-pool.yaml}"
+  if [[ -n "${lease}" ]]; then
+    if [[ -n "${resource_id}" ]]; then
+      echo "ERROR: ${id_var} and ${lease_var} are mutually exclusive" >&2
+      return 1
+    fi
+    if [[ "${lease}" == *[[:space:]]* ]]; then
+      echo "ERROR: ${lease_var} must contain exactly one catalog name" >&2
+      return 1
+    fi
+    if ! resource_id=$(AMW_LEASE="${lease}" AMW_PURPOSE="${purpose}" yq -er '
+      .amwPool[strenv(AMW_LEASE)] |
+      select(.purpose == strenv(AMW_PURPOSE)) |
+      select((.location | tag) == "!!str" and .location != "") |
+      .workspaceId | select(tag == "!!str")
+    ' "${catalog}"); then
+      echo "ERROR: ${lease_var} not found, incomplete, or wrong purpose in ${catalog}" >&2
+      return 1
+    fi
+    if [[ ! "${resource_id,,}" =~ ^/subscriptions/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/resourcegroups/[^/[:space:]?#]+/providers/microsoft[.]monitor/accounts/[^/[:space:]?#]+$ ]]; then
+      echo "ERROR: ${lease_var} catalog workspaceId must be a full Microsoft.Monitor/accounts ARM ID" >&2
+      return 1
+    fi
+  fi
+  printf '%s' "${resource_id}"
+}
+
+SVC_AMW_ID=$(resolve_amw_id SVC services) || exit 1
+HCP_AMW_ID=$(resolve_amw_id HCP hcps) || exit 1
+if [[ -n "${SVC_AMW_LEASE:-}${HCP_AMW_LEASE:-}" && "${SVC_AMW_ID,,}" == "${HCP_AMW_ID,,}" ]]; then
+  echo "ERROR: services and HCP AMW inputs must resolve to distinct workspaces" >&2
+  exit 1
+fi
+if [[ -n "${SVC_AMW_ID}" ]]; then
+  SVC_AMW_RESOURCE_ID="${SVC_AMW_ID}" yq -i "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.monitoring.svcWorkspaceResourceId = strenv(SVC_AMW_RESOURCE_ID)
+  " "${OVERRIDE_CONFIG_FILE}"
+fi
+if [[ -n "${HCP_AMW_ID}" ]]; then
+  HCP_AMW_RESOURCE_ID="${HCP_AMW_ID}" yq -i "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.monitoring.hcpWorkspaceResourceId = strenv(HCP_AMW_RESOURCE_ID)
+  " "${OVERRIDE_CONFIG_FILE}"
+fi
+
 # MSI mock SP overrides (if provided)
 if [[ -n "${LEASED_MSI_MOCK_SP:-}" ]]; then
   MSI_MOCK_CLIENT_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".clientId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
