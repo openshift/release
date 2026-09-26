@@ -10,6 +10,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
+  # Save xtrace log with credentials scrubbed when the step exits non-zero.
   _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
@@ -19,7 +20,41 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
-trap '_opp_cleanup' EXIT
+
+# --- JUnit XML wrapper: emit result for skip-ratio-gate ---
+_junit_start=$(date +%s)
+_junit_emitted=0
+_jrc=0  # initialized here, assigned inside trap string
+_junit_emit() {
+  # Emit a JUnit XML result for the ODF upgrade step and propagate to SHARED_DIR/junit.
+  (( _junit_emitted )) && return 0
+  _junit_emitted=1
+  local _jr=${1:-0}
+  local _je
+  _je=$(date +%s) || _je=${_junit_start}
+  local _jd=$((_je - _junit_start))
+  local _jn="odf-upgrade"
+  local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
+  local _fc=0 _fx=""
+  if (( _jr != 0 )); then
+    _fc=1
+    _fx="<failure message=\"${_jn} exited with code ${_jr}\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
+  fi
+  cat > "${_jf}" <<JUNITEOF || true
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="${_fc}" errors="0" skipped="0" time="${_jd}">
+  <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
+    ${_fx}
+  </testcase>
+</testsuite>
+JUNITEOF
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; exit ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -32,6 +67,7 @@ ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
 
 function CollectDiagnostics () {
+    # Dump ODF subscription, CSV, StorageCluster, and pod state to artifacts for debugging.
     typeset artifactFile="${ARTIFACT_DIR}/odf-upgrade-diagnostics.txt"
     {
         printf '=== ODF Operator Upgrade Diagnostics ===\n\n'
@@ -51,15 +87,17 @@ function CollectDiagnostics () {
     true
 }
 
-trap '_opp_cleanup; if (( _exit_code != 0 )); then CollectDiagnostics; fi' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; if (( _exit_code != 0 )); then CollectDiagnostics; fi; exit ${_jrc}' EXIT
 
 function GetCurrentCsv () {
+    # Return the currentCSV name from the operator subscription status.
     oc get subscription "${ODF_SUBSCRIPTION_NAME}" \
         -n "${ODF_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.currentCSV}' || true
 }
 
 function GetCsvPhase () {
+    # Return the status phase of the given CSV in the operator namespace.
     typeset csvName="$1"
     oc get csv "${csvName}" \
         -n "${ODF_SUBSCRIPTION_NAMESPACE}" \
@@ -67,6 +105,7 @@ function GetCsvPhase () {
 }
 
 function GetInstalledVersion () {
+    # Return the installed operator version from the current CSV spec.
     typeset csvName
     csvName="$(GetCurrentCsv)"
     if [[ -z "${csvName}" ]]; then
@@ -78,12 +117,14 @@ function GetInstalledVersion () {
 }
 
 function GetCurrentChannel () {
+    # Return the current subscription channel for the operator.
     oc get subscription "${ODF_SUBSCRIPTION_NAME}" \
         -n "${ODF_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.channel}' || true
 }
 
 function ResolveTargetChannel () {
+    # Determine the next higher channel to upgrade to from the packagemanifest.
     if [[ -n "${ODF_TARGET_CHANNEL}" ]]; then
         echo "${ODF_TARGET_CHANNEL}"
         return 0
@@ -164,6 +205,7 @@ function ResolveTargetChannel () {
 }
 
 function WaitForCsvSucceeded () {
+    # Poll until a new CSV (different from previousCsv) reaches Succeeded phase or timeout.
     typeset previousCsv="$1"
     typeset timeoutSeconds
     timeoutSeconds="$(ParseTimeout "${ODF_UPGRADE_TIMEOUT}")"
@@ -202,6 +244,7 @@ function WaitForCsvSucceeded () {
 }
 
 function ParseTimeout () {
+    # Convert a human-readable timeout string (e.g. 30m, 300s) to seconds.
     typeset input="$1"
     typeset minutes=0 seconds=0
     if [[ "${input}" =~ ^([0-9]+)m$ ]]; then
@@ -221,6 +264,7 @@ function ParseTimeout () {
 }
 
 function ResolveSubOperatorCsv () {
+    # Find the leaf (un-replaced) CSV for an ODF sub-operator subscription.
     typeset subOp="$1"
     typeset installedCsv
     installedCsv="$(oc get subscription "${subOp}" \
@@ -273,6 +317,7 @@ function ResolveSubOperatorCsv () {
 }
 
 function ValidateSubOperatorUpgrades () {
+    # Verify that OCS, MCG, and NooBaa sub-operator CSVs reached Succeeded.
     echo "Validating ODF sub-operator upgrades..."
     typeset -a subOperators=("ocs-operator" "mcg-operator" "noobaa-operator")
 
@@ -313,6 +358,7 @@ function ValidateSubOperatorUpgrades () {
 }
 
 function ValidateOdfHealth () {
+    # Check StorageCluster phase, CephCluster health, and pod readiness post-upgrade.
     echo "Validating ODF health post-upgrade..."
 
     typeset scPhase
@@ -376,6 +422,7 @@ function ValidateOdfHealth () {
 # === Main ===
 
 function Main () {
+    # Orchestrate the ODF operator upgrade: resolve channel, patch subscription, wait, validate.
     typeset currentCsv currentVersion currentChannel targetChannel
     typeset prePatchPlan planPhase installPlan localApproval
     typeset newCsv newVersion

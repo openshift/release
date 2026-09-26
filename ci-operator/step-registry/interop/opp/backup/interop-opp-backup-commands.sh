@@ -10,6 +10,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
+  # Save xtrace log with credentials scrubbed when the step exits non-zero.
   _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
@@ -25,7 +26,41 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
-trap '_opp_cleanup' EXIT
+
+# --- JUnit XML wrapper: emit result for skip-ratio-gate ---
+_junit_start=$(date +%s)
+_junit_emitted=0
+_jrc=0  # initialized here, assigned inside trap string
+_junit_emit() {
+  # Emit a JUnit XML result for the backup step and propagate to SHARED_DIR/junit.
+  (( _junit_emitted )) && return 0
+  _junit_emitted=1
+  local _jr=${1:-0}
+  local _je
+  _je=$(date +%s) || _je=${_junit_start}
+  local _jd=$((_je - _junit_start))
+  local _jn="backup"
+  local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
+  local _fc=0 _fx=""
+  if (( _jr != 0 )); then
+    _fc=1
+    _fx="<failure message=\"${_jn} exited with code ${_jr}\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
+  fi
+  cat > "${_jf}" <<JUNITEOF || true
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="${_fc}" errors="0" skipped="0" time="${_jd}">
+  <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
+    ${_fx}
+  </testcase>
+</testsuite>
+JUNITEOF
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; exit ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -44,6 +79,7 @@ typeset -i failures=0
 typeset -i captured=0
 
 Capture() {
+    # Run a command and save its output to an artifact file, tracking success/failure counts.
     typeset description="${1:-}"; (($#)) && shift
     typeset outputFile="${1:-}"; (($#)) && shift
     : "Capturing ${description}..."
@@ -57,6 +93,7 @@ Capture() {
 }
 
 TimeoutMonitor() {
+    # Background watchdog that sends SIGTERM to the main process after BACKUP_TIMEOUT seconds.
     typeset -i startTime=0
     startTime=$(date +%s)
     typeset -i deadline=$(( startTime + BACKUP_TIMEOUT ))
@@ -70,7 +107,7 @@ TimeoutMonitor() {
 # Start timeout monitor in background
 TimeoutMonitor &
 typeset timeoutPid=$!
-trap '_opp_cleanup; kill ${timeoutPid} || true' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; (exit ${_jrc}); _opp_cleanup; kill ${timeoutPid} || true; exit ${_jrc}' EXIT
 trap 'kill ${timeoutPid} || true; exit 124' TERM
 
 echo ">>> PHASE: Pre-Upgrade Cluster Backup"
