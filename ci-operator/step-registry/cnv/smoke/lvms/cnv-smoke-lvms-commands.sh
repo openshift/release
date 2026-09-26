@@ -60,7 +60,7 @@ uv --verbose --cache-dir /tmp/uv-cache \
   -o log_cli=true \
   -o cache_dir=/tmp/pytest-cache \
   -m 'smoke and not rwx_default_storage' \
-  -k 'not TestVMMigrationAndState or TestCommonTemplatesRhel' \
+  -k 'not (TestVMMigrationAndState or TestCommonTemplatesRhel)' \
   --tc-file=tests/global_config_lvms.py \
   --tc "default_storage_class:${CNV_STORAGE_CLASS}" \
   --tc "default_volume_mode:${CNV_VOLUME_MODE}" \
