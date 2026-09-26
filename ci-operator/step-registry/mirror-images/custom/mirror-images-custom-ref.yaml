@@ -1,0 +1,59 @@
+ref:
+  as: mirror-images-custom
+  from: upi-installer
+  grace_period: 10m
+  timeout: 1h0m0s
+  commands: mirror-images-custom-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  env:
+  - name: MIRROR_CUSTOM_IMAGES
+    default: ""
+    documentation: |-
+      Comma-separated list of images to mirror into the disconnected cluster's
+      bastion mirror registry. Each entry is either:
+        * a pipeline imagestream tag built by this job (e.g. "my-operator"), which
+          is resolved to its build-farm digest pullspec; or
+        * a full external pullspec ("quay.io/org/img:tag" or "registry/img@sha256:...").
+      List every image the workload DEPLOYS (operands, sidecars, console plugins).
+      When empty (default) the step is a no-op, so it is safe to include in shared
+      disconnected chains.
+  - name: MIRROR_IN_BASTION
+    default: "yes"
+    documentation: |-
+      When "yes", run the mirror on the bastion host over SSH (the bastion has
+      egress to the source registries and local access to the mirror registry).
+      When "no", mirror from the build-farm pod directly to the bastion registry.
+      Requires CLUSTER_PROFILE_DIR/ssh-privatekey when "yes".
+  - name: CUSTOM_MIRROR_APPLY_MODE
+    default: "manifest"
+    documentation: |-
+      How the image-mirror redirect is published to the cluster. Only "manifest" is
+      currently implemented: the step writes ${SHARED_DIR}/manifest_*.yaml (an
+      ImageContentSourcePolicy, or ImageDigestMirrorSet/ImageTagMirrorSet, matched to
+      the family the release-payload mirror already established) which the installer
+      applies as day-1 manifests (no node reboot). "install-config" and "day2" are
+      reserved for future use and are rejected for now.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Mirror arbitrary container images (pipeline images built by the job, or external
+    pullspecs) into the disconnected cluster's bastion mirror registry and emit the
+    matching image-mirror redirect (ImageContentSourcePolicy, or
+    ImageDigestMirrorSet/ImageTagMirrorSet). This lets a test deploy its own images by
+    their original pullspecs on a disconnected cluster with no test-code change,
+    mirroring the bare-metal dev-scripts MIRROR_CUSTOM_IMAGES capability.
+
+    The redirect family is auto-detected from and matched to the release-payload
+    mirror (install-config-mirror.yaml.patch): a cluster cannot mix ICSP with
+    IDMS/ITMS. Tag-referenced sources require the IDMS/ITMS family (chain-wide
+    ENABLE_IDMS=yes) because ICSP is digest-only. No-op when MIRROR_CUSTOM_IMAGES is
+    empty.
+
+    Consumed ${SHARED_DIR} contracts (written by the cloud bastion provisioning):
+    mirror_registry_url, bastion_public_address, bastion_private_address,
+    bastion_ssh_user; and, for family detection, install-config-mirror.yaml.patch.
