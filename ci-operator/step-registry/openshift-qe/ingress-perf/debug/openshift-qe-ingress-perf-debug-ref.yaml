@@ -1,0 +1,32 @@
+ref:
+  as: openshift-qe-ingress-perf-debug
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-ingress-perf-debug-commands.sh
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
+    mount_path: /secret
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: CONFIG
+    default: "config/standard.yml"
+    documentation: |-
+      Defaults to "config/standard.yml"
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Debug step to reproduce and diagnose the hloader passthrough HTTP/2 failure
+    on OCP 5.0. Runs the full ingress-perf test suite (same as the production
+    data-path test) to reproduce the HAProxy sidecar exhaustion, then runs
+    hloader directly to capture the actual error message that ingress-perf's
+    exec.go discards (stdout from failed exec is not logged).
