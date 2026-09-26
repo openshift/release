@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-azure-manual-oidc-workload-identity-upgrade
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      TEST_SKIPS: >-
+        CSRs from machines that are not recognized by the cloud provider are not approved
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+    pre:
+    - chain: ipi-azure-pre-manual-oidc-workload-identity
+    test:
+    - ref: openshift-e2e-azure-manual-oidc-workload-identity-upgrade-credentials
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-azure-post-manual-oidc-workload-identity
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+  documentation: |-
+    The OpenShift E2E Azure workflow installs a cluster with manually managed workload identity credentials, updates the provider resources and cluster Secrets for the target release, marks the cluster upgradeable, and executes the upgrade end-to-end test suite.

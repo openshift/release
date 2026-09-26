@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-aws-manual-oidc-sts-upgrade
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      TEST_SKIPS: >-
+        CSRs from machines that are not recognized by the cloud provider are not approved
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
+    test:
+    - ref: openshift-e2e-aws-manual-oidc-sts-upgrade-credentials
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-aws-post-manual-oidc-sts
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+  documentation: |-
+    The OpenShift E2E AWS workflow installs a cluster with manually managed OIDC credentials, updates the provider resources and cluster Secrets for the target release, marks the cluster upgradeable, and executes the upgrade end-to-end test suite.
