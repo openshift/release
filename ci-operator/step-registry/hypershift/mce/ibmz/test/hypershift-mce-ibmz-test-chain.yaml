@@ -4,23 +4,124 @@ chain:
     - as: test-ibmz-hostedcluster
       cli: latest
       commands: |-
+        set -euo pipefail
         set -x
-        echo "$(date) Checking for the cluster-operators status to be ready"
-        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        while true; do
-            count=$(oc get co --insecure-skip-tls-verify --no-headers| awk '$3 != "True" {print $1}' | wc -l)
-            if [ "$count" -eq 0 ]
-            then
-                echo "$(date) All the cluster operators are ready"
-                break
-            else
-                echo "All the cluster operators are not ready yet"
-                sleep 5
-            fi
-            oc get co --insecure-skip-tls-verify
+
+        # Guest-facing step on a NEW CI pod + VPN vs create. Prefer the mgmt
+        # ingress Route hostname written into nested_kubeconfig (same *.apps path
+        # CI uses for mgmt). LPAR:NodePort remains flaky across pods (#84152 RCA).
+        # Do not treat failed oc as "operators ready" (empty awk|wc was a false
+        # positive on PR #84152).
+
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+
+        echo "$(date) ===== guest API path diagnostics (post-VPN) ====="
+        echo "$(date) hostname=$(hostname -f 2>/dev/null || hostname)"
+        GUEST_SERVER=$(oc --kubeconfig="${KUBECONFIG}" config view -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo unknown)
+        echo "$(date) nested server=${GUEST_SERVER}"
+        if [[ -f "${SHARED_DIR}/guest-api-server" ]]; then
+          echo "$(date) SHARED_DIR/guest-api-server=$(cat "${SHARED_DIR}/guest-api-server")"
+        fi
+        if [[ -f "${SHARED_DIR}/cluster-name" ]]; then
+          echo "$(date) cluster-name=$(cat "${SHARED_DIR}/cluster-name")"
+        fi
+        # VPN sidecar writes this when --route-up completes; presence != TLS works.
+        if [[ -e /tmp/vpn/up ]]; then
+          echo "$(date) VPN marker /tmp/vpn/up present"
+        else
+          echo "$(date) WARNING: /tmp/vpn/up missing — waiting up to 120s"
+          for i in $(seq 1 24); do
+            [[ -e /tmp/vpn/up ]] && break
+            sleep 5
+          done
+          [[ -e /tmp/vpn/up ]] && echo "$(date) VPN marker appeared" || echo "$(date) WARNING: VPN marker still missing"
+        fi
+        # Route hostnames use mgmt *.apps; LPAR IP is fallback-only.
+        ip route get 10.0.1.15 2>/dev/null || true
+        if [[ "${GUEST_SERVER}" == https://* ]]; then
+          GUEST_HOST=$(printf '%s' "${GUEST_SERVER}" | sed -E 's#^https://([^:/]+).*#\1#')
+          echo "$(date) ip route get ${GUEST_HOST}:"
+          ip route get "${GUEST_HOST}" 2>/dev/null || true
+          getent hosts "${GUEST_HOST}" 2>/dev/null || true
+        fi
+        ip link show 2>/dev/null | head -40 || true
+        ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | while read -r ifc; do
+          [[ -z "${ifc}" || "${ifc}" == *"@"* ]] && continue
+          echo "$(date) MTU $(ip -o link show "${ifc}" 2>/dev/null | head -1 || true)"
+        done || true
+
+        echo "$(date) Warming guest API /readyz (bounded retries; oc exit status required)"
+        API_OK=false
+        for attempt in $(seq 1 90); do
+          set +e
+          READY_OUT=$(oc --kubeconfig="${KUBECONFIG}" --insecure-skip-tls-verify --request-timeout=15s get --raw=/readyz 2>/tmp/guest-readyz.err)
+          READY_RC=$?
+          set -e
+          if [[ ${READY_RC} -eq 0 && "${READY_OUT}" == "ok" ]]; then
+            echo "$(date) guest /readyz=ok (attempt ${attempt}/90)"
+            API_OK=true
+            break
+          fi
+          echo "$(date) guest /readyz not ok yet (attempt ${attempt}/90 rc=${READY_RC} body=${READY_OUT:-<empty>})"
+          cat /tmp/guest-readyz.err 2>/dev/null || true
+          # Lightweight TCP/TLS probe for RCA (do not hide oc failures).
+          SERVER=$(oc --kubeconfig="${KUBECONFIG}" config view -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)
+          if [[ -n "${SERVER}" ]]; then
+            curl -sk --connect-timeout 5 --max-time 10 -o /tmp/curl-readyz.body -w "curl_http=%{http_code} curl_exit=%{exitcode} curl_err=%{errormsg}\n" "${SERVER%/}/readyz" || true
+            cat /tmp/curl-readyz.body 2>/dev/null || true
+          fi
+          sleep 10
         done
-        oc get co --insecure-skip-tls-verify
-        oc get no --insecure-skip-tls-verify
+
+        if [[ "${API_OK}" != "true" ]]; then
+          echo "$(date) ERROR: guest API unreachable from this CI pod/VPN after warm-up"
+          oc --kubeconfig="${KUBECONFIG}" config view || true
+          # Best-effort mgmt-side confirmation that HCP still exists (separate kubeconfig).
+          if [[ -f "${SHARED_DIR}/kubeconfig" || -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
+            MGMT_KC="${SHARED_DIR}/mgmt_kubeconfig"
+            [[ -f "${MGMT_KC}" ]] || MGMT_KC="${SHARED_DIR}/kubeconfig"
+            echo "$(date) mgmt snapshot via ${MGMT_KC}:"
+            oc --kubeconfig="${MGMT_KC}" get hc -A -o wide || true
+            oc --kubeconfig="${MGMT_KC}" get np -A -o wide || true
+          fi
+          exit 1
+        fi
+
+        echo "$(date) Waiting for ClusterOperators Available=True (oc failures are NOT success)"
+        OPERATORS_READY=false
+        for attempt in $(seq 1 60); do
+          set +e
+          CO_OUT=$(oc --kubeconfig="${KUBECONFIG}" --insecure-skip-tls-verify --request-timeout=30s get co --no-headers 2>/tmp/guest-co.err)
+          CO_RC=$?
+          set -e
+          if [[ ${CO_RC} -ne 0 ]]; then
+            echo "$(date) oc get co failed (rc=${CO_RC}) attempt ${attempt}/60 — API reachability unknown, NOT treating as ready"
+            cat /tmp/guest-co.err || true
+          elif [[ -z "${CO_OUT}" ]]; then
+            echo "$(date) oc get co returned no rows (attempt ${attempt}/60) — NOT treating as ready"
+          else
+            NOT_AVAILABLE=$(printf '%s\n' "${CO_OUT}" | awk '$3 != "True" {print $1" available="$3}' || true)
+            if [[ -z "${NOT_AVAILABLE}" ]]; then
+              echo "$(date) All ClusterOperators are Available=True"
+              printf '%s\n' "${CO_OUT}"
+              OPERATORS_READY=true
+              break
+            fi
+            echo "$(date) ClusterOperators not ready yet (attempt ${attempt}/60):"
+            echo "${NOT_AVAILABLE}"
+          fi
+          sleep 10
+        done
+
+        if [[ "${OPERATORS_READY}" != "true" ]]; then
+          echo "$(date) ERROR: timed out waiting for Available ClusterOperators"
+          oc --kubeconfig="${KUBECONFIG}" --insecure-skip-tls-verify --request-timeout=30s get co || true
+          oc --kubeconfig="${KUBECONFIG}" --insecure-skip-tls-verify --request-timeout=30s get no -o wide || true
+          exit 1
+        fi
+
+        echo "$(date) Guest nodes:"
+        oc --kubeconfig="${KUBECONFIG}" --insecure-skip-tls-verify --request-timeout=30s get no -o wide
       from: tests
       grace_period: 15m0s
       resources:
