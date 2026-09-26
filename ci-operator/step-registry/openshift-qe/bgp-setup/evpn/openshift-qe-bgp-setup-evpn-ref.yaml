@@ -1,0 +1,46 @@
+ref:
+  as: openshift-qe-bgp-setup-evpn
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: NETWORK_WORKLOAD
+    default: "evpn"
+    documentation: |-
+      Workload selector for BGP setup branching.
+  - name: FRR_IMAGE
+    default: "quay.io/frrouting/frr:10.4.1"
+    documentation: |-
+      FRR container image for upgrading frr-k8s daemonset
+  - name: EXTERNAL_WEBSERVER_IP
+    default: "172.27.187.82"
+    documentation: |-
+      External webserver anycast IP used for bastion FRR VRF setup
+  - name: ITERATIONS
+    default: "72"
+    documentation: |-
+      Iteration/CUDN count used for external FRR VRF setup on bastion
+  - name: L3VNI_START
+    default: "100"
+    documentation: |-
+      Starting L3 VNI for external FRR VRF setup on bastion
+  - name: L2VNI_START
+    default: "20000"
+    documentation: |-
+      Starting L2 VNI for east-west CUDN macVRF and external bastion VXLAN/FRR setup
+  - name: VTEP_CIDR
+    default: "198.18.0.0/24"
+    documentation: |-
+      Fallback CIDR for the EVPN VTEP resource on baremetal. On AWS the VTEP is
+      created by openshift-qe-installer-aws-provision-bastion.
+  commands: openshift-qe-bgp-setup-evpn-commands.sh
+  timeout: 2h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  documentation: >-
+    BGP/FRR bastion setup for the EVPN perfscale workload. Enables TechPreview,
+    configures external FRR on the bastion, and waits for BGP sessions.
