@@ -321,8 +321,8 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
     echo "ERROR: failed to obtain RHOBS OIDC access token from ${rhobs_issuer}" >&2
     exit 1
   }
-  $WAS_TRACING_RHOBS && set -x
 
+  # Keep tracing off while the bearer token is written / used on the curl cmdline.
   # Mount OIDC creds so ocmci can refresh tokens after SOAK_TIME (SSO TTL ~5m).
   podman_args+=("-v" "${rhobs_oidc_dir}:/usr/local/rhobs-oidc:ro,z")
   echo "OCM_FVT_PROMETHEUS_URL=${rhobs_metrics_url}" >> "${podman_env_file}"
@@ -334,7 +334,6 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
 
   # Spot-check PromQL against RHOBS (log truncated body only).
   ns="osd-fleet-manager-${OCM_FVT_OCM_ENV:-integration}"
-  set +x
   code="$(curl -sS -o /tmp/rhobs-up.out -w '%{http_code}' --max-time 30 \
     -H "Authorization: Bearer ${rhobs_token}" \
     --get "${rhobs_metrics_url}/api/v1/query" \
