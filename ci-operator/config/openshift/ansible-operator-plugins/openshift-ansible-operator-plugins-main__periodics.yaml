@@ -97,40 +97,7 @@ tests:
           | tar -xz -C /tmp/bin oc
         export PATH="/tmp/bin:/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
 
-        # TEMPORARY: rehearse the unmerged script against a v1.42.1 fork base.
-        # Remove this block and the disposable branches after validation.
-        if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
-          REHEARSAL_BRANCH=oape-987-ci-rehearsal-base
-          REHEARSAL_CRED_FILE=$(mktemp)
-          chmod 600 "$REHEARSAL_CRED_FILE"
-          printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" > "$REHEARSAL_CRED_FILE"
-          git config --global --add safe.directory "$(pwd)"
-          git config credential.helper "store --file=${REHEARSAL_CRED_FILE}"
-          if git remote get-url origin >/dev/null 2>&1; then
-            git remote set-url origin https://github.com/openshift/ansible-operator-plugins.git
-          else
-            git remote add origin https://github.com/openshift/ansible-operator-plugins.git
-          fi
-          git fetch https://github.com/neha037/ansible-operator-plugins.git "$REHEARSAL_BRANCH"
-          git push origin "FETCH_HEAD:refs/heads/${REHEARSAL_BRANCH}"
-          git fetch origin "refs/heads/${REHEARSAL_BRANCH}:refs/remotes/origin/${REHEARSAL_BRANCH}"
-          git checkout -B "$REHEARSAL_BRANCH" "origin/$REHEARSAL_BRANCH"
-          export GH_TOKEN="$GITHUB_TOKEN"
-          gh pr list --repo openshift/ansible-operator-plugins --state open \
-            --head "v1.42.3-rebase-${REHEARSAL_BRANCH}" --json number --jq '.[].number' \
-            | while read -r number; do
-                gh pr close "$number" --repo openshift/ansible-operator-plugins
-              done
-          git push origin --delete "v1.42.3-rebase-${REHEARSAL_BRANCH}" 2>/dev/null || true
-          git config --unset credential.helper
-          rm -f "$REHEARSAL_CRED_FILE"
-          export REBASE_BRANCH="$REHEARSAL_BRANCH"
-          # Rehearsal: discover tags with the fork pinned at current v1.42.3.
-          unset OVERRIDE_TAG
-          echo "==> Rehearsal Podman probe (uid=$(id -u), gid=$(id -g))"
-          podman info 2>&1 | tail -25 || true
-        fi
-
+        git config --global --add safe.directory "$(pwd)"
         export FORCE_REMOTE_URLS=1
         export CONTAINER_ENGINE=podman
         export REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
