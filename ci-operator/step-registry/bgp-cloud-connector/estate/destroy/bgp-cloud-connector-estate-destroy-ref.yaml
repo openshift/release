@@ -1,0 +1,33 @@
+ref:
+  as: bgp-cloud-connector-estate-destroy
+  from_image:
+    namespace: ocp
+    name: "4.14"
+    tag: upi-installer
+  commands: bgp-cloud-connector-estate-destroy-commands.sh
+  best_effort: true
+  grace_period: 10m0s
+  timeout: 45m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: USE_HYPERSHIFT_AZURE_CREDS
+    default: "false"
+    documentation: |-
+      If true, use the HyperShift CI credentials rather than the cluster
+      profile's. It has to match what bgp-cloud-connector-estate-create
+      used.
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-azurecreds
+    group: ops/hypershift-ci-jobs-azurecreds
+    collection: hypershift-team
+  documentation: |-
+    Remove what bgp-cloud-connector-estate-create built, in the order
+    Azure will accept, reporting anything that would not go rather than
+    printing "gone" over a failure.
+
+    Run it in post: a test step that never runs leaves a Route Server
+    behind, and a Route Server holds the subnet, which holds the virtual
+    network, which the group delete then cannot remove.
