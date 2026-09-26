@@ -317,25 +317,31 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
     -d "client_id=${rhobs_client_id}" \
     -d "client_secret=${rhobs_client_secret}" \
     | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")" || {
+    $WAS_TRACING_RHOBS && set -x
     echo "ERROR: failed to obtain RHOBS OIDC access token from ${rhobs_issuer}" >&2
     exit 1
   }
+  $WAS_TRACING_RHOBS && set -x
 
-  # Keep tracing off while the bearer token is on the command line / in env writes.
+  # Mount OIDC creds so ocmci can refresh tokens after SOAK_TIME (SSO TTL ~5m).
+  podman_args+=("-v" "${rhobs_oidc_dir}:/usr/local/rhobs-oidc:ro,z")
   echo "OCM_FVT_PROMETHEUS_URL=${rhobs_metrics_url}" >> "${podman_env_file}"
+  echo "OCM_FVT_RHOBS_OIDC_DIR=/usr/local/rhobs-oidc" >> "${podman_env_file}"
+  # Initial token for spot-check / early queries; container refreshes before PromQL.
   echo "OCM_FVT_PROMETHEUS_TOKEN=${rhobs_token}" >> "${podman_env_file}"
   echo "RHOBS metrics URL: ${rhobs_metrics_url}"
-  echo "RHOBS OIDC dir: ${rhobs_oidc_dir}"
+  echo "RHOBS OIDC dir: ${rhobs_oidc_dir} (mounted at /usr/local/rhobs-oidc)"
 
   # Spot-check PromQL against RHOBS (log truncated body only).
   ns="osd-fleet-manager-${OCM_FVT_OCM_ENV:-integration}"
+  set +x
   code="$(curl -sS -o /tmp/rhobs-up.out -w '%{http_code}' --max-time 30 \
     -H "Authorization: Bearer ${rhobs_token}" \
     --get "${rhobs_metrics_url}/api/v1/query" \
     --data-urlencode "query=fleet_manager_cluster_status_count{namespace=\"${ns}\"}" || echo err)"
+  $WAS_TRACING_RHOBS && set -x
   echo "RHOBS spot-check HTTP ${code}; body: $(head -c 160 /tmp/rhobs-up.out 2>/dev/null | tr '\n' ' ')"
   rm -f /tmp/rhobs-up.out
-  $WAS_TRACING_RHOBS && set -x
   if [[ "${code}" != "200" ]]; then
     echo "ERROR: RHOBS metrics query failed (HTTP ${code})" >&2
     exit 1
