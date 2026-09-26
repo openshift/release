@@ -323,7 +323,7 @@ ApplyRhelVirtualMachine() {
     typeset _sshPubKey
     _sshPubKey="$(<"${SHARED_DIR}/${P2P_HS_VM_SSH_KEY_NAME}.pub")"
     typeset _userData
-    _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: %s\nchpasswd:\n  expire: false\nssh_pwauth: true\nssh_authorized_keys:\n- %s\nwrite_files:\n- path: /home/cloud-user/migration-marker.txt\n  content: %s\n  permissions: "0644"\n  owner: cloud-user:cloud-user\nruncmd:\n- dnf install -y qemu-guest-agent\n- systemctl enable --now qemu-guest-agent\n- echo "VM %s is ready for migration testing" > /tmp/vm-ready.txt\n' \
+    _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: %s\nchpasswd:\n  expire: false\nssh_pwauth: true\nssh_authorized_keys:\n- %s\nruncmd:\n- echo %s > /home/cloud-user/migration-marker.txt\n- chown cloud-user:cloud-user /home/cloud-user/migration-marker.txt\n- chmod 0644 /home/cloud-user/migration-marker.txt\n- dnf install -y qemu-guest-agent\n- systemctl enable --now qemu-guest-agent\n- echo "VM %s is ready for migration testing" > /tmp/vm-ready.txt\n' \
         "${_vmPwd}" "${_sshPubKey}" "${vmName}" "${vmName}")"
 
     vmName="${vmName}" DV_NAME="${dvName}" VM_NS="${ns}" \

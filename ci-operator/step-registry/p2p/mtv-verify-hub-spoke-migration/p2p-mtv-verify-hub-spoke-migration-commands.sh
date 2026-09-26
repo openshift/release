@@ -332,7 +332,7 @@ function VirtctlReadVmFile () {
 }
 
 # VerifyVmDataIntegrity — verify that cloud-init marker files survive migration intact.
-# p2p-create-migration-test-vm injects a write_files cloud-init block that writes
+# p2p-create-migration-test-vm injects a cloud-init runcmd step that writes
 # /home/cloud-user/migration-marker.txt with content equal to the VM name.
 # This function reads back that file on the destination via QEMU Guest Agent and
 # compares it to the expected VM name.
