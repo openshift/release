@@ -36,15 +36,18 @@ if [[ "${MAP_TESTS}" == 'true' ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 1. Kubeconfig — use writable $HOME/.kube, not image-owned /workspace/.kube
+# 1. Kubeconfig — use writable /tmp, not image-owned /workspace/.kube
+#    The image sets USER 1001 but OpenShift runs with arbitrary UID;
+#    /workspace/.kube is chown 1001:1001 and not group-writable.
 # ---------------------------------------------------------------------------
-typeset kubeDir="${HOME}/.kube"
+typeset kubeDir="/tmp/obs-kube"
 mkdir -p "${kubeDir}"
 cp "${SHARED_DIR}/kubeconfig" "${kubeDir}/config"
 export KUBECONFIG="${kubeDir}/config"
 
 if [[ -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
     cp "${SHARED_DIR}/managed-cluster-kubeconfig" "${kubeDir}/import-kubeconfig"
+    export IMPORT_KUBECONFIG="${kubeDir}/import-kubeconfig"
 fi
 
 # ---------------------------------------------------------------------------
