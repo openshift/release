@@ -15,6 +15,12 @@ ref:
   - collection: rosa-clusters-service
     group: rosa-clusters-service-sandbox
     mount_path: /usr/local/rosa-clusters-service-sandbox
+  - collection: rosa-e2e
+    group: rhobs-oidc-staging
+    mount_path: /usr/local/rhobs-oidc-staging
+  - collection: rosa-e2e
+    group: rhobs-oidc-production
+    mount_path: /usr/local/rhobs-oidc-production
   resources:
     requests:
       cpu: 100m
@@ -55,8 +61,18 @@ ref:
   - name: OCM_FVT_APPSRE_BACKPLANE_CLUSTER_ID
     default: "19mjrthsfn66bm22m574v2v1gt9a8r4q"
     documentation: |-
-      AppSRE cluster for Prom port-forward (default app-sre-stage-01).
-      Override for prod osdfm gating.
+      Deprecated (ROSAENG-67791). Previously used for AppSRE Prom port-forward;
+      osdfm metrics now query RHOBS. Kept for backward compatibility.
+  - name: OCM_FVT_PROMETHEUS_URL
+    default: ""
+    documentation: |-
+      Optional override for osdfm metrics PromQL base URL (no /api/v1/query).
+      Empty selects RHOBS stage or prod hcp endpoint from OCM_FVT_OCM_ENV.
+  - name: OCM_FVT_RHOBS_OIDC_DIR
+    default: ""
+    documentation: |-
+      Optional override for RHOBS OIDC credential mount dir.
+      Empty selects /usr/local/rhobs-oidc-staging or -production from OCM_FVT_OCM_ENV.
   - name: OCM_FVT_BACKPLANE_CREDENTIALS_DIR
     default: "/usr/local/rosa-clusters-service-sandbox"
     documentation: |-
