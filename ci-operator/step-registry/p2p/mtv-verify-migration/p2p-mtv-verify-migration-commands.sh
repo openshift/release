@@ -5,8 +5,8 @@
 # Checks (all hard-fail; recorded as JUnit cases):
 # destination VMIs Running; destination VM runStrategy==Always (OCPBUGS-101771);
 # source VMIM not Failed (OCPBUGS-99403); SSH port 22 from a peer virt-launcher;
-# cloud-init data integrity marker via QEMU Guest Agent; guest disk I/O;
-# guest-level ping to a peer VM.
+# SSH login (virtctl ssh); cloud-init data integrity marker; guest disk I/O;
+# guest-level ping to a peer VM. In-guest checks run over virtctl ssh.
 #
 # Results written to ${ARTIFACT_DIR}/junit_cclm_migration_verify${suffix}.xml.
 set -euxo pipefail; shopt -s inherit_errexit
@@ -38,7 +38,9 @@ typeset destKubeconfig="${MTV_DEST_SPOKE_KUBECONFIG}"
 typeset targetNs="${MTV_TEST_VM_TARGET_NAMESPACE}"
 typeset vmSshVerify="${MTV_VM_SSH_VERIFY}"
 typeset vmGuestExec="${MTV_VM_GUEST_EXEC}"
-typeset agentWaitTimeout="${MTV_VM_AGENT_WAIT_TIMEOUT}"
+typeset -i sshWaitSeconds="${MTV_VM_SSH_WAIT_SECONDS}"
+typeset sshUser="${MTV_VM_SSH_USER}"
+typeset virtctlBin="" sshKeyFile="" sshReady=false
 typeset migrationSuffix="${MTV_MIGRATION_SUFFIX:-}"
 typeset diagDir=""
 
@@ -265,177 +267,144 @@ function VerifyAllVmsSsh () {
   (( failed == 0 ))
 }
 
-# VirtctlReadVmFile — read a file from a KubeVirt VM via QEMU Guest Agent.
-# Requires qemu-guest-agent in the VM and libvirt/virsh in the virt-launcher
-# compute container (KubeVirt 1.x / OCP CNV 4.14+).
-# All oc exec calls run under set +x: pod/domain names are internal identifiers
-# that must not appear in xtrace logs.
-# Exit codes:
-#   0 — file read successfully (content on stdout)
-#   1 — QEMU GA infrastructure unavailable (virsh not found, domain not listed,
-#       QEMU GA not reachable); caller should skip the VM gracefully.
-#   2 — QEMU GA responded but guest command failed (file not found, permission
-#       denied, /bin/cat exited non-zero); caller should treat as integrity failure.
-function VirtctlReadVmFile () {
-  typeset launcherPod="${1:?}"; (($#)) && shift
-  typeset ns="${1:?}"; (($#)) && shift
-  typeset kc="${1:?}"; (($#)) && shift
-  typeset filePath="${1:?}"; (($#)) && shift
-
-  ( set +x
-    # Discover the libvirt domain name; KubeVirt runs one VM per pod.
-    typeset domain
-    domain="$(oc --kubeconfig="${kc}" exec -n "${ns}" "${launcherPod}" -c compute -- \
-      bash -c 'virsh -c qemu:///system list --all --name 2>/dev/null \
-        | grep -v "^[[:space:]]*$" | head -1' \
-      || true)"
-    [[ -n "${domain}" ]] || exit 1
-
-    # Invoke /bin/cat inside the guest via QEMU GA guest-exec; returns async PID.
-    typeset execJson
-    execJson="{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/bin/cat\",\"arg\":[\"${filePath}\"],\"capture-output\":true}}"
-    typeset execResult
-    execResult="$(oc --kubeconfig="${kc}" exec -n "${ns}" "${launcherPod}" -c compute -- \
-      virsh -c qemu:///system qemu-agent-command "${domain}" "${execJson}")" || exit 1
-
-    typeset pid
-    pid="$(printf '%s' "${execResult}" | jq -r '.return.pid // empty')"
-    [[ -n "${pid}" ]] || exit 1
-
-    # Poll guest-exec-status until exited=true (QEMU GA is asynchronous).
-    typeset statusJson
-    statusJson="{\"execute\":\"guest-exec-status\",\"arguments\":{\"pid\":${pid}}}"
-    typeset statusResult=""
-    typeset -i attempts=0 completed=0
-    while (( attempts < 10 && completed == 0 )); do
-      sleep 1
-      statusResult="$(oc --kubeconfig="${kc}" exec -n "${ns}" "${launcherPod}" -c compute -- \
-        virsh -c qemu:///system qemu-agent-command "${domain}" "${statusJson}" \
-        || true)"
-      [[ "$(printf '%s' "${statusResult}" | jq -r '.return.exited // false')" == "true" ]] \
-        && completed=1
-      (( ++attempts )) || true
-    done
-
-    (( completed )) || exit 1
-
-    # Require guest command exited 0; decode base64-encoded stdout.
-    # Non-zero exit from /bin/cat means the file is missing or unreadable —
-    # distinguish this from an infra failure by exiting 2 so the caller can
-    # record it as an integrity failure rather than silently skipping.
-    typeset exitcode
-    exitcode="$(printf '%s' "${statusResult}" | jq -r '.return.exitcode // 1')"
-    [[ "${exitcode}" == "0" ]] || exit 2
-
-    printf '%s' "${statusResult}" | jq -r '.return."out-data" // ""' | base64 -d
-    true
-  )
+# RedactOutput — mask URLs and IPv4 addresses in ssh/virtctl error text before logging.
+function RedactOutput () {
+  sed -E -e 's#https?://[^[:space:]]+#<REDACTED-URL>#g' \
+    -e 's#[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+#<REDACTED-IP>#g'
 }
 
-# WaitDestAgentConnected — gate QEMU GA checks until the agent is reachable post-CCLM.
-#
-# Probes the KubeVirt guestosinfo subresource API via `oc get --raw`:
-#   GET /apis/subresources.kubevirt.io/v1/namespaces/{ns}/virtualmachineinstances/{name}/guestosinfo
-# This is the same call virtctl guestosinfo makes and exercises the full path:
-#   API server → virt-handler → virt-launcher → libvirt → QEMU GA
-# If it returns JSON (non-empty kernelVersion / id), the GA is fully operational
-# and VirtctlReadVmFile / VirtctlGuestExec can safely proceed.
-#
+# EnsurePasswdEntry — the OpenSSH client refuses to run when the pod's random UID
+# has no passwd entry; the cli-with-ssh image makes /etc/passwd group-writable.
+function EnsurePasswdEntry () {
+  whoami &>/dev/null && return 0
+  [[ -w /etc/passwd ]] || {
+    printf 'ERROR: no passwd entry for uid %s and /etc/passwd is not writable\n' "$(id -u)" >&2
+    return 1
+  }
+  printf '%s:x:%s:0:%s user:%s:/sbin/nologin\n' \
+    "${USER_NAME:-default}" "$(id -u)" "${USER_NAME:-default}" "${HOME}" >> /etc/passwd
+}
+
+# InstallVirtctl — download virtctl matching the destination CNV version from its
+# hyperconverged-cluster-cli-download route. Runs under set +x (route host is a cluster URL).
+function InstallVirtctl () {
+  typeset binDir="${TMPDIR:-/tmp}/cclm-verify-bin"
+  mkdir -p "${binDir}"
+  ( set +x
+    typeset host
+    host="$(DestOc get route hyperconverged-cluster-cli-download -n "${MTV_CNV_NAMESPACE}" \
+      -o jsonpath='{.spec.host}' 2>/dev/null)" || exit 1
+    [[ -n "${host}" ]] || exit 1
+    curl -kfsSL "https://${host}/amd64/linux/virtctl.tar.gz" | tar -xz -C "${binDir}"
+  ) || return 1
+  virtctlBin="${binDir}/virtctl"
+  "${virtctlBin}" version --client 1>/dev/null
+}
+
+# PrepareSshAccess — key from SHARED_DIR (written by p2p-create-cclm-test-vms) + virtctl.
+function PrepareSshAccess () {
+  typeset srcKey="${SHARED_DIR}/${MTV_VM_SSH_KEY_NAME}"
+  [[ -s "${srcKey}" ]] || {
+    printf 'ERROR: VM SSH key %s not found in SHARED_DIR\n' "${MTV_VM_SSH_KEY_NAME}" >&2
+    return 1
+  }
+  sshKeyFile="${TMPDIR:-/tmp}/cclm-verify-ssh-key"
+  install -m 0600 "${srcKey}" "${sshKeyFile}" || return 1
+  [[ -w "${HOME:-/}" ]] || export HOME="${TMPDIR:-/tmp}"
+  EnsurePasswdEntry || return 1
+  command -v ssh 1>/dev/null || { printf 'ERROR: ssh client not found in step image\n' >&2; return 1; }
+  InstallVirtctl || { printf 'ERROR: failed to install virtctl from the destination cluster\n' >&2; return 1; }
+}
+
+# VmSsh — run a command inside a destination VM via virtctl ssh (API server port-forward,
+# so it works with masquerade networking). stdin is closed so loops are not consumed.
+# KUBECONFIG must be set in the environment: the ssh ProxyCommand virtctl generates
+# (virtctl port-forward --stdio) does not inherit a --kubeconfig flag.
+function VmSsh () {
+  typeset vmName="${1:?}"; (($#)) && shift
+  typeset cmd="${1:?}"; (($#)) && shift
+  KUBECONFIG="${destKubeconfig}" "${virtctlBin}" ssh "${sshUser}@vmi/${vmName}" \
+    --namespace="${targetNs}" --identity-file="${sshKeyFile}" --known-hosts=/dev/null \
+    --local-ssh-opts='-o StrictHostKeyChecking=no' \
+    --local-ssh-opts='-o UserKnownHostsFile=/dev/null' \
+    --local-ssh-opts='-o BatchMode=yes' \
+    --local-ssh-opts='-o ConnectTimeout=15' \
+    --local-ssh-opts='-o LogLevel=ERROR' \
+    --command="${cmd}" 0</dev/null
+}
+
+# VmSshChecked — VmSsh, logging the (redacted) tail of stderr on failure.
+function VmSshChecked () {
+  typeset vmName="${1:?}"
+  typeset errFile="${TMPDIR:-/tmp}/cclm-verify-ssh-err"
+  typeset -i rc=0
+  VmSsh "$@" 2>"${errFile}" || rc=$?
+  if (( rc != 0 )); then
+    printf 'ERROR: ssh command on %s failed (rc=%d): %s\n' "${vmName}" "${rc}" \
+      "$(RedactOutput < "${errFile}" | tail -n 3 | tr '\n' ' ')" >&2
+  fi
+  return "${rc}"
+}
+
+# WaitDestSshReady — gate in-guest checks until every destination VM accepts an SSH login.
+# Retries each VM for up to MTV_VM_SSH_WAIT_SECONDS (cloud-init may still be finishing).
 # Skipped (return 77) when both MTV_VM_DATA_INTEGRITY and MTV_VM_GUEST_EXEC are false.
-function WaitDestAgentConnected () {
+function WaitDestSshReady () {
   if [[ "${MTV_VM_DATA_INTEGRITY}" != 'true' && "${vmGuestExec}" != 'true' ]]; then
     return 77
   fi
+  PrepareSshAccess || return 1
 
+  typeset errFile="${TMPDIR:-/tmp}/cclm-verify-ssh-err"
   typeset -i i
   for (( i = 1; i <= vmCount; i++ )); do
     typeset vmName; vmName="$(VmName "${i}")"
-    : "Waiting for QEMU GA readiness on destination VMI ${vmName} (guestosinfo subresource)"
-
-    typeset -i elapsed=0 gaReady=0
-    while (( elapsed < 300 )); do
-      typeset response
-      response="$(DestOc get --raw \
-        "/apis/subresources.kubevirt.io/v1/namespaces/${targetNs}/virtualmachineinstances/${vmName}/guestosinfo" \
-        2>/dev/null || true)"
-      # A successful response has os info nested under .os — check .os.id or .os.kernelVersion.
-      if [[ -n "${response}" ]] && printf '%s' "${response}" | jq -e '.os.id // .os.kernelVersion' 1>/dev/null 2>&1; then
-        gaReady=1
+    typeset -i deadline=$(( SECONDS + sshWaitSeconds )) ready=0
+    while (( SECONDS < deadline )); do
+      if VmSsh "${vmName}" true 1>/dev/null 2>"${errFile}"; then
+        ready=1
         break
       fi
-      sleep 5
-      (( elapsed += 5 )) || true
+      sleep 10
     done
-
-    if (( gaReady == 0 )); then
-      printf 'ERROR: QEMU GA not responsive for %s after %ds (guestosinfo subresource timed out)\n' \
-        "${vmName}" "${elapsed}" >&2
+    if (( ready == 0 )); then
+      printf 'ERROR: SSH login to %s failed for %ds; last error: %s\n' "${vmName}" "${sshWaitSeconds}" \
+        "$(RedactOutput < "${errFile}" | tail -n 3 | tr '\n' ' ')" >&2
       return 1
     fi
   done
-  true
+  sshReady=true
 }
 
 # VerifyVmDataIntegrity — verify that cloud-init marker files survive migration intact.
 # p2p-create-migration-test-vm injects a write_files cloud-init block that writes
 # /home/cloud-user/migration-marker.txt with content equal to the VM name.
-# This function reads back that file on the destination via QEMU Guest Agent and
-# compares it to the expected VM name.
-# Gracefully skipped per VM when virsh / QEMU GA is unavailable (e.g. cirros VMs).
-# If every VM is skipped, the check fails (no false green). Per-VM failures fail the step.
+# This function reads back that file on the destination over SSH and compares it to
+# the expected VM name. Any VM whose marker is missing or different fails the step.
 function VerifyVmDataIntegrity () {
   [[ "${MTV_VM_DATA_INTEGRITY}" == "true" ]] || return 77
+  [[ "${sshReady}" == "true" ]] || {
+    printf 'ERROR: destination SSH not ready; data integrity not checked\n' >&2
+    return 1
+  }
 
-  # Disable xtrace for the entire function: pod names, domain identifiers, and
-  # marker content are internal values that must not appear in CI logs.
+  # Disable xtrace: marker content must not appear in CI logs.
   typeset _wasTracing=''
   [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
   set +x
 
-  typeset -i i
-  typeset -a vmNamesArr=() launcherPodsArr=()
-  typeset -i failed=0 skipped=0
+  typeset -i i failed=0
+  for (( i = 1; i <= vmCount; i++ )); do
+    typeset vmName actualMarker=""
+    vmName="$(VmName "${i}")"
 
-  # CollectDestLaunchers runs under set +x and uses the two-strategy pod lookup,
-  # which handles post-CCLM pods where kubevirt.io/domain may be absent.
-  CollectDestLaunchers vmNamesArr launcherPodsArr
-
-  for (( i = 0; i < vmCount; i++ )); do
-    typeset vmName launcherPod
-    vmName="${vmNamesArr[${i}]}"
-    launcherPod="${launcherPodsArr[${i}]}"
-    typeset expectedMarker="${vmName}"
-
-    if [[ -z "${launcherPod}" ]]; then
-      printf 'WARN: No Running virt-launcher pod for %s; skipping integrity check\n' \
-        "${vmName}" >&2
-      (( ++skipped ))
-      continue
-    fi
-
-    typeset probeRc=0
-    typeset actualMarker=""
-    actualMarker="$(VirtctlReadVmFile \
-      "${launcherPod}" "${targetNs}" "${destKubeconfig}" \
-      "/home/cloud-user/migration-marker.txt")" || probeRc=$?
-
-    if (( probeRc == 1 )); then
-      # QEMU GA infrastructure not available (virsh/domain unreachable); skip.
-      printf 'WARN: Cannot read integrity marker on %s (virsh/QEMU GA unavailable); skipping\n' \
-        "${vmName}" >&2
-      (( ++skipped ))
-      continue
-    elif (( probeRc == 2 )); then
-      # Guest command ran but marker is missing or unreadable — integrity failure.
+    if ! actualMarker="$(VmSshChecked "${vmName}" 'cat /home/cloud-user/migration-marker.txt')"; then
       printf 'ERROR: Integrity marker missing or unreadable on %s\n' "${vmName}" >&2
       (( ++failed ))
       continue
     fi
 
-    # Strip any trailing newline that cloud-init or base64-d may append.
-    typeset trimmedMarker="${actualMarker%$'\n'}"
-
-    if [[ "${trimmedMarker}" == "${expectedMarker}" ]]; then
+    if [[ "${actualMarker%$'\r'}" == "${vmName}" ]]; then
       : "Data integrity verified for ${vmName}"
     else
       # Log only a mismatch indicator — never log raw marker content.
@@ -445,69 +414,7 @@ function VerifyVmDataIntegrity () {
   done
 
   [[ "${_wasTracing}" == "true" ]] && set -x
-
-  # All VMs skipped means the check never ran — that is a false green, not a pass.
-  (( skipped == vmCount )) && {
-    : "FAIL: data integrity skipped on all ${vmCount} VMs (QEMU GA unavailable?)"
-    return 1
-  }
-
   (( failed == 0 ))
-}
-
-# VirtctlGuestExec — run a guest command via QEMU Guest Agent (path + JSON arg array).
-# argJson must be a JSON array of strings, e.g. '["-c","sync"].
-# Exit 1 = GA infra unavailable; exit 2 = guest command non-zero; 0 = success.
-# stdout is the guest command stdout (decoded). Runs under set +x.
-function VirtctlGuestExec () {
-  typeset launcherPod="${1:?}"; (($#)) && shift
-  typeset ns="${1:?}"; (($#)) && shift
-  typeset kc="${1:?}"; (($#)) && shift
-  typeset guestPath="${1:?}"; (($#)) && shift
-  typeset argJson="${1:?}"; (($#)) && shift
-
-  ( set +x
-    typeset domain
-    domain="$(oc --kubeconfig="${kc}" exec -n "${ns}" "${launcherPod}" -c compute -- \
-      bash -c 'virsh -c qemu:///system list --all --name 2>/dev/null \
-        | grep -v "^[[:space:]]*$" | head -1' \
-      || true)"
-    [[ -n "${domain}" ]] || exit 1
-
-    typeset execJson
-    execJson="$(jq -cn --arg path "${guestPath}" --argjson arg "${argJson}" \
-      '{execute:"guest-exec", arguments:{path:$path, arg:$arg, "capture-output":true}}')"
-    typeset execResult
-    execResult="$(oc --kubeconfig="${kc}" exec -n "${ns}" "${launcherPod}" -c compute -- \
-      virsh -c qemu:///system qemu-agent-command "${domain}" "${execJson}")" || exit 1
-
-    typeset pid
-    pid="$(printf '%s' "${execResult}" | jq -r '.return.pid // empty')"
-    [[ -n "${pid}" ]] || exit 1
-
-    typeset statusJson
-    statusJson="$(jq -cn --argjson pid "${pid}" \
-      '{execute:"guest-exec-status", arguments:{pid:$pid}}')"
-    typeset statusResult=""
-    typeset -i attempts=0 completed=0
-    while (( attempts < 20 && completed == 0 )); do
-      sleep 1
-      statusResult="$(oc --kubeconfig="${kc}" exec -n "${ns}" "${launcherPod}" -c compute -- \
-        virsh -c qemu:///system qemu-agent-command "${domain}" "${statusJson}" \
-        || true)"
-      [[ "$(printf '%s' "${statusResult}" | jq -r '.return.exited // false')" == "true" ]] \
-        && completed=1
-      (( ++attempts )) || true
-    done
-    (( completed )) || exit 1
-
-    typeset exitcode
-    exitcode="$(printf '%s' "${statusResult}" | jq -r '.return.exitcode // 1')"
-    [[ "${exitcode}" == "0" ]] || exit 2
-
-    printf '%s' "${statusResult}" | jq -r '.return."out-data" // ""' | base64 -d
-    true
-  )
 }
 
 # CollectDestLaunchers — fill nameref arrays of VM names and Running virt-launcher pods.
@@ -569,100 +476,64 @@ function CollectDestLaunchers () {
 
 # VerifyGuestDiskIo — write, fsync, checksum, and remove a scratch file inside each guest.
 # Proves the migrated root disk is writable and readable after CCLM (not just VMI Running).
-# Skipped (SKIP JUnit record, rc=77) when MTV_VM_GUEST_EXEC=false (e.g. cirros VMs that
-# do not ship a QEMU Guest Agent), or when GA infra is unavailable on ALL VMs (rc=1 from
-# VirtctlGuestExec on every VM — indicates qemu-guest-agent not running in guest; cloud-init
-# should enable it via "systemctl enable --now qemu-guest-agent" in runcmd).
+# Skipped (SKIP JUnit record, rc=77) when MTV_VM_GUEST_EXEC=false (e.g. cirros VMs).
 function VerifyGuestDiskIo () {
   [[ "${vmGuestExec}" == "true" ]] || return 77
-  typeset -a vmNamesArr=() launcherPodsArr=()
-  CollectDestLaunchers vmNamesArr launcherPodsArr
+  [[ "${sshReady}" == "true" ]] || {
+    printf 'ERROR: destination SSH not ready; guest disk I/O not checked\n' >&2
+    return 1
+  }
 
-  typeset -i i failed=0 gaUnavail=0
   typeset ioCmd='dd if=/dev/zero of=/tmp/cclm-io.bin bs=1M count=4 conv=fsync status=none && sha256sum /tmp/cclm-io.bin && rm -f /tmp/cclm-io.bin'
-  typeset argJson
-  argJson="$(jq -cn --arg c "${ioCmd}" '["-c", $c]')"
-
-  for (( i = 0; i < vmCount; i++ )); do
-    typeset vmName launcherPod
-    vmName="${vmNamesArr[${i}]}"
-    launcherPod="${launcherPodsArr[${i}]}"
-    if [[ -z "${launcherPod}" ]]; then
-      : "FAIL: no Running virt-launcher for disk I/O check on ${vmName}"
+  typeset -i i failed=0
+  for (( i = 1; i <= vmCount; i++ )); do
+    typeset vmName; vmName="$(VmName "${i}")"
+    if VmSshChecked "${vmName}" "${ioCmd}" 1>/dev/null; then
+      : "Guest disk I/O succeeded on ${vmName}"
+    else
+      : "FAIL: guest disk I/O command failed on ${vmName}"
       (( ++failed ))
-      continue
     fi
-    typeset probeRc=0
-    VirtctlGuestExec "${launcherPod}" "${targetNs}" "${destKubeconfig}" \
-      /bin/bash "${argJson}" >/dev/null || probeRc=$?
-    case "${probeRc}" in
-      0) : "Guest disk I/O succeeded on ${vmName}" ;;
-      1) : "SKIP: QEMU GA unavailable for disk I/O on ${vmName} (qemu-guest-agent not running)"
-         (( ++gaUnavail )) ;;
-      *) : "FAIL: guest disk I/O command failed on ${vmName} (rc=${probeRc})"
-         (( ++failed )) ;;
-    esac
   done
-
-  # If GA infra was universally absent (no partial results) record as SKIP, not FAIL.
-  # A partial result (some pass, some unavailable) is still a real failure worth reporting.
-  (( gaUnavail == vmCount && failed == 0 )) && return 77
-
-  (( failed == 0 && gaUnavail == 0 ))
+  (( failed == 0 ))
 }
 
 # VerifyGuestNetwork — ping a peer VM IP from inside each guest (guest-level reachability).
 # Distinct from the SSH TCP probe which runs in the virt-launcher pod, not the guest.
-# Skipped (SKIP JUnit record, rc=77) for vmCount=1 (no peer), when MTV_VM_GUEST_EXEC=false,
-# or when GA infra is universally absent (VirtctlGuestExec rc=1 on every VM).
+# Skipped (SKIP JUnit record, rc=77) for vmCount=1 (no peer) or when MTV_VM_GUEST_EXEC=false.
 function VerifyGuestNetwork () {
   [[ "${vmGuestExec}" == "true" ]] || return 77
   (( vmCount > 1 )) || return 77
+  [[ "${sshReady}" == "true" ]] || {
+    printf 'ERROR: destination SSH not ready; guest network not checked\n' >&2
+    return 1
+  }
 
-  typeset -a vmNamesArr=() launcherPodsArr=()
-  CollectDestLaunchers vmNamesArr launcherPodsArr
-
-  typeset -i i failed=0 gaUnavail=0
-  for (( i = 0; i < vmCount; i++ )); do
-    typeset vmName launcherPod
-    vmName="${vmNamesArr[${i}]}"
-    launcherPod="${launcherPodsArr[${i}]}"
-    typeset -i peerIdx=$(( (i + 1) % vmCount ))
-    typeset peerName="${vmNamesArr[${peerIdx}]}"
-
-    if [[ -z "${launcherPod}" ]]; then
-      : "FAIL: no Running virt-launcher for guest network check on ${vmName}"
-      (( ++failed ))
-      continue
-    fi
+  typeset -i i failed=0
+  for (( i = 1; i <= vmCount; i++ )); do
+    typeset vmName peerName
+    vmName="$(VmName "${i}")"
+    peerName="$(VmName $(( i % vmCount + 1 )))"
 
     typeset probeRc=0
+    # set +x: peer IP is an internal cluster address.
     ( set +x
       typeset peerIp
       peerIp="$(DestOc get "virtualmachineinstance/${peerName}" -n "${targetNs}" \
         -o jsonpath='{.status.interfaces[0].ipAddress}' || true)"
       [[ -n "${peerIp}" ]] || exit 2
-      typeset argJson
-      argJson="$(jq -cn --arg ip "${peerIp}" '["-c", ("ping -c 2 -W 5 " + $ip)]')"
-      VirtctlGuestExec "${launcherPod}" "${targetNs}" "${destKubeconfig}" \
-        /bin/bash "${argJson}" >/dev/null
+      VmSshChecked "${vmName}" "ping -c 2 -W 5 ${peerIp}" 1>/dev/null
     ) || probeRc=$?
 
     case "${probeRc}" in
       0) : "Guest ping to peer succeeded on ${vmName}" ;;
-      1) : "SKIP: QEMU GA unavailable for guest network check on ${vmName} (qemu-guest-agent not running)"
-         (( ++gaUnavail )) ;;
       2) : "FAIL: no IP on peer VMI for guest network check on ${vmName}"
          (( ++failed )) ;;
       *) : "FAIL: guest ping to peer failed on ${vmName} (rc=${probeRc})"
          (( ++failed )) ;;
     esac
   done
-
-  # If GA infra was universally absent (no partial results) record as SKIP, not FAIL.
-  (( gaUnavail == vmCount && failed == 0 )) && return 77
-
-  (( failed == 0 && gaUnavail == 0 ))
+  (( failed == 0 ))
 }
 
 
@@ -759,7 +630,7 @@ typeset -i verifyStepRc=0
   JStep "Verification: Destination VM runStrategy" VerifyDestVmsRunStrategy || _rc=$?
   JStep "Verification: Source VMIM Not Failed" VerifySourceVmimNotFailed || _rc=$?
   JStep "Verification: VM SSH Port Probe" VerifyAllVmsSsh || _rc=$?
-  JStep "Verification: Destination Agent Connected" WaitDestAgentConnected || _rc=$?
+  JStep "Verification: Destination SSH Login" WaitDestSshReady || _rc=$?
   JStep "Verification: VM Data Integrity" VerifyVmDataIntegrity || _rc=$?
   JStep "Verification: Guest Disk I/O" VerifyGuestDiskIo || _rc=$?
   JStep "Verification: Guest Network Reachability" VerifyGuestNetwork || _rc=$?

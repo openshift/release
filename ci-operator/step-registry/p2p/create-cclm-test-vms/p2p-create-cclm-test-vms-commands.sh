@@ -65,6 +65,26 @@ ResolveSpokeKubeconfig() {
     printf '%s' "${spokeKubeconfig}" > "${SHARED_DIR}/.spoke-kubeconfig-path"
 }
 
+# EnsureVmSshKey generate (once) the SSH key pair authorized on RHEL VMs via cloud-init.
+# The verify steps read it back from SHARED_DIR to log in with virtctl ssh.
+EnsureVmSshKey() {
+    typeset keyFile="${SHARED_DIR}/${P2P_HS_VM_SSH_KEY_NAME}"
+    [[ -s "${keyFile}" && -s "${keyFile}.pub" ]] && return 0
+
+    # ssh-keygen refuses to run when the pod's random UID has no passwd entry.
+    if ! whoami &> /dev/null; then
+        [[ -w /etc/passwd ]] || { : "No passwd entry for uid $(id -u) and /etc/passwd not writable" >&2; return 1; }
+        printf '%s:x:%s:0:%s user:%s:/sbin/nologin\n' \
+            "${USER_NAME:-default}" "$(id -u)" "${USER_NAME:-default}" "${HOME}" >> /etc/passwd
+    fi
+
+    typeset tmpKey="${TMPDIR:-/tmp}/cclm-vm-ssh-key"
+    rm -f "${tmpKey}" "${tmpKey}.pub"
+    ssh-keygen -q -t ed25519 -N '' -C cclm-verify -f "${tmpKey}"
+    cp "${tmpKey}" "${keyFile}"
+    cp "${tmpKey}.pub" "${keyFile}.pub"
+}
+
 # EnsureNamespace idempotently create the test VM namespace on a cluster.
 EnsureNamespace() {
     typeset kc="${1:?}"
@@ -297,9 +317,11 @@ ApplyRhelVirtualMachine() {
     set +x
     typeset _vmPwd
     _vmPwd="$(openssl rand -base64 16)"
+    typeset _sshPubKey
+    _sshPubKey="$(<"${SHARED_DIR}/${P2P_HS_VM_SSH_KEY_NAME}.pub")"
     typeset _userData
-    _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: %s\nchpasswd:\n  expire: false\nssh_pwauth: true\nwrite_files:\n- path: /home/cloud-user/migration-marker.txt\n  content: %s\n  permissions: "0644"\n  owner: cloud-user:cloud-user\nruncmd:\n- dnf install -y qemu-guest-agent\n- systemctl enable --now qemu-guest-agent\n- echo "VM %s is ready for migration testing" > /tmp/vm-ready.txt\n' \
-        "${_vmPwd}" "${vmName}" "${vmName}")"
+    _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: %s\nchpasswd:\n  expire: false\nssh_pwauth: true\nssh_authorized_keys:\n- %s\nwrite_files:\n- path: /home/cloud-user/migration-marker.txt\n  content: %s\n  permissions: "0644"\n  owner: cloud-user:cloud-user\nruncmd:\n- dnf install -y qemu-guest-agent\n- systemctl enable --now qemu-guest-agent\n- echo "VM %s is ready for migration testing" > /tmp/vm-ready.txt\n' \
+        "${_vmPwd}" "${_sshPubKey}" "${vmName}" "${vmName}")"
 
     vmName="${vmName}" DV_NAME="${dvName}" VM_NS="${ns}" \
     CLOUD_INIT_USERDATA="${_userData}" \
@@ -529,6 +551,10 @@ typeset -i cclmStepRc=0
 (( vmCount >= 1 ))
 
 ResolveSpokeKubeconfig || cclmStepRc=$?
+
+if (( cclmStepRc == 0 )) && [[ "${P2P_HS_VM_IMAGE_TYPE}" == "rhel" ]]; then
+    EnsureVmSshKey || cclmStepRc=$?
+fi
 
 if (( cclmStepRc == 0 )) && [[ "${P2P_HS_CREATE_HUB_VMS}" != "false" ]]; then
     CreateClusterVms "${KUBECONFIG}" "${P2P_HS_HUB_VM_PREFIX}" \

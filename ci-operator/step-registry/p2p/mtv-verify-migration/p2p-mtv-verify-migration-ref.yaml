@@ -1,6 +1,6 @@
 ref:
   as: p2p-mtv-verify-migration
-  from: cli
+  from: cli-with-ssh
   commands: p2p-mtv-verify-migration-commands.sh
   timeout: 30m0s
   grace_period: 10m0s
@@ -16,9 +16,13 @@ ref:
     2. Destination VM runStrategy==Always (OCPBUGS-101771)
     3. Source VMIM is not Failed (OCPBUGS-99403)
     4. SSH port 22 reachable from a peer virt-launcher (requires MTV_TEST_VM_COUNT>1)
-    5. Cloud-init marker file intact via QEMU Guest Agent
-    6. Guest disk I/O (write + fsync + checksum + unlink)
-    7. Guest network reachability (ping a peer VM IP from inside the guest)
+    5. SSH login to every destination VM (virtctl ssh, key from p2p-create-cclm-test-vms)
+    6. Cloud-init marker file intact (read over SSH)
+    7. Guest disk I/O over SSH (write + fsync + checksum + unlink)
+    8. Guest network reachability over SSH (ping a peer VM IP from inside the guest)
+
+    virtctl is downloaded from the destination cluster's CNV cli-download route; the step
+    runs from the cli-with-ssh image (cli + openssh-clients).
 
     Writes ${ARTIFACT_DIR}/junit_cclm_migration_verify.xml (suffix applied when
     MTV_MIGRATION_SUFFIX is set); diagnostics under mtv-migration-verify-diagnostics/.
@@ -64,14 +68,14 @@ ref:
   - name: MTV_VM_DATA_INTEGRITY
     default: "true"
     documentation: |-
-      When true, verify cloud-init marker files survive migration via QEMU Guest Agent.
-      Failure or "skipped on all VMs" fails the step. Set false for cirros guests.
+      When true, verify cloud-init marker files survive migration (read over SSH).
+      Any missing or mismatched marker fails the step. Set false for cirros guests.
   - name: MTV_VM_GUEST_EXEC
     default: "true"
     documentation: |-
-      When true, run QEMU Guest Agent checks: guest disk I/O (VerifyGuestDiskIo) and
+      When true, run in-guest checks over SSH: guest disk I/O (VerifyGuestDiskIo) and
       guest network reachability (VerifyGuestNetwork). Set false for cirros or other
-      guest images that do not ship a QEMU Guest Agent; the checks are recorded as
+      guest images without the cloud-init SSH key; the checks are recorded as
       SKIPPED in JUnit instead of FAILED.
   - name: MTV_MIGRATION_SUFFIX
     default: ""
@@ -87,10 +91,16 @@ ref:
   - name: MTV_MIGRATION_NAME
     default: "cclm-run-1"
     documentation: Migration metadata.name on the hub (used for diagnostics).
-  - name: MTV_VM_AGENT_WAIT_TIMEOUT
-    default: "10m"
+  - name: MTV_VM_SSH_WAIT_SECONDS
+    default: "600"
     documentation: |-
-      oc wait timeout for the AgentConnected condition on each destination VMI.
-      Applied after CCLM lands the VM on the destination spoke, before QEMU Guest
-      Agent checks (data integrity, guest disk I/O, guest network) are attempted.
-      Increase if the destination cluster is slow to reconnect the guest agent.
+      Seconds to keep retrying the SSH login on each destination VM before the
+      in-guest checks (data integrity, guest disk I/O, guest network) are attempted.
+  - name: MTV_VM_SSH_USER
+    default: "cloud-user"
+    documentation: Guest user for virtctl ssh (the cloud-init default user).
+  - name: MTV_VM_SSH_KEY_NAME
+    default: "cclm-vm-ssh-key"
+    documentation: |-
+      SHARED_DIR file name of the SSH private key authorized on the test VMs.
+      Must match P2P_HS_VM_SSH_KEY_NAME in p2p-create-cclm-test-vms.
