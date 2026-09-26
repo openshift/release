@@ -1,4 +1,8 @@
 base_images:
+  test-selector-gatekeeper-stable:
+    name: test-selector-gatekeeper
+    namespace: opendatahub-io
+    tag: latest
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -80,6 +84,8 @@ images:
       # VENV by default.
       ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
     to: kserve-tests
+  - dockerfile_path: tools/test_selector/gatekeeper/Dockerfile
+    to: test-selector-gatekeeper
 promotion:
   to:
   - excluded_images:
@@ -111,6 +117,27 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: test-selector-unit
+  run_if_changed: ^tools/test_selector/
+  steps:
+    test:
+    - as: unit
+      commands: |-
+        PYTHONPYCACHEPREFIX=/tmp/test-selector-pycache \
+          python -m compileall -q /opt/test-selector
+        python -m test_selector --help >/dev/null
+        python -m test_selector.gatekeeper.evaluate --help >/dev/null
+        python -m test_selector.gatekeeper.dispatch --help >/dev/null
+        python -m pytest \
+          tools/test_selector/tests \
+          tools/test_selector/gatekeeper/tests \
+          -q
+      from: test-selector-gatekeeper
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+      timeout: 15m0s
 - always_run: false
   as: e2e-graph
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
