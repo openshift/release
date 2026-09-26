@@ -1,0 +1,57 @@
+workflow:
+  as: hypershift-kubevirt-baremetalds-e2e-ovn-bgp-dualstack
+  documentation: |-
+    HyperShift KubeVirt on bare metal (equinix-ocp-hcp) with dual-stack guest cluster and OVN
+    BGP route advertisements (shared gateway). Runs openshift conformance tests on the hosted
+    cluster after baremetalds-e2e-ovn-bgp-pre equivalent setup on the guest.
+  steps:
+    post:
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - chain: hypershift-kubevirt-destroy
+    - chain: baremetalds-ofcir-post
+    test:
+    - chain: hypershift-conformance
+    pre:
+    - ref: baremetalds-devscripts-conf-featureset
+    - chain: baremetalds-ofcir-pre
+    - ref: enable-qe-catalogsource
+    - ref: deploy-konflux-operator
+    - chain: hypershift-kubevirt-baremetalds-lvm
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - chain: hypershift-kubevirt-baremetalds-odf
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-install
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-kubevirt-baremetalds-proxy
+    - ref: hypershift-kubevirt-health-check
+    - ref: hypershift-kubevirt-baremetalds-e2e-ovn-bgp-pre
+    - ref: baremetalds-e2e-ovn-debug-enable-console
+    env:
+      IP_STACK: v4v6
+      KONFLUX_DEPLOY_OPERATORS: "false"
+      KONFLUX_TARGET_OPERATORS: metallb,local-storage
+      CLUSTERTYPE: host_384gb_el9
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      # OCP 5.1 jobs auto-select lvm-operator-catalog:v5.1; use Konflux v5.0 until v5.1 is published.
+      MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v5.0
+      LVM_OPERATOR_SUB_CHANNEL: stable-5.0
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      ETCD_STORAGE_CLASS: lvms-vg1
+      EXTRA_MG_ARGS: --host-network
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=81920
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=16384
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=250G
