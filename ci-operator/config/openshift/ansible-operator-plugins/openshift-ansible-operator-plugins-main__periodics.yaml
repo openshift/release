@@ -1,8 +1,14 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
   items:
   - dockerfile_literal: |
+      FROM nested-podman AS podman
       FROM src
       USER 0
       RUN dnf install -y podman shadow-utils libcap && dnf clean all && \
@@ -11,9 +17,16 @@ images:
           touch /etc/subgid /etc/subuid && \
           chmod g=u /etc/subuid /etc/subgid && \
           chmod g=u /etc/passwd /etc/group
+      COPY --from=podman /entrypoint.sh /entrypoint.sh
+      RUN chmod +rx /entrypoint.sh
       ENV BUILDAH_ISOLATION=chroot
       USER 1000
+      ENTRYPOINT ["/entrypoint.sh"]
+      CMD ["bash"]
     inputs:
+      nested-podman:
+        as:
+        - nested-podman
       src:
         as:
         - src
@@ -101,10 +114,19 @@ tests:
           git push origin "FETCH_HEAD:refs/heads/${REHEARSAL_BRANCH}"
           git fetch origin "refs/heads/${REHEARSAL_BRANCH}:refs/remotes/origin/${REHEARSAL_BRANCH}"
           git checkout -B "$REHEARSAL_BRANCH" "origin/$REHEARSAL_BRANCH"
+          export GH_TOKEN="$GITHUB_TOKEN"
+          gh pr list --repo openshift/ansible-operator-plugins --state open \
+            --head "v1.42.3-rebase-${REHEARSAL_BRANCH}" --json number --jq '.[].number' \
+            | while read -r number; do
+                gh pr close "$number" --repo openshift/ansible-operator-plugins
+              done
+          git push origin --delete "v1.42.3-rebase-${REHEARSAL_BRANCH}" 2>/dev/null || true
           git config --unset credential.helper
           rm -f "$REHEARSAL_CRED_FILE"
           export REBASE_BRANCH="$REHEARSAL_BRANCH"
           export OVERRIDE_TAG=v1.42.3
+          echo "==> Rehearsal Podman probe (uid=$(id -u), gid=$(id -g))"
+          podman info 2>&1 | tail -25 || true
         fi
 
         export FORCE_REMOTE_URLS=1
