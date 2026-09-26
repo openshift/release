@@ -50,10 +50,11 @@ ref:
     A short CI/security block matching jira-solver is prepended;
     repo-specific REVIEW.md is appended last on the
     review worker. Credential-dumping shell tools are disallowed. Bash
-    verifies the PR head repository, branch, and SHA against the configured
-    fork and local checkout before workers run, then pushes only that fork ref.
-    Rewritten history uses a force-with-lease pinned to the captured SHA after
-    the PR head is revalidated; upstream and unrestricted force pushes are
-    never used. Mints a fresh GitHub App token (1h TTL) immediately before
+    validates the PR head repository, branch, SHA, and effective fork URLs,
+    fetches only that fork branch, verifies the fetched commit, and resets the
+    local branch before workers run. It then pushes only that exact fork ref.
+    Publication uses a force-with-lease pinned to the captured SHA after the PR
+    head is revalidated; upstream and unrestricted force pushes are never
+    used. Mints a fresh GitHub App token (1h TTL) immediately before
     comment workers and git push.
     Reads PR number from SHARED_DIR (written by jira-solver or pr-followup).
