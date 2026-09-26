@@ -1,0 +1,872 @@
+#!/bin/bash
+# LCS Load Generator — CI Orchestration Script
+set -euo pipefail
+
+# Keep time for diagnostics and artifact collection inside the ref's 24h timeout.
+STEP_START_EPOCH=$(date +%s)
+STEP_TIMEOUT_SECONDS=$((24 * 60 * 60))
+DIAGNOSTIC_GRACE_SECONDS=$((15 * 60))
+
+# Configuration
+
+LCS_NAMESPACE="${LCS_NAMESPACE:-openshift-lightspeed}"
+NUM_USERS="${NUM_USERS:-5}"
+TEST_DURATION="${TEST_DURATION:-5m}"
+: "${LCS_LOADGEN_IMAGE:?LCS_LOADGEN_IMAGE must be injected by ci-operator}"
+LCS_APP_IMAGE="${LCS_APP_IMAGE:-quay.io/lightspeed-core/lightspeed-stack:dev-latest}"
+MOCK_LLM_IMAGE="${MOCK_LLM_IMAGE:-quay.io/rh-ee-bbodapat/lcs-testing:mock-llm-server}"
+ENABLE_PYROSCOPE="${ENABLE_PYROSCOPE:-true}"
+ENABLE_MEMRAY="${ENABLE_MEMRAY:-false}"
+LCS_WORKERS="${LCS_WORKERS:-1}"
+ES_INDEX="${ES_BENCHMARK_INDEX:-lcs-perf-results}"
+
+LCS_PROVIDER="${LCS_PROVIDER:-openai}"
+LCS_MODEL="${LCS_MODEL:-granite-3.1-8b-instruct}"
+LCS_HOST="http://lcs-service.${LCS_NAMESPACE}.svc.cluster.local:8080"
+LCS_TOKEN=""
+REQUEST_TIMEOUT="${REQUEST_TIMEOUT:-120}"
+LOCUST_PROCESSES="${LOCUST_PROCESSES:-1}"
+METRIC_STEP="${METRIC_STEP:-30s}"
+
+PYROSCOPE_NAMESPACE="pyroscope"
+export PYROSCOPE_NAMESPACE
+PYROSCOPE_URL="http://pyroscope.${PYROSCOPE_NAMESPACE}.svc.cluster.local:4040"
+
+ES_SERVER_HOST="search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+
+# ES credentials for Orion fingerprint logging.
+# Tracing is off (no set -x) so the URL stays out of CI logs.
+ES_USERNAME_RAW=$(<"/secret/username")
+ES_PASSWORD_RAW=$(<"/secret/password")
+ES_SERVER="https://${ES_USERNAME_RAW}:${ES_PASSWORD_RAW}@${ES_SERVER_HOST}"
+unset ES_USERNAME_RAW ES_PASSWORD_RAW
+
+# Orion tracking variables — reset per iteration inside the duration loop.
+job_start=""
+job_end=""
+job_status=""
+uuid=""
+workload="lcs-load-generator"
+additional_attributes='{}'
+
+RUNTIME_TMP_DIR=$(mktemp -d)
+chmod 700 "${RUNTIME_TMP_DIR}"
+trap 'rm -rf "${RUNTIME_TMP_DIR}"' EXIT
+
+# Clone e2e-benchmarking for fingerprint publishing utility.
+LATEST_E2E_TAG=$(curl -sS \
+  "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" \
+  | jq -r '.tag_name') || true
+
+E2E_BENCH_AVAILABLE="false"
+if [[ -n "${LATEST_E2E_TAG}" ]] && \
+   git clone --branch "${LATEST_E2E_TAG}" --depth 1 \
+     https://github.com/cloud-bulldozer/e2e-benchmarking.git \
+     "${RUNTIME_TMP_DIR}/e2e-benchmarking" 2>&1; then
+  E2E_BENCH_AVAILABLE="true"
+else
+  echo "WARN: Failed to clone e2e-benchmarking — fingerprints will be skipped"
+fi
+
+# ── Helper functions ──────────────────────────────────────────────────
+
+# Function to log job fingerprint to Orion via e2e-benchmarking index.sh
+log_fingerprint() {
+  if [[ "${E2E_BENCH_AVAILABLE}" != "true" ]]; then
+    echo "WARN: e2e-benchmarking not available — skipping fingerprint"
+    return 0
+  fi
+  pushd "${RUNTIME_TMP_DIR}/e2e-benchmarking/utils" >/dev/null
+  env BENCHMARK="lcs-load-generator" \
+      WORKLOAD="${workload}" \
+      ES_SERVER="${ES_SERVER}" \
+      UUID="${uuid}" \
+      JOB_START="${job_start}" \
+      JOB_END="${job_end}" \
+      JOB_STATUS="${job_status}" \
+      ADDITIONAL_PARAMS="${additional_attributes}" \
+      ./index.sh || echo "WARN: Fingerprint index.sh failed — continuing"
+  popd >/dev/null
+  echo "  Fingerprint logged (UUID=${uuid})"
+}
+
+# Function to run a command and handle failures
+run_or_fail() {
+  if ! "$@"; then
+    echo "Error: Command '$*' failed."
+    job_status="failure"
+    job_end=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    log_fingerprint
+    cleanup
+    exit 1
+  fi
+}
+
+job_terminal_state() {
+  local conditions=$1
+
+  if grep -qx 'Complete=True' <<<"${conditions}"; then
+    echo "complete"
+  elif grep -qx 'Failed=True' <<<"${conditions}"; then
+    echo "failed"
+  fi
+}
+
+# ── Per-iteration functions ───────────────────────────────────────────
+
+deploy_monitoring() {
+  echo "=== Deploying monitoring prerequisites ==="
+
+  oc create namespace "${LCS_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+
+  # Required for platform Prometheus to scrape ServiceMonitor in openshift-* ns
+  oc label namespace "${LCS_NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite
+
+  # RBAC for Prometheus to scrape pods in this namespace
+  cat <<'PROM_RBAC' | envsubst | oc apply -f -
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-k8s
+  namespace: ${LCS_NAMESPACE}
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: ${LCS_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-k8s
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-k8s
+    namespace: openshift-monitoring
+PROM_RBAC
+
+  # ServiceMonitor for LCS metrics
+  cat <<'SVCMON' | envsubst | oc apply -f -
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: lcs-monitor
+  namespace: ${LCS_NAMESPACE}
+spec:
+  selector:
+    matchLabels:
+      app: lcs
+  endpoints:
+    - targetPort: 8080
+      path: /metrics
+      interval: 30s
+SVCMON
+}
+
+deploy_pyroscope() {
+  echo "=== Deploying Pyroscope ==="
+
+  oc create namespace "${PYROSCOPE_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+
+  cat <<'PYROSCOPE' | envsubst | oc apply -n "${PYROSCOPE_NAMESPACE}" -f -
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pyroscope
+  namespace: ${PYROSCOPE_NAMESPACE}
+  labels:
+    app: pyroscope
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pyroscope
+  template:
+    metadata:
+      labels:
+        app: pyroscope
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: pyroscope
+          image: grafana/pyroscope:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 4040
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          volumeMounts:
+            - name: pyroscope-data
+              mountPath: /data
+      volumes:
+        - name: pyroscope-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pyroscope
+  namespace: ${PYROSCOPE_NAMESPACE}
+spec:
+  selector:
+    app: pyroscope
+  ports:
+    - port: 4040
+      targetPort: 4040
+PYROSCOPE
+
+  if ! oc wait --for=condition=available deployment/pyroscope \
+    -n "${PYROSCOPE_NAMESPACE}" --timeout=120s; then
+    echo "WARN: Pyroscope failed to become ready — disabling profiling and continuing"
+    ENABLE_PYROSCOPE="false"
+  fi
+}
+
+deploy_lcs() {
+  echo "=== Deploying LCS (library mode + mock LLM sidecar) ==="
+
+  # Create ConfigMaps from heredocs
+  cat <<'LCS_STACK_CONFIG' | envsubst | oc apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lcs-config
+  namespace: ${LCS_NAMESPACE}
+data:
+  lightspeed-stack.yaml: |
+    name: Lightspeed Core Service (LCS)
+    service:
+      host: 0.0.0.0
+      port: 8080
+      workers: ${LCS_WORKERS}
+      access_log: false
+
+    ogx:
+      use_as_library_client: true
+      config:
+        profile: /app-config/run.yaml
+      timeout: 120
+
+    user_data_collection: {}
+
+    authentication:
+      module: "noop"
+
+  run.yaml: |
+    version: 2
+    distro_name: starter
+
+    apis:
+    - responses
+    - conversations
+    - files
+    - file_processors
+    - inference
+    - tool_runtime
+    - vector_io
+
+    providers:
+      inference:
+      - provider_id: openai
+        provider_type: remote::openai
+        config:
+          api_key: fake-key-for-testing
+          base_url: http://localhost:11434/v1
+      - config: {}
+        provider_id: sentence-transformers
+        provider_type: inline::sentence-transformers
+      files:
+      - config:
+          metadata_store:
+            table_name: files_metadata
+            backend: sql_default
+          storage_dir: /tmp/llama-storage/files
+        provider_id: meta-reference-files
+        provider_type: inline::localfs
+      file_processors:
+      - provider_id: pypdf
+        provider_type: inline::pypdf
+        config:
+          default_chunk_size_tokens: 800
+          default_chunk_overlap_tokens: 400
+      tool_runtime:
+      - config: {}
+        provider_id: model-context-protocol
+        provider_type: remote::model-context-protocol
+      - config: {}
+        provider_id: file-search
+        provider_type: inline::file-search
+      vector_io:
+      - provider_id: faiss
+        provider_type: inline::faiss
+        config:
+          persistence:
+            namespace: vector_io::faiss
+            backend: kv_default
+      responses:
+      - config:
+          persistence:
+            responses:
+              table_name: agents_responses
+              backend: sql_default
+        provider_id: meta-reference
+        provider_type: inline::builtin
+
+    server:
+      port: 8321
+
+    storage:
+      backends:
+        kv_default:
+          type: kv_sqlite
+          db_path: /tmp/llama-storage/kv_store.db
+        sql_default:
+          type: sql_sqlite
+          db_path: /tmp/llama-storage/sql_store.db
+      stores:
+        metadata:
+          namespace: registry
+          backend: kv_default
+        inference:
+          table_name: inference_store
+          backend: sql_default
+          max_write_queue_size: 10000
+          num_writers: 4
+        conversations:
+          table_name: openai_conversations
+          backend: sql_default
+        prompts:
+          table_name: prompts
+          backend: sql_default
+        connectors:
+          table_name: connectors
+          backend: sql_default
+
+    registered_resources:
+      models:
+      - model_id: granite-3.1-8b-instruct
+        model_type: llm
+        provider_id: openai
+        provider_model_id: granite-3.1-8b-instruct
+      - model_id: llama-guard-3-8b
+        model_type: llm
+        provider_id: openai
+        provider_model_id: llama-guard-3-8b
+
+    vector_stores:
+      annotation_prompt_params:
+        enable_annotations: false
+      default_provider_id: faiss
+      default_embedding_model:
+        provider_id: sentence-transformers
+        model_id: nomic-ai/nomic-embed-text-v1.5
+LCS_STACK_CONFIG
+
+  # Deploy LCS with mock LLM sidecar
+  local pyroscope_env=""
+  if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
+    pyroscope_env="
+            - name: PYROSCOPE_SERVER_ADDRESS
+              value: \"${PYROSCOPE_URL}\""
+  fi
+
+  local lcs_command_override='          command: ["python3", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
+  if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
+    lcs_command_override='          command: ["memray", "run", "--output", "/mnt/profiling/memray-output.bin", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
+  fi
+
+  cat <<DEPLOYMENT | oc apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lcs
+  namespace: ${LCS_NAMESPACE}
+  labels:
+    app: lcs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lcs
+  template:
+    metadata:
+      labels:
+        app: lcs
+        app.kubernetes.io/name: lightspeed-core-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: lcs
+          image: ${LCS_APP_IMAGE}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+${lcs_command_override}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: OTEL_SDK_DISABLED
+              value: "true"
+            - name: LIGHTSPEED_STACK_SYNTHESIZED_CONFIG_PATH
+              value: "/tmp/.generated/run.yaml"
+            - name: HOME
+              value: "/tmp"${pyroscope_env}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app-config
+            - name: profiling-volume
+              mountPath: /mnt/profiling
+            - name: generated-config
+              mountPath: /app-root/.generated
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "4"
+              memory: "4Gi"
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+        - name: mock-llm
+          image: ${MOCK_LLM_IMAGE}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 11434
+          env:
+            - name: MOCK_MODELS
+              value: "granite-3.1-8b-instruct,llama-guard-3-8b"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: config-volume
+          configMap:
+            name: lcs-config
+        - name: profiling-volume
+          emptyDir: {}
+        - name: generated-config
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lcs-service
+  namespace: ${LCS_NAMESPACE}
+  labels:
+    app: lcs
+spec:
+  selector:
+    app: lcs
+  ports:
+    - port: 8080
+      targetPort: 8080
+DEPLOYMENT
+
+  if ! oc rollout status deployment/lcs -n "${LCS_NAMESPACE}" --timeout=300s; then
+    echo "ERROR: LCS deployment failed to become ready"
+    mkdir -p "${ARTIFACT_DIR}/logs"
+    {
+      oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o wide || true
+      echo "--- current lcs container logs ---"
+      oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c lcs --tail=100 || true
+      echo "--- previous lcs container logs (crash-loop) ---"
+      oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c lcs --previous --tail=200 2>/dev/null || true
+      echo "--- current mock-llm container logs ---"
+      oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c mock-llm --tail=50 || true
+      echo "--- previous mock-llm container logs (crash-loop) ---"
+      oc logs -n "${LCS_NAMESPACE}" -l app=lcs -c mock-llm --previous --tail=50 2>/dev/null || true
+      echo "--- pod describe ---"
+      oc describe pod -n "${LCS_NAMESPACE}" -l app=lcs || true
+      echo "--- namespace events ---"
+      oc get events -n "${LCS_NAMESPACE}" --sort-by='.lastTimestamp' | tail -30 || true
+    } 2>&1 | tee "${ARTIFACT_DIR}/logs/lcs-diagnostic.log"
+    return 1
+  fi
+
+  # Verify LCS is responding
+  local lcs_pod
+  lcs_pod=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
+  echo "LCS pod: ${lcs_pod}"
+  oc exec -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs -- \
+    curl -sf http://localhost:8080/readiness || {
+      echo "ERROR: LCS readiness check failed"
+      oc logs -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs --tail=50
+      return 1
+    }
+
+  # Create kubeconfig secret for load generator Job
+  oc create secret generic kubeconfig-secret \
+    -n "${LCS_NAMESPACE}" \
+    --from-file=kubeconfig="${KUBECONFIG}" \
+    --dry-run=client -o yaml | oc apply -f -
+
+  oc delete secret lcs-load-generator-es-credentials \
+    -n "${LCS_NAMESPACE}" --ignore-not-found=true
+  oc create secret generic lcs-load-generator-es-credentials \
+    -n "${LCS_NAMESPACE}" \
+    --from-file=username=/secret/username \
+    --from-file=password=/secret/password
+}
+
+run_load_test() {
+  local duration=$1
+  echo "=== Running load test (duration=${duration}) ==="
+
+  # Record start time for profiling collection window
+  TEST_START_EPOCH=$(date +%s)
+
+  # Set env vars for envsubst in the Job manifest
+  export LCS_NAMESPACE LCS_LOADGEN_IMAGE LCS_HOST LCS_TOKEN
+  export LCS_PROVIDER LCS_MODEL ES_INDEX ES_SERVER_HOST
+  export LOCUST_USERS="${NUM_USERS}"
+  export LOCUST_PROCESSES REQUEST_TIMEOUT METRIC_STEP
+  export LOCUST_RUN_TIME="${duration}"
+
+  # Apply the dedicated ServiceAccount and Job manifests inline.
+  cat <<JOBMANIFEST | oc apply -f -
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: lcs-load-generator
+  namespace: ${LCS_NAMESPACE}
+automountServiceAccountToken: false
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: lcs-load-generator
+  namespace: ${LCS_NAMESPACE}
+  labels:
+    app: lcs-load-generator
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: lcs-load-generator
+    spec:
+      restartPolicy: Never
+      serviceAccountName: lcs-load-generator
+      automountServiceAccountToken: false
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/worker
+                    operator: Exists
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: lcs
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: lcs-load-generator
+          image: ${LCS_LOADGEN_IMAGE}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -o pipefail
+              ES_USERNAME=\$(python3 -c "import urllib.parse,sys; sys.stdout.write(urllib.parse.quote(\"\$(< /var/run/lcs-es/username)\", safe=''))")
+              ES_PASSWORD=\$(python3 -c "import urllib.parse,sys; sys.stdout.write(urllib.parse.quote(\"\$(< /var/run/lcs-es/password)\", safe=''))")
+              export ES_SERVER="https://\${ES_USERNAME}:\${ES_PASSWORD}@${ES_SERVER_HOST}"
+              unset ES_USERNAME ES_PASSWORD
+              python3 ./lcs-load-generator run 2>&1 | \
+                python3 -c 'import os,sys; secret=os.environ["ES_SERVER"]; sys.stdout.writelines(line.replace(secret, "[REDACTED ES_SERVER]") for line in sys.stdin)'
+          env:
+            - name: KUBECONFIG
+              value: "/etc/kubeconfig/kubeconfig"
+            - name: LCS_NAMESPACE
+              value: "${LCS_NAMESPACE}"
+            - name: LCS_HOST
+              value: "${LCS_HOST}"
+            - name: LCS_TOKEN
+              value: "${LCS_TOKEN}"
+            - name: LCS_PROVIDER
+              value: "${LCS_PROVIDER}"
+            - name: LCS_MODEL
+              value: "${LCS_MODEL}"
+            - name: LOCUST_USERS
+              value: "${LOCUST_USERS}"
+            - name: LOCUST_RUN_TIME
+              value: "${LOCUST_RUN_TIME}"
+            - name: LOCUST_PROCESSES
+              value: "${LOCUST_PROCESSES}"
+            - name: TEST_UUID
+              value: "${TEST_UUID}"
+            - name: REQUEST_TIMEOUT
+              value: "${REQUEST_TIMEOUT}"
+            - name: RESULTS_DIR
+              value: "/results"
+            - name: QUESTIONS_FILE
+              value: "/opt/lcs-load-generator/locust/assets/questions.yaml"
+            - name: ES_INDEX
+              value: "${ES_INDEX}"
+            - name: METRIC_STEP
+              value: "${METRIC_STEP}"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "4"
+              memory: "4Gi"
+          volumeMounts:
+            - name: results
+              mountPath: /results
+            - name: kubeconfig-volume
+              mountPath: /etc/kubeconfig
+              readOnly: true
+            - name: es-credentials
+              mountPath: /var/run/lcs-es
+              readOnly: true
+          imagePullPolicy: Always
+      volumes:
+        - name: results
+          emptyDir: {}
+        - name: kubeconfig-volume
+          secret:
+            secretName: kubeconfig-secret
+        - name: es-credentials
+          secret:
+            secretName: lcs-load-generator-es-credentials
+JOBMANIFEST
+
+  # Wait for Job to complete or fail, reserving time for diagnostics.
+  local job_wait_deadline=$((STEP_START_EPOCH + STEP_TIMEOUT_SECONDS - DIAGNOSTIC_GRACE_SECONDS))
+  local job_finished=""
+  while [[ -z "${job_finished}" ]]; do
+    local job_conditions
+    job_conditions=$(oc get job lcs-load-generator -n "${LCS_NAMESPACE}" \
+      -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' 2>/dev/null || true)
+    job_finished=$(job_terminal_state "${job_conditions}")
+    if [[ -n "${job_finished}" ]]; then
+      continue
+    elif [[ $(date +%s) -ge ${job_wait_deadline} ]]; then
+      job_finished="timeout"
+    else
+      sleep 30
+    fi
+  done
+
+  if [[ "${job_finished}" != "complete" ]]; then
+    echo "ERROR: Load generator Job ${job_finished} (duration=${duration})"
+    oc describe job lcs-load-generator -n "${LCS_NAMESPACE}" || true
+    local job_pod
+    job_pod=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
+    if [[ -n "${job_pod}" ]]; then
+      oc logs -n "${LCS_NAMESPACE}" "${job_pod}" --tail=200 || true
+    fi
+    return 1
+  fi
+
+  # Collect Job logs to artifacts
+  local job_pod
+  job_pod=$(oc get pods -n "${LCS_NAMESPACE}" -l job-name=lcs-load-generator -o name | head -1)
+  if [[ -n "${job_pod}" ]]; then
+    mkdir -p "${ARTIFACT_DIR}/logs"
+    oc logs -n "${LCS_NAMESPACE}" "${job_pod}" > "${ARTIFACT_DIR}/logs/lcs-load-generator-${duration}.log" 2>&1 || true
+  fi
+
+  TEST_END_EPOCH=$(date +%s)
+}
+
+collect_profiles() {
+  echo "=== Collecting profiling data ==="
+
+  mkdir -p "${ARTIFACT_DIR}/profiling-data"
+
+  # Pyroscope CPU profiles
+  if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
+    local prof_dir="${ARTIFACT_DIR}/profiling-data/pyroscope"
+    mkdir -p "${prof_dir}"
+
+    echo "  Collecting Pyroscope profiles (${TEST_START_EPOCH} -> ${TEST_END_EPOCH})"
+
+    # The test step pod runs on the build cluster, not the provisioned cluster,
+    # so cluster-internal DNS (pyroscope.pyroscope.svc) is unreachable.
+    # Use oc port-forward to tunnel through KUBECONFIG to the provisioned cluster.
+    oc port-forward -n "${PYROSCOPE_NAMESPACE}" svc/pyroscope 4040:4040 &
+    local pf_pid=$!
+    # Give port-forward a moment to establish
+    sleep 3
+
+    local pyroscope_local="http://localhost:4040"
+
+    # grafana/pyroscope query parameters:
+    #   Route:  /pyroscope/render
+    #   Query:  process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="lightspeed-stack"}
+    #   Formats: pprof, json
+    local pyro_query="process_cpu%3Acpu%3Ananoseconds%3Acpu%3Ananoseconds%7Bservice_name%3D%22lightspeed-stack%22%7D"
+
+    # Fetch profile formats; each fetch is non-fatal so a profiling
+    # hiccup never crashes the pipeline.
+    for fmt_pair in "pprof:cpu-profile.pprof" "json:cpu-profile.json"; do
+      local fmt="${fmt_pair%%:*}"
+      local fname="${fmt_pair##*:}"
+      local resp_code
+      resp_code=$(curl -sS -o "${prof_dir}/${fname}" -w '%{http_code}' \
+        "${pyroscope_local}/pyroscope/render?query=${pyro_query}&from=${TEST_START_EPOCH}&until=${TEST_END_EPOCH}&format=${fmt}") || true
+      if [[ "${resp_code}" != "200" ]] || [[ ! -s "${prof_dir}/${fname}" ]]; then
+        echo "WARN: Pyroscope ${fmt} export failed (HTTP ${resp_code})"
+        rm -f "${prof_dir}/${fname}"
+      else
+        echo "  Saved ${fname} ($(wc -c < "${prof_dir}/${fname}") bytes)"
+      fi
+    done
+
+    # Clean up port-forward
+    kill "${pf_pid}" 2>/dev/null || true
+    wait "${pf_pid}" 2>/dev/null || true
+
+    echo "  Pyroscope profiles saved to ${prof_dir}"
+  fi
+
+  # Memray memory profiles (if enabled)
+  if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
+    local mem_dir="${ARTIFACT_DIR}/profiling-data/memray"
+    mkdir -p "${mem_dir}"
+
+    local lcs_pod
+    lcs_pod=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
+    if [[ -n "${lcs_pod}" ]]; then
+      echo "  Collecting Memray profiles from ${lcs_pod}"
+
+      # Generate flamegraph HTML
+      oc exec -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs -- \
+        memray flamegraph -o /tmp/memray-flamegraph.html /mnt/profiling/memray-output.bin 2>/dev/null || true
+      oc cp "${LCS_NAMESPACE}/${lcs_pod#pod/}:/tmp/memray-flamegraph.html" \
+        "${mem_dir}/memray-flamegraph.html" 2>/dev/null || true
+
+      # Generate stats
+      oc exec -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs -- \
+        memray stats /mnt/profiling/memray-output.bin > "${mem_dir}/memray-stats.txt" 2>/dev/null || true
+
+      # Generate summary
+      oc exec -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs -- \
+        memray summary /mnt/profiling/memray-output.bin > "${mem_dir}/memray-summary.txt" 2>/dev/null || true
+
+      # Copy raw binary (for offline analysis)
+      oc cp "${LCS_NAMESPACE}/${lcs_pod#pod/}:/mnt/profiling/memray-output.bin" \
+        "${mem_dir}/memray-output.bin" 2>/dev/null || true
+
+      echo "  Memray profiles saved to ${mem_dir}"
+    else
+      echo "WARN: Could not find LCS pod for Memray collection"
+    fi
+  fi
+
+  # Collect LCS pod logs
+  echo "  Collecting LCS pod logs"
+  local lcs_pod
+  lcs_pod=$(oc get pods -n "${LCS_NAMESPACE}" -l app=lcs -o name | head -1)
+  if [[ -n "${lcs_pod}" ]]; then
+    mkdir -p "${ARTIFACT_DIR}/logs"
+    oc logs -n "${LCS_NAMESPACE}" "${lcs_pod}" -c lcs > "${ARTIFACT_DIR}/logs/lcs-app.log" 2>&1 || true
+    oc logs -n "${LCS_NAMESPACE}" "${lcs_pod}" -c mock-llm > "${ARTIFACT_DIR}/logs/mock-llm.log" 2>&1 || true
+  fi
+}
+
+cleanup() {
+  echo "=== Cleaning up namespaces ==="
+
+  oc delete namespace "${LCS_NAMESPACE}" --ignore-not-found=true
+  oc wait --for=delete namespace/"${LCS_NAMESPACE}" --timeout=120s 2>/dev/null || true
+
+  if [[ "${ENABLE_PYROSCOPE}" == "true" ]]; then
+    oc delete namespace "${PYROSCOPE_NAMESPACE}" --ignore-not-found=true
+    oc wait --for=delete namespace/"${PYROSCOPE_NAMESPACE}" --timeout=120s 2>/dev/null || true
+  fi
+
+  echo "  Cleanup complete"
+}
+
+# ── Main duration loop ────────────────────────────────────────────────
+
+IFS=',' read -ra DURATIONS <<< "${TEST_DURATION}"
+for duration in "${DURATIONS[@]}"; do
+
+  echo ""
+  echo "================================================================"
+  echo "  Starting iteration: duration=${duration}"
+  echo "================================================================"
+
+  # Reset per-iteration metadata for Orion fingerprinting
+  uuid=$(uuidgen)
+  export TEST_UUID="${uuid}"
+  job_status="success"
+  job_start=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  job_end=""
+  additional_attributes='{"lcsTestWorkers": "'"${NUM_USERS}"'", "lcsTestDuration": "'"${duration}"'"}'
+
+  # Full deploy → test → collect → fingerprint → cleanup per iteration
+  run_or_fail deploy_monitoring
+  [[ "${ENABLE_PYROSCOPE}" == "true" ]] && run_or_fail deploy_pyroscope
+  run_or_fail deploy_lcs
+  run_or_fail run_load_test "${duration}"
+  collect_profiles
+
+  job_end=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  log_fingerprint
+  cleanup
+
+  sleep 60  # stabilize between iterations
+
+done
+
+# Summary
+echo ""
+echo "=== All iterations complete ==="
+ls -la "${ARTIFACT_DIR}/profiling-data/" 2>/dev/null || true
+ls -la "${ARTIFACT_DIR}/logs/" 2>/dev/null || true
