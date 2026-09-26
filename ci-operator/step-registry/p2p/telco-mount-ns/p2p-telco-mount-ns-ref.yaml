@@ -1,0 +1,60 @@
+ref:
+  as: p2p-telco-mount-ns
+  from: eco-gotests
+  cli: latest
+  timeout: 8h0m0s
+  grace_period: 30m0s
+  commands: p2p-telco-mount-ns-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  documentation: |-
+    Run eco-gotests rdscore mount-ns tests against a pre-installed OCP cluster.
+    Selects only tests matching the Ginkgo label filter
+    `clean-cluster && mount-ns` under the rdscore feature directory.
+    Produces JUnit XML (picked up by Prow) and Polarion XML (mirrored to
+    SHARED_DIR with polarion_ prefix) on exit.
+  env:
+  - name: ECO_TEST_FEATURES
+    default: "rdscore"
+    documentation: >-
+      Space-separated eco-gotests feature directories to run.
+      Mount-ns tests live under rdscore.
+  - name: ECO_TEST_LABELS
+    default: "clean-cluster && mount-ns"
+    documentation: >-
+      Ginkgo --label-filter that selects only mount-ns tests inside rdscore.
+  - name: ECO_RDS_CORE_CONFIG_FILE_PATH
+    default: "/tmp/eco-gotests-config/default.yaml"
+    documentation: >-
+      Path to the rdscore YAML config. Generated from cluster node hostnames
+      when the file does not already exist.
+  - name: REPORT_CASE_TAG
+    default: "polarion-testcase-id"
+    documentation: XML attribute name for Polarion test case IDs.
+  - name: REPORT_PARAMETER_TAG
+    default: "polarion-parameter"
+    documentation: XML attribute name for Polarion test parameters.
+  - name: ECO_TC_PREFIX
+    default: "OCP-"
+    documentation: Prefix prepended to Polarion test case IDs.
+  - name: ECO_TEST_VERBOSE
+    default: "true"
+    documentation: Set to "true" to enable verbose ginkgo output (-vv).
+  - name: ECO_VERBOSE_LEVEL
+    default: "100"
+    documentation: >-
+      glog verbose level. Must be >= 100 to produce output. Matches the
+      standalone podman run that selected the 3 mount-ns specs.
+  - name: ECO_DUMP_FAILED_TESTS
+    default: "true"
+    documentation: Collect cluster resources for failed tests.
+  - name: ECO_ENABLE_REPORT
+    default: "true"
+    documentation: Generate JUnit and Polarion XML reports.
+  - name: ECO_GOTESTS_ENV_VARS
+    default: ""
+    documentation: >-
+      Newline-separated KEY=VALUE pairs for extra eco-gotests environment
+      variables not exposed as dedicated ref env entries above.
