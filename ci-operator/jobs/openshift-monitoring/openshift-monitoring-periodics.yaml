@@ -1,0 +1,60 @@
+periodics:
+- agent: kubernetes
+  cluster: app.ci
+  cron: "0 8 * * *"
+  decorate: true
+  name: periodic-jira-refresh-release-monitoring
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        comments:<2500
+        state:open
+        base:release-
+        label:jira/invalid-bug
+        label:lgtm
+        label:approved
+        label:backport-risk-assessed
+        -label:do-not-merge/hold
+        repo:openshift/prometheus-alertmanager
+        repo:openshift/cluster-monitoring-operator
+        repo:openshift/kube-state-metrics
+        repo:openshift/kubernetes-metrics-server
+        repo:openshift/node_exporter
+        repo:openshift/prom-label-proxy
+        repo:openshift/prometheus
+        repo:openshift/prometheus-operator
+        repo:openshift/thanos
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --updated=0
+      - |-
+        --comment=/jira refresh
+
+        Periodic re-evaluation: checking if dependent Jira bug status has changed.
+      - --ceiling=0
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
