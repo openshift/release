@@ -73,10 +73,22 @@ images:
   - dockerfile_literal: |
       FROM quay.io/zzlotnik/zacks-openshift-helpers:latest
     to: zacks-toolbox
+  - dockerfile_literal: |
+      FROM src
+      RUN cat /etc/redhat-release || echo "No /etc/redhat-release" && \
+          if [ -f /etc/hummingbird-release ] && command -v node >/dev/null 2>&1; then \
+            echo "In Hummingbird nodejs image, skipping nodejs installation"; \
+          else \
+            dnf -y install nodejs; \
+          fi && \
+          npm install -g markdownlint@v0.25.1 markdownlint-cli2@v0.4.0
+    from: src
+    to: markdownlint
 promotion:
   to:
   - excluded_images:
     - custom-os-image
+    - markdownlint
     - src-with-skopeo
     - zacks-toolbox
     name: "5.1"
@@ -98,6 +110,8 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |
+  hack/install-markdownlint.sh
 tests:
 - as: unit
   commands: make test-unit
@@ -209,6 +223,12 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
+- as: lint-md
+  commands: hack/markdownlint.sh
+  container:
+    from: markdownlint
+  optional: true
+  run_if_changed: \.md$
 - as: verify
   commands: |
     make verify
