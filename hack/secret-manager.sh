@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GCLOUD_CONFIG_PATH="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-gcloud"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
 IMAGE="${SECRET_MANAGER_IMAGE:-quay.io/openshift/ci-public:ci_secret-manager_latest}"
+SKIP_PULL="${SKIP_PULL:-false}"
 
 if [ "${1:-}" = "clean" ]; then
     echo "Removing cached credentials..."
@@ -78,9 +79,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if ! "$CONTAINER_ENGINE" image exists "$IMAGE" 2>/dev/null; then
-    "$CONTAINER_ENGINE" pull "$IMAGE" >/dev/null
-fi
+"$SKIP_PULL" || "$CONTAINER_ENGINE" pull "$IMAGE" >/dev/null
 exec "$CONTAINER_ENGINE" run --rm ${tty_flags[@]+"${tty_flags[@]}"} \
     -v "$GCLOUD_CONFIG_PATH:/gcloud:z" \
     ${file_mount[@]+"${file_mount[@]}"} \
