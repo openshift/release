@@ -301,7 +301,7 @@ function ApplyRhelVirtualMachine () {
     typeset _vmPwd
     _vmPwd="$(openssl rand -base64 16)"
     typeset _userData
-    _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: %s\nchpasswd:\n  expire: false\nssh_pwauth: true\nwrite_files:\n- path: /home/cloud-user/migration-marker.txt\n  content: %s\n  permissions: \"0644\"\n  owner: cloud-user:cloud-user\nruncmd:\n- dnf install -y qemu-guest-agent\n- systemctl enable --now qemu-guest-agent\n- echo \"VM %s is ready for migration testing\" > /tmp/vm-ready.txt\n' \
+    _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: %s\nchpasswd:\n  expire: false\nssh_pwauth: true\nruncmd:\n- echo %s > /home/cloud-user/migration-marker.txt\n- chown cloud-user:cloud-user /home/cloud-user/migration-marker.txt\n- chmod 0644 /home/cloud-user/migration-marker.txt\n- dnf install -y qemu-guest-agent\n- systemctl enable --now qemu-guest-agent\n- echo \"VM %s is ready for migration testing\" > /tmp/vm-ready.txt\n' \
     "${_vmPwd}" "${vmName}" "${vmName}")"
 
     VM_NAME="${vmName}" DV_NAME="${dvName}" \
@@ -386,7 +386,15 @@ function WaitVmiRunning () {
     )
 
     SpokeOc wait "virtualmachineinstance/${vmName}" -n "${CNV_TEST_VM_NAMESPACE}" \
-        --for=jsonpath='{.status.phase}'=Running --timeout="${CNV_TEST_VM_VMI_WAIT_TIMEOUT}"
+        --for=jsonpath='{.status.phase}'=Running --timeout="${CNV_TEST_VM_VMI_WAIT_TIMEOUT}" 1>/dev/null
+
+    # For RHEL VMs, cloud-init runcmd installs qemu-guest-agent asynchronously.
+    # Wait for AgentConnected before exiting so the migration step doesn't race
+    # the guest agent startup and post-migration verification finds GA ready.
+    if [[ "${CNV_TEST_VM_IMAGE_TYPE}" == 'rhel' ]]; then
+        SpokeOc wait "virtualmachineinstance/${vmName}" -n "${CNV_TEST_VM_NAMESPACE}" \
+            --for=condition=AgentConnected --timeout="${CNV_TEST_VM_VMI_WAIT_TIMEOUT}" 1>/dev/null
+    fi
 }
 
 trap - ERR

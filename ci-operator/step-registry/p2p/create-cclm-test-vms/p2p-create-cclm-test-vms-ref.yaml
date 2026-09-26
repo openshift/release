@@ -1,6 +1,6 @@
 ref:
   as: p2p-create-cclm-test-vms
-  from: cli
+  from: cli-with-ssh
   commands: p2p-create-cclm-test-vms-commands.sh
   timeout: 2h0m0s
   grace_period: 10m0s
@@ -30,9 +30,18 @@ ref:
 
     Spoke kubeconfig defaults to SHARED_DIR/managed-cluster-kubeconfig-${P2P_HS_SPOKE_INDEX}.
 
+    RHEL VMs get an SSH public key via cloud-init; the key pair is written to
+    ${SHARED_DIR}/${P2P_HS_VM_SSH_KEY_NAME} (+ .pub) for post-migration verification
+    over virtctl ssh. Runs from the cli-with-ssh image (cli + openssh-clients).
+
     Writes ${ARTIFACT_DIR}/hub-spoke-vm-create-status.txt; diagnostics on failure under
     ${ARTIFACT_DIR}/hub-spoke-vm-create-diagnostics/.
   env:
+  - name: P2P_HS_VM_SSH_KEY_NAME
+    default: "cclm-vm-ssh-key"
+    documentation: |-
+      SHARED_DIR file name for the SSH key pair authorized on RHEL test VMs (cloud-user).
+      Must match MTV_VM_SSH_KEY_NAME in p2p-mtv-verify-migration / -return.
   - name: P2P_HS_VM_COUNT
     default: "2"
     documentation: Number of VMs to create on the spoke cluster.
