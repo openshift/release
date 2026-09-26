@@ -58,7 +58,7 @@ ResolveSpokeKubeconfig() {
     elif [[ "${P2P_HS_SPOKE_INDEX}" == "1" && -r "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
         spokeKubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig"
     else
-        : "Spoke kubeconfig not found for index ${P2P_HS_SPOKE_INDEX}" >&2
+        printf 'ERROR: Spoke kubeconfig not found for index %s\n' "${P2P_HS_SPOKE_INDEX}" >&2
         return 1
     fi
     [[ -r "${spokeKubeconfig}" ]]
@@ -73,7 +73,10 @@ EnsureVmSshKey() {
 
     # ssh-keygen refuses to run when the pod's random UID has no passwd entry.
     if ! whoami &> /dev/null; then
-        [[ -w /etc/passwd ]] || { : "No passwd entry for uid $(id -u) and /etc/passwd not writable" >&2; return 1; }
+        [[ -w /etc/passwd ]] || {
+            printf 'ERROR: no passwd entry for uid %s and /etc/passwd is not writable\n' "$(id -u)" >&2
+            return 1
+        }
         printf '%s:x:%s:0:%s user:%s:/sbin/nologin\n' \
             "${USER_NAME:-default}" "$(id -u)" "${USER_NAME:-default}" "${HOME}" >> /etc/passwd
     fi
@@ -406,7 +409,7 @@ WaitVmiRunning() {
                 -n "${ns}" 1>/dev/null && exit 0
             sleep 2
         done
-        : "VMI ${vmName} not found in ${ns} after 120s" >&2
+        printf 'ERROR: VMI %s not found in %s after 120s\n' "${vmName}" "${ns}" >&2
         exit 1
     )
 

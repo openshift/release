@@ -177,8 +177,10 @@ function VerifyMigration () {
     vmName="$(VmName "${i}")"
     destPhase="$(DestOc get "virtualmachineinstance/${vmName}" -n "${targetNs}" \
       -o jsonpath='{.status.phase}' || true)"
-    [[ "${destPhase}" == "Running" ]] \
-      || { : "VMI ${vmName} not Running on destination (phase=${destPhase})"; false; }
+    [[ "${destPhase}" == "Running" ]] || {
+      printf 'ERROR: VMI %s not Running on destination (phase=%s)\n' "${vmName}" "${destPhase}" >&2
+      return 1
+    }
   done
   true
 }
@@ -195,8 +197,10 @@ function VerifyDestVmsRunStrategy () {
     vmName="$(VmName "${i}")"
     strategy="$(DestOc get "virtualmachine/${vmName}" -n "${targetNs}" \
       -o jsonpath='{.spec.runStrategy}' || true)"
-    [[ "${strategy}" == "Always" ]] \
-      || { : "VM ${vmName} runStrategy='${strategy}', expected 'Always' (OCPBUGS-101771)"; false; }
+    [[ "${strategy}" == "Always" ]] || {
+      printf "ERROR: VM %s runStrategy='%s', expected 'Always' (OCPBUGS-101771)\n" "${vmName}" "${strategy}" >&2
+      return 1
+    }
   done
   true
 }
@@ -212,8 +216,10 @@ function VerifySourceVmimNotFailed () {
   for (( i = 1; i <= vmCount; i++ )); do
     vmName="$(VmName "${i}")"
     srcVmimPhase="$(VmimPhase "${sourceKubeconfig}" "${MTV_TEST_VM_NAMESPACE}" "${vmName}")"
-    [[ "${srcVmimPhase}" != "Failed" ]] \
-      || { : "Source VMIM for ${vmName} is Failed — false-positive migration (OCPBUGS-99403)"; false; }
+    [[ "${srcVmimPhase}" != "Failed" ]] || {
+      printf 'ERROR: Source VMIM for %s is Failed — false-positive migration (OCPBUGS-99403)\n' "${vmName}" >&2
+      return 1
+    }
   done
   true
 }
@@ -361,7 +367,8 @@ function WaitDestSshReady () {
     typeset vmName; vmName="$(VmName "${i}")"
     typeset -i deadline=$(( SECONDS + sshWaitSeconds )) ready=0
     while (( SECONDS < deadline )); do
-      if VmSsh "${vmName}" true 1>/dev/null 2>"${errFile}"; then
+      # set +x: avoid logging the full virtctl ssh command line on every 10s retry.
+      if ( set +x; VmSsh "${vmName}" true 1>/dev/null 2>"${errFile}" ); then
         ready=1
         break
       fi
@@ -377,7 +384,7 @@ function WaitDestSshReady () {
 }
 
 # VerifyVmDataIntegrity — verify that cloud-init marker files survive migration intact.
-# p2p-create-migration-test-vm injects a write_files cloud-init block that writes
+# p2p-create-cclm-test-vms injects a write_files cloud-init block that writes
 # /home/cloud-user/migration-marker.txt with content equal to the VM name.
 # This function reads back that file on the destination over SSH and compares it to
 # the expected VM name. Any VM whose marker is missing or different fails the step.
