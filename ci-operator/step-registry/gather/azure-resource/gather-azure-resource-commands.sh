@@ -106,21 +106,42 @@ function gatherLBs() {
 }
 
 function getResourceGroup() {
-    local CONFIG 
+    local CONFIG METADATA
     CONFIG="${SHARED_DIR}/install-config.yaml"
-    RESOURCE_GROUP=$(yq-go r "${CONFIG}" 'platform.azure.resourceGroupName')
-    echo "resourceGroupName in $CONFIG: $RESOURCE_GROUP"
+    METADATA="${SHARED_DIR}/metadata.json"
+
+    RESOURCE_GROUP=""
+    if [[ -f "${CONFIG}" ]]; then
+        RESOURCE_GROUP=$(yq-go r "${CONFIG}" 'platform.azure.resourceGroupName')
+        echo "resourceGroupName in $CONFIG: $RESOURCE_GROUP"
+    else
+        echo "No $CONFIG found"
+    fi
+
+    # The installer only writes metadata.json once it starts creating the
+    # cluster, so neither source exists when a pre step fails before the
+    # installation. There is nothing to gather in that case: exit successfully
+    # instead of failing the post phase and masking the real failure.
     if [[ -z "${RESOURCE_GROUP}" ]]; then
-        RESOURCE_GROUP="$(jq -r .infraID ${SHARED_DIR}/metadata.json)-rg"
+        if [[ ! -f "${METADATA}" ]]; then
+            echo "No resource group in $CONFIG and no $METADATA, skipping the resource gathering"
+            exit 0
+        fi
+        RESOURCE_GROUP="$(jq -r .infraID ${METADATA})-rg"
     fi
     export RESOURCE_GROUP
 }
 
-cli_Login
-
 OUTPUT_DIR="${ARTIFACT_DIR}"
 
+# Resolve the resource group first: it only reads files from SHARED_DIR, and
+# logging in is pointless when there is nothing to gather. cli_Login itself
+# depends on pre steps having run (the azurestack branch reads
+# SHARED_DIR/AZURESTACK_ENDPOINT), so doing it first would fail the step before
+# the skip below can take effect.
 getResourceGroup
+
+cli_Login
 echo ""
 run_command "az group show --name $RESOURCE_GROUP" || true
 echo ""
