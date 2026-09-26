@@ -1,0 +1,32 @@
+ref:
+  as: aro-hcp-alert-gate
+  from: aro-hcp-e2e-tests
+  commands: aro-hcp-alert-gate-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: aro-hcp-ci-oidc-sa
+      mount_path: /var/run/aro-hcp-ci-oidc-sa
+  resources:
+    requests:
+      cpu: 10m
+      memory: 200Mi
+  env:
+    - name: RELEASE_DASHBOARD_URL
+      default: "https://api.releases.dev.aro.azure-test.net"
+      documentation: |-
+        Base URL of the release-dashboard merge-gate API.
+    - name: RELEASE_DASHBOARD_TOKEN_URL
+      default: "https://auth.redhat.com/auth/realms/EmployeeIDP/protocol/openid-connect/token"
+      documentation: |-
+        OAuth2 token endpoint used to mint a bearer token from the
+        aro-hcp-ci-oidc-sa client credentials.
+    - name: RELEASE_DASHBOARD_SCOPE
+      default: "api://prow/.default"
+      documentation: |-
+        OAuth2 scope to request so the minted token carries an audience the
+        merge-gate API accepts.
+  timeout: 10m
+  documentation: |-
+    Ask the release dashboard whether this PR should merge given production
+    alerts. Posts the prow JOB_SPEC to the release-dashboard merge-gate API and
+    fails when the change touches components with unresolved production alerts.
