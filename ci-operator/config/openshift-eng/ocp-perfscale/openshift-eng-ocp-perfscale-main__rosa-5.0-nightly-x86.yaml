@@ -60,6 +60,122 @@ tests:
     - ref: openshift-qe-orion
     workflow: rosa-aws-sts
   timeout: 8h0m0s
+- always_run: false
+  as: data-path-9nodes
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "6"
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      CONFIG: config/standard-classic-rosa.yml
+      ENABLE_AUTOSCALING: "false"
+      HAPROXY_VERSION: "2.8"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+    test:
+    - as: rosa-configure-haproxy-version
+      cli: latest
+      commands: |
+        echo "Step 1: Set spec.haproxyVersion on IngressController..."
+        oc patch ingresscontroller/default -n openshift-ingress-operator \
+          --type=merge -p "{\"spec\":{\"haproxyVersion\":\"${HAPROXY_VERSION}\"}}"
+
+        echo "Step 2: Get haproxy28 image from ingress-operator deployment..."
+        HAPROXY_IMAGE=$(oc get deployment/ingress-operator -n openshift-ingress-operator \
+          -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="HAPROXY_28_IMAGE")].value}')
+        if [[ -z "${HAPROXY_IMAGE}" ]]; then
+          echo "ERROR: HAPROXY_28_IMAGE not found in ingress-operator deployment"
+          echo "Ingress operator env vars:"
+          oc get deployment/ingress-operator -n openshift-ingress-operator \
+            -o jsonpath='{.spec.template.spec.containers[0].env[*].name}' || true
+          exit 1
+        fi
+        echo "HAProxy 2.8 image: ${HAPROXY_IMAGE}"
+
+        echo "Step 3: Directly swap the haproxy sidecar and router container images..."
+        oc set image deployment/router-default -n openshift-ingress \
+          haproxy="${HAPROXY_IMAGE}" router="${HAPROXY_IMAGE}"
+
+        echo "Step 4: Wait for router deployment rollout..."
+        oc rollout status deployment/router-default -n openshift-ingress --timeout=600s
+
+        echo "Step 5: Verify actual HAProxy binary version in pod..."
+        MAX_RETRIES=12
+        RETRY_INTERVAL=10
+        for i in $(seq 1 $MAX_RETRIES); do
+          ACTUAL_VERSION=$(oc exec deploy/router-default -n openshift-ingress -c haproxy -- rpm -qa 2>/dev/null | grep haproxy || true)
+          if [[ "${ACTUAL_VERSION}" == *"haproxy28"* ]]; then
+            echo "HAProxy 2.8 binary confirmed in haproxy container: ${ACTUAL_VERSION}"
+            break
+          fi
+          echo "Attempt ${i}/${MAX_RETRIES}: got '${ACTUAL_VERSION}', waiting ${RETRY_INTERVAL}s..."
+
+          # Check if operator reverted the image — if so, scale it down and retry
+          if [[ $i -eq 3 ]]; then
+            echo "Operator may have reverted the image. Scaling down ingress-operator..."
+            oc scale deployment/ingress-operator -n openshift-ingress-operator --replicas=0 2>/dev/null || \
+              echo "WARNING: Could not scale down ingress-operator (may be blocked by ROSA)"
+            # Re-apply the image swap
+            oc set image deployment/router-default -n openshift-ingress haproxy="${HAPROXY_IMAGE}" router="${HAPROXY_IMAGE}"
+            oc rollout status deployment/router-default -n openshift-ingress --timeout=600s
+          fi
+
+          sleep ${RETRY_INTERVAL}
+        done
+
+        if [[ "${ACTUAL_VERSION}" != *"haproxy28"* ]]; then
+          echo "ERROR: HAProxy 2.8 binary not detected in haproxy container after ${MAX_RETRIES} retries"
+          echo "Last version seen: ${ACTUAL_VERSION}"
+          oc get deployment/router-default -n openshift-ingress -o jsonpath='{.spec.template.spec.containers[*].image}' || true
+          exit 1
+        fi
+
+        echo "Step 6: Verify HAProxy binary version in router container..."
+        for i in $(seq 1 $MAX_RETRIES); do
+          ROUTER_VERSION=$(oc exec deploy/router-default -n openshift-ingress -c router -- rpm -qa 2>/dev/null | grep haproxy || true)
+          if [[ "${ROUTER_VERSION}" == *"haproxy28"* ]]; then
+            echo "HAProxy 2.8 binary confirmed in router container: ${ROUTER_VERSION}"
+            exit 0
+          fi
+          echo "Attempt ${i}/${MAX_RETRIES}: router container got '${ROUTER_VERSION}', waiting ${RETRY_INTERVAL}s..."
+          sleep ${RETRY_INTERVAL}
+        done
+
+        echo "ERROR: HAProxy 2.8 binary not detected in router container after ${MAX_RETRIES} retries"
+        echo "Last version seen: ${ROUTER_VERSION}"
+        oc get deployment/router-default -n openshift-ingress -o jsonpath='{.spec.template.spec.containers[*].image}' || true
+        exit 1
+      env:
+      - name: HAPROXY_VERSION
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    - as: capture-prometheus-dump
+      cli: latest
+      commands: |
+        echo "Capturing Prometheus dump..."
+        PROMDIR="${ARTIFACT_DIR}/metrics"
+        mkdir -p "${PROMDIR}"
+        for pod in $(oc get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus -o name); do
+          podname=${pod#"pod/"}
+          echo "Snapshotting prometheus from ${podname}..."
+          oc exec -n openshift-monitoring "${podname}" -- tar cvzf - -C /prometheus . > "${PROMDIR}/${podname}.tar.gz" || true
+        done
+        echo "Prometheus dump complete"
+        ls -lh "${PROMDIR}" || true
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: rosa-aws-sts
 zz_generated_metadata:
   branch: main
   org: openshift-eng
