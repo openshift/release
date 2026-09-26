@@ -22,7 +22,7 @@ cp "${SHARED_DIR}/master0" /eco-ci-cd/inventories/ocp-deployment/host_vars/maste
 
 cd /eco-ci-cd
 
-echo "Mirroring ${ARCH} architecture OCP release ${VERSION} to disconnected registry"
+echo "Mirroring ${SPOKE_ARCH} architecture OCP release ${VERSION} to disconnected registry"
 ansible-playbook ./playbooks/mirror-ocp.yaml \
   -i ./inventories/ocp-deployment/build-inventory.py \
   --extra-vars "release=${VERSION} arch=${SPOKE_ARCH}"
