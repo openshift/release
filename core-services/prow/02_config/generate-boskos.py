@@ -75,8 +75,8 @@ CONFIG = {
         'us-east-1': 5,
     },
     'aws-china-qe-quota-slice': {
-        'cn-north-1': 1,
-        'cn-northwest-1': 1,
+        'cn-north-1': 3,
+        'cn-northwest-1': 3,
     },
     'aws-usgov-qe-quota-slice': {
         'us-gov-west-1': 10,
