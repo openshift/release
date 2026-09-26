@@ -775,9 +775,44 @@ ExtractClusterCredentials() {
     true
 }
 
+# Polls until every MachineConfigPool on the spoke is fully synchronized:
+#   - status.configuration.name == spec.configuration.name
+#   - Updated condition is True
+# Fails closed if the deadline is exceeded.
+# Args: <kubeconfig> <clusterName> [<timeoutSeconds=1200>]
+WaitMcpFullSync() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+    typeset -i syncTimeout="${1:-1200}"; (($#)) && shift
+
+    # Subshell isolates the SECONDS reset from the caller.
+    ( SECONDS=0
+    typeset -i syncInterval=30 pendingCnt=0
+    while ((SECONDS < syncTimeout)); do
+        pendingCnt=$(
+            oc --kubeconfig="${kubeconfig}" get machineconfigpool -o json |
+            jq '[.items[] | select(
+                .spec.configuration.name != .status.configuration.name or
+                ([.status.conditions[]? |
+                    select(.type == "Updated" and .status == "True")
+                ] | length == 0)
+            )] | length'
+        )
+        ((pendingCnt == 0)) && break
+        sleep "${syncInterval}"
+    done
+    if ((pendingCnt != 0)); then
+        : "FATAL: Spoke ${clusterName}: ${pendingCnt} MCPs not fully synchronized within ${syncTimeout}s"
+        exit 1
+    fi
+    true )
+
+    true
+}
+
 # Marks the 'openshift' ClusterImagePolicy unmanaged on the spoke ClusterVersion
 # so CVO does not revert it during upgrade (unsigned nightlies, OCPBUGS-114622).
-# No-op when the policy is absent or does not enforce ocp-v4.0-art-dev.
+# No-op when the policy is absent or does not enforce openshift-release-dev images.
 DisableClusterImagePolicySignatureEnforcement() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
@@ -789,9 +824,9 @@ DisableClusterImagePolicySignatureEnforcement() {
         : "Spoke ${clusterName}: no openshift ClusterImagePolicy found — skipping"
         return 0
     fi
-    if ! jq -e '.spec.scopes[]? | select(contains("ocp-v4.0-art-dev"))' \
+    if ! jq -e '.spec.scopes[]? | select(contains("openshift-release-dev"))' \
             <<<"${cipJson}" >/dev/null; then
-        : "Spoke ${clusterName}: ClusterImagePolicy does not enforce ocp-v4.0-art-dev — skipping"
+        : "Spoke ${clusterName}: ClusterImagePolicy does not enforce openshift-release-dev — skipping"
         return 0
     fi
 
@@ -805,7 +840,8 @@ DisableClusterImagePolicySignatureEnforcement() {
             .namespace=="" and
             .unmanaged==true)' \
             <<<"${currentOverrides}" >/dev/null; then
-        : "ClusterImagePolicy already unmanaged on ${clusterName}"
+        : "ClusterImagePolicy already unmanaged on ${clusterName} — ensuring MCP rollout is complete"
+        WaitMcpFullSync "${kubeconfig}" "${clusterName}"
         return 0
     fi
     newOverrides="$(jq -c \
@@ -832,11 +868,66 @@ DisableClusterImagePolicySignatureEnforcement() {
         return 1
     fi
 
+    # Snapshot each MCP spec.configuration.name BEFORE deleting the CIP.
+    # After deletion MCO re-renders every pool; we must wait for ALL pools
+    # to pick up the new rendered config before proceeding, otherwise nodes
+    # still carrying the old policy.json will reject unsigned images.
+    typeset -A preRenderedArr=()
+    typeset mcpName='' mcpRendered=''
+    while IFS='=' read -r mcpName mcpRendered; do
+        [[ -n "${mcpName}" ]] && preRenderedArr["${mcpName}"]="${mcpRendered}"
+    done < <(
+        oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+            -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
+    )
+    if ((${#preRenderedArr[@]} == 0)); then
+        : "FATAL: Spoke ${clusterName}: failed to snapshot MCP rendered configs"
+        return 1
+    fi
+
     # CVO no longer manages the CIP — delete it so MCO removes the signature
     # requirement from each node's /etc/containers/policy.json.
-    # Without this CIP, CRI-O permits unsigned nightly image pulls by default.
     oc --kubeconfig="${kubeconfig}" delete clusterimagepolicy openshift \
         --ignore-not-found 1>/dev/null
+
+    # Wait for MCO to re-render EVERY pool. Isolated in a subshell so
+    # the SECONDS reset does not leak into the caller.
+    typeset -i snapshotCnt=${#preRenderedArr[@]}
+    ( SECONDS=0
+    typeset -i mcpWaitMax=300 mcpWaitInt=15 readCnt=0
+    typeset isAllChanged='false'
+    while ((SECONDS < mcpWaitMax)); do
+        isAllChanged='true'
+        readCnt=0
+        while IFS='=' read -r mcpName mcpRendered; do
+            [[ -n "${mcpName}" ]] || continue
+            ((++readCnt))
+            if [[ "${preRenderedArr[${mcpName}]:-}" == "${mcpRendered}" ]]; then
+                isAllChanged='false'
+                break
+            fi
+        done < <(
+            oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+                -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
+        )
+        # An empty or incomplete read must not pass as "all changed".
+        if ((readCnt < snapshotCnt)); then
+            isAllChanged='false'
+        fi
+        "${isAllChanged}" && break
+        sleep "${mcpWaitInt}"
+    done
+    if ! "${isAllChanged}"; then
+        : "FATAL: Spoke ${clusterName}: not all MCPs re-rendered within ${mcpWaitMax}s — failing closed"
+        exit 1
+    fi
+    true )
+
+    # All pools have a new spec. Wait for full rollout: every pool's
+    # status.configuration.name must equal spec.configuration.name and
+    # the Updated condition must be True.
+    WaitMcpFullSync "${kubeconfig}" "${clusterName}"
+
     : "ClusterImagePolicy signature enforcement disabled on spoke ${clusterName}"
     true
 }

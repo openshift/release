@@ -242,6 +242,18 @@ bundles:
       - namespace: ci
         cluster: core-ci
 
+  - name: horologium
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: build_farm
+        fields:
+          - sa--dot--horologium--dot--app--dot--ci--dot--config
+          - sa--dot--horologium--dot--app--dot--ci--dot--token--dot--txt
+    sync_to_cluster: true
+    targets:
+      - namespace: ci
+        cluster: core-ci
+
   - name: cluster-display
     gsm_secrets:
       - collection: test-platform-infra
@@ -9439,6 +9451,9 @@ bundles:
       - auth_field: token_image-puller_build04_reg_auth_value--dot--txt
         group: build_farm
         registry_url: registry.build04.ci.openshift.org
+    gsm_secrets:
+    - collection: quay-tests
+      group: azure-quay-qe
     name: cluster-secrets-azure-quay-qe
     sync_to_cluster: true
     targets:
@@ -12628,6 +12643,11 @@ bundles:
     targets:
       - cluster: app.ci
         namespace: ci
+      # Alertmanager reads the bearer token from this secret via
+      # http_config.authorization.credentials_file, so it must also exist in the
+      # namespace the Alertmanager pods run in.
+      - cluster: app.ci
+        namespace: openshift-user-workload-monitoring
 
   - name: alert-proxy-forwarder
     gsm_secrets:

@@ -1,0 +1,29 @@
+ref:
+  as: rosa-operator-restore
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-operator-restore-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OPERATOR_TYPE
+    default: "ho"
+    documentation: >-
+      Which operator was deployed in the pre step. Must match the OPERATOR_TYPE used in
+      rosa-operator-deploy-pr. Use "ho" for HyperShift operator or "cpo" for control
+      plane operator.
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The OCM environment to log into. Supported values are [production, staging, integration].
+  documentation: |-
+    Restores the HyperShift operator deployment on the MC after a PR test run. Must run
+    as a best_effort post step paired with rosa-operator-deploy-pr.
+
+    ho  - Restores the original operator container image, removes the temporary CI
+          registry pull secret and SA link, releases ho-deploy-lock.
+
+    cpo - Restores the original HO deployment args (removing the
+          --control-plane-operator-image override), removes the temporary CI registry
+          pull secret, releases cpo-deploy-lock.

@@ -16,6 +16,17 @@ if [[ -n "${QUAY_OPERATOR_CHANNEL}" ]]; then
   sed -i "/^    name: quay-operator$/a\\    channel: ${QUAY_OPERATOR_CHANNEL}" "${quayPolicyFile}"
   grep -A5 'name: quay-operator' "${quayPolicyFile}"
 fi
+
+# If ODF_OPERATOR_CHANNEL is set, patch the ODF operator subscription to pin the channel
+if [[ -n "${ODF_OPERATOR_CHANNEL}" ]]; then
+  if [[ ! "${ODF_OPERATOR_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "Invalid ODF_OPERATOR_CHANNEL: ${ODF_OPERATOR_CHANNEL}" >&2
+    exit 1
+  fi
+  typeset odfPolicyFile="../policygenerator/policy-sets/stable/openshift-plus/input-odf/policy-odf.yaml"
+  sed -i "/^    name: odf-operator$/a\\    channel: ${ODF_OPERATOR_CHANNEL}" "${odfPolicyFile}"
+  grep -A5 'name: odf-operator' "${odfPolicyFile}"
+fi
 echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
 
 # openshift-plus generates ~25 policies; require 4+ before oc wait to avoid

@@ -42,6 +42,20 @@ images:
     from: cli
     optional: true
     to: cli-with-skopeo
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/openjdk-17:1.21
+      USER root
+      RUN microdnf install -y git gzip && microdnf clean all
+      RUN cd /tmp \
+          && curl -sLO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/candidate-5.0/openshift-client-linux.tar.gz \
+          && curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/candidate-5.0/sha256sum.txt \
+             | grep openshift-client-linux.tar.gz > /tmp/checksum.txt \
+          && test -s /tmp/checksum.txt \
+          && sha256sum -c /tmp/checksum.txt \
+          && tar xzf openshift-client-linux.tar.gz -C /usr/local/bin oc kubectl \
+          && rm -f openshift-client-linux.tar.gz /tmp/checksum.txt
+      USER 1001
+    to: acs-smoke-runner
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -87,11 +101,11 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "false"
       MAP_TESTS: "true"
-      ODF_VERSION_MAJOR_MINOR: "5.1"
       OPERATORS: |
         [
-          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.18", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      QUAY_OPERATOR_CHANNEL: stable-3.17
       SKIP_POLICIES: policy-acs,policy-acs-central-ca-bundle,policy-acs-central-status,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
       ZONES_COUNT: "3"
     post:
@@ -121,9 +135,6 @@ tests:
     - ref: acm-tests-clc-smoke
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
-    - ref: interop-opp-odf-health
-    - ref: interop-opp-observability-odf
-    - ref: interop-tests-ocs-tests
     - ref: interop-tests-opp-quay-smoke
     - ref: interop-opp-skip-ratio-gate
 - as: interop-opp-vsphere
@@ -146,7 +157,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "6"
-      DISABLE_ENVIRONMENT_CHECKER: "true"
       DR__RP__CR_COMP_NAME: lp-interop--OPP
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.1-lp","opp-vsphere-lp","opp-lp"]'
@@ -155,13 +165,13 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "false"
       MAP_TESTS: "true"
-      ODF_VERSION_MAJOR_MINOR: "5.1"
       OPENSHIFT_REQUIRED_CORES: "72"
       OPENSHIFT_REQUIRED_MEMORY: "288"
       OPERATORS: |
         [
-          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.18", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      QUAY_OPERATOR_CHANNEL: stable-3.17
       SIZE_VARIANT: large
       SKIP_POLICIES: policy-acs,policy-acs-central-ca-bundle,policy-acs-central-status,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
     post:
@@ -182,9 +192,6 @@ tests:
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
     - ref: interop-opp-wait-mcp
-    - ref: interop-opp-odf-health
-    - ref: interop-opp-observability-odf
-    - ref: interop-tests-ocs-tests
     - ref: acm-opp-app
     - ref: interop-opp-skip-ratio-gate
     workflow: acm-ipi-vsphere

@@ -1,0 +1,27 @@
+ref:
+  as: rosa-e2e-validate-platform
+  from: rosa-e2e
+  grace_period: 10m
+  commands: rosa-e2e-validate-platform-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: OCM environment the cluster lives in.
+  - name: LABEL_FILTER
+    default: "Area:ManagedService || Area:InfraTiers || Area:MgmtPlane"
+    documentation: Ginkgo label filter selecting the platform-plane (SRE/fleet vantage) areas.
+  dependencies:
+  - name: rosa-e2e
+    env: ROSA_E2E_IMAGE
+  documentation: |-
+    Platform-plane validation for the unified ROSA E2E architecture (ROSAENG-67580).
+    Reads the management (and, when available, service) cluster kubeconfigs written
+    by rosa-backplane-login (${SHARED_DIR}/mc-kubeconfig, ${SHARED_DIR}/sc-kubeconfig)
+    and the feature flags from ${SHARED_DIR}/cluster-metadata.json, then runs the
+    rosa-e2e suite for the SRE/fleet areas (ManagedService, InfraTiers, MgmtPlane).
+    Requires corp-network reachability (intranet); schedule only where backplane is
+    reachable. Run rosa-backplane-login first.

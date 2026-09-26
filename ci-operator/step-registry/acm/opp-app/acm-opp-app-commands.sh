@@ -35,7 +35,7 @@ _propagate_junit () {
 ################################################################################
 
 # cd to writable directory
-cd /tmp/ || exit 0
+cd /tmp/ || { echo "ERROR: Cannot cd to /tmp" >&2; exit 1; }
 
 # Define all test cases with initial "skipped" status
 typeset -A testStatus
@@ -406,6 +406,17 @@ fi
 : "====== Test Summary ======"
 : "All test results will be available in JUnit XML report"
 
-# Always exit 0 to allow subsequent test steps to run
-# Test results are reported via JUnit XML
-exit 0
+# Exit based on whether any test failed
+typeset _overall_status="PASS"
+for test in "${allTestCasesArr[@]}"; do
+    if [[ "${testStatus[${test}]}" == "failed" ]]; then
+        _overall_status="FAIL"
+        break
+    fi
+done
+
+if [[ "${_overall_status}" == "PASS" ]]; then
+    exit 0
+else
+    exit 1
+fi

@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 15 8-14 * 5
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -39,7 +39,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 15 1-7 * 5
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -77,7 +77,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 15 22-28 * 4
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -115,7 +115,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 20 8-14 * 5
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -153,7 +153,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 15 15-21 * 5
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -191,7 +191,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 20 22-28 * 5
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -229,7 +229,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 20 15-21 * 5
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -267,7 +267,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 15 1-7 * 4
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -305,7 +305,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 15 22-28 * 5
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -343,7 +343,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 15 8-14 * 4
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -381,7 +381,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 20 1-7 * 4
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -419,7 +419,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: '@yearly'
+  cron: 0 15 15-21 * 4
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -457,7 +457,7 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
-  cron: 30 0 * * 1-5
+  cron: 0 20 15-21 * 4
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -477,6 +477,82 @@ periodics:
       - upgrade
       - --to-latest
       - --kubeconfig=/etc/build-farm-credentials/sa.config-updater.hosted-mgmt.config
+      command:
+      - /usr/bin/oc
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        secretName: config-updater
+- agent: kubernetes
+  cluster: core-ci
+  cron: 0 20 8-14 * 4
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-hosted-mgmt2-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `hosted-mgmt2` has not been completed over 24 hours. Please check if anything
+        blocks the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      - --kubeconfig=/etc/build-farm-credentials/sa.config-updater.hosted-mgmt2.config
+      command:
+      - /usr/bin/oc
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        secretName: config-updater
+- agent: kubernetes
+  cluster: core-ci
+  cron: 0 20 22-28 * 4
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-core-ci-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `core-ci` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      - --kubeconfig=/etc/build-farm-credentials/sa.config-updater.core-ci.config
       command:
       - /usr/bin/oc
       image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli

@@ -204,6 +204,16 @@ function CheckOppCompatibility () {
     for entry in ${compatSpec}; do
         typeset opPrefix="${entry%%:*}"
         typeset minVersion="${entry##*:}"
+
+        # If OPP_OPERATORS is set, only check operators listed in it
+        if [[ -n "${OPP_OPERATORS:-}" ]]; then
+            if ! echo ",${OPP_OPERATORS}," | grep -q ",${opPrefix},"; then
+                : "INFO: ${opPrefix}: Skipping (not in OPP_OPERATORS)"
+                details="${details}${opPrefix}: skipped (not in OPP_OPERATORS); "
+                continue
+            fi
+        fi
+
         typeset minMajor minMinor
         minMajor="${minVersion%%.*}"
         minMinor="${minVersion##*.}"
