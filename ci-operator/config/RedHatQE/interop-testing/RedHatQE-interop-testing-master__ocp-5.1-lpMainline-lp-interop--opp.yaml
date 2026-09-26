@@ -195,6 +195,71 @@ tests:
     - ref: acm-opp-app
     - ref: interop-opp-skip-ratio-gate
     workflow: acm-ipi-vsphere
+- as: cr--full-stack--fips--aws
+  capabilities:
+  - intranet
+  cluster: build05
+  cron: 30 5,17 * * *
+  reporter_config:
+    channel: '#opp-discussion'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-cspi-qe
+    env:
+      AWS_COMPUTE_VOLUME_SIZE: "500"
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.1-lp","opp-aws-lp","opp-lp","fips"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "false"
+      ODF_VERSION_MAJOR_MINOR: "5.1"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+      ZONES_COUNT: "3"
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: acm-inspector
+    - ref: acm-tests-clc-destroy
+    - ref: gather-aws-console
+    - chain: ipi-deprovision
+    - ref: firewatch-report-issues
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-rootvolume
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-policies-openshift-plus-setup
+    - ref: acm-policies-openshift-plus
+    - ref: interop-opp-wait-mcp
+    - ref: acm-tests-clc-create
+    - ref: acm-fetch-managed-clusters
+    - ref: acm-opp-app
+    - ref: interop-tests-ocs-tests
+    - ref: interop-tests-opp-quay-smoke
+    - ref: acm-tests-observability
 zz_generated_metadata:
   branch: master
   org: RedHatQE
