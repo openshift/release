@@ -10,6 +10,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
+  # Save xtrace log with credentials scrubbed when the step exits non-zero.
   _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
@@ -33,6 +34,7 @@ typeset -a tcResultsArr=()    # "pass" or "fail"
 typeset -a tcMessagesArr=()   # failure message (empty when pass)
 
 AddResult() {
+    # Append a test-case name, result, and optional message to the JUnit accumulators.
     typeset name="${1:-}"; (($#)) && shift
     typeset result="${1:-}"; (($#)) && shift
     typeset message="${1:-}"; (($#)) && shift
@@ -46,6 +48,7 @@ AddResult() {
 # by default, changing how ${var//pattern/replacement} handles & and \ in
 # the replacement string. Without escaping, JUnit XML output is malformed.
 XmlEscape() {
+    # Escape XML special characters for safe embedding in JUnit output.
     typeset text="${1:-}"; (($#)) && shift
     if shopt -q patsub_replacement 2>/dev/null; then
         shopt -u patsub_replacement
@@ -61,6 +64,7 @@ XmlEscape() {
 }
 
 WriteJunit() {
+    # Write accumulated test-case results to the JUnit XML file.
     typeset -i total=${#tcNamesArr[@]}
     typeset -i failCount=0
     typeset -i skipCount=0
@@ -97,6 +101,7 @@ WriteJunit() {
 
 # shellcheck disable=SC2317  # invoked via trap
 CollectExitArtifacts() {
+    # Dump cluster state to artifacts on exit for post-mortem analysis.
     : "Collecting exit diagnostics..."
     oc get clusterversion version -o yaml > "${ARTIFACT_DIR}/pre-upgrade-clusterversion.yaml" || true
     oc get clusteroperators -o yaml > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.yaml" || true
@@ -105,6 +110,7 @@ CollectExitArtifacts() {
 
 # shellcheck disable=SC2317
 _propagate_junit () {
+    # Copy all JUnit XML files from ARTIFACT_DIR into SHARED_DIR/junit for aggregation.
     mkdir -p "${SHARED_DIR}/junit"
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }

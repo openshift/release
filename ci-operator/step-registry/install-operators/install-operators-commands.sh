@@ -13,6 +13,42 @@ else
     echo "no proxy setting."
 fi
 
+# --- JUnit XML wrapper: emit result for skip-ratio-gate ---
+_junit_start=$(date +%s)
+_junit_emitted=0
+_jrc=0  # initialized here, assigned inside trap string
+_junit_emit() {
+  # Emit a JUnit XML result for the install-operators step and propagate
+  # it to SHARED_DIR/junit so downstream steps can aggregate results.
+  (( _junit_emitted )) && return 0
+  _junit_emitted=1
+  local _jr=${1:-0}
+  local _je
+  _je=$(date +%s) || _je=${_junit_start}
+  local _jd=$((_je - _junit_start))
+  local _jn="install-operators"
+  local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
+  local _fc=0 _fx=""
+  if (( _jr != 0 )); then
+    _fc=1
+    _fx="<failure message=\"${_jn} exited with code ${_jr}\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
+  fi
+  cat > "${_jf}" <<JUNITEOF || true
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="${_fc}" errors="0" skipped="0" time="${_jd}">
+  <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
+    ${_fx}
+  </testcase>
+</testsuite>
+JUNITEOF
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; exit ${_jrc}' EXIT
+
 # If not provided in the JSON, will use the following defaults.
 DEFAULT_OPERATOR_SOURCE="redhat-operators"
 DEFAULT_OPERATOR_SOURCE_DISPLAY="Red Hat Operators"

@@ -10,6 +10,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
+  # Save xtrace log with credentials scrubbed when the step exits non-zero.
   _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
@@ -31,6 +32,7 @@ _junit_start=$(date +%s)
 _junit_emitted=0
 _jrc=0
 _junit_emit() {
+  # Emit a JUnit XML result for the readiness step and propagate to SHARED_DIR/junit.
   (( _junit_emitted )) && return 0
   _junit_emitted=1
   local _jr=${1:-0}
@@ -91,6 +93,7 @@ readinessStart=$(date +%s)
 readinessDeadline=$((readinessStart + READINESS_TIMEOUT))
 
 function WaitForReadiness() {
+    # Retry a check function until it passes or READINESS_TIMEOUT is exceeded.
     typeset description="${1}" checkFunction="${2}"
     typeset -i attempt=1 checkResult=0 now=0 sleepSeconds=0
 
@@ -124,6 +127,7 @@ function WaitForReadiness() {
 }
 
 function CheckClusterVersion() {
+    # Verify the ClusterVersion resource reports Available=True.
     typeset cvAvailable=""
     if ! cvAvailable=$(oc get clusterversion version \
         -o jsonpath='{.status.conditions[?(@.type=="Available")].status}'); then
@@ -138,6 +142,7 @@ function CheckClusterVersion() {
 }
 
 function CheckClusterOperators() {
+    # Verify no ClusterOperators are Degraded or unavailable.
     typeset coOutput="" degradedCOs="" unavailCOs=""
     coOutput=$(mktemp)
     if ! oc get clusteroperators -o json > "${coOutput}"; then
@@ -172,6 +177,7 @@ function CheckClusterOperators() {
 }
 
 function CheckNodes() {
+    # Count nodes by Ready condition status without exposing node names in logs.
     typeset nodeStatuses="" nodeStatusSummary=""
     typeset -i notReadyCount=0
 

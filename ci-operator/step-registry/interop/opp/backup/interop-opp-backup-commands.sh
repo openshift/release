@@ -10,6 +10,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
+  # Save xtrace log with credentials scrubbed when the step exits non-zero.
   _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
@@ -31,6 +32,7 @@ _junit_start=$(date +%s)
 _junit_emitted=0
 _jrc=0  # initialized here, assigned inside trap string
 _junit_emit() {
+  # Emit a JUnit XML result for the backup step and propagate to SHARED_DIR/junit.
   (( _junit_emitted )) && return 0
   _junit_emitted=1
   local _jr=${1:-0}
@@ -77,6 +79,7 @@ typeset -i failures=0
 typeset -i captured=0
 
 Capture() {
+    # Run a command and save its output to an artifact file, tracking success/failure counts.
     typeset description="${1:-}"; (($#)) && shift
     typeset outputFile="${1:-}"; (($#)) && shift
     : "Capturing ${description}..."
@@ -90,6 +93,7 @@ Capture() {
 }
 
 TimeoutMonitor() {
+    # Background watchdog that sends SIGTERM to the main process after BACKUP_TIMEOUT seconds.
     typeset -i startTime=0
     startTime=$(date +%s)
     typeset -i deadline=$(( startTime + BACKUP_TIMEOUT ))

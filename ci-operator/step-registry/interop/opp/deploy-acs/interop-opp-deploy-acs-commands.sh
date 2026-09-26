@@ -10,6 +10,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
+  # Save xtrace log with credentials scrubbed when the step exits non-zero.
   _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
@@ -31,6 +32,7 @@ _junit_start=$(date +%s)
 _junit_emitted=0
 _jrc=0
 _junit_emit() {
+  # Emit a JUnit XML result for the ACS deploy step and propagate to SHARED_DIR/junit.
   (( _junit_emitted )) && return 0
   _junit_emitted=1
   local _jr=${1:-0}
