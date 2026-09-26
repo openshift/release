@@ -521,3 +521,6 @@ function Main () {
 }
 
 Main "$@"
+
+# Rename JUnit suite for dashboard visibility
+find "${ARTIFACT_DIR}" -name "*.xml" -exec sed -i 's/name="product-upgrade-acm"/name="lp-interop--OPP--acm-upgrade"/g; s/classname="product-upgrade-acm"/classname="lp-interop--OPP--acm-upgrade"/g' {} + 2>/dev/null || true

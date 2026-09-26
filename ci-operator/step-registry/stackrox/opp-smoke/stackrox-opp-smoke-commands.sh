@@ -110,4 +110,8 @@ if [[ -d build/reports/tests/testSMOKE ]]; then
 fi
 
 echo "[smoke] Test run finished with exit code: ${testExit}"
+
+# Rename JUnit suite for dashboard visibility
+find "${ARTIFACT_DIR}" -name "*.xml" -exec sed -i 's/name="stackrox-opp-smoke"/name="lp-interop--OPP--acs-smoke"/g; s/classname="stackrox-opp-smoke"/classname="lp-interop--OPP--acs-smoke"/g' {} + 2>/dev/null || true
+
 exit "${testExit}"
