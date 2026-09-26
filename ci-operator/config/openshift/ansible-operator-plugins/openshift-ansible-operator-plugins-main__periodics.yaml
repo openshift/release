@@ -88,7 +88,6 @@ tests:
         if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
           REHEARSAL_BRANCH=oape-987-ci-rehearsal-base
           REHEARSAL_CRED_FILE=$(mktemp)
-          trap 'rm -f "$REHEARSAL_CRED_FILE"' EXIT
           chmod 600 "$REHEARSAL_CRED_FILE"
           printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" > "$REHEARSAL_CRED_FILE"
           git config --global --add safe.directory "$(pwd)"
@@ -102,6 +101,8 @@ tests:
           git push origin "FETCH_HEAD:refs/heads/${REHEARSAL_BRANCH}"
           git fetch origin "refs/heads/${REHEARSAL_BRANCH}:refs/remotes/origin/${REHEARSAL_BRANCH}"
           git checkout -B "$REHEARSAL_BRANCH" "origin/$REHEARSAL_BRANCH"
+          git config --unset credential.helper
+          rm -f "$REHEARSAL_CRED_FILE"
           export REBASE_BRANCH="$REHEARSAL_BRANCH"
           export OVERRIDE_TAG=v1.42.3
         fi
