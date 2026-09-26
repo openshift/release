@@ -51,10 +51,11 @@ function mirror_ccs() {
     fi
     echo "mirror registry is ${mirror_registry}"
 
-    echo "2: get oc-mirror from CGW (Content Gateway)"
-    CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
+    echo "2: get oc-mirror from stable clients"
     if [[ ! -f /home/oc-mirror ]]; then
-        curl -s -k -L "${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-amd64.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
+        MIRROR2URL="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4"
+        CLIENTURL="${MIRROR2URL}"/x86_64/clients/ocp/stable
+        curl -s -k -L "${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
         if ls /home/oc-mirror > /dev/null ; then
             chmod +x /home/oc-mirror
         else
