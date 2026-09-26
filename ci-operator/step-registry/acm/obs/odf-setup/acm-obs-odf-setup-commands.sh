@@ -254,7 +254,7 @@ jq -cn \
 
 typeset mcNameFile="${SHARED_DIR}/managed.cluster.name"
 typeset mcDomainFile="${SHARED_DIR}/managed.cluster.base.domain"
-typeset mcKubeFile="${SHARED_DIR}/managed.cluster.kubeconfig"
+typeset mcKubeFile="${SHARED_DIR}/managed-cluster-kubeconfig"
 
 if [[ -e "${mcNameFile}" || -e "${mcDomainFile}" || -e "${mcKubeFile}" ]]; then
     [[ -s "${mcNameFile}" ]] || { : 'ERROR: managed cluster name missing or empty'; exit 1; }

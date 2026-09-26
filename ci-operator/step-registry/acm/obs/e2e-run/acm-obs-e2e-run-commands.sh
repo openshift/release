@@ -50,8 +50,8 @@ export KUBECONFIG='/workspace/.kube/config'
 mkdir -p /resources
 cp "${SHARED_DIR}/acm-obs-options.json" /resources/options.yaml
 
-if [[ -f "${SHARED_DIR}/managed.cluster.kubeconfig" ]]; then
-    cp "${SHARED_DIR}/managed.cluster.kubeconfig" /workspace/.kube/import-kubeconfig
+if [[ -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
+    cp "${SHARED_DIR}/managed-cluster-kubeconfig" /workspace/.kube/import-kubeconfig
 fi
 
 # ---------------------------------------------------------------------------
