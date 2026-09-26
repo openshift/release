@@ -98,6 +98,31 @@ tests:
         export PATH="/tmp/bin:/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
 
         git config --global --add safe.directory "$(pwd)"
+        # TEMPORARY: replay PR #82's pre-rebase tree with the auto-rebase script.
+        if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
+          REHEARSAL_BRANCH=oape-987-pr82-base
+          REHEARSAL_CRED_FILE=$(mktemp)
+          chmod 600 "$REHEARSAL_CRED_FILE"
+          printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" > "$REHEARSAL_CRED_FILE"
+          git config credential.helper "store --file=${REHEARSAL_CRED_FILE}"
+          if git remote get-url origin >/dev/null 2>&1; then
+            git remote set-url origin https://github.com/openshift/ansible-operator-plugins.git
+          else
+            git remote add origin https://github.com/openshift/ansible-operator-plugins.git
+          fi
+          git fetch https://github.com/neha037/ansible-operator-plugins.git "$REHEARSAL_BRANCH"
+          git push origin "FETCH_HEAD:refs/heads/${REHEARSAL_BRANCH}"
+          git fetch origin "refs/heads/${REHEARSAL_BRANCH}:refs/remotes/origin/${REHEARSAL_BRANCH}"
+          git checkout -B "$REHEARSAL_BRANCH" "origin/$REHEARSAL_BRANCH"
+          export GH_TOKEN="$GITHUB_TOKEN"
+          gh pr close 96 --repo openshift/ansible-operator-plugins || true
+          git config --unset credential.helper
+          rm -f "$REHEARSAL_CRED_FILE"
+          export REBASE_BRANCH="$REHEARSAL_BRANCH"
+          export OVERRIDE_TAG=v1.42.3
+          podman info >/dev/null
+        fi
+
         export FORCE_REMOTE_URLS=1
         export CONTAINER_ENGINE=podman
         export REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
