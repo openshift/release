@@ -46,7 +46,9 @@ body { margin: 0; background: var(--pf-t--global--background--color--secondary--
 .pf-v6-c-masthead__logo svg { height: 28px; width: auto; display: block; }
 
 .qp-graph { display: flex; flex-wrap: wrap; row-gap: var(--pf-t--global--spacer--md); align-items: center; padding: var(--pf-t--global--spacer--sm) 0; }
-.qp-node { flex: 1 1 0; min-width: min-content; display: flex; flex-direction: column;
+.qp-help { cursor: help; color: var(--pf-t--global--icon--color--subtle); }
+.qp-help svg { vertical-align: -2px; }
+.qp-node { flex: 1 1 0; min-width: min-content; max-width: 16rem; display: flex; flex-direction: column;
   padding: 6px 8px; border: var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default);
   border-radius: var(--pf-t--global--border--radius--small); background: var(--pf-t--global--background--color--primary--default);
   color: var(--pf-t--global--text--color--regular); font-size: var(--pf-t--global--font--size--sm); line-height: 1.35; text-decoration: none; }
@@ -91,20 +93,24 @@ var API = 'https://storage.googleapis.com/storage/v1/b/' + RUN.bucket + '/o';
 var WEB = 'https://gcs.ci.openshift.org/gcs/' + RUN.bucket + '/' + RUN.path + '/';
 var PROW = 'https://prow.ci.openshift.org/view/gs/' + RUN.bucket + '/' + RUN.path;
 
-// CI replaces a file it redacts with a 76-byte notice; real logs can be that short too.
-var REDACTED_SIZE = 76;
+// A build-log.txt this short holds no step output (e.g. only "skipping").
+var TINY_LOG = 1024;
 
 var ICON_OK = '<svg class="qp-ok" fill="currentColor" viewBox="0 0 32 32" width="14" height="14" aria-hidden="true"><path d="M16 1C7.729 1 1 7.729 1 16s6.729 15 15 15 15-6.729 15-15S24.271 1 16 1Zm7.795 11.795-8.646 8.646c-.317.317-.733.475-1.149.475s-.832-.158-1.149-.475l-4.646-4.646a1.126 1.126 0 0 1 1.591-1.591l4.205 4.205 8.205-8.205a1.126 1.126 0 0 1 1.591 1.591Z"/></svg>';
 var ICON_BAD = '<svg class="qp-bad" fill="currentColor" viewBox="0 0 32 32" width="14" height="14" aria-hidden="true"><path d="M16 1C7.729 1 1 7.729 1 16s6.729 15 15 15 15-6.729 15-15S24.271 1 16 1Zm-1.5 8a1.5 1.5 0 1 1 3 0v7a1.5 1.5 0 1 1-3 0V9ZM16 25.001a2 2 0 1 1-.001-3.999A2 2 0 0 1 16 25.001Z"/></svg>';
 var ICON_ALERT = ICON_BAD.replace('class="qp-bad"', 'class="pf-v6-svg"').replace(/ width="14" height="14"/, ' width="1em" height="1em"');
-var CHEVRON = '<svg class="pf-v6-svg" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true" width="1em" height="1em"><path d="M18.71 5.29a.996.996 0 0 0-1.41 0l-7.29 7.29-7.3-7.29a.987.987 0 0 0-1.41-.02.987.987 0 0 0-.02 1.41l.02.02 7.65 7.65c.29.29.68.44 1.06.44s.77-.15 1.06-.44l7.65-7.65a.996.996 0 0 0 0-1.41Z"/></svg>';
+var ICON_HELP = '<svg fill="currentColor" viewBox="0 0 32 32" width="14" height="14" aria-hidden="true"><path d="M16 1C7.729 1 1 7.729 1 16s6.729 15 15 15 15-6.729 15-15S24.271 1 16 1Zm0 25a1.75 1.75 0 1 1 0-3.5 1.75 1.75 0 0 1 0 3.5Zm1.5-7.36V19a1.5 1.5 0 1 1-3 0v-1.5c0-.83.67-1.5 1.5-1.5 1.65 0 3-1.35 3-3s-1.35-3-3-3-3 1.35-3 3a1.5 1.5 0 1 1-3 0c0-3.31 2.69-6 6-6s6 2.69 6 6c0 2.79-1.91 5.14-4.5 5.64Z"/></svg>';
+var CHEVRON ='<svg class="pf-v6-svg" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true" width="1em" height="1em"><path d="M18.71 5.29a.996.996 0 0 0-1.41 0l-7.29 7.29-7.3-7.29a.987.987 0 0 0-1.41-.02.987.987 0 0 0-.02 1.41l.02.02 7.65 7.65c.29.29.68.44 1.06.44s.77-.15 1.06-.44l7.65-7.65a.996.996 0 0 0 0-1.41Z"/></svg>';
 
 // ---- GCS access. Every name below is relative to the run's directory. ----
 var files = new Map();   // object name -> size
 var dirs = new Set();    // "a/b/" for every directory known to hold an object
+// Objects CI's secret scanner (leaktk) replaced with a short notice; it marks them in metadata.
+var redacted = new Set();
 
-function addFile(name, size) {
+function addFile(name, size, meta) {
   files.set(name, size);
+  if (meta && meta['leaktk-redacted'] === '1') redacted.add(name);
   for (var i = name.indexOf('/'); i >= 0; i = name.indexOf('/', i + 1)) dirs.add(name.slice(0, i + 1));
 }
 function has(rel) { return rel.slice(-1) === '/' ? dirs.has(rel) : files.has(rel); }
@@ -123,13 +129,13 @@ function opt(p) { return p.catch(function () { return null; }); }
 async function list(rel, extra) {
   var token = '', cut = RUN.path.length + 1;
   do {
-    var q = new URLSearchParams({ prefix: RUN.path + '/' + rel, fields: 'items(name,size),prefixes,nextPageToken' });
+    var q = new URLSearchParams({ prefix: RUN.path + '/' + rel, fields: 'items(name,size,metadata),prefixes,nextPageToken' });
     Object.keys(extra || {}).forEach(function (k) { q.set(k, extra[k]); });
     if (token) q.set('pageToken', token);
     var r = await fetch(API + '?' + q);
     if (!r.ok) throw new Error('list ' + rel + ': HTTP ' + r.status);
     var d = await r.json();
-    (d.items || []).forEach(function (i) { addFile(i.name.slice(cut), +i.size); });
+    (d.items || []).forEach(function (i) { addFile(i.name.slice(cut), +i.size, i.metadata); });
     (d.prefixes || []).forEach(function (p) { dirs.add(p.slice(cut)); });
     token = d.nextPageToken || '';
   } while (token);
@@ -157,6 +163,7 @@ function words(s) { return esc(s).split(' ').map(function (w) { return '<span cl
 function label(color, s) {
   return '<span class="pf-v6-c-label pf-m-' + color + '"><span class="pf-v6-c-label__content"><span class="pf-v6-c-label__text">' + esc(s) + '</span></span></span>';
 }
+function help(tip) { return '<span class="qp-help" tabindex="0" role="img" aria-label="' + esc(tip) + '" title="' + esc(tip) + '">' + ICON_HELP + '</span>'; }
 function card(title, sub, body, footer) {
   return '<div class="pf-v6-c-card pf-m-compact"><div class="pf-v6-c-card__title"><h2 class="pf-v6-c-card__title-text">' + title +
     (sub ? ' <span class="qp-sub">' + sub + '</span>' : '') + '</h2></div><div class="pf-v6-c-card__body">' + body + '</div>' +
@@ -252,7 +259,7 @@ function node(o) {
 function stepHref(T, s) {
   var dir = 'artifacts/' + T + '/' + s.name + '/';
   if (s.failed && has(dir + 'artifacts/')) return WEB + dir + 'artifacts/';
-  if (has(dir + 'build-log.txt')) return WEB + dir + 'build-log.txt';
+  if (files.get(dir + 'build-log.txt') >= TINY_LOG) return WEB + dir + 'build-log.txt';
   return has(dir) ? WEB + dir : null;
 }
 
@@ -292,6 +299,26 @@ function condCell(c) {
   return '<span class="' + (good ? 'qp-ok' : 'qp-bad') + '">' + esc(c.status) + '</span> <span class="qp-sub">' + esc(c.reason || '') + '</span>';
 }
 
+// Parses `oc get events` output (fixed-width columns under a header) into
+// [age, type, reason, object, message] rows.
+function events(txt) {
+  var lines = (txt || '').split('\n'), hdr = lines[0] || '';
+  var at = ['TYPE', 'REASON', 'OBJECT', 'MESSAGE'].map(function (c) { return hdr.indexOf(c); });
+  if (hdr.indexOf('LAST SEEN') !== 0 || at.some(function (i) { return i < 0; })) return [];
+  at.unshift(0);
+  return lines.slice(1).filter(function (l) { return l.trim(); }).map(function (l) {
+    return at.map(function (i, k) { return l.slice(i, k + 1 < at.length ? at[k + 1] : undefined).trim(); });
+  });
+}
+// Same rows from the Events table of `oc describe quayregistry`.
+function describeEvents(txt, obj) {
+  var m = /\nEvents:\n.*\n\s*-+.*\n([\s\S]*)$/.exec(txt || '');
+  return m ? m[1].split('\n').filter(function (l) { return l.trim(); }).map(function (l) {
+    var c = l.trim().split(/\s{2,}/);   // Type, Reason, Age, From, Message
+    return [c[2] || '', c[0] || '', c[1] || '', obj, c.slice(4).join('  ')];
+  }) : [];
+}
+
 // ---- Render. ----
 // Write to the DOM only once the PatternFly stylesheet has loaded: Prow sizes
 // the iframe on DOM mutations, not on a stylesheet load.
@@ -301,17 +328,15 @@ var cssReady = css.sheet ? Promise.resolve() : new Promise(function (ok) { css.a
 async function main() {
   var head = document.getElementById('qp-head'), out = document.getElementById('qp-main');
   var base = await Promise.all([
-    opt(json('started.json')), opt(json('finished.json')), opt(json('prowjob.json')), opt(json('clone-records.json')),
+    opt(json('finished.json')), opt(json('prowjob.json')), opt(json('clone-records.json')),
     opt(json('artifacts/ci-operator-step-graph.json')), opt(text('artifacts/ci-operator.log')), opt(text('artifacts/junit_operator.xml')),
     listDir(''), listDir('artifacts/'), listDir('artifacts/build-logs/')
   ]);
-  var started = base[0], finished = base[1], pj = base[2], clones = base[3], graph = base[4], log = base[5], junitOp = base[6];
+  var finished = base[0], pj = base[1], clones = base[2], graph = base[3], log = base[4], junitOp = base[5];
   await cssReady;
-  var build = RUN.path.split('/').pop();
-  var type = (pj && pj.spec && pj.spec.type) || 'job';
   var result = finished ? finished.result || (finished.passed ? 'SUCCESS' : 'FAILURE') : 'PENDING';
   var badge = result === 'SUCCESS' ? label('success', 'Passed') : result === 'FAILURE' ? label('danger', 'Failed') : label(result === 'PENDING' ? 'blue' : 'orange', result.charAt(0) + result.slice(1).toLowerCase());
-  head.innerHTML = badge + '\u00a0 <span class="qp-sub">' + esc(type.charAt(0).toUpperCase() + type.slice(1)) + ' job run \u00b7 build ' + esc(build) + '</span>';
+  head.innerHTML = badge;
 
   var test = graph && (graph.find(function (n) { return n.substeps && n.name === RUN.test; }) || graph.find(function (n) { return n.substeps; }));
   if (!finished || !test) {
@@ -343,7 +368,9 @@ async function main() {
     startJson && has(startJson) ? opt(json(startJson)) : null,
     deploy && has(S + deploy.name + '/artifacts/pods_status.txt') ? opt(text(S + deploy.name + '/artifacts/pods_status.txt')) : null,
     gather && has(S + 'quay-gather/artifacts/' + ns + '/pods.txt') ? opt(text(S + 'quay-gather/artifacts/' + ns + '/pods.txt')) : null,
-    e2e[0] && has(S + e2e[0] + '/artifacts/junit_playwright.xml') ? opt(text(S + e2e[0] + '/artifacts/junit_playwright.xml')) : null
+    e2e[0] && has(S + e2e[0] + '/artifacts/junit_playwright.xml') ? opt(text(S + e2e[0] + '/artifacts/junit_playwright.xml')) : null,
+    gather && has(S + 'quay-gather/artifacts/' + ns + '/events.txt') ? opt(text(S + 'quay-gather/artifacts/' + ns + '/events.txt')) : null,
+    gather && has(S + 'quay-gather/artifacts/quayregistry-describe.txt') ? opt(text(S + 'quay-gather/artifacts/quayregistry-describe.txt')) : null
   ]);
   var startReg = registry(extra[0]), startPods = pods(extra[1]), finalPods = pods(extra[2]);
   var pw = null;
@@ -358,21 +385,11 @@ async function main() {
   var src = (clones || []).find(function (c) { return c.refs && c.refs.org; });
   var title = src ? esc(src.refs.org + '/' + src.refs.repo + ' ' + src.refs.base_ref) + ' \u00b7 ' + esc(T) : esc(T);
   var variant = pj && pj.metadata && pj.metadata.labels && pj.metadata.labels['ci-operator.openshift.io/variant'];
-  var count = { pre: 0, test: 0, post: 0 };
-  model.steps.forEach(function (s) { count[s.phase] = (count[s.phase] || 0) + 1; });
-  var dl = function (k, v) {
-    return '<div class="pf-v6-c-description-list__group"><dt class="pf-v6-c-description-list__term"><span class="pf-v6-c-description-list__text">' + k +
-      '</span></dt><dd class="pf-v6-c-description-list__description"><div class="pf-v6-c-description-list__text">' + v + '</div></dd></div>';
-  };
-  var t0 = started ? started.timestamp * 1000 : Date.parse(graph.map(function (n) { return n.started_at; }).sort()[0]), t1 = finished.timestamp * 1000;
+  // Run ids, times and job links are already on the Prow page around this one.
+  var commit = src && src.final_sha ? 'commit <a href="https://github.com/' + esc(src.refs.org + '/' + src.refs.repo) + '/commit/' + esc(src.final_sha) + '" target="_blank"><code>' + esc(src.final_sha.slice(0, 7)) + '</code></a>' : '';
+  var meta = [variant ? 'variant ' + esc(variant) : '', commit].filter(Boolean).join(' \u00b7 ');
   sections.push('<div class="pf-v6-c-card pf-m-compact"><div class="pf-v6-c-card__title"><h1 class="pf-v6-c-card__title-text">' + title +
-    (variant ? ' <span class="qp-sub">variant ' + esc(variant) + '</span>' : '') + '</h1></div><div class="pf-v6-c-card__body">' +
-    '<dl class="pf-v6-c-description-list pf-m-compact pf-m-horizontal pf-m-2-col pf-m-3-col-on-lg">' +
-    dl('Started', new Date(t0).toISOString().slice(0, 19).replace('T', ' ') + ' UTC') + dl('Finished', hms(t1) + ' UTC') + dl('Total', '<b>' + dur(t1 - t0) + '</b>') +
-    dl('Commit', src && src.final_sha ? '<a href="https://github.com/' + esc(src.refs.org + '/' + src.refs.repo) + '/commit/' + esc(src.final_sha) + '" target="_blank"><code>' + esc(src.final_sha.slice(0, 7)) + '</code></a>' : '\u2014') +
-    dl('Steps', model.steps.length + ': ' + count.pre + ' pre, ' + count.test + ' test, ' + count.post + ' post') +
-    dl('Job', '<a href="' + esc(PROW) + '" target="_blank">Prow</a> \u00b7 ' + a('artifacts/', 'artifacts') + ' \u00b7 ' + a('artifacts/ci-operator.log', 'ci-operator.log')) +
-    '</dl></div></div>');
+    (meta ? ' <span class="qp-sub">' + meta + '</span>' : '') + '</h1></div></div>');
 
   // Failure alert.
   var startAvail = cond(startReg, 'Available'), finalAvail = cond(finalReg, 'Available');
@@ -390,7 +407,7 @@ async function main() {
       titleText = esc(f.name) + ' failed' + (exit ? ': exit ' + exit[1] : '') + ' after ' + dur(Date.parse(f.end) - Date.parse(f.start)) + ' (' + hms(f.start) + '\u2013' + hms(f.end) + ')';
       if (pw && e2e.indexOf(f.name) >= 0) body.push('Playwright: <b>' + pw.failed + ' failed</b>, ' + pw.skipped + ' skipped, ' + pw.tests + ' total.');
       var bl = S + f.name + '/build-log.txt';
-      if (files.get(bl) === REDACTED_SIZE) body.push('The step\'s build-log.txt was redacted by CI (a ' + files.get(bl) + '-byte placeholder); the tail of its output is in junit_operator.xml.');
+      if (redacted.has(bl)) body.push('CI secret scanning replaced the step\'s build-log.txt with a notice; the tail of its output is in junit_operator.xml.');
       var after = model.steps.filter(function (s) { return s.phase === 'post' && Date.parse(s.start) >= Date.parse(f.end); });
       var afterBad = after.filter(function (s) { return s.failed; });
       var more = failedSteps.slice(1).map(function (s) { return esc(s.name); });
@@ -444,7 +461,7 @@ async function main() {
     if (grp.failedSteps.length && grp.phase !== 'post') failedBefore = true;
   });
   var mains = model.groups.filter(function (x) { return x.steps.length > 1; }).map(function (x) { return esc(x.main.name); });
-  sections.push(card('Pipeline', 'times UTC', '<div class="qp-graph">' + g.join('') + '</div>',
+  sections.push(card('Pipeline', help('Times are UTC'), '<div class="qp-graph">' + g.join('') + '</div>',
     (mains.length ? 'Stage nodes link to their longest or failed step: ' + mains.join(', ') + '. ' : '') +
     'Every step has its own directory under ' + a(S, esc(T) + '/') + '.' +
     (failedSteps.some(function (s) { return s.phase !== 'post'; }) ? ' The dashed edge is the post phase running after the failure.' : '')));
@@ -475,11 +492,23 @@ async function main() {
         table('QuayRegistry conditions', conds.map(function (c) { return [esc(c.type), condCell(cond(startReg, c.type)), condCell(cond(finalReg, c.type))]; }), { cols: ['Type', 'START', 'FINAL'] });
       body += expandable('All ' + conds.length + ' QuayRegistry conditions' + (same ? ' (identical at START and FINAL)' : !startReg || !finalReg ? (finalReg ? ' (FINAL)' : ' (START)') : ' (START vs FINAL)'), ctab);
     }
+    // Events at FINAL: the QuayRegistry's own, plus the namespace's warnings (its normal events are mostly pod scheduling).
+    var nsEvents = events(extra[4]), warn = nsEvents.filter(function (e) { return e[1] === 'Warning'; });
+    var qrEvents = describeEvents(extra[5], 'quayregistry/' + (finalReg ? finalReg.metadata.name : 'quay'));
+    if (nsEvents.length || qrEvents.length) {
+      var evRows = qrEvents.concat(warn.slice(0, 50)).map(function (e) {
+        return [esc(e[0]), e[1] === 'Warning' ? '<span class="qp-bad">Warning</span>' : esc(e[1]), esc(e[2]), esc(e[3]), esc(e[4])];
+      });
+      body += expandable('Quay events: ' + plural(qrEvents.length, 'QuayRegistry event') + ', ' + plural(warn.length, 'warning') + ' of ' + nsEvents.length + ' in ' + esc(ns) +
+        (warn.length > 50 ? ' (first 50 shown)' : ''),
+        (evRows.length ? table('Quay events', evRows, { cols: ['Age at FINAL', 'Type', 'Reason', 'Object', 'Message'] }) : '') +
+        '<p class="qp-sub">' + [a(gstep + ns + '/events.txt', 'events.txt'), a(gstep + 'quayregistry-describe.txt', 'quayregistry-describe.txt')].join(' \u00b7 ') + '</p>');
+    }
     sections.push(card('Quay health', finalReg || startReg ? 'QuayRegistry ' + esc((finalReg || startReg).metadata.namespace + '/' + (finalReg || startReg).metadata.name) : '', body));
   }
 
-  // Logs & artifacts. Rows whose target is missing from this run are dropped.
-  var rowsOf = function (rows) { return rows.filter(function (r) { return has(r[0]); }).map(function (r) { return [a(r[0], r[1]), '<span class="qp-sub">' + r[2] + '</span>']; }); };
+  // Logs & artifacts. Null rows and rows whose target is missing from this run are dropped.
+  var rowsOf = function (rows) { return rows.filter(function (r) { return r && has(r[0]); }).map(function (r) { return [a(r[0], r[1]), '<span class="qp-sub">' + r[2] + '</span>']; }); };
   var items = [];
   var logs = gather ? Array.from(files.keys()).filter(function (k) { return k.indexOf(gstep + ns + '/logs/') === 0; }) : [];
   // quay-gather names container logs <pod>-<container>.log.
@@ -493,9 +522,10 @@ async function main() {
     [gstep + ns + '/logs/', 'all ' + esc(ns) + ' logs', 'every pod in ' + esc(ns)]]));
   if (quayRows.length) items.push(accordionItem('Quay operator and app logs <span class="qp-sub">quay-gather, ' + hms(gather.start) + '</span>', table('Quay logs', quayRows), result !== 'SUCCESS'));
 
-  var mg = S + 'gather-must-gather/artifacts/must-gather.tar', mgRedacted = files.get(mg) === REDACTED_SIZE;
+  var mg = S + 'gather-must-gather/artifacts/must-gather.tar', mgRedacted = redacted.has(mg);
   var clusterRows = rowsOf([
-    [mg, 'must-gather.tar', mgRedacted ? 'Redacted by CI in this run: a ' + files.get(mg) + '-byte placeholder.' : 'full cluster must-gather'],
+    [mg, 'must-gather.tar', mgRedacted ? 'CI secret scanning replaced the whole archive with a notice, as it does for many OpenShift jobs' : 'full cluster must-gather'],
+    mgRedacted ? [S + 'gather-must-gather/artifacts/camgi.html', 'camgi.html', 'must-gather summary, rendered before the archive was uploaded'] : null,
     [S + 'gather-extra/artifacts/', 'gather-extra', 'cluster resource dump, node and pod logs'],
     [S + 'gather-must-gather/artifacts/event-filter.html', 'event-filter.html', 'cluster events, filterable'],
     [S + 'gather-audit-logs/artifacts/', 'audit logs', 'API server audit logs'],
@@ -505,7 +535,9 @@ async function main() {
   var junits = Array.from(files.keys()).filter(function (k) { return k.indexOf(S) === 0 && /\/artifacts\/junit[^/]*\.xml$/.test(k); });
   var testRows = rowsOf([].concat(e2e.map(function (n) {
     return [S + n + '/artifacts/index.html', 'Playwright report', pw ? pw.tests + ' tests, ' + pw.failed + ' failed, ' + pw.skipped + ' skipped' : esc(n)];
-  }), junits.map(function (k) { return [k, esc(k.split('/').pop()), esc(k.split('/')[2])]; }), [['artifacts/junit_operator.xml', 'junit_operator.xml', 'every ci-operator step, with output tails']]));
+  }), junits.map(function (k) {
+    return [k, esc(k.split('/').pop()), /\/gather-must-gather\/artifacts\/junit_install\.xml$/.test(k) ? 'must-gather install status' : esc(k.split('/')[2])];
+  }), [['artifacts/junit_operator.xml', 'junit_operator.xml', 'every ci-operator step, with output tails']]));
   if (testRows.length) items.push(accordionItem('Test results', table('Test results', testRows)));
 
   var buildRows = rowsOf([['artifacts/ci-operator.log', 'ci-operator.log', 'full ci-operator output']].concat(
