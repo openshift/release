@@ -2,6 +2,37 @@ build_root:
   from_repository: true
 images:
   items:
+  - dockerfile_literal: |-
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.26-openshift-5.0
+      USER 0
+      RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_amd64.tar.gz -o /tmp/gh.tar.gz && \
+          echo 'a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112  /tmp/gh.tar.gz' | sha256sum -c - && \
+          tar -xzf /tmp/gh.tar.gz -C /tmp && \
+          install -m 0755 /tmp/gh_2.97.0_linux_amd64/bin/gh /usr/local/bin/gh && \
+          rm -rf /tmp/gh.tar.gz /tmp/gh_2.97.0_linux_amd64
+      WORKDIR /app
+      RUN git init /tmp/oape && \
+          git -C /tmp/oape remote add origin https://github.com/neha037/oape-ai-e2e.git && \
+          git -C /tmp/oape fetch --depth 1 origin b4de252c7688f27d243ae73b7fa987ebe2ae8c9c && \
+          git -C /tmp/oape checkout --detach FETCH_HEAD && \
+          test "$(git -C /tmp/oape rev-parse HEAD)" = b4de252c7688f27d243ae73b7fa987ebe2ae8c9c && \
+          cp -a /tmp/oape/scripts /app/scripts && \
+          cp -a /tmp/oape/plugins /plugins && \
+          mkdir -p /config && cp -a /tmp/oape/deploy/config/. /config/ && \
+          rm -rf /tmp/oape
+      RUN curl -fsSL https://nodejs.org/dist/v22.18.0/node-v22.18.0-linux-x64.tar.gz -o /tmp/node.tar.gz && \
+          echo 'a2e703725d8683be86bb5da967bf8272f4518bdaf10f21389e2b2c9eaeae8c8a  /tmp/node.tar.gz' | sha256sum -c - && \
+          mkdir -p /opt/node && tar -xzf /tmp/node.tar.gz -C /opt/node --strip-components=1 && \
+          ln -s /opt/node/bin/node /usr/local/bin/node && \
+          ln -s /opt/node/bin/npm /usr/local/bin/npm && \
+          npm install -g --prefix /usr/local @anthropic-ai/claude-code@1.0.16 && \
+          rm -f /tmp/node.tar.gz
+      RUN git config --global user.name "openshift-app-platform-shift-bot" && \
+          git config --global user.email "267347085+openshift-app-platform-shift-bot@users.noreply.github.com" && \
+          mkdir -p /opt/app-root/src /config && chmod -R g=u /opt/app-root/src /config && \
+          chmod g=u /app
+      USER 1001
+    to: ci-monitor-agent
   - dockerfile_path: ci/dockerfiles/builder.Dockerfile
     from: root
     to: osdk-builder
@@ -17,6 +48,7 @@ images:
 promotion:
   to:
   - excluded_images:
+    - ci-monitor-agent
     - osdk-builder
     - osdk-helm-e2e
     - memcached-operator
@@ -42,6 +74,142 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make build/operator-sdk-dev-x86_64-linux-gnu
 tests:
+- always_run: false
+  as: oape-ci-monitor
+  optional: true
+  steps:
+    test:
+    - as: monitor
+      commands: |
+        set -euo pipefail
+
+        : "${REPO_OWNER:?Prow repository owner is required}"
+        : "${REPO_NAME:?Prow repository name is required}"
+        rehearsal=false
+        if [[ "${REPO_OWNER}/${REPO_NAME}" == "openshift/release" ]]; then
+          rehearsal=true
+          if [[ ! "${OAPE_TEST_PR_NUMBER:-}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "[setup] ERROR: release rehearsal requires an explicit SDK demo PR number" >&2
+            exit 1
+          fi
+          export REPO_OWNER=openshift
+          export REPO_NAME=ocp-release-operator-sdk
+          export PULL_NUMBER="${OAPE_TEST_PR_NUMBER}"
+        elif [[ "${REPO_OWNER}/${REPO_NAME}" == "openshift/ocp-release-operator-sdk" ]]; then
+          : "${PULL_NUMBER:?SDK PR number is required}"
+        else
+          echo "[setup] ERROR: unexpected Prow repository ${REPO_OWNER}/${REPO_NAME}" >&2
+          exit 1
+        fi
+        if [[ ! "${PULL_NUMBER}" =~ ^[1-9][0-9]*$ ]]; then
+          echo "[setup] ERROR: invalid SDK PR number ${PULL_NUMBER}" >&2
+          exit 1
+        fi
+
+        export PR_URL="https://github.com/openshift/ocp-release-operator-sdk/pull/${PULL_NUMBER}"
+        export DRY_RUN=false
+        export REVIEW_HANDLER_ENABLED=false
+        export GOFLAGS=-tags=containers_image_openpgp
+        export CGO_ENABLED=0
+        export GOPATH=/tmp/ci-monitor-go
+        export GOMODCACHE=/tmp/ci-monitor-go/pkg/mod
+        export GOCACHE=/tmp/ci-monitor-go/cache
+        export XDG_CACHE_HOME=/tmp/ci-monitor-cache
+        export XDG_CONFIG_HOME=/tmp/ci-monitor-config
+        export GIT_CONFIG_GLOBAL=/tmp/ci-monitor-gitconfig
+        export GOOGLE_APPLICATION_CREDENTIALS=/var/run/gcloud-adc/application_default_credentials.json
+        export CLAUDE_CODE_USE_VERTEX=1
+        export CLOUD_ML_REGION=global
+        export ANTHROPIC_VERTEX_PROJECT_ID=itpc-gcp-hcm-pe-eng-claude
+        export SKIP_POLL=false
+        export SELF_JOB_NAME=oape-ci-monitor
+        export OAPE_RUN_URL="${BUILD_LOG_URL:-}"
+
+        if [[ ! -s /var/run/github-app/app-id || ! -s /var/run/github-app/private-key.pem ]]; then
+          echo "[auth] ERROR: GitHub App credentials are required for a live formatting push" >&2
+          exit 1
+        fi
+        refresh_app_token() {
+          local app_id header now payload signature jwt installation installation_id token_response
+          app_id=$(cat /var/run/github-app/app-id)
+          header=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+          now=$(date +%s)
+          payload=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$((now - 60))" "$((now + 300))" "$app_id" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+          signature=$(printf '%s' "${header}.${payload}" | openssl dgst -sha256 -sign /var/run/github-app/private-key.pem -binary | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+          jwt="${header}.${payload}.${signature}"
+          installation=$(curl -fsS --retry 3 -H "Authorization: Bearer ${jwt}" -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/openshift/ocp-release-operator-sdk/installation) || {
+              echo "[auth] ERROR: App is not installed on the SDK repository" >&2
+              exit 1
+            }
+          installation_id=$(jq -er '.id' <<< "$installation")
+          token_response=$(curl -fsS --retry 3 -X POST -H "Authorization: Bearer ${jwt}" -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            -d '{"repositories":["ocp-release-operator-sdk"],"permissions":{"contents":"write","pull_requests":"write"}}' \
+            "https://api.github.com/app/installations/${installation_id}/access_tokens") || {
+              echo "[auth] ERROR: App cannot obtain SDK contents and PR write permissions" >&2
+              exit 1
+            }
+          if ! jq -e '.permissions.contents == "write" and .permissions.pull_requests == "write"' <<< "$token_response" >/dev/null; then
+            echo "[auth] ERROR: App token lacks SDK contents or PR write permission" >&2
+            exit 1
+          fi
+          export GH_TOKEN
+          GH_TOKEN=$(jq -er '.token' <<< "$token_response")
+        }
+        refresh_app_token
+        if [[ "$(gh api repos/openshift/ocp-release-operator-sdk --jq '.permissions.push')" != true ]]; then
+          echo "[auth] ERROR: App token cannot push to the SDK repository" >&2
+          exit 1
+        fi
+        pr_json=$(gh api "repos/openshift/ocp-release-operator-sdk/pulls/${PULL_NUMBER}")
+        if [[ "$(jq -r '.state' <<< "$pr_json")" != open || \
+              "$(jq -r '.head.repo.full_name' <<< "$pr_json")" != openshift/ocp-release-operator-sdk ]]; then
+          echo "[setup] ERROR: PR must be open and have an upstream SDK head branch for the App to push" >&2
+          exit 1
+        fi
+        if [[ "$rehearsal" == true && "$(jq -r '.draft' <<< "$pr_json")" != true ]]; then
+          echo "[setup] ERROR: the rehearsal demo PR must remain draft" >&2
+          exit 1
+        fi
+        before_sha=$(jq -r '.head.sha' <<< "$pr_json")
+        gh auth setup-git
+        echo "[setup] Monitoring ${PR_URL}; head ${before_sha}"
+        /app/scripts/ci-monitor/monitor.sh
+        refresh_app_token
+        /app/scripts/ci-monitor/dispatch.sh
+
+        result_file=/tmp/ci-monitor-result.json
+        if [[ "$rehearsal" == true ]]; then
+          if ! jq -e '.trigger_actions[] | select(.action == "auto-fix-lint" and (.job | contains("unit")))' "$result_file" >/dev/null; then
+            echo "[verify] ERROR: SDK unit failure was not classified as fixable formatting" >&2
+            exit 1
+          fi
+        fi
+        if [[ "$rehearsal" == true ]] || jq -e '.trigger_actions[] | select(.action == "auto-fix-lint" or .action == "auto-fix-generated")' "$result_file" >/dev/null; then
+          after_sha=$(gh api "repos/openshift/ocp-release-operator-sdk/pulls/${PULL_NUMBER}" --jq '.head.sha')
+          if [[ "$after_sha" == "$before_sha" ]]; then
+            echo "[verify] ERROR: CI-Monitor reported an auto-fix but did not push a commit" >&2
+            exit 1
+          fi
+          echo "[verify] Bot pushed SDK head ${after_sha}"
+        fi
+      credentials:
+      - mount_path: /var/run/gcloud-adc
+        name: oap-lts-claude-gcp-vertex-sa
+        namespace: test-credentials
+      - mount_path: /var/run/github-app
+        name: openshift-app-platform-shift-github-bot
+        namespace: test-credentials
+      env:
+      - default: "0"
+        name: OAPE_TEST_PR_NUMBER
+      from: ci-monitor-agent
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 3h0m0s
 - as: unit
   commands: |
     echo "patch upstream"
