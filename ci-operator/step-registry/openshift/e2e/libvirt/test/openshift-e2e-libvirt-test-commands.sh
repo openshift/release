@@ -344,6 +344,10 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
         ;;
 	esac
 
+	if [[ "${DISABLE_LOAD_BALANCER_MONITOR:-false}" == "true" ]]; then
+		TEST_ARGS="${TEST_ARGS:-} --disable-monitor=service-type-load-balancer-availability"
+	fi
+
     VERBOSITY="" # "--v 9"
     set -x
     openshift-tests run \
