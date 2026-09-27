@@ -11,7 +11,7 @@ set -x
 # shellcheck disable=SC2154
 _opp_cleanup() {
   # Save xtrace log with credentials scrubbed when the step exits non-zero.
-  _exit_code=$?
+  _exit_code=${1:-$?}
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
@@ -54,7 +54,7 @@ JUNITEOF
   fi
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; exit ${_jrc}' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -87,7 +87,7 @@ function CollectDiagnostics () {
     true
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; if (( _exit_code != 0 )); then CollectDiagnostics; fi; exit ${_jrc}' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; if (( _jrc != 0 )); then CollectDiagnostics; fi; exit ${_jrc}' EXIT
 
 function GetCurrentCsv () {
     # Return the currentCSV name from the operator subscription status.

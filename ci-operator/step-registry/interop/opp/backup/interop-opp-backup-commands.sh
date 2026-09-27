@@ -11,7 +11,7 @@ set -x
 # shellcheck disable=SC2154
 _opp_cleanup() {
   # Save xtrace log with credentials scrubbed when the step exits non-zero.
-  _exit_code=$?
+  _exit_code=${1:-$?}
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -60,7 +60,7 @@ JUNITEOF
   fi
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; exit ${_jrc}' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -107,7 +107,7 @@ TimeoutMonitor() {
 # Start timeout monitor in background
 TimeoutMonitor &
 typeset timeoutPid=$!
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; kill ${timeoutPid} || true; exit ${_jrc}' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; kill ${timeoutPid} || true; exit ${_jrc}' EXIT
 trap 'kill ${timeoutPid} || true; exit 124' TERM
 
 echo ">>> PHASE: Pre-Upgrade Cluster Backup"

@@ -14,14 +14,6 @@ set -euo pipefail
 
 echo ">>> interop-opp-scrub-vsphere-creds: starting credential scrub of \${SHARED_DIR}"
 
-# ---------- locate govc.sh ----------
-
-govc_sh="${SHARED_DIR}/govc.sh"
-if [[ ! -f "${govc_sh}" ]]; then
-  echo "INFO: ${govc_sh} not found -- nothing to scrub (non-vSphere job?)"
-  exit 0
-fi
-
 # ---------- scrub credential values from all files ----------
 # Disable tracing so we never log credentials.
 set +x
@@ -68,8 +60,10 @@ with os.scandir(shared_dir) as entries:
                     value = value[1:-1]
                 if value:
                     secrets.add(value)
-        except OSError:
-            continue
+        except OSError as exc:
+            raise SystemExit(
+                f"ERROR: failed to inspect credential source {os.fsdecode(entry.path)}: {exc}"
+            ) from exc
 
 # Replace longer values first when one credential contains another.
 secrets = tuple(sorted(secrets, key=len, reverse=True))
@@ -100,8 +94,10 @@ for directory, subdirectories, filenames in os.walk(shared_dir):
             if any(secret in verified for secret in secrets):
                 raise RuntimeError("credential redaction verification failed")
             scrubbed += 1
-        except OSError:
-            continue
+        except OSError as exc:
+            raise SystemExit(
+                f"ERROR: failed to inspect or redact {os.fsdecode(path)}: {exc}"
+            ) from exc
 
 # These files exist only to pass credentials between vSphere consumers. The
 # scrub step runs after the post chain, so remove them before artifact upload.

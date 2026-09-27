@@ -199,7 +199,8 @@ def main():
     print(f"FAIL_ON_BREACH: {fail_on_breach}")
 
     write_gate_junit(artifact_dir, grand_total, total_passed, total_failed,
-                     total_skipped, total_errored, skip_ratio, threshold, breach)
+                     total_skipped, total_errored, skip_ratio, threshold,
+                     breach and fail_on_breach)
 
     if breach and fail_on_breach:
         print(f"FAIL: skip ratio {skip_ratio:.4f} exceeds threshold {threshold:.4f}",

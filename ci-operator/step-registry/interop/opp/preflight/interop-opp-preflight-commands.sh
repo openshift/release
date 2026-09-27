@@ -482,16 +482,14 @@ with open(sys.argv[1], 'w') as f:
 }
 
 SUITE_NAME="${SUITE_NAME:-preflight}"
-set +e
-Main "$@"
-rc=$?
-set -e
-
 # --- JUnit wrapper ---
-TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-JUNIT_FILE="${ARTIFACT_DIR}/junit_${SUITE_NAME}.xml"
-if [[ $rc -eq 0 ]]; then
-  cat > "${JUNIT_FILE}" <<JEOF
+# shellcheck disable=SC2317  # invoked via trap
+WriteJunit() {
+  local rc=${1:-0}
+  TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  JUNIT_FILE="${ARTIFACT_DIR}/junit_${SUITE_NAME}.xml"
+  if [[ $rc -eq 0 ]]; then
+    cat > "${JUNIT_FILE}" <<JEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${SUITE_NAME}" tests="1" failures="0" time="0">
   <testcase name="${SUITE_NAME}" classname="interop.opp">
@@ -499,8 +497,8 @@ if [[ $rc -eq 0 ]]; then
   </testcase>
 </testsuite>
 JEOF
-else
-  cat > "${JUNIT_FILE}" <<JEOF
+  else
+    cat > "${JUNIT_FILE}" <<JEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${SUITE_NAME}" tests="1" failures="1" time="0">
   <testcase name="${SUITE_NAME}" classname="interop.opp">
@@ -510,6 +508,8 @@ Step failed at ${TIMESTAMP} with exit code ${rc}
   </testcase>
 </testsuite>
 JEOF
-fi
+  fi
+}
 
-exit $rc
+trap '_opp_cleanup; EXIT_CODE=${_exit_code}; DebugOnExit; WriteJunit ${_exit_code}' EXIT
+Main "$@"

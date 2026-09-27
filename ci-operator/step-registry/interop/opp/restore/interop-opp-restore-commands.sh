@@ -175,8 +175,16 @@ fi
 # --- Verify node health ---
 echo ">>> PHASE: Node Health Check"
 typeset notReadyNodes=""
-notReadyNodes=$(oc get nodes --no-headers | grep -v ' Ready' | wc -l) || true
-if (( notReadyNodes > 0 )); then
+if ! notReadyNodes=$(oc get nodes -o json | jq '[
+    .items[]
+    | select(
+        (.status.conditions // [] | map(select(.type == "Ready")) | first | .status) != "True"
+    )
+] | length'); then
+    : "FAIL: Failed to query node readiness"
+    AddResult "node-health" "fail" "Failed to query node readiness"
+    notReadyNodes="null"
+elif (( notReadyNodes > 0 )); then
     : "FAIL: ${notReadyNodes} node(s) not in Ready state"
     AddResult "node-health" "fail" "${notReadyNodes} node(s) not in Ready state"
 else
