@@ -484,4 +484,35 @@ function Main () {
     true
 }
 
+SUITE_NAME="${SUITE_NAME:-ocp-upgrade}"
+set +e
 Main "$@"
+rc=$?
+set -e
+
+# --- JUnit wrapper ---
+TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+JUNIT_FILE="${ARTIFACT_DIR}/junit_${SUITE_NAME}.xml"
+if [[ $rc -eq 0 ]]; then
+  cat > "${JUNIT_FILE}" <<JEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${SUITE_NAME}" tests="1" failures="0" time="0">
+  <testcase name="${SUITE_NAME}" classname="interop.opp">
+    <system-out>Step completed successfully at ${TIMESTAMP}</system-out>
+  </testcase>
+</testsuite>
+JEOF
+else
+  cat > "${JUNIT_FILE}" <<JEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${SUITE_NAME}" tests="1" failures="1" time="0">
+  <testcase name="${SUITE_NAME}" classname="interop.opp">
+    <failure message="${SUITE_NAME} failed with exit code ${rc}">
+Step failed at ${TIMESTAMP} with exit code ${rc}
+    </failure>
+  </testcase>
+</testsuite>
+JEOF
+fi
+
+exit $rc

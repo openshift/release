@@ -93,11 +93,11 @@ WriteJunit() {
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"opp-smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        echo "<testsuite name=\"lp-interop--OPP--smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
-            echo "  <testcase classname=\"opp-smoke\" name=\"${name}\">"
+            echo "  <testcase classname=\"lp-interop--OPP--smoke\" name=\"${name}\">"
             if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
                 typeset msg=""
                 msg="$(XmlEscape "${tcMessagesArr[$i]}")"

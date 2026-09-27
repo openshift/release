@@ -90,7 +90,7 @@ def write_gate_junit(artifact_dir, total, passed, failed, skipped, errored,
 
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        f'<testsuite name="skip-ratio-gate" tests="1" failures="{1 if breach else 0}">',
+        f'<testsuite name="lp-interop--OPP--skip-gate" tests="1" failures="{1 if breach else 0}">',
         f'  <testcase name="{tc_name}" classname="interop.opp.skip-ratio-gate">',
     ]
     if breach:
