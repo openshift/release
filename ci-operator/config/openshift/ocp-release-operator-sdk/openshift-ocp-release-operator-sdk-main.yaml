@@ -196,6 +196,19 @@ tests:
         /app/scripts/ci-monitor/monitor.sh
         refresh_app_token "$head_repo"
         gh auth setup-git
+        # The pinned fixer clones with --single-branch. Add the PR branch fetch
+        # rule before gh pr checkout so Git recognizes its remote tracking ref.
+        mkdir -p /tmp/ci-monitor-bin
+        cat > /tmp/ci-monitor-bin/gh <<'GH_WRAPPER'
+        #!/usr/bin/env bash
+        set -euo pipefail
+        if [[ "${1:-}" == pr && "${2:-}" == checkout ]]; then
+          git config --replace-all remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+        fi
+        exec /usr/local/bin/gh "$@"
+        GH_WRAPPER
+        chmod +x /tmp/ci-monitor-bin/gh
+        export PATH="/tmp/ci-monitor-bin:${PATH}"
         /app/scripts/ci-monitor/dispatch.sh
 
         result_file=/tmp/ci-monitor-result.json
