@@ -17,7 +17,6 @@ echo "CLUSTER_NAME=${CLUSTER_NAME}"
 echo "ECO_GOTESTS_FEATURES=${ECO_GOTESTS_FEATURES}"
 echo "MIRROR_REGISTRY=${MIRROR_REGISTRY}"
 echo "VERSION=${VERSION}"
-echo "SEED_SPOKE_BMC_ADDRESS=${SEED_SPOKE_BMC_ADDRESS}"
 echo ""
 
 # Copy inventory from SHARED_DIR (processed by earlier hub-deploy step)
@@ -101,17 +100,6 @@ for f in "${ARTIFACT_DIR}/junit_eco_gotests/"*.xml; do
 done
 
 echo ""
-echo "=== Step 3: Power off seed spoke (helix81) via Redfish BMC ==="
-BMC_USER="root"
-BMC_PASS="calvin"
-
-curl -6 -k -s -u "${BMC_USER}:${BMC_PASS}" -X POST \
-  "${SEED_SPOKE_BMC_ADDRESS}/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset" \
-  -H 'Content-Type: application/json' \
-  -d '{"ResetType":"ForceOff"}' && echo "helix81 powered off via Redfish" || \
-  echo "WARNING: Redfish power-off failed — manual power-off may be required"
-
-echo ""
 echo "=== IBI Seed Eco-Gotests Complete ==="
 echo "Seed image: ${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
-echo "Seed spoke (helix81) has been powered off and is ready for IBI"
+echo "Seed generation completed; the image is ready to mirror to the target registry."
