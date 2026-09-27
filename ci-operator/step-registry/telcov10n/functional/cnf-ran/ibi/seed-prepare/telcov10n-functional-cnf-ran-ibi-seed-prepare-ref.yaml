@@ -1,0 +1,26 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibi-seed-prepare
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibi-seed-prepare-commands.sh
+  timeout: 60m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CLUSTER_NAME
+    default: "kni-qe-127"
+    documentation: Seed hub cluster name used to retrieve the spoke kubeconfig from ACM
+  - name: SEED_SPOKE_CLUSTER
+    default: "helix81"
+    documentation: Seed spoke cluster name; must match the seedgeneration step
+  documentation: |-
+    Prepare the IBI seed before detaching it from ACM. Load the restored seed
+    inventory from SHARED_DIR and run ran/ibu-prepare-spoke-sno.yml to retrieve
+    the seed kubeconfig and prepare the CoreOS extensions image.
+    Run after seed deployment and before ibu-prune-argocd-apps.
+    The kubeconfig remains at /tmp/${SEED_SPOKE_CLUSTER}-kubeconfig on the seed
+    bastion for ibi-eco-gotests-seed to use after detachment.

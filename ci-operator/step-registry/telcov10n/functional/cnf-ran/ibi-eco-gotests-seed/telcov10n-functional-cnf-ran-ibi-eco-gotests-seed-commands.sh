@@ -42,17 +42,20 @@ cp "${SHARED_DIR}/bastion"  "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml"
 echo "Inventory copied from SHARED_DIR"
 
 echo ""
-echo "=== Step 1: Retrieve seed spoke kubeconfig from hub ACM ==="
+echo "=== Step 1: Check saved seed kubeconfig on the seed bastion ==="
 cd /eco-ci-cd
-ansible-playbook playbooks/ran/ibu-prepare-spoke-sno.yml \
-  -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
-  --extra-vars "hub_cluster=${CLUSTER_NAME}" \
-  --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}" \
-  --extra-vars "skip_vm_disk_attachment=true"
+SEED_SPOKE_KUBECONFIG="/tmp/${SEED_SPOKE_CLUSTER}-kubeconfig"
+# Preparation must run before ACM detachment. Do not fetch the hub Secret here.
+if ! ansible bastion \
+  -i "${CNF_INVENTORY_PATH}/switch-config.yaml" \
+  -m ansible.builtin.shell \
+  -a "test -r '${SEED_SPOKE_KUBECONFIG}' && test -s '${SEED_SPOKE_KUBECONFIG}'"; then
+  echo "Seed kubeconfig is missing, empty, or unreadable on the seed bastion. Run ibi-seed-prepare before ibu-prune-argocd-apps." >&2
+  exit 1
+fi
 
 echo ""
 echo "=== Step 2: Generate eco-gotests IBI seedgeneration script ==="
-SEED_SPOKE_KUBECONFIG="/tmp/${SEED_SPOKE_CLUSTER}-kubeconfig"
 
 ECO_GOTESTS_ENV_VARS="-e ECO_CNF_RAN_SKIP_TLS_VERIFY=true"
 ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_SEED_IMAGE=${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
