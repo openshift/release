@@ -23,7 +23,7 @@ resources:
       cpu: 500m
       memory: 200Mi
 tests:
-- as: e2e-telcov10n-nrop-tests-5-0-nightly
+- as: e2e-telcov10n-nrop-tls-scanner-stage-5-1
   capabilities:
   - intranet
   cron: 0 12 * * 0
@@ -40,20 +40,24 @@ tests:
       {{end}}'
   steps:
     env:
-      CLUSTER_NAME: helix47
+      CLUSTER_NAME: hlxcl9
       OCP_VERSION_RELEASE_AGE_MAX_DAYS: "7"
-      OCP_VERSION_RELEASE_TYPE: release-candidate
+      OCP_VERSION_RELEASE_TYPE: engineering-candidate
       OPERATORS: |
         [
-          { "name": "numaresources-operator", "catalog": "numaresources-operator-fbc", "og_name": "numaresources-operator", "nsname": "openshift-numaresources", "deploy_default_config": false, "fbc_iib_repo": "latest", "channel": "5.0", "ocp_operator_mirror_fbc_image_base": "quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-5-0" }
+          { "name": "numaresources-operator", "catalog": "numaresources-operator-fbc", "og_name": "numaresources-operator", "nsname": "openshift-numaresources", "deploy_default_config": false, "fbc_iib_repo": "latest", "channel": "5.1", "ocp_operator_mirror_fbc_image_base": "quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-5-1" }
         ]
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-numaresources
+      SCANNER_CPU: "2"
+      SCANNER_NAMESPACE: tls-scanner
       TEST_ENV: stage
-      VERSION: "5.0"
-    workflow: telcov10n-functional-cnf-compute-nrop-testing
-- as: e2e-telcov10n-nrop-tls-scanner-5-0-nightly
+      VERSION: "5.1"
+    workflow: telcov10n-functional-cnf-compute-nrop-tls-scanner
+- as: e2e-telcov10n-nrop-tls-scanner-stage-5-0
   capabilities:
   - intranet
-  cron: 0 8 * * 0
+  cron: 0 0 * * 0
   reporter_config:
     channel: '#eco-ci-cd-notifications'
     job_states_to_report:
@@ -68,8 +72,6 @@ tests:
   steps:
     env:
       CLUSTER_NAME: hlxcl9
-      OCP_VERSION_RELEASE_AGE_MAX_DAYS: "7"
-      OCP_VERSION_RELEASE_TYPE: release-candidate
       OPERATORS: |
         [
           { "name": "numaresources-operator", "catalog": "numaresources-operator-fbc", "og_name": "numaresources-operator", "nsname": "openshift-numaresources", "deploy_default_config": false, "fbc_iib_repo": "latest", "channel": "5.0", "ocp_operator_mirror_fbc_image_base": "quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-5-0" }
@@ -85,4 +87,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-kni
   repo: eco-ci-cd
-  variant: cnf-compute-nrop-stage-nightly
+  variant: cnf-compute-nrop-tls-scanner
