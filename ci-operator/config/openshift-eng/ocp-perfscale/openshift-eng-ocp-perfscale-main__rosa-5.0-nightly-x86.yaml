@@ -257,6 +257,105 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: rosa-aws-sts
+- always_run: false
+  as: data-path-9nodes-haproxy32-router100m
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "6"
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      CONFIG: config/standard-classic-rosa.yml
+      ENABLE_AUTOSCALING: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+    test:
+    - as: increase-router-resources
+      cli: latest
+      commands: |
+        echo "Step 1: Scale down ingress-operator to prevent reconciliation..."
+        oc scale deployment/ingress-operator -n openshift-ingress-operator --replicas=0
+        oc rollout status deployment/ingress-operator -n openshift-ingress-operator --timeout=60s || true
+        echo "Ingress operator scaled down"
+
+        echo "Step 2: Increase router container CPU request to 100m..."
+        oc set resources deployment/router-default -n openshift-ingress \
+          -c router --requests=cpu=100m,memory=256Mi
+
+        echo "Step 3: Wait for router deployment rollout..."
+        oc rollout status deployment/router-default -n openshift-ingress --timeout=300s
+
+        echo "Step 4: Verify resource requests..."
+        ROUTER_CPU=$(oc get deployment/router-default -n openshift-ingress \
+          -o jsonpath='{.spec.template.spec.containers[?(@.name=="router")].resources.requests.cpu}')
+        echo "Router CPU request: ${ROUTER_CPU}"
+        if [[ "${ROUTER_CPU}" != "100m" ]]; then
+          echo "ERROR: Router CPU request is ${ROUTER_CPU}, expected 100m"
+          exit 1
+        fi
+        echo "Router resource increase complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-ingress-perf
+    - as: capture-prometheus-dump
+      cli: latest
+      commands: |
+        echo "Capturing Prometheus dump..."
+        PROMDIR="${ARTIFACT_DIR}/metrics"
+        mkdir -p "${PROMDIR}"
+        prometheus="$(oc get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name)" || true
+        if [[ -n "${prometheus}" ]]; then
+          echo "${prometheus}" | while read prompod; do
+            prompod=${prompod#"pod/"}
+            FILE_NAME="${prompod}"
+            if [[ "$prompod" == *-0 ]]; then
+              FILE_NAME="prometheus"
+            fi
+            echo "Snapshotting prometheus from ${prompod} as ${FILE_NAME} (may take 15s)..."
+            oc exec -n openshift-monitoring "${prompod}" -- tar cvzf - -C /prometheus . > "${PROMDIR}/${FILE_NAME}.tar.gz" || true
+            echo "Collecting prometheus metadata from ${prompod}..."
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'" | gzip > "${PROMDIR}/${FILE_NAME}-target-metadata.json.gz" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config" | gzip > "${PROMDIR}/${FILE_NAME}-config.json.gz" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb" > "${PROMDIR}/${FILE_NAME}-tsdb-status.json" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo" > "${PROMDIR}/${FILE_NAME}-runtimeinfo.json" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets" > "${PROMDIR}/${FILE_NAME}-targets.json" || true
+          done
+          cat >> "${SHARED_DIR}/custom-links.txt" <<'PROM_LINK'
+        <script>
+        let prom = document.createElement('a');
+        prom.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
+        prom.title="Creates a new prometheus deployment with data from this job run.";
+        prom.innerHTML="PromeCIeus";
+        prom.target="_blank";
+        document.getElementById("wrapper").append(prom);
+        </script>
+        PROM_LINK
+        else
+          echo "Unable to find a Prometheus pod to snapshot."
+        fi
+        echo "Adding Sippy intervals link..."
+        if [[ "${JOB_TYPE:-}" == "presubmit" ]]; then
+          extra_args="${JOB_NAME}/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+        else
+          extra_args="${JOB_NAME:-}"
+        fi
+        cat >> "${SHARED_DIR}/custom-links.txt" << INTERVALS_LINK
+        <a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/${extra_args}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
+        INTERVALS_LINK
+        echo "Prometheus dump complete"
+        ls -lh "${PROMDIR}" || true
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: rosa-aws-sts
 zz_generated_metadata:
   branch: main
   org: openshift-eng
