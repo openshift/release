@@ -310,9 +310,16 @@ function events(txt) {
     return at.map(function (i, k) { return l.slice(i, k + 1 < at.length ? at[k + 1] : undefined).trim(); });
   });
 }
-// Same rows from the Events table of `oc describe quayregistry`.
-function describeEvents(txt, obj) {
-  var m = /\nEvents:\n.*\n\s*-+.*\n([\s\S]*)$/.exec(txt || '');
+// Same rows from the Events table of `oc describe quayregistry --all-namespaces`,
+// scoped to reg's section (each section starts at an unindented Name: line).
+function describeEvents(txt, reg) {
+  var secs = ('\n' + (txt || '')).split(/\nName:[ \t]+/).slice(1).filter(function (s) {
+    var l = s.split('\n');
+    return !reg || (l[0].trim() === reg.metadata.name &&
+      l.some(function (x) { return /^Namespace:/.test(x) && x.slice(10).trim() === reg.metadata.namespace; }));
+  });
+  var obj = 'quayregistry/' + (reg ? reg.metadata.name : 'quay');
+  var m = secs.length === 1 && /\nEvents:\n.*\n\s*-+.*\n([\s\S]*)$/.exec(secs[0]);
   return m ? m[1].split('\n').filter(function (l) { return l.trim(); }).map(function (l) {
     var c = l.trim().split(/\s{2,}/);   // Type, Reason, Age, From, Message
     return [c[2] || '', c[0] || '', c[1] || '', obj, c.slice(4).join('  ')];
@@ -494,7 +501,7 @@ async function main() {
     }
     // Events at FINAL: the QuayRegistry's own, plus the namespace's warnings (its normal events are mostly pod scheduling).
     var nsEvents = events(extra[4]), warn = nsEvents.filter(function (e) { return e[1] === 'Warning'; });
-    var qrEvents = describeEvents(extra[5], 'quayregistry/' + (finalReg ? finalReg.metadata.name : 'quay'));
+    var qrEvents = describeEvents(extra[5], finalReg);
     if (nsEvents.length || qrEvents.length) {
       var evRows = qrEvents.concat(warn.slice(0, 50)).map(function (e) {
         return [esc(e[0]), e[1] === 'Warning' ? '<span class="qp-bad">Warning</span>' : esc(e[1]), esc(e[2]), esc(e[3]), esc(e[4])];
