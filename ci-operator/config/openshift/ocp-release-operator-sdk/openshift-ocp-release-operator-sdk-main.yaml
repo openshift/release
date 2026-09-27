@@ -145,13 +145,13 @@ tests:
           installation_id=$(jq -er '.id' <<< "$installation")
           token_response=$(curl -fsS --retry 3 -X POST -H "Authorization: Bearer ${jwt}" -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/json" \
-            -d '{"repositories":["ocp-release-operator-sdk"],"permissions":{"contents":"write","pull_requests":"write"}}' \
+            -d '{"repositories":["ocp-release-operator-sdk"]}' \
             "https://api.github.com/app/installations/${installation_id}/access_tokens") || {
-              echo "[auth] ERROR: App cannot obtain SDK contents and PR write permissions" >&2
+              echo "[auth] ERROR: App cannot obtain an SDK installation token" >&2
               exit 1
             }
-          if ! jq -e '.permissions.contents == "write" and .permissions.pull_requests == "write"' <<< "$token_response" >/dev/null; then
-            echo "[auth] ERROR: App token lacks SDK contents or PR write permission" >&2
+          if ! jq -e '.permissions.contents == "write" and (.permissions.pull_requests == "write" or .permissions.issues == "write")' <<< "$token_response" >/dev/null; then
+            echo "[auth] ERROR: App token lacks SDK push or PR comment permission" >&2
             exit 1
           fi
           export GH_TOKEN
@@ -170,6 +170,11 @@ tests:
         fi
         if [[ "$rehearsal" == true && "$(jq -r '.draft' <<< "$pr_json")" != true ]]; then
           echo "[setup] ERROR: the rehearsal demo PR must remain draft" >&2
+          exit 1
+        fi
+        checks_json=$(gh pr checks "$PULL_NUMBER" --repo openshift/ocp-release-operator-sdk --json name,state,link,bucket)
+        if [[ "$rehearsal" == true ]] && ! jq -e '.[] | select(.name == "ci/prow/unit" and .bucket == "fail")' <<< "$checks_json" >/dev/null; then
+          echo "[verify] ERROR: SDK unit must fail before the live rehearsal" >&2
           exit 1
         fi
         before_sha=$(jq -r '.head.sha' <<< "$pr_json")
