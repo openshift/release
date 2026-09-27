@@ -12,15 +12,30 @@ resources:
       cpu: 500m
       memory: 200Mi
 tests:
-- as: e2e-telcov10n-nrop-tests-scheduled-5-0-nightly
+- as: e2e-telcov10n-nrop-tests-scheduled-stage-5-1
   capabilities:
   - intranet
-  cron: 0 12 31 2 0
+  cron: 0 0 * * 6
   steps:
     env:
       CLUSTER_NAME: hlxcl9
       OCP_VERSION_RELEASE_AGE_MAX_DAYS: "7"
-      OCP_VERSION_RELEASE_TYPE: release-candidate
+      OCP_VERSION_RELEASE_TYPE: engineering-candidate
+      OPERATORS: |
+        [
+          { "name": "numaresources-operator", "catalog": "numaresources-operator-fbc", "og_name": "numaresources-operator", "nsname": "openshift-numaresources", "deploy_default_config": false, "fbc_iib_repo": "latest", "channel": "5.1", "ocp_operator_mirror_fbc_image_base": "quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-5-1" }
+        ]
+      TEST_ENV: stage
+      VERSION: "5.1"
+      WORKLOAD_PARTITIONING: "true"
+    workflow: telcov10n-functional-cnf-compute-nrop-testing
+- as: e2e-telcov10n-nrop-tests-scheduled-stage-5-0
+  capabilities:
+  - intranet
+  cron: 0 12 * * 5
+  steps:
+    env:
+      CLUSTER_NAME: hlxcl9
       OPERATORS: |
         [
           { "name": "numaresources-operator", "catalog": "numaresources-operator-fbc", "og_name": "numaresources-operator", "nsname": "openshift-numaresources", "deploy_default_config": false, "fbc_iib_repo": "latest", "channel": "5.0", "ocp_operator_mirror_fbc_image_base": "quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-5-0" }
@@ -32,7 +47,7 @@ tests:
 - as: e2e-telcov10n-nrop-tests-scheduled-stage-4-22
   capabilities:
   - intranet
-  cron: 0 0 31 2 6
+  cron: 0 0 * * 5
   steps:
     env:
       CLUSTER_NAME: hlxcl9
@@ -47,7 +62,7 @@ tests:
 - as: e2e-telcov10n-nrop-tests-scheduled-stage-4-21
   capabilities:
   - intranet
-  cron: 0 0 31 2 5
+  cron: 0 12 * * 4
   steps:
     env:
       CLUSTER_NAME: hlxcl9
@@ -62,7 +77,7 @@ tests:
 - as: e2e-telcov10n-nrop-tests-scheduled-stage-4-20
   capabilities:
   - intranet
-  cron: 0 0 31 2 4
+  cron: 0 0 * * 4
   steps:
     env:
       CLUSTER_NAME: hlxcl9
