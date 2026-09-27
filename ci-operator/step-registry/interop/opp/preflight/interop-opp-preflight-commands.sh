@@ -26,6 +26,7 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
+_jrc=0
 trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
