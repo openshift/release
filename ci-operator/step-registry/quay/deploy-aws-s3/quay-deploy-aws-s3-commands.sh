@@ -594,6 +594,8 @@ for i in $(seq 1 90); do
     echo "Quay is ready (after $((i * 10))s)" >&2
     QL_INSTALL_STATUS="passed"
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+    # JSON copy for the quay-pipeline-view page, which has no YAML parser.
+    oc -n "${QUAY_NS}" get quayregistries -o json >"$ARTIFACT_DIR/quayregistries.json" || true
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
     quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
@@ -622,6 +624,7 @@ echo "Events in ${QUAY_NS} namespace:" >&2
 oc -n "${QUAY_NS}" get events --sort-by='.lastTimestamp' >&2 || true
 
 oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml" || true
+oc -n "${QUAY_NS}" get quayregistries -o json >"$ARTIFACT_DIR/quayregistries.json" || true
 oc -n "${QUAY_NS}" get pods -o yaml >"$ARTIFACT_DIR/quay-pods.yaml" || true
 oc -n "${QUAY_NS}" get events --sort-by='.lastTimestamp' -o yaml >"$ARTIFACT_DIR/quay-events.yaml" || true
 oc -n "${QUAY_NS}" get deployments -o yaml >"$ARTIFACT_DIR/quay-deployments.yaml" || true
