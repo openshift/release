@@ -11,7 +11,7 @@ set -x
 # shellcheck disable=SC2154
 _opp_cleanup() {
   # Save xtrace log with credentials scrubbed when the step exits non-zero.
-  _exit_code=$?
+  _exit_code="${1:-$?}"
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -114,7 +114,8 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
+_jrc=0
+trap '_jrc=$?; set +e; WriteJunit || true; _opp_cleanup "${_jrc}"; CollectExitArtifacts; _propagate_junit; exit "${_jrc}"' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -211,8 +212,6 @@ cat > "${ARTIFACT_DIR}/post-upgrade-policy-check.json" <<EOF
     "policy_violations": ${policyViolations}
 }
 EOF
-
-WriteJunit
 
 echo ">>> PHASE: Policy Check Summary"
 : "End time: $(date '+%F %T')"
