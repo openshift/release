@@ -121,7 +121,7 @@ tests:
         export CLAUDE_CODE_USE_VERTEX=1
         export CLOUD_ML_REGION=global
         export ANTHROPIC_VERTEX_PROJECT_ID=itpc-gcp-hcm-pe-eng-claude
-        export SKIP_POLL=false
+        export SKIP_POLL="$rehearsal"
         export SELF_JOB_NAME=oape-ci-monitor
         export OAPE_RUN_URL="${BUILD_LOG_URL:-}"
 
@@ -130,7 +130,9 @@ tests:
           exit 1
         fi
         refresh_app_token() {
-          local app_id header now payload signature jwt installation installation_id token_response
+          local target_repo="$1"
+          local repo_name="${target_repo#*/}"
+          local app_id header now payload signature jwt installation installation_id token_response request_body
           app_id=$(cat /var/run/github-app/app-id)
           header=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
           now=$(date +%s)
@@ -138,34 +140,38 @@ tests:
           signature=$(printf '%s' "${header}.${payload}" | openssl dgst -sha256 -sign /var/run/github-app/private-key.pem -binary | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
           jwt="${header}.${payload}.${signature}"
           installation=$(curl -fsS --retry 3 -H "Authorization: Bearer ${jwt}" -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/openshift/ocp-release-operator-sdk/installation) || {
-              echo "[auth] ERROR: App is not installed on the SDK repository" >&2
+            "https://api.github.com/repos/${target_repo}/installation") || {
+              echo "[auth] ERROR: App is not installed on ${target_repo}" >&2
               exit 1
             }
           installation_id=$(jq -er '.id' <<< "$installation")
+          request_body=$(jq -nc --arg repo "$repo_name" '{repositories: [$repo]}')
           token_response=$(curl -fsS --retry 3 -X POST -H "Authorization: Bearer ${jwt}" -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/json" \
-            -d '{"repositories":["ocp-release-operator-sdk"]}' \
+            -d "$request_body" \
             "https://api.github.com/app/installations/${installation_id}/access_tokens") || {
-              echo "[auth] ERROR: App cannot obtain an SDK installation token" >&2
+              echo "[auth] ERROR: App cannot obtain a token for ${target_repo}" >&2
               exit 1
             }
-          if ! jq -e '.permissions.contents == "write" and (.permissions.pull_requests == "write" or .permissions.issues == "write")' <<< "$token_response" >/dev/null; then
-            echo "[auth] ERROR: App token lacks SDK push or PR comment permission" >&2
-            exit 1
-          fi
+          APP_CONTENTS_PERMISSION=$(jq -r '.permissions.contents // "none"' <<< "$token_response")
+          APP_PR_PERMISSION=$(jq -r '.permissions.pull_requests // "none"' <<< "$token_response")
+          APP_ISSUES_PERMISSION=$(jq -r '.permissions.issues // "none"' <<< "$token_response")
           export GH_TOKEN
           GH_TOKEN=$(jq -er '.token' <<< "$token_response")
         }
-        refresh_app_token
-        if [[ "$(gh api repos/openshift/ocp-release-operator-sdk --jq '.permissions.push')" != true ]]; then
-          echo "[auth] ERROR: App token cannot push to the SDK repository" >&2
+        refresh_app_token openshift/ocp-release-operator-sdk
+        if [[ "$APP_PR_PERMISSION" != write && "$APP_ISSUES_PERMISSION" != write ]]; then
+          echo "[auth] ERROR: upstream App token cannot comment on SDK PRs" >&2
           exit 1
         fi
         pr_json=$(gh api "repos/openshift/ocp-release-operator-sdk/pulls/${PULL_NUMBER}")
-        if [[ "$(jq -r '.state' <<< "$pr_json")" != open || \
-              "$(jq -r '.head.repo.full_name' <<< "$pr_json")" != openshift/ocp-release-operator-sdk ]]; then
-          echo "[setup] ERROR: PR must be open and have an upstream SDK head branch for the App to push" >&2
+        if [[ "$(jq -r '.state' <<< "$pr_json")" != open ]]; then
+          echo "[setup] ERROR: SDK PR must be open" >&2
+          exit 1
+        fi
+        head_repo=$(jq -er '.head.repo.full_name' <<< "$pr_json")
+        if [[ "$rehearsal" == true && "$head_repo" != neha037/ocp-release-operator-sdk ]]; then
+          echo "[setup] ERROR: rehearsal PR must use the dedicated SDK demo fork" >&2
           exit 1
         fi
         if [[ "$rehearsal" == true && "$(jq -r '.draft' <<< "$pr_json")" != true ]]; then
@@ -178,10 +184,17 @@ tests:
           exit 1
         fi
         before_sha=$(jq -r '.head.sha' <<< "$pr_json")
+        refresh_app_token "$head_repo"
+        if [[ "$APP_CONTENTS_PERMISSION" != write || "$(gh api "repos/${head_repo}" --jq '.permissions.push')" != true ]]; then
+          echo "[auth] ERROR: App token cannot push to ${head_repo}" >&2
+          exit 1
+        fi
+        refresh_app_token openshift/ocp-release-operator-sdk
         gh auth setup-git
         echo "[setup] Monitoring ${PR_URL}; head ${before_sha}"
         /app/scripts/ci-monitor/monitor.sh
-        refresh_app_token
+        refresh_app_token "$head_repo"
+        gh auth setup-git
         /app/scripts/ci-monitor/dispatch.sh
 
         result_file=/tmp/ci-monitor-result.json
@@ -192,12 +205,15 @@ tests:
           fi
         fi
         if [[ "$rehearsal" == true ]] || jq -e '.trigger_actions[] | select(.action == "auto-fix-lint" or .action == "auto-fix-generated")' "$result_file" >/dev/null; then
+          refresh_app_token openshift/ocp-release-operator-sdk
           after_sha=$(gh api "repos/openshift/ocp-release-operator-sdk/pulls/${PULL_NUMBER}" --jq '.head.sha')
           if [[ "$after_sha" == "$before_sha" ]]; then
             echo "[verify] ERROR: CI-Monitor reported an auto-fix but did not push a commit" >&2
             exit 1
           fi
           echo "[verify] Bot pushed SDK head ${after_sha}"
+          gh pr comment "$PULL_NUMBER" --repo openshift/ocp-release-operator-sdk \
+            --body "CI-Monitor pushed formatting fix ${after_sha} to ${head_repo}."
         fi
       credentials:
       - mount_path: /var/run/gcloud-adc
@@ -207,7 +223,7 @@ tests:
         name: openshift-app-platform-shift-github-bot
         namespace: test-credentials
       env:
-      - default: "0"
+      - default: "474"
         name: OAPE_TEST_PR_NUMBER
       from: ci-monitor-agent
       resources:
