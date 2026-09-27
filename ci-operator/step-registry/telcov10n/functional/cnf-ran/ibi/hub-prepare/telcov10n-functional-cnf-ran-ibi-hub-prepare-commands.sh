@@ -20,10 +20,10 @@ import time
 kubeconfig = sys.argv[1]
 
 
-def oc(*args):
+def oc(*args, input_text=None):
     result = subprocess.run(
         ['oc', '--kubeconfig', kubeconfig, '--request-timeout=30s', *args],
-        text=True, capture_output=True,
+        text=True, capture_output=True, input=input_text,
     )
     if result.returncode and args[:2] == ('auth', 'can-i') and result.stdout.strip() == 'no':
         return 'no'
@@ -63,7 +63,34 @@ def deployment_ready(namespace, name):
             and status.get('availableReplicas', 0) == desired)
 
 
-mch = read('multiclusterhub', 'multiclusterhub', '-n', 'open-cluster-management')
+# Keep hub mappings separate from oc-mirror's generated idms-operator-* objects.
+registry = sys.argv[2].rstrip('/')
+if not registry or '://' in registry or any(c.isspace() for c in registry):
+    raise RuntimeError('Expected registry hostname and port from hub inventory')
+mirrors = [
+    {'source': 'registry.redhat.io/' + namespace,
+     'mirrors': [registry + '/operators/' + namespace]}
+    for namespace in ('rhacm2', 'multicluster-engine')
+]
+manifest = {
+    'apiVersion': 'config.openshift.io/v1',
+    'kind': 'ImageDigestMirrorSet',
+    'metadata': {'name': 'ibi-hub-acm-mce'},
+    'spec': {'imageDigestMirrors': mirrors},
+}
+oc('apply', '-f', '-', input_text=json.dumps(manifest))
+actual = read('imagedigestmirrorsets.config.openshift.io', 'ibi-hub-acm-mce')
+if actual.get('spec', {}).get('imageDigestMirrors') != mirrors:
+    raise RuntimeError('ACM/MCE mirror mappings did not match hub inventory')
+print('ACM/MCE mirror mappings: verified (image availability checked separately)', flush=True)
+
+
+hubs = read('multiclusterhubs.operator.open-cluster-management.io', '--all-namespaces')['items']
+if len(hubs) != 1:
+    raise RuntimeError('Expected exactly one MultiClusterHub; found ' + str(len(hubs)))
+mch = hubs[0]
+mch_name = mch['metadata']['name']
+mch_namespace = mch['metadata']['namespace']
 overrides = mch['spec'].get('overrides', {})
 components = overrides.get('components', [])
 siteconfig = [item for item in components if item.get('name') == 'siteconfig']
@@ -77,7 +104,7 @@ if not siteconfig or siteconfig[0].get('enabled') is not True:
     # Resource version prevents overwriting a concurrent controller update.
     patch = {'metadata': {'resourceVersion': mch['metadata']['resourceVersion']},
              'spec': {'overrides': {'components': components}}}
-    oc('patch', 'multiclusterhub', 'multiclusterhub', '-n', 'open-cluster-management',
+    oc('patch', 'multiclusterhubs.operator.open-cluster-management.io', mch_name, '-n', mch_namespace,
        '--type=merge', '-p', json.dumps(patch))
 
 wait_for('SiteConfig controller', lambda: deployment_ready(
@@ -148,7 +175,9 @@ for group in ('all', 'bastions', 'bastion'):
     if not isinstance(values, dict):
         raise RuntimeError('Expected mapping in saved hub inventory')
     variables.update(values)
-key = variables.pop('ansible_ssh_private_key')
+# Legacy inventory serialization folds multiline YAML scalars. Use raw credentials.
+variables.pop('ansible_ssh_private_key', None)
+key = pathlib.Path('/var/group_variables/common/all/ansible_ssh_private_key').read_text()
 key_path = work / (hub + '.key')
 key_path.write_text(key.rstrip() + '\n')
 key_path.chmod(0o600)
@@ -156,8 +185,12 @@ variables['ansible_ssh_private_key_file'] = str(key_path)
 variables['ansible_private_key_file'] = str(key_path)
 (work / (hub + '.json')).write_text(json.dumps({'all': {'hosts': {'bastion': variables}}}))
 PY
+  if ! ssh-keygen -y -P '' -f "${WORK_DIR}/${hub}.key" >/dev/null 2>&1; then
+    echo "Invalid or encrypted SSH key in hub credentials" >&2
+    exit 1
+  fi
   echo "Preparing ${hub} hub prerequisites"
   ansible bastion -i "${WORK_DIR}/${hub}.json" \
     -m ansible.builtin.script \
-    -a "${WORK_DIR}/ready.py /home/telcov10n/project/generated/${cluster}/auth/kubeconfig executable=python3"
+    -a "${WORK_DIR}/ready.py /home/telcov10n/project/generated/${cluster}/auth/kubeconfig '{{ disconnected_registry_url }}:{{ disconnected_registry_port }}' executable=python3"
 done
