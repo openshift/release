@@ -107,10 +107,6 @@ tests:
         fi
         export GH_TOKEN
         GH_TOKEN=$(jq -er '.token' <<< "$token_response")
-        if [[ "$(gh api repos/openshift/ocp-release-operator-sdk --jq '.permissions.push')" != true ]]; then
-          echo "[auth] ERROR: App token cannot push to upstream SDK" >&2
-          exit 1
-        fi
         gh auth setup-git
 
         demo_pr=$(gh api repos/openshift/ocp-release-operator-sdk/pulls/474)
@@ -263,8 +259,8 @@ tests:
         fi
         before_sha=$(jq -r '.head.sha' <<< "$pr_json")
         refresh_app_token "$head_repo"
-        if [[ "$APP_CONTENTS_PERMISSION" != write || "$(gh api "repos/${head_repo}" --jq '.permissions.push')" != true ]]; then
-          echo "[auth] ERROR: App token cannot push to ${head_repo}" >&2
+        if [[ "$APP_CONTENTS_PERMISSION" != write ]]; then
+          echo "[auth] ERROR: App token lacks Contents write on ${head_repo}" >&2
           exit 1
         fi
         refresh_app_token openshift/ocp-release-operator-sdk
