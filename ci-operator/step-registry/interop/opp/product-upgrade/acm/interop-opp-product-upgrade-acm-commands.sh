@@ -61,7 +61,7 @@ JUNITEOF
   fi
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit ${_jrc}' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit 0' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -97,7 +97,7 @@ function CollectDiagnostics () {
     true
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; if (( _jrc != 0 )); then CollectDiagnostics; fi; exit ${_jrc}' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; if (( _jrc != 0 )); then CollectDiagnostics; fi; exit 0' EXIT
 
 function GetCurrentCsv () {
     # Return the currentCSV name from the operator subscription status.

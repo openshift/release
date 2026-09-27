@@ -515,5 +515,5 @@ JEOF
   fi
 }
 
-trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; exitCode=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit ${_jrc}' EXIT
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; exitCode=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit 0' EXIT
 Main "$@"

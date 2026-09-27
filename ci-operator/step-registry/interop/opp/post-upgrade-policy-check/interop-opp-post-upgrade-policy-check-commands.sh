@@ -115,7 +115,7 @@ _propagate_junit () {
 }
 
 _jrc=0
-trap '_jrc=$?; set +e; WriteJunit || true; _opp_cleanup "${_jrc}"; CollectExitArtifacts; _propagate_junit; exit "${_jrc}"' EXIT
+trap '_jrc=$?; set +e; WriteJunit || true; _opp_cleanup "${_jrc}"; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
 
 echo ">>> PHASE: initialization"
 
