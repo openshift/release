@@ -71,7 +71,7 @@ body { margin: 0; background: var(--pf-t--global--background--color--secondary--
   <div class="pf-v6-c-masthead__main">
     <div class="pf-v6-c-masthead__brand"><span class="pf-v6-c-masthead__logo"><svg role="img" aria-label="Red Hat Quay" xmlns="http://www.w3.org/2000/svg" width="356.5" height="39.700001" viewBox="0 0 356.5 39.7"><defs><style>.cls-1{fill:#d71e00;}.cls-2{fill:#c21a00;}.cls-3{fill:#fff;}.cls-4{fill:#b7b7b7;}</style></defs><g transform="translate(48.651235,0.837963)"><g><path d="m 18.4,32.5 -4.5,-9.3 h -3.1 v 9.3 H 3.3 V 4.9 h 12.4 c 1.6,0 3.1,0.2 4.4,0.5 1.3,0.3 2.5,0.9 3.4,1.6 0.9,0.7 1.7,1.6 2.2,2.8 0.5,1.1 0.8,2.5 0.8,4.2 0,2.1 -0.4,3.8 -1.3,5.1 -0.9,1.3 -2.1,2.3 -3.6,3 L 27,32.5 Z M 18,11.9 c -0.5,-0.6 -1.4,-0.8 -2.6,-0.8 h -4.6 v 6 h 4.5 c 1.3,0 2.2,-0.3 2.7,-0.8 0.5,-0.5 0.8,-1.3 0.8,-2.3 0,-0.8 -0.3,-1.5 -0.8,-2.1 z" /><path d="M 32.8,32.5 V 4.9 H 54 v 6.4 H 40.3 V 15 h 8.2 v 6.3 H 40.3 V 26 h 13.9 v 6.4 H 32.8 Z" /><path d="m 83.3,25.1 c -0.6,1.8 -1.6,3.2 -2.8,4.3 -1.2,1.1 -2.8,1.9 -4.7,2.4 -1.9,0.5 -4,0.7 -6.5,0.7 h -9 V 4.9 H 70 c 2.2,0 4.1,0.2 5.9,0.7 1.8,0.4 3.3,1.2 4.5,2.3 1.2,1.1 2.2,2.5 2.8,4.2 0.7,1.7 1,3.9 1,6.5 0,2.6 -0.3,4.7 -0.9,6.5 z M 76,15.4 c -0.2,-0.9 -0.6,-1.7 -1.1,-2.3 -0.5,-0.6 -1.2,-1 -2,-1.3 -0.8,-0.3 -1.8,-0.4 -3,-0.4 H 68 V 26 h 1.7 c 1.2,0 2.2,-0.1 3,-0.4 0.8,-0.3 1.5,-0.7 2.1,-1.2 0.5,-0.6 0.9,-1.3 1.2,-2.3 0.2,-0.9 0.4,-2.1 0.4,-3.5 0,-1.2 -0.2,-2.3 -0.4,-3.2 z" /><path d="M 120.7,32.5 V 21.6 h -8.6 v 10.9 h -7.8 V 4.9 h 7.8 V 15 h 8.6 V 4.9 h 7.8 v 27.7 h -7.8 z" /><path d="m 153.2,32.5 -1.5,-4.9 h -8.3 l -1.5,4.9 h -8.2 l 10,-27.7 h 7.7 l 10,27.7 z m -3.9,-12.7 c -0.2,-0.9 -0.4,-1.7 -0.6,-2.3 -0.2,-0.7 -0.4,-1.3 -0.5,-1.8 -0.1,-0.5 -0.3,-1 -0.4,-1.4 -0.1,-0.4 -0.2,-0.9 -0.3,-1.4 -0.1,0.5 -0.2,0.9 -0.3,1.4 -0.1,0.4 -0.2,0.9 -0.4,1.5 -0.1,0.5 -0.3,1.1 -0.5,1.8 -0.2,0.7 -0.4,1.4 -0.6,2.3 l -0.5,1.8 h 4.6 z" /><path d="m 177.2,11.5 v 21 h -7.7 v -21 h -7.7 V 4.9 H 185 v 6.7 h -7.8 z" /><path d="m 195.2,9.6 c -0.2,0.4 -0.4,0.8 -0.8,1.1 -0.3,0.3 -0.7,0.6 -1.1,0.8 -0.4,0.2 -0.9,0.3 -1.4,0.3 -0.5,0 -1,-0.1 -1.4,-0.3 -0.4,-0.2 -0.8,-0.4 -1.1,-0.8 -0.3,-0.3 -0.6,-0.7 -0.8,-1.1 -0.2,-0.4 -0.3,-0.9 -0.3,-1.4 0,-0.5 0.1,-1 0.3,-1.4 0.2,-0.4 0.4,-0.8 0.8,-1.1 0.3,-0.3 0.7,-0.6 1.1,-0.8 0.4,-0.2 0.9,-0.3 1.4,-0.3 0.5,0 1,0.1 1.4,0.3 0.4,0.2 0.8,0.4 1.1,0.8 0.3,0.3 0.6,0.7 0.8,1.1 0.2,0.4 0.3,0.9 0.3,1.4 0,0.5 -0.1,1 -0.3,1.4 z m -0.5,-2.5 c -0.2,-0.4 -0.4,-0.7 -0.6,-1 -0.3,-0.3 -0.6,-0.5 -1,-0.6 -0.4,-0.2 -0.8,-0.2 -1.2,-0.2 -0.4,0 -0.8,0.1 -1.2,0.2 -0.4,0.2 -0.7,0.4 -0.9,0.6 -0.2,0.2 -0.5,0.6 -0.6,1 -0.2,0.4 -0.2,0.8 -0.2,1.2 0,0.4 0.1,0.8 0.2,1.2 0.2,0.4 0.4,0.7 0.6,0.9 0.3,0.3 0.6,0.5 0.9,0.6 0.4,0.2 0.8,0.2 1.2,0.2 0.4,0 0.8,-0.1 1.2,-0.2 0.4,-0.2 0.7,-0.4 1,-0.6 0.3,-0.3 0.5,-0.6 0.6,-0.9 0.2,-0.4 0.2,-0.8 0.2,-1.2 0,-0.5 -0.1,-0.9 -0.2,-1.2 z m -1.4,1 c -0.2,0.2 -0.4,0.3 -0.6,0.4 l 0.8,1.6 h -0.8 l -0.8,-1.5 h -0.7 v 1.5 h -0.7 V 6.2 h 1.7 c 0.2,0 0.3,0 0.5,0.1 0.2,0 0.3,0.1 0.4,0.2 0.1,0.1 0.2,0.2 0.3,0.4 0.1,0.1 0.1,0.3 0.1,0.5 0,0.3 -0.1,0.6 -0.2,0.7 z M 192.7,7 c -0.1,-0.1 -0.3,-0.1 -0.4,-0.1 h -1 V 8 h 1 c 0.2,0 0.3,0 0.4,-0.1 0.1,-0.1 0.2,-0.2 0.2,-0.4 -0.1,-0.3 -0.1,-0.4 -0.2,-0.5 z" /></g><g><path d="m 227,25.8 c -0.9,2 -2,3.7 -3.5,4.9 l 1.8,2.9 -2.5,1.5 -1.7,-2.8 c -1.3,0.6 -2.7,0.9 -4.2,0.9 -1.7,0 -3.3,-0.3 -4.7,-1 -1.4,-0.7 -2.6,-1.7 -3.6,-2.9 -1,-1.3 -1.8,-2.8 -2.3,-4.5 -0.5,-1.7 -0.8,-3.6 -0.8,-5.7 0,-2.1 0.3,-4 0.8,-5.7 0.6,-1.7 1.3,-3.2 2.3,-4.5 1,-1.3 2.2,-2.2 3.6,-2.9 1.4,-0.7 3,-1.1 4.7,-1.1 1.7,0 3.3,0.3 4.7,1 1.4,0.7 2.6,1.7 3.6,2.9 1,1.3 1.8,2.8 2.3,4.5 0.5,1.7 0.8,3.6 0.8,5.7 0,2.4 -0.5,4.7 -1.3,6.8 z m -2.5,-11.5 c -0.4,-1.4 -1,-2.6 -1.8,-3.6 -0.8,-1 -1.7,-1.8 -2.7,-2.3 -1,-0.5 -2.1,-0.8 -3.3,-0.8 -1.2,0 -2.3,0.3 -3.3,0.8 -1,0.5 -1.9,1.3 -2.6,2.3 -0.7,1 -1.3,2.2 -1.7,3.6 -0.4,1.4 -0.6,3 -0.6,4.7 0,1.7 0.2,3.3 0.6,4.7 0.4,1.4 1,2.6 1.8,3.6 0.7,1 1.6,1.8 2.7,2.3 1,0.5 2.1,0.8 3.3,0.8 0.9,0 1.8,-0.2 2.6,-0.5 l -2.2,-3.7 2.5,-1.5 2.2,3.6 c 1,-0.9 1.8,-2.2 2.4,-3.8 0.6,-1.6 0.9,-3.4 0.9,-5.6 -0.1,-1.7 -0.3,-3.2 -0.8,-4.6 z" /><path d="m 251.5,30.1 c -1.6,2 -4.1,3 -7.4,3 -3.3,0 -5.8,-1 -7.5,-2.9 -1.7,-2 -2.5,-4.8 -2.5,-8.7 V 5.2 h 3.1 v 16.3 c 0,5.9 2.3,8.9 7,8.9 2.4,0 4.1,-0.7 5.1,-2.2 1,-1.4 1.5,-3.7 1.5,-6.6 V 5.2 h 3.1 v 16.3 c 0,3.8 -0.8,6.7 -2.4,8.6 z" /><path d="m 277.9,32.7 -2.4,-7 h -11.4 l -2.4,7 h -3.1 l 9.6,-27.5 h 3.4 l 9.6,27.5 z m -6.4,-18.9 c -0.2,-0.4 -0.3,-0.9 -0.5,-1.5 -0.2,-0.5 -0.3,-1 -0.5,-1.5 -0.2,-0.5 -0.3,-0.9 -0.4,-1.4 -0.1,-0.4 -0.2,-0.8 -0.3,-1.1 -0.1,0.3 -0.2,0.6 -0.3,1.1 -0.1,0.4 -0.3,0.9 -0.4,1.4 -0.2,0.5 -0.3,1 -0.5,1.6 -0.2,0.5 -0.4,1 -0.5,1.5 l -3,9 h 9.5 z" /><path d="m 293.8,21.8 v 10.9 h -3.1 V 21.8 L 281.3,5.2 h 3.5 l 4.4,7.9 c 0.6,1 1.1,2 1.7,3.1 0.6,1.1 1,2 1.4,2.8 0.4,-0.8 0.9,-1.8 1.4,-2.8 0.6,-1.1 1.1,-2.1 1.7,-3.1 l 4.4,-7.9 h 3.4 z" /></g></g><g data-name="Layer 1" transform="matrix(0.39457959,0,0,0.39457959,1.0823681,0.10489944)"><circle r="50" cy="50" cx="50" class="cls-1" style="fill:#d71e00" /><path d="M 85.36,14.64 A 50.006592,50.006592 0 0 1 14.64,85.36 Z" class="cls-2" style="fill:#c21a00" /><polygon points="54.54,49.99 69.6,81.86 56.77,81.86 41.72,49.99 56.77,18.14 69.6,18.14 " class="cls-3" style="fill:#ffffff" /><polygon points="69.6,81.86 84.65,49.99 69.6,18.14 63.19,31.7 71.83,49.99 63.19,68.29 " class="cls-4" style="fill:#b7b7b7" /><polygon points="28.17,49.99 43.23,81.86 30.4,81.86 15.35,49.99 30.4,18.14 43.23,18.14 " class="cls-3" style="fill:#ffffff" /><polygon points="43.59,46.04 50,32.47 43.23,18.14 36.81,31.71 " class="cls-4" style="fill:#b7b7b7" /><polygon points="36.81,68.29 43.23,81.86 50,67.53 43.59,53.96 " class="cls-4" style="fill:#b7b7b7" /></g></svg></span></div>
   </div>
-  <div class="pf-v6-c-masthead__content" id="qp-head"><span class="qp-sub">Loading this run&hellip;</span></div>
+  <div class="pf-v6-c-masthead__content" id="qp-head"><span class="qp-sub">Loading this run...</span></div>
 </header>
 <main class="qp-main" id="qp-main"></main>
 <script>
@@ -137,8 +137,11 @@ async function list(rel, extra) {
 function listDir(rel) { return opt(list(rel, { delimiter: '/' })); }
 
 // ---- Formatting. ----
+// Prow's html lens puts this file in a srcdoc attribute escaping only '"', so
+// the browser decodes any character reference here once. Keep the file free of
+// them: build references at runtime and write other characters as \u escapes.
 function esc(s) {
-  return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; });
 }
 function a(rel, label) {
   return has(rel) ? '<a href="' + esc(WEB + rel) + '" target="_blank">' + label + '</a>' : label;
@@ -148,7 +151,7 @@ function dur(ms) {
   var s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
   return (h ? h + 'h' + m + 'm' : m ? m + 'm' : '') + (s % 60) + 's';
 }
-function span(t1, t2) { return hms(t1) + '&ndash;<wbr>' + hms(t2); }
+function span(t1, t2) { return hms(t1) + '\u2013<wbr>' + hms(t2); }
 function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
 function words(s) { return esc(s).split(' ').map(function (w) { return '<span class="qp-nw">' + w + '</span>'; }).join(' '); }
 function label(color, s) {
@@ -308,7 +311,7 @@ async function main() {
   var type = (pj && pj.spec && pj.spec.type) || 'job';
   var result = finished ? finished.result || (finished.passed ? 'SUCCESS' : 'FAILURE') : 'PENDING';
   var badge = result === 'SUCCESS' ? label('success', 'Passed') : result === 'FAILURE' ? label('danger', 'Failed') : label(result === 'PENDING' ? 'blue' : 'orange', result.charAt(0) + result.slice(1).toLowerCase());
-  head.innerHTML = badge + '&nbsp; <span class="qp-sub">' + esc(type.charAt(0).toUpperCase() + type.slice(1)) + ' job run &middot; build ' + esc(build) + '</span>';
+  head.innerHTML = badge + '\u00a0 <span class="qp-sub">' + esc(type.charAt(0).toUpperCase() + type.slice(1)) + ' job run \u00b7 build ' + esc(build) + '</span>';
 
   var test = graph && (graph.find(function (n) { return n.substeps && n.name === RUN.test; }) || graph.find(function (n) { return n.substeps; }));
   if (!finished || !test) {
@@ -353,7 +356,7 @@ async function main() {
 
   // Summary card.
   var src = (clones || []).find(function (c) { return c.refs && c.refs.org; });
-  var title = src ? esc(src.refs.org + '/' + src.refs.repo + ' ' + src.refs.base_ref) + ' &middot; ' + esc(T) : esc(T);
+  var title = src ? esc(src.refs.org + '/' + src.refs.repo + ' ' + src.refs.base_ref) + ' \u00b7 ' + esc(T) : esc(T);
   var variant = pj && pj.metadata && pj.metadata.labels && pj.metadata.labels['ci-operator.openshift.io/variant'];
   var count = { pre: 0, test: 0, post: 0 };
   model.steps.forEach(function (s) { count[s.phase] = (count[s.phase] || 0) + 1; });
@@ -366,9 +369,9 @@ async function main() {
     (variant ? ' <span class="qp-sub">variant ' + esc(variant) + '</span>' : '') + '</h1></div><div class="pf-v6-c-card__body">' +
     '<dl class="pf-v6-c-description-list pf-m-compact pf-m-horizontal pf-m-2-col pf-m-3-col-on-lg">' +
     dl('Started', new Date(t0).toISOString().slice(0, 19).replace('T', ' ') + ' UTC') + dl('Finished', hms(t1) + ' UTC') + dl('Total', '<b>' + dur(t1 - t0) + '</b>') +
-    dl('Commit', src && src.final_sha ? '<a href="https://github.com/' + esc(src.refs.org + '/' + src.refs.repo) + '/commit/' + esc(src.final_sha) + '" target="_blank"><code>' + esc(src.final_sha.slice(0, 7)) + '</code></a>' : '&mdash;') +
+    dl('Commit', src && src.final_sha ? '<a href="https://github.com/' + esc(src.refs.org + '/' + src.refs.repo) + '/commit/' + esc(src.final_sha) + '" target="_blank"><code>' + esc(src.final_sha.slice(0, 7)) + '</code></a>' : '\u2014') +
     dl('Steps', model.steps.length + ': ' + count.pre + ' pre, ' + count.test + ' test, ' + count.post + ' post') +
-    dl('Job', '<a href="' + esc(PROW) + '" target="_blank">Prow</a> &middot; ' + a('artifacts/', 'artifacts') + ' &middot; ' + a('artifacts/ci-operator.log', 'ci-operator.log')) +
+    dl('Job', '<a href="' + esc(PROW) + '" target="_blank">Prow</a> \u00b7 ' + a('artifacts/', 'artifacts') + ' \u00b7 ' + a('artifacts/ci-operator.log', 'ci-operator.log')) +
     '</dl></div></div>');
 
   // Failure alert.
@@ -384,7 +387,7 @@ async function main() {
       var failure = tc && tc.querySelector('failure');
       var tail = failure ? failure.textContent : '';
       var exit = /exit status (\d+)/.exec(tail);
-      titleText = esc(f.name) + ' failed' + (exit ? ': exit ' + exit[1] : '') + ' after ' + dur(Date.parse(f.end) - Date.parse(f.start)) + ' (' + hms(f.start) + '&ndash;' + hms(f.end) + ')';
+      titleText = esc(f.name) + ' failed' + (exit ? ': exit ' + exit[1] : '') + ' after ' + dur(Date.parse(f.end) - Date.parse(f.start)) + ' (' + hms(f.start) + '\u2013' + hms(f.end) + ')';
       if (pw && e2e.indexOf(f.name) >= 0) body.push('Playwright: <b>' + pw.failed + ' failed</b>, ' + pw.skipped + ' skipped, ' + pw.tests + ' total.');
       var bl = S + f.name + '/build-log.txt';
       if (files.get(bl) === REDACTED_SIZE) body.push('The step\'s build-log.txt was redacted by CI (a ' + files.get(bl) + '-byte placeholder); the tail of its output is in junit_operator.xml.');
@@ -435,8 +438,8 @@ async function main() {
     if (g.length) g.push('<span class="qp-edge' + (failedBefore && grp.phase === 'post' ? ' qp-after-fail' : '') + '"></span>');
     if (grp.phase === 'post') failedBefore = false;
     var single = grp.steps.length === 1 && grp.name === grp.steps[0].name;
-    var sub = grp.phase + ' &middot; ' + (single ? (grp.failedSteps.length ? 'failed' : 'step') : plural(grp.steps.length, 'step').replace(' ', '&nbsp;')) +
-      (grp.failedSteps.length && !single ? ' &middot; ' + esc(grp.failedSteps[0].name) + ' failed' : '');
+    var sub = grp.phase + ' \u00b7 ' + (single ? (grp.failedSteps.length ? 'failed' : 'step') : plural(grp.steps.length, 'step').replace(' ', '\u00a0')) +
+      (grp.failedSteps.length && !single ? ' \u00b7 ' + esc(grp.failedSteps[0].name) + ' failed' : '');
     g.push(node({ title: grp.name, sub: sub, failed: grp.failedSteps.length > 0, href: stepHref(T, grp.main), start: grp.start, end: grp.end }));
     if (grp.failedSteps.length && grp.phase !== 'post') failedBefore = true;
   });
@@ -457,8 +460,8 @@ async function main() {
     var dstep = deploy ? S + deploy.name + '/artifacts/' : '', gstep = S + 'quay-gather/artifacts/';
     var rows = [['Version', sc[0], fc[0]], ['Available', sc[1], fc[1]], ['RolloutBlocked', sc[2], fc[2]], ['Components', sc[3], fc[3]], ['Pods (' + podN + ')', sc[4], fc[4]],
       ['Source', [a(dstep + 'quayregistries.json', 'quayregistries.json'), a(dstep + 'quayregistries.yaml', 'quayregistries.yaml'), a(dstep + 'pods_status.txt', 'pods_status.txt')]
-        .filter(function (x) { return x.indexOf('<a') === 0; }).join(' &middot; ') || '&mdash;',
-       [a(gstep + 'quayregistries.json', 'quayregistries.json'), a(gstep + ns + '/pods.txt', 'pods.txt')].filter(function (x) { return x.indexOf('<a') === 0; }).join(' &middot; ') || '&mdash;']];
+        .filter(function (x) { return x.indexOf('<a') === 0; }).join(' \u00b7 ') || '\u2014',
+       [a(gstep + 'quayregistries.json', 'quayregistries.json'), a(gstep + ns + '/pods.txt', 'pods.txt')].filter(function (x) { return x.indexOf('<a') === 0; }).join(' \u00b7 ') || '\u2014']];
     var body = table('Quay health START vs FINAL', rows, { rowHeaders: true, cols: ['',
       'START <span class="qp-sub">' + (deploy ? 'after ' + esc(deploy.name) + ', ' + hms(deploy.end) : 'no deploy step') + '</span>',
       'FINAL <span class="qp-sub">' + (gather ? 'quay-gather, ' + hms(gather.start) : 'no quay-gather step') + '</span>'] });
@@ -509,7 +512,7 @@ async function main() {
     builds.map(function (n) { return ['artifacts/build-logs/' + n.name + '-amd64.log', esc(n.name) + ' build', dur(Date.parse(n.finished_at) - Date.parse(n.started_at))]; }),
     [['artifacts/release/', 'release import', 'release payload import logs'], [S, 'all step directories', plural(model.steps.length, 'step')]]));
   items.push(accordionItem('Job and image builds', table('Job and image builds', buildRows)));
-  sections.push(card('Logs &amp; artifacts', '', '<div class="pf-v6-c-accordion pf-m-bordered">' + items.join('') + '</div>'));
+  sections.push(card('Logs and artifacts', '', '<div class="pf-v6-c-accordion pf-m-bordered">' + items.join('') + '</div>'));
 
   out.innerHTML = sections.join('\n');
 }
