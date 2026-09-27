@@ -75,80 +75,6 @@ resources:
 test_binary_build_commands: make build/operator-sdk-dev-x86_64-linux-gnu
 tests:
 - always_run: false
-  as: oape-ci-monitor-bootstrap
-  optional: true
-  steps:
-    test:
-    - as: create-demo-pr
-      commands: |
-        set -euo pipefail
-        if [[ "${REPO_OWNER}/${REPO_NAME}" != openshift/release ]]; then
-          echo "[setup] ERROR: bootstrap is only for a release PR rehearsal" >&2
-          exit 1
-        fi
-        export GIT_CONFIG_GLOBAL=/tmp/ci-monitor-bootstrap-gitconfig
-        export XDG_CONFIG_HOME=/tmp/ci-monitor-bootstrap-config
-        app_id=$(cat /var/run/github-app/app-id)
-        header=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
-        now=$(date +%s)
-        payload=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$((now - 60))" "$((now + 300))" "$app_id" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
-        signature=$(printf '%s' "${header}.${payload}" | openssl dgst -sha256 -sign /var/run/github-app/private-key.pem -binary | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
-        jwt="${header}.${payload}.${signature}"
-        installation=$(curl -fsS --retry 3 -H "Authorization: Bearer ${jwt}" -H "Accept: application/vnd.github+json" \
-          https://api.github.com/repos/openshift/ocp-release-operator-sdk/installation)
-        installation_id=$(jq -er '.id' <<< "$installation")
-        token_response=$(curl -fsS --retry 3 -X POST -H "Authorization: Bearer ${jwt}" -H "Accept: application/vnd.github+json" \
-          -H 'Content-Type: application/json' -d '{"repositories":["ocp-release-operator-sdk"]}' \
-          "https://api.github.com/app/installations/${installation_id}/access_tokens")
-        if [[ "$(jq -r '.permissions.contents // "none"' <<< "$token_response")" != write || \
-              "$(jq -r '.permissions.pull_requests // "none"' <<< "$token_response")" != write ]]; then
-          echo "[auth] ERROR: App needs Contents and Pull requests write on upstream SDK" >&2
-          exit 1
-        fi
-        export GH_TOKEN
-        GH_TOKEN=$(jq -er '.token' <<< "$token_response")
-        gh auth setup-git
-
-        demo_pr=$(gh api repos/openshift/ocp-release-operator-sdk/pulls/474)
-        if [[ "$(jq -r '.state' <<< "$demo_pr")" != open || \
-              "$(jq -r '.head.sha' <<< "$demo_pr")" != b677a31ee373314b3a1ff35848498388071a5152 ]]; then
-          echo "[setup] ERROR: SDK seed PR #474 changed; refusing to copy an unreviewed diff" >&2
-          exit 1
-        fi
-        branch=ci-monitor-bot-demo-202609
-        if gh api "repos/openshift/ocp-release-operator-sdk/git/ref/heads/${branch}" >/dev/null 2>&1; then
-          echo "[setup] ERROR: upstream demo branch already exists" >&2
-          exit 1
-        fi
-        git init /tmp/ci-monitor-sdk-demo
-        git -C /tmp/ci-monitor-sdk-demo remote add origin https://github.com/openshift/ocp-release-operator-sdk.git
-        git -C /tmp/ci-monitor-sdk-demo fetch --depth 1 origin main
-        git -C /tmp/ci-monitor-sdk-demo checkout -b "$branch" FETCH_HEAD
-        gh pr diff 474 --repo openshift/ocp-release-operator-sdk > /tmp/ci-monitor-seed.patch
-        git -C /tmp/ci-monitor-sdk-demo apply --check /tmp/ci-monitor-seed.patch
-        git -C /tmp/ci-monitor-sdk-demo apply /tmp/ci-monitor-seed.patch
-        git -C /tmp/ci-monitor-sdk-demo add internal/version/version.go internal/version/version_test.go
-        git -C /tmp/ci-monitor-sdk-demo -c user.name=openshift-app-platform-shift-bot \
-          -c user.email=267347085+openshift-app-platform-shift-bot@users.noreply.github.com \
-          commit -m 'test: seed CI-Monitor SDK formatting rehearsal'
-        git -C /tmp/ci-monitor-sdk-demo push -u origin "$branch"
-        jq -n --arg head "$branch" \
-          --arg body 'Draft CI-Monitor rehearsal. The unit test intentionally catches a gofmt issue in internal/version/version.go. Keep draft and unmerged for the live auto-fix demo.' \
-          '{title:"test: CI-Monitor SDK formatting rehearsal",head:$head,base:"main",body:$body,draft:true}' \
-          > /tmp/ci-monitor-demo-pr.json
-        gh api -X POST repos/openshift/ocp-release-operator-sdk/pulls \
-          --input /tmp/ci-monitor-demo-pr.json --jq '{number,html_url,draft,head:.head.sha}'
-      credentials:
-      - collection: oape-ai-e2e
-        group: openshift-app-platform-shift-github-bot
-        mount_path: /var/run/github-app
-      from: ci-monitor-agent
-      resources:
-        requests:
-          cpu: "1"
-          memory: 1Gi
-      timeout: 1h0m0s
-- always_run: false
   as: oape-ci-monitor
   optional: true
   steps:
@@ -244,8 +170,9 @@ tests:
           exit 1
         fi
         head_repo=$(jq -er '.head.repo.full_name' <<< "$pr_json")
-        if [[ "$rehearsal" == true && "$head_repo" != neha037/ocp-release-operator-sdk ]]; then
-          echo "[setup] ERROR: rehearsal PR must use the dedicated SDK demo fork" >&2
+        if [[ "$rehearsal" == true && ( "$head_repo" != openshift/ocp-release-operator-sdk ||
+              "$(jq -r '.head.ref' <<< "$pr_json")" != ci-monitor-bot-demo-202609 ) ]]; then
+          echo "[setup] ERROR: rehearsal PR must use the bot-owned upstream SDK demo branch" >&2
           exit 1
         fi
         if [[ "$rehearsal" == true && "$(jq -r '.draft' <<< "$pr_json")" != true ]]; then
@@ -297,7 +224,7 @@ tests:
         group: openshift-app-platform-shift-github-bot
         mount_path: /var/run/github-app
       env:
-      - default: "474"
+      - default: "475"
         name: OAPE_TEST_PR_NUMBER
       from: ci-monitor-agent
       resources:
