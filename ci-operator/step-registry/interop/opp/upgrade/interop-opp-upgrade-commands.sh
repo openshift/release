@@ -10,7 +10,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  _exit_code=$?
+  _exit_code=${1:-$?}
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -25,7 +25,7 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
-trap '_opp_cleanup' EXIT
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -94,8 +94,8 @@ function DebugOnExit () {
     true
 }
 
-trap '_opp_cleanup; exitCode=${_exit_code}; DebugOnExit' EXIT
-trap '{ exitCode=143; DebugOnExit; trap - EXIT; exit 143; }' TERM
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; exitCode=${_jrc}; DebugOnExit' EXIT
+trap 'exit 143' TERM
 
 set +x
 KUBECONFIG="" oc registry login
@@ -514,5 +514,5 @@ JEOF
   fi
 }
 
-trap '_opp_cleanup; exitCode=${_exit_code}; DebugOnExit; WriteJunit ${_exit_code}' EXIT
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; exitCode=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit ${_jrc}' EXIT
 Main "$@"

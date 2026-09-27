@@ -81,11 +81,10 @@ def parse_junit(path):
 
 
 def write_gate_junit(artifact_dir, total, passed, failed, skipped, errored,
-                     skip_ratio, threshold, breach):
+                     skip_ratio, threshold, breach, advisory_breach=False):
     """Write a single-testcase JUnit XML summarising the gate result."""
     out = Path(artifact_dir) / "skip-ratio-gate.xml"
 
-    suite_status = "failure" if breach else "success"
     tc_name = f"skip-ratio-gate (ratio={skip_ratio:.4f}, threshold={threshold:.4f})"
 
     lines = [
@@ -98,6 +97,13 @@ def write_gate_junit(artifact_dir, total, passed, failed, skipped, errored,
             f'    <failure message="Skip ratio {skip_ratio:.4f} exceeds threshold {threshold:.4f}">'
             f'Total={total} Passed={passed} Failed={failed} Skipped={skipped} Errored={errored}'
             f'</failure>'
+        )
+    elif advisory_breach:
+        lines.append(
+            f'    <system-out>ADVISORY: skip ratio {skip_ratio:.4f} exceeds threshold '
+            f'{threshold:.4f} (FAIL_ON_BREACH=false, not failing). '
+            f'Total={total} Passed={passed} Failed={failed} Skipped={skipped} '
+            f'Errored={errored}</system-out>'
         )
     lines += [
         "  </testcase>",
@@ -198,11 +204,14 @@ def main():
           f"{'BREACH' if breach else 'OK'}")
     print(f"FAIL_ON_BREACH: {fail_on_breach}")
 
+    is_failing_breach = breach and fail_on_breach
+    is_advisory_breach = breach and not fail_on_breach
+
     write_gate_junit(artifact_dir, grand_total, total_passed, total_failed,
                      total_skipped, total_errored, skip_ratio, threshold,
-                     breach and fail_on_breach)
+                     is_failing_breach, is_advisory_breach)
 
-    if breach and fail_on_breach:
+    if is_failing_breach:
         print(f"FAIL: skip ratio {skip_ratio:.4f} exceeds threshold {threshold:.4f}",
               file=sys.stderr)
         sys.exit(1)

@@ -175,15 +175,11 @@ fi
 # --- Verify node health ---
 echo ">>> PHASE: Node Health Check"
 typeset notReadyNodes=""
-if ! notReadyNodes=$(oc get nodes -o json | jq '[
-    .items[]
-    | select(
-        (.status.conditions // [] | map(select(.type == "Ready")) | first | .status) != "True"
-    )
-] | length'); then
+notReadyNodes=$(oc get nodes -o json | jq '[.items[] | select(([.status.conditions[]? | select(.type=="Ready")][0].status // "Unknown") != "True")] | length') || notReadyNodes=-1
+if (( notReadyNodes < 0 )); then
     : "FAIL: Failed to query node readiness"
     AddResult "node-health" "fail" "Failed to query node readiness"
-    notReadyNodes="null"
+    notReadyNodes=0
 elif (( notReadyNodes > 0 )); then
     : "FAIL: ${notReadyNodes} node(s) not in Ready state"
     AddResult "node-health" "fail" "${notReadyNodes} node(s) not in Ready state"
