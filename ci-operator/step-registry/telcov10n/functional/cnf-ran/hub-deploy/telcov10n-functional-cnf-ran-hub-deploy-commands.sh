@@ -65,9 +65,9 @@ if [ "${CLUSTER_NAME}" = "kni-qe-106" ] || [ "${CLUSTER_NAME}" = "kni-qe-110" ];
 fi
 
 # kni-qe-127 is on helix118 (its own dedicated hypervisor mount)
-if [ "${CLUSTER_NAME}" = "kni-qe-127" ]; then
-  echo "Processing hypervisor inventory for kni-qe-127 from helix118 mount"
-  process_inventory "${MOUNTED_HOST_INVENTORY}/kni-qe-127/hypervisor" \
+if [ "${CLUSTER_NAME}" = "kni-qe-127" ] || [ "${CLUSTER_NAME}" = "kni-qe-130" ]; then
+  echo "Processing hypervisor inventory for ${CLUSTER_NAME}  from helix118 mount"
+  process_inventory "${MOUNTED_HOST_INVENTORY}/kni-qe-130/hypervisor" \
     /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
 fi
 
