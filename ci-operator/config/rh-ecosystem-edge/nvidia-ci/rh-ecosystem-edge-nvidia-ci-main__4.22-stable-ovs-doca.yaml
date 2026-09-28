@@ -86,6 +86,31 @@ images:
           dnf -y install mft && \
           rm -rf /etc/yum.repos.d/doca.repo /tmp/rpms
 
+      # doca-openvswitch pulls in collectx-clxapi as a transitive dependency
+      # (it provides libclx_api.so.1, which ovs-vswitchd links against and
+      # needs even just to answer `--version`, which ovsdb-server.service
+      # calls out to on every start to stamp external-ids:ovs-version).
+      # collectx-clxapi installs into /opt/mellanox/collectx, and /opt is a
+      # symlink to /var/opt on ostree-based RHCOS -- the same `mkdir -p
+      # /var/opt` above exists only because that symlink target doesn't
+      # exist yet at this point in the build. So this ~60MB of real shared
+      # library payload physically lands under /var, exactly like the OVS
+      # runtime directories below -- but unlike those, this is not empty
+      # state a tmpfiles `d` rule can recreate; it's actual binary content
+      # that `ostree container commit` discarding /var would permanently
+      # lose, leaving ovs-vswitchd unable to load and, in turn,
+      # ovsdb-server.service's version-stamping step failing.
+      # Stash a copy under /usr (which does survive the commit, being part
+      # of the base ostree layer) and have tmpfiles restore it into
+      # /var/opt/mellanox at every boot via a `C` (copy) rule instead of
+      # the `d` (create empty) rules used for genuine runtime state.
+      RUN mkdir -p /usr/lib/doca-collectx-payload && \
+          cp -a /var/opt/mellanox /usr/lib/doca-collectx-payload/mellanox
+
+      RUN cat > /usr/lib/tmpfiles.d/doca-collectx-restore.conf <<'EOF'
+      C /var/opt/mellanox - - - - /usr/lib/doca-collectx-payload/mellanox
+      EOF
+
       # doca-openvswitch carries /run/openvswitch, /var/log/openvswitch and
       # /var/lib/openvswitch{,/pki} as plain rpm payload and ships no
       # tmpfiles.d entry -- the stock FDP openvswitch3.x removed above is
