@@ -1,0 +1,26 @@
+ref:
+  as: openshift-qe-etcd-operator-override
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-etcd-operator-override-commands.sh
+  env:
+  - name: ETCD_OPERATOR_IMAGE
+    default: "quay.io/mcornea/cluster-etcd-operator:pr-1720"
+    documentation: |-
+      Custom cluster-etcd-operator image to use for the override
+  - name: OVERRIDE_WAIT_TIME
+    default: "300"
+    documentation: |-
+      Time in seconds to wait before verifying the image was not reconciled back
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step overrides the cluster-etcd-operator image on the cluster by marking
+    the etcd-operator deployment as unmanaged in the ClusterVersion spec.overrides,
+    then patching the deployment with the custom image. After a configurable wait
+    period, it verifies the image was not reconciled back to the original.
