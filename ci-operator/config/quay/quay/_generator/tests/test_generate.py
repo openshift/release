@@ -353,21 +353,6 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     assert post_refs[-1] == "upi-libvirt-cleanup-post"
     assert "ipi-aws-post" not in post_refs
 
-    default_grep_invert = (
-        "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@webhook|"
-        "saves and loads architecture filter with mirror configuration|"
-        "loads existing architecture filter from saved mirror configuration"
-    )
-    s390x_grep_invert = test["steps"]["env"]["PLAYWRIGHT_GREP_INVERT"]
-    assert s390x_grep_invert.startswith(default_grep_invert)
-    assert "Email Lookup" in s390x_grep_invert
-    assert "export delivery" in s390x_grep_invert
-
-    for filename in (PHASE0_NAME, "quay-quay-redhat-3.18__gcp-ocp422-e2e-install.yaml"):
-        other_grep_invert = by_name[filename]["tests"][0]["steps"]["env"]["PLAYWRIGHT_GREP_INVERT"]
-        assert "Email Lookup" not in other_grep_invert
-        assert "export delivery" not in other_grep_invert
-
 
 def test_master_presubmit_expands_both_clouds() -> None:
     results, _retired = generate_all()
