@@ -405,6 +405,30 @@ VerifyCclmSyncPath() {
     return "${cclmRc}"
 }
 
+# ── GrantTestPodScc / RevokeTestPodScc — nonroot-v2 for subctl verify pods ────
+# Lighthouse e2e (>= v0.24.2) Deployments pin runAsUser 10000, which restricted-v2
+# rejects (UID outside the namespace range), so ReplicaSets create zero pods.
+# subctl verify generates random e2e-tests-* namespaces, so the grant cannot be
+# scoped to one namespace; it is held only for the duration of subctl verify.
+GrantTestPodScc() {
+    typeset kc
+    for kc in "$@"; do
+        KUBECONFIG="${kc}" oc adm policy add-scc-to-group nonroot-v2 system:serviceaccounts 1>/dev/null \
+            || return 1
+    done
+    true
+}
+
+RevokeTestPodScc() {
+    typeset kc
+    typeset -i rc=0
+    for kc in "$@"; do
+        KUBECONFIG="${kc}" oc adm policy remove-scc-from-group nonroot-v2 system:serviceaccounts 1>/dev/null \
+            || rc=1
+    done
+    return "${rc}"
+}
+
 # ── VerifyConnectivity — run subctl verify between two spokes ─────────────────
 VerifyConnectivity() {
     typeset kc1="${1:?}"; (($#)) && shift
@@ -462,12 +486,21 @@ VerifyConnectivity() {
     # Use || rc=$? instead of relying on set -e: bash does not reliably
     # trigger set -e on function return codes inside for-loop bodies.
     typeset -i rc=0
+    GrantTestPodScc "${kc1}" "${kc2}" || {
+        printf 'ERROR: failed to grant nonroot-v2 SCC for subctl verify test pods\n' >&2
+        RevokeTestPodScc "${kc1}" "${kc2}" || true
+        rm -f "${kc1Renamed}" "${kc2Renamed}" "${mergedKc}"
+        return 1
+    }
+
     KUBECONFIG="${mergedKc}" timeout --kill-after=30s 35m "${subctlBin}" verify \
         --context   "${ctx1}" \
         --tocontext "${ctx2}" \
         --only connectivity,service-discovery \
         --verbose || rc=$?
 
+    RevokeTestPodScc "${kc1}" "${kc2}" \
+        || printf 'WARNING: failed to revoke nonroot-v2 SCC from system:serviceaccounts\n' >&2
     rm -f "${kc1Renamed}" "${kc2Renamed}" "${mergedKc}"
     return "${rc}"
 }

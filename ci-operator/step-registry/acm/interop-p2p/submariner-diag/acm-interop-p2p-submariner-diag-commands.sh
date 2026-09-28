@@ -8,6 +8,14 @@
 # Individual command failures are guarded with || true so the step continues even if
 # one diagnostic command fails; set -e and set -x are still required by MPEX BP.
 set -euxo pipefail; shopt -s inherit_errexit
+# cli-with-git ships without jq; a failed install is reported by the precondition check below.
+eval "$(
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh \
+        || true
+)" && EnsureReqs jq \
+    || printf 'WARNING: EnsureReqs jq failed\n' >&2
 
 typeset -r subctlBin="/tmp/bin/subctl"
 # ARTIFACT_DIR may be unset early in the script; use :- to avoid set -u abort.
