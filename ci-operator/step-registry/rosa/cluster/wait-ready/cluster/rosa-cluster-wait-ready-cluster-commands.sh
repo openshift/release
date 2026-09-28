@@ -414,6 +414,12 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
         echo "API hostname: ${api_host}"
       else
         echo "API URL not available in cluster description"
+        # Fallback: construct API hostname from cluster name and base domain
+        # so that dig queries still run for early install failures.
+        if [[ -n "${cluster_name}" && -n "${base_domain}" ]]; then
+          api_host="api.${cluster_name}.${base_domain}"
+          echo "API hostname (constructed): ${api_host}"
+        fi
       fi
 
       cluster_zone=""
