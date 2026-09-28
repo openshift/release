@@ -1,0 +1,51 @@
+workflow:
+  as: hypershift-aws-conformance-dynamic-dns
+  documentation: |-
+    The HyperShift AWS conformance dynamic DNS workflow executes upstream
+    conformance tests against an ephemeral public HyperShift cluster created
+    with a custom kube-apiserver DNS name (HostedCluster.spec.kubeAPIServerDNSName,
+    set at day-1 via the --kas-dns-name flag).
+
+    After the HostedCluster is created, the Route53 CNAME record for the custom
+    KAS DNS name is pointed at the control plane endpoint, a serving certificate
+    for that name is installed via spec.configuration.apiServer.servingCerts,
+    and the generated custom admin kubeconfig is verified to reach the API server.
+
+    An additional NodePool backed by an on-demand AWS capacity reservation is
+    created alongside the default NodePools.
+  steps:
+    env:
+      REGION: us-east-1
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
+      HYPERSHIFT_DISK_ENCRYPTION: "true"
+      HYPERSHIFT_ETCD_ENCRYPTION: "true"
+      HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
+      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      PUBLIC_ONLY: "true"
+      DYNAMIC_DNS_ENABLED: "true"
+      HYPERSHIFT_DYNAMIC_DNS: hypershift-qe-dns.qe.devcluster.openshift.com
+      # FIXME: Remove test skips when those are fixed. Each test skip must be anchored to a issue:
+      # CCM-AWS (upstream): https://issues.redhat.com/browse/OCPBUGS-74537 for upstream CCM tests not supported by Hypershift
+      # FIPS: Remove when https://github.com/openshift/origin/pull/31288 is merged and propagated to older branches.
+      # readyz test lists KAS pods across all namespaces: https://redhat.atlassian.net/browse/OCPBUGS-91633
+      IGNORE_EMPTY_TEST_SKIPS: "true"
+      TEST_SKIPS: loadbalancer NLB should be reachable with target-node-labels\|
+        loadbalancer NLB internal should be reachable with hairpinning traffic\|
+        FIPS TestFIPS\|
+        API LBs follow /readyz of kube-apiserver and stop sending requests before server shutdowns for external clients
+    pre:
+    - ref: aws-provision-kms-key
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-provision
+    - ref: cucushift-hypershift-extended-enable-dns
+    - ref: cucushift-hypershift-extended-capacity-reservation-create
+    - ref: hypershift-aws-create-nodepool
+    - ref: cucushift-hypershift-extended-enable-guest
+    test:
+    - chain: hypershift-conformance
+    post:
+    - ref: cucushift-hypershift-extended-disable-guest
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-deprovision
+    - ref: cucushift-hypershift-extended-capacity-reservation-cancel
+    - ref: aws-deprovision-kms-key
