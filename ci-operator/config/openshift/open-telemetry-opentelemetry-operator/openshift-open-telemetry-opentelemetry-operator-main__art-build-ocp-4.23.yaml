@@ -1,0 +1,39 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.0
+canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: Dockerfile.art
+    to: opentelemetry-operator-art
+  - context_dir: .
+    dockerfile_path: cmd/otel-allocator/Dockerfile.art
+    to: opentelemetry-target-allocator-art
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.23"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: build-operator-art
+  commands: echo "Operator ART image built successfully"
+  container:
+    from: opentelemetry-operator-art
+- as: build-ta-art
+  commands: echo "Target allocator ART image built successfully"
+  container:
+    from: opentelemetry-target-allocator-art
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: open-telemetry-opentelemetry-operator
+  variant: art-build-ocp-4.23
