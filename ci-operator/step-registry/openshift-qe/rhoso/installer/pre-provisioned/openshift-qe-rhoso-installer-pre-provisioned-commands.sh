@@ -23,6 +23,11 @@ amphora_container_image=$(cat ${CLUSTER_PROFILE_DIR}/amphora_container_image)
 ceph_backend=$(cat ${CLUSTER_PROFILE_DIR}/ceph_backend)
 ceph_admin_node=$(cat ${CLUSTER_PROFILE_DIR}/ceph_admin_node)
 
+# Load QUADS SSO token for authenticated inventory download (QUADS 3+)
+set +x
+QUADS_SSO_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/quads_sso_token_${lab} 2>/dev/null || echo "")
+set -x
+
 bootstrap_jumphost_cmds=""
 bootstrap_bastion_cmds=""
 if [[ -f "${SHARED_DIR}/assignment_id" ]]; then
@@ -55,13 +60,14 @@ ceph_admin_user: root
 ceph_admin_password: $password
 ceph_config_local_path: /root/ceph-config
 amphora_image_container_image: $amphora_container_image
+quads_api_token: $QUADS_SSO_TOKEN
 ocp_environment:
   KUBECONFIG: $kubeconfig
 EOF
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
-cat /tmp/all-updated.yml
+sed 's/quads_api_token:.*/quads_api_token: [REDACTED]/' /tmp/all-updated.yml
 
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${jumphost}:/tmp/rhoso_all.yml
 
