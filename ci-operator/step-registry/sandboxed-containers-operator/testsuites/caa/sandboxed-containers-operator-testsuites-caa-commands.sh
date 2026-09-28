@@ -49,17 +49,19 @@ OPERATOR_REF="devel"
 
 # User-facing parameters (see the ref for defaults/documentation). They follow
 # the TESTS_<SUITE_NAME>_<PARAMETER> convention shared by all OSC test suites:
-#   TESTS_CAA_PROVIDER -> runner -p/--provider
 #   TESTS_CAA_PROFILE  -> runner -t/--test
 #   TESTS_CAA_REPO     -> runner --tests-repo
 #   TESTS_CAA_REPO_REF -> runner --tests-repo-ref
 #   TESTS_CAA_TIMEOUT  -> runner --timeout
 # Empty values are omitted so the runner falls back to its own defaults.
-PROVIDER="${TESTS_CAA_PROVIDER:-azure}"
 PROFILE="${TESTS_CAA_PROFILE:-}"
 TESTS_REPO="${TESTS_CAA_REPO:-}"
 TESTS_REPO_REF="${TESTS_CAA_REPO_REF:-}"
 TIMEOUT="${TESTS_CAA_TIMEOUT:-}"
+
+# Get the provider
+PROVIDER="$(oc get infrastructure -n cluster -o json | jq -r '.items[].status.platformStatus.type // empty' | awk '{print tolower($0)}')" || true
+[[ -n "${PROVIDER}" ]] || { echo "ERROR: failed to detect the provider name"; exit 1; }
 
 # --- Provide the tools the runner needs --------------------------------------
 # go and git come from the src image; oc is injected via the ref's `cli` field.
