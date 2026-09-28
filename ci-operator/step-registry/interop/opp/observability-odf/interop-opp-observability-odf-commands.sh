@@ -392,12 +392,16 @@ except Exception:
     sys.exit(0)
 endpoint=''
 try:
-    import yaml
-    cfg=yaml.safe_load(content)
+    cfg=json.loads(content)
     endpoint=cfg.get('config',{}).get('endpoint','') if isinstance(cfg,dict) else ''
 except Exception:
-    m=re.search(r'endpoint:\s*(.+)',content)
-    endpoint=m.group(1).strip() if m else ''
+    try:
+        import yaml
+        cfg=yaml.safe_load(content)
+        endpoint=cfg.get('config',{}).get('endpoint','') if isinstance(cfg,dict) else ''
+    except Exception:
+        m=re.search(r'endpoint:\s*(.+)',content)
+        endpoint=m.group(1).strip() if m else ''
 del content
 if not endpoint:
     print('no-endpoint')
@@ -450,7 +454,7 @@ function CheckThanosHealth () {
     typeset -a missingComponents=()
 
     typeset -a componentNames=("thanos-receive"     "thanos-compact"     "thanos-store"       "thanos-query"       "alertmanager"       "rbac-query-proxy")
-    typeset -a componentLabels=("app=thanos-receive" "app=thanos-compact" "app=thanos-store"   "app=thanos-query"   "alertmanager=observability" "app=rbac-query-proxy")
+    typeset -a componentLabels=("app.kubernetes.io/name=thanos-receive" "app.kubernetes.io/name=thanos-compact" "app.kubernetes.io/name=thanos-store" "app.kubernetes.io/name=thanos-query" "alertmanager=observability" "app=rbac-query-proxy")
 
     typeset -i idx=0
     for idx in "${!componentNames[@]}"; do
@@ -462,16 +466,6 @@ function CheckThanosHealth () {
             --no-headers 2>&1)"; then
             (( ++discoveryErrors ))
             podList=""
-        fi
-
-        if [[ -z "${podList}" ]]; then
-            typeset allPods=""
-            if ! allPods="$(oc get pods -n "${obsNamespace}" \
-                --no-headers 2>&1)"; then
-                (( ++discoveryErrors ))
-                allPods=""
-            fi
-            podList="$(printf '%s' "${allPods}" | awk -v pat="^${component}" '$0 ~ pat')"
         fi
 
         typeset podCount=""
