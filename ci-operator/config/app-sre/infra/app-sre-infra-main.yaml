@@ -58,7 +58,10 @@ tests:
         # could simply edit hack/lint.sh or the Makefile to read the token. The
         # Terraform configuration under test stays as the PR wrote it.
         git checkout "${PULL_BASE_SHA}" -- Makefile hack/
-        make validate
+        # Only the workspaces this pull request touches: initializing all ~200
+        # of them takes around twenty minutes and repeats work the change does
+        # not affect.
+        make validate-changed BASE="${PULL_BASE_SHA}"
       credentials:
       - as: oauth
         collection: test-platform-infra
