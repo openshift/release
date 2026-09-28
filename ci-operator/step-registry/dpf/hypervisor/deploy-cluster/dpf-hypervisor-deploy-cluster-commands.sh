@@ -188,7 +188,6 @@ source "env.user_${CLUSTER_NAME}"
 set +a
 make generate-env
 echo ".env file generated successfully"
-cat .env
 
 # Set LIBVIRT_HOST for remote VM management from the Prow pod
 echo "LIBVIRT_HOST=${REMOTE_HOST}" >> .env
