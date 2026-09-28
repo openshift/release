@@ -216,10 +216,17 @@ echo "OC Version:"
 export PATH=${CLI_DIR:-}:$PATH
 which oc
 oc version --client
-oc adm release extract --help
+OC_EXTRACT_HELP=$(oc adm release extract --help)
+printf '%s\n' "${OC_EXTRACT_HELP}"
 ADDITIONAL_OC_EXTRACT_ARGS=""
+EXTRACT_MANIFEST_INCLUDED_EFFECTIVE=false
 if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
-  ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
+  if [[ "${OC_EXTRACT_HELP}" =~ (^|[[:space:]])--included([=[:space:]]|$) ]] && [[ "${OC_EXTRACT_HELP}" =~ (^|[[:space:]])--install-config([=[:space:]]|$) ]]; then
+    ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
+    EXTRACT_MANIFEST_INCLUDED_EFFECTIVE=true
+  else
+    echo "The selected oc does not support --included with --install-config; extracting without these options"
+  fi
 fi
 
 dir=$(mktemp -d)
@@ -233,7 +240,7 @@ popd || exit 1
 echo "Extracted CR files:"
 ls $cr_yaml_d
 
-if [[ "${EXTRACT_MANIFEST_INCLUDED}" != "true" ]] && [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/manifest_feature_gate.yaml ]]; then
+if [[ "${EXTRACT_MANIFEST_INCLUDED_EFFECTIVE}" != "true" ]] && [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/manifest_feature_gate.yaml ]]; then
   remove_tech_preview_feature_from_manifests "${cr_yaml_d}" "TechPreviewNoUpgrade" || exit 1
 fi
 
