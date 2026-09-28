@@ -15,6 +15,25 @@ resources:
       cpu: 1000m
       memory: 4Gi
 tests:
+- as: delete-expired-dev-ci-certificates
+  cron: 45 * * * *
+  reporter_config:
+    channel: '#aro-hcp-failures-dev'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      CERTIFICATE_CLEANUP_DRY_RUN: "false"
+      CERTIFICATE_CLEANUP_MAX_DELETIONS: "1000"
+      CERTIFICATE_CLEANUP_MAX_PURGES: "1000"
+      CERTIFICATE_CLEANUP_MIN_AGE: 168h
+      CERTIFICATE_CLEANUP_TIMEOUT: 60m
+      CERTIFICATE_CLEANUP_WORKERS: "2"
+    test:
+    - ref: aro-hcp-deprovision-expired-certificates
 - as: delete-expired-kusto-role-assignments
   cron: 35 * * * *
   reporter_config:
