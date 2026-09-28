@@ -320,18 +320,27 @@ def command(args, repo, env, log, timeout, *, stdout=None):  # pylint: disable=t
                 raise
 
 
+def xml_text(text):
+    """Render XML 1.0-illegal code points visibly without changing raw diagnostics."""
+    return "".join(
+        char if (ord(char) in (9, 10, 13) or 0x20 <= ord(char) <= 0xD7FF
+                 or 0xE000 <= ord(char) <= 0xFFFD or 0x10000 <= ord(char) <= 0x10FFFF)
+        else f"\\u{ord(char):04x}" for char in text)
+
+
 def write_junit(artifacts, results):
     suite = ET.Element("testsuite", name="claude-eval", tests=str(len(results)),
                        failures=str(sum(bool(r[2]) for r in results)),
                        time=f"{sum(r[1] for r in results):.3f}")
     for name, duration, failure in results:
-        case = ET.SubElement(suite, "testcase", name=f"[sig-claude] {name} evaluation",
+        case = ET.SubElement(suite, "testcase", name=xml_text(f"[sig-claude] {name} evaluation"),
                              time=f"{duration:.3f}")
         if failure:
-            ET.SubElement(case, "failure", message=failure).text = failure
+            ET.SubElement(case, "failure", message=xml_text(failure)).text = xml_text(failure)
     destination = artifacts / "junit_claude-eval.xml"
     temporary = destination.with_suffix(".tmp")
     ET.ElementTree(suite).write(temporary, encoding="utf-8", xml_declaration=True)
+    ET.parse(temporary)  # Publish only a report that XML consumers can read.
     temporary.replace(destination)
 
 

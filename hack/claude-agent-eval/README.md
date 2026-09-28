@@ -128,6 +128,10 @@ This extractor remains an image dependency, independent of the checkout path.
 
 ## Results
 
+JUnit names and failure diagnostics render XML 1.0-illegal characters as visible
+`\uNNNN` escapes. The writer re-parses the XML before publishing it; raw
+diagnostics remain unchanged in the JSON summary and logs.
+
 Evals run sequentially; parallelism applies to cases within each eval.
 Each gets a unique run ID. Artifact directory names combine the config basename
 and a path hash, so configs with the same basename remain separate:
