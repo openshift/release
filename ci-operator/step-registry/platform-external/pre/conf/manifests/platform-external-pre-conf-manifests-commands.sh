@@ -21,8 +21,63 @@ source "${SHARED_DIR}/init-fn.sh" || true
 log "Copying to install dir"
 cp -vp "${SHARED_DIR}"/install-config.yaml "${INSTALL_DIR}"/install-config.yaml
 
+# Extracting openshift-install from the release image.
+# This is necessary to avoid using the upi-installer binary, which is not available in the release image,
+# and to ensure manifests will be created with the installed binary instead
+# of the step image binary.
+export INSTALLER_BINARY="openshift-install"
+if [[ -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  # Build-farm release images (registry.build*.ci.openshift.org) need CI registry credentials on
+  # top of the cluster-profile pull secret. platform-external-pre-conf already builds such a file
+  # when it runs; fall back to logging in ourselves so this step does not depend on step ordering.
+  PULL_SECRET="${SHARED_DIR}/pull-secret-with-ci"
+  if [[ ! -s "${PULL_SECRET}" ]]; then
+    PULL_SECRET="/tmp/pull-secret-with-ci"
+    cp -f "${CLUSTER_PROFILE_DIR}/pull-secret" "${PULL_SECRET}"
+    if [[ "$(dirname "$(dirname "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}")")" != "quay.io" ]]; then
+      KUBECONFIG="" oc registry login --to "${PULL_SECRET}"
+    fi
+  fi
+
+  CONTAINER_VERSION="$(${INSTALLER_BINARY} version | awk '/^openshift-install/ {print $2; exit}' | cut -d. -f1,2 || true)"
+  PAYLOAD_VERSION="$(oc adm release info -a "${PULL_SECRET}" \
+    "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}' \
+    2> "${ARTIFACT_DIR}/release-info-err.txt" | cut -d. -f1,2 || true)"
+
+  if [[ -z "${PAYLOAD_VERSION}" ]]; then
+    log "WARNING: could not read the install payload version, see ${ARTIFACT_DIR}/release-info-err.txt; using the upi-installer binary (${CONTAINER_VERSION:-unknown})"
+  elif [[ "${PAYLOAD_VERSION}" == "${CONTAINER_VERSION}" ]]; then
+    log "upi-installer and install payload are both ${PAYLOAD_VERSION}; using the upi-installer binary"
+  else
+    log "upi-installer is ${CONTAINER_VERSION} but the install payload is ${PAYLOAD_VERSION}; extracting the payload's installer so the bootimage matches"
+    oc adm release extract -a "${PULL_SECRET}" \
+      "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+      --command=openshift-install --to=/tmp
+    chmod +x /tmp/openshift-install
+    INSTALLER_BINARY=/tmp/openshift-install
+  fi
+else
+  log "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is not set; using the upi-installer binary"
+fi
+
+log "openshift-install version used for bootimage discovery:"
+"${INSTALLER_BINARY}" version | grep -E "(openshift-install|build|release|architecture)"
+
+#
+# Discover RHCOS image to use for the cluster
+#
+
+if ! "${INSTALLER_BINARY}" coreos print-stream-json 2> "${ARTIFACT_DIR}/err.txt" > ${SHARED_DIR}/coreos.json; then
+  log "Failed to discover RHCOS image: $(cat "${ARTIFACT_DIR}/err.txt")"
+  exit 1
+fi
+test -s "${ARTIFACT_DIR}/err.txt" && rm "${ARTIFACT_DIR}/err.txt" || true
+
+#
+# MachineConfig for kubelet providerId
+#
 log "Creating manifests"
-openshift-install create manifests --dir "${INSTALL_DIR}"
+"${INSTALLER_BINARY}" create manifests --dir "${INSTALL_DIR}"
 
 log "# << Manifest customization >> #"
 
@@ -140,7 +195,7 @@ rm -vf "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_worker-machineset-*.y
 
 log "# << Ignition config/generation >> #"
 
-openshift-install --dir="${INSTALL_DIR}" create ignition-configs &
+"${INSTALLER_BINARY}" --dir="${INSTALL_DIR}" create ignition-configs &
 wait "$!"
 
 log "# << Saving to shared dir >> #"
