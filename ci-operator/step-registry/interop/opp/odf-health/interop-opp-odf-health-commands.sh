@@ -26,6 +26,7 @@ _opp_cleanup() {
 }
 _jrc=0
 trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}' EXIT
+_in_product_test=0
 
 echo ">>> PHASE: initialization"
 
@@ -190,7 +191,7 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_jrc=$?; set +e; WriteJunit || true; _opp_cleanup ${_jrc}; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
+trap '_jrc=$?; set +e; if [[ ${_in_product_test} -eq 1 ]]; then WriteJunit || true; _opp_cleanup ${_jrc}; CollectExitArtifacts; _propagate_junit; exit 0; else _opp_cleanup ${_jrc}; CollectExitArtifacts; exit ${_jrc}; fi' EXIT
 
 # ---------------------------------------------------------------------------
 # Check 1: ODF Operator CSV in Succeeded phase
@@ -733,6 +734,8 @@ print(len(items))
         : "ODF Health Check: ALL SKIPPED (ODF operator present but no StorageCluster)"
         exit 0
     fi
+
+    _in_product_test=1
 
     if ! WaitForOdfReady; then
         : "ODF subsystems did not converge within ${ODF_READY_TIMEOUT}s; running checks to capture current state"

@@ -62,7 +62,8 @@ JUNITEOF
   fi
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit 0' EXIT
+trap '_jrc=$?; set +e; if [[ ${_in_product_test} -eq 1 ]]; then _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit 0; else _opp_cleanup ${_jrc}; exit ${_jrc}; fi' EXIT
+_in_product_test=0
 
 echo ">>> PHASE: initialization"
 
@@ -206,6 +207,8 @@ typeset -ri deadline=$(( SECONDS + mcpWaitTimeout ))
 typeset -i consecutivePasses=0
 
 echo "Polling MCPs for up to ${mcpWaitTimeout}s (need ${consecutiveRequired} consecutive clean polls)..."
+
+_in_product_test=1
 
 while (( SECONDS < deadline )); do
     typeset -i remaining=$(( deadline - SECONDS ))
