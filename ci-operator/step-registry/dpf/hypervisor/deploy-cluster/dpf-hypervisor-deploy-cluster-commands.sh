@@ -107,6 +107,27 @@ fi
 REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
 echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
 
+# Copy kubeconfig to SHARED_DIR on exit so must-gather can reach the
+# cluster even when the deployment fails partway through.
+copy_kubeconfig() {
+  echo "Attempting to copy kubeconfig from hypervisor to SHARED_DIR..."
+  if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME} 2>/dev/null; then
+    cp /tmp/kubeconfig.${CLUSTER_NAME} "${SHARED_DIR}/kubeconfig"
+    echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig"
+  else
+    echo "WARNING: Could not copy kubeconfig from hypervisor (file may not exist yet)"
+  fi
+
+  echo "Attempting to copy .env from hypervisor to SHARED_DIR..."
+  if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env "${SHARED_DIR}/.env" 2>/dev/null; then
+    sed -i 's/^PAYLOAD_URL=.*$/PAYLOAD_URL=/' "${SHARED_DIR}/.env"
+    echo ".env copied to \${SHARED_DIR}/.env"
+  else
+    echo "WARNING: Could not copy .env from hypervisor (file may not exist yet)"
+  fi
+}
+trap copy_kubeconfig EXIT
+
 echo "Checking if github repo branch was cloned successfully"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
   env; \
