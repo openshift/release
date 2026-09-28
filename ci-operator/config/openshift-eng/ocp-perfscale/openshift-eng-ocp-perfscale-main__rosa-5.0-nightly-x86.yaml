@@ -264,15 +264,12 @@ tests:
     env:
       ADDITIONAL_WORKER_NODES: "6"
       CHANNEL_GROUP: nightly
-      CLUSTER_NAME: ocpbugs127458-debug
       COMPUTE_MACHINE_TYPE: m6i.xlarge
       CONFIG: config/standard-classic-rosa.yml
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "5.0"
-    post:
-    - ref: send-results-to-reportportal
     test:
     - as: increase-router-resources
       cli: latest
@@ -280,61 +277,52 @@ tests:
         set -o errexit
         set -o pipefail
 
-        echo "=== Step 1: Scale down ingress-operator ==="
+        echo "=== Step 1: Scale down ingress-operator and CVO ==="
         oc scale deployment/ingress-operator -n openshift-ingress-operator --replicas=0
-        oc rollout status deployment/ingress-operator -n openshift-ingress-operator --timeout=60s || true
-        echo "Ingress operator scaled down"
+        oc scale deployment/cluster-version-operator -n openshift-cluster-version --replicas=0 2>/dev/null || \
+          echo "CVO scale-down not permitted, continuing..."
+        oc annotate deployment/ingress-operator -n openshift-ingress-operator \
+          cluster-version-operator.openshift.io/unmanaged=true --overwrite 2>/dev/null || true
+        sleep 5
+        echo "Ingress operator replicas: $(oc get deployment/ingress-operator -n openshift-ingress-operator -o jsonpath='{.spec.replicas}')"
 
-        echo "=== Step 2: Check for validating webhooks ==="
-        echo "Validating webhooks that might affect openshift-ingress:"
-        oc get validatingwebhookconfigurations -o json | \
-          jq -r '.items[] | select(.webhooks[]?.rules[]?.apiGroups[]? == "apps" or .webhooks[]?.namespaceSelector?.matchExpressions[]?.values[]? == "openshift-ingress") | .metadata.name' 2>/dev/null || echo "No blocking webhooks found"
+        echo "=== Step 2: Show current router resources ==="
+        echo "Containers:"
+        oc get deployment/router-default -n openshift-ingress \
+          -o jsonpath='{range .spec.template.spec.containers[*]}{.name}: cpu={.resources.requests.cpu}, mem={.resources.requests.memory}{"\n"}{end}'
+        echo "Init containers (sidecar):"
+        oc get deployment/router-default -n openshift-ingress \
+          -o jsonpath='{range .spec.template.spec.initContainers[*]}{.name}: cpu={.resources.requests.cpu}, mem={.resources.requests.memory}{"\n"}{end}'
 
-        echo "=== Step 3: Show current deployment state ==="
-        echo "Current containers in router-default:"
-        oc get deployment/router-default -n openshift-ingress -o json | \
-          jq '.spec.template.spec | {containers: [.containers[] | {name, resources}], initContainers: [(.initContainers // [])[] | {name, resources, restartPolicy}]}'
+        echo "=== Step 3: Patch router container resources (25m->100m CPU, 64Mi->256Mi mem) ==="
+        oc patch deployment/router-default -n openshift-ingress --type='json' \
+          -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources","value":{"requests":{"cpu":"100m","memory":"256Mi"}}}]'
 
-        echo "=== Step 4: Patch router container resources via JSON patch ==="
-        ROUTER_IDX=$(oc get deployment/router-default -n openshift-ingress -o json | \
-          jq '.spec.template.spec.containers | to_entries[] | select(.value.name == "router") | .key')
-        echo "Router container is at index: ${ROUTER_IDX}"
-
-        if [[ -z "${ROUTER_IDX}" ]]; then
-          echo "ERROR: Could not find router container in deployment"
+        echo "=== Step 4: Verify patch applied to deployment spec ==="
+        ROUTER_CPU=$(oc get deployment/router-default -n openshift-ingress \
+          -o jsonpath='{.spec.template.spec.containers[0].resources.requests.cpu}')
+        echo "Router CPU request: ${ROUTER_CPU}"
+        if [[ "${ROUTER_CPU}" != "100m" ]]; then
+          echo "ERROR: Router CPU request is ${ROUTER_CPU}, expected 100m"
+          echo "=== Debug: deployment spec ==="
+          oc get deployment/router-default -n openshift-ingress -o yaml | head -80
+          echo "=== Debug: events ==="
+          oc get events -n openshift-ingress --sort-by='.lastTimestamp' 2>/dev/null | tail -20
           exit 1
         fi
-
-        oc patch deployment/router-default -n openshift-ingress --type='json' \
-          -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/${ROUTER_IDX}/resources\",\"value\":{\"requests\":{\"cpu\":\"100m\",\"memory\":\"256Mi\"}}}]" \
-          -v=6 2>&1 || {
-            echo "JSON patch failed, trying strategic merge patch..."
-            oc patch deployment/router-default -n openshift-ingress --type='strategic' \
-              -p="{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"router\",\"resources\":{\"requests\":{\"cpu\":\"100m\",\"memory\":\"256Mi\"}}}]}}}}" \
-              -v=6 2>&1
-          }
 
         echo "=== Step 5: Wait for rollout ==="
         oc rollout status deployment/router-default -n openshift-ingress --timeout=300s
 
-        echo "=== Step 6: Verify ==="
-        ROUTER_CPU=$(oc get deployment/router-default -n openshift-ingress -o json | \
-          jq -r '.spec.template.spec.containers[] | select(.name == "router") | .resources.requests.cpu')
-        ROUTER_MEM=$(oc get deployment/router-default -n openshift-ingress -o json | \
-          jq -r '.spec.template.spec.containers[] | select(.name == "router") | .resources.requests.memory')
-        echo "Router CPU request: ${ROUTER_CPU}"
-        echo "Router Memory request: ${ROUTER_MEM}"
+        echo "=== Step 6: Final verification ==="
+        echo "Deployment spec:"
+        oc get deployment/router-default -n openshift-ingress \
+          -o jsonpath='{range .spec.template.spec.containers[*]}{.name}: cpu={.resources.requests.cpu}, mem={.resources.requests.memory}{"\n"}{end}'
+        echo "Operator replicas: $(oc get deployment/ingress-operator -n openshift-ingress-operator -o jsonpath='{.spec.replicas}')"
+        echo "Router pods:"
+        oc get pods -n openshift-ingress -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default --no-headers
 
-        if [[ "${ROUTER_CPU}" != "100m" ]]; then
-          echo "ERROR: Router CPU request is ${ROUTER_CPU}, expected 100m"
-          echo "=== Debug: Full deployment spec ==="
-          oc get deployment/router-default -n openshift-ingress -o yaml | head -100
-          echo "=== Debug: Recent events ==="
-          oc get events -n openshift-ingress --sort-by='.lastTimestamp' | tail -20
-          exit 1
-        fi
-
-        echo "=== Done ==="
+        echo "=== Router resource increase complete ==="
       from: cli
       resources:
         requests:
