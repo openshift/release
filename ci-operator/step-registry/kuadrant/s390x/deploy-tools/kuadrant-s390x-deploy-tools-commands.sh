@@ -321,6 +321,9 @@ spec:
   - name: otlp-grpc
     port: 4317
     targetPort: 4317
+  - name: otlp-http
+    port: 4318
+    targetPort: 4318
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
@@ -353,7 +356,7 @@ echo "=== Testing tools deployed ==="
 echo "Keycloak URL:    ${KEYCLOAK_URL}"
 echo "Mockserver URL:  ${MOCKSERVER_URL}"
 echo "Jaeger query:    ${JAEGER_QUERY_URL}"
-echo "Jaeger collector: rpc://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4317"
+echo "Jaeger collector: rpc://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4317 (gRPC) http://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4318 (HTTP)"
 echo "Prometheus URL:  $(cat "${PROMETHEUS_URL_FILE}")"
 
 # ---------------------------------------------------------------------------
@@ -364,16 +367,21 @@ echo "Prometheus URL:  $(cat "${PROMETHEUS_URL_FILE}")"
 # ---------------------------------------------------------------------------
 KUADRANT_NS="${KUADRANT_NAMESPACE:-kuadrant-system}"
 KUADRANT_SUB="${KUADRANT_SUBSCRIPTION_NAME:-rhcl-operator}"
+# Operator traces + Kuadrant CR defaultEndpoint stay on OTLP gRPC :4317 (Kind / already passing).
 JAEGER_COLLECTOR_ENDPOINT="rpc://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4317"
-# OTLP HTTP for operator logs/metrics; gRPC (rpc://) for traces — matches examples/otel.
+# OTLP HTTP for operator logs/metrics; Service must expose 4318 (container already listens).
 OTEL_HTTP_ENDPOINT="http://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4318"
 
 if oc get kuadrant/kuadrant -n "${KUADRANT_NS}" >/dev/null 2>&1; then
-  echo "=== Enabling Kuadrant CR observability (rhcl-mc1 pattern) ==="
+  echo "=== Enabling Kuadrant CR observability (rhcl-mc1 / Kind pattern) ==="
   oc patch kuadrant/kuadrant -n "${KUADRANT_NS}" --type merge -p "{
     \"spec\": {
       \"observability\": {
         \"enable\": true,
+        \"dataPlane\": {
+          \"defaultLevels\": [{\"debug\": \"true\"}],
+          \"httpHeaderIdentifier\": \"x-request-id\"
+        },
         \"tracing\": {
           \"defaultEndpoint\": \"${JAEGER_COLLECTOR_ENDPOINT}\",
           \"insecure\": true
