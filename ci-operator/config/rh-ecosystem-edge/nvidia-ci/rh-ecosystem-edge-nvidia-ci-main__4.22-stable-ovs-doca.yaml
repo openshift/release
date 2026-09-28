@@ -49,7 +49,10 @@ images:
       # x86_64 payload) above and with OCP_ARCH=amd64 below -- ipi-conf-aws
       # derives the AWS instance types *from* that arch (amd64 -> m6a/m6i,
       # arm64 -> m6g), not the reverse, so the arch is the knob and the
-      # instance type follows.
+      # instance type follows. OCP_ARCH is pinned there rather than left to
+      # ipi-conf-aws's own "amd64" default so both halves of that agreement
+      # are stated outright; note it cannot be commented at its own site,
+      # since `make ci-operator-config` strips comments from the env map.
       #
       # When the arm64 variant is written: the DOCA repo's directories are
       # not the Linux arch names. aarch64 is published as "arm64-sbsa"; an
@@ -149,12 +152,6 @@ tests:
       BASE_DOMAIN: edge-sro.rhecoeng.com
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
-      # Must match the arch of the layered image above (`namespace: ocp` and
-      # the DOCA x86_64 repo). ipi-conf-aws turns this into the instance
-      # types (amd64 -> m6a where the region has capacity, else m6i) and into
-      # install-config's `architecture` field. Pinned rather than left to the
-      # step's "amd64" default so this config states its arch outright --
-      # arm64 is a separate variant, not a flag flip here.
       OCP_ARCH: amd64
     test:
     - ref: ovs-doca-validate-node-package
