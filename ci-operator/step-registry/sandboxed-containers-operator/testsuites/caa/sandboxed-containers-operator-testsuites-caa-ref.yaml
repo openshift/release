@@ -1,0 +1,57 @@
+ref:
+  as: sandboxed-containers-operator-testsuites-caa
+  from: src
+  cli: latest
+  commands: sandboxed-containers-operator-testsuites-caa-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 130m0s
+  grace_period: 10m0s
+  env:
+  - name: TESTS_CAA_ENABLE
+    default: "false"
+    documentation: |-
+      Enable-gate for the cloud-api-adaptor (CAA) e2e suite (skip-by-default).
+      "true"        -> the step runs the tests.
+      "false"/unset -> the step writes a skipped JUnit and exits 0.
+  - name: TESTS_CAA_PROVIDER
+    default: "azure"
+    documentation: |-
+      Cloud provider passed to the runner via -p/--provider: azure or aws.
+  - name: TESTS_CAA_PROFILE
+    default: ""
+    documentation: |-
+      Test profile passed to the runner via -t/--test. Empty uses the runner
+      default.
+  - name: TESTS_CAA_REPO
+    default: ""
+    documentation: |-
+      CAA tests repository passed to the runner via --tests-repo. Empty uses
+      the runner default.
+  - name: TESTS_CAA_REPO_REF
+    default: ""
+    documentation: |-
+      Branch or tag of the CAA tests repository passed to the runner via
+      --tests-repo-ref. Empty uses the runner default.
+  - name: TESTS_CAA_TIMEOUT
+    default: "110m"
+    documentation: |-
+      Value passed to the runner via --timeout (go test -timeout). Must stay
+      below the ref `timeout` (130m) so the runner has time to publish results
+      before the step is killed. Headroom above the ~40m happy path absorbs the
+      occasional CreateContainerError guest-pull flake on burstable pod VMs,
+      each of which can burn ~20m before its assessment deadline fires.
+  documentation: |-
+    Run the upstream cloud-api-adaptor (CAA) e2e tests.
+
+    The step clones the openshift/sandboxed-containers-operator repository
+    (devel branch) to obtain test/e2e/run_caa_tests.sh and executes it.
+
+    Cloud credentials for the test provisioner are sourced from the ci-operator
+    cluster profile: the step reads the static service principal
+    (Azure osServicePrincipal.json) / access keys (AWS .awscred) from
+    ${CLUSTER_PROFILE_DIR} and exports them, so the suite works regardless of
+    the cluster's peer-pods credential mode (manual, CCO, or short-lived
+    workload-identity/STS).
