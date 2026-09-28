@@ -10,10 +10,15 @@ ref:
       cpu: 500m
       memory: 512Mi
   credentials:
-  - mount_path: /etc/terraform-cloud
+  - as: credentials.tfrc.json
+    field: credentials
+    mount_path: /etc/terraform-cloud
     group: tfcloud-token
     collection: gcp-hcp-infra-terraform-cloud
   env:
+  - name: TF_CLI_CONFIG_FILE
+    default: /etc/terraform-cloud/credentials.tfrc.json
+    documentation: "Mounted HCP Terraform CLI credentials file"
   - name: GCP_REGION
     default: "us-central1"
     documentation: "GCP region for e2e infrastructure deployment"
@@ -34,7 +39,7 @@ ref:
     6. Clears Terraform Cloud workspace state
     
     WIF credential is read from SHARED_DIR/wif-cred.json (written by hypershift-gcp-wif-auth).
-    TFC token is mounted from the tfcloud-ci-secret credential.
+    HCP Terraform CLI credentials are mounted from the tfcloud-token group.
     
     Uses best_effort: true so cleanup failures don't block the job.
     

@@ -17,10 +17,13 @@ done
 
 log "All required tools available"
 
-# Validate TFC token mount exists
-if [[ ! -f "/etc/terraform-cloud/token" ]]; then
-  log "ERROR: /etc/terraform-cloud/token not found"
-  log "The tfcloud-ci-secret vault mount must be configured"
+# Validate the mounted Terraform CLI config and read its token for API calls.
+if [[ ! -r "${TF_CLI_CONFIG_FILE}" ]]; then
+  log "ERROR: ${TF_CLI_CONFIG_FILE} not found or not readable"
+  exit 1
+fi
+if ! TFC_TOKEN=$(jq -er '.credentials["app.terraform.io"].token | strings | select(length > 0)' "${TF_CLI_CONFIG_FILE}" 2>/dev/null); then
+  log "ERROR: HCP Terraform credentials file has no valid app.terraform.io token"
   exit 1
 fi
 
@@ -159,17 +162,6 @@ log "  Service Project: ${SERVICE_PROJECT_ID}"
 # --- Configure Terraform ---
 
 cd "${RENDERED_DIR}"
-
-# Read TFC token once — used for both .terraformrc and API calls
-TFC_TOKEN="$(cat /etc/terraform-cloud/token)"
-
-# Configure TFC authentication via .terraformrc (avoids token in env vars)
-(umask 077 && cat > "$HOME/.terraformrc" <<TFRC
-credentials "app.terraform.io" {
-  token = "${TFC_TOKEN}"
-}
-TFRC
-)
 
 # Disable terraform's interactive prompts
 export TF_INPUT=false
