@@ -1103,3 +1103,57 @@ def test_master_arm64_variant_without_promotion(tmp_path: Path) -> None:
         "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE": "release:arm64-latest",
         "QUAY_CI_IMAGE": "pipeline:quay-server",
     }
+
+
+def test_post_refs_prepend_to_cloud_post_steps() -> None:
+    cell = _phase0_cell(post_refs=("quay-pipeline-view",))
+    config = build_config(cell, GENERATOR_DIR / "templates")
+    post = config["tests"][0]["steps"]["post"]
+    assert post == [
+        {"ref": "quay-pipeline-view"},
+        {"ref": "quay-gather-jaeger-traces"},
+        {"ref": "quay-gather"},
+        {"ref": "quay-deprovision"},
+        {"chain": "ipi-aws-post"},
+    ]
+
+
+def test_production_matrix_runs_pipeline_view_on_aws_nightly_only() -> None:
+    results, _retired = generate_all()
+    with_view = [
+        (filename, test["as"])
+        for _group, filename, config in results
+        for test in config["tests"]
+        if {"ref": "quay-pipeline-view"} in test["steps"].get("post", [])
+    ]
+    assert with_view == [("quay-quay-redhat-3.18__aws-ocp422-e2e-install.yaml", "aws-s3-nightly")]
+
+
+@pytest.mark.parametrize(
+    ("post_refs", "message"),
+    [
+        ([], "post_refs must be a non-empty list"),
+        ("quay-pipeline-view", "post_refs must be a non-empty list"),
+        ([""], "post_refs must be a non-empty list"),
+        (["quay-pipeline-view", "quay-pipeline-view"], "post_refs must not contain duplicates"),
+    ],
+)
+def test_post_refs_rejects_malformed_values(post_refs: Any, message: str) -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "post_refs": post_refs,
+        }
+    )
+    with pytest.raises(ValueError, match=message):
+        expand_cells(matrix)
+
+
+def test_post_refs_rejects_ref_already_in_post() -> None:
+    cell = _phase0_cell(post_refs=("quay-gather",))
+    with pytest.raises(ValueError, match="post_refs already in the post phase: quay-gather"):
+        build_config(cell, GENERATOR_DIR / "templates")

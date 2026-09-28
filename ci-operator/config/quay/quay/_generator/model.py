@@ -44,6 +44,7 @@ class Cell:
     image_source: str = "build"
     env: dict[str, Any] = field(default_factory=dict)
     as_name: str | None = None
+    post_refs: tuple[str, ...] = ()
     kind: str = "periodic"
     layout: str = "variant"
     always_run: bool | None = None

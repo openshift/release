@@ -8,7 +8,7 @@
 #
 # WHERE TO MAKE YOUR CHANGES:
 #   1. matrix.yaml.in — Quay releases, OCP versions, clouds, kind, cron, source,
-#                        env, as, managed_files
+#                        env, as, post_refs, managed_files
 #   2. templates/     — job structure (base, clouds/{cloud}, tests/{test});
 #                        kind: presubmit renders templates/presubmit/ instead
 #   3. generate.py    — merge and expansion logic only
@@ -20,7 +20,7 @@
 #   templates/tests/<test>.yaml.j2
 #   templates/presubmit/tests/<test>.yaml.j2 (kind: presubmit only, when present)
 #   kind settings (periodic cron, or presubmit trigger fields)
-#   branch env, then job env / as
+#   branch env, then job env / as / post_refs
 #
 # Usage:
 #   python3 generate.py              # regenerate all CI configs
@@ -62,6 +62,7 @@ JOB_KEYS = {
     "arches",
     "env",
     "as",
+    "post_refs",
     "always_run",
     "optional",
     "run_if_changed",
@@ -239,6 +240,21 @@ def _job_as_name(job: YamlMap, where: str) -> str | None:
     return as_name
 
 
+def _job_post_refs(job: YamlMap, where: str) -> tuple[str, ...]:
+    if "post_refs" not in job:
+        return ()
+    value = job.get("post_refs")
+    if (
+        not isinstance(value, list)
+        or not value
+        or not all(isinstance(item, str) and item.strip() for item in value)
+    ):
+        raise ValueError(f"{where}.post_refs must be a non-empty list of ref names")
+    if len(set(value)) != len(value):
+        raise ValueError(f"{where}.post_refs must not contain duplicates")
+    return tuple(value)
+
+
 def _job_bool_field(job: YamlMap, key: str, where: str) -> bool | None:
     if key not in job:
         return None
@@ -389,6 +405,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             job_env = copy.deepcopy(_as_mapping(job.get("env"), f"{where}.env"))
             merged_env = {**branch_env, **job_env}
             as_name = _job_as_name(job, where)
+            post_refs = _job_post_refs(job, where)
             for ocp, cloud, job_arch in itertools.product(ocps, clouds, arches):
                 cells.append(
                     Cell(
@@ -405,6 +422,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         image_source=image_source,
                         env=copy.deepcopy(merged_env),
                         as_name=as_name,
+                        post_refs=post_refs,
                         kind=kind,
                         layout=layout,
                         always_run=always_run,
@@ -444,10 +462,20 @@ def apply_cell_settings(config: YamlMap, cell: Cell) -> YamlMap:
     test = tests[0]
     if cell.as_name:
         test["as"] = cell.as_name
-    if cell.env:
+    if cell.env or cell.post_refs:
         steps = test.setdefault("steps", {})
         if not isinstance(steps, dict):
             raise ValueError("tests[0].steps must be a mapping")
+    if cell.post_refs:
+        post = steps.get("post") or []
+        if not isinstance(post, list):
+            raise ValueError("tests[0].steps.post must be a list")
+        existing = {item.get("ref") for item in post if isinstance(item, dict)}
+        repeated = sorted(existing & set(cell.post_refs))
+        if repeated:
+            raise ValueError(f"post_refs already in the post phase: {', '.join(repeated)}")
+        steps["post"] = [{"ref": ref} for ref in cell.post_refs] + post
+    if cell.env:
         env = steps.setdefault("env", {})
         if not isinstance(env, dict):
             raise ValueError("tests[0].steps.env must be a mapping")
