@@ -111,19 +111,19 @@ echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
 # cluster even when the deployment fails partway through.
 copy_kubeconfig() {
   echo "Attempting to copy kubeconfig from hypervisor to SHARED_DIR..."
-  if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME} 2>/dev/null; then
-    cp /tmp/kubeconfig.${CLUSTER_NAME} "${SHARED_DIR}/kubeconfig"
+  if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME} 2>/dev/null &&
+     cp /tmp/kubeconfig.${CLUSTER_NAME} "${SHARED_DIR}/kubeconfig"; then
     echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig"
   else
-    echo "WARNING: Could not copy kubeconfig from hypervisor (file may not exist yet)"
+    echo "WARNING: Could not copy kubeconfig to SHARED_DIR (file may not exist yet)"
   fi
 
   echo "Attempting to copy .env from hypervisor to SHARED_DIR..."
-  if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env "${SHARED_DIR}/.env" 2>/dev/null; then
-    sed -i 's/^PAYLOAD_URL=.*$/PAYLOAD_URL=/' "${SHARED_DIR}/.env"
+  if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env "${SHARED_DIR}/.env" 2>/dev/null &&
+     sed -i 's/^PAYLOAD_URL=.*$/PAYLOAD_URL=/' "${SHARED_DIR}/.env"; then
     echo ".env copied to \${SHARED_DIR}/.env"
   else
-    echo "WARNING: Could not copy .env from hypervisor (file may not exist yet)"
+    echo "WARNING: Could not copy .env to SHARED_DIR (file may not exist yet)"
   fi
 }
 trap copy_kubeconfig EXIT
