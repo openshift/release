@@ -3,6 +3,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.22"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -263,6 +267,208 @@ tests:
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: peer-pods
     workflow: sandboxed-containers-operator-e2e-aws
+  timeout: 24h0m0s
+- as: tls-scanner-default
+  cron: 20 3 * * 1
+  reporter_config:
+    channel: '#kata-ocp-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
+      {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+      CATALOG_SOURCE_NAME: brew-catalog
+      CUSTOM_AZURE_REGION: eastus
+      ENABLE_MUST_GATHER: "true"
+      ENABLEPEERPODS: "true"
+      INITDATA: ""
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: 3.31.0-2.rhaos4.22.el9
+      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
+      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      OSC_INSTALL: "true"
+      PQC_CHECK: "false"
+      RUNTIMECLASS: kata-remote
+      SCAN_NAMESPACE: openshift-sandboxed-containers-operator
+      SCANNER_CPU_LIMIT: 500m
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 1Gi
+      SCANNER_MEM_REQUEST: 1Gi
+      SLEEP_DURATION: 0h
+      TEST_TIMEOUT: "90"
+      TESTS_OSC_ENABLE: "false"
+      TRUSTEE_URL: ""
+      WORKLOAD_TO_TEST: peer-pods
+    test:
+    - as: create-peer-pod
+      cli: latest
+      commands: |
+        cat <<'EOF' | oc apply -f -
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: tls-scan-peerpod
+          namespace: openshift-sandboxed-containers-operator
+        spec:
+          runtimeClassName: kata-remote
+          automountServiceAccountToken: false
+          containers:
+            - name: hello-openshift
+              image: quay.io/openshift/origin-hello-openshift
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 8080
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
+              securityContext:
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+        EOF
+        oc wait pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --for=condition=Ready --timeout=10m
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    - as: delete-peer-pod
+      cli: latest
+      commands: |
+        oc delete pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --ignore-not-found --timeout=5m
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: sandboxed-containers-operator-e2e-azure
+  timeout: 24h0m0s
+- as: tls-scanner-pqc
+  cron: 20 3 * * 1
+  reporter_config:
+    channel: '#kata-ocp-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
+      {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+      CATALOG_SOURCE_NAME: brew-catalog
+      CUSTOM_AZURE_REGION: eastus
+      ENABLE_MUST_GATHER: "true"
+      ENABLEPEERPODS: "true"
+      INITDATA: ""
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: 3.31.0-2.rhaos4.22.el9
+      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
+      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      OSC_INSTALL: "true"
+      PQC_CHECK: "true"
+      RUNTIMECLASS: kata-remote
+      SCAN_NAMESPACE: openshift-sandboxed-containers-operator
+      SCANNER_CPU_LIMIT: 500m
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 1Gi
+      SCANNER_MEM_REQUEST: 1Gi
+      SLEEP_DURATION: 0h
+      TEST_TIMEOUT: "90"
+      TESTS_OSC_ENABLE: "false"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TRUSTEE_URL: ""
+      WORKLOAD_TO_TEST: peer-pods
+    test:
+    - ref: tls-13
+    - as: log-osc-tls-state
+      cli: latest
+      commands: |
+        NS="openshift-sandboxed-containers-operator"
+        echo "=== Cluster TLS Security Profile ==="
+        oc get apiserver cluster -o jsonpath='{.spec.tlsSecurityProfile}' || true
+        echo ""
+        echo "=== Cluster TLS Adherence ==="
+        oc get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' || true
+        echo ""
+        echo "=== Deployments in ${NS} ==="
+        oc get deployments -n "${NS}" -o jsonpath='{range .items[*]}{"deployment/"}{.metadata.name}{"\n"}{range .spec.template.spec.containers[*]}{"  container/"}{.name}{"\n"}{"    args: "}{.args}{"\n"}{range .env[*]}{"    "}{.name}{"="}{.value}{"\n"}{end}{end}{end}' || true
+        echo ""
+        echo "=== DaemonSets in ${NS} ==="
+        oc get daemonsets -n "${NS}" -o jsonpath='{range .items[*]}{"daemonset/"}{.metadata.name}{"\n"}{range .spec.template.spec.containers[*]}{"  container/"}{.name}{"\n"}{"    args: "}{.args}{"\n"}{range .env[*]}{"    "}{.name}{"="}{.value}{"\n"}{end}{end}{end}' || true
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: create-peer-pod
+      cli: latest
+      commands: |
+        cat <<'EOF' | oc apply -f -
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: tls-scan-peerpod
+          namespace: openshift-sandboxed-containers-operator
+        spec:
+          runtimeClassName: kata-remote
+          automountServiceAccountToken: false
+          containers:
+            - name: hello-openshift
+              image: quay.io/openshift/origin-hello-openshift
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 8080
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
+              securityContext:
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+        EOF
+        oc wait pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --for=condition=Ready --timeout=10m
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    - as: delete-peer-pod
+      cli: latest
+      commands: |
+        oc delete pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --ignore-not-found --timeout=5m
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: sandboxed-containers-operator-e2e-azure
   timeout: 24h0m0s
 zz_generated_metadata:
   branch: devel
