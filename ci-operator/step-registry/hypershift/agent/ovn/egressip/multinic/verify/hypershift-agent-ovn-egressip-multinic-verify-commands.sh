@@ -21,8 +21,24 @@ set -o pipefail
 # Both checks are deliberately per interface rather than global. An unqualified
 # "ip route get" consults main as a whole and answers for whichever route has the lowest
 # metric, so with two secondary NICs pointed at one target it would report success for
-# both while only one of them actually has a route of its own. "oif" and curl's
-# "--interface" each constrain the lookup the way the EgressIP routing table does.
+# both while only one of them actually has a route of its own.
+#
+# The route check is "ip route list match", not "ip route get ... oif". Forcing an output
+# interface on "route get" never fails: when the FIB lookup comes back ENETUNREACH and an
+# oif was given, the kernel assumes the destination is on link and hands back a made-up
+# "<dst> dev <oif>" (net/ipv4/route.c, "Apparently, routing tables are wrong. Assume, that
+# the destination is on link"). Measured on a live guest node, "ip route get 10.99.99.99
+# oif enp3s0" answers "10.99.99.99 dev enp3s0 src 192.168.221.26" with no such route
+# anywhere. "route list match" reads the main table directly, which is the same table
+# ovnkube-node copies from, and returns nothing when nothing matches.
+#
+# The curl is kept but is necessary, not sufficient. On a dev-scripts host every extra
+# network is a bridge on one machine with the default arp_ignore=0, so that host answers
+# ARP for any of its addresses on any of its bridges - each gateway and the ipecho dummy
+# all resolve from every guest NIC. A request therefore succeeds even over the next-hopless
+# "default dev <iface>" that ovnkube-node synthesises when it finds nothing to copy, which
+# is exactly the broken state this step exists to catch. The route check is the one that
+# discriminates; the curl only adds that the echo is up and answering on this path.
 #
 # Runs after hypershift-agent-ovn-ipecho-provision, so it needs to be in the job's test
 # sequence rather than in the workflow's pre.
@@ -80,14 +96,13 @@ for suffix in "${SUFFIXES[@]}"; do
   for node in ${NODES}; do
     echo "--- ${node}"
 
-    # The route lookup and the request are the same question asked two ways: whether the
-    # kernel can reach the target out of this specific interface, and what the far end
-    # actually sees as the source. They can disagree - a route whose reply never arrives
-    # looks fine to "ip route get" and fails the curl.
+    # Does the main table hold a route covering the target out of this link? This is
+    # literally what ovnkube-node asks when it builds the EgressIP table - it lists main
+    # filtered on output interface - so an empty answer here is an empty answer there.
     route="$(guest debug -n default "node/${node}" --quiet -- \
-      chroot /host ip -4 route get "${IPECHO_TARGET}" oif "${iface}" 2>/dev/null | tr -d '\r' | head -1)" || true
+      chroot /host ip -4 route list match "${IPECHO_TARGET}" dev "${iface}" 2>/dev/null | tr -d '\r' | head -1)" || true
     echo "  route: ${route:-<none>}"
-    if ! echo "${route}" | grep -q "dev ${iface}"; then
+    if [[ -z "${route}" ]]; then
       echo "  ERROR: ${IPECHO_TARGET} does not resolve out of ${iface} in the main table."
       echo "         An EgressIP on this interface will blackhole: ovnkube-node copies routes"
       echo "         out of the link from main, and there is nothing here to copy."

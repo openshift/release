@@ -27,9 +27,10 @@ ref:
     secondary-host-network EgressIP's routing table by copying routes out of the link from
     main, filtered on output interface.
 
-    Per node and per interface it asserts that "ip route get <target> oif <iface>"
-    resolves, that the echo answers a request bound to that interface, and that what the
-    echo reports as the source is that node's address on the matching egress subnet.
+    Per node and per interface it asserts that "ip route list match <target> dev <iface>"
+    returns something, that the echo answers a request bound to that interface, and that
+    what the echo reports as the source is that node's address on the matching egress
+    subnet.
 
     Both checks are constrained to one interface at a time on purpose. An unqualified
     lookup consults main as a whole and answers for whichever route has the lowest metric,
@@ -37,6 +38,17 @@ ref:
     only one of them has a route of its own - which is precisely the failure mode worth
     catching. Without this step it surfaces much later as an EgressIP test timing out with
     "sourceIP was still included in [...]", which names neither the route nor the target.
+
+    The route check is "route list match" rather than "route get ... oif" because forcing
+    an output interface on "route get" cannot fail: when the lookup returns ENETUNREACH and
+    an oif was given, the kernel assumes the destination is on link and invents a reply.
+    "route list match" reads the main table, which is the table ovnkube-node copies from.
+
+    The curl is necessary but not sufficient. On a dev-scripts host every extra network is
+    a bridge on one machine with the default arp_ignore=0, so that host answers ARP for any
+    of its addresses on any of its bridges and a request succeeds from a NIC that has no
+    route at all. The route check is what discriminates; the curl adds that the echo is up
+    and that the source the far end sees is the expected one.
 
     A no-op when ${SHARED_DIR}/ipecho_url or ${SHARED_DIR}/egressip_secondary_iface is
     absent, so it is safe to leave in a job that does not configure either.
