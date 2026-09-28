@@ -22,7 +22,19 @@ cat ${CLUSTER_PROFILE_DIR}/private-key | base64 -d > /tmp/id_rsa
 echo "" >> /tmp/id_rsa
 chmod 600 /tmp/id_rsa
 
-# Define SSH command with explicit options (don't rely on ~/.ssh/config)
+# Set up ~/.ssh for libvirt qemu+ssh:// connections from the Prow pod
+mkdir -p ~/.ssh
+cp /tmp/id_rsa ~/.ssh/id_rsa
+chmod 600 ~/.ssh/id_rsa
+chmod 700 ~/.ssh
+cat > ~/.ssh/config <<'SSHEOF'
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+SSHEOF
+
+# Define SSH command with explicit options
 SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
 # Test SSH connection
@@ -41,6 +53,7 @@ fi
 
 OPENSHIFT_DPF_GITHUB_REPO_URL="https://github.com/rh-ecosystem-edge/openshift-dpf.git"
 REMOTE_MAIN_WORK_DIR="/root/${CLUSTER_NAME}/ci"
+WORK_DIR="/root/dpf-ci"
 
 # Check if target bastion is in maintenance mode
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f /root/${CLUSTER_NAME}/pause"; then
@@ -48,79 +61,72 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f /root/${CLUSTER_NAME}/pause"; th
   exit 1
 fi
 
-# store last openshift-dpf install dir on hypervisor
 REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
-echo "Deploying OpenShift cluster with DPF on host ${REMOTE_HOST}"
-echo "Remote Main Working directory on hypervisor: ${REMOTE_MAIN_WORK_DIR}"
+datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
+REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
+
+echo "Deploying OpenShift cluster with DPF from Prow pod"
+echo "Local working directory: ${WORK_DIR}"
+echo "Remote host: ${REMOTE_HOST}"
 echo "Cluster name: ${CLUSTER_NAME}"
 
-# Verify remote work directory exists
+# Verify remote work directory exists on bastion
 echo "Verifying remote work directory exists..."
 if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -d ${REMOTE_MAIN_WORK_DIR}"; then
   echo "ERROR: Remote work directory ${REMOTE_MAIN_WORK_DIR} does not exist on ${REMOTE_HOST}"
   exit 1
 fi
-echo "Remote work directory verified: ${REMOTE_MAIN_WORK_DIR}"
 
-# logs directory for artifacts on the remote host
-REMOTE_LOGS_DIR="${REMOTE_MAIN_WORK_DIR}/deployment-logs"
-echo "Remote logs directory on hypervisor: ${REMOTE_LOGS_DIR}"
+cd "${WORK_DIR}"
 
-datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
+# Allow git operations despite UID mismatch (OpenShift runs as arbitrary UID)
+git config --global --add safe.directory "${WORK_DIR}"
 
-CLEAN_ALL_LOG="${REMOTE_LOGS_DIR}/make_clean-all_${datetime_string}.log"
-echo "Remote make clean-all logs directory on hypervisor: ${CLEAN_ALL_LOG}"
+# Set up remote for fetching PRs
+git remote set-url origin "${OPENSHIFT_DPF_GITHUB_REPO_URL}" 2>/dev/null \
+  || git remote add origin "${OPENSHIFT_DPF_GITHUB_REPO_URL}"
 
-DEPLOYMENT_LOG="${REMOTE_LOGS_DIR}/make_all_${datetime_string}.log"
-echo "Remote deployment logs directory on hypervisor: ${DEPLOYMENT_LOG}"
-
-
-# Git clone the dpf-openshift repo on hypervisor
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
-  env; \
-  cd ${REMOTE_MAIN_WORK_DIR}; \
-  mkdir -p openshift-dpf-${datetime_string}; \
-  cd openshift-dpf-${datetime_string}; \
-  git clone -b ${OPENSHIFT_DPF_BRANCH} ${OPENSHIFT_DPF_GITHUB_REPO_URL}"; then
-  # need more checks to ensure repo was git cloned successfully
-  echo "Git clone openshift-dpf repo was successful"
-else
-  echo "Git clone openshift-dpf repo failed"
-  exit 1
-fi
+# TEMPORARY: merge PR #269 for prow release integration (remove once merged)
+echo "Fetching PR #269 (prow release integration)..."
+git fetch origin pull/269/head:pr-269
+NEED_PR_269=true
 
 # If running in a PR job for openshift-dpf, checkout the PR branch
 if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; then
-  echo "PR job detected: checking out PR #${PULL_NUMBER} on the remote host"
-  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; \
-    git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER} && \
-    git checkout pr-${PULL_NUMBER} && \
-    git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
-    echo "Successfully checked out PR #${PULL_NUMBER}"
+  echo "PR job detected: checking out PR #${PULL_NUMBER}"
+  if [[ "${PULL_NUMBER}" == "269" ]]; then
+    git checkout pr-269
+    NEED_PR_269=false
+    echo "PR #269 is the PR under test, checked out directly"
   else
-    echo "ERROR: Failed to checkout PR #${PULL_NUMBER}"
-    exit 1
+    git fetch origin "pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}"
+    git checkout "pr-${PULL_NUMBER}"
+    git rebase "origin/${OPENSHIFT_DPF_BRANCH}"
+    echo "Successfully checked out PR #${PULL_NUMBER}"
   fi
 fi
 
-REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
-echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
+if [[ "${NEED_PR_269}" == "true" ]]; then
+  git merge pr-269 --no-edit
+  echo "PR #269 merged successfully"
+fi
 
-# Copy kubeconfig to SHARED_DIR on exit so must-gather can reach the
-# cluster even when the deployment fails partway through.
+# Copy kubeconfig and .env to SHARED_DIR on exit so must-gather can reach
+# the cluster even when the deployment fails partway through.
 copy_kubeconfig() {
-  echo "Attempting to copy kubeconfig from hypervisor to SHARED_DIR..."
-  if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME} 2>/dev/null &&
-     cp /tmp/kubeconfig.${CLUSTER_NAME} "${SHARED_DIR}/kubeconfig"; then
+  echo "Attempting to copy kubeconfig to SHARED_DIR..."
+  if [[ -f "${WORK_DIR}/kubeconfig.${CLUSTER_NAME}" ]]; then
+    cp "${WORK_DIR}/kubeconfig.${CLUSTER_NAME}" "${SHARED_DIR}/kubeconfig"
     echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig"
   else
     echo "WARNING: Could not copy kubeconfig to SHARED_DIR (file may not exist yet)"
   fi
 
-  echo "Attempting to copy .env from hypervisor to SHARED_DIR..."
-  if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env "${SHARED_DIR}/.env" 2>/dev/null &&
-     sed -i 's/^PAYLOAD_URL=.*$/PAYLOAD_URL=/' "${SHARED_DIR}/.env"; then
+  echo "Attempting to copy .env to SHARED_DIR..."
+  if [[ -f "${WORK_DIR}/.env" ]]; then
+    cp "${WORK_DIR}/.env" "${SHARED_DIR}/.env"
+    sed -i 's/^PAYLOAD_URL=.*$/PAYLOAD_URL=/' "${SHARED_DIR}/.env"
     echo ".env copied to \${SHARED_DIR}/.env"
   else
     echo "WARNING: Could not copy .env to SHARED_DIR (file may not exist yet)"
@@ -128,48 +134,19 @@ copy_kubeconfig() {
 }
 trap copy_kubeconfig EXIT
 
-echo "Checking if github repo branch was cloned successfully"
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
-  env; \
-  cd ${REMOTE_WORK_DIR}/openshift-dpf; \
-  git status; \
-  git log -1"; then
-  echo "Git repository verified successfully"
-else
-  echo "ERROR: Failed to verify git repository at ${REMOTE_WORK_DIR}/openshift-dpf"
-  exit 1
-fi
+echo "Git repository state:"
+git log --oneline -5
 
-echo "Verify last-openshift-dpf-dir.sh file exists..."
-if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"; then
-  echo "WARNING: File ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION} does not exist, creating it..."
-  if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "echo 'LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf' > ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"; then
-    echo "ERROR: Failed to create ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"
-    exit 1
-  fi
-  echo "File created successfully"
-else
-  echo "Update hypervisor file ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION} with path to latest openshift-dpf install dir"
-  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}; \
-    sed -i 's|LAST_OPENSHIFT_DPF=.*|LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf|' last-openshift-dpf-dir.sh"; then
-    echo "Updated variable LAST_OPENSHIFT_DPF with path '${REMOTE_WORK_DIR}/openshift-dpf' in hypervisor file '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"
-  else
-    echo "ERROR: Failed to update variable LAST_OPENSHIFT_DPF in hypervisor file '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"
-    exit 1
-  fi
-fi
-
-# Generate the .env file using the env.user file on hypervisor
-echo "Verify env.user_${CLUSTER_NAME} source file exists on hypervisor ..."
+# SCP env.user file from bastion
+echo "Fetching env.user_${CLUSTER_NAME} from bastion..."
 if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}"; then
-  echo "ERROR: File env.user_${CLUSTER_NAME} file does not exist: ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}"
+  echo "ERROR: File env.user_${CLUSTER_NAME} does not exist on bastion: ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}"
   exit 1
 fi
+scp ${SSH_OPTS} "root@${REMOTE_HOST}:${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}" .
+echo "env.user_${CLUSTER_NAME} copied from bastion"
 
-echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hypervisor"
-
-echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
-# Pass the CI release payload (resolved by ci-operator from the releases.latest config)
+# Handle CI release payload
 if [[ "${DPF_SKIP_CI_PAYLOAD:-false}" == "true" ]]; then
   PAYLOAD_URL=""
   echo "DPF_SKIP_CI_PAYLOAD is set; skipping CI release payload injection"
@@ -181,7 +158,7 @@ echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
 # Merge CI registry credentials into the pull secret so the cluster can
 # access the Prow-internal registry (registry.buildXX.ci.openshift.org).
 if [[ -n "${PAYLOAD_URL}" ]]; then
-  echo "Merging CI registry credentials into pull secret on hypervisor..."
+  echo "Merging CI registry credentials into pull secret..."
   PULL_SECRET_SRC="${CLUSTER_PROFILE_DIR}/openshift-pull-secret"
   if [[ ! -f "${PULL_SECRET_SRC}" ]]; then
     echo "ERROR: ${PULL_SECRET_SRC} not found"
@@ -189,46 +166,33 @@ if [[ -n "${PAYLOAD_URL}" ]]; then
   fi
   cp "${PULL_SECRET_SRC}" /tmp/pull-secret.json
   oc registry login --to=/tmp/pull-secret.json
-  REMOTE_PULL_SECRET=$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -ea; source ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}; set +a; PS=\${OPENSHIFT_PULL_SECRET:-openshift_pull.json}; [[ \"\$PS\" = /* ]] && echo \"\$PS\" || echo \"${REMOTE_WORK_DIR}/openshift-dpf/\$PS\"")
-  scp -q ${SSH_OPTS} /tmp/pull-secret.json root@${REMOTE_HOST}:"${REMOTE_PULL_SECRET}"
-  echo "Pull secret with CI registry credentials copied to ${REMOTE_PULL_SECRET}"
+
+  # Place the merged pull secret where env.user expects it
+  set -a; source "env.user_${CLUSTER_NAME}"; set +a
+  PS=${OPENSHIFT_PULL_SECRET:-openshift_pull.json}
+  [[ "$PS" = /* ]] && LOCAL_PULL_SECRET="$PS" || LOCAL_PULL_SECRET="${WORK_DIR}/$PS"
+  cp /tmp/pull-secret.json "${LOCAL_PULL_SECRET}"
+  echo "Pull secret with CI registry credentials placed at ${LOCAL_PULL_SECRET}"
   rm -f /tmp/pull-secret.json
 fi
 
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
-  cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
-  cd ${REMOTE_WORK_DIR}/openshift-dpf; \
-  pwd; \
-  env; \
-  set -a; \
-  source env.user_${CLUSTER_NAME}; \
-  env; \
-  set +a; \
-  make generate-env; \
-  ls -ltra .env; \
-  cat .env"; then
-  echo ".env file from sourced env.user_${CLUSTER_NAME} was generated successfully"
-else
-  echo "ERROR: Failed to generate .env file from sourced env.user_${CLUSTER_NAME} file"
-  exit 1
-fi
+# Generate the .env file
+echo "Generating .env file from env.user_${CLUSTER_NAME}..."
+export PAYLOAD_URL
+set -a
+source "env.user_${CLUSTER_NAME}"
+set +a
+make generate-env
+echo ".env file generated successfully"
+cat .env
 
-echo "Create logs dir on the remote host"
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "mkdir -p ${REMOTE_LOGS_DIR}; cd ${REMOTE_LOGS_DIR}; pwd"; then
-  echo "Logs directory created successfully at ${REMOTE_LOGS_DIR}"
-else
-  echo "ERROR: Failed to create logs directory at ${REMOTE_LOGS_DIR}"
-  exit 1
-fi
+# Set LIBVIRT_HOST for remote VM management from the Prow pod
+echo "LIBVIRT_HOST=${REMOTE_HOST}" >> .env
+echo "Added LIBVIRT_HOST=${REMOTE_HOST} to .env"
 
-echo "Updating variables to use correct file paths with timestamps in .env file"
-# Using delimiter '|' since we have '/' in the patterns
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; sed -i 's|KUBECONFIG=.*|KUBECONFIG=${REMOTE_WORK_DIR}/openshift-dpf/kubeconfig-mno|' ${REMOTE_WORK_DIR}/openshift-dpf/.env"; then
-  echo "KUBECONFIG variable updated successfully in .env file"
-else
-  echo "ERROR: Failed to update KUBECONFIG variable in .env file"
-  exit 1
-fi
+# Update KUBECONFIG to local path
+sed -i "s|KUBECONFIG=.*|KUBECONFIG=${WORK_DIR}/kubeconfig-mno|" .env
+echo "KUBECONFIG path updated in .env"
 
 # Override dpf-hcp-provisioner-operator image if a CI-built override was provided
 if [[ -f "${SHARED_DIR}/dpf-hcp-provisioner-operator-override" ]]; then
@@ -237,67 +201,72 @@ if [[ -f "${SHARED_DIR}/dpf-hcp-provisioner-operator-override" ]]; then
     OVERRIDE_REPO="${OVERRIDE_IMAGE%:*}"
     OVERRIDE_TAG="${OVERRIDE_IMAGE##*:}"
     echo "Overriding dpf-hcp-provisioner-operator image: repo=${OVERRIDE_REPO} tag=${OVERRIDE_TAG}"
-    if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; \
-      sed -i 's|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_REPO=.*|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_REPO=${OVERRIDE_REPO}|' .env; \
-      sed -i 's|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_TAG=.*|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_TAG=${OVERRIDE_TAG}|' .env"; then
-      echo "dpf-hcp-provisioner-operator image override applied successfully"
-    else
-      echo "ERROR: Failed to apply dpf-hcp-provisioner-operator image override"
-      exit 1
-    fi
+    sed -i "s|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_REPO=.*|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_REPO=${OVERRIDE_REPO}|" .env
+    sed -i "s|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_TAG=.*|DPF_HCP_PROVISIONER_OPERATOR_IMAGE_TAG=${OVERRIDE_TAG}|" .env
+    echo "dpf-hcp-provisioner-operator image override applied successfully"
   fi
 fi
 
-echo "Copying .env from hypervisor to artifacts..."
-scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env ${ARTIFACT_DIR}/.env || echo "WARNING: Failed to copy .env to artifacts"
+# Pick dynamic ports for the SSH reverse tunnel so parallel deployments
+# (e.g. doca4 and doca8) sharing the same hypervisor don't collide
+AI_PORT=$((RANDOM % 10000 + 20000))
+IMAGE_PORT=$((AI_PORT + 1))
+echo "AI_URL=http://${REMOTE_HOST}:${AI_PORT}" >> .env
+echo "AI_ONPREM_PORT=${AI_PORT}" >> .env
+echo "AI_ONPREM_IMAGE_PORT=${IMAGE_PORT}" >> .env
+echo "Added AI_URL=http://${REMOTE_HOST}:${AI_PORT}, AI_ONPREM_PORT=${AI_PORT}, AI_ONPREM_IMAGE_PORT=${IMAGE_PORT} to .env"
 
+echo "Copying .env to artifacts..."
+cp .env "${ARTIFACT_DIR}/.env" || echo "WARNING: Failed to copy .env to artifacts"
 
-# SSH session to hypervisor
-echo "Starting DPF deployment with 'make all'..."
-echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
+# Start SSH reverse tunnel so VMs on the bastion network can reach the
+# Assisted Installer running in this Prow pod
+echo "Starting SSH reverse tunnel (AI API :${AI_PORT} -> :8090, image service :${IMAGE_PORT} -> :8888)..."
+ssh ${SSH_OPTS} \
+  -R "0.0.0.0:${AI_PORT}:127.0.0.1:8090" \
+  -R "0.0.0.0:${IMAGE_PORT}:127.0.0.1:8888" \
+  root@${REMOTE_HOST} -N &
+SSH_TUNNEL_PID=$!
+trap "copy_kubeconfig; kill ${SSH_TUNNEL_PID} 2>/dev/null || true" EXIT
+sleep 2
+if ! kill -0 ${SSH_TUNNEL_PID} 2>/dev/null; then
+  echo "ERROR: SSH reverse tunnel failed to start"
+  exit 1
+fi
+echo "SSH reverse tunnel started (PID: ${SSH_TUNNEL_PID})"
 
-
-# Execute `make clean-all` on hypervisor with comprehensive logging
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
-  ls -ltr; \
-  env; \
-  cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
-  mkdir -p ${REMOTE_LOGS_DIR} ; \
-  make clean-all 2>&1 | tee ${CLEAN_ALL_LOG}"; then
-
-  CLEAN_ALL_SUCCESS=true
-  echo "DPF pre-deployment clean-all completed successfully.  CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
-
-  echo "Sleeping for 300 seconds ...."
-  sleep 300
-
-  # Execute make all on hypervisor with comprehensive logging
-  echo "Execute make all on hypervisor with comprehensive logging"
-
-  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
-    cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
-    mkdir -p ${REMOTE_LOGS_DIR} ; \
-    make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
-
-    DEPLOYMENT_SUCCESS=true
-
-    # Note:  here we often get here but make all failed, so we need to ssh again
-    # and run oc commands to confirm the deployment is success and we got the DPU workers ready
-
-    echo "DPF deployment completed successfully, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
-
-  else
-    DEPLOYMENT_SUCCESS=false
-    echo "ERROR: DPF deployment failed, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
-    echo "Check deployment logs at: ${DEPLOYMENT_LOG}"
-    exit 1
-  fi
-
+# Run deployment locally
+echo "Starting DPF deployment with 'make clean-all'..."
+if make clean-all 2>&1 | tee "${ARTIFACT_DIR}/make_clean-all_${datetime_string}.log"; then
+  echo "DPF pre-deployment clean-all completed successfully"
 else
-  CLEAN_ALL_SUCCESS=false
-  echo "DPF pre-deployment clean-all failed, CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
+  echo "ERROR: DPF pre-deployment clean-all failed"
   exit 1
 fi
 
-# To Do: add basic oc commands to verify make all step passed
+echo "Sleeping for 300 seconds..."
+sleep 300
 
+echo "Starting DPF deployment with 'make all'..."
+if make all 2>&1 | tee "${ARTIFACT_DIR}/make_all_${datetime_string}.log"; then
+  echo "DPF deployment completed successfully"
+else
+  echo "ERROR: DPF deployment failed"
+  echo "Check deployment logs in artifacts"
+  exit 1
+fi
+
+# Post-deployment: copy files back to bastion for tracking
+echo "Copying deployment files back to bastion..."
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "mkdir -p ${REMOTE_WORK_DIR}/openshift-dpf"
+scp ${SSH_OPTS} .env "root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/" || echo "WARNING: Failed to copy .env to bastion"
+scp ${SSH_OPTS} kubeconfig-mno "root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/" 2>/dev/null || echo "WARNING: Failed to copy kubeconfig to bastion"
+
+# Update last-openshift-dpf-dir.sh on bastion
+echo "Updating last-openshift-dpf-dir.sh on bastion..."
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"; then
+  ssh ${SSH_OPTS} root@${REMOTE_HOST} "sed -i 's|LAST_OPENSHIFT_DPF=.*|LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf|' ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"
+else
+  ssh ${SSH_OPTS} root@${REMOTE_HOST} "echo 'LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf' > ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"
+fi
+echo "Bastion tracking updated"
