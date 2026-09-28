@@ -3,6 +3,40 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
+
+# --- CRI-O heap pprof investigation ---
+# Install Go (CI image has no go binary)
+GO_VERSION="1.25.9"
+curl -sL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz
+mkdir -p /tmp/goroot
+tar -C /tmp/goroot -xzf /tmp/go.tar.gz
+rm /tmp/go.tar.gz
+export GOROOT=/tmp/goroot/go
+export PATH="/tmp/goroot/go/bin:${PATH}"
+go version
+
+# Download and build kube-burner-ocp from fork (with CRI-O heap pprof target)
+FORK_REPO="https://github.com/redhat-chai-bot/kube-burner_kube-burner-ocp"
+FORK_BRANCH="add-crio-heap-pprof-target"
+KB_OCP_SRC=$(mktemp -d)
+echo "Building kube-burner-ocp from ${FORK_REPO} branch ${FORK_BRANCH}..."
+curl -sL "${FORK_REPO}/archive/refs/heads/${FORK_BRANCH}.tar.gz" -o /tmp/kb-ocp.tar.gz
+tar -xzf /tmp/kb-ocp.tar.gz --strip-components=1 -C "$KB_OCP_SRC"
+rm /tmp/kb-ocp.tar.gz
+cd "$KB_OCP_SRC"
+mkdir -p bin/amd64
+GOARCH=amd64 CGO_ENABLED=0 go build -v -ldflags \
+  "-X github.com/cloud-bulldozer/go-commons/v2/version.Version=test" \
+  -o bin/amd64/kube-burner-ocp ./cmd/
+echo "BUILD SUCCESS: $(ls -la bin/amd64/kube-burner-ocp)"
+cd -
+
+# Create tarball and override KUBE_BURNER_URL
+KB_TARBALL="/tmp/kube-burner-ocp-custom.tar.gz"
+tar -czf "$KB_TARBALL" -C "$KB_OCP_SRC/bin/amd64" kube-burner-ocp
+export KUBE_BURNER_URL="file://${KB_TARBALL}"
+# --- END CRI-O heap pprof ---
+
 cat /etc/os-release
 oc config view
 oc projects
@@ -66,7 +100,7 @@ ITERATIONS=$(awk "BEGIN {printf \"%d\", $iteration_multiplier * $current_worker_
 export ITERATIONS
 
 export WORKLOAD=cluster-density-v2
-EXTRA_FLAGS="${KB_FLAGS} ${CD_V2_EXTRA_FLAGS} --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+EXTRA_FLAGS="${KB_FLAGS} ${CD_V2_EXTRA_FLAGS} --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE} --pprof=${PPROF} --pprof-interval=1m"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
