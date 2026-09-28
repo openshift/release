@@ -187,4 +187,4 @@ This generator lives in `openshift/release` directly (`ci-operator/config/quay/q
 make check
 ```
 
-Golden output and other fixed expectations use `tests/fixtures/matrix-phase0.yaml.in`, not the checked-in `matrix.yaml.in`. You can add releases, clouds, and OCP versions to `matrix.yaml.in` without updating those tests; `test_production_matrix_expands_without_error` only checks that the production matrix expands with unique filenames.
+Golden output and other fixed expectations use `tests/fixtures/matrix-phase0.yaml.in`, not the checked-in `matrix.yaml.in`; adding releases, clouds, or OCP versions to `matrix.yaml.in` never touches those. But several tests assert against the checked-in `matrix.yaml.in` directly (`test_expand_matrix_cells`, `test_periodic_names_use_cloud_storage_source`, `test_golden_master_bytes`, `test_master_presubmit_expands_both_clouds`, `test_list_includes_arch_header_and_values`), so adding a release, cloud, or OCP version there can require updating those tests too. `test_production_matrix_expands_without_error` only checks that the production matrix expands with unique filenames.

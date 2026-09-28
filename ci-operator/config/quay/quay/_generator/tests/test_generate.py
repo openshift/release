@@ -679,6 +679,20 @@ def _matrix_with_job(
     }
 
 
+def test_ocp_rejects_non_string_values() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": [4.20],
+            "test": "e2e-install",
+        }
+    )
+    with pytest.raises(ValueError, match=r"\.ocp values must be quoted strings"):
+        expand_cells(matrix)
+
+
 def test_kind_must_be_periodic_or_presubmit() -> None:
     matrix = _matrix_with_job(
         {

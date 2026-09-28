@@ -165,6 +165,14 @@ def _as_str_list(value: Any) -> list[str]:
     return [str(value)]
 
 
+def _ocp_str_list(value: Any, where: str) -> list[str]:
+    items = value if isinstance(value, list) else ([] if value is None else [value])
+    non_str = [item for item in items if not isinstance(item, str)]
+    if non_str:
+        raise ValueError(f"{where}.ocp values must be quoted strings, got {non_str!r}")
+    return _as_str_list(value)
+
+
 def _job_arches_field(job: YamlMap, default_arch: str, where: str) -> list[str]:
     if "arches" not in job:
         return [default_arch]
@@ -332,7 +340,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             if kind not in ("periodic", "presubmit"):
                 raise ValueError(f"{where}.kind must be 'periodic' or 'presubmit', got {kind!r}")
             test = str(job.get("test") or "")
-            ocps = _as_str_list(job.get("ocp"))
+            ocps = _ocp_str_list(job.get("ocp"), where)
             clouds = _as_str_list(job.get("clouds"))
             arches = _job_arches_field(job, default_arch, where)
             if not test or not ocps or not clouds:
