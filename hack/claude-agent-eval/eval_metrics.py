@@ -151,7 +151,7 @@ def main(args):  # pylint: disable=too-many-statements
             rows.append(row)
 
 
-    def add_harness_rows():
+    def add_harness_rows():  # pylint: disable=too-many-statements
         result_file = pathlib.Path(result_path) if result_path else None
         if result_file is None or not result_file.is_file():
             return
@@ -167,7 +167,17 @@ def main(args):  # pylint: disable=too-many-statements
         model_turns = result.get("per_model_turns", {})
         if not isinstance(model_turns, dict):
             model_turns = {}
-        total_turns = sum(int(value or 0) for value in model_turns.values())
+        # Missing/null is unavailable, not a measured zero. Keep known counts
+        # even for models without token usage; never assign run totals per model.
+        model_turns = {model: int(value) for model, value in model_turns.items() if value is not None}
+        usages = {**{model: {} for model in model_turns}, **usages}
+        missing_turns = sorted(set(usages) - model_turns.keys())
+        if missing_turns:
+            print(f"Per-model turns unavailable for {missing_turns}; "
+                  "omit their counts and record any known unattributed total separately")
+        total_turns = sum(model_turns.values())
+        run_turns = result.get("num_turns")
+        unattributed_turns = max(0, int(run_turns) - total_turns) if run_turns is not None else None
         total_cost = sum(float(usage.get("cost_usd", 0) or 0) for usage in usages.values())
         duration_s = float(result.get("duration_s", 0) or result.get("wall_clock_s", 0) or 0)
         if not duration_s:
@@ -187,16 +197,16 @@ def main(args):  # pylint: disable=too-many-statements
         harness_prompt = f"/{skill} {skill_args}".strip() if skill else prompt
 
         for model, usage in usages.items():
-            turns = int(model_turns.get(model, 0) or 0)
+            turns = model_turns.get(model)
             cost = float(usage.get("cost_usd", 0) or 0)
             input_tokens = int(usage.get("input", 0) or 0)
             output_tokens = int(usage.get("output", 0) or 0)
             cache_read = int(usage.get("cache_read", 0) or 0)
             cache_create = int(usage.get("cache_creation", 0) or 0)
             total_input = input_tokens + cache_read + cache_create
-            if cost <= 0 and total_input <= 0 and output_tokens <= 0 and turns <= 0:
+            if cost <= 0 and total_input <= 0 and output_tokens <= 0 and turns is None:
                 continue
-            if total_turns:
+            if total_turns and not missing_turns and not unattributed_turns:
                 duration_ratio = turns / total_turns
             elif total_cost:
                 duration_ratio = cost / total_cost
@@ -215,7 +225,6 @@ def main(args):  # pylint: disable=too-many-statements
                 "plugins_loaded": "agent-eval-harness",
                 "analyzed_at": analyzed_at,
                 "duration_ms": str(max(1, int(duration_ms * duration_ratio))),
-                "num_turns": str(turns or int(result.get("num_turns", 0) or 0)),
                 "total_cost_usd": f"{cost:.6f}",
                 "input_tokens": str(input_tokens),
                 "output_tokens": str(output_tokens),
@@ -227,6 +236,28 @@ def main(args):  # pylint: disable=too-many-statements
                 "is_error": "1" if exit_code else "0",
                 "terminal_reason": "eval_failed" if exit_code else "eval_complete",
                 "stop_reason": "eval_failed" if exit_code else "end_turn",
+            })
+            # AutoDL columns are optional: absence means unknown, while "0"
+            # is a measured zero. Never serialize None as "None" or a zero.
+            if turns is None:
+                row.pop("num_turns", None)
+            else:
+                row["num_turns"] = str(turns)
+            rows.append(row)
+
+        if unattributed_turns or (unattributed_turns == 0 and not model_turns):
+            # An accounting-only row preserves the total without fabricating a
+            # model attribution or duplicating token, cost, or duration metrics.
+            row = empty_row()
+            row.update({
+                "session_id": f"eval-harness-unattributed:{build_id}:{run_id}",
+                "model": "",
+                "entrypoint": "agent-eval-harness",
+                "prompt": harness_prompt[:500],
+                "analyzed_at": analyzed_at,
+                "num_turns": str(unattributed_turns),
+                "is_error": "1" if result.get("exit_code") else "0",
+                "terminal_reason": "unattributed_turns",
             })
             rows.append(row)
 

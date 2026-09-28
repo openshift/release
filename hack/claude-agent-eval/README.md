@@ -213,6 +213,24 @@ temporary directory aliases created by the orchestrator. Missing summaries or
 thresholded judges still fail the eval.
 Python emits AutoDL metrics for orchestrator and harness model usage;
 metrics failures remain warnings and do not replace the eval verdict.
+Harness model rows count only turns explicitly attributed to that model. Missing
+or null counts omit the row's `num_turns` field (unavailable); explicit zero counts
+remain `"0"`. The `int64` schema stays unchanged: AutoDL columns are optional,
+and omission does not claim zero turns. Do not coalesce missing counts to zero
+when displaying or averaging per-model turns. Any run-total turns not covered
+by known model counts appear
+once in an accounting-only row with an empty `model` and
+`terminal_reason: unattributed_turns`, without additional cost, tokens, or duration.
+The original availability information remains in `run_result.json`. When no run
+total is available, only known model counts are emitted. Known counts are never
+replaced by a smaller or inconsistent run total. A known zero run total is also
+preserved once when all per-model counts are unavailable.
+
+The [AutoDL format](https://github.com/openshift/origin/blob/4bf055776bfdbd08af6e622ce20104f9600716b1/pkg/dataloader/types.go)
+defines optional schema columns and string-valued rows. The
+[loader](https://github.com/neisw/ci-data-loader/blob/ecb7ce971901f4a8f472c74cab944e02d48a4951/big_query_loader.go#L754)
+uploads only present row fields; its schema columns are nullable. Unknown counts
+therefore use omission rather than a nonnumeric `"unavailable"` value.
 
 ## Development and validation
 
