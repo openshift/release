@@ -154,9 +154,13 @@ def main():
             write_gate_junit(artifact_dir, 0, 0, 0, 0, 0, 0.0, threshold, True)
             sys.exit(1)
         else:
+            # Sentinel: emit a JUnit failure testcase so the absence of
+            # evidence is visible in Sippy/TestGrid, but exit 0 per the
+            # advisory-mode invariant (FAIL_ON_BREACH=false).
             print(f"WARNING: no *.xml files found in {junit_dir} "
-                  f"(FAIL_ON_BREACH=false, not failing)")
-            write_gate_junit(artifact_dir, 0, 0, 0, 0, 0, 0.0, threshold, False)
+                  f"(FAIL_ON_BREACH=false, recording sentinel failure)")
+            write_gate_junit(artifact_dir, 0, 0, 0, 0, 0, 0.0, threshold,
+                             breach=True, advisory_breach=True)
             sys.exit(0)
 
     all_suites = []

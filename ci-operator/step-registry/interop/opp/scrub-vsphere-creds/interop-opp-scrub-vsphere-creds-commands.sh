@@ -69,12 +69,6 @@ with os.scandir(shared_dir) as entries:
 secrets = tuple(sorted(secrets, key=len, reverse=True))
 
 for directory, subdirectories, filenames in os.walk(shared_dir):
-    relative_directory = os.path.relpath(directory, shared_dir)
-    depth = 0 if relative_directory == b"." else relative_directory.count(b"/") + 1
-    if depth >= 3:
-        subdirectories.clear()
-        continue
-
     for filename in filenames:
         path = os.path.join(directory, filename)
         try:

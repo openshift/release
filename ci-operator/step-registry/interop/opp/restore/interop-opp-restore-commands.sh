@@ -102,10 +102,14 @@ WriteJunit() {
 # shellcheck disable=SC2317  # invoked via trap
 CollectExitArtifacts() {
     # Dump cluster state to artifacts on exit for post-mortem analysis.
+    # Node YAML is deliberately excluded — it contains IPs and providerIDs
+    # that must not leak into public GCS artifacts.
     : "Collecting exit diagnostics..."
     oc get clusterversion version -o yaml > "${ARTIFACT_DIR}/restore-clusterversion.yaml" || true
     oc get clusteroperators -o yaml > "${ARTIFACT_DIR}/restore-clusteroperators.yaml" || true
-    oc get nodes -o yaml > "${ARTIFACT_DIR}/restore-nodes.yaml" || true
+    # Node health: capture only Ready condition status per node (no IPs/providerIDs).
+    oc get nodes -o go-template='{{range .items}}{{.metadata.name}}{{"\t"}}{{range .status.conditions}}{{if eq .type "Ready"}}{{.status}}{{end}}{{end}}{{"\n"}}{{end}}' \
+        > "${ARTIFACT_DIR}/restore-node-readiness.txt" 2>/dev/null || true
 }
 
 # shellcheck disable=SC2317
@@ -115,7 +119,7 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
+trap '_jrc=$?; set +e; WriteJunit || true; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
 
 echo ">>> PHASE: initialization"
 
