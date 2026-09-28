@@ -357,6 +357,38 @@ Context (generated 2026-09-24T18:40:20.154Z)
         self.assertIn('1.25', usage)
         self.assertNotIn('private cluster output', usage)
 
+    def test_budget_exhaustion_preserves_baseline_evidence_without_claiming_a_fix(self):
+        test = {'spec': 'console/app/demo.spec.ts', 'project': 'console', 'name': 'demo'}
+        self.driver.EVIDENCE.mkdir()
+        self.driver.report('Investigation did not complete.')
+        self.driver.save({'schema_version': 1, 'verification_status': 'no_fix',
+                          'reason': 'no candidate patch', 'patch': None,
+                          'targets': [], 'verified_runs': 0})
+        self.driver.dump(self.driver.CONTEXT, {'failed_tests': [test], 'flaked_tests': []})
+        self.driver.dump(self.root / 'selected.json', [test])
+        self.driver.dump(self.driver.EVIDENCE / 'history.json', {'status': 'unavailable'})
+        self.driver.dump(self.driver.EVIDENCE / 'baseline.json', [
+            {'test': test, 'executed': True, 'passed': False},
+            {'test': test, 'executed': True, 'passed': True},
+        ])
+        (self.root / 'session.jsonl').write_text(json.dumps({
+            'type': 'result', 'subtype': 'error_max_budget_usd',
+            'is_error': True, 'total_cost_usd': 5.0,
+        }) + '\n')
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.driver.finalize()
+        state = self.driver.read(self.driver.STATE)
+        analysis = (self.artifacts / 'console-flake-analysis.md').read_text()
+        self.assertEqual(state['model_status'], 'budget_exhausted')
+        self.assertIn('model spend cap reached', state['reason'])
+        self.assertEqual(state['classification'], [])
+        self.assertIn('did not pass, passed', analysis)
+        self.assertIn('No test-code fix was established', analysis)
+        self.assertIn('No independent verification was run', analysis)
+        self.assertNotIn('console-flake-evidence/verification.json', analysis)
+        self.assertNotIn('PROPOSED SOLUTION', output.getvalue())
+
     def test_original_failure_followed_by_passing_rerun_is_observed_flaky(self):
         test = {'spec': 'console/a.spec.ts', 'project': 'console', 'name': 'a'}
         self.driver.EVIDENCE.mkdir()
