@@ -154,8 +154,7 @@ main() {
 
     local raw_entries=()
     if [[ -n "$MEDIK8S_BUNDLE_IMAGES" ]]; then
-        local IFS=','
-        read -ra raw_entries <<< "$MEDIK8S_BUNDLE_IMAGES"
+        IFS=',' read -ra raw_entries <<< "$MEDIK8S_BUNDLE_IMAGES"
     elif [[ -n "$OO_PACKAGE" ]]; then
         if [[ -n "$OO_BUNDLE" ]]; then
             raw_entries=("${OO_PACKAGE}=${OO_BUNDLE}")
