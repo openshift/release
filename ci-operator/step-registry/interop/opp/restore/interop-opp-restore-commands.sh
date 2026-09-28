@@ -107,8 +107,9 @@ CollectExitArtifacts() {
     : "Collecting exit diagnostics..."
     oc get clusterversion version -o yaml > "${ARTIFACT_DIR}/restore-clusterversion.yaml" || true
     oc get clusteroperators -o yaml > "${ARTIFACT_DIR}/restore-clusteroperators.yaml" || true
-    # Node health: capture only Ready condition status per node (no IPs/providerIDs).
-    oc get nodes -o go-template='{{range .items}}{{.metadata.name}}{{"\t"}}{{range .status.conditions}}{{if eq .type "Ready"}}{{.status}}{{end}}{{end}}{{"\n"}}{{end}}' \
+    # Node health: capture aggregate Ready condition counts without node identities.
+    oc get nodes -o json | jq -r \
+        '[.items[] | ([.status.conditions[]? | select(.type == "Ready")][0].status // "Unknown")] | group_by(.)[] | "\(.[0])\t\(length)"' \
         > "${ARTIFACT_DIR}/restore-node-readiness.txt" 2>/dev/null || true
 }
 
