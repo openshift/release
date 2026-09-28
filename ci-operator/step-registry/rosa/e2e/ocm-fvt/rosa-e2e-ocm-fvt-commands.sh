@@ -131,28 +131,8 @@ fi
 old_umask=$(umask)
 umask 077
 podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
-prom_pf_pid=""
-pf_watchdog_pid=""
-pf_pid_file=""
-appsre_kubeconfig=""
 cleanup_ocm_fvt() {
-  if [[ -n "${pf_watchdog_pid}" ]]; then
-    kill "${pf_watchdog_pid}" 2>/dev/null || true
-    wait "${pf_watchdog_pid}" 2>/dev/null || true
-  fi
-  if [[ -n "${pf_pid_file}" && -f "${pf_pid_file}" ]]; then
-    local cur_pid
-    cur_pid="$(cat "${pf_pid_file}" 2>/dev/null || true)"
-    if [[ -n "${cur_pid}" ]]; then
-      kill "${cur_pid}" 2>/dev/null || true
-      wait "${cur_pid}" 2>/dev/null || true
-    fi
-    rm -f "${pf_pid_file}"
-  elif [[ -n "${prom_pf_pid}" ]]; then
-    kill "${prom_pf_pid}" 2>/dev/null || true
-    wait "${prom_pf_pid}" 2>/dev/null || true
-  fi
-  rm -f "${podman_env_file}" "${hive_kubeconfig:-}" "${hive_kubeconfig_src:-}" "${appsre_kubeconfig:-}"
+  rm -f "${podman_env_file}" "${hive_kubeconfig:-}" "${hive_kubeconfig_src:-}"
 }
 trap cleanup_ocm_fvt EXIT
 umask "${old_umask}"
@@ -303,150 +283,67 @@ podman_args+=(--rm)
 
 ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
 
-# osdfm post-alerts: port-forward AppSRE Prom; tests use a hard-coded in-cluster URL.
-# --add-host maps that hostname to host-gateway:9090 (backplane monitoring is not available).
-prom_host_fqdn="prometheus-app-sre.openshift-customer-monitoring.svc.cluster.local"
-if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && "${OCM_FVT_USE_BACKPLANE:-false}" == "true" && -n "${backplane_bin_dir}" ]]; then
-  prom_ns=openshift-customer-monitoring
-  prom_svc=prometheus-app-sre
-  prom_artifact_dir="${ARTIFACT_DIR:-/tmp}"
-  prom_ocm_env="${OCM_FVT_OCM_ENV:-integration}"
-  mkdir -p "${prom_artifact_dir}"
+# ROSAENG-67791: osdfm metrics/alerts query RHOBS (in-cluster prometheus-app-sre PF removed).
+if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
+  echo "=== RHOBS metrics endpoint (osdfm post-alerts) ==="
+  ocm_env_lower="$(echo "${OCM_FVT_OCM_ENV:-integration}" | tr '[:upper:]' '[:lower:]')"
+  case "${ocm_env_lower}" in
+    production|prod)
+      rhobs_oidc_dir="${OCM_FVT_RHOBS_OIDC_DIR:-/usr/local/rhobs-oidc-production}"
+      rhobs_metrics_url="${OCM_FVT_PROMETHEUS_URL:-https://us-east-1-0.rhobs.api.openshift.com/api/metrics/v1/hcp}"
+      ;;
+    *)
+      # integration + stage OSDFM metrics land in stage RHOBS hcp tenant (OTEL catchall).
+      rhobs_oidc_dir="${OCM_FVT_RHOBS_OIDC_DIR:-/usr/local/rhobs-oidc-staging}"
+      rhobs_metrics_url="${OCM_FVT_PROMETHEUS_URL:-https://us-east-1-0.rhobs.api.stage.openshift.com/api/metrics/v1/hcp}"
+      ;;
+  esac
 
-  appsre_cluster_id="${OCM_FVT_APPSRE_BACKPLANE_CLUSTER_ID:-19mjrthsfn66bm22m574v2v1gt9a8r4q}"
-  appsre_kubeconfig="$(mktemp /tmp/appsre-kubeconfig.XXXXXX)"
-  rm -f "${appsre_kubeconfig}"
-  saved_kubeconfig="${KUBECONFIG:-}"
-  export KUBECONFIG="${appsre_kubeconfig}"
-  export PATH="${backplane_bin_dir}:${PATH}"
+  if [[ ! -f "${rhobs_oidc_dir}/client_id" || ! -f "${rhobs_oidc_dir}/client_secret" ]]; then
+    echo "ERROR: RHOBS OIDC credentials missing under ${rhobs_oidc_dir} (need client_id/client_secret)" >&2
+    exit 1
+  fi
 
-  echo "=== AppSRE Prometheus port-forward (osdfm post-alerts) ==="
-  if ! ocm-backplane login "${appsre_cluster_id}"; then
-    echo "ERROR: backplane login to app-sre-stage-01 (${appsre_cluster_id}) failed" >&2
-    export KUBECONFIG="${saved_kubeconfig}"
-    rm -f "${appsre_kubeconfig}"
-    appsre_kubeconfig=""
-  else
-    chmod 0600 "${appsre_kubeconfig}"
-    echo "oc whoami: $(oc whoami 2>&1 || true)"
-    oc -n "${prom_ns}" get svc "${prom_svc}" -o name 2>&1 || true
+  [[ $- == *x* ]] && WAS_TRACING_RHOBS=true || WAS_TRACING_RHOBS=false
+  set +x
+  rhobs_client_id="$(cat "${rhobs_oidc_dir}/client_id")"
+  rhobs_client_secret="$(cat "${rhobs_oidc_dir}/client_secret")"
+  rhobs_issuer="$(cat "${rhobs_oidc_dir}/oidc_issuer_url" 2>/dev/null || true)"
+  if [[ -z "${rhobs_issuer}" ]]; then
+    rhobs_issuer="https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+  fi
+  rhobs_token="$(curl -sf -X POST "${rhobs_issuer}" \
+    -d "grant_type=client_credentials" \
+    -d "client_id=${rhobs_client_id}" \
+    -d "client_secret=${rhobs_client_secret}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")" || {
+    $WAS_TRACING_RHOBS && set -x
+    echo "ERROR: failed to obtain RHOBS OIDC access token from ${rhobs_issuer}" >&2
+    exit 1
+  }
 
-    pf_log="${prom_artifact_dir}/prom-port-forward.log"
-    pf_max_retries=3
-    for (( pf_try=1; pf_try<=pf_max_retries; pf_try++ )); do
-      echo "port-forward attempt ${pf_try}/${pf_max_retries}"
-      # Listen on 0.0.0.0 so podman host-gateway can reach the port-forward.
-      oc -n "${prom_ns}" port-forward --address 0.0.0.0 "svc/${prom_svc}" 9090:9090 \
-        >"${pf_log}" 2>&1 &
-      prom_pf_pid=$!
+  # Keep tracing off while the bearer token is written / used on the curl cmdline.
+  # Mount OIDC creds so ocmci can refresh tokens after SOAK_TIME (SSO TTL ~5m).
+  podman_args+=("-v" "${rhobs_oidc_dir}:/usr/local/rhobs-oidc:ro,z")
+  echo "OCM_FVT_PROMETHEUS_URL=${rhobs_metrics_url}" >> "${podman_env_file}"
+  echo "OCM_FVT_RHOBS_OIDC_DIR=/usr/local/rhobs-oidc" >> "${podman_env_file}"
+  # Initial token for spot-check / early queries; container refreshes before PromQL.
+  echo "OCM_FVT_PROMETHEUS_TOKEN=${rhobs_token}" >> "${podman_env_file}"
+  echo "RHOBS metrics URL: ${rhobs_metrics_url}"
+  echo "RHOBS OIDC dir: ${rhobs_oidc_dir} (mounted at /usr/local/rhobs-oidc)"
 
-      ready=false
-      attempts=60
-      while (( attempts-- > 0 )); do
-        if ! kill -0 "${prom_pf_pid}" 2>/dev/null; then
-          echo "port-forward exited early (pid ${prom_pf_pid})"
-          break
-        fi
-        if curl -sS -o /dev/null --max-time 1 "http://127.0.0.1:9090/api/v1/query?query=up" 2>/dev/null; then
-          ready=true
-          break
-        fi
-        sleep 1
-      done
-
-      if [[ "${ready}" == "true" ]]; then
-        break
-      fi
-
-      echo "WARNING: port-forward attempt ${pf_try} failed" >&2
-      cat "${pf_log}" 2>/dev/null || true
-      kill "${prom_pf_pid}" 2>/dev/null || true
-      wait "${prom_pf_pid}" 2>/dev/null || true
-      prom_pf_pid=""
-      if (( pf_try < pf_max_retries )); then
-        sleep 2
-      fi
-    done
-
-    if [[ "${ready}" != "true" ]]; then
-      echo "ERROR: Prometheus port-forward not ready after ${pf_max_retries} attempts" >&2
-      prom_pf_pid=""
-    else
-      # Spot-check Prom; log truncated snippets only.
-      code="$(curl -sS -o /tmp/prom-up.out -w '%{http_code}' --max-time 10 \
-        "http://127.0.0.1:9090/api/v1/query?query=up" || echo err)"
-      echo "PromQL up HTTP ${code}; body: $(head -c 160 /tmp/prom-up.out 2>/dev/null | tr '\n' ' ')"
-      rm -f /tmp/prom-up.out
-      ns="osd-fleet-manager-${prom_ocm_env}"
-      for q in \
-        "fleet_manager_cluster_status_count{namespace=\"${ns}\"}" \
-        "ALERTS{namespace=\"${ns}\"}"; do
-        sc="$(curl -sS -o /tmp/prom-suite.out -w '%{http_code}' --max-time 15 \
-          --get "http://127.0.0.1:9090/api/v1/query" --data-urlencode "query=${q}" || echo err)"
-        echo "suite HTTP ${sc}: ${q}; body: $(head -c 120 /tmp/prom-suite.out 2>/dev/null | tr '\n' ' ')"
-        rm -f /tmp/prom-suite.out
-      done
-
-      # Route hard-coded Prom hostname to this port-forward.
-      podman_args+=(--add-host="${prom_host_fqdn}:host-gateway")
-      # Bypass proxy for the injected Prom hostname.
-      echo "NO_PROXY=${prom_host_fqdn},localhost,127.0.0.1" >> "${podman_env_file}"
-      echo "no_proxy=${prom_host_fqdn},localhost,127.0.0.1" >> "${podman_env_file}"
-      echo "Prometheus PF ready (pid ${prom_pf_pid}); podman --add-host ${prom_host_fqdn}:host-gateway"
-
-      # Start background watchdog to monitor and auto-restart PF if it drops.
-      pf_pid_file="$(mktemp /tmp/prom-pf-pid.XXXXXX)"
-      echo "${prom_pf_pid}" > "${pf_pid_file}"
-      (
-        wd_kubeconfig="${appsre_kubeconfig}"
-        wd_ns="${prom_ns}"
-        wd_svc="${prom_svc}"
-        wd_log="${pf_log}"
-        wd_pid_file="${pf_pid_file}"
-        while true; do
-          sleep 10
-          if ! curl -sS -o /dev/null --max-time 2 \
-            "http://127.0.0.1:9090/api/v1/query?query=up" 2>/dev/null; then
-            echo "[PF-WATCHDOG] $(date '+%Y-%m-%d %H:%M:%S') Port-forward health check failed, restarting..."
-            old_pid="$(cat "${wd_pid_file}" 2>/dev/null || true)"
-            if [[ -n "${old_pid}" ]]; then
-              kill "${old_pid}" 2>/dev/null || true
-              for (( wd_wait=0; wd_wait<10; wd_wait++ )); do
-                if ! kill -0 "${old_pid}" 2>/dev/null; then
-                  break
-                fi
-                sleep 1
-              done
-            fi
-            KUBECONFIG="${wd_kubeconfig}" oc -n "${wd_ns}" port-forward \
-              --address 0.0.0.0 "svc/${wd_svc}" 9090:9090 \
-              >>"${wd_log}" 2>&1 &
-            new_pid=$!
-            echo "${new_pid}" > "${wd_pid_file}"
-            echo "[PF-WATCHDOG] New port-forward started (pid ${new_pid})"
-            wd_ready=false
-            for (( wd_i=0; wd_i<30; wd_i++ )); do
-              if curl -sS -o /dev/null --max-time 1 \
-                "http://127.0.0.1:9090/api/v1/query?query=up" 2>/dev/null; then
-                wd_ready=true
-                break
-              fi
-              sleep 1
-            done
-            if [[ "${wd_ready}" == "true" ]]; then
-              echo "[PF-WATCHDOG] Port-forward restored (pid ${new_pid})"
-            else
-              echo "[PF-WATCHDOG] WARNING: Port-forward restart failed" >&2
-            fi
-          fi
-        done
-      ) &
-      pf_watchdog_pid=$!
-      echo "[PF-WATCHDOG] Started background port-forward watchdog (pid ${pf_watchdog_pid})"
-    fi
-
-    # Restore Hive kubeconfig; port-forward stays up until EXIT cleanup.
-    export KUBECONFIG="${saved_kubeconfig}"
+  # Spot-check PromQL against RHOBS (log truncated body only).
+  ns="osd-fleet-manager-${OCM_FVT_OCM_ENV:-integration}"
+  code="$(curl -sS -o /tmp/rhobs-up.out -w '%{http_code}' --max-time 30 \
+    -H "Authorization: Bearer ${rhobs_token}" \
+    --get "${rhobs_metrics_url}/api/v1/query" \
+    --data-urlencode "query=fleet_manager_cluster_status_count{namespace=\"${ns}\"}" || echo err)"
+  $WAS_TRACING_RHOBS && set -x
+  echo "RHOBS spot-check HTTP ${code}; body: $(head -c 160 /tmp/rhobs-up.out 2>/dev/null | tr '\n' ' ')"
+  rm -f /tmp/rhobs-up.out
+  if [[ "${code}" != "200" ]]; then
+    echo "ERROR: RHOBS metrics query failed (HTTP ${code})" >&2
+    exit 1
   fi
   echo "============================================"
 fi

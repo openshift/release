@@ -56,8 +56,35 @@ ref:
       Determine if we should run Orion or not.
   - name: ORION_CONFIG
     default: "examples/maas-gateway-perf.yaml"
-    documentation:
+    documentation: |-
       Orion configuration file for the MaaS AI Gateway performance workload.
+      Every MaaS test overrides this with its own per-job config, e.g.
+      examples/maas-gateway-perf-odh-anthropic.yaml. Those configs inherit
+      their metadata from examples/config/maas-gateway-perf-config.yaml and
+      their metrics from examples/metrics/maas-gateway-perf-metrics.yaml.
+  - name: PROVIDERS
+    default: "gpt-4o-openai"
+    documentation: |-
+      Comma separated list of model providers the workload ran against. Shared
+      with the openshift-qe-maas-gateway-perf step so Orion always builds its
+      kube-burner job-name matrix out of exactly what the job executed.
+  - name: PAYLOAD_SIZES
+    default: "small"
+    documentation: |-
+      Comma separated list of payload sizes the workload ran against. Shared
+      with the openshift-qe-maas-gateway-perf step.
+  - name: ORION_CONCURRENCY_LEVELS
+    default: "8,64,512"
+    documentation: |-
+      Comma separated subset of CONCURRENCY_LEVELS that Orion tracks. The
+      container metrics fan out over every job name and then group by every
+      container, so analysing the full sweep would produce many thousands of
+      series per run.
+  - name: GATEWAY_MODES
+    default: "gateway,baseline"
+    documentation: |-
+      Comma separated list of the kube-burner job-name prefixes that make up
+      the A/B comparison. Both halves are analysed by default.
   - name: LOOKBACK_SIZE
     default: ""
     documentation:
@@ -83,7 +110,7 @@ ref:
     documentation:
       Workload type suffix for auto-selecting ORION_CONFIG. Left empty since ORION_CONFIG is set explicitly for MaaS.
   commands: openshift-qe-orion-maas-gateway-perf-commands.sh
-  timeout: 6h
+  timeout: 2h
   credentials:
   - collection: ocp-perfscale-cpt
     group: ocp-qe-perfscale-es-creds
