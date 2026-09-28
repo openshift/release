@@ -766,6 +766,27 @@ tests:
     - ref: openshift-qe-evpn
     workflow: openshift-qe-installer-aws
   timeout: 14h0m0s
+- always_run: false
+  as: build-farm-114nodes
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      BUILD_FARM_EXTRA_FLAGS: --alerting=false --job-iterations=80 --set=jobs.2.jobPause=10m
+      COMPUTE_NODE_REPLICAS: "18"
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
+      DEPLOY_AUTOSCALER: "true"
+      KUBE_BURNER_VERSION: 1.11.18
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-build-farm
+    workflow: openshift-qe-installer-aws-etcd-encryption
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
