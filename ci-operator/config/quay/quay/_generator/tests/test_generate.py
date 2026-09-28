@@ -75,6 +75,7 @@ def test_expand_matrix_cells() -> None:
         ("3.18", "redhat-3.18", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64"),
         ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64"),
         ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64"),
+        ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x"),
         (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64"),
         (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64"),
     }
@@ -326,6 +327,31 @@ def test_golden_redhat_318_arm64_canary_bytes() -> None:
     assert config["releases"]["latest"]["candidate"]["architecture"] == "amd64"
     assert config["releases"]["arm64-latest"]["candidate"]["architecture"] == "arm64"
     assert config["zz_generated_metadata"]["variant"] == "aws-arm64-ocp422-e2e-install"
+
+
+def test_redhat_318_libvirt_s390x_cell() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    filename = "quay-quay-redhat-3.18__libvirt-s390x-ocp422-e2e-install.yaml"
+    assert filename in by_name
+    config = by_name[filename]
+    test = config["tests"][0]
+    assert test["as"] == "libvirt-s3-nightly-s390x"
+    assert test["cron"] == "0 8 * * 2"
+    assert test["capabilities"] == ["intranet"]
+    assert test["steps"]["cluster_profile"] == "libvirt-s390x-vpn"
+    assert test["steps"]["workflow"] == "quay-tests-libvirt-s390x"
+    assert test["steps"]["dependencies"] == {"OPENSHIFT_INSTALL_TARGET": "release:s390x-latest"}
+    assert test["steps"]["env"]["QUAY_DEPLOY_MAILPIT"] == "false"
+    assert test["steps"]["env"]["BRANCH"] == "4.22"
+    assert config["releases"]["s390x-latest"]["candidate"]["architecture"] == "s390x"
+    assert config["releases"]["latest"]["candidate"]["architecture"] == "amd64"
+    assert set(config["base_images"]) == {"libvirt-installer", "dev-scripts"}
+    test_refs = [step["ref"] for step in test["steps"]["test"] if "ref" in step]
+    assert "quay-deploy-aws-s3" in test_refs
+    post_refs = [step.get("ref") or step.get("chain") for step in test["steps"]["post"]]
+    assert post_refs[-1] == "upi-libvirt-cleanup-post"
+    assert "ipi-aws-post" not in post_refs
 
 
 def test_master_presubmit_expands_both_clouds() -> None:
@@ -1013,7 +1039,7 @@ def test_list_includes_arch_header_and_values(capsys: object) -> None:
     lines = out.splitlines()
     arch_idx = lines[0].split().index("ARCH")
     arches = {line.split()[arch_idx] for line in lines[1:]}
-    assert arches == {"amd64", "arm64"}
+    assert arches == {"amd64", "arm64", "s390x"}
 
 
 MASTER_ARM64_NAME = "quay-quay-master__arm64.yaml"

@@ -19,11 +19,13 @@ STORAGE_BY_CLOUD = {
     "aws": "s3",
     "gcp": "gcs",
     "azure": "blob",
+    "libvirt": "s3",
 }
 DEPLOY_REF_BY_CLOUD = {
     "aws": "quay-deploy-aws-s3",
     "gcp": "quay-deploy-gcp-gcs",
     "azure": "quay-deploy-azure-blob",
+    "libvirt": "quay-deploy-aws-s3",
 }
 
 
