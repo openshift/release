@@ -740,6 +740,24 @@ tests:
     env:
       TEST_SUITE: openshift/etcd/certrotation
     workflow: baremetalds-two-node-fencing
+- as: e2e-metal-ovn-two-node-fencing-etcd-certrotation-repo-ra
+  capabilities:
+  - intranet
+  - nested-podman
+  cron: '@yearly'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      CUSTOM_OS_IMAGE_REPO: rh-edge-enablement/tnf-custom-rhcos
+      CUSTOM_OS_MIRROR_REGISTRY: quay.io
+      RESOURCE_AGENT_SOURCE: REPO
+      RESOURCE_AGENTS_REF: 27dd69cd4ff478ccfedea9f9382953746e27ca7e
+      RESOURCE_AGENTS_REPO: https://github.com/Neilhamza/resource-agents
+      TEST_SUITE: openshift/etcd/certrotation
+    test:
+    - ref: baremetalds-two-node-fencing-resource-agents-update-rhcos
+    - chain: baremetalds-ipi-test
+    workflow: baremetalds-two-node-fencing
 - as: e2e-metal-two-node-fencing-ipv6-certrotation
   capabilities:
   - intranet
@@ -908,6 +926,21 @@ tests:
       CUSTOM_OS_IMAGE_REPO: rh-edge-enablement/tnf-custom-rhcos
       CUSTOM_OS_MIRROR_REGISTRY: quay.io
       RESOURCE_AGENT_SOURCE: REPO
+    workflow: baremetalds-two-node-fencing-recovery
+- as: e2e-metal-ovn-two-node-fencing-recovery-repo-ra-pr2207
+  capabilities:
+  - intranet
+  - nested-podman
+  cron: '@yearly'
+  shard_count: 2
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      CUSTOM_OS_IMAGE_REPO: rh-edge-enablement/tnf-custom-rhcos
+      CUSTOM_OS_MIRROR_REGISTRY: quay.io
+      RESOURCE_AGENT_SOURCE: REPO
+      RESOURCE_AGENTS_REF: 27dd69cd4ff478ccfedea9f9382953746e27ca7e
+      RESOURCE_AGENTS_REPO: https://github.com/Neilhamza/resource-agents
     workflow: baremetalds-two-node-fencing-recovery
 - as: e2e-metal-ovn-two-node-fencing-ipv6-recovery
   capabilities:
