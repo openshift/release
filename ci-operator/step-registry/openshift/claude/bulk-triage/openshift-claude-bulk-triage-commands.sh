@@ -24,6 +24,10 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL:-}" ]]; then
     echo "Applying Gangway override: CLAUDE_MODEL=${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL}"
     CLAUDE_MODEL="${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL}"
 fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_TRIAGE_EXISTING_ONLY:-}" ]]; then
+    echo "Applying Gangway override: TRIAGE_EXISTING_ONLY=${MULTISTAGE_PARAM_OVERRIDE_TRIAGE_EXISTING_ONLY}"
+    TRIAGE_EXISTING_ONLY="${MULTISTAGE_PARAM_OVERRIDE_TRIAGE_EXISTING_ONLY}"
+fi
 
 # --- Load JIRA credentials (read + write) ---
 # Mounted from the openshift-qse-jira-sa test-credentials secret: an
