@@ -1,0 +1,74 @@
+ref:
+  as: ovs-doca-validate-node-package
+  from: cli
+  commands: ovs-doca-validate-node-package-commands.sh
+  # The script traps EXIT to close the <testsuites> root it opens around the
+  # JUnit file (needed so Prow's JUnit lens parses every check on every node,
+  # not just the first). 30s is ample -- the trap only appends one line, no
+  # in-flight child process to wait on.
+  grace_period: 30s
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: OVS_DOCA_VALIDATE_NODE_ROLES
+    default: "master worker"
+    documentation: |-
+      Space-separated list of node-role names to validate. Defaults to both
+      roles because the layered image is part of the release payload and so
+      lands on every node, control plane included -- validating only workers
+      would leave half the cluster unchecked.
+  documentation: |-
+    Validates, per node in the given role(s), that the ovs-doca layered
+    RHCOS image built at ci-operator's image-build stage (day0 layering,
+    substituted into the release payload via `include_built_images`) is
+    actually running -- the image is already booted at install time, there
+    is no day2 rollout to wait on. Runs six read-only assertions via
+    `oc debug node/<n> -- chroot /host`:
+
+      1. `systemctl is-active openvswitch` -- health gate. Layering OVS into
+         the ostree commit is exactly where this breaks (doca-openvswitch
+         carries /var/lib/openvswitch as rpm payload with no tmpfiles.d
+         entry, and `ostree container commit` discards /var), so confirm the
+         daemon is up before asserting anything about what it reports.
+      2. `rpm -qa | grep doca-openvswitch` -- the DOCA-enabled package is
+         installed (distinct from the stock, version-suffixed `openvswitch`
+         Fast Datapath package it replaces).
+      3. No `openvswitch[0-9]*` package remains -- the DOCA package
+         *replaced* stock OVS rather than landing beside it. Its
+         `Obsoletes: openvswitch` does not cover the version-suffixed Fast
+         Datapath name, so this is the image build's explicit `dnf remove`
+         being verified, not an rpm guarantee.
+      4. `ovs-vsctl list open_vswitch | grep datapath_types` -- the
+         advertised datapath_types list includes `doca`.
+      5. and 6. `other_config:hw-offload` and `other_config:doca-init` are each
+         either `false` or absent -- confirms OVS is running like a normal,
+         non-offloaded switch. This cluster has no DOCA-capable NIC, so
+         offload is deliberately left off. Nothing writes these keys: the
+         image ships no tuning unit, and OVS treats an absent key exactly as
+         false (ovs-vswitchd logs "DOCA Disabled - Use other_config:doca-init
+         to enable" and never enables the flow API). Absent is therefore the
+         expected steady state, and only an explicit `true` is a failure.
+
+    Also prints, without asserting, whether openvswitch-selinux-extra-policy
+    survived the Fast Datapath removal -- see the SELinux gap below.
+
+    IMPORTANT SCOPE NOTE: these checks only prove the DOCA-enabled OVS
+    package/binary is installed and recognized by the running daemon, and
+    that offload is (correctly) disabled. They do NOT prove hardware
+    offload is functional -- that requires a real NVIDIA ConnectX/BlueField
+    NIC (ASAP^2/switchdev), which AWS instances do not have. Do not read a
+    pass here as "hardware offload works."
+
+    KNOWN GAP: does not assert the installed doca-openvswitch version, only
+    that the package exists. Note for anyone adding that check: the "3.4.1"
+    pinned in the image's repo URL is the DOCA release train, not the rpm
+    version -- DOCA 3.4.1 ships doca-openvswitch-3.4.0040-1.el9. Asserting
+    a literal "3.4.1" against the package version would never match.
+
+    KNOWN GAP: does not check SELinux. doca-openvswitch ships no policy
+    module of its own, so the node depends on the base image's existing
+    openvswitch policy surviving the removal of the Fast Datapath packages;
+    the step prints whether openvswitch-selinux-extra-policy is still
+    installed but draws no conclusion from it.

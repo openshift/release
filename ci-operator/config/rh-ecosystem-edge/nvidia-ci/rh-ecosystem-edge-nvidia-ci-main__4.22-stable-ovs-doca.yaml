@@ -42,6 +42,18 @@ images:
       # rhel9 and rhel10 trees (no rhel8) as of this writing -- if this
       # config is ever branched onto a RHEL8-based RHCOS (older OCP), this
       # pinned version won't resolve and will need revisiting.
+      #
+      # The arch, unlike the RHEL major, is deliberately hardcoded: this is
+      # the x86_64 variant, and arm64 gets its own config rather than a
+      # runtime switch here. It has to agree with `namespace: ocp` (the
+      # x86_64 payload) above and with OCP_ARCH=amd64 below -- ipi-conf-aws
+      # derives the AWS instance types *from* that arch (amd64 -> m6a/m6i,
+      # arm64 -> m6g), not the reverse, so the arch is the knob and the
+      # instance type follows.
+      #
+      # When the arm64 variant is written: the DOCA repo's directories are
+      # not the Linux arch names. aarch64 is published as "arm64-sbsa"; an
+      # "aarch64" path is a 404.
       RUN source /etc/os-release && \
           RHEL_MAJOR="${VERSION_ID%%.*}" && \
           echo "Detected RHEL major version: ${RHEL_MAJOR}" && \
@@ -71,60 +83,37 @@ images:
           dnf -y install mft && \
           rm -rf /etc/yum.repos.d/doca.repo /tmp/rpms
 
-      # Ensures OVS runs like a normal (non-offloaded) switch: this cluster has
-      # no DOCA-capable NIC, so hardware offload must stay explicitly disabled
-      # even though the DOCA-enabled binary/datapath is installed.
-      RUN cat > /usr/bin/doca-init.sh <<'SCRIPT'
-      #!/bin/bash
-      set -euo pipefail
-      log() { echo "[doca-init] $*"; }
+      # doca-openvswitch carries /run/openvswitch, /var/log/openvswitch and
+      # /var/lib/openvswitch{,/pki} as plain rpm payload and ships no
+      # tmpfiles.d entry -- the stock FDP openvswitch3.x removed above is
+      # what covered this in base RHCOS. `ostree container commit` below
+      # discards /var, and /run is tmpfs, so on a layered image all four are
+      # simply absent at first boot: ovsdb-server then fails with EACCES on
+      # /var/lib/openvswitch/.conf.db.~lock~, gives up after 5 restarts, and
+      # takes openvswitch -> ovs-vswitchd -> nmstate -> ovs-configuration ->
+      # crio -> kubelet down with it, so the node never joins.
+      #
+      # ovsdb-server.service's ExecStartPre chowns only
+      # /etc/openvswitch /run/openvswitch /var/log/openvswitch -- never
+      # /var/lib/openvswitch -- so that one must be created with the right
+      # owner up front. RHCOS runs OVS as openvswitch:hugetlbfs (set in
+      # /etc/sysconfig/openvswitch, also shipped by doca-openvswitch), not
+      # the root:root of default.conf. Modes and owners below are exactly
+      # the package's own, so this only restores what /var's removal dropped.
+      RUN cat > /usr/lib/tmpfiles.d/doca-openvswitch.conf <<'EOF'
+      d /run/openvswitch         0755 root        root      -
+      d /var/log/openvswitch     0750 root        root      -
+      d /var/lib/openvswitch     0750 openvswitch hugetlbfs -
+      d /var/lib/openvswitch/pki 0750 openvswitch hugetlbfs -
+      EOF
 
-      CONFIGURATION_CHANGED=false
-      declare -A DESIRED=(
-        [hw-offload]=false
-      )
-      for key in "${!DESIRED[@]}"; do
-        current=$(ovs-vsctl get Open_vSwitch . other_config:"$key" 2>/dev/null | tr -d '"' || echo "")
-        if [ "$current" != "${DESIRED[$key]}" ]; then
-          log "Setting $key=${DESIRED[$key]} (was: ${current:-unset})"
-          ovs-vsctl set Open_vSwitch . other_config:"$key"="${DESIRED[$key]}"
-          CONFIGURATION_CHANGED=true
-        fi
-      done
-
-      if [ "$CONFIGURATION_CHANGED" = true ]; then
-        log "Configuration changed, restarting openvswitch"
-        # --no-block: doca-init.service Requires=openvswitch.service, so this
-        # restart is propagated back to doca-init.service itself while its
-        # own ExecStart (this script) is still running. Blocking here would
-        # wait on that transaction and could delay kubelet.service, which is
-        # ordered After=doca-init.service.
-        systemctl --no-block restart openvswitch
-      fi
-      log "Done."
-      SCRIPT
-      RUN chmod +x /usr/bin/doca-init.sh
-
-      RUN mkdir -p /etc/systemd/system
-
-      RUN cat > /etc/systemd/system/doca-init.service <<'UNIT'
-      [Unit]
-      Description=Initialize OVS-DOCA hardware offload
-      After=openvswitch.service network-online.target
-      Before=kubelet.service
-      Requires=openvswitch.service
-
-      [Service]
-      Type=oneshot
-      ExecStart=/usr/bin/doca-init.sh
-      RemainAfterExit=yes
-      StandardOutput=journal
-      StandardError=journal
-
-      [Install]
-      WantedBy=multi-user.target
-      UNIT
-      RUN systemctl enable doca-init.service
+      # No offload is configured here on purpose: this cluster has no
+      # DOCA-capable NIC. Both switches default to off -- with an empty
+      # other_config, ovs-vswitchd logs "DOCA Disabled - Use
+      # other_config:doca-init to enable" and never enables the flow API
+      # (that needs other_config:hw-offload=true) -- so the DOCA-enabled
+      # binary runs the plain kernel datapath, identical to stock OVS, with
+      # no extra unit needed to disable anything.
 
       RUN ostree container commit
     inputs:
@@ -160,8 +149,15 @@ tests:
       BASE_DOMAIN: edge-sro.rhecoeng.com
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
+      # Must match the arch of the layered image above (`namespace: ocp` and
+      # the DOCA x86_64 repo). ipi-conf-aws turns this into the instance
+      # types (amd64 -> m6a where the region has capacity, else m6i) and into
+      # install-config's `architecture` field. Pinned rather than left to the
+      # step's "amd64" default so this config states its arch outright --
+      # arm64 is a separate variant, not a flag flip here.
+      OCP_ARCH: amd64
     test:
-    - ref: ovs-doca-validate-worker-package
+    - ref: ovs-doca-validate-node-package
     - as: get-nodes
       cli: latest
       commands: |
