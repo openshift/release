@@ -264,6 +264,7 @@ tests:
     env:
       ADDITIONAL_WORKER_NODES: "6"
       CHANNEL_GROUP: nightly
+      CLUSTER_NAME: ocpbugs127458-debug
       COMPUTE_MACHINE_TYPE: m6i.xlarge
       CONFIG: config/standard-classic-rosa.yml
       ENABLE_AUTOSCALING: "false"
@@ -323,12 +324,12 @@ tests:
         echo "Router Memory request: ${ROUTER_MEM}"
 
         if [[ "${ROUTER_CPU}" != "100m" ]]; then
-          echo "WARNING: Router CPU request is ${ROUTER_CPU}, expected 100m"
+          echo "ERROR: Router CPU request is ${ROUTER_CPU}, expected 100m"
           echo "=== Debug: Full deployment spec ==="
           oc get deployment/router-default -n openshift-ingress -o yaml | head -100
           echo "=== Debug: Recent events ==="
           oc get events -n openshift-ingress --sort-by='.lastTimestamp' | tail -20
-          echo "=== Continuing anyway to see what happens under load ==="
+          exit 1
         fi
 
         echo "=== Done ==="
