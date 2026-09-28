@@ -67,7 +67,7 @@ JOB_KEYS = {
     "run_if_changed",
     "skip_if_only_changed",
 }
-ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
+ALLOWED_ARCHES = {"amd64", "arm64", "s390x", "ppc64le"}
 TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
 GENERATED_HEADER = """\
 # =============================================================================

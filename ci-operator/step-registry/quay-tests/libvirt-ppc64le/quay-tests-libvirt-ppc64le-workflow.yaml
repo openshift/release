@@ -1,0 +1,42 @@
+workflow:
+  as: quay-tests-libvirt-ppc64le
+  documentation: |-
+    Provisions an ephemeral ppc64le OpenShift cluster on remote IBM Power libvirt
+    hypervisors (same pre/post path and DNS as openshift-e2e-libvirt-upi), then runs
+    Quay test steps from the ci-operator job configuration.
+
+    Requires cluster_profile libvirt-ppc64le-s2s and capability/intranet. Hypervisor
+    hostnames and network layout come from Boskos (LEASED_RESOURCE) and the cluster
+    profile leases secret.
+
+    Reuses the quay-tests-libvirt-s390x helpers after install: two control-plane
+    nodes become schedulable workers, and a default StorageClass is provisioned when
+    none exists. Quay operator/catalog/deploy/test steps remain on the job test: chain.
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    - ref: quay-tests-libvirt-s390x-make-masters-workers
+    - ref: quay-tests-libvirt-s390x-provision-nfs-csi
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.22"
+      DOMAIN_MEMORY: "34816"
+      ETCD_DISK_SPEED: slow
+      SCHEDULABLE_MASTER_COUNT: "2"
+      USE_EXTERNAL_DNS: "true"
+      USE_RAMFS: "true"
+    dnsConfig:
+      nameservers:
+      - 172.30.38.188
+      searches:
+      - "bastion-z.svc.cluster.local"
+      - "bastion-ppc64le-libvirt.svc.cluster.local"

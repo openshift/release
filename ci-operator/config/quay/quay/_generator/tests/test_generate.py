@@ -76,6 +76,7 @@ def test_expand_matrix_cells() -> None:
         ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64"),
         ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64"),
         ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x"),
+        ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 4", "periodic", "ppc64le"),
         (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64"),
         (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64"),
     }
@@ -352,6 +353,27 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     post_refs = [step.get("ref") or step.get("chain") for step in test["steps"]["post"]]
     assert post_refs[-1] == "upi-libvirt-cleanup-post"
     assert "ipi-aws-post" not in post_refs
+
+
+def test_redhat_318_libvirt_ppc64le_cell() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    filename = "quay-quay-redhat-3.18__libvirt-ppc64le-ocp422-e2e-install.yaml"
+    assert filename in by_name
+    config = by_name[filename]
+    test = config["tests"][0]
+    assert test["as"] == "libvirt-s3-nightly-ppc64le"
+    assert test["cron"] == "0 8 * * 4"
+    assert test["capabilities"] == ["intranet"]
+    assert test["steps"]["cluster_profile"] == "libvirt-ppc64le-s2s"
+    assert test["steps"]["workflow"] == "quay-tests-libvirt-ppc64le"
+    assert test["steps"]["dependencies"] == {"OPENSHIFT_INSTALL_TARGET": "release:ppc64le-latest"}
+    assert test["steps"]["env"]["QUAY_DEPLOY_MAILPIT"] == "false"
+    assert config["releases"]["ppc64le-latest"]["candidate"]["architecture"] == "ppc64le"
+    assert config["releases"]["latest"]["candidate"]["architecture"] == "amd64"
+    assert set(config["base_images"]) == {"libvirt-installer", "dev-scripts"}
+    post_refs = [step.get("ref") or step.get("chain") for step in test["steps"]["post"]]
+    assert post_refs[-1] == "upi-libvirt-cleanup-post"
 
 
 def test_master_presubmit_expands_both_clouds() -> None:
@@ -998,7 +1020,7 @@ def test_arches_rejects_unsupported_value() -> None:
             "clouds": ["aws"],
             "ocp": ["4.22"],
             "test": "e2e-install",
-            "arches": ["ppc64le"],
+            "arches": ["riscv64"],
         }
     )
     with pytest.raises(ValueError, match="unsupported values"):
@@ -1021,8 +1043,8 @@ def test_arches_rejects_duplicates() -> None:
 
 
 def test_missing_arch_layer_raises() -> None:
-    cell = _phase0_cell(arch="ppc64le")
-    with pytest.raises(ValueError, match="failed to render template arches/ppc64le.yaml.j2"):
+    cell = _phase0_cell(arch="riscv64")
+    with pytest.raises(ValueError, match="failed to render template arches/riscv64.yaml.j2"):
         build_config(cell, GENERATOR_DIR / "templates")
 
 
@@ -1039,7 +1061,7 @@ def test_list_includes_arch_header_and_values(capsys: object) -> None:
     lines = out.splitlines()
     arch_idx = lines[0].split().index("ARCH")
     arches = {line.split()[arch_idx] for line in lines[1:]}
-    assert arches == {"amd64", "arm64", "s390x"}
+    assert arches == {"amd64", "arm64", "s390x", "ppc64le"}
 
 
 MASTER_ARM64_NAME = "quay-quay-master__arm64.yaml"
