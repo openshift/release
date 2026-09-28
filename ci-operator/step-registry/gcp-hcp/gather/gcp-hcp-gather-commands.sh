@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# ci-operator prepends `set -eu`; this best-effort collector handles command
+# failures explicitly so one unavailable scope does not abort all diagnostics.
+set +e
 set -uo pipefail
 
 umask 077
