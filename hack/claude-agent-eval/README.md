@@ -33,13 +33,16 @@ are positive integers. `setup_script` and `eval_cases_dir` are optional.
 `run` accepts `pr`, `periodic`, or `manual`. This workflow executes only `pr`
 entries; other recognized modes are logged and skipped, without setup or model
 calls. A manifest containing only non-PR entries is a successful no-op.
-`triggers` is a nonempty list of literal path prefixes for `run: pr`; it is
+`triggers` is a nonempty list of literal paths for `run: pr`; it is
 optional for other modes. Unknown modes are invalid. `evals: []` is valid.
 Unknown fields, duplicate YAML keys/configs, invalid types, missing paths,
 and paths escaping the repository fail before any model calls.
 
 Paths are relative to the repository root, without `./` or `..`. Triggers
-use OR semantics: `skills/foo/` includes descendants but not `skills/foobar/`.
+use OR semantics and match complete path segments: `skills/foo` and
+`skills/foo/` both match that path and its descendants, but not
+`skills/foobar/` or `skills/foo-2/`. A file trigger such as `evals.yaml`
+does not match `evals.yaml.bak`.
 They are not globs or regular expressions. Include configs, cases, setup,
 and shared dependencies as appropriate. Include `evals.yaml` explicitly if
 manifest edits should trigger an eval; it has no implicit trigger behavior.

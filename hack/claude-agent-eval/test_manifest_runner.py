@@ -281,9 +281,17 @@ class SelectionTests(Fixture):
         self.assertIn("regression", self.calls())
 
     def test_literal_prefix_and_directory_boundary(self):
-        entries = runner.load_manifest(self.repo)
-        self.assertEqual(runner.select_evals(entries, ["skills/foobar/SKILL.md"]), [])
-        self.assertEqual(runner.select_evals(entries, ["skills/foo/SKILL.md"]), entries)
+        for trigger in ("skills/foo", "skills/foo/"):
+            entries = [runner.Eval("x.yaml", "pr", 1, 10, "", (trigger,))]
+            for path in ("skills/foobar/SKILL.md", "skills/foo-2/SKILL.md"):
+                with self.subTest(trigger=trigger, path=path):
+                    self.assertEqual(runner.select_evals(entries, [path]), [])
+            for path in ("skills/foo", "skills/foo/SKILL.md", "skills/foo/nested/file"):
+                with self.subTest(trigger=trigger, path=path):
+                    self.assertEqual(runner.select_evals(entries, [path]), entries)
+        entries = [runner.Eval("x.yaml", "pr", 1, 10, "", ("evals.yaml",))]
+        self.assertEqual(runner.select_evals(entries, ["evals.yaml.bak"]), [])
+        self.assertEqual(runner.select_evals(entries, ["evals.yaml"]), entries)
         literal = runner.Eval("x.yaml", "pr", 1, 10, "", ("skills/a[1]/",))
         self.assertEqual(runner.select_evals([literal], ["skills/a1/file"]), [])
         self.assertEqual(runner.select_evals([literal], ["skills/a[1]/file"]), [literal])
@@ -383,6 +391,15 @@ class CaseSelectionTests(Fixture):
         self.commit()
         self.base = self.git("rev-parse", "HEAD").strip()
         self.env["PULL_BASE_SHA"] = self.base
+
+    def test_sibling_trigger_path_does_not_expand_case_subset(self):
+        self.entry["triggers"] = ["skills/foo", "evals/cases/foo"]
+        self.write_manifest([self.entry])
+        entry, = runner.load_manifest(self.repo)
+        files = ["evals/cases/foo/case-001/input.yaml", "skills/foo-2/SKILL.md",
+                 "evals/cases/foo-2/case-002/input.yaml"]
+        self.assertEqual(runner.select_evals([entry], files), [entry])
+        self.assertEqual(runner.select_cases(self.repo, entry, files), ("case-001",))
 
     def test_only_changed_cases_are_passed_sorted_and_deduplicated(self):
         original = (self.repo / self.entry["config"]).read_bytes()

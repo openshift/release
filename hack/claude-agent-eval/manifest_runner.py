@@ -114,13 +114,19 @@ def load_manifest(repo):
     return entries
 
 
+def matches_triggers(path, triggers):
+    """Match literal paths and descendants, never partial path segments."""
+    return any(path == trigger.rstrip("/") or path.startswith(trigger.rstrip("/") + "/")
+               for trigger in triggers)
+
+
 def select_evals(entries, files):
     selected = []
     for entry in entries:
         if entry.run != "pr":
             print(f"SKIP {entry.config}: run: {entry.run} is not executed in PR mode", flush=True)
             continue
-        match = next((path for path in files if path.startswith(entry.triggers)), None)
+        match = next((path for path in files if matches_triggers(path, entry.triggers)), None)
         if match is None:
             print(f"SKIP {entry.config}: no changed file matches triggers {entry.triggers}", flush=True)
         else:
@@ -142,7 +148,7 @@ def select_cases(repo, entry, files):
         # Config/setup/manifest changes invalidate a subset even when omitted
         # from triggers. They do not independently select an otherwise skipped eval.
         controls = {MANIFEST, entry.config, entry.setup_script}
-        relevant = [path for path in files if path.startswith(entry.triggers)
+        relevant = [path for path in files if matches_triggers(path, entry.triggers)
                     or path.startswith(prefix) or path in controls]
         reason = "no attributable case changes"
         case_ids = set()
