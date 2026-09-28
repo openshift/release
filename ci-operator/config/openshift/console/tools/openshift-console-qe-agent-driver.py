@@ -708,6 +708,10 @@ def finalize():
             'table_name': 'claude_session_metrics', 'schema': schema, 'schema_mapping': None,
             'rows': [row], 'chunk_size': 0, 'expiration_days': 0, 'partition_column': '',
         })
+        if terminal.get('subtype') == 'error_max_budget_usd':
+            state['model_status'] = 'budget_exhausted'
+            if state.get('reason') == 'no candidate patch':
+                state['reason'] = 'model spend cap reached before a candidate was saved'
     diagnoses = read(EVIDENCE / 'candidate-diagnoses.json', [])
     originals = read(CONTEXT, {}).get('failed_tests', []) + read(CONTEXT, {}).get('flaked_tests', [])
     keys = {same_test(test) for test in originals}
@@ -736,13 +740,37 @@ def finalize():
     analysis = ARTIFACTS / 'console-flake-analysis.md'
     if analysis.is_file():
         content = analysis.read_text(errors='replace')
+        placeholder = ('> **AI-Generated Content** — Review before use.\n\n'
+                       '# Console e2e failure analysis\n\nInvestigation did not complete.\n')
+        if content == placeholder:
+            context = read(CONTEXT, {})
+            selected = read(ROOT / 'selected.json', [])
+            history = read(EVIDENCE / 'history.json', {})
+            lines = [placeholder.rstrip(), '',
+                     'The agent did not save a root cause analysis. No test-code fix was established.',
+                     '', f'Original report: {len(context.get("failed_tests", []))} final failures; '
+                     f'{len(context.get("flaked_tests", []))} tests passed on retry.',
+                     f'Dashboard history: {history.get("status", "unknown")}.', '',
+                     '## Selected tests and unchanged-code reruns', '']
+            for test in selected:
+                attempts = [run for run in baseline_runs
+                            if same_test(run.get('test', {})) == same_test(test)]
+                outcomes = [('passed' if run.get('passed') else
+                             'did not pass' if run.get('executed') else 'not executed')
+                            for run in attempts]
+                identity = ' — '.join(str(test.get(key, '')).replace('\n', ' ')[:200]
+                                      for key in ('project', 'spec', 'name'))
+                lines.append(f'- {identity}: {", ".join(outcomes) if outcomes else "no rerun result"}')
+            content = '\n'.join(lines) + '\n'
         content = sanitize(content)
         if not content.startswith('> **AI-Generated Content**'):
             content = '> **AI-Generated Content** — Review before use.\n\n' + content
         content += ('\n\n## Independent verification\n\n'
                     f'Status: **{state.get("verification_status", "skipped")}**. '
                     f'{state.get("reason", "No result")}\n\n'
-                    'See `console-flake-evidence/verification.json` for each attempt.\n')
+                    + ('See `console-flake-evidence/verification.json` for each attempt.\n'
+                       if (EVIDENCE / 'verification.json').is_file()
+                       else 'No independent verification was run.\n'))
         analysis.write_text(content)
     targets = state.get('targets', [])
     verified_runs = state.get('verified_runs', 0)
