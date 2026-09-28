@@ -76,7 +76,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
     # Avoid conflicts with the older versioned yq from the image:
     # Write /tmp/bin/yq as a tiny script (#!/bin/sh; exit 1), so yq --version fails and ExitTrap EnsureReqs downloads latest yq (replacing the stub).
     eval "$(
-        curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/9997e1f42bbef863d25f2e7d15224c9fa948a9ff/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
     trap '
         _opp_cleanup
