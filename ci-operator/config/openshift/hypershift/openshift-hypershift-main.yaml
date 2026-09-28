@@ -577,12 +577,34 @@ tests:
   steps:
     cluster_profile: hypershift-aks
     env:
+      ENABLE_DES_DEFAULT_MACHINE: "true"
       HYPERSHIFT_AZURE_FIPS: "true"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+      HYPERSHIFT_DISK_ENCRYPTION: "true"
+      HYPERSHIFT_ENCRYPTION_AT_HOST: "true"
+      HYPERSHIFT_ETCD_ENCRYPTION: "true"
       TEST_SKIPS: 'etcd leader changes are not excessive\| In-tree Volumes \[Driver:
         azure-disk\]\| In-tree Volumes \[Driver: azure-file\]\| FIPS TestFIPS'
       TEST_SUITE: openshift/conformance/parallel/minimal
+    pre:
+    - chain: cucushift-installer-rehearse-azure-aks-provision
+    - ref: hypershift-azure-aks-attach-kv
+    - ref: azure-provision-vnet-hypershift
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-role-assignment-hypershift
+    - ref: azure-provision-vault-key
+    - ref: azure-provision-disk-encryption-set
+    - ref: hypershift-install
+    - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
+    - chain: hypershift-azure-create
     test:
     - ref: hypershift-hostedcluster-fips-check
+    - ref: cucushift-hypershift-extended-etcd-encryption-health-check-azure
+    - ref: cucushift-hypershift-extended-vm-encryption-azure-server-side-encryption-customer-managed-keys-health-check
+    - ref: cucushift-hypershift-extended-vm-encryption-azure-encryption-at-host-health-check
     - chain: hypershift-conformance
     workflow: hypershift-azure-aks-conformance
 - as: security
