@@ -116,8 +116,8 @@ fi
 # the cluster even when the deployment fails partway through.
 copy_kubeconfig() {
   echo "Attempting to copy kubeconfig to SHARED_DIR..."
-  if [[ -f "${WORK_DIR}/kubeconfig.${CLUSTER_NAME}" ]]; then
-    cp "${WORK_DIR}/kubeconfig.${CLUSTER_NAME}" "${SHARED_DIR}/kubeconfig"
+  if [[ -f "${WORK_DIR}/kubeconfig-mno" ]]; then
+    cp "${WORK_DIR}/kubeconfig-mno" "${SHARED_DIR}/kubeconfig"
     echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig"
   else
     echo "WARNING: Could not copy kubeconfig to SHARED_DIR (file may not exist yet)"
@@ -168,7 +168,10 @@ if [[ -n "${PAYLOAD_URL}" ]]; then
   oc registry login --to=/tmp/pull-secret.json
 
   # Place the merged pull secret where env.user expects it
-  set -a; source "env.user_${CLUSTER_NAME}"; set +a
+  set -a
+  # shellcheck source=/dev/null
+  source "env.user_${CLUSTER_NAME}"
+  set +a
   PS=${OPENSHIFT_PULL_SECRET:-openshift_pull.json}
   [[ "$PS" = /* ]] && LOCAL_PULL_SECRET="$PS" || LOCAL_PULL_SECRET="${WORK_DIR}/$PS"
   cp /tmp/pull-secret.json "${LOCAL_PULL_SECRET}"
@@ -180,6 +183,7 @@ fi
 echo "Generating .env file from env.user_${CLUSTER_NAME}..."
 export PAYLOAD_URL
 set -a
+# shellcheck source=/dev/null
 source "env.user_${CLUSTER_NAME}"
 set +a
 make generate-env
@@ -223,11 +227,16 @@ cp .env "${ARTIFACT_DIR}/.env" || echo "WARNING: Failed to copy .env to artifact
 # Assisted Installer running in this Prow pod
 echo "Starting SSH reverse tunnel (AI API :${AI_PORT} -> :8090, image service :${IMAGE_PORT} -> :8888)..."
 ssh ${SSH_OPTS} \
+  -o ExitOnForwardFailure=yes \
   -R "0.0.0.0:${AI_PORT}:127.0.0.1:8090" \
   -R "0.0.0.0:${IMAGE_PORT}:127.0.0.1:8888" \
   root@${REMOTE_HOST} -N &
 SSH_TUNNEL_PID=$!
-trap "copy_kubeconfig; kill ${SSH_TUNNEL_PID} 2>/dev/null || true" EXIT
+cleanup() {
+  copy_kubeconfig
+  kill "${SSH_TUNNEL_PID}" 2>/dev/null || true
+}
+trap 'cleanup' EXIT
 sleep 2
 if ! kill -0 ${SSH_TUNNEL_PID} 2>/dev/null; then
   echo "ERROR: SSH reverse tunnel failed to start"
