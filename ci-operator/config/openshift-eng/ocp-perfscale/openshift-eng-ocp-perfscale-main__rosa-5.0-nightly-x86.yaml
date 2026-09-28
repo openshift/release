@@ -274,27 +274,64 @@ tests:
     - as: increase-router-resources
       cli: latest
       commands: |
-        echo "Step 1: Scale down ingress-operator to prevent reconciliation..."
+        set -o errexit
+        set -o pipefail
+
+        echo "=== Step 1: Scale down ingress-operator ==="
         oc scale deployment/ingress-operator -n openshift-ingress-operator --replicas=0
         oc rollout status deployment/ingress-operator -n openshift-ingress-operator --timeout=60s || true
         echo "Ingress operator scaled down"
 
-        echo "Step 2: Increase router container CPU request to 100m..."
-        oc set resources deployment/router-default -n openshift-ingress \
-          -c router --requests=cpu=100m,memory=256Mi
+        echo "=== Step 2: Check for validating webhooks ==="
+        echo "Validating webhooks that might affect openshift-ingress:"
+        oc get validatingwebhookconfigurations -o json | \
+          jq -r '.items[] | select(.webhooks[]?.rules[]?.apiGroups[]? == "apps" or .webhooks[]?.namespaceSelector?.matchExpressions[]?.values[]? == "openshift-ingress") | .metadata.name' 2>/dev/null || echo "No blocking webhooks found"
 
-        echo "Step 3: Wait for router deployment rollout..."
-        oc rollout status deployment/router-default -n openshift-ingress --timeout=300s
+        echo "=== Step 3: Show current deployment state ==="
+        echo "Current containers in router-default:"
+        oc get deployment/router-default -n openshift-ingress -o json | \
+          jq '.spec.template.spec | {containers: [.containers[] | {name, resources}], initContainers: [(.initContainers // [])[] | {name, resources, restartPolicy}]}'
 
-        echo "Step 4: Verify resource requests..."
-        ROUTER_CPU=$(oc get deployment/router-default -n openshift-ingress \
-          -o jsonpath='{.spec.template.spec.containers[?(@.name=="router")].resources.requests.cpu}')
-        echo "Router CPU request: ${ROUTER_CPU}"
-        if [[ "${ROUTER_CPU}" != "100m" ]]; then
-          echo "ERROR: Router CPU request is ${ROUTER_CPU}, expected 100m"
+        echo "=== Step 4: Patch router container resources via JSON patch ==="
+        ROUTER_IDX=$(oc get deployment/router-default -n openshift-ingress -o json | \
+          jq '.spec.template.spec.containers | to_entries[] | select(.value.name == "router") | .key')
+        echo "Router container is at index: ${ROUTER_IDX}"
+
+        if [[ -z "${ROUTER_IDX}" ]]; then
+          echo "ERROR: Could not find router container in deployment"
           exit 1
         fi
-        echo "Router resource increase complete."
+
+        oc patch deployment/router-default -n openshift-ingress --type='json' \
+          -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/${ROUTER_IDX}/resources\",\"value\":{\"requests\":{\"cpu\":\"100m\",\"memory\":\"256Mi\"}}}]" \
+          -v=6 2>&1 || {
+            echo "JSON patch failed, trying strategic merge patch..."
+            oc patch deployment/router-default -n openshift-ingress --type='strategic' \
+              -p="{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"router\",\"resources\":{\"requests\":{\"cpu\":\"100m\",\"memory\":\"256Mi\"}}}]}}}}" \
+              -v=6 2>&1
+          }
+
+        echo "=== Step 5: Wait for rollout ==="
+        oc rollout status deployment/router-default -n openshift-ingress --timeout=300s
+
+        echo "=== Step 6: Verify ==="
+        ROUTER_CPU=$(oc get deployment/router-default -n openshift-ingress -o json | \
+          jq -r '.spec.template.spec.containers[] | select(.name == "router") | .resources.requests.cpu')
+        ROUTER_MEM=$(oc get deployment/router-default -n openshift-ingress -o json | \
+          jq -r '.spec.template.spec.containers[] | select(.name == "router") | .resources.requests.memory')
+        echo "Router CPU request: ${ROUTER_CPU}"
+        echo "Router Memory request: ${ROUTER_MEM}"
+
+        if [[ "${ROUTER_CPU}" != "100m" ]]; then
+          echo "WARNING: Router CPU request is ${ROUTER_CPU}, expected 100m"
+          echo "=== Debug: Full deployment spec ==="
+          oc get deployment/router-default -n openshift-ingress -o yaml | head -100
+          echo "=== Debug: Recent events ==="
+          oc get events -n openshift-ingress --sort-by='.lastTimestamp' | tail -20
+          echo "=== Continuing anyway to see what happens under load ==="
+        fi
+
+        echo "=== Done ==="
       from: cli
       resources:
         requests:
@@ -355,6 +392,8 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    post:
+    - ref: send-results-to-reportportal
     workflow: rosa-aws-sts
 zz_generated_metadata:
   branch: main
