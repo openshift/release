@@ -17,8 +17,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: netpol-24nodes
+- as: netpol-24nodes
+  cron: 0 12 6,13,20,27 * *
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -77,8 +77,8 @@ tests:
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
-- always_run: false
-  as: control-plane-120nodes
+- as: control-plane-120nodes
+  cron: 0 5 * * 2
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -115,8 +115,8 @@ tests:
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
   timeout: 10h0m0s
-- always_run: false
-  as: control-plane-252nodes
+- as: control-plane-252nodes
+  cron: 0 5 5,19 * *
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -220,8 +220,8 @@ tests:
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
-- always_run: false
-  as: control-plane-fips-24nodes
+- as: control-plane-fips-24nodes
+  cron: 17 9 * * *
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -249,8 +249,8 @@ tests:
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws-ovn-fips
-- always_run: false
-  as: control-plane-fips-6nodes
+- as: control-plane-fips-6nodes
+  cron: 17 15 * * *
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -311,8 +311,8 @@ tests:
     - ref: openshift-qe-batch-churn
     - ref: openshift-qe-orion-batch-churn
     workflow: openshift-qe-installer-aws-ovn-fips
-- always_run: false
-  as: control-plane-etcdencrypt-24nodes
+- as: control-plane-etcdencrypt-24nodes
+  cron: 0 3 * * 3
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -373,8 +373,8 @@ tests:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-router-perf
     workflow: openshift-qe-installer-aws
-- always_run: false
-  as: data-path-9nodes
+- as: data-path-9nodes
+  cron: 0 3 1,8,15,22 * *
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -426,6 +426,38 @@ tests:
     test:
     - chain: openshift-qe-node-density-cni
     workflow: openshift-qe-installer-aws
+- as: control-plane-ipsec-24nodes
+  cron: 0 10 11,23 * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency
+      ENABLE_LAYER_3: "false"
+      KB_FLAGS: --set=metricsEndpoints.0.step=2m --set=metricsEndpoints.1.step=2m
+        --local-indexing
+      NODE_DENSITY_GC: "false"
+      ORION_ENVS: ipsec=true
+      RUN_ORION: deferred
+      UDN_ITERATION_MULTIPLIER: "3"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws-ovn-ipsec
 - always_run: false
   as: control-plane-ipsec-120nodes
   reporter_config:
@@ -502,8 +534,8 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 14h0m0s
-- always_run: false
-  as: data-path-ipsec-9nodes
+- as: data-path-ipsec-9nodes
+  cron: 0 2 8,22 * *
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -531,8 +563,8 @@ tests:
     - ref: openshift-qe-perfscale-aws-data-path-sg
     - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-aws-ovn-ipsec
-- always_run: false
-  as: udn-density-l3-24nodes
+- as: udn-density-l3-24nodes
+  cron: 0 2 * * 2,4
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -561,8 +593,8 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     - ref: openshift-qe-workers-scale
     workflow: openshift-qe-udn-density-pods
-- as: cudn-density-single-ns-800-24nodes
-  cron: 20 2 * * 0,2,4
+- always_run: false
+  as: cudn-density-single-ns-800-24nodes
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -696,7 +728,7 @@ tests:
     test:
     - chain: openshift-qe-cudn-density
 - as: cudn-incremental-1000-24nodes
-  cron: 20 10 * * 1,3
+  cron: 20 10 * * 1
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -730,6 +762,40 @@ tests:
     - ref: openshift-qe-workers-scale
     test:
     - chain: openshift-qe-cudn-density
+- as: evpn
+  cron: 0 4 * * 2,4
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      EXTERNAL_WEBSERVER_IP: 172.27.187.82
+      ITERATIONS: "72"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+    post:
+    - ref: openshift-qe-installer-aws-deprovision-bastion
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ipi-install-post-featureset
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-installer-aws-provision-bastion
+    test:
+    - ref: openshift-qe-evpn
+    workflow: openshift-qe-installer-aws
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
