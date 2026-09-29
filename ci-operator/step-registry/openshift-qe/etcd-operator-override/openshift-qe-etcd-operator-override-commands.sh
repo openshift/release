@@ -65,3 +65,9 @@ fi
 
 echo "SUCCESS: Custom etcd-operator image persisted after ${OVERRIDE_WAIT_TIME}s"
 echo "  Image: ${FINAL_IMAGE}"
+
+# Wait for etcd clusteroperator to finish reconciling
+echo "--- Waiting for etcd clusteroperator to finish reconciling ---"
+oc wait co/etcd --for=condition=Progressing=False --timeout=600s
+echo "etcd clusteroperator reconciliation complete"
+oc get co etcd
