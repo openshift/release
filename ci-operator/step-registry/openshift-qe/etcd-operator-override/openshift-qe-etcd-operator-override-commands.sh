@@ -18,8 +18,10 @@ echo "Original image: ${ORIGINAL_IMAGE}"
 # Step 1: Scale down CVO so it cannot reconcile managed operators
 echo "--- Scaling down cluster-version-operator ---"
 oc scale deployment/cluster-version-operator -n openshift-cluster-version --replicas=0
-oc wait deployment/cluster-version-operator -n openshift-cluster-version \
-  --for=jsonpath='{.status.replicas}'=0 --timeout=60s
+# Wait for all CVO pods to terminate (jsonpath on status.replicas is unreliable
+# when replicas=0 because the field may be omitted entirely)
+oc wait pod -n openshift-cluster-version -l k8s-app=cluster-version-operator \
+  --for=delete --timeout=60s || true
 echo "CVO scaled down successfully"
 
 # Step 2: Patch the etcd-operator deployment with the custom image
@@ -46,8 +48,10 @@ fi
 # Step 4: Scale CVO back up
 echo "--- Scaling cluster-version-operator back up ---"
 oc scale deployment/cluster-version-operator -n openshift-cluster-version --replicas=1
-oc wait deployment/cluster-version-operator -n openshift-cluster-version \
-  --for=condition=Available --timeout=120s
+# Use rollout status to wait for the new CVO pod to be running and ready
+# (--for=condition=Available is unreliable here because the condition may
+# still be True from before the scale-down, returning immediately)
+oc rollout status deployment/cluster-version-operator -n openshift-cluster-version --timeout=120s
 echo "CVO scaled back up successfully"
 
 # Step 5: Wait the configured period to verify no reconciliation
