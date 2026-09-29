@@ -367,10 +367,13 @@ echo "Prometheus URL:  $(cat "${PROMETHEUS_URL_FILE}")"
 # ---------------------------------------------------------------------------
 KUADRANT_NS="${KUADRANT_NAMESPACE:-kuadrant-system}"
 KUADRANT_SUB="${KUADRANT_SUBSCRIPTION_NAME:-rhcl-operator}"
-# Operator traces + Kuadrant CR defaultEndpoint stay on OTLP gRPC :4317 (Kind / already passing).
+# Operator traces stay on OTLP gRPC :4317 (control-plane tests already passing).
 JAEGER_COLLECTOR_ENDPOINT="rpc://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4317"
-# OTLP HTTP for operator logs/metrics; Service must expose 4318 (container already listens).
+# OTLP HTTP :4318 — operator logs/metrics and wasm defaultEndpoint experiment.
 OTEL_HTTP_ENDPOINT="http://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4318"
+# Kind uses rpc://:4317; last full suite still had no kuadrant-filter spans.
+# Try HTTP for dataplane wasm only; do not change operator TRACES_ENDPOINT.
+WASM_OTLP_ENDPOINT="${OTEL_HTTP_ENDPOINT}"
 
 if oc get kuadrant/kuadrant -n "${KUADRANT_NS}" >/dev/null 2>&1; then
   echo "=== Enabling Kuadrant CR observability (rhcl-mc1 / Kind pattern) ==="
@@ -383,7 +386,7 @@ if oc get kuadrant/kuadrant -n "${KUADRANT_NS}" >/dev/null 2>&1; then
           \"httpHeaderIdentifier\": \"x-request-id\"
         },
         \"tracing\": {
-          \"defaultEndpoint\": \"${JAEGER_COLLECTOR_ENDPOINT}\",
+          \"defaultEndpoint\": \"${WASM_OTLP_ENDPOINT}\",
           \"insecure\": true
         }
       }

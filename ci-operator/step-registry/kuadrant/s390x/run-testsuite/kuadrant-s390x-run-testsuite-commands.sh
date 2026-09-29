@@ -1178,6 +1178,15 @@ RUN_LIMITADOR="${RUN_LIMITADOR:-false}"
 RUN_DNSTLS="${RUN_DNSTLS:-false}"
 RUN_OBSERVABILITY="${RUN_OBSERVABILITY:-false}"
 RUN_KUADRANT="${RUN_KUADRANT:-true}"
+RUN_DATAPLANE_TRACING_ONLY="${RUN_DATAPLANE_TRACING_ONLY:-false}"
+if [[ "${RUN_DATAPLANE_TRACING_ONLY}" == "true" ]]; then
+  RUN_SMOKE=false
+  RUN_AUTHORINO=false
+  RUN_LIMITADOR=false
+  RUN_DNSTLS=false
+  RUN_OBSERVABILITY=false
+  RUN_KUADRANT=false
+fi
 
 append_make_target() {
   # $1 = target name, $2 = extra flags (e.g. --reruns 0), empty for smoke
@@ -1266,6 +1275,7 @@ cfssl version || true
 echo "=== Testsuite make targets (from RUN_* flags) ==="
 echo "  RUN_SMOKE=${RUN_SMOKE} RUN_AUTHORINO=${RUN_AUTHORINO} RUN_LIMITADOR=${RUN_LIMITADOR}"
 echo "  RUN_DNSTLS=${RUN_DNSTLS} RUN_OBSERVABILITY=${RUN_OBSERVABILITY} RUN_KUADRANT=${RUN_KUADRANT}"
+echo "  RUN_DATAPLANE_TRACING_ONLY=${RUN_DATAPLANE_TRACING_ONLY}"
 
 # Independent targets: each records failure into rc but does not skip the next.
 # Non-smoke uses --reruns 0 (Makefile defaults to --reruns 3; last CLI flag wins).
@@ -1275,6 +1285,9 @@ echo "  RUN_DNSTLS=${RUN_DNSTLS} RUN_OBSERVABILITY=${RUN_OBSERVABILITY} RUN_KUAD
 [[ "${RUN_DNSTLS}" == "true" ]] && append_make_target dnstls "--reruns 0"
 [[ "${RUN_OBSERVABILITY}" == "true" ]] && append_make_target observability "--reruns 0"
 [[ "${RUN_KUADRANT}" == "true" ]] && append_make_target kuadrant "--reruns 0"
+# Makefile testsuite/% runs a path; junit xml is junit-data_plane_tracing.xml.
+[[ "${RUN_DATAPLANE_TRACING_ONLY}" == "true" ]] && \
+  append_make_target "testsuite/tests/singlecluster/tracing/data_plane_tracing" "--reruns 0"
 
 CONTAINER_SCRIPT+="make polish-junit || true
 # Debug summary before JUnit dump (survives even if follow logs drop mid-run).

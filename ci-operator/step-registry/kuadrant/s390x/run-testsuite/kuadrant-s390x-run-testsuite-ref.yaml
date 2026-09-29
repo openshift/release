@@ -75,7 +75,14 @@ ref:
     documentation: |-
       When "true", run `make kuadrant` (catch-all single-cluster suite; excludes
       standalone_only, disruptive, ui). Runs after optional segmented targets.
-      Invoked with --reruns 0. Enabled by default.
+      Invoked with --reruns 0. Enabled by default. Ignored when
+      RUN_DATAPLANE_TRACING_ONLY is true.
+  - name: RUN_DATAPLANE_TRACING_ONLY
+    default: "false"
+    documentation: |-
+      When "true", skip smoke/kuadrant/segmented suites and run only
+      testsuite/tests/singlecluster/tracing/data_plane_tracing (the 12
+      kuadrant-filter Jaeger tests). For focused rehearsals of wasm OTLP.
   - name: HTTPBIN_IMAGE
     default: "quay.io/vray_rh/rhcl_testsuite_dependencies:httpbin-s390x"
     documentation: |-
@@ -152,7 +159,8 @@ ref:
 
     Default make targets: smoke + kuadrant. Optional segmented suites
     (authorino, limitador, dnstls, observability) are off by default via RUN_*
-    booleans; enable for focused rehearsals. Order when enabled:
+    booleans; enable for focused rehearsals. RUN_DATAPLANE_TRACING_ONLY skips
+    those and runs only data_plane_tracing (12 tests). Order when enabled:
     smoke → authorino → limitador → dnstls → observability → kuadrant.
     Failure does not skip later targets. Non-smoke uses --reruns 0.
     Each target writes its own junit-*.xml.
