@@ -371,6 +371,70 @@ YAML
     [[ "${_wasTracing}" == "true" ]] && set -x
 }
 
+# ApplyDataDisk — create a blank secondary DataVolume on the spoke for data-disk testing.
+# The DataVolume uses CNV_TEST_VM_DATA_DISK_STORAGE_CLASS (default: ocs-storagecluster-cephfs)
+# so that MTV must handle two distinct source storage classes in its StorageMap
+# (root on the virt-class, data on the cephfs filesystem class).
+function ApplyDataDisk () {
+    typeset vmName="${1:?}"; (($#)) && shift
+    typeset dvName="${vmName}-datadisk"
+    typeset sc="${CNV_TEST_VM_DATA_DISK_STORAGE_CLASS}"
+    typeset vMode="${CNV_TEST_VM_DATA_DISK_VOLUME_MODE}"
+    typeset aMode="${CNV_TEST_VM_DATA_DISK_ACCESS_MODE}"
+    typeset capacity="${CNV_TEST_VM_DATA_DISK_SIZE}"
+
+    DV_NAME="${dvName}" \
+    DV_SC="${sc}" \
+    DV_VMODE="${vMode}" \
+    DV_AMODE="${aMode}" \
+    DV_CAPACITY="${capacity}" \
+    yq e '
+        .metadata.name                          = strenv(DV_NAME) |
+        .metadata.namespace                     = strenv(CNV_TEST_VM_NAMESPACE) |
+        .metadata.labels["app.kubernetes.io/name"] = strenv(DV_NAME) |
+        .spec.pvc.storageClassName              = strenv(DV_SC) |
+        .spec.pvc.volumeMode                    = strenv(DV_VMODE) |
+        .spec.pvc.accessModes                   = [strenv(DV_AMODE)] |
+        .spec.pvc.resources.requests.storage    = strenv(DV_CAPACITY)
+    ' - <<'YAML' | SpokeOc apply -f -
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: placeholder
+  namespace: placeholder
+  labels:
+    app.kubernetes.io/name: placeholder
+spec:
+  source:
+    blank: {}
+  pvc:
+    storageClassName: placeholder
+    volumeMode: placeholder
+    accessModes:
+    - placeholder
+    resources:
+      requests:
+        storage: placeholder
+YAML
+}
+
+# AddDataDiskToVM — JSON-patch the VM spec to append the secondary disk and volume entries.
+# The disk uses bus virtio and is named "datadisk"; the volume references the DataVolume by name.
+function AddDataDiskToVM () {
+    typeset vmName="${1:?}"; (($#)) && shift
+    typeset dvName="${vmName}-datadisk"
+
+    SpokeOc patch "virtualmachine/${vmName}" -n "${CNV_TEST_VM_NAMESPACE}" \
+        --type json -p "[
+            {\"op\": \"add\",
+             \"path\": \"/spec/template/spec/domain/devices/disks/-\",
+             \"value\": {\"name\": \"datadisk\", \"disk\": {\"bus\": \"virtio\"}}},
+            {\"op\": \"add\",
+             \"path\": \"/spec/template/spec/volumes/-\",
+             \"value\": {\"name\": \"datadisk\", \"dataVolume\": {\"name\": \"${dvName}\"}}}
+        ]" 1>/dev/null
+}
+
 # WaitVmiRunning — wait for VMI object then Running phase.
 function WaitVmiRunning () {
     typeset vmName="${1:?}"; (($#)) && shift
@@ -450,7 +514,22 @@ YAML
         esac
 
         WaitVmiRunning "${currentVmName}"
-    done
+
+        # Optionally attach a secondary data disk (CNV_TEST_VM_DATA_DISK_ENABLED=true).
+        # The disk uses a different StorageClass (CNV_TEST_VM_DATA_DISK_STORAGE_CLASS) from
+        # the root disk so that MTV must map two source storage classes in its StorageMap
+        # (set MTV_ADDITIONAL_SOURCE_STORAGE_NAME to the same value in the job env).
+        if [[ "${CNV_TEST_VM_DATA_DISK_ENABLED:-false}" == "true" ]]; then
+            ApplyDataDisk "${currentVmName}"
+            SpokeOc wait "datavolume/${currentVmName}-datadisk" -n "${CNV_TEST_VM_NAMESPACE}" \
+                --for=condition=Ready --timeout="${CNV_TEST_VM_DATAVOLUME_WAIT_TIMEOUT}"
+            AddDataDiskToVM "${currentVmName}"
+            # runStrategy:Always already fired the VMI from the original (single-disk) template.
+            # Delete it so KubeVirt recreates it from the updated spec that now includes datadisk.
+            SpokeOc delete "virtualmachineinstance/${currentVmName}" -n "${CNV_TEST_VM_NAMESPACE}" \
+                --ignore-not-found --wait=true --timeout=5m
+            WaitVmiRunning "${currentVmName}"
+        fi
 
     if [[ -n "${ARTIFACT_DIR}" ]]; then
         mkdir -p "${ARTIFACT_DIR}"
