@@ -304,7 +304,6 @@ spec:
         - key: karpenter.azure.com/sku-version
           operator: In
           values:
-            - "2"
             - "3"
             - "4"
             - "5"
