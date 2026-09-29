@@ -99,8 +99,9 @@ EOF
 }
 
 collect_gke() {
-  local kubeconfig="$1"
-  local scope_dir="$2"
+  local name="$1"
+  local kubeconfig="$2"
+  local scope_dir="$3"
   local namespaces_json="${scope_dir}/cluster/namespaces.json"
   local candidates="${scope_dir}/candidate-namespaces.txt"
   local application_candidates="${scope_dir}/application-namespaces.txt"
@@ -170,6 +171,26 @@ collect_gke() {
     ' "${output}" >>"${application_candidates}"; then
       record_error "${scope_dir}" "application-destinations-json" 1
     fi
+    if ! jq '
+      {
+        apiVersion,
+        kind,
+        items: [
+          .items[]
+          | select(
+              .metadata.name == "gecko-version-sync"
+              or .metadata.name == "platform-api-server"
+            )
+          | {
+              metadata: {name: .metadata.name, namespace: .metadata.namespace},
+              spec,
+              status
+            }
+        ]
+      }
+    ' "${output}" >"${scope_dir}/custom-resources/argocd-debug-applications.json"; then
+      record_error "${scope_dir}" "argocd-debug-applications-json" 1
+    fi
   else
     record_error "${scope_dir}" "applications.argoproj.io" "${exit_code}"
   fi
@@ -217,6 +238,23 @@ collect_gke() {
       kubectl --kubeconfig="${kubeconfig}" get "${kind}" --all-namespaces -o json
   done
 
+  if [[ "${name}" == "region-cluster" ]]; then
+    # These cluster-scoped resources are omitted by namespace inspection. Keep
+    # the Argo desired/status view beside the live Channel and its API schema.
+    run_capture "${scope_dir}" "channels.gcp.managed.openshift.io" \
+      "${scope_dir}/custom-resources/channels.gcp.managed.openshift.io.json" 30s \
+      kubectl --kubeconfig="${kubeconfig}" --request-timeout=20s \
+        get channels.gcp.managed.openshift.io -o json
+    run_capture "${scope_dir}" "apiservices.apiregistration.k8s.io" \
+      "${scope_dir}/custom-resources/apiservices.apiregistration.k8s.io.json" 30s \
+      kubectl --kubeconfig="${kubeconfig}" --request-timeout=20s \
+        get apiservices.apiregistration.k8s.io -o json
+    run_capture "${scope_dir}" "openapi-gcp-managed-v1" \
+      "${scope_dir}/cluster/openapi-gcp-managed-v1.json" 30s \
+      kubectl --kubeconfig="${kubeconfig}" --request-timeout=20s \
+        get --raw /openapi/v3/apis/gcp.managed.openshift.io/v1
+  fi
+
   run_capture "${scope_dir}" "nodes" "${scope_dir}/cluster/nodes.json" 30s \
     kubectl --kubeconfig="${kubeconfig}" get nodes -o json
   run_capture "${scope_dir}" "persistentvolumes" "${scope_dir}/cluster/persistentvolumes.json" 30s \
@@ -233,7 +271,7 @@ collect_gke_bounded() {
   local name="$1"
   local kubeconfig="$2"
   local scope_dir="$3"
-  timeout 240s bash -c 'set -uo pipefail; collect_gke "$@"' _ "${kubeconfig}" "${scope_dir}"
+  timeout 240s bash -c 'set -uo pipefail; collect_gke "$@"' _ "${name}" "${kubeconfig}" "${scope_dir}"
   local exit_code=$?
   if (( exit_code != 0 )); then
     record_error "${scope_dir}" "${name}" "${exit_code}"
