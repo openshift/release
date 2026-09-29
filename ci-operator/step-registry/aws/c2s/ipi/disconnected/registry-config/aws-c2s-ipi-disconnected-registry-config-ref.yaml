@@ -1,0 +1,43 @@
+ref:
+  as: aws-c2s-ipi-disconnected-registry-config
+  from: cli
+  grace_period: 10m
+  timeout: 40m
+  commands: aws-c2s-ipi-disconnected-registry-config-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - collection: openshift-qe
+    group: mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  env:
+  - name: SELF_MANAGED_ADDITIONAL_CA
+    default: ""
+    documentation: |-
+      When "true", read the mirror registry CA from
+      ${CLUSTER_PROFILE_DIR}/mirror_registry_ca.crt; otherwise from the
+      openshift-qe mirror-registry vault (/var/run/vault/mirror-registry/client_ca.crt).
+      Must match the value ipi-conf-mirror used so node trust matches the CA that
+      signed the mirror registry certificate.
+  documentation: |-
+    Reconcile a freshly installed disconnected AWS C2S/SC2S cluster for the origin
+    conformance suite.
+
+    Trusts the bastion mirror registry on the nodes by adding its CA to
+    image.config.openshift.io/cluster additionalTrustedCA (configmap
+    registry-config in openshift-config), then waits for the worker
+    MachineConfigPool to converge. Release images pull via the install-time
+    imageContentSources/ICSP redirect, but the e2e suite references images on the
+    mirror directly (--from-repository <mirror>/e2e/tests); a directly referenced
+    registry's certificate is verified against /etc/docker/certs.d, which only
+    additionalTrustedCA populates, so without this the e2e workload images fail
+    with x509 errors and ImagePullBackOff.
+
+    Also disables the default operator catalog sources (OperatorHub
+    disableAllDefaultSources and, on >= 4.18, the OLMv1 default ClusterCatalogs),
+    which otherwise crash-loop trying to reach registry.redhat.io on the
+    disconnected cluster.
+
+    Reused by both C2S (us-iso) and SC2S (us-isob).

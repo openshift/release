@@ -1,0 +1,18 @@
+workflow:
+  as: aws-c2s-ipi-disconnected
+  steps:
+    pre:
+    - chain: aws-c2s-ipi-disconnected-provision
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: gather-installer-boostrap-logs-in-bastion
+    - ref: gather-mirror-registry
+    - ref: gather-aws-console
+    - chain: gather
+    - ref: gather-proxy
+    - chain: aws-c2s-ipi-disconnected-deprovision
+  documentation: |-
+    Provision a disconnected, internal-publish IPI cluster on AWS C2S (us-iso), run the origin
+    openshift-e2e-test suite against it, then gather artifacts and tear the cluster and
+    infrastructure down. The region and account are selected by the cluster_profile.

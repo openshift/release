@@ -1,0 +1,52 @@
+chain:
+  as: aws-c2s-ipi-disconnected-provision
+  steps:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: aws-c2s-get-project-info
+    - ref: aws-provision-bastionhost
+    - ref: proxy-config-generate
+    - ref: aws-c2s-instance-metadata
+    - ref: aws-c2s-mirror-images
+    - ref: mirror-images-by-oc-adm
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-network-c2s
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-mirror
+    - ref: ipi-install-monitoringpvc
+    - ref: aws-c2s-init-token-service
+    - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+    - ref: ipi-install-install-aws
+    - ref: ipi-install-times-collection
+    - ref: cucushift-installer-check-aws-custom-vpc
+    - ref: cucushift-installer-check-aws-c2s
+    - ref: aws-c2s-ipi-disconnected-registry-config
+    - ref: aws-c2s-ipi-disconnected-e2e-images
+    - ref: mirror-images-qe-test-images
+  env:
+  - name: SIZE_VARIANT
+    default: "large"
+    documentation: "Instance type, known issue https://bugzilla.redhat.com/show_bug.cgi?id=2020181"
+  - name: BASTION_HOST_AMI
+    default: "ami-0cb19faa9c6c86a91"
+    documentation: "Image id for bastion host."
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy."
+  - name: QE_IMAGES
+    default: "false"
+    documentation: |-
+      Controls mirror-images-qe-test-images: when "true" it mirrors its built-in
+      openshifttest QE image set; when "false" it mirrors the pre-created list at
+      ${SHARED_DIR}/mirror-images-list.yaml instead. Set to "false" here so that the
+      origin e2e image list produced by aws-c2s-ipi-disconnected-e2e-images is
+      mirrored, matching the openshift-e2e-test suite these jobs run.
+  documentation: |-
+    Provision a disconnected, internal-publish IPI cluster on AWS C2S/SC2S for e2e tests.
+    It sets up the bastion host, mirror registry and proxy, mirrors the release payload,
+    generates the install-config and installs the cluster, then validates the custom VPC
+    and C2S/SC2S configuration. It is reused by both C2S (us-iso) and SC2S (us-isob); the
+    region and account are selected by the cluster_profile.

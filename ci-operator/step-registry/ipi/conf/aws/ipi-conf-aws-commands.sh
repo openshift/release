@@ -100,12 +100,26 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   # Not all instance family are supported by SHIFT emulator
   #   see https://bugzilla.redhat.com/show_bug.cgi?id=2020181
 
-  if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
-    COMPUTE_NODE_TYPE="m5.xlarge"
-  fi
+  if [[ "${OCP_ARCH}" == "arm64" ]]; then
+    # arm64 C2S/SC2S: use Graviton (m6g) instances and arm64 machine pools
+    CONTROL_ARCH="arm64"
+    COMPUTE_ARCH="arm64"
 
-  if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
-    CONTROL_PLANE_INSTANCE_TYPE="m5.${CONTROL_PLANE_INSTANCE_SIZE}"
+    if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+      COMPUTE_NODE_TYPE="m6g.xlarge"
+    fi
+
+    if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+      CONTROL_PLANE_INSTANCE_TYPE="m6g.${CONTROL_PLANE_INSTANCE_SIZE}"
+    fi
+  else
+    if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+      COMPUTE_NODE_TYPE="m5.xlarge"
+    fi
+
+    if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+      CONTROL_PLANE_INSTANCE_TYPE="m5.${CONTROL_PLANE_INSTANCE_SIZE}"
+    fi
   fi
 elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
   # ARM 64
@@ -336,6 +350,13 @@ rm /tmp/pull-secret
 # custom rhcos ami for non-public regions
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && [[ -z "${COMPUTE_AMI}" ]]; then
   jq --version
+
+  # RHCOS AMI architecture key in the installer's coreos metadata (x86_64 or aarch64)
+  ami_arch="x86_64"
+  if [[ "${OCP_ARCH}" == "arm64" ]]; then
+    ami_arch="aarch64"
+  fi
+
   if version_le "${ocp_version}" "4.9"; then
     # 4.9 and below
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/rhcos.json -o /tmp/ami.json
@@ -343,7 +364,7 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && 
   elif version_le "${ocp_version}" "4.21"; then
     # 4.10 to 4.21
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/rhcos.json -o /tmp/ami.json
-    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
+    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region --arg a "${ami_arch}" -r '.architectures[$a].images.aws.regions[$r].image' /tmp/ami.json)
   else
     # 4.22 and above: rhcos.json was split into coreos-rhel-9.json and coreos-rhel-10.json
     if version_le "5.0" "${ocp_version}"; then
@@ -360,7 +381,7 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && 
       coreos_file="coreos-rhel-9.json"
     fi
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/${coreos_file} -o /tmp/ami.json
-    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
+    CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region --arg a "${ami_arch}" -r '.architectures[$a].images.aws.regions[$r].image' /tmp/ami.json)
   fi
   COMPUTE_AMI="${CONTROL_PLANE_AMI}"
   echo "RHCOS for C2S: ${CONTROL_PLANE_AMI}"

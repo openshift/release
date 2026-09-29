@@ -1,0 +1,36 @@
+ref:
+  as: aws-c2s-ipi-disconnected-deprovision
+  from: upi-installer
+  grace_period: 10m
+  timeout: 60m
+  commands: aws-c2s-ipi-disconnected-deprovision-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 300Mi
+  env:
+  - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    default: ""
+    documentation: |-
+      Pullspec of a release image to extract openshift-install from, instead of
+      using the binary baked into the step image.
+  documentation: |-
+    Tear down a disconnected AWS C2S/SC2S cluster.
+
+    C2S/SC2S secret regions are emulated in CI: the cluster's AWS API calls are
+    intercepted through the bastion proxy and authenticated with short-lived
+    credentials from the SHIFT provider (CAP for C2S, GEOAxIS for SC2S).
+
+    OCP >= 4.12 is destroyed in the emulated environment, the same way it was
+    installed: the provision-time credential snapshot (${SHARED_DIR}/aws_temp_creds)
+    has expired and nothing refreshes the teardown pod, so a fresh credential is
+    minted from the provider and "destroy cluster" runs through the proxy with the
+    same credential env install used and the region left untouched. In-environment
+    destroy for the us-iso/us-isob partitions landed in openshift/installer#7427
+    (4.13, OCPBUGS-17809) and was backported to 4.12 (#7474, OCPBUGS-18646).
+
+    OCP <= 4.11 cannot destroy against the emulated endpoints, so the region in
+    metadata.json is rewritten to the commercial source_region and the cluster is
+    destroyed there directly with the long-lived backing-account credentials.
+
+    Reused by both C2S (us-iso) and SC2S (us-isob).
