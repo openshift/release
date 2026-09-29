@@ -52,7 +52,11 @@ quay:
     layout: base
     env:
       QUAY_OPERATOR_CHANNEL: stable-3.18
-      QUAY_OPERATOR_SOURCE: redhat-operators
+      # presubmit renders no source layer, so the ART FBC env that periodics get
+      # from templates/sources/nightly.yaml.j2 is set on the branch instead
+      QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      QUAY_INDEX_IMAGE_TAG: quay-3.18__v4.22__quay-rhel9-operator
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
     jobs:
       - {kind: presubmit, clouds: [aws], ocp: ["4.22"], test: e2e-install, always_run: false, optional: true}
 ```

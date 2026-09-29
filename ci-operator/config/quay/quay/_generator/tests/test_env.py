@@ -143,8 +143,9 @@ def test_source_nightly_env() -> None:
     env = config["tests"][0]["steps"]["env"]
     assert env["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
     assert env["QUAY_INDEX_IMAGE_REPO"] == (
-        "quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22"
+        "quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc"
     )
+    assert env["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.22__quay-rhel9-operator"
     assert env["QUAY_OPERATOR_CHANNEL"] == "stable-3.18"
 
 
