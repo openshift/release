@@ -6,7 +6,7 @@
         rules: [
           {
             alert: 'releaseControllerDown',
-            expr: 'kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"release-controller.*"} >= 1',
+            expr: 'kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"release-controller.*", clusterName="core-ci"} >= 1',
             'for': '5m',
             labels: {
               severity: 'critical',

@@ -6,7 +6,7 @@
         rules: [
           {
             alert: 'ciChatBotDown',
-            expr: 'kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"ci-chat-bot"} >= 1',
+            expr: 'kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"ci-chat-bot", clusterName="core-ci"} >= 1',
             'for': '5m',
             labels: {
               severity: 'critical',
