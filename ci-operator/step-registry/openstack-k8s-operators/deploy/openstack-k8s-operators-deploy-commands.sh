@@ -285,6 +285,10 @@ MARIADB_SECRET_NAME=$(oc get ${DBSERVICE} -o json | jq -r '.items[0].spec.secret
 MARIADB_PASSWD=$(oc get secret ${MARIADB_SECRET_NAME} -o json | jq -r .data.DbRootPassword | base64 -d)
 oc exec -it  pod/${DBSERVICE_CONTAINER} -- mysql -uroot -p${MARIADB_PASSWD} -e "show databases;"
 
+env|grep OS_
+openstack --version
+pip3 freeze
+sleep 30
 # Post tests for keystone-operator
 # Check to confirm you can issue a token.
 openstack --insecure token issue

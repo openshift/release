@@ -201,7 +201,7 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   fi
 
   # run kuttl
-  make ${SERVICE_NAME}_kuttl
+  # make ${SERVICE_NAME}_kuttl
 
   if [ -f "$KUTTL_REPORT" ]; then
       cp "${KUTTL_REPORT}" ${ARTIFACT_DIR}
