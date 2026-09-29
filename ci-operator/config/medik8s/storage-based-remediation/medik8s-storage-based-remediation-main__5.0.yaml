@@ -131,6 +131,13 @@ tests:
           echo '==> Copy the CI-selected SBR checkout into a writable build directory'
           test -f /opt/sbr-ci-src/Makefile
           cp -R /opt/sbr-ci-src /tmp/sbr-source
+
+          # TODO: Revert this rehearsal-only checkout after storage-based-remediation#95 merges.
+          echo '==> Check out storage-based-remediation PR 95'
+          git -C /tmp/sbr-source fetch --depth=1 \
+            https://github.com/medik8s/storage-based-remediation.git refs/pull/95/head
+          git -C /tmp/sbr-source checkout --detach FETCH_HEAD
+
           local revision prefix operator_tag agent_tag bundle_tag catalog_tag
           revision="$(git -C /tmp/sbr-source rev-parse HEAD)"
           git -C /tmp/sbr-source show --no-patch --format=fuller HEAD
