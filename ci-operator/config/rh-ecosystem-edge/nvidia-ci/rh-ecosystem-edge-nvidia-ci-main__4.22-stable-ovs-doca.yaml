@@ -100,15 +100,40 @@ images:
       # that `ostree container commit` discarding /var would permanently
       # lose, leaving ovs-vswitchd unable to load and, in turn,
       # ovsdb-server.service's version-stamping step failing.
-      # Stash a copy under /usr (which does survive the commit, being part
-      # of the base ostree layer) and have tmpfiles restore it into
-      # /var/opt/mellanox at every boot via a `C` (copy) rule instead of
-      # the `d` (create empty) rules used for genuine runtime state.
+      # Stash a copy under /usr, which does survive the commit as part of
+      # the base ostree layer, and restore it from there at boot.
       RUN mkdir -p /usr/lib/doca-collectx-payload && \
           cp -a /var/opt/mellanox /usr/lib/doca-collectx-payload/mellanox
 
-      RUN cat > /usr/lib/tmpfiles.d/doca-collectx-restore.conf <<'EOF'
-      C /var/opt/mellanox - - - - /usr/lib/doca-collectx-payload/mellanox
+      # Restoring it is done from ovsdb-server.service rather than from a
+      # tmpfiles.d `C` (copy) rule, for two reasons.
+      #
+      # First, putting the file back is not by itself sufficient.
+      # collectx-clxapi installs outside the default search path and ships
+      # /etc/ld.so.conf.d/clx-api.conf to cover that, so libclx_api.so.1 is
+      # found via /etc/ld.so.cache -- not by scanning the directory. /etc is
+      # preserved across the commit, so the cache built at image-build time
+      # persists onto the node, but any ldconfig run while the library is
+      # missing silently drops the entry, after which restoring only the
+      # file still fails with this exact error until ldconfig runs again.
+      # Verified locally: remove the file, run ldconfig, restore the file --
+      # `ovs-vswitchd --version` keeps failing until ldconfig is re-run.
+      # So the cache has to be rebuilt after the restore, which a tmpfiles
+      # rule cannot do.
+      #
+      # Second, a tmpfiles `C` rule has to win a boot-ordering race against
+      # whatever else touches /var and the linker cache;
+      # systemd-tmpfiles-setup runs Before=sysinit.target, far ahead of OVS.
+      # An ExecStartPre depends on no ordering at all: it runs at the one
+      # moment the library is actually needed. RHCOS already ships a drop-in
+      # on this same unit (10-ovsdb-restart.conf), so the mechanism is known
+      # to work here. The restore is conditional so it is a no-op on any
+      # boot where /var/opt/mellanox is already intact.
+      RUN mkdir -p /etc/systemd/system/ovsdb-server.service.d && \
+          cat > /etc/systemd/system/ovsdb-server.service.d/10-doca-collectx-restore.conf <<'EOF'
+      [Service]
+      ExecStartPre=/bin/sh -c '[ -e /var/opt/mellanox/collectx/lib/libclx_api.so.1 ] || { mkdir -p /var/opt && cp -a /usr/lib/doca-collectx-payload/mellanox /var/opt/mellanox; }'
+      ExecStartPre=/sbin/ldconfig
       EOF
 
       # doca-openvswitch carries /run/openvswitch, /var/log/openvswitch and
