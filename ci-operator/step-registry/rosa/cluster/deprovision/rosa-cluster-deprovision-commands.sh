@@ -96,20 +96,52 @@ while true; do
   fi
 done
 
+sts_delete_with_retry() {
+    local cmd="$1"
+    local retries="${STS_DELETE_RETRIES:-5}"
+    local interval="${STS_RETRY_INTERVAL:-30}"
+
+    # Validate inputs — fall back to defaults rather than aborting a cleanup step
+    if ! [[ "$retries" =~ ^[1-9][0-9]*$ ]]; then
+        echo "WARNING: STS_DELETE_RETRIES='$retries' is not a positive integer, using default 5"
+        retries=5
+    fi
+    if ! [[ "$interval" =~ ^[0-9]+$ ]]; then
+        echo "WARNING: STS_RETRY_INTERVAL='$interval' is not a non-negative integer, using default 30"
+        interval=30
+    fi
+
+    local attempt=1
+    while [ "$attempt" -le "$retries" ]; do
+        echo "Attempt $attempt of $retries: $cmd"
+        if eval "$cmd"; then
+            echo "Successfully executed: $cmd"
+            return 0
+        fi
+        echo "Attempt $attempt failed. Waiting ${interval}s before retry..."
+        sleep "$interval"
+        attempt=$((attempt + 1))
+    done
+    echo "WARNING: All $retries attempts failed for: $cmd"
+    return 1
+}
+
 if [[ "$STS" == "true" ]]; then
+  PROPAGATION_DELAY="${STS_PROPAGATION_DELAY:-120}"
+  echo "Waiting ${PROPAGATION_DELAY}s for cluster state to propagate before deleting STS resources..."
+  sleep "$PROPAGATION_DELAY"
+
   start_time=$(date +"%s")
   echo "Deleting operator roles"
-  rosa delete operator-roles -c "${CLUSTER_ID}" -y -m auto
+  sts_delete_with_retry "rosa delete operator-roles -c ${CLUSTER_ID} -y -m auto" || true
 
   echo "Deleting oidc-provider"
-  rosa delete oidc-provider -c "${CLUSTER_ID}" -y -m auto
+  sts_delete_with_retry "rosa delete oidc-provider -c ${CLUSTER_ID} -y -m auto" || true
 
   end_time=$(date +"%s")
   record_cluster "timers" "sts_destroy" $(( "${end_time}" - "${start_time}" ))
   echo "STS resoures of ${CLUSTER_ID} deleted after $(( ${end_time} - ${start_time} )) seconds"
 fi
-echo "Do a smart 120 sleeping to make sure the processes are complted."
-sleep 120
 
 echo "Cluster is no longer accessible; delete successful."
 exit 0
