@@ -19,7 +19,16 @@ ref:
     documentation: Minimum age since the latest certificate creation or update; renewal postpones cleanup.
   - name: CERTIFICATE_CLEANUP_MAX_DELETIONS
     default: "1000"
-    documentation: Maximum number of certificate deletions per run.
+    documentation: Maximum number of active certificate mutations selected per run.
+  - name: CERTIFICATE_CLEANUP_MAX_PURGES
+    default: "1000"
+    documentation: Maximum total purge mutations selected per run across immediate purges and existing tombstones.
+  - name: CERTIFICATE_CLEANUP_WORKERS
+    default: "2"
+    documentation: Maximum concurrent certificate delete and purge chains.
+  - name: CERTIFICATE_CLEANUP_TIMEOUT
+    default: "60m"
+    documentation: Overall timeout for inventory discovery and mutations.
   documentation: |-
     Clean up orphaned DEV CI certificates with cleanup-sweeper ci-certificates.
     The command fixes the scope to aro-hcp-dev-svc-kv and the two DEV infrastructure
@@ -27,12 +36,13 @@ ref:
     Owner inventory must succeed in both subscriptions before any deletion; an
     inventory failure fails closed. The default seven-day (168h) age is measured
     from the latest creation or update timestamp, not the earliest, so a recent
-    renewal postpones cleanup. At most 1000 certificates are deleted per run by
-    default. Certificates are soft-deleted, never purged.
+    renewal postpones cleanup. The deletion and purge limits are mutation budgets:
+    ineligible metadata does not consume them, so discovery can inspect the complete
+    inventory. Successful deletes are immediately purged, and pre-existing
+    tombstones share the same purge budget. Purging is irreversible.
     The step defaults to dry-run; the dedicated hourly
     delete-expired-dev-ci-certificates job explicitly sets dry-run to false.
     The script forces dry-run unless JOB_TYPE is exactly periodic, regardless of
     CERTIFICATE_CLEANUP_DRY_RUN. Prow rehearsals run as presubmits and cannot delete;
     unset, empty, and other non-periodic job types also force dry-run.
-    Requires https://github.com/Azure/ARO-HCP/pull/7019 in ARO-HCP main before this
-    periodic is enabled. Merging this job enables real deletion immediately.
+    Merging a periodic that sets dry-run to false enables real deletion immediately.

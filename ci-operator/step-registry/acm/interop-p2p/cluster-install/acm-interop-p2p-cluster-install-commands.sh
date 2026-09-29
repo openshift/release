@@ -165,43 +165,64 @@ fi
 #=====================
 # Resolve cluster image set (once for all clusters)
 #=====================
-# Find the latest ClusterImageSet matching the target OCP version
-# ClusterImageSets are named like: img4.14.0-x86_64, img4.14.1-x86_64, etc.
+# Default: latest ACM/Hive ClusterImageSet matching ACM_SPOKE_CLUSTER_INITIAL_VERSION
+# (names like img4.14.0-x86_64). When OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+# is true, install from the hub payload instead so the spoke is the same unsigned
+# nightly as the hub (catalog image sets are signed GA and fail rpm-ostree rebase
+# onto nightlies). Hive does not pass that installer env into the spoke install.
 if [[ -z "${ACM_SPOKE_CLUSTER_INITIAL_VERSION}" ]]; then
     : "ACM_SPOKE_CLUSTER_INITIAL_VERSION must be set (e.g. 4.20)"
     exit 1
 fi
 : "Resolving cluster image set for version '${ACM_SPOKE_CLUSTER_INITIAL_VERSION}'"
 typeset clusterImagesetName
-# jq select avoids grep's non-zero exit on no match; sort -V preserves version ordering.
-clusterImagesetName="$(
-    oc get clusterimagesets.hive.openshift.io -o json |
-    jq -r --arg prefix "img${ACM_SPOKE_CLUSTER_INITIAL_VERSION}." \
-        '.items[].metadata.name | select(startswith($prefix))' |
-    sort -V |
-    tail -n 1
-)"
-
-if [[ -z "${clusterImagesetName}" ]]; then
-    : "No cluster image set found for version '${ACM_SPOKE_CLUSTER_INITIAL_VERSION}'"
-    exit 1
-fi
-
-# Double-check that the ClusterImageSet resource exists
-if ! oc get clusterimageset "${clusterImagesetName}" 1>/dev/null; then
-    : "ClusterImageSet '${clusterImagesetName}' not found or not accessible"
-    exit 1
+typeset ocpReleaseImage=""
+if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY}" == 'true' ]]; then
+    ocpReleaseImage="$(oc get clusterversion version -o jsonpath='{.status.desired.image}')"
+    [[ -n "${ocpReleaseImage}" ]] || { : "Failed to fetch release image from hub clusterversion"; exit 1; }
+    clusterImagesetName="img-eus-from-hub-${ACM_SPOKE_CLUSTER_INITIAL_VERSION}"
+    {
+        oc create -f - --dry-run=client -o json --save-config |
+        jq -c \
+            --arg name  "${clusterImagesetName}" \
+            --arg image "${ocpReleaseImage}" \
+            '
+            .metadata.name     = $name  |
+            .spec.releaseImage = $image
+            '
+    } 0<<'ocEOF' | oc apply -f -
+apiVersion: hive.openshift.io/v1
+kind: ClusterImageSet
+metadata:
+  name: placeholder
+spec:
+  releaseImage: placeholder
+ocEOF
+    : "Using hub payload ClusterImageSet ${clusterImagesetName}"
+else
+    # jq select avoids grep's non-zero exit on no match; sort -V preserves version ordering.
+    clusterImagesetName="$(
+        oc get clusterimagesets.hive.openshift.io -o json |
+        jq -r --arg prefix "img${ACM_SPOKE_CLUSTER_INITIAL_VERSION}." \
+            '.items[].metadata.name | select(startswith($prefix))' |
+        sort -V |
+        tail -n 1
+    )"
+    if [[ -z "${clusterImagesetName}" ]]; then
+        : "No cluster image set found for version '${ACM_SPOKE_CLUSTER_INITIAL_VERSION}'"
+        exit 1
+    fi
+    if ! oc get clusterimageset "${clusterImagesetName}" 1>/dev/null; then
+        : "ClusterImageSet '${clusterImagesetName}' not found or not accessible"
+        exit 1
+    fi
+    ocpReleaseImage="$(
+        oc get clusterimageset "${clusterImagesetName}" \
+            -o jsonpath='{.spec.releaseImage}' || true
+    )"
 fi
 
 : "Using cluster image set: ${clusterImagesetName}"
-
-# Log the release image URL for debugging purposes
-typeset ocpReleaseImage
-ocpReleaseImage="$(
-    oc get clusterimageset "${clusterImagesetName}" \
-        -o jsonpath='{.spec.releaseImage}' || true
-)"
-
 if [[ -n "${ocpReleaseImage}" ]]; then
     : "Cluster image set release image: ${ocpReleaseImage}"
 fi
@@ -775,6 +796,179 @@ ExtractClusterCredentials() {
     true
 }
 
+# Polls until every MachineConfigPool on the spoke is fully synchronized:
+#   - status.configuration.name == spec.configuration.name
+#   - Updated condition is True
+# Fails closed if the deadline is exceeded.
+# Args: <kubeconfig> <clusterName> [<timeoutSeconds=1200>]
+WaitMcpFullSync() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+    typeset -i syncTimeout="${1:-1200}"; (($#)) && shift
+
+    # Subshell isolates the SECONDS reset from the caller.
+    ( SECONDS=0
+    typeset -i syncInterval=30 pendingCnt=0
+    while ((SECONDS < syncTimeout)); do
+        pendingCnt=$(
+            oc --kubeconfig="${kubeconfig}" get machineconfigpool -o json |
+            jq '[.items[] | select(
+                .spec.configuration.name != .status.configuration.name or
+                ([.status.conditions[]? |
+                    select(.type == "Updated" and .status == "True")
+                ] | length == 0)
+            )] | length'
+        )
+        ((pendingCnt == 0)) && break
+        sleep "${syncInterval}"
+    done
+    if ((pendingCnt != 0)); then
+        : "FATAL: Spoke ${clusterName}: ${pendingCnt} MCPs not fully synchronized within ${syncTimeout}s"
+        exit 1
+    fi
+    true )
+
+    true
+}
+
+# Ensures the 'openshift' ClusterImagePolicy does not enforce Sigstore signatures
+# for openshift-release-dev images on the spoke (unsigned nightlies, OCPBUGS-114622).
+#
+# At OCP 4.20 install time the CIP does not yet exist (introduced in 4.21).
+# The CVO override MUST be set pre-emptively so that CVO does not create the
+# 'openshift' CIP when the cluster is later upgraded to 4.21.  Without it,
+# MCO bakes Sigstore enforcement into every node's /etc/containers/policy.json
+# during the 4.21 hop, causing unsigned nightly OS images to be rejected when
+# paused workers are finally unpaused and try to pull the 4.22 node OS image.
+#
+# If the CIP already exists (e.g. called post-upgrade), it is deleted after
+# the override so MCO re-renders all pools with the corrected policy.json.
+DisableClusterImagePolicySignatureEnforcement() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+    typeset cipJson='' currentOverrides='' newOverrides='' patchPayload=''
+
+    # Set the CVO override FIRST — unconditionally, even when the CIP does not
+    # yet exist.  This prevents CVO from creating the 'openshift' CIP on upgrade
+    # to 4.21+.  The hub step (acm-interop-p2p-disable-cluster-image-policy) does
+    # the same pre-emptive override; this function must match that behaviour.
+    : "Spoke ${clusterName}: ensuring ClusterImagePolicy is marked unmanaged in CVO overrides"
+    currentOverrides="$(oc --kubeconfig="${kubeconfig}" get clusterversion version -o json |
+        jq -c '.spec.overrides // []')"
+    if jq -e '.[] | select(
+            .group=="config.openshift.io" and
+            .kind=="ClusterImagePolicy" and
+            .name=="openshift" and
+            .namespace=="" and
+            .unmanaged==true)' \
+            <<<"${currentOverrides}" >/dev/null; then
+        : "ClusterImagePolicy already unmanaged on ${clusterName}"
+    else
+        newOverrides="$(jq -c \
+            '[.[] | select(
+                .group!="config.openshift.io" or
+                .kind!="ClusterImagePolicy" or
+                .name!="openshift" or
+                .namespace!=""
+            )] + [{"group":"config.openshift.io","kind":"ClusterImagePolicy","name":"openshift","namespace":"","unmanaged":true}]' \
+        <<<"${currentOverrides}")"
+        patchPayload="$(jq -cn --argjson overrides "${newOverrides}" \
+            '{"spec":{"overrides":$overrides}}')"
+        oc --kubeconfig="${kubeconfig}" patch clusterversion version --type merge \
+            -p "${patchPayload}" 1>/dev/null
+        if ! jq -e '.spec.overrides[] | select(
+                .group=="config.openshift.io" and
+                .kind=="ClusterImagePolicy" and
+                .name=="openshift" and
+                .namespace=="" and
+                .unmanaged==true)' \
+                <<<"$(oc --kubeconfig="${kubeconfig}" get clusterversion version -o json)" \
+                >/dev/null; then
+            : "Failed to verify CVO override for ClusterImagePolicy on spoke ${clusterName}"
+            return 1
+        fi
+        : "CVO override set: openshift ClusterImagePolicy → unmanaged"
+    fi
+
+    # Delete the CIP only if it already exists and enforces openshift-release-dev.
+    # At 4.20 install time there is nothing to delete; the override above is enough.
+    cipJson="$(oc --kubeconfig="${kubeconfig}" get clusterimagepolicy openshift \
+        --ignore-not-found -o json)"
+    if [[ -z "${cipJson}" ]]; then
+        : "Spoke ${clusterName}: no openshift ClusterImagePolicy present — CVO override is sufficient"
+        return 0
+    fi
+    if ! jq -e '.spec.scopes[]? | select(contains("openshift-release-dev"))' \
+            <<<"${cipJson}" >/dev/null; then
+        : "Spoke ${clusterName}: ClusterImagePolicy does not enforce openshift-release-dev — skipping deletion"
+        return 0
+    fi
+
+    # CIP exists and enforces openshift-release-dev.
+    # Snapshot each MCP spec.configuration.name BEFORE deleting the CIP.
+    # After deletion MCO re-renders every pool; we must wait for ALL pools
+    # to pick up the new rendered config before proceeding, otherwise nodes
+    # still carrying the old policy.json will reject unsigned images.
+    typeset -A preRenderedArr=()
+    typeset mcpName='' mcpRendered=''
+    while IFS='=' read -r mcpName mcpRendered; do
+        [[ -n "${mcpName}" ]] && preRenderedArr["${mcpName}"]="${mcpRendered}"
+    done < <(
+        oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+            -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
+    )
+    if ((${#preRenderedArr[@]} == 0)); then
+        : "FATAL: Spoke ${clusterName}: failed to snapshot MCP rendered configs"
+        return 1
+    fi
+
+    # CVO no longer manages the CIP — delete it so MCO removes the signature
+    # requirement from each node's /etc/containers/policy.json.
+    oc --kubeconfig="${kubeconfig}" delete clusterimagepolicy openshift \
+        --ignore-not-found 1>/dev/null
+
+    # Wait for MCO to re-render EVERY pool. Isolated in a subshell so
+    # the SECONDS reset does not leak into the caller.
+    typeset -i snapshotCnt=${#preRenderedArr[@]}
+    ( SECONDS=0
+    typeset -i mcpWaitMax=300 mcpWaitInt=15 readCnt=0
+    typeset isAllChanged='false'
+    while ((SECONDS < mcpWaitMax)); do
+        isAllChanged='true'
+        readCnt=0
+        while IFS='=' read -r mcpName mcpRendered; do
+            [[ -n "${mcpName}" ]] || continue
+            ((++readCnt))
+            if [[ "${preRenderedArr[${mcpName}]:-}" == "${mcpRendered}" ]]; then
+                isAllChanged='false'
+                break
+            fi
+        done < <(
+            oc --kubeconfig="${kubeconfig}" get machineconfigpool \
+                -o jsonpath='{range .items[*]}{.metadata.name}={.spec.configuration.name}{"\n"}{end}'
+        )
+        # An empty or incomplete read must not pass as "all changed".
+        if ((readCnt < snapshotCnt)); then
+            isAllChanged='false'
+        fi
+        "${isAllChanged}" && break
+        sleep "${mcpWaitInt}"
+    done
+    if ! "${isAllChanged}"; then
+        : "FATAL: Spoke ${clusterName}: not all MCPs re-rendered within ${mcpWaitMax}s — failing closed"
+        exit 1
+    fi
+    true )
+
+    # All pools have a new spec. Wait for full rollout: every pool's
+    # status.configuration.name must equal spec.configuration.name and
+    # the Updated condition must be True.
+    WaitMcpFullSync "${kubeconfig}" "${clusterName}"
+
+    : "ClusterImagePolicy signature enforcement disabled on spoke ${clusterName}"
+    true
+}
+
 #=====================
 # Main execution: Create all clusters
 #=====================
@@ -829,9 +1023,12 @@ for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     WaitForManagedClusterAvailable "${clusterNamesArr[i]}" "${idx}"
 done
 
-# Phase 5: Disable ClusterImagePolicy signature enforcement on spokes
-# Only needed when installing with unsigned nightly images.
-if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}" == "true" ]]; then
+# Phase 5: Disable ClusterImagePolicy signature enforcement on spokes.
+# DisableClusterImagePolicySignatureEnforcement marks the 'openshift' CIP unmanaged in the
+# CVO and deletes it, so CRI-O falls back to the permissive /etc/containers/policy.json
+# and unsigned nightly images can be pulled.
+# Only needed when installing from unsigned nightly images.
+if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY}" == 'true' ]]; then
     for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
         idx=$((i + 1))
         DisableClusterImagePolicySignatureEnforcement \

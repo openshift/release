@@ -138,6 +138,10 @@ spec:
         - --enable-dispatch-capacity=true
         - --enable-dispatch-drain=true
         - --enable-dispatch-capability-scope=true
+        - --alert-proxy-interaction-url=http://alert-proxy.ci.svc:8080/interactions
+        - --alert-proxy-mention-url=http://alert-proxy.ci.svc:8080/mentions
+        - --alert-proxy-forwarder-secret-path=/etc/alert-proxy-forwarder/hmac_secret
+        - --alert-proxy-channel-id=CHY2E1BL4
         env:
         - name: DISPATCH_COMMAND_CHANNEL_ID
           valueFrom:
@@ -180,6 +184,9 @@ spec:
         - name: slack
           mountPath: /etc/slack
           readOnly: true
+        - name: alert-proxy-forwarder
+          mountPath: /etc/alert-proxy-forwarder
+          readOnly: true
         - name: jira
           mountPath: /etc/jira
           readOnly: true
@@ -201,6 +208,9 @@ spec:
       - name: slack
         secret:
           secretName: slack-credentials-dptp-bot
+      - name: alert-proxy-forwarder
+        secret:
+          secretName: alert-proxy-forwarder
       - name: jira
         secret:
           secretName: jira-token-dptp-bot

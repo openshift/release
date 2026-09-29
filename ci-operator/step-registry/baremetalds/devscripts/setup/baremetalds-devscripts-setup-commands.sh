@@ -316,11 +316,6 @@ cd dev-scripts
 
 cp /root/pull-secret /root/dev-scripts/pull_secret.json
 
-# Copy pull-secret to /root/.docker/config.json so that images can be pulled from the local registry
-mkdir -p /root/.docker
-cp /root/pull-secret /root/.docker/config.json
-chmod 600 /root/.docker/config.json
-
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
@@ -370,6 +365,16 @@ echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root
 set +e
 timeout -s 9 ${MAKE_TIMEOUT} make ${DEVSCRIPTS_TARGET}
 rv=\$?
+
+# Install local registry credentials for default podman/docker auth.
+# dig-scripts creates REGISTRY_CREDS ($HOME/private-mirror-<cluster>.json)
+# during configure.
+registry_creds=\$(ls /root/private-mirror-*.json 2>/dev/null | head -n1 || true)
+if [[ -n "\${registry_creds}" ]]; then
+  mkdir -p /root/.docker
+  cp "\${registry_creds}" /root/.docker/config.json
+  chmod 600 /root/.docker/config.json
+fi
 
 # squid needs to be restarted after network changes
 podman restart --time 1 external-squid || true

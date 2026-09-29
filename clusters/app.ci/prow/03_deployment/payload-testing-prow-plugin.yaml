@@ -40,6 +40,31 @@ roleRef:
   kind: Role
   name: payload-testing-prow-plugin
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: payload-testing-prow-plugin-groups
+rules:
+- apiGroups:
+  - user.openshift.io
+  resources:
+  - groups
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: payload-testing-prow-plugin-groups
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: payload-testing-prow-plugin-groups
+subjects:
+- kind: ServiceAccount
+  name: payload-testing-prow-plugin
+  namespace: ci
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -114,6 +139,7 @@ spec:
         - --ci-op-config-dir=/var/repo/release/ci-operator/config
         - --log-level=debug
         - --trusted-app=openshift-pr-manager[bot]
+        - --private-payload-rbac-group=aos-staff-engineers
         env:
         - name: GITHUB_APP_ID
           valueFrom:

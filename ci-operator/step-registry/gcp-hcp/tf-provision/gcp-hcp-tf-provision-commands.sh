@@ -93,11 +93,24 @@ fi
 
 WORKSPACE_NAME="platform-e2e-${RUN_ID}"
 REGION="${GCP_REGION:-us-central1}"
+TESTED_SHA_PATH="${SHARED_DIR}/gcp-hcp-tested-sha"
+
+if [[ ! -s "${TESTED_SHA_PATH}" ]]; then
+  log "ERROR: Tested gcp-hcp-infra SHA is missing or empty: ${TESTED_SHA_PATH}"
+  exit 1
+fi
+GIT_REVISION="$(<"${TESTED_SHA_PATH}")"
+
+if [[ ! "${GIT_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+  log "ERROR: Tested gcp-hcp-infra SHA is not a full lowercase Git SHA"
+  exit 1
+fi
 
 log "Configuration:"
 log "  Run ID:      ${RUN_ID}"
 log "  Workspace:   ${WORKSPACE_NAME}"
 log "  Region:      ${REGION}"
+log "  Git revision: ${GIT_REVISION}"
 log "  BUILD_ID:    ${BUILD_ID}"
 log "  JOB_NAME:    ${JOB_NAME:-unknown}"
 
@@ -106,7 +119,7 @@ log "  JOB_NAME:    ${JOB_NAME:-unknown}"
 cd "${REPO_ROOT}"  # gcp-hcp-infra repo root (from: src)
 
 log "Rendering e2e template..."
-RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}")"
+RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}" "${GIT_REVISION}")"
 
 if [[ ! -d "${RENDERED_DIR}" ]]; then
   log "ERROR: Render script failed - directory not created"
@@ -161,6 +174,18 @@ TFRC
 # Disable terraform's interactive prompts
 export TF_INPUT=false
 export TF_IN_AUTOMATION=true
+
+# HCP Terraform runs plan and apply remotely with workspace credentials, but
+# terraform import always executes locally in this Prow step. Use the WIF
+# credential prepared by hypershift-gcp-wif-auth so the Google provider can
+# read orphaned Firestore databases during recovery.
+WIF_CREDENTIAL_FILE="${SHARED_DIR}/wif-cred.json"
+if [[ ! -r "${WIF_CREDENTIAL_FILE}" ]]; then
+  log "ERROR: ${WIF_CREDENTIAL_FILE} not found or not readable"
+  log "The hypershift-gcp-wif-auth step must run before gcp-hcp-tf-provision"
+  exit 1
+fi
+export GOOGLE_APPLICATION_CREDENTIALS="${WIF_CREDENTIAL_FILE}"
 
 # --- Terraform Init ---
 

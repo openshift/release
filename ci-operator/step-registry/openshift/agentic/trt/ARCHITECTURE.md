@@ -85,14 +85,14 @@ flowchart TD
 | State tracker | [`ship_help_bot/tools/agentic_solver/tracker.py`][tracker] | `SolveRequest` CRUD in Firestore (collection: `agentic_solves`, 30-day TTL) |
 | GitHub client | [`ship_help_bot/tools/agentic_solver/github_client.py`][ghclient] | PR lookup, review comment fetching, actionability classification |
 | JIRA helpers | [`ship_help_bot/tools/agentic_solver/jira_helpers.py`][jira] | Safe wrappers for JIRA transitions and assignment |
-| Config | [`config/workspaces.yaml`][workspaces] | `repo_jobs` mapping (repo → solve job + followup job + fork), `ignored_bots` list |
+| Config | [TRT persona configs][personas] | `repo_jobs` mapping (repo → solve job + followup job + fork), `ignored_bots` list |
 
 [tools]: https://github.com/openshift/ship-help-bot/blob/main/ship_help_bot/tools/agentic_solver/tools.py
 [handler]: https://github.com/openshift/ship-help-bot/blob/main/ship_help_bot/tools/agentic_solver/handler.py
 [tracker]: https://github.com/openshift/ship-help-bot/blob/main/ship_help_bot/tools/agentic_solver/tracker.py
 [ghclient]: https://github.com/openshift/ship-help-bot/blob/main/ship_help_bot/tools/agentic_solver/github_client.py
 [jira]: https://github.com/openshift/ship-help-bot/blob/main/ship_help_bot/tools/agentic_solver/jira_helpers.py
-[workspaces]: https://github.com/openshift/ship-help-bot/blob/main/config/workspaces.yaml
+[personas]: https://github.com/openshift/ship-help-bot/tree/main/config/groups/trt/personas
 
 ### CI Step Registry (release repo)
 
@@ -124,11 +124,13 @@ All steps live under [`ci-operator/step-registry/openshift/agentic/trt/`][regist
 |------|--------|-----------|---------------|
 | openshift/sippy | [`openshift-sippy-main__agentic.yaml`][sippy-cfg] | `periodic-ci-openshift-sippy-main-agentic-periodic-sippy-jira-agent` | `periodic-ci-openshift-sippy-main-agentic-periodic-sippy-pr-followup-agent` |
 | openshift/origin | [`openshift-origin-main__agentic.yaml`][origin-cfg] | `periodic-ci-openshift-origin-main-agentic-periodic-origin-jira-agent` | `periodic-ci-openshift-origin-main-agentic-periodic-origin-pr-followup-agent` |
+| openshift-eng/ship-status-dash | [`openshift-eng-ship-status-dash-main__agentic.yaml`][ship-status-cfg] | `periodic-ci-openshift-eng-ship-status-dash-main-agentic-periodic-ship-status-dash-jira-agent` | `periodic-ci-openshift-eng-ship-status-dash-main-agentic-periodic-ship-status-dash-pr-followup-agent` |
 
-Both are `cron: '@yearly'` (Gangway-triggered only, never scheduled).
+These jobs are `cron: '@yearly'` (Gangway-triggered only, never scheduled).
 
 [sippy-cfg]: https://github.com/openshift/release/blob/main/ci-operator/config/openshift/sippy/openshift-sippy-main__agentic.yaml
 [origin-cfg]: https://github.com/openshift/release/blob/main/ci-operator/config/openshift/origin/openshift-origin-main__agentic.yaml
+[ship-status-cfg]: https://github.com/openshift/release/blob/main/ci-operator/config/openshift-eng/ship-status-dash/openshift-eng-ship-status-dash-main__agentic.yaml
 
 ### Devcontainer (example: sippy)
 
@@ -181,4 +183,4 @@ States are tracked in Firestore (`agentic_solves` collection), managed by `Solve
 
 1. **Target repo**: Create `.devcontainer/` (Dockerfile, init-services.sh, etc.), `hack/agentic_setup.sh`, `.agentic/solve-config.md`, optional root `REVIEW.md`, and `CLAUDE.md`
 2. **Release repo**: Add CI operator config (`openshift-<repo>-main__agentic.yaml`) defining the `agentic-dev` image build and both periodic jobs
-3. **ship-help-bot**: Add entry to `repo_jobs` in `config/workspaces.yaml` mapping the repo to its solve/followup job names and fork
+3. **ship-help-bot**: Add the repo to the `repo_jobs` blocks in the TRT persona configs, mapping it to the solve/followup job names and fork

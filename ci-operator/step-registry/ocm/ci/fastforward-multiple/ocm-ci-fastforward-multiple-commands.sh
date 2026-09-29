@@ -1261,14 +1261,57 @@ is_version_gte() {
   return 1
 }
 
+# Returns 0 (skip) if REPO_MAP_PATH marks the component at $repo_url as
+# deprecated. Per the REPO_MAP_PATH schema, a deprecated component should be
+# skipped regardless of whether removed_in_version is set — deprecated means
+# it's not expected to be carried forward, so it's left for manual handling
+# rather than being auto-fast-forwarded or having new Tekton files generated.
+# Matches on the product bundle and documented .repository field (full URL),
+# not .name, since a component's .name does not always match the last path
+# segment of its .repository URL (e.g. "multicluster-operators-application"
+# vs. repository ".../multicloud-operators-application").
+is_repo_deprecated() {
+  local repo_url=$1
+  local product=$2
+
+  local deprecated
+  deprecated=$(yq '.components[] |
+    select(.repository == "'"${repo_url}"'") |
+    select(.bundle == "'"${product}-operator-bundle"'" or .name == "'"${product}-operator-bundle"'") |
+    .deprecated' "${REPO_MAP_PATH}" 2>/dev/null | head -1)
+
+  [[ "${deprecated}" == "true" ]]
+}
+
+# Prints a human-readable reason for skipping a deprecated component: the
+# specific removed_in_version if the manifest records one, otherwise a
+# generic message pointing at the manifest so it can be filled in.
+deprecated_repo_skip_reason() {
+  local repo_url=$1
+  local product=$2
+
+  local removed_in
+  removed_in=$(yq '.components[] |
+    select(.repository == "'"${repo_url}"'") |
+    select(.bundle == "'"${product}-operator-bundle"'" or .name == "'"${product}-operator-bundle"'") |
+    .removed_in_version' "${REPO_MAP_PATH}" 2>/dev/null | head -1)
+
+  if [[ -n "${removed_in}" && "${removed_in}" != "null" ]]; then
+    echo "removed in version ${removed_in}"
+  else
+    echo "deprecated component — specify removed_in_version in manifest or update manually"
+  fi
+}
+
 # Returns 0 (skip) if REPO_MAP_PATH marks the component at $repo_url deprecated
-# with a removed_in_version <= $version, meaning the repo no longer exists on
-# that release line and should not be fast-forwarded to it. Matches on the
-# product bundle and documented .repository field (full URL), not .name, since a
-# component's .name does not always match the last path segment of its
-# .repository URL (e.g. "multicluster-operators-application" vs. repository
-# ".../multicloud-operators-application").
-is_repo_deprecated_for_version() {
+# with a removed_in_version <= $version, meaning the repo no longer exists as
+# of that release line and must not have Tekton files generated for it. E.g.
+# maestro's default branch is backplane-5.1 but it is removed_in_version:
+# "5.1" — the component no longer exists as of that version, so that branch
+# should never have Tekton files generated on it (doing so falls back to
+# stale LAST_RELEASE_VERSION templates and then fails cleanup since those
+# fallback files can't be removed).
+is_repo_removed_as_of_version() {
   local repo_url=$1
   local product=$2
   local version=$3
@@ -1284,21 +1327,14 @@ is_repo_deprecated_for_version() {
     return 1
   fi
 
-  if is_version_gte "${version}" "${removed_in}"; then
-    return 0
-  fi
-  return 1
+  is_version_gte "${version}" "${removed_in}"
 }
 
-# Repos with release-* default branch - exclude from main fast-forward
-# These are processed separately to handle non-main default branches
-# EXCLUDED_REPOS list is no longer needed - auto-detect based on default branch
-# Repos with non-main default branch (e.g., release-5.0) are handled automatically
-# Previously hardcoded list included:
-#   cloudevents-conductor, cluster-permission, grafana, kube-rbac-proxy,
-#   kube-state-metrics, maestro, memcached_exporter, obo-prometheus-operator,
-#   node-exporter, prometheus, prometheus-alertmanager, prometheus-operator,
-#   thanos, thanos-receive-controller
+# Repos with a non-main default branch (e.g., release-5.0) are not "excluded"
+# from processing — they simply don't fast-forward from main like normal repos
+# do. They are auto-detected based on their default branch and processed
+# separately below to fast-forward from their own default branch to the other
+# release branches instead.
 
 for product in mce acm globalhub; do
   # Print section header
@@ -1320,6 +1356,10 @@ for product in mce acm globalhub; do
     owner_repo=${repo#https://github.com/}
     owner=${owner_repo%/*}
     repo=${owner_repo#*/}
+
+    # Blank line before each component's analysis so per-repo output blocks
+    # are visually separated in the build log.
+    echo ""
 
     # Check if repo should be completely skipped
     skip=false
@@ -1385,25 +1425,26 @@ for product in mce acm globalhub; do
 
     # Route based on default branch
     # Normal repos: default = main/master → fast-forward main to release-X.Y
-    # Excluded repos: default = release-X.Y → fast-forward default to other release-X.Y
+    # Non-main default branch repos: default = release-X.Y → fast-forward default to other release-X.Y
     if [[ "${default_branch}" == "main" ]] || [[ "${default_branch}" == "master" ]]; then
       # NORMAL REPO HANDLING: default branch is main/master
       echo "INFO: Using normal fast-forward (${default_branch} → release branches)"
 
-      # Build filtered version list for this repo (excluding per-repo version skips
-      # and versions where the repo is marked deprecated/removed in REPO_MAP_PATH)
+      # Build filtered version list for this repo (excluding per-repo version
+      # skips, and all destination versions if the repo is deprecated — a
+      # deprecated component is not fast-forwarded to future release lines)
       REPO_DEST_VERSIONS=""
-      for version in ${DESTINATION_VERSIONS}; do
-        if is_repo_deprecated_for_version "https://github.com/${owner_repo}" "${product}" "${version}"; then
-          echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (deprecated component)"
-          continue
-        fi
-        if is_repo_version_skipped "${repo}" "${version}"; then
-          echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (per-repo version exclusion)"
-          continue
-        fi
-        REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS} ${version}"
-      done
+      if is_repo_deprecated "https://github.com/${owner_repo}" "${product}"; then
+        echo "INFO: Skipping fast-forward for ${owner_repo} (deprecated — not fast-forwarded)"
+      else
+        for version in ${DESTINATION_VERSIONS}; do
+          if is_repo_version_skipped "${repo}" "${version}"; then
+            echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (per-repo version exclusion)"
+            continue
+          fi
+          REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS} ${version}"
+        done
+      fi
       REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS# }"
 
       for version in ${REPO_DEST_VERSIONS}; do
@@ -1470,8 +1511,8 @@ for product in mce acm globalhub; do
       fi
 
     else
-      # EXCLUDED REPO HANDLING: default branch is NOT main/master (e.g., release-5.0)
-      echo "INFO: Using excluded repo logic (${default_branch} → other release branches)"
+      # NON-MAIN DEFAULT BRANCH HANDLING: default branch is NOT main/master (e.g., release-5.0)
+      echo "INFO: Using non-main default branch logic (${default_branch} → other release branches)"
 
       # Use natural branch prefix for product (release for ACM, backplane for MCE)
       # Exception: cluster-permission in ACM uses backplane (deprecated, moved to MCE)
@@ -1489,6 +1530,14 @@ for product in mce acm globalhub; do
       fi
 
       echo "INFO: Default branch version: ${default_version}"
+
+      # Skip entirely if this component is already removed as of its own
+      # default branch version — the branch should never have been created
+      # and must not have Tekton files generated on it.
+      if is_repo_removed_as_of_version "https://github.com/${owner_repo}" "${product}" "${default_version}"; then
+        echo "INFO: Skipping ${owner_repo} ($(deprecated_repo_skip_reason "https://github.com/${owner_repo}" "${product}"))"
+        continue
+      fi
 
       # Create Tekton files ONLY on default branch for default version ONLY
       echo "INFO: Creating Tekton files for ${owner_repo} on ${default_branch} (version ${default_version})"
@@ -1554,14 +1603,15 @@ for product in mce acm globalhub; do
         fi
       fi
 
-      # Fast-forward to destination branches and transform Tekton files
-      for version in ${DESTINATION_VERSIONS}; do
-        # Check if repo is deprecated/removed as of this version
-        if is_repo_deprecated_for_version "https://github.com/${owner_repo}" "${product}" "${version}"; then
-          echo "INFO: Skipping ${owner_repo} → ${repo_branch_prefix}-${version} (deprecated component)"
-          continue
-        fi
+      # Fast-forward to destination branches and transform Tekton files.
+      # Deprecated components still get Tekton files on their own default
+      # branch (above), but are not fast-forwarded to future release lines.
+      if is_repo_deprecated "https://github.com/${owner_repo}" "${product}"; then
+        echo "INFO: Skipping fast-forward for ${owner_repo} (deprecated — not fast-forwarded)"
+        continue
+      fi
 
+      for version in ${DESTINATION_VERSIONS}; do
         # Check per-repo version exclusion
         if is_repo_version_skipped "${repo}" "${version}"; then
           echo "INFO: Skipping ${owner_repo} → ${repo_branch_prefix}-${version} (per-repo version exclusion)"
@@ -1680,8 +1730,14 @@ echo ""
 echo "=== Cleaning up stale ff-* branches ==="
 echo ""
 
-declare -a CLEANED_BRANCHES
 TOTAL_CLEANED=0
+
+# File used to record successfully deleted branches for the summary report.
+# A side-channel file (rather than appending to CLEANED_BRANCHES directly) is
+# required because each repo's cleanup below runs in an isolated subshell;
+# variables set inside a subshell are never visible to the parent shell.
+CLEANUP_RESULTS_FILE="${ARTIFACT_DIR}/.cleanup-results"
+: >"${CLEANUP_RESULTS_FILE}"
 
 # Get unique repos we processed
 declare -A PROCESSED_REPO_MAP
@@ -1728,57 +1784,103 @@ if [[ -f "${GITHUB_TOKEN_FILE}" ]]; then
   export GH_TOKEN="${token}"
 fi
 
-# For each processed repo, clean up stale ff-* branches
-for owner_repo in "${!PROCESSED_REPO_MAP[@]}"; do
-  owner=${owner_repo%/*}
-  repo=${owner_repo#*/}
+# Clean up stale ff-* branches for a single repo. Called inside a subshell by
+# the loop below so that any hard failure here (a transient gh crash, an
+# unexpected signal, etc.) is contained to that subshell and can never abort
+# the remaining repos or fail the overall job. This phase only removes
+# leftover branches from the old PR-based fast-forward flow; it is purely
+# janitorial and must never gate job success.
+cleanup_stale_branches_for_repo() {
+  local owner=$1
+  local repo=$2
+  local owner_repo="${owner}/${repo}"
 
   echo "INFO: Checking ${owner_repo} for stale ff-* branches"
 
-  # Get all ff-* branches for this repo
   if ! command -v gh >/dev/null 2>&1; then
-    echo "WARNING: gh CLI not available, skipping cleanup"
-    break
+    echo "WARNING: gh CLI not available, skipping cleanup for ${owner_repo}"
+    return 0
   fi
 
-  # List all branches matching ff-release-* or ff-backplane-*
-  stale_branches=$(gh api "repos/${owner}/${repo}/branches" --paginate --jq '.[].name | select(test("^ff-(release|backplane)-"))' 2>&1)
-  api_status=$?
+  # List only refs whose name starts with "ff-" via the matching-refs
+  # endpoint, instead of paginating every branch in the repo via
+  # `branches --paginate` (which buffers the full branch list for every repo
+  # in memory - unnecessary here, since we only ever care about a handful of
+  # leftover ff-* branches, and this was previously the first
+  # `gh api --paginate` call in the whole workflow to fetch an unbounded,
+  # unfiltered list). Bound the call with a timeout so a hung or misbehaving
+  # gh invocation can't stall this phase indefinitely.
+  local gh_timeout_cmd=()
+  if command -v timeout >/dev/null 2>&1; then
+    gh_timeout_cmd=(timeout 60s)
+  fi
 
-  if [[ $api_status -ne 0 ]]; then
-    echo "WARNING: Failed to list branches for ${owner_repo}: ${stale_branches}"
-    continue
+  local stale_branches gh_status
+  stale_branches=$("${gh_timeout_cmd[@]}" gh api "repos/${owner_repo}/git/matching-refs/heads/ff-" --paginate \
+    --jq '.[].ref | sub("^refs/heads/"; "") | select(test("^ff-(release|backplane)-"))' 2>&1)
+  gh_status=$?
+
+  if [[ ${gh_status} -ne 0 ]]; then
+    echo "WARNING: Failed to list ff-* branches for ${owner_repo}: ${stale_branches}"
+    return 0
   fi
 
   if [[ -z "${stale_branches}" ]]; then
-    continue
+    return 0
   fi
 
-  # Check each branch
+  local branch pr_number
   while IFS= read -r branch; do
     [[ -z "${branch}" ]] && continue
 
     # Check if branch has open PR
-    pr_number=$(gh pr list --repo "${owner}/${repo}" --head "${branch}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    pr_number=$(gh pr list --repo "${owner_repo}" --head "${branch}" --json number --jq '.[0].number' 2>/dev/null || echo "")
 
     if [[ -n "${pr_number}" ]]; then
       # Close the PR first
       echo "INFO: Closing obsolete PR #${pr_number} for ${branch} in ${owner_repo}"
-      gh pr close "${pr_number}" --repo "${owner}/${repo}" \
+      gh pr close "${pr_number}" --repo "${owner_repo}" \
         --comment "Closing obsolete PR. Fast-forward workflow now pushes directly to release branches instead of creating PRs. This branch and PR are no longer needed." \
         2>/dev/null || echo "WARNING: Failed to close PR #${pr_number}"
     fi
 
     # Delete the branch
     echo "INFO: Deleting stale branch ${branch} from ${owner_repo}"
-    if gh api -X DELETE "repos/${owner}/${repo}/git/refs/heads/${branch}" 2>/dev/null; then
-      CLEANED_BRANCHES+=("${owner_repo}:${branch}")
-      TOTAL_CLEANED=$((TOTAL_CLEANED + 1))
+    if gh api -X DELETE "repos/${owner_repo}/git/refs/heads/${branch}" 2>/dev/null; then
+      echo "${owner_repo}:${branch}" >>"${CLEANUP_RESULTS_FILE}"
     else
       echo "WARNING: Failed to delete ${branch} from ${owner_repo}"
     fi
   done <<< "${stale_branches}"
+
+  return 0
+}
+
+# For each processed repo, clean up stale ff-* branches. Each repo's cleanup
+# runs in its own subshell: if it dies unexpectedly (signal, gh crash, etc.)
+# only that subshell is affected, `$?` reports what happened, and the loop
+# moves on to the next repo instead of aborting the whole phase (and, in
+# turn, the job).
+for owner_repo in "${!PROCESSED_REPO_MAP[@]}"; do
+  owner=${owner_repo%/*}
+  repo=${owner_repo#*/}
+
+  if (cleanup_stale_branches_for_repo "${owner}" "${repo}"); then
+    :
+  else
+    cleanup_status=$?
+    echo "WARNING: Cleanup for ${owner_repo} exited unexpectedly (status ${cleanup_status}), continuing with remaining repos"
+  fi
 done
+
+if [[ -s "${CLEANUP_RESULTS_FILE}" ]]; then
+  while IFS= read -r cleaned; do
+    [[ -z "${cleaned}" ]] && continue
+    CLEANED_BRANCHES+=("${cleaned}")
+    TOTAL_CLEANED=$((TOTAL_CLEANED + 1))
+  done <"${CLEANUP_RESULTS_FILE}"
+fi
+rm -f "${CLEANUP_RESULTS_FILE}"
 
 if [[ ${TOTAL_CLEANED} -gt 0 ]]; then
   echo "INFO: Cleaned ${TOTAL_CLEANED} stale branches"

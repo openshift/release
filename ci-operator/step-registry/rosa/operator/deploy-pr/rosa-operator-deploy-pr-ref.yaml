@@ -1,0 +1,42 @@
+ref:
+  as: rosa-operator-deploy-pr
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-operator-deploy-pr-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  dependencies:
+  - name: hypershift-operator
+    env: OPERATOR_IMAGE
+  env:
+  - name: OPERATOR_TYPE
+    default: "ho"
+    documentation: >-
+      Which operator image to deploy. Use "ho" for the HyperShift operator (patches the
+      operator container image directly) or "cpo" for the control plane operator (patches
+      --control-plane-operator-image on the HO deployment so new HCPs use the PR image).
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The OCM environment to log into. Supported values are [production, staging, integration].
+  - name: CLUSTER_SECTOR
+    default: ""
+    documentation: The OSDFM sector to look up the management cluster from.
+  - name: REGION
+    default: "us-west-2"
+    documentation: The AWS region to filter service clusters by.
+  documentation: |-
+    Deploys a CI-built operator image to the management cluster in the specified OSDFM
+    sector. Supports two modes via OPERATOR_TYPE:
+
+    ho  - Patches the HyperShift operator container image directly on the operator
+          deployment. Creates a temporary CI registry pull secret and saves the original
+          image for restoration. Acquires a ho-deploy-lock ConfigMap on the MC.
+
+    cpo - Patches --control-plane-operator-image on the HyperShift operator deployment
+          so that newly provisioned HCPs use the PR-built control plane operator image.
+          Creates a temporary CI registry pull secret and saves the original deployment
+          args for restoration. Acquires a cpo-deploy-lock ConfigMap on the MC.
+
+    Both modes use stale-lock eviction (>4h) and release the lock on TERM/INT.

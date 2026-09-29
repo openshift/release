@@ -1,5 +1,32 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
 
 # ---------------------------------------------------------------------------
 # OPP post-upgrade smoke tests
@@ -34,13 +61,21 @@ AddResult() {
     true
 }
 
+# XmlEscape: Required for bash 5.x where patsub_replacement is enabled
+# by default, changing how ${var//pattern/replacement} handles & and \ in
+# the replacement string. Without escaping, JUnit XML output is malformed.
 XmlEscape() {
     typeset text="${1:-}"; (($#)) && shift
+    if shopt -q patsub_replacement 2>/dev/null; then
+        shopt -u patsub_replacement
+        local _restore_patsub=true
+    fi
     text="${text//&/&amp;}"
     text="${text//</&lt;}"
     text="${text//>/&gt;}"
     text="${text//\"/&quot;}"
     text="${text//\'/&apos;}"
+    [[ "${_restore_patsub:-}" == true ]] && shopt -s patsub_replacement
     printf '%s' "${text}"
 }
 
@@ -93,14 +128,14 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '{( CollectExitArtifacts; _propagate_junit; true )}' EXIT
+trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
 
 # ---------------------------------------------------------------------------
 # Test 1: cluster-health
 # ---------------------------------------------------------------------------
 
 TestClusterHealth() {
-    : "=== Test: cluster-health ==="
+    echo ">>> PHASE: Test — cluster-health"
     typeset failMsg=""
 
     # ClusterOperators: Available=True, Degraded!=True
@@ -183,7 +218,13 @@ TestClusterHealth() {
 # ---------------------------------------------------------------------------
 
 TestOppOperators() {
-    : "=== Test: opp-operators ==="
+    echo ">>> PHASE: Test — opp-operators"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: opp-operators check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "opp-operators" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "opp-operators" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     typeset -a operatorsArr=()
@@ -277,7 +318,13 @@ TestOppOperators() {
 # ---------------------------------------------------------------------------
 
 TestAcmConnectivity() {
-    : "=== Test: acm-connectivity ==="
+    echo ">>> PHASE: Test — acm-connectivity"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: acm-connectivity check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "acm-connectivity" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "acm-connectivity" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     # Check if ManagedCluster resources exist
@@ -324,7 +371,13 @@ TestAcmConnectivity() {
 # ---------------------------------------------------------------------------
 
 TestAcsSensors() {
-    : "=== Test: acs-sensors ==="
+    echo ">>> PHASE: Test — acs-sensors"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: acs-sensors check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "acs-sensors" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "acs-sensors" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     # Check SecuredCluster CR status first
@@ -394,7 +447,13 @@ TestAcsSensors() {
 # ---------------------------------------------------------------------------
 
 TestQuayPull() {
-    : "=== Test: quay-pull ==="
+    echo ">>> PHASE: Test — quay-pull"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: quay-pull check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "quay-pull" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "quay-pull" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     # Find the Quay registry route
@@ -471,7 +530,7 @@ Main() {
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
 
-    : "OPP Smoke Tests starting"
+    echo ">>> PHASE: OPP Smoke Tests starting"
     : "Operators: ${OPP_OPERATORS}"
     : "Settle window: ${SMOKE_SETTLE_SECONDS}s"
     : "Artifacts dir: ${ARTIFACT_DIR}"

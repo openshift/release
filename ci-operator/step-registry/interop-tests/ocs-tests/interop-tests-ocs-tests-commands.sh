@@ -1,7 +1,34 @@
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
 
 CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.version}')
 OCP_MAJOR_MINOR=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1,2)
@@ -23,13 +50,14 @@ fi
 CLUSTER_NAME=$([[ -f "${SHARED_DIR}/CLUSTER_NAME" ]] && cat "${SHARED_DIR}/CLUSTER_NAME" || echo "cluster-name")
 CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
 LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
-LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
+LOGS_CONFIG="$(mktemp /tmp/ocs-tests-config.XXXXXX.yaml)"
 CLUSTER_PATH="${ARTIFACT_DIR}/ocs-tests"
 
 export BIN_FOLDER="${LOGS_FOLDER}/bin"
 
 # Function to clean up folders
 cleanup() {
+    rm -f "${LOGS_CONFIG}"
     # Tear down local auth copy created for run-ci.
     [[ -d "${CLUSTER_PATH}/auth" ]] && rm -rf "${CLUSTER_PATH}/auth"
 }
@@ -51,6 +79,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
         curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
     trap '
+        _opp_cleanup
         cleanup
         _propagate_junit
         mkdir -p /tmp/bin
@@ -60,7 +89,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
             ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
     ' EXIT
 else
-    trap 'cleanup; _propagate_junit' EXIT
+    trap '_opp_cleanup; cleanup; _propagate_junit' EXIT
 fi
 
 #
@@ -113,7 +142,6 @@ if [[ -f "${SHARED_DIR}/vsphere_context.sh" ]]; then
     set +x
     source "${SHARED_DIR}/vsphere_context.sh"
     source "${SHARED_DIR}/govc.sh"
-    set -x
 
     cat >> "${LOGS_CONFIG}" << __APPENDED_ENV_DATA__
 ENV_DATA:
@@ -124,6 +152,7 @@ ENV_DATA:
   vsphere_cluster: "${vsphere_cluster}"
   vsphere_datastore: "${vsphere_datastore}"
 __APPENDED_ENV_DATA__
+    set -x
 fi
 
 EXTRA_ARGS=""

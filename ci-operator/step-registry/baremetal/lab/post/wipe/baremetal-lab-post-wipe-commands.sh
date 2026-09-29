@@ -44,8 +44,21 @@ function wait_for_power_down() {
   if [ $retry_max -le 0 ]; then
     echo -n "$host_str didn't power off successfully..."
     if [ -f "/tmp/$bmc_host.$bmc_forwarded_port" ]; then
-      echo "$host_str kept powered on and needs further manual investigation..."
-      return 1
+      echo "$host_str kept powered on after retry, forcing IPMI power off..."
+      # Force power off via IPMI (workaround for firmware bug where poweroff triggers reboot)
+      ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+        -U "$bmc_user" -P "$bmc_pass" power off
+      sleep 10
+      # Verify it's off now
+      if ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+        -U "$bmc_user" -P "$bmc_pass" power status | grep -q "Power is off"; then
+        echo "$host_str forcibly powered off via IPMI"
+        echo "$bmc_address:$bmc_forwarded_port" >> "/tmp/forced_shutdown.${bmc_forwarded_port}"
+        return 0
+      else
+        echo "$host_str failed to power off even after forced IPMI command..."
+        return 1
+      fi
     else
       # We perform the reboot at most twice to overcome some known BMC hardware failures
       # that sometimes keep the hosts frozen before POST.
@@ -166,8 +179,8 @@ function reset_host() {
 # can happen safely, i.e., a concurrent reservation job has to wait until the disk of host X is wiped before being allowed
 # to reserve X
 
-# Clean up any old failed.* files
-rm -f /tmp/failed /tmp/failed.* 2>/dev/null || true
+# Clean up any old failed.* and forced_shutdown.* files
+rm -f /tmp/failed /tmp/failed.* /tmp/forced_shutdown /tmp/forced_shutdown.* 2>/dev/null || true
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -215,10 +228,21 @@ echo "Disk wipe completed"
 # Combine all per-host failure files into one
 cat /tmp/failed.* 2>/dev/null > /tmp/failed || true
 
+# Combine all per-host forced_shutdown files into one
+cat /tmp/forced_shutdown.* 2>/dev/null > /tmp/forced_shutdown || true
+
+if [ -s /tmp/forced_shutdown ]; then
+  echo ""
+  echo "WARNING: The following nodes required forced IPMI power-off (firmware bug: OS poweroff triggered reboot):"
+  cat /tmp/forced_shutdown
+  echo "These hosts have a firmware bug and should be investigated."
+fi
+
 if [ -s /tmp/failed ]; then
-  echo "The following nodes failed to power off:"
+  echo ""
+  echo "WARNING: The following nodes failed to power off completely:"
   cat /tmp/failed
-  exit 1
+  echo "These hosts may need manual intervention."
 fi
 
 exit 0

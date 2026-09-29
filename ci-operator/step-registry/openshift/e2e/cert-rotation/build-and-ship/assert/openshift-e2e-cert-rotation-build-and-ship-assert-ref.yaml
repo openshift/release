@@ -1,0 +1,41 @@
+ref:
+  as: openshift-e2e-cert-rotation-build-and-ship-assert
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  timeout: 2h0m0s
+  commands: openshift-e2e-cert-rotation-build-and-ship-assert-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: NODE_CLIENT_CERT_RECOVERY_TOGGLE
+    default: "on"
+    documentation: |-
+      Must match the prep step. "on": pass only if every node recovers with no manual approval
+      (RECOVERED_UNATTENDED). "off": pass only if the gap reproduces (client CSRs stay pending,
+      GAP_REPRODUCED); the step then approves them by hand so the post steps can gather.
+  - name: API_TIMEOUT
+    default: "20m"
+    documentation: How long to wait for kube-apiserver /readyz after power-on.
+  - name: RECOVERY_TIMEOUT
+    default: "30m"
+    documentation: "NODE_CLIENT_CERT_RECOVERY_TOGGLE=on: how long every node gets to recover (client and serving certs) without help."
+  - name: GAP_WINDOW
+    default: "10m"
+    documentation: "NODE_CLIENT_CERT_RECOVERY_TOGGLE=off: how long to watch that nothing approves the client CSRs."
+  - name: MANUAL_RECOVERY_TIMEOUT
+    default: "30m"
+    documentation: How long the fallback manual approval loop may take after a failure or a toggle-off run.
+  documentation: |-
+    Watches a build-and-ship power cycle from the API without approving anything, then decides:
+    with the approver on, every node's post-power-on client CSR must be approved with reason
+    KCMRecoveryApprove (nothing else may approve a client CSR, the first control-plane node included,
+    before machine-approver restarts), every node must be Ready with a fresh heartbeat, and every
+    node's serving CSR must be approved by machine-approver (NodeCSRApprove). Writes verdict.json,
+    a timeline, CSR/node/Event dumps and a junit result under ${ARTIFACT_DIR}/build-and-ship. On
+    failure it approves the pending CSRs by hand before exiting non-zero, so gather steps still work.
+    Because the cluster clock now runs SKEW ahead, certificates it issues after power-on are not yet
+    valid for correct clocks; the step rewrites ${SHARED_DIR}/kubeconfig to skip server-certificate
+    verification (original kept as kubeconfig.before-skew) so it and the post steps can reach the API.

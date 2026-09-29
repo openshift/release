@@ -107,6 +107,27 @@ fi
 REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
 echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
 
+# Copy kubeconfig to SHARED_DIR on exit so must-gather can reach the
+# cluster even when the deployment fails partway through.
+copy_kubeconfig() {
+  echo "Attempting to copy kubeconfig from hypervisor to SHARED_DIR..."
+  if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME} 2>/dev/null &&
+     cp /tmp/kubeconfig.${CLUSTER_NAME} "${SHARED_DIR}/kubeconfig"; then
+    echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig"
+  else
+    echo "WARNING: Could not copy kubeconfig to SHARED_DIR (file may not exist yet)"
+  fi
+
+  echo "Attempting to copy .env from hypervisor to SHARED_DIR..."
+  if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env "${SHARED_DIR}/.env" 2>/dev/null &&
+     sed -i 's/^PAYLOAD_URL=.*$/PAYLOAD_URL=/' "${SHARED_DIR}/.env"; then
+    echo ".env copied to \${SHARED_DIR}/.env"
+  else
+    echo "WARNING: Could not copy .env to SHARED_DIR (file may not exist yet)"
+  fi
+}
+trap copy_kubeconfig EXIT
+
 echo "Checking if github repo branch was cloned successfully"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
   env; \
@@ -149,7 +170,12 @@ echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hyp
 
 echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
 # Pass the CI release payload (resolved by ci-operator from the releases.latest config)
-PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
+if [[ "${DPF_SKIP_CI_PAYLOAD:-false}" == "true" ]]; then
+  PAYLOAD_URL=""
+  echo "DPF_SKIP_CI_PAYLOAD is set; skipping CI release payload injection"
+else
+  PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
+fi
 echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
 
 # Merge CI registry credentials into the pull secret so the cluster can

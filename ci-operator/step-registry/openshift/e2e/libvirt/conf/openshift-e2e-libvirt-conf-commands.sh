@@ -332,6 +332,13 @@ EOF
 "[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Beta] Pod Generation pod generation should start at 1 and increment per update"
 EOF
        fi
+       # Skip the NetworkSegmentation test for 4.22 and higher versions on PowerVS until it pass
+       # NetworkSegmentation defaults to 9100 MTU, which exceeds PowerVS used 1500 MTU underlay limit and causes encapsulation packet drops.
+       if echo "${BRANCH}" | awk -F. '{ if ($1 > 4 || ($1 == 4 && $2 >= 22)) { exit 0 } else { exit 1 } }'; then
+          cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[Feature:NetworkSegmentation][ovn-kubernetes-ote][sig-network] Network Segmentation: services on a user defined primary network should be reachable through their cluster IP, node port and load balancer L2 primary UDN with custom network, cluster-networked pods, NodePort service [Suite:openshift/conformance/parallel]"
+EOF
+       fi
        # Skip HAProxy router tests for versions below 4.22 until the fix is backported
        # These tests fail due to missing VPC security group rule for port 80 in IBM Cloud PowerVS infrastructure
        # The issue was fixed in 4.22 by https://github.com/openshift/installer/pull/10548

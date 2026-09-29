@@ -3,37 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# When AWS_STS_MODE=yes, authenticate to AWS via STS (AssumeRoleWithWebIdentity)
-# instead of a long-lived access key. The pod projects a service-account token
-# (audience sts.amazonaws.com) at AWS_WEB_IDENTITY_TOKEN_FILE. We build an AWS
-# config that first exchanges that token for the per-cluster "home" role
-# (HOME_ROLE_ARN, in the hub account) and then chain-assumes the per-account
-# "target" role (TARGET_ROLE_ARN) that owns the clusters being deprovisioned.
-# This mirrors the credential setup ci-operator generates at
-# /var/run/secrets/aws/config/config for ipi-aws jobs.
-if [[ "${AWS_STS_MODE:-}" == "yes" ]]; then
-	aws_region="${AWS_REGION:-us-east-1}"
-	mkdir -p "${HOME}/.aws"
-	cat > "${HOME}/.aws/config" <<EOF
-[default]
-region = ${aws_region}
-role_arn = ${TARGET_ROLE_ARN:?TARGET_ROLE_ARN must be set when AWS_STS_MODE=yes}
-source_profile = home
-
-[profile home]
-region = ${aws_region}
-role_arn = ${HOME_ROLE_ARN:?HOME_ROLE_ARN must be set when AWS_STS_MODE=yes}
-web_identity_token_file = ${AWS_WEB_IDENTITY_TOKEN_FILE:?AWS_WEB_IDENTITY_TOKEN_FILE must be set when AWS_STS_MODE=yes}
-EOF
-	export AWS_CONFIG_FILE="${HOME}/.aws/config"
-	export AWS_PROFILE=default
-	# Required for the AWS SDK for Go (openshift-install) to honor the shared
-	# config file, including role_arn/source_profile chaining.
-	export AWS_SDK_LOAD_CONFIG=1
-	# Ensure nothing falls back to a stale static credentials file.
-	unset AWS_SHARED_CREDENTIALS_FILE
-fi
-
 trap finish TERM QUIT
 
 function finish {

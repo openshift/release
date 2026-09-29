@@ -179,6 +179,7 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
+      TEST_SKIPS: InPlace Resize
     observers:
       enable:
       - observers-resource-watch
@@ -513,6 +514,36 @@ tests:
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-zones-techpreview
+  cron: 30 15 * * 2
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere-zones
+- as: e2e-vsphere-ovn-zones-techpreview-serial
+  cron: 45 15 * * 2
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  shard_count: 2
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-multi-network
   cron: 24 7 * * 2
   reporter_config:
@@ -1732,21 +1763,6 @@ tests:
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
-- as: opct-external-aws-ccm
-  cron: '@weekly'
-  reporter_config:
-    channel: '#forum-opct-updates'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: |
-      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
-    workflow: opct-conformance-external-aws
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-kube-apiserver-rollout
   interval: 168h
   steps:
@@ -1922,7 +1938,7 @@ tests:
     report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
       *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
   steps:
     cluster_profile: rosa-e2e-02
     observers:
@@ -1940,7 +1956,7 @@ tests:
     report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
       *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
   steps:
     cluster_profile: rosa-e2e-01
     env:

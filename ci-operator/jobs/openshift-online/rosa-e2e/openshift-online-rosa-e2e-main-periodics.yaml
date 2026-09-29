@@ -1,6 +1,108 @@
 periodics:
 - agent: kubernetes
   cluster: build01
+  cron: 0 6 * * 0
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: rosa-e2e-01
+    ci-operator.openshift.io/variant: cloud-resource-cleanup
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-cloud-resource-cleanup-profile01
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=profile01
+      - --variant=cloud-resource-cleanup
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
   cron: 0 3 * * *
   decorate: true
   decoration_config:
@@ -408,7 +510,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -510,7 +612,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 9 * * *
   decorate: true
   decoration_config:
@@ -612,7 +714,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -714,7 +816,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 0 12 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-osd-gcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-firewall-rules-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-osd-gcp-firewall-rules-staging-main
+      - --variant=ocm-fvt-osd-gcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 0 9 * * *
   decorate: true
   decoration_config:
@@ -816,7 +1020,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 9 * * *
   decorate: true
   decoration_config:
@@ -918,7 +1122,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 9 * * *
   decorate: true
   decoration_config:
@@ -948,6 +1152,108 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-osd-gcp-wif-sv-staging-main
+      - --variant=ocm-fvt-osd-gcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
+  cron: 0 11 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-osd-gcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-version-pruning-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-osd-gcp-wif-version-pruning-staging-main
       - --variant=ocm-fvt-osd-gcp-staging
       command:
       - ci-operator
@@ -1345,7 +1651,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 10 * * 4
   decorate: true
   decoration_config:
@@ -1447,7 +1753,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 10 * * 3
   decorate: true
   decoration_config:
@@ -1478,6 +1784,228 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-osdfm-sc-autoscaling-integration
       - --variant=ocm-fvt-osdfm-integration
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 0 0 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 4h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/intranet: intranet
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: ocm-fvt-osdfm-production
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-production-ocm-fvt-gating-osdfm-prod-ap-southeast-3
+  reporter_config:
+    slack:
+      channel: '#rosa-prow-info'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-gating-osdfm-prod-ap-southeast-3
+      - --variant=ocm-fvt-osdfm-production
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 0 0 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 4h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/intranet: intranet
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: ocm-fvt-osdfm-production
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osdfm-production-ocm-fvt-gating-osdfm-prod-ap-southeast-4
+  reporter_config:
+    slack:
+      channel: '#rosa-prow-info'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-gating-osdfm-prod-ap-southeast-4
+      - --variant=ocm-fvt-osdfm-production
       command:
       - ci-operator
       env:
@@ -1882,7 +2410,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 9 * * 1
   decorate: true
   decoration_config:
@@ -1984,7 +2512,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -2086,7 +2614,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -2188,7 +2716,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 20 4 * * *
   decorate: true
   decoration_config:
@@ -2290,7 +2818,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 4 * * *
   decorate: true
   decoration_config:
@@ -2392,7 +2920,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 10 7 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-classic-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-ad-candidate-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-ad-candidate-staging-main
+      - --variant=ocm-fvt-rosa-classic-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 40 2 * * *
   decorate: true
   decoration_config:
@@ -2494,7 +3124,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -2596,7 +3226,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 0 7 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-classic-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-ad-candidate-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-sts-ad-candidate-staging-main
+      - --variant=ocm-fvt-rosa-classic-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 0 3 * * *
   decorate: true
   decoration_config:
@@ -2698,7 +3430,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 0 31 2 *
   decorate: true
   decoration_config:
@@ -2800,7 +3532,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 30 7 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-classic-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-pl-candidate-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-sts-pl-candidate-staging-main
+      - --variant=ocm-fvt-rosa-classic-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 20 3 * * *
   decorate: true
   decoration_config:
@@ -2902,7 +3736,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 40 3 * * *
   decorate: true
   decoration_config:
@@ -3004,7 +3838,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 20 7 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-classic-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-classic-staging-ocm-fvt-periodic-cs-rosa-sts-shvpc-candidate-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-sts-shvpc-candidate-staging-main
+      - --variant=ocm-fvt-rosa-classic-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 20 2 * * *
   decorate: true
   decoration_config:
@@ -3106,7 +4042,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -3208,7 +4144,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -3310,7 +4246,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -3418,7 +4354,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -3526,7 +4462,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -3634,7 +4570,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 8 * * *
   decorate: true
   decoration_config:
@@ -3742,7 +4678,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 3 * * 1
   decorate: true
   decoration_config:
@@ -3844,7 +4780,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 0 10 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-hcp-e2e-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-hcp-e2e-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 0 6 * * *
   decorate: true
   decoration_config:
@@ -3946,7 +4984,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 20 10 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-access-request-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-access-request-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 20 6 * * *
   decorate: true
   decoration_config:
@@ -4048,7 +5188,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 7 * * *
   decorate: true
   decoration_config:
@@ -4150,7 +5290,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 0 3 * * *
   decorate: true
   decoration_config:
@@ -4252,7 +5392,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 20 7 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-adobe-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-adobe-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 20 3 * * *
   decorate: true
   decoration_config:
@@ -4354,7 +5596,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 40 6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-amd64-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 40 2 * * *
   decorate: true
   decoration_config:
@@ -4456,7 +5800,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 40 8 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-amd64-upgrade-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-amd64-upgrade-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 40 4 * * *
   decorate: true
   decoration_config:
@@ -4558,7 +6004,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 20 9 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-arm-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-arm-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 20 5 * * *
   decorate: true
   decoration_config:
@@ -4660,7 +6208,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 0 9 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-autonode-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-autonode-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 0 5 * * *
   decorate: true
   decoration_config:
@@ -4762,7 +6412,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 40 10 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-nx-y-upgrade-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-nx-y-upgrade-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 0 0 31 2 *
   decorate: true
   decoration_config:
@@ -4864,7 +6616,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 20 8 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-pl-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-pl-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 20 4 * * *
   decorate: true
   decoration_config:
@@ -4966,7 +6820,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 0 8 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-shared-vpc-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-shared-vpc-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 0 4 * * *
   decorate: true
   decoration_config:
@@ -5068,7 +7024,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 20 6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-upgrade-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-upgrade-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 20 2 * * *
   decorate: true
   decoration_config:
@@ -5170,7 +7228,109 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 0 6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-y-upgrade-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-y-upgrade-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 0 2 * * *
   decorate: true
   decoration_config:
@@ -5272,7 +7432,211 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 40 7 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egr-upg-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-zero-egr-upg-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
+  cron: 40 9 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-rosa-hcp-zero-egress-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-zero-egress-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 40 5 * * *
   decorate: true
   decoration_config:
@@ -5374,7 +7738,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
   cron: 40 3 * * *
   decorate: true
   decoration_config:
@@ -5476,7 +7840,313 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build11
+  cron: 0 0 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-sanity-jira-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-sanity-jira-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
+  cron: 0 0 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-sanity-jira-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-sanity-jira-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
+  cron: 0 7 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-sanity-ocp5-staging-main
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-sanity-ocp5-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   cron: 0 3 * * *
   decorate: true
   decoration_config:
@@ -5506,6 +8176,107 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=ocm-fvt-periodic-cs-sanity-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build07
+  cron: 0 2 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 30m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-ocp5-resource-cleaner
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-ocp5-resource-cleaner
       - --variant=ocm-fvt-rosa-hcp-staging
       command:
       - ci-operator

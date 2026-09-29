@@ -41,17 +41,24 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       sed -E -i ':a;N;$!ba;s/\.rendezvous_node\(\)[[:space:]]*\n[[:space:]]*\.select_ip\(\)/.non_rendezvous_node(self.rendezvous_ip)/g' agent-tui/tui_driver/driver.py
     fi
   fi
+  IP_ADDRESS="$(echo "$bmhost" | jq -r '.ip')/22"
+  SERVER_ADDRESS="192.168.80.1"
+  INTERFACE=$(echo "$bmhost" | jq -r '.baremetal_iface')
+  HOSTNAME=$(echo "$bmhost" | jq -r '.name')
   IPMITOOL_IP=$(echo "$bmhost" | jq -r '.bmc_address')
   IPMITOOL_USERNAME=$(echo "$bmhost" | jq -r '.bmc_user')
   IPMITOOL_PASSWORD=$(echo "$bmhost" | jq -r '.bmc_pass')
   HOST_MACHINE=$(echo "$bmhost" | jq -r '.host')
+  NETWORK_MODE="${NETWORK_MODE:-dhcp}"
   (
-    echo "Agent TUI execution started for $HOST_MACHINE"
-    IPMITOOL_IP="$IPMITOOL_IP" \
-    IPMITOOL_USERNAME="$IPMITOOL_USERNAME" \
-    IPMITOOL_PASSWORD="$IPMITOOL_PASSWORD" \
-    RENDEZVOUS_IP="$RENDEZVOUS_IP" \
-    RENDEZVOUS_NODE="$CURRENT_RENDEZVOUS_NODE" \
+    echo "Agent TUI execution started for $HOST_MACHINE ($NETWORK_MODE)"
+    RENDEZVOUS_NODE="$CURRENT_RENDEZVOUS_NODE"
+    export IPMITOOL_IP IPMITOOL_USERNAME IPMITOOL_PASSWORD RENDEZVOUS_IP RENDEZVOUS_NODE NETWORK_MODE
+
+    if [ "$NETWORK_MODE" != "dhcp" ]; then
+      export IP_ADDRESS SERVER_ADDRESS INTERFACE HOSTNAME
+    fi
+
     python3.11 agent-tui/run_agent_tui.py || {
       echo "Agent TUI settings failed for $HOST_MACHINE."
       exit 1

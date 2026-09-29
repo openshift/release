@@ -1,6 +1,27 @@
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
 
 QUAY_TARGET_CHANNEL="${QUAY_TARGET_CHANNEL:-}"
 QUAY_UPGRADE_TIMEOUT="${QUAY_UPGRADE_TIMEOUT:-30m}"
@@ -30,7 +51,7 @@ function CollectDiagnostics () {
     true
 }
 
-trap 'if (( $? != 0 )); then CollectDiagnostics; fi' EXIT
+trap '_opp_cleanup; if (( _exit_code != 0 )); then CollectDiagnostics; fi' EXIT
 
 function GetCurrentCsv () {
     oc get subscription "${QUAY_SUBSCRIPTION_NAME}" \

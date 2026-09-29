@@ -480,6 +480,64 @@ tests:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-aws-edge-zones
 - always_run: false
+  as: e2e-aws-ovn-edge-zones-byo-iam-role
+  optional: true
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-edge-zones-byo-iam-role
+- always_run: false
+  as: e2e-aws-ovn-edge-zones-byo-iam-role-cp-worker
+  optional: true
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ENABLE_BYO_IAM_ROLE_EDGE: "false"
+      PROVISION_EDGE_IAM_ROLE: "no"
+    workflow: openshift-e2e-aws-edge-zones-byo-iam-role
+- always_run: false
+  as: e2e-aws-ovn-edge-zones-byo-iam-profile
+  optional: true
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-edge-zones-byo-iam-profile
+- always_run: false
+  as: e2e-aws-ovn-edge-zones-byo-iam-profile-cp-worker
+  optional: true
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ENABLE_BYO_IAM_PROFILE_EDGE: "false"
+      PROVISION_EDGE_IAM_PROFILE: "no"
+    workflow: openshift-e2e-aws-edge-zones-byo-iam-profile
+- always_run: false
   as: e2e-aws-ovn-shared-vpc-edge-zones
   optional: true
   pipeline_run_if_changed: aws
@@ -740,8 +798,13 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     env:
-      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AZURE_MULTIDISK_COMPUTE_DISKS: |
+        user-defined:containers:32:0:Premium_LRS:/var/lib/containers
+        user-defined:kubelet:16:1:StandardSSD_LRS:/var/lib/kubelet
+      AZURE_MULTIDISK_CONTROL_PLANE_DISKS: |
+        etcd:etcddisk:64:0:Premium_LRS:
+        user-defined:containers:32:1:StandardSSD_LRS:/var/lib/containers
       FEATURE_SET: TechPreviewNoUpgrade
       USER_TAGS: |
         keyA valueA

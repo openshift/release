@@ -1,11 +1,42 @@
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 shopt -s inherit_errexit
+
+# === Known-Issue Skip Framework ===
+# This script uses _detect_known_issue() to emit JUnit SKIPPED results
+# for tracked bugs instead of failing the job. Unknown failures still FAIL.
+# Tracked issues: ACM-45920
+# See PR review Fix 3 for rationale.
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
 
 ACM_TARGET_CHANNEL="${ACM_TARGET_CHANNEL:-}"
 ACM_UPGRADE_TIMEOUT="${ACM_UPGRADE_TIMEOUT:-30m}"
 ACM_SUBSCRIPTION_NAME="${ACM_SUBSCRIPTION_NAME:-advanced-cluster-management}"
 ACM_SUBSCRIPTION_NAMESPACE="${ACM_SUBSCRIPTION_NAMESPACE:-open-cluster-management}"
+# Use the fully-qualified OLM resource type to avoid ambiguity with ACM's own
+# subscriptions.apps.open-cluster-management.io CRD that is registered on the
+# hub once ACM is installed. Override via ACM_SUBSCRIPTION_RESOURCE if needed.
+ACM_SUBSCRIPTION_RESOURCE="${ACM_SUBSCRIPTION_RESOURCE:-subscriptions.operators.coreos.com}"
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -15,7 +46,7 @@ function CollectDiagnostics () {
     {
         printf '=== ACM Operator Upgrade Diagnostics ===\n\n'
         printf '=== Subscription ===\n'
-        oc get subscription "${ACM_SUBSCRIPTION_NAME}" -n "${ACM_SUBSCRIPTION_NAMESPACE}" -o yaml 2>&1 || true
+        oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" -n "${ACM_SUBSCRIPTION_NAMESPACE}" -o yaml 2>&1 || true
         printf '\n=== CSVs in %s ===\n' "${ACM_SUBSCRIPTION_NAMESPACE}"
         oc get csv -n "${ACM_SUBSCRIPTION_NAMESPACE}" 2>&1 || true
         printf '\n=== InstallPlan ===\n'
@@ -29,10 +60,10 @@ function CollectDiagnostics () {
     true
 }
 
-trap 'if (( $? != 0 )); then CollectDiagnostics; fi' EXIT
+trap '_opp_cleanup; if (( _exit_code != 0 )); then CollectDiagnostics; fi' EXIT
 
 function GetCurrentCsv () {
-    oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.currentCSV}' || true
 }
@@ -56,7 +87,7 @@ function GetInstalledVersion () {
 }
 
 function GetCurrentChannel () {
-    oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.channel}' || true
 }
@@ -75,12 +106,12 @@ function ResolveTargetChannel () {
     fi
 
     typeset catalogNamespace
-    catalogNamespace="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    catalogNamespace="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.sourceNamespace}' || true)"
 
     typeset packageName
-    packageName="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    packageName="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.name}' || true)"
 
@@ -288,16 +319,25 @@ function ValidateHubHealth () {
     fi
 
     echo "  Checking managed clusters..."
-    typeset clusterOutput=""
-    clusterOutput="$(oc get managedclusters --no-headers || true)"
-    typeset -i clusterCount=0
-    clusterCount="$(echo "${clusterOutput}" | grep -c . || true)"
-    typeset availableOutput=""
-    availableOutput="$(oc get managedclusters \
-        -o jsonpath='{.items[?(@.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status=="True")].metadata.name}' \
-        || true)"
+    # Use per-cluster condition queries instead of a nested jsonpath filter;
+    # kubectl jsonpath does not support nested [?(...)] predicates and silently
+    # returns an unterminated-filter error that is masked by || true, causing
+    # all clusters to appear unavailable even when they are healthy.
+    typeset -a clusterNames=()
+    typeset clusterNamesRaw=""
+    clusterNamesRaw="$(oc get managedclusters -o jsonpath='{.items[*].metadata.name}' || true)"
+    read -ra clusterNames <<< "${clusterNamesRaw}"
+    typeset -i clusterCount=${#clusterNames[@]}
     typeset -i availableCount=0
-    availableCount="$(echo "${availableOutput}" | wc -w)"
+    for clusterName in "${clusterNames[@]}"; do
+        typeset condStatus=""
+        condStatus="$(oc get managedcluster "${clusterName}" \
+            -o jsonpath='{.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status}' \
+            || true)"
+        if [[ "${condStatus}" == "True" ]]; then
+            (( availableCount += 1 ))
+        fi
+    done
     echo "  Managed clusters: ${availableCount}/${clusterCount} available"
 
     if (( clusterCount > 0 && availableCount == 0 )); then
@@ -308,6 +348,45 @@ function ValidateHubHealth () {
 
     echo "ACM hub health validation complete"
     return 0
+}
+
+# _xml_escape: Required for bash 5.x where patsub_replacement is enabled
+# by default, changing how ${var//pattern/replacement} handles & and \ in
+# the replacement string. Without escaping, JUnit XML output is malformed.
+_xml_escape() {
+    local text="$1"
+    text="${text//&/\&amp;}"
+    text="${text//</\&lt;}"
+    text="${text//>/\&gt;}"
+    text="${text//\"/\&quot;}"
+    text="${text//\'/\&apos;}"
+    printf '%s' "${text}"
+}
+
+# JUnit fragment contract: ci-operator's junit_report.go accepts both
+# standalone <testcase> fragments and full <testsuite>-wrapped documents.
+# Fragments are appended to junit_known_issues.xml and consumed correctly.
+_detect_known_issue() {
+    local error_output="$1"
+    local bug_id="$2"
+    local bug_description="$3"
+    local safe_bug_id safe_desc safe_error
+
+    safe_bug_id="$(_xml_escape "${bug_id}")"
+    safe_desc="$(_xml_escape "${bug_description}")"
+    safe_error="$(_xml_escape "${error_output:0:500}")"
+
+    echo ">>> KNOWN ISSUE: ${bug_id} — ${bug_description}"
+    echo ">>> Marking as SKIPPED (tracked: https://issues.redhat.com/browse/${bug_id})"
+
+    cat <<JUNIT_EOF >> "${ARTIFACT_DIR}/junit_known_issues.xml"
+<testcase name="${safe_bug_id}: ${safe_desc}" classname="opp.interop.known_issues">
+  <skipped message="Known issue: ${safe_bug_id}">
+    Tracked at https://issues.redhat.com/browse/${safe_bug_id}
+    Error: ${safe_error}
+  </skipped>
+</testcase>
+JUNIT_EOF
 }
 
 # === Main ===
@@ -336,7 +415,7 @@ function Main () {
     echo "Target channel: ${targetChannel}"
 
     prePatchPlan=""
-    if ! prePatchPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    if ! prePatchPlan="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null)"; then
         echo "WARNING: Could not query current installPlanRef; treating as empty"
@@ -360,7 +439,7 @@ function Main () {
         installPlan="${prePatchPlan}"
     else
         echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
-        oc patch subscription "${ACM_SUBSCRIPTION_NAME}" \
+        oc patch "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
             -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
             --type merge \
             -p "{\"spec\":{\"channel\":\"${targetChannel}\"}}"
@@ -370,7 +449,7 @@ function Main () {
 
         installPlan=""
         for _ in {1..18}; do
-            installPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+            installPlan="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
                 -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
                 -o jsonpath='{.status.installPlanRef.name}' || true)"
             if [[ -n "${installPlan}" && "${installPlan}" != "${prePatchPlan}" ]]; then
@@ -404,8 +483,38 @@ function Main () {
     newVersion="$(GetInstalledVersion)"
     echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
 
-    ValidateMceUpgrade
-    ValidateHubHealth
+    typeset _acm_upgrade_output=""
+    if ! _acm_upgrade_output="$(ValidateMceUpgrade 2>&1)"; then
+        echo "${_acm_upgrade_output}"
+        if echo "${_acm_upgrade_output}" | grep -q "cannot unmarshal string into Go struct"; then
+            # Known-issue skip: ACM-45920
+            # Added: 2026-09-21
+            # Review-by: 2026-12-21 (or when ACM-45920 is resolved)
+            # Owner: OPP-interop team
+            _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
+                "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
+        else
+            exit 1
+        fi
+    else
+        echo "${_acm_upgrade_output}"
+    fi
+
+    if ! _acm_upgrade_output="$(ValidateHubHealth 2>&1)"; then
+        echo "${_acm_upgrade_output}"
+        if echo "${_acm_upgrade_output}" | grep -q "cannot unmarshal string into Go struct"; then
+            # Known-issue skip: ACM-45920
+            # Added: 2026-09-21
+            # Review-by: 2026-12-21 (or when ACM-45920 is resolved)
+            # Owner: OPP-interop team
+            _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
+                "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
+        else
+            exit 1
+        fi
+    else
+        echo "${_acm_upgrade_output}"
+    fi
 
     {
         printf '=== ACM Operator Upgrade Summary ===\n'

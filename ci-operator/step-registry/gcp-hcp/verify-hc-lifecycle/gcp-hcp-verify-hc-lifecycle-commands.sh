@@ -110,3 +110,4 @@ echo "Running HC lifecycle validation tests..."
 
 echo ""
 echo "HC lifecycle validation completed successfully"
+touch "${SHARED_DIR}/gcp-hcp-e2e-tests-passed"

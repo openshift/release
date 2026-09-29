@@ -57,6 +57,23 @@ tests:
   commands: ./ci/unit-tests.sh
   container:
     from: src
+- as: coverage
+  commands: ./scripts/codecov.sh
+  container:
+    from: src
+  secrets:
+  - collection: rosa-hyperfleet-api
+    group: codecov
+    mount_path: /var/run/codecov-secret
+- as: publish-coverage
+  commands: ./scripts/codecov.sh
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - collection: rosa-hyperfleet-api
+    group: codecov
+    mount_path: /var/run/codecov-secret
 - as: verify
   commands: ./ci/verify.sh
   container:
