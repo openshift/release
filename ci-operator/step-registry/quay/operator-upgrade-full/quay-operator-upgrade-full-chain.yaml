@@ -1,0 +1,28 @@
+chain:
+  as: quay-operator-upgrade-full
+  steps:
+  - ref: quay-operator-upgrade-full-playwright
+  env:
+  - name: PLAYWRIGHT_GREP
+    default: ""
+    documentation: Empty runs the full post-upgrade suite subject only to existing exclusion defaults.
+  - name: PLAYWRIGHT_PHASE
+    default: n
+    documentation: Select the independently configured PLAYWRIGHT_N_* suite controls.
+  - name: PLAYWRIGHT_REQUIRE_EXPLICIT_REF
+    default: "true"
+    documentation: Prevent derived or fallback Playwright refs in the target phase.
+  - name: PLAYWRIGHT_CREDENTIALS_SOURCE
+    default: mounted-secret
+    documentation: |-
+      Read the quay-tests credential mount. The Playwright global setup manages the
+      admin user itself; the admin created during the n-1 smoke phase persists
+      across the upgrade, so the suite signs in with the same mounted credentials.
+  - name: PLAYWRIGHT_ARTIFACT_SUBDIR
+    default: n-full
+    documentation: Keep post-upgrade reports separate from n-1 smoke artifacts.
+  documentation: |-
+    Thin target-version full-suite wrapper around quay-test-e2e. It intentionally
+    has no positive selector and requires an explicit target Git ref through
+    PLAYWRIGHT_N_GIT_* controls. Its inherited PLAYWRIGHT_GREP_INVERT value retains
+    existing exclusions by default.

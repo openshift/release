@@ -1,0 +1,58 @@
+ref:
+  as: quay-operator-upgrade-upgrade
+  cli: latest
+  from: cli
+  commands: quay-operator-upgrade-upgrade-commands.sh
+  timeout: 45m
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: QUAY_UPGRADE_TARGET_CATALOG_IMAGE
+    default: ""
+    documentation: "Required immutable target (n) Quay catalog pullspec: image@sha256:<64 hex>."
+  - name: QUAY_UPGRADE_TARGET_CHANNEL
+    default: ""
+    documentation: Required target (n) Quay operator subscription channel.
+  - name: QUAY_UPGRADE_TARGET_CATALOG_NAME
+    default: quay-upgrade-target
+    documentation: Name for the target CatalogSource created by this scaffold.
+  - name: QUAY_UPGRADE_SOURCE_CHANNEL
+    default: ""
+    documentation: Required source channel, checked against the source identity written during installation.
+  - name: QUAY_UPGRADE_SOURCE_CATALOG_IMAGE
+    default: ""
+    documentation: Required source immutable catalog image, checked against the source identity.
+  - name: QUAY_UPGRADE_SOURCE_CATALOG_NAME
+    default: quay-upgrade-source
+    documentation: Source CatalogSource name expected by this scaffold.
+  - name: QUAY_UPGRADE_CATALOG_NAMESPACE
+    default: openshift-marketplace
+    documentation: Namespace in which source and target CatalogSources are created.
+  - name: QUAY_UPGRADE_OPERATOR_NAMESPACE
+    default: openshift-operators
+    documentation: Namespace containing the Quay Subscription and CSVs.
+  - name: QUAY_UPGRADE_SUBSCRIPTION_NAME
+    default: quay-operator
+    documentation: Name of the Quay Subscription managed by this scaffold.
+  - name: QUAY_UPGRADE_QUAY_NAMESPACE
+    default: quay
+    documentation: Namespace containing the QuayRegistry whose readiness is asserted after upgrade.
+  - name: QUAY_UPGRADE_QUAY_REGISTRY
+    default: quay
+    documentation: Name of the QuayRegistry whose readiness is asserted after upgrade.
+  - name: QUAY_UPGRADE_TIMEOUT
+    default: 30m
+    documentation: Positive Ns, Nm, or Nh timeout covering CSV replacement and Quay readiness.
+  - name: QUAY_UPGRADE_CATALOG_TIMEOUT
+    default: 10m
+    documentation: Positive Ns, Nm, or Nh timeout for target CatalogSource readiness.
+  documentation: |-
+    Performs a parameterized n-1 to n OLM upgrade. The step verifies the exact
+    pre-upgrade source identity and installedCSV, replaces the Subscription's
+    source and channel with an immutable target catalog, requires a different
+    Succeeded installedCSV, and waits for QuayRegistry plus quay-app readiness.
+    It writes pre/post state and diagnostics as artifacts. The app image is only
+    reported as changed when an actual before/after image difference is observed.

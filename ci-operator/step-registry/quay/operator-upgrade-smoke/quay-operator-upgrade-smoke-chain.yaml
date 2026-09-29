@@ -1,0 +1,29 @@
+chain:
+  as: quay-operator-upgrade-smoke
+  steps:
+  - ref: quay-operator-upgrade-smoke-playwright
+  env:
+  - name: PLAYWRIGHT_GREP
+    default: '@smoke'
+    documentation: Positive Playwright selector for the n-1 smoke phase; override with the suite's real smoke tag if it differs.
+  - name: PLAYWRIGHT_PHASE
+    default: n-minus-one
+    documentation: Select the independently configured PLAYWRIGHT_N_MINUS_ONE_* suite controls.
+  - name: PLAYWRIGHT_REQUIRE_EXPLICIT_REF
+    default: "true"
+    documentation: Prevent derived or fallback Playwright refs in the source phase.
+  - name: PLAYWRIGHT_CREDENTIALS_SOURCE
+    default: mounted-secret
+    documentation: |-
+      Read the quay-tests credential mount. The Playwright global setup owns admin
+      user creation via the one-shot /user/initialize, so no quay-create-admin-user
+      step must run before this phase (doing so consumes initialize and breaks the
+      suite's admin sign-in).
+  - name: PLAYWRIGHT_ARTIFACT_SUBDIR
+    default: n-minus-one-smoke
+    documentation: Keep smoke reports separate from the post-upgrade full-suite reports.
+  documentation: |-
+    Thin n-1 smoke wrapper around quay-test-e2e. It adds a positive selector and
+    requires an explicit source-suite Git ref through PLAYWRIGHT_N_MINUS_ONE_GIT_*
+    controls. Its inherited PLAYWRIGHT_GREP_INVERT value preserves existing Quay
+    exclusions unless a caller deliberately changes it.

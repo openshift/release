@@ -1,0 +1,80 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_path: web/Containerfile.playwright
+    to: quay-playwright-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: from-317
+  cron: '@weekly'
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      # ART FBC catalog resolution. quay-enable-catalogsource-art resolves this
+      # floating tag to an immutable digest and writes it to
+      # ${SHARED_DIR}/quay_index_image; install-source/upgrade fall back to it.
+      QUAY_INDEX_IMAGE_TAG: quay-3.18__v4.22__quay-rhel9-operator
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      # OLM upgrade edge: one ART FBC carries every channel, so the same digest
+      # backs both; only the Subscription channel changes across the upgrade.
+      QUAY_UPGRADE_SOURCE_CHANNEL: stable-3.17
+      QUAY_UPGRADE_TARGET_CHANNEL: stable-3.18
+      # Per-phase Playwright suites, version-matched to each product release.
+      # Namespaced by phase so the smoke (n-1) and full (n) runs never collide.
+      PLAYWRIGHT_USE_IMAGE_TESTS: "false"
+      # The Playwright global setup owns admin creation via the one-shot
+      # /user/initialize, so no quay-create-admin-user step runs; the suite reads
+      # the quay-tests credential mount (mounted-secret) and signs in with it.
+      PLAYWRIGHT_CREDENTIALS_SOURCE: mounted-secret
+      PLAYWRIGHT_N_MINUS_ONE_GIT_REPO: https://github.com/quay/quay.git
+      PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH: redhat-3.17
+      PLAYWRIGHT_N_GIT_REPO: https://github.com/quay/quay.git
+      PLAYWRIGHT_N_GIT_BRANCH: redhat-3.18
+    test:
+    # 1. Enable the ART FBC catalog and deploy the S3 object storage.
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-provision-storage-s3
+    # 2. Start Quay n-1 (3.17): install the operator on the source channel and
+    #    reconcile a QuayRegistry backed by the external S3 storage.
+    - ref: quay-operator-upgrade-install-source
+    - ref: quay-install-quay-external-storage
+    - ref: quay-operator-upgrade-prepare-e2e
+    # 3. Run the n-1 smoke suite.
+    - chain: quay-operator-upgrade-smoke
+    # 4. Upgrade Quay to n (3.18) through OLM (Subscription channel move).
+    - ref: quay-operator-upgrade-upgrade
+    # 5. Run the full post-upgrade suite.
+    - chain: quay-operator-upgrade-full
+    post:
+    - ref: quay-gather
+    - ref: quay-deprovision
+    - chain: ipi-aws-post
+    workflow: ipi-aws
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: redhat-3.18
+  org: quay
+  repo: quay
+  variant: aws-ocp422-upgrade

@@ -4,6 +4,14 @@ set -euo pipefail
 set -x
 
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
+PLAYWRIGHT_ARTIFACT_SUBDIR="${PLAYWRIGHT_ARTIFACT_SUBDIR:-}"
+if [[ -n "${PLAYWRIGHT_ARTIFACT_SUBDIR}" ]]; then
+  if [[ ! "${PLAYWRIGHT_ARTIFACT_SUBDIR}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "ERROR: PLAYWRIGHT_ARTIFACT_SUBDIR must be a single safe directory name" >&2
+    exit 1
+  fi
+  ARTIFACT_DIR="${ARTIFACT_DIR}/${PLAYWRIGHT_ARTIFACT_SUBDIR}"
+fi
 mkdir -p "${ARTIFACT_DIR}"
 
 # Read the Quay route written by the deploy step
@@ -14,12 +22,30 @@ if [[ -z "${QUAY_ROUTE}" ]]; then
 fi
 echo "Quay route: ${QUAY_ROUTE}"
 
-# Read credentials
+# Read credentials. The normal path preserves the existing mounted-secret
+# behavior; the shared-admin path supports the self-contained upgrade scaffold.
 # Disable tracing due to password handling
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+PLAYWRIGHT_CREDENTIALS_SOURCE="${PLAYWRIGHT_CREDENTIALS_SOURCE:-mounted-secret}"
+case "${PLAYWRIGHT_CREDENTIALS_SOURCE}" in
+  mounted-secret)
+    QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+    QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+    ;;
+  shared-admin)
+    if [[ ! -s "${SHARED_DIR}/quay-admin-username" || ! -s "${SHARED_DIR}/quay-admin-password" ]]; then
+      echo "ERROR: shared-admin credentials are not present in SHARED_DIR" >&2
+      exit 1
+    fi
+    QUAY_USERNAME=$(cat "${SHARED_DIR}/quay-admin-username")
+    QUAY_PASSWORD=$(cat "${SHARED_DIR}/quay-admin-password")
+    ;;
+  *)
+    echo "ERROR: PLAYWRIGHT_CREDENTIALS_SOURCE must be mounted-secret or shared-admin" >&2
+    exit 1
+    ;;
+esac
 $WAS_TRACING && set -x
 
 # Configure Playwright environment
@@ -47,6 +73,26 @@ else
   echo "No mailpit_api in SHARED_DIR; email-dependent specs may skip or fail"
 fi
 
+# Upgrade wrappers select different, independently configured suite controls
+# through PLAYWRIGHT_PHASE. Non-upgrade callers keep the original variables.
+PLAYWRIGHT_PHASE="${PLAYWRIGHT_PHASE:-}"
+case "${PLAYWRIGHT_PHASE}" in
+  "") ;;
+  n-minus-one)
+    PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_N_MINUS_ONE_USE_IMAGE_TESTS:-false}"
+    PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_N_MINUS_ONE_GIT_REPO:-}"
+    PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH:-}"
+    ;;
+  n)
+    PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_N_USE_IMAGE_TESTS:-false}"
+    PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_N_GIT_REPO:-}"
+    PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_N_GIT_BRANCH:-}"
+    ;;
+  *)
+    echo "ERROR: PLAYWRIGHT_PHASE must be empty, n-minus-one, or n" >&2
+    exit 1
+    ;;
+esac
 PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_USE_IMAGE_TESTS:-false}"
 CLONE_DIR="/tmp/quay-playwright-src"
 if [[ "${PLAYWRIGHT_USE_IMAGE_TESTS}" == "true" ]]; then
@@ -75,8 +121,17 @@ else
 PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_GIT_REPO:-}"
 PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_GIT_BRANCH:-}"
 PLAYWRIGHT_GIT_FALLBACK_BRANCH="${PLAYWRIGHT_GIT_FALLBACK_BRANCH:-redhat-3.18}"
+PLAYWRIGHT_REQUIRE_EXPLICIT_REF="${PLAYWRIGHT_REQUIRE_EXPLICIT_REF:-false}"
+if [[ "${PLAYWRIGHT_REQUIRE_EXPLICIT_REF}" != "true" && "${PLAYWRIGHT_REQUIRE_EXPLICIT_REF}" != "false" ]]; then
+  echo "ERROR: PLAYWRIGHT_REQUIRE_EXPLICIT_REF must be true or false" >&2
+  exit 1
+fi
 if [[ -z "${PLAYWRIGHT_GIT_REPO}" ]]; then
   echo "ERROR: PLAYWRIGHT_GIT_REPO must be set" >&2
+  exit 1
+fi
+if [[ "${PLAYWRIGHT_REQUIRE_EXPLICIT_REF}" == "true" && -z "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
+  echo "ERROR: PLAYWRIGHT_GIT_BRANCH must be explicitly set when PLAYWRIGHT_REQUIRE_EXPLICIT_REF=true" >&2
   exit 1
 fi
 PLAYWRIGHT_REF_IS_DERIVED=false
@@ -740,7 +795,15 @@ fi
 # Playwright test title; see E2E_FAILURE_REPORT.md in the repo root for the rationale
 # behind the current exclusions. When unset, the full suite runs.
 PLAYWRIGHT_GREP_INVERT="${PLAYWRIGHT_GREP_INVERT:-}"
+PLAYWRIGHT_GREP="${PLAYWRIGHT_GREP:-}"
+GREP_ARGS=()
 GREP_INVERT_ARGS=()
+if [[ -n "${PLAYWRIGHT_GREP}" ]]; then
+  GREP_ARGS=(--grep "${PLAYWRIGHT_GREP}")
+  echo "Selecting tests matching: ${PLAYWRIGHT_GREP}"
+else
+  echo "No PLAYWRIGHT_GREP set; running all tests not excluded by PLAYWRIGHT_GREP_INVERT."
+fi
 if [[ -n "${PLAYWRIGHT_GREP_INVERT}" ]]; then
   GREP_INVERT_ARGS=(--grep-invert "${PLAYWRIGHT_GREP_INVERT}")
   echo "Excluding tests matching: ${PLAYWRIGHT_GREP_INVERT}"
@@ -762,7 +825,30 @@ startJaegerPortForward
 
 echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
+if [[ -n "${PLAYWRIGHT_GREP}" ]]; then
+  # A positive selector is useful only when it actually selects something.  Playwright
+  # can otherwise exit successfully after running zero tests, which would make the
+  # n-1 smoke stage a false-positive gate.
+  if ! selected_tests_output="$(npx playwright test "${GREP_ARGS[@]}" "${GREP_INVERT_ARGS[@]}" --list 2>&1)"; then
+    printf '%s\n' "${selected_tests_output}" | tee "${ARTIFACT_DIR}/playwright-selected-tests.log" >&2
+    echo "ERROR: unable to list tests selected by PLAYWRIGHT_GREP" >&2
+    exit 1
+  fi
+  printf '%s\n' "${selected_tests_output}" | tee "${ARTIFACT_DIR}/playwright-selected-tests.log"
+  if [[ "${selected_tests_output}" =~ Total:[[:space:]]+([0-9]+)[[:space:]]+tests? ]]; then
+    selected_tests="${BASH_REMATCH[1]}"
+  else
+    echo "ERROR: Playwright --list output did not report a selected-test total" >&2
+    exit 1
+  fi
+  if (( selected_tests == 0 )); then
+    echo "ERROR: PLAYWRIGHT_GREP selected zero tests" >&2
+    exit 1
+  fi
+  echo "PLAYWRIGHT_GREP selected ${selected_tests} test(s)."
+fi
 npx playwright test \
+  "${GREP_ARGS[@]}" \
   "${GREP_INVERT_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
   --reporter=list,junit,html,json \
