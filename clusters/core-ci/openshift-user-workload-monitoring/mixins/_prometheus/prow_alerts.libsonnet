@@ -6,7 +6,7 @@
         rules: [
           {
             alert: 'prow-pod-crashlooping',
-            expr: 'increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci"}[1h]) > 20',
+            expr: 'increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci",clusterName="core-ci"}[1h]) > 20',
             'for': '10m',
             labels: {
               severity: 'critical',
@@ -17,7 +17,7 @@
           },
           {
             alert: 'NonKubeContainerWaiting',
-            expr: 'max by (namespace, pod, container) (kube_pod_container_status_waiting_reason{namespace!~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"} > 0)',
+            expr: 'max by (namespace, pod, container) (kube_pod_container_status_waiting_reason{namespace!~"(openshift-.*|kube-.*|default)",job="kube-state-metrics",clusterName="core-ci"} > 0)',
             'for': '1h',
             labels: {
               severity: 'warning',
