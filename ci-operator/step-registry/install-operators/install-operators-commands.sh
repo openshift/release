@@ -195,7 +195,7 @@ EOF
             if (( i % 5 == 0 )); then
                 echo "--- Subscription status for ${operator_name} ---"
                 oc get subscription -n "${operator_install_namespace}" "${operator_name}" \
-                    -o jsonpath='{range .status.conditions[*]}  Condition: {.type} = {.status} - {.message}{"\n"}{end}' 2>/dev/null || true
+                    -o jsonpath='{range .status.conditions[*]}  Condition: type={.type} status={.status}{"\n"}{end}' 2>/dev/null || true
                 echo "---"
             fi
             sleep 30
@@ -217,19 +217,18 @@ EOF
             echo
             echo "=== Subscription status ==="
             oc get subscription -n "${operator_install_namespace}" "${operator_name}" \
-                -o jsonpath='{.status.currentCSV}{"\n"}{.status.installedCSV}{"\n"}{.status.state}{"\n"}{range .status.conditions[*]}  Condition: {.type} = {.status} - {.message}{"\n"}{end}' 2>/dev/null || echo "Subscription not found"
+                -o jsonpath='Subscription: name={.metadata.name} channel={.spec.channel} currentCSV={.status.currentCSV} installedCSV={.status.installedCSV} installPlan={.status.installPlanRef.name}{"\n"}{range .status.conditions[*]}  Condition: type={.type} status={.status}{"\n"}{end}' 2>/dev/null || echo "Subscription not found"
             echo
             echo "=== Available channels for ${operator_name} ==="
-            oc get packagemanifest "${operator_name}" -o jsonpath='{range .status.channels[*]}  {.name}{"\n"}{end}' 2>/dev/null || echo "packagemanifest not found"
-            echo
-            echo "=== Recent events (install namespace) ==="
-            oc get events -n "${operator_install_namespace}" --sort-by='.lastTimestamp' 2>/dev/null | tail -20 || true
+            oc get packagemanifest "${operator_name}" -o jsonpath='{range .status.channels[*]}  Channel: name={.name}{"\n"}{end}' 2>/dev/null || echo "packagemanifest not found"
             echo
             echo "=== OLM Resolution events ==="
-            oc get events -n "${operator_install_namespace}" --field-selector reason=ResolutionFailed --sort-by='.lastTimestamp' 2>/dev/null | tail -10 || true
+            oc get events -A --field-selector reason=ResolutionFailed --sort-by='.lastTimestamp' \
+                -o jsonpath='{range .items[*]}  Event: timestamp={.lastTimestamp} namespace={.metadata.namespace} objectKind={.involvedObject.kind} objectName={.involvedObject.name} reason={.reason}{"\n"}{end}' 2>/dev/null | tail -10 || true
             echo
             echo "=== InstallPlans ==="
-            oc get installplan -n "${operator_install_namespace}" -o wide 2>/dev/null || echo "No InstallPlans found"
+            oc get installplan -n "${operator_install_namespace}" \
+                -o jsonpath='{range .items[*]}  InstallPlan: name={.metadata.name} phase={.status.phase}{"\n"}{end}' 2>/dev/null || echo "No InstallPlans found"
         else
             # CSV exists but not Succeeded — keep existing diagnostics
             echo "Error: Failed to deploy ${operator_name}"
