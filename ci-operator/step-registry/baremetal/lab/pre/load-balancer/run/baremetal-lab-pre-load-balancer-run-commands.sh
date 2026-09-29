@@ -132,7 +132,15 @@ if [ "${ipv4_enabled}" == "true" ]; then
     fi
   else
     # Required for internal communication, uses a separate IP to avoid conflicts with VIPs or node IPs.
-    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${INTERNAL_API_IPV4/.81./.80.}"/22 dev eth2
+    LAST_OCTET="${INTERNAL_API_IPV4##*.}"
+    if [ "$LAST_OCTET" -lt 155 ]; then
+      # Nodes 1 to 154 -> Containers get 80.101 to 80.254
+      HAPROXY_IPv4="${INTERNAL_API_IPV4%.*.*}.80.$((LAST_OCTET+100))"/22
+    else
+      # Fallback for Nodes 155 to 248 -> Containers get 83.161 to 83.254
+      HAPROXY_IPv4="${INTERNAL_API_IPV4%.*.*}.83.$((LAST_OCTET+6))"/22
+    fi
+    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${HAPROXY_IPv4}" dev eth2
     echo "Skipping assignment of IPv4 VIPs to eth2 because the load balancer is cluster-managed."
   fi
 fi
@@ -147,7 +155,7 @@ if [ "${ipv6_enabled}" == "true" ]; then
     fi
   else
     # Required for internal communication, uses a separate IP to avoid conflicts with VIPs or node IPs.
-    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${INTERNAL_API_IPV6/::1/::3}"/64 dev eth2
+    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${INTERNAL_API_IPV6/::1/::4}"/64 dev eth2
     echo "Skipping assignment of IPv6 VIPs to eth2 because the load balancer is cluster-managed."
   fi
 fi

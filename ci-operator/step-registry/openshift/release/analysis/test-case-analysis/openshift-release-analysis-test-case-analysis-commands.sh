@@ -24,7 +24,7 @@ function run_analysis() {
     --minimum-successful-count="${min_successful}" \
     --job-start-time="${JOB_START_TIME}" \
     --working-dir="${artifacts}" \
-    --timeout=4h30m \
+    --timeout=5h50m \
     --query-source=cluster \
     $parameters \
     --test-group="${TEST_GROUP}" > "${artifacts}/${analysis}.log" 2>&1  &

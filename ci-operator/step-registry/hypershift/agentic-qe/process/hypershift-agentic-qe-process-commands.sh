@@ -85,6 +85,59 @@ echo "$CHANGED_PLANS" | sed 's/^/  - /'
 PASS_COUNT=0
 FAIL_COUNT=0
 
+# --- Claude session metrics (cost/tokens/timing) via agentic-ci + OTEL ---
+# extract_metrics.py ships in the claude-ai-helpers image and produces the
+# claude_session_metrics BigQuery autodl consumed by the CI cost dashboards.
+EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+
+# run_claude_metered <prompt> <stream_json_out> [extra claude args...]
+# Runs Claude through `agentic-ci run` so an ephemeral OTEL collector captures
+# cost/token/timing telemetry. Writes raw stream-json to <stream_json_out>
+# (agentic-ci log lines stripped) and appends per-run OTEL to ${OTEL_LOG}.
+# Honors ${CLAUDE_TIMEOUT} (a `timeout`-style duration, e.g. 1200 or 35m) when set.
+# Returns the claude/agentic-ci exit code.
+run_claude_metered() {
+  local prompt="$1"; shift
+  local out_file="$1"; shift
+  local raw rc=0 timeout_cmd=()
+  raw="$(mktemp)"
+  [ -n "${CLAUDE_TIMEOUT:-}" ] && timeout_cmd=(timeout "${CLAUDE_TIMEOUT}")
+  "${timeout_cmd[@]}" agentic-ci run \
+    --backend local \
+    --harness claude-code \
+    --model "${CLAUDE_MODEL}" \
+    --workdir "${PWD}" \
+    --no-streaming \
+    "${prompt}" \
+    -- \
+    --verbose \
+    --output-format stream-json \
+    "$@" \
+    > "${raw}" 2>>"${ARTIFACT_DIR}/claude-agentic-ci.log" || rc=$?
+  grep '^{' "${raw}" > "${out_file}" || true
+  rm -f "${raw}"
+  local f
+  for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
+    [ -f "$f" ] && cat "$f" >> "${OTEL_LOG}"
+  done
+  rm -rf /tmp/agentic-ci-run.* 2>/dev/null || true
+  return $rc
+}
+
+# emit_session_metrics [stream_json_out]
+# Best-effort: emit ${ARTIFACT_DIR}/claude-session-metrics-autodl.json from the
+# collected OTEL, enriched with identity fields from the stream-json when given.
+emit_session_metrics() {
+  local stream_log="${1:-}"
+  [ -s "${OTEL_LOG}" ] || { echo "No OTEL data collected; skipping session metrics"; return 0; }
+  [ -f "${EXTRACT_METRICS}" ] || { echo "extract_metrics.py not found; skipping session metrics"; return 0; }
+  local args=("${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json")
+  [ -n "${stream_log}" ] && [ -s "${stream_log}" ] && args+=(--stream-log "${stream_log}")
+  python3 "${EXTRACT_METRICS}" "${args[@]}" || echo "Warning: session metrics extraction failed"
+  return 0
+}
+
 # Process each test plan
 for PLAN_FILE in $CHANGED_PLANS; do
   if [ ! -f "$PLAN_FILE" ]; then
@@ -142,16 +195,14 @@ This file is required — the job result depends on it."
   rm -f "$RESULT_FILE"
 
   set +e
-  claude -p "$PROMPT" \
+  run_claude_metered "$PROMPT" "${ARTIFACT_DIR}/claude-${PLAN_BASENAME}.json" \
     --allowedTools "Bash Read Write Edit Grep Glob" \
-    --max-turns 100 \
-    --model "$CLAUDE_MODEL" \
-    --verbose \
-    --output-format stream-json \
-    2> "${ARTIFACT_DIR}/claude-${PLAN_BASENAME}.log" \
-    | tee "${ARTIFACT_DIR}/claude-${PLAN_BASENAME}.json"
+    --max-turns 100
   CLAUDE_EXIT=$?
   set -e
+
+  # Emit Claude session cost metrics (best-effort; never fails the step)
+  emit_session_metrics "${ARTIFACT_DIR}/claude-${PLAN_BASENAME}.json"
 
   # Extract text output
   jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' \

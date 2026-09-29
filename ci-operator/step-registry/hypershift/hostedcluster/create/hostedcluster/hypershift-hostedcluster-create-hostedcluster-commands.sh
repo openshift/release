@@ -9,14 +9,6 @@ oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
 
 RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
-# is the image multiarch?
-MULTI_ARCH_IMAGE="false"
-NUM_IMAGES="$(oc image info ${RELEASE_IMAGE} -a ${SHARED_DIR}/pull-secret-build-farm.json --show-multiarch true -o json 2>/dev/null | jq '.[].config.architecture' | wc -l || true)"
-if [[ $NUM_IMAGES -gt 1 ]]; then
-  MULTI_ARCH_IMAGE="true"
-fi
-echo "Is multiarch image: ${MULTI_ARCH_IMAGE}"
-
 echo "Set KUBECONFIG to management cluster"
 if [[ $HOSTED_MANAGEMENT_CLUSTER == "hosted-mgmt2" ]]; then
 	MGMT_KUBECONFIG=/var/run/hypershift-workload-credentials-hosted-mgmt2/kubeconfig
@@ -136,6 +128,7 @@ case "${PLATFORM}" in
 
     ARGS+=( \
       --instance-type "${COMPUTE_NODE_TYPE}" \
+      --arch "${HYPERSHIFT_NODE_ARCH}" \
       --region "${HYPERSHIFT_AWS_REGION}" \
       --pull-secret /tmp/pull-secret.json \
       --aws-creds "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
@@ -148,10 +141,6 @@ case "${PLATFORM}" in
       --additional-tags "prow.k8s.io/job=${JOB_NAME}" \
       --additional-tags "prow.k8s.io/build-id=${BUILD_ID}"
     )
-
-    if [[ "${MULTI_ARCH_IMAGE}" == "true" ]]; then
-      ARGS+=( "--multi-arch" )
-    fi
 
     if [[ "${HYPERSHIFT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
       ARGS+=( --annotations "hypershift.openshift.io/skip-release-image-validation=true" )

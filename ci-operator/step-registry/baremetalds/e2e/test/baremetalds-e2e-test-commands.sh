@@ -73,10 +73,12 @@ declare -a MIRRORED_IMAGES=(
   # agnhost:2.63 is not available in "openshift-tests images" command output, so we need to mirror it from source to avoid test failures
   # remove after image is available in "openshift-tests images" command output
   "quay.io/openshift/community-e2e-images:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-63-0-t_yPbigw-dJBrfQ9 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-63-0-t_yPbigw-dJBrfQ9"
+  # new image coming in k8s 1.37
+  "registry.k8s.io/e2e-test-images/sample-device-plugin:1.8 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-registry-k8s-io-e2e-test-images-sample-device-plugin-1-8-0-qeUHEuHnL6hGHUCw"
 )
 
 function run-oc-image-mirror() {
-  if ! oc image mirror -f /tmp/mirror --keep-manifest-list --registry-config ${DS_WORKING_DIR}/pull_secret.json; then
+  if ! oc image mirror -f /tmp/mirror --filter-by-os="linux/${ARCHITECTURE}.*" --registry-config ${DS_WORKING_DIR}/pull_secret.json; then
     echo "oc image mirror failed. Contents of /tmp/mirror:"
     cat /tmp/mirror || true
     return 1
@@ -323,11 +325,21 @@ function suite() {
         HYPERVISOR_ARGS=("--with-hypervisor-json={\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}")
     fi
 
-    if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
-        TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")" &&
-        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
-        echo "Tests to be skipped:" &&
-        echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
+    if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/conformance/serial" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
+        TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")" || return $?
+        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests || return $?
+        echo "Tests to be skipped:"
+        if echo "${TESTS}" | grep "${TEST_SKIPS}"; then
+            :
+        else
+            exit_code=$?
+            if [[ ${exit_code} -eq 1 ]]; then
+                echo 'Warning: no tests were found matching the TEST_SKIPS regex:'
+                echo "${TEST_SKIPS}"
+            else
+                return ${exit_code}
+            fi
+        fi
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
         scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
 

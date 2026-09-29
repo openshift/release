@@ -2,7 +2,7 @@
 
 Skills are Markdown files that define how Claude Code CLI triages and debugs failing tests for a specific operator or component. Each skill is loaded at runtime as Claude's system prompt and drives an autonomous test failure analysis loop.
 
-This document describes the required structure and conventions that every skill must follow. Review the existing skills (`TEMPO.md`, `OTEL.md`, `TRACING_UI.md`, `DISCONNECTED.md`) as reference implementations.
+This document describes the required structure and conventions that every skill must follow. Review the existing skills (`resources/skills/tempo/SKILL.md`, `otel/SKILL.md`, `tracing-ui/SKILL.md`) as reference implementations.
 
 ---
 
@@ -136,8 +136,8 @@ Must state:
 ## Adding a new skill
 
 1. Create `resources/skills/<name>/SKILL.md` following this structure (e.g., `resources/skills/my-operator/SKILL.md`)
-2. Add your team identifier to the `OWNERS` file in `resources/`
-3. Run `make lint` from the `resources/` directory to validate the skill (see [Skill validation](#skill-validation))
+2. Add an `OWNERS` file in `resources/skills/<name>/` listing your team as reviewers/approvers (each existing skill has its own)
+3. Lint the skill with skillsaw (see [Skill validation](#skill-validation))
 4. Open a PR to `openshift/release`
 5. Set `AGENT_SKILL: <name>` in your CI config (e.g., `AGENT_SKILL: my-operator`)
 
@@ -149,20 +149,21 @@ Skill directory names must match `^[A-Za-z0-9_-]+$`. The step rejects any value 
 
 Before submitting a new or modified skill, run [skillsaw](https://github.com/stbenjam/skillsaw) lint locally. Skillsaw checks skill files for security issues (embedded secrets), content quality (weak language, contradictions, attention dead zones), and structure (frontmatter, instruction budget limits).
 
-### Prerequisites
-
-- Docker or Podman
-
 ### Running skillsaw lint
 
-From the `resources/` directory:
+Run skillsaw directly from the qe-agent step directory, either installed locally (`pip install skillsaw`) or with the container image:
 
 ```bash
-cd ci-operator/step-registry/openshift-observability/qe-agent/resources
-make lint
+cd ci-operator/step-registry/openshift-observability/qe-agent
+
+# Lint one skill (or pass resources/skills to lint all of them)
+skillsaw lint resources/skills/<name>
+
+# Same, with Podman or Docker instead of a local install
+podman run --rm -v "$(pwd):/workspace:Z" ghcr.io/stbenjam/skillsaw:latest lint resources/skills/<name>
 ```
 
-The Makefile, `.skillsaw.yaml`, and `.claude-plugin/plugin.json` live in the `resources/` directory alongside the skills. Skillsaw discovers skills via the plugin manifest and lints all `skills/<name>/SKILL.md` files.
+Skillsaw runs with its default rules; there is no Makefile or `.skillsaw.yaml` here because the step registry only accepts registry files, `*.md` and `OWNERS` under `ci-operator/step-registry/`. A new or modified skill must lint without errors. The baseline is skillsaw's default `context-budget` limit of **6,000 tokens per `SKILL.md`** — keep skills under it (the rule also warns above 3,000 tokens; that warning is informational). If a change pushes a skill over the limit, tighten existing wording instead of dropping required steps, and keep the Step 0a MCP check verbatim.
 
 The step script fetches skills by directory name (e.g., `AGENT_SKILL: tempo` loads `resources/skills/tempo/SKILL.md`).
 

@@ -21,6 +21,7 @@ images:
       COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
     from: src
     to: cli-operator-sdk
+  run_if_changed: ^$
 operator:
   bundles:
   - as: must-gather-operator-bundle
@@ -32,6 +33,8 @@ operator:
     with: pipeline:must-gather-operator
   - pullspec: quay.io/openshift/origin-must-gather:latest
     with: stable:must-gather
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -55,7 +58,7 @@ resources:
 test_binary_build_commands: make e2e-binary-build
 tests:
 - as: e2e-hypershift-operator-weekly
-  cron: '@weekly'
+  cron: 30 2 * * 2
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -95,16 +98,16 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-hypershift
 - as: e2e-aws-operator-multi-weekly
-  cron: '@weekly'
+  cron: 30 2 * * 2
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -149,9 +152,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:

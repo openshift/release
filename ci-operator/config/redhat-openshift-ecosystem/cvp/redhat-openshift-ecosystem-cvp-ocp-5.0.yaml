@@ -1,0 +1,72 @@
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
+tests:
+- as: cvp-common-claim
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: cvp
+    product: ocp
+    timeout: 1h0m0s
+    version: "5.0"
+  cron: '@yearly'
+  steps:
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs/3scale-amp2-apicast-rhel7-operator-metadata:2.12.0-1014
+      OO_INDEX: brew.registry.redhat.io/rh-osbs/iib:1211431
+    env:
+      CUSTOM_SCORECARD_TESTCASE: ""
+      ENABLE_HYBRID_OVERLAY: "false"
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: apicast-operator
+      OO_TARGET_NAMESPACES: '!install'
+      TEST_MODE: cvp
+    workflow: optional-operators-cvp-common-claim
+- as: cvp-fips-common-claim
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      variant: fips
+    owner: cvp
+    product: ocp
+    timeout: 1h0m0s
+    version: "5.0"
+  cron: '@yearly'
+  steps:
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs/3scale-amp2-apicast-rhel7-operator-metadata:2.12.0-1014
+      OO_INDEX: brew.registry.redhat.io/rh-osbs/iib:1211431
+    env:
+      CUSTOM_SCORECARD_TESTCASE: ""
+      ENABLE_HYBRID_OVERLAY: "false"
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: apicast-operator
+      OO_TARGET_NAMESPACES: '!install'
+      TEST_MODE: cvp
+    workflow: optional-operators-cvp-common-claim
+- as: cvp-common-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-cpaas
+    workflow: optional-operators-cvp-common-aws
+zz_generated_metadata:
+  branch: ocp-5.0
+  org: redhat-openshift-ecosystem
+  repo: cvp

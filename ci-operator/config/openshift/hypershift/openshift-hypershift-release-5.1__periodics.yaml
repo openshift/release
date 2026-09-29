@@ -35,6 +35,8 @@ base_images:
     name: "5.1"
     namespace: ocp
     tag: upi-installer
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -198,6 +200,9 @@ tests:
     cluster_profile: hypershift-aws
     env:
       GUEST_FEATURE_SET: TechPreviewNoUpgrade
+      HYPERSHIFT_INFRA_AVAILABILITY_POLICY: HighlyAvailable
+      TEST_SKIPS: Console operator route label propagation\| oc can operate accept
+        risks
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
@@ -227,7 +232,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -244,7 +249,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -313,6 +318,25 @@ tests:
       OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external-oidc
+- as: e2e-azure-aks-external-oidc
+  cron: 0 9 * * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: TestExternalOIDC
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-external-oidc
+- as: e2e-azure-aks-external-oidc-techpreview
+  cron: 0 20 9,18,25 * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: TestExternalOIDC
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-azure-aks-external-oidc
 - as: e2e-powervs-ovn
   cron: 0 4 1 12 *
   steps:
@@ -322,6 +346,9 @@ tests:
   cron: 0 4 * * *
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      ODF_CATALOG_VERSION: "5.0"
+      ODF_USE_PRERELEASE: "true"
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-azure-aks-ovn-conformance
   cron: 0 */2 * * *
@@ -366,7 +393,8 @@ tests:
     cluster_profile: openshift-org-azure
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
-      ODF_OPERATOR_CHANNEL: stable-4.20
+      ODF_CATALOG_VERSION: "5.0"
+      ODF_USE_PRERELEASE: "true"
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-kubevirt-azure-conformance
@@ -374,6 +402,9 @@ tests:
   cron: 0 0 1 1 *
   steps:
     cluster_profile: openshift-org-azure
+    env:
+      ODF_CATALOG_VERSION: "5.0"
+      ODF_USE_PRERELEASE: "true"
     workflow: hypershift-kubevirt-azure-conformance
 - as: e2e-openstack-aws
   cron: 0 10 * * *
@@ -460,6 +491,7 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
 - as: e2e-v2-aws-techpreview-osimagestream

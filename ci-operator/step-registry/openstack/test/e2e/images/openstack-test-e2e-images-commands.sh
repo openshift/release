@@ -35,6 +35,7 @@ registry.k8s.io/pause:3.10.2 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-22-registry-k
 registry.k8s.io/e2e-test-images/agnhost:2.47 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-1-registry-k8s-io-e2e-test-images-agnhost-2-47-LZRfusN51OgGfP9f
 registry.k8s.io/e2e-test-images/agnhost:2.52 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-1-registry-k8s-io-e2e-test-images-agnhost-2-52-vo_U710PrYLetnfE
 registry.k8s.io/e2e-test-images/agnhost:2.59 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-59-l6lMl0FrhVtCSA-8
+registry.k8s.io/e2e-test-images/agnhost:2.63.0 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-63-0-t_yPbigw-dJBrfQ9
 EOF
 
 echo "${MIRROR_REGISTRY_HOST}/e2e/tests" > "${SHARED_DIR}/mirror-tests-image"

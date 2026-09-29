@@ -39,8 +39,8 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
   export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi
 
-export ARO_HCP_CONFIG_FILE="config/config.yaml"
-export CLOUD="public"
+export ARO_HCP_CONFIG_FILE="${PWD}/config/config.yaml"
+export ARO_HCP_CLOUD="dev"
 export DEPLOY_ENV="${VAULT_SECRET_PROFILE}"
 export REGION="${LOCATION}"
 

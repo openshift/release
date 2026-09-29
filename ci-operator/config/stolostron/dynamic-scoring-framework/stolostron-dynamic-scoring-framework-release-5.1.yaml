@@ -30,6 +30,8 @@ images:
         - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.26
     optional: true
     to: dynamic-scoring-addon
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -48,8 +50,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonarcloud-postsubmit
   commands: |
     export HOME="/tmp"
@@ -63,8 +66,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 zz_generated_metadata:
   branch: release-5.1
   org: stolostron

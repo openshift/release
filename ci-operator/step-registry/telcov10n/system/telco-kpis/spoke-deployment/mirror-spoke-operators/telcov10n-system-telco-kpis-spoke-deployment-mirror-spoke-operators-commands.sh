@@ -31,12 +31,14 @@ main() {
 
     if [[ -n "${SPOKE_LOCKDOWN_URI:-}" ]]; then
         echo "Using spoke lockdown: ${SPOKE_LOCKDOWN_URI}"
-        extra_vars+=(-e "spoke_lockdown_uri=${SPOKE_LOCKDOWN_URI}")
-        # version is intentionally omitted in lockdown mode: mirror-spoke-operators.yml
-        # extracts spoke_ocp_version from the lockdown and overwrites the version fact,
-        # so passing it here would be redundant and could mask lockdown mismatches.
+        # Variable renamed with telco_kpis_ prefix to avoid upstream clashing
+        extra_vars+=(-e "telco_kpis_spoke_lockdown_uri=${SPOKE_LOCKDOWN_URI}")
+        # version is intentionally omitted: wrapper extracts spoke_ocp_version from lockdown
+        echo "Wrapper will extract operators, version, architecture from lockdown JSON"
     else
-        extra_vars+=(-e "version=${VERSION}")
+        # Variable renamed with telco_kpis_ prefix for wrapper
+        extra_vars+=(-e "telco_kpis_version=${VERSION}")
+        echo "Wrapper will use version from parameter"
     fi
 
     if [[ "${GENERATE_SPOKE_LOCKDOWN:-false}" == "true" ]]; then
@@ -44,17 +46,16 @@ main() {
         local timestamp
         timestamp=$(date -u +%Y%m%d_%H%M%S)
         local lockdown_filename="lockdown-spoke-${VERSION:-unknown}-${ARCHITECTURE:-x86_64}-${timestamp}-${BUILD_ID:-0}-prow.json"
-        # lockdown_output_file is what the playbook checks to trigger generation:
-        #   ocp_operator_mirror_generate_lockdown: "{{ (lockdown_output_file | default('') | length > 0) }}"
+        # All variables prefixed with telco_kpis_ to avoid upstream clashing
         # Write to /tmp on the bastion (tasks run via SSH there, not inside the container).
-        extra_vars+=(-e "lockdown_output_file=/tmp/${lockdown_filename}")
-        extra_vars+=(-e "hub_name=${HUB_CLUSTER}")
-        # Prow exposes BUILD_ID; use it as build_number for lockdown metadata.
-        extra_vars+=(-e "build_number=${BUILD_ID:-0}")
+        extra_vars+=(-e "telco_kpis_lockdown_output_file=/tmp/${lockdown_filename}")
+        extra_vars+=(-e "telco_kpis_hub_name=${HUB_CLUSTER}")
+        extra_vars+=(-e "telco_kpis_build_number=${BUILD_ID:-0}")
+        extra_vars+=(-e "telco_kpis_generate_lockdown=true")
         # In lockdown-validation mode (SPOKE_LOCKDOWN_URI set) architecture is extracted
-        # from the lockdown JSON — do not override it here.
+        # from the lockdown JSON by wrapper — do not override it here.
         if [[ -z "${SPOKE_LOCKDOWN_URI:-}" ]]; then
-            extra_vars+=(-e "architecture=${ARCHITECTURE:-x86_64}")
+            extra_vars+=(-e "telco_kpis_architecture=${ARCHITECTURE:-x86_64}")
         fi
     fi
 

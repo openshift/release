@@ -43,6 +43,32 @@ else
     echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE'"
 fi
 
+# Retry helper for `oc` calls made around the insecure-registry trust patch
+# and MachineConfigPool rollout below. That patch reboots every node in the
+# affected pool(s), and CoreDNS (which the API server's in-cluster DNS name
+# resolves through) can go briefly unreachable mid-rollout -- observed live
+# as a step-ending "dial tcp: lookup api.<cluster>... i/o timeout" from an
+# unguarded `oc` call in this exact window (migtools/kubevirt-datamover-
+# controller#224, build 2095217771783655424), even though the rollout-wait
+# loop's own per-field reads (below) already tolerate this via `|| true`.
+# Retries the whole command, not just a read: a failed patch must be
+# reissued, not silently treated as "no output".
+oc_retry() {
+    local attempts=5 delay=10 n=1
+    while true; do
+        if "$@"; then
+            return 0
+        fi
+        if [[ "${n}" -ge "${attempts}" ]]; then
+            return 1
+        fi
+        echo "[$(date --utc +%FT%T.%3NZ)] Command failed (attempt ${n}/${attempts}), retrying in ${delay}s: $*" >&2
+        sleep "${delay}"
+        n=$(( n + 1 ))
+        delay=$(( delay * 2 ))
+    done
+}
+
 echo "Checking/installing oc..."
 if ! command -v oc &> /dev/null; then
     curl -L https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o /tmp/oc.tar.gz && tar xzvf /tmp/oc.tar.gz -C /tmp
@@ -102,7 +128,7 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
     echo "[$(date --utc +%FT%T.%3NZ)] Diagnostic: registries in pull secret: $(grep -oE '"[a-zA-Z0-9.-]+"[[:space:]]*:[[:space:]]*\{[[:space:]]*"auth"' /tmp/.dockerconfigjson | sed -E 's/^"([^"]+)".*/\1/' | paste -sd ', ' -)"
 
     echo "[$(date --utc +%FT%T.%3NZ)] Enabling the test cluster's own image registry default route"
-    oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
+    oc_retry oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
 
     DEST_HOST=""
     for _ in $(seq 1 30); do
@@ -166,7 +192,7 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
         # steps (SA/token creation, mirroring) that follow -- capturing
         # it later risked the MCO already starting its rollout in that
         # gap, poisoning the "pre-change" baseline the wait below relies on.
-        MCP_BASELINE=$(oc get mcp -o jsonpath='{range .items[*]}{.metadata.name}={.status.configuration.name}{"\n"}{end}')
+        MCP_BASELINE=$(oc_retry oc get mcp -o jsonpath='{range .items[*]}{.metadata.name}={.status.configuration.name}{"\n"}{end}')
         if [[ -z "${MCP_BASELINE//[[:space:]]/}" ]]; then
             # No MachineConfigPools means the wait loop below would iterate
             # zero pools, leave ALL_DONE at its initial "true", and report
@@ -174,7 +200,7 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
             echo "[$(date --utc +%FT%T.%3NZ)] No MachineConfigPools found; cannot confirm the insecure-registry trust rollout" >&2
             exit 1
         fi
-        oc patch image.config.openshift.io/cluster --type=merge -p "{\"spec\":{\"registrySources\":{\"insecureRegistries\":${INSECURE_JSON}}}}"
+        oc_retry oc patch image.config.openshift.io/cluster --type=merge -p "{\"spec\":{\"registrySources\":{\"insecureRegistries\":${INSECURE_JSON}}}}"
 
         # Deterministic MCO rollout wait: nothing else in this
         # OO_MIRROR_TO_CLUSTER_REGISTRY block depends on the node-level
@@ -378,7 +404,7 @@ while true; do
         break
     fi
     echo "[$(date --utc +%FT%T.%3NZ)] operator-sdk run bundle failed (exit ${RUN_BUNDLE_STATUS}, attempt ${BUNDLE_ATTEMPT}/${OO_RUN_BUNDLE_ATTEMPTS}) -- retrying after backoff in case this was a transient infra pull failure"
-    sleep $(( BUNDLE_ATTEMPT * 30 ))
+    sleep $(( BUNDLE_ATTEMPT * 60 ))
     BUNDLE_ATTEMPT=$(( BUNDLE_ATTEMPT + 1 ))
 done
 

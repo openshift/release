@@ -81,9 +81,9 @@ done
 if ! "$CONTAINER_ENGINE" image exists "$IMAGE" 2>/dev/null; then
     "$CONTAINER_ENGINE" pull "$IMAGE" >/dev/null
 fi
-exec "$CONTAINER_ENGINE" run --rm "${tty_flags[@]}" \
+exec "$CONTAINER_ENGINE" run --rm ${tty_flags[@]+"${tty_flags[@]}"} \
     -v "$GCLOUD_CONFIG_PATH:/gcloud:z" \
     ${file_mount[@]+"${file_mount[@]}"} \
     -e CLOUDSDK_CONFIG=/gcloud \
     -e GOOGLE_CLOUD_QUOTA_PROJECT=openshift-ci-secrets \
-    "$IMAGE" "${args[@]}"
+    "$IMAGE" ${args[@]+"${args[@]}"}

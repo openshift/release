@@ -35,6 +35,156 @@ EOF
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
+# render_pool_disks renders the diskSetup and platform.azure.dataDisks stanzas for one
+# machine pool from a disk spec, and prints them indented two spaces so that the caller can
+# nest them under either "controlPlane:" or a "compute:" list item.
+#
+# The spec is one disk per line, with colon-separated fields:
+#   type:name:sizeGB:lun:storageAccountType:mountPath
+# where type is etcd, swap or user-defined, storageAccountType may be empty to let the
+# platform choose, and mountPath is only read for user-defined disks.
+#
+# Disks are emitted in the order given, because the installer pairs the Nth diskSetup entry
+# with the Nth dataDisks entry on Azure.
+function render_pool_disks() {
+    local spec=$1 role=$2
+    local disk_setup="" data_disks=""
+    local dtype dname dsize dlun dsat dmount dsurplus
+
+    while IFS=':' read -r dtype dname dsize dlun dsat dmount dsurplus; do
+        dtype=$(echo "${dtype}" | tr -d '[:space:]')
+        [[ -z "${dtype}" ]] && continue
+
+        if [[ -n "${dsurplus}" ]]; then
+            echo "ERROR: disk spec line has more than the six fields of type:name:sizeGB:lun:storageAccountType:mountPath" >&2
+            return 1
+        fi
+
+        dname=$(echo "${dname}" | tr -d '[:space:]')
+        dsize=$(echo "${dsize}" | tr -d '[:space:]')
+        dlun=$(echo "${dlun}" | tr -d '[:space:]')
+        dsat=$(echo "${dsat}" | tr -d '[:space:]')
+        dmount=$(echo "${dmount}" | tr -d '[:space:]')
+
+        case "${dtype}" in
+            etcd|swap)
+                # The installer only accepts etcd on the control plane and swap on compute,
+                # so reject the other combinations here rather than letting the install fail
+                # later with a validation error that does not name this step.
+                if [[ "${dtype}" == "etcd" ]] && [[ "${role}" != "master" ]]; then
+                    echo "ERROR: etcd disk setup is only valid on the control plane, not on ${role}" >&2
+                    return 1
+                fi
+                if [[ "${dtype}" == "swap" ]] && [[ "${role}" == "master" ]]; then
+                    echo "ERROR: swap disk setup is not supported on the control plane" >&2
+                    return 1
+                fi
+                disk_setup+="  - type: ${dtype}
+    ${dtype}:
+      platformDiskID: \"${dname}\"
+"
+                ;;
+            user-defined)
+                if [[ -z "${dmount}" ]]; then
+                    echo "ERROR: user-defined disk ${dname} requires a mount path" >&2
+                    return 1
+                fi
+                # The name becomes the platformDiskID, which the installer rejects beyond
+                # 12 characters.
+                if [[ "${#dname}" -gt 12 ]]; then
+                    echo "ERROR: user-defined disk name ${dname} is ${#dname} characters, the limit is 12" >&2
+                    return 1
+                fi
+                disk_setup+="  - type: user-defined
+    userDefined:
+      platformDiskID: \"${dname}\"
+      mountPath: ${dmount}
+"
+                ;;
+            *)
+                echo "ERROR: unsupported disk type ${dtype}" >&2
+                return 1
+                ;;
+        esac
+
+        data_disks+="      - nameSuffix: \"${dname}\"
+        diskSizeGB: ${dsize}
+        lun: ${dlun}
+"
+        if [[ -n "${dsat}" ]]; then
+            data_disks+="        managedDisk:
+          storageAccountType: ${dsat}
+"
+        fi
+    done <<< "${spec}"
+
+    if [[ -z "${disk_setup}" ]]; then
+        return 0
+    fi
+
+    printf '  diskSetup:\n%s  platform:\n    azure:\n      dataDisks:\n%s' "${disk_setup}" "${data_disks}"
+}
+
+# generate_compute_swap_manifests emits the KubeletConfig and kernel argument manifests that
+# a swap disk needs, when the compute spec declares one. Only compute is considered, because
+# swap is rejected on the control plane.
+function generate_compute_swap_manifests() {
+    local spec=$1
+    local dtype
+
+    while IFS=':' read -r dtype _; do
+        dtype=$(echo "${dtype}" | tr -d '[:space:]')
+        if [[ "${dtype}" == "swap" ]]; then
+            swap_machineconfig_generate "worker"
+            return 0
+        fi
+    done <<< "${spec}"
+}
+
+# When the structured spec is used, it fully describes the disk layout for both pools and
+# the single-disk-per-role variables below are ignored. This keeps the older interface
+# working for the jobs and chains that still rely on it.
+#
+# Each pool is patched separately because the installer rejects dataDisks on
+# platform.azure.defaultMachinePlatform, so there is no way to declare a disk once for
+# every pool.
+if [[ -n "${AZURE_MULTIDISK_CONTROL_PLANE_DISKS}" ]] || [[ -n "${AZURE_MULTIDISK_COMPUTE_DISKS}" ]]; then
+    echo "
+Using the structured multi-disk specification.
+control plane disks:
+${AZURE_MULTIDISK_CONTROL_PLANE_DISKS}
+compute disks:
+${AZURE_MULTIDISK_COMPUTE_DISKS}
+"
+
+    MULTIDISK_PATCH="${SHARED_DIR}/install-config-azure-multidisk.yaml.patch"
+    : > "${MULTIDISK_PATCH}"
+
+    cp_body=$(render_pool_disks "${AZURE_MULTIDISK_CONTROL_PLANE_DISKS}" "master")
+    if [[ -n "${cp_body}" ]]; then
+        echo "controlPlane:" >> "${MULTIDISK_PATCH}"
+        echo "${cp_body}" >> "${MULTIDISK_PATCH}"
+    fi
+
+    # compute is a list, so the first line of the rendered body becomes the list item.
+    compute_body=$(render_pool_disks "${AZURE_MULTIDISK_COMPUTE_DISKS}" "worker" | sed '1s/^  /- /')
+    if [[ -n "${compute_body}" ]]; then
+        echo "compute:" >> "${MULTIDISK_PATCH}"
+        echo "${compute_body}" >> "${MULTIDISK_PATCH}"
+        generate_compute_swap_manifests "${AZURE_MULTIDISK_COMPUTE_DISKS}"
+    fi
+
+    if [[ ! -s "${MULTIDISK_PATCH}" ]]; then
+        echo "ERROR: the structured disk specification produced no disks" >&2
+        exit 1
+    fi
+
+    yq-go m -x -i "${CONFIG}" "${MULTIDISK_PATCH}"
+    echo "install-config patch:"
+    cat "${MULTIDISK_PATCH}"
+    exit 0
+fi
+
 echo "
 controlPlane multi disk type: ${AZURE_CONTROL_PLANE_MULTIDISK_TYPE}
     disk size: ${AZURE_CONTROL_PLANE_MULTIDISK_DISK_SIZE}

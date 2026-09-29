@@ -3,6 +3,8 @@ base_images:
     name: rebasebot
     namespace: ci
     tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -28,12 +30,12 @@ tests:
                   --git-email metal-networking@redhat.com \
                   --tag-policy=none
       credentials:
-      - mount_path: /secrets/metal-net-merge-bot
-        name: metal-net-merge-bot-private-key
-        namespace: test-credentials
-      - mount_path: /secrets/metal-net-cloner-bot
-        name: metal-net-cloner-bot-private-key
-        namespace: test-credentials
+      - collection: openshift-networking
+        group: metal-net-merge-bot-private-key
+        mount_path: /secrets/metal-net-merge-bot
+      - collection: openshift-networking
+        group: metal-net-cloner-bot-private-key
+        mount_path: /secrets/metal-net-cloner-bot
       from_image:
         name: rebasebot
         namespace: ci

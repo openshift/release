@@ -7,9 +7,12 @@ images:
   items:
   - dockerfile_path: Containerfile
     to: dpf-ci
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
+      architecture: multi
       product: ocp
       stream: nightly
       version: "4.22"
@@ -41,7 +44,11 @@ tests:
       {{- end }}
   restrict_network_access: false
   steps:
+    allow_skip_on_success: true
     cluster_profile: metal-dpf-doca8
+    post:
+    - ref: gather-extra
+    - ref: gather-must-gather
     test:
     - ref: dpf-hypervisor-deploy-cluster
     - ref: dpf-hypervisor-sanity
@@ -66,7 +73,11 @@ tests:
       {{- end }}
   restrict_network_access: false
   steps:
+    allow_skip_on_success: true
     cluster_profile: metal-dpf-doca4
+    post:
+    - ref: gather-extra
+    - ref: gather-must-gather
     test:
     - ref: dpf-hypervisor-deploy-cluster
     - ref: dpf-hypervisor-sanity

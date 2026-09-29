@@ -1,6 +1,7 @@
 (import '../config.libsonnet') +
 (import './job_failures_config.libsonnet') +
 (import 'ci_absent_alerts.libsonnet') +
+(import 'alert_proxy_alerts.libsonnet') +
 (import 'hook_alert.libsonnet') +
 (import 'configmap_alerts.libsonnet') +
 (import 'dptp_alerts.libsonnet') +

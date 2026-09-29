@@ -1,0 +1,49 @@
+ref:
+  as: interop-opp-product-upgrade-quay
+  commands: interop-opp-product-upgrade-quay-commands.sh
+  documentation: |-
+    Upgrades the Quay operator via OLM subscription channel change and
+    validates the upgrade completes successfully.
+
+    The step performs:
+    1. Identifies the currently installed Quay version via CSV
+    2. Patches the Subscription to the target channel (or next available)
+    3. Waits for the new CSV to reach Succeeded phase
+    4. Validates QuayRegistry CR reaches Available condition
+    5. Confirms key deployments (quay-app, quay-database, quay-redis,
+       clair-app) are healthy
+
+    This step is part of the OPP coordinated product upgrade workflow.
+
+    Exit codes:
+      0 - upgrade successful, all health checks passed
+      1 - upgrade failed (CSV did not reach Succeeded)
+      2 - timeout waiting for upgrade
+      3 - precondition failure (no subscription found, no upgrade path)
+  env:
+    - default: "quay-operator"
+      documentation: |-
+        Name of the Quay Subscription resource in the target namespace.
+      name: QUAY_SUBSCRIPTION_NAME
+    - default: "openshift-operators"
+      documentation: |-
+        Namespace containing the Quay Subscription and CSV resources.
+      name: QUAY_SUBSCRIPTION_NAMESPACE
+    - default: ""
+      documentation: |-
+        Target subscription channel for Quay operator upgrade (e.g. stable-3.13).
+        When empty, the step determines the next available channel automatically
+        by querying the catalog for channels newer than the currently installed version.
+      name: QUAY_TARGET_CHANNEL
+    - default: "30m"
+      documentation: |-
+        Maximum time to wait for the Quay operator upgrade to complete.
+        Covers CSV transition from Replacing to Succeeded phase.
+      name: QUAY_UPGRADE_TIMEOUT
+  from: cli
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 45m

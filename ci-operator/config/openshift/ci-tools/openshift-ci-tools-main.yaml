@@ -15,6 +15,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  release:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.22
 binary_build_commands: make production-install
 build_root:
   from_repository: true
@@ -298,10 +302,6 @@ images:
         - destination_dir: .
           source_path: /go/bin/determinize-prow-config
         - destination_dir: .
-          source_path: /go/bin/registry-replacer
-        - destination_dir: .
-          source_path: /go/bin/ci-operator-yaml-creator
-        - destination_dir: .
           source_path: /go/bin/clusterimageset-updater
         - destination_dir: .
           source_path: /go/bin/promoted-image-governor
@@ -536,16 +536,6 @@ images:
     to: auto-peribolos-sync
   - additional_architectures:
     - arm64
-    context_dir: images/registry-replacer/
-    from: os
-    inputs:
-      bin:
-        paths:
-        - destination_dir: .
-          source_path: /go/bin/registry-replacer
-    to: registry-replacer
-  - additional_architectures:
-    - arm64
     context_dir: images/autopublicizeconfig
     from: os
     inputs:
@@ -642,18 +632,6 @@ images:
         - destination_dir: .
           source_path: /go/bin/vault-secret-collection-manager
     to: vault-secret-collection-manager
-  - dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-      RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
-      ADD ci-operator-yaml-creator /usr/bin/ci-operator-yaml-creator
-      ENTRYPOINT ["ci-operator-yaml-creator"]
-    from: os
-    inputs:
-      bin:
-        paths:
-        - destination_dir: .
-          source_path: /go/bin/ci-operator-yaml-creator
-    to: ci-operator-yaml-creator
   - context_dir: images/clusterimageset-updater
     from: os
     inputs:
@@ -726,12 +704,11 @@ images:
           source_path: /go/bin/prcreator
     to: job-run-aggregator
   - dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-      RUN microdnf install -y tar git diffutils && microdnf clean all && rm -rf /var/cache/dnf
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.26-openshift-4.22
       ADD sync-rover-groups /usr/bin/sync-rover-groups
       ADD usr/bin/oc /usr/bin/oc
       ENTRYPOINT ["sync-rover-groups"]
-    from: os
+    from: release
     inputs:
       bin:
         paths:

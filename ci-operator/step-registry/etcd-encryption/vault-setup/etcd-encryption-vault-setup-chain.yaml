@@ -13,8 +13,10 @@ chain:
     1. Installs two HashiCorp Vault Enterprise instances via Helm (vault-install step)
        - Mirrors Vault Enterprise and vault-kube-kms plugin images to dev-scripts local registry on baremetalds jobs
        - Applies ImageContentSourcePolicy/vault-mirror so kube-apiserver nodes can pull both images from the local mirror
-       - Deploys Vault in dev mode to vault-kms and vault-kms-secondary namespaces
+       - Deploys standalone Vault with service-CA TLS and file storage in vault-kms and vault-kms-secondary
        - Creates vault-license secret from mounted credentials
+       - Initializes and unseals Vault; stores root token and unseal key in Secrets
+       - Deploys an auto-unseal sidecar so transit keys survive pod restarts
        - Waits for Vault pods to be ready
        - Creates CA ConfigMaps (vault-ca-bundle and vault-ca-bundle-secondary) in openshift-config
 

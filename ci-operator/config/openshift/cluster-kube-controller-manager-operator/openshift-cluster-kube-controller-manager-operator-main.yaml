@@ -1,3 +1,8 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -9,6 +14,8 @@ promotion:
   to:
   - name: "5.1"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -78,6 +85,32 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
+- as: e2e-aws-ovn-node-cert-recovery
+  optional: true
+  run_if_changed: ^pkg/cmd/recoverycontroller/
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-cert-rotation-build-and-ship-aws
+- as: e2e-agent-ha-ipv4-node-cert-recovery
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^pkg/cmd/recoverycontroller/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: openshift-e2e-cert-rotation-build-and-ship-agent
+- as: e2e-agent-compact-ipv4-node-cert-recovery
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^pkg/cmd/recoverycontroller/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        NETWORK_TYPE=OVNKubernetes
+    workflow: openshift-e2e-cert-rotation-build-and-ship-agent
 - as: security
   optional: true
   steps:

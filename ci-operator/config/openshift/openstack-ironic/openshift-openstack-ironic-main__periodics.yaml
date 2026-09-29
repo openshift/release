@@ -3,6 +3,8 @@ base_images:
     name: rebasebot
     namespace: ci
     tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -28,12 +30,12 @@ tests:
                   --git-username ironic-bot \
                   --git-email metal-platform@redhat.com
       credentials:
-      - mount_path: /secrets/slack-hooks
-        name: metal-platform-slack-hooks
-        namespace: test-credentials
-      - mount_path: /secrets/ironic-bot
-        name: metal-platform-bot-credentials
-        namespace: test-credentials
+      - collection: slack-hooks
+        group: metal-platform-slack-hooks
+        mount_path: /secrets/slack-hooks
+      - collection: ironic-bot
+        group: metal-platform-bot-credentials
+        mount_path: /secrets/ironic-bot
       from_image:
         name: rebasebot
         namespace: ci

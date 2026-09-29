@@ -23,9 +23,12 @@ trap getlogs EXIT
 
 cat >"${SHARED_DIR}"/time-skew-gather.sh <<'EOF'
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 
+# Tracing is enabled only after config.sh is sourced, otherwise xtrace expands
+# PULL_SECRET from it into the publicly readable build log.
 source ~/config.sh
+set -o xtrace
 
 INTERNAL_SSH_OPTS=${INTERNAL_SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
 SSH=${SSH:-ssh ${INTERNAL_SSH_OPTS}}

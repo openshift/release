@@ -6,9 +6,13 @@ ref:
   timeout: 45m0s
   env:
   - name: AZURE_CREDENTIALS_DIR
-    default: /var/run/hcp-integration-credentials
+    default: /var/run/aro-hcp-dev
     documentation: |-
-      The directory where the Azure credentials are stored.
+      The directory containing Azure credentials for private ACR access.
+  - name: DOCKER_CONFIG
+    default: /var/run/component-sync-pull-secret
+    documentation: |-
+      The directory containing the Docker config for private registry access.
   - name: GITHUB_REPO_ORG
     default: Azure
     documentation: |-
@@ -55,14 +59,19 @@ ref:
       The debug level. 0 for no debug, 1 for debug, 2 for debug with verbose output.
   credentials:
   - mount_path: /var/run/aro-hcp-robot
-    name: aro-hcp-robot
-    namespace: test-credentials
-  - mount_path: /var/run/hcp-integration-credentials
-    name: hcp-integration-credentials
-    namespace: test-credentials
+    group: aro-hcp-robot
+    collection: hcm-aro
+  - mount_path: /var/run/aro-hcp-dev
+    group: aro-hcp-dev
+    collection: hcm-aro
+  - mount_path: /var/run/component-sync-pull-secret
+    group: component-sync-pull-secret
+    field: pull-secret
+    as: config.json
+    collection: hcm-aro
   - mount_path: /var/run/slack-webhook
-    name: aro-hcp-image-bump-slack-webhook
-    namespace: test-credentials
+    group: aro-hcp-image-bump-slack-webhook
+    collection: hcm-aro
   resources:
     requests:
       cpu: 500m

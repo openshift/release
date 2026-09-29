@@ -170,8 +170,8 @@ MACHINE_CIDR=10.0.0.0/16
 
 echo "install-config.yaml"
 echo "-------------------"
-# hide proxy credential and some other sensitive info
-cat ${SHARED_DIR}/install-config.yaml | sed -E 's#(https?://[^:@/]+):[^:@/]+@#\1:XXX@#g' | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+# hide proxy credentials and some other sensitive info
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${SHARED_DIR}/install-config.yaml" | tee "${ARTIFACT_DIR}/install-config.yaml"
 
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"

@@ -1,0 +1,32 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: rosa-marketplace-release-generator
+prowgen:
+  private: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: bin
+- as: lint
+  commands: make lint
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-marketplace-release-generator

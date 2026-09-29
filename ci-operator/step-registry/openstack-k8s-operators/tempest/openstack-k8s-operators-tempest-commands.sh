@@ -26,7 +26,7 @@ OS_PASSWORD=$(oc get secret "${KEYSTONE_SECRET_NAME}" -o json | jq -r .data.${KE
 export OS_PASSWORD
 
 # Because tempestconf complain if we don't have the password in the clouds.yaml
-YQ_PASSWD=(".clouds.default.auth.password = ${OS_PASSWORD}")
+YQ_PASSWD=('.clouds.default.auth.password = strenv(OS_PASSWORD)')
 yq -i "${YQ_PASSWD[@]}" ~/.config/openstack/clouds.yaml
 
 # Configuring tempest

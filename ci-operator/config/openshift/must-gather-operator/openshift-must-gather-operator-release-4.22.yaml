@@ -30,6 +30,8 @@ promotion:
   to:
   - name: "4.22"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -62,8 +64,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: must-gather-operator-codecov-token
     mount_path: /tmp/secret
-    name: must-gather-operator-codecov-token
   skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: publish-coverage
   commands: |
@@ -73,8 +76,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: must-gather-operator-codecov-token
     mount_path: /tmp/secret
-    name: must-gather-operator-codecov-token
 - as: lint
   commands: make lint
   container:
@@ -117,16 +121,16 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
-- as: e2e-gcp-operator-weekly
-  cron: '@weekly'
+- as: e2e-gcp-operator-art-fbc-weekly
+  cron: 30 2 * * 2
   steps:
     cluster_profile: openshift-org-gcp
     dependency_overrides:
@@ -136,13 +140,12 @@ tests:
       OO_INSTALL_NAMESPACE: must-gather-operator
       OO_PACKAGE: support-log-gather-operator
       OO_TARGET_NAMESPACES: '!all'
-    test:
-    - as: setup-konflux-image-access
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: enable-qe-catalogsource
+    - as: setup-konflux-art-idms
       cli: latest
       commands: |
-        oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
-        jq -s '.[0].auths += .[1].auths | .[0]' /tmp/.dockerconfigjson /var/run/secrets/pull-secret/.dockerconfigjson > /tmp/merged-pullsecret.json
-        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged-pullsecret.json
         cat <<'EOF' | oc apply -f -
         apiVersion: config.openshift.io/v1
         kind: ImageDigestMirrorSet
@@ -164,14 +167,15 @@ tests:
         oc wait mcp/master --for condition=Updated --timeout=30m
         oc wait mcp/worker --for condition=Updated --timeout=30m
       credentials:
-      - mount_path: /var/run/secrets/pull-secret
-        name: deploy-konflux-operator-art-image-share
-        namespace: test-credentials
+      - collection: deploy-konflux-operator
+        group: art-image-share
+        mount_path: /var/run/secrets/pull-secret
       from: src
       resources:
         requests:
           cpu: 100m
     - ref: optional-operators-subscribe
+    test:
     - as: verify-install
       cli: latest
       commands: |
@@ -186,9 +190,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
@@ -223,9 +227,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:
@@ -258,9 +262,9 @@ tests:
         export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
         make test-e2e
       credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
+      - collection: must-gather-operator
+        group: case-management-creds
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
       from: src
       resources:
         requests:

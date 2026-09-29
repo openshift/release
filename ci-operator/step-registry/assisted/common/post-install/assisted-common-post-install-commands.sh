@@ -9,7 +9,12 @@ echo "************ assisted common post-install command ************"
 timeout -s 9 175m ssh -F ${SHARED_DIR}/ssh_config ci_machine bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 set -xeuo pipefail
 cd /home/assisted
+# Tracing is disabled while config.sh is sourced, otherwise xtrace expands
+# PULL_SECRET and the platform credentials it pulls in from platform-conf.sh
+# (VSPHERE_PASSWORD, NUTANIX_PASSWORD) into the publicly readable build log.
+set +x
 source /root/config.sh
+set -x
 echo "export KUBECONFIG=/home/assisted/build/kubeconfig" >> /root/.bashrc
 export KUBECONFIG=/home/assisted/build/kubeconfig
 source /root/assisted-post-install.sh

@@ -48,7 +48,7 @@ ansible-playbook ./playbooks/cnf/deploy-run-metallb-tests-script.yaml \
     ipv6_service_range=${IPV6_SERVICE_RANGE}"
 
 echo "Run MetalLB e2e tests via SSH"
-ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no \
+ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
     "sudo /tmp/metallb/metallb-tests-run.sh || true"
 

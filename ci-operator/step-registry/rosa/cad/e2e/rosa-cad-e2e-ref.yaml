@@ -1,0 +1,43 @@
+ref:
+  as: rosa-cad-e2e
+  cli: latest
+  from: operator-e2e
+  grace_period: 10m
+  commands: rosa-cad-e2e-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 30m0s
+  env:
+  - name: CAD_E2E_CLUSTER_ID
+    default: ""
+    documentation: OCM cluster ID to test against. When using the lease workflow, this is set automatically from SHARED_DIR/cluster-id.
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: OCM environment to log into (e.g. staging, integration, production).
+  - name: OCM_CLIENT_ID
+    default: ""
+    documentation: OCM SSO client ID exported from the cluster profile for e2e tests that interact with the OCM API.
+  - name: OCM_CLIENT_SECRET
+    default: ""
+    documentation: OCM SSO client secret exported from the cluster profile for e2e tests that interact with the OCM API.
+  - name: CAD_PAGERDUTY_ROUTING_KEY
+    default: ""
+    documentation: PagerDuty routing key for CAD alert investigation tests. Read from the cluster profile file cad-pagerduty-routing-key if available.
+  - name: GINKGO_LABEL_FILTER
+    default: ""
+    documentation: Optional Ginkgo label filter expression.
+  - name: GINKGO_FOCUS
+    default: ""
+    documentation: Optional Ginkgo focus expression to run a subset of tests.
+  documentation: |-
+    Runs configuration-anomaly-detection (CAD) e2e tests against an
+    existing ROSA cluster. CAD is not an on-cluster operator; it is a
+    centralized PagerDuty investigation service that examines cluster
+    state via backplane when alerts fire. The e2e tests verify CAD's
+    investigation logic against a real cluster.
+
+    Uses OCM credentials from the cluster profile to get cluster access
+    via backplane. The e2e binary must be baked into the operator-e2e
+    image at /usr/local/bin/e2e.test.

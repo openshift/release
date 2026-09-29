@@ -50,8 +50,11 @@ setup_packet_cluster() {
       # environment variables, as well as their lowercase equivalents (note
       # that libcurl doesn't recognize the uppercase variables).
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+          set +x
           # shellcheck source=/dev/null
           source "${SHARED_DIR}/proxy-conf.sh"
+          set -x
       fi
 
       export KUBECONFIG=${SHARED_DIR}/kubeconfig

@@ -34,13 +34,15 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: statusreconciler
-        image: us-docker.pkg.dev/k8s-infra-prow/images/status-reconciler:v20260902-ffc57790b
+        image: us-docker.pkg.dev/k8s-infra-prow/images/status-reconciler:v20260908-104d452f4
         args:
         - --dry-run=false
         - --continue-on-error=true
         - --plugin-config=/etc/plugins/plugins.yaml
         - --config-path=/etc/config/config.yaml
-        - --job-config-path=/etc/jobs
+        # Keep git-sync's published link (release-staging) in the path. Never
+        # point the recursive job loader at the root containing .git/.worktrees.
+        - --job-config-path=/etc/jobs/release-staging/release-staging/ci-operator/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --gcs-credentials-file=/etc/gcs-credentials/service-account.json

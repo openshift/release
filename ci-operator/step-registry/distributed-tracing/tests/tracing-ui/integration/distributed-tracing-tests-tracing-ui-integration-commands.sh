@@ -113,7 +113,9 @@ function copyArtifacts {
 {
   "step_script_ref": "distributed-tracing/tests/tracing-ui/integration/distributed-tracing-tests-tracing-ui-integration-commands.sh",
   "has_test_failures": ${has_failures},
-  "env": {}
+  "env": {
+    "CYPRESS_SKIP_TESTS": "${CYPRESS_SKIP_TESTS:-}"
+  }
 }
 EOF
   echo "QE agent context and ${i} JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures})"
@@ -195,9 +197,9 @@ export CYPRESS_CACHE_FOLDER=/tmp/Cypress
 repo_url="https://github.com/openshift/distributed-tracing-console-plugin.git"
 target_dir="/tmp/distributed-tracing-console-plugin"
 
-# Clone the repository (uses main branch by default)
+# Clone the repository, explicitly selecting the main branch.
 echo "Cloning the repository."
-git clone "$repo_url" "$target_dir"
+git clone --branch main --single-branch "$repo_url" "$target_dir"
 if [ $? -eq 0 ]; then
   cd "$target_dir/tests" || exit 0
   echo "Successfully cloned the repository and changed directory to $target_dir/tests."

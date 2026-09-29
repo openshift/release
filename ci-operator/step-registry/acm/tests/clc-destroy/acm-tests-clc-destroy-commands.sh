@@ -12,9 +12,31 @@ if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
     echo "------------ Skipping OCP Deploy = $SKIP_OCP_DEPLOY ------------"
     cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/kubeconfig
     cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
-fi 
+fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+
+# Wait for the cluster API server to become reachable.
+# This is a best-effort cleanup step (no errexit), so exit 0 if
+# the API never comes back — we cannot clean up a cluster we
+# cannot reach.
+wait_for_api() {
+    local retries=20
+    local delay=15
+    echo "Waiting for cluster API to become reachable..."
+    for i in $(seq 1 "${retries}"); do
+        if oc get --raw=/version &>/dev/null; then
+            echo "Cluster API is reachable."
+            return 0
+        fi
+        echo "  Attempt ${i}/${retries}: API not reachable, retrying in ${delay}s..."
+        sleep "${delay}"
+    done
+    echo "WARNING: Cluster API not reachable after $(( retries * delay ))s — skipping cleanup."
+    exit 0
+}
+
+wait_for_api
 
 cp ${SECRETS_DIR}/clc-interop/secret-options-yaml ./options.yaml
 

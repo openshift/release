@@ -11,7 +11,6 @@
       'e2e_template_jobs.json': 'af88e642a76f37342fb52d475d52d965',
       'ghproxy.json': 'd72fe8d0400b2912e319b1e95d0ab1b3',
       'osde2e.json': '4238b58e99c5470481c2050f823e4fb9',
-      'configresolver.json': '703f0ccf02cc4339a374b52eb10f653b',
       'clusterpool.json': '22491886c1e19dde8d2984bca82154c1',
       'ci-chat-bot.json': '63182a3ee8939d9b5c54b5c5ce97134c',
       'osp-hive-dashboard.json': '114c4a96cb93b35ef74ccf94c23b63f4',

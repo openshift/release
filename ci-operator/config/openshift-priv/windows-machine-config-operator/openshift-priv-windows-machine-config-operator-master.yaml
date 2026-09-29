@@ -46,6 +46,7 @@ promotion:
     name: "5.1"
     namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -107,7 +108,7 @@ tests:
 - always_run: false
   as: aws-e2e-ote
   optional: true
-  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/proxy\.go$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -118,8 +119,75 @@ tests:
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]
       TEST_SUITE: windows-machine-config-operator/all
     test:
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: aws-e2e-ote-techpreview
+  optional: true
+  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/proxy\.go$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: enable-tls-adherence
+      cli: latest
+      commands: |
+        set -euo pipefail
+        echo "Enabling TLSAdherence feature gate via CustomNoUpgrade..."
+        oc patch featuregate cluster --type=merge \
+          -p '{"spec":{"featureSet":"CustomNoUpgrade","customNoUpgrade":{"enabled":["TLSAdherence"]}}}'
+
+        echo "Setting tlsAdherence=StrictAllComponents (retry through the kube-apiserver rollout)..."
+        ok=false
+        for i in $(seq 1 60); do
+          if oc patch apiserver cluster --type=merge \
+               -p '{"spec":{"tlsAdherence":"StrictAllComponents"}}' >/dev/null 2>&1 \
+             && [ "$(oc get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null)" = "StrictAllComponents" ]; then
+            ok=true; echo "tlsAdherence=StrictAllComponents accepted (iteration $i)"; break
+          fi
+          echo "  waiting for apiserver schema/gate (i=$i)..."; sleep 15
+        done
+        [ "$ok" = true ] || { echo "ERROR: tlsAdherence never accepted StrictAllComponents"; exit 1; }
+
+        echo "Waiting for cluster to stabilize..."
+        oc adm wait-for-stable-cluster --timeout=30m
+
+        oc get featuregate cluster -o jsonpath='{.spec.featureSet}' | grep -q CustomNoUpgrade
+        oc get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' | grep -q StrictAllComponents
+        echo "TLSAdherence enabled and verified successfully."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
     - as: wmco-setup-and-test
       cli: latest
       commands: |
@@ -290,7 +358,7 @@ tests:
 - always_run: false
   as: vsphere-proxy-e2e-ote
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/winc\.go$
   steps:
     cluster_profile: vsphere-elastic
     dependencies:
@@ -298,6 +366,8 @@ tests:
     env:
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/proxy
     test:
     - as: wmco-setup
       cli: latest
@@ -314,30 +384,7 @@ tests:
           memory: 400Mi
       timeout: 2h15m0s
     - ref: openshift-tests-extension-setup-out-of-payload
-    - as: proxy-e2e-test-with-zero-handling
-      cli: latest
-      commands: |
-        set +e
-        openshift-tests run windows-machine-config-operator/proxy \
-          --provider vsphere \
-          --monitor=e2e-test-analyzer \
-          -o "${ARTIFACT_DIR}/e2e.log" \
-          --junit-dir "${ARTIFACT_DIR}/junit" 2>&1 | tee "${ARTIFACT_DIR}/test-run.log"
-        EXIT_CODE=$?
-
-        # If no tests found, that's expected until WMCO PR #4459 merges
-        if [ $EXIT_CODE -eq 1 ] && grep -q "no tests to run" "${ARTIFACT_DIR}/test-run.log" 2>/dev/null; then
-          echo "No proxy tests found in WMCO master yet - this is expected"
-          echo "Once WMCO PR #4459 merges, this job will find and run proxy tests"
-          exit 0
-        fi
-
-        exit $EXIT_CODE
-      from: tests
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 600Mi
+    - ref: openshift-e2e-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
   as: wicd-unit-vsphere
@@ -379,12 +426,6 @@ tests:
     - ref: openshift-windows-install-wmco
     - ref: tls-scanner-run
     workflow: ipi-aws-ovn-hybrid
-- always_run: false
-  as: address-review-comments
-  optional: true
-  skip_if_only_changed: .*
-  steps:
-    workflow: windows-review-agent-trigger
 zz_generated_metadata:
   branch: master
   org: openshift-priv

@@ -107,7 +107,7 @@ for node in $nodes;do
     # Install the RPM
     install_output=""
     install_err=0
-    install_output=$(oc debug -n default "${node}" -- chroot /host bash -c \
+    install_output=$(oc debug -n default "${node}" -- nsenter -a -t 1 bash -c \
         "ostree admin unlock --hotfix && rpm -Uvh /var/local/kata-containers.rpm && rpm -q kata-containers && systemctl restart crio" 2>&1) || install_err=$?
 
     if [ $install_err -ne 0 ]; then
@@ -116,7 +116,16 @@ for node in $nodes;do
         continue
     fi
 
-    echo "${node}: installed successfully"
+    # Verify the correct version is installed
+    verified=""
+    verified=$(oc debug -n default "${node}" -- chroot /host rpm -q kata-containers 2>/dev/null) || true
+    if [ "${verified}" != "${target_version}" ]; then
+        echo "ERROR: ${node}: expected ${target_version} but found ${verified}"
+        failed_nodes="${node} ${failed_nodes}"
+        continue
+    fi
+
+    echo "${node}: installed successfully (${verified})"
     updated=$((updated + 1))
 done
 

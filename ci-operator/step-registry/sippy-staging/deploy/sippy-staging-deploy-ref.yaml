@@ -4,10 +4,13 @@ ref:
   commands: sippy-staging-deploy-commands.sh
   credentials:
   - namespace: test-credentials
-    name: gce-sa-credentials-gcs-publisher
+    bundle: gce-sa-credentials-gcs-publisher
     mount_path: /tmp/gcs
   - namespace: test-credentials
-    name: sippy-staging-htpasswd
+    bundle: registry-pull-credentials
+    mount_path: /var/run/registry-pull-credentials
+  - collection: technical-release-team
+    group: sippy-staging
     mount_path: /var/run/sippy-staging-htpasswd
   grace_period: 30s
   timeout: 2h0m0s
@@ -20,6 +23,9 @@ ref:
   - name: STAGING_TIMEOUT
     default: "3600"
     documentation: How long (in seconds) to keep the staging environment alive.
+  - name: REGISTRY_AUTH_FILE
+    default: /var/run/registry-pull-credentials/.dockerconfigjson
+    documentation: Pull secret for nested-podman QCI/registry.ci image pulls.
   documentation: |-
     Deploy a sippy staging environment inside the CI build pod using nested-podman.
     Runs hack/agentic_setup.sh to start postgres/redis, build sippy, and seed the

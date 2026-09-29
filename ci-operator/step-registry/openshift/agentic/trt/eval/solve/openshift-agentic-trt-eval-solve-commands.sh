@@ -6,14 +6,14 @@ set -o pipefail
 
 echo "=== TRT Eval Solve ==="
 
-# --- Read tokens ---
-set +x
-GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
-export GH_FORK_TOKEN
-GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
-export GITHUB_TOKEN
-
-git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
+[[ -f "${SHARED_DIR}/github-app-auth.sh" ]] || {
+    echo "ERROR: ${SHARED_DIR}/github-app-auth.sh not found — github-app-auth step must run first"
+    exit 1
+}
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/github-app-auth.sh"
+load_github_tokens
+configure_github_git_credentials
 
 # --- Read case list ---
 mapfile -t CASE_LIST < "${SHARED_DIR}/eval-cases"
@@ -80,6 +80,8 @@ for case_name in "${CASE_LIST[@]}"; do
         cp "${REAL_SHARED_DIR}/gh-fork-token" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/gh-upstream-token" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/trt-telemetry.sh" "${CASE_SHARED}/"
+        cp "${REAL_SHARED_DIR}/github-app-auth.sh" "${CASE_SHARED}/"
+        cp "${REAL_SHARED_DIR}/github-app-token-outputs" "${CASE_SHARED}/"
 
         cp -r "${TEMPLATE_DIR}" "${CASE_WORKDIR}"
         cd "${CASE_WORKDIR}"

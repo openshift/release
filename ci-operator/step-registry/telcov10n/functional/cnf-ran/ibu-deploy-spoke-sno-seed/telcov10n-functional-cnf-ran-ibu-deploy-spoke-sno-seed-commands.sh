@@ -33,8 +33,14 @@ KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconf
 cd /eco-ci-cd
 
 SPOKE_NAME=$(echo "${SPOKE_CLUSTER}" | tr -d "[]'\" ")
+
 ZTP_CLUSTERS_PATH="${VERSION}/${SPOKE_NAME}/clusterinstance"
 ZTP_POLICIES_PATH="${VERSION}/${SPOKE_NAME}/policygentemplate"
+
+# 4.16 predates the siteconfig operator: the clusters dir holds a SiteConfig CR
+if [[ ${VERSION} == "4.16" ]]; then
+    ZTP_CLUSTERS_PATH="${VERSION}/${SPOKE_NAME}/siteconfig"
+fi
 
 echo "Running IBU seed SNO ZTP deployment for spoke cluster: ${SPOKE_CLUSTER}"
 echo "ZTP clusters path: ${ZTP_CLUSTERS_PATH}"

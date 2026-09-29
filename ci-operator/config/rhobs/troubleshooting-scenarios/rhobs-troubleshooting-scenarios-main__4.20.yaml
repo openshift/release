@@ -3,6 +3,8 @@ build_root:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -44,15 +46,15 @@ tests:
 
         tests/scripts/test-troubleshooting-scenarios-rhoai.sh
       credentials:
-      - mount_path: /var/run/openai
-        name: obsinta-openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/huggingface
-        name: obsinta-huggingface-token
-        namespace: test-credentials
-      - mount_path: /var/run/vllm
-        name: obsinta-vllm-api-key
-        namespace: test-credentials
+      - collection: obsinta
+        group: obsinta-openai-apitoken
+        mount_path: /var/run/openai
+      - collection: obsinta
+        group: obsinta-huggingface-token
+        mount_path: /var/run/huggingface
+      - collection: obsinta
+        group: obsinta-vllm-api-key
+        mount_path: /var/run/vllm
       from: src
       resources:
         requests:

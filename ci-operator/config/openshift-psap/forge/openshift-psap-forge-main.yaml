@@ -5,6 +5,7 @@ base_images:
     tag: latest
 prowgen:
   disable_rehearsals: true
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -27,18 +28,21 @@ tests:
 
         export PSAP_FORGE_FOURNOS_CI_SECRET_PATH=/var/run/psap-forge-ci
         export PSAP_FORGE_NOTIFICATIONS_SECRET_PATH=/var/run/psap-forge-notifications
+        export PSAP_FOURNOS_INTLAB_CI_SECRET_PATH=/var/run/psap-fournos-intlab-ci
 
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
 
         exec ./bin/run_ci fournos_launcher ci submit
       credentials:
-      - mount_path: /var/run/psap-forge-ci
-        name: psap-forge-ci
-        namespace: test-credentials
-      - mount_path: /var/run/psap-forge-notifications
-        name: psap-forge-notifications
-        namespace: test-credentials
+      - bundle: psap-forge-ci
+        mount_path: /var/run/psap-forge-ci
+      - collection: psap
+        group: psap-forge-notifications
+        mount_path: /var/run/psap-forge-notifications
+      - collection: psap
+        group: psap-fournos-intlab-ci
+        mount_path: /var/run/psap-fournos-intlab-ci
       from_image:
         name: forge-light
         namespace: ci

@@ -9,6 +9,8 @@ build_root:
     namespace: ci
     tag: upstream-1.31
   use_build_cache: true
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -86,7 +88,7 @@ tests:
     --cmd=./ossm/merge_upstream.sh
   container:
     from: src
-  cron: 00 0,4,8,12,16,20 * * 1-5
+  cron: 00 0 29 2 *
   reporter_config:
     channel: '#team-ossm-release-maintenance'
     job_states_to_report:
@@ -95,8 +97,9 @@ tests:
     report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs>'
   secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 - always_run: false
   as: e2e-ocp
   pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
@@ -105,7 +108,7 @@ tests:
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: registry.istio.io/testing/build-tools:release-1.31-9dd215042ac24a150e432b1321a23be505f281a5
+      MAISTRA_BUILDER_IMAGE: registry.istio.io/testing/build-tools:release-1.31-b191766806f5d2982fab99ee081c7e519d436019
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
@@ -131,7 +134,7 @@ tests:
       COMPUTE_NODE_TYPE: r6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r6g.xlarge
       INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: registry.istio.io/testing/build-tools:release-1.31-9dd215042ac24a150e432b1321a23be505f281a5
+      MAISTRA_BUILDER_IMAGE: registry.istio.io/testing/build-tools:release-1.31-b191766806f5d2982fab99ee081c7e519d436019
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       OCP_ARCH: arm64
@@ -152,7 +155,7 @@ tests:
       COMPUTE_NODE_TYPE: r6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r6g.xlarge
       INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: registry.istio.io/testing/build-tools:release-1.31-9dd215042ac24a150e432b1321a23be505f281a5
+      MAISTRA_BUILDER_IMAGE: registry.istio.io/testing/build-tools:release-1.31-b191766806f5d2982fab99ee081c7e519d436019
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       OCP_ARCH: arm64
@@ -171,7 +174,7 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      MAISTRA_BUILDER_IMAGE: registry.istio.io/testing/build-tools:release-1.31-9dd215042ac24a150e432b1321a23be505f281a5
+      MAISTRA_BUILDER_IMAGE: registry.istio.io/testing/build-tools:release-1.31-b191766806f5d2982fab99ee081c7e519d436019
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache

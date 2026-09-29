@@ -24,6 +24,23 @@ data:
       fi
     fi
 
+    # Nested podman does not inherit the test pod's imagePullSecrets. If the
+    # job mounted registry-pull-credentials, install them so pulls of
+    # quay.io/openshift/ci (and registry.ci) succeed.
+    for candidate in \
+      "${REGISTRY_AUTH_FILE:-}" \
+      /var/run/registry-pull-credentials/.dockerconfigjson \
+      /var/run/registry-pull-credentials-all/.dockerconfigjson \
+      /etc/ci-pull-credentials/.dockerconfigjson
+    do
+      if [ -n "${candidate}" ] && [ -f "${candidate}" ]; then
+        cp "${candidate}" "${HOME}/.config/containers/auth.json"
+        chmod 0600 "${HOME}/.config/containers/auth.json"
+        export REGISTRY_AUTH_FILE="${HOME}/.config/containers/auth.json"
+        break
+      fi
+    done
+
     # Create User ID
     if ! whoami &> /dev/null
     then

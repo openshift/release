@@ -1,28 +1,30 @@
 base_images:
   cli:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: cli
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "5.0"
+    tag: "5.1"
   upi-installer:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-5.0
+    tag: rhel-9-release-golang-1.26-openshift-5.1
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
       architecture: amd64
       product: ocp
       stream: ci
-      version: "5.0"
+      version: "5.1"
 resources:
   '*':
     limits:
@@ -103,33 +105,6 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
-- as: vsphere-ipi-proxy-ovn-winc
-  postsubmit: true
-  skip_if_only_changed: ^(?:hack|\.tekton)/
-  steps:
-    cluster_profile: vsphere-connected-2
-    env:
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-ovn-winc
-- as: nutanix-ipi-ovn-winc
-  postsubmit: true
-  skip_if_only_changed: ^(?:hack|\.tekton)/
-  steps:
-    cluster_profile: nutanix
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-nutanix-ipi-ovn-winc
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -64,6 +64,14 @@ function delete_all() {
 
   aws_delete_policy $REGION "$(head -n 1 ${SHARED_DIR}/aws_byo_policy_arn_master)"
   aws_delete_policy $REGION "$(head -n 1 ${SHARED_DIR}/aws_byo_policy_arn_worker)"
+
+  # Clean up the dedicated edge pool BYO role/policy when it was provisioned.
+  if [[ -f ${SHARED_DIR}/aws_byo_role_name_edge ]]; then
+    aws_delete_role $REGION "$(head -n 1 ${SHARED_DIR}/aws_byo_role_name_edge)"
+  fi
+  if [[ -f ${SHARED_DIR}/aws_byo_policy_arn_edge ]]; then
+    aws_delete_policy $REGION "$(head -n 1 ${SHARED_DIR}/aws_byo_policy_arn_edge)"
+  fi
 }
 
 echo "Post-check for BYO-IAM resources"

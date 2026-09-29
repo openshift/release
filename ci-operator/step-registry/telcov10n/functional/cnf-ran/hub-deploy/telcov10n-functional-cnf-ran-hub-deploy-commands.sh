@@ -71,10 +71,18 @@ if [ "${CLUSTER_NAME}" = "kni-qe-111" ]; then
     /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
 fi
 
+# kni-qe-133 uses helix89 (same as kni-qe-108), ci-operator cannot mount the same secret twice.
+if [ "${CLUSTER_NAME}" = "kni-qe-133" ]; then
+  echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} from kni-qe-108 mount"
+  process_inventory "${MOUNTED_HOST_INVENTORY}/kni-qe-108/hypervisor" \
+    /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
+fi
+
 cd /eco-ci-cd
 
-echo "Running deploy-ocp-sno for ${CLUSTER_NAME} (version=${VERSION})"
-EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true release_age_max_days=7"
+
+echo "Running deploy-ocp-sno for ${CLUSTER_NAME} (version=${VERSION}) arch=${ARCH}"
+EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true release_age_max_days=${MULTISTAGE_PARAM_OVERRIDE_RELEASE_AGE_MAX_DAYS} arch=${ARCH}"
 if [ "${DISABLE_INSIGHTS}" = "true" ]; then
   EXTRA_VARS="${EXTRA_VARS} disable_insights=true"
 fi

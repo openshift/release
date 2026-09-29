@@ -366,6 +366,16 @@ set +e
 timeout -s 9 ${MAKE_TIMEOUT} make ${DEVSCRIPTS_TARGET}
 rv=\$?
 
+# Install local registry credentials for default podman/docker auth.
+# dig-scripts creates REGISTRY_CREDS ($HOME/private-mirror-<cluster>.json)
+# during configure.
+registry_creds=\$(ls /root/private-mirror-*.json 2>/dev/null | head -n1 || true)
+if [[ -n "\${registry_creds}" ]]; then
+  mkdir -p /root/.docker
+  cp "\${registry_creds}" /root/.docker/config.json
+  chmod 600 /root/.docker/config.json
+fi
+
 # squid needs to be restarted after network changes
 podman restart --time 1 external-squid || true
 

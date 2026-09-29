@@ -27,6 +27,8 @@ base_images:
     name: "4.23"
     namespace: ocp
     tag: upi-installer
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -284,6 +286,8 @@ tests:
   cron: 0 4 * * *
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      ODF_USE_PRERELEASE: "true"
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-azure-aks-ovn-conformance
   cron: 0 */2 * * *
@@ -328,7 +332,7 @@ tests:
     cluster_profile: openshift-org-azure
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
-      ODF_OPERATOR_CHANNEL: stable-4.20
+      ODF_USE_PRERELEASE: "true"
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-kubevirt-azure-conformance
@@ -336,6 +340,8 @@ tests:
   cron: 0 0 1 1 *
   steps:
     cluster_profile: openshift-org-azure
+    env:
+      ODF_USE_PRERELEASE: "true"
     workflow: hypershift-kubevirt-azure-conformance
 - as: e2e-openstack-aws
   cron: 0 10 * * *
@@ -422,6 +428,7 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
 zz_generated_metadata:

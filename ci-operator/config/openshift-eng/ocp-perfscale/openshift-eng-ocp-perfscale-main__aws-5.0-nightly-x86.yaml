@@ -3,6 +3,8 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -275,39 +277,6 @@ tests:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
-    workflow: openshift-qe-installer-aws-ovn-fips
-- as: batch-churn-fips-6nodes
-  cron: 0 6 * * 1
-  reporter_config:
-    channel: '#ocp-qe-scale-ci-results'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :warning: {{end}}'
-  steps:
-    allow_skip_on_success: false
-    cluster_profile: aws-perfscale-qe
-    env:
-      ADDITIONAL_WORKER_NODES: "3"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      CHAOS_ACTION: kill-node
-      CHAOS_CYCLES_COUNT: "20"
-      CHAOS_DELAY: "10"
-      COMPUTE_NODE_TYPE: m6i.2xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6i.4xlarge
-      KB_FLAGS: --local-indexing
-      PROFILE_TYPE: regular
-      RUN_ORION: "true"
-      VERSION: "5.0"
-      ZONES_COUNT: "3"
-    test:
-    - ref: openshift-qe-workers-scale
-    - ref: openshift-qe-batch-churn
-    - ref: openshift-qe-orion-batch-churn
     workflow: openshift-qe-installer-aws-ovn-fips
 - as: control-plane-etcdencrypt-24nodes
   cron: 0 3 * * 3
@@ -760,6 +729,40 @@ tests:
     - ref: openshift-qe-workers-scale
     test:
     - chain: openshift-qe-cudn-density
+- as: evpn
+  cron: 0 4 * * 2,4
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      EXTERNAL_WEBSERVER_IP: 172.27.187.82
+      ITERATIONS: "72"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+    post:
+    - ref: openshift-qe-installer-aws-deprovision-bastion
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ipi-install-post-featureset
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-installer-aws-provision-bastion
+    test:
+    - ref: openshift-qe-evpn
+    workflow: openshift-qe-installer-aws
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng

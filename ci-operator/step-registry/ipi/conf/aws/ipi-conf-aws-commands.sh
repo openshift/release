@@ -346,9 +346,18 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && 
     CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
   else
     # 4.22 and above: rhcos.json was split into coreos-rhel-9.json and coreos-rhel-10.json
-    coreos_file="coreos-rhel-9.json"
+    if version_le "5.0" "${ocp_version}"; then
+      # Default to rhel-10 for 5.0 and above
+      coreos_file="coreos-rhel-10.json"
+    else
+      # rhel-9 for 4.22-4.x
+      coreos_file="coreos-rhel-9.json"
+    fi
+    # OS_IMAGE_STREAM explicitly overrides the version-based default.
     if [[ "${OS_IMAGE_STREAM:-}" == "rhel-10" ]]; then
       coreos_file="coreos-rhel-10.json"
+    elif [[ "${OS_IMAGE_STREAM:-}" == "rhel-9" ]]; then
+      coreos_file="coreos-rhel-9.json"
     fi
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/${coreos_file} -o /tmp/ami.json
     CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)

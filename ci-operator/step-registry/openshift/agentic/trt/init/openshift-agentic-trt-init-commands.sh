@@ -19,7 +19,7 @@ fi
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 
 # --- Validate GitHub tokens from github-app-auth step ---
-for f in gh-fork-token gh-upstream-token; do
+for f in gh-fork-token gh-upstream-token github-app-auth.sh github-app-token-outputs; do
     [[ -f "${SHARED_DIR}/${f}" ]] || { echo "ERROR: ${f} not found in SHARED_DIR. Run trt-github-app-auth step first."; exit 1; }
 done
 echo "GitHub tokens validated."
@@ -46,7 +46,16 @@ cat > "${SHARED_DIR}/trt-telemetry.sh" << 'HEREDOC_EOF'
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
 
+if [[ -f "${SHARED_DIR}/github-app-auth.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/github-app-auth.sh"
+fi
+
 agentic_ci() {
+    # Installation tokens last 1h; mint a fresh one before each long child.
+    if declare -F refresh_github_tokens >/dev/null 2>&1; then
+        refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
+    fi
     local timeout_seconds=""
     local extra_args=()
     while [[ "${1:-}" == --* ]]; do

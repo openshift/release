@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: "90s"
+  name: ci-operator-configresolver
+  namespace: ci
+spec:
+  ingressClassName: openshift-default
+  tls:
+    - secretName: ci-operator-configresolver-tls
+      hosts:
+        - config.ci.openshift.org
+        - steps.ci.openshift.org
+  rules:
+  - host: config.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: ci-operator-configresolver
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: steps.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: ci-operator-configresolver
+            port:
+              number: 8082
+        pathType: ImplementationSpecific

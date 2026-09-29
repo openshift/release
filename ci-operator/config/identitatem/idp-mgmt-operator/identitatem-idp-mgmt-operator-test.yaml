@@ -21,6 +21,8 @@ promotion:
   - disabled: true
     name: fake
     namespace: identitatem
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -95,15 +97,15 @@ tests:
         export VERSION_TAG=latest
         ./run-prow-e2e.sh
       credentials:
-      - mount_path: /etc/ocm-mgdsvcs-e2e-test
-        name: ocm-mgdsvcs-e2e-test
-        namespace: test-credentials
-      - mount_path: /etc/ocm-mgdsvcs-clusterpool
-        name: ocm-mgdsvcs-clusterpool
-        namespace: test-credentials
-      - mount_path: /etc/acm-cicd-quay-pull
-        name: acm-cicd-quay-pull
-        namespace: test-credentials
+      - collection: ocm-mgdsvcs-secrets
+        group: ocm-mgdsvcs-e2e-test
+        mount_path: /etc/ocm-mgdsvcs-e2e-test
+      - collection: ocm-mgdsvcs-secrets
+        group: ocm-mgdsvcs-clusterpool
+        mount_path: /etc/ocm-mgdsvcs-clusterpool
+      - collection: ocm-secrets
+        group: acm-cicd-quay-pull
+        mount_path: /etc/acm-cicd-quay-pull
       from: idp-mgmt-operator-e2e-tests
       resources:
         requests:

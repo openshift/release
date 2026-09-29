@@ -245,8 +245,17 @@ function collect_diagnostic_data {
                       JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$HOST_METRIC_FILE" --arg host "$hostname" '.hosts[.hosts | length] |= .+ {"file": $file, "name": $host}')
                   fi
               fi
-              echo "Collecting VM metrics for ${vm}"
               vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)
+              if [ -f "${vcenter_state}/${vmname}.metrics.json" ]; then
+                # Multi-network jobs put each VM on more than one network, so the
+                # outer network loop revisits the same VM once per network it's
+                # attached to. Skip re-collecting (and re-appending to JSON_DATA)
+                # a VM we've already processed, same as the host dedup above.
+                echo "Already collected metrics for ${vmname}, skipping"
+                continue
+              fi
+
+              echo "Collecting VM metrics for ${vm}"
               govc metric.sample -dc="${datacenter}" -d=80 -n=180 $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.txt
               govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.json
 
@@ -263,7 +272,7 @@ function collect_diagnostic_data {
               # attempt to get and clean up node journals
               curl -H "node-id: ${vmname}" -o "${vcenter_state}/${vmname}-journal.log" http://log-gather.vmc.ci.openshift.org:8000
               curl -X DELETE -H "node-id: ${vmname}" http://log-gather.vmc.ci.openshift.org:8000
-              
+
               METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
               JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" --arg screenshot "$(cat ${vcenter_state}/${vmname}.png | base64 -w0)" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm, "screenshot": $screenshot}')
           done
@@ -293,6 +302,18 @@ function write_html() {
   write_results_html
 }
 
+function format_duration_seconds() {
+  local total_seconds=$1
+  local minutes=$((total_seconds / 60))
+  local seconds=$((total_seconds % 60))
+
+  if [[ ${minutes} -gt 0 ]]; then
+    echo "${minutes}m ${seconds}s"
+  else
+    echo "${seconds}s"
+  fi
+}
+
 function embed_topology_data() {
   echo "<hr>" >> "${RESULT_HTML}"
   for LEASE in "${SHARED_DIR}"/LEASE_*; do
@@ -302,6 +323,20 @@ function embed_topology_data() {
 
     NAME=$(jq --compact-output -r .metadata.name < "${LEASE}")
     echo "Lease: ${NAME}<br>" >> "${RESULT_HTML}"
+
+    CREATED=$(jq -r '.metadata.creationTimestamp // empty' < "${LEASE}")
+    FULFILLED=$(jq -r '[.status.conditions[]? | select(.type == "Fulfilled" and .status == "True")][0].lastTransitionTime // empty' < "${LEASE}")
+
+    # The lease's "Fulfilled" condition only tells us when it last became
+    # fulfilled, not how long the job waited for it, so pair it with the
+    # lease's creation time (when the job requested it) to get the actual
+    # wait duration.
+    FULFILLMENT_TIME="N/A"
+    if [[ -n "${CREATED}" && -n "${FULFILLED}" ]]; then
+      created_epoch=$(date -u -d "${CREATED}" +%s)
+      fulfilled_epoch=$(date -u -d "${FULFILLED}" +%s)
+      FULFILLMENT_TIME=$(format_duration_seconds $((fulfilled_epoch - created_epoch)))
+    fi
 
     pool_info_count=$(jq '.status.poolInfo | length' < "${LEASE}")
     if [[ "${pool_info_count}" != "null" && "${pool_info_count}" -gt 0 ]]; then
@@ -335,6 +370,7 @@ function embed_topology_data() {
       echo "- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
       echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
     fi
+    echo "- Time to Fulfill Lease Request: ${FULFILLMENT_TIME}<br>" >> "${RESULT_HTML}"
     echo "<br>" >> "${RESULT_HTML}"
   done
 

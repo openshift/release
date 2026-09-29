@@ -18,6 +18,8 @@ images:
       RUN CGO_ENABLED=0 go test ./test/e2e -v -c --tags=osde2e -o /usr/local/bin/e2e.test
     from: src
     to: operator-e2e
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -44,8 +46,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: splunk-forwarder-operator-codecov-token
     mount_path: /tmp/secret
-    name: splunk-forwarder-operator-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -54,8 +57,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: splunk-forwarder-operator-codecov-token
     mount_path: /tmp/secret
-    name: splunk-forwarder-operator-codecov-token
 - as: lint
   commands: make lint
   container:
@@ -92,7 +96,7 @@ tests:
     report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
       *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
   steps:
     cluster_profile: rosa-e2e-01
     dependencies:
@@ -117,7 +121,7 @@ tests:
     report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
       *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
   steps:
     cluster_profile: rosa-e2e-01
     dependencies:
@@ -156,7 +160,7 @@ tests:
     report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
       *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
   steps:
     cluster_profile: rosa-e2e-01
     dependencies:
@@ -182,7 +186,7 @@ tests:
     report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
       *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
   steps:
     cluster_profile: rosa-e2e-01
     dependencies:

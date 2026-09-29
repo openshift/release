@@ -2,6 +2,12 @@
 set -euxo pipefail
 shopt -s inherit_errexit
 
+# shellcheck disable=SC2317
+_propagate_junit () {
+    mkdir -p "${SHARED_DIR}/junit"
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+}
+
 ################################################################################
 # Test Overview
 ################################################################################
@@ -29,7 +35,7 @@ shopt -s inherit_errexit
 ################################################################################
 
 # cd to writable directory
-cd /tmp/ || exit 0
+cd /tmp/ || { echo "ERROR: Cannot cd to /tmp" >&2; exit 1; }
 
 # Define all test cases with initial "skipped" status
 typeset -A testStatus
@@ -283,7 +289,7 @@ function RunTestCase2 () {
 # Test Execution Setup
 ################################################################################
 # Set trap to generate JUnit XML on exit (regardless of success or failure)
-trap '{( GenerateJunitXml; true )}' EXIT
+trap '{( GenerateJunitXml; _propagate_junit; true )}' EXIT
 
 if [ "${MAP_TESTS:-}" = "true" ]; then
     eval "$(
@@ -295,6 +301,7 @@ if [ "${MAP_TESTS:-}" = "true" ]; then
     if type -t ExitTrap--PostProcessPrep; then
         trap '{(
             GenerateJunitXml
+            _propagate_junit
             LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
                 ExitTrap--PostProcessPrep junit--acm-opp-app.xml
             true
@@ -399,6 +406,17 @@ fi
 : "====== Test Summary ======"
 : "All test results will be available in JUnit XML report"
 
-# Always exit 0 to allow subsequent test steps to run
-# Test results are reported via JUnit XML
-exit 0
+# Exit based on whether any test failed
+typeset _overall_status="PASS"
+for test in "${allTestCasesArr[@]}"; do
+    if [[ "${testStatus[${test}]}" == "failed" ]]; then
+        _overall_status="FAIL"
+        break
+    fi
+done
+
+if [[ "${_overall_status}" == "PASS" ]]; then
+    exit 0
+else
+    exit 1
+fi

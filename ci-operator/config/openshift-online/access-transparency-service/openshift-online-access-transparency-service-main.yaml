@@ -25,6 +25,7 @@ images:
           source_path: /go/src/github.com/openshift-online/access-transparency-service
     to: golang-plus
 prowgen:
+  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -55,8 +56,9 @@ tests:
     from: golang-plus
   nested_podman: true
   secrets:
-  - mount_path: /opt/app-root/ats-secrets
-    name: openshift-online-ats-secrets
+  - collection: openshift-online-access-transparency-service
+    group: integration-tests
+    mount_path: /opt/app-root/ats-secrets
 - as: post-merge-integration
   capabilities:
   - nested-podman
@@ -71,8 +73,9 @@ tests:
   nested_podman: true
   postsubmit: true
   secrets:
-  - mount_path: /opt/app-root/ats-secrets
-    name: openshift-online-ats-secrets
+  - collection: openshift-online-access-transparency-service
+    group: integration-tests
+    mount_path: /opt/app-root/ats-secrets
 - as: coverage
   capabilities:
   - nested-podman
@@ -85,8 +88,9 @@ tests:
     from: golang-plus
   nested_podman: true
   secrets:
-  - mount_path: /var/run/codecov-secret
-    name: access-transparency-service-codecov
+  - collection: openshift-online-access-transparency-service
+    group: codecov-secret
+    mount_path: /var/run/codecov-secret
 - as: publish-coverage
   capabilities:
   - nested-podman
@@ -100,8 +104,9 @@ tests:
   nested_podman: true
   postsubmit: true
   secrets:
-  - mount_path: /var/run/codecov-secret
-    name: access-transparency-service-codecov
+  - collection: openshift-online-access-transparency-service
+    group: codecov-secret
+    mount_path: /var/run/codecov-secret
 zz_generated_metadata:
   branch: main
   org: openshift-online

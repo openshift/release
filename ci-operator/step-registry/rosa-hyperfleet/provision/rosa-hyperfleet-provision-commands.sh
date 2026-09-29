@@ -88,4 +88,5 @@ fi
 echo "Starting ephemeral provisioning..."
 uv run --no-cache ci/ephemeral-provider/main.py \
   --save-regional-state "${SHARED_DIR}/regional-terraform-outputs.json" \
+  --save-management-state "${SHARED_DIR}/management-terraform-outputs.json" \
   "${OVERRIDE_ARGS[@]}"

@@ -28,6 +28,8 @@ operator:
   substitutions:
   - pullspec: openshift.io/aws-load-balancer-operator:latest
     with: pipeline:aws-load-balancer-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -57,10 +59,10 @@ tests:
     make test
   container:
     from: src
-  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - always_run: false
   as: e2e-aws-operator
-  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -91,7 +93,7 @@ tests:
           cpu: 100m
     workflow: aws-load-balancer-install
 - as: e2e-aws-rosa-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: rosa-e2e-03
     dependencies:
@@ -120,7 +122,7 @@ tests:
     workflow: aws-load-balancer-install-rosa
 - always_run: false
   as: e2e-aws-proxy-operator
-  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     env:

@@ -31,6 +31,8 @@ images:
         | tar xzf - --strip-components=1 -C /usr/local/bin/ prek-x86_64-unknown-linux-gnu/prek
     from: src
     to: prek-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -44,6 +46,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  lint:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
 tests:
 - as: coverage
   commands: |
@@ -52,8 +60,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: aws-account-operator-codecov-token
     mount_path: /tmp/secret
-    name: aws-account-operator-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -62,8 +71,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: aws-account-operator-codecov-token
     mount_path: /tmp/secret
-    name: aws-account-operator-codecov-token
 - as: lint
   commands: make lint
   container:
@@ -107,10 +117,6 @@ tests:
       commands: |
         echo -e "\nStarting Integration Test\n"
         make prow-ci-entrypoint
-      credentials:
-      - mount_path: /tmp/secret/aao-aws-creds
-        name: aao-aws-creds
-        namespace: test-credentials
       dependencies:
       - env: OPERATOR_IMAGE
         name: aws-account-operator
@@ -149,7 +155,7 @@ tests:
     report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
       *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
   restrict_network_access: false
   steps:
     cluster_profile: rosa-e2e-01
@@ -173,7 +179,7 @@ tests:
     report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
       *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
   restrict_network_access: false
   steps:
     cluster_profile: rosa-e2e-01

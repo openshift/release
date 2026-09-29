@@ -1,0 +1,72 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    # deck-history's oauth-proxy authenticates as this service account
+    # (-client-id=system:serviceaccount:ci:deck-history), so its callback must
+    # be registered here.
+    serviceaccounts.openshift.io/oauth-redirectreference.deck-history: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"deck-history"}}'
+  name: deck-history
+  namespace: ci
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: deck-history-app-ci
+  namespace: ci
+rules:
+  # Read-only: this instance browses archived results and never reruns a job,
+  # so it does not get `create` or `patch` the way the other Decks do.
+  - apiGroups:
+      - prow.k8s.io
+    resources:
+      - prowjobs
+    verbs:
+      - get
+      - list
+      - watch
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: deck-history-app-ci
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: deck-history-app-ci
+subjects:
+- kind: ServiceAccount
+  name: deck-history
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: deck-history-oauth
+rules:
+  - apiGroups:
+    - authentication.k8s.io
+    resources:
+    - tokenreviews
+    verbs:
+    - create
+  - apiGroups:
+    - authorization.k8s.io
+    resources:
+    - subjectaccessreviews
+    verbs:
+    - create
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: deck-history-oauth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: deck-history-oauth
+subjects:
+- kind: ServiceAccount
+  name: deck-history
+  namespace: ci

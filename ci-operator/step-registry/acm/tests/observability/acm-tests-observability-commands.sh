@@ -1,7 +1,14 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
-if [ "${MAP_TESTS}" = "true" ]; then
+# shellcheck disable=SC2317
+_propagate_junit () {
+    mkdir -p "${SHARED_DIR}/junit"
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+}
+trap _propagate_junit EXIT
+
+if [[ "${MAP_TESTS}" = "true" ]]; then
     eval "$(
         typeset -a _fURL=()
         type -t wget 1>/dev/null && _fURL=(wget --timeout=30 -qO-) || _fURL=(curl --connect-timeout 10 --max-time 30 -fsSL)
@@ -23,12 +30,12 @@ typeset secretsDir="/tmp/secrets"
 
 # Get the creds from ACMQE CI vault and run the automation on pre-exisiting HUB
 SKIP_OCP_DEPLOY="false"
-if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
-    echo "------------ Skipping OCP Deploy = $SKIP_OCP_DEPLOY ------------"
-    cp ${secretsDir}/ci/kubeconfig $SHARED_DIR/kubeconfig
-    cp ${secretsDir}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
-    cp ${secretsDir}/ci/metadata $SHARED_DIR/metadata.json
-fi 
+if [[ "${SKIP_OCP_DEPLOY}" == "true" ]]; then
+    echo "------------ Skipping OCP Deploy = ${SKIP_OCP_DEPLOY} ------------"
+    cp "${secretsDir}/ci/kubeconfig" "${SHARED_DIR}/kubeconfig"
+    cp "${secretsDir}/ci/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
+    cp "${secretsDir}/ci/metadata" "${SHARED_DIR}/metadata.json"
+fi
 
 : Copy kubeconfig to default location for kubectl/oc
 mkdir -p ~/.kube
@@ -55,6 +62,7 @@ MANAGED_CLUSTER_PASS="$(cat "${SHARED_DIR}/managed.cluster.password" 2>/dev/null
 set -x
 
 # Run Observability tests with all required environment variables
+typeset -i _test_rc=0
 OC_CLUSTER_USER="kubeadmin" \
 BASE_DOMAIN="$(oc get ingress.config.openshift.io/cluster -ojson | jq -r '.spec.domain | sub("apps\\."; "")')" \
 OC_HUB_CLUSTER_API_URL="$(oc whoami --show-server)" \
@@ -63,7 +71,7 @@ MANAGED_CLUSTER_API_URL="$(cat "${SHARED_DIR}/managed.cluster.api.url" 2>/dev/nu
 MANAGED_CLUSTER_NAME="$(cat "${SHARED_DIR}/managed.cluster.name" 2>/dev/null || true)" \
 MANAGED_CLUSTER_BASE_DOMAIN="$(cat "${SHARED_DIR}/managed.cluster.base.domain" 2>/dev/null || true)" \
 MANAGED_CLUSTER_USER="$(cat "${SHARED_DIR}/managed.cluster.username" 2>/dev/null || true)" \
-bash +x ./execute_obs_interop_commands.sh || :
+bash +x ./execute_obs_interop_commands.sh || _test_rc=$?
 
 unset PARAM_AWS_SECRET_ACCESS_KEY PARAM_AWS_ACCESS_KEY_ID OC_HUB_CLUSTER_PASS MANAGED_CLUSTER_PASS
 
@@ -73,8 +81,8 @@ if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 fi
 
 : Copy the test cases results to an external directory
-cp -r tests/pkg/tests $ARTIFACT_DIR/
+cp -r tests/pkg/tests "${ARTIFACT_DIR}/" || true
 
-mv $ARTIFACT_DIR/tests/results.xml $ARTIFACT_DIR/tests/junit_results.xml
+mv "${ARTIFACT_DIR}/tests/results.xml" "${ARTIFACT_DIR}/tests/junit_results.xml" || true
 
-true
+exit "${_test_rc}"

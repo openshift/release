@@ -13,14 +13,17 @@ ref:
       cpu: 10m
       memory: 100Mi
   credentials:
-  - namespace: test-credentials
-    name: quay-qe-aws-secret
+  - collection: quay-tests
+    group: aws
     mount_path: /var/run/quay-qe-aws-secret
-  - namespace: test-credentials
-    name: quay-qe-quay-secret
+  - collection: quay-tests
+    group: quay
     mount_path: /var/run/quay-qe-quay-secret
   documentation: |-
-    Deploy Quay Operator and Quay
+    Deploy Quay Operator and Quay. Merges ${SHARED_DIR}/quay-mail-config.yaml and
+    ${SHARED_DIR}/quay-otel-config.yaml into the config bundle when present
+    (written by the mailpit and jaeger deploy steps); absent when those steps
+    did not run or produced no fragment.
   env:
   - name: DR__RP__CR_COMP_NAME
     default: "lp-ocp-compat--Quay"
@@ -28,6 +31,13 @@ ref:
   - name: MAP_TESTS
     default: "false"
     documentation: Specify whether to update the test suite name for reporting tools
+  - name: PLAYWRIGHT_GIT_REPO
+    default: "https://github.com/quay/quay.git"
+    documentation: |-
+      Upstream repository the Playwright suite is cloned from by the test-e2e
+      step. Read here only to resolve the deployed image's version label to a
+      vX.Y.Z tag when deriving ${SHARED_DIR}/playwright_git_ref; nothing is
+      cloned in this step.
   - name: QUAY_OPERATOR_CHANNEL
     documentation: The quay operator channel
     default: "stable-3.16"

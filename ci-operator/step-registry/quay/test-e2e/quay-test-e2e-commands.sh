@@ -47,12 +47,27 @@ else
   echo "No mailpit_api in SHARED_DIR; email-dependent specs may skip or fail"
 fi
 
+PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_USE_IMAGE_TESTS:-false}"
+CLONE_DIR="/tmp/quay-playwright-src"
+if [[ "${PLAYWRIGHT_USE_IMAGE_TESTS}" == "true" ]]; then
+  # /app is root-owned in the runner image (USER 1001, arbitrary UID on OpenShift) and
+  # Playwright writes test-results/ and playwright-report/ into its cwd, so run a copy.
+  echo "PLAYWRIGHT_USE_IMAGE_TESTS=true: using the suite baked into the runner image at /app"
+  rm -rf "${CLONE_DIR}"; mkdir -p "${CLONE_DIR}/web"
+  cp -a /app/. "${CLONE_DIR}/web/"
+  PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
+  PLAYWRIGHT_GIT_REF="image"
+  pushd "${PLAYWRIGHT_WORKDIR}"
+else
+# Left at column 0 (not indented) so this branch stays a byte-for-byte diff of
+# the pre-image-tests script.
 # The Playwright suite is cloned from PLAYWRIGHT_GIT_REPO at a ref resolved in this
 # order (first match wins):
 #   1. PLAYWRIGHT_GIT_BRANCH        - explicit override from the ci-operator config.
-#   2. ${SHARED_DIR}/playwright_git_ref - commit auto-derived by the deploy step from
-#      the deployed Quay app image's source-commit label, so the suite is version-
-#      matched to the product with no manual upkeep.
+#   2. ${SHARED_DIR}/playwright_git_ref - ref auto-derived by the deploy step from the
+#      deployed Quay app image's version/release labels (the upstream vX.Y.Z tag when
+#      one matches, otherwise the redhat-X.Y branch), so the suite is version-matched
+#      to the product with no manual upkeep.
 #   3. PLAYWRIGHT_GIT_FALLBACK_BRANCH - last-resort branch so the run still executes
 #      (with a warning) instead of hard-failing when nothing else is available.
 # PLAYWRIGHT_GIT_REPO stays required. The resolved ref may be a branch, tag, or commit
@@ -64,11 +79,13 @@ if [[ -z "${PLAYWRIGHT_GIT_REPO}" ]]; then
   echo "ERROR: PLAYWRIGHT_GIT_REPO must be set" >&2
   exit 1
 fi
+PLAYWRIGHT_REF_IS_DERIVED=false
 if [[ -n "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
   PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_BRANCH}"
   echo "Using explicitly configured Playwright ref: ${PLAYWRIGHT_GIT_REF}"
 elif [[ -s "${SHARED_DIR}/playwright_git_ref" ]]; then
   PLAYWRIGHT_GIT_REF="$(cat "${SHARED_DIR}/playwright_git_ref")"
+  PLAYWRIGHT_REF_IS_DERIVED=true
   echo "Using Playwright ref auto-derived from the deployed image: ${PLAYWRIGHT_GIT_REF}"
 else
   PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
@@ -93,7 +110,10 @@ clone_playwright_sources() {
     if [[ "${ref}" =~ ^[0-9a-f]{40}$ ]]; then
       git init -q "${dest}"
       git -C "${dest}" remote add origin "${repo}"
-      git -C "${dest}" fetch --depth 1 origin "${ref}"
+      # The commit a product image was built from is not guaranteed to exist in
+      # ${repo}; return non-zero so the caller can fall back to a branch rather
+      # than failing the whole e2e run on an unfetchable derived ref.
+      git -C "${dest}" fetch --depth 1 origin "${ref}" || return 1
       git -C "${dest}" checkout -q FETCH_HEAD
     else
       git clone --depth 1 --branch "${ref}" "${repo}" "${dest}"
@@ -115,15 +135,23 @@ clone_playwright_sources() {
   else
     echo "ERROR: failed to download ${repo} at ${ref}" >&2
     rm -f "${archive}"
-    exit 1
+    return 1
   fi
   tar -xzf "${archive}" --strip-components=1 -C "${dest}"
   rm -f "${archive}"
 }
 
-CLONE_DIR="/tmp/quay-playwright-src"
 echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (ref ${PLAYWRIGHT_GIT_REF})"
-clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
+if ! clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"; then
+  if [[ "${PLAYWRIGHT_REF_IS_DERIVED}" != true ]]; then
+    echo "ERROR: failed to clone ${PLAYWRIGHT_GIT_REPO} at ${PLAYWRIGHT_GIT_REF}" >&2
+    exit 1
+  fi
+  echo "WARNING: derived ref ${PLAYWRIGHT_GIT_REF} is not present in ${PLAYWRIGHT_GIT_REPO};" >&2
+  echo "         falling back to branch ${PLAYWRIGHT_GIT_FALLBACK_BRANCH}" >&2
+  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
+  clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
+fi
 PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
 if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
   echo "ERROR: cloned sources have no web/ directory at ${PLAYWRIGHT_WORKDIR}" >&2
@@ -133,6 +161,7 @@ fi
 echo "Installing npm dependencies for Playwright ref ${PLAYWRIGHT_GIT_REF}..."
 pushd "${PLAYWRIGHT_WORKDIR}"
 npm ci
+fi
 
 # Image browsers live in /opt/playwright as root. Test pods cannot write there.
 IMAGE_BROWSERS=/opt/playwright
@@ -147,7 +176,16 @@ else
   fi
 fi
 echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH}"
-npx playwright install chromium
+# The browser download fails on transient DNS errors from the CDN hosts; retry it.
+for attempt in 1 2 3; do
+  npx playwright install chromium && break
+  if [[ ${attempt} -eq 3 ]]; then
+    echo "ERROR: playwright browser install failed after 3 attempts" >&2
+    exit 1
+  fi
+  echo "playwright install attempt ${attempt} failed; retrying in $((attempt * 30))s"
+  sleep $((attempt * 30))
+done
 popd
 
 # Capture virtual-builder diagnostics from the TARGET cluster. Playwright build
@@ -172,6 +210,67 @@ function gatherBuilderDiagnostics {
   oc logs -n "${ns}" -l quay-component=quay-app -c quay-app --tail=5000 2>/dev/null \
     | grep -iE 'buildman|build manager|executor|ephemeral|register|build token|kubernetes|traceback|error' \
     > "${out}/quay-app-buildman.log" 2>&1 || true
+}
+
+# Expose the in-cluster Jaeger query API to the Playwright suite. On a failed
+# test the suite attaches server-spans.json -- the Jaeger spans for that test's
+# own requests -- by GETting ${JAEGER_QUERY_URL}/api/traces/<traceId>. With the
+# variable unset that collection silently no-ops, so it has to be set here.
+#
+# Port-forward, not the in-cluster Service DNS: this step's pod runs in the CI
+# build farm, not in the target cluster, so jaeger.${ns}.svc is unreachable from
+# it. The step has `cli: latest` and the target-cluster KUBECONFIG, which is the
+# same mechanism the quay-gather-jaeger-traces post step already uses against
+# this Service. 127.0.0.1 rather than localhost so Node's fetch cannot pick ::1,
+# which the forward does not bind.
+#
+# Best-effort: if Jaeger was not deployed or the forward never answers, leave
+# JAEGER_QUERY_URL UNSET. The suite treats that as "not collected" and records a
+# reason, which is better than handing it a URL that quietly returns nothing.
+function startJaegerPortForward {
+  local ns="${QUAYNAMESPACE:-quay-enterprise}"
+  # Drop any inherited value so the "unset" paths below cannot leave an
+  # unverified URL in the suite's environment.
+  unset JAEGER_QUERY_URL
+  if [[ ! -f "${SHARED_DIR}/jaeger_deployed" ]]; then
+    echo "Jaeger was not deployed; leaving JAEGER_QUERY_URL unset"
+    return 0
+  fi
+
+  # The suite can run for hours and a single port-forward does not survive a
+  # Jaeger pod restart or an idle drop, so supervise it: the keeper restarts oc
+  # until it is asked to stop, and on TERM kills the forward it is currently
+  # supervising.
+  (
+    pf=""
+    trap '[[ -n "${pf}" ]] && kill "${pf}" 2>/dev/null; exit 0' TERM
+    while true; do
+      oc port-forward -n "${ns}" svc/jaeger 16686:16686 >> "${ARTIFACT_DIR}/jaeger-port-forward.log" 2>&1 &
+      pf=$!
+      wait "${pf}" || true
+      sleep 5
+    done
+  ) &
+  JAEGER_PF_PID=$!
+
+  for _ in $(seq 1 12); do
+    if curl -sf --connect-timeout 5 --max-time 10 "http://127.0.0.1:16686/api/services" -o /dev/null; then
+      export JAEGER_QUERY_URL="http://127.0.0.1:16686"
+      echo "JAEGER_QUERY_URL=${JAEGER_QUERY_URL}"
+      return 0
+    fi
+    sleep 5
+  done
+
+  echo "WARNING: Jaeger query API never became reachable; leaving JAEGER_QUERY_URL unset" >&2
+  stopJaegerPortForward
+}
+
+function stopJaegerPortForward {
+  [[ -n "${JAEGER_PF_PID:-}" ]] || return 0
+  kill "${JAEGER_PF_PID}" 2>/dev/null || true
+  wait "${JAEGER_PF_PID}" 2>/dev/null || true
+  JAEGER_PF_PID=""
 }
 
 function copyArtifacts {
@@ -277,7 +376,7 @@ function copyArtifacts {
   # link when index.html actually landed so it is never dead; default every CI var
   # with :- so a missing var in a local run cannot abort this EXIT trap.
   if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
-    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results"
+    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
     local gcs_path
     if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
       gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"
@@ -303,7 +402,7 @@ EOF
   fi
   gatherBuilderDiagnostics || true
 }
-trap copyArtifacts EXIT
+trap 'copyArtifacts; stopJaegerPortForward' EXIT
 
 # Test users (admin/testuser/readonly) are created by Playwright's global-setup.ts,
 # exactly as in upstream Quay CI (.github/workflows/ci-web.yaml). With FEATURE_MAILING
@@ -335,32 +434,150 @@ if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
   echo "SSL_CERT_FILE=${SSL_CERT_FILE}"
 fi
 
-# Route DNS/connectivity readiness gate. The suite fires hundreds of rapid
-# apiRequestContext calls with tight 5-10s timeouts; on a freshly provisioned
-# cluster the test pod's resolver intermittently returns ENOTFOUND for the *.apps
-# wildcard (and TCP/TLS is slow) until the record and resolver cache warm. Starting
-# the run into a cold resolver is the top source of flakes/failures. Block until the
-# route both resolves AND answers over HTTPS several times in a row before launching
-# Playwright. Best-effort: warn and proceed on timeout so we never hard-fail here.
-QUAY_HOST="${QUAY_ROUTE#*://}"; QUAY_HOST="${QUAY_HOST%%/*}"
-echo "Waiting for Quay route DNS + HTTPS readiness..."
-ready=0
-for attempt in $(seq 1 60); do
-  http_code="$(curl -sk -o /dev/null -m 10 -w '%{http_code}' "${QUAY_ROUTE}/api/v1/discovery" 2>/dev/null || echo 000)"
-  if getent ahosts "${QUAY_HOST}" >/dev/null 2>&1 && [[ "${http_code}" != "000" ]]; then
-    ready=$((ready + 1))
-    echo "  readiness ${ready}/5 (attempt ${attempt}, http=${http_code})"
-    [[ "${ready}" -ge 5 ]] && break
+# Route preflight gate. The suite fires hundreds of rapid apiRequestContext calls
+# with tight 5-10s timeouts; on a freshly provisioned cluster the test pod's resolver
+# intermittently returns ENOTFOUND for the *.apps wildcard (and TCP/TLS is slow) until
+# the record and resolver cache warm, and the route happily answers 404/503 from the
+# router while quay-app is still starting. Starting the run into either is the top
+# source of mass failures, so require a genuinely healthy endpoint -- DNS answer,
+# successful curl, HTTP 200, and a discovery-shaped JSON body -- for several samples
+# in a row, and fail the step on the deadline instead of running the suite. One
+# preflight JUnit case then reports the not-ready environment as a single clear
+# failure rather than hundreds of test failures.
+# A real quayroute is scheme+host with no port, but strip one anyway so getent always
+# gets a bare name -- that also lets a local dry run point the gate at a host:port stub.
+QUAY_HOST="${QUAY_ROUTE#*://}"; QUAY_HOST="${QUAY_HOST%%/*}"; QUAY_HOST="${QUAY_HOST%%:*}"
+DISCOVERY_URL="${QUAY_ROUTE}/api/v1/discovery"
+PREFLIGHT_DEADLINE_SECONDS=300
+PREFLIGHT_REQUIRED_SAMPLES=5
+PREFLIGHT_BODY=/tmp/quay-discovery-body.json
+READINESS_LOG="${ARTIFACT_DIR}/readiness.jsonl"
+
+function xml_escape() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e "s/'/\&apos;/g" -e 's/"/\&quot;/g'
+}
+
+# One preflight sample against the discovery endpoint. Appends a JSON line to
+# READINESS_LOG (timestamp, DNS answers, curl exit, HTTP status, curl's
+# dns/connect/tls/ttfb timings) and sets PROBE_CLASS to one of
+# ok | dns | transport | http | app-contract, with a human-readable PROBE_DETAIL.
+function probe_route() {
+  local attempt="$1"
+  local ts dns curl_exit metrics http_code t_dns t_conn t_tls t_ttfb
+
+  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # getent exits 2 when the name does not resolve; under set -e/pipefail that would
+  # abort the step, and an empty answer is exactly the dns failure we want to record.
+  dns="$(getent ahosts "${QUAY_HOST}" 2>/dev/null | awk '{print $1}' | sort -u | paste -sd, -)" || dns=""
+
+  # LC_ALL=C keeps curl's -w timings dot-decimal so the JSONL stays valid JSON.
+  curl_exit=0
+  metrics="$(LC_ALL=C curl -sk -m 10 -o "${PREFLIGHT_BODY}" \
+    -w '%{http_code} %{time_namelookup} %{time_connect} %{time_appconnect} %{time_starttransfer}' \
+    "${DISCOVERY_URL}" 2>/dev/null)" || curl_exit=$?
+  read -r http_code t_dns t_conn t_tls t_ttfb <<<"${metrics:-000 0 0 0 0}"
+
+  if [[ -z "${dns}" || "${curl_exit}" -eq 6 ]]; then
+    PROBE_CLASS=dns
+    PROBE_DETAIL="${QUAY_HOST} did not resolve (curl exit ${curl_exit})"
+  elif [[ "${curl_exit}" -ne 0 ]]; then
+    PROBE_CLASS=transport
+    PROBE_DETAIL="curl exit ${curl_exit} talking to ${DISCOVERY_URL}"
+  elif [[ "${http_code}" != "200" ]]; then
+    PROBE_CLASS=http
+    PROBE_DETAIL="${DISCOVERY_URL} answered HTTP ${http_code}, want 200"
+  # The runner is a nodejs image (it runs the Playwright suite), so node is the
+  # available JSON parser here; python3 and jq are not in ubi9 nodejs-minimal.
+  # Quay's swagger_route_data() always emits a non-empty top-level "paths" object,
+  # so its absence means something other than Quay answered 200.
+  elif ! node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const p=d&&d.paths;if(!p||typeof p!=="object"||Array.isArray(p)||Object.keys(p).length===0)process.exit(1)' \
+      "${PREFLIGHT_BODY}" >/dev/null 2>&1; then
+    PROBE_CLASS=app-contract
+    PROBE_DETAIL="HTTP 200 from ${DISCOVERY_URL} but the body is not a discovery document (no non-empty JSON \"paths\")"
   else
-    [[ "${ready}" -ne 0 ]] && echo "  readiness reset (attempt ${attempt}, http=${http_code})"
-    ready=0
+    PROBE_CLASS=ok
+    PROBE_DETAIL="HTTP 200 discovery document"
+  fi
+
+  printf '{"timestamp":"%s","attempt":%d,"dns":"%s","curl_exit":%d,"http_status":"%s","time_namelookup":%s,"time_connect":%s,"time_appconnect":%s,"time_starttransfer":%s,"class":"%s"}\n' \
+    "${ts}" "${attempt}" "${dns}" "${curl_exit}" "${http_code}" \
+    "${t_dns}" "${t_conn}" "${t_tls}" "${t_ttfb}" "${PROBE_CLASS}" >> "${READINESS_LOG}"
+}
+
+# Same lifecycle-JUnit shape the quay deploy steps write, so Sippy sees preflight as
+# one more case in the quay-lifecycle suite.
+function write_preflight_junit() {
+  local failures="$1" duration="$2" message="$3"
+  local tmp
+  tmp="$(mktemp "${ARTIFACT_DIR}/junit_quay_preflight.xml.XXXXXX")"
+  {
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+    printf '<testsuite name="quay-lifecycle" tests="1" failures="%d" skipped="0" time="%d">\n' \
+      "${failures}" "${duration}"
+    printf '  <testcase name="[sig-quay] route preflight should report a healthy discovery endpoint" time="%d"' \
+      "${duration}"
+    if [[ "${failures}" -eq 1 ]]; then
+      printf '>\n    <failure message="%s">%s</failure>\n  </testcase>\n' \
+        "$(xml_escape "${message}")" "$(xml_escape "${message}")"
+    else
+      # Explicit close tag, not a self-closing testcase: the flaky-tagging awk in
+      # copyArtifacts buffers from <testcase until it sees </testcase> and would
+      # otherwise buffer this file to EOF and emit nothing after <testsuite>.
+      printf '></testcase>\n'
+    fi
+    echo '</testsuite>'
+  } > "${tmp}"
+  mv "${tmp}" "${ARTIFACT_DIR}/junit_quay_preflight.xml"
+}
+
+echo "Preflight: waiting up to ${PREFLIGHT_DEADLINE_SECONDS}s for ${PREFLIGHT_REQUIRED_SAMPLES} consecutive healthy samples from ${DISCOVERY_URL}"
+: > "${READINESS_LOG}"
+preflight_start="$(date +%s)"
+preflight_deadline=$((preflight_start + PREFLIGHT_DEADLINE_SECONDS))
+consecutive=0
+attempt=0
+PROBE_CLASS=""
+PROBE_DETAIL=""
+last_bad_class=""
+last_bad_detail=""
+while :; do
+  attempt=$((attempt + 1))
+  probe_route "${attempt}"
+  if [[ "${PROBE_CLASS}" == "ok" ]]; then
+    consecutive=$((consecutive + 1))
+    echo "  preflight ${consecutive}/${PREFLIGHT_REQUIRED_SAMPLES} (attempt ${attempt}, ${PROBE_DETAIL})"
+    if [[ "${consecutive}" -ge "${PREFLIGHT_REQUIRED_SAMPLES}" ]]; then
+      break
+    fi
+  else
+    echo "  preflight not ready (attempt ${attempt}, ${PROBE_CLASS}: ${PROBE_DETAIL})"
+    last_bad_class="${PROBE_CLASS}"
+    last_bad_detail="${PROBE_DETAIL}"
+    consecutive=0
+  fi
+  if [[ "$(date +%s)" -ge "${preflight_deadline}" ]]; then
+    break
   fi
   sleep 5
 done
-if [[ "${ready}" -ge 5 ]]; then
-  echo "Quay route is resolvable and responding; starting tests."
+preflight_seconds=$(( $(date +%s) - preflight_start ))
+if [[ "${consecutive}" -ge "${PREFLIGHT_REQUIRED_SAMPLES}" ]]; then
+  write_preflight_junit 0 "${preflight_seconds}" ""
+  echo "Preflight passed in ${preflight_seconds}s over ${attempt} attempts; starting tests."
 else
-  echo "WARNING: Quay route did not reach stable DNS+HTTPS readiness in time; proceeding anyway" >&2
+  # The last sample can be healthy when the deadline expires mid-streak (a flapping
+  # route), so report the flap rather than mislabelling the failure "ok".
+  if [[ "${PROBE_CLASS}" == "ok" ]]; then
+    fail_class="flapping"
+    fail_detail="reached only ${consecutive}/${PREFLIGHT_REQUIRED_SAMPLES} consecutive healthy samples; last unhealthy sample was ${last_bad_class}: ${last_bad_detail}"
+  else
+    fail_class="${PROBE_CLASS}"
+    fail_detail="${PROBE_DETAIL}"
+  fi
+  PREFLIGHT_MESSAGE="Quay route preflight failed after ${preflight_seconds}s and ${attempt} attempts; failure class ${fail_class}: ${fail_detail}. Per-attempt evidence in readiness.jsonl."
+  write_preflight_junit 1 "${preflight_seconds}" "${PREFLIGHT_MESSAGE}"
+  echo "ERROR: ${PREFLIGHT_MESSAGE}" >&2
+  exit 1
 fi
 
 # Tests excluded from the run come entirely from PLAYWRIGHT_GREP_INVERT, set in the
@@ -387,6 +604,8 @@ fi
 # same operations pass on retry). Cap concurrency to relieve that contention. The CLI
 # --workers flag overrides the config value; override via PLAYWRIGHT_WORKERS if needed.
 PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-2}"
+
+startJaegerPortForward
 
 echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"

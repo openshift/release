@@ -1,0 +1,54 @@
+workflow:
+  as: p2p-cclm-hub-spoke
+  steps:
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: p2p-install-odf-hub
+    - ref: acm-interop-p2p-cluster-install
+    - ref: acm-fetch-managed-clusters
+    - ref: p2p-install-cnv-hub
+    - ref: p2p-acm-cnv-install-policy
+    - ref: p2p-install-odf-spokes
+    - chain: acm-interop-p2p-submariner-install
+    - ref: p2p-mtv-additional-config
+    - ref: p2p-mtv-register-providers
+    - ref: p2p-cnv-exchange-kubevirt-ca
+    - chain: p2p-cclm-hub-spoke-migration-test
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: gather-aws-console
+    - ref: acm-interop-p2p-cluster-uninstall
+    - chain: ipi-deprovision
+    - ref: firewatch-report-issues
+  documentation: |-
+    End-to-end workflow for spoke-VM round-trip Cross-Cluster Live Migration (CCLM)
+    between the ACM hub cluster and a managed spoke cluster using MTV (Migration
+    Toolkit for Virtualization).
+
+    **Phase 1 — Infrastructure**:
+    - Hub IPI provisioning, ACM, ODF, CNV setup
+    - Spoke provisioning via Hive/ACM with CNV + ODF
+    - Submariner pod-to-pod connectivity (no Globalnet)
+    - MTV configuration and spoke provider registration on hub
+
+    **Phase 2 — CCLM spoke round-trip (P2P_MIGRATION_DIRECTION=both)**:
+    - Create test VMs (prefix P2P_HS_SPOKE_VM_PREFIX) on spoke only
+    - Create MTV NetworkMaps and StorageMaps for both directions
+    - Leg 1: migrate spoke VMs → hub (spoke is source, hub is destination)
+    - Cleanup spoke source resources after successful leg 1
+    - Leg 2: return the same VMs hub → spoke (hub is source, spoke is destination)
+      only runs when leg 1 succeeds; error propagation gates the return migration
+
+    MTV management plane runs on the hub (host provider = hub cluster itself).
+    Spoke clusters are registered as OpenShift providers via ACM ManifestWork.
+    Submariner provides cross-cluster pod-to-pod connectivity (no Globalnet).

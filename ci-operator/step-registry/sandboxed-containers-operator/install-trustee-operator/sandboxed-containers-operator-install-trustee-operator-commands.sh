@@ -78,6 +78,10 @@ function exit_handler() {
     oc get all -n "${TRUSTEE_NAMESPACE}" || true
     echo ">>> Operator logs:"
     oc logs -n "${TRUSTEE_NAMESPACE}" -l control-plane=controller-manager --tail=50 || true
+    echo ">>> Trustee deployment pod logs (last 100 lines):"
+    oc logs -n "${TRUSTEE_NAMESPACE}" -l app=kbs --tail=100 --prefix 2>/dev/null || true
+    echo ">>> Trustee deployment pod events:"
+    oc describe pods -n "${TRUSTEE_NAMESPACE}" -l app=kbs 2>/dev/null | grep -A 20 "^Events:" | tail -25 || true
   fi
 }
 trap 'exit_handler' EXIT
@@ -520,6 +524,27 @@ function wait_for_operands() {
         echo ">>> ERROR: ${deployment} not ready after timeout" >&2
         oc get "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
         oc describe "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
+        exit 1
+      fi
+
+      # Verify pods are actually Ready — the Available condition can pass transiently
+      # before a CrashLoopBackOff pod crashes again.
+      if ! oc wait pods -n "${TRUSTEE_NAMESPACE}" -l app=kbs \
+        --for=condition=Ready --timeout=150s; then
+        echo ">>> ERROR: ${deployment} pods not Ready" >&2
+        oc get pods -n "${TRUSTEE_NAMESPACE}" || true
+        oc logs -n "${TRUSTEE_NAMESPACE}" -l app=kbs --tail=50 --prefix 2>/dev/null || true
+        exit 1
+      fi
+
+      # Wait for the rollout to fully complete. The TrusteeConfig reconciler can
+      # update the deployment (smart-merge) shortly after the initial pods become
+      # Ready, which triggers a second rollout. Without this wait the connectivity
+      # test races the new pod startup and gets ECONNREFUSED.
+      echo ">>> Waiting for ${deployment} rollout to complete..." >&2
+      if ! oc rollout status "${deployment}" -n "${TRUSTEE_NAMESPACE}" --timeout=150s; then
+        echo ">>> ERROR: ${deployment} rollout did not complete" >&2
+        oc get "${deployment}" -n "${TRUSTEE_NAMESPACE}" || true
         exit 1
       fi
     done

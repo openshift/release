@@ -97,7 +97,7 @@ function apply_brew_idms() {
 
 ### MAIN ###################################################################################
 
-env::hash | grep -i cnv | sort
+env::hash | grep "^CNV_" | sort
 
 if [[ -n $CNV_CATALOG_IMAGE ]]; then
   CNV_CATALOG_SOURCE=${CNV_IIB_CATALOG_NAME}
@@ -191,10 +191,11 @@ EOF
 # Disable autopilot
 #oc annotate hyperconverged "${CNV_HYPERCONVERGED_NAME}" -n "${CNV_INSTALL_NAMESPACE}" platform.kubevirt.io/autopilot=false
 
-oc wait hyperconverged -n "${CNV_INSTALL_NAMESPACE}" "${CNV_HYPERCONVERGED_NAME}" --for=condition=Available --timeout=15m
+echo_debug "Waiting for HyperConverged resource to be ready"
+retry 3 5 oc wait hyperconverged -n "${CNV_INSTALL_NAMESPACE}" "${CNV_HYPERCONVERGED_NAME}" --for=condition=Available --timeout=15m
 
-echo "CNV is deployed successfully"
+echo "🟢 CNV is deployed successfully"
 
-sleep 30
 echo_debug "Waiting for MCPs to update"
+sleep 30
 wait_for_mcp_to_update 90

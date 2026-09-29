@@ -3,6 +3,8 @@ base_images:
     name: rebasebot
     namespace: ci
     tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -28,12 +30,12 @@ tests:
                   --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
                   --tag-policy=none
       credentials:
-      - mount_path: /secrets/dt-secrets
-        name: dt-secrets
-        namespace: test-credentials
-      - mount_path: /secrets/rebasebot
-        name: rebasebot-credentials
-        namespace: test-credentials
+      - collection: distributed-tracing
+        group: distributed-tracing-team
+        mount_path: /secrets/dt-secrets
+      - collection: rebasebot-credentials
+        group: secret
+        mount_path: /secrets/rebasebot
       from_image:
         name: rebasebot
         namespace: ci

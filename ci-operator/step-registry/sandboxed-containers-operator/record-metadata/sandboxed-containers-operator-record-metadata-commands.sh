@@ -132,7 +132,7 @@ fi
 # PROW_JOB_ID and JOB_NAME are provided by Prow
 PROW_JOB_URL=""
 if [[ -n "${PROW_JOB_ID:-}" ]]; then
-    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME:-unknown}/${BUILD_ID:-unknown}"
+    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/${JOB_NAME:-unknown}/${BUILD_ID:-unknown}"
 fi
 
 # CLUSTER_TYPE is set by the workflow based on cluster_profile
