@@ -62,6 +62,27 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- always_run: false
+  as: openperouter-e2e-metal
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=2
+        ENABLE_LOCAL_REGISTRY=true
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-openperouter
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: openperouter-e2e
+    workflow: baremetalds-e2e
 zz_generated_metadata:
   branch: release-4.22
   org: openshift-kni
