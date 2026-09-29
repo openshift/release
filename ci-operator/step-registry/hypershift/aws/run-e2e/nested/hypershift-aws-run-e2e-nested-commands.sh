@@ -107,16 +107,15 @@ export EVENTUALLY_VERBOSE="false"
 
 export E2E_AWS_CREDENTIALS_FILE="/etc/hypershift-pool-aws-credentials/credentials"
 export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${E2E_AWS_CREDENTIALS_FILE}"
+export E2E_AWS_PRIVATE_REGION="${HYPERSHIFT_AWS_REGION}"
 if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-false}" == "true" ]]; then
   export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-  if [[ -f ${SHARED_DIR}/aws-region ]]; then
+  if [[ -f "${SHARED_DIR}/aws-region" ]]; then
     echo "Region override found. Using it."
-    AWS_PRIVATE_REGION="$(cat ${SHARED_DIR}/aws-region)"
+    E2E_AWS_PRIVATE_REGION="$(cat "${SHARED_DIR}/aws-region")"
   else
-    echo "No region override found. Using leased resource."
-    AWS_PRIVATE_REGION="${LEASED_RESOURCE}"
+    echo "No region override found. Using default region."
   fi
-  export E2E_AWS_PRIVATE_REGION="${AWS_PRIVATE_REGION}"
 fi
 
 hack/ci-test-e2e.sh -test.v \

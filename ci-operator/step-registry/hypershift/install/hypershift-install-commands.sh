@@ -175,6 +175,19 @@ if echo "${INSTALL_HELP}" | grep -q -- '--additional-operator-env-vars'; then
   EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=quay-proxy.ci.openshift.org/openshift/ci:ocp_${OCP_VERSION}_cluster-api-provider-kubevirt"
 fi
 
+AWS_PRIVATE_CREDENTIALS_FILE="/etc/hypershift-pool-aws-credentials/credentials"
+AWS_PRIVATE_REGION="${HYPERSHIFT_AWS_REGION}"
+if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT}" == "true" ]]; then
+  AWS_PRIVATE_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+  if [[ -f "${SHARED_DIR}/aws-region" ]]; then
+    echo "Region override found. Using it."
+    AWS_PRIVATE_REGION="$(cat "${SHARED_DIR}/aws-region")"
+  else
+    echo "No region override found. Using leased resource."
+    AWS_PRIVATE_REGION="${LEASED_RESOURCE}"
+  fi
+fi
+
 case "${CLOUD_PROVIDER}" in
   AWS)
     if echo "${INSTALL_HELP}" | grep -q -- '--scale-from-zero-provider'; then
@@ -188,8 +201,8 @@ case "${CLOUD_PROVIDER}" in
     --platform-monitoring=All \
     --enable-ci-debug-output \
     --private-platform=AWS \
-    --aws-private-creds=/etc/hypershift-pool-aws-credentials/credentials \
-    --aws-private-region="${HYPERSHIFT_AWS_REGION}" \
+    --aws-private-creds="${AWS_PRIVATE_CREDENTIALS_FILE}" \
+    --aws-private-region="${AWS_PRIVATE_REGION}" \
     --external-dns-provider=aws \
     --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
     --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
