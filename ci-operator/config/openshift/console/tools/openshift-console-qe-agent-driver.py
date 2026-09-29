@@ -61,12 +61,35 @@ def same_test(test):
     return (test.get('spec', ''), test.get('project', ''), test.get('name', ''))
 
 
+def e2e_spec(spec):
+    if spec.startswith('frontend/e2e/tests/'):
+        spec = spec[len('frontend/e2e/tests/'):]
+    if (not re.fullmatch(r'[A-Za-z0-9_./-]+\.spec\.ts', spec)
+            or pathlib.PurePosixPath(spec).is_absolute()
+            or any(part in ('.', '..') for part in pathlib.PurePosixPath(spec).parts)):
+        raise ValueError('unsafe or unsupported e2e spec path')
+    return spec
+
+
 def selected_tests(context, history):
     tests = context.get('failed_tests', []) + context.get('flaked_tests', [])
     rates = {entry['suite']: entry.get('flake_rate', 0) for entry in history.get('suites', [])}
-    tests = [test for test in tests if all(isinstance(test.get(k), str) and test.get(k) for k in ('spec', 'project', 'name'))]
-    tests.sort(key=lambda test: (rates.get(test['spec'], 0), test in context.get('flaked_tests', [])), reverse=True)
-    return tests[:3]
+    selected = []
+    for test in tests:
+        if not isinstance(test, dict) or not all(isinstance(test.get(k), str) and test.get(k)
+                                                 for k in ('spec', 'project', 'name')):
+            continue
+        try:
+            e2e_spec(test['spec'])
+        except ValueError:
+            continue
+        if re.fullmatch(r'[A-Za-z0-9_-]+', test['project']):
+            selected.append(test)
+    failed_keys = {same_test(test) for test in context.get('failed_tests', [])
+                   if isinstance(test, dict)}
+    selected.sort(key=lambda test: (rates.get(test['spec'], 0),
+                                    same_test(test) in failed_keys), reverse=True)
+    return selected[:3]
 
 
 def report(message):
@@ -440,11 +463,7 @@ def prepare():
 
 
 def test_command(test, worktree, workers, grep):
-    spec = test['spec']
-    if spec.startswith('frontend/e2e/tests/'):
-        spec = spec[len('frontend/e2e/tests/'):]
-    if not re.fullmatch(r'[A-Za-z0-9_./-]+\.spec\.ts', spec) or '..' in pathlib.PurePosixPath(spec).parts:
-        raise ValueError('unsafe spec path')
+    spec = e2e_spec(test['spec'])
     path = worktree / 'frontend/e2e/tests' / spec
     if not path.is_file():
         raise ValueError(f'spec missing from checkout: {spec}')
@@ -481,6 +500,9 @@ def run_test(test, worktree, workers, label, deadline, grep=True):
         result['output'] = sanitize((finished.stdout + '\n' + finished.stderr)[-3000:])
     except subprocess.TimeoutExpired:
         result['error'] = 'Playwright timed out'
+        return result
+    except ValueError as exc:
+        result['error'] = str(exc)
         return result
     if not report_path.is_file():
         result['error'] = 'Playwright Prow reporter did not produce a report'
@@ -713,8 +735,7 @@ def finalize():
             if state.get('reason') == 'no candidate patch':
                 state['reason'] = 'model spend cap reached before a candidate was saved'
     diagnoses = read(EVIDENCE / 'candidate-diagnoses.json', [])
-    originals = read(CONTEXT, {}).get('failed_tests', []) + read(CONTEXT, {}).get('flaked_tests', [])
-    keys = {same_test(test) for test in originals}
+    keys = {same_test(test) for test in read(ROOT / 'selected.json', [])}
     baseline_runs = read(EVIDENCE / 'baseline.json', [])
     original_flakes = {same_test(test) for test in read(CONTEXT, {}).get('flaked_tests', [])}
     original_failures = {same_test(test) for test in read(CONTEXT, {}).get('failed_tests', [])}
