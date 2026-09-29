@@ -45,20 +45,14 @@ if [[ "${CURRENT_IMAGE}" != "${ETCD_OPERATOR_IMAGE}" ]]; then
   exit 1
 fi
 
-# Step 4: Scale CVO back up
-echo "--- Scaling cluster-version-operator back up ---"
-oc scale deployment/cluster-version-operator -n openshift-cluster-version --replicas=1
-# Use rollout status to wait for the new CVO pod to be running and ready
-# (--for=condition=Available is unreliable here because the condition may
-# still be True from before the scale-down, returning immediately)
-oc rollout status deployment/cluster-version-operator -n openshift-cluster-version --timeout=120s
-echo "CVO scaled back up successfully"
+# CVO stays scaled down (replicas=0) for the duration of the test
+# to prevent reconciliation of the custom etcd-operator image.
 
-# Step 5: Wait the configured period to verify no reconciliation
+# Step 4: Wait the configured period to verify no reconciliation
 echo "--- Waiting ${OVERRIDE_WAIT_TIME}s to verify no reconciliation ---"
 sleep "${OVERRIDE_WAIT_TIME}"
 
-# Step 6: Verify the image was not reconciled back
+# Step 5: Verify the image was not reconciled back
 FINAL_IMAGE=$(oc get deployment -n openshift-etcd-operator etcd-operator -o jsonpath='{.spec.template.spec.containers[0].image}')
 echo "Image after ${OVERRIDE_WAIT_TIME}s wait: ${FINAL_IMAGE}"
 
