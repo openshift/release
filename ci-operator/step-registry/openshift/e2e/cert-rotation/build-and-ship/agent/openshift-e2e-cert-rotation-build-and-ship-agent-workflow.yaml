@@ -1,0 +1,26 @@
+workflow:
+  as: openshift-e2e-cert-rotation-build-and-ship-agent
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4
+        NETWORK_TYPE=OVNKubernetes
+      DEVSCRIPTS_TARGET: agent
+      NODE_CLIENT_CERT_RECOVERY_TOGGLE: "on"
+    pre:
+    - chain: agent-pre
+    test:
+    - ref: openshift-e2e-cert-rotation-build-and-ship-prep
+    - ref: openshift-e2e-cert-rotation-build-and-ship-power-cycle-metal
+    - ref: openshift-e2e-cert-rotation-build-and-ship-assert
+    post:
+    - chain: agent-post
+  documentation: |-
+    Build-and-ship test on an agent-installed bare-metal cluster (dev-scripts libvirt VMs, OCPSTRAT-1346):
+    install, power every VM off while the cluster is still on its 24h install-time kubelet signer,
+    power it back on with node clocks past that expiry (SKEW, default 2d), and require every node to
+    recover with no manual CSR approval. The topology comes from DEVSCRIPTS_CONFIG (default HA_IPV4).
+    Set NODE_CLIENT_CERT_RECOVERY_TOGGLE=off in the job's env to leave the approver disabled and require
+    the unfixed behavior instead (client CSRs stay pending).
