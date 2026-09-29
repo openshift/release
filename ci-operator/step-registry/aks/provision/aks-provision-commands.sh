@@ -396,6 +396,80 @@ EOF
         awk 'NR>1 && $2 ~ /[a-z]+-[0-9]+$/ { zones[$2]++ } END { for (z in zones) printf "  %s: %d nodes\n", z, zones[z] }' "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>/dev/null || true
     }
 
+    # Keep failure diagnostics best-effort so collection never masks the NAP timeout.
+    collect_nap_failure_artifacts() {
+        local xtrace_enabled=false
+
+        [[ $- == *x* ]] && xtrace_enabled=true
+        set +x
+
+        echo "Collecting NAP failure diagnostics"
+        # Avoid arbitrary annotations in the public artifact. Keep the newest 200
+        # NodeClaims with the status fields needed to diagnose provisioning failures.
+        {
+            printf 'NAME\tCREATED\tNODE\tPROVIDER-ID\tCONDITION-TYPES\tCONDITION-STATUS\tCONDITION-REASONS\tCONDITION-MESSAGES\n'
+            oc --request-timeout=15s get nodeclaims.karpenter.sh \
+                --sort-by='.metadata.creationTimestamp' --no-headers \
+                -o custom-columns='NAME:.metadata.name,CREATED:.metadata.creationTimestamp,NODE:.status.nodeName,PROVIDER-ID:.status.providerID,CONDITION-TYPES:.status.conditions[*].type,CONDITION-STATUS:.status.conditions[*].status,CONDITION-REASONS:.status.conditions[*].reason,CONDITION-MESSAGES:.status.conditions[*].message' 2>&1 \
+                | tail -n 200
+        } | sed -E 's#(/subscriptions/)[^/"[:space:]]+#\1<redacted>#gI' \
+            | cut -b 1-4096 > "${ARTIFACT_DIR}/karpenter-nodeclaims.txt" || true
+
+        # AKS documents this field selector as the customer-cluster view of NAP events.
+        # Keep at most 200 lines and 4 KiB per line so the public artifact stays small.
+        {
+            printf 'NAMESPACE\tLAST-SEEN\tTYPE\tREASON\tOBJECT-KIND\tOBJECT-NAME\tMESSAGE\n'
+            oc --request-timeout=15s get events -A --field-selector source=karpenter-events \
+                --sort-by='.lastTimestamp' --no-headers \
+                -o custom-columns='NAMESPACE:.metadata.namespace,LAST-SEEN:.lastTimestamp,TYPE:.type,REASON:.reason,OBJECT-KIND:.involvedObject.kind,OBJECT-NAME:.involvedObject.name,MESSAGE:.message' 2>&1 \
+                | tail -n 200
+        } | sed -E 's#(/subscriptions/)[^/"[:space:]]+#\1<redacted>#gI' \
+            | cut -b 1-4096 > "${ARTIFACT_DIR}/karpenter-events.txt" || true
+
+        # Capture only scheduler-related events for the pods that trigger NAP. Missing
+        # legacy source fields are expected on newer Event objects and are handled by jq.
+        {
+            printf 'TIMESTAMP\tTYPE\tREASON\tOBJECT-NAME\tREPORTER\tMESSAGE\n'
+            oc --request-timeout=15s get events -n default \
+                --field-selector involvedObject.kind=Pod -o json 2>&1 \
+                | jq -r '
+                    [
+                        .items[]?
+                        | select((.involvedObject.name // "") | startswith("nap-placeholder-"))
+                        | select(
+                            ((.reason // "") | test("schedul"; "i")) or
+                            ((.source.component // "") | test("scheduler"; "i")) or
+                            ((.reportingController // "") | test("scheduler"; "i"))
+                        )
+                        | [
+                            (.eventTime // .series.lastObservedTime // .lastTimestamp // .metadata.creationTimestamp // ""),
+                            (.type // ""),
+                            (.reason // ""),
+                            (.involvedObject.name // ""),
+                            (.reportingController // .source.component // ""),
+                            (.message // "")
+                        ]
+                    ]
+                    | sort_by(.[0])
+                    | .[-200:][]
+                    | @tsv
+                ' 2>&1
+        } | sed -E 's#(/subscriptions/)[^/"[:space:]]+#\1<redacted>#gI' \
+            | cut -b 1-4096 > "${ARTIFACT_DIR}/nap-placeholder-scheduling-events.txt" || true
+
+        cat > "${ARTIFACT_DIR}/karpenter-control-plane-logs.txt" <<'EOF' || true
+AKS runs the NAP Karpenter controller in the managed control plane.
+Its control-plane resource logs cannot be read through oc. They require Azure Monitor
+diagnostic settings configured separately before the failure; this step does not enable
+or query those settings.
+EOF
+
+        if [[ "${xtrace_enabled}" == "true" ]]; then
+            set -x
+        fi
+        return 0
+    }
+
     echo "Waiting for NAP to provision nodes"
     # Wait for the desired number of Ready nodes (NAP-provisioned + system pool)
     DESIRED_NODES=$((${AKS_NODE_COUNT:-9} + 3))
@@ -412,6 +486,7 @@ EOF
             oc get nodes || true
             oc get nodepool.karpenter.sh -o yaml || true
             collect_nap_artifacts
+            collect_nap_failure_artifacts
             exit 1
         fi
         echo "Waiting for NAP nodes: $READY_NODES/$DESIRED_NODES ready (${NAP_ELAPSED}s/${NAP_TIMEOUT}s)..."
