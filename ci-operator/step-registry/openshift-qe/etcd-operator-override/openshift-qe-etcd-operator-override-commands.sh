@@ -29,8 +29,7 @@ echo "--- Patching etcd-operator deployment with custom image ---"
 oc set image -n openshift-etcd-operator deployment/etcd-operator \
   etcd-operator="${ETCD_OPERATOR_IMAGE}"
 oc set env -n openshift-etcd-operator deployment/etcd-operator \
-  OPERATOR_IMAGE="${ETCD_OPERATOR_IMAGE}" \
-  IMAGE="${ETCD_OPERATOR_IMAGE}"
+  OPERATOR_IMAGE="${ETCD_OPERATOR_IMAGE}"
 
 # Step 3: Wait for the deployment to roll out
 echo "--- Waiting for etcd-operator deployment rollout ---"
