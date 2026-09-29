@@ -61,14 +61,25 @@ def same_test(test):
     return (test.get('spec', ''), test.get('project', ''), test.get('name', ''))
 
 
-def e2e_spec(spec):
+def test_source_path(spec):
+    if spec.startswith('../setup/'):
+        name = spec[len('../setup/'):]
+        if re.fullmatch(r'[A-Za-z0-9_-]+\.setup\.ts', name):
+            return 'e2e/setup/' + name
+        raise ValueError('unsafe or unsupported e2e setup path')
     if spec.startswith('frontend/e2e/tests/'):
         spec = spec[len('frontend/e2e/tests/'):]
     if (not re.fullmatch(r'[A-Za-z0-9_./-]+\.spec\.ts', spec)
             or pathlib.PurePosixPath(spec).is_absolute()
             or any(part in ('.', '..') for part in pathlib.PurePosixPath(spec).parts)):
         raise ValueError('unsafe or unsupported e2e spec path')
-    return spec
+    return 'e2e/tests/' + spec
+
+
+def allowed_candidate_file(path):
+    return (any(path.startswith(prefix) for prefix in ALLOWED)
+            or bool(re.fullmatch(r'frontend/e2e/setup/[A-Za-z0-9_-]+\.setup\.ts', path))
+            or path == 'frontend/e2e/setup/login-helper.ts')
 
 
 def selected_tests(context, history):
@@ -80,7 +91,7 @@ def selected_tests(context, history):
                                                  for k in ('spec', 'project', 'name')):
             continue
         try:
-            e2e_spec(test['spec'])
+            test_source_path(test['spec'])
         except ValueError:
             continue
         if re.fullmatch(r'[A-Za-z0-9_-]+', test['project']):
@@ -463,17 +474,17 @@ def prepare():
 
 
 def test_command(test, worktree, workers, grep):
-    spec = e2e_spec(test['spec'])
-    path = worktree / 'frontend/e2e/tests' / spec
+    source_path = test_source_path(test['spec'])
+    path = worktree / 'frontend' / source_path
     if not path.is_file():
-        raise ValueError(f'spec missing from checkout: {spec}')
+        raise ValueError(f'test missing from checkout: {source_path}')
     project = test['project']
     if not re.fullmatch(r'[A-Za-z0-9_-]+', project):
         raise ValueError('unsafe project')
     command = ['./node_modules/.bin/playwright', 'test', '--project=' + project,
                '--retries=0', '--workers=' + str(workers),
                '--reporter=./e2e/reporters/prow-junit-reporter.ts',
-               'e2e/tests/' + spec]
+               source_path]
     if grep:
         command.extend(['--grep', re.escape(test['name'].split(' › ')[-1]) + '$'])
     return command
@@ -564,13 +575,13 @@ def candidate_patch():
     for path in filter(None, untracked):
         if any(path.startswith(prefix) for prefix in ignored) or path.startswith('.claude/'):
             continue
-        if not any(path.startswith(prefix) for prefix in ALLOWED):
+        if not allowed_candidate_file(path):
             raise ValueError(f'agent created a file outside test code: {path}')
         git('add', '-N', '--', path, cwd=AGENT)
     paths = git('diff', '--name-only', '-z', 'HEAD', cwd=AGENT).stdout.decode().split('\0')
     paths = list(filter(None, paths))
     for path in paths:
-        if not any(path.startswith(prefix) for prefix in ALLOWED):
+        if not allowed_candidate_file(path):
             raise ValueError(f'agent modified a file outside test code: {path}')
     patch = git('diff', '--binary', 'HEAD', cwd=AGENT).stdout
     if len(patch) > 102400:

@@ -134,14 +134,17 @@ class DriverTests(unittest.TestCase):
 <testcase name="hard" classname="x"><error message="API error"/></testcase>
 </testsuite><testsuite name="dev-console/developer/demo.spec.ts" hostname="dev-console-developer">
 <testcase name="developer test" classname="x"><failure message="bad"/></testcase>
+</testsuite><testsuite name="../setup/knative.setup.ts" hostname="knative-setup">
+<testcase name="install operator" classname="x"><failure message="setup failed"/></testcase>
 </testsuite></testsuites>'''
         failed, flaked = self.driver.parse_original_junit(xml)
-        self.assertEqual(len(failed), 2)
+        self.assertEqual(len(failed), 3)
         self.assertEqual(len(flaked), 1)
         self.assertEqual(flaked[0]['name'], 'recovered')
         self.assertEqual(failed[1]['project'], 'dev-console-developer')
+        self.assertEqual(failed[2]['spec'], '../setup/knative.setup.ts')
 
-    def test_selection_excludes_setup_and_prefers_final_failures_without_history(self):
+    def test_selection_accepts_setup_and_prefers_final_failures_without_history(self):
         setup = {'spec': '../setup/knative.setup.ts', 'project': 'knative-setup',
                  'name': 'install operator'}
         failed = {'spec': 'console/app/debug-pod.spec.ts', 'project': 'console',
@@ -150,11 +153,44 @@ class DriverTests(unittest.TestCase):
                   'name': 'demo plugin'}
         context = {'failed_tests': [setup, failed], 'flaked_tests': [flaked]}
         selected = self.driver.selected_tests(context, {'suites': []})
-        self.assertEqual(selected, [failed, flaked])
+        self.assertEqual(selected, [setup, failed, flaked])
         history = {'suites': [{'suite': flaked['spec'], 'flake_rate': 0.5}]}
-        self.assertEqual(self.driver.selected_tests(context, history), [flaked, failed])
+        self.assertEqual(self.driver.selected_tests(context, history), [flaked, setup, failed])
+        work = self.root / 'agent'
+        setup_file = work / 'frontend/e2e/setup/knative.setup.ts'
+        setup_file.parent.mkdir(parents=True)
+        setup_file.write_text('test("install operator", () => {});\n')
+        command = self.driver.test_command(setup, work, 2, True)
+        self.assertIn('e2e/setup/knative.setup.ts', command)
         with self.assertRaises(ValueError):
-            self.driver.e2e_spec('/tmp/other.spec.ts')
+            self.driver.test_source_path('/tmp/other.spec.ts')
+        with self.assertRaises(ValueError):
+            self.driver.test_source_path('../setup/../../other.setup.ts')
+
+    def test_setup_rerun_matches_original_junit_identity(self):
+        setup = {'spec': '../setup/knative.setup.ts', 'project': 'knative-setup',
+                 'name': 'install operator'}
+        work = self.root / 'agent'
+        source = work / 'frontend/e2e/setup/knative.setup.ts'
+        source.parent.mkdir(parents=True)
+        source.write_text('test("install operator", () => {});\n')
+        report = work / 'frontend/test-results/prow-junit-results.xml'
+
+        def fake_playwright(command, **_):
+            self.assertIn('--project=knative-setup', command)
+            self.assertIn('e2e/setup/knative.setup.ts', command)
+            report.parent.mkdir(parents=True)
+            report.write_text('''<testsuites><testsuite name="../setup/knative.setup.ts"
+hostname="knative-setup"><testcase name="install operator"/></testsuite></testsuites>''')
+            return subprocess.CompletedProcess(command, 0, stdout='', stderr='')
+
+        with mock.patch.dict(self.driver.run_test.__globals__,
+                             {'cluster_env': lambda: os.environ.copy()}), \
+             mock.patch.object(self.driver.subprocess, 'run', side_effect=fake_playwright):
+            result = self.driver.run_test(setup, work, 2, 'baseline-1',
+                                          self.driver.time.monotonic() + 60)
+        self.assertTrue(result['executed'])
+        self.assertTrue(result['passed'])
 
     def test_unrunnable_selected_spec_records_incomplete_baseline_result(self):
         work = self.root / 'agent'
@@ -166,7 +202,7 @@ class DriverTests(unittest.TestCase):
                                           self.driver.time.monotonic() + 60)
         self.assertFalse(result['passed'])
         self.assertFalse(result['executed'])
-        self.assertIn('spec missing from checkout', result['error'])
+        self.assertIn('test missing from checkout', result['error'])
 
     def test_original_artifact_path_is_bound_to_this_pr_and_job(self):
         env = {'JOB_NAME': 'pull-ci-openshift-console-main-e2e-gcp-console',
@@ -459,6 +495,11 @@ Context (generated 2026-09-24T18:40:20.154Z)
         path = work / 'frontend/e2e/tests/console/a.spec.ts'
         path.parent.mkdir(parents=True)
         path.write_text('test("a", () => { expect(1).toBe(1); });\n')
+        setup = work / 'frontend/e2e/setup/knative.setup.ts'
+        setup.parent.mkdir(parents=True)
+        setup.write_text('test("setup", () => { expect(1).toBe(1); });\n')
+        helper = work / 'frontend/e2e/setup/login-helper.ts'
+        helper.write_text('export const login = () => true;\n')
         subprocess.run(['git', 'init', '-q', str(work)], check=True)
         subprocess.run(['git', '-C', str(work), 'config', 'user.email', 'test@example.com'], check=True)
         subprocess.run(['git', '-C', str(work), 'config', 'user.name', 'Test'], check=True)
@@ -478,6 +519,18 @@ Context (generated 2026-09-24T18:40:20.154Z)
         paths, patch = self.driver.candidate_patch()
         self.assertEqual(paths, ['frontend/e2e/tests/console/a.spec.ts'])
         self.assertNotIn(b'.last-run.json', patch)
+        setup.write_text('test("setup", () => { expect(1).toBe(2); });\n')
+        helper.write_text('export const login = () => false;\n')
+        paths, patch = self.driver.candidate_patch()
+        self.assertEqual(paths, ['frontend/e2e/setup/knative.setup.ts',
+                                 'frontend/e2e/setup/login-helper.ts',
+                                 'frontend/e2e/tests/console/a.spec.ts'])
+        self.assertIn(b'export const login = () => false;', patch)
+        forbidden_setup = work / 'frontend/e2e/setup/runner-config.ts'
+        forbidden_setup.write_text('export const retries = 2;\n')
+        with self.assertRaisesRegex(ValueError, 'outside test code'):
+            self.driver.candidate_patch()
+        forbidden_setup.unlink()
         forbidden = work / 'frontend/e2e/runner-config.ts'
         forbidden.write_text('export const retries = 2;\n')
         with self.assertRaisesRegex(ValueError, 'outside test code'):

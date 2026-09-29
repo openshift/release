@@ -49,9 +49,12 @@ queries the normal Console main job for historical data.
 `CONSOLE_FLAKE_VERIFY_RUNS` defaults to 5. The model call is capped at $5 and
 shares a 60-minute investigation window with baseline repeats. Independent
 verification has 30 minutes; finalization has 10 minutes, for a 100-minute
-outer timeout. The wrapper selects at most three eligible e2e specs for
-individual diagnosis. Setup failures remain available as context, but are not
-repair targets. Without matching history, final failures take priority over
+outer timeout. The wrapper selects at most three eligible e2e specs or
+Playwright setup tests for individual diagnosis. A selected setup failure can
+be rerun in its original project, and a proposed patch may change `.setup.ts`
+tests or `login-helper.ts` under `frontend/e2e/setup/`. Playwright config and
+other runner files remain outside the repair scope. Without matching history,
+final failures take priority over
 tests that passed on retry. The model may compare other failures for common
 symptoms. It is instructed to rerun only selected tests. If it reaches its
 spend cap before saving a candidate, the result records
