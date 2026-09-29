@@ -395,8 +395,19 @@ packet|equinix*)
         # IDMS is GA from OCP 4.13; skip on older clusters.
         echo "### IDMS check: DS_IP_STACK=${DS_IP_STACK} DS_OPENSHIFT_VERSION=${DS_OPENSHIFT_VERSION}"
         if [[ "${DS_IP_STACK}" == "v6" ]] && is_openshift_version_gte "4.13"; then
-            echo "### Creating ImageDigestMirrorSet for test images on disconnected cluster"
-            ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${DEVSCRIPTS_TEST_IMAGE_REPO}" << 'IDMS_EOF'
+            if [[ "${DEGRADED_NODE:-false}" == "true" ]]; then
+                # The master pool cannot finish a rollout once a master is offline.
+                # Require the degradation step to have applied this configuration
+                # while both masters were healthy, without changing it here.
+                if [[ ! -f "${SHARED_DIR}/test-image-idms-prepared" ]] ||
+                    [[ "$(cat "${SHARED_DIR}/test-image-idms-prepared")" != "${DEVSCRIPTS_TEST_IMAGE_REPO}" ]]; then
+                    echo "ERROR: The node-degradation step must prepare the test image mirror before node degradation." >&2
+                    exit 1
+                fi
+                echo "### Using test image IDMS prepared before node degradation"
+            else
+                echo "### Creating ImageDigestMirrorSet for test images on disconnected cluster"
+                ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${DEVSCRIPTS_TEST_IMAGE_REPO}" << 'IDMS_EOF'
                 set -euo pipefail
                 LOCAL_REPO="$1"
                 oc apply -f - <<EOF
@@ -414,6 +425,7 @@ EOF
                 oc wait mcp --all --for=condition=Updating=True --timeout=5m || true
                 oc wait mcp --all --for=condition=Updated=true --timeout=10m
 IDMS_EOF
+            fi
         fi
     else
         export TEST_PROVIDER='{"type":"skeleton"}'
