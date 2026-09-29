@@ -15,19 +15,12 @@ echo "Wait time: ${OVERRIDE_WAIT_TIME}s"
 ORIGINAL_IMAGE=$(oc get deployment -n openshift-etcd-operator etcd-operator -o jsonpath='{.spec.template.spec.containers[0].image}')
 echo "Original image: ${ORIGINAL_IMAGE}"
 
-# Step 1: Mark the etcd-operator deployment as unmanaged in CVO
-echo "--- Marking etcd-operator as unmanaged in ClusterVersion spec.overrides ---"
-oc patch clusterversion version --type=merge -p '{
-  "spec": {
-    "overrides": [{
-      "kind": "Deployment",
-      "name": "etcd-operator",
-      "namespace": "openshift-etcd-operator",
-      "unmanaged": true,
-      "group": "apps/v1"
-    }]
-  }
-}'
+# Step 1: Scale down CVO so it cannot reconcile managed operators
+echo "--- Scaling down cluster-version-operator ---"
+oc scale deployment/cluster-version-operator -n openshift-cluster-version --replicas=0
+oc wait deployment/cluster-version-operator -n openshift-cluster-version \
+  --for=jsonpath='{.status.replicas}'=0 --timeout=60s
+echo "CVO scaled down successfully"
 
 # Step 2: Patch the etcd-operator deployment with the custom image
 echo "--- Patching etcd-operator deployment with custom image ---"
@@ -50,11 +43,18 @@ if [[ "${CURRENT_IMAGE}" != "${ETCD_OPERATOR_IMAGE}" ]]; then
   exit 1
 fi
 
-# Step 4: Wait the configured period
+# Step 4: Scale CVO back up
+echo "--- Scaling cluster-version-operator back up ---"
+oc scale deployment/cluster-version-operator -n openshift-cluster-version --replicas=1
+oc wait deployment/cluster-version-operator -n openshift-cluster-version \
+  --for=condition=Available --timeout=120s
+echo "CVO scaled back up successfully"
+
+# Step 5: Wait the configured period to verify no reconciliation
 echo "--- Waiting ${OVERRIDE_WAIT_TIME}s to verify no reconciliation ---"
 sleep "${OVERRIDE_WAIT_TIME}"
 
-# Step 5: Verify the image was not reconciled back
+# Step 6: Verify the image was not reconciled back
 FINAL_IMAGE=$(oc get deployment -n openshift-etcd-operator etcd-operator -o jsonpath='{.spec.template.spec.containers[0].image}')
 echo "Image after ${OVERRIDE_WAIT_TIME}s wait: ${FINAL_IMAGE}"
 
