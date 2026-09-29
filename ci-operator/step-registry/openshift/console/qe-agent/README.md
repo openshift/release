@@ -30,8 +30,9 @@ agent-supplied verification status.
 The ref defaults to `CONSOLE_FLAKE_AGENT_ENABLED=false`. Main's standard job
 sets `CONSOLE_FLAKE_AGENT_ENABLED=rehearsal` before rollout. This runs the
 agent only in a matching `openshift/release` PR rehearsal, using that PR's
-immutable head SHA to fetch the driver and skill. A passing e2e test still
-invokes no model. A failed e2e test receives the same investigation and
+immutable head SHA to fetch the driver and skill. The agent post-step is
+optional on success, so a passing e2e test does not start its pod. Teardown
+steps still run. A failed e2e test receives the same investigation and
 independent verification as a normal run. After the rehearsal is reviewed and
 the step is merged, set `CONSOLE_FLAKE_SKILL_REVISION` to the full 40-character
 merged commit containing the reviewed driver and skill, then set
