@@ -1211,6 +1211,462 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- always_run: false
+  as: e2e-aro-classic-miwi-operator
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: azure-qe
+    env:
+      ARO_CLUSTER_VERSION: "4.21"
+    post:
+    - as: estate-sweep
+      best_effort: true
+      cli: latest
+      commands: |
+        # Remove any Route Server left in the network resource group, whoever
+        # made it. The suite builds its own estate on every other cloud, and if
+        # it does so here this job did not record it and cannot name it, but a
+        # Route Server still holds the subnet, which holds the virtual network,
+        # which takes the group delete with it. aro-deprovision runs next and
+        # would fail on exactly that.
+        set +e
+        set -uo pipefail
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}' 2>/dev/null)"
+        if [[ -z "${net_rg}" ]]; then
+          echo "no cluster to ask, so nothing can be swept"
+          exit 0
+        fi
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        err="$(mktemp)"
+        if ! az login --service-principal \
+             --username "$(jq -er .clientId "${sp}")" \
+             --password="$(jq -er .clientSecret "${sp}")" \
+             --tenant "$(jq -er .tenantId "${sp}")" --output none 2>"${err}"; then
+          echo "could not log in:"; redact <"${err}" | sed 's/^/  /'; exit 0
+        fi
+        az account set --subscription "$(jq -er .subscriptionId "${sp}")" 2>/dev/null
+
+        found="$(az network routeserver list -g "${net_rg}" --query "[].name" -o tsv 2>/dev/null)"
+        if [[ -z "${found}" ]]; then
+          echo "no Route Server in ${net_rg}"
+          exit 0
+        fi
+
+        while read -r rs; do
+          [[ -z "${rs}" ]] && continue
+          echo "=== ${rs} ==="
+          peerings="$(az network routeserver peering list -g "${net_rg}" --routeserver "${rs}" \
+            --query "[].name" -o tsv 2>/dev/null)"
+          while read -r peering; do
+            [[ -z "${peering}" ]] && continue
+            az network routeserver peering delete -g "${net_rg}" --routeserver "${rs}" \
+              -n "${peering}" --yes --output none 2>/dev/null \
+              && echo "  peering ${peering}: removed" \
+              || echo "  peering ${peering}: would not go"
+          done <<<"${peerings}"
+          # AnotherOperationInProgress is a wait, not a refusal.
+          for attempt in $(seq 1 8); do
+            if az network routeserver delete -g "${net_rg}" -n "${rs}" --yes --output none 2>"${err}"; then
+              echo "  removed on attempt ${attempt}"
+              break
+            fi
+            grep -q 'AnotherOperationInProgress' "${err}" || { echo "  COULD NOT REMOVE:"; redact <"${err}" | head -3 | sed 's/^/    /'; break; }
+            sleep 30
+          done
+        done <<<"${found}"
+        rm -f "${err}"
+        exit 0
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 45m0s
+    - ref: aro-deprovision
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: aro-provision-vnet
+    - as: aro-provision-miwi-cluster
+      cli: latest
+      commands: |
+        # Build an ARO classic cluster with managed identities. The shared
+        # aro-provision-cluster step cannot: its image carries az 2.61, and
+        # az aro create takes --enable-managed-identity only from 2.84.
+        # e2e-runner carries 2.90. az aro create makes neither the
+        # identities nor their role assignments for a managed-identity
+        # cluster, so this does, as Microsoft's "Create an Azure Red Hat
+        # OpenShift cluster with managed identities" lists them.
+        set -euo pipefail
+
+        CLUSTER="${NAMESPACE}-${UNIQUE_HASH}"
+        RESOURCEGROUP="$(cat "${SHARED_DIR}/resourcegroup")"
+        VNET="$(cat "${SHARED_DIR}/vnet")"
+        LOCATION="${LEASED_RESOURCE}"
+        echo "${CLUSTER}" > "${SHARED_DIR}/cluster-name"
+        echo "${LOCATION}" > "${SHARED_DIR}/location"
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        # --password=VALUE, not --password VALUE: a secret beginning with a
+        # hyphen is otherwise read as another flag.
+        az login --service-principal \
+          --username "$(jq -er .clientId "${sp}")" \
+          --password="$(jq -er .clientSecret "${sp}")" \
+          --tenant "$(jq -er .tenantId "${sp}")" --output none
+        subscription="$(jq -er .subscriptionId "${sp}")"
+        az account set --subscription "${subscription}"
+        echo "az $(az version --query '"azure-cli"' -o tsv)"
+
+        version="$(az aro get-versions -l "${LOCATION}" -o tsv | grep "^${ARO_CLUSTER_VERSION}\." | sort -V | tail -1 || true)"
+        if [[ -z "${version}" ]]; then
+          echo "no ARO ${ARO_CLUSTER_VERSION}.x in ${LOCATION}; it offers:" >&2
+          az aro get-versions -l "${LOCATION}" -o tsv >&2
+          exit 1
+        fi
+        echo "ARO ${version} in ${LOCATION}"
+
+        operators=(aro-operator cloud-controller-manager cloud-network-config
+                   disk-csi-driver file-csi-driver image-registry ingress machine-api)
+
+        # The resource provider publishes the operators per minor version
+        # but not the scopes their roles apply at, so the scopes are written
+        # below and the list is checked against the provider's. A new
+        # operator would otherwise surface as a create failing an hour in.
+        want="$(printf '%s\n' "${operators[@]}" | sort)"
+        got="$(az rest --method GET \
+          --url "https://management.azure.com/subscriptions/${subscription}/providers/Microsoft.RedHatOpenShift/locations/${LOCATION}/platformWorkloadIdentityRoleSets/${version%.*}?api-version=2025-07-25" \
+          --query 'properties.platformWorkloadIdentityRoles[].operatorName' -o tsv | sort)"
+        if [[ "${want}" != "${got}" ]]; then
+          echo "the provider's operators for ${version%.*} differ from this step's:" >&2
+          diff <(echo "${want}") <(echo "${got}") >&2 || true
+          exit 1
+        fi
+
+        declare -A id=() principal=()
+        for key in cluster "${operators[@]}"; do
+          out="$(az identity create -g "${RESOURCEGROUP}" -n "${CLUSTER}-${key}" -l "${LOCATION}" \
+            --query '[id, principalId]' -o tsv)"
+          id[${key}]="$(sed -n 1p <<<"${out}")"
+          principal[${key}]="$(sed -n 2p <<<"${out}")"
+        done
+        echo "created ${#id[@]} identities"
+
+        # A role assignment to a principal created seconds ago fails with
+        # PrincipalNotFound until the principal has replicated.
+        grant() {
+          local attempt
+          for attempt in $(seq 1 10); do
+            if az role assignment create --assignee-object-id "$1" \
+                 --assignee-principal-type ServicePrincipal \
+                 --role "$2" --scope "$3" --output none; then
+              return 0
+            fi
+            sleep 20
+          done
+          return 1
+        }
+
+        vnet_scope="/subscriptions/${subscription}/resourceGroups/${RESOURCEGROUP}/providers/Microsoft.Network/virtualNetworks/${VNET}"
+        n=0
+
+        # Azure Red Hat OpenShift Federated Credential, for the cluster
+        # identity over each platform identity.
+        for op in "${operators[@]}"; do
+          grant "${principal[cluster]}" ef318e2a-8334-4a05-9e4a-295a196c6a6e "${id[${op}]}"
+          n=$((n + 1))
+        done
+
+        # operator, role definition, scope; "subnets" means both subnets.
+        # disk-csi-driver has a role in the set but no network grant.
+        while read -r op role scope; do
+          [[ -n "${op}" ]] || continue
+          if [[ "${scope}" == subnets ]]; then
+            grant "${principal[${op}]}" "${role}" "${vnet_scope}/subnets/master-subnet"
+            grant "${principal[${op}]}" "${role}" "${vnet_scope}/subnets/worker-subnet"
+            n=$((n + 2))
+          else
+            grant "${principal[${op}]}" "${role}" "${vnet_scope}"
+            n=$((n + 1))
+          fi
+        done <<'EOF'
+        cloud-controller-manager a1f96423-95ce-4224-ab27-4e3dc72facd4 subnets
+        ingress                  0336e1d3-7a87-462b-b6db-342b63f7802c subnets
+        machine-api              0358943c-7e01-48ba-8889-02cc51d78637 subnets
+        aro-operator             4436bae4-7702-4c84-919b-c4069ff25ee2 subnets
+        cloud-network-config     be7a6435-15ae-4171-8f30-4a343eff9e8f vnet
+        file-csi-driver          0d7aedc0-15fd-4a67-a412-efad370c947e vnet
+        image-registry           8b32b316-c2f5-4ddf-b05b-83dacd2d08b5 vnet
+        EOF
+
+        # Azure Red Hat OpenShift First Party Network, for the resource
+        # provider's own principal, over the vnet.
+        rp="$(az ad sp show --id f1dd0a37-89c6-4e07-bcd1-ffd3d43d8875 --query id -o tsv)"
+        grant "${rp}" 42f3c60f-e7b1-46d7-ba56-6de681664342 "${vnet_scope}"
+        n=$((n + 1))
+        echo "${n} role assignments"
+
+        args=(--enable-managed-identity --assign-cluster-identity "${id[cluster]}")
+        for op in "${operators[@]}"; do
+          args+=(--assign-platform-workload-identity "${op}" "${id[${op}]}")
+        done
+        pull_secret=()
+        if [[ -f "${CLUSTER_PROFILE_DIR}/pull-secret" ]]; then
+          pull_secret=(--pull-secret "@${CLUSTER_PROFILE_DIR}/pull-secret")
+        fi
+
+        echo "creating ${CLUSTER}; this takes about an hour"
+        az aro create -g "${RESOURCEGROUP}" -n "${CLUSTER}" --location "${LOCATION}" \
+          --version "${version}" --vnet "${VNET}" \
+          --master-subnet master-subnet --worker-subnet worker-subnet \
+          "${pull_secret[@]}" "${args[@]}" --output none
+
+        az aro get-admin-kubeconfig -g "${RESOURCEGROUP}" -n "${CLUSTER}" \
+          --file "${SHARED_DIR}/kubeconfig"
+        KUBECONFIG="${SHARED_DIR}/kubeconfig" oc wait clusteroperators --all \
+          --for=condition=Available --timeout=30m
+      env:
+      - default: "4.21"
+        documentation: OpenShift minor version; the latest patch ARO offers in the
+          leased region is used.
+        name: ARO_CLUSTER_VERSION
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    - ref: ipi-install-rbac
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # Both controllers watch FRRConfiguration and RouteAdvertisements
+        # from SetupWithManager, and CNO creates those two CRDs only in
+        # response to this patch. Without them the caches never sync, the
+        # manager exits after two minutes, and the CSV never installs.
+        # The operator applies this same patch itself as the first phase
+        # of reconcile, but it cannot stay alive long enough to do so;
+        # when that is fixed, this step comes out and the job proves the
+        # install a catalogue user actually performs.
+        oc patch network.operator.openshift.io cluster --type=merge \
+          -p '{"spec":{"additionalRoutingCapabilities":{"providers":["FRR"]},"defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+
+        deadline=$((SECONDS + 900))
+
+        for crd in frrconfigurations.frrk8s.metallb.io routeadvertisements.k8s.ovn.org; do
+          echo "waiting for crd/${crd}..."
+          until oc wait --for=condition=Established "crd/${crd}" --timeout=10s >/dev/null 2>&1; do
+            if (( SECONDS >= deadline )); then
+              oc get network.operator.openshift.io cluster -o yaml >&2
+              echo "timed out waiting for crd/${crd}" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+        done
+
+        # The rollout is what says CNO finished rather than that it
+        # started. Measured at about two minutes on 4.22.
+        echo "waiting for the frr-k8s rollout..."
+        until oc -n openshift-frr-k8s rollout status daemonset/frr-k8s --timeout=2m >/dev/null 2>&1; do
+          if (( SECONDS >= deadline )); then
+            oc -n openshift-frr-k8s get pods >&2
+            echo "timed out waiting for the frr-k8s daemonset" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+
+        oc -n openshift-frr-k8s get daemonset frr-k8s
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        # The administrator's half on a cluster with managed identities,
+        # as docs/azure-authentication.md in bgp-cloud-connector describes
+        # it: an identity for the operator with Network Contributor over
+        # the group holding the vnet and the Route Server, the operator's
+        # ServiceAccount trusted on it and on machine-api, and the identity
+        # handed to the operator through its Subscription, where the
+        # console would put it.
+        #
+        # machine-api because the deny assignment on the managed group lets
+        # only the platform identities write the router nodes' interfaces.
+        # rh-mobb's aro-bgp borrows the same one for the same write.
+        set -euo pipefail
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        CLUSTER="$(cat "${SHARED_DIR}/cluster-name")"
+        RESOURCEGROUP="$(cat "${SHARED_DIR}/resourcegroup")"
+        ns=openshift-bgp-cloud-connector
+        subject="system:serviceaccount:${ns}:openshift-bgp-cloud-connector-controller-manager"
+        issuer="$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')"
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        az login --service-principal \
+          --username "$(jq -er .clientId "${sp}")" \
+          --password="$(jq -er .clientSecret "${sp}")" \
+          --tenant "$(jq -er .tenantId "${sp}")" --output none
+        subscription="$(jq -er .subscriptionId "${sp}")"
+        tenant="$(jq -er .tenantId "${sp}")"
+        az account set --subscription "${subscription}"
+
+        operator_identity="${CLUSTER}-bgp-cloud-connector"
+        az identity create -g "${RESOURCEGROUP}" -n "${operator_identity}" --output none
+        op_client="$(az identity show -g "${RESOURCEGROUP}" -n "${operator_identity}" --query clientId -o tsv)"
+        op_principal="$(az identity show -g "${RESOURCEGROUP}" -n "${operator_identity}" --query principalId -o tsv)"
+
+        for identity in "${operator_identity}" "${CLUSTER}-machine-api"; do
+          az identity federated-credential create -g "${RESOURCEGROUP}" --identity-name "${identity}" \
+            --name bgp-cloud-connector --issuer "${issuer}" --subject "${subject}" \
+            --audiences openshift --output none
+          echo "trusted ${subject} on ${identity}"
+        done
+
+        scope="/subscriptions/${subscription}/resourceGroups/${RESOURCEGROUP}"
+        for attempt in $(seq 1 10); do
+          if az role assignment create --assignee-object-id "${op_principal}" \
+               --assignee-principal-type ServicePrincipal --role "Network Contributor" \
+               --scope "${scope}" --output none 2>&1 | redact; then
+            break
+          fi
+          if (( attempt == 10 )); then
+            echo "could not grant Network Contributor over ${RESOURCEGROUP}" >&2
+            exit 1
+          fi
+          sleep 20
+        done
+        echo "granted Network Contributor over ${RESOURCEGROUP}"
+
+        # Usable is not the same as created; grant-network-role measured
+        # twenty seconds to six minutes.
+        for attempt in $(seq 1 36); do
+          if az role assignment list --assignee "${op_principal}" --scope "${scope}" \
+               --query "[?roleDefinitionName=='Network Contributor'] | length(@)" -o tsv 2>/dev/null \
+               | grep -qv '^0$'; then
+            echo "  visible after $(( attempt * 20 )) seconds"
+            break
+          fi
+          if (( attempt == 36 )); then
+            echo "the role assignment never became visible" >&2
+            exit 1
+          fi
+          sleep 20
+        done
+
+        az identity show -g "${RESOURCEGROUP}" -n "${CLUSTER}-machine-api" --query clientId -o tsv \
+          > "${SHARED_DIR}/nic-client-id"
+
+        subscription_object="$(oc -n "${ns}" get subscription.operators.coreos.com -o name | head -1)"
+        oc -n "${ns}" patch "${subscription_object}" --type=merge -p "$(jq -nc \
+          --arg c "${op_client}" --arg t "${tenant}" --arg s "${subscription}" \
+          '{spec:{config:{env:[{name:"CLIENTID",value:$c},{name:"TENANTID",value:$t},{name:"SUBSCRIPTIONID",value:$s}]}}}')"
+
+        # OLM rewrites the deployment from the Subscription; wait for the
+        # identity to reach it, then for the new pod.
+        deadline=$((SECONDS + 300))
+        until oc -n "${ns}" get deployment openshift-bgp-cloud-connector-controller-manager \
+                -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].env[?(@.name=="CLIENTID")].value}' \
+                | grep -q .; do
+          if (( SECONDS >= deadline )); then
+            echo "the Subscription's identity never reached the deployment" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+        oc -n "${ns}" rollout status deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+
+        # Prove the borrowed identity before the suite depends on it: a
+        # token for the operator's ServiceAccount, exchanged for
+        # machine-api, reads the interfaces in the managed group. A new
+        # federated credential can take a minute to be honoured.
+        nic_client="$(cat "${SHARED_DIR}/nic-client-id")"
+        managed_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')"
+        exchange_dir="$(mktemp -d)"
+        for attempt in $(seq 1 12); do
+          token="$(oc -n "${ns}" create token openshift-bgp-cloud-connector-controller-manager \
+            --audience openshift --duration 10m)"
+          if AZURE_CONFIG_DIR="${exchange_dir}" az login --service-principal -u "${nic_client}" \
+               -t "${tenant}" --federated-token "${token}" --allow-no-subscriptions --output none 2>/dev/null; then
+            break
+          fi
+          if (( attempt == 12 )); then
+            echo "the operator's ServiceAccount token was never exchanged for machine-api" >&2
+            exit 1
+          fi
+          sleep 10
+        done
+        nics="$(AZURE_CONFIG_DIR="${exchange_dir}" az network nic list -g "${managed_rg}" \
+          --subscription "${subscription}" --query 'length(@)' -o tsv)"
+        if [[ -z "${nics}" || "${nics}" == 0 ]]; then
+          echo "machine-api, as the operator's ServiceAccount, found no interfaces in ${managed_rg}" >&2
+          exit 1
+        fi
+        echo "machine-api, as the operator's ServiceAccount, reads ${nics} interfaces in ${managed_rg}"
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: NETWORK_INTERFACE_CLIENT_ID="$(cat "${SHARED_DIR}/nic-client-id")"
+        hack/ci-e2e-azure.sh
+      from: e2e-runner
+      grace_period: 1h0m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
