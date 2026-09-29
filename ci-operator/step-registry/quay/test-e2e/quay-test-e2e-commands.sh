@@ -762,6 +762,27 @@ startJaegerPortForward
 
 echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
+# TEMPORARY evidence for openshift/release#86086, reverted before merge: a spec
+# that fails with real Quay CSRF/session values and a random bearer token in
+# Playwright's call log and trace, so the rehearsal shows the scrub at work.
+cat > playwright/e2e/zz-scrub-evidence.spec.ts <<'EOF'
+import {test} from '@playwright/test';
+import {randomBytes} from 'crypto';
+import {API_URL} from '../utils/config';
+
+test('scrub evidence: failing request logs auth headers', async ({request}) => {
+  const {csrf_token} = await (await request.get(`${API_URL}/csrf_token`)).json();
+  const {cookies} = await request.storageState();
+  const session = cookies.find((c) => c.name === '_csrf_token')?.value ?? randomBytes(24).toString('base64');
+  await request.get('http://127.0.0.1:9/api/v1/user/', {
+    headers: {
+      Authorization: 'Bearer ' + randomBytes(20).toString('hex'),
+      'X-CSRF-Token': csrf_token,
+      Cookie: '_csrf_token=' + session,
+    },
+  });
+});
+EOF
 npx playwright test \
   "${GREP_INVERT_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
