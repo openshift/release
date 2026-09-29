@@ -77,6 +77,13 @@ chain:
     - name: HYPERSHIFT_DYNAMIC_DNS
       default: ""
       documentation: "Set dynamic dns for kube-apiserver"
+    - name: HYPERSHIFT_DYNAMIC_DNS_BASE_DOMAIN
+      default: ""
+      documentation: |-
+        If set and HYPERSHIFT_DYNAMIC_DNS is empty, the kube-apiserver DNS name is derived
+        per job run as kas-<cluster-name>.<HYPERSHIFT_DYNAMIC_DNS_BASE_DOMAIN>, so that
+        concurrent runs never share a DNS record. Whichever name is used, it is written to
+        ${SHARED_DIR}/kas_dns_name for later steps to update and clean up the record.
     - name: HYPERSHIFT_AUTONODE
       default: "false"
       documentation: "If set to true, it sets the --auto-node flag to true"
@@ -175,8 +182,13 @@ chain:
         COMMAND+=(--kms-key-arn="$(cat ${SHARED_DIR}/aws_kms_key_arn)")
       fi
       
+      if [[ -z $HYPERSHIFT_DYNAMIC_DNS && -n $HYPERSHIFT_DYNAMIC_DNS_BASE_DOMAIN ]]; then
+        HYPERSHIFT_DYNAMIC_DNS="kas-${CLUSTER_NAME}.${HYPERSHIFT_DYNAMIC_DNS_BASE_DOMAIN}"
+      fi
+
       if [[ -n $HYPERSHIFT_DYNAMIC_DNS ]]; then
         COMMAND+=(--kas-dns-name="${HYPERSHIFT_DYNAMIC_DNS}")
+        echo "${HYPERSHIFT_DYNAMIC_DNS}" > "${SHARED_DIR}/kas_dns_name"
       fi
 
       if [[ -n "${ADDITIONAL_CA_BUNDLE_FILE}" ]]; then
