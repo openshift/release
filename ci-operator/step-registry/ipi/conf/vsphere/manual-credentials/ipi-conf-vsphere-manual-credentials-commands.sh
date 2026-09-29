@@ -77,6 +77,10 @@ patch=$(mktemp)
 trap 'rm -f "${patch}"' EXIT
 jq -n --argjson vcenter "${vcenter}" \
   '{platform: {vsphere: {credentialType: "component-scoped", vcenters: [$vcenter]}}}' >"${patch}"
+# The merge keeps existing fields when a patch omits them, so remove global
+# credentials before applying the component-scoped vCenter configuration.
+yq-go d -i "${CONFIG}" 'platform.vsphere.vcenters[0].user'
+yq-go d -i "${CONFIG}" 'platform.vsphere.vcenters[0].password'
 yq-go m -x -i "${CONFIG}" "${patch}"
 
 echo "Configured four vCenter accounts for Manual credentials mode"
