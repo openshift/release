@@ -266,6 +266,8 @@ spec:
         - world
         - host
 ---
+# The four NetworkPolicies below are also added in https://github.com/openshift/hypershift/pull/9515
+# They can be removed once the PR is merged and backported to the respective release branches.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
