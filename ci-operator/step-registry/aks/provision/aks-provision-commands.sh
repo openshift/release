@@ -399,6 +399,25 @@ EOF
     # BEGIN NAP FAILURE ARTIFACT COLLECTOR
     # Publish only fixed keys and allowlisted values. Cluster-provided strings stay in
     # the private temporary directory and are used only for in-memory categorization.
+    capture_nap_json() {
+        local output="$1"
+        shift
+
+        # Suppress the enclosing group's stderr before the shell opens the private
+        # output path. A redirection failure would otherwise disclose that path.
+        if { "$@" > "${output}"; } 2>/dev/null \
+            && jq -e '.items | type == "array"' "${output}" >/dev/null 2>/dev/null; then
+            return 0
+        fi
+
+        # Replace failed or invalid captures with safe input for the aggregator. If
+        # even that write fails, remove any partial raw capture and report unavailable.
+        if ! { printf '{"items":[]}\n' > "${output}"; } 2>/dev/null; then
+            rm -f -- "${output}" 2>/dev/null || true
+        fi
+        return 1
+    }
+
     collect_nap_failure_artifacts() {
         local xtrace_enabled=false
         local capture_dir=""
@@ -439,30 +458,21 @@ EOF
         echo "Collecting NAP failure diagnostics"
 
         if capture_dir="$(mktemp -d 2>/dev/null)"; then
-            if oc --request-timeout=15s get nodeclaims.karpenter.sh -o json \
-                > "${capture_dir}/nodeclaims.json" 2>/dev/null \
-                && jq -e '.items | type == "array"' "${capture_dir}/nodeclaims.json" >/dev/null 2>/dev/null; then
+            if capture_nap_json "${capture_dir}/nodeclaims.json" \
+                oc --request-timeout=15s get nodeclaims.karpenter.sh -o json; then
                 nodeclaims_available=true
-            else
-                printf '{"items":[]}\n' > "${capture_dir}/nodeclaims.json"
             fi
 
-            if oc --request-timeout=15s get events -A \
-                --field-selector source=karpenter-events -o json \
-                > "${capture_dir}/karpenter-events.json" 2>/dev/null \
-                && jq -e '.items | type == "array"' "${capture_dir}/karpenter-events.json" >/dev/null 2>/dev/null; then
+            if capture_nap_json "${capture_dir}/karpenter-events.json" \
+                oc --request-timeout=15s get events -A \
+                --field-selector source=karpenter-events -o json; then
                 karpenter_events_available=true
-            else
-                printf '{"items":[]}\n' > "${capture_dir}/karpenter-events.json"
             fi
 
-            if oc --request-timeout=15s get events -n default \
-                --field-selector involvedObject.kind=Pod -o json \
-                > "${capture_dir}/scheduler-events.json" 2>/dev/null \
-                && jq -e '.items | type == "array"' "${capture_dir}/scheduler-events.json" >/dev/null 2>/dev/null; then
+            if capture_nap_json "${capture_dir}/scheduler-events.json" \
+                oc --request-timeout=15s get events -n default \
+                --field-selector involvedObject.kind=Pod -o json; then
                 scheduler_events_available=true
-            else
-                printf '{"items":[]}\n' > "${capture_dir}/scheduler-events.json"
             fi
 
             # jq emits digits only. The shell validates the complete fixed-width tuple
