@@ -570,6 +570,15 @@ setup_vault_namespace() {
     --from-file=license="${VAULT_LICENSE_FILE}" \
     -n "${namespace}" \
     --dry-run=client -o yaml | oc apply -f -
+
+  # Placeholder so server.extraSecretEnvironmentVars can reference the secret
+  # before operator init. store_vault_init_secrets replaces the token afterward,
+  # and the post-init pod recreate picks up VAULT_TOKEN in the container env.
+  echo "Creating placeholder vault-root-token secret..."
+  oc create secret generic vault-root-token \
+    --from-literal=token="pending-init" \
+    -n "${namespace}" \
+    --dry-run=client -o yaml | oc apply -f -
 }
 
 store_vault_init_secrets() {
@@ -720,10 +729,11 @@ initialize_or_unseal_vault() {
   wait_for_vault_unsealed "${namespace}" "${pod_name}"
 
   # Init secrets are created after the TLS restart pod is already running. Kubernetes
-  # does not hot-reload optional secret volumes, so recreate the pod once so the
-  # auto-unseal sidecar mounts vault-unseal-key. This is separate from the earlier
+  # does not hot-reload optional secret volumes or secretKeyRef env vars, so recreate
+  # the pod once so the auto-unseal sidecar mounts vault-unseal-key and the vault
+  # container picks up the real VAULT_TOKEN. This is separate from the earlier
   # StatefulSet restart that mounts the service-CA TLS certificate.
-  echo "Recreating ${pod_name} so init secrets mount for auto-unseal sidecar..."
+  echo "Recreating ${pod_name} so init secrets mount and VAULT_TOKEN is refreshed..."
   oc delete pod "${pod_name}" -n "${namespace}" --wait=false
   wait_for_vault_pod_created "${namespace}" "${pod_name}"
   oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
@@ -945,6 +955,10 @@ ${data_storage_block}
     apiAddr: "${vault_api_addr}"
   extraEnvironmentVars:
     VAULT_DISABLE_USER_LOCKOUT: "true"
+  extraSecretEnvironmentVars:
+    - envName: VAULT_TOKEN
+      secretName: vault-root-token
+      secretKey: token
   enterpriseLicense:
     secretName: ${VAULT_LICENSE_SECRET_NAME}
     secretKey: license
