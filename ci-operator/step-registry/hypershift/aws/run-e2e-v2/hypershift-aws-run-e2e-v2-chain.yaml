@@ -7,6 +7,9 @@ chain:
     - name: HYPERSHIFT_PLATFORM
       default: ""
       documentation: "The cloud platform for the clusters (e.g. aws). Set in the workflow env block."
+    - name: TEST_PLAN_FILE
+      default: ""
+      documentation: "Path to a test plan that ships in the hypershift-tests image, e.g. /hypershift/testplans/aws-etcd-sharding.yaml. Must match the value given to hypershift-aws-create-guests so the same plan selects the clusters and the tests. Ignored when hypershift-write-test-plan has written an inline plan to SHARED_DIR."
     commands: |-
       set -xuo pipefail
       export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
@@ -14,7 +17,11 @@ chain:
       export AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       export PULL_SECRET_FILE="/etc/ci-pull-credentials/.dockerconfigjson"
       if [[ -f "${SHARED_DIR}/test-plan.yaml" ]]; then
+          # An inline plan written by hypershift-write-test-plan wins over a
+          # plan that ships in the image, so a job can always override.
           export TEST_PLAN="${SHARED_DIR}/test-plan.yaml"
+      elif [[ -n "${TEST_PLAN_FILE:-}" ]]; then
+          export TEST_PLAN="${TEST_PLAN_FILE}"
       fi
       /hypershift/bin/run-tests
     timeout: 150m

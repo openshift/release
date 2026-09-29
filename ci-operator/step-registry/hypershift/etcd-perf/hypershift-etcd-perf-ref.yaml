@@ -1,0 +1,112 @@
+ref:
+  as: hypershift-etcd-perf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: ETCD_PERF_WORKLOAD
+    default: "event-storm"
+    documentation: |-
+      Which "kube-burner-ocp etcd-density" sub-workload to run. One of
+      event-storm, crashloop-flood, db-quota-pressure, annotation-churn.
+      These are the four workloads the OpenShift Performance and Scale team
+      used for the standard-vs-sharded etcd characterisation on HCP.
+  - name: ETCD_PERF_FLAGS
+    default: ""
+    documentation: |-
+      Workload specific flags appended verbatim to the kube-burner-ocp
+      invocation, e.g. "--iterations=900 --event-iterations=2000".
+      See "kube-burner-ocp etcd-density <workload> --help" for the flag set;
+      it differs per workload.
+  - name: ETCD_PERF_VARIANT
+    default: "standard"
+    documentation: |-
+      Free form label recorded alongside the results so the sharded run can be
+      told apart from the standard baseline run when the two are compared.
+      Conventionally "standard" or "sharded"; it has no effect on what runs.
+  - name: QPS
+    default: "20"
+    documentation: "Client side QPS for kube-burner. 20 matches the perf and scale baseline."
+  - name: BURST
+    default: "40"
+    documentation: "Client side burst for kube-burner. 40 matches the perf and scale baseline."
+  - name: GC
+    default: "true"
+    documentation: |-
+      Whether kube-burner deletes the objects it created. Set to false for
+      db-quota-pressure, which has to retain its objects to keep the backend
+      under storage pressure for the duration of the measurement.
+  - name: KUBE_BURNER_VERSION
+    default: "1.12.6"
+    documentation: "kube-burner-ocp release to download."
+  - name: KUBE_BURNER_URL
+    default: ""
+    documentation: "Full URL of a kube-burner-ocp tarball, overriding KUBE_BURNER_VERSION."
+  - name: METRICS_STEP
+    default: "30s"
+    documentation: "Prometheus range query resolution used when collecting the metrics profile."
+  - name: SCRAPE_SETTLE_SECONDS
+    default: "180"
+    documentation: |-
+      How long to wait after enabling user workload monitoring before checking
+      that the hosted control plane etcd targets are actually being scraped.
+  - name: INDEX_TO_ES
+    default: "false"
+    documentation: |-
+      When true, index the collected metrics into the perf and scale
+      Elasticsearch so Orion can do run-over-run regression detection.
+      When false the metrics are only written to the artifact directory.
+  - name: ES_SECRETS_PATH
+    default: "/secret"
+    documentation: "Directory holding the Elasticsearch username, password and optional host files."
+  - name: ES_INDEX
+    default: "ripsaw-kube-burner"
+    documentation: "Elasticsearch index to write the collected metrics to."
+  - name: ETCD_MAX_P99_COMMIT_LATENCY_MS
+    default: ""
+    documentation: |-
+      Optional hard gate. If set, the step fails when the peak 99th percentile
+      etcd backend commit latency observed during the run exceeds this many
+      milliseconds. Leave empty to collect data without gating; the intended
+      use is a deliberately generous bound that only catches gross regressions,
+      with trend detection left to Orion over the indexed results.
+  - name: ETCD_MAX_LEADER_CHANGES
+    default: ""
+    documentation: |-
+      Optional hard gate. If set, the step fails when any etcd shard saw more
+      than this many leader changes during the run. Leave empty to disable.
+  commands: hypershift-etcd-perf-commands.sh
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 4h0m0s
+  grace_period: 10m0s
+  documentation: |-
+    Runs one of the kube-burner-ocp "etcd-density" workloads against a
+    HyperShift hosted cluster and collects the etcd and kube-apiserver metrics
+    of that cluster's hosted control plane.
+
+    The interesting property of a hosted cluster is that the load is applied to
+    the guest API server while the etcd being measured runs as pods in the
+    "clusters-<name>" namespace of the management cluster. So this step drives
+    the workload with the guest kubeconfig and scrapes metrics from the
+    management cluster's Thanos, using a metrics profile scoped to the hosted
+    control plane namespace and broken down "by (pod)" so that each etcd shard
+    is reported separately.
+
+    It does not compare shard topologies by itself. Comparison is done by
+    running the same workload twice, once against a hosted cluster created with
+    "--etcd-shard" flags and once without, and diffing the two result sets --
+    either by hand from the artifact directory or, when INDEX_TO_ES is true,
+    with Orion over the indexed metrics.
+
+    Requires a hosted cluster to already exist, i.e. the hypershift-aws-create
+    chain (or an equivalent) must have run and written ${SHARED_DIR}/cluster-name
+    and ${SHARED_DIR}/nested_kubeconfig.
