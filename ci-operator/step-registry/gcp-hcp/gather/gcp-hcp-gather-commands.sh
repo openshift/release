@@ -353,9 +353,9 @@ finalize_scope() {
   local scope_dir="$2"
   local record_file="$3"
   local status="success"
-  local archive_path="${GATHER_ROOT}/${name}.tar.gz"
+  local archive_path="${GATHER_ROOT}/${name}.tgz"
   local archive_temp
-  local archive_publish_temp="${GATHER_ROOT}/.${name}.tar.gz.tmp"
+  local archive_publish_temp="${GATHER_ROOT}/.${name}.tgz.tmp"
   local archive_json="null"
   local bytes=0
   local digest=""
@@ -382,15 +382,16 @@ finalize_scope() {
     find "${scope_dir}" \( -type f -o -type d \) -exec touch -t 198001010000 {} +
     scope_parent="$(dirname "${scope_dir}")"
     scope_base="$(basename "${scope_dir}")"
-    archive_temp="${scope_parent}/.${name}.tar.gz"
+    archive_temp="${scope_parent}/.${name}.tgz"
     if (
       cd "${scope_parent}" || exit 1
-      find "${scope_base}" \( -type f -o -type l \) -print0 | LC_ALL=C sort -z | tar --null -T - -cf -
+      # Prow censoring requires explicit directory entries before nested files.
+      find "${scope_base}" \( -type d -o -type f -o -type l \) -print0 | LC_ALL=C sort -z | tar --no-recursion --null -T - -cf -
     ) | gzip -n >"${archive_temp}"; then
       if cp "${archive_temp}" "${archive_publish_temp}" && mv "${archive_publish_temp}" "${archive_path}"; then
         bytes="$(wc -c <"${archive_path}" | tr -d ' ')"
         digest="$(sha256_file "${archive_path}")"
-        archive_json="gather/${name}.tar.gz"
+        archive_json="gather/${name}.tgz"
         if (( bytes < CHAI_MAX_BYTES )); then
           chai_readable="true"
         fi
@@ -543,7 +544,7 @@ finalize_scope_bounded() {
     "${name}" "${scope_dir}" "${record}"
   local finalize_exit=$?
   if (( finalize_exit != 0 )); then
-    rm -f "${GATHER_ROOT}/${name}.tar.gz" "${GATHER_ROOT}/.${name}.tar.gz.tmp"
+    rm -f "${GATHER_ROOT}/${name}.tgz" "${GATHER_ROOT}/.${name}.tgz.tmp"
     jq -n \
       --arg name "${name}" \
       --arg error "finalize: exit=${finalize_exit} timeout=$([[ "${finalize_exit}" == "124" ]] && printf true || printf false)" \
