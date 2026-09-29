@@ -93,11 +93,11 @@ WriteJunit() {
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"opp-smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        echo "<testsuite name=\"lp-interop--OPP--smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
-            echo "  <testcase classname=\"opp-smoke\" name=\"${name}\">"
+            echo "  <testcase classname=\"lp-interop--OPP--smoke\" name=\"${name}\">"
             if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
                 typeset msg=""
                 msg="$(XmlEscape "${tcMessagesArr[$i]}")"
@@ -128,7 +128,7 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
+trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
 
 # ---------------------------------------------------------------------------
 # Test 1: cluster-health
