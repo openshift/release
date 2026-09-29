@@ -176,6 +176,7 @@ if [[ -n "${PAYLOAD_URL}" ]]; then
   set +a
   PS=${OPENSHIFT_PULL_SECRET:-openshift_pull.json}
   [[ "$PS" = /* ]] && LOCAL_PULL_SECRET="$PS" || LOCAL_PULL_SECRET="${WORK_DIR}/$PS"
+  mkdir -p "$(dirname "${LOCAL_PULL_SECRET}")"
   cp /tmp/pull-secret.json "${LOCAL_PULL_SECRET}"
   echo "Pull secret with CI registry credentials placed at ${LOCAL_PULL_SECRET}"
   rm -f /tmp/pull-secret.json
