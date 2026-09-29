@@ -141,6 +141,33 @@ class DriverTests(unittest.TestCase):
         self.assertEqual(flaked[0]['name'], 'recovered')
         self.assertEqual(failed[1]['project'], 'dev-console-developer')
 
+    def test_selection_excludes_setup_and_prefers_final_failures_without_history(self):
+        setup = {'spec': '../setup/knative.setup.ts', 'project': 'knative-setup',
+                 'name': 'install operator'}
+        failed = {'spec': 'console/app/debug-pod.spec.ts', 'project': 'console',
+                  'name': 'debug pod'}
+        flaked = {'spec': 'console/app/demo-dynamic-plugin.spec.ts', 'project': 'console',
+                  'name': 'demo plugin'}
+        context = {'failed_tests': [setup, failed], 'flaked_tests': [flaked]}
+        selected = self.driver.selected_tests(context, {'suites': []})
+        self.assertEqual(selected, [failed, flaked])
+        history = {'suites': [{'suite': flaked['spec'], 'flake_rate': 0.5}]}
+        self.assertEqual(self.driver.selected_tests(context, history), [flaked, failed])
+        with self.assertRaises(ValueError):
+            self.driver.e2e_spec('/tmp/other.spec.ts')
+
+    def test_unrunnable_selected_spec_records_incomplete_baseline_result(self):
+        work = self.root / 'agent'
+        (work / 'frontend').mkdir(parents=True)
+        test = {'spec': 'console/missing.spec.ts', 'project': 'console', 'name': 'missing'}
+        with mock.patch.dict(self.driver.run_test.__globals__,
+                             {'cluster_env': lambda: os.environ.copy()}):
+            result = self.driver.run_test(test, work, 2, 'baseline-1',
+                                          self.driver.time.monotonic() + 60)
+        self.assertFalse(result['passed'])
+        self.assertFalse(result['executed'])
+        self.assertIn('spec missing from checkout', result['error'])
+
     def test_original_artifact_path_is_bound_to_this_pr_and_job(self):
         env = {'JOB_NAME': 'pull-ci-openshift-console-main-e2e-gcp-console',
                'BUILD_ID': '2103138818189168640', 'PULL_NUMBER': '17301', 'JOB_SPEC': '{}'}
@@ -391,21 +418,26 @@ Context (generated 2026-09-24T18:40:20.154Z)
 
     def test_original_failure_followed_by_passing_rerun_is_observed_flaky(self):
         test = {'spec': 'console/a.spec.ts', 'project': 'console', 'name': 'a'}
+        setup = {'spec': '../setup/knative.setup.ts', 'project': 'knative-setup',
+                 'name': 'setup'}
         self.driver.EVIDENCE.mkdir()
         self.driver.report('No candidate yet.')
         self.driver.save({'schema_version': 1, 'verification_status': 'no_fix',
                           'reason': 'no patch', 'patch': None})
-        self.driver.dump(self.driver.CONTEXT, {'failed_tests': [test], 'flaked_tests': []})
+        self.driver.dump(self.driver.CONTEXT, {'failed_tests': [test, setup], 'flaked_tests': []})
+        self.driver.dump(self.root / 'selected.json', [test])
         self.driver.dump(self.driver.EVIDENCE / 'baseline.json', [
             {'test': test, 'executed': True, 'passed': True},
             {'test': test, 'executed': True, 'passed': True},
         ])
         self.driver.dump(self.driver.EVIDENCE / 'candidate-diagnoses.json', [
             {**test, 'classification': 'inconclusive'},
+            {**setup, 'classification': 'test_defect'},
         ])
         with contextlib.redirect_stdout(io.StringIO()):
             self.driver.finalize()
         state = self.driver.read(self.driver.STATE)
+        self.assertEqual(len(state['classification']), 1)
         self.assertTrue(state['classification'][0]['observed_flaky'])
 
     def test_verifier_resets_agent_supplied_validation_state(self):
