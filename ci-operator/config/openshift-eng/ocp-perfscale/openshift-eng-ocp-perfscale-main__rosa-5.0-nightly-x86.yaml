@@ -55,12 +55,62 @@ tests:
       ORION_CONFIG: examples/build-farm.yaml
       REPLICAS: "114"
       RUN_ORION: "true"
-    post:
-    - ref: send-results-to-reportportal
     test:
     - ref: openshift-qe-etcd-operator-override
     - chain: openshift-qe-build-farm
     - ref: openshift-qe-orion
+    - as: capture-prometheus-dump
+      cli: latest
+      commands: |
+        echo "Capturing Prometheus dump..."
+        PROMDIR="${ARTIFACT_DIR}/metrics"
+        mkdir -p "${PROMDIR}"
+        prometheus="$(oc get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name)" || true
+        if [[ -n "${prometheus}" ]]; then
+          echo "${prometheus}" | while read prompod; do
+            prompod=${prompod#"pod/"}
+            FILE_NAME="${prompod}"
+            if [[ "$prompod" == *-0 ]]; then
+              FILE_NAME="prometheus"
+            fi
+            echo "Snapshotting prometheus from ${prompod} as ${FILE_NAME} (may take 15s)..."
+            oc exec -n openshift-monitoring "${prompod}" -- tar cvzf - -C /prometheus . > "${PROMDIR}/${FILE_NAME}.tar.gz" || true
+            echo "Collecting prometheus metadata from ${prompod}..."
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'" | gzip > "${PROMDIR}/${FILE_NAME}-target-metadata.json.gz" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config" | gzip > "${PROMDIR}/${FILE_NAME}-config.json.gz" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb" > "${PROMDIR}/${FILE_NAME}-tsdb-status.json" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo" > "${PROMDIR}/${FILE_NAME}-runtimeinfo.json" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets" > "${PROMDIR}/${FILE_NAME}-targets.json" || true
+          done
+          cat >> "${SHARED_DIR}/custom-links.txt" <<'PROM_LINK'
+        <script>
+        let prom = document.createElement('a');
+        prom.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
+        prom.title="Creates a new prometheus deployment with data from this job run.";
+        prom.innerHTML="PromeCIeus";
+        prom.target="_blank";
+        document.getElementById("wrapper").append(prom);
+        </script>
+        PROM_LINK
+        else
+          echo "Unable to find a Prometheus pod to snapshot."
+        fi
+        echo "Adding Sippy intervals link..."
+        if [[ "${JOB_TYPE:-}" == "presubmit" ]]; then
+          extra_args="${JOB_NAME}/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+        else
+          extra_args="${JOB_NAME:-}"
+        fi
+        cat >> "${SHARED_DIR}/custom-links.txt" << INTERVALS_LINK
+        <a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/${extra_args}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
+        INTERVALS_LINK
+        echo "Prometheus dump complete"
+        ls -lh "${PROMDIR}" || true
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: rosa-aws-sts
   timeout: 8h0m0s
 zz_generated_metadata:
