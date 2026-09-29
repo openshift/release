@@ -41,7 +41,7 @@ resources:
       memory: 1000Mi
 tests:
 - always_run: false
-  as: e2e-rhwa-s390x
+  as: e2e-nhc-s390x
   capabilities:
   - intranet
   cluster: build12
@@ -55,7 +55,9 @@ tests:
       BRANCH: "4.22"
       COMPUTE_COUNT: "2"
       CONTROL_COUNT: "3"
-      ECO_TEST_FEATURES: nhc-operator nmo-operator snr-operator
+      ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-cluster && !tier:upgrade-operator
+        && !tier:fresh-install'
       ECO_TEST_TIMEOUT: 3h
       ECO_TEST_VERBOSE: "true"
       ETCD_DISK_SPEED: slow
@@ -63,8 +65,68 @@ tests:
       NODE_TUNING: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
-      OPERATORS: node-healthcheck-operator,node-maintenance-operator,self-node-remediation
-      TEST_NAME: e2e-rhwa-s390x
+      OPERATORS: node-healthcheck-operator,self-node-remediation
+      TEST_NAME: e2e-nhc-s390x
+      TEST_STEPS: medik8s-system-tests-s390x-run-tests
+      USE_EXTERNAL_DNS: "true"
+    workflow: medik8s-system-tests-s390x
+- always_run: false
+  as: e2e-nmo-s390x
+  capabilities:
+  - intranet
+  cluster: build12
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.22"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      ECO_TEST_FEATURES: nmo-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-cluster && !tier:upgrade-operator
+        && !tier:fresh-install'
+      ECO_TEST_TIMEOUT: 3h
+      ECO_TEST_VERBOSE: "true"
+      ETCD_DISK_SPEED: slow
+      INSTALL_NAMESPACE: openshift-workload-availability
+      NODE_TUNING: "true"
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: node-maintenance-operator
+      TEST_NAME: e2e-nmo-s390x
+      TEST_STEPS: medik8s-system-tests-s390x-run-tests
+      USE_EXTERNAL_DNS: "true"
+    workflow: medik8s-system-tests-s390x
+- always_run: false
+  as: e2e-snr-s390x
+  capabilities:
+  - intranet
+  cluster: build12
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.22"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-cluster && !tier:upgrade-operator
+        && !tier:fresh-install'
+      ECO_TEST_TIMEOUT: 3h
+      ECO_TEST_VERBOSE: "true"
+      ETCD_DISK_SPEED: slow
+      INSTALL_NAMESPACE: openshift-workload-availability
+      NODE_TUNING: "true"
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: self-node-remediation,node-healthcheck-operator
+      TEST_NAME: e2e-snr-s390x
       TEST_STEPS: medik8s-system-tests-s390x-run-tests
       USE_EXTERNAL_DNS: "true"
     workflow: medik8s-system-tests-s390x
