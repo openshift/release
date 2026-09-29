@@ -216,7 +216,8 @@ EOF
             echo "This typically means OLM could not resolve the subscription (wrong channel, missing bundle, or catalog issue)."
             echo
             echo "=== Subscription status ==="
-            oc get subscription -n "${operator_install_namespace}" "${operator_name}" -o yaml 2>/dev/null || echo "Subscription not found"
+            oc get subscription -n "${operator_install_namespace}" "${operator_name}" \
+                -o jsonpath='{.status.currentCSV}{"\n"}{.status.installedCSV}{"\n"}{.status.state}{"\n"}{range .status.conditions[*]}  Condition: {.type} = {.status} - {.message}{"\n"}{end}' 2>/dev/null || echo "Subscription not found"
             echo
             echo "=== Available channels for ${operator_name} ==="
             oc get packagemanifest "${operator_name}" -o jsonpath='{range .status.channels[*]}  {.name}{"\n"}{end}' 2>/dev/null || echo "packagemanifest not found"
@@ -225,7 +226,7 @@ EOF
             oc get events -n "${operator_install_namespace}" --sort-by='.lastTimestamp' 2>/dev/null | tail -20 || true
             echo
             echo "=== OLM Resolution events ==="
-            oc get events --all-namespaces --field-selector reason=ResolutionFailed --sort-by='.lastTimestamp' 2>/dev/null | tail -10 || true
+            oc get events -n "${operator_install_namespace}" --field-selector reason=ResolutionFailed --sort-by='.lastTimestamp' 2>/dev/null | tail -10 || true
             echo
             echo "=== InstallPlans ==="
             oc get installplan -n "${operator_install_namespace}" -o wide 2>/dev/null || echo "No InstallPlans found"
