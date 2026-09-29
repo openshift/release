@@ -82,6 +82,8 @@ cd "${WORK_DIR}"
 
 # Allow git operations despite UID mismatch (OpenShift runs as arbitrary UID)
 git config --global --add safe.directory "${WORK_DIR}"
+# Ignore permission changes from Containerfile's chmod 777
+git config core.fileMode false
 
 # Set up remote for fetching PRs
 git remote set-url origin "${OPENSHIFT_DPF_GITHUB_REPO_URL}" 2>/dev/null \
