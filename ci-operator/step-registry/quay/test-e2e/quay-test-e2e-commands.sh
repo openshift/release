@@ -273,6 +273,149 @@ function stopJaegerPortForward {
   JAEGER_PF_PID=""
 }
 
+# Playwright call logs and traces carry request auth (Authorization, X-CSRF-Token,
+# the _csrf_token session cookie, secret-named JSON keys), and leaktk/gcs-filter
+# replaces any artifact that matches with a 76-byte notice. Swap just the values
+# for fixed placeholders; ANSI codes and JSON escapes around them survive.
+# The header is written Authorizatio[n] on purpose: ci-operator embeds this script
+# in pods.json, and the plain header-plus-colon literal matches the scanner's rule.
+# stdin -> stdout, line-buffered so the live log keeps streaming.
+function scrub_playwright_secrets {
+  local -
+  set +x
+  sed -u -E \
+    -e 's|(Authorizatio[n]:[[:blank:]]*([A-Za-z]+[[:blank:]]+)?)[A-Za-z0-9._~+/=-]{16,}|\1<redacted:authorization>|Ig' \
+    -e 's|(X-CSRF-Token:[[:blank:]]*)[A-Za-z0-9._~+/=-]+|\1<redacted:csrf>|Ig' \
+    -e 's|(_csrf_token=)[A-Za-z0-9._~+/=-]+|\1<redacted:session>|g' \
+    -e 's#("name":[[:blank:]]*"(authorization|x-csrf-token|_csrf_token)",[[:blank:]]*"value":[[:blank:]]*"([A-Za-z]+ )?)([^"\\]|\\.)+#\1<redacted:value>#Ig' \
+    -e 's#("[A-Za-z0-9_-]*(password|secret|token)(_?(key|code))?"[[:blank:]]*:[[:blank:]]*")([^"\\]|\\.)+#\1<redacted:value>#Ig'
+}
+# The zip scrubber below runs it from node.
+export -f scrub_playwright_secrets
+
+# Playwright traces (test-results/*/trace.zip and their playwright-report/data
+# copies) are zips, and the report's index.html embeds its data as a base64 zip.
+# The runner image has node but no zip tools, so rewrite each archive in node,
+# passing every non-image entry that mentions a secret-ish word through
+# scrub_playwright_secrets. The result is a normal zip the trace viewer loads.
+# Leaves a file untouched on anything unexpected (zip64, unknown compression).
+function scrub_playwright_archives {
+  [[ $# -gt 0 ]] || return 0
+  node - "$@" <<'NODE'
+const fs = require('fs');
+const zlib = require('zlib');
+const {execFileSync} = require('child_process');
+
+const SKIP = /\.(?:jpe?g|png|webp|gif|woff2?)$/i;
+const WORTH = /authorization|csrf|token|password|secret/i;
+
+function scrub(data) {
+  return execFileSync('bash', ['-c', 'scrub_playwright_secrets'], {
+    input: data, env: {...process.env, LC_ALL: 'C'}, maxBuffer: 1 << 30,
+  });
+}
+
+function scrubZip(buf) {
+  let eocd = buf.length - 22;
+  while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
+  if (eocd < 0) throw new Error('no end of central directory');
+  const count = buf.readUInt16LE(eocd + 10);
+  let cd = buf.readUInt32LE(eocd + 16);
+  if (count === 0xffff || cd === 0xffffffff) throw new Error('zip64');
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+  for (let i = 0; i < count; i++) {
+    if (buf.readUInt32LE(cd) !== 0x02014b50) throw new Error('bad central header');
+    const flags = buf.readUInt16LE(cd + 8) & 0x800;
+    let method = buf.readUInt16LE(cd + 10);
+    const time = buf.readUInt16LE(cd + 12);
+    const date = buf.readUInt16LE(cd + 14);
+    let crc = buf.readUInt32LE(cd + 16);
+    const csize = buf.readUInt32LE(cd + 20);
+    let usize = buf.readUInt32LE(cd + 24);
+    const nlen = buf.readUInt16LE(cd + 28);
+    const elen = buf.readUInt16LE(cd + 30);
+    const clen = buf.readUInt16LE(cd + 32);
+    const attrs = buf.readUInt32LE(cd + 38);
+    const lho = buf.readUInt32LE(cd + 42);
+    const name = buf.subarray(cd + 46, cd + 46 + nlen);
+    cd += 46 + nlen + elen + clen;
+    if (csize === 0xffffffff || usize === 0xffffffff || lho === 0xffffffff) throw new Error('zip64');
+    if (method !== 0 && method !== 8) throw new Error(`compression method ${method}`);
+    const start = lho + 30 + buf.readUInt16LE(lho + 26) + buf.readUInt16LE(lho + 28);
+    let data = buf.subarray(start, start + csize);
+    if (!SKIP.test(name.toString())) {
+      const raw = method === 8 ? zlib.inflateRawSync(data) : data;
+      if (WORTH.test(raw.toString('latin1'))) {
+        const out = scrub(raw);
+        if (!out.equals(raw)) {
+          data = zlib.deflateRawSync(out);
+          method = 8;
+          crc = zlib.crc32(out);
+          usize = out.length;
+        }
+      }
+    }
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(flags, 6);
+    local.writeUInt16LE(method, 8);
+    local.writeUInt16LE(time, 10);
+    local.writeUInt16LE(date, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(usize, 22);
+    local.writeUInt16LE(nlen, 26);
+    locals.push(local, name, data);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(0x0314, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(flags, 8);
+    central.writeUInt16LE(method, 10);
+    central.writeUInt16LE(time, 12);
+    central.writeUInt16LE(date, 14);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(data.length, 20);
+    central.writeUInt32LE(usize, 24);
+    central.writeUInt16LE(nlen, 28);
+    central.writeUInt32LE(attrs, 38);
+    central.writeUInt32LE(offset, 42);
+    centrals.push(central, name);
+    offset += 30 + nlen + data.length;
+  }
+  const cdSize = centrals.reduce((n, b) => n + b.length, 0);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(count, 8);
+  end.writeUInt16LE(count, 10);
+  end.writeUInt32LE(cdSize, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, ...centrals, end]);
+}
+
+for (const file of process.argv.slice(2)) {
+  try {
+    const buf = fs.readFileSync(file);
+    let out;
+    if (file.endsWith('.html')) {
+      out = Buffer.from(buf.toString('utf8').replace(
+        /(data:application\/zip;base64,)([A-Za-z0-9+/=]+)/g,
+        (_, prefix, b64) => prefix + scrubZip(Buffer.from(b64, 'base64')).toString('base64')));
+    } else {
+      out = scrubZip(buf);
+    }
+    fs.writeFileSync(`${file}.tmp`, out);
+    fs.renameSync(`${file}.tmp`, file);
+  } catch (err) {
+    console.error(`WARNING: could not scrub ${file}: ${err.message}`);
+  }
+}
+NODE
+}
+
 function copyArtifacts {
   echo "Copying test artifacts..."
   local src="${PLAYWRIGHT_WORKDIR:-.}"
@@ -368,7 +511,17 @@ function copyArtifacts {
       { print }
     ' "${xml}" > "${xml}.tmp" && mv "${xml}.tmp" "${xml}" || rm -f "${xml}.tmp"
   done || true
+  # results.json and the JUnit files carry the same call logs as stdout.
+  for f in "${ARTIFACT_DIR}"/results.json "${ARTIFACT_DIR}"/junit_*.xml; do
+    [[ -f "${f}" ]] || continue
+    scrub_playwright_secrets < "${f}" > "${f}.tmp" && mv "${f}.tmp" "${f}" || rm -f "${f}.tmp"
+  done || true
   cp -r "${src}"/playwright-report/* "${ARTIFACT_DIR}/" 2>/dev/null || true
+  local archives=() archive
+  for archive in "${ARTIFACT_DIR}"/*/trace.zip "${ARTIFACT_DIR}"/data/*.zip "${ARTIFACT_DIR}"/index.html; do
+    [[ -f "${archive}" ]] && archives+=("${archive}")
+  done
+  scrub_playwright_archives "${archives[@]}" || true
   # Prow's html lens renders any artifact matching custom-link-*.html inline near
   # the top of the Spyglass job page. The Playwright HTML report copied above only
   # shows up buried in the artifact tree, so surface a direct link to it. Compose
@@ -613,5 +766,5 @@ npx playwright test \
   "${GREP_INVERT_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
   --reporter=list,junit,html,json \
-  2>&1 | tee "${ARTIFACT_DIR}/playwright-output.log"
+  2>&1 | scrub_playwright_secrets | tee "${ARTIFACT_DIR}/playwright-output.log"
 popd
