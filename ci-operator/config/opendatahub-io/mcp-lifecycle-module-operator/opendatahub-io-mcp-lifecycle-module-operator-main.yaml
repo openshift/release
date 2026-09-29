@@ -1,10 +1,31 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - build_args:
+    - name: TARGETOS
+      value: linux
+    - name: TARGETARCH
+      value: amd64
+    dockerfile_path: Dockerfile.konflux
+    to: mcp-lifecycle-module-operator
 prowgen:
   enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: '5.0'
 resources:
   '*':
     limits:
@@ -17,6 +38,112 @@ tests:
   commands: GOFLAGS='' make unit-test
   container:
     from: src
+- as: tls-scan-default
+  cron: 0 6 1,15 * *
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCAN_NAMESPACE: mcp-lifecycle-module-operator-system
+    test:
+    - ref: cert-manager-install-operator
+    - as: deploy
+      cli: latest
+      commands: |
+        make deploy IMG="${OPERATOR_IMAGE}" MCPLO_OPERAND_IMAGE="quay.io/opendatahub/odh-mcp-lifecycle-operator:odh-stable"
+        oc -n mcp-lifecycle-module-operator-system rollout status deploy/mcp-lifecycle-module-operator-controller-manager --timeout=5m
+        oc apply -f - <<EOF
+        apiVersion: components.platform.opendatahub.io/v1alpha1
+        kind: MCPLifecycleOperator
+        metadata:
+          name: default
+        spec:
+          managementState: Managed
+        EOF
+        oc wait --for=condition=Ready mcplifecycleoperator/default --timeout=10m
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: mcp-lifecycle-module-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: tls-scan-modern-adherence
+  cron: 0 6 1,15 * *
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCAN_NAMESPACE: mcp-lifecycle-module-operator-system
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: cert-manager-install-operator
+    - as: deploy
+      cli: latest
+      commands: |
+        make deploy IMG="${OPERATOR_IMAGE}" MCPLO_OPERAND_IMAGE="quay.io/opendatahub/odh-mcp-lifecycle-operator:odh-stable"
+        oc -n mcp-lifecycle-module-operator-system rollout status deploy/mcp-lifecycle-module-operator-controller-manager --timeout=5m
+        oc apply -f - <<EOF
+        apiVersion: components.platform.opendatahub.io/v1alpha1
+        kind: MCPLifecycleOperator
+        metadata:
+          name: default
+        spec:
+          managementState: Managed
+        EOF
+        oc wait --for=condition=Ready mcplifecycleoperator/default --timeout=10m
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: mcp-lifecycle-module-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: tls-scan-pqc
+  cron: 0 6 1,15 * *
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      PQC_CHECK: "true"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCAN_NAMESPACE: mcp-lifecycle-module-operator-system
+    test:
+    - ref: cert-manager-install-operator
+    - as: deploy
+      cli: latest
+      commands: |
+        make deploy IMG="${OPERATOR_IMAGE}" MCPLO_OPERAND_IMAGE="quay.io/opendatahub/odh-mcp-lifecycle-operator:odh-stable"
+        oc -n mcp-lifecycle-module-operator-system rollout status deploy/mcp-lifecycle-module-operator-controller-manager --timeout=5m
+        oc apply -f - <<EOF
+        apiVersion: components.platform.opendatahub.io/v1alpha1
+        kind: MCPLifecycleOperator
+        metadata:
+          name: default
+        spec:
+          managementState: Managed
+        EOF
+        oc wait --for=condition=Ready mcplifecycleoperator/default --timeout=10m
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: mcp-lifecycle-module-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
