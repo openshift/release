@@ -28,7 +28,6 @@ mkdir -p "${DUMP_DIR}"
 oc get modules.kmm.sigs.x-k8s.io -A -o yaml > "${DUMP_DIR}/kmm-modules.yaml" 2>&1 || true
 oc get modulebuildsignconfigs.kmm.sigs.x-k8s.io -A -o yaml > "${DUMP_DIR}/kmm-modulebuildsignconfigs.yaml" 2>&1 || true
 oc get builds.build.openshift.io -A -o yaml > "${DUMP_DIR}/kmm-builds.yaml" 2>&1 || true
-oc get buildconfigs.build.openshift.io -A -o yaml > "${DUMP_DIR}/kmm-buildconfigs.yaml" 2>&1 || true
 oc get pods -A -o wide > "${DUMP_DIR}/all-pods.txt" 2>&1 || true
 oc get pods -n openshift-kmm -o wide > "${DUMP_DIR}/kmm-pods.txt" 2>&1 || true
 oc get daemonsets -A -o wide > "${DUMP_DIR}/daemonsets.txt" 2>&1 || true
@@ -50,8 +49,6 @@ if [[ -n "${NEURON_NS}" ]]; then
     # collect both current resources and any available logs before cleanup.
     oc get builds.build.openshift.io -n "${NEURON_NS}" -o yaml \
         > "${DUMP_DIR}/neuron-kmm-builds.yaml" 2>&1 || true
-    oc get buildconfigs.build.openshift.io -n "${NEURON_NS}" -o yaml \
-        > "${DUMP_DIR}/neuron-kmm-buildconfigs.yaml" 2>&1 || true
     oc get modulebuildsignconfigs.kmm.sigs.x-k8s.io -n "${NEURON_NS}" -o yaml \
         > "${DUMP_DIR}/neuron-kmm-modulebuildsignconfigs.yaml" 2>&1 || true
 
