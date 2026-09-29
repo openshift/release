@@ -192,6 +192,12 @@ EOF
 
         if [[ -z "${CSV}" ]]; then
             echo "Try ${i}/${RETRIES}: can't get the ${operator_name} yet. Checking again in 30 seconds"
+            if (( i % 5 == 0 )); then
+                echo "--- Subscription status for ${operator_name} ---"
+                oc get subscription -n "${operator_install_namespace}" "${operator_name}" \
+                    -o jsonpath='{range .status.conditions[*]}  Condition: {.type} = {.status} - {.message}{"\n"}{end}' 2>/dev/null || true
+                echo "---"
+            fi
             sleep 30
         fi
 
@@ -204,17 +210,38 @@ EOF
         fi
     done
 
-    if [[ $(oc get csv -n "${operator_install_namespace}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
-        echo "Error: Failed to deploy ${operator_name}"
-        echo
-        echo "Assert that the '${operator_name}' packagemanifest belongs to '${operator_source}' catalog"
-        echo
-        oc get packagemanifest | grep ${operator_name} || echo
-        echo "CSV ${CSV} YAML"
-        oc get csv "${CSV}" -n "${operator_install_namespace}" -o yaml
-        echo
-        echo "CSV ${CSV} Describe"
-        oc describe csv "${CSV}" -n "${operator_install_namespace}"
+    if [[ -z "${CSV}" ]] || [[ $(oc get csv -n "${operator_install_namespace}" "${CSV}" -o jsonpath='{.status.phase}' 2>/dev/null) != "Succeeded" ]]; then
+        if [[ -z "${CSV}" ]]; then
+            echo "Error: Failed to deploy ${operator_name} - no CSV was ever created"
+            echo "This typically means OLM could not resolve the subscription (wrong channel, missing bundle, or catalog issue)."
+            echo
+            echo "=== Subscription status ==="
+            oc get subscription -n "${operator_install_namespace}" "${operator_name}" -o yaml 2>/dev/null || echo "Subscription not found"
+            echo
+            echo "=== Available channels for ${operator_name} ==="
+            oc get packagemanifest "${operator_name}" -o jsonpath='{range .status.channels[*]}  {.name}{"\n"}{end}' 2>/dev/null || echo "packagemanifest not found"
+            echo
+            echo "=== Recent events (install namespace) ==="
+            oc get events -n "${operator_install_namespace}" --sort-by='.lastTimestamp' 2>/dev/null | tail -20 || true
+            echo
+            echo "=== OLM Resolution events ==="
+            oc get events --all-namespaces --field-selector reason=ResolutionFailed --sort-by='.lastTimestamp' 2>/dev/null | tail -10 || true
+            echo
+            echo "=== InstallPlans ==="
+            oc get installplan -n "${operator_install_namespace}" -o wide 2>/dev/null || echo "No InstallPlans found"
+        else
+            # CSV exists but not Succeeded — keep existing diagnostics
+            echo "Error: Failed to deploy ${operator_name}"
+            echo
+            echo "Assert that the '${operator_name}' packagemanifest belongs to '${operator_source}' catalog"
+            echo
+            oc get packagemanifest | grep ${operator_name} || echo
+            echo "CSV ${CSV} YAML"
+            oc get csv "${CSV}" -n "${operator_install_namespace}" -o yaml
+            echo
+            echo "CSV ${CSV} Describe"
+            oc describe csv "${CSV}" -n "${operator_install_namespace}"
+        fi
         if [[ "${operator_skip_checking}" == "true" ]]; then
             echo "'${operator_name}' installation failed, but maybe not all needed CRDs are available yet... continue"
         else
