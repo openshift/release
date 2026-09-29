@@ -30,6 +30,22 @@ export CONTAINER_TAG
 export CLUSTER_TOPOLOGY
 export NUMBER_OF_NODES
 
+# Resolve a "major.minor" OPENSHIFT_VERSION (e.g. "5.0") to the latest
+# available release and matching RHCOS image URL. The resolver ships in the
+# repo under test (hack/resolve_release.py) and uses only the standard
+# library, so no dependency install is needed here.
+if [[ -n "${OPENSHIFT_VERSION:-}" ]]; then
+    if [[ "${OPENSHIFT_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        OPENSHIFT_VERSION="$(python3 hack/resolve_release.py version --version "${OPENSHIFT_VERSION}")"
+    fi
+    if [[ -z "${RHCOS_IMAGE_URL:-}" ]]; then
+        RHCOS_IMAGE_URL="$(python3 hack/resolve_release.py rhcos --version "${OPENSHIFT_VERSION}")"
+    fi
+    export OPENSHIFT_VERSION
+    export RHCOS_IMAGE_URL
+    echo "Using OPENSHIFT_VERSION=${OPENSHIFT_VERSION} RHCOS_IMAGE_URL=${RHCOS_IMAGE_URL}"
+fi
+
 make generate && make manifests && make build-installer
 
 if [[ "${TEST_TARGET}" == "snapshots-test" ]]; then
