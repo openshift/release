@@ -181,57 +181,76 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   storage_create
 
   # perform an OLM based minor update if it is the openstack-operator
+  # set SKIP_OLM_UPDATE=true in .prow_ci.env to skip the base->PR upgrade dance
+  # and just install the PR CSV directly before running kuttl
   if [ ${SERVICE_NAME} == "openstack" ]; then
     # Upgrade edge CSV names baked into the PR index by the build step.
-    BASE_CSV=$(cat "${SHARED_DIR}/olm-base-csv")
     PR_CSV=$(cat "${SHARED_DIR}/olm-pr-csv")
     export TIMEOUT=${TIMEOUT:="600s"}
-
-    # Install the base release first and gate upgrades behind manual approval so
-    # OLM walks ${BASE_CSV} -> ${PR_CSV} within the PR index (${OPENSTACK_IMG}).
     export INSTALLPLAN_APPROVAL=Manual
-    export STARTING_CSV=${BASE_CSV}
-    # use fr1 oscp yaml sample with deprecated rabbitMqInstanceBus parameters
-    export OPENSTACK_CTLPLANE="config/samples/core_v1beta1_openstackcontrolplane_galera_fr1.yaml"
 
-    # create catalogsource/subscription pinned to the base CSV (pending approval)
-    make openstack || exit 1
-    # approve the base version and wait for it to install
-    APPROVE_CSV=${BASE_CSV} make openstack_approve_installplan || exit 1
+    if [ "${SKIP_OLM_UPDATE}" == "true" ]; then
+      # install the PR version directly, skipping the base install and upgrade
+      export STARTING_CSV=${PR_CSV}
+      # create catalogsource/subscription pinned to the PR CSV (pending approval)
+      make openstack || exit 1
+      # approve the PR version and wait for it to install
+      APPROVE_CSV=${PR_CSV} make openstack_approve_installplan || exit 1
+      # if the new initialization resource exists install it
+      # this will also wait for operators to deploy
+      if oc get crd openstacks.operator.openstack.org &> /dev/null; then
+        make openstack_init
+      fi
+    else
+      BASE_CSV=$(cat "${SHARED_DIR}/olm-base-csv")
 
-    # if the new initialization resource exists install it
-    # this will also wait for operators to deploy
-    if oc get crd openstacks.operator.openstack.org &> /dev/null; then
-      make openstack_init
+      # Install the base release first and gate upgrades behind manual approval so
+      # OLM walks ${BASE_CSV} -> ${PR_CSV} within the PR index (${OPENSTACK_IMG}).
+      export STARTING_CSV=${BASE_CSV}
+      # defaults to the fr1 oscp yaml sample with deprecated rabbitMqInstanceBus
+      # parameters (see OPENSTACK_CTLPLANE_BASE_RELEASE default in the ref.yaml);
+      # override it in .prow_ci.env if OPENSTACK_IMG_BASE_RELEASE needs a different sample CR
+      export OPENSTACK_CTLPLANE=${OPENSTACK_CTLPLANE_BASE_RELEASE}
+
+      # create catalogsource/subscription pinned to the base CSV (pending approval)
+      make openstack || exit 1
+      # approve the base version and wait for it to install
+      APPROVE_CSV=${BASE_CSV} make openstack_approve_installplan || exit 1
+
+      # if the new initialization resource exists install it
+      # this will also wait for operators to deploy
+      if oc get crd openstacks.operator.openstack.org &> /dev/null; then
+        make openstack_init
+      fi
+
+      # deploy ctlplane and dataplane CRs on the base version, to be updated
+      make openstack_wait_deploy || exit 1
+      make edpm_deploy_baremetal || exit 1
+
+      # trigger the OLM upgrade to the PR version and wait for it to install
+      APPROVE_CSV=${PR_CSV} make openstack_approve_installplan || exit 1
+      # revert to default oscp sample for subsequent steps
+      unset OPENSTACK_CTLPLANE
+      # if the new initialization resource exists install it
+      # this will also wait for operators to deploy
+      if oc get crd openstacks.operator.openstack.org &> /dev/null; then
+        make openstack_init
+      fi
+      # wait until all the service operators got really up and validate that the ctlplane
+      # is ready before patching the osversion. This is to make sure to check that the
+      # new set of operator and the deployments they create to work correct with the
+      # old vesion of service containers.
+      sleep 60
+      oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
+      make openstack_patch_version || exit 1
+      sleep 10
+      oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
+
+      # cleanup to run kuttl
+      make edpm_deploy_cleanup openstack_deploy_cleanup && \
+      oc wait -n openstack --for=delete pod/swift-storage-0 --timeout=${TIMEOUT}
+      storage_cleanup && storage_create
     fi
-
-    # deploy ctlplane and dataplane CRs on the base version, to be updated
-    make openstack_wait_deploy || exit 1
-    make edpm_deploy_baremetal || exit 1
-
-    # trigger the OLM upgrade to the PR version and wait for it to install
-    APPROVE_CSV=${PR_CSV} make openstack_approve_installplan || exit 1
-    # revert to default oscp sample for subsequent steps
-    unset OPENSTACK_CTLPLANE
-    # if the new initialization resource exists install it
-    # this will also wait for operators to deploy
-    if oc get crd openstacks.operator.openstack.org &> /dev/null; then
-      make openstack_init
-    fi
-    # wait until all the service operators got really up and validate that the ctlplane
-    # is ready before patching the osversion. This is to make sure to check that the
-    # new set of operator and the deployments they create to work correct with the
-    # old vesion of service containers.
-    sleep 60
-    oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
-    make openstack_patch_version || exit 1
-    sleep 10
-    oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
-
-    # cleanup to run kuttl
-    make edpm_deploy_cleanup openstack_deploy_cleanup && \
-    oc wait -n openstack --for=delete pod/swift-storage-0 --timeout=${TIMEOUT}
-    storage_cleanup && storage_create
   fi
 
   # run kuttl
