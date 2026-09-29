@@ -36,57 +36,7 @@ Fetch `https://raw.githubusercontent.com/openshift/release/main/ci-operator/step
 
 ## Step 0a — Verify Cluster Stability
 
-Before running any prerequisites setup or test reruns, confirm the cluster is stable. The original CI test step may have applied resources that triggered MachineConfig updates — running tests while nodes are updating causes spurious failures.
-
-```bash
-oc get machineconfigpools.machineconfiguration.openshift.io
-```
-
-For each MachineConfigPool, all of the following must be true before proceeding:
-- `UPDATED` = `True`
-- `UPDATING` = `False`
-- `DEGRADED` = `False`
-
-**If any pool is not ready**, wait and recheck every 60 seconds:
-
-```bash
-# Wait until all MCPs are updated, not updating, and not degraded.
-# Split into two 10-minute phases to stay within the Bash tool's timeout limit.
-# Phase 1: wait up to 10 minutes
-deadline=$((SECONDS + 600))
-while oc get machineconfigpools.machineconfiguration.openshift.io \
-    -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Updated")].status}{" "}{.status.conditions[?(@.type=="Updating")].status}{" "}{.status.conditions[?(@.type=="Degraded")].status}{"\n"}{end}' \
-    | grep -qvE '^True False False$'; do
-  echo "MCPs not ready yet, waiting 60s..."
-  if (( SECONDS >= deadline )); then
-    echo "Phase 1 timeout — MCPs still not ready after 10 minutes. Continuing in phase 2."
-    oc get machineconfigpools.machineconfiguration.openshift.io
-    break
-  fi
-  sleep 60
-  oc get machineconfigpools.machineconfiguration.openshift.io
-done
-```
-
-If the first phase did not converge (the loop exited via the `break`), run a second Bash invocation to continue waiting:
-
-```bash
-# Phase 2: wait up to 10 more minutes (total 20 minutes across both phases)
-deadline=$((SECONDS + 600))
-while oc get machineconfigpools.machineconfiguration.openshift.io \
-    -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Updated")].status}{" "}{.status.conditions[?(@.type=="Updating")].status}{" "}{.status.conditions[?(@.type=="Degraded")].status}{"\n"}{end}' \
-    | grep -qvE '^True False False$'; do
-  echo "MCPs not ready yet, waiting 60s..."
-  if (( SECONDS >= deadline )); then
-    echo "ERROR: MCPs still not ready after 20 minutes — cluster is unhealthy."
-    oc get machineconfigpools.machineconfiguration.openshift.io
-    exit 1
-  fi
-  sleep 60
-  oc get machineconfigpools.machineconfiguration.openshift.io
-done
-echo "All MCPs ready — proceeding."
-```
+Mandatory, before Step 0b. Read `/tmp/qe-agent-modules/cluster-stability.md` and follow it. If missing: poll `oc get machineconfigpools.machineconfiguration.openshift.io` every 60s for up to 20 minutes until every pool is `UPDATED=True`, `UPDATING=False`, `DEGRADED=False`; if pools are listed but never become ready, classify `CLUSTER_INSTABILITY` (Step 5d) and skip to Step 6; if the query itself keeps failing, record the MCP status as unavailable, recommend a rerun and skip to Step 6.
 
 ## Step 0b — Re-establish the Test Environment
 
@@ -106,16 +56,7 @@ Then continue with Steps 1–6 in the cloned repo. If `qe-agent-context.json` is
 
 ## Step 1 — Parse JUnit XMLs and Identify Failures
 
-Read `${SHARED_DIR}/qe-agent-junit-*.xml`. For each file extract the suite name (`<testsuite name>`), the failed `<testcase>` elements (those with a `<failure>` or `<error>` child), and the failure `message` and full text. Group failures by suite. If no files exist, exit with a clear message — the test step produced no results.
-
-### High-failure triage: more than 5 failures total
-
-More than 5 failures usually share one root cause (plugin not loaded, auth failure, UI not responding, network error, or a failed `before` hook). Look for a common pattern: the same error string (`Cannot read properties of null`, `401 Unauthorized`), the same failing Cypress command (`cy.visit`, `cy.get`), or tightly clustered failure times.
-
-- **Clear pattern**: pick the simplest failing test as the representative and run Steps 2–5 for it only.
-- **No clear pattern**: process failures individually, cap at 3 tests, and note this in the summary.
-
-Write the pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
+Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Typical shared root causes here: plugin not loaded, auth failure, UI not responding, network error, a failed `before` hook. Pattern signals: the same error string (`Cannot read properties of null`, `401 Unauthorized`) or the same failing Cypress command (`cy.visit`, `cy.get`). If missing: read `${SHARED_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
 
 ---
 
@@ -254,127 +195,35 @@ oc logs -n "${COO_NS}" deploy/observability-operator --tail=500 \
   | grep -E '"reconcileID"|"Reconciling"|"requeue"|"error"' | head -100
 ```
 
-A reconciliation loop (same MonitoringStack reconciled >1/2s, rapid sub-second `requeue` entries) is a `PRODUCT_BUG`. Classify as `CLUSTER_INSTABILITY` (Step 5d; takes precedence over `FLAKY`) only when **all four** hold: (1) MCPs were updating, or COO had probe-failure restarts correlated with the MCP rollout, at original run time; (2) all 4 reruns pass cleanly; (3) no fixable test defect — a selector, wait, or assertion that would fail under foreseeable cluster load is a `TEST_ISSUE`; (4) no tight reconciliation loop.
-
-When ambiguous, gather more evidence and explain your reasoning.
+Mandatory. Read `/tmp/qe-agent-modules/cluster-instability.md` (loop indicators and the four conditions for `CLUSTER_INSTABILITY`) and follow it. If missing: classify `CLUSTER_INSTABILITY` only when the MCPs were updating (or operator restarts correlate with the rollout) at the original run, all reruns pass cleanly and faster, and neither a test defect nor a reconciliation loop explains the failure; a loop is a `PRODUCT_BUG` (Step 5b); otherwise it takes precedence over `FLAKY` (Step 5d).
 
 ---
 
+## Step 4a — Attribution
+
+Mandatory. Read `/tmp/qe-agent-modules/attribution.md` and follow it, including its Step 5/6 additions. If missing, write `${ARTIFACT_DIR}/attribution.json` with `"status": "failed"` and continue.
+
 ## Step 5a — If TEST_ISSUE: Fix and Export
 
-Apply the **minimal** change that makes the test correct (selector, route, wait for an async operation, hardcoded name). The tests use Cypress 15: `cy.exec()` yields `{ exitCode, stdout, stderr }` (no `code` field).
-
-Copy only the changed files to `${ARTIFACT_DIR}/test-fixes/`, **preserving the path relative to the repo root**:
-
-```bash
-dest="${ARTIFACT_DIR}/test-fixes/tests/e2e"
-mkdir -p "${dest}"
-cp tests/e2e/dt-plugin-tests.cy.ts "${dest}/"
-```
-
-Write `${ARTIFACT_DIR}/test-fixes/CHANGES.md`:
-
-```markdown
-> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
-
-# Test Fix Summary
-
-## Failing test
-<suite name> / <test case name>
-
-## Root cause
-<one paragraph explaining what was wrong in the test and why>
-
-## Fix applied
-<what was changed, which files, what specifically>
-
-## Files changed
-- `tests/e2e/dt-plugin-tests.cy.ts`
-
-## Verification
-Rerun result after fix: [PASS / FAIL / not re-verified]
-```
+Mandatory. Read `/tmp/qe-agent-modules/test-fix-export.md` and follow "Fix a test" and "Export the fix". Typical fixes: selector, route, wait for an async operation, hardcoded name. The tests use Cypress 15: `cy.exec()` yields `{ exitCode, stdout, stderr }` (no `code` field). If missing: make the minimal change, copy only the changed files to `${ARTIFACT_DIR}/test-fixes/` preserving the repo-relative path, and write `${ARTIFACT_DIR}/test-fixes/CHANGES.md` (banner `> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.`; Failing test, Root cause, Fix applied, Files changed, Verification).
 
 ---
 
 ## Step 5b — If PRODUCT_BUG: Write Bug Report
 
-Do not fix plugin or operator code; write `${ARTIFACT_DIR}/bug-report.md`:
-
-````markdown
-> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
-
-# Product Bug Report
-
-## Summary
-<one-sentence description of the bug>
-
-## Affected component
-- Operator: Cluster Observability Operator / Distributed Tracing Console Plugin
-- Namespace: <COO namespace>
-- Failing test: <suite / test case>
-
-## Reproduction
-1. <Step-by-step reproduction based on what the test does>
-
-## Observed behavior
-<What happened — include the exact failure message from JUnit and the Cypress error>
-
-## Expected behavior
-<What should have happened>
-
-## Evidence
-### Operator logs
-```text
-<relevant COO log lines>
-```
-
-### Cluster events
-```text
-<relevant events>
-```
-
-### JUnit failure message
-```text
-<failure text from XML>
-```
-
-## Suggested severity
-<Critical / Major / Minor — based on whether this blocks a release gate>
-````
-
-Then write `${ARTIFACT_DIR}/jira-payload.json` for automated Jira filing, converting the bug report to **Jira wiki notation**: `# `/`## `/`### ` → `h1. `/`h2. `/`h3. `, `**bold**` → `*bold*`, `` `code` `` → `{{code}}`, ` ```text ... ``` ` → `{code:title=text}...{code}`, `- item` → `* item`, `1. item` → `# item`, `> quote` → `bq. quote`.
-
-Write the JSON using `jq` for safe escaping:
-
-```bash
-_SUMMARY="[qe-agent] <one-sentence summary from the bug report>"
-# Summary must be ≤ 255 characters
-_SUMMARY="${_SUMMARY:0:255}"
-
-_DESCRIPTION="<full bug report content converted to Jira wiki notation>"
-
-jq -n \
-  --arg summary "${_SUMMARY}" \
-  --arg description "${_DESCRIPTION}" \
-  --arg severity "<Critical / Major / Minor>" \
-  '{summary: $summary, description: $description, severity: $severity}' \
-  > "${ARTIFACT_DIR}/jira-payload.json"
-```
-
-The description must NOT contain raw credentials, tokens, passwords, or SHA-256 digests — redact with `[REDACTED]` if any appear in the evidence.
+Mandatory. Read `/tmp/qe-agent-modules/product-bug-report.md` and follow it. Affected component: Cluster Observability Operator / Distributed Tracing Console Plugin, namespace: the COO namespace. If missing: write `${ARTIFACT_DIR}/bug-report.md` (AI-Generated Content banner as in Step 5a; Summary, Affected component, Reproduction, Observed behavior, Expected behavior, Evidence, Suggested severity) and `${ARTIFACT_DIR}/jira-payload.json` via `jq -n --arg`: `summary` (`[qe-agent]` prefix, ≤ 255 characters), `description` (the report in Jira wiki notation, starting with `*Severity:* <level>`) and `severity`. Redact credentials, tokens, passwords and SHA-256 digests as `[REDACTED]`.
 
 ---
 
 ## Step 5c — If FLAKY: Fix and Export
 
-Fix the race itself, not with blanket retries: `cy.intercept()` + `cy.wait('@alias')` before asserting post-API UI state, `.should('be.visible')` with a timeout, condition-based waits instead of `cy.wait(<ms>)`. Export as in Step 5a, with the 4-run pattern as evidence.
+Mandatory. Read `/tmp/qe-agent-modules/test-fix-export.md` and follow "Fix a flaky test" and "Export the fix". If missing: make the minimal change that removes the race (no blanket retries), export as in Step 5a, and put the pass/fail pattern from the 4 reruns in `CHANGES.md`. Typical fixes: `cy.intercept()` + `cy.wait('@alias')` before asserting post-API UI state, `.should('be.visible')` with a timeout, condition-based waits instead of `cy.wait(<ms>)`.
 
 ---
 
 ## Step 5d — If CLUSTER_INSTABILITY: Write Incident Note
 
-Write `${ARTIFACT_DIR}/cluster-instability-report.md`: a one-sentence summary; affected-tests table (suite / test case / original vs rerun duration); root cause (MCP updates, node evictions, COO restarts — include the Step 0a MCP snapshot); evidence (MCP output, pod events); and a recommendation to rerun the job. Same AI-Generated Content banner as the other reports.
+Mandatory. Follow "Incident note" in `/tmp/qe-agent-modules/analysis-summary.md`. If missing: write `${ARTIFACT_DIR}/cluster-instability-report.md` with the AI-Generated Content banner, a one-sentence summary, an affected-tests table (suite / test case / original vs rerun duration), the root cause (include the Step 0a MCP snapshot), evidence, and a recommendation to rerun the CI job.
 
 ---
 
@@ -386,54 +235,7 @@ The test and product are fine, but the job needs something the cluster can't pro
 
 ## Step 6 — Write Analysis Summary
 
-Write `${ARTIFACT_DIR}/qe-agent-analysis.md` after each diagnosis and overwrite it for later tests, with partial entries for in-progress flakiness runs ("Rerun 1: PASS — confirmation in progress"). Record deviations from the skill steps under **Skill Improvement Recommendations**.
-
-````markdown
-> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
-
-# QE Agent Analysis
-
-## Failed Tests
-| Suite | Test Case | JUnit File |
-|---|---|---|
-| <suite> | <test-case> | <xml-filename> |
-
-## Rerun Result
-<still failing / passed on rerun (flaky) / passed cleanly (cluster instability) / not rerun>
-
-## Diagnosis
-**<PRODUCT_BUG | TEST_ISSUE | FLAKY | CLUSTER_INSTABILITY | JOB_CONFIG>**
-
-<Two to three sentences explaining the reasoning. Reference specific Cypress errors, console plugin status, COO log lines, catalog or MCP status that led to this conclusion.>
-
-## Rerun Summary
-| Run | Result |
-|---|---|
-| Original CI run | FAIL |
-| Rerun 1 | PASS / FAIL |
-| Rerun 2 | PASS / FAIL |
-| Rerun 3 | PASS / FAIL |
-| Rerun 4 | PASS / FAIL |
-
-## Outcome
-<If TEST_ISSUE>: Test fix applied. Changed files in `${ARTIFACT_DIR}/test-fixes/`. See `CHANGES.md` for details.
-<If PRODUCT_BUG>: Bug report written to `${ARTIFACT_DIR}/bug-report.md`.
-<If FLAKY>: Flaky test confirmed (pattern: <e.g. PFPP>). Fix applied to `${ARTIFACT_DIR}/test-fixes/`. See `CHANGES.md` for root cause and fix details.
-<If CLUSTER_INSTABILITY>: Incident note written to `${ARTIFACT_DIR}/cluster-instability-report.md`. Recommendation: rerun the CI job.
-<If JOB_CONFIG>: No test or product change. Recommended job config change: <exact env/config change and file>.
-
-## Evidence Sources
-- JUnit XML: `<filename>` — failure message at line <N>
-- Operator logs: `<namespace>/<deployment>` — <relevant log excerpt>
-- Cluster state: <MCP status / CRD or catalog availability / pod status>
-- Test source: `<file-path>` — <what was found>
-
-## Skill Improvement Recommendations
-<!-- Record deviations from the skill steps: commands that failed and had to be adapted, decisive diagnostics the skill did not mention, steps that were unnecessary or slow, cleanup that did not work, or assumptions (namespace, resource name, container index) that did not hold. -->
-<If the skill steps were followed exactly and worked as written>: None.
-<Otherwise, one bullet per finding>:
-- **Step <N> — <short title>**: <What the skill said to do> → <What actually worked / what was wrong and why>. Suggested fix: <concrete change to the skill>.
-````
+Mandatory. Follow "Analysis summary" in `/tmp/qe-agent-modules/analysis-summary.md`. Classifications also include `JOB_CONFIG` (Step 5e). If missing: write `${ARTIFACT_DIR}/qe-agent-analysis.md` with the AI-Generated Content banner immediately after each diagnosis, without overwriting earlier tests' entries. Per test: Failed Tests, Rerun Result, Diagnosis (classification + evidence), Rerun Summary (Original + Reruns 1–4), Outcome, Evidence Sources. Finish with one Skill Improvement Recommendations section (deviations from skill steps, `None.` if none).
 
 ---
 
