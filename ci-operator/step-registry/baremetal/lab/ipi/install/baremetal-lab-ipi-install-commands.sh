@@ -268,6 +268,8 @@ if [[ -n "${WORKER_COREOS_STREAM:-}" ]]; then
     esc_stream="$(printf '%s' "${WORKER_COREOS_STREAM}" | sed 's/[\/&]/\\&/g')"
     for bmh_file in "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_hosts-*.yaml; do
         if ! grep -q 'installer.openshift.io/role: control-plane' "${bmh_file}"; then
+            echo "cat ${bmh_file}"
+            cat "${bmh_file}"
             sed -i "s/coreos.openshift.io\/stream: .*/coreos.openshift.io\/stream: ${esc_stream}/" "${bmh_file}"
             grep "${esc_stream}" "${bmh_file}"
         fi
