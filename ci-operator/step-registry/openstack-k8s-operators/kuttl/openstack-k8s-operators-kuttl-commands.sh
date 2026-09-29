@@ -58,12 +58,28 @@ PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Get Pull request info - Pull request
 PR_NUMBER=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].number')
-PR_BODY=$(curl -s -X GET \
+PR_API_URL="https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER}"
+# -L: follow a redirect (e.g. a renamed repo) so %{http_code} below reflects the
+# final response, not just the redirect's own 3xx.
+PR_HTTP_RESPONSE=$(curl -sL -w $'\n%{http_code}' -X GET \
   -H "Accept: application/vnd.github+json" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
-  https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} |
-  jq -r '.body')
-DEPENDS_ON_INSTALL_YAMLS=$(echo "$PR_BODY" | grep -iE "(depends-on).*(install_yamls)" || true)
+  "${PR_API_URL}")
+PR_HTTP_CODE=$(echo "$PR_HTTP_RESPONSE" | tail -n1)
+PR_JSON=$(echo "$PR_HTTP_RESPONSE" | sed '$d')
+# Fail with the actual response instead of a bare jq parse error further down:
+# this API call is unauthenticated (60 req/hour, shared across every job on
+# this CI cluster's egress IP), so a non-200 here usually means rate-limited.
+if [[ "$PR_HTTP_CODE" != "200" ]]; then
+  echo "GitHub API GET ${PR_API_URL} returned HTTP ${PR_HTTP_CODE} (expected 200), response body:" >&2
+  echo "$PR_JSON" >&2
+  exit 1
+fi
+PR_BODY=$(echo "$PR_JSON" | jq -r '.body')
+# Anchored to a real "Depends-On:" trailer, not any line mentioning both words,
+# so PR prose discussing the syntax is not picked up (see the build step).
+DEPENDS_ON_INSTALL_YAMLS=$(echo "$PR_BODY" | grep -iE "^depends-on:.*install_yamls" | head -1 || true)
+DEPENDS_ON=$(echo "$PR_BODY" | grep -iE "^depends-on:.*openstack-operator" | head -1 || true)
 # Build tag
 BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
 
@@ -83,6 +99,19 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
 fi
 # sets default branch for install_yamls
 export OPENSTACK_K8S_BRANCH=${REF_BRANCH}
+
+# In a rehearsal prow clones the meta operator as an extra_ref at its base branch,
+# so a "Depends-On: .../openstack-operator#<pr>" on the release PR is not reflected
+# in this step's /go/src checkout. The build step rebuilds the operator image from
+# that PR, but this step also reads .prow_ci.env, kuttl-test.yaml and the tests from
+# /go/src, so check the PR out here too to keep config/tests in sync with the image.
+if [[ "$REF_ORG" != "$ORG" && "$BASE_OP" == "$META_OPERATOR" && -n "$DEPENDS_ON" ]]; then
+  pr_num=$(echo "$DEPENDS_ON" | rev | cut -d"/" -f1 | rev | tr -d '[:space:]')
+  if [[ "$pr_num" == ?(-)+([0-9]) ]]; then
+    git -C /go/src/github.com/${ORG}/${BASE_OP} fetch "https://github.com/${ORG}/${BASE_OP}.git" "pull/${pr_num}/head:PR${pr_num}"
+    git -C /go/src/github.com/${ORG}/${BASE_OP} checkout "PR${pr_num}"
+  fi
+fi
 
 # custom per project ENV variables
 # shellcheck source=/dev/null

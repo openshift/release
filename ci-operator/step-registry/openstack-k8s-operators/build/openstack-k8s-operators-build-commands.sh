@@ -20,20 +20,36 @@ PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Get Pull request info - Pull request
 PR_NUMBER=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].number')
-PR_REPO_NAME=$(curl -s -X GET -H \
+# Single call for both fields below (same URL): every call here counts against
+# the shared unauthenticated GitHub API rate limit (60/hour per source IP,
+# shared with every other job on this CI cluster's egress).
+PR_API_URL="https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER}"
+# -L: follow a redirect (e.g. a renamed repo) so %{http_code} below reflects the
+# final response, not just the redirect's own 3xx.
+PR_HTTP_RESPONSE=$(curl -sL -w $'\n%{http_code}' -X GET \
   -H "Accept: application/vnd.github+json" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
-  https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} |
-  jq -r '.head.repo.full_name')
+  "${PR_API_URL}")
+PR_HTTP_CODE=$(echo "$PR_HTTP_RESPONSE" | tail -n1)
+PR_JSON=$(echo "$PR_HTTP_RESPONSE" | sed '$d')
+# Fail with the actual response instead of a bare jq parse error further down:
+# a non-200 here usually means the call above got rate-limited.
+if [[ "$PR_HTTP_CODE" != "200" ]]; then
+  echo "GitHub API GET ${PR_API_URL} returned HTTP ${PR_HTTP_CODE} (expected 200), response body:" >&2
+  echo "$PR_JSON" >&2
+  exit 1
+fi
+PR_REPO_NAME=$(echo "$PR_JSON" | jq -r '.head.repo.full_name')
+PR_BODY=$(echo "$PR_JSON" | jq -r '.body')
 
-PR_BODY=$(curl -s -X GET -H \
-  -H "Accept: application/vnd.github+json" \
-  -H "X-GitHub-Api-Version: 2022-11-28" \
-  https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} |
-  jq -r '.body')
-
-DEPENDS_ON=$(echo "$PR_BODY" | grep -iE "(depends-on).*(openstack-operator)" || true)
-DEPENDS_ON_INSTALL_YAMLS=$(echo "$PR_BODY" | grep -iE "(depends-on).*(install_yamls)" || true)
+# Anchored to the start of the line (a real "Depends-On:" trailer), not just any
+# line mentioning both words: an unanchored match also picks up this PR's own
+# description/commit-message prose discussing the Depends-On syntax (and
+# CodeRabbit's auto-generated summary doing the same), concatenating multiple
+# lines into garbage that then fails the numeric pr_num check below silently,
+# so the checkout is skipped without ever reporting an error.
+DEPENDS_ON=$(echo "$PR_BODY" | grep -iE "^depends-on:.*openstack-operator" | head -1 || true)
+DEPENDS_ON_INSTALL_YAMLS=$(echo "$PR_BODY" | grep -iE "^depends-on:.*install_yamls" | head -1 || true)
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
@@ -295,6 +311,21 @@ function build_push_operator_images {
 # Begin operators build
 # Copy base operator code to base directory
 cp -r /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/ ${BASE_DIR}
+
+# In a rehearsal the meta operator is cloned by prow as an extra_ref at its base
+# branch, so a "Depends-On: .../openstack-operator#<pr>" on the release PR would
+# otherwise be ignored when the meta operator itself is under test. Check out that
+# PR on top of the copied clone so the rehearsal builds the proposed code.
+if [[ "$IS_REHEARSAL" == true && "$BASE_OP" == "$META_OPERATOR" && -n "$DEPENDS_ON" ]]; then
+  pr_num=$(echo "$DEPENDS_ON" | rev | cut -d"/" -f1 | rev | tr -d '[:space:]')
+  if [[ "$pr_num" == ?(-)+([0-9]) ]]; then
+    # The clonerefs checkout copied in above has no guaranteed "origin" remote
+    # (unlike clone_openstack_operator, which names it via a fresh git clone), so
+    # fetch by explicit URL instead of relying on a remote name.
+    git -C "${BASE_DIR}/${BASE_OP}" fetch "https://github.com/${DEFAULT_ORG}/${BASE_OP}.git" "pull/${pr_num}/head:PR${pr_num}"
+    git -C "${BASE_DIR}/${BASE_OP}" checkout "PR${pr_num}"
+  fi
+fi
 
 # Create and enable openstack namespace
 create_openstack_namespace
