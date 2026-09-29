@@ -194,9 +194,13 @@ tests:
         }
 
         run_tests() {
-          echo '==> Clone system-tests main'
+          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#11 merges.
+          echo '==> Check out openshift/rhwa-system-tests PR 11'
           git clone --depth=1 --branch main \
             https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
+          git -C /tmp/system-tests fetch --depth=1 \
+            https://github.com/openshift/rhwa-system-tests.git refs/pull/11/head
+          git -C /tmp/system-tests checkout --detach FETCH_HEAD
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
 
           export SBR_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
