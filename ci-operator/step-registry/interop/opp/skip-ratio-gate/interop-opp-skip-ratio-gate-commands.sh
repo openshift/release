@@ -139,10 +139,8 @@ def main():
               file=sys.stderr)
         sys.exit(1)
     shared_dir = os.environ.get("SHARED_DIR", "")
-    shared_junit = os.path.join(shared_dir, "junit") if shared_dir else ""
     junit_dir = (
         os.environ.get("JUNIT_DIR", "")
-        or (shared_junit if os.path.isdir(shared_junit) else "")
         or (shared_dir if shared_dir and any(Path(shared_dir).rglob("*.xml")) else "")
         or os.environ.get("ARTIFACT_DIR", "")
     )

@@ -110,9 +110,11 @@ CollectExitArtifacts() {
 
 # shellcheck disable=SC2317
 _propagate_junit () {
-    # Copy all JUnit XML files from ARTIFACT_DIR into SHARED_DIR/junit for aggregation.
-    mkdir -p "${SHARED_DIR}/junit"
-    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+    local _step_prefix
+    _step_prefix="$(basename "${BASH_SOURCE[1]:-$0}" .sh | sed 's/-commands$//')"
+    find "${ARTIFACT_DIR}" -name '*.xml' -print0 2>/dev/null | while IFS= read -r -d '' _xf; do
+        cp "${_xf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_xf}")" 2>/dev/null || true
+    done
 }
 
 _jrc=0

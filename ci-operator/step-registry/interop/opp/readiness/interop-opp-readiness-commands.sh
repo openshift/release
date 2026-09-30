@@ -32,7 +32,7 @@ _junit_start=$(date +%s)
 _junit_emitted=0
 _jrc=0
 _junit_emit() {
-  # Emit a JUnit XML result for the readiness step and propagate to SHARED_DIR/junit.
+  # Emit a JUnit XML result for the readiness step and propagate to SHARED_DIR.
   (( _junit_emitted )) && return 0
   _junit_emitted=1
   local _jr=${1:-0}
@@ -55,8 +55,9 @@ _junit_emit() {
 </testsuite>
 JUNITEOF
   if [[ -n "${SHARED_DIR:-}" ]]; then
-    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    local _step_prefix
+    _step_prefix="$(basename "${BASH_SOURCE[0]:-$0}" .sh | sed 's/-commands$//')"
+    cp "${_jf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_jf}")" 2>/dev/null || true
   fi
 }
 
