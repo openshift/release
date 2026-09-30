@@ -6,7 +6,7 @@ cat <<'MEDIK8S_LIB_EOF' > "${SHARED_DIR}/medik8s-lib.sh"
 # Written by the medik8s-lib ref step; do not edit directly.
 #
 # Required caller variables per function:
-#   resolve_commit_sha: OCP_VERSION, FBC_COMMIT_SHA (in/out), FBC_SHA_PINNED (in/out)
+#   resolve_commit_sha: OCP_VERSION, FBC_COMMIT_SHA (in/out), FBC_SHA_PINNED (in/out); takes optional [max_attempts]
 #   verify_fbc_image:   OCP_VERSION, FBC_COMMIT_SHA, FBC_SHA_PINNED
 #   wait_for_mcp_rollout: (none - takes argument)
 #   ensure_marketplace: (none)
@@ -61,6 +61,8 @@ set_proxy() {
 }
 
 resolve_commit_sha() {
+    local max_attempts="${1:-6}"
+
     if [[ -n "$FBC_COMMIT_SHA" ]]; then
         FBC_SHA_PINNED="true"
         log "Using provided FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
@@ -77,19 +79,32 @@ resolve_commit_sha() {
     local image_name="${FBC_IMAGE_PREFIX}-${OCP_VERSION}"
     log "Resolving latest active FBC image for ${image_name} from Quay..."
 
-    local quay_response
-    if ! quay_response=$(curl -sSf --retry 3 --retry-delay 2 \
-        --connect-timeout 10 --max-time 30 \
-        "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=50&onlyActiveTags=true" 2>&1); then
-        log "ERROR: Quay API request failed for ${image_name}: ${quay_response}"
-        exit 1
-    fi
-
-    FBC_COMMIT_SHA=$(echo "$quay_response" \
-        | jq -r '[.tags[] | select(.name | test("^[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty')
+    # The FBC image is a periodic Konflux build tagged by commit SHA; a fresh
+    # tag can be briefly absent while a build publishes (Quay returns 200 with
+    # no matching tag). Retry both the request and the empty-result case with
+    # exponential backoff (2+4+8+16+32 = 62s window) before failing hard.
+    local quay_response attempt delay
+    for attempt in $(seq 1 "$max_attempts"); do
+        if quay_response=$(curl -sSf --connect-timeout 10 --max-time 30 \
+            "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=50&onlyActiveTags=true" 2>&1); then
+            FBC_COMMIT_SHA=$(echo "$quay_response" \
+                | jq -r '[.tags[] | select(.name | test("^[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty')
+            if [[ -n "$FBC_COMMIT_SHA" ]]; then
+                break
+            fi
+            log "WARNING: No active SHA tag for ${image_name} yet (attempt ${attempt}/${max_attempts})"
+        else
+            log "WARNING: Quay API request for ${image_name} failed (attempt ${attempt}/${max_attempts}): ${quay_response}"
+        fi
+        if [[ "$attempt" -lt "$max_attempts" ]]; then
+            delay=$(( 2 ** attempt ))
+            log "Retrying in ${delay}s..."
+            sleep "$delay"
+        fi
+    done
 
     if [[ -z "$FBC_COMMIT_SHA" ]]; then
-        log "ERROR: No active SHA tag found for ${image_name} on Quay"
+        log "ERROR: No active SHA tag found for ${image_name} on Quay after ${max_attempts} attempts"
         exit 1
     fi
 
