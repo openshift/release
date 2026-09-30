@@ -24,16 +24,13 @@ Read `${SHARED_DIR}/qe-agent-context.json`, written by the test step at exit:
 
 ```json
 {
-  "step_script_ref": "distributed-tracing/tests/opentelemetry/ui/distributed-tracing-tests-opentelemetry-ui-commands.sh",
+  "step_script_ref": "distributed-tracing/tests/opentelemetry-ui/upstream/distributed-tracing-tests-opentelemetry-ui-upstream-commands.sh",
   "has_test_failures": true,
-  "env": {
-    "DT_QE_BRANCH": "main"
-  }
+  "env": {}
 }
 ```
 
 - `step_script_ref` — path relative to `ci-operator/step-registry/`
-- `env.DT_QE_BRANCH` — branch of distributed-tracing-qe that the tests were taken from
 
 Fetch `https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/<step_script_ref>`. Before `chainsaw test` is **setup** (proxy file, console URL, kubeadmin password file, `git clone`); the `chainsaw test` command is the **test execution**.
 
@@ -43,7 +40,7 @@ Mandatory, before Step 0b. Read `/tmp/qe-agent-modules/cluster-stability.md` and
 
 ## Step 0b — Re-establish the Test Environment
 
-Clone the tests, this is the repo root: `git clone --depth 1 --branch "${DT_QE_BRANCH:-main}" https://github.com/openshift/distributed-tracing-qe.git /tmp/distributed-tracing-qe` (`DT_QE_BRANCH` from the context `env`). The environment of the script (proxy file, console URL, kubeadmin password file, `CI=true`) is set up in Step 3. Verify the operator is installed and `Succeeded` (`oc get csv -n opentelemetry-operator-system`); do not reinstall it. If `qe-agent-context.json` is missing, infer the suite from the JUnit prefix, skip the rerun, and diagnose from the JUnit content and cluster state.
+Clone the tests, this is the repo root: `git clone --depth 1 --branch main https://github.com/openshift/distributed-tracing-qe.git /tmp/distributed-tracing-qe` (the step takes the tests from the main branch). The environment of the script (proxy file, console URL, kubeadmin password file, `CI=true`) is set up in Step 3. Verify the operator is installed and `Succeeded` (`oc get csv -n opentelemetry-operator-system`); do not reinstall it. If `qe-agent-context.json` is missing, infer the suite from the JUnit prefix, skip the rerun, and diagnose from the JUnit content and cluster state.
 
 ## Step 1 — Parse JUnit XMLs and Identify Failures
 
@@ -227,7 +224,7 @@ Mandatory. Follow "Incident note" in `/tmp/qe-agent-modules/analysis-summary.md`
 
 ## Step 5e — If JOB_CONFIG: Recommend a Job Configuration Change
 
-The test and product are fine, but the job lacks something (the kubeadmin password file, `OPENSHIFT_CREATE_DASHBOARD=true` in the operator bundle, access to the telemetrygen image). Don't modify tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the evidence and the exact change: the step `distributed-tracing-tests-opentelemetry-ui` and the job `opentelemetry-ui-tests` (variant `upstream-ui-ocp-4.22-amd64`) are in `ci-operator/config/openshift/open-telemetry-opentelemetry-operator/`.
+The test and product are fine, but the job lacks something (the kubeadmin password file, `OPENSHIFT_CREATE_DASHBOARD=true` in the operator bundle, access to the telemetrygen image). Don't modify tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the evidence and the exact change: the step `distributed-tracing-tests-opentelemetry-ui-upstream` and the job `opentelemetry-ui-tests` (variant `upstream-ui-ocp-4.22-amd64`) are in `ci-operator/config/openshift/open-telemetry-opentelemetry-operator/`.
 
 ---
 
