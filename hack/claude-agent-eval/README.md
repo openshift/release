@@ -61,14 +61,16 @@ After triggers select an eval, `eval_cases_dir` allows case-only changes to
 select exact case IDs via `--cases`. IDs are sorted, deduplicated names of
 immediate subdirectories, including cases with changed nested fixtures.
 The directory must match the eval YAML's `dataset.path`, resolved relative
-to that YAML (e.g. `cases/foo` in the example). The eval YAML is not rewritten.
+to the base config at the root of its `extends` chain (e.g. `cases/foo` in the
+example). The eval YAML is not rewritten.
 
 The provisional policy, pending task-owner confirmation, is:
 
 - Only individual cases change: run those cases.
 - A trigger-matching change is outside individual cases: run the full dataset.
-- For an already-selected eval, config/setup/manifest edits also force a full
-  run, even when those paths are absent from its triggers.
+- For an already-selected eval, edits to the manifest, setup script, original
+  config, or any inherited base/intermediate config force a full run, even when
+  those paths are absent from its triggers.
 - Shared files or removed/renamed case directories force a full run. Removing
   a fixture inside a surviving case selects that case. A missing entire
   `eval_cases_dir` is a configuration error.
@@ -76,6 +78,8 @@ The provisional policy, pending task-owner confirmation, is:
 
 The field adds no implicit triggers. Unrelated changes do not force a full
 run. This policy lives in `select_cases()` so it can be revised independently.
+Changing a base or intermediate config does not select an eval; add every
+configuration file that should trigger an eval to that entry's `triggers`.
 
 ## Configuration ownership
 
@@ -94,10 +98,28 @@ dataset remain harness-owned. In case mode, `execution.max_budget_usd` limits
 each case invocation, not total CI spend or judge/orchestrator calls.
 `CLAUDE_MODEL` chooses the outer orchestrator model.
 
+The manifest runner pins `agent-eval-harness` at
+`e4b0f24bdbaa33bb07e0d723dfd834e90b655b5f`. It fetches that exact commit,
+checks `git rev-parse HEAD`, and uses that checkout for configuration
+resolution, the Claude plugin, and regression scoring. The runner resolves
+selected configs with the harness's `load_raw()` and `EvalConfig.from_yaml()`
+APIs, so `extends`, inherited values, list merging, and `!replace` follow the
+same rules at preflight and execution. The original overlay path remains the
+eval identity and the `/eval-run --config` argument.
+
+The harness resolves relative `extends` references from each file and resolves
+`dataset.path` from the base config at the root of the chain. Every config in
+the resolved chain must be an existing file inside the consumer checkout.
+Selected configs are preflighted after the harness checkout is prepared and
+before any setup script or model call. A malformed manifest or failed Git diff
+still fails before harness preparation; a config overlay error is reported
+after harness preparation, with a per-eval `config-resolution.log`.
+
 `thresholds`, when present, must map judge names to mappings of scoring limits.
 Omit it or use `{}` for no thresholds; null and other non-mapping shapes are
-rejected before setup, harness installation, or model calls. The harness still
-interprets the scoring limits.
+rejected during config preflight, before setup or model calls. The harness
+still interprets the scoring limits. Configs use the harness loader whether or
+not they contain `extends`.
 
 The new step exposes no legacy scheduling/runner overrides. `EVAL_DISCOVER`,
 an explicit non-default `EVAL_CONFIG`, and `EVAL_EXTRA_ARGS` are rejected.
@@ -144,6 +166,7 @@ ARTIFACT_DIR/
   evals-summary.json
   runner/harness-install.log
   evals/<artifact_name>/
+    config-resolution.log
     report-summary.html
     summary.yaml
     run_result.json
@@ -234,8 +257,9 @@ therefore use omission rather than a nonnumeric `"unavailable"` value.
 
 ## Development and validation
 
-Edit `manifest_runner.py`, `eval_plan.py`, or `eval_metrics.py`, then run
-`sync_commands.py`. It packages these sources into the manifest step's
+Edit `eval_config.py`, `manifest_runner.py`, `eval_plan.py`,
+`eval_regression.py`, or `eval_metrics.py`, then run `sync_commands.py`.
+It packages these sources into the manifest step's
 commands script only; it does not read or write the existing workflow's
 commands script. ci-operator ships a commands script's contents, not sibling
 Python files from release/hack.
@@ -266,3 +290,14 @@ For a fast local run (Python 3.9+ and PyYAML):
 Run pylint against all of `hack`, as CI does. The separate Python validation
 image currently uses Python 3.14 and unpinned pylint; older local versions
 may miss checks enforced by CI.
+
+The offline suite uses a fake harness API. Separately, run the contract suite
+against the exact pinned checkout to verify overlays with the real parser:
+
+```bash
+python3 hack/claude-agent-eval/real_harness_contract.py --harness-checkout /path/to/agent-eval-harness
+```
+
+Run the contract suite with Python 3.11+ and the harness's core dependencies
+(PyYAML, Jinja2, and truststore). It checks the checkout SHA and makes no
+API/model calls. The default offline suite does not fetch the harness.

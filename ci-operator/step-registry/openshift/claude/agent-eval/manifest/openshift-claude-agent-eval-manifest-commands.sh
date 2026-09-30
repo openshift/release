@@ -14,15 +14,20 @@ from pathlib import Path
 import re
 import subprocess
 
-import yaml
-
 
 class EvalError(Exception):
     """An invalid configuration or unsuccessful evaluation."""
 
 
+def artifact_name(config):
+    """Keep artifact names readable and distinct across equal config basenames."""
+    stem = re.sub(r"[^a-zA-Z0-9_-]", "-", Path(config).stem)[:80]
+    suffix = hashlib.sha256(config.encode()).hexdigest()[:12]
+    return f"{stem}-{suffix}"
+
+
 @dataclass(frozen=True)
-class EvalPlan:
+class EvalPlan:  # pylint: disable=too-many-instance-attributes
     """One manifest eval with its resolved settings and selected cases."""
 
     config: str
@@ -32,25 +37,12 @@ class EvalPlan:
     max_turns: int
     setup_script: str = ""
     cases: tuple = ()
+    config_chain: tuple = ()
 
     @property
     def artifact_name(self):
-        """Keep artifact names readable and distinct across equal config basenames."""
-        stem = re.sub(r"[^a-zA-Z0-9_-]", "-", Path(self.config).stem)[:80]
-        suffix = hashlib.sha256(self.config.encode()).hexdigest()[:12]
-        return f"{stem}-{suffix}"
-
-
-def read_config(path):
-    """Read an eval YAML without requiring manifest-owned model settings."""
-    try:
-        with path.open(encoding="utf-8") as stream:
-            config = yaml.safe_load(stream)
-    except (OSError, yaml.YAMLError) as error:
-        raise EvalError(f"cannot read {path}: {error}") from error
-    if not isinstance(config, dict):
-        raise EvalError(f"{path}: eval config must be a mapping")
-    return config
+        """Return the stable directory name for this config identity."""
+        return artifact_name(self.config)
 
 
 def validate_thresholds(thresholds):
@@ -106,7 +98,248 @@ def changed_files(repo, base_sha):
                         "and its merge base (a diff failure is not a no-op)") from error
     return [os.fsdecode(path) for path in diff.split(b"\0") if path]
 PYTHON_SOURCE_0
-cat > "${runner_dir}/manifest_runner.py" <<'PYTHON_SOURCE_1'
+cat > "${runner_dir}/eval_config.py" <<'PYTHON_SOURCE_1'
+#!/usr/bin/env python3
+"""Resolve eval configuration through the pinned agent-eval-harness loader."""
+
+import argparse
+import importlib
+import json
+from dataclasses import dataclass
+from pathlib import Path
+import sys
+from typing import Optional
+
+try:
+    from .eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_thresholds
+except ImportError:
+    from eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_thresholds
+
+
+HARNESS_URL = "https://github.com/opendatahub-io/agent-eval-harness.git"
+HARNESS_REVISION = "e4b0f24bdbaa33bb07e0d723dfd834e90b655b5f"
+RESULT_SCHEMA_VERSION = 1
+
+
+@dataclass(frozen=True)
+class ResolvedConfig:
+    """The minimal resolved runner settings and structured harness config."""
+
+    config: str
+    model: str
+    settings: dict
+    dataset_path: Optional[str]
+    config_chain: tuple
+    harness_config: object
+
+    def as_dict(self):
+        """Return the versioned bridge contract without dataclass internals."""
+        return {
+            "schema_version": RESULT_SCHEMA_VERSION,
+            "config": self.config,
+            "model": self.model,
+            "settings": self.settings,
+            "dataset_path": self.dataset_path,
+            "config_chain": list(self.config_chain),
+        }
+
+
+def _import_harness_config(harness):
+    """Import the config API from this checkout, never a consumer's package."""
+    root = Path(harness).resolve()
+    module_path = root / "agent_eval" / "config.py"
+    if not module_path.is_file():
+        raise EvalError(f"harness checkout does not contain {module_path.relative_to(root)}")
+
+    # A caller may have imported a consumer-local package already. Remove only
+    # foreign agent_eval modules so sys.path precedence also applies to the
+    # import cache, not just to future module lookups.
+    for name in list(sys.modules):
+        if name == "agent_eval" or name.startswith("agent_eval."):
+            module = sys.modules[name]
+            location = getattr(module, "__file__", None)
+            if not location or not Path(location).resolve().is_relative_to(root):
+                del sys.modules[name]
+    root_string = str(root)
+    sys.path[:] = [item for item in sys.path if item and Path(item).resolve() != root]
+    sys.path.insert(0, root_string)
+    try:
+        config_module = importlib.import_module("agent_eval.config")
+    except (ImportError, OSError) as error:
+        raise EvalError(f"cannot import agent_eval.config from {root}: {error}") from error
+    imported_path = Path(config_module.__file__).resolve()
+    if not imported_path.is_relative_to(root):
+        raise EvalError(f"agent_eval.config was imported from outside the supplied harness: {imported_path}")
+    if not callable(getattr(config_module, "load_raw", None)):
+        raise EvalError("pinned harness agent_eval.config is missing load_raw()")
+    eval_config = getattr(config_module, "EvalConfig", None)
+    if eval_config is None or not callable(getattr(eval_config, "from_yaml", None)):
+        raise EvalError("pinned harness agent_eval.config is missing EvalConfig.from_yaml()")
+    return config_module
+
+
+def _normalize_chain(repo, config_path, chain):
+    if not isinstance(chain, (list, tuple)) or not chain:
+        raise EvalError("harness load_raw() returned an empty or invalid config chain")
+    normalized = []
+    resolved_paths = []
+    for item in chain:
+        if not isinstance(item, str) or not item:
+            raise EvalError("harness config chain entries must be nonempty path strings")
+        path = Path(item)
+        if not path.is_absolute():
+            raise EvalError(f"harness config chain entry is not absolute: {item!r}")
+        path = path.resolve()
+        if not path.is_relative_to(repo) or not path.is_file():
+            raise EvalError(f"inherited config must resolve to an existing file inside the repository: {item}")
+        resolved_paths.append(path)
+        normalized.append(path.relative_to(repo).as_posix())
+    if len(set(resolved_paths)) != len(resolved_paths):
+        raise EvalError("harness returned a config chain with repeated files")
+    if resolved_paths[-1] != config_path:
+        raise EvalError("harness config chain does not end at the selected overlay config")
+    return tuple(normalized)
+
+
+def resolve_config(harness, repo, config):
+    """Resolve and validate one original config path using the harness APIs."""
+    repo = Path(repo).resolve()
+    config_value = Path(config)
+    if config_value.is_absolute():
+        config_path = config_value.resolve()
+        if not config_path.is_relative_to(repo):
+            raise EvalError(f"config must be inside the repository: {config}")
+        identity = config_path.relative_to(repo).as_posix()
+    else:
+        identity = relative_path(config_value.as_posix(), "config")
+        config_path = repo_file(repo, identity, "config")
+    config_path = repo_file(repo, identity, "config")
+
+    harness_config_module = _import_harness_config(harness)
+    try:
+        merged, chain = harness_config_module.load_raw(config_path)
+    except Exception as error:  # harness exceptions need the selected config context
+        raise EvalError(f"{identity}: harness load_raw() failed: {type(error).__name__}: {error}") from error
+    if not isinstance(merged, dict):
+        raise EvalError(f"{identity}: harness load_raw() did not return a mapping")
+
+    # Keep release's structural guard on the merged value. In particular,
+    # explicit null must not become the no-threshold default.
+    validate_thresholds(merged.get("thresholds", {}))
+    try:
+        harness_config = harness_config_module.EvalConfig.from_yaml(config_path)
+    except Exception as error:  # the harness owns structured eval validation
+        raise EvalError(f"{identity}: EvalConfig.from_yaml() failed: {type(error).__name__}: {error}") from error
+
+    models = getattr(harness_config, "models", None)
+    model = getattr(models, "skill", None)
+    if not isinstance(model, str) or not model.strip():
+        raise EvalError(f"{identity}: models.skill is required; EVAL_MODEL is ignored")
+    thresholds = validate_thresholds(getattr(harness_config, "thresholds", None))
+    config_chain = _normalize_chain(repo, config_path, chain)
+
+    dataset = getattr(harness_config, "dataset", None)
+    dataset_value = getattr(dataset, "path", None)
+    if dataset_value in (None, ""):
+        dataset_path = None
+    elif not isinstance(dataset_value, str):
+        raise EvalError(f"{identity}: harness dataset.path must be a string")
+    else:
+        resolver = getattr(harness_config, "resolve_path", None)
+        if not callable(resolver):
+            raise EvalError(f"{identity}: pinned harness EvalConfig is missing resolve_path()")
+        try:
+            dataset_path = str(resolver(dataset_value).resolve())
+        except Exception as error:
+            raise EvalError(f"{identity}: harness could not resolve dataset.path: {error}") from error
+
+    resolved = ResolvedConfig(identity, model, {"thresholds": thresholds}, dataset_path,
+                              config_chain, harness_config)
+    try:
+        encoded = json.dumps(resolved.as_dict(), ensure_ascii=False, allow_nan=False)
+        if json.loads(encoded) != resolved.as_dict():
+            raise ValueError("JSON encoding would change resolved settings")
+    except (TypeError, ValueError) as error:
+        raise EvalError(f"{identity}: resolved settings are not JSON-safe: {error}") from error
+    return resolved
+
+
+def validate_resolution_result(document, repo, config, eval_cases_dir=""):
+    """Validate the child's result file before it enters an eval plan."""
+    if not isinstance(document, dict) or set(document) != {
+            "schema_version", "config", "model", "settings", "dataset_path", "config_chain"}:
+        raise EvalError("config resolver returned an incompatible result schema")
+    version = document["schema_version"]
+    if not isinstance(version, int) or isinstance(version, bool) or version != RESULT_SCHEMA_VERSION:
+        raise EvalError(f"config resolver returned unsupported schema_version: {version!r}")
+    if document["config"] != config:
+        raise EvalError(f"config resolver identity mismatch: expected {config!r}, got {document['config']!r}")
+    model = document["model"]
+    if not isinstance(model, str) or not model.strip():
+        raise EvalError("config resolver returned an empty or invalid model")
+    settings = document["settings"]
+    if not isinstance(settings, dict) or set(settings) != {"thresholds"}:
+        raise EvalError("config resolver returned invalid settings")
+    thresholds = validate_thresholds(settings["thresholds"])
+
+    chain = document["config_chain"]
+    if not isinstance(chain, list) or not chain:
+        raise EvalError("config resolver returned an empty or invalid config_chain")
+    resolved_chain = []
+    for item in chain:
+        relative_path(item, "config_chain")
+        resolved_chain.append(repo_file(repo, item, "config_chain"))
+    if len(set(resolved_chain)) != len(resolved_chain):
+        raise EvalError("config resolver returned a config_chain with repeated files")
+    expected_config = repo_file(repo, config, "config")
+    if resolved_chain[-1] != expected_config:
+        raise EvalError("config resolver returned a config_chain that does not end at the selected config")
+
+    dataset_path = document["dataset_path"]
+    if dataset_path is not None and (
+            not isinstance(dataset_path, str) or not dataset_path or not Path(dataset_path).is_absolute()):
+        raise EvalError("config resolver returned an invalid dataset_path")
+    if eval_cases_dir:
+        cases_path = repo_directory(repo, eval_cases_dir, "eval_cases_dir").resolve()
+        resolved_dataset = Path(dataset_path).resolve() if dataset_path is not None else None
+        if resolved_dataset != cases_path:
+            raise EvalError(f"{config}: eval_cases_dir must point to the same directory "
+                            "as the harness-resolved dataset.path")
+    return {"model": model, "settings": {"thresholds": thresholds},
+            "dataset_path": dataset_path, "config_chain": tuple(chain)}
+
+
+def _write_result(destination, document):
+    path = Path(destination)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(document, ensure_ascii=False, allow_nan=False,
+                                    indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def main(argv=None):
+    """CLI used by the bounded runner child; diagnostics remain on stderr."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--harness", type=Path, required=True)
+    parser.add_argument("--repo", type=Path, required=True)
+    parser.add_argument("--config", required=True)
+    parser.add_argument("--result", type=Path, required=True)
+    args = parser.parse_args(argv)
+    try:
+        resolved = resolve_config(args.harness, args.repo, args.config)
+        _write_result(args.result, resolved.as_dict())
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        # Harness imports and validation may raise implementation-specific errors.
+        print(f"configuration resolution failed: {type(error).__name__}: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+PYTHON_SOURCE_1
+cat > "${runner_dir}/manifest_runner.py" <<'PYTHON_SOURCE_2'
 #!/usr/bin/env python3
 """Run PR evaluations selected by the repository's manifest.
 
@@ -132,17 +365,20 @@ import yaml
 
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
     from .eval_report import render_report
-    from .eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
+    from .eval_config import HARNESS_REVISION, HARNESS_URL, validate_resolution_result
+    from .eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
     from .eval_plan import validate_thresholds
 except ImportError:
     from eval_report import render_report
-    from eval_plan import EvalError, EvalPlan, changed_files, read_config, relative_path, repo_directory, repo_file
+    from eval_config import HARNESS_REVISION, HARNESS_URL, validate_resolution_result
+    from eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
     from eval_plan import validate_thresholds
 
 
 MANIFEST = "evals.yaml"
 STEP_TIMEOUT = 13800  # Leave ten minutes inside the Prow step's four-hour limit.
 EVAL_TIMEOUT = 12600
+CONFIG_RESOLUTION_TIMEOUT = 60
 
 
 
@@ -244,7 +480,7 @@ def select_evals(entries, files):
     return selected
 
 
-def select_cases(repo, entry, files):
+def select_cases(repo, entry, files, config_chain=()):
     """Return exact changed case IDs, or None to run the full dataset.
 
     This policy is deliberately separate from eval trigger matching: adding a
@@ -256,7 +492,7 @@ def select_cases(repo, entry, files):
         prefix = entry.eval_cases_dir.rstrip("/") + "/"
         # Config/setup/manifest changes invalidate a subset even when omitted
         # from triggers. They do not independently select an otherwise skipped eval.
-        controls = {MANIFEST, entry.config, entry.setup_script}
+        controls = {MANIFEST, entry.config, entry.setup_script, *config_chain}
         relevant = [path for path in files if matches_triggers(path, entry.triggers)
                     or path.startswith(prefix) or path in controls]
         reason = "no attributable case changes"
@@ -282,37 +518,60 @@ def select_cases(repo, entry, files):
     return None
 
 
-def read_eval(repo, entry):
-    config = read_config(repo_file(repo, entry.config, "config"))
-    validate_thresholds(config.get("thresholds", {}))
-    models = config.get("models") if isinstance(config, dict) else None
-    model = models.get("skill") if isinstance(models, dict) else None
-    if not isinstance(model, str) or not model.strip():
-        raise EvalError(f"{entry.config}: models.skill is required; EVAL_MODEL is ignored")
-    if entry.eval_cases_dir:
-        dataset = config.get("dataset")
-        dataset_path = dataset.get("path") if isinstance(dataset, dict) else None
-        # The harness resolves dataset.path against the eval config directory.
-        # Check consistency without rewriting the config or overriding its dataset.
-        if (not isinstance(dataset_path, str) or not dataset_path
-                or (repo / entry.config).resolve().parent.joinpath(dataset_path).resolve()
-                != (repo / entry.eval_cases_dir).resolve()):
-            raise EvalError(f"{entry.config}: eval_cases_dir must point to the same directory "
-                            "as dataset.path (resolved relative to the eval YAML)")
-    return config, model
+def read_eval(repo, entry, harness, result_path, eval_artifacts, env, deadline):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    """Resolve one config in a bounded child using the pinned harness loader."""
+    time_left = deadline - time.monotonic()
+    if time_left <= 0:
+        raise EvalError("step time limit reached during config preflight")
+    result_path.unlink(missing_ok=True)
+    log = eval_artifacts / "config-resolution.log"
+    helper = Path(__file__).with_name("eval_config.py")
+    try:
+        status = command([sys.executable, str(helper), "--harness", str(harness),
+                          "--repo", str(repo), "--config", entry.config,
+                          "--result", str(result_path)],
+                         repo, env, log, min(CONFIG_RESOLUTION_TIMEOUT, time_left))
+    except subprocess.TimeoutExpired as error:
+        with log.open("ab") as output:
+            output.write(f"config resolver timed out after {error.timeout} seconds\n".encode())
+        raise EvalError(f"{entry.config}: config resolver timed out; see config-resolution.log") from error
+    if status:
+        raise EvalError(f"{entry.config}: configuration resolution failed (exit {status}); "
+                        "see config-resolution.log")
+    try:
+        document = json.loads(result_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        with log.open("ab") as output:
+            output.write(f"invalid resolver result: {error}\n".encode())
+        raise EvalError(f"{entry.config}: missing or malformed config resolver result: {error}; "
+                        "see config-resolution.log") from error
+    try:
+        return validate_resolution_result(document, repo, entry.config, entry.eval_cases_dir)
+    except EvalError as error:
+        with log.open("ab") as output:
+            output.write(f"parent validation failed: {error}\n".encode())
+        raise
 
 
-def command(args, repo, env, log, timeout, *, stdout=None):  # pylint: disable=too-many-arguments
-    """Run a bounded command and terminate its entire process group on failure."""
-    with log.open("wb") as output:
+def command(args, repo, env, log, timeout, *, stdout=None, append=False, capture_output=False):  # pylint: disable=too-many-arguments
+    """Run a bounded process group, optionally capturing its small stdout."""
+    if capture_output and stdout is not None:
+        raise ValueError("capture_output cannot be combined with a stdout target")
+    log.parent.mkdir(parents=True, exist_ok=True)
+    mode = "ab" if append else "wb"
+    with log.open(mode) as output:
+        target = subprocess.PIPE if capture_output else (stdout if stdout is not None else output)
         with subprocess.Popen(args, cwd=repo, env=env, stdin=subprocess.DEVNULL,
-                              stdout=stdout if stdout is not None else output, stderr=output,
-                              start_new_session=True) as process:
+                              stdout=target, stderr=output, start_new_session=True,
+                              text=capture_output) as process:
             try:
+                if capture_output:
+                    captured, _ = process.communicate(timeout=max(0.01, timeout))
+                    return process.returncode, captured
                 return process.wait(timeout=max(0.01, timeout))
             except BaseException:
-                # Popen's timeout kills only the immediate child; Claude and
-                # setup scripts can have their own descendants.
+                # Popen's timeout kills only the immediate child; downloads,
+                # Python resolvers, and setup scripts can have descendants.
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:
@@ -374,8 +633,8 @@ def collect_result(directory, artifacts):
         raise EvalError("; ".join(errors))
 
 
-def verify_result(directory, config):
-    thresholds = validate_thresholds(config.get("thresholds", {}))
+def verify_result(directory, settings):
+    thresholds = validate_thresholds(settings.get("thresholds", {}))
     try:
         result = json.loads((directory / "run_result.json").read_text(encoding="utf-8"))
         summary = yaml.safe_load((directory / "summary.yaml").read_text(encoding="utf-8"))
@@ -416,7 +675,7 @@ def summary_data(artifacts, entries, errors):
               "not_run" if counts["not run"] else "passed" if entries else "no_evals")
     evaluations = []
     filenames = ("report-summary.html", "summary.yaml", "run_result.json", "claude-eval.log",
-                 "setup.log", "regression.log", "metrics.log", "eval-run.tar")
+                 "config-resolution.log", "setup.log", "regression.log", "metrics.log", "eval-run.tar")
     for entry in entries:
         directory = Path("evals") / entry["name"]
         files = {name: (directory / name).as_posix() for name in filenames
@@ -484,26 +743,132 @@ def write_reports(artifacts, results, entries, errors):
                 pass  # The original reporting error is already recorded above.
 
 
-def emit_metrics(env, repo, artifacts, eval_artifacts, *, stream_log, result, run_id, prompt):  # pylint: disable=too-many-arguments
+def emit_metrics(env, repo, artifacts, eval_artifacts, *, stream_log, result, run_id, prompt,  # pylint: disable=too-many-arguments
+                 timeout=60):
     # Keep accounting bounded and non-fatal, including for incomplete eval runs.
     try:
+        if timeout <= 0:
+            print(f"WARNING: metrics extraction skipped after the step deadline for {run_id}", flush=True)
+            return
         status = command([sys.executable, str(Path(__file__).with_name("eval_metrics.py")),
                           "/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py",
                           str(stream_log), str(result) if result else "",
                           str(artifacts / "claude-session-metrics-autodl.json"),
                           env.get("BUILD_ID", "unknown"), run_id, prompt],
-                         repo, env, eval_artifacts / "metrics.log", 60)
+                         repo, env, eval_artifacts / "metrics.log", min(60, timeout))
         if status:
             print(f"WARNING: metrics extraction failed for {run_id}", flush=True)
     except Exception as error:  # pylint: disable=broad-exception-caught
         print(f"WARNING: metrics extraction failed: {error}", flush=True)
 
 
-def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statements
+def remaining(deadline):
+    """Return seconds left in the one step-wide monotonic deadline."""
+    return deadline - time.monotonic()
+
+
+def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
+    """Fetch and verify exactly the pinned harness revision."""
+    harness = Path(temporary) / "plugin"
+    install_log = runner_artifacts / "harness-install.log"
+    install_log.write_text(f"Expected harness revision: {HARNESS_REVISION}\n", encoding="utf-8")
+    steps = (
+        (["git", "init", "--quiet", str(harness)], 60, "initialize the harness checkout"),
+        (["git", "-C", str(harness), "remote", "add", "origin", HARNESS_URL],
+         60, "configure the harness remote"),
+        (["git", "-C", str(harness), "fetch", "--no-tags", "--depth", "1",
+          "origin", HARNESS_REVISION], 300, "fetch the pinned harness revision"),
+        (["git", "-C", str(harness), "checkout", "--quiet", "--detach", "FETCH_HEAD"],
+         60, "check out the pinned harness revision"),
+    )
+    for args, timeout, action in steps:
+        left = remaining(deadline)
+        if left <= 0:
+            raise EvalError("step time limit reached during harness preparation; see runner/harness-install.log")
+        with install_log.open("ab") as output:
+            output.write(("$ " + shlex.join(args) + "\n").encode())
+        try:
+            status = command(args, repo, env, install_log, min(timeout, left), append=True)
+        except subprocess.TimeoutExpired as error:
+            with install_log.open("ab") as output:
+                output.write(f"ERROR: {action} timed out after {error.timeout} seconds\n".encode())
+            raise EvalError(f"cannot {action}: step time limit reached; see runner/harness-install.log") from error
+        except OSError as error:
+            with install_log.open("ab") as output:
+                output.write(f"{type(error).__name__}: {error}\n".encode())
+            raise EvalError(f"cannot {action}; see runner/harness-install.log") from error
+        if status:
+            with install_log.open("ab") as output:
+                output.write(f"ERROR: {action} exited with status {status}\n".encode())
+            raise EvalError(f"cannot {action} (exit {status}); see runner/harness-install.log")
+
+    left = remaining(deadline)
+    if left <= 0:
+        raise EvalError("step time limit reached while verifying the harness; see runner/harness-install.log")
+    try:
+        status, actual = command(["git", "-C", str(harness), "rev-parse", "HEAD"],
+                                 repo, env, install_log, min(30, left),
+                                 append=True, capture_output=True)
+    except subprocess.TimeoutExpired as error:
+        with install_log.open("ab") as output:
+            output.write(f"ERROR: git rev-parse timed out after {error.timeout} seconds\n".encode())
+        raise EvalError("step time limit reached while verifying the harness; see runner/harness-install.log") from error
+    except OSError as error:
+        with install_log.open("ab") as output:
+            output.write(f"{type(error).__name__}: {error}\n".encode())
+        raise EvalError("cannot verify harness revision; see runner/harness-install.log") from error
+    actual = actual.strip()
+    with install_log.open("ab") as output:
+        output.write(f"Verified harness revision: {actual}\n".encode())
+    if status:
+        raise EvalError(f"cannot verify harness revision (exit {status}); see runner/harness-install.log")
+    if actual != HARNESS_REVISION:
+        message = f"harness revision mismatch: expected {HARNESS_REVISION}, got {actual!r}"
+        with install_log.open("ab") as output:
+            output.write(f"ERROR: {message}\n".encode())
+        raise EvalError(f"{message}; see runner/harness-install.log")
+    return harness
+
+
+def preflight_evals(repo, entries, files, artifacts, harness, temporary, env,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+                    deadline, results, errors, index):
+    """Resolve every selected config before allowing setup or model execution."""
+    plans = []
+    failed = False
+    for entry, record in zip(entries, index):
+        left = remaining(deadline)
+        if left <= 0:
+            message = f"{entry.config}: step time limit reached before config preflight completed"
+            errors.append(message)
+            results.append(("config preflight", 0, message))
+            print(f"ERROR: {message}", flush=True)
+            failed = True
+            break
+        started = time.monotonic()
+        eval_artifacts = artifacts / "evals" / record["name"]
+        result_path = Path(temporary) / f"{record['name']}.json"
+        try:
+            resolved = read_eval(repo, entry, harness, result_path, eval_artifacts, env, deadline)
+            cases = select_cases(repo, entry, files, resolved["config_chain"]) or ()
+            plans.append(EvalPlan(entry.config, resolved["settings"], resolved["model"],
+                                  entry.parallelism, entry.max_turns, entry.setup_script,
+                                  tuple(cases), resolved["config_chain"]))
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            message = f"{entry.config}: {type(error).__name__}: {error}"
+            record.update(status="failed", failure=message)
+            errors.append(message)
+            results.append((entry.config, time.monotonic() - started, message))
+            print(f"ERROR: {message}", flush=True)
+            failed = True
+    return None if failed else plans
+
+
+def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint: disable=too-many-arguments,too-many-statements
+    """Prepare, preflight, execute, and report selected manifest entries."""
+    deadline = deadline if deadline is not None else time.monotonic() + STEP_TIMEOUT
     results, errors = [], []
-    index = [{"config": entry.config, "name": entry.artifact_name,
+    index = [{"config": entry.config, "name": artifact_name(entry.config),
               "run_id": "", "status": "not run", "failure": ""} for entry in entries]
-    started = time.monotonic()
     runs = Path(env.get("AGENT_EVAL_RUNS_DIR") or "eval/runs")
     if not runs.is_absolute():
         runs = repo / runs
@@ -512,11 +877,11 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
     child_env.pop("EVAL_SNAPSHOT_DIR", None)
     child_env["AGENT_EVAL_RUNS_DIR"] = str(runs)
     child_env["CLAUDE_CODE_ENTRYPOINT"] = "sdk-cli"
-
-    def remaining():
-        return STEP_TIMEOUT - (time.monotonic() - started)
+    started = time.monotonic()
 
     try:
+        for record in index:
+            (artifacts / "evals" / record["name"]).mkdir(parents=True, exist_ok=True)
         write_reports(artifacts, results, index, errors)
         runner_artifacts = artifacts / "runner"
         runner_artifacts.mkdir(exist_ok=True)
@@ -524,17 +889,17 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
         if token_path.is_file():
             child_env["GITHUB_TOKEN"] = token_path.read_text(encoding="utf-8").strip()
         with tempfile.TemporaryDirectory(prefix="agent-eval-harness-") as temporary:
-            harness = Path(temporary) / "plugin"
-            status = command(["git", "clone", "--depth", "1",
-                              "https://github.com/opendatahub-io/agent-eval-harness.git", str(harness)],
-                             repo, child_env, runner_artifacts / "harness-install.log", min(300, remaining()))
-            if status:
-                raise EvalError("cannot clone agent-eval-harness; see runner/harness-install.log")
+            harness = prepare_harness(repo, child_env, runner_artifacts, temporary, deadline)
             child_env["PYTHONPATH"] = os.pathsep.join(
                 [str(harness), str(repo), child_env.get("PYTHONPATH", "")])
-            for entry, record in zip(entries, index):
-                config, model, cases = entry.settings, entry.model, entry.cases
-                name = entry.artifact_name
+            plans = preflight_evals(repo, entries, files, artifacts, harness, temporary,
+                                    child_env, deadline, results, errors, index)
+            write_reports(artifacts, results, index, errors)
+            if plans is None:
+                return 1
+
+            for plan, record in zip(plans, index):
+                name = record["name"]
                 run_id = f"ci-{name}-{uuid.uuid4().hex[:12]}"
                 record["run_id"] = run_id
                 eval_artifacts = artifacts / "evals" / name
@@ -546,48 +911,46 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                 invoked = False
                 directory = None
                 stream_log = eval_artifacts / "claude-eval.log"
-                args = ["--config", entry.config, "--model", model,
-                        "--run-id", run_id, "--parallelism", str(entry.parallelism)]
-                if cases:
-                    args.extend(["--cases", *cases])
+                args = ["--config", plan.config, "--model", plan.model,
+                        "--run-id", run_id, "--parallelism", str(plan.parallelism)]
+                if plan.cases:
+                    args.extend(["--cases", *plan.cases])
                 prompt = "/eval-run " + shlex.join(args)
-                print(f"RUN {entry.config}: model={model}, parallelism={entry.parallelism}, "
-                      f"orchestrator max_turns={entry.max_turns}", flush=True)
+                print(f"RUN {plan.config}: model={plan.model}, parallelism={plan.parallelism}, "
+                      f"orchestrator max_turns={plan.max_turns}", flush=True)
                 try:
-                    eval_artifacts.mkdir(parents=True, exist_ok=True)
-                    if remaining() <= 0:
+                    if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached before this eval could start")
-                    if entry.setup_script:
+                    if plan.setup_script:
                         setup_log = eval_artifacts / "setup.log"
                         with tempfile.TemporaryFile() as output:
-                            status = command(["bash", entry.setup_script], repo, run_env, setup_log,
-                                             remaining(), stdout=output)
+                            status = command(["bash", plan.setup_script], repo, run_env, setup_log,
+                                             remaining(deadline), stdout=output)
                             output.seek(0)
                             snapshot = output.read().decode().rstrip("\n")
                         if status:
                             raise EvalError(f"setup_script failed (exit {status}); see {setup_log.name}")
                         run_env["EVAL_SNAPSHOT_DIR"] = snapshot
-                    if remaining() <= 0:
+                    if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached during setup")
                     invoked = True
                     status = command(["claude", "--model", env.get("CLAUDE_MODEL", "claude-opus-4-6"),
                                       "--plugin-dir", str(harness), "--allowedTools",
                                       "Bash Read Write Edit Grep Glob Agent Skill",
-                                      "--output-format", "stream-json", "--max-turns", str(entry.max_turns),
+                                      "--output-format", "stream-json", "--max-turns", str(plan.max_turns),
                                       "-p", prompt, "--verbose"], repo, run_env, stream_log,
-                                     min(EVAL_TIMEOUT, remaining()))
+                                     min(EVAL_TIMEOUT, remaining(deadline)))
                     if status:
                         raise EvalError(f"Claude orchestrator failed (exit {status}); see {stream_log.name}")
                     directory = run_directory(runs, run_id)
-                    verify_result(directory, config)
-                    # Deterministic threshold check using the harness itself: do
-                    # not trust an outer Claude exit code as the eval verdict.
-                    # Use the verified physical directory: the orchestrator can
-                    # write under config.name while score.py derives a skill name.
+                    verify_result(directory, plan.settings)
+                    # Score the verified physical run through the same harness
+                    # checkout that resolved this original overlay config.
                     status = command([sys.executable, str(Path(__file__).with_name("eval_regression.py")),
-                                      "--harness", str(harness), "--config", entry.config,
-                                      "--run-dir", str(directory)],
-                                     repo, run_env, eval_artifacts / "regression.log", min(60, remaining()))
+                                      "--harness", str(harness), "--repo", str(repo),
+                                      "--config", plan.config, "--run-dir", str(directory)],
+                                     repo, run_env, eval_artifacts / "regression.log",
+                                     min(60, remaining(deadline)))
                     if status:
                         raise EvalError("harness regression check failed; see regression log")
                     execution_completed = True
@@ -613,7 +976,8 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                                         failures.append(f"{label}: {type(error).__name__}: {error}")
                             emit_metrics(env, repo, artifacts, eval_artifacts, stream_log=stream_log,
                                          result=directory / "run_result.json" if directory else None,
-                                         run_id=run_id, prompt=prompt)
+                                         run_id=run_id, prompt=prompt,
+                                         timeout=remaining(deadline))
                         finalized = True
                     finally:
                         # Escaping control-flow exceptions must not become success.
@@ -621,9 +985,9 @@ def run_evals(repo, entries, artifacts, env):  # pylint: disable=too-many-statem
                             failures.append("eval did not complete")
                         failure = "; ".join(dict.fromkeys(failures))
                         record.update(status="failed" if failure else "passed", failure=failure)
-                        results.append((entry.config, time.monotonic() - begin, failure))
+                        results.append((plan.config, time.monotonic() - begin, failure))
                         write_reports(artifacts, results, index, errors)
-                print(f"{'FAIL' if failure else 'PASS'} {entry.config}: {failure or 'complete'}", flush=True)
+                print(f"{'FAIL' if failure else 'PASS'} {plan.config}: {failure or 'complete'}", flush=True)
     except (Exception, Interrupted) as error:  # pylint: disable=broad-exception-caught
         message = f"{type(error).__name__}: {error}"
         errors.append(message)
@@ -638,8 +1002,8 @@ def interrupted(signum, _frame):
     raise Interrupted(f"interrupted by signal {signum}")
 
 
-def manifest_plans(repo, env):
-    """Validate and select manifest inputs before execution."""
+def select_manifest_entries(repo, env):
+    """Validate manifest and diff inputs, then select only explicit triggers."""
     if env.get("EVAL_DISCOVER") or env.get("EVAL_CONFIG", "eval.yaml") not in ("", "eval.yaml"):
         raise EvalError("the manifest workflow does not accept EVAL_DISCOVER or explicit EVAL_CONFIG")
     if env.get("EVAL_EXTRA_ARGS"):
@@ -648,16 +1012,12 @@ def manifest_plans(repo, env):
         raise EvalError("manifest mode currently supports PR runs only (periodic/manual are follow-on work)")
     entries = load_manifest(repo)
     files = changed_files(repo, env.get("PULL_BASE_SHA", "")) if any(e.run == "pr" for e in entries) else []
-    plans = []
-    for entry in select_evals(entries, files):
-        config, model = read_eval(repo, entry)
-        plans.append(EvalPlan(entry.config, config, model, entry.parallelism, entry.max_turns,
-                              entry.setup_script, select_cases(repo, entry, files) or ()))
-    return plans
+    return select_evals(entries, files), files
 
 
 def main():
     env = dict(os.environ)
+    deadline = time.monotonic() + STEP_TIMEOUT
     repo = Path(env.get("EVAL_WORKDIR") or os.getcwd()).resolve()
     artifacts = Path(env["ARTIFACT_DIR"]).resolve()
     artifacts.mkdir(parents=True, exist_ok=True)
@@ -665,9 +1025,10 @@ def main():
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGINT, interrupted)
     try:
-        selected = manifest_plans(repo, env)
+        selected, files = select_manifest_entries(repo, env)
         if not selected:
-            print("No evals matched; exiting without setup, harness installation, or Claude calls.", flush=True)
+            print("No evaluations selected; exiting without setup, harness installation, or Claude calls.",
+                  flush=True)
             results = []
             write_reports(artifacts, results, [], [])
             return int(bool(results))
@@ -675,13 +1036,13 @@ def main():
         print(f"ERROR: {error}", flush=True)
         write_reports(artifacts, [("eval selection", 0, str(error))], [], [str(error)])
         return 1
-    return run_evals(repo, selected, artifacts, env)
+    return run_evals(repo, selected, files, artifacts, env, deadline=deadline)
 
 
 if __name__ == "__main__":
     sys.exit(main())
-PYTHON_SOURCE_1
-cat > "${runner_dir}/eval_metrics.py" <<'PYTHON_SOURCE_2'
+PYTHON_SOURCE_2
+cat > "${runner_dir}/eval_metrics.py" <<'PYTHON_SOURCE_3'
 #!/usr/bin/env python3
 """AutoDL accounting ported from the legacy eval step, without a Bash bridge."""
 
@@ -976,8 +1337,8 @@ def main(args):  # pylint: disable=too-many-statements
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-PYTHON_SOURCE_2
-cat > "${runner_dir}/eval_report.py" <<'PYTHON_SOURCE_3'
+PYTHON_SOURCE_3
+cat > "${runner_dir}/eval_report.py" <<'PYTHON_SOURCE_4'
 #!/usr/bin/env python3
 """Render evals-summary.json as self-contained HTML without model calls.
 
@@ -1098,8 +1459,8 @@ def main():
 
 if __name__ == "__main__":
     main()
-PYTHON_SOURCE_3
-cat > "${runner_dir}/eval_regression.py" <<'PYTHON_SOURCE_4'
+PYTHON_SOURCE_4
+cat > "${runner_dir}/eval_regression.py" <<'PYTHON_SOURCE_5'
 #!/usr/bin/env python3
 """Apply harness thresholds to the run directory already verified by the runner."""
 
@@ -1111,26 +1472,34 @@ import sys
 import yaml
 
 try:
-    from .eval_plan import read_config, validate_thresholds
+    from .eval_config import resolve_config
 except ImportError:
-    from eval_plan import read_config, validate_thresholds
+    from eval_config import resolve_config
 
 
 def main():
     """Use the cloned harness's scoring rules without repeating its path lookup."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--harness", type=Path, required=True)
+    parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run-dir", type=Path, required=True)
     args = parser.parse_args()
-    validate_thresholds(read_config(args.config).get("thresholds", {}))
+    resolved = resolve_config(args.harness, args.repo, args.config)
+    thresholds = resolved.harness_config.thresholds
 
     # Keep harness imports in this bounded child process. Import from the same
     # scripts directory as the score.py CLI, including its agent_eval package.
-    sys.path.insert(0, str(args.harness / "skills/eval-run/scripts"))
+    scripts = (args.harness.resolve() / "skills/eval-run/scripts").resolve()
+    sys.path.insert(0, str(scripts))
+    loaded_score = sys.modules.get("score")
+    loaded_path = getattr(loaded_score, "__file__", None)
+    if loaded_score is not None and (
+            not loaded_path or not Path(loaded_path).resolve().is_relative_to(scripts)):
+        del sys.modules["score"]
     score = importlib.import_module("score")
-    config = score.EvalConfig.from_yaml(args.config)
-    thresholds = validate_thresholds(config.thresholds)
+    if not Path(score.__file__).resolve().is_relative_to(scripts):
+        raise ValueError(f"score module imported from outside the supplied harness: {score.__file__}")
     summary_path = args.run_dir / "summary.yaml"
     print(f"SUMMARY: {summary_path}", flush=True)
     with summary_path.open(encoding="utf-8") as stream:
@@ -1150,8 +1519,8 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-PYTHON_SOURCE_4
-cat > "${runner_dir}/eval-report.html" <<'PYTHON_SOURCE_5'
+PYTHON_SOURCE_5
+cat > "${runner_dir}/eval-report.html" <<'PYTHON_SOURCE_6'
 <!doctype html>
 <html lang="en">
 <head>
@@ -1200,8 +1569,8 @@ $body
 $artifact_links
 </body>
 </html>
-PYTHON_SOURCE_5
-cat > "${runner_dir}/eval-report.css" <<'PYTHON_SOURCE_6'
+PYTHON_SOURCE_6
+cat > "${runner_dir}/eval-report.css" <<'PYTHON_SOURCE_7'
 /* Colors, typography, chips, cards, and theme control adapted from
  * opendatahub-io/agent-eval-harness, Apache-2.0 (see repository LICENSE).
  * skills/eval-run/scripts/report.py at 3c4165bbfdd4a20f4472eec9c1c85e62f5167fba.
@@ -1332,7 +1701,7 @@ a:hover { text-decoration: underline; }
 .report-note { color: var(--text-muted); font-size: .9em; }
 @media (max-width: 600px) { body { padding: 1em; } .section { padding: 1em; } .eval-heading { flex-direction: column; gap: .5em; } }
 @media print { #theme-toggle { display: none; } .section { break-inside: avoid; } }
-PYTHON_SOURCE_6
+PYTHON_SOURCE_7
 
 # Forward termination so Python can stop its children and preserve artifacts
 # before the temporary source files are removed.

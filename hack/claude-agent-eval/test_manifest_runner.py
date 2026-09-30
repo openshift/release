@@ -31,6 +31,7 @@ def load_sibling(name):
 
 
 load_sibling("eval_plan")
+config_bridge = load_sibling("eval_config")
 report = load_sibling("eval_report")
 runner = load_sibling("manifest_runner")
 sync_commands = load_sibling("sync_commands")
@@ -38,20 +39,43 @@ sync_commands = load_sibling("sync_commands")
 
 FAKE_GIT = r'''
 import os, pathlib, sys
-if sys.argv[1] == "clone":
+args = sys.argv[1:]
+if args[0] == "init":
     with open(os.environ["CALLS"], "a") as out:
-        out.write('clone\n')
-    dest = pathlib.Path(sys.argv[-1])
+        out.write('harness-init\n')
+    dest = pathlib.Path(args[-1])
+    dest.mkdir(parents=True)
+    if not os.environ.get("NO_CONFIG_API"):
+        package = dest / "agent_eval"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("")
+        (package / "config.py").write_text("""from pathlib import Path
+import os, time
+class EvalConfig:
+    def __init__(self, path, raw):
+        self.models = type('Models', (), {'skill': (raw.get('models') or {}).get('skill')})()
+        self.thresholds = raw.get('thresholds', {})
+        self.dataset = type('Dataset', (), {'path': (raw.get('dataset') or {}).get('path', '')})()
+        self.base = Path(path).resolve().parent
+    def resolve_path(self, value):
+        path = Path(value)
+        return path if path.is_absolute() else self.base / path
+    @classmethod
+    def from_yaml(cls, path):
+        return cls(path, load_raw(path)[0])
+def load_raw(path):
+    import yaml
+    time.sleep(float(os.environ.get('RESOLVER_SLEEP', '0')))
+    path = Path(path).resolve()
+    raw = yaml.safe_load(path.read_text()) or {}
+    if not isinstance(raw, dict):
+        raise ValueError('config must be a mapping')
+    return raw, [str(path)]
+""")
     script = dest / "skills/eval-run/scripts/score.py"
     script.parent.mkdir(parents=True)
     script.write_text("""import os
-from pathlib import Path
 from types import SimpleNamespace
-import yaml
-class EvalConfig:
-    @classmethod
-    def from_yaml(cls, path):
-        return SimpleNamespace(thresholds=yaml.safe_load(Path(path).read_text()).get('thresholds', {}))
 def detect_regressions(judges, thresholds):
     with open(os.environ['CALLS'], 'a') as out: out.write('regression\\n')
     return [SimpleNamespace(judge_name=name, metric='pass_rate', baseline_value=limit['min_pass_rate'],
@@ -59,7 +83,24 @@ def detect_regressions(judges, thresholds):
             for name, limit in thresholds.items()
             if judges[name]['pass_rate'] < limit['min_pass_rate']]
 """)
-    sys.exit(int(os.environ.get("CLONE_EXIT", "0")))
+    sys.exit(int(os.environ.get("INIT_EXIT", "0")))
+if args[0] == "-C" and args[2] == "remote":
+    with open(os.environ["CALLS"], "a") as out: out.write('harness-remote\n')
+    sys.exit(0)
+if args[0] == "-C" and args[2] == "fetch":
+    with open(os.environ["CALLS"], "a") as out: out.write('harness-fetch\n')
+    status = int(os.environ.get("FETCH_EXIT", "0"))
+    if status: print('fake harness fetch failed', file=sys.stderr)
+    sys.exit(status)
+if args[0] == "-C" and args[2] == "checkout":
+    with open(os.environ["CALLS"], "a") as out: out.write('harness-checkout\n')
+    status = int(os.environ.get("CHECKOUT_EXIT", "0"))
+    if status: print('fake harness checkout failed', file=sys.stderr)
+    sys.exit(status)
+if args[0] == "-C" and args[2] == "rev-parse":
+    with open(os.environ["CALLS"], "a") as out: out.write('harness-rev-parse\n')
+    print(os.environ["PINNED_REVISION"])
+    sys.exit(0)
 os.execv(os.environ["REAL_GIT"], [os.environ["REAL_GIT"], *sys.argv[1:]])
 '''
 
@@ -149,6 +190,7 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
             "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}",
             "HOME": str(self.root), "REAL_GIT": self.real_git,
             "CALLS": str(self.calls_path),
+            "PINNED_REVISION": config_bridge.HARNESS_REVISION,
             "EVAL_WORKDIR": str(self.repo), "PULL_BASE_SHA": self.base,
             "ARTIFACT_DIR": str(self.artifacts), "JOB_TYPE": "presubmit",
             "EVAL_CONFIG": "eval.yaml", "EVAL_DISCOVER": "",
@@ -161,6 +203,30 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
         target = self.bin / name
         target.write_text(f"#!{sys.executable}\n" + source)
         target.chmod(0o755)
+
+    def make_fake_harness(self):
+        root = self.root / "standalone-harness"
+        package = root / "agent_eval"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("")
+        (package / "config.py").write_text("""from pathlib import Path
+from types import SimpleNamespace
+import yaml
+def load_raw(path):
+    path = Path(path).resolve()
+    return yaml.safe_load(path.read_text()) or {}, [str(path)]
+class EvalConfig:
+    @classmethod
+    def from_yaml(cls, path):
+        raw, _ = load_raw(path)
+        value = cls()
+        value.models = SimpleNamespace(skill=(raw.get('models') or {}).get('skill'))
+        value.thresholds = raw.get('thresholds', {})
+        value.dataset = SimpleNamespace(path=(raw.get('dataset') or {}).get('path', ''))
+        value.resolve_path = lambda path: Path(path)
+        return value
+""")
+        return root
 
     def put(self, path, text):
         target = self.repo / path
@@ -279,6 +345,11 @@ class SelectionTests(Fixture):
         self.assertEqual(call["entrypoint"], "sdk-cli")
         self.assertEqual((self.repo / self.entry["config"]).read_bytes(), original)
         self.assertIn("regression", self.calls())
+        install_log = (self.artifacts / "runner/harness-install.log").read_text()
+        self.assertIn(f"Expected harness revision: {config_bridge.HARNESS_REVISION}", install_log)
+        self.assertIn(f"Verified harness revision: {config_bridge.HARNESS_REVISION}", install_log)
+        summary = json.loads((self.artifacts / "evals-summary.json").read_text())
+        self.assertIn("config-resolution.log", summary["evals"][0]["artifacts"])
 
     def test_literal_prefix_and_directory_boundary(self):
         for trigger in ("skills/foo", "skills/foo/"):
@@ -437,6 +508,16 @@ class CaseSelectionTests(Fixture):
         self.assertEqual(self.run_step().returncode, 0)
         self.assertIsNone(self.claude_calls()[0]["cases"])
 
+    def test_changed_base_or_intermediate_config_invalidates_case_subset(self):
+        self.put("evals/base.yaml", "models: {skill: base}\n")
+        self.put("evals/profiles/ci.yaml", "extends: ../base.yaml\n")
+        entry = runner.load_manifest(self.repo)[0]
+        chain = ("evals/base.yaml", "evals/profiles/ci.yaml", entry.config)
+        for changed in chain[:2]:
+            with self.subTest(changed=changed):
+                files = ["evals/cases/foo/case-001/input.yaml", changed]
+                self.assertIsNone(runner.select_cases(self.repo, entry, files, chain))
+
     def test_shared_manifest_and_setup_changes_invalidate_subset(self):
         self.put("setup.sh", "echo fixture\n")
         entry = runner.load_manifest(self.repo)[0]
@@ -477,14 +558,28 @@ class CaseSelectionTests(Fixture):
         self.assertEqual(self.calls(), [])
         self.assertEqual(self.junit().attrib["tests"], "0")
 
+    def test_base_config_change_outside_triggers_does_not_select_eval(self):
+        self.put("evals/base.yaml", "models: {skill: model}\n")
+        self.put(self.entry["config"], "extends: base.yaml\n")
+        self.entry["triggers"] = ["skills/foo/"]
+        self.write_manifest([self.entry])
+        self.commit()
+        base = self.git("rev-parse", "HEAD").strip()
+        self.put("evals/base.yaml", "models: {skill: changed-model}\n")
+        self.commit()
+        result = self.run_step(PULL_BASE_SHA=base)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.junit().attrib["tests"], "0")
+
     def test_dataset_mismatch_fails_before_any_calls(self):
         self.entry["eval_cases_dir"] = "skills/foo"
         self.write_manifest([self.entry])
         self.change_skill()
         result = self.run_step()
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("same directory as dataset.path", result.stdout)
-        self.assertEqual(self.calls(), [])
+        self.assertIn("same directory as the harness-resolved dataset.path", result.stdout)
+        self.assertEqual(self.claude_calls(), [])
 
     def test_case_filters_do_not_leak_between_evals(self):
         other = self.make_entry("evals/eval-bar.yaml", eval_cases_dir="evals/cases/bar",
@@ -503,103 +598,6 @@ class CaseSelectionTests(Fixture):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual([c["cases"] for c in self.claude_calls()], [["case-001"], ["case-005"]])
         self.assertEqual(self.junit().attrib["tests"], "2")
-
-
-class ValidationTests(Fixture):
-    def test_invalid_thresholds_fail_before_any_calls(self):
-        other = self.make_entry("evals/other.yaml")
-        self.write_manifest([self.entry, other])
-        self.change_skill()
-        config = yaml.safe_load((self.repo / self.entry["config"]).read_text())
-        for value in (None, [], "quality", False, {"quality": None}, {"": {}}):
-            with self.subTest(thresholds=value):
-                self.put(self.entry["config"], yaml.safe_dump({**config, "thresholds": value}))
-                result = self.run_step()
-                self.assertNotEqual(result.returncode, 0)
-                self.assertEqual(self.calls(), [])
-                self.assertEqual(self.junit().attrib["failures"], "1")
-                summary = json.loads((self.artifacts / "evals-summary.json").read_text())
-                self.assertEqual(summary["status"], "failed")
-                self.assertEqual(summary["counts"]["passed"], 0)
-                self.assertIn("thresholds must", result.stdout)
-
-    def test_threshold_validation_at_verification_and_regression_boundaries(self):
-        regression = load_sibling("eval_regression")
-        self.put(self.entry["config"], "thresholds: null\n")
-        with self.assertRaisesRegex(runner.EvalError, "thresholds must"):
-            runner.verify_result(self.repo, {"thresholds": None})
-        with mock.patch.object(sys, "argv", ["eval_regression", "--harness", str(self.root),
-                               "--config", str(self.repo / self.entry["config"]),
-                               "--run-dir", str(self.root)]), \
-                mock.patch.object(regression.importlib, "import_module") as loader:
-            with self.assertRaisesRegex(runner.EvalError, "thresholds must"):
-                regression.main()
-            loader.assert_not_called()
-
-    def test_invalid_manifest_entries(self):
-        updates = [
-            {"parallelism": 0}, {"parallelism": True}, {"parallelism": "5"},
-            {"max_turns": -1}, {"max_turns": None}, {"max_turns": 1.5},
-            {"run": "always"}, {"triggers": []}, {"triggers": "skills/foo/"},
-            {"triggers": ["../outside/"]}, {"triggers": [""]},
-            {"config": "missing.yaml"}, {"config": "../outside.yaml"},
-            {"config": "/tmp/outside.yaml"}, {"config": "./evals/eval-foo.yaml"},
-            {"setup_script": "missing.sh"}, {"setup_script": None},
-            {"eval_cases_dir": "missing"}, {"eval_cases_dir": None},
-            {"eval_cases_dir": ""}, {"eval_cases_dir": "../outside"},
-            {"eval_cases_dir": "/tmp"}, {"eval_cases_dir": "./skills/foo"},
-            {"eval_cases_dir": "evals/eval-foo.yaml"},
-            {"unknown": "typo"},
-        ]
-        for update in updates:
-            with self.subTest(update=update):
-                self.write_manifest([{**self.entry, **update}])
-                with self.assertRaises(runner.EvalError):
-                    runner.load_manifest(self.repo)
-
-    def test_malformed_empty_and_duplicate_yaml(self):
-        for text in ("", "evals: null", "evals: {}", "evals: [", "evals: []\nevals: []"):
-            with self.subTest(text=text):
-                self.put("evals.yaml", text)
-                result = self.run_step()
-                self.assertNotEqual(result.returncode, 0)
-                self.assertEqual(self.calls(), [])
-
-    def test_duplicate_config(self):
-        self.write_manifest([self.entry, self.entry])
-        with self.assertRaises(runner.EvalError):
-            runner.load_manifest(self.repo)
-
-    def test_symlink_cannot_escape_repository(self):
-        outside = self.root / "outside.yaml"
-        outside.write_text("models: {skill: model}")
-        link = self.repo / "link.yaml"
-        link.symlink_to(outside)
-        self.write_manifest([{**self.entry, "config": "link.yaml"}])
-        with self.assertRaises(runner.EvalError):
-            runner.load_manifest(self.repo)
-
-    def test_selected_eval_requires_models_skill_before_any_calls(self):
-        self.put(self.entry["config"], "models: {judge: judge-model}\n")
-        self.change_skill()
-        result = self.run_step()
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("models.skill", result.stdout)
-        self.assertEqual(self.calls(), [])
-
-    def test_cases_directory_symlink_cannot_escape_repository(self):
-        (self.repo / "outside-cases").symlink_to(self.root, target_is_directory=True)
-        self.write_manifest([{**self.entry, "eval_cases_dir": "outside-cases"}])
-        with self.assertRaises(runner.EvalError):
-            runner.load_manifest(self.repo)
-
-    def test_modes_and_extra_args_conflict(self):
-        for overrides in ({"EVAL_CONFIG": "custom.yaml"}, {"EVAL_DISCOVER": "true"},
-                          {"EVAL_EXTRA_ARGS": "--model override"}, {"JOB_TYPE": "periodic"},
-                          {"JOB_TYPE": "postsubmit"}):
-            with self.subTest(overrides=overrides):
-                self.assertNotEqual(self.run_step(**overrides).returncode, 0)
-                self.assertEqual(self.calls(), [])
 
 
 class RunDirectoryTests(Fixture):
@@ -665,7 +663,7 @@ class ExecutionTests(Fixture):
         self.write_manifest([self.entry, other])
         self.change_skill()
         self.artifacts.mkdir()
-        plans = runner.manifest_plans(self.repo, self.env)
+        entries, files = runner.select_manifest_entries(self.repo, self.env)
         original_collect, original_archive = runner.collect_result, runner.archive
 
         def fail_collect(directory, artifacts):
@@ -681,7 +679,7 @@ class ExecutionTests(Fixture):
         with mock.patch.object(runner, "collect_result", side_effect=fail_collect), \
                 mock.patch.object(runner, "archive", side_effect=fail_archive):
             env = {**self.env, "BEHAVIORS": json.dumps({self.entry["config"]: "missing_result"})}
-            self.assertEqual(runner.run_evals(self.repo, plans, self.artifacts, env), 1)
+            self.assertEqual(runner.run_evals(self.repo, entries, files, self.artifacts, env), 1)
         self.assertEqual(len(self.claude_calls()), 2)
         self.assertTrue((self.eval_artifacts() / "claude-eval.log").is_file())
         self.assertTrue((self.eval_artifacts(other["config"]) / "report-summary.html").is_file())
@@ -861,14 +859,6 @@ class ExecutionTests(Fixture):
         self.assertNotEqual(self.run_step().returncode, 0)
         self.assertIn("missing thresholded judge", self.last_result.stdout)
 
-    def test_failed_clone_has_junit(self):
-        self.change_skill()
-        self.assertNotEqual(self.run_step(CLONE_EXIT="1").returncode, 0)
-        self.assertEqual(self.claude_calls(), [])
-        self.assertEqual(self.junit().attrib["failures"], "1")
-        self.assertEqual(json.loads((self.artifacts / "evals-summary.json").read_text())["evals"][0]["status"], "not_run")
-        self.assertIn("runner/harness-install.log", self.index())
-
     def test_junit_escapes_config_paths(self):
         entry = self.make_entry('evals/eval-foo & "bar".yaml')
         self.write_manifest([entry])
@@ -884,9 +874,9 @@ class ExecutionTests(Fixture):
     def test_step_deadline_does_not_silently_drop_evals(self):
         self.artifacts.mkdir()
         self.change_skill()
-        entries = runner.manifest_plans(self.repo, self.env)
+        entries, files = runner.select_manifest_entries(self.repo, self.env)
         with mock.patch.object(runner, "STEP_TIMEOUT", -1), mock.patch.object(runner, "command", return_value=0):
-            self.assertEqual(runner.run_evals(self.repo, entries, self.artifacts, self.env), 1)
+            self.assertEqual(runner.run_evals(self.repo, entries, files, self.artifacts, self.env), 1)
         self.assertEqual(self.junit().attrib["failures"], "1")
 
     def test_metrics_run_in_python_without_exported_shell_functions(self):

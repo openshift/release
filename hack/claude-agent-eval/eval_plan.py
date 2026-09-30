@@ -7,15 +7,20 @@ from pathlib import Path
 import re
 import subprocess
 
-import yaml
-
 
 class EvalError(Exception):
     """An invalid configuration or unsuccessful evaluation."""
 
 
+def artifact_name(config):
+    """Keep artifact names readable and distinct across equal config basenames."""
+    stem = re.sub(r"[^a-zA-Z0-9_-]", "-", Path(config).stem)[:80]
+    suffix = hashlib.sha256(config.encode()).hexdigest()[:12]
+    return f"{stem}-{suffix}"
+
+
 @dataclass(frozen=True)
-class EvalPlan:
+class EvalPlan:  # pylint: disable=too-many-instance-attributes
     """One manifest eval with its resolved settings and selected cases."""
 
     config: str
@@ -25,25 +30,12 @@ class EvalPlan:
     max_turns: int
     setup_script: str = ""
     cases: tuple = ()
+    config_chain: tuple = ()
 
     @property
     def artifact_name(self):
-        """Keep artifact names readable and distinct across equal config basenames."""
-        stem = re.sub(r"[^a-zA-Z0-9_-]", "-", Path(self.config).stem)[:80]
-        suffix = hashlib.sha256(self.config.encode()).hexdigest()[:12]
-        return f"{stem}-{suffix}"
-
-
-def read_config(path):
-    """Read an eval YAML without requiring manifest-owned model settings."""
-    try:
-        with path.open(encoding="utf-8") as stream:
-            config = yaml.safe_load(stream)
-    except (OSError, yaml.YAMLError) as error:
-        raise EvalError(f"cannot read {path}: {error}") from error
-    if not isinstance(config, dict):
-        raise EvalError(f"{path}: eval config must be a mapping")
-    return config
+        """Return the stable directory name for this config identity."""
+        return artifact_name(self.config)
 
 
 def validate_thresholds(thresholds):
