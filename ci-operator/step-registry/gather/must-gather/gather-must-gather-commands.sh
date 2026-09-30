@@ -384,8 +384,12 @@ if installCamgi; then
 else
   echo "WARNING: camgi installation failed, skipping camgi report generation (non-fatal)."
 fi
-tar -czC "${ARTIFACT_DIR}/must-gather" -f "${ARTIFACT_DIR}/must-gather.tar.gz" .
-rm -rf "${ARTIFACT_DIR}"/must-gather
+if [[ "${MUST_GATHER_KEEP_UNPACKED:-false}" == "true" ]]; then
+  echo "MUST_GATHER_KEEP_UNPACKED=true: skipping must-gather.tar.gz so Prow censors unpacked files individually."
+else
+  tar -czC "${ARTIFACT_DIR}/must-gather" -f "${ARTIFACT_DIR}/must-gather.tar.gz" .
+  rm -rf "${ARTIFACT_DIR}"/must-gather
+fi
 set +x # stop logging commands
 
 cat >> ${SHARED_DIR}/custom-links.txt << EOF
