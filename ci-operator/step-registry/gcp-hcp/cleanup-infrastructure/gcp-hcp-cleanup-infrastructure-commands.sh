@@ -308,13 +308,16 @@ clear_tfc_workspace() {
   local workspace_name
   workspace_name=$(<"${SHARED_DIR}/workspace-name")
 
-  if [[ ! -f "/etc/terraform-cloud/token" ]]; then
-    log "  WARNING: TFC token not found, skipping TFC cleanup"
+  if [[ ! -r "${TF_CLI_CONFIG_FILE}" ]]; then
+    log "  WARNING: HCP Terraform credentials not found, skipping TFC cleanup"
     return 0
   fi
 
   local tfc_token
-  tfc_token=$(<"/etc/terraform-cloud/token")
+  if ! tfc_token=$(jq -er '.credentials["app.terraform.io"].token | strings | select(length > 0)' "${TF_CLI_CONFIG_FILE}" 2>/dev/null); then
+    log "  WARNING: HCP Terraform credentials are invalid, skipping TFC cleanup"
+    return 0
+  fi
   local tfc_org="${TFC_ORGANIZATION:-hp-platform-engineering}"
 
   log "  Workspace: ${workspace_name}"
@@ -380,14 +383,6 @@ terraform {
   }
 }
 TFEOF
-
-  # Configure TFC auth
-  (umask 077 && cat > "$HOME/.terraformrc" <<TFRC
-credentials "app.terraform.io" {
-  token = "${tfc_token}"
-}
-TFRC
-  )
 
   export TF_INPUT=false
   export TF_IN_AUTOMATION=true
