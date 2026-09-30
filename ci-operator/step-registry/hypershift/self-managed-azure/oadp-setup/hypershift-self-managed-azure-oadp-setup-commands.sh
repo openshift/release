@@ -18,6 +18,16 @@ if [[ -z "${CLUSTER_NAME}" ]]; then
   exit 1
 fi
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+KUBECONFIG_SECRET_NAME="$(oc get hostedcluster "${CLUSTER_NAME}" -n clusters -o jsonpath='{.status.kubeconfig.name}')"
+if [[ -z "${KUBECONFIG_SECRET_NAME}" ]]; then
+  echo "!!! HostedCluster ${CLUSTER_NAME} does not report a kubeconfig secret"
+  exit 1
+fi
+oc get secret -n clusters "${KUBECONFIG_SECRET_NAME}" -ojsonpath='{.data.kubeconfig}' | base64 -d > "${SHARED_DIR}/nested_kubeconfig"
+if [[ ! -s "${SHARED_DIR}/nested_kubeconfig" ]]; then
+  echo "!!! Kubeconfig secret ${KUBECONFIG_SECRET_NAME} is empty"
+  exit 1
+fi
 
 RESOURCEGROUP="$(cat "${SHARED_DIR}/azure_pls_resource_group")"
 CONTAINER_PREFIX="hypershift-oadp-"
