@@ -95,7 +95,7 @@ if [[ ! "${RUN_ID}" =~ ^[a-z][a-z0-9]{2,15}$ ]]; then
 fi
 
 WORKSPACE_NAME="platform-e2e-${RUN_ID}"
-REGION="${GCP_REGION:-us-central1}"
+REGION="${GCP_REGION:-us-east1}"
 TESTED_SHA_PATH="${SHARED_DIR}/gcp-hcp-tested-sha"
 
 if [[ ! -s "${TESTED_SHA_PATH}" ]]; then
