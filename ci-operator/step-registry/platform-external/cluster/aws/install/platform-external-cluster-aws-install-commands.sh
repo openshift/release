@@ -53,9 +53,9 @@ install_jq
 install_yq3
 install_awscli
 
-echo "==============================="
-echo "Patch CloudFormation Templates"
-echo "==============================="
+echo "==================================="
+echo "Retrieving CloudFormation Templates"
+echo "==================================="
 
 TEMPLATES_BASE=https://raw.githubusercontent.com/openshift-splat-team/installer-labs
 TEMPLATES_VERSION=main
