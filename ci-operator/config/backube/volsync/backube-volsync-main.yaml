@@ -59,6 +59,9 @@ images:
         as:
         - golang:1.25
     to: volsync
+  - context_dir: .
+    dockerfile_path: Dockerfile.minio-test-storage
+    to: minio-test-storage
 operator:
   bundles:
   - as: volsync-bundle
@@ -189,6 +192,9 @@ tests:
         make cli
         export BATCHES=4
         make test-e2e
+      dependencies:
+      - env: MINIO_IMAGE
+        name: minio-test-storage
       from: src-oc
       resources:
         requests:
@@ -281,6 +287,9 @@ tests:
         make cli
         export BATCHES=4
         make test-e2e
+      dependencies:
+      - env: MINIO_IMAGE
+        name: minio-test-storage
       from: src-oc
       resources:
         requests:
@@ -372,6 +381,8 @@ tests:
         export BATCHES=4
         make test-e2e
       dependencies:
+      - env: MINIO_IMAGE
+        name: minio-test-storage
       - env: VOLSYNC_OPERATOR
         name: volsync
       from: src-oc
