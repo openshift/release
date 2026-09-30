@@ -43,6 +43,37 @@ if [[ -f "${SHARED_DIR}/neuron-deviceconfig.env" ]]; then
     source "${SHARED_DIR}/neuron-deviceconfig.env"
 fi
 
+# KMM needs a registry credential to push the in-cluster-built kernel image and
+# for the generated module loader to pull that image back from the internal
+# registry.  The builder service account is present in every OpenShift
+# namespace and is granted system:image-builder by default.  Use a fresh
+# short-lived token when the job did not provide an explicit secret name.
+NEURON_NAMESPACE="aws-neuron-operator"
+if [[ -n "${ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET:-}" ]]; then
+    if ! oc -n "${NEURON_NAMESPACE}" get secret "${ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET}" >/dev/null 2>&1; then
+        echo "ERROR: ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET=${ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET} does not exist in ${NEURON_NAMESPACE}" >&2
+        exit 1
+    fi
+    echo "Using configured Neuron image repository secret ${ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET}"
+elif [[ -n "${ECO_HWACCEL_NEURON_DRA_DRIVER_IMAGE:-}" && -n "${ECO_HWACCEL_NEURON_DRIVER_VERSION:-}" ]]; then
+    ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET="neuron-build-push-secret"
+    export ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET
+
+    oc -n "${NEURON_NAMESPACE}" policy add-role-to-user \
+        system:image-builder "system:serviceaccount:${NEURON_NAMESPACE}:builder" >/dev/null
+    BUILDER_TOKEN=$(oc -n "${NEURON_NAMESPACE}" create token builder --duration=24h)
+    oc -n "${NEURON_NAMESPACE}" delete secret "${ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET}" \
+        --ignore-not-found >/dev/null
+    oc -n "${NEURON_NAMESPACE}" create secret docker-registry \
+        "${ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET}" \
+        --docker-server=image-registry.openshift-image-registry.svc:5000 \
+        --docker-username=builder \
+        --docker-password="${BUILDER_TOKEN}" \
+        --dry-run=client -o yaml | oc apply -f - >/dev/null
+    unset BUILDER_TOKEN
+    echo "Created short-lived Neuron image repository secret ${ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET}"
+fi
+
 OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || true)
 if [[ -z "${OCP_VERSION}" && -f "${SHARED_DIR}/ocp-version" ]]; then
     OCP_VERSION=$(<"${SHARED_DIR}/ocp-version")
