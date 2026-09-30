@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# shellcheck disable=SC1090
+source "$LEASE_PROXY_CLIENT_SH"
+
 echo HyperShift CLI version
 /usr/bin/hypershift version
 
@@ -9,12 +12,23 @@ oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
 
 RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
+HOSTED_MGMT_LEASE_TYPE='hypershift-hive-quota-slice'
 echo "Set KUBECONFIG to management cluster"
 if [[ $HOSTED_MANAGEMENT_CLUSTER == "hosted-mgmt2" ]]; then
-	MGMT_KUBECONFIG=/var/run/hypershift-workload-credentials-hosted-mgmt2/kubeconfig
+  MGMT_KUBECONFIG=/var/run/hypershift-workload-credentials-hosted-mgmt2/kubeconfig
+  HOSTED_MGMT_LEASE_TYPE='hypershift-hive-hosted-mgmt2-quota-slice'
 else
 	MGMT_KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 fi
+
+echo "Acquiring a lease of type $HOSTED_MGMT_LEASE_TYPE"
+if ! lease__acquire --type="$HOSTED_MGMT_LEASE_TYPE" --scope=test; then
+  echo "Failed to acquire a lease of type $HOSTED_MGMT_LEASE_TYPE"
+  exit 1
+else
+  echo "Lease acquired successfully"
+fi
+
 export KUBECONFIG=$MGMT_KUBECONFIG
 cp "$MGMT_KUBECONFIG" "${SHARED_DIR}/mgmt_kubeconfig" # idp-htpasswd step needs
 
