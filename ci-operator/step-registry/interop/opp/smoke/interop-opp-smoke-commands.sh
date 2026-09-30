@@ -29,6 +29,18 @@ trap '_opp_cleanup' EXIT
 echo ">>> PHASE: initialization"
 
 # ---------------------------------------------------------------------------
+# Ensure jq is available (the "cli" image may not include it)
+# ---------------------------------------------------------------------------
+if ! command -v jq &>/dev/null; then
+    echo "INFO: jq not found in PATH; installing static binary..."
+    curl -fsSL -o /tmp/jq \
+        "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64"
+    chmod +x /tmp/jq
+    export PATH="/tmp:${PATH}"
+    echo "INFO: jq installed → $(jq --version)"
+fi
+
+# ---------------------------------------------------------------------------
 # OPP post-upgrade smoke tests
 #
 # Validates that OPP bundle components (ACM, ACS, ODF, Quay) are healthy
