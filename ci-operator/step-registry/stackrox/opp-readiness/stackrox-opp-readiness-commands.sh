@@ -74,15 +74,31 @@ function PreFlightDiagnostics () {
     oc get crd securedclusters.platform.stackrox.io 2>&1 || echo "[readiness]   SecuredCluster CRD NOT found"
 
     echo "[readiness] StackRox/RHACS operator Subscription status..."
-    oc get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' 2>&1 \
-        || oc get sub -A 2>/dev/null | grep -i -e stackrox -e rhacs || echo "[readiness]   No StackRox/RHACS subscription found"
+    typeset sub_result=""
+    sub_result="$(oc get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' --no-headers 2>/dev/null)" || true
+    if [[ -z "${sub_result}" ]]; then
+        sub_result="$(oc get sub -A --no-headers 2>/dev/null | grep -i -e stackrox -e rhacs)" || true
+    fi
+    if [[ -n "${sub_result}" ]]; then
+        echo "${sub_result}"
+    else
+        echo "[readiness]   No StackRox/RHACS subscription found"
+    fi
 
     echo "[readiness] StackRox/RHACS operator CSV status..."
     oc get csv -A 2>/dev/null | grep -i -e stackrox -e rhacs || echo "[readiness]   No StackRox/RHACS CSV found"
 
     echo "[readiness] StackRox/RHACS operator pod status..."
-    oc get pods -A -l app=rhacs-operator 2>&1 \
-        || oc get pods -A 2>/dev/null | grep -i rhacs || echo "[readiness]   No RHACS operator pods found"
+    typeset pod_result=""
+    pod_result="$(oc get pods -A -l app=rhacs-operator --no-headers 2>/dev/null)" || true
+    if [[ -z "${pod_result}" ]]; then
+        pod_result="$(oc get pods -A --no-headers 2>/dev/null | grep -i rhacs)" || true
+    fi
+    if [[ -n "${pod_result}" ]]; then
+        echo "${pod_result}"
+    else
+        echo "[readiness]   No RHACS operator pods found"
+    fi
 
     echo "[readiness] === End pre-flight diagnostics ==="
 }
@@ -96,8 +112,12 @@ function PeriodicOperatorDiagnostics () {
     echo "[readiness]   CSV status:"
     oc get csv -A 2>/dev/null | grep -i -e stackrox -e rhacs || echo "[readiness]     (none)"
     echo "[readiness]   Operator pods:"
-    oc get pods -A -l app=rhacs-operator --no-headers 2>/dev/null \
-        || oc get pods -A --no-headers 2>/dev/null | grep -i rhacs || echo "[readiness]     (none)"
+    typeset ppod_result=""
+    ppod_result="$(oc get pods -A -l app=rhacs-operator --no-headers 2>/dev/null)" || true
+    if [[ -z "${ppod_result}" ]]; then
+        ppod_result="$(oc get pods -A --no-headers 2>/dev/null | grep -i rhacs)" || true
+    fi
+    echo "${ppod_result:-[readiness]     (none)}"
     echo "[readiness]   Central CRs (any state):"
     oc get centrals.platform.stackrox.io -A 2>/dev/null || echo "[readiness]     (none)"
 }
