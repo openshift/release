@@ -61,6 +61,188 @@ function JsonLength () {
     true
 }
 
+# Convert resource JSON into fixed labels and numeric counters only. Resource
+# identifiers and arbitrary status or condition strings must never be printed.
+function FormatDiagnosticStatus () {
+    typeset resourceType="$1"
+    typeset nameFilter="${2:-}"
+    python3 -c '
+import json
+import sys
+
+resource_type = sys.argv[1]
+needles = tuple(part.lower() for part in sys.argv[2].split(",") if part)
+try:
+    items = json.load(sys.stdin).get("items", [])
+except (AttributeError, json.JSONDecodeError):
+    sys.exit(1)
+
+def mapping(value):
+    return value if isinstance(value, dict) else {}
+
+def status_of(item):
+    return mapping(mapping(item).get("status"))
+
+def categorize(values, healthy, progressing, failed):
+    counts = {"healthy": 0, "progressing": 0, "failed": 0, "unknown": 0}
+    for value in values:
+        if isinstance(value, str) and value in healthy:
+            counts["healthy"] += 1
+        elif isinstance(value, str) and value in progressing:
+            counts["progressing"] += 1
+        elif isinstance(value, str) and value in failed:
+            counts["failed"] += 1
+        else:
+            counts["unknown"] += 1
+    return counts
+
+matched = []
+for item in items if isinstance(items, list) else []:
+    metadata = mapping(mapping(item).get("metadata"))
+    match_values = (str(metadata.get("namespace", "")), str(metadata.get("name", "")))
+    if needles and not any(needle in value.lower() for needle in needles for value in match_values):
+        continue
+    matched.append(mapping(item))
+
+if not matched:
+    sys.exit(0)
+
+if resource_type == "subscription":
+    counts = categorize(
+        (status_of(item).get("state") for item in matched),
+        {"AtLatestKnown"},
+        {"UpgradeAvailable", "UpgradePending"},
+        {"UpgradeFailed"},
+    )
+    print(
+        "resources={} healthy={} progressing={} failed={} unknown={}".format(
+            len(matched), counts["healthy"], counts["progressing"], counts["failed"], counts["unknown"]
+        )
+    )
+elif resource_type == "csv":
+    counts = categorize(
+        (status_of(item).get("phase") for item in matched),
+        {"Succeeded"},
+        {"Pending", "InstallReady", "Installing", "Replacing", "Deleting"},
+        {"Failed"},
+    )
+    print(
+        "resources={} healthy={} progressing={} failed={} unknown={}".format(
+            len(matched), counts["healthy"], counts["progressing"], counts["failed"], counts["unknown"]
+        )
+    )
+elif resource_type == "pod":
+    counts = {"running": 0, "pending": 0, "failed": 0, "succeeded": 0, "unknown": 0}
+    ready = 0
+    containers = 0
+    restarts = 0
+    for item in matched:
+        status = status_of(item)
+        phase = status.get("phase")
+        category = phase.lower() if isinstance(phase, str) and phase in {"Running", "Pending", "Failed", "Succeeded"} else "unknown"
+        counts[category] += 1
+        container_statuses = status.get("containerStatuses")
+        for container in container_statuses if isinstance(container_statuses, list) else []:
+            container = mapping(container)
+            containers += 1
+            ready += int(container.get("ready") is True)
+            restart_count = container.get("restartCount", 0)
+            restarts += restart_count if isinstance(restart_count, int) and restart_count >= 0 else 0
+    print(
+        "resources={} running={} pending={} failed={} succeeded={} unknown={} readyContainers={} containers={} restarts={}".format(
+            len(matched), counts["running"], counts["pending"], counts["failed"], counts["succeeded"],
+            counts["unknown"], ready, containers, restarts
+        )
+    )
+elif resource_type == "installplan":
+    counts = categorize(
+        (status_of(item).get("phase") for item in matched),
+        {"Complete"},
+        {"Planning", "RequiresApproval", "Installing"},
+        {"Failed"},
+    )
+    print(
+        "resources={} healthy={} progressing={} failed={} unknown={}".format(
+            len(matched), counts["healthy"], counts["progressing"], counts["failed"], counts["unknown"]
+        )
+    )
+elif resource_type == "central":
+    conditions = []
+    for item in matched:
+        item_conditions = status_of(item).get("conditions")
+        conditions.extend(item_conditions if isinstance(item_conditions, list) else [])
+    condition_counts = {"true": 0, "false": 0, "unknown": 0}
+    for condition in conditions:
+        condition_status = mapping(condition).get("status")
+        category = condition_status.lower() if isinstance(condition_status, str) and condition_status in {"True", "False"} else "unknown"
+        condition_counts[category] += 1
+    print(
+        "resources={} conditions={} true={} false={} unknown={}".format(
+            len(matched), len(conditions), condition_counts["true"], condition_counts["false"],
+            condition_counts["unknown"]
+        )
+    )
+else:
+    sys.exit(1)
+' "${resourceType}" "${nameFilter}" 2>/dev/null
+}
+
+# Summarize matching operator Subscriptions, falling back on empty selectors.
+function SubscriptionStatus () {
+    typeset output=""
+    if output="$(oc get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' -o json 2>/dev/null \
+        | FormatDiagnosticStatus subscription)" && [[ -n "${output}" ]]; then
+        echo "${output}"
+        return 0
+    fi
+    if output="$(oc get sub -A -o json 2>/dev/null \
+        | FormatDiagnosticStatus subscription 'stackrox,rhacs')" && [[ -n "${output}" ]]; then
+        echo "${output}"
+        return 0
+    fi
+    return 1
+}
+
+# Summarize StackRox/RHACS CSV state without printing CSV identifiers.
+function CsvStatus () {
+    typeset output=""
+    output="$(oc get csv -A -o json 2>/dev/null \
+        | FormatDiagnosticStatus csv 'stackrox,rhacs')" && [[ -n "${output}" ]] || return 1
+    echo "${output}"
+}
+
+# Summarize matching operator pods, falling back on empty selectors.
+function OperatorPodStatus () {
+    typeset output=""
+    if output="$(oc get pods -A -l app=rhacs-operator -o json 2>/dev/null \
+        | FormatDiagnosticStatus pod)" && [[ -n "${output}" ]]; then
+        echo "${output}"
+        return 0
+    fi
+    if output="$(oc get pods -A -o json 2>/dev/null \
+        | FormatDiagnosticStatus pod rhacs)" && [[ -n "${output}" ]]; then
+        echo "${output}"
+        return 0
+    fi
+    return 1
+}
+
+# Summarize StackRox/RHACS InstallPlan state without printing identifiers.
+function InstallPlanStatus () {
+    typeset output=""
+    output="$(oc get installplan -A -o json 2>/dev/null \
+        | FormatDiagnosticStatus installplan 'stackrox,rhacs')" && [[ -n "${output}" ]] || return 1
+    echo "${output}"
+}
+
+# Summarize Central conditions without printing condition content.
+function CentralStatus () {
+    typeset output=""
+    output="$(oc get centrals.platform.stackrox.io -A -o json 2>/dev/null \
+        | FormatDiagnosticStatus central)" && [[ -n "${output}" ]] || return 1
+    echo "${output}"
+}
+
 # ---------------------------------------------------------------------------
 # Pre-flight diagnostics: inspect operator state BEFORE CR discovery
 # ---------------------------------------------------------------------------
@@ -68,37 +250,27 @@ function PreFlightDiagnostics () {
     echo "[readiness] === Pre-flight operator diagnostics ==="
 
     echo "[readiness] Checking Central CRD registration..."
-    oc get crd centrals.platform.stackrox.io 2>&1 || echo "[readiness]   Central CRD NOT found"
+    if oc get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+        echo "[readiness]   Central CRD registered"
+    else
+        echo "[readiness]   Central CRD NOT found"
+    fi
 
     echo "[readiness] Checking SecuredCluster CRD registration..."
-    oc get crd securedclusters.platform.stackrox.io 2>&1 || echo "[readiness]   SecuredCluster CRD NOT found"
+    if oc get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+        echo "[readiness]   SecuredCluster CRD registered"
+    else
+        echo "[readiness]   SecuredCluster CRD NOT found"
+    fi
 
     echo "[readiness] StackRox/RHACS operator Subscription status..."
-    typeset sub_result=""
-    sub_result="$(oc get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' --no-headers 2>/dev/null)" || true
-    if [[ -z "${sub_result}" ]]; then
-        sub_result="$(oc get sub -A --no-headers 2>/dev/null | grep -i -e stackrox -e rhacs)" || true
-    fi
-    if [[ -n "${sub_result}" ]]; then
-        echo "${sub_result}"
-    else
-        echo "[readiness]   No StackRox/RHACS subscription found"
-    fi
+    SubscriptionStatus || echo "[readiness]   No StackRox/RHACS subscription found"
 
     echo "[readiness] StackRox/RHACS operator CSV status..."
-    oc get csv -A 2>/dev/null | grep -i -e stackrox -e rhacs || echo "[readiness]   No StackRox/RHACS CSV found"
+    CsvStatus || echo "[readiness]   No StackRox/RHACS CSV found"
 
     echo "[readiness] StackRox/RHACS operator pod status..."
-    typeset pod_result=""
-    pod_result="$(oc get pods -A -l app=rhacs-operator --no-headers 2>/dev/null)" || true
-    if [[ -z "${pod_result}" ]]; then
-        pod_result="$(oc get pods -A --no-headers 2>/dev/null | grep -i rhacs)" || true
-    fi
-    if [[ -n "${pod_result}" ]]; then
-        echo "${pod_result}"
-    else
-        echo "[readiness]   No RHACS operator pods found"
-    fi
+    OperatorPodStatus || echo "[readiness]   No RHACS operator pods found"
 
     echo "[readiness] === End pre-flight diagnostics ==="
 }
@@ -108,58 +280,35 @@ function PreFlightDiagnostics () {
 # ---------------------------------------------------------------------------
 function PeriodicOperatorDiagnostics () {
     echo "[readiness]   Subscription status:"
-    oc get sub -A 2>/dev/null | grep -i -e stackrox -e rhacs || echo "[readiness]     (none)"
+    SubscriptionStatus || echo "[readiness]     (none)"
     echo "[readiness]   CSV status:"
-    oc get csv -A 2>/dev/null | grep -i -e stackrox -e rhacs || echo "[readiness]     (none)"
+    CsvStatus || echo "[readiness]     (none)"
     echo "[readiness]   Operator pods:"
-    typeset ppod_result=""
-    ppod_result="$(oc get pods -A -l app=rhacs-operator --no-headers 2>/dev/null)" || true
-    if [[ -z "${ppod_result}" ]]; then
-        ppod_result="$(oc get pods -A --no-headers 2>/dev/null | grep -i rhacs)" || true
-    fi
-    echo "${ppod_result:-[readiness]     (none)}"
+    OperatorPodStatus || echo "[readiness]     (none)"
     echo "[readiness]   Central CRs (any state):"
-    oc get centrals.platform.stackrox.io -A 2>/dev/null || echo "[readiness]     (none)"
+    CentralStatus || echo "[readiness]     (none)"
 }
 
 # ---------------------------------------------------------------------------
-# Comprehensive failure diagnostics: run on Central CR discovery timeout
+# Failure diagnostics: allowlisted operator status on discovery timeout
 # ---------------------------------------------------------------------------
 function CentralDiscoveryFailureDiagnostics () {
-    echo "[readiness] === Comprehensive failure diagnostics ==="
+    echo "[readiness] === Failure diagnostics ==="
 
     echo "[readiness] --- StackRox/RHACS Subscriptions ---"
-    oc get sub -A -o wide 2>/dev/null | grep -i -e stackrox -e rhacs || echo "[readiness]   (none)"
+    SubscriptionStatus || echo "[readiness]   (none)"
 
-    echo "[readiness] --- StackRox/RHACS CSVs (with conditions) ---"
-    oc get csv -A -o wide 2>/dev/null | grep -i -e stackrox -e rhacs || echo "[readiness]   (none)"
-    # Describe CSVs for condition details
-    for csv_info in $(oc get csv -A --no-headers 2>/dev/null | grep -i -e stackrox -e rhacs | awk '{print $1 "/" $2}'); do
-        typeset csv_ns="${csv_info%%/*}"
-        typeset csv_name="${csv_info#*/}"
-        echo "[readiness]   CSV ${csv_name} conditions:"
-        oc get csv "${csv_name}" -n "${csv_ns}" -o jsonpath='{range .status.conditions[*]}  {.type}={.reason}: {.message}{"\n"}{end}' 2>/dev/null || true
-    done
+    echo "[readiness] --- StackRox/RHACS CSVs ---"
+    CsvStatus || echo "[readiness]   (none)"
 
-    echo "[readiness] --- StackRox/RHACS operator pod logs (last 50 lines) ---"
-    for pod_info in $(oc get pods -A -l app=rhacs-operator --no-headers 2>/dev/null | awk '{print $1 "/" $2}'); do
-        typeset pod_ns="${pod_info%%/*}"
-        typeset pod_name="${pod_info#*/}"
-        echo "[readiness]   Logs from ${pod_ns}/${pod_name}:"
-        oc logs "${pod_name}" -n "${pod_ns}" --tail=50 2>&1 || true
-    done
+    echo "[readiness] --- StackRox/RHACS operator pods ---"
+    OperatorPodStatus || echo "[readiness]   (none)"
 
     echo "[readiness] --- InstallPlans ---"
-    oc get installplan -A 2>/dev/null | grep -i -e stackrox -e rhacs || echo "[readiness]   (none)"
-
-    echo "[readiness] --- Events in stackrox/rhacs namespaces ---"
-    for ns in $(oc get namespaces --no-headers 2>/dev/null | awk '{print $1}' | grep -i -e stackrox -e rhacs); do
-        echo "[readiness]   Events in namespace ${ns}:"
-        oc get events -n "${ns}" --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
-    done
+    InstallPlanStatus || echo "[readiness]   (none)"
 
     echo "[readiness] --- Central CRs in any state ---"
-    oc get centrals.platform.stackrox.io -A -o wide 2>/dev/null || echo "[readiness]   No Central CRs found at all"
+    CentralStatus || echo "[readiness]   No Central CRs found at all"
 
     echo "[readiness] === End failure diagnostics ==="
 }
