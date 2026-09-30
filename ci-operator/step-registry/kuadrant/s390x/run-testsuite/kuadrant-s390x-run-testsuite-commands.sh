@@ -1608,6 +1608,127 @@ snapshot_job_logs() {
   fi
 }
 
+# Snapshot WasmPlugin / tracing EnvoyFilter / Jaeger services WHILE tests still
+# own Gateways. Workflow post cleanup deletes the Kuadrant CR before gather, so
+# this is the only artifact that can tell Kuadrant-operator gap vs OSSM egress.
+DUMP_TRACING_DIR="${ARTIFACT_DIR}/dataplane-tracing-rca"
+mkdir -p "${DUMP_TRACING_DIR}"
+
+dump_dataplane_tracing_rca() {
+  local tag="${1:-snap}"
+  local out="${DUMP_TRACING_DIR}/${tag}"
+  mkdir -p "${out}"
+  date -u +"%Y-%m-%dT%H:%M:%SZ" >"${out}/timestamp.txt"
+  oc get kuadrant -A -o yaml >"${out}/kuadrant.yaml" 2>&1 || true
+  oc get gatewayclass -o yaml >"${out}/gatewayclass.yaml" 2>&1 || true
+  oc get wasmplugin -A >"${out}/wasmplugin.list" 2>&1 || true
+  oc get envoyfilter -A >"${out}/envoyfilter.list" 2>&1 || true
+  oc get telemetry.telemetry.istio.io -A >"${out}/telemetry.list" 2>&1 || true
+  oc get wasmplugin -A -o yaml >"${out}/wasmplugins.yaml" 2>&1 || true
+  oc get envoyfilter -A -o yaml >"${out}/envoyfilters.yaml" 2>&1 || true
+  oc get telemetry.telemetry.istio.io -A -o yaml >"${out}/telemetry.yaml" 2>&1 || true
+
+  # Step pod cannot hit ClusterIP; port-forward to Jaeger query.
+  local pf_log="${out}/jaeger-port-forward.log"
+  oc -n "${TOOLS_NAMESPACE}" port-forward svc/jaeger-query 16686:80 >"${pf_log}" 2>&1 &
+  local pf_pid=$!
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    if curl -fsS --max-time 2 "http://127.0.0.1:16686/api/services" -o "${out}/jaeger-services.json" 2>/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+  curl -fsS --max-time 5 "http://127.0.0.1:16686/api/services" -o "${out}/jaeger-services.json" 2>"${out}/jaeger-services.err" || true
+  kill "${pf_pid}" 2>/dev/null || true
+  wait "${pf_pid}" 2>/dev/null || true
+
+  python3 - "${out}" <<'PY'
+import json, os, re, sys
+out = sys.argv[1]
+def read(name):
+    p = os.path.join(out, name)
+    try:
+        with open(p, errors="replace") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+wp = read("wasmplugins.yaml")
+ef = read("envoyfilters.yaml")
+wp_list = read("wasmplugin.list")
+ef_list = read("envoyfilter.list")
+ku = read("kuadrant.yaml")
+jg = read("jaeger-services.json")
+
+has_wp = bool(re.search(r"(?m)^kind:\s*WasmPlugin\s*$", wp)) or ("No resources found" not in wp_list and wp_list.strip() and "error" not in wp_list.lower()[:40])
+# Require a real item line (NAME column plus a name), not only headers.
+wp_items = [ln for ln in wp_list.splitlines() if ln.strip() and not ln.lower().startswith("namespace") and "no resources" not in ln.lower()]
+has_wp = len(wp_items) > 0
+ef_items = [ln for ln in ef_list.splitlines() if ln.strip() and not ln.lower().startswith("namespace") and "no resources" not in ln.lower()]
+has_ef = len(ef_items) > 0
+
+wp_tracing = bool(re.search(r"tracing-service|jaeger-collector|:4317|defaultEndpoint", wp, re.I))
+ef_tracing = bool(re.search(r"kuadrant-tracing|jaeger-collector|:4317", ef, re.I))
+ku_endpoint = bool(re.search(r"defaultEndpoint|jaeger-collector", ku, re.I))
+
+services = []
+try:
+    data = json.loads(jg) if jg.strip() else {}
+    services = data.get("data") or data.get("services") or []
+    if isinstance(services, dict):
+        services = list(services)
+except Exception:
+    services = []
+svc_l = [str(s).lower() for s in services]
+has_filter = any("kuadrant-filter" in s or s == "wasm-shim" for s in svc_l)
+has_operator = any("kuadrant-operator" in s for s in svc_l)
+
+if not has_wp:
+    verdict = "INCONCLUSIVE"
+    why = "No WasmPlugin while dumping (too early, or tests already deleted Gateways)."
+elif not wp_tracing and not ef_tracing:
+    verdict = "KUADRANT_OPERATOR"
+    why = "WasmPlugin exists but neither pluginConfig nor any EnvoyFilter mentions tracing/jaeger/:4317. Operator did not wire dataplane OTLP."
+elif wp_tracing and not ef_tracing:
+    verdict = "KUADRANT_OPERATOR"
+    why = "WasmPlugin has tracing config but there is no tracing EnvoyFilter (kuadrant-tracing / jaeger cluster). Operator did not create the Envoy upstream."
+elif ef_tracing and has_filter:
+    verdict = "UNEXPECTED"
+    why = "Tracing CRs exist and Jaeger already has kuadrant-filter — tests failing for another reason (request_id tag)."
+elif (wp_tracing or ef_tracing) and not has_filter:
+    verdict = "OSSM_OR_ENVOY_EGRESS"
+    why = "Operator wired tracing (WasmPlugin and/or tracing EnvoyFilter present) but Jaeger has no kuadrant-filter service. Envoy likely cannot reach jaeger-collector (OSSM mTLS/egress) or wasm is not exporting."
+else:
+    verdict = "INCONCLUSIVE"
+    why = "Could not classify from this snapshot."
+
+lines = [
+    f"verdict={verdict}",
+    f"why={why}",
+    f"kuadrant_cr_has_tracing_endpoint={ku_endpoint}",
+    f"wasmplugin_count_lines={len(wp_items)}",
+    f"envoyfilter_count_lines={len(ef_items)}",
+    f"wasmplugin_mentions_tracing={wp_tracing}",
+    f"envoyfilter_mentions_tracing={ef_tracing}",
+    f"jaeger_has_kuadrant_filter={has_filter}",
+    f"jaeger_has_kuadrant_operator={has_operator}",
+    f"jaeger_services={services!r}",
+    "",
+    "KUADRANT_OPERATOR = operator never created tracing-service / kuadrant-tracing EnvoyFilter for openshift-default.",
+    "OSSM_OR_ENVOY_EGRESS = those objects exist; mesh/network (or wasm export) is why Jaeger is empty.",
+]
+with open(os.path.join(out, "verdict.txt"), "w") as f:
+    f.write("\n".join(lines) + "\n")
+print(f"{out}: {verdict}")
+PY
+  # Promote classified snapshots (not empty dumps) to BEST.
+  if [[ -f "${out}/verdict.txt" ]] && grep -q '^verdict=\(KUADRANT_OPERATOR\|OSSM_OR_ENVOY_EGRESS\|UNEXPECTED\)' "${out}/verdict.txt"; then
+    rm -rf "${DUMP_TRACING_DIR}/BEST"
+    cp -a "${out}" "${DUMP_TRACING_DIR}/BEST"
+  fi
+}
+
 dump_runner_diagnostics() {
   local pod="$1"
   echo "=== Test-runner diagnostics (pod=${pod:-none}) ==="
@@ -1660,6 +1781,28 @@ if [[ -n "${RUNNER_POD}" ]]; then
   oc -n "${TEST_RUNNER_NAMESPACE}" wait --for=condition=Ready \
     "pod/${RUNNER_POD}" --timeout=600s 2>/dev/null || true
 
+  echo "=== Sampling dataplane tracing CRs while tests run ==="
+  (
+    # First dump after policies exist; then every 20s until the Job ends.
+    sleep 45
+    n=0
+    while true; do
+      n=$((n + 1))
+      dump_dataplane_tracing_rca "t$(printf '%02d' "${n}")" || true
+      if [[ "$(oc -n "${TEST_RUNNER_NAMESPACE}" get job "${JOB_NAME}" -o jsonpath='{.status.succeeded}' 2>/dev/null)" == "1" ]]; then
+        break
+      fi
+      if [[ "$(oc -n "${TEST_RUNNER_NAMESPACE}" get job "${JOB_NAME}" -o jsonpath='{.status.failed}' 2>/dev/null)" =~ ^[1-9] ]]; then
+        break
+      fi
+      if [[ "${n}" -ge 90 ]]; then
+        break
+      fi
+      sleep 20
+    done
+  ) &
+  TRACING_DUMP_PID=$!
+
   # Follow with restarts: a single `oc logs -f` often dies on long s390x runs
   # ("http2: client connection lost") and previously left us blind.
   follow_rounds=0
@@ -1699,6 +1842,22 @@ if [[ -n "${RUNNER_POD}" ]]; then
   done
   echo "Job state: ${job_state}"
   [[ "${job_state}" == "succeeded" ]] || FAILED=1
+
+  if [[ -n "${TRACING_DUMP_PID:-}" ]]; then
+    kill "${TRACING_DUMP_PID}" 2>/dev/null || true
+    wait "${TRACING_DUMP_PID}" 2>/dev/null || true
+  fi
+  pkill -f "port-forward svc/jaeger-query" 2>/dev/null || true
+  dump_dataplane_tracing_rca final || true
+  if [[ -f "${DUMP_TRACING_DIR}/BEST/verdict.txt" ]]; then
+    cp -f "${DUMP_TRACING_DIR}/BEST/verdict.txt" "${ARTIFACT_DIR}/dataplane-tracing-verdict.txt" || true
+    echo "=== Dataplane tracing RCA (BEST) ==="
+    cat "${DUMP_TRACING_DIR}/BEST/verdict.txt" || true
+  elif [[ -f "${DUMP_TRACING_DIR}/final/verdict.txt" ]]; then
+    cp -f "${DUMP_TRACING_DIR}/final/verdict.txt" "${ARTIFACT_DIR}/dataplane-tracing-verdict.txt" || true
+    echo "=== Dataplane tracing RCA (final) ==="
+    cat "${DUMP_TRACING_DIR}/final/verdict.txt" || true
+  fi
 
   # Final full log snapshot + diagnostics while the pod still exists.
   snapshot_job_logs "${JOB_LOG}"
