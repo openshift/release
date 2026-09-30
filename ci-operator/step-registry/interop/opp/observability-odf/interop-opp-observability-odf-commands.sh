@@ -102,12 +102,12 @@ function WriteJunit () {
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"lp-interop--ACM-OBS-ODF\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        echo "<testsuite name=\"lp-interop--OPP--acm-obs-odf\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         typeset -i i=0
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
-            echo "  <testcase classname=\"lp-interop--ACM-OBS-ODF\" name=\"${name}\">"
+            echo "  <testcase classname=\"lp-interop--OPP--acm-obs-odf\" name=\"${name}\">"
             if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
                 typeset msg=""
                 msg="$(XmlEscape "${tcMessagesArr[$i]}")"
@@ -144,7 +144,7 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
+trap '_jrc=$?; set +e; WriteJunit || true; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
 
 # ---------------------------------------------------------------------------
 # Check 1: ODF Ceph RGW infrastructure ready
@@ -392,12 +392,16 @@ except Exception:
     sys.exit(0)
 endpoint=''
 try:
-    import yaml
-    cfg=yaml.safe_load(content)
+    cfg=json.loads(content)
     endpoint=cfg.get('config',{}).get('endpoint','') if isinstance(cfg,dict) else ''
 except Exception:
-    m=re.search(r'endpoint:\s*(.+)',content)
-    endpoint=m.group(1).strip() if m else ''
+    try:
+        import yaml
+        cfg=yaml.safe_load(content)
+        endpoint=cfg.get('config',{}).get('endpoint','') if isinstance(cfg,dict) else ''
+    except Exception:
+        m=re.search(r'endpoint:\s*(.+)',content)
+        endpoint=m.group(1).strip() if m else ''
 del content
 if not endpoint:
     print('no-endpoint')
@@ -450,7 +454,7 @@ function CheckThanosHealth () {
     typeset -a missingComponents=()
 
     typeset -a componentNames=("thanos-receive"     "thanos-compact"     "thanos-store"       "thanos-query"       "alertmanager"       "rbac-query-proxy")
-    typeset -a componentLabels=("app=thanos-receive" "app=thanos-compact" "app=thanos-store"   "app=thanos-query"   "alertmanager=observability" "app=rbac-query-proxy")
+    typeset -a componentLabels=("app.kubernetes.io/name=thanos-receive" "app.kubernetes.io/name=thanos-compact" "app.kubernetes.io/name=thanos-store" "app.kubernetes.io/name=thanos-query" "alertmanager=observability" "app=rbac-query-proxy")
 
     typeset -i idx=0
     for idx in "${!componentNames[@]}"; do
@@ -462,16 +466,6 @@ function CheckThanosHealth () {
             --no-headers 2>&1)"; then
             (( ++discoveryErrors ))
             podList=""
-        fi
-
-        if [[ -z "${podList}" ]]; then
-            typeset allPods=""
-            if ! allPods="$(oc get pods -n "${obsNamespace}" \
-                --no-headers 2>&1)"; then
-                (( ++discoveryErrors ))
-                allPods=""
-            fi
-            podList="$(printf '%s' "${allPods}" | awk -v pat="^${component}" '$0 ~ pat')"
         fi
 
         typeset podCount=""

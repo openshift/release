@@ -18,6 +18,11 @@ QUAY_NS="${QUAYNAMESPACE}"
 # deploy steps a config left over from a different run.
 rm -f "${SHARED_DIR}/quay-mail-config.yaml"
 
+if [[ "${QUAY_DEPLOY_MAILPIT}" == "false" ]]; then
+  echo "QUAY_DEPLOY_MAILPIT=false: skipping Mailpit"
+  exit 0
+fi
+
 # Ensure the namespace exists (deploy-aws-s3 also creates it; be order-independent).
 oc get namespace "${QUAY_NS}" >/dev/null 2>&1 || oc create namespace "${QUAY_NS}"
 

@@ -4,6 +4,7 @@ workflow:
     allow_best_effort_post_steps: true
     env:
       NODE_CLIENT_CERT_RECOVERY_TOGGLE: "on"
+      SERVING_APPROVER: machine-approver
     pre:
     - chain: ipi-aws-pre
     test:
@@ -16,5 +17,7 @@ workflow:
     Build-and-ship test on AWS IPI (OCPSTRAT-1346): install, power every instance off while the cluster
     is still on its 24h install-time kubelet signer, power it back on with node clocks past that
     expiry (SKEW, default 2d), and require every node to recover with no manual CSR approval.
+    The AWS Machines list every name and IP a kubelet asks for, so machine-approver must approve every
+    serving CSR (SERVING_APPROVER=machine-approver); the recovery approver must leave them alone.
     Set NODE_CLIENT_CERT_RECOVERY_TOGGLE=off in the job's env to leave the approver disabled and require
     the unfixed behavior instead (client CSRs stay pending).

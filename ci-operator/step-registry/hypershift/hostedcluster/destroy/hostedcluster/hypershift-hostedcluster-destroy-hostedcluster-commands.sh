@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 set -euox pipefail
 
+# shellcheck disable=SC1090
+source "$LEASE_PROXY_CLIENT_SH"
+
+function on_exit() {
+  echo 'Releasing leases'
+  if ! lease__release --scope=test; then
+    echo "Failed to release leases"
+  else
+    echo "Leases released successfully"
+  fi
+}
+
+trap 'on_exit' EXIT TERM INT
+
 echo "Set KUBECONFIG to management cluster"
 if [[ $HOSTED_MANAGEMENT_CLUSTER == "hosted-mgmt2" ]]; then
 	export KUBECONFIG=/var/run/hypershift-workload-credentials-hosted-mgmt2/kubeconfig

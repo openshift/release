@@ -92,7 +92,7 @@ spec:
      containers:
        - name: minio
          # Pulls the default Minio image from Docker Hub. !! when you change tag, do not forget to update mirror scripts in kiali-qe-utils repo !!
-         image: quay.io/minio/minio:RELEASE.2024-10-02T17-50-41Z
+         image: quay.io/openshifttest/minio:latest@sha256:fc6bedc99355fbdf1982a734475b56d01f4bbc59a9ec6f9a7bc4e222f74f5326
          args:
            - server
            - /storage

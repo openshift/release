@@ -156,10 +156,13 @@ $( if [ -n "${API_IP}" ];
 EOF
 cp "${WORK_DIR}/vars.yaml" "${ARTIFACT_DIR}/vars.yaml"
 
-echo "Installing Ansible collections"
-ansible-galaxy install emilienm.routed_lb,1.0.1
+echo "Installing Ansible role and collections from GitHub"
+# Prefer GitHub over Galaxy to avoid galaxy.ansible.com flakiness; third field keeps include_role name.
+ansible-galaxy role install git+https://github.com/EmilienM/ansible-role-routed-lb.git,1.0.1,emilienm.routed_lb
 # Ultimately, dependencies should be deployed by routed_lb, once it'll be converted to a collection.
-ansible-galaxy collection install ansible.posix ansible.utils
+ansible-galaxy collection install \
+  git+https://github.com/ansible-collections/ansible.posix.git \
+  git+https://github.com/ansible-collections/ansible.utils.git
 
 echo "Running Ansible playbook"
 ansible-playbook -i "${WORK_DIR}/inventory.yaml" -e "@$WORK_DIR/vars.yaml" "${WORK_DIR}/playbook.yaml"

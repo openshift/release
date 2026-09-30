@@ -27,12 +27,24 @@ readonly SIGNER_CLIENT=kubernetes.io/kube-apiserver-client-kubelet
 readonly SIGNER_SERVING=kubernetes.io/kubelet-serving
 readonly BOOTSTRAPPER=system:serviceaccount:openshift-machine-config-operator:node-bootstrapper
 readonly APPROVER_REASON=KCMRecoveryApprove
+readonly MACHINE_APPROVER_REASON=NodeCSRApprove
 readonly MA_NS=openshift-cluster-machine-approver
 readonly FRESH_S=300
 readonly STATE="${SHARED_DIR}/build-and-ship-state.json"
 readonly OUT="${ARTIFACT_DIR}/build-and-ship"
 mkdir -p "${OUT}"
 [[ -f ${STATE} ]] || { echo "missing ${STATE}: run the prep step first" >&2; exit 1; }
+
+# Approval reasons allowed on post-power-on serving CSRs. machine-approver approves them where the
+# node's Machine lists every requested name and IP (AWS); the KCM recovery approver approves the rest,
+# for nodes it just recovered (agent-installed bare metal, where Machines lack hostnames).
+case ${SERVING_APPROVER} in
+  machine-approver) serving_reasons=$(jq -cn --arg m "${MACHINE_APPROVER_REASON}" '[$m]') ;;
+  recovery) serving_reasons=$(jq -cn --arg r "${APPROVER_REASON}" '[$r]') ;;
+  any) serving_reasons=$(jq -cn --arg m "${MACHINE_APPROVER_REASON}" --arg r "${APPROVER_REASON}" '[$m, $r]') ;;
+  *) echo "SERVING_APPROVER must be machine-approver, recovery or any, not ${SERVING_APPROVER}" >&2; exit 1 ;;
+esac
+readonly serving_reasons
 
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*"; }
 now() { date -u +%s; }
@@ -117,7 +129,7 @@ fi
 # --- watch, never approve ---
 if [[ ${NODE_CLIENT_CERT_RECOVERY_TOGGLE} == on ]]; then window=$(dur "${RECOVERY_TIMEOUT}"); else window=$(dur "${GAP_WINDOW}"); fi
 deadline=$(($(now) + window))
-ma_restarted="" last="" C="[]" N="[]"
+ma_restarted="" last="" C="[]" N="[]" serving_by="{}"
 while (($(now) < deadline)); do
   cnow=$(cluster_now) || true
   C=$(csrs) || C="[]"
@@ -149,17 +161,25 @@ reasons=()
 if [[ ${NODE_CLIENT_CERT_RECOVERY_TOGGLE} == on ]]; then
   verdict=RECOVERED_UNATTENDED
   f() { jq -c --argjson want "${nodes}" --argjson m "${masters}" --argjson n "$N" \
-    --arg c "${SIGNER_CLIENT}" --arg s "${SIGNER_SERVING}" --arg r "${APPROVER_REASON}" "$1" <<<"$C"; }
-  foreign=$(f '[.[] | select(.signer == $c and .reason != null and .reason != $r) | {name, node, reason}]')
+    --arg c "${SIGNER_CLIENT}" --arg s "${SIGNER_SERVING}" --arg r "${APPROVER_REASON}" --argjson sr "${serving_reasons}" "$1" <<<"$C"; }
+  # Guard on the approval state, not on .reason: an approval with no reason must count as foreign too.
+  foreign=$(f '[.[] | select(.signer == $c and .state == "Approved" and .reason != $r) | {name, node, reason}]')
   missing_ours=$(f '$want - [.[] | select(.signer == $c and .reason == $r) | .node]')
   not_fresh=$(f '$want - [$n[] | select(.fresh) | .name]')
-  missing_serving=$(f '$want - [.[] | select(.signer == $s and .reason == "NodeCSRApprove") | .node]')
+  missing_serving=$(f '$want - [.[] | select(.signer == $s and .state == "Approved" and (.reason | IN($sr[]))) | .node]')
+  foreign_serving=$(f '[.[] | select(.signer == $s and .state == "Approved" and (.reason | IN($sr[]) | not)) | {name, node, reason}]')
+  serving_by=$(f '[.[] | select(.signer == $s and .state == "Approved") | {node, reason}] | group_by(.node)
+    | map({key: .[0].node, value: (map(.reason) | unique | join(","))}) | from_entries')
+  while IFS=$'\t' read -r node reason at; do
+    timeline serving-approved "${node} by ${reason} at ${at}"
+  done < <(f '.[] | select(.signer == $s and .state == "Approved") | [.node, .reason, .approved_at] | @tsv' | jq -r .)
   first_master=$(f '[.[] | select(.signer == $c and .reason == $r and (.node | IN($m[]))) | .approved_at] | sort | .[0] // ""' | jq -r .)
   [[ $clock_check == ok ]] || reasons+=("${clock_check}")
   [[ $foreign == "[]" ]] || reasons+=("client-csrs-approved-by-something-else:${foreign}")
   [[ $missing_ours == "[]" ]] || reasons+=("nodes-without-an-approver-approval:${missing_ours}")
   [[ $not_fresh == "[]" ]] || reasons+=("nodes-not-ready-with-fresh-heartbeat:${not_fresh}")
-  [[ $missing_serving == "[]" ]] || reasons+=("nodes-without-a-machine-approver-serving-approval:${missing_serving}")
+  [[ $missing_serving == "[]" ]] || reasons+=("nodes-without-an-expected-serving-approval:${missing_serving}")
+  [[ $foreign_serving == "[]" ]] || reasons+=("serving-csrs-approved-by-something-else:${foreign_serving}")
   if [[ -n $first_master && -n $ma_restarted ]] &&
     (($(date -u -d "$first_master" +%s) >= $(date -u -d "$ma_restarted" +%s))); then
     reasons+=("machine-approver-restarted-before-the-first-master-approval")
@@ -179,9 +199,10 @@ pass=false
 [[ $verdict == RECOVERED_UNATTENDED || $verdict == GAP_REPRODUCED ]] && pass=true
 jq -n --arg v "$verdict" --argjson pass "$pass" --arg toggle "${NODE_CLIENT_CERT_RECOVERY_TOGGLE}" --argjson offset "$offset" --argjson skew "$skew_s" \
   --argjson reasons "$(printf '%s\n' "${reasons[@]}" | jq -R . | jq -sc 'map(select(length > 0))')" \
-  --arg ma "$ma_restarted" --argjson by "$(jq -c 'map(select(.reason != null)) | group_by(.signer + "|" + .reason) | map({key: (.[0].signer + "|" + .[0].reason), value: length}) | from_entries' <<<"$C")" \
+  --arg ma "$ma_restarted" --arg sa "${SERVING_APPROVER}" --argjson sb "${serving_by}" --argjson by "$(jq -c 'map(select(.reason != null)) | group_by(.signer + "|" + .reason) | map({key: (.[0].signer + "|" + .[0].reason), value: length}) | from_entries' <<<"$C")" \
   '{verdict: $v, pass: $pass, toggle: $toggle, clock_offset_s: $offset, expected_offset_s: $skew, reasons: $reasons,
-    machine_approver_restarted_at: (if $ma == "" then null else $ma end), approvals_by_signer_reason: $by}' |
+    machine_approver_restarted_at: (if $ma == "" then null else $ma end), approvals_by_signer_reason: $by,
+    serving_approver: $sa, serving_approved_by: $sb}' |
   tee "${OUT}/verdict.json"
 timeline verdict "$verdict ${reasons[*]:-}"
 

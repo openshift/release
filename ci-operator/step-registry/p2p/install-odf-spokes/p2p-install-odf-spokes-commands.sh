@@ -18,12 +18,8 @@ ODF_OPERATOR_CHANNEL="${ODF_SPOKE_OPERATOR_CHANNEL:-${ODF_OPERATOR_CHANNEL}}"
 
 typeset -i odfCsvPollInt="${ODF_CSV_POLL_INTERVAL_SECONDS}"
 typeset -i odfCsvPollMax="${ODF_CSV_POLL_TIMEOUT_SECONDS}"
-typeset -i odfCephPollInt="${ODF_CEPH_POLL_INTERVAL_SECONDS}"
-typeset -i odfCephPollMax="${ODF_CEPH_POLL_TIMEOUT_SECONDS}"
-typeset -i odfScPollInt="${ODF_STORAGECLUSTER_POLL_INTERVAL_SECONDS}"
 typeset -i odfScPollMax="${ODF_STORAGECLUSTER_POLL_TIMEOUT_SECONDS}"
 typeset -i odfOcsOperatorBuffer="${ODF_OCS_OPERATOR_BUFFER_SECONDS}"
-typeset -i odfCephInitialDelay="${ODF_CEPH_INITIAL_DELAY_SECONDS}"
 typeset -i odfPkgPollInt="${ODF_PACKAGE_MANIFEST_POLL_INTERVAL_SECONDS}"
 typeset -i odfPkgPollMax="${ODF_PACKAGE_MANIFEST_POLL_TIMEOUT_SECONDS}"
 
@@ -142,49 +138,25 @@ WaitCsvSucceeded() {
     )
 }
 
-# WaitCephClusterReady — poll first CephCluster until phase Ready.
-WaitCephClusterReady() {
-    typeset kubeconfig="${1:?}"
-    typeset cephPhase=""
-
-    sleep "${odfCephInitialDelay}"
-    (
-        SECONDS=0
-        while (( SECONDS < odfCephPollMax )); do
-            cephPhase="$(oc --kubeconfig="${kubeconfig}" get cephcluster -n "${ODF_INSTALL_NAMESPACE}" \
-                -o jsonpath='{.items[0].status.phase}' || true)"
-            [[ "${cephPhase}" == "Ready" ]] && break
-            : "Waiting for CephCluster Ready (${SECONDS}/${odfCephPollMax}s, phase=${cephPhase:-unknown})"
-            sleep "${odfCephPollInt}"
-        done
-        [[ "${cephPhase}" == "Ready" ]]
-        true
-    )
-}
-
-# WaitStorageClusterAndNoobaaReady — poll StorageCluster phase and NooBaa until both Ready.
+# WaitStorageClusterAndNoobaaReady — wait for StorageCluster and NooBaa to both reach Ready.
+# StorageCluster phase=Ready is authoritative: it implies the CephCluster was created and
+# reached Ready (Ceph health OK, OSDs up) and all ODF sub-resources are reconciled.
+# No separate CephCluster wait is needed. Uses oc wait --for=jsonpath so failures surface
+# immediately rather than being swallowed by a || true polling loop.
 WaitStorageClusterAndNoobaaReady() {
     typeset kubeconfig="${1:?}"
-    typeset scPhase="" noobaaPhase=""
-
-    (
-        SECONDS=0
-        while (( SECONDS < odfScPollMax )); do
-            scPhase="$(oc --kubeconfig="${kubeconfig}" get storagecluster "${ODF_STORAGE_CLUSTER_NAME}" \
-                -n "${ODF_INSTALL_NAMESPACE}" \
-                -o jsonpath='{.status.phase}' || true)"
-            noobaaPhase="$(oc --kubeconfig="${kubeconfig}" get noobaa noobaa \
-                -n "${ODF_INSTALL_NAMESPACE}" \
-                -o jsonpath='{.status.phase}' || true)"
-            if [[ "${scPhase}" == "Ready" && "${noobaaPhase}" == "Ready" ]]; then
-                break
-            fi
-            : "Waiting for StorageCluster/NooBaa Ready (${SECONDS}/${odfScPollMax}s, sc=${scPhase:-unknown}, noobaa=${noobaaPhase:-unknown})"
-            sleep "${odfScPollInt}"
-        done
-        [[ "${scPhase}" == "Ready" && "${noobaaPhase}" == "Ready" ]]
-        true
-    )
+    : "Waiting for StorageCluster phase=Ready (covers CephCluster creation + Ceph bootstrap)"
+    oc --kubeconfig="${kubeconfig}" wait \
+        "storagecluster/${ODF_STORAGE_CLUSTER_NAME}" \
+        -n "${ODF_INSTALL_NAMESPACE}" \
+        --for=jsonpath='{.status.phase}'=Ready \
+        --timeout="${odfScPollMax}s"
+    : "Waiting for NooBaa phase=Ready"
+    oc --kubeconfig="${kubeconfig}" wait \
+        noobaa/noobaa \
+        -n "${ODF_INSTALL_NAMESPACE}" \
+        --for=jsonpath='{.status.phase}'=Ready \
+        --timeout="${odfScPollMax}s"
 }
 
 # ConfigureDefaultStorage — set virtualization SC and snapshot class as cluster defaults.
@@ -285,8 +257,11 @@ InstallOdfOnSpoke() {
 
         WaitCsvSucceeded "${kubeconfig}"
 
-        sleep "${odfOcsOperatorBuffer}"
-        oc --kubeconfig="${kubeconfig}" wait deployment ocs-operator \
+        oc --kubeconfig="${kubeconfig}" wait --for=create \
+            deployment/ocs-operator \
+            -n "${ODF_INSTALL_NAMESPACE}" \
+            --timeout="${odfOcsOperatorBuffer}s"
+        oc --kubeconfig="${kubeconfig}" wait deployment/ocs-operator \
             -n "${ODF_INSTALL_NAMESPACE}" \
             --for=condition=Available \
             --timeout=5m
@@ -294,6 +269,19 @@ InstallOdfOnSpoke() {
         oc --kubeconfig="${kubeconfig}" label nodes cluster.ocs.openshift.io/openshift-storage='' \
             --selector='node-role.kubernetes.io/worker' \
             --overwrite
+
+        # Verify every worker node received the ODF storage label.
+        # ODF schedules OSDs only onto labeled nodes; a mismatch means at least one worker
+        # was silently skipped and the StorageCluster will fail to reach Ready.
+        typeset -i _workerCount _labeledCount
+        _workerCount="$(oc --kubeconfig="${kubeconfig}" get nodes \
+            --selector='node-role.kubernetes.io/worker' \
+            -o json | jq '.items | length')"
+        _labeledCount="$(oc --kubeconfig="${kubeconfig}" get nodes \
+            --selector='cluster.ocs.openshift.io/openshift-storage' \
+            -o json | jq '.items | length')"
+        : "ODF storage label check: ${_labeledCount}/${_workerCount} worker nodes labeled on ${clusterName}"
+        (( _workerCount > 0 && _labeledCount == _workerCount ))
 
         oc --kubeconfig="${kubeconfig}" wait --for=create crd/storageclusters.ocs.openshift.io \
             --timeout=5m
@@ -339,7 +327,6 @@ InstallOdfOnSpoke() {
                 }
             }' | oc --kubeconfig="${kubeconfig}" apply -f -
 
-        WaitCephClusterReady "${kubeconfig}"
         WaitStorageClusterAndNoobaaReady "${kubeconfig}"
         ConfigureDefaultStorage "${kubeconfig}"
 

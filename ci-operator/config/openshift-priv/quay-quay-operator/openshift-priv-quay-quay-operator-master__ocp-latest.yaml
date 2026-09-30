@@ -93,6 +93,27 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      CHAINSAW_SUITE: e2e
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      SETUP_NOOBAA: "true"
+    post:
+    - ref: quay-gather
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: quay-install-odf-operator
+    - ref: quay-install-operator-bundle
+    test:
+    - ref: quay-test-chainsaw
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-destructive
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      CHAINSAW_SUITE: destructive
       COMPUTE_NODE_TYPE: m5.4xlarge
       SETUP_NOOBAA: "true"
     post:
