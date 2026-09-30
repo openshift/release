@@ -24,6 +24,8 @@ spec:
       containers:
       - args:
         - --namespace=test-harness
+        - --gcs-bucket=test-harness-operator
+        - --gcs-credentials-secret=/etc/test-harness-gcs-credentials/service-account.json
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_test-harness-operator_test-harness-operator
         imagePullPolicy: Always
         name: test-harness-operator
@@ -31,6 +33,14 @@ spec:
           requests:
             cpu: 50m
             memory: 128Mi
+        volumeMounts:
+        - mountPath: /etc/test-harness-gcs-credentials
+          name: test-harness-gcs-credentials
+          readOnly: true
       nodeSelector:
         kubernetes.io/arch: amd64
       serviceAccountName: test-harness-operator
+      volumes:
+      - name: test-harness-gcs-credentials
+        secret:
+          secretName: test-harness-gcs-credentials

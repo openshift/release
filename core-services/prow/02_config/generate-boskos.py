@@ -413,10 +413,11 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
-    # Orange zone (OZ) VPN heterogeneous: s390x CP/compute + amd64 workers (xkvm);
-    # capacity carved from lnxocp11 oz-0-3; explicit lease name (YZ already owns amd64-0-0).
+    # Orange zone (OZ) VPN heterogeneous: s390x CP/compute + amd64 workers (xkvmocp08);
+    # capacity carved from lnxocp11 oz-0-1 + oz-0-3; explicit lease names (YZ owns amd64-0-0).
     'libvirt-s390x-vpn-amd64-quota-slice': {
-        'libvirt-s390x-vpn-amd64-0-0': 1
+        'libvirt-s390x-vpn-amd64-0-0': 1,
+        'libvirt-s390x-vpn-amd64-0-1': 1
     },
     # Orange zone (OZ) VPN heterogeneous: s390x CP/compute + ARM64 workers (akvmocp03);
     # capacity carved from lnxocp11 oz-0-2 below; keep explicit arm64 lease name.
@@ -750,8 +751,9 @@ for i in range(4):
 # Move lnxocp14 slots 2-3 from vpn-oz to the HCP VPN profile (same lease names / host)
 del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-2']
 del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-3']
-# Reserve lnxocp11 slots 2-3 from vpn-oz for heterogeneous VPN profiles
-# (ARM → libvirt-s390x-arm64-0-0; x86 → libvirt-s390x-vpn-amd64-0-0)
+# Reserve lnxocp11 slots from vpn-oz for heterogeneous VPN profiles
+# (ARM → arm64-0-0 ← oz-0-2; x86 → vpn-amd64-0-0/0-1 ← oz-0-3/oz-0-1)
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-1']
 del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-2']
 del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-3']
 
@@ -759,9 +761,10 @@ del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-3']
 CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-2'] = 1
 CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-3'] = 1
 
-# Heterogeneous on OZ lnxocp11: oz-0-2 capacity → ARM; oz-0-3 capacity → x86 VPN hetero.
-# Z control-plane + compute on lnxocp11; day-2 workers on akvmocp03 / xkvm.
-# GSM: arm64-0-0 ← former oz-0-2 IPs; vpn-amd64-0-0 ← former oz-0-3 IPs.
+# Heterogeneous on OZ lnxocp11: oz-0-2 → ARM; oz-0-3 + oz-0-1 → x86 VPN hetero (2 leases).
+# Z control-plane + compute on lnxocp11; day-2 workers on akvmocp03 / xkvmocp08.
+# GSM: arm64-0-0 ← oz-0-2; vpn-amd64-0-0 ← oz-0-3; vpn-amd64-0-1 ← oz-0-1.
+# vpn-oz retains oz-0-0 on lnxocp11.
 
 # Orange zone (OZ) kubevirt06 (0) + kubevirt07 (1), 1 HA + 1 SNO lease each
 for i in range(2):

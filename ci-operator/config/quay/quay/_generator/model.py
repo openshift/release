@@ -85,9 +85,18 @@ class Cell:
 
     @property
     def index_image_repo(self) -> str:
-        dashed = self.quay_version_dashed
-        ocp = self.ocp_version_dashed
-        return "quay.io/redhat-user-workloads/quay-eng-tenant/" f"stable-{dashed}-v{ocp}"
+        # ART publishes every Quay FBC to a single shared, public repo; the
+        # per-release/per-OCP build is selected by index_image_tag, not the repo.
+        return "quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc"
+
+    @property
+    def index_image_tag(self) -> str:
+        # ART floating-tag convention: <group>__v<ocp_version>__<component_name>.
+        # The floating tag (no trailing __g<sha> commit suffix) always points at
+        # the latest successful build for that release/OCP pair.
+        if self.quay_version is None:
+            raise ValueError("index_image_tag requires quay_version to be set")
+        return f"quay-{self.quay_version}__v{self.ocp_version}__quay-rhel9-operator"
 
     @property
     def variant(self) -> str:
@@ -139,4 +148,5 @@ class Cell:
             ctx["quay_version_dashed"] = self.quay_version_dashed
             ctx["operator_channel"] = self.operator_channel
             ctx["index_image_repo"] = self.index_image_repo
+            ctx["index_image_tag"] = self.index_image_tag
         return ctx

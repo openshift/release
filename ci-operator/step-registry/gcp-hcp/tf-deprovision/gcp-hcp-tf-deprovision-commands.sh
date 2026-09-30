@@ -25,9 +25,9 @@ if [[ ! "${RUN_ID}" =~ ^[a-z][a-z0-9]{2,15}$ ]]; then
   exit 0  # Don't fail job
 fi
 
-# Validate TFC token mount exists
-if [[ ! -f "/etc/terraform-cloud/token" ]]; then
-  log "ERROR: /etc/terraform-cloud/token not found"
+# Validate Terraform CLI credentials mount exists
+if [[ ! -r "${TF_CLI_CONFIG_FILE}" ]]; then
+  log "ERROR: ${TF_CLI_CONFIG_FILE} not found or not readable"
   log "Auto-destroy will clean up resources in 24h"
   exit 0  # Don't fail job
 fi
@@ -98,14 +98,6 @@ if [[ ! -d "${RENDERED_DIR}" ]]; then
 fi
 
 cd "${RENDERED_DIR}"
-
-# Configure TFC authentication via .terraformrc (avoids token in env vars)
-(umask 077 && cat > "$HOME/.terraformrc" <<TFRC
-credentials "app.terraform.io" {
-  token = "$(cat /etc/terraform-cloud/token)"
-}
-TFRC
-)
 
 export TF_INPUT=false
 export TF_IN_AUTOMATION=true
