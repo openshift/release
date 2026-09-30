@@ -499,6 +499,9 @@ create_node () {
     if [[ "$ARCH" == "ppc64le" ]]; then
       HTTPD_PORT="$(leaseLookup 'httpd-port')"
       EXTRA_ARGS="${EXTRA_ARGS} coreos.live.rootfs_url=http://${HOSTNAME}:${HTTPD_PORT}/${ROOTFS_NAME}"
+      # domain XML templates (domain-install-template.xml, domain-template.xml) in the
+      # cluster profile secret must use machine='pseries-rhel10.0.0' and cpu POWER10
+      # for hosts running CentOS Stream 10 / POWER10.
     fi
 
     # Boot artifacts names/paths were exported above upon creation
