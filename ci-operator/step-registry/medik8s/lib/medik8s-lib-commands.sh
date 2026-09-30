@@ -7,7 +7,7 @@ cat <<'MEDIK8S_LIB_EOF' > "${SHARED_DIR}/medik8s-lib.sh"
 #
 # Required caller variables per function:
 #   resolve_commit_sha: OCP_VERSION, FBC_COMMIT_SHA (in/out), FBC_SHA_PINNED (in/out),
-#                       FBC_IMAGE_TAG (out; Quay tag, may be on-pr-<sha>)
+#                       FBC_IMAGE_TAG (out; Quay image tag, normally bare SHA)
 #   verify_fbc_image:   OCP_VERSION, FBC_COMMIT_SHA, FBC_SHA_PINNED, FBC_IMAGE_TAG
 #   wait_for_mcp_rollout: (none - takes argument)
 #   ensure_marketplace: (none)
@@ -64,7 +64,6 @@ set_proxy() {
 resolve_commit_sha() {
     if [[ -n "$FBC_COMMIT_SHA" ]]; then
         FBC_SHA_PINNED="true"
-        # Quay tag for the image; Konflux may publish on-pr-<sha> instead of bare sha.
         FBC_IMAGE_TAG="${FBC_IMAGE_TAG:-$FBC_COMMIT_SHA}"
         log "Using provided FBC_COMMIT_SHA: $FBC_COMMIT_SHA (image tag: $FBC_IMAGE_TAG)"
         return 0
@@ -80,38 +79,51 @@ resolve_commit_sha() {
     local image_name="${FBC_IMAGE_PREFIX}-${OCP_VERSION}"
     log "Resolving latest active FBC image for ${image_name} from Quay..."
 
-    local quay_response
-    if ! quay_response=$(curl -sSf --retry 3 --retry-delay 2 \
-        --connect-timeout 10 --max-time 30 \
-        "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=100&onlyActiveTags=true" 2>&1); then
-        log "ERROR: Quay API request failed for ${image_name}: ${quay_response}"
-        exit 1
-    fi
+    # Quay returns newest tags first with a hard page size. Konflux publishes many
+    # non-SHA tags (per-arch, on-pr, pipeline build names) that drown bare SHA
+    # tags off page 1 — so paginate until we find a bare 40-char SHA tag.
+    local page=1 max_pages=10 quay_response page_sha best_sha="" best_ts=0 page_ts has_more
+    while (( page <= max_pages )); do
+        if ! quay_response=$(curl -sSf --retry 3 --retry-delay 2 \
+            --connect-timeout 10 --max-time 30 \
+            "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=100&page=${page}&onlyActiveTags=true" 2>&1); then
+            log "ERROR: Quay API request failed for ${image_name} (page ${page}): ${quay_response}"
+            exit 1
+        fi
 
-    # Historical Konflux: bare 40-char git SHA tags.
-    FBC_COMMIT_SHA=$(echo "$quay_response" \
-        | jq -r '[.tags[] | select(.name | test("^[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty')
+        page_sha=$(echo "$quay_response" \
+            | jq -r '[.tags[] | select(.name | test("^[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty')
+        page_ts=$(echo "$quay_response" \
+            | jq -r --arg sha "$page_sha" '[.tags[] | select(.name == $sha)][0].start_ts // 0')
+        if [[ -n "$page_sha" && "$page_ts" -gt "$best_ts" ]]; then
+            best_sha="$page_sha"
+            best_ts="$page_ts"
+            # Newest tags are on early pages; once we have a bare SHA from page 1
+            # we can stop. Later pages only have older SHAs.
+            if (( page == 1 )); then
+                break
+            fi
+        fi
 
-    if [[ -n "$FBC_COMMIT_SHA" ]]; then
-        FBC_IMAGE_TAG="${FBC_COMMIT_SHA}"
-        log "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA (bare Quay SHA tag)"
+        has_more=$(echo "$quay_response" | jq -r '.has_additional // false')
+        if [[ "$has_more" != "true" ]]; then
+            break
+        fi
+        # If page 1 had no bare SHA, keep scanning newer-ish pages until we find one.
+        if [[ -n "$best_sha" ]]; then
+            break
+        fi
+        page=$((page + 1))
+    done
+
+    if [[ -n "$best_sha" ]]; then
+        FBC_COMMIT_SHA="$best_sha"
+        FBC_IMAGE_TAG="$best_sha"
+        log "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA (bare Quay SHA tag, page ${page})"
         return 0
     fi
 
-    # Newer Konflux: on-pr-<sha> index tags (bare SHA tag is no longer published).
-    # GitLab IDMS still needs the bare commit; the CatalogSource image uses on-pr-<sha>.
-    local on_pr_tag
-    on_pr_tag=$(echo "$quay_response" \
-        | jq -r '[.tags[] | select(.name | test("^on-pr-[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty')
-
-    if [[ -n "$on_pr_tag" ]]; then
-        FBC_COMMIT_SHA="${on_pr_tag#on-pr-}"
-        FBC_IMAGE_TAG="${on_pr_tag}"
-        log "Resolved FBC from on-pr tag: commit=${FBC_COMMIT_SHA} image_tag=${FBC_IMAGE_TAG}"
-        return 0
-    fi
-
-    log "ERROR: No active SHA or on-pr-<sha> tag found for ${image_name} on Quay"
+    log "ERROR: No active bare SHA tag found for ${image_name} on Quay (scanned ${page} page(s))"
     exit 1
 }
 
@@ -127,18 +139,6 @@ verify_fbc_image() {
             --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
             "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_IMAGE_TAG}" \
             -H "Accept: application/vnd.oci.image.index.v1+json" || true)
-        if [[ "$manifest_status" != "200" && "$FBC_IMAGE_TAG" == "$FBC_COMMIT_SHA" ]]; then
-            # Pinned bare SHA may only exist as on-pr-<sha> on newer Konflux.
-            local alt_tag="on-pr-${FBC_COMMIT_SHA}"
-            log "Bare tag missing (HTTP ${manifest_status}); trying ${alt_tag}"
-            manifest_status=$(curl -sS -o /dev/null -w '%{http_code}' \
-                --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
-                "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${alt_tag}" \
-                -H "Accept: application/vnd.oci.image.index.v1+json" || true)
-            if [[ "$manifest_status" == "200" ]]; then
-                FBC_IMAGE_TAG="${alt_tag}"
-            fi
-        fi
         if [[ "$manifest_status" != "200" ]]; then
             log "ERROR: Pinned FBC image not found (HTTP ${manifest_status})"
             exit 1
