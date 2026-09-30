@@ -80,6 +80,10 @@ resolve_vault_service_address() {
     echo "Error: Service ${service_name} in ${vault_namespace} has no port named https" >&2
     exit 1
   fi
+  # Bracket IPv6 so https://fd02::1:8200 becomes https://[fd02::1]:8200 (valid URL).
+  if [[ "${cluster_ip}" == *:* ]]; then
+    cluster_ip="[${cluster_ip}]"
+  fi
   echo "https://${cluster_ip}:${port}"
 }
 
