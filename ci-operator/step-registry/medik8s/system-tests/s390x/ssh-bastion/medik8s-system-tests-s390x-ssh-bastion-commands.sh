@@ -1,10 +1,11 @@
 #!/bin/bash
 # Gated ssh-bastion for medik8s system-tests on s390x libvirt OZ.
 #
-# The upstream eparis image (quay.io/eparis/ssh:latest) is amd64-only and will
-# never schedule on s390x. This step deploys an equivalent sshd using a multi-
-# arch centos stream9 image, authorized with the cluster SSH public key, then
-# records port-forward mode for run-tests (libvirt has no cloud LB).
+# quay.io/eparis/ssh:latest is amd64-only. This step deploys openssh-server on
+# multi-arch centos stream9 with hostNetwork so the bastion can reach node
+# InternalIPs on the libvirt machine network (pod network cannot). sshd listens
+# on 2222 to avoid clashing with the node's host sshd on :22. run-tests
+# port-forwards the Service (libvirt has no cloud LB).
 
 set -euo pipefail
 
@@ -15,7 +16,6 @@ fi
 
 echo "=== Deploying s390x-capable ssh-bastion for medik8s system-tests ==="
 
-# Ensure our UID is in /etc/passwd (required for SSH from the step pod).
 if ! whoami &>/dev/null; then
   if [[ -w /etc/passwd ]]; then
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
@@ -27,8 +27,6 @@ fi
 
 # shellcheck disable=SC1090
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
-  # Needed so the bastion container can dnf-install openssh-server.
-  # Also helps this step reach registries if the cluster uses an HTTP proxy.
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
@@ -68,13 +66,14 @@ metadata:
 EOF
 oc adm policy add-scc-to-user privileged -z ssh-bastion -n "${SSH_BASTION_NAMESPACE}"
 
-echo "Generating ssh host keys and sshd_config..."
+echo "Generating ssh host keys and sshd_config (listen :2222 for hostNetwork)..."
 workdir="$(mktemp -d)"
 trap 'rm -rf "${workdir}"' EXIT
 ssh-keygen -q -t rsa -f "${workdir}/ssh_host_rsa_key" -C '' -N ''
 ssh-keygen -q -t ecdsa -f "${workdir}/ssh_host_ecdsa_key" -C '' -N ''
 ssh-keygen -q -t ed25519 -f "${workdir}/ssh_host_ed25519_key" -C '' -N ''
 cat > "${workdir}/sshd_config" <<'EOF'
+Port 2222
 HostKey /etc/ssh/ssh_host_rsa_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
@@ -87,6 +86,7 @@ UsePAM no
 X11Forwarding no
 PrintMotd no
 AllowTcpForwarding yes
+GatewayPorts no
 PermitTunnel no
 Subsystem sftp /usr/libexec/openssh/sftp-server
 EOF
@@ -102,7 +102,7 @@ oc -n "${SSH_BASTION_NAMESPACE}" delete secret ssh-authorized-keys --ignore-not-
 oc -n "${SSH_BASTION_NAMESPACE}" create secret generic ssh-authorized-keys \
   --from-file="authorized_keys=${SSH_PUB_KEY_FILE}"
 
-echo "Creating ClusterIP Service (no cloud LB on libvirt)..."
+echo "Creating ClusterIP Service (forwards to hostNetwork sshd :2222)..."
 oc -n "${SSH_BASTION_NAMESPACE}" apply -f - <<EOF
 apiVersion: v1
 kind: Service
@@ -115,15 +115,13 @@ spec:
   - name: ssh
     port: 22
     protocol: TCP
-    targetPort: ssh
+    targetPort: 2222
   selector:
     run: ssh-bastion
   type: ClusterIP
 EOF
 
-# Multi-arch base (includes s390x). openssh-server is installed at container
-# start so we do not depend on the amd64-only quay.io/eparis/ssh image.
-echo "Creating ssh-bastion Deployment (quay.io/centos/centos:stream9)..."
+echo "Creating hostNetwork ssh-bastion Deployment (quay.io/centos/centos:stream9)..."
 oc -n "${SSH_BASTION_NAMESPACE}" apply -f - <<'EOF'
 apiVersion: apps/v1
 kind: Deployment
@@ -141,13 +139,16 @@ spec:
       labels:
         run: ssh-bastion
     spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: ssh-bastion
       containers:
       - name: ssh-bastion
         image: quay.io/centos/centos:stream9
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 22
+        - containerPort: 2222
+          hostPort: 2222
           name: ssh
           protocol: TCP
         securityContext:
@@ -175,7 +176,7 @@ spec:
           chown -R core:core /home/core
           chmod 700 /home/core/.ssh
           chmod 600 /home/core/.ssh/authorized_keys
-          echo "Starting sshd..."
+          echo "Starting sshd on :2222 (hostNetwork)..."
           exec /usr/sbin/sshd -D -e -f /etc/ssh/sshd_config
       volumes:
       - name: ssh-host-keys
@@ -196,7 +197,7 @@ dump_bastion_debug() {
         echo "--- describe ${pod} ---" >&2
         oc -n "${SSH_BASTION_NAMESPACE}" describe "${pod}" >&2 || true
         echo "--- logs ${pod} ---" >&2
-        oc -n "${SSH_BASTION_NAMESPACE}" logs "${pod}" --tail=80 >&2 || true
+        oc -n "${SSH_BASTION_NAMESPACE}" logs "${pod}" --tail=120 >&2 || true
       done
 }
 
@@ -207,8 +208,19 @@ if ! oc -n "${SSH_BASTION_NAMESPACE}" rollout status deployment/ssh-bastion --ti
 fi
 oc -n "${SSH_BASTION_NAMESPACE}" get pods,svc -o wide
 
-# Libvirt has no LB; run-tests will oc port-forward this ClusterIP Service.
-echo "No cloud LoadBalancer on libvirt OZ; run-tests will port-forward svc/ssh-bastion"
-echo "port-forward" > "${SHARED_DIR}/medik8s_ssh_bastion_mode"
+# Prove the bastion pod can reach a worker on the machine network.
+worker_ip="$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)"
+if [[ -n "${worker_ip}" ]]; then
+  echo "Checking bastion -> worker ${worker_ip}:22 connectivity from inside the bastion pod..."
+  bastion_pod="$(oc -n "${SSH_BASTION_NAMESPACE}" get pods -l run=ssh-bastion -o jsonpath='{.items[0].metadata.name}')"
+  if ! oc -n "${SSH_BASTION_NAMESPACE}" exec "${bastion_pod}" -- \
+      bash -c "timeout 10 bash -c 'echo >/dev/tcp/${worker_ip}/22'" 2>/dev/null; then
+    echo "ERROR: bastion pod cannot TCP-connect to ${worker_ip}:22 (machine network unreachable)" >&2
+    dump_bastion_debug
+    exit 1
+  fi
+  echo "Bastion -> worker TCP check succeeded"
+fi
 
+echo "port-forward" > "${SHARED_DIR}/medik8s_ssh_bastion_mode"
 echo "=== ssh-bastion ready ==="
