@@ -37,45 +37,6 @@ tests:
   commands: GOFLAGS='' make unit-test
   container:
     from: src
-- as: tls-scan-default
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: opendatahub
-    product: ocp
-    timeout: 2h0m0s
-    version: '4.20'
-  cron: 0 6 1,15 * *
-  steps:
-    env:
-      SCAN_NAMESPACE: mcp-lifecycle-module-operator-system
-    test:
-    - ref: cert-manager-install-operator
-    - as: deploy
-      cli: latest
-      commands: |
-        make deploy IMG="${OPERATOR_IMAGE}" MCPLO_OPERAND_IMAGE="quay.io/opendatahub/odh-mcp-lifecycle-operator:odh-stable"
-        oc -n mcp-lifecycle-module-operator-system rollout status deploy/mcp-lifecycle-module-operator-controller-manager --timeout=5m
-        oc apply -f - <<EOF
-        apiVersion: components.platform.opendatahub.io/v1alpha1
-        kind: MCPLifecycleOperator
-        metadata:
-          name: default
-        spec:
-          managementState: Managed
-        EOF
-        oc wait --for=condition=Ready mcplifecycleoperator/default --timeout=10m
-      dependencies:
-      - env: OPERATOR_IMAGE
-        name: mcp-lifecycle-module-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 20m0s
-    - ref: tls-scanner-run
-    workflow: generic-claim
 - as: tls-scan-modern-adherence
   cluster_claim:
     architecture: amd64
