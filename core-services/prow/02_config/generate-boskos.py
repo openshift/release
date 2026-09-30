@@ -572,6 +572,9 @@ CONFIG = {
     'hypershift-hive-quota-slice': {
         'default': 20,
     },
+    'hypershift-hive-hosted-mgmt2-quota-slice': {
+        'default': 100,
+    },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,
         'us-east-2': 5,
