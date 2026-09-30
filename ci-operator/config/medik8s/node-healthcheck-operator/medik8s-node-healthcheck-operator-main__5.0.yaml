@@ -254,6 +254,168 @@ tests:
           cpu: "2"
           memory: 4Gi
     workflow: ipi-aws
+- always_run: false
+  as: e2e-system-tests-nhc-fbc-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      TEST_NAME: e2e-system-tests-nhc-fbc-upgrade
+      TEST_STEPS: run-nhc-fbc-upgrade-tests
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - as: run-nhc-fbc-upgrade-tests
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+
+        : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
+        exec > >(tee "$ARTIFACT_DIR/nhc-fbc-upgrade-tests.log") 2>&1
+
+        prepare_runtime() {
+          # Give skopeo/tools the cluster's Red Hat registry credentials.
+          echo '==> Read cluster pull secret for Red Hat registry access'
+          local auth_dir=/tmp/nhc-registry-auth
+          mkdir -p "$auth_dir"
+          oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' |
+            base64 --decode > "$auth_dir/auth.json"
+          chmod 0600 "$auth_dir/auth.json"
+          export REGISTRY_AUTH_FILE="$auth_dir/auth.json"
+
+          # The test container runs as an arbitrary UID.
+          export GOPATH=/tmp/nhc-go
+          export GOMODCACHE="$GOPATH/pkg/mod"
+          export GOCACHE=/tmp/nhc-go-build-cache
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
+
+          go version
+        }
+
+        write_idms() {
+          echo '==> Write reviewed IDMS for rhwa-fbc'
+          cat <<'EOF' > /tmp/nhc-fbc-idms.yaml
+        apiVersion: config.openshift.io/v1
+        kind: ImageDigestMirrorSet
+        metadata:
+          name: rhwa-fbc-fips-image-mirror-set
+        spec:
+          imageDigestMirrors:
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-operator-0-10
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-operator-0-11
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-operator-0-12
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-operator-5-8
+              source: registry.redhat.io/workload-availability/node-healthcheck-rhel9-operator
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-bundle-0-10
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-bundle-0-11
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-bundle-0-12
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-bundle-5-8
+              source: registry.redhat.io/workload-availability/node-healthcheck-operator-bundle
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-console-0-10
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-console-0-11
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-console-0-12
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-console-5-8
+              source: registry.redhat.io/workload-availability/node-remediation-console-rhel9
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-must-gather-0-10
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-must-gather-0-11
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-must-gather-0-12
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-must-gather-5-8
+              source: registry.redhat.io/workload-availability/node-healthcheck-must-gather-rhel9
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-operator-0-11
+                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-operator-0-12
+                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-operator-0-13
+              source: registry.redhat.io/workload-availability/self-node-remediation-rhel9-operator
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-bundle-0-11
+                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-bundle-0-12
+                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-bundle-0-13
+              source: registry.redhat.io/workload-availability/self-node-remediation-operator-bundle
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-operator-0-6
+                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-operator-0-7
+                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-operator-0-8
+              source: registry.redhat.io/workload-availability/fence-agents-remediation-rhel9-operator
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-bundle-0-6
+                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-bundle-0-7
+                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-bundle-0-8
+              source: registry.redhat.io/workload-availability/fence-agents-remediation-operator-bundle
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-operator-0-5
+                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-operator-0-6
+                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-operator-0-7
+              source: registry.redhat.io/workload-availability/machine-deletion-remediation-rhel9-operator
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-bundle-0-5
+                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-bundle-0-6
+                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-bundle-0-7
+              source: registry.redhat.io/workload-availability/machine-deletion-remediation-operator-bundle
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-operator-5-5
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-operator-5-6
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-operator-5-7
+              source: registry.redhat.io/workload-availability/node-maintenance-rhel9-operator
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-bundle-5-5
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-bundle-5-6
+                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-bundle-5-7
+              source: registry.redhat.io/workload-availability/node-maintenance-operator-bundle
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/storage-based-remediation/sbr-agent-0-3
+              source: registry.redhat.io/workload-availability/storage-based-remediation-agent-rhel9
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/storage-based-remediation/sbr-operator-0-3
+              source: registry.redhat.io/workload-availability/storage-based-remediation-rhel9-operator
+            - mirrors:
+                - quay.io/redhat-user-workloads/rhwa-tenant/storage-based-remediation/sbr-bundle-0-3
+              source: registry.redhat.io/workload-availability/storage-based-remediation-operator-bundle
+        EOF
+          export NHC_FBC_IDMS_PATH=/tmp/nhc-fbc-idms.yaml
+        }
+
+        run_tests() {
+          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#18 merges.
+          echo '==> Check out openshift/rhwa-system-tests PR 18'
+          git clone --depth=1 --branch main \
+            https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
+          git -C /tmp/system-tests fetch --depth=1 \
+            https://github.com/openshift/rhwa-system-tests.git refs/pull/18/head
+          git -C /tmp/system-tests checkout --detach FETCH_HEAD
+          git -C /tmp/system-tests show --no-patch --format=fuller HEAD
+
+          export ECO_TEST_FEATURES=nhc-operator
+          export ECO_TEST_LABELS=tier:upgrade-operator
+          export NHC_FBC_CATALOG_IMAGE='quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500@sha256:5a72bdb2e825a687fdef206b5a8fe4f26c884e427f0acabb6d16c9dca2d94607'
+          export NHC_FBC_CANDIDATE_VERSION=5.8.0
+          export NHC_FBC_CANDIDATE_IMAGE='registry.redhat.io/workload-availability/node-healthcheck-rhel9-operator@sha256:c90eb5266b9734766d7afb84306a0147672e1a1aeb8c7a3dd5c33a9bfc77ffb9'
+          export NHC_FBC_CHANNEL=stable
+          export NHC_FBC_IDMS_PATH=/tmp/nhc-fbc-idms.yaml
+          export WORKLOAD_IMAGE=unused-by-nhc-upgrade-tests
+          # Prow test pods cannot reach worker private IPs over SSH.
+          export MEDIK8S_KUBELET_STOP_OCDEBUG=true
+
+          echo "==> Start system-tests tier: upgrade-operator"
+          export ECO_REPORTS_DUMP_DIR="$ARTIFACT_DIR/upgrade-operator"
+          mkdir -p "$ECO_REPORTS_DUMP_DIR"
+          make -C /tmp/system-tests run-tests 2>&1 | tee "$ECO_REPORTS_DUMP_DIR/run.log"
+        }
+
+        prepare_runtime
+        write_idms
+        run_tests
+      from: nhc-upgrade-test-runner
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: medik8s
