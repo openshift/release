@@ -346,7 +346,6 @@ tests:
       {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
       logs> :warning: {{end}}'
   steps:
-    allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
       ADDITIONAL_WORKER_NODES: "6"
@@ -357,6 +356,11 @@ tests:
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.xlarge
       SET_ENV_BY_PLATFORM: custom
       ZONES_COUNT: "3"
+    post:
+    - ref: gather-must-gather
+    - ref: gather-extra
+    - ref: gather-audit-logs
+    - ref: ipi-deprovision-deprovision
     test:
     - ref: openshift-qe-workers-scale
     - ref: openshift-qe-perfscale-aws-data-path-sg
