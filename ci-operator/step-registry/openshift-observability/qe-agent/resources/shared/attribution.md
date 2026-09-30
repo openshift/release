@@ -27,6 +27,7 @@ Run it **once per diagnosed root cause**, after the skill's Step 4 classificatio
 | `tempo` | `https://github.com/grafana/tempo-operator` (forks: `openshift/grafana-tempo-operator`, `os-observability/tempo-operator`) | same repo, `tests/` |
 | `otel` | `https://github.com/openshift/open-telemetry-opentelemetry-operator` (fork of `open-telemetry/opentelemetry-operator`) | same repo `tests/`, plus `https://github.com/openshift/distributed-tracing-qe` (`tests/e2e-otel`) when the step script clones it |
 | `tracing-ui` | `https://github.com/openshift/distributed-tracing-console-plugin` (only if the diagnosis implicates the operator: `https://github.com/rhobs/observability-operator`) | same repo, `tests/` |
+| `otel-ui` | `https://github.com/openshift/open-telemetry-opentelemetry-operator` (fork of `open-telemetry/opentelemetry-operator`; the dashboard is built in `internal/openshift/dashboards/`; only if the diagnosis implicates the console: `https://github.com/openshift/monitoring-plugin`) | `https://github.com/openshift/distributed-tracing-qe` (`tests/e2e-otel-ui/`) |
 | `cluster-logging` | `https://github.com/openshift/cluster-logging-operator` | `https://github.com/openshift-eng/openshift-logging-e2e-tests` (`test/e2e/`) |
 | `loki` | `https://github.com/openshift/loki` (operator under `operator/`) | `https://github.com/openshift-eng/openshift-logging-e2e-tests` (`test/e2e/`) |
 

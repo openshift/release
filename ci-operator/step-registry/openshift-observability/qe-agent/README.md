@@ -192,6 +192,7 @@ Skills are Markdown files hosted in this step's `resources/skills/` directory wi
 ```text
 ci-operator/step-registry/openshift-observability/qe-agent/resources/skills/
 ├── otel/SKILL.md        <- OpenTelemetry Operator (junit_otel_* tests, chainsaw)
+├── otel-ui/SKILL.md     <- OpenTelemetry Collector dashboard in the console (junit_console_ui_otel_* tests, Playwright)
 ├── tempo/SKILL.md       <- Tempo Operator (junit_tempo_* tests, chainsaw)
 ├── tracing-ui/SKILL.md  <- Distributed Tracing Console Plugin (Cypress)
 └── OWNERS
