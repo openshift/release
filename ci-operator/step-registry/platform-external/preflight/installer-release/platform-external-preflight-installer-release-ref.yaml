@@ -1,0 +1,29 @@
+ref:
+  as: platform-external-preflight-installer-release
+  from: cli
+  commands: platform-external-preflight-installer-release-commands.sh
+  grace_period: 10m
+  timeout: 15m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Preflight guard after ignition generation and before AWS provisioning.
+    Fails fast when bootstrap embeds cvo-render flags (e.g. --cluster-version-manifest-path)
+    that the install release CVO rejects — the mismatch that hangs wait-for-api-bootstrap.
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    - name: "release:latest"
+      env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: PLATFORM_EXTERNAL_OVERRIDE_RELEASE
+    default: ""
+    documentation: |-
+      Override release image used for install (same semantics as manifests step).
+  - name: REGISTRY_AUTH_FILE
+    default: "/tmp/secret/pull-secret-with-ci"
+    documentation: |-
+      Writable pull-secret path. When the install release is not on quay.io, the step runs
+      `oc registry login` before pulling release/CVO images.

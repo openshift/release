@@ -5,6 +5,11 @@
 # The step creates manifests (openshift-install create manifests) and generate the ignition
 # config files (create ignition-configs), saving in a the shared storage.
 #
+# Always run openshift-install from OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE so bootstrap
+# assets (bootkube/cvo-render flags) match the install payload. Using the step container's
+# installer imagestream alone breaks upgrades when latest installer > initial CVO
+# (e.g. --cluster-version-manifest-path). Same pattern as ipi-install-install extract.
+#
 
 set -o nounset
 set -o errexit
@@ -15,17 +20,92 @@ if [[ -n "${PLATFORM_EXTERNAL_OVERRIDE_RELEASE-}" ]]; then
 fi
 echo "Using release image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
+if [[ -z "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  echo "ERROR: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is empty"
+  exit 1
+fi
+
+# Persist for preflight (exact payload baked into ignition / bootstrap)
+echo -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" > "${SHARED_DIR}/platform-external-install-release-image"
+
 STEP_WORKDIR=${STEP_WORKDIR:-/tmp}
 INSTALL_DIR=${STEP_WORKDIR}/install-dir
 mkdir -vp "${INSTALL_DIR}"
 
 source "${SHARED_DIR}/init-fn.sh" || true
 
+# Prefer installer binary from the install payload over the step's imagestream tag.
+INSTALLER_BINARY="${STEP_WORKDIR}/openshift-install"
+
+# Build-farm release images (registry.build*.ci.openshift.org/ci-op-*) need CI
+# registry credentials. Cluster-profile pull-secret alone is not enough.
+PULL_SECRET="${REGISTRY_AUTH_FILE:-${STEP_WORKDIR}/pull-secret-with-ci}"
+mkdir -p "$(dirname "${PULL_SECRET}")"
+cp -f "${CLUSTER_PROFILE_DIR}/pull-secret" "${PULL_SECRET}"
+if [[ "$(dirname "$(dirname "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}")")" != "quay.io" ]]; then
+  log "Logging into CI registry to extract installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  # Prefer build-cluster SA token over any SHARED_DIR kubeconfig.
+  KUBECONFIG="" oc registry login --to "${PULL_SECRET}"
+fi
+
+# EXPERIMENT (DO NOT MERGE, OPCT-486): resolve the release image to a pullspec the
+# EXTERNAL bootstrap node can actually pull by digest.
+#
+# node-image-pull.service on the bootstrap node pulls the release image from
+# OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE, which the installer bakes into
+# bootstrap.ign. In the upgrade job that override is the ci-operator build-farm
+# image for `release:initial` (registry.build*.ci.openshift.org/ci-op-*/release@sha256:...).
+# The bootstrap node CAN reach that registry (the passing non-upgrade job pulls its
+# `release:latest` image from the same host), but the IMPORTED initial image's blobs
+# are not servable by digest from the integrated registry, so the external pull
+# fails with "no such object" and the API never comes up (confirmed run
+# 2102722534163091456 via serial console). The pipeline `release:latest` works
+# because ci-operator assembles it locally (blobs present); `release:initial` is
+# imported, so only a manifest reference exists.
+#
+# Work around it by pointing the bootstrap at the ORIGINAL, externally-pullable
+# source for the same version: nightlies live at
+# registry.ci.openshift.org/ocp/release:<version>; GA/candidate at
+# quay.io/openshift-release-dev/ocp-release:<version>-x86_64. Guard on the candidate
+# actually being pullable before rewriting.
+if [[ "$(dirname "$(dirname "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}")")" != "quay.io" ]]; then
+  REL_VERSION="$(oc adm release info -a "${PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}' 2>/dev/null || true)"
+  log "EXPERIMENT: build-farm override ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}, version=${REL_VERSION:-<unknown>}"
+  PUBLIC_RELEASE=""
+  if [[ "${REL_VERSION}" == *nightly* || "${REL_VERSION}" == *"-0.ci"* ]]; then
+    PUBLIC_RELEASE="registry.ci.openshift.org/ocp/release:${REL_VERSION}"
+  elif [[ "${REL_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+    PUBLIC_RELEASE="quay.io/openshift-release-dev/ocp-release:${REL_VERSION}-x86_64"
+  fi
+  if [[ -n "${PUBLIC_RELEASE}" ]]; then
+    log "EXPERIMENT: probing public pullspec ${PUBLIC_RELEASE}"
+    if oc adm release info -a "${PULL_SECRET}" "${PUBLIC_RELEASE}" >/dev/null 2>&1; then
+      log "EXPERIMENT: public pullspec is pullable; rewriting override to ${PUBLIC_RELEASE}"
+      export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${PUBLIC_RELEASE}"
+      echo -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" > "${SHARED_DIR}/platform-external-install-release-image"
+    else
+      log "EXPERIMENT: public pullspec NOT pullable; leaving override unchanged"
+    fi
+  else
+    log "EXPERIMENT: could not derive a public pullspec from version; leaving override unchanged"
+  fi
+fi
+
+log "Extracting openshift-install from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+oc adm release extract -a "${PULL_SECRET}" \
+  "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install \
+  --to="${STEP_WORKDIR}"
+
+chmod +x "${INSTALLER_BINARY}"
+log "openshift-install version:"
+"${INSTALLER_BINARY}" version
+
 log "Copying to install dir"
 cp -vp "${SHARED_DIR}"/install-config.yaml "${INSTALL_DIR}"/install-config.yaml
 
 log "Creating manifests"
-openshift-install create manifests --dir "${INSTALL_DIR}"
+"${INSTALLER_BINARY}" create manifests --dir "${INSTALL_DIR}"
 
 log "# << Manifest customization >> #"
 
@@ -143,7 +223,7 @@ rm -vf "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_worker-machineset-*.y
 
 log "# << Ignition config/generation >> #"
 
-openshift-install --dir="${INSTALL_DIR}" create ignition-configs &
+"${INSTALLER_BINARY}" --dir="${INSTALL_DIR}" create ignition-configs &
 wait "$!"
 
 log "# << Saving to shared dir >> #"

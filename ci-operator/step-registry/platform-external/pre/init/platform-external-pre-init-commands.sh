@@ -137,11 +137,49 @@ function collect_bootstrap_handler() {
   log "[\${handler_name}]: Attempting to collect bootstrap logs..."
   {
     make_install_dir
+    # gather writes .openshift_install.log into the working directory, which is
+    # not writable on every step image.
+    cd "\${INSTALL_DIR}"
     if ! command -v openshift-install &> /dev/null; then
       log "[\${handler_name}]: ERROR: openshift-install not found, cannot gather bootstrap logs"
     else
       openshift-install gather bootstrap --key "\${SSH_PRIV_KEY_PATH}" --bootstrap "\${BOOTSTRAP_IP}" || true
       cp log-bundle-*.tar.gz "\${ARTIFACT_DIR}" || true
+    fi
+  } || true
+
+  # Fallback: collect EC2 serial console output. Works when SSH is down, and
+  # when the installer's own console gather is skipped (no metadata.json on
+  # platform external installs).
+  log "[\${handler_name}]: Attempting to collect EC2 console output as fallback..."
+  {
+    export AWS_SHARED_CREDENTIALS_FILE="\${CLUSTER_PROFILE_DIR}/.awscred"
+    export AWS_DEFAULT_REGION="\${LEASED_RESOURCE}"
+    install_awscli
+
+    if ! [ -f "\${SHARED_DIR}/CLUSTER_NAME" ]; then
+      log "[\${handler_name}]: CLUSTER_NAME not found in \${SHARED_DIR}, skipping console output"
+    else
+      STACK_NAME="\$(<\${SHARED_DIR}/CLUSTER_NAME)-bootstrap"
+      INSTANCE_ID=\$(aws ec2 describe-instances \\
+        --filters "Name=tag:aws:cloudformation:stack-name,Values=\${STACK_NAME}" \\
+        --query 'Reservations[0].Instances[0].InstanceId' \\
+        --output text 2>/dev/null || echo "")
+
+      if [[ -n "\${INSTANCE_ID}" && "\${INSTANCE_ID}" != "None" && "\${INSTANCE_ID}" != "null" ]]; then
+        log "[\${handler_name}]: Collecting console output for instance \${INSTANCE_ID}..."
+        # --latest is required on Nitro instances, otherwise output is empty.
+        if aws ec2 get-console-output \\
+          --instance-id "\${INSTANCE_ID}" \\
+          --latest \\
+          --output text > "\${ARTIFACT_DIR}/bootstrap-console-output.txt" 2>&1; then
+          log "[\${handler_name}]: Console output saved to \${ARTIFACT_DIR}/bootstrap-console-output.txt"
+        else
+          log "[\${handler_name}]: Could not collect EC2 console output"
+        fi
+      else
+        log "[\${handler_name}]: Could not find bootstrap instance ID for stack \${STACK_NAME}"
+      fi
     fi
   } || true
 
