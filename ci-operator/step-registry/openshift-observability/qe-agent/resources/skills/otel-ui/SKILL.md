@@ -47,7 +47,6 @@ Clone the tests, this is the repo root: `git clone --depth 1 --branch main https
 Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Suite rules:
 - The specs run serially: the first `<failure>` is the root cause, the `skipped` cases after it did not run. Its text has the assertion, the locator and the call log; the `Error Context:` and `[[ATTACHMENT|…]]` paths (page snapshot, screenshot, trace) are in the test step's artifacts, which this pod cannot read; the reruns of Step 3 write their own.
 - The chainsaw XML only says `exit status 1`. Read `${SHARED_DIR}/qe-agent-ui-chainsaw-output.log` (last 100 KiB of Chainsaw's console output): it names the failed step, what it printed and what the catch operations collected (collector status, pod logs, events). No Playwright XML, or one without cases, means the run failed before the specs: in the steps `enable-user-workload-monitoring`, `deploy-collectors`, `generate-telemetry` or `wait-for-dashboard-metrics` (the data pipeline), or in the console login. With no JUnit file at all but this log present, the step failed before any report (a failed clone, a missing password file, the time limit): diagnose from the log, this overrides the module's rule to exit.
-- Typical shared root causes: console login failed, dashboard ConfigMap missing, no series in the monitoring stack.
 
 If missing: read `${SHARED_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
 
@@ -87,21 +86,21 @@ cd /tmp/distributed-tracing-qe && ARTIFACT_DIR="${RUN_DIR}" chainsaw test --conf
 
 Read `${RUN_DIR}/junit_console_ui_otel_dashboard.xml` and the Chainsaw output. For a failing spec, `${RUN_DIR}/test-results/*/error-context.md` is the page snapshot at the failure, and the `.png` next to it is the screenshot (open it with the Read tool). The same failure as in the original run goes to Step 4.
 
-**Dashboard queries.** Whether run 1 passed or failed, the namespace is still there (skip this if it failed before the collectors were deployed). Run the dashboard's own queries (variables replaced by "all") against Thanos. Every query must return a series, except the Processor `dropped` queries (never) and the `refused` queries (only after a refusal) where `0` is normal:
+**Dashboard queries.** Whether run 1 passed or failed, the namespace is still there (skip this if it failed before the collectors were deployed). Run the dashboard's own queries (variables replaced by "all") against Thanos. Every query must return a series, except the Processor `dropped` queries (never) and the `refused` queries (only after a refusal) where `0` is normal. `ERR` means that the query itself failed, not that it has no series: retry it, and record it as not checked if it still fails:
 
 ```bash
 NS=$(oc get opentelemetrycollector -A --field-selector metadata.name=cluster-collector -o jsonpath='{.items[0].metadata.namespace}')
 SA="system:serviceaccount:${NS}:qe-agent-thanos"
-oc create serviceaccount qe-agent-thanos -n "$NS" && oc adm policy add-cluster-role-to-user cluster-monitoring-view "$SA"
+trap 'oc adm policy remove-cluster-role-from-user cluster-monitoring-view "$SA" 2>/dev/null; oc delete serviceaccount qe-agent-thanos -n "$NS" --ignore-not-found' EXIT
+oc create serviceaccount qe-agent-thanos -n "$NS" --dry-run=client -o yaml | oc apply -f - && oc adm policy add-cluster-role-to-user cluster-monitoring-view "$SA"
 TOKEN=$(oc create token qe-agent-thanos -n "$NS")
 HOST=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
 oc get configmap opentelemetry-collector -n openshift-config-managed -o json | jq -r '.data["otel.json"]' > /tmp/otel.json
 jq -r '[.rows[]?.panels[]?, .panels[]?][] | .targets[]?.expr' /tmp/otel.json | sed -E 's/"\$[a-z ]+"/".+"/g' > /tmp/exprs.txt
 while IFS= read -r q; do
-  n=$(curl -sk -H "Authorization: Bearer ${TOKEN}" --data-urlencode "query=${q}" "https://${HOST}/api/v1/query" | jq -r '.data.result | length')
-  echo "${n} ${q}"
+  n=$(curl -sk --max-time 30 -H "Authorization: Bearer ${TOKEN}" --data-urlencode "query=${q}" "https://${HOST}/api/v1/query" | jq -r 'if .status=="success" then (.data.result | length) else "ERR" end')
+  echo "${n:-ERR} ${q}"
 done < /tmp/exprs.txt
-oc adm policy remove-cluster-role-from-user cluster-monitoring-view "$SA"; oc delete serviceaccount qe-agent-thanos -n "$NS"
 ```
 
 **Runs 2–4: the failing spec only**, against the kept namespace (`npm ci` was done by run 1). The telemetry Jobs stop 15 minutes after run 1: delete them and apply `${TEST_DIR}/02-generate-telemetry.yaml` in `NS` again if needed.
@@ -120,9 +119,10 @@ Record the pass/fail pattern of the four runs (for example `PFPP`). A failure in
 
 ## Step 4 — Diagnose: Product Bug vs Test Issue
 
-Run the diagnostics first; the logs, the Step 3 query counts and the failure text are the primary evidence. `NS` is the test namespace that run 1 of Step 3 kept.
+Run the diagnostics first; the logs, the Step 3 query counts and the failure text are the primary evidence. `NS` (first line of the block) is the test namespace that run 1 of Step 3 kept; without one the commands that use it are skipped: record that as unavailable.
 
 ```bash
+NS=$(oc get opentelemetrycollector -A --field-selector metadata.name=cluster-collector -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)
 oc get pods -n opentelemetry-operator-system
 oc logs -n opentelemetry-operator-system deploy/opentelemetry-operator-controller-manager --tail=150
 oc logs -n opentelemetry-operator-system deploy/opentelemetry-operator-controller-manager --previous --tail=50 2>/dev/null || true
@@ -133,11 +133,13 @@ oc get configmap opentelemetry-collector -n openshift-config-managed -o jsonpath
 oc get clusteroperator console authentication monitoring ingress
 oc get pods -n openshift-console
 oc get pods -n openshift-monitoring -l app.kubernetes.io/component=monitoring-plugin
-# Data path in the test namespace (Step 3: NS) and user workload monitoring
-oc get opentelemetrycollector,servicemonitor,pods,jobs -n "${NS}"
-oc logs -n "${NS}" job/telemetrygen-traces --tail=20 2>/dev/null || true
+# Data path in the test namespace and user workload monitoring
+if [[ -n "${NS}" ]]; then
+  oc get opentelemetrycollector,servicemonitor,pods,jobs -n "${NS}"
+  oc logs -n "${NS}" job/telemetrygen-traces --tail=20 2>/dev/null || true
+  oc get events -n "${NS}" --sort-by='.lastTimestamp' | tail -20
+fi
 oc get pods -n openshift-user-workload-monitoring
-oc get events -n "${NS}" --sort-by='.lastTimestamp' | tail -20
 ```
 
 ### Failure text → cause
