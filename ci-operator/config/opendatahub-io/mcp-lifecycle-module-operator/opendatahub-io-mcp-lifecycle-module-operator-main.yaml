@@ -21,11 +21,10 @@ prowgen:
   enable_secrets_store_csi_driver: true
 releases:
   latest:
-    candidate:
-      architecture: amd64
-      product: ocp
-      stream: nightly
-      version: "5.0"
+    release:
+      architecture: multi
+      channel: stable
+      version: '4.20'
 resources:
   '*':
     limits:
@@ -39,11 +38,16 @@ tests:
   container:
     from: src
 - as: tls-scan-default
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: '4.20'
   cron: 0 6 1,15 * *
   steps:
-    cluster_profile: aws-opendatahub
     env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
       SCAN_NAMESPACE: mcp-lifecycle-module-operator-system
     test:
     - ref: cert-manager-install-operator
@@ -71,13 +75,18 @@ tests:
           memory: 200Mi
       timeout: 20m0s
     - ref: tls-scanner-run
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: tls-scan-modern-adherence
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: '4.20'
   cron: 0 6 1,15 * *
   steps:
-    cluster_profile: aws-opendatahub
     env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
       SCAN_NAMESPACE: mcp-lifecycle-module-operator-system
       TLS_13_ENABLE_TLS_ADHERENCE: "true"
       TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
@@ -108,13 +117,18 @@ tests:
       timeout: 20m0s
     - ref: tls-13
     - ref: tls-scanner-run
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: tls-scan-pqc
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: '4.20'
   cron: 0 6 1,15 * *
   steps:
-    cluster_profile: aws-opendatahub
     env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
       PQC_CHECK: "true"
       SCAN_NAMESPACE: mcp-lifecycle-module-operator-system
     test:
@@ -143,7 +157,7 @@ tests:
           memory: 200Mi
       timeout: 20m0s
     - ref: tls-scanner-run
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
