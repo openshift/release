@@ -15,6 +15,22 @@ if [ -z "${OCP_VERSION}" ]; then
     fi
 fi
 
+# Defensive: trim leading/trailing whitespace from XML `name` and `classname`
+# attribute values. Upstream Cypress suites occasionally produce JUnit XML
+# with trailing whitespace in suite names, which causes a lookup mismatch
+# in ReportPortal / Data Router (see LPINTEROP-7179, LPINTEROP-7194).
+typeset xmlFile=''
+for xmlFile in "${SHARED_DIR}"/*.xml; do
+    [ -f "${xmlFile}" ] || continue
+    sed -i -E \
+        -e 's/(name=")[[:space:]]+/\1/g' \
+        -e 's/(name="[^"]*[^[:space:]"])[[:space:]]+"/\1"/g' \
+        -e 's/(classname=")[[:space:]]+/\1/g' \
+        -e 's/(classname="[^"]*[^[:space:]"])[[:space:]]+"/\1"/g' \
+        "${xmlFile}"
+done
+unset xmlFile
+
 DATAROUTER_RESULTS="${SHARED_DIR}/*.xml" \
     REPORTPORTAL_LAUNCH_NAME="${DR__RP__CR_COMP_NAME}" \
     REPORTPORTAL_LAUNCH_ATTRIBUTES="$(
