@@ -9,26 +9,34 @@ import sys
 import yaml
 
 try:
-    from .eval_plan import read_config, validate_thresholds
+    from .eval_config import resolve_config
 except ImportError:
-    from eval_plan import read_config, validate_thresholds
+    from eval_config import resolve_config
 
 
 def main():
     """Use the cloned harness's scoring rules without repeating its path lookup."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--harness", type=Path, required=True)
+    parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run-dir", type=Path, required=True)
     args = parser.parse_args()
-    validate_thresholds(read_config(args.config).get("thresholds", {}))
+    resolved = resolve_config(args.harness, args.repo, args.config)
+    thresholds = resolved.harness_config.thresholds
 
     # Keep harness imports in this bounded child process. Import from the same
     # scripts directory as the score.py CLI, including its agent_eval package.
-    sys.path.insert(0, str(args.harness / "skills/eval-run/scripts"))
+    scripts = (args.harness.resolve() / "skills/eval-run/scripts").resolve()
+    sys.path.insert(0, str(scripts))
+    loaded_score = sys.modules.get("score")
+    loaded_path = getattr(loaded_score, "__file__", None)
+    if loaded_score is not None and (
+            not loaded_path or not Path(loaded_path).resolve().is_relative_to(scripts)):
+        del sys.modules["score"]
     score = importlib.import_module("score")
-    config = score.EvalConfig.from_yaml(args.config)
-    thresholds = validate_thresholds(config.thresholds)
+    if not Path(score.__file__).resolve().is_relative_to(scripts):
+        raise ValueError(f"score module imported from outside the supplied harness: {score.__file__}")
     summary_path = args.run_dir / "summary.yaml"
     print(f"SUMMARY: {summary_path}", flush=True)
     with summary_path.open(encoding="utf-8") as stream:
