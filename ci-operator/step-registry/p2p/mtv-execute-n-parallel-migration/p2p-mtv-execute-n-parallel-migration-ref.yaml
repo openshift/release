@@ -2,7 +2,7 @@ ref:
   as: p2p-mtv-execute-n-parallel-migration
   from: cli
   commands: p2p-mtv-execute-n-parallel-migration-commands.sh
-  timeout: 13h0m0s
+  timeout: 14h0m0s
   grace_period: 15m0s
   resources:
     requests:
@@ -70,18 +70,25 @@ ref:
   - name: MTV_DEST_PROVIDER
     default: "spoke-2"
     documentation: MTV destination Provider CR name (forward leg destination).
-  - name: MTV_NETWORK_MAP_NAME
-    default: "spoke-network-map"
-    documentation: NetworkMap for the forward leg (created by p2p-mtv-create-migration-maps).
-  - name: MTV_STORAGE_MAP_NAME
-    default: "spoke-storage-map"
-    documentation: StorageMap for the forward leg (created by p2p-mtv-create-migration-maps).
-  - name: MTV_RETURN_NETWORK_MAP_NAME
-    default: "spoke-network-map-return"
-    documentation: NetworkMap for the return leg (created by p2p-mtv-create-return-migration-maps).
-  - name: MTV_RETURN_STORAGE_MAP_NAME
-    default: "spoke-storage-map-return"
-    documentation: StorageMap for the return leg (created by p2p-mtv-create-return-migration-maps).
+
+  # ---- Per-plan StorageMap storage class settings ----
+  # This step creates one dedicated NetworkMap + StorageMap per plan (and per return plan)
+  # rather than sharing a single map across all plans.  Map names are derived automatically
+  # from MTV_PLAN_NAME_PREFIX: <prefix>-<n>-netmap / <prefix>-<n>-stormap (forward) and
+  # <prefix>-<n>-return-netmap / <prefix>-<n>-return-stormap (return).
+  - name: MTV_SOURCE_STORAGE_NAME
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: StorageClass name on the source spoke (spec.map[].source.name in StorageMap).
+  - name: MTV_DESTINATION_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: Destination StorageClass name (spec.map[].destination.storageClass in StorageMap).
+  - name: MTV_ADDITIONAL_SOURCE_STORAGE_NAME
+    default: ""
+    documentation: |
+      Optional second source StorageClass for VMs with a secondary data disk on a different
+      storage class (e.g. ocs-storagecluster-cephfs).  When non-empty, a second map entry is
+      appended to every StorageMap so MTV can map both disk types.  Leave empty (default) for
+      the standard single-entry StorageMap.
 
   # ---- Spoke kubeconfig indices ----
   - name: MTV_SOURCE_SPOKE_INDEX

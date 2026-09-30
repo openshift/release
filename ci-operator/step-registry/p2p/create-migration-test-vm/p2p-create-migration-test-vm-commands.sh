@@ -124,6 +124,9 @@ function CleanupPriorResources () {
     SpokeOc delete "virtualmachine/${vmName}" -n "${CNV_TEST_VM_NAMESPACE}" --ignore-not-found --wait=false
     SpokeOc delete "virtualmachineinstance/${vmName}" -n "${CNV_TEST_VM_NAMESPACE}" --ignore-not-found --wait=false
     SpokeOc delete "datavolume/${dvName}" -n "${CNV_TEST_VM_NAMESPACE}" --ignore-not-found --wait=false
+    # Also delete the secondary data disk DataVolume if it exists; ApplyDataDisk creates it without
+    # an ownerReference so it is not garbage-collected when the VM is deleted.
+    SpokeOc delete "datavolume/${vmName}-datadisk" -n "${CNV_TEST_VM_NAMESPACE}" --ignore-not-found --wait=false
 
     while read -r pvcName; do
         [[ -n "${pvcName}" ]] || continue

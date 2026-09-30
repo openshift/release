@@ -21,7 +21,7 @@ set -euo pipefail; shopt -s inherit_errexit
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
@@ -99,14 +99,69 @@ function WaitMapReady () {
         --for=condition=Ready --timeout="${MTV_PLAN_READY_TIMEOUT}" 1>/dev/null
 }
 
-# PreflightProvidersAndMaps — providers and all four maps must be Ready.
+# PreflightProviders — both MTV Providers must be Ready before creating per-plan maps.
 function PreflightProvidersAndMaps () {
     WaitProviderReady "${MTV_SOURCE_PROVIDER}"
     WaitProviderReady "${MTV_DEST_PROVIDER}"
-    WaitMapReady networkmap "${MTV_NETWORK_MAP_NAME}"
-    WaitMapReady storagemap "${MTV_STORAGE_MAP_NAME}"
-    WaitMapReady networkmap "${MTV_RETURN_NETWORK_MAP_NAME}"
-    WaitMapReady storagemap "${MTV_RETURN_STORAGE_MAP_NAME}"
+    true
+}
+
+# ApplyNetworkMap — create a pod→pod NetworkMap on the hub for one plan.
+function ApplyNetworkMap () {
+    typeset name="${1:?}"; (($#)) && shift
+    typeset srcProv="${1:?}"; (($#)) && shift
+    typeset dstProv="${1:?}"; (($#)) && shift
+    jq -n \
+        --arg name    "${name}" \
+        --arg ns      "${MTV_NAMESPACE}" \
+        --arg srcProv "${srcProv}" \
+        --arg dstProv "${dstProv}" \
+        '{
+            apiVersion: "forklift.konveyor.io/v1beta1",
+            kind: "NetworkMap",
+            metadata: {name: $name, namespace: $ns},
+            spec: {
+                map: [{source: {type: "pod"}, destination: {type: "pod"}}],
+                provider: {
+                    source:      {name: $srcProv, namespace: $ns},
+                    destination: {name: $dstProv, namespace: $ns}
+                }
+            }
+        }' | HubOc apply -f - 1>/dev/null
+    true
+}
+
+# ApplyStorageMap — create a StorageMap on the hub for one plan.
+# When MTV_ADDITIONAL_SOURCE_STORAGE_NAME is set a second entry is added for data-disk volumes.
+function ApplyStorageMap () {
+    typeset name="${1:?}"; (($#)) && shift
+    typeset srcProv="${1:?}"; (($#)) && shift
+    typeset dstProv="${1:?}"; (($#)) && shift
+    jq -n \
+        --arg name          "${name}" \
+        --arg ns            "${MTV_NAMESPACE}" \
+        --arg srcName       "${MTV_SOURCE_STORAGE_NAME}" \
+        --arg dstClass      "${MTV_DESTINATION_STORAGE_CLASS}" \
+        --arg srcProv       "${srcProv}" \
+        --arg dstProv       "${dstProv}" \
+        --arg additionalSrc "${MTV_ADDITIONAL_SOURCE_STORAGE_NAME:-}" \
+        '{
+            apiVersion: "forklift.konveyor.io/v1beta1",
+            kind: "StorageMap",
+            metadata: {name: $name, namespace: $ns},
+            spec: {
+                map: (
+                    [{source: {name: $srcName}, destination: {storageClass: $dstClass}}]
+                    + if $additionalSrc != "" then
+                        [{source: {name: $additionalSrc}, destination: {storageClass: $dstClass}}]
+                      else [] end
+                ),
+                provider: {
+                    source:      {name: $srcProv, namespace: $ns},
+                    destination: {name: $dstProv, namespace: $ns}
+                }
+            }
+        }' | HubOc apply -f - 1>/dev/null
     true
 }
 
@@ -412,16 +467,32 @@ function CleanupStaleVmsOnSpoke () {
 
     for (( i = startIdx; i < startIdx + count; i++ )); do
         vmName="$(VmNameAt "${i}")"
-        dvName="${vmName}-rootdisk"
         oc --kubeconfig="${kc}" delete "virtualmachine/${vmName}" \
             -n "${MTV_TEST_VM_NAMESPACE}" --ignore-not-found=true --timeout=2m 1>/dev/null || true
-        oc --kubeconfig="${kc}" delete "datavolume/${dvName}" \
-            -n "${MTV_TEST_VM_NAMESPACE}" --ignore-not-found=true --timeout=2m 1>/dev/null || true
-        oc --kubeconfig="${kc}" delete "pvc/${dvName}" \
-            -n "${MTV_TEST_VM_NAMESPACE}" --ignore-not-found=true --timeout=2m 1>/dev/null || true
+        # Delete both rootdisk and datadisk DataVolumes/PVCs.
+        # When CNV_TEST_VM_DATA_DISK_ENABLED=true, a second datadisk DV exists on spoke-1;
+        # leaving it behind causes a name collision when the return leg tries to recreate it.
+        for dvName in "${vmName}-rootdisk" "${vmName}-datadisk"; do
+            oc --kubeconfig="${kc}" delete "datavolume/${dvName}" \
+                -n "${MTV_TEST_VM_NAMESPACE}" --ignore-not-found=true --timeout=2m 1>/dev/null || true
+            oc --kubeconfig="${kc}" delete "pvc/${dvName}" \
+                -n "${MTV_TEST_VM_NAMESPACE}" --ignore-not-found=true --timeout=2m 1>/dev/null || true
+        done
         : "[${label}] cleaned stale resources for ${vmName}"
     done
     true
+}
+
+# SanitizeDiagnosticOutput — redact sensitive values before writing CI artifacts.
+# Strips IPv4 addresses, AWS internal hostnames, token/key query params, and raw URLs
+# so that CI artifacts stored in publicly accessible object storage do not expose
+# cluster internals.  Pipe oc output through this before redirecting to ARTIFACT_DIR.
+function SanitizeDiagnosticOutput () {
+    sed -E \
+        -e 's/[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[IP_REDACTED]/g' \
+        -e 's/ip-[0-9]+-[0-9]+-[0-9]+-[0-9]+\.[^[:space:]]*/[HOST_REDACTED]/g' \
+        -e 's/token=[^[:space:]&"]*/token=[REDACTED]/g' \
+        -e 's/https?:\/\/[^[:space:]"]*/[URL_REDACTED]/g'
 }
 
 # DumpDiagnostics — collect MTV and VM state for all plans.
@@ -431,9 +502,9 @@ function DumpDiagnostics () {
     mkdir -p "${diagDir}"
 
     HubOc get plan,migration,networkmap,storagemap,provider -n "${MTV_NAMESPACE}" \
-        > "${diagDir}/hub-mtv-resources.txt" 2>&1 || true
+        | SanitizeDiagnosticOutput > "${diagDir}/hub-mtv-resources.txt" 2>&1 || true
     HubOc get events -n "${MTV_NAMESPACE}" --sort-by='.lastTimestamp' \
-        > "${diagDir}/hub-mtv-events.txt" 2>&1 || true
+        | SanitizeDiagnosticOutput > "${diagDir}/hub-mtv-events.txt" 2>&1 || true
 
     typeset -a planDescs=()
     typeset -i _p
@@ -441,15 +512,15 @@ function DumpDiagnostics () {
         planDescs+=("plan/${MTV_PLAN_NAME_PREFIX}-${_p}" "plan/${MTV_PLAN_NAME_PREFIX}-${_p}-return")
     done
     HubOc describe "${planDescs[@]}" -n "${MTV_NAMESPACE}" \
-        > "${diagDir}/plans-describe.txt" 2>&1 || true
+        | SanitizeDiagnosticOutput > "${diagDir}/plans-describe.txt" 2>&1 || true
 
     if [[ -n "${kcSpoke1}" && -r "${kcSpoke1}" ]]; then
         oc --kubeconfig="${kcSpoke1}" get pods -n "${MTV_CNV_NAMESPACE}" \
-            > "${diagDir}/spoke1-cnv-pods.txt" 2>&1 || true
+            | SanitizeDiagnosticOutput > "${diagDir}/spoke1-cnv-pods.txt" 2>&1 || true
     fi
     if [[ -n "${kcSpoke2}" && -r "${kcSpoke2}" ]]; then
         oc --kubeconfig="${kcSpoke2}" get pods -n "${MTV_CNV_NAMESPACE}" \
-            > "${diagDir}/spoke2-cnv-pods.txt" 2>&1 || true
+            | SanitizeDiagnosticOutput > "${diagDir}/spoke2-cnv-pods.txt" 2>&1 || true
     fi
     true
 }
@@ -462,6 +533,9 @@ function OnError () {
 }
 
 # JStep — run a function, record PASS/FAIL in junitFile, propagate exit code.
+# On failure the first nonzero rc is stored in the subshell-local cclmStepRc so that
+# the orchestration subshell can exit with the earliest failure code even when the
+# ERR trap has been temporarily suppressed (e.g. inside loops with || true guards).
 function JStep () {
     typeset name="${1:?}"; shift
     typeset -i t0=$SECONDS rc=0
@@ -472,6 +546,8 @@ function JStep () {
     else
         printf 'FAIL\t%s\t%d\tFailed (rc=%d); see mtv-n-parallel-diagnostics/\n' \
             "${name}" "${elapsed}" "${rc}" >> "${junitFile}"
+        # Preserve the first nonzero rc so the subshell can exit with it.
+        (( cclmStepRc == 0 )) && cclmStepRc=${rc} || true
     fi
     return "${rc}"
 }
@@ -555,6 +631,21 @@ typeset -i cclmStepRc=0
     done
 
     # ---- Phase 2: Parallel forward migration (spoke-1 → spoke-2) ----
+    # Create one dedicated NetworkMap + StorageMap per plan, then submit all Plans and Migrations.
+    for (( _p = 1; _p <= planCount; _p++ )); do
+        JStep "Leg1 Plan ${_p}: Apply NetworkMap (spoke-1 → spoke-2)" \
+            ApplyNetworkMap "${MTV_PLAN_NAME_PREFIX}-${_p}-netmap" \
+                "${MTV_SOURCE_PROVIDER}" "${MTV_DEST_PROVIDER}"
+        JStep "Leg1 Plan ${_p}: Apply StorageMap (spoke-1 → spoke-2)" \
+            ApplyStorageMap "${MTV_PLAN_NAME_PREFIX}-${_p}-stormap" \
+                "${MTV_SOURCE_PROVIDER}" "${MTV_DEST_PROVIDER}"
+    done
+    for (( _p = 1; _p <= planCount; _p++ )); do
+        JStep "Leg1 Plan ${_p}: NetworkMap Ready" \
+            WaitMapReady networkmap "${MTV_PLAN_NAME_PREFIX}-${_p}-netmap"
+        JStep "Leg1 Plan ${_p}: StorageMap Ready" \
+            WaitMapReady storagemap "${MTV_PLAN_NAME_PREFIX}-${_p}-stormap"
+    done
     # Create all Plans first, then wait for Ready, then submit all Migrations back-to-back.
     for (( _p = 1; _p <= planCount; _p++ )); do
         typeset -i _vmStart=$(( (_p - 1) * vmsPerPlan + 1 ))
@@ -562,7 +653,7 @@ typeset -i cclmStepRc=0
         JStep "Leg1 Plan ${_p}: Apply Plan (spoke-1 → spoke-2)" \
             ApplyPlan "${MTV_PLAN_NAME_PREFIX}-${_p}" \
                 "${MTV_SOURCE_PROVIDER}" "${MTV_DEST_PROVIDER}" \
-                "${MTV_NETWORK_MAP_NAME}" "${MTV_STORAGE_MAP_NAME}" \
+                "${MTV_PLAN_NAME_PREFIX}-${_p}-netmap" "${MTV_PLAN_NAME_PREFIX}-${_p}-stormap" \
                 "${_vmStart}" "${_vmEnd}"
     done
     for (( _p = 1; _p <= planCount; _p++ )); do
@@ -594,13 +685,28 @@ typeset -i cclmStepRc=0
     done
 
     # ---- Phase 5: Parallel return migration (spoke-2 → spoke-1) ----
+    # Create one dedicated NetworkMap + StorageMap per return plan, then submit all Plans and Migrations.
+    for (( _p = 1; _p <= planCount; _p++ )); do
+        JStep "Leg2 Plan ${_p}-return: Apply NetworkMap (spoke-2 → spoke-1)" \
+            ApplyNetworkMap "${MTV_PLAN_NAME_PREFIX}-${_p}-return-netmap" \
+                "${MTV_DEST_PROVIDER}" "${MTV_SOURCE_PROVIDER}"
+        JStep "Leg2 Plan ${_p}-return: Apply StorageMap (spoke-2 → spoke-1)" \
+            ApplyStorageMap "${MTV_PLAN_NAME_PREFIX}-${_p}-return-stormap" \
+                "${MTV_DEST_PROVIDER}" "${MTV_SOURCE_PROVIDER}"
+    done
+    for (( _p = 1; _p <= planCount; _p++ )); do
+        JStep "Leg2 Plan ${_p}-return: NetworkMap Ready" \
+            WaitMapReady networkmap "${MTV_PLAN_NAME_PREFIX}-${_p}-return-netmap"
+        JStep "Leg2 Plan ${_p}-return: StorageMap Ready" \
+            WaitMapReady storagemap "${MTV_PLAN_NAME_PREFIX}-${_p}-return-stormap"
+    done
     for (( _p = 1; _p <= planCount; _p++ )); do
         typeset -i _vmStart=$(( (_p - 1) * vmsPerPlan + 1 ))
         typeset -i _vmEnd=$(( _vmStart + vmsPerPlan - 1 ))
         JStep "Leg2 Plan ${_p}-return: Apply Plan (spoke-2 → spoke-1)" \
             ApplyPlan "${MTV_PLAN_NAME_PREFIX}-${_p}-return" \
                 "${MTV_DEST_PROVIDER}" "${MTV_SOURCE_PROVIDER}" \
-                "${MTV_RETURN_NETWORK_MAP_NAME}" "${MTV_RETURN_STORAGE_MAP_NAME}" \
+                "${MTV_PLAN_NAME_PREFIX}-${_p}-return-netmap" "${MTV_PLAN_NAME_PREFIX}-${_p}-return-stormap" \
                 "${_vmStart}" "${_vmEnd}"
     done
     for (( _p = 1; _p <= planCount; _p++ )); do
@@ -633,12 +739,16 @@ typeset -i cclmStepRc=0
                     "plan/${MTV_PLAN_NAME_PREFIX}-${_p}-return"
                     "migration/${MTV_MIGRATION_NAME_PREFIX}-${_p}"
                     "migration/${MTV_MIGRATION_NAME_PREFIX}-${_p}-return"
+                    "networkmap/${MTV_PLAN_NAME_PREFIX}-${_p}-netmap"
+                    "storagemap/${MTV_PLAN_NAME_PREFIX}-${_p}-stormap"
+                    "networkmap/${MTV_PLAN_NAME_PREFIX}-${_p}-return-netmap"
+                    "storagemap/${MTV_PLAN_NAME_PREFIX}-${_p}-return-stormap"
                 )
             done
-            HubOc get "${_allRes[@]}" -n "${MTV_NAMESPACE}"
+            HubOc get "${_allRes[@]}" -n "${MTV_NAMESPACE}" | SanitizeDiagnosticOutput
         } > "${ARTIFACT_DIR}/mtv-n-parallel-status.txt" 2>&1 || true
     fi
-    true
+    exit "${cclmStepRc}"
 ) || cclmStepRc=$?
 
 WriteJunit
