@@ -1,0 +1,61 @@
+base_images:
+  ocp_5-0_cli:
+    name: "5.0"
+    namespace: ocp
+    tag: cli
+  openshift-tests:
+    name: "5.0"
+    namespace: ocp
+    tag: tests
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-5.0
+images:
+  items:
+  - dockerfile_literal: |
+      # Stage 1: Build quay-tests extension binary
+      FROM src AS extension-builder
+      RUN make build && gzip -c quay-tests > quay-tests-ext.gz
+
+      # Stage 2: Create composite container
+      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+      # Copy openshift-tests from base image
+      COPY --from=openshift-tests /usr/bin/openshift-tests /usr/bin/openshift-tests
+      RUN chmod +x /usr/bin/openshift-tests
+
+      # Copy quay-tests extension binary (compressed)
+      COPY --from=extension-builder /go/src/github.com/quay/quay-tests/quay-tests-ext.gz /usr/bin/quay-tests-ext.gz
+
+      # Copy test scripts
+      COPY --from=extension-builder /go/src/github.com/quay/quay-tests/scripts /usr/share/quay-tests/scripts
+
+      # Set working directory
+      WORKDIR /usr/share/quay-tests
+
+      # Default entrypoint
+      ENTRYPOINT ["/usr/bin/openshift-tests"]
+      CMD ["--help"]
+    from: ocp_5-0_cli
+    inputs:
+      openshift-tests:
+        as:
+        - openshift-tests
+      src:
+        as:
+        - src
+    to: opp-interop-tests
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: ote-composite
