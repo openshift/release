@@ -1,0 +1,21 @@
+chain:
+  as: rosa-gather-hcp-guest-artifacts
+  steps:
+  - ref: rosa-gather-guest-kubeconfig
+  - ref: gather-must-gather
+  - ref: gather-extra
+  - ref: rosa-e2e-ocm-fvt-clean
+  documentation: |-
+    OCM FVT post chain for ROSA HCP guest debug artifacts then cleanup (ROSAENG-67965):
+    - rosa-gather-guest-kubeconfig: export guest kubeconfig to SHARED_DIR
+    - gather-must-gather / gather-extra: standard OCP guest collection
+      (pod logs including --previous, node journals, Multus, must-gather)
+    - rosa-e2e-ocm-fvt-clean: ocmtest --justClean after gather
+
+    Jobs that use this chain MUST set OCM_FVT_DEFER_CLEAN=true so the test step
+    skips in-workflow CleanClusterByProfile and persists clean state to SHARED_DIR.
+    Without defer, gather runs after destroy and must-gather is empty.
+
+    Kept separate from rosa-gather-hcp-diagnostics so workflows that already
+    include rosa-cluster-deprovision -> gather (rosa-e2e-hcp*) do not hit
+    duplicate step-name registry errors. All steps are best-effort.
