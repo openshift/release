@@ -16,6 +16,14 @@ ref:
       Must match the prep step. "on": pass only if every node recovers with no manual approval
       (RECOVERED_UNATTENDED). "off": pass only if the gap reproduces (client CSRs stay pending,
       GAP_REPRODUCED); the step then approves them by hand so the post steps can gather.
+  - name: SERVING_APPROVER
+    default: "any"
+    documentation: |-
+      NODE_CLIENT_CERT_RECOVERY_TOGGLE=on: which approver must approve every node's post-power-on serving CSR.
+      "machine-approver": reason NodeCSRApprove only, for platforms whose Machines list every name and IP
+      the kubelet asks for (AWS); a serving CSR approved by the recovery approver fails the run, which
+      shows it didn't take over machine-approver's work. "recovery": reason KCMRecoveryApprove only, for
+      platforms where machine-approver can't approve them (agent-installed bare metal). "any": either.
   - name: API_TIMEOUT
     default: "20m"
     documentation: How long to wait for kube-apiserver /readyz after power-on.
@@ -33,7 +41,7 @@ ref:
     with the approver on, every node's post-power-on client CSR must be approved with reason
     KCMRecoveryApprove (nothing else may approve a client CSR, the first control-plane node included,
     before machine-approver restarts), every node must be Ready with a fresh heartbeat, and every
-    node's serving CSR must be approved by machine-approver (NodeCSRApprove). Writes verdict.json,
+    node's serving CSR must be approved by the approver SERVING_APPROVER names, and by nothing else. Writes verdict.json,
     a timeline, CSR/node/Event dumps and a junit result under ${ARTIFACT_DIR}/build-and-ship. On
     failure it approves the pending CSRs by hand before exiting non-zero, so gather steps still work.
     Because the cluster clock now runs SKEW ahead, certificates it issues after power-on are not yet
