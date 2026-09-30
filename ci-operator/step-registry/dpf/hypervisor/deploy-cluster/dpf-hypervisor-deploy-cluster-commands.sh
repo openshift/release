@@ -148,6 +148,16 @@ fi
 scp ${SSH_OPTS} "root@${REMOTE_HOST}:${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}" .
 echo "env.user_${CLUSTER_NAME} copied from bastion"
 
+# Set up secrets from the Vault cluster profile
+echo "Setting up secrets from Vault cluster profile..."
+ssh-keygen -y -f /tmp/id_rsa > "${WORK_DIR}/ssh_key.pub"
+export SSH_KEY="${WORK_DIR}/ssh_key.pub"
+echo "SSH public key derived from private key: ${SSH_KEY}"
+
+cp "${CLUSTER_PROFILE_DIR}/dpf-pull-secret" "${WORK_DIR}/dpf_pull_secret.json"
+export DPF_PULL_SECRET="${WORK_DIR}/dpf_pull_secret.json"
+echo "DPF pull secret copied from Vault cluster profile"
+
 # Handle CI release payload
 if [[ "${DPF_SKIP_CI_PAYLOAD:-false}" == "true" ]]; then
   PAYLOAD_URL=""
@@ -169,15 +179,11 @@ if [[ -n "${PAYLOAD_URL}" ]]; then
   cp "${PULL_SECRET_SRC}" /tmp/pull-secret.json
   oc registry login --to=/tmp/pull-secret.json
 
-  # Place the merged pull secret where env.user expects it
-  set -a
-  # shellcheck source=/dev/null
-  source "env.user_${CLUSTER_NAME}"
-  set +a
-  PS=${OPENSHIFT_PULL_SECRET:-openshift_pull.json}
-  [[ "$PS" = /* ]] && LOCAL_PULL_SECRET="$PS" || LOCAL_PULL_SECRET="${WORK_DIR}/$PS"
-  mkdir -p "$(dirname "${LOCAL_PULL_SECRET}")"
+  # Place the merged pull secret in the writable working directory
+  # (env.user's OPENSHIFT_PULL_SECRET path targets the bastion, not the pod)
+  LOCAL_PULL_SECRET="${WORK_DIR}/openshift_pull.json"
   cp /tmp/pull-secret.json "${LOCAL_PULL_SECRET}"
+  export OPENSHIFT_PULL_SECRET="${LOCAL_PULL_SECRET}"
   echo "Pull secret with CI registry credentials placed at ${LOCAL_PULL_SECRET}"
   rm -f /tmp/pull-secret.json
 fi
@@ -189,12 +195,17 @@ set -a
 # shellcheck source=/dev/null
 source "env.user_${CLUSTER_NAME}"
 set +a
+# Re-apply pod-local overrides that env.user may have clobbered
+[[ -n "${LOCAL_PULL_SECRET:-}" ]] && export OPENSHIFT_PULL_SECRET="${LOCAL_PULL_SECRET}"
+[[ -f "${WORK_DIR}/ssh_key.pub" ]] && export SSH_KEY="${WORK_DIR}/ssh_key.pub"
+[[ -f "${WORK_DIR}/dpf_pull_secret.json" ]] && export DPF_PULL_SECRET="${WORK_DIR}/dpf_pull_secret.json"
 make generate-env
 echo ".env file generated successfully"
 
 # Set LIBVIRT_HOST for remote VM management from the Prow pod
-echo "LIBVIRT_HOST=${REMOTE_HOST}" >> .env
-echo "Added LIBVIRT_HOST=${REMOTE_HOST} to .env"
+# Include user since the pod runs as UID 1000, not root
+echo "LIBVIRT_HOST=root@${REMOTE_HOST}" >> .env
+echo "Added LIBVIRT_HOST=root@${REMOTE_HOST} to .env"
 
 # Update KUBECONFIG to local path
 sed -i "s|KUBECONFIG=.*|KUBECONFIG=${WORK_DIR}/kubeconfig-mno|" .env
