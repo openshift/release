@@ -27,6 +27,15 @@ if [[ -n "${ODF_OPERATOR_CHANNEL}" ]]; then
   sed -i "/^    name: odf-operator$/a\\    channel: ${ODF_OPERATOR_CHANNEL}" "${odfPolicyFile}"
   grep -A5 'name: odf-operator' "${odfPolicyFile}"
 fi
+
+# Remove the local-cluster exclusion from the clusters placement so
+# SecuredCluster policies can target local-cluster.  In OPP single-
+# cluster test environments local-cluster is the only managed cluster,
+# and the default NotIn rule prevents the SecuredCluster CR from being
+# created — causing stackrox-opp-readiness to timeout.
+sed -i '/local-cluster.*NotIn/d' \
+  ../policygenerator/policy-sets/stable/openshift-plus/input/clusters-placement.yaml
+
 echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
 
 # openshift-plus generates ~25 policies; require 4+ before oc wait to avoid
