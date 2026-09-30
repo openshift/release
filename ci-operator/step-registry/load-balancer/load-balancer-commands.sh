@@ -184,3 +184,5 @@ EOF
 $SCP_CMD ${LB_USER}@${LB_HOST}:/tmp/load-balancer.tar.gz ${ARTIFACT_DIR}
 
 echo "Load balancer was deployed and artifacts are available in ${ARTIFACT_DIR}/load-balancer.tar.gz"
+
+# dummy commit to trigger a new build
