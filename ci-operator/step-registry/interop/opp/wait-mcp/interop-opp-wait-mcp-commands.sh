@@ -210,8 +210,11 @@ mcList="$(oc get machineconfig --sort-by=.metadata.creationTimestamp -o custom-c
 echo "${mcList}" | tail -10
 
 typeset -i startSeconds=${SECONDS}
-typeset -i deadline=$(( SECONDS + mcpWaitTimeout ))
 typeset -i effectiveTimeout=${mcpWaitTimeout}
+if (( effectiveTimeout > maxTimeout )); then
+    effectiveTimeout=${maxTimeout}
+fi
+typeset -i deadline=$(( SECONDS + effectiveTimeout ))
 typeset -i consecutivePasses=0
 
 echo "Polling MCPs for up to ${mcpWaitTimeout}s (need ${consecutiveRequired} consecutive clean polls)..."
@@ -288,12 +291,16 @@ else:
             if IsReadyCountProgressing; then
                 typeset -i proposedDeadline=$(( deadline + progressExtension ))
                 typeset -i maxDeadline=$(( startSeconds + maxTimeout ))
-                if (( proposedDeadline <= maxDeadline )); then
+                if (( proposedDeadline > maxDeadline )); then
+                    proposedDeadline=${maxDeadline}
+                fi
+                if (( proposedDeadline > deadline )); then
+                    typeset -i appliedExtension=$(( proposedDeadline - deadline ))
                     deadline=${proposedDeadline}
                     effectiveTimeout=$(( deadline - startSeconds ))
                     (( extensionsApplied += 1 )) || true
                     pollsSinceLastExtension=0
-                    echo "Progress detected: extending deadline by ${progressExtension}s (total wait now ${effectiveTimeout}s/${maxTimeout}s max, extension #${extensionsApplied})"
+                    echo "Progress detected: extending deadline by ${appliedExtension}s (total wait now ${effectiveTimeout}s/${maxTimeout}s max, extension #${extensionsApplied})"
                 else
                     echo "Progress detected but max timeout ${maxTimeout}s would be exceeded — no further extensions"
                 fi
