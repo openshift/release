@@ -254,7 +254,7 @@ tests:
 
         echo "=== Enable PSI (Pressure Stall Information) via MachineConfig ==="
 
-        echo "Step 1: Apply MachineConfig to enable PSI on worker, master, and infra nodes..."
+        echo "Step 1: Apply MachineConfig to enable PSI on worker and master nodes..."
         oc apply -f - <<'EOF'
         apiVersion: v1
         kind: List
@@ -277,24 +277,18 @@ tests:
           spec:
             kernelArguments:
             - psi=1
-        - apiVersion: machineconfiguration.openshift.io/v1
-          kind: MachineConfig
-          metadata:
-            labels:
-              machineconfiguration.openshift.io/role: infra
-            name: 99-psi-enabled-infra
-          spec:
-            kernelArguments:
-            - psi=1
         EOF
         echo "MachineConfigs applied."
 
-        echo "Step 2: Wait for MachineConfigPools to finish rolling out..."
+        echo "Step 2: Wait for MachineConfigPools to start updating..."
+        oc wait mcp worker master --for condition=Updating=True --timeout=5m || true
+
+        echo "Step 3: Wait for MachineConfigPools to finish rolling out..."
         echo "This may take up to 30 minutes as nodes are rebooted one by one."
-        oc wait mcp worker master infra --for condition=Updated --timeout=30m
+        oc wait mcp worker master --for condition=Updated=True --timeout=30m
         echo "MachineConfigPools are Updated."
 
-        echo "Step 3: Verify PSI is enabled on worker nodes..."
+        echo "Step 4: Verify PSI is enabled on worker nodes..."
         WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers -o name | head -1)
         if [[ -n "${WORKER_NODE}" ]]; then
           PSI_CHECK=$(oc debug "${WORKER_NODE}" -- cat /proc/cmdline 2>/dev/null | grep -o "psi=1" || true)

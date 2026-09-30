@@ -280,7 +280,7 @@ tests:
         OS_IMAGE_URL="quay.io/openshift-release-dev/ocp-v5.0-art-dev@sha256:e3695daa29b639d4f8f79707f14b24bd146f0161ad5143d5b2c6ee4e1e67a7fb"
 
         echo "=== Applying MachineConfigs to overlay RHEL 9 image via osImageURL ==="
-        for ROLE in worker master infra; do
+        for ROLE in worker master; do
           echo "Creating MachineConfig os-layer-custom-${ROLE} for role ${ROLE}..."
           oc apply -f - <<MCEOF
         apiVersion: machineconfiguration.openshift.io/v1
@@ -294,9 +294,12 @@ tests:
         MCEOF
         done
 
-        echo "=== MachineConfigs applied, waiting for cluster stability ==="
-        oc adm wait-for-stable-cluster --minimum-stable-period 5m
-        echo "=== Cluster is stable after RHEL 9 image overlay ==="
+        echo "=== MachineConfigs applied, waiting for MCPs to start updating ==="
+        oc wait mcp worker master --for condition=Updating=True --timeout=5m || true
+
+        echo "=== Waiting for MachineConfigPools to finish rolling out ==="
+        oc wait mcp worker master --for condition=Updated=True --timeout=30m
+        echo "=== MachineConfigPools are Updated after RHEL 9 image overlay ==="
       from: cli
       resources:
         requests:
@@ -380,7 +383,7 @@ tests:
 
         echo "=== Enable PSI (Pressure Stall Information) via MachineConfig ==="
 
-        echo "Step 1: Apply MachineConfig to enable PSI on worker, master, and infra nodes..."
+        echo "Step 1: Apply MachineConfig to enable PSI on worker and master nodes..."
         oc apply -f - <<'EOF'
         apiVersion: v1
         kind: List
@@ -403,24 +406,18 @@ tests:
           spec:
             kernelArguments:
             - psi=1
-        - apiVersion: machineconfiguration.openshift.io/v1
-          kind: MachineConfig
-          metadata:
-            labels:
-              machineconfiguration.openshift.io/role: infra
-            name: 99-psi-enabled-infra
-          spec:
-            kernelArguments:
-            - psi=1
         EOF
         echo "MachineConfigs applied."
 
-        echo "Step 2: Wait for MachineConfigPools to finish rolling out..."
+        echo "Step 2: Wait for MachineConfigPools to start updating..."
+        oc wait mcp worker master --for condition=Updating=True --timeout=5m || true
+
+        echo "Step 3: Wait for MachineConfigPools to finish rolling out..."
         echo "This may take up to 30 minutes as nodes are rebooted one by one."
-        oc wait mcp worker master infra --for condition=Updated --timeout=30m
+        oc wait mcp worker master --for condition=Updated=True --timeout=30m
         echo "MachineConfigPools are Updated."
 
-        echo "Step 3: Verify PSI is enabled on worker nodes..."
+        echo "Step 4: Verify PSI is enabled on worker nodes..."
         WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers -o name | head -1)
         if [[ -n "${WORKER_NODE}" ]]; then
           PSI_CHECK=$(oc debug "${WORKER_NODE}" -- cat /proc/cmdline 2>/dev/null | grep -o "psi=1" || true)
