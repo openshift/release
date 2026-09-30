@@ -64,11 +64,13 @@ elif [[ -n "${ECO_HWACCEL_NEURON_DRA_DRIVER_IMAGE:-}" && -n "${ECO_HWACCEL_NEURO
     BUILDER_TOKEN=$(oc -n "${NEURON_NAMESPACE}" create token builder --duration=24h)
     oc -n "${NEURON_NAMESPACE}" delete secret "${ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET}" \
         --ignore-not-found >/dev/null
-    oc -n "${NEURON_NAMESPACE}" create secret docker-registry \
+    printf '%s' "${BUILDER_TOKEN}" | jq -Rs \
+        --arg registry image-registry.openshift-image-registry.svc:5000 \
+        '{auths: {($registry): {username: "builder", password: rtrimstr("\n")}}}' | \
+        oc -n "${NEURON_NAMESPACE}" create secret generic \
         "${ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET}" \
-        --docker-server=image-registry.openshift-image-registry.svc:5000 \
-        --docker-username=builder \
-        --docker-password="${BUILDER_TOKEN}" \
+        --type=kubernetes.io/dockerconfigjson \
+        --from-file=.dockerconfigjson=/dev/stdin \
         --dry-run=client -o yaml | oc apply -f - >/dev/null
     unset BUILDER_TOKEN
     echo "Created short-lived Neuron image repository secret ${ECO_HWACCEL_NEURON_IMAGE_REPO_SECRET}"
