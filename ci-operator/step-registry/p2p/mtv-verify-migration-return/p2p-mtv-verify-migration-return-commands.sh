@@ -43,6 +43,8 @@ typeset sshUser="${MTV_VM_SSH_USER}"
 typeset virtctlBin="" sshKeyFile="" sshReady=false
 typeset migrationSuffix="${MTV_MIGRATION_SUFFIX:-}"
 typeset diagDir=""
+typeset pvcCheck="${MTV_PVC_CHECK:-true}"
+typeset rootdiskSize="${MTV_VM_ROOTDISK_SIZE:-}"
 
 (( vmCount >= 1 )) \
   || { printf 'ERROR: MTV_TEST_VM_COUNT must be a positive integer (got: %s)\n' "${MTV_TEST_VM_COUNT}" >&2; false; }
@@ -62,19 +64,45 @@ function VmName () {
   true
 }
 
+# OcWithRedactedStderr — run a command with stdout unchanged and stderr passed through
+# RedactOutput. Always uses /tmp (never TMPDIR/ARTIFACT_DIR) so unredacted oc errors
+# cannot be collected as CI artifacts. xtrace is disabled so kubeconfig paths and
+# command lines are not logged. A temp file is used instead of 2> >(RedactOutput >&2)
+# because process substitution races under command substitution ($(...)).
+function OcWithRedactedStderr () {
+  typeset _wasTracing=''
+  [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+  set +x
+
+  typeset _errFile
+  _errFile="$(mktemp /tmp/oc-stderr.XXXXXX)"
+  typeset -i _rc=0
+  "$@" 2>"${_errFile}" || _rc=$?
+  if [[ -s "${_errFile}" ]]; then
+    RedactOutput < "${_errFile}" >&2 || true
+  fi
+  rm -f "${_errFile}"
+
+  if [[ "${_wasTracing}" == "true" ]]; then
+    set -x
+  fi
+  return "${_rc}"
+}
+
 # HubOc — run oc against the ACM hub.
 function HubOc () {
-  oc --kubeconfig="${KUBECONFIG}" "$@"
+  OcWithRedactedStderr oc --kubeconfig="${KUBECONFIG}" "$@"
 }
 
 # SourceOc — run oc against the source spoke.
 function SourceOc () {
-  oc --kubeconfig="${sourceKubeconfig}" "$@"
+  OcWithRedactedStderr oc --kubeconfig="${sourceKubeconfig}" "$@"
 }
 
-# DestOc — run oc against the destination spoke.
+# DestOc — run oc against the destination spoke. stderr is redacted so API-server
+# URLs and IPs from connection errors cannot reach public CI logs.
 function DestOc () {
-  oc --kubeconfig="${destKubeconfig}" "$@"
+  OcWithRedactedStderr oc --kubeconfig="${destKubeconfig}" "$@"
 }
 
 # ResolveSpokeKubeconfigs — source and destination spoke admin kubeconfigs.
@@ -135,11 +163,16 @@ function DumpDiagnostics () {
   for (( k = 1; k <= vmCount; k++ )); do
     typeset vn
     vn="$(VmName "${k}")"
+    # custom-columns omits VMI IP and node name (default printer includes both).
     SourceOc get "virtualmachine/${vn}" "virtualmachineinstance/${vn}" \
-      -n "${MTV_TEST_VM_NAMESPACE}" 2>&1 \
+      -n "${MTV_TEST_VM_NAMESPACE}" \
+      -o custom-columns=KIND:.kind,NAME:.metadata.name,PHASE:.status.phase \
+      2>&1 \
       | RedactOutput > "${diagDir}/source-vm-${vn}.txt" || true
     DestOc get "virtualmachine/${vn}" "virtualmachineinstance/${vn}" \
-      -n "${targetNs}" 2>&1 \
+      -n "${targetNs}" \
+      -o custom-columns=KIND:.kind,NAME:.metadata.name,PHASE:.status.phase \
+      2>&1 \
       | RedactOutput > "${diagDir}/dest-vm-${vn}.txt" || true
   done
   { SourceOc get vmim -n "${MTV_TEST_VM_NAMESPACE}" -o json | jq "${vmimFilter}"; } 2>&1 \
@@ -171,8 +204,8 @@ function VmimPhase () {
   typeset ns="${1:?}"; (($#)) && shift
   typeset vmName="${1:?}"; (($#)) && shift
 
-  oc --kubeconfig="${kc}" get vmim -n "${ns}" -o json \
-    | jq -r --arg vm "${vmName}" \
+  OcWithRedactedStderr oc --kubeconfig="${kc}" get vmim -n "${ns}" -o json \
+    | OcWithRedactedStderr jq -r --arg vm "${vmName}" \
       'first(.items[] | select(.spec.vmiName == $vm) | .status.phase) // ""'
 }
 
@@ -312,7 +345,7 @@ function InstallVirtctl () {
   ( set +x
     typeset host
     host="$(DestOc get route hyperconverged-cluster-cli-download -n "${MTV_CNV_NAMESPACE}" \
-      -o jsonpath='{.spec.host}' 2>/dev/null)" || exit 1
+      -o jsonpath='{.spec.host}')" || exit 1
     [[ -n "${host}" ]] || exit 1
     curl -kfsSL "https://${host}/amd64/linux/virtctl.tar.gz" | tar -xz -C "${binDir}"
   ) || return 1
@@ -327,7 +360,7 @@ function PrepareSshAccess () {
     printf 'ERROR: VM SSH key %s not found in SHARED_DIR\n' "${MTV_VM_SSH_KEY_NAME}" >&2
     return 1
   }
-  sshKeyFile="${TMPDIR:-/tmp}/cclm-verify-ssh-key"
+  sshKeyFile="/tmp/cclm-verify-ssh-key-$$"
   install -m 0600 "${srcKey}" "${sshKeyFile}" || return 1
   [[ -w "${HOME:-/}" ]] || export HOME="${TMPDIR:-/tmp}"
   EnsurePasswdEntry || return 1
@@ -355,7 +388,7 @@ function VmSsh () {
 # VmSshChecked — VmSsh, logging the (redacted) tail of stderr on failure.
 function VmSshChecked () {
   typeset vmName="${1:?}"
-  typeset errFile="${TMPDIR:-/tmp}/cclm-verify-ssh-err"
+  typeset errFile="/tmp/cclm-verify-ssh-err-$$"
   typeset -i rc=0
   VmSsh "$@" 2>"${errFile}" || rc=$?
   if (( rc != 0 )); then
@@ -375,7 +408,7 @@ function WaitDestSshReady () {
   fi
   PrepareSshAccess || return 1
 
-  typeset errFile="${TMPDIR:-/tmp}/cclm-verify-ssh-err"
+  typeset errFile="/tmp/cclm-verify-ssh-err-$$"
   typeset -i i deadline=$(( SECONDS + sshWaitSeconds ))
   for (( i = 1; i <= vmCount; i++ )); do
     typeset vmName; vmName="$(VmName "${i}")"
@@ -472,7 +505,7 @@ function CollectDestLaunchers () {
 
     # Strategy 1: kubevirt.io/domain label equals VM name.
     pod="$(printf '%s' "${podsJson}" \
-      | jq -r --arg d "${vmn}" \
+      | OcWithRedactedStderr jq -r --arg d "${vmn}" \
         'first(.items[]
          | select(.metadata.labels["kubevirt.io/domain"]==$d)
          | select(.status.phase=="Running")
@@ -482,7 +515,7 @@ function CollectDestLaunchers () {
     # Strategy 2: pod name prefix fallback (post-CCLM pods may lack the domain label).
     if [[ -z "${pod}" ]]; then
       pod="$(printf '%s' "${podsJson}" \
-        | jq -r --arg n "${vmn}" \
+        | OcWithRedactedStderr jq -r --arg n "${vmn}" \
           'first(.items[]
            | select(.metadata.name | startswith("virt-launcher-" + $n + "-"))
            | select(.status.phase=="Running")
@@ -559,6 +592,123 @@ function VerifyGuestNetwork () {
   (( failed == 0 ))
 }
 
+# VerifyPvcAttachment — verify the destination VM spec references the expected rootdisk PVC as a
+# volume. Guards against Forklift silently detaching the PVC from the VM spec during migration
+# while the VMI still appears Running (the VM would fail to restart after a pod crash).
+# Skipped (rc=77) when MTV_PVC_CHECK=false.
+function VerifyPvcAttachment () {
+  [[ "${pvcCheck}" == "true" ]] || return 77
+
+  # Disable xtrace: VM JSON may contain internal node hostnames and IP addresses
+  # that must not appear in CI logs via xtrace variable-expansion tracing.
+  typeset _wasTracing=''
+  [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+  set +x
+
+  typeset -i _rc=0
+  {
+    typeset -i i failed=0
+    for (( i = 1; i <= vmCount; i++ )); do
+      typeset vmName; vmName="$(VmName "${i}")"
+      typeset expectedPvc="${vmName}-rootdisk"
+      typeset -i attached=0
+
+      # Fetch VM separately so an API/missing-VM error is reported with its real cause,
+      # not misreported as "PVC not attached".
+      typeset vmJson
+      vmJson="$(DestOc get "virtualmachine/${vmName}" -n "${targetNs}" -o json)" || {
+        printf 'ERROR: Cannot read VM %s on destination\n' "${vmName}" >&2
+        (( ++failed ))
+        continue
+      }
+
+      # jq -e exits 1 when any() returns false. stdout discarded (boolean only).
+      # jq stderr is redacted so a parse error cannot dump VM JSON (IPs/hostnames)
+      # into CI logs. []? tolerates a VM spec with no volumes field.
+      if printf '%s' "${vmJson}" | OcWithRedactedStderr jq -e --arg pvc "${expectedPvc}" \
+          'any(.spec.template.spec.volumes[]?;
+            .dataVolume.name==$pvc or .persistentVolumeClaim.claimName==$pvc)' \
+        1>/dev/null; then
+        attached=1
+      fi
+
+      if (( attached == 0 )); then
+        printf 'ERROR: VM %s on destination does not have PVC %s attached as a volume\n' \
+          "${vmName}" "${expectedPvc}" >&2
+        (( ++failed ))
+      fi
+    done
+    (( failed == 0 ))
+  } || _rc=$?
+
+  if [[ "${_wasTracing}" == "true" ]]; then
+    set -x
+  fi
+  return "${_rc}"
+}
+
+# VerifyPvcIntegrity — verify the rootdisk PVC on the destination is Bound and, when
+# MTV_VM_ROOTDISK_SIZE is set, that the requested storage size is preserved. The observed
+# capacity is logged for human review in all cases.
+# Skipped (rc=77) when MTV_PVC_CHECK=false.
+function VerifyPvcIntegrity () {
+  [[ "${pvcCheck}" == "true" ]] || return 77
+
+  # Disable xtrace: PVC JSON may contain storage-provider annotations and internal
+  # metadata fields that must not appear in CI logs via xtrace variable-expansion tracing.
+  typeset _wasTracing=''
+  [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+  set +x
+
+  typeset -i _rc=0
+  {
+    typeset -i i failed=0
+    for (( i = 1; i <= vmCount; i++ )); do
+      typeset vmName; vmName="$(VmName "${i}")"
+      typeset pvcName="${vmName}-rootdisk"
+
+      typeset pvcJson
+      # DestOc redacts oc stderr (URLs/IPs). Do not use 2>/dev/null — NotFound and
+      # auth/network errors must still appear in CI logs after redaction.
+      pvcJson="$(DestOc get "pvc/${pvcName}" -n "${targetNs}" -o json)" || {
+        printf 'ERROR: PVC %s not found or unreadable on destination for VM %s\n' "${pvcName}" "${vmName}" >&2
+        (( ++failed ))
+        continue
+      }
+
+      # Phase check — PVC must be Bound.
+      typeset phase
+      phase="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '.status.phase // ""')"
+      if [[ "${phase}" != "Bound" ]]; then
+        printf 'ERROR: PVC %s on destination has phase=%s, expected Bound\n' "${pvcName}" "${phase}" >&2
+        (( ++failed ))
+      fi
+
+      # Log observed capacity for human review; not a failure if it differs (provisioners may round up).
+      # Use printf >&2 (not : "...") — the null-command is invisible inside set +x and produces no output.
+      typeset capacityStr
+      capacityStr="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '.status.capacity.storage // ""')"
+      printf 'INFO: PVC %s status.capacity.storage=%s\n' "${pvcName}" "${capacityStr:-<empty>}" >&2
+
+      # Size check — compare spec.resources.requests.storage when MTV_VM_ROOTDISK_SIZE is set.
+      if [[ -n "${rootdiskSize}" ]]; then
+        typeset requestedSize
+        requestedSize="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '.spec.resources.requests.storage // ""')"
+        if [[ "${requestedSize}" != "${rootdiskSize}" ]]; then
+          printf 'ERROR: PVC %s requested storage=%s, expected %s (MTV_VM_ROOTDISK_SIZE)\n' \
+            "${pvcName}" "${requestedSize}" "${rootdiskSize}" >&2
+          (( ++failed ))
+        fi
+      fi
+    done
+    (( failed == 0 ))
+  } || _rc=$?
+
+  if [[ "${_wasTracing}" == "true" ]]; then
+    set -x
+  fi
+  return "${_rc}"
+}
 
 # JStep — run a function, append PASS/FAIL/SKIP record to junitFile, propagate exit code.
 # rc=0: PASS — check executed and succeeded.
@@ -657,6 +807,8 @@ typeset -i verifyStepRc=0
   JStep "Verification: VM Data Integrity" VerifyVmDataIntegrity || _rc=$?
   JStep "Verification: Guest Disk I/O" VerifyGuestDiskIo || _rc=$?
   JStep "Verification: Guest Network Reachability" VerifyGuestNetwork || _rc=$?
+  JStep "Verification: PVC Attachment" VerifyPvcAttachment || _rc=$?
+  JStep "Verification: PVC Integrity" VerifyPvcIntegrity || _rc=$?
   exit "${_rc}"
 ) || verifyStepRc=$?
 
