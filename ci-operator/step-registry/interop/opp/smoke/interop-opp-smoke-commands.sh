@@ -142,8 +142,9 @@ CollectExitArtifacts() {
 
 # shellcheck disable=SC2317
 _propagate_junit () {
+    # BASH_SOURCE[0] = this file's basename for JUnit prefix; $0 fallback for direct execution
     local _step_prefix
-    _step_prefix="$(basename "${BASH_SOURCE[1]:-$0}" .sh | sed 's/-commands$//')"
+    _step_prefix="$(basename "${BASH_SOURCE[0]:-$0}" .sh)"
     find "${ARTIFACT_DIR}" -name '*.xml' -print0 2>/dev/null | while IFS= read -r -d '' _xf; do
         cp "${_xf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_xf}")" 2>/dev/null || true
     done
