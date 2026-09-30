@@ -47,8 +47,13 @@ elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNE
 then
   CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
 else
-  CNV_RELEASE_CHANNEL=nightly-$(ocp_version)
-  CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:$(ocp_version)
+  if [ "${CNV_PRERELEASE_LATEST_CHANNEL}" == "true" ]; then
+    cnv_version=4.99
+  else
+    cnv_version=$(ocp_version)
+  fi
+  CNV_RELEASE_CHANNEL=nightly-${cnv_version}
+  CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:${cnv_version}
 fi
 
 # The kubevirt tests require wildcard routes to be allowed
