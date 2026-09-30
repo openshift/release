@@ -1,0 +1,29 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.23
+prowgen:
+  enable_secrets_store_csi_driver: true
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: validate
+  commands: |
+    unset GOFLAGS
+    export HOME=/tmp
+    export GOBIN=/tmp/bin
+    export PATH=$PATH:/tmp/bin
+    make all yaml-lint
+    git diff --exit-code
+    test -z "$(git ls-files --others --exclude-standard)"
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-rhobs-rules

@@ -1,0 +1,25 @@
+workflow:
+  as: cluster-resource-override-s390x
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    test:
+    - chain: cluster-resource-override-s390x-test
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: cluster-resource-override-s390x-cleanup
+    - ref: upi-libvirt-cleanup-post
+  documentation: |-
+    End-to-end workflow for the ClusterResourceOverride operator on s390x (IBM Z).
+    Provisions an OCP cluster on the VPN'd IBM Z CI environment using the same
+    UPI/libvirt pre and post steps as openshift-e2e-libvirt-vpn, installs the
+    ClusterResourceOverride operator via OLM (with optional ImageDigestMirrorSet
+    image source changes), creates the ClusterResourceOverride CR, then runs the
+    test step. Gather runs before component cleanup so failure forensics are
+    preserved, then the cluster is deprovisioned.

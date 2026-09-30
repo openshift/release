@@ -1,0 +1,32 @@
+workflow:
+  as: rosa-operator-e2e-workflow
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: ""
+    pre:
+      - chain: rosa-aws-sts-provision
+      - ref: rosa-cluster-wait-ready-nodes
+      - ref: rosa-operator-install
+    test:
+      - ref: rosa-operator-e2e
+    post:
+      - ref: rosa-operator-cleanup
+      - chain: rosa-aws-sts-deprovision
+  documentation: |-
+    Provisions a ROSA Classic STS cluster, installs an operator via PKO
+    ClusterPackage, runs the operator e2e tests, cleans up, then deprovisions.
+
+    Required env vars per operator:
+      OPERATOR_NAME: short name (e.g. route-monitor-operator)
+
+    Optional overrides:
+      OPERATOR_DEPLOYMENT_NAME: defaults to OPERATOR_NAME
+      OPERATOR_NAMESPACE: defaults to openshift-OPERATOR_NAME
+      OPERATOR_CRDS: comma-separated CRDs to preserve across reinstall
+      GINKGO_FOCUS: filter to specific test suite
+
+    Required dependencies:
+      OPERATOR_IMAGE: pipeline:<operator-image-name>
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko

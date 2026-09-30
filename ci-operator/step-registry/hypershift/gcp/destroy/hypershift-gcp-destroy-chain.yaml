@@ -1,0 +1,47 @@
+chain:
+  as: hypershift-gcp-destroy
+  steps:
+  - as: destroy
+    cli: latest
+    commands: |-
+      set -exuo pipefail
+
+      if [[ ! -f "${SHARED_DIR}/cluster-name" ]]; then
+          echo "WARNING: cluster-name not found — create step may not have completed. Skipping destroy."
+          exit 0
+      fi
+
+      CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
+
+      # Fail fast if the management cluster API is not reachable (e.g. token
+      # expired, network issue). Without this check, `hypershift destroy`
+      # would spin for the entire --cluster-grace-period (40m) retrying errors.
+      # Use --request-timeout to avoid hanging indefinitely on an unreachable server.
+      if ! oc get hostedcluster "${CLUSTER_NAME}" -n clusters --request-timeout=10s &>/dev/null; then
+          echo "WARNING: Cannot access API server (HostedCluster/${CLUSTER_NAME} in clusters). Skipping destroy."
+          echo "The deprovision step will clean up via GCP project deletion."
+          exit 0
+      fi
+
+      echo "$(date) Deleting GCP HyperShift cluster ${CLUSTER_NAME}"
+      bin/hypershift destroy cluster gcp \
+        --name "${CLUSTER_NAME}" \
+        --namespace clusters \
+        --cluster-grace-period 40m
+      echo "$(date) Finished deleting cluster"
+    from: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 45m0s
+    best_effort: true
+  documentation: |-
+    Destroys a GCP HostedCluster by deleting the HostedCluster CR and
+    waiting for finalizers to complete.
+
+    The underlying GCP infrastructure (VPC, WIF, projects) is cleaned up
+    separately by hypershift-gcp-gke-deprovision via project deletion.
+
+    Reads cluster-name from SHARED_DIR (saved by hypershift-gcp-create).

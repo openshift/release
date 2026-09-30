@@ -1,0 +1,108 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: karpenter-operator
+promotion:
+  to:
+  - name: "5.1"
+    namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  karpenter-operator:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  verify:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|\.mdc$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_GATES: '["KarpenterOperator=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|\.mdc$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_GATES: '["KarpenterOperator=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-hypershift
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      ENABLE_STANDALONE_KARPENTER_OPERATOR: "true"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_PLAN: |
+        name: autonode-standalone-ko
+        platform: aws
+        testMatrix:
+          parallel:
+          - name: karpenter
+            variant: karpenter
+            labelFilter: karpenter
+    workflow: hypershift-aws-e2e-v2
+- as: verify
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make verify
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|\.mdc$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: karpenter-operator

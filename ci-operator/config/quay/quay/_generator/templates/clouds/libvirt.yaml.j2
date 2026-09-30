@@ -1,0 +1,19 @@
+base_images:
+  libvirt-installer:
+    name: "{{ ocp_version }}"
+    namespace: ocp
+    tag: libvirt-installer
+tests:
+- capabilities:
+  - intranet
+  timeout: 8h0m0s
+  steps:
+    env:
+      BRANCH: "{{ ocp_version }}"
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post

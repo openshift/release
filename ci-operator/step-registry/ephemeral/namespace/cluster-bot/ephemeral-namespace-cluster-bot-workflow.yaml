@@ -1,0 +1,24 @@
+workflow:
+  as: ephemeral-namespace-cluster-bot
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: ephemeral-namespace-reserve
+    post:
+    - ref: ephemeral-namespace-release
+    test:
+    - ref: clusterbot-wait
+    env:
+      BONFIRE_NAMESPACE_DURATION: "4h"
+      CLUSTER_DURATION: "14400"
+  documentation: |-
+    ClusterBot workflow for on-demand ephemeral namespace provisioning
+    via Slack. Reserves a namespace from the consoledot ephemeral
+    cluster using bonfire, keeps it alive for the configured duration,
+    then releases it back to the pool.
+
+    Usage in Slack:
+      workflow-launch ephemeral-namespace-cluster-bot <version>
+
+    The reserved namespace details (name, kubeconfig, server URL)
+    are written to SHARED_DIR and returned to the user in Slack.
