@@ -30,3 +30,15 @@ webhooks:
     - key: "ci.openshift.io/gpu-scheduling-webhook"
       operator: DoesNotExist
       values: []
+  matchConditions:
+  - name: requests-gpu
+    expression: >-
+      object.spec.containers.exists(c,
+        has(c.resources) &&
+        ((has(c.resources.requests) && 'nvidia.com/gpu' in c.resources.requests) ||
+         (has(c.resources.limits) && 'nvidia.com/gpu' in c.resources.limits))) ||
+      (has(object.spec.initContainers) &&
+       object.spec.initContainers.exists(c,
+         has(c.resources) &&
+         ((has(c.resources.requests) && 'nvidia.com/gpu' in c.resources.requests) ||
+          (has(c.resources.limits) && 'nvidia.com/gpu' in c.resources.limits))))
