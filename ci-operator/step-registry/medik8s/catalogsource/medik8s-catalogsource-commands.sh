@@ -122,7 +122,7 @@ main() {
         resolve_commit_sha
         verify_fbc_image
         apply_idms
-        CATALOG_IMAGE="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
+        CATALOG_IMAGE="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_IMAGE_TAG:-$FBC_COMMIT_SHA}"
     fi
 
     ensure_marketplace
@@ -133,6 +133,7 @@ main() {
     echo "${CATALOG_IMAGE}" > "${SHARED_DIR}/catalog_image"
     if [[ "$CATALOG_MODE" != "direct" ]]; then
         echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_commit_sha"
+        echo "${FBC_IMAGE_TAG:-$FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_image_tag"
         log "=== Done. Commit SHA exported to \${SHARED_DIR}/rhwa_fbc_commit_sha ==="
     else
         log "=== Done. CatalogSource ${CATALOG_SOURCE_NAME} is READY ==="
