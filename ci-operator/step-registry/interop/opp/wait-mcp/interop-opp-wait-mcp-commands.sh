@@ -286,10 +286,11 @@ else:
         # extend the deadline to avoid timing out on slow-but-healthy rollouts.
         if (( pollsSinceLastExtension >= extensionCheckInterval )); then
             if IsReadyCountProgressing; then
-                typeset -i totalElapsed=$(( SECONDS - startSeconds ))
-                if (( totalElapsed + progressExtension <= maxTimeout )); then
-                    deadline=$(( SECONDS + progressExtension ))
-                    effectiveTimeout=$(( totalElapsed + progressExtension ))
+                typeset -i proposedDeadline=$(( deadline + progressExtension ))
+                typeset -i maxDeadline=$(( startSeconds + maxTimeout ))
+                if (( proposedDeadline <= maxDeadline )); then
+                    deadline=${proposedDeadline}
+                    effectiveTimeout=$(( deadline - startSeconds ))
                     (( extensionsApplied += 1 )) || true
                     pollsSinceLastExtension=0
                     echo "Progress detected: extending deadline by ${progressExtension}s (total wait now ${effectiveTimeout}s/${maxTimeout}s max, extension #${extensionsApplied})"
