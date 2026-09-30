@@ -27,29 +27,26 @@ fi
 [[ -r "${KUBECONFIG}" ]]
 
 typeset mchNs="" mchName="" localCluster=""
+typeset -i waitTimeoutSeconds=0
 
-# ParseDurationSeconds — convert an oc-style duration (e.g. 2h, 15m, 90s) to seconds.
+# ParseDurationSeconds — convert an oc-style duration (e.g. 2h, 15m, 90s, 1h30m, 1h0m0s) to seconds.
 function ParseDurationSeconds () {
     typeset duration="${1:?}"; (($#)) && shift
-    if [[ "${duration}" =~ ^([0-9]+)h$ ]]; then
-        printf '%d' $(( BASH_REMATCH[1] * 3600 ))
-    elif [[ "${duration}" =~ ^([0-9]+)m$ ]]; then
-        printf '%d' $(( BASH_REMATCH[1] * 60 ))
-    elif [[ "${duration}" =~ ^([0-9]+)s$ ]]; then
-        printf '%d' "${BASH_REMATCH[1]}"
-    else
+    if [[ ! "${duration}" =~ ^(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?$ || -z "${duration}" ]]; then
         printf 'ERROR: unrecognised duration %s\n' "${duration}" >&2
         return 1
     fi
+    printf '%d' $(( ${BASH_REMATCH[2]:-0} * 3600 + ${BASH_REMATCH[4]:-0} * 60 + ${BASH_REMATCH[6]:-0} ))
 }
 
 # ResolveMultiClusterHub — locate the single MultiClusterHub and the hub's self-managed cluster.
 function ResolveMultiClusterHub () {
-    typeset mchJson
-    mchJson="$(oc get multiclusterhub -A -o json)"
-    (( $(jq '.items | length' <<<"${mchJson}") == 1 ))
-    mchNs="$(jq -r '.items[0].metadata.namespace' <<<"${mchJson}")"
-    mchName="$(jq -r '.items[0].metadata.name' <<<"${mchJson}")"
+    typeset -a mchRefsArr=()
+    mapfile -t mchRefsArr < <(oc get multiclusterhub -A \
+        -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}')
+    (( ${#mchRefsArr[@]} == 1 ))
+    read -r mchNs mchName <<<"${mchRefsArr[0]}"
+    [[ -n "${mchNs}" && -n "${mchName}" ]]
 
     localCluster="$(oc get managedcluster -l local-cluster=true \
         -o jsonpath='{.items[0].metadata.name}')"
@@ -91,6 +88,9 @@ function WaitMtvAddonAvailable () {
 
 # WaitForkliftController — ACM-applied ForkliftController reconciled with CCLM enabled.
 function WaitForkliftController () {
+    oc wait crd/forkliftcontrollers.forklift.konveyor.io --for=create --timeout="${P2P_ACM_MTV_WAIT_TIMEOUT}"
+    oc wait crd/forkliftcontrollers.forklift.konveyor.io --for=condition=Established \
+        --timeout="${P2P_ACM_MTV_WAIT_TIMEOUT}"
     oc -n "${MTV_INSTALL_NAMESPACE}" wait "forkliftcontroller/${MTV_FORKLIFT_CONTROLLER_NAME}" \
         --for=create --timeout="${P2P_ACM_MTV_WAIT_TIMEOUT}"
     oc -n "${MTV_INSTALL_NAMESPACE}" wait "deployment/${MTV_FORKLIFT_CONTROLLER_NAME}" \
@@ -111,7 +111,7 @@ function WaitForkliftController () {
 function WaitControllerLiveMigrationEnv () {
     typeset -i deadline
     typeset envVal=""
-    deadline=$(( SECONDS + $(ParseDurationSeconds "${P2P_ACM_MTV_WAIT_TIMEOUT}") ))
+    deadline=$(( SECONDS + waitTimeoutSeconds ))
 
     while (( SECONDS < deadline )); do
         envVal="$(oc -n "${MTV_INSTALL_NAMESPACE}" get "deployment/${MTV_FORKLIFT_CONTROLLER_NAME}" \
@@ -133,7 +133,7 @@ function WaitControllerLiveMigrationEnv () {
 function WaitPlanWebhookServing () {
     typeset -i deadline
     typeset svcNs ready=""
-    deadline=$(( SECONDS + $(ParseDurationSeconds "${P2P_ACM_MTV_WAIT_TIMEOUT}") ))
+    deadline=$(( SECONDS + waitTimeoutSeconds ))
 
     oc wait "validatingwebhookconfiguration/${MTV_PLAN_WEBHOOK_CONFIG_NAME}" --for=create \
         --timeout="${P2P_ACM_MTV_WAIT_TIMEOUT}"
@@ -153,20 +153,26 @@ function WaitPlanWebhookServing () {
 }
 
 # DumpDiagnostics — MCH, add-on, and MTV state to ARTIFACT_DIR (best-effort).
+# ARTIFACT_DIR is public: write allowlisted status fields only, never raw objects.
 function DumpDiagnostics () {
     [[ -n "${ARTIFACT_DIR}" ]] || return 0
     typeset diagDir="${ARTIFACT_DIR}/acm-mtv-integration-diagnostics"
     mkdir -p "${diagDir}"
-    [[ -n "${mchNs}" ]] && oc -n "${mchNs}" get "multiclusterhub/${mchName}" -o yaml \
-        > "${diagDir}/multiclusterhub.yaml" 2>&1 || true
+    [[ -n "${mchNs}" ]] && oc -n "${mchNs}" get "multiclusterhub/${mchName}" -o json |
+        jq '{components: .spec.overrides.components, phase: .status.phase,
+             conditions: [.status.conditions[]? | {type, status, reason, message}]}' \
+        > "${diagDir}/multiclusterhub-status.json" 2>&1 || true
     oc get clustermanagementaddon > "${diagDir}/clustermanagementaddons.txt" 2>&1 || true
-    [[ -n "${localCluster}" ]] && oc -n "${localCluster}" get managedclusteraddon -o yaml \
-        > "${diagDir}/local-cluster-addons.yaml" 2>&1 || true
+    [[ -n "${localCluster}" ]] && oc -n "${localCluster}" get managedclusteraddon -o json |
+        jq '[.items[] | {name: .metadata.name,
+             conditions: [.status.conditions[]? | {type, status, reason, message}]}]' \
+        > "${diagDir}/local-cluster-addons-status.json" 2>&1 || true
     oc get operatorpolicy -A > "${diagDir}/operatorpolicies.txt" 2>&1 || true
     oc -n "${MTV_INSTALL_NAMESPACE}" get subscription,csv,forkliftcontroller,deploy,pods \
         > "${diagDir}/mtv-install-namespace.txt" 2>&1 || true
 }
 
+waitTimeoutSeconds="$(ParseDurationSeconds "${P2P_ACM_MTV_WAIT_TIMEOUT}")"
 ResolveMultiClusterHub
 
 # errexit is ignored inside a subshell used as the left side of ||, so capture $? separately.

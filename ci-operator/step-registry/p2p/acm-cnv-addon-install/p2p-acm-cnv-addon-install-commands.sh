@@ -41,7 +41,7 @@ typeset -a spokeNamesArr=()
 # AcmObjName — deterministic DNS-safe name for an ACM view/action/work object.
 function AcmObjName () {
     typeset prefix="${1:?}"; (($#)) && shift
-    printf '%s-%s' "${prefix}" "$(printf '%s|' "$@" | sha1sum | cut -c1-16)"
+    printf '%s-%s' "${prefix}" "$(printf '%s|' "$@" | sha256sum | cut -c1-16)"
 }
 
 # McvGet — evaluate a jq filter against one object on a managed cluster via ManagedClusterView.
@@ -184,14 +184,17 @@ function RecordCnvVersion () {
 }
 
 # DumpDiagnostics — hub-side add-on and policy state (best-effort).
+# ARTIFACT_DIR is public: write allowlisted status fields only, never raw objects.
 function DumpDiagnostics () {
     [[ -n "${ARTIFACT_DIR}" ]] || return 0
     typeset diagDir="${ARTIFACT_DIR}/acm-cnv-addon-diagnostics" cluster
+    typeset -r condFilter='{name: .metadata.name, conditions: [.status.conditions[]? | {type, status, reason, message}]}'
     mkdir -p "${diagDir}"
-    oc get "clustermanagementaddon/${CNV_ADDON_NAME}" -o yaml > "${diagDir}/cma.yaml" 2>&1 || true
+    oc get "clustermanagementaddon/${CNV_ADDON_NAME}" -o json | jq "${condFilter}" \
+        > "${diagDir}/cma-status.json" 2>&1 || true
     for cluster in "${spokeNamesArr[@]}"; do
-        oc -n "${cluster}" get "managedclusteraddon/${CNV_ADDON_NAME}" -o yaml \
-            > "${diagDir}/${cluster}-addon.yaml" 2>&1 || true
+        oc -n "${cluster}" get "managedclusteraddon/${CNV_ADDON_NAME}" -o json | jq "${condFilter}" \
+            > "${diagDir}/${cluster}-addon-status.json" 2>&1 || true
         oc -n "${cluster}" get manifestwork -o custom-columns=NAME:.metadata.name,APPLIED:.status.conditions[0].status \
             > "${diagDir}/${cluster}-manifestworks.txt" 2>&1 || true
         McvGet "${cluster}" hco.kubevirt.io v1beta1 HyperConverged "${CNV_NAMESPACE}" "${CNV_HCO_NAME}" \
