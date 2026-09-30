@@ -476,6 +476,7 @@ TestQuayPull() {
 
     # Find the Quay registry route
     typeset quayRoute=""
+    set +x  # suppress xtrace — route hostnames are sensitive
     if ! quayRoute="$(oc get routes --all-namespaces -o json | jq -r '
         .items[]
         | select(.metadata.name | test("quay"; "i"))
@@ -484,14 +485,17 @@ TestQuayPull() {
     ' | head -1)"; then
         : "Route query failed, trying QuayRegistry CR..."
     fi
+    set -x
 
     if [[ -z "${quayRoute}" ]]; then
         # Try looking for QuayRegistry CR to find the route
+        set +x  # suppress xtrace — registry endpoint URLs are sensitive
         if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json | jq -r '
             .items[0].status.registryEndpoint // empty
         ' | sed 's|^https://||')"; then
             : "QuayRegistry CR query failed"
         fi
+        set -x
     fi
 
     if [[ -z "${quayRoute}" ]]; then
@@ -521,9 +525,11 @@ TestQuayPull() {
     # Attempt to pull the Quay health endpoint (API check instead of image pull
     # since we may not have registry credentials configured)
     typeset httpCode=""
+    set +x  # suppress xtrace — URL contains route hostname
     if ! httpCode="$(curl -sk -o /dev/null -w '%{http_code}' "https://${quayRoute}/api/v1/discovery" --max-time 30)"; then
         httpCode=""
     fi
+    set -x
 
     if [[ "${httpCode}" =~ ^(200|401|403)$ ]]; then
         : "PASS: Quay registry responding (HTTP ${httpCode}) at ${quayRoute}"
