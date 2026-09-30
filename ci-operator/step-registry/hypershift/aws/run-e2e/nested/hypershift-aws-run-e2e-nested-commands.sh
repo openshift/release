@@ -111,7 +111,11 @@ export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${E2E_AWS_CREDENTIALS_FILE}"
 export E2E_AWS_PRIVATE_REGION="${HYPERSHIFT_AWS_REGION}"
 if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-false}" == "true" ]]; then
   export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-  if [[ -f "${SHARED_DIR}/aws-region" ]]; then
+  if [[ -n "${AWS_REGION_OVERWRITE:-}" ]]; then
+    echo "AWS region override found. Using ${AWS_REGION_OVERWRITE}."
+    E2E_AWS_PRIVATE_REGION="${AWS_REGION_OVERWRITE}"
+    E2E_AWS_REGION="${E2E_AWS_PRIVATE_REGION}"
+  elif [[ -f "${SHARED_DIR}/aws-region" ]]; then
     echo "Region override found. Using it."
     E2E_AWS_PRIVATE_REGION="$(cat "${SHARED_DIR}/aws-region")"
     E2E_AWS_REGION="${E2E_AWS_PRIVATE_REGION}"
