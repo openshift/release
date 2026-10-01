@@ -2,6 +2,13 @@
 
 set -euo pipefail
 
+if [[ "${ENABLE_NAP:-}" == "true" && -n "${NAP_SKU_NAMES:-}" ]]; then
+    if [[ ! "${NAP_SKU_NAMES}" =~ ^Standard_[A-Za-z0-9_]+(,Standard_[A-Za-z0-9_]+)*$ ]]; then
+        echo "NAP_SKU_NAMES must be comma-separated Standard_ SKU names containing only letters, digits, and underscores" >&2
+        exit 1
+    fi
+fi
+
 # Azure CLI does not consistently retry DNS and lower-level transport failures.
 # Keep direct retries scoped to safe repeats. AKS and node-pool creates remain
 # single-shot because repeating them after an ambiguous response is unsafe.
@@ -267,6 +274,14 @@ if [[ "${ENABLE_NAP:-}" == "true" ]]; then
         done
     fi
 
+    NAP_SKU_SELECTOR="family"
+    NAP_SKU_VALUES="            - \"${NAP_SKU_FAMILY:-D}\""
+    if [[ -n "${NAP_SKU_NAMES:-}" ]]; then
+        NAP_SKU_SELECTOR="name"
+        IFS=',' read -ra NAP_SKU_ARRAY <<< "${NAP_SKU_NAMES}"
+        NAP_SKU_VALUES=$(printf '            - "%s"\n' "${NAP_SKU_ARRAY[@]}")
+    fi
+
     NODEPOOL_YAML=$(cat <<EOF
 apiVersion: karpenter.sh/v1
 kind: NodePool
@@ -293,10 +308,10 @@ spec:
           operator: In
           values:
             - on-demand
-        - key: karpenter.azure.com/sku-family
+        - key: karpenter.azure.com/sku-${NAP_SKU_SELECTOR}
           operator: In
           values:
-            - "${NAP_SKU_FAMILY:-D}"
+${NAP_SKU_VALUES}
         - key: karpenter.azure.com/sku-cpu
           operator: In
           values:
