@@ -89,6 +89,9 @@ git -C "${TESTS_DIR}" fetch -q --depth 1 "${TESTS_OSC_REPO}" "${TESTS_OSC_REPO_R
     || git -C "${TESTS_DIR}" fetch -q "${TESTS_OSC_REPO}" "${TESTS_OSC_REPO_REF}" 2>/dev/null \
     || { echo "ERROR: failed to fetch ref ${TESTS_OSC_REPO_REF}; verify TESTS_OSC_REPO and TESTS_OSC_REPO_REF"; exit 1; }
 git -C "${TESTS_DIR}" checkout -q FETCH_HEAD
+# Record the commit actually used: the default ref tracks a moving branch, so
+# this is what tells a later reader whether the tests changed between runs.
+echo "Tests commit: $(git -C "${TESTS_DIR}" rev-parse HEAD)"
 cd "${TESTS_DIR}/test/e2e"
 
 # --- Run the golang (Ginkgo v2) e2e tests ------------------------------------

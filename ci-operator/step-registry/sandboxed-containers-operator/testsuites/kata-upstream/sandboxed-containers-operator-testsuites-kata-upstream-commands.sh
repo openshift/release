@@ -121,6 +121,9 @@ git -C "${RUNNER_DIR}" fetch -q --depth 1 "${RUNNER_REPO}" "${RUNNER_REPO_REF}" 
     || git -C "${RUNNER_DIR}" fetch -q "${RUNNER_REPO}" "${RUNNER_REPO_REF}" 2>/dev/null \
     || { echo "ERROR: failed to fetch ref ${RUNNER_REPO_REF}; verify TESTS_KATA_UPSTREAM_RUNNER_REPO and TESTS_KATA_UPSTREAM_RUNNER_REPO_REF"; exit 1; }
 git -C "${RUNNER_DIR}" checkout -q FETCH_HEAD
+# Record the commit actually used: the default ref tracks a moving branch, so
+# this is what tells a later reader whether the runner changed between runs.
+echo "Runner commit: $(git -C "${RUNNER_DIR}" rev-parse HEAD)"
 
 # --- Run the upstream test runner --------------------------------------------
 # The runner writes per-suite JUnit under ${RESULTS_DIR}/<timestamp>/.
