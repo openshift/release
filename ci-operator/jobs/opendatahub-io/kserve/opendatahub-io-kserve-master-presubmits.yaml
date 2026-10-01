@@ -23,6 +23,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-opendatahub
@@ -138,6 +139,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-opendatahub
@@ -253,6 +255,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-opendatahub
@@ -368,6 +371,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-opendatahub
@@ -483,6 +487,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-opendatahub
@@ -598,6 +603,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -666,6 +672,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -779,6 +786,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -892,6 +900,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1004,6 +1013,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1117,6 +1127,7 @@ presubmits:
       - python/storage-initializer.Dockerfile
       - python/success_200_isvc.Dockerfile
       - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1207,3 +1218,117 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )pr-image-mirror-kserve-storage-initializer,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build07
+    context: ci/prow/test-selector-unit
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+      - agent.Dockerfile
+      - kserve-module-controller.Dockerfile
+      - llmisvc-controller.Dockerfile
+      - localmodel-agent.Dockerfile
+      - localmodel.Dockerfile
+      - python/custom_model_grpc.Dockerfile
+      - python/custom_transformer.Dockerfile
+      - python/error_404_isvc.Dockerfile
+      - python/sklearn.Dockerfile
+      - python/storage-initializer.Dockerfile
+      - python/success_200_isvc.Dockerfile
+      - router.Dockerfile
+      - tools/test_selector/gatekeeper/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-kserve-master-test-selector-unit
+    rerun_command: /test test-selector-unit
+    run_if_changed: ^tools/test_selector/
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-selector-unit
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )test-selector-unit,?($|\s.*)
