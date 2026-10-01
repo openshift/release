@@ -43,11 +43,23 @@ ref:
       before the step is killed. Headroom above the ~40m happy path absorbs the
       occasional CreateContainerError guest-pull flake on burstable pod VMs,
       each of which can burn ~20m before its assessment deadline fires.
+  - name: TESTS_CAA_RUNNER_REPO
+    default: "https://github.com/openshift/sandboxed-containers-operator"
+    documentation: |-
+      Repository providing test/e2e/run_caa_tests.sh. Point this at a fork to
+      try out runner changes before they merge. Distinct from TESTS_CAA_REPO,
+      which selects the CAA tests the runner drives.
+  - name: TESTS_CAA_RUNNER_REPO_REF
+    default: "devel"
+    documentation: |-
+      Branch, tag or full commit SHA of TESTS_CAA_RUNNER_REPO to check out. Set
+      it to a release branch (e.g. osc-release-v1.10) to run that release's
+      runner, or to a tag/SHA to pin the suite against drift on devel.
   documentation: |-
     Run the upstream cloud-api-adaptor (CAA) e2e tests.
 
-    The step clones the openshift/sandboxed-containers-operator repository
-    (devel branch) to obtain test/e2e/run_caa_tests.sh and executes it.
+    The step fetches test/e2e/run_caa_tests.sh from TESTS_CAA_RUNNER_REPO (by
+    default openshift/sandboxed-containers-operator at devel) and executes it.
 
     Cloud credentials for the test provisioner are sourced from the ci-operator
     cluster profile: the step reads the static service principal

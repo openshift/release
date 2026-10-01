@@ -42,10 +42,10 @@ EOF
 fi
 
 # --- Configuration -----------------------------------------------------------
-# The upstream test runner lives in the operator repo. We always run the
-# runner from the development branch.
-OPERATOR_REPO="https://github.com/openshift/sandboxed-containers-operator"
-OPERATOR_REF="devel"
+# Where run_upstream_tests.sh comes from. Defaults live in the ref so a job can
+# point the suite at a fork, a release branch or a pinned commit.
+RUNNER_REPO="${TESTS_KATA_UPSTREAM_RUNNER_REPO:-https://github.com/openshift/sandboxed-containers-operator}"
+RUNNER_REPO_REF="${TESTS_KATA_UPSTREAM_RUNNER_REPO_REF:-devel}"
 
 # User-facing parameters (see the ref for defaults/documentation). They follow
 # the TESTS_<SUITE_NAME>_<PARAMETER> convention shared by all OSC test suites:
@@ -106,17 +106,28 @@ for tool in oc kubectl git bats yq jq envsubst; do
     command -v "${tool}" >/dev/null 2>&1 || { echo "ERROR: required tool '${tool}' not found on PATH"; exit 1; }
 done
 
-# --- Fetch the operator repo (hosts the runner, setup and manifests) ---------
-OPERATOR_DIR="$(mktemp -d /tmp/osc-XXXXXX)"
-echo "Cloning ${OPERATOR_REPO} (${OPERATOR_REF})"
-git clone --depth 1 -b "${OPERATOR_REF}" "${OPERATOR_REPO}" "${OPERATOR_DIR}"
+# --- Fetch the runner repo (hosts the runner, setup and manifests) -----------
+# fetch+checkout instead of `clone -b` so TESTS_KATA_UPSTREAM_RUNNER_REPO_REF
+# accepts a branch, a tag or a full commit SHA. The shallow fetch covers all
+# three on github.com; the retry unshallows for servers that refuse
+# fetch-by-SHA. A user-supplied repo URL may embed credentials, so log the ref
+# only. Stderr is suppressed on fetch: git writes the full URL to stderr on
+# failure, which would leak internal hostnames or embedded credentials into CI
+# logs.
+RUNNER_DIR="$(mktemp -d /tmp/osc-XXXXXX)"
+echo "Fetching runner repo (ref ${RUNNER_REPO_REF})"
+git init -q "${RUNNER_DIR}"
+git -C "${RUNNER_DIR}" fetch -q --depth 1 "${RUNNER_REPO}" "${RUNNER_REPO_REF}" 2>/dev/null \
+    || git -C "${RUNNER_DIR}" fetch -q "${RUNNER_REPO}" "${RUNNER_REPO_REF}" 2>/dev/null \
+    || { echo "ERROR: failed to fetch ref ${RUNNER_REPO_REF}; verify TESTS_KATA_UPSTREAM_RUNNER_REPO and TESTS_KATA_UPSTREAM_RUNNER_REPO_REF"; exit 1; }
+git -C "${RUNNER_DIR}" checkout -q FETCH_HEAD
 
 # --- Run the upstream test runner --------------------------------------------
 # The runner writes per-suite JUnit under ${RESULTS_DIR}/<timestamp>/.
 RESULTS_DIR="$(mktemp -d /tmp/kata-results-XXXXXX)"
 export RESULTS_DIR
 
-RUNNER="${OPERATOR_DIR}/test/e2e/run_upstream_tests.sh"
+RUNNER="${RUNNER_DIR}/test/e2e/run_upstream_tests.sh"
 runner_args=(-t "${TEST_PROFILE}")
 [[ -n "${TESTS_REPO}" ]]     && runner_args+=(--tests-repo "${TESTS_REPO}")
 [[ -n "${TESTS_REPO_REF}" ]] && runner_args+=(--tests-repo-ref "${TESTS_REPO_REF}")
