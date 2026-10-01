@@ -2,7 +2,7 @@
 set -o nounset -o errexit -o
 
 # Variables
-GLOBAL_DEADLINE=$(( $(date +%s) + 1200 ))         # 20 minutes global timebox
+GLOBAL_DEADLINE=$(( $(date +%s) + 1800 ))         # 30 minutes: registry wait + ACPI + API recovery
 SKIP_HOST_SSH=0
 
 # Logging
@@ -71,6 +71,95 @@ wait_for_image_registry_stable() {
 }
 
 
+wait_for_api_after_degradation() {
+  local deadline=$(( "$(date +%s)" + 600 ))
+  if [[ ${GLOBAL_DEADLINE} -lt ${deadline} ]]; then
+    deadline=${GLOBAL_DEADLINE}
+  fi
+  local stable_required=5
+  local stable_count=0
+
+  log "Waiting for API after node degradation (need ${stable_required} consecutive /healthz ok)..."
+
+  while [[ "$(date +%s)" -lt ${deadline} ]]; do
+    if oc get --raw=/healthz --request-timeout=10s >/dev/null 2>&1; then
+      stable_count=$((stable_count + 1))
+      log "API /healthz ok (${stable_count}/${stable_required} consecutive)"
+      if [[ ${stable_count} -ge ${stable_required} ]]; then
+        log "API considered recovered after node degradation."
+        return 0
+      fi
+    else
+      log "API /healthz not ready (resetting stable counter)."
+      stable_count=0
+    fi
+
+    sleep 10
+  done
+
+  log "ERROR: API did not recover after degrading node"
+  return 1
+}
+
+# TODO(OCPBUGS-111074): temporary until the node-lifecycle carry is in the
+# payload (False->Unknown MarkPodsNotReady and
+# seeding nodeHealthMap before pod workers). Remove taint_shutdown_node_out_of_service
+# and wait_for_dns_default_ready_only_on_survivor once that fix ships.
+taint_shutdown_node_out_of_service() {
+  local node="master-1"
+  log "Tainting shutdown node ${node} with node.kubernetes.io/out-of-service=nodeshutdown:NoExecute"
+  oc adm taint nodes "${node}" "node.kubernetes.io/out-of-service=nodeshutdown:NoExecute" --overwrite --request-timeout=10s
+}
+
+# Success when dns-default is ready on surviving master-0 and not ready (or
+# absent) on ACPI'd master-1.
+wait_for_dns_default_ready_only_on_survivor() {
+  local deadline=$(( "$(date +%s)" + 300 ))
+  if [[ ${GLOBAL_DEADLINE} -lt ${deadline} ]]; then
+    deadline=${GLOBAL_DEADLINE}
+  fi
+
+  log "Waiting for dns-default EndpointSlice ready on master-0 and not ready on master-1..."
+
+  while [[ "$(date +%s)" -lt ${deadline} ]]; do
+    local out
+    out="$(oc get endpointslices -n openshift-dns -l kubernetes.io/service-name=dns-default \
+      -o jsonpath='{range .items[*].endpoints[*]}{.nodeName}{"\t"}{.conditions.ready}{"\n"}{end}' \
+      --request-timeout=10s 2>/dev/null || true)"
+    log "dns-default EndpointSlice backends:"$'\n'"${out:-<empty>}"
+
+    if [[ -z "${out}" ]]; then
+      log "dns-default EndpointSlice listing empty or unavailable; retrying..."
+      sleep 10
+      continue
+    fi
+
+    local master0_ready=0 master1_ready=0 node ready
+    while IFS=$'\t' read -r node ready; do
+      [[ -z "${node}" ]] && continue
+      case "${ready}" in
+        false|False) continue ;;
+      esac
+      case "${node}" in
+        master-0) master0_ready=1 ;;
+        master-1) master1_ready=1 ;;
+      esac
+    done <<< "${out}"
+
+    if [[ ${master0_ready} -eq 1 && ${master1_ready} -eq 0 ]]; then
+      log "dns-default EndpointSlice ready on master-0 only (master-1 not ready or absent)."
+      return 0
+    fi
+
+    log "dns-default not yet ready-only-on-survivor (master-0 ready=${master0_ready} master-1 ready=${master1_ready}); retrying..."
+    sleep 10
+  done
+
+  log "ERROR: dns-default EndpointSlice did not become ready on master-0 and not ready on master-1"
+  return 1
+}
+
+
 wait_for_image_registry_stable
 
 # Host SSH setup (optional)
@@ -86,7 +175,7 @@ fi
 
 # Degrade master-1 via hypervisor
 if [[ ${SKIP_HOST_SSH} -eq 0 && -n "${IP:-}" ]]; then
-  log "Degrading ostest_master_1 via hypervisor @ ${IP}"
+  log "Degrading master_1 via hypervisor @ ${IP}"
 
   set +e
   timeout -s 9 5m ssh "${SSHOPTS[@]}" root@"${IP}" bash -s << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
@@ -96,12 +185,6 @@ if ! command -v virsh >/dev/null 2>&1; then
   echo "[host] virsh not found, aborting host actions"
   exit 0
 fi
-
-NET="ostestbm"
-echo "[host] DHCP leases (${NET}):"
-virsh -c qemu:///system net-dhcp-leases "${NET}" || true
-
-MASTER0_IP="$(virsh -c qemu:///system net-dhcp-leases "${NET}" 2>/dev/null | awk '/master-0/ {print $5}' | cut -d/ -f1 | head -n1)"
 
 echo "[host] VMs before:"
 virsh -c qemu:///system list --all || true
@@ -120,56 +203,29 @@ st="$(virsh -c qemu:///system domstate ostest_master_1 2>/dev/null || true)"
 
 echo "[host] VMs after:"
 virsh -c qemu:///system list --all || true
-
-# Manual recovery on the surviving node (master-0) WITHOUT disabling stonith.
-# Force-start etcd on the survivor while keeping fencing enabled.
-if [[ -n "${MASTER0_IP:-}" ]]; then
-  echo "[host] Attempting manual recovery on master-0 (${MASTER0_IP}) via pcs debug-stop/debug-start..."
-  timeout 180s ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 \
-    core@"${MASTER0_IP}" << 'PCS_EOF'
-set -euo pipefail
-
-echo "[master-0] pcs status (pre):"
-sudo pcs status || true
-sudo pcs resource status || true
-
-# Break any stuck recovery attempts (best-effort)
-echo "[master-0] debug-stop etcd (best-effort)..."
-sudo pcs resource debug-stop etcd || true
-
-# Wait for etcd ports to be released before restarting.
-# debug-stop uses 'podman stop -t=80' which can take up to ~90s to fully
-# release ports 2379/2380. debug-start's internal port wait is only 60s,
-# so without this explicit wait the start can time out.
-echo "[master-0] waiting for etcd ports 2379/2380 to be released..."
-for _i in $(seq 1 120); do
-  if ! ss -Htan '( sport = 2379 or sport = 2380 )' | grep -q .; then
-    echo "[master-0] etcd ports released after ${_i}s"
-    break
-  fi
-  sleep 1
-done
-
-# Force start etcd on survivor with the notify meta env var required by the RA
-echo "[master-0] debug-start etcd with notify meta env var..."
-sudo OCF_RESKEY_CRM_meta_notify_start_resource='etcd' pcs resource debug-start etcd
-
-# Cleanup so pacemaker re-evaluates state cleanly (best-effort)
-sudo pcs resource cleanup etcd || true
-
-echo "[master-0] pcs status (post):"
-sudo pcs status || true
-sudo pcs resource status || true
-PCS_EOF
-fi
 EOF
   ssh_rc=${PIPESTATUS[0]}
   set -e
 
   if [[ ${ssh_rc} -ne 0 ]]; then
-    log "ERROR: Failed to degrade ostest_master_1 via hypervisor (rc=${ssh_rc})"
+    log "ERROR: Failed to degrade master_1 via hypervisor (rc=${ssh_rc})"
     exit ${ssh_rc}
   fi
+
+  # Leave etcd on the survivor alone. pcs debug-stop/debug-start recycles
+  # kube-apiserver and kube-controller-manager (lease renew fails, process
+  # exits) and races node-lifecycle MarkPodsNotReady. Quorum recovery after
+  # the peer is OFFLINE is the etcd resource agent's job.
+  wait_for_api_after_degradation
+
+  # TODO(OCPBUGS-111074): temporary until the node-lifecycle carry is in the
+  # payload (False->Unknown MarkPodsNotReady and
+  # seeding nodeHealthMap before pod workers). ACPI never emits STONITH, so
+  # TNF does not apply out-of-service itself; without that taint, dns-default
+  # on the dead node can stay Ready and keep a zombie EndpointSlice backend.
+  # Remove this taint and the EndpointSlice wait once that fix ships.
+  taint_shutdown_node_out_of_service
+  wait_for_dns_default_ready_only_on_survivor
 else
   log "Host SSH not attempted (no packet-conf.sh or IP empty)"
 fi
