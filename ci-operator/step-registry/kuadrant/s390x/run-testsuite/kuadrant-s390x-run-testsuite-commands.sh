@@ -1258,6 +1258,28 @@ if p.exists():
         print('egress-bk already present or no backend name')
 PY
 
+# RHCL 1.4.x publishes dataplane traces as Jaeger service wasm-shim.
+# Testsuite 80f962fc+ looks up kuadrant-filter. Match pre-80f962fc (17815b9).
+echo '=== Jaeger lookup kuadrant-filter -> wasm-shim (RHCL 1.4.x) ==='
+python3 - <<'PY' || true
+from pathlib import Path
+files = [
+    Path('testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing.py'),
+    Path('testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing_rate_limit_only.py'),
+]
+old, new = 'service=\"kuadrant-filter\"', 'service=\"wasm-shim\"'
+for p in files:
+    if not p.exists():
+        print('missing', p)
+        continue
+    t = p.read_text()
+    if old not in t:
+        print(p, ': no kuadrant-filter service= (already wasm-shim?)')
+        continue
+    p.write_text(t.replace(old, new))
+    print('patched', p, '-> wasm-shim')
+PY
+
 # CFSSL: Dockerfile.s390x installs /usr/bin/cfssl; re-install if the baked image is older.
 echo '=== Ensuring cfssl is on PATH ==='
 if ! command -v cfssl >/dev/null 2>&1; then

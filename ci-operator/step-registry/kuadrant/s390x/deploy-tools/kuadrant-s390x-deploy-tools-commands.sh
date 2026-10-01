@@ -369,11 +369,10 @@ KUADRANT_NS="${KUADRANT_NAMESPACE:-kuadrant-system}"
 KUADRANT_SUB="${KUADRANT_SUBSCRIPTION_NAME:-rhcl-operator}"
 # Operator traces stay on OTLP gRPC :4317 (control-plane tests already passing).
 JAEGER_COLLECTOR_ENDPOINT="rpc://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4317"
-# OTLP HTTP :4318 — operator logs/metrics and wasm defaultEndpoint experiment.
+# OTLP HTTP :4318 — operator OTEL_EXPORTER_OTLP_ENDPOINT (logs/metrics).
 OTEL_HTTP_ENDPOINT="http://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4318"
-# Kind uses rpc://:4317; last full suite still had no kuadrant-filter spans.
-# Try HTTP for dataplane wasm only; do not change operator TRACES_ENDPOINT.
-WASM_OTLP_ENDPOINT="${OTEL_HTTP_ENDPOINT}"
+# Dataplane wasm / Kuadrant CR defaultEndpoint: gRPC OTLP :4317 (Kind + RHCL docs).
+WASM_OTLP_ENDPOINT="${JAEGER_COLLECTOR_ENDPOINT}"
 
 if oc get kuadrant/kuadrant -n "${KUADRANT_NS}" >/dev/null 2>&1; then
   echo "=== Enabling Kuadrant CR observability (rhcl-mc1 / Kind pattern) ==="
