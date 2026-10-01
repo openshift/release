@@ -59,6 +59,11 @@ tests:
       cli: latest
       commands: |
         export GOFLAGS=''
+        # The deploy target uses `kubectl`, but the `cli: latest` image only
+        # ships `oc`. Make `kubectl` resolve to `oc` (a functional superset).
+        mkdir -p "${HOME}/bin"
+        ln -sf "$(command -v oc)" "${HOME}/bin/kubectl"
+        export PATH="${HOME}/bin:${PATH}"
         make deploy IMG="${OPERATOR_IMAGE}" MCPLO_OPERAND_IMAGE="quay.io/opendatahub/odh-mcp-lifecycle-operator:odh-stable"
         oc -n mcp-lifecycle-module-operator-system rollout status deploy/mcp-lifecycle-module-operator-controller-manager --timeout=5m
         oc apply -f - <<EOF
