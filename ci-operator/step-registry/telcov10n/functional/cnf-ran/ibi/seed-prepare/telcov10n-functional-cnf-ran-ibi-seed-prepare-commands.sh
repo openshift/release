@@ -22,4 +22,5 @@ cd /eco-ci-cd
 ansible-playbook playbooks/ran/ibu-prepare-spoke-sno.yml \
   -i "${INVENTORY_PATH}/build-inventory.py" \
   --extra-vars "hub_cluster=${CLUSTER_NAME}" \
-  --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}"
+  --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}" \
+  --extra-vars "spoke_release_metadata_dir=${SHARED_DIR}"
