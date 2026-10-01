@@ -44,9 +44,18 @@ typeset migrationSuffix="${MTV_MIGRATION_SUFFIX}"
 # When true, clean up stale VM/DV/PVC on the destination before Plan creation.
 # Required for the return leg (destination may still hold the pre-forward-migration VM).
 typeset cleanupDestBeforeMigration="${MTV_CLEANUP_DEST_BEFORE_MIGRATION}"
+# When 0 < MTV_COLD_VM_COUNT < vmCount, start a cold Plan and a live Plan at the
+# same time (disjoint VM sets). MTV warm is not supported for OpenShift sources;
+# live is the running-VM path. The return step uses the same count with
+# *-return-cold Plan/Migration names.
+typeset -i coldVmCount="${MTV_COLD_VM_COUNT:-0}"
+typeset parallelColdLive=false
+(( coldVmCount > 0 && coldVmCount < vmCount )) && parallelColdLive=true
 
 (( vmCount >= 1 )) \
     || { printf 'ERROR: MTV_TEST_VM_COUNT must be a positive integer (got: %s)\n' "${MTV_TEST_VM_COUNT}" >&2; false; }
+(( coldVmCount >= 0 && coldVmCount <= vmCount )) \
+    || { printf 'ERROR: MTV_COLD_VM_COUNT must be 0..%d (got: %d)\n' "${vmCount}" "${coldVmCount}" >&2; false; }
 
 # Temp file accumulating tab-separated JUnit records (PASS/FAIL/WARN\tname\telapsed\t[msg]).
 typeset -r junitFile="${TMPDIR:-/tmp}/cclm${migrationSuffix}-junit-$$.tsv"
@@ -63,7 +72,7 @@ function VmName () {
     if (( vmCount == 1 )); then
         printf '%s' "${MTV_TEST_VM_NAME}"
     else
-        printf 'test-vm-%d' "${idx}"
+        printf '%s-%d' "${P2P_HS_SPOKE_VM_PREFIX:-test-vm}" "${idx}"
     fi
     true
 }
@@ -191,7 +200,10 @@ function PreflightSourceVm () {
         phase="$(SourceOc get "virtualmachineinstance/${vmName}" -n "${MTV_TEST_VM_NAMESPACE}" \
             -o jsonpath='{.status.phase}' || true)"
 
-        if [[ "${MTV_PLAN_TYPE}" == "live" ]]; then
+        if [[ "${MTV_PLAN_TYPE}" == "live" && "${parallelColdLive}" != "true" ]]; then
+            [[ "${phase}" == "Running" ]] \
+                || { : "VMI ${vmName} not Running on source (phase=${phase})"; false; }
+        elif [[ "${parallelColdLive}" == "true" && "${i}" -gt "${coldVmCount}" ]]; then
             [[ "${phase}" == "Running" ]] \
                 || { : "VMI ${vmName} not Running on source (phase=${phase})"; false; }
         fi
@@ -360,9 +372,10 @@ function MaybePreflightSubmarinerNoGlobalnet () {
 function MigrationPipelinePhase () {
     typeset vmName="${1:?}"; (($#)) && shift
     typeset stepName="${1:?}"; (($#)) && shift
+    typeset migName="${1:-${MTV_MIGRATION_NAME}}"
     typeset migJson phase
 
-    migJson="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" -o json || true)"
+    migJson="$(HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" -o json || true)"
     [[ -n "${migJson}" ]] || return 0
 
     phase="$(jq -r --arg vm "${vmName}" --arg step "${stepName}" \
@@ -389,15 +402,17 @@ function VmimPhase () {
 # Checks ALL VMs every poll; shared timer starts when the first VM enters Running
 # and resets when no VM is in Running sync (i.e., all have advanced past it).
 function CheckSyncStuck () {
-    typeset -i i anyRunning=0
+    typeset migName="${1:-${MTV_MIGRATION_NAME}}"
+    typeset -i i anyRunning=0 iStart=1
     typeset syncPhase vmName
 
-    [[ "${MTV_PLAN_TYPE}" != "live" ]] && return 0
+    [[ "${MTV_PLAN_TYPE}" != "live" && "${parallelColdLive}" != "true" ]] && return 0
     (( syncStuckMinutes > 0 )) || return 0
+    [[ "${parallelColdLive}" == "true" ]] && iStart=$((coldVmCount + 1))
 
-    for (( i = 1; i <= vmCount; i++ )); do
+    for (( i = iStart; i <= vmCount; i++ )); do
         vmName="$(VmName "${i}")"
-        syncPhase="$(MigrationPipelinePhase "${vmName}" "Synchronization")"
+        syncPhase="$(MigrationPipelinePhase "${vmName}" "Synchronization" "${migName}")"
         [[ "${syncPhase}" == "Running" ]] || continue
 
         (( anyRunning++ )) || true
@@ -443,6 +458,44 @@ function RefreshProvidersForLivePlan () {
         --for=condition=Ready --timeout="${MTV_PROVIDER_INVENTORY_REFRESH_WAIT}"
 }
 
+# StopSourceVms — power off all source VMs before a cold Plan.
+# Patches runStrategy=Halted, waits for VMI deletion, confirms printableStatus=Stopped.
+# No-op for live plans. Idempotent if VMs are already Halted.
+function StopSourceVms () {
+    typeset -i i from=1 to="${vmCount}"
+    typeset vmName vmStatus
+    typeset -i wMax=600
+
+    if [[ "${parallelColdLive}" == "true" ]]; then
+        to="${coldVmCount}"
+    elif [[ "${MTV_PLAN_TYPE}" != "cold" ]]; then
+        return 0
+    fi
+
+    for (( i = from; i <= to; i++ )); do
+        vmName="$(VmName "${i}")"
+        SourceOc get "virtualmachine/${vmName}" -n "${MTV_TEST_VM_NAMESPACE}" 1>/dev/null
+        SourceOc patch "virtualmachine/${vmName}" -n "${MTV_TEST_VM_NAMESPACE}" \
+            --type merge -p '{"spec":{"runStrategy":"Halted"}}' 1>/dev/null
+        SourceOc wait "virtualmachineinstance/${vmName}" -n "${MTV_TEST_VM_NAMESPACE}" \
+            --for=delete --timeout="${MTV_COLD_VM_STOP_TIMEOUT}" 1>/dev/null || true
+
+        SECONDS=0
+        vmStatus=""
+        while (( SECONDS < wMax )); do
+            vmStatus="$(SourceOc get "virtualmachine/${vmName}" \
+                -n "${MTV_TEST_VM_NAMESPACE}" \
+                -o jsonpath='{.status.printableStatus}' || true)"
+            [[ "${vmStatus}" == "Stopped" ]] && break
+            printf 'INFO: Waiting for VM %s Stopped (%s/%ss): %s\n' \
+                "${vmName}" "${SECONDS}" "${wMax}" "${vmStatus}" >&2
+            sleep 5
+        done
+        [[ "${vmStatus}" == "Stopped" ]] \
+            || { printf 'ERROR: VM %s not Stopped (status=%s)\n' "${vmName}" "${vmStatus}" >&2; return 1; }
+    done
+}
+
 # CleanupDestinationStaleResources — remove stale VM/DV/PVC artifacts on the destination.
 # Required before a return-leg Plan when the destination may still hold the original
 # pre-migration VMs (MTV leaves them in Stopped state after the forward migration).
@@ -468,11 +521,15 @@ function CleanupDestinationStaleResources () {
 
 # ApplyPlan — create or update MTV Plan CR including all VMs via jq marshalling.
 function ApplyPlan () {
+    typeset planName="${1:-${MTV_PLAN_NAME}}"
+    typeset planType="${2:-${MTV_PLAN_TYPE}}"
+    typeset -i vmFrom="${3:-1}"
+    typeset -i vmTo="${4:-${vmCount}}"
     typeset -i i
     typeset vmsJson="[]"
     typeset planJson
 
-    for (( i = 1; i <= vmCount; i++ )); do
+    for (( i = vmFrom; i <= vmTo; i++ )); do
         vmsJson="$(jq -cn \
             --argjson vms "${vmsJson}" \
             --arg name "$(VmName "${i}")" \
@@ -481,7 +538,7 @@ function ApplyPlan () {
     done
 
     planJson="$(jq -cn \
-        --arg planName "${MTV_PLAN_NAME}" \
+        --arg planName "${planName}" \
         --arg ns "${MTV_NAMESPACE}" \
         --arg srcProvider "${MTV_SOURCE_PROVIDER}" \
         --arg dstProvider "${MTV_DESTINATION_PROVIDER}" \
@@ -489,7 +546,7 @@ function ApplyPlan () {
         --arg netMap "${MTV_NETWORK_MAP_NAME}" \
         --arg storMap "${MTV_STORAGE_MAP_NAME}" \
         --argjson vms "${vmsJson}" \
-        --arg planType "${MTV_PLAN_TYPE}" \
+        --arg planType "${planType}" \
         '{
             "apiVersion": "forklift.konveyor.io/v1beta1",
             "kind": "Plan",
@@ -517,7 +574,8 @@ function ApplyPlan () {
 
 # WaitPlanReady — wait for Plan Ready condition.
 function WaitPlanReady () {
-    HubOc wait "plan/${MTV_PLAN_NAME}" -n "${MTV_NAMESPACE}" \
+    typeset planName="${1:-${MTV_PLAN_NAME}}"
+    HubOc wait "plan/${planName}" -n "${MTV_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_PLAN_READY_TIMEOUT}"
 }
 
@@ -525,10 +583,12 @@ function WaitPlanReady () {
 function ApplyMigration () {
     # jq marshalling avoids raw heredoc expansion of YAML-special chars,
     # consistent with ApplyNetworkMap / ApplyStorageMap / ApplyPlan.
+    typeset migName="${1:-${MTV_MIGRATION_NAME}}"
+    typeset planName="${2:-${MTV_PLAN_NAME}}"
     jq -cn \
-        --arg migName  "${MTV_MIGRATION_NAME}" \
+        --arg migName  "${migName}" \
         --arg ns       "${MTV_NAMESPACE}" \
-        --arg planName "${MTV_PLAN_NAME}" \
+        --arg planName "${planName}" \
         '{
             "apiVersion": "forklift.konveyor.io/v1beta1",
             "kind": "Migration",
@@ -557,44 +617,88 @@ function ParseOcWaitDurationSeconds () {
 
 # PrintMigrationPipeline — log migration VM pipeline phases.
 function PrintMigrationPipeline () {
-    HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+    typeset migName="${1:-${MTV_MIGRATION_NAME}}"
+    HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
         -o jsonpath='{range .status.vms[*]}{.name}{"\n"}{range .pipeline[*]}  {.name}: {.phase}{"\n"}{end}{"\n"}{end}' \
         || true
 }
 
 # WaitMigrationSucceeded — poll until Migration Succeeded or Failed.
 function WaitMigrationSucceeded () {
+    typeset migName="${1:-${MTV_MIGRATION_NAME}}"
     typeset -i deadline
     typeset succeededStatus failedStatus msg
 
     deadline=$((SECONDS + $(ParseOcWaitDurationSeconds "${MTV_MIGRATION_TIMEOUT}")))
 
     while (( SECONDS < deadline )); do
-        succeededStatus="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+        succeededStatus="$(HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' || true)"
-        failedStatus="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+        failedStatus="$(HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' || true)"
-        msg="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+        msg="$(HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].message}' || true)"
 
         [[ "${succeededStatus}" == "True" ]] && return 0
 
         if [[ "${failedStatus}" == "True" ]]; then
-            HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+            HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}' \
                 1>&2 || true
-            PrintMigrationPipeline 1>&2
+            PrintMigrationPipeline "${migName}" 1>&2
             false
         fi
 
-        CheckSyncStuck
+        CheckSyncStuck "${migName}"
 
-        PrintMigrationPipeline
-        : "Migration in progress${msg:+: ${msg}} (${SECONDS}/${deadline}s)"
+        PrintMigrationPipeline "${migName}"
+        : "Migration ${migName} in progress${msg:+: ${msg}} (${SECONDS}/${deadline}s)"
         sleep "${migrationPollInterval}"
     done
 
     false
+}
+
+# WaitMigrationsSucceeded — poll multiple Migrations until every one Succeeded.
+# Starts from already-created CRs so cold and live run at the same time.
+function WaitMigrationsSucceeded () {
+    typeset -a migNames=("$@")
+    typeset -i deadline
+    typeset migName succeededStatus failedStatus
+    typeset -i allDone
+
+    (( ${#migNames[@]} )) || migNames=("${MTV_MIGRATION_NAME}")
+    deadline=$((SECONDS + $(ParseOcWaitDurationSeconds "${MTV_MIGRATION_TIMEOUT}")))
+
+    while (( SECONDS < deadline )); do
+        allDone=1
+        for migName in "${migNames[@]}"; do
+            succeededStatus="$(HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+                -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' || true)"
+            failedStatus="$(HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+                -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' || true)"
+
+            if [[ "${failedStatus}" == "True" ]]; then
+                printf 'ERROR: Migration %s Failed\n' "${migName}" >&2
+                HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+                    -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}' \
+                    1>&2 || true
+                PrintMigrationPipeline "${migName}" 1>&2
+                return 1
+            fi
+            [[ "${succeededStatus}" == "True" ]] || allDone=0
+            PrintMigrationPipeline "${migName}"
+        done
+        (( allDone )) && return 0
+        CheckSyncStuck "${MTV_MIGRATION_NAME}"
+        : "Waiting for ${#migNames[@]} migrations (${SECONDS}/${deadline}s)"
+        sleep "${migrationPollInterval}"
+    done
+
+    printf 'ERROR: timed out waiting for migrations:' >&2
+    printf ' %s' "${migNames[@]}" >&2
+    printf '\n' >&2
+    return 1
 }
 
 # VerifyMigration — all destination VMIs must be Running after migration.
@@ -786,7 +890,11 @@ typeset -i cclmStepRc=0
     ResolveSpokeKubeconfigs
     targetNs="${targetNs:-${MTV_TEST_VM_NAMESPACE}}"
 
-    [[ "${MTV_PLAN_TYPE}" == "live" || "${MTV_PLAN_TYPE}" == "cold" ]]
+    if [[ "${parallelColdLive}" == "true" ]]; then
+        :
+    else
+        [[ "${MTV_PLAN_TYPE}" == "live" || "${MTV_PLAN_TYPE}" == "cold" ]]
+    fi
 
     JStep "Preflight: Providers and Maps Ready"          PreflightHub
     JStep "Preflight: DecentralizedLiveMigration Gates"  MaybeEnsureDecentralizedLiveMigration
@@ -796,12 +904,30 @@ typeset -i cclmStepRc=0
     JStep "Preflight: Provider Inventory Refresh"        RefreshProvidersForLivePlan
     JStep "Preflight: Source VMs Running"                PreflightSourceVm
     JStep "Preflight: VM Storage Classes Mapped"         PreflightVmStorageMapped
+    if [[ "${parallelColdLive}" == "true" || "${MTV_PLAN_TYPE}" == "cold" ]]; then
+        JStep "Pre-migration: Stop source VMs (cold)"     StopSourceVms
+    fi
     [[ "${cleanupDestBeforeMigration}" == "true" ]] && \
         JStep "Pre-migration: Cleanup stale destination resources" CleanupDestinationStaleResources
-    JStep "Migration: Apply Plan"                        ApplyPlan
-    JStep "Migration: Plan Ready"                        WaitPlanReady
-    JStep "Migration: Apply Migration"                   ApplyMigration
-    JStep "Migration: Succeeded"                         WaitMigrationSucceeded
+    if [[ "${parallelColdLive}" == "true" ]]; then
+        JStep "Migration: Apply cold Plan" \
+            ApplyPlan "${MTV_COLD_PLAN_NAME}" "cold" 1 "${coldVmCount}"
+        JStep "Migration: Apply live Plan" \
+            ApplyPlan "${MTV_PLAN_NAME}" "live" $((coldVmCount + 1)) "${vmCount}"
+        JStep "Migration: Cold Plan Ready"               WaitPlanReady "${MTV_COLD_PLAN_NAME}"
+        JStep "Migration: Live Plan Ready"               WaitPlanReady "${MTV_PLAN_NAME}"
+        JStep "Migration: Apply cold Migration" \
+            ApplyMigration "${MTV_COLD_MIGRATION_NAME}" "${MTV_COLD_PLAN_NAME}"
+        JStep "Migration: Apply live Migration" \
+            ApplyMigration "${MTV_MIGRATION_NAME}" "${MTV_PLAN_NAME}"
+        JStep "Migration: Cold and live Succeeded" \
+            WaitMigrationsSucceeded "${MTV_COLD_MIGRATION_NAME}" "${MTV_MIGRATION_NAME}"
+    else
+        JStep "Migration: Apply Plan"                    ApplyPlan
+        JStep "Migration: Plan Ready"                    WaitPlanReady
+        JStep "Migration: Apply Migration"               ApplyMigration
+        JStep "Migration: Succeeded"                     WaitMigrationSucceeded
+    fi
     JStep "Verification: Destination VMIs Running"       VerifyMigration
     JStep "Verification: Destination VM runStrategy"     VerifyDestVmsRunStrategy
     JStep "Verification: Source VMIM Not Failed"         VerifySourceVmimNotFailed
@@ -814,11 +940,16 @@ typeset -i cclmStepRc=0
         mkdir -p "${ARTIFACT_DIR}"
         {
             HubOc get "plan/${MTV_PLAN_NAME}" "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" -o wide
+            if [[ "${parallelColdLive}" == "true" ]]; then
+                HubOc get "plan/${MTV_COLD_PLAN_NAME}" "migration/${MTV_COLD_MIGRATION_NAME}" \
+                    -n "${MTV_NAMESPACE}" -o wide || true
+                PrintMigrationPipeline "${MTV_COLD_MIGRATION_NAME}"
+            fi
             HubOc get "plan/${MTV_PLAN_NAME}" -n "${MTV_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}'
             HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}'
-            PrintMigrationPipeline
+            PrintMigrationPipeline "${MTV_MIGRATION_NAME}"
             typeset -i m
             for (( m = 1; m <= vmCount; m++ )); do
                 typeset vn

@@ -9,36 +9,52 @@ ref:
       cpu: 200m
       memory: 400Mi
   documentation: |-
-    Stop the CNV test VM on the source spoke to prepare it for cold (powered-off) migration.
+    Stop CNV test VMs on the source spoke so they can be cold-migrated (powered-off).
 
-    Patches spec.runStrategy to Halted and waits for the VirtualMachineInstance to be
-    deleted, then confirms VM printableStatus is Stopped. This step must run after
-    p2p-create-migration-test-vm and before p2p-mtv-execute-live-migration (with
-    MTV_PLAN_TYPE=cold) in a cold migration chain.
+    Patches spec.runStrategy to Halted for every VM, waits for each VirtualMachineInstance
+    to be deleted, then confirms printableStatus is Stopped. Used by the existing CCLM
+    jobs after the live bidir/hub-spoke legs so the same VMs can run a cold Plan
+    (MTV_PLAN_TYPE=cold / MTV_HS_PLAN_TYPE=cold) without a separate cluster job.
 
-    Shares CNV_TEST_VM_NAME / CNV_TEST_VM_NAMESPACE / CNV_TEST_VM_SPOKE_INDEX env vars
-    with p2p-create-migration-test-vm so the same VM is targeted.
+    VM count and naming match p2p-create-cclm-test-vms:
+      P2P_HS_VM_COUNT VMs named ${P2P_HS_SPOKE_VM_PREFIX}-1..N (or CNV_TEST_VM_NAME when count=1).
 
     Writes ${ARTIFACT_DIR}/stop-migration-vm-status.txt; diagnostics on failure under
     ${ARTIFACT_DIR}/stop-migration-vm-diagnostics/.
   env:
+  - name: P2P_HS_VM_COUNT
+    default: "1"
+    documentation: Number of VMs to stop. Falls back to MTV_TEST_VM_COUNT when unset in the script.
+  - name: MTV_TEST_VM_COUNT
+    default: "1"
+    documentation: Alternate VM count (same value the execute/verify steps use).
+  - name: P2P_HS_SPOKE_VM_PREFIX
+    default: "test-vm"
+    documentation: VM name prefix when count>1 (VMs are <prefix>-1..N).
   - name: CNV_TEST_VM_NAME
     default: "test-vm-1"
-    documentation: VirtualMachine metadata.name on the source spoke (must match p2p-create-migration-test-vm).
+    documentation: VirtualMachine name for the single-VM path (count=1).
+  - name: P2P_HS_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Namespace containing the test VMs.
   - name: CNV_TEST_VM_NAMESPACE
     default: "vm-migration-test"
-    documentation: Namespace containing the test VM (must match p2p-create-migration-test-vm).
+    documentation: Legacy namespace alias; P2P_HS_VM_NAMESPACE takes priority.
+  - name: P2P_HS_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional explicit source spoke kubeconfig path.
   - name: CNV_TEST_VM_SPOKE_KUBECONFIG
     default: ""
-    documentation: |-
-      Optional path to source spoke kubeconfig. When empty, uses
-      SHARED_DIR/managed-cluster-kubeconfig-${CNV_TEST_VM_SPOKE_INDEX}.
+    documentation: Legacy kubeconfig alias; P2P_HS_SPOKE_KUBECONFIG takes priority.
+  - name: P2P_HS_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the source spoke.
   - name: CNV_TEST_VM_SPOKE_INDEX
     default: "1"
-    documentation: 1-based spoke index for SHARED_DIR kubeconfig discovery (source spoke).
+    documentation: Legacy spoke index alias; P2P_HS_SPOKE_INDEX takes priority.
   - name: CNV_TEST_VM_STOP_TIMEOUT
     default: "10m"
-    documentation: oc wait --for=delete timeout for the VMI after patching runStrategy to Halted.
+    documentation: oc wait --for=delete timeout for each VMI after patching runStrategy to Halted.
   - name: P2P_CCLM_DEBUG_MODE
     default: "false"
     documentation: |-

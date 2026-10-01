@@ -10,12 +10,11 @@ chain:
       1. Create P2P_HS_VM_COUNT VMs on the spoke cluster only (P2P_HS_CREATE_HUB_VMS=false by
          default; hub VMs are not pre-created — the hub is populated by the spoke→hub migration leg).
       2. Create MTV NetworkMaps and StorageMaps for both directions on the hub.
-      3. Leg 1 — spoke→hub: migrate all spoke VMs (prefix P2P_HS_SPOKE_VM_PREFIX) to the hub.
+      3. Leg 1 — spoke→hub: when MTV_HS_COLD_VM_COUNT is 0 < N < P2P_HS_VM_COUNT, a cold
+         Plan (VMs 1..N) and a live Plan (VMs N+1..COUNT) start at the same time.
+         MTV warm is not supported for OpenShift sources; live is the running-VM path.
       4. Clean up spoke source VM resources.
-      5. Leg 2 — hub→spoke return: migrate the same VMs from hub back to spoke.
-         Only runs if Leg 1 succeeded (error propagation prevents orphaned return migration).
-      6. Post-migration verification (p2p-mtv-verify-hub-spoke-migration): confirms final spoke
-         state — VMIs Running, runStrategy==Always (OCPBUGS-101771), source VMIM not Failed
-         (OCPBUGS-99403), SSH probe, data integrity, guest disk I/O, and guest network.
+      5. Leg 2 — hub→spoke return: same cold+live split (Plan names suffixed -cold).
+      6. Post-migration verification (p2p-mtv-verify-hub-spoke-migration).
     Set P2P_HS_CREATE_HUB_VMS=true to also pre-create hub VMs for a true bi-directional test.
     Set MTV_TEST_VM_COUNT to match P2P_HS_VM_COUNT so the verify step checks all VMs.
