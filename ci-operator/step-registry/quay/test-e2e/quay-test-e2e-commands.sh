@@ -591,7 +591,16 @@ function copyArtifacts {
     else
       gcs_path="logs/${JOB_NAME:-}/${BUILD_ID:-}"
     fi
-    local report_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}/quay-test-e2e/artifacts"
+    # ci-operator uploads a step's ARTIFACT_DIR to artifacts/<test>/<step>/artifacts/.
+    # The step name is quay-test-e2e by default, but composed workflows run this
+    # runner under uniquely named adapter steps (e.g. the operator-upgrade
+    # seed/verify/functional phases), so derive it from PLAYWRIGHT_STEP_NAME. When
+    # a phase nests its reports under PLAYWRIGHT_ARTIFACT_SUBDIR, append that too so
+    # the link resolves to that phase's own report instead of a sibling's.
+    local report_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}/${PLAYWRIGHT_STEP_NAME:-quay-test-e2e}/artifacts"
+    if [[ -n "${PLAYWRIGHT_ARTIFACT_SUBDIR}" ]]; then
+      report_base="${report_base}/${PLAYWRIGHT_ARTIFACT_SUBDIR}"
+    fi
     cat > "${ARTIFACT_DIR}/custom-link-playwright-report.html" << EOF || true
 <html>
 <head>
