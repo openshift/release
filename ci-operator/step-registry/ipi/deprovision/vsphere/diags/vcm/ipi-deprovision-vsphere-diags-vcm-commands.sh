@@ -291,8 +291,88 @@ function collect_diagnostic_data {
     v_idx=$((v_idx+1));
   done
 
+  collect_mapi_vsphere_metrics
+
   write_html
 
+}
+
+# Collects vSphere client request latency/error metrics exposed by the
+# machine-api-operator's vSphere actuator (mapi_vsphere_request_duration_seconds,
+# added in https://github.com/openshift/machine-api-operator/pull/1552). The
+# metric is scraped by the in-cluster Prometheus, so it's queried through the
+# thanos-querier pod rather than via govc. Older releases won't have this
+# metric, so its absence is handled, not treated as an error.
+function collect_mapi_vsphere_metrics() {
+  echo "$(date -u --rfc-3339=seconds) - Collecting vSphere request metrics (mapi_vsphere_request_duration_seconds) from in-cluster Prometheus"
+
+  function prom_query() {
+    oc --insecure-skip-tls-verify rsh -T -n openshift-monitoring -c thanos-query deploy/thanos-querier \
+      curl -f --silent http://localhost:9090/api/v1/query --data-urlencode "query=$1"
+  }
+
+  local counts_json p50_json p95_json p99_json
+  counts_json=$(prom_query 'sum by (client, operation, status) (mapi_vsphere_request_duration_seconds_count)' 2>/dev/null)
+
+  if [[ -z "${counts_json}" ]] || [[ "$(echo "${counts_json}" | jq -r '.data.result | length' 2>/dev/null)" == "0" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - mapi_vsphere_request_duration_seconds not found on this cluster, skipping"
+    echo '{"available": false}' > "${vcenter_state}/mapi-vsphere-metrics.json"
+    return
+  fi
+
+  p50_json=$(prom_query 'histogram_quantile(0.50, sum by (le, client, operation) (mapi_vsphere_request_duration_seconds_bucket))' 2>/dev/null)
+  p95_json=$(prom_query 'histogram_quantile(0.95, sum by (le, client, operation) (mapi_vsphere_request_duration_seconds_bucket))' 2>/dev/null)
+  p99_json=$(prom_query 'histogram_quantile(0.99, sum by (le, client, operation) (mapi_vsphere_request_duration_seconds_bucket))' 2>/dev/null)
+
+  jq -n \
+    --argjson counts "${counts_json:-{\"data\":{\"result\":[]}}}" \
+    --argjson p50 "${p50_json:-{\"data\":{\"result\":[]}}}" \
+    --argjson p95 "${p95_json:-{\"data\":{\"result\":[]}}}" \
+    --argjson p99 "${p99_json:-{\"data\":{\"result\":[]}}}" \
+    '
+    def quantiles($data): reduce $data.data.result[] as $r ({}; .[$r.metric.client + "|" + $r.metric.operation] = ($r.value[1] | tonumber));
+    (quantiles($p50)) as $p50 |
+    (quantiles($p95)) as $p95 |
+    (quantiles($p99)) as $p99 |
+    (reduce $counts.data.result[] as $r ({};
+      ($r.metric.client + "|" + $r.metric.operation) as $k |
+      .[$k].client = $r.metric.client |
+      .[$k].operation = $r.metric.operation |
+      .[$k][$r.metric.status] = (($r.value[1] | tonumber))
+    )) as $byOp |
+    {
+      available: true,
+      rows: ($byOp | to_entries | map(.value + {
+        key: .key,
+        success: (.value.success // 0),
+        error: (.value.error // 0),
+        total: ((.value.success // 0) + (.value.error // 0)),
+        p50: $p50[.key],
+        p95: $p95[.key],
+        p99: $p99[.key]
+      }) | sort_by(-.total))
+    }
+    ' > "${vcenter_state}/mapi-vsphere-metrics.json" || echo '{"available": false}' > "${vcenter_state}/mapi-vsphere-metrics.json"
+}
+
+function embed_mapi_vsphere_metrics_html() {
+  local file="${vcenter_state}/mapi-vsphere-metrics.json"
+  if [[ ! -f "${file}" ]] || [[ "$(jq -r '.available' "${file}" 2>/dev/null)" != "true" ]]; then
+    cat >> "${RESULT_HTML}" << 'EOF'
+        <p>No vSphere request metrics (<code>mapi_vsphere_request_duration_seconds</code>) were found on this cluster. This metric was introduced by <a href="https://github.com/openshift/machine-api-operator/pull/1552" target="_blank">machine-api-operator#1552</a> and may not be present on older releases.</p>
+EOF
+    return
+  fi
+  cat >> "${RESULT_HTML}" << 'EOF'
+        <table class="table table-striped table-sm">
+          <thead><tr><th>Client</th><th>Operation</th><th>Success</th><th>Errors</th><th>Total</th><th>p50 (s)</th><th>p95 (s)</th><th>p99 (s)</th></tr></thead>
+          <tbody>
+EOF
+  jq -r '.rows[] | "<tr><td>\(.client)</td><td>\(.operation)</td><td>\(.success // 0)</td><td>\(.error // 0)</td><td>\(.total)</td><td>\(.p50 // "n/a")</td><td>\(.p95 // "n/a")</td><td>\(.p99 // "n/a")</td></tr>"' "${file}" >> "${RESULT_HTML}"
+  cat >> "${RESULT_HTML}" << 'EOF'
+          </tbody>
+        </table>
+EOF
 }
 
 function write_html() {
@@ -495,6 +575,8 @@ function write_results_html() {
   Virtual Machines </button>
         <button class="list-group-item list-group-item-action" v-on:click="changeContent('host')">
   Hosts            </button>
+        <button class="list-group-item list-group-item-action" v-on:click="changeContent('mapi')">
+  Machine API      </button>
          <a href="https://github.com/openshift/release/blob/master/ci-operator/step-registry/ipi/deprovision/vsphere/diags/ipi-deprovision-vsphere-diags-commands.sh" class="list-group-item list-group-item-action text-center" target="_blank">
          <img src="https://github.com/favicon.ico" alt="GitHub logo" title="Found a bug or issue? Visit this project's git repo.">
         </a>
@@ -573,6 +655,15 @@ EOF
             <canvas id="host-cpu-readiness"></canvas>
           </div>
         </div>
+      </div>
+    </data>
+    <data id="mapi-data">
+      <div id="mapi-data-content">
+        <h1>Machine API vSphere Calls</h1>
+        <hr>
+EOF
+  embed_mapi_vsphere_metrics_html
+  cat >> ${RESULT_HTML} << EOF
       </div>
     </data>
 
