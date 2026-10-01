@@ -276,10 +276,16 @@ if [[ "${ENABLE_NAP:-}" == "true" ]]; then
 
     NAP_SKU_SELECTOR="family"
     NAP_SKU_VALUES="            - \"${NAP_SKU_FAMILY:-D}\""
+    NAP_SKU_VERSION_EXTENSION=""
     if [[ -n "${NAP_SKU_NAMES:-}" ]]; then
         NAP_SKU_SELECTOR="name"
         IFS=',' read -ra NAP_SKU_ARRAY <<< "${NAP_SKU_NAMES}"
         NAP_SKU_VALUES=$(printf '            - "%s"\n' "${NAP_SKU_ARRAY[@]}")
+        for sku_name in "${NAP_SKU_ARRAY[@]}"; do
+            if [[ "${sku_name}" == *_v7 ]]; then
+                NAP_SKU_VERSION_EXTENSION=$'\n            - "7"'
+            fi
+        done
     fi
 
     NODEPOOL_YAML=$(cat <<EOF
@@ -322,7 +328,7 @@ ${NAP_SKU_VALUES}
             - "3"
             - "4"
             - "5"
-            - "6"
+            - "6"${NAP_SKU_VERSION_EXTENSION}
 $(if [[ -n "$ZONE_VALUES" ]]; then
 cat <<ZONES
         - key: topology.kubernetes.io/zone
