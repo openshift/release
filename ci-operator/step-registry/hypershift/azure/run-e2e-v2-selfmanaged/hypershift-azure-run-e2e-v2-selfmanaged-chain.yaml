@@ -7,9 +7,15 @@ chain:
     - name: HYPERSHIFT_PLATFORM
       default: ""
       documentation: "The cloud platform for the self-managed clusters (e.g. azure). Set in the workflow env block."
+    - name: TEST_PLAN_FILE
+      default: ""
+      documentation: "Path to a test plan that ships in the hypershift-tests image, e.g. /hypershift/testplans/azure-etcd-sharding.yaml. Must match the value given to hypershift-azure-create-selfmanaged-guests so the same plan selects the clusters and the tests."
     commands: |-
       set -xuo pipefail
       export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+      if [[ -n "${TEST_PLAN_FILE:-}" ]]; then
+          export TEST_PLAN="${TEST_PLAN_FILE}"
+      fi
       /hypershift/bin/run-tests
     timeout: 150m
     grace_period: 5m

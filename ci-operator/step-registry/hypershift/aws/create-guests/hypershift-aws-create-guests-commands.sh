@@ -11,7 +11,11 @@ if [[ -f "${SHARED_DIR}/nodepool_release_images" ]]; then
 fi
 
 if [[ -f "${SHARED_DIR}/test-plan.yaml" ]]; then
+    # An inline plan written by hypershift-write-test-plan wins over a plan
+    # that ships in the image, so a job can always override.
     export TEST_PLAN="${SHARED_DIR}/test-plan.yaml"
+elif [[ -n "${TEST_PLAN_FILE:-}" ]]; then
+    export TEST_PLAN="${TEST_PLAN_FILE}"
 fi
 
 # Storage KMS encryption: only forward the KMS key alias when the hypershift

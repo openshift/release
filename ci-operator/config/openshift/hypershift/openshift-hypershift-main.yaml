@@ -310,6 +310,47 @@ tests:
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
 - always_run: false
+  as: e2e-v2-aws-etcd-sharding
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      NODEPOOL_N1_VERSION: "5.0"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_PLAN_FILE: /hypershift/testplans/aws-etcd-sharding.yaml
+    workflow: hypershift-aws-e2e-v2
+- always_run: false
+  as: e2e-v2-azure-self-managed-etcd-sharding
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-azure
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      NODEPOOL_N1_VERSION: "5.0"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_PLAN_FILE: /hypershift/testplans/azure-etcd-sharding.yaml
+    workflow: hypershift-azure-e2e-v2-self-managed
+- always_run: false
+  as: e2e-v2-aws-backuprestore-etcd-sharding
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      HYPERSHIFT_CP_AVAILABILITY_POLICY: HighlyAvailable
+      HYPERSHIFT_ETCD_SHARDS: |-
+        name=events,resources=/events;events.k8s.io/events,replicas=3,storage=EmptyDir
+        name=leases,resources=coordination.k8s.io/leases,replicas=3,storage=PersistentVolume
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-aws-e2e-backuprestore
+- always_run: false
   as: e2e-kubevirt-metal-ovn-backuprestore
   capabilities:
   - intranet
@@ -782,6 +823,30 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-azure-aks-external-oidc
+- as: e2e-aws-etcd-sharding
+  capabilities:
+  - arm64
+  cron: 15 3 * * *
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      NODEPOOL_N1_VERSION: "5.0"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_PLAN_FILE: /hypershift/testplans/aws-etcd-sharding.yaml
+    workflow: hypershift-aws-e2e-v2
+- as: e2e-azure-etcd-sharding
+  capabilities:
+  - arm64
+  cron: 15 5 * * 3
+  steps:
+    cluster_profile: hypershift-azure
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      NODEPOOL_N1_VERSION: "5.0"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_PLAN_FILE: /hypershift/testplans/azure-etcd-sharding.yaml
+    workflow: hypershift-azure-e2e-v2-self-managed
 zz_generated_metadata:
   branch: main
   org: openshift
