@@ -69,17 +69,19 @@ def test_expand_matrix_cells() -> None:
             cell.cron,
             cell.kind,
             cell.arch,
+            cell.fips,
         )
         for cell in cells
     } == {
-        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "azure", "4.22", "e2e-install", "@daily", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64"),
-        ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x"),
-        (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64"),
-        (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64"),
+        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False),
+        ("3.18", "redhat-3.18", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64", False),
+        ("3.18", "redhat-3.18", "azure", "4.22", "e2e-install", "@daily", "periodic", "amd64", False),
+        ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64", False),
+        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64", False),
+        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", True),
+        ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x", False),
+        (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64", False),
+        (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64", False),
     }
     cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "amd64")
     assert cell.filename == PHASE0_NAME
@@ -1116,3 +1118,53 @@ def test_master_arm64_variant_without_promotion(tmp_path: Path) -> None:
         "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE": "release:arm64-latest",
         "QUAY_CI_IMAGE": "pipeline:quay-server",
     }
+
+
+def test_redhat_318_aws_fips_shares_aws_file() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    tests = {test["as"]: test for test in by_name[PHASE0_NAME]["tests"]}
+    assert set(tests) == {"aws-s3-nightly", "aws-s3-nightly-fips"}
+
+    fips = tests["aws-s3-nightly-fips"]
+    assert fips["cron"] == "@weekly"
+    assert fips["steps"]["env"]["FIPS_ENABLED"] == "true"
+    assert fips["steps"]["env"]["QUAY_DEPLOY_MAILPIT"] == "false"
+    assert "FEATURE_FIPS: true" in fips["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()
+    assert fips["steps"]["test"][0] == {"ref": "fips-check-fips-or-die"}
+    assert fips["steps"]["test"][1:] == tests["aws-s3-nightly"]["steps"]["test"]
+
+    plain = tests["aws-s3-nightly"]["steps"]
+    assert "FIPS_ENABLED" not in plain["env"]
+    assert "QUAY_DEPLOY_MAILPIT" not in plain["env"]
+    assert "FEATURE_FIPS" not in plain["env"]["QUAY_EXTRA_CONFIG"]
+
+
+def test_fips_rejects_non_bool() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "fips": "yes",
+        }
+    )
+    with pytest.raises(ValueError, match="fips must be a boolean"):
+        expand_cells(matrix)
+
+
+def test_presubmit_rejects_fips() -> None:
+    matrix = _matrix_with_job(
+        {
+            "kind": "presubmit",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "fips": True,
+        },
+        release_overrides={"branch": "master", "layout": "base"},
+    )
+    with pytest.raises(ValueError, match="fips is only valid for kind: periodic"):
+        expand_cells(matrix)
