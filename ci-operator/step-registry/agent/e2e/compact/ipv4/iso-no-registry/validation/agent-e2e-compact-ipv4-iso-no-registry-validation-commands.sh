@@ -16,14 +16,20 @@ function wait_for_cluster_available() {
         oc wait clusterversion version --for=condition=Available=True --timeout=1s 2>/dev/null && 
         oc wait clusterversion version --for=condition=Progressing=False --timeout=1s 2>/dev/null &&
         oc wait clusterversion version --for=condition=Failing=False --timeout=1s 2>/dev/null &&
-        return 0
+        break
 
         oc get clusterversion --no-headers || true
         sleep "$sleep_seconds"
     done
 
-    echo "ERROR: cluster not available after 60 minutes."
-    return 1
+    if [ "$i" -ge "$attempts" ]; then
+        echo "ERROR: cluster not available after 60 minutes."
+        return 1
+    fi
+
+    # Ensure all cluster operators remain stable for a sustained period
+    # to avoid flaky results from transient operator restarts
+    oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=105m
 }
 
 function verify_installed_operators() {
