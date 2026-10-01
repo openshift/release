@@ -1,8 +1,24 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.21
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      USER root
+      RUN curl -sSLo /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64 && \
+          chmod +x /usr/local/bin/kind && \
+          curl -sSLo /usr/local/bin/kubectl https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl && \
+          chmod +x /usr/local/bin/kubectl
+    from: nested-podman
+    to: nested-podman-kind
 prowgen:
   enable_secrets_store_csi_driver: true
 resources:
@@ -30,6 +46,87 @@ tests:
   container:
     from: src
   run_if_changed: ^(ci-operator/step-registry/hyperfleet/risk-scorer/|hack/hyperfleet/validate-risk-scorer-step\.sh).*
+- as: kind-nested-poc
+  capabilities:
+  - nested-podman
+  commands: |
+    set -euo pipefail
+
+    echo "=== Environment ==="
+    uname -a
+    podman version
+    podman info | grep -E 'os:|arch:|cgroupVersion:|rootless:'
+    kind version
+    kubectl version --client
+
+    echo "=== Fixing subuid/subgid range for kindest/node ==="
+    MY_USER=$(whoami)
+    MY_UID=$(id -u)
+    echo "${MY_USER}:1:$((MY_UID - 1))" > /etc/subuid
+    echo "${MY_USER}:$((MY_UID + 1)):$((65536 - MY_UID - 1))" >> /etc/subuid
+    cp /etc/subuid /etc/subgid
+    cat /etc/subuid
+    podman system migrate
+
+    echo "=== Configuring podman networking ==="
+    mkdir -p "${HOME}/.config/containers"
+    printf '[network]\nfirewall_driver = "none"\n' >> "${HOME}/.config/containers/containers.conf"
+
+    echo "=== Creating kind cluster ==="
+    export KIND_EXPERIMENTAL_PROVIDER=podman
+    printf 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnetworking:\n  ipFamily: ipv4\n' > /tmp/kind-config.yaml
+    CREATE_START=$(date +%s)
+    kind create cluster --name poc --wait 180s --verbosity 4 --config /tmp/kind-config.yaml
+    CREATE_END=$(date +%s)
+    echo "=== kind cluster created in $((CREATE_END - CREATE_START))s ==="
+
+    export KUBECONFIG="$(kind get kubeconfig-path --name poc 2>/dev/null || echo "${HOME}/.kube/config")"
+    kind get kubeconfig --name poc > /tmp/kubeconfig
+    export KUBECONFIG=/tmp/kubeconfig
+
+    echo "=== Cluster nodes ==="
+    kubectl get nodes -o wide
+
+    echo "=== Deploying nginx hello-world ==="
+    kubectl create deployment hello --image=nginx:alpine --replicas=1
+    kubectl expose deployment hello --port=80 --type=ClusterIP
+
+    echo "=== Waiting for pod ready ==="
+    kubectl wait --for=condition=Ready pod -l app=hello --timeout=120s
+
+    echo "=== Pod status ==="
+    kubectl get pods -o wide
+    kubectl get svc hello
+
+    echo "=== Curling the service ==="
+    SVC_IP=$(kubectl get svc hello -o jsonpath='{.spec.clusterIP}')
+    kubectl run curl-test --image=curlimages/curl --rm -i --restart=Never -- curl -s --max-time 10 "http://${SVC_IP}" | head -20
+
+    echo "=== Cleanup ==="
+    DELETE_START=$(date +%s)
+    kind delete cluster --name poc
+    DELETE_END=$(date +%s)
+    echo "=== kind cluster deleted in $((DELETE_END - DELETE_START))s ==="
+    echo "=== Second run (images cached) ==="
+    CREATE2_START=$(date +%s)
+    kind create cluster --name poc2 --wait 180s --verbosity 4
+    CREATE2_END=$(date +%s)
+    echo "=== kind cluster created (cached) in $((CREATE2_END - CREATE2_START))s ==="
+
+    DELETE2_START=$(date +%s)
+    kind delete cluster --name poc2
+    DELETE2_END=$(date +%s)
+    echo "=== kind cluster deleted (cached) in $((DELETE2_END - DELETE2_START))s ==="
+
+    echo "=== Timing summary ==="
+    echo "  First create:  $((CREATE_END - CREATE_START))s"
+    echo "  First delete:  $((DELETE_END - DELETE_START))s"
+    echo "  Second create: $((CREATE2_END - CREATE2_START))s (images cached)"
+    echo "  Second delete: $((DELETE2_END - DELETE2_START))s"
+    echo "=== SUCCESS: kind nested in OpenShift CI works ==="
+  container:
+    from: nested-podman-kind
+  nested_podman: true
 zz_generated_metadata:
   branch: main
   org: openshift
