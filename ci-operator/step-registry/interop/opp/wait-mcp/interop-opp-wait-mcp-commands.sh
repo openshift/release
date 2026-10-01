@@ -214,10 +214,10 @@ typeset -i effectiveTimeout=${mcpWaitTimeout}
 if (( effectiveTimeout > maxTimeout )); then
     effectiveTimeout=${maxTimeout}
 fi
-typeset -i deadline=$(( SECONDS + effectiveTimeout ))
+typeset -i deadline=$(( startSeconds + effectiveTimeout ))
 typeset -i consecutivePasses=0
 
-echo "Polling MCPs for up to ${mcpWaitTimeout}s (need ${consecutiveRequired} consecutive clean polls)..."
+echo "Polling MCPs for up to ${effectiveTimeout}s (need ${consecutiveRequired} consecutive clean polls)..."
 echo "Progress-based extension: +${progressExtension}s per detection, max total ${maxTimeout}s"
 
 _in_product_test=1
