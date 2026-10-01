@@ -6,6 +6,12 @@ workflow:
     create-guests binary (driven by platform config), and runs the v2 test suite
     via run-tests. Each test group produces a separate JUnit XML entry for Sippy.
 
+    Test plan selection (in order of precedence):
+    1. Explicit TEST_PLAN env via hypershift-write-test-plan
+    2. LLM generation via hypershift-generate-test-plan when
+       GENERATE_TEST_PLAN_FROM_PR=true (no-op otherwise)
+    3. Built-in default plan in the create-guests / run-tests binaries
+
     The HyperShift launch capability is currently supported by the HyperShift
     team. For now, please direct all questions and comments to:
 
@@ -24,6 +30,7 @@ workflow:
     - ref: hypershift-install
     - ref: hypershift-resolve-nodepool-releases
     - ref: hypershift-write-test-plan
+    - ref: hypershift-generate-test-plan
     - chain: hypershift-aws-create-guests
     test:
     - chain: hypershift-aws-run-e2e-v2
