@@ -205,6 +205,31 @@ metadata:
 EOF
 
 echo "Configure IPAddressPool"
+
+# Resolve the IP address pool range.
+# Priority:
+#   1. METALLB_MGMT_IPS env var, if explicitly set by the caller.
+#   2. A default derived from the cluster/environment (extend this if-block
+#      as new environments are added).
+if [[ -n "${METALLB_MGMT_IPS_INFRA:-}" ]]; then
+  IP_POOL="${METALLB_MGMT_IPS_INFRA}"
+elif [[ -f "${SHARED_DIR}/METALLB_MGMT_IPS_INFRA" ]]; then
+  IP_POOL="$(cat "${SHARED_DIR}/METALLB_MGMT_IPS_INFRA")"
+  echo "  Loaded IP pool from SHARED_DIR: ${IP_POOL}"
+else
+  # Auto-detect the IP subnet from the first node's INTERNAL-IP reported by
+  # 'oc get no -o wide', then pick the matching pool range.
+  NODE_IP=$(oc get nodes -o wide --no-headers 2>/dev/null \
+    | awk '{print $6}' | grep -v '^$' | head -1)
+  echo "  Detected node IP: ${NODE_IP}"
+  if [[ "${NODE_IP}" == 192.168.2.* ]]; then
+    IP_POOL="192.168.2.54-192.168.2.54"
+  else
+    IP_POOL="192.168.3.54-192.168.3.54"
+  fi
+fi
+echo "  IPAddressPool range: ${IP_POOL}"
+
 oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
@@ -213,7 +238,7 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  - 192.168.2.54-192.168.2.54
+  - ${IP_POOL}
 EOF
 
 oc create -f - <<EOF

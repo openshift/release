@@ -208,6 +208,9 @@ echo "Configure IPAddressPool"
 #      as new environments are added).
 if [[ -n "${METALLB_MGMT_IPS:-}" ]]; then
   IP_POOL="${METALLB_MGMT_IPS}"
+elif [[ -f "${SHARED_DIR}/METALLB_MGMT_IPS" ]]; then
+  IP_POOL="$(cat "${SHARED_DIR}/METALLB_MGMT_IPS")"
+  echo "  Loaded IP pool from SHARED_DIR: ${IP_POOL}"
 else
   # Auto-detect the IP subnet from the first node's INTERNAL-IP reported by
   # 'oc get no -o wide', then pick the matching pool range.
