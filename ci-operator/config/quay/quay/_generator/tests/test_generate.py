@@ -77,6 +77,7 @@ def test_expand_matrix_cells() -> None:
         ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64"),
         ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64"),
         ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x"),
+        ("3.17", "redhat-3.17", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64"),
         (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64"),
         (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64"),
     }
@@ -542,7 +543,7 @@ def test_check_fails_when_retired_present(tmp_path: Path) -> None:
 
 def test_check_ignores_unrelated_branch_neighbors(tmp_path: Path) -> None:
     assert main(["--output", str(tmp_path)]) == 0
-    (tmp_path / "quay-quay-redhat-3.17__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
+    (tmp_path / "quay-quay-redhat-3.16__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
     (tmp_path / "quay-quay-master__claim.yaml").write_text("foo: bar\n")
     (tmp_path / "quay-quay-master__omr-v3.yaml").write_text("foo: bar\n")
     assert main(["--check", "--output", str(tmp_path)]) == 0
