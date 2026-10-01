@@ -372,6 +372,11 @@ jq -r '.management_cluster.value.project_id // empty' /tmp/tf-outputs.json > "${
 jq -r '.management_cluster.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-name"
 jq -r '.management_cluster.value.cluster_endpoint // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-endpoint"
 
+# Per-run GCP folder (parent of both region and MC projects). Written so
+# cleanup can delete the folder by ID instead of leaving it orphaned once
+# the projects underneath it are gone.
+jq -r '.region.value.folder_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-folder-id"
+
 # HC lifecycle test outputs (explicit top-level outputs from e2e template)
 jq -r '.customer_project_id.value // .customer_project.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/customer-project-id"
 jq -r '.oidc_endpoint.value // .region.value.oidc_cdn_issuer_url // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/oidc-endpoint"
@@ -408,6 +413,9 @@ if [[ -s "${SHARED_DIR}/api-endpoint" ]]; then
 fi
 if [[ -s "${SHARED_DIR}/service-project-id" ]]; then
   log "  Service Project:  $(<${SHARED_DIR}/service-project-id)"
+fi
+if [[ -s "${SHARED_DIR}/region-folder-id" ]]; then
+  log "  Region Folder ID: $(<${SHARED_DIR}/region-folder-id)"
 fi
 log ""
 log "Outputs written to SHARED_DIR for downstream steps"

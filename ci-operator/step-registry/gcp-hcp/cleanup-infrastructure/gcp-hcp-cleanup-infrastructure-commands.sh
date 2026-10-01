@@ -30,7 +30,8 @@ log "2. Delete Gateway API resources (triggers NEG cleanup)"
 log "3. Force-delete NEGs"
 log "4. Delete DNS records"
 log "5. Delete GCP projects (bypasses terraform destroy for reliability)"
-log "6. Clear TFC workspace state"
+log "6. Delete the per-run GCP folder (by ID) that parented those projects"
+log "7. Clear TFC workspace state"
 log ""
 
 # Authenticate with WIF
@@ -52,6 +53,7 @@ MC_PROJECT=$(<"${SHARED_DIR}/mc-project-id")
 MC_CLUSTER=$(<"${SHARED_DIR}/mc-cluster-name")
 SERVICE_PROJECT=$(cat "${SHARED_DIR}/service-project-id" 2>/dev/null || echo "")
 CUSTOMER_PROJECT=$(cat "${SHARED_DIR}/customer-project-id" 2>/dev/null || echo "")
+REGION_FOLDER=$(cat "${SHARED_DIR}/region-folder-id" 2>/dev/null || echo "")
 REGION=${GCP_REGION:-us-central1}
 
 # Get project numbers
@@ -66,6 +68,9 @@ if [[ -n "${SERVICE_PROJECT}" ]]; then
 fi
 if [[ -n "${CUSTOMER_PROJECT}" ]]; then
   log "  Customer: ${CUSTOMER_PROJECT}"
+fi
+if [[ -n "${REGION_FOLDER}" ]]; then
+  log "  Folder:   folders/${REGION_FOLDER}"
 fi
 log "  Region:   ${REGION}"
 log ""
@@ -294,7 +299,39 @@ delete_project() {
 }
 
 # ========================================================================
-# Phase 6: Clear TFC workspace state
+# Phase 6: Delete the per-run GCP folder
+# ========================================================================
+# Region and MC projects are parented under a single per-run folder
+# (terraform/modules/region/project.tf: google_folder.region). Project
+# deletion above empties it but never removes the folder itself, leaving an
+# orphan behind on every run. Delete by numeric ID (not display name) to
+# avoid any ambiguity if names are ever reused.
+delete_folder() {
+  local folder_id=$1
+
+  log "--- Deleting per-run GCP folder: folders/${folder_id} ---"
+
+  local output
+  local exit_code
+  if output=$(gcloud resource-manager folders delete "${folder_id}" --quiet 2>&1); then
+    exit_code=0
+  else
+    exit_code=$?
+  fi
+
+  echo "${output}" | tee -a "${LOG}"
+
+  if [[ ${exit_code} -eq 0 ]]; then
+    log "  Folder folders/${folder_id} deletion initiated"
+    return 0
+  else
+    log "  ERROR: Failed to delete folder folders/${folder_id} (exit code: ${exit_code})"
+    return 1
+  fi
+}
+
+# ========================================================================
+# Phase 7: Clear TFC workspace state
 # ========================================================================
 clear_tfc_workspace() {
   log "--- Clearing TFC workspace state ---"
@@ -661,7 +698,15 @@ if [[ -n "${CUSTOMER_PROJECT}" ]]; then
   delete_project "${CUSTOMER_PROJECT}" "Customer" || CLEANUP_FAILED=1
 fi
 
-# Phase 6: Clear TFC workspace state
+# Phase 6: Delete the per-run GCP folder (region + MC projects lived here)
+log ""
+if [[ -n "${REGION_FOLDER}" ]]; then
+  delete_folder "${REGION_FOLDER}" || CLEANUP_FAILED=1
+else
+  log "No region-folder-id in SHARED_DIR — skipping folder cleanup (provision may predate this output)"
+fi
+
+# Phase 7: Clear TFC workspace state
 log ""
 clear_tfc_workspace || CLEANUP_FAILED=1
 
