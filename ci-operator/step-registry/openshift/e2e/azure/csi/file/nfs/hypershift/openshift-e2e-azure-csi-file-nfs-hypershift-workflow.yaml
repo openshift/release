@@ -1,0 +1,28 @@
+workflow:
+  as: openshift-e2e-azure-csi-file-nfs-hypershift
+  steps:
+    pre:
+      - chain: cucushift-installer-rehearse-azure-hypershift-provision
+      - ref: cucushift-hypershift-extended-enable-guest
+      - ref: storage-create-csi-azure-file-nfs
+      - ref: storage-conf-wait-for-csi-driver
+      - ref: storage-obj-save
+    test:
+      - ref: storage-run-csi-hypershift
+    post:
+      - ref: storage-obj-check
+      - ref: cucushift-hypershift-extended-disable-guest
+      - chain: cucushift-installer-rehearse-azure-hypershift-deprovision
+    env:
+      SKIP_MONITOR_TEST: "true"
+      CLUSTERCSIDRIVER: file.csi.azure.com
+      TRUECONDITIONS: AzureFileDriverControllerServiceControllerAvailable AzureFileDriverNodeServiceControllerAvailable
+      TEST_CSI_DRIVER_MANIFEST: manifest-azure-file-nfs.yaml
+      TEST_SUITE: openshift/csi
+      # The Azure File NFS CSI driver does not support snapshotDataSource and pvcDataSource capabilities in the hosted cluster due to network policy issue, so we need to disable them for the test suite.
+      # https://redhat.atlassian.net/browse/OCPBUGS-69882
+      DISABLED_CSI_CAPABILITIES: snapshotDataSource pvcDataSource
+  documentation: |-
+    Installs the HyperShift Operator and creates a hosted cluster in Azure, then runs the openshift/csi
+    end-to-end test suite for Azure File NFS CSI driver on the guest cluster, and finally destroys the hosted
+    cluster and management cluster.

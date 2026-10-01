@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  annotations:
+    openshift.io/description: a workaround for https://issues.redhat.com/browse/OCPBUGS-31067
+  name: manual-crs-approval
+  namespace: openshift-cluster-machine-approver
+spec:
+  schedule: "*/5 * * * *"
+  # Suspend to verify if the fix works
+  # We may delete this manifest if it does
+  suspend: true
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: machine-approver-sa
+          containers:
+          - name: manual-crs-approval
+            image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.15_cli
+            imagePullPolicy: Always
+            args:
+            - -c
+            - |
+              set -euo pipefail
+              oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs --no-run-if-empty oc adm certificate approve
+            command:
+            - /bin/bash
+          restartPolicy: OnFailure

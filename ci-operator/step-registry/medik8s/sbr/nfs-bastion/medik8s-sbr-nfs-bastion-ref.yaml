@@ -1,0 +1,23 @@
+ref:
+  as: medik8s-sbr-nfs-bastion
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: medik8s-sbr-nfs-bastion-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Configures an NFS server on the disconnected bastion host and creates a
+    StorageClass and PersistentVolume in the cluster backed by that NFS export.
+    Used by SBR tests to provide a shared RWX storage class in disconnected
+    environments where ODF is not available.
+
+    Reads bastion connection details from SHARED_DIR (bastion_public_address,
+    bastion_private_address, bastion_ssh_user) and the SSH key from
+    CLUSTER_PROFILE_DIR/ssh-privatekey.
+
+    The PV is created with soft NFS mount options (soft,timeo=50) so that
+    storage loss surfaces as I/O errors to the application rather than causing
+    indefinite kernel retries — required for SBR fault detection to work.

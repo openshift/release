@@ -1,0 +1,160 @@
+#!/bin/sh
+
+set -euo pipefail
+
+# Creates a new release branch for FROM, then creates a new commit into master and
+# tags it as TO, then pushes both to upstream.
+#
+# Usage: TO= FROM= ./branch [tag|reset|push]
+#
+# Argument:
+# * <empty>: displays latest commit on the branch
+# * tag:     creates the tags and branches locally
+# * reset:   deletes the branches or tags to start over
+# * push:    actually push the branches and tags
+
+base=$( dirname "${BASH_SOURCE[0]}")
+source "${base}/lib/constants.sh"
+
+DIR=${DIR:-/tmp/dist}
+BRANCH=${BRANCH:-master}
+
+for repo in `managed_repos "${BRANCH}"`; do
+  if [[ ! -d ${DIR}/src/github.com/${repo} ]]; then
+    mkdir -p ${DIR}/src/github.com/${repo}
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+    if ! git clone --depth=1 --branch ${BRANCH} git@github.com:${repo} $(pwd); then
+      echo "error: ${repo} is not a valid Git repository" 2>&1
+    fi
+    popd &>/dev/null
+  fi
+done
+
+# create a commit in each repo
+if [[ "${1-}" == "bump" ]]; then
+  for repo in `managed_repos "${BRANCH}"`; do
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+    git checkout ${BRANCH}
+    git fetch origin ${BRANCH} 2>/dev/null
+    git reset --hard origin/${BRANCH} >/dev/null
+    echo date '+%Y%m%d-%H%M%S' > .repo-date; git add .repo-date; git commit -S -m "Updating branch ${BRANCH}"
+    popd &>/dev/null
+  done
+  exit 0
+fi
+
+# create a commit in each repo
+if [[ "${1-}" == "fast-forward" ]]; then
+  if [[ -z "${TO-}"  ]]; then
+    echo "Must set TO= to the major/minor version of the release to fast-forward"
+    exit 1
+  fi
+  TO_BRANCH=release-${TO}
+  if [[ -n "${PUSH-}" ]]; then
+    echo "info: Pushing ${TO_BRANCH}"
+  else
+    echo "info: Showing commits that exist on ${BRANCH} but not ${TO_BRANCH}, set PUSH=1 to push"
+  fi
+  for repo in `managed_repos "${TO_BRANCH}"`; do
+    echo "${repo}"
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+    if ! git fetch origin --deepen=300 --update-shallow -n -f ${TO_BRANCH}:remotes/origin/${TO_BRANCH} ${BRANCH}:remotes/origin/${BRANCH} &>/dev/null; then
+      echo "error: ${repo} does not have a ${TO_BRANCH} branch" 2>&1
+      continue
+    fi
+    if ! git rev-parse --verify ${TO_BRANCH} &>/dev/null; then
+      git branch ${TO_BRANCH} origin/${TO_BRANCH}
+    fi
+    git checkout ${TO_BRANCH} &>/dev/null
+    git reset --hard origin/${TO_BRANCH} &>/dev/null
+    if ! git pull --ff-only --ff origin ${BRANCH} &>/dev/null; then
+      echo "error: ${repo} cannot fast-forward ${TO_BRANCH} cleanly from master" 2>&1
+      continue
+    fi
+    git --no-pager log --oneline origin/${TO_BRANCH}..${TO_BRANCH}
+    if [[ -n "${PUSH-}" ]]; then
+      git push origin "${TO_BRANCH}"
+    fi
+    popd &>/dev/null
+  done
+  exit 0
+fi
+
+# clear the repos back to a known state
+if [[ "${1-}" == "reset" ]]; then
+  for repo in `managed_repos "${BRANCH}"`; do
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+    git fetch origin ${BRANCH} 2>/dev/null
+    git checkout ${BRANCH}
+    git reset origin/${BRANCH} --hard >/dev/null
+    if [[ -n "${FROM-}" ]]; then
+      git branch -D release-${FROM} || true
+      git tag -d v${FROM}.0-rc.0 || true
+    fi
+    if [[ -n "${TO-}" ]]; then
+      git tag -d v${TO}.0-alpha.0 || true
+    fi
+    popd &>/dev/null
+  done
+  exit 0
+fi
+
+out=""
+for repo in `managed_repos "${BRANCH}"`; do
+  pushd ${DIR}/src/github.com/${repo} &>/dev/null
+
+  if ! git rev-parse HEAD &>/dev/null; then
+    echo "error: ${repo} is not a git directory" 2>&1
+    continue
+  fi
+
+  if [[ "${1-}" == "" ]]; then
+    out+="${repo}|$( git log --relative-date --pretty='%cd|%h|%s' -1 origin/${BRANCH} -- || true )\n"
+    continue
+  fi
+
+  if [[ -z "${FROM-}" ]]; then
+    echo "Must set FROM= to the major/minor version of the current release, e.g. 3.9"
+    exit 1
+  fi
+
+  if [[ "${1-}" == "create" ]]; then
+    if git rev-parse release-${FROM} &>/dev/null; then
+      continue
+    fi
+    git checkout -b release-${FROM} ${BRANCH}
+    git push origin "release-${FROM}"
+    continue
+  fi
+
+  if [[ "${1-}" != "push" && "${1-}" != "try" ]]; then
+    echo "Must set argument to 'push' or 'try' to continue"
+    exit 1
+  fi
+
+  if [[ -z "${TO-}" ]]; then
+    echo "Must set TO= to the major/minor version of the next release, e.g. 3.10"
+    exit 1
+  fi
+
+  if git rev-parse release-${FROM} &>/dev/null; then
+    echo "release-${FROM} branch already exists" 2>&1
+    continue
+  fi
+  git checkout -b release-${FROM} ${BRANCH}
+  git checkout ${BRANCH}
+
+  ! git rev-parse v${TO}.0-rc.0 &>/dev/null
+  git tag -f -s -a -m "v${FROM}.0-rc.0" v${FROM}.0-rc.0
+  echo ${TO} > .release; git add .release; git commit -S -m "Branch for v${TO}"
+
+  ! git rev-parse v${TO}.0-alpha.0 &>/dev/null
+  git tag -f -s -a -m "v${TO}.0-alpha.0" v${TO}.0-alpha.0
+
+  if [[ "${1-}" == "push" ]]; then
+    git push origin "release-${FROM}" "v${TO}.0-alpha.0" "v${FROM}.0-rc.0" "${BRANCH}"
+  fi
+
+  popd &>/dev/null
+done
+echo $out | column -ts '|'

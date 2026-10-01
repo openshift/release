@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-workload-monitoring-config
+  namespace: openshift-user-workload-monitoring
+data:
+  config.yaml: |
+    prometheus:
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 100Gi
+      retention: "30d"
+    alertmanager:
+      enabled: true
+      enableAlertmanagerConfig: true
+      # Mounted at /etc/alertmanager/secrets/alert-proxy-alertmanager-webhook/;
+      # the alert-proxy receiver reads the bearer token from the token key
+      # rather than having it interpolated into the rendered config.
+      secrets:
+      - alert-proxy-alertmanager-webhook
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 10Gi

@@ -1,0 +1,1 @@
+../../test/generate-yamls/capz-test-generate-yamls-commands.sh

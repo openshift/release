@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hypershift-pool-admins
+  annotations:
+    openshift.io/description: Service Accounts for hypershift-pool-admins
+    openshift.io/display-name: hypershift-pool-admins CI
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: periodic-job-bot
+  namespace: hypershift-pool-admins
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-token-secret
+  namespace: hypershift-pool-admins
+  annotations:
+    kubernetes.io/service-account.name: periodic-job-bot
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-owner
+  namespace: hypershift-pool-admins
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["api-token-secret"]
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-owner-hypershift-pool-admins
+  namespace: hypershift-pool-admins
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: hypershift-pool-admins
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-owner

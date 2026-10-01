@@ -1,0 +1,81 @@
+ref:
+  as: etcd-encryption-vault-configure
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: etcd-encryption-vault-configure-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: VAULT_NAMESPACE
+    default: "vault-kms"
+    documentation: |-
+      Namespace where Vault Enterprise is installed.
+  - name: VAULT_KMS_KEY_NAME
+    default: "kms-key"
+    documentation: |-
+      Name of the transit encryption key to create in Vault for KMS encryption.
+      This key will be used by the Kubernetes API server for encrypting secrets.
+  - name: VAULT_ENTERPRISE_NS
+    default: "admin"
+    documentation: |-
+      Vault Enterprise namespace where the transit engine, AppRole auth, and
+      policies will be created. Must match the VaultNamespace configured in the
+      KMS plugin (defaults to "admin" in library-go test helpers).
+  - name: VAULT_SECONDARY_NAMESPACE
+    default: "vault-kms-secondary"
+    documentation: |-
+      Namespace where the second Vault Enterprise instance is installed.
+  - name: VAULT_SECONDARY_KMS_KEY_NAME
+    default: "kms-key-secondary"
+    documentation: |-
+      Name of the transit encryption key for the second Vault instance.
+      Must differ from VAULT_KMS_KEY_NAME to ensure each instance uses a distinct KEK.
+  - name: VAULT_KMS_PLUGIN_IMAGE
+    default: ""
+    documentation: |-
+      vault-kube-kms plugin image written to VaultKMSConfig status.kmsPluginImage when
+      mocking the operator. Falls back to ${SHARED_DIR}/vault-kms-plugin-image from install.
+  documentation: |-
+    Configures already-installed Vault instances for Kubernetes KMS encryption.
+
+    This step should run after etcd-encryption-vault-install.
+
+    Configuration steps (applied to both primary and secondary instances):
+    - Creates Vault Enterprise namespace (${VAULT_ENTERPRISE_NS})
+    - Enables transit secret engine in ${VAULT_ENTERPRISE_NS}
+    - Creates transit encryption key in ${VAULT_ENTERPRISE_NS}
+    - Enables AppRole authentication in ${VAULT_ENTERPRISE_NS}
+    - Creates KMS policy with encrypt/decrypt permissions in ${VAULT_ENTERPRISE_NS}
+    - Creates AppRole role (kms-plugin) in ${VAULT_ENTERPRISE_NS}
+    - Retrieves AppRole credentials from ${VAULT_ENTERPRISE_NS}
+    - Stores credentials in vault-credentials secret
+    - Installs VaultKMSConfig CRD and applies cluster VaultKMSConfig objects (operator mock)
+    - Copies AppRole credentials to openshift-config secrets for VaultKMSConfig
+
+    Each instance uses a distinct transit key (${VAULT_KMS_KEY_NAME} vs
+    ${VAULT_SECONDARY_KMS_KEY_NAME}) to ensure independent KEKs.
+
+    Prerequisites:
+    - Vault must be installed and pods Ready (run etcd-encryption-vault-install first)
+    - OpenShift cluster with vault-0 running in ${VAULT_NAMESPACE}
+      and vault-secondary-0 running in ${VAULT_SECONDARY_NAMESPACE}
+
+    Outputs (primary):
+    - Cluster VaultKMSConfig: ${VAULT_NAMESPACE} (name matches Vault install namespace)
+    - AppRole secret: vault-approle-secret (openshift-config namespace)
+    - Credentials stored in: vault-credentials secret (namespace: ${VAULT_NAMESPACE})
+      * role-id: AppRole role ID
+      * secret-id: AppRole secret ID
+      * root-token: Vault root token
+
+    Outputs (secondary):
+    - Cluster VaultKMSConfig: ${VAULT_SECONDARY_NAMESPACE}
+    - AppRole secret: vault-approle-secret-secondary (openshift-config namespace)
+    - Credentials stored in: vault-credentials secret (namespace: ${VAULT_SECONDARY_NAMESPACE})
+      * role-id: AppRole role ID
+      * secret-id: AppRole secret ID
+      * root-token: Vault root token

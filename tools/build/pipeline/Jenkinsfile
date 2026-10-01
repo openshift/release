@@ -1,0 +1,72 @@
+#!/usr/bin/groovy
+
+def library_url = "${env.RELEASE_LIBRARY_URL ?: 'github.com/openshift/release-library' }"
+def library_ref = "${env.RELEASE_LIBRARY_REF ?: 'legacy' }"
+
+library "${library_url}@${library_ref}"
+
+def contextDir="tools/build/config"
+
+pipeline {
+  agent any
+
+  parameters {
+    string(defaultValue: "${env.RELEASE_URL ?: 'https://github.com/openshift/release.git' }", name: "RELEASE_URL", description: "URL of the release repository to build")
+    string(defaultValue: "${env.RELEASE_REF ?: 'master' }", name: "RELEASE_REF", description: "Git reference of release repository")
+  }
+
+  stages {
+    stage("Create release-ci image stream") {
+      when {
+        not { expression { return imageStreamExists(this, "release-ci") } }
+      }
+      steps {
+        sh "oc create imagestream release-ci"
+      }
+    }
+    stage("Import origin-release image stream") {
+      steps {
+        sh "oc import-image origin-release:golang-1.8 --from openshift/origin-release:golang-1.8 --confirm"
+      }
+    }
+    stage("Create release-ci-binary build") {
+      steps {
+        applyTemplate(this, "${contextDir}/build-release-ci.yaml",
+          "RELEASE_URL=${params.RELEASE_URL}",
+          "RELEASE_REF=${params.RELEASE_REF}")
+      }
+    }
+    stage("Build Binary") {
+      steps {
+        waitForTag(this, "origin-release", "golang-1.8")
+        runBuild(this, "release-ci-binary")
+      }
+    }
+    stage("Provision binary to Jenkins") {
+      steps {
+        waitForTag(this, "release-ci", "binary")
+        script {
+          openshift.withCluster() {
+            def releaseCI = openshift.selector("is/release-ci")
+            def imageName = releaseCI.object().status.dockerImageRepository
+            deploymentName = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+            sh "oc run --quiet ${deploymentName} --image ${imageName}:binary --command -- /bin/bash -c 'while(true); do date; sleep 60; done'"
+            def extractDC = openshift.selector("dc/${deploymentName}")
+            extractDC.rollout().status("-w")
+            def podName = extractDC.related("pods").name()
+            def podObjectName = podName.tokenize("/")[1]
+            sh "oc rsync ${podObjectName}:/usr/bin/release-ci ."
+            sh "mkdir -p /var/lib/jenkins/tools"
+            sh "cp ./release-ci /var/lib/jenkins/tools"
+            extractDC.delete()
+          }
+        }
+      }
+    }
+  }
+  post {
+    always {
+      deleteDir()
+    }
+  }
+}

@@ -1,0 +1,582 @@
+periodics:
+- agent: kubernetes
+  cluster: build08
+  cron: 0 8 * * *
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-cleanup-hypershift-aws
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=cleanup-hypershift-aws
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build08
+  cron: 0 1 * * 5
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-cleanup-rosa-nightly
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=cleanup-rosa-nightly
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build08
+  cron: 0 8 * * *
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-cleanup-selfservice-aws
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=cleanup-selfservice-aws
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build08
+  cron: 0 8 * * *
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-cleanup-tekton-aws
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=cleanup-tekton-aws
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build08
+  cron: 0 3 * * 0
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-int-clusters-cleanup
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=int-clusters-cleanup
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build08
+  cron: 0 2 * * 0
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-prod-clusters-cleanup
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=prod-clusters-cleanup
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build08
+  cron: 0 1 * * 0
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-stage-clusters-cleanup
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=stage-clusters-cleanup
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator

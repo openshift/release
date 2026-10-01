@@ -1,0 +1,24 @@
+chain:
+  as: p2p-mtv-mig-config
+  steps:
+    - ref: p2p-mtv-additional-config
+    - ref: p2p-mtv-register-providers
+    - ref: p2p-mtv-create-migration-maps
+  documentation: |-
+    Configure MTV for cross-cluster live migration (CCLM) on the ACM hub and wire spoke clusters.
+
+    This chain sequences three steps:
+      1. p2p-mtv-additional-config
+         Applies ForkliftController with feature_ocp_live_migration=true (CCLM) on the hub after
+         install-operators deploys mtv-operator; waits for forklift-controller deployment Available.
+
+      2. p2p-mtv-register-providers
+         Registers each ACM spoke as an MTV OpenShift Provider on the hub (ManifestWork RBAC,
+         token+cacert secrets, Provider CR Ready).
+
+      3. p2p-mtv-create-migration-maps
+         Creates pod-to-pod NetworkMap and ODF StorageMap between source and destination providers;
+         requires ODF Available on both spokes (p2p-install-odf-spokes).
+
+    Requires install-operators (mtv-operator on hub), acm-fetch-managed-clusters, and
+    p2p-install-odf-spokes before this chain.

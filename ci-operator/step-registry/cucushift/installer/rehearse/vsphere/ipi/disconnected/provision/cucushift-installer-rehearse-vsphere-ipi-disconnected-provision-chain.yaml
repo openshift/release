@@ -1,0 +1,23 @@
+chain:
+  as: cucushift-installer-rehearse-vsphere-ipi-disconnected-provision
+  steps:
+  - chain: ipi-conf-vsphere
+  - ref: ipi-install-rbac
+  - chain: vsphere-provision-bastionhost
+  - ref: mirror-images-by-oc-adm-in-bastion
+  - ref: ipi-conf-mirror
+  - ref: ipi-install-install
+  - ref: ipi-install-vsphere-registry
+  - ref: enable-qe-catalogsource-disconnected
+  - ref: mirror-images-tag-images
+  - ref: set-sample-operator-disconnected
+  - chain: cucushift-installer-check
+  env:
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+  - name: PULL_THROUGH_CACHE
+    default: "disabled"
+    documentation: |-
+      Register DNS for mirror registry.
+  documentation: |-
+    Create an IPI cluster in disconnected network on vSphere for QE e2e tests.
