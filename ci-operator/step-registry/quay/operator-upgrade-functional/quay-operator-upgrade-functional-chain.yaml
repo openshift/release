@@ -25,6 +25,18 @@ chain:
   - name: PLAYWRIGHT_ARTIFACT_SUBDIR
     default: n-functional
     documentation: Keep post-upgrade functional-regression reports separate from seed and verify artifacts.
+  - name: PLAYWRIGHT_GREP_INVERT
+    default: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves and loads architecture filter with mirror configuration|loads existing architecture filter from saved mirror configuration'
+    documentation: |-
+      Regex passed to `playwright test --grep-invert` for the post-upgrade full
+      suite. Beyond the standard quarantine (unsupported auth backends, webhook,
+      quota-notification, and the known arch-filter race specs), this MUST exclude
+      the @upgrade-seed and @upgrade-verify specs: they ran as the dedicated seed
+      and verify phases, and the verify phase already removed the seeded fixtures
+      (UPGRADE_CLEAN), so re-running @upgrade-verify here would fail. The upgrade
+      job therefore does not set PLAYWRIGHT_GREP_INVERT at the shared steps.env
+      level (that would also zero out the seed/verify --grep selections); the
+      exclusion lives here so it applies to the functional phase only.
   documentation: |-
     Thin n functional-regression wrapper around quay-test-e2e. Runs the complete
     target (3.18) suite after the upgrade to prove core functionality on the
