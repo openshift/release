@@ -2,7 +2,7 @@
 
 Python generator that reads a compact `matrix.yaml.in` and writes [ci-operator](https://docs.ci.openshift.org/) config files for each test cell.
 
-Templating is Jinja `{{ variable }}` placeholders only. Conditionals and loops stay in `generate.py`, not in the YAML templates.
+Templating is Jinja `{{ variable }}` placeholders plus `{% if %}` on cell flags (`arch`, `layout`, `fips`). Expansion and merging stay in `generate.py`, not in the YAML templates.
 
 Each generated file starts with a `# DO NOT EDIT` header pointing back at `matrix.yaml.in`, `templates/`, and `generate.py`.
 
@@ -78,6 +78,7 @@ quay:
 | `quay[].jobs[].always_run` / `.optional` / `.run_if_changed` / `.skip_if_only_changed` | Presubmit trigger fields, copied onto the test when set. `run_if_changed` and `skip_if_only_changed` are mutually exclusive; `always_run: true` cannot combine with either. Only valid when `kind: presubmit`. |
 | `quay[].jobs[].env` | Optional per-job env; keys replace branch env of the same name |
 | `quay[].jobs[].as` | Optional ci-operator test name. Defaults to `{cloud}-{storage}-{source}` for `periodic` (for example `aws-s3-nightly`) and `{cloud}-{storage}` for `presubmit` (for example `aws-s3`) -- cron changes only timing, never the name. Split the job into its own row when only some clouds need a different name. |
+| `quay[].jobs[].fips` | Optional boolean, periodic only. `true` installs a FIPS cluster (`FIPS_ENABLED`), runs `fips-check-fips-or-die` first, sets `FEATURE_FIPS: true` in `QUAY_EXTRA_CONFIG`, and turns Mailpit off (`QUAY_DEPLOY_MAILPIT: "false"`; `FEATURE_FIPS` requires `MAIL_USE_TLS`, so the `@feature:MAILING` specs self-skip). The derived `as` gets a `-fips` suffix; the filename does not change, so a FIPS row shares its non-FIPS sibling's file. |
 | `quay[].jobs[].arches` | Optional non-empty list of `amd64` / `arm64` / `s390x`, no duplicates. Defaults to `[global_defaults.arch]`. Expands into the cartesian product alongside `ocp` and `clouds`. |
 
 The `libvirt` cloud maps to S3 storage (`STORAGE_BY_CLOUD` in `model.py`); its `s390x` arch cell provisions through the IBM Z libvirt workflow (`quay-tests-libvirt-s390x`) instead of an `ipi-*` cloud installer.

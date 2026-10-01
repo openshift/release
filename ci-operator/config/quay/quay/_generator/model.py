@@ -50,6 +50,7 @@ class Cell:
     optional: bool | None = None
     run_if_changed: str | None = None
     skip_if_only_changed: str | None = None
+    fips: bool = False
 
     @property
     def quay_version_dashed(self) -> str:
@@ -107,9 +108,12 @@ class Cell:
     def test_as(self) -> str:
         # No arch suffix: a non-amd64 arch is already in the variant, which
         # Prow puts ahead of `as` in the job name.
-        if self.kind == "periodic":
-            return f"{self.cloud}-{self.storage}-{self.source}"
-        return f"{self.cloud}-{self.storage}"
+        base = (
+            f"{self.cloud}-{self.storage}-{self.source}"
+            if self.kind == "periodic"
+            else f"{self.cloud}-{self.storage}"
+        )
+        return f"{base}-fips" if self.fips else base
 
     @property
     def filename(self) -> str:
@@ -139,6 +143,7 @@ class Cell:
             "deploy_ref": self.deploy_ref,
             "kind": self.kind,
             "layout": self.layout,
+            "fips": self.fips,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version
