@@ -334,7 +334,9 @@ function RedactOutput () {
 # EnsurePasswdEntry — the OpenSSH client refuses to run when the pod's random UID
 # has no passwd entry; the cli-with-ssh image makes /etc/passwd group-writable.
 function EnsurePasswdEntry () {
-  whoami &>/dev/null && return 0
+  # stdout discarded (boolean probe). stderr stays open so a missing whoami
+  # or unexpected failure is visible in CI logs.
+  whoami 1>/dev/null && return 0
   [[ -w /etc/passwd ]] || {
     printf 'ERROR: no passwd entry for uid %s and /etc/passwd is not writable\n' "$(id -u)" >&2
     return 1
@@ -455,28 +457,36 @@ function VerifyVmDataIntegrity () {
   [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
   set +x
 
-  typeset -i i failed=0
-  for (( i = 1; i <= vmCount; i++ )); do
-    typeset vmName actualMarker=""
-    vmName="$(VmName "${i}")"
+  typeset -i _rc=0
+  {
+    typeset -i i failed=0
+    for (( i = 1; i <= vmCount; i++ )); do
+      typeset vmName actualMarker=""
+      vmName="$(VmName "${i}")"
 
-    if ! actualMarker="$(VmSshChecked "${vmName}" 'cat /home/cloud-user/migration-marker.txt')"; then
-      printf 'ERROR: Integrity marker missing or unreadable on %s\n' "${vmName}" >&2
-      (( ++failed ))
-      continue
-    fi
+      if ! actualMarker="$(VmSshChecked "${vmName}" 'cat /home/cloud-user/migration-marker.txt')"; then
+        printf 'ERROR: Integrity marker missing or unreadable on %s\n' "${vmName}" >&2
+        (( ++failed ))
+        continue
+      fi
 
-    if [[ "${actualMarker%$'\r'}" == "${vmName}" ]]; then
-      : "Data integrity verified for ${vmName}"
-    else
-      # Log only a mismatch indicator — never log raw marker content.
-      printf 'ERROR: Data integrity FAIL for %s (marker mismatch)\n' "${vmName}" >&2
-      (( ++failed ))
-    fi
-  done
+      if [[ "${actualMarker%$'\r'}" == "${vmName}" ]]; then
+        # Use printf >&2 (not : "...") — the null-command is invisible inside set +x.
+        # Log the VM name only; never log raw marker content.
+        printf 'INFO: data integrity verified for %s\n' "${vmName}" >&2
+      else
+        # Log only a mismatch indicator — never log raw marker content.
+        printf 'ERROR: Data integrity FAIL for %s (marker mismatch)\n' "${vmName}" >&2
+        (( ++failed ))
+      fi
+    done
+    (( failed == 0 ))
+  } || _rc=$?
 
-  [[ "${_wasTracing}" == "true" ]] && set -x
-  (( failed == 0 ))
+  if [[ "${_wasTracing}" == "true" ]]; then
+    set -x
+  fi
+  return "${_rc}"
 }
 
 # CollectDestLaunchers — fill nameref arrays of VM names and Running virt-launcher pods.
@@ -500,40 +510,45 @@ function CollectDestLaunchers () {
   [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
   set +x
 
-  # Snapshot all virt-launcher pods once — avoids N oc calls in the loop.
-  typeset podsJson
-  podsJson="$(DestOc get pods -n "${targetNs}" -l kubevirt.io=virt-launcher -o json || true)"
+  typeset -i _rc=0
+  {
+    # Snapshot all virt-launcher pods once — avoids N oc calls in the loop.
+    typeset podsJson
+    podsJson="$(DestOc get pods -n "${targetNs}" -l kubevirt.io=virt-launcher -o json || true)"
 
-  for (( i = 1; i <= vmCount; i++ )); do
-    typeset vmn pod
-    vmn="$(VmName "${i}")"
-    _names+=("${vmn}")
+    for (( i = 1; i <= vmCount; i++ )); do
+      typeset vmn pod
+      vmn="$(VmName "${i}")"
+      _names+=("${vmn}")
 
-    # Strategy 1: kubevirt.io/domain label equals VM name.
-    pod="$(printf '%s' "${podsJson}" \
-      | OcWithRedactedStderr jq -r --arg d "${vmn}" \
-        'first(.items[]
-         | select(.metadata.labels["kubevirt.io/domain"]==$d)
-         | select(.status.phase=="Running")
-         | .metadata.name) // ""' \
-      || true)"
-
-    # Strategy 2: pod name prefix fallback (post-CCLM pods may lack the domain label).
-    if [[ -z "${pod}" ]]; then
+      # Strategy 1: kubevirt.io/domain label equals VM name.
       pod="$(printf '%s' "${podsJson}" \
-        | OcWithRedactedStderr jq -r --arg n "${vmn}" \
+        | OcWithRedactedStderr jq -r --arg d "${vmn}" \
           'first(.items[]
-           | select(.metadata.name | startswith("virt-launcher-" + $n + "-"))
+           | select(.metadata.labels["kubevirt.io/domain"]==$d)
            | select(.status.phase=="Running")
            | .metadata.name) // ""' \
         || true)"
-    fi
 
-    _pods+=("${pod}")
-  done
+      # Strategy 2: pod name prefix fallback (post-CCLM pods may lack the domain label).
+      if [[ -z "${pod}" ]]; then
+        pod="$(printf '%s' "${podsJson}" \
+          | OcWithRedactedStderr jq -r --arg n "${vmn}" \
+            'first(.items[]
+             | select(.metadata.name | startswith("virt-launcher-" + $n + "-"))
+             | select(.status.phase=="Running")
+             | .metadata.name) // ""' \
+          || true)"
+      fi
 
-  [[ "${_wasTracing}" == "true" ]] && set -x
-  true
+      _pods+=("${pod}")
+    done
+  } || _rc=$?
+
+  if [[ "${_wasTracing}" == "true" ]]; then
+    set -x
+  fi
+  return "${_rc}"
 }
 
 # VerifyGuestDiskIo — write, fsync, checksum, and remove a scratch file inside each guest.
@@ -653,10 +668,12 @@ function VerifyPvcAttachment () {
   return "${_rc}"
 }
 
-# VerifyPvcIntegrity — verify destination rootdisk PVC Bound phase plus retained
-# spec metadata: requested size, accessModes, and volumeMode (defaults match
-# P2P_HS_VM_DISK_SIZE / RWX Block from p2p-create-cclm-test-vms). Observed
-# capacity is logged for human review (provisioners may round up).
+# VerifyPvcIntegrity — verify destination rootdisk PVC is Bound and that spec
+# metadata survived migration. When the source PVC still exists, compare
+# requested size, accessModes, and volumeMode to the destination. Always also
+# assert dest against the create-time env (P2P_HS_VM_DISK_SIZE / RWX Block);
+# source PVCs are deleted after some hub-spoke legs. Observed capacity is
+# logged for human review (provisioners may round up).
 # Skipped (rc=77) when MTV_PVC_CHECK=false.
 function VerifyPvcIntegrity () {
   [[ "${pvcCheck}" == "true" ]] || return 77
@@ -696,6 +713,38 @@ function VerifyPvcIntegrity () {
       typeset capacityStr
       capacityStr="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '.status.capacity.storage // ""')"
       printf 'INFO: PVC %s status.capacity.storage=%s\n' "${pvcName}" "${capacityStr:-<empty>}" >&2
+
+      # Source↔dest metadata comparison when the source PVC is still present.
+      # StorageClass is not compared: MTV storage maps may remap it.
+      typeset srcPvcJson=""
+      srcPvcJson="$(SourceOc get "pvc/${pvcName}" -n "${MTV_TEST_VM_NAMESPACE}" -o json)" || srcPvcJson=""
+      if [[ -n "${srcPvcJson}" ]]; then
+        typeset srcSize dstSize srcModes dstModes srcVolMode dstVolMode
+        srcSize="$(printf '%s' "${srcPvcJson}" | OcWithRedactedStderr jq -r '.spec.resources.requests.storage // ""')"
+        dstSize="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '.spec.resources.requests.storage // ""')"
+        srcModes="$(printf '%s' "${srcPvcJson}" | OcWithRedactedStderr jq -r '(.spec.accessModes // []) | sort | join(",")')"
+        dstModes="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '(.spec.accessModes // []) | sort | join(",")')"
+        srcVolMode="$(printf '%s' "${srcPvcJson}" | OcWithRedactedStderr jq -r '.spec.volumeMode // ""')"
+        dstVolMode="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '.spec.volumeMode // ""')"
+        if [[ "${dstSize}" != "${srcSize}" ]]; then
+          printf 'ERROR: PVC %s requested storage dest=%s source=%s\n' \
+            "${pvcName}" "${dstSize}" "${srcSize}" >&2
+          (( ++failed ))
+        fi
+        if [[ "${dstModes}" != "${srcModes}" ]]; then
+          printf 'ERROR: PVC %s accessModes dest=%s source=%s\n' \
+            "${pvcName}" "${dstModes}" "${srcModes}" >&2
+          (( ++failed ))
+        fi
+        if [[ "${dstVolMode}" != "${srcVolMode}" ]]; then
+          printf 'ERROR: PVC %s volumeMode dest=%s source=%s\n' \
+            "${pvcName}" "${dstVolMode}" "${srcVolMode}" >&2
+          (( ++failed ))
+        fi
+      else
+        printf 'INFO: source PVC %s not present; comparing destination against expected env only\n' \
+          "${pvcName}" >&2
+      fi
 
       # Size check — compare spec.resources.requests.storage when MTV_VM_ROOTDISK_SIZE is set.
       if [[ -n "${rootdiskSize}" ]]; then
