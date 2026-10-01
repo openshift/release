@@ -1,0 +1,124 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman AS podman
+      FROM src
+      USER 0
+      RUN dnf install -y podman shadow-utils libcap && dnf clean all && \
+          setcap cap_setuid+ep /usr/bin/newuidmap && \
+          setcap cap_setgid+ep /usr/bin/newgidmap && \
+          touch /etc/subgid /etc/subuid && \
+          chmod g=u /etc/subuid /etc/subgid && \
+          chmod g=u /etc/passwd /etc/group
+      COPY --from=podman /entrypoint.sh /entrypoint.sh
+      RUN chmod +rx /entrypoint.sh
+      ENV BUILDAH_ISOLATION=chroot
+      ENV HOME=/tmp
+      USER 1000
+      ENTRYPOINT ["/entrypoint.sh"]
+      CMD ["bash"]
+    inputs:
+      nested-podman:
+        as:
+        - nested-podman
+      src:
+        as:
+        - src
+    to: auto-rebase-runner
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: auto-rebase
+  capabilities:
+  - nested-podman
+  cron: 0 6 * * 1
+  steps:
+    test:
+    - as: auto-rebase
+      commands: |
+        set -euo pipefail
+
+        # --- Mint a GitHub App installation token (openshift-app-platform-shift-bot) ---
+        APP_ID=$(cat /var/run/github-app/app-id)
+        PEM_PATH="/var/run/github-app/private-key.pem"
+        HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        NOW=$(date +%s); IAT=$((NOW - 60)); EXP=$((NOW + 300))
+        PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$IAT" "$EXP" "$APP_ID" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        SIGNATURE=$(printf '%s' "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$PEM_PATH" -binary | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+
+        REPO_OWNER="openshift"
+        REPO_NAME="ansible-operator-plugins"
+
+        INSTALL_RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time 30 \
+          -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/installation")
+        HTTP_CODE=$(echo "$INSTALL_RESPONSE" | tail -1)
+        INSTALL_BODY=$(echo "$INSTALL_RESPONSE" | sed '$d')
+        if [[ "$HTTP_CODE" == 404 ]]; then
+          echo "ERROR: GitHub App has no installation access to ${REPO_OWNER}/${REPO_NAME}; add this repository to the App installation" >&2
+          exit 1
+        elif [[ "$HTTP_CODE" != 200 ]]; then
+          echo "ERROR: GitHub App installation lookup failed for ${REPO_OWNER}/${REPO_NAME} (HTTP ${HTTP_CODE})" >&2
+          exit 1
+        fi
+        INST_ID=$(echo "$INSTALL_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+        TOKEN_REQUEST=$(printf '{"repositories":["%s"],"permissions":{"contents":"write","pull_requests":"write"}}' "$REPO_NAME")
+        TOKEN_RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time 30 -X POST \
+          -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          -H "Content-Type: application/json" -d "$TOKEN_REQUEST" \
+          "https://api.github.com/app/installations/${INST_ID}/access_tokens")
+        T_CODE=$(echo "$TOKEN_RESPONSE" | tail -1)
+        T_BODY=$(echo "$TOKEN_RESPONSE" | sed '$d')
+        if [[ "$T_CODE" -ne 201 ]]; then
+          echo "ERROR: Failed to mint installation token (HTTP ${T_CODE})" >&2
+          exit 1
+        fi
+        export GITHUB_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+        # Install gh + oc CLIs (not in the base src image).
+        # oc is required by update_golang_builder / _resolve_builder_ocp.
+        GH_VERSION=2.62.0
+        curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+          | tar -xz -C /tmp
+        mkdir -p /tmp/bin
+        curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" \
+          | tar -xz -C /tmp/bin oc
+        export PATH="/tmp/bin:/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
+
+        git config --global --add safe.directory "$(pwd)"
+        export FORCE_REMOTE_URLS=1
+        export CONTAINER_ENGINE=podman
+        export REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
+        ./hack/auto-rebase.sh
+      credentials:
+      - mount_path: /var/run/github-app
+        name: openshift-app-platform-shift-github-bot
+        namespace: test-credentials
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: auto-rebase-runner
+      nested_podman: true
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: ansible-operator-plugins
+  variant: periodics
