@@ -131,6 +131,15 @@ RESULTS_DIR="$(mktemp -d /tmp/kata-results-XXXXXX)"
 export RESULTS_DIR
 
 RUNNER="${RUNNER_DIR}/test/e2e/run_upstream_tests.sh"
+# test/e2e only exists on devel today, so a ref that predates it (or a fork
+# that never carried it) resolves to nothing. Say so instead of letting the
+# invocation below fail with a bare "No such file or directory".
+if [[ ! -x "${RUNNER}" ]]; then
+    echo "ERROR: test/e2e/run_upstream_tests.sh not found at ref ${RUNNER_REPO_REF}"
+    echo "       Set TESTS_KATA_UPSTREAM_RUNNER_REPO_REF to a ref that carries the runner."
+    exit 1
+fi
+
 runner_args=(-t "${TEST_PROFILE}")
 [[ -n "${TESTS_REPO}" ]]     && runner_args+=(--tests-repo "${TESTS_REPO}")
 [[ -n "${TESTS_REPO_REF}" ]] && runner_args+=(--tests-repo-ref "${TESTS_REPO_REF}")

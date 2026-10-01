@@ -92,6 +92,15 @@ git -C "${TESTS_DIR}" checkout -q FETCH_HEAD
 # Record the commit actually used: the default ref tracks a moving branch, so
 # this is what tells a later reader whether the tests changed between runs.
 echo "Tests commit: $(git -C "${TESTS_DIR}" rev-parse HEAD)"
+
+# test/e2e only exists on devel today, so a ref that predates it (or a fork
+# that never carried it) resolves to nothing. Say so instead of letting the
+# cd below fail with a bare "No such file or directory".
+if [[ ! -d "${TESTS_DIR}/test/e2e" ]]; then
+    echo "ERROR: test/e2e not found at ref ${TESTS_OSC_REPO_REF}"
+    echo "       Set TESTS_OSC_REPO_REF to a ref that carries the tests."
+    exit 1
+fi
 cd "${TESTS_DIR}/test/e2e"
 
 # --- Run the golang (Ginkgo v2) e2e tests ------------------------------------

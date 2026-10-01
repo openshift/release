@@ -175,6 +175,15 @@ RESULTS_DIR="$(mktemp -d /tmp/caa-results-XXXXXX)"
 export RESULTS_DIR
 
 RUNNER="${RUNNER_DIR}/test/e2e/run_caa_tests.sh"
+# test/e2e only exists on devel today, so a ref that predates it (or a fork
+# that never carried it) resolves to nothing. Say so instead of letting the
+# invocation below fail with a bare "No such file or directory".
+if [[ ! -x "${RUNNER}" ]]; then
+    echo "ERROR: test/e2e/run_caa_tests.sh not found at ref ${RUNNER_REPO_REF}"
+    echo "       Set TESTS_CAA_RUNNER_REPO_REF to a ref that carries the runner."
+    exit 1
+fi
+
 runner_args=(-p "${PROVIDER}")
 [[ -n "${PROFILE}" ]]        && runner_args+=(-t "${PROFILE}")
 [[ -n "${TIMEOUT}" ]]        && runner_args+=(--timeout "${TIMEOUT}")
