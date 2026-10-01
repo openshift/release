@@ -18,7 +18,7 @@ REGION_PROJECT=$(<"${SHARED_DIR}/region-project-id")
 REGION_CLUSTER_NAME=$(<"${SHARED_DIR}/region-cluster-name")
 MC_PROJECT=$(<"${SHARED_DIR}/mc-project-id")
 MC_CLUSTER_NAME=$(<"${SHARED_DIR}/mc-cluster-name")
-REGION=${GCP_REGION:-us-central1}
+REGION=${GCP_REGION:-us-east1}
 
 echo "  Region Project:  ${REGION_PROJECT}"
 echo "  Region Cluster:  ${REGION_CLUSTER_NAME}"
