@@ -1,0 +1,38 @@
+ref:
+  as: netobserv-day0-patch-cno
+  from: netobserv-perfscale
+  cli: latest
+  commands: netobserv-day0-patch-cno-commands.sh
+  env:
+  - name: NETOBSERV_INSTALLATION_POLICY
+    default: "InstallAndEnable"
+    documentation: |-
+      installationPolicy value to patch onto network.config/cluster.
+      Defaults to "InstallAndEnable" to trigger NetObserv deployment via CNO.
+  - name: NETOBSERV_NAMESPACE
+    default: "netobserv"
+    documentation: |-
+      Namespace where NetObserv components (FLP, console plugin) run.
+  - name: NETOBSERV_PRIVILEGED_NAMESPACE
+    default: "netobserv-privileged"
+    documentation: |-
+      Namespace where the eBPF agent DaemonSet runs.
+  - name: NETOBSERV_OPERATOR_NAMESPACE
+    default: "netobserv-operator"
+    documentation: |-
+      Namespace where the NetObserv operator controller manager runs.
+      When installed via CNO (InstallAndEnable), CNO creates it in "netobserv-operator".
+  - name: WAIT_TIMEOUT
+    default: "15m"
+    documentation: |-
+      Timeout for each wait condition (flowcollector Ready, deployments Available, pods Ready).
+  timeout: 30m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Patches network.config/cluster to set networkObservability.installationPolicy,
+    triggering CNO to install and enable NetObserv. Waits for FlowCollector Ready
+    condition and all component pods (controller manager, eBPF agent DaemonSet,
+    FLP Deployment or DaemonSet) to be Ready before exiting.
