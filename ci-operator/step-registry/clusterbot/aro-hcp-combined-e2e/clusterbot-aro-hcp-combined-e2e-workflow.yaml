@@ -1,0 +1,32 @@
+workflow:
+  as: clusterbot-aro-hcp-combined-e2e
+  steps:
+    allow_best_effort_post_steps: true
+    leases:
+    - env: LEASED_MSI_MOCK_SP
+      resource_type: aro-hcp-msi-mock-cs-sp-dev
+    - count: 2
+      env: LEASED_ARM_HELPER_SP
+      resource_type: aro-hcp-arm-helper-sp-dev
+    pre:
+    - ref: aro-hcp-lease-acquire
+    - ref: aro-hcp-write-config
+    - ref: aro-hcp-hypershift-images-push
+    - ref: clusterbot-aro-hcp-combined-provision
+    test:
+    - ref: aro-hcp-test-local
+    post:
+    - ref: aro-hcp-deprovision-tracked-resource-groups
+    - ref: aro-hcp-gather-provision-failure
+    - ref: aro-hcp-gather-visualization
+    - ref: aro-hcp-gather-test-visualization
+    - ref: aro-hcp-gather-custom-link-tools
+    - ref: aro-hcp-gather-observability
+    - ref: aro-hcp-gather-snapshot
+    - ref: aro-hcp-deprovision-environment
+    - ref: aro-hcp-lease-release
+  documentation: |-
+    Launch an isolated ARO HCP environment with service images built from an
+    Azure/ARO-HCP PR and a HyperShift Operator image built from an
+    openshift/hypershift PR. Provision once with both sets of image overrides,
+    then tear down the environment and release its leases after testing.
