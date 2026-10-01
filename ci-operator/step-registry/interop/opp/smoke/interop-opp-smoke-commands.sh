@@ -29,6 +29,24 @@ trap '_opp_cleanup' EXIT
 echo ">>> PHASE: initialization"
 
 # ---------------------------------------------------------------------------
+# Ensure jq is available (the "cli" image may not include it)
+# ---------------------------------------------------------------------------
+if ! command -v jq &>/dev/null; then
+    echo "INFO: jq not found in PATH; installing static binary..."
+    case "$(uname -m)" in
+        x86_64)  _jq_arch="amd64"; _jq_sha256="5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5" ;;
+        aarch64) _jq_arch="arm64"; _jq_sha256="4dd2d8a0661df0b22f1bb9a1f9830f06b6f3b8f7d91211a1ef5d7c4f06a8b4a5" ;;
+        *)       echo "FATAL: unsupported architecture $(uname -m) for jq bootstrap" >&2; exit 1 ;;
+    esac
+    curl -fsSL -o /tmp/jq \
+        "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-${_jq_arch}"
+    echo "${_jq_sha256}  /tmp/jq" | sha256sum --check --strict --quiet
+    chmod +x /tmp/jq
+    export PATH="/tmp:${PATH}"
+    echo "INFO: jq installed → $(jq --version) [${_jq_arch}, checksum verified]"
+fi
+
+# ---------------------------------------------------------------------------
 # OPP post-upgrade smoke tests
 #
 # Validates that OPP bundle components (ACM, ACS, ODF, Quay) are healthy
@@ -461,6 +479,7 @@ TestQuayPull() {
 
     # Find the Quay registry route
     typeset quayRoute=""
+    set +x  # suppress xtrace — route hostnames are sensitive
     if ! quayRoute="$(oc get routes --all-namespaces -o json | jq -r '
         .items[]
         | select(.metadata.name | test("quay"; "i"))
@@ -469,14 +488,17 @@ TestQuayPull() {
     ' | head -1)"; then
         : "Route query failed, trying QuayRegistry CR..."
     fi
+    set -x
 
     if [[ -z "${quayRoute}" ]]; then
         # Try looking for QuayRegistry CR to find the route
+        set +x  # suppress xtrace — registry endpoint URLs are sensitive
         if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json | jq -r '
             .items[0].status.registryEndpoint // empty
         ' | sed 's|^https://||')"; then
             : "QuayRegistry CR query failed"
         fi
+        set -x
     fi
 
     if [[ -z "${quayRoute}" ]]; then
@@ -506,9 +528,11 @@ TestQuayPull() {
     # Attempt to pull the Quay health endpoint (API check instead of image pull
     # since we may not have registry credentials configured)
     typeset httpCode=""
+    set +x  # suppress xtrace — URL contains route hostname
     if ! httpCode="$(curl -sk -o /dev/null -w '%{http_code}' "https://${quayRoute}/api/v1/discovery" --max-time 30)"; then
         httpCode=""
     fi
+    set -x
 
     if [[ "${httpCode}" =~ ^(200|401|403)$ ]]; then
         : "PASS: Quay registry responding (HTTP ${httpCode}) at ${quayRoute}"
