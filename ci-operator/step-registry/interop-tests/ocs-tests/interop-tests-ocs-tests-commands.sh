@@ -58,6 +58,12 @@ export BIN_FOLDER="${LOGS_FOLDER}/bin"
 # Function to clean up folders
 cleanup() {
     rm -f "${LOGS_CONFIG}"
+    if [[ -n "${_cluster_ps:-}" ]]; then
+        rm -f "${_cluster_ps}"
+    fi
+    if [[ -n "${_merged_ps:-}" ]]; then
+        rm -f "${_merged_ps}"
+    fi
     # Tear down local auth copy created for run-ci.
     [[ -d "${CLUSTER_PATH}/auth" ]] && rm -rf "${CLUSTER_PATH}/auth"
 }
@@ -117,6 +123,22 @@ if [ -s "${KUBECONFIG}" ]; then
     cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
 else #login for ROSA & Hypershift platforms
     (set +x; eval "$(cat "${SHARED_DIR}/api.login")")
+fi
+
+# --- Merge ODF Quay pull credentials into the cluster pull secret ---
+ODF_QUAY_CREDENTIALS_FILE="/tmp/secrets/odf-quay-credentials/rhceph-dev"
+if [[ -f "${ODF_QUAY_CREDENTIALS_FILE}" ]]; then
+    echo ">>> Merging ODF Quay pull credentials into cluster pull secret"
+    _cluster_ps=$(mktemp)
+    _merged_ps=$(mktemp)
+    oc get secret/pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${_cluster_ps}"
+    jq -s '.[0] * .[1]' "${_cluster_ps}" "${ODF_QUAY_CREDENTIALS_FILE}" > "${_merged_ps}"
+    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${_merged_ps}"
+    rm -f "${_cluster_ps}" "${_merged_ps}"
+    echo ">>> quay.io/rhceph-dev credentials merged — ocs-must-gather will authenticate"
+else
+    echo ">>> WARNING: ODF Quay credentials not found at ${ODF_QUAY_CREDENTIALS_FILE}"
+    echo ">>> ocs-must-gather may fail with 'unauthorized' errors"
 fi
 
 # Create ocs-tests config overwrite file
