@@ -159,28 +159,349 @@ tests:
       cli: latest
       commands: |
         set -euo pipefail
-        echo "Enabling TLSAdherence feature gate via CustomNoUpgrade..."
-        oc patch featuregate cluster --type=merge \
-          -p '{"spec":{"featureSet":"CustomNoUpgrade","customNoUpgrade":{"enabled":["TLSAdherence"]}}}'
 
-        echo "Setting tlsAdherence=StrictAllComponents (retry through the kube-apiserver rollout)..."
+        kas_resource=kubeapiserver.operator.openshift.io/cluster
+        kas_namespace=openshift-kube-apiserver
+        poll_seconds=15
+        observe_attempts=60
+        rollout_timeout_seconds=1800
+        stable_seconds=300
+        latest_revision=""
+
+        revision_has_tls_adherence() {
+          local revision=$1 config
+          if ! config=$(oc --request-timeout=10s -n "${kas_namespace}" \
+               get configmap "config-${revision}" -o jsonpath='{.data.config\.yaml}' 2>/dev/null); then
+            return 1
+          fi
+          grep -Fq '"TLSAdherence=true"' <<< "${config}" \
+            && ! grep -Fq '"TLSAdherence=false"' <<< "${config}"
+        }
+
+        operator_observed_tls_adherence() {
+          local observed_feature_gates
+          if ! observed_feature_gates=$(oc --request-timeout=10s get "${kas_resource}" \
+               -o jsonpath='{range .spec.observedConfig.apiServerArguments.feature-gates[*]}{@}{"\n"}{end}' \
+               2>/dev/null); then
+            return 1
+          fi
+          grep -Fxq 'TLSAdherence=true' <<< "${observed_feature_gates}" \
+            && ! grep -Fxq 'TLSAdherence=false' <<< "${observed_feature_gates}"
+        }
+
+        pod_revisions_are_current() {
+          local pod_revisions revision current_revision target_revision index
+          local pod_count=0
+          local -a revision_lines
+
+          if ! pod_revisions=$(oc --request-timeout=10s get "${kas_resource}" \
+               -o jsonpath='{.status.latestAvailableRevision}{"\n"}{range .status.nodeStatuses[*]}{.currentRevision}{"|"}{.targetRevision}{"\n"}{end}' \
+               2>/dev/null); then
+            return 1
+          fi
+          mapfile -t revision_lines <<< "${pod_revisions}"
+          revision=${revision_lines[0]:-}
+          [[ "${revision}" =~ ^[1-9][0-9]*$ ]] || return 1
+
+          for ((index = 1; index < ${#revision_lines[@]}; index++)); do
+            IFS='|' read -r current_revision target_revision <<< "${revision_lines[$index]}"
+            [[ "${current_revision}" == "${revision}" ]] || return 1
+            [[ "${target_revision}" == 0 ]] || return 1
+            ((pod_count += 1))
+          done
+          (( pod_count > 0 ))
+        }
+
+        kube_apiserver_operator_condition_status() {
+          local condition_type=$1 conditions
+          if ! conditions=$(oc --request-timeout=10s get "${kas_resource}" \
+               -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{"\n"}{end}' \
+               2>/dev/null); then
+            echo Unknown
+          elif grep -Fxq "${condition_type}=True" <<< "${conditions}"; then
+            echo True
+          elif grep -Fxq "${condition_type}=False" <<< "${conditions}"; then
+            echo False
+          else
+            echo Unknown
+          fi
+        }
+
+        clusteroperator_condition_status() {
+          local condition_type=$1 conditions
+          if ! conditions=$(oc --request-timeout=10s get clusteroperator kube-apiserver \
+               -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{"\n"}{end}' \
+               2>/dev/null); then
+            echo Unknown
+          elif grep -Fxq "${condition_type}=True" <<< "${conditions}"; then
+            echo True
+          elif grep -Fxq "${condition_type}=False" <<< "${conditions}"; then
+            echo False
+          else
+            echo Unknown
+          fi
+        }
+
+        dump_diagnostics() {
+          local raw_value feature_set=Unknown adherence=Unknown diagnostic_revision=Unknown
+          local tls_adherence_enabled=false observed_gate=false revision_gate=false
+          local pod_revisions_current=false api_ready=false
+
+          if raw_value=$(oc --request-timeout=10s get featuregate cluster \
+               -o jsonpath='{.spec.featureSet}' 2>/dev/null); then
+            case "${raw_value}" in
+              ""|Default) feature_set=Default ;;
+              CustomNoUpgrade|TechPreviewNoUpgrade|DevPreviewNoUpgrade) feature_set=${raw_value} ;;
+            esac
+          fi
+          if raw_value=$(oc --request-timeout=10s get featuregate cluster \
+               -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{@}{"\n"}{end}' \
+               2>/dev/null) \
+            && grep -Fxq TLSAdherence <<< "${raw_value}"; then
+            tls_adherence_enabled=true
+          fi
+          if raw_value=$(oc --request-timeout=10s get apiserver cluster \
+               -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null); then
+            case "${raw_value}" in
+              "") adherence=Unset ;;
+              StrictAllComponents|LegacyAdheringComponentsOnly) adherence=${raw_value} ;;
+            esac
+          fi
+          if raw_value=$(oc --request-timeout=10s get "${kas_resource}" \
+               -o jsonpath='{.status.latestAvailableRevision}' 2>/dev/null) \
+            && [[ "${raw_value}" =~ ^[1-9][0-9]*$ ]]; then
+            diagnostic_revision=${raw_value}
+          fi
+          if operator_observed_tls_adherence; then
+            observed_gate=true
+          fi
+          if [[ "${diagnostic_revision}" =~ ^[1-9][0-9]*$ ]] \
+            && revision_has_tls_adherence "${diagnostic_revision}"; then
+            revision_gate=true
+          fi
+          if pod_revisions_are_current; then
+            pod_revisions_current=true
+          fi
+          if oc --request-timeout=10s get --raw=/readyz >/dev/null 2>&1; then
+            api_ready=true
+          fi
+
+          echo "--- TLS adherence rollout diagnostics (allowlisted fields only) ---"
+          echo "feature_set=${feature_set}"
+          echo "tls_adherence_enabled=${tls_adherence_enabled}"
+          echo "tls_adherence=${adherence}"
+          echo "latest_revision=${diagnostic_revision}"
+          echo "observed_gate=${observed_gate}"
+          echo "revision_gate=${revision_gate}"
+          echo "pod_revisions_current=${pod_revisions_current}"
+          echo "kube_apiserver_operator.StaticPodsAvailable=$(kube_apiserver_operator_condition_status StaticPodsAvailable)"
+          echo "kube_apiserver_operator.NodeInstallerProgressing=$(kube_apiserver_operator_condition_status NodeInstallerProgressing)"
+          echo "kube_apiserver_operator.NodeControllerDegraded=$(kube_apiserver_operator_condition_status NodeControllerDegraded)"
+          echo "clusteroperator_kube_apiserver.Available=$(clusteroperator_condition_status Available)"
+          echo "clusteroperator_kube_apiserver.Progressing=$(clusteroperator_condition_status Progressing)"
+          echo "clusteroperator_kube_apiserver.Degraded=$(clusteroperator_condition_status Degraded)"
+          echo "api_ready=${api_ready}"
+        }
+
+        rollout_and_health_are_stable() {
+          local operator_state kas_conditions co_conditions node_count=0
+          local node_name current_revision target_revision index
+          local -a state_lines
+
+          if ! operator_state=$(oc --request-timeout=10s get "${kas_resource}" -o jsonpath='{.status.latestAvailableRevision}{"\n"}{range .status.nodeStatuses[*]}{.nodeName}{"|"}{.currentRevision}{"|"}{.targetRevision}{"\n"}{end}' 2>/dev/null); then
+            return 1
+          fi
+          mapfile -t state_lines <<< "${operator_state}"
+          latest_revision=${state_lines[0]:-}
+          [[ "${latest_revision}" =~ ^[1-9][0-9]*$ ]] || return 1
+
+          if [[ "${baseline_is_noop}" != true ]] && (( latest_revision <= baseline_revision )); then
+            return 1
+          fi
+          revision_has_tls_adherence "${latest_revision}" || return 1
+
+          for ((index = 1; index < ${#state_lines[@]}; index++)); do
+            IFS='|' read -r node_name current_revision target_revision <<< "${state_lines[$index]}"
+            [[ -n "${node_name}" && "${current_revision}" =~ ^[1-9][0-9]*$ ]] || return 1
+            [[ "${current_revision}" == "${latest_revision}" ]] || return 1
+            [[ "${target_revision}" == 0 ]] || return 1
+            ((node_count += 1))
+          done
+          (( node_count > 0 )) || return 1
+
+          if ! kas_conditions=$(oc --request-timeout=10s get "${kas_resource}" -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{"\n"}{end}' 2>/dev/null); then
+            return 1
+          fi
+          grep -Fxq 'StaticPodsAvailable=True' <<< "${kas_conditions}" || return 1
+          grep -Fxq 'NodeInstallerProgressing=False' <<< "${kas_conditions}" || return 1
+          grep -Fxq 'NodeControllerDegraded=False' <<< "${kas_conditions}" || return 1
+
+          if ! co_conditions=$(oc --request-timeout=10s get clusteroperator kube-apiserver -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{"\n"}{end}' 2>/dev/null); then
+            return 1
+          fi
+          grep -Fxq 'Available=True' <<< "${co_conditions}" || return 1
+          grep -Fxq 'Progressing=False' <<< "${co_conditions}" || return 1
+          grep -Fxq 'Degraded=False' <<< "${co_conditions}" || return 1
+
+          oc --request-timeout=10s get --raw=/readyz >/dev/null 2>&1
+        }
+
+        if ! baseline_revision=$(oc --request-timeout=10s get "${kas_resource}" \
+             -o jsonpath='{.status.latestAvailableRevision}' 2>/dev/null); then
+          echo "ERROR: cannot read the baseline kube-apiserver revision"
+          dump_diagnostics
+          exit 1
+        fi
+        if [[ ! "${baseline_revision}" =~ ^[1-9][0-9]*$ ]]; then
+          echo "ERROR: invalid baseline kube-apiserver revision"
+          dump_diagnostics
+          exit 1
+        fi
+
+        if ! baseline_config=$(oc --request-timeout=10s -n "${kas_namespace}" \
+             get configmap "config-${baseline_revision}" -o jsonpath='{.data.config\.yaml}' \
+             2>/dev/null); then
+          echo "ERROR: cannot read baseline kube-apiserver config revision ${baseline_revision}"
+          dump_diagnostics
+          exit 1
+        fi
+        if [[ -z "${baseline_config}" ]]; then
+          echo "ERROR: baseline kube-apiserver config revision ${baseline_revision} has no config.yaml payload"
+          dump_diagnostics
+          exit 1
+        fi
+        if ! baseline_feature_set=$(oc --request-timeout=10s get featuregate cluster \
+             -o jsonpath='{.spec.featureSet}' 2>/dev/null) \
+          || ! baseline_enabled_gates=$(oc --request-timeout=10s get featuregate cluster \
+            -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
+          || ! baseline_disabled_gates=$(oc --request-timeout=10s get featuregate cluster \
+            -o jsonpath='{range .spec.customNoUpgrade.disabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
+          || ! baseline_adherence=$(oc --request-timeout=10s get apiserver cluster \
+            -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null) \
+          || ! baseline_observed_feature_gates=$(oc --request-timeout=10s get "${kas_resource}" \
+            -o jsonpath='{range .spec.observedConfig.apiServerArguments.feature-gates[*]}{@}{"\n"}{end}' \
+            2>/dev/null); then
+          echo "ERROR: cannot read the pre-patch TLS adherence state"
+          dump_diagnostics
+          exit 1
+        fi
+
+        baseline_is_noop=false
+        if [[ "${baseline_feature_set}" == CustomNoUpgrade ]] \
+          && [[ "${baseline_enabled_gates}" == TLSAdherence ]] \
+          && ! grep -Fxq TLSAdherence <<< "${baseline_disabled_gates}" \
+          && [[ "${baseline_adherence}" == StrictAllComponents ]] \
+          && grep -Fxq 'TLSAdherence=true' <<< "${baseline_observed_feature_gates}" \
+          && ! grep -Fxq 'TLSAdherence=false' <<< "${baseline_observed_feature_gates}" \
+          && grep -Fq '"TLSAdherence=true"' <<< "${baseline_config}" \
+          && ! grep -Fq '"TLSAdherence=false"' <<< "${baseline_config}"; then
+          baseline_is_noop=true
+        fi
+        echo "Baseline kube-apiserver revision: ${baseline_revision}; exact desired state already active: ${baseline_is_noop}"
+
+        echo "Enabling TLSAdherence feature gate via CustomNoUpgrade..."
+        if ! oc --request-timeout=10s patch featuregate cluster --type=merge \
+             -p '{"spec":{"featureSet":"CustomNoUpgrade","customNoUpgrade":{"enabled":["TLSAdherence"]}}}' \
+             >/dev/null 2>&1; then
+          echo "ERROR: failed to enable TLSAdherence via CustomNoUpgrade"
+          dump_diagnostics
+          exit 1
+        fi
+
+        echo "Setting tlsAdherence=StrictAllComponents (retry until the API accepts the field)..."
         ok=false
         for i in $(seq 1 60); do
-          if oc patch apiserver cluster --type=merge \
+          if oc --request-timeout=10s patch apiserver cluster --type=merge \
                -p '{"spec":{"tlsAdherence":"StrictAllComponents"}}' >/dev/null 2>&1 \
-             && [ "$(oc get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null)" = "StrictAllComponents" ]; then
+             && [ "$(oc --request-timeout=10s get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null)" = "StrictAllComponents" ]; then
             ok=true; echo "tlsAdherence=StrictAllComponents accepted (iteration $i)"; break
           fi
-          echo "  waiting for apiserver schema/gate (i=$i)..."; sleep 15
+          echo "  waiting for apiserver schema/gate (i=$i)..."; sleep "${poll_seconds}"
         done
-        [ "$ok" = true ] || { echo "ERROR: tlsAdherence never accepted StrictAllComponents"; exit 1; }
+        if [[ "${ok}" != true ]]; then
+          echo "ERROR: tlsAdherence never accepted StrictAllComponents"
+          dump_diagnostics
+          exit 1
+        fi
 
-        echo "Waiting for cluster to stabilize..."
-        oc adm wait-for-stable-cluster --timeout=30m
+        echo "Waiting for the kube-apiserver operator to observe TLSAdherence=true..."
+        observed=false
+        for i in $(seq 1 "${observe_attempts}"); do
+          if operator_observed_tls_adherence; then
+            observed=true
+            echo "kube-apiserver operator observed TLSAdherence=true (iteration $i)"
+            break
+          fi
+          echo "  waiting for kube-apiserver observed configuration (i=$i/${observe_attempts})..."
+          sleep "${poll_seconds}"
+        done
+        if [[ "${observed}" != true ]]; then
+          echo "ERROR: kube-apiserver operator did not observe TLSAdherence=true"
+          dump_diagnostics
+          exit 1
+        fi
 
-        oc get featuregate cluster -o jsonpath='{.spec.featureSet}' | grep -q CustomNoUpgrade
-        oc get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' | grep -q StrictAllComponents
-        echo "TLSAdherence enabled and verified successfully."
+        echo "Waiting for the TLS-enabled revision to finish and remain healthy for ${stable_seconds}s..."
+        deadline=$(( $(date +%s) + rollout_timeout_seconds ))
+        stable_since=0
+        stable_revision=""
+        stable_complete=false
+        while (( $(date +%s) < deadline )); do
+          if rollout_and_health_are_stable; then
+            now=$(date +%s)
+            if (( stable_since == 0 )) || [[ "${stable_revision}" != "${latest_revision}" ]]; then
+              stable_since=${now}
+              stable_revision=${latest_revision}
+              echo "  rollout is complete at revision ${latest_revision}; starting sustained health window"
+            fi
+            stable_for=$(( now - stable_since ))
+            echo "  revision ${latest_revision} and API healthy for ${stable_for}/${stable_seconds}s"
+            if (( stable_for >= stable_seconds )); then
+              stable_complete=true
+              break
+            fi
+          else
+            if (( stable_since != 0 )); then
+              echo "  rollout/API health changed; resetting sustained health window"
+            fi
+            stable_since=0
+            stable_revision=""
+          fi
+          sleep "${poll_seconds}"
+        done
+        if [[ "${stable_complete}" != true ]]; then
+          echo "ERROR: kube-apiserver rollout did not reach sustained health before timeout"
+          dump_diagnostics
+          exit 1
+        fi
+
+        if ! feature_set=$(oc --request-timeout=10s get featuregate cluster \
+             -o jsonpath='{.spec.featureSet}' 2>/dev/null) \
+          || ! enabled_gates=$(oc --request-timeout=10s get featuregate cluster \
+            -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
+          || ! disabled_gates=$(oc --request-timeout=10s get featuregate cluster \
+            -o jsonpath='{range .spec.customNoUpgrade.disabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
+          || ! adherence=$(oc --request-timeout=10s get apiserver cluster \
+            -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null); then
+          echo "ERROR: failed to read final TLS adherence settings"
+          dump_diagnostics
+          exit 1
+        fi
+        if [[ "${feature_set}" != CustomNoUpgrade ]] \
+          || [[ "${enabled_gates}" != TLSAdherence ]] \
+          || grep -Fxq TLSAdherence <<< "${disabled_gates}" \
+          || [[ "${adherence}" != StrictAllComponents ]]; then
+          echo "ERROR: final TLS adherence settings do not match the requested configuration"
+          dump_diagnostics
+          exit 1
+        fi
+        echo "Waiting for the cluster to stabilize..."
+        if ! oc adm wait-for-stable-cluster --timeout=30m >/dev/null 2>&1; then
+          echo "ERROR: cluster did not stabilize after TLS adherence configuration"
+          dump_diagnostics
+          exit 1
+        fi
+        echo "TLSAdherence enabled; kube-apiserver revision ${latest_revision} is rolled out and sustainably healthy."
       from: cli
       resources:
         requests:
