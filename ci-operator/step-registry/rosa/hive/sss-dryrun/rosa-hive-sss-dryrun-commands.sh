@@ -141,7 +141,7 @@ if [ -z "${UNEXPECTED_ERRORS}" ]; then
 else
     log "ERROR: Unexpected SelectorSyncSet validation failures detected:"
     echo "${UNEXPECTED_ERRORS}"
-    log "Known annotation-limit failures (tolerated): acm-policies, osd-oauth-templates-login, rosa-oauth-templates-login, rosa-oauth-templates-policies, rosa-oauth-templates-providers"
+    log "Known annotation-limit failures (tolerated): acm-policies, osd-oauth-templates-login, rosa-oauth-templates-errors, rosa-oauth-templates-login, rosa-oauth-templates-policies, rosa-oauth-templates-providers"
     exit 1
 fi
 
