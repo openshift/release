@@ -1,0 +1,35 @@
+ref:
+  as: netobserv-day0-diff-resource
+  best_effort: true
+  from: netobserv-perfscale
+  cli: latest
+  commands: netobserv-day0-diff-resource-commands.sh
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
+    mount_path: /secret
+  env:
+  - name: ES_INDEX
+    default: "prod-netobserv-datapoints"
+    documentation: |-
+      Elasticsearch index holding the day0 resource measurement datapoints
+      uploaded by nope.py during the measure-resource steps.
+  - name: DIFF_METRICS
+    default: "TotalClusterCPUUsage,TotalClusterMemoryUsage,TotalNetworkBytesOut,TotalNetworkBytesIn,TotalNetObservCPUUsage,TotalNetObservMemoryUsage,NetObservClusterCPUPercentUtil,NetObservClusterMemPercentUtil,prometheusEstimatedStorageUsage"
+    documentation: |-
+      Comma-separated list of metricNames to include in the diff report.
+  timeout: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Reads the without-netobserv and with-netobserv run UUIDs from SHARED_DIR,
+    fetches per-metric averages from the Elasticsearch datapoints index uploaded
+    by nope.py (SHARED_DIR is a k8s secret capped at 1MB, so raw measurement
+    JSON cannot pass through it), computes per-metric deltas (absolute and
+    percent change), and writes text and HTML reports to ARTIFACT_DIR.
+    The custom-link-day0-report.html artifact renders the diff directly in the
+    Prow Spyglass HTML lens and, when Prow job metadata is available, provides
+    full artifact links to the report, output.txt, and the dynamically named
+    output_*_viz.html files produced by the later openshift-qe-orion step.
