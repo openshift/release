@@ -1,0 +1,35 @@
+chain:
+  as: quay-operator-upgrade-seed
+  steps:
+  - ref: quay-operator-upgrade-seed-playwright
+  env:
+  - name: PLAYWRIGHT_GREP
+    default: '@upgrade-seed'
+    documentation: |-
+      Positive Playwright selector for the pre-upgrade n-1 phase. Selects only the
+      upgrade seed specs (deterministic, no-cleanup fixtures authored in quay/quay)
+      that create the organization/repository/robot/team/user whose survival the
+      post-upgrade verify phase asserts. This is NOT the functional suite: only the
+      seed + minimal liveness run on the n-1 server, so n-1 functional version skew
+      cannot affect the result.
+  - name: PLAYWRIGHT_PHASE
+    default: n-minus-one
+    documentation: Select the independently configured PLAYWRIGHT_N_MINUS_ONE_* suite controls (the n-1 / redhat-3.17 branch).
+  - name: PLAYWRIGHT_REQUIRE_EXPLICIT_REF
+    default: "true"
+    documentation: Prevent derived or fallback Playwright refs in the source phase; the n-1 suite ref must be set explicitly.
+  - name: PLAYWRIGHT_CREDENTIALS_SOURCE
+    default: mounted-secret
+    documentation: |-
+      Read the quay-tests credential mount. The Playwright global setup owns admin
+      user creation via self-registration, so no quay-create-admin-user step must
+      run before this phase.
+  - name: PLAYWRIGHT_ARTIFACT_SUBDIR
+    default: n-minus-one-seed
+    documentation: Keep seed reports separate from the post-upgrade verify and functional reports.
+  documentation: |-
+    Thin n-1 seed wrapper around quay-test-e2e. Runs the quay/quay @upgrade-seed
+    specs against the freshly installed n-1 (3.17) Quay to create the fixtures whose
+    survival is asserted after the upgrade. Pins the source suite through
+    PLAYWRIGHT_N_MINUS_ONE_GIT_* and inherits PLAYWRIGHT_GREP_INVERT exclusions
+    unless a caller deliberately changes them.

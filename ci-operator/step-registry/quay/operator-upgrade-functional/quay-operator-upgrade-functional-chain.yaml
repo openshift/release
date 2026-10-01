@@ -1,0 +1,32 @@
+chain:
+  as: quay-operator-upgrade-functional
+  steps:
+  - ref: quay-operator-upgrade-functional-playwright
+  env:
+  - name: PLAYWRIGHT_GREP
+    default: '@smoke|@critical'
+    documentation: |-
+      Positive Playwright selector for the post-upgrade functional regression phase.
+      Runs the tagged @smoke/@critical subset of the n (3.18) suite against the
+      upgraded Quay to confirm core functionality still works after the upgrade.
+      Override to widen or narrow the regression scope.
+  - name: PLAYWRIGHT_PHASE
+    default: n
+    documentation: Select the independently configured PLAYWRIGHT_N_* suite controls (the n / redhat-3.18 branch).
+  - name: PLAYWRIGHT_REQUIRE_EXPLICIT_REF
+    default: "true"
+    documentation: Prevent derived or fallback Playwright refs in the target phase; the n suite ref must be set explicitly.
+  - name: PLAYWRIGHT_CREDENTIALS_SOURCE
+    default: mounted-secret
+    documentation: |-
+      Read the quay-tests credential mount. The Playwright global setup manages the
+      admin user itself; the admin persists across the upgrade, so the suite signs
+      in with the same mounted credentials.
+  - name: PLAYWRIGHT_ARTIFACT_SUBDIR
+    default: n-functional
+    documentation: Keep post-upgrade functional-regression reports separate from seed and verify artifacts.
+  documentation: |-
+    Thin n functional-regression wrapper around quay-test-e2e. Runs the tagged
+    @smoke/@critical subset of the target (3.18) suite after the upgrade to prove
+    core functionality on the upgraded server. Pins the target suite through
+    PLAYWRIGHT_N_GIT_* and retains PLAYWRIGHT_GREP_INVERT exclusions by default.

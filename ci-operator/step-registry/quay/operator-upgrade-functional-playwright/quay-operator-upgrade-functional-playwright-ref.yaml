@@ -1,0 +1,118 @@
+ref:
+  as: quay-operator-upgrade-functional-playwright
+  cli: latest
+  from: quay-playwright-runner
+  commands: quay-operator-upgrade-functional-playwright-commands.sh
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  timeout: 2h0m0s
+  grace_period: 15m0s
+  credentials:
+  - collection: quay-tests
+    group: quay
+    mount_path: /var/run/quay-qe-quay-secret
+  env:
+  - name: PLAYWRIGHT_USE_IMAGE_TESTS
+    default: "false"
+    documentation: |-
+      When "true", skip cloning PLAYWRIGHT_GIT_REPO and run the Playwright
+      suite baked into the quay-playwright-runner image at /app. When
+      "false" (default) the suite is cloned at runtime as before.
+  - name: PLAYWRIGHT_GIT_REPO
+    default: ""
+    documentation: |-
+      Git repository the Playwright suite is cloned from. Empty by default;
+      the caller must set this explicitly in the ci-operator config whenever
+      PLAYWRIGHT_USE_IMAGE_TESTS is "false", since the tests must be
+      deliberately version-matched to the deployed Quay image. Not needed
+      when PLAYWRIGHT_USE_IMAGE_TESTS is "true".
+  - name: PLAYWRIGHT_GIT_BRANCH
+    default: ""
+    documentation: |-
+      Optional explicit git ref (branch, tag, or commit SHA) for the Playwright
+      tests. When set it overrides everything else, and the step fails if it
+      cannot be cloned. When empty (the default), the step uses the ref
+      auto-derived from the deployed Quay app image
+      (${SHARED_DIR}/playwright_git_ref, written by the deploy step: the
+      upstream vX.Y.Z tag matching the image's version label, or the
+      redhat-X.Y branch when no such tag exists); if that is absent, or is
+      present but not fetchable from PLAYWRIGHT_GIT_REPO, it falls back to
+      PLAYWRIGHT_GIT_FALLBACK_BRANCH with a warning.
+  - name: PLAYWRIGHT_PHASE
+    default: ""
+    documentation: |-
+      Optional version-control mode for a composed upgrade workflow. "n-minus-one"
+      consumes PLAYWRIGHT_N_MINUS_ONE_* controls and "n" consumes PLAYWRIGHT_N_*
+      controls. Empty retains the normal PLAYWRIGHT_GIT_* behavior.
+  - name: PLAYWRIGHT_N_MINUS_ONE_GIT_REPO
+    default: ""
+    documentation: Explicit repository for the n-1 Playwright suite when PLAYWRIGHT_PHASE=n-minus-one.
+  - name: PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH
+    default: ""
+    documentation: Explicit branch, tag, or commit SHA for the n-1 Playwright suite.
+  - name: PLAYWRIGHT_N_MINUS_ONE_USE_IMAGE_TESTS
+    default: "false"
+    documentation: Use the runner-image suite for the n-1 phase instead of its explicit Git controls.
+  - name: PLAYWRIGHT_N_GIT_REPO
+    default: ""
+    documentation: Explicit repository for the target n Playwright suite when PLAYWRIGHT_PHASE=n.
+  - name: PLAYWRIGHT_N_GIT_BRANCH
+    default: ""
+    documentation: Explicit branch, tag, or commit SHA for the target n Playwright suite.
+  - name: PLAYWRIGHT_N_USE_IMAGE_TESTS
+    default: "false"
+    documentation: Use the runner-image suite for the target n phase instead of its explicit Git controls.
+  - name: PLAYWRIGHT_GIT_FALLBACK_BRANCH
+    default: "redhat-3.18"
+    documentation: |-
+      Last-resort branch cloned when neither PLAYWRIGHT_GIT_BRANCH nor a usable
+      auto-derived ref is available, so the run still executes (with a warning)
+      rather than hard-failing. Also used when an auto-derived ref exists but
+      cannot be fetched from PLAYWRIGHT_GIT_REPO.
+  - name: PLAYWRIGHT_REQUIRE_EXPLICIT_REF
+    default: "false"
+    documentation: |-
+      When "true", fail unless PLAYWRIGHT_GIT_REPO and PLAYWRIGHT_GIT_BRANCH
+      are both explicitly set (unless PLAYWRIGHT_USE_IMAGE_TESTS is "true").
+      This lets an upgrade job pin each phase to the intended product version
+      rather than use a derived or fallback branch.
+  - name: PLAYWRIGHT_CREDENTIALS_SOURCE
+    default: "mounted-secret"
+    documentation: |-
+      "mounted-secret" reads the existing quay-tests credential mount.
+      "shared-admin" reads admin credentials written by quay-create-admin-user
+      to SHARED_DIR for a self-contained temporary Quay deployment.
+  - name: PLAYWRIGHT_ARTIFACT_SUBDIR
+    default: ""
+    documentation: |-
+      Optional child directory under ARTIFACT_DIR for this invocation's
+      Playwright artifacts. Use distinct values when this ref runs in multiple
+      phases of one job.
+  - name: PLAYWRIGHT_GREP
+    default: ""
+    documentation: |-
+      Optional positive regex passed to `playwright test --grep`. Unlike
+      PLAYWRIGHT_GREP_INVERT, this selects tests for a tagged smoke phase.
+  - name: PLAYWRIGHT_GREP_INVERT
+    default: "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@webhook"
+    documentation: |-
+      Regex passed to `playwright test --grep-invert` to skip tests. Defaults
+      exclude unsupported auth backends (OIDC/LDAP), all webhook tests (out of
+      scope), and tests tracking known product bugs / UI-version gaps. See
+      E2E_FAILURE_REPORT.md for the rationale behind each quarantined entry.
+  documentation: |-
+    Execute the existing Quay Playwright e2e implementation as the uniquely named
+    n functional-regression invocation of an operator-upgrade workflow. The commands
+    file is a symlink to quay-test-e2e-commands.sh, so behavior stays in one implementation.
+    By default the suite is cloned at runtime from PLAYWRIGHT_GIT_REPO; set
+    PLAYWRIGHT_USE_IMAGE_TESTS "true" to run the suite baked into the
+    quay-playwright-runner image at /app instead.
+    When quay-deploy-jaeger ran successfully (${SHARED_DIR}/jaeger_deployed
+    exists), this step port-forwards the in-cluster Jaeger query API and exports
+    JAEGER_QUERY_URL=http://127.0.0.1:16686 so the suite can attach the server
+    spans for a failed test's own requests. The forward is supervised for the
+    length of the run and torn down on exit. If Jaeger was not deployed or the
+    query API never answers, JAEGER_QUERY_URL is left unset and the suite
+    records the spans as not collected rather than failing.
