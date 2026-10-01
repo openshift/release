@@ -862,22 +862,6 @@ function update_env_configmap() {
   ]"
 }
 
-# Seed peer-pods-cm with INITDATA before CAA (daemonset) ever starts, so it
-# doesn't boot with an empty INITDATA (CAA only reads it once, at startup).
-function seed_peerpods_cm_initdata() {
-  if ! oc get configmap peer-pods-cm -n default &>/dev/null; then
-    echo ">>> INFO: peer-pods-cm not found yet (expected if ENABLEPEERPODS is not true), skipping INITDATA seed"
-    return 0
-  fi
-
-  if ! oc patch configmap peer-pods-cm -n default --type=merge -p="{\"data\":{\"INITDATA\":\"${INITDATA}\"}}"; then
-    echo ">>> ERROR: failed to seed INITDATA into peer-pods-cm" >&2
-    return 1
-  fi
-
-  echo ">>> Seeded INITDATA into peer-pods-cm (avoids CAA startup race)"
-}
-
 #========================================
 # Verification Functions
 #========================================
@@ -1113,7 +1097,6 @@ wait_for_operands
 get_trustee_url
 create_initdata
 update_env_configmap
-seed_peerpods_cm_initdata
 verify_trustee_connectivity
 
 echo ">>> Trustee operator installation complete"

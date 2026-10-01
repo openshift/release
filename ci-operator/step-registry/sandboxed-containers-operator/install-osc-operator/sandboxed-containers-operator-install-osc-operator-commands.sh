@@ -378,6 +378,15 @@ function render_osc_operands_chart() {
       [[ -n "${vxlan_port}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.VXLAN_PORT=${vxlan_port}")
       [[ -n "${proxy_timeout}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.PROXY_TIMEOUT=${proxy_timeout}")
 
+      # Bake INITDATA into peer-pods-cm at render time (not via a later patch):
+      # CAA reads it once at startup, so it must already be correct before the
+      # daemonset is created, which happens right after this chart is applied.
+      if [[ -f "${SHARED_DIR}/INITDATA" ]]; then
+        local initdata
+        initdata=$(< "${SHARED_DIR}/INITDATA")
+        [[ -n "${initdata}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.INITDATA=${initdata}")
+      fi
+
       # TEMPORARY: the operator does not yet propagate the cluster-wide Proxy
       # object into CAA (tracked by openshift/sandboxed-containers-operator#2839).
       # Until that lands, wire HTTP_PROXY/HTTPS_PROXY/NO_PROXY into CAA manually
