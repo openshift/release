@@ -10,7 +10,7 @@ CILIUM_REPOSITORY="${CILIUM_REPOSITORY:-oci://quay.io/cilium/charts/cilium}"
 CILIUM_CLI_VERSION="${CILIUM_CLI_VERSION:-0.19.2}"
 ENDPOINT_ROUTES="${ENDPOINT_ROUTES:-true}"
 HUBBLE="${HUBBLE:-true}"
-TUNNEL_PORT="${TUNNEL_PORT:-4790}"
+TUNNEL_PORT="${TUNNEL_PORT:-4789}"
 SHARED_DIR="${SHARED_DIR:-/tmp/shared_dir}"
 
 if [[ -f "${SHARED_DIR}/install-config.yaml" ]]; then
