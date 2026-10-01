@@ -48,7 +48,7 @@ cleanup() {
 
     if [[ "${remote_cleanup_ready}" == true ]]; then
         ssh "${ssh_options[@]}" "${bastion_user}@${bastion_public_dns}" \
-            "rm -f -- '/home/${bastion_user}/quay' '/home/${bastion_user}/quay-mirror.tar'" \
+            "rm -f -- '/home/${bastion_user}/mirror-registry' '/home/${bastion_user}/quay-mirror.tar'" \
             >/dev/null 2>&1 || true
     fi
 
@@ -99,12 +99,12 @@ skopeo copy --retry-times=3 --src-authfile="${auth_file}" \
 
 oc image extract "${OMR_IMAGE}" \
     --registry-config="${auth_file}" \
-    --path="/quay:${extract_dir}"
-if [[ ! -s "${extract_dir}/quay" ]]; then
+    --path="/mirror-registry:${extract_dir}"
+if [[ ! -s "${extract_dir}/mirror-registry" ]]; then
     echo "The extracted OMR installer binary is missing or empty." >&2
     exit 1
 fi
-chmod 0755 "${extract_dir}/quay"
+chmod 0755 "${extract_dir}/mirror-registry"
 
 # OMR shares the standard bastion security group. Open its private listener
 # only to the disconnected VPC before publishing the downstream ready marker.
@@ -215,12 +215,12 @@ remote_cleanup_ready=true
 
 scp "${ssh_options[@]}" "${image_archive}" \
     "${bastion_user}@${bastion_public_dns}:/home/${bastion_user}/quay-mirror.tar"
-scp "${ssh_options[@]}" "${extract_dir}/quay" \
-    "${bastion_user}@${bastion_public_dns}:/home/${bastion_user}/quay"
+scp "${ssh_options[@]}" "${extract_dir}/mirror-registry" \
+    "${bastion_user}@${bastion_public_dns}:/home/${bastion_user}/mirror-registry"
 
 ssh "${ssh_options[@]}" "${bastion_user}@${bastion_public_dns}" \
-    "sudo install -m 0755 '/home/${bastion_user}/quay' /usr/local/bin/quay &&
-     sudo /usr/local/bin/quay install -hostname '${bastion_private_dns}' -data-dir /var/lib/quay -image-archive '/home/${bastion_user}/quay-mirror.tar' &&
+    "sudo install -m 0755 '/home/${bastion_user}/mirror-registry' /usr/local/bin/mirror-registry &&
+     sudo /usr/local/bin/mirror-registry install -hostname '${bastion_private_dns}' -data-dir /var/lib/quay -image-archive '/home/${bastion_user}/quay-mirror.tar' &&
      sudo systemctl is-active --quiet quay.service &&
      sudo curl --retry 20 --retry-delay 3 --retry-all-errors --silent --show-error --fail --cacert /var/lib/quay/ssl.cert 'https://${bastion_private_dns}:8443/healthz' >/dev/null"
 

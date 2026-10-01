@@ -157,8 +157,12 @@ ibmcloud resource group-delete $infra_name-rg -f
 echo "Successfully completed the deletion of all the resources that are created during the CI."
 
 # Deleting the pxe artifacts from the HTTPD server
+# Tracing is disabled while the private key is read, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
 export ssh_key_string
+set -x
 tmp_ssh_key="/tmp/httpd-vsi-key"
 envsubst <<"EOF" >${tmp_ssh_key}
 -----BEGIN OPENSSH PRIVATE KEY-----

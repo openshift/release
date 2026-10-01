@@ -1,6 +1,50 @@
 #!/bin/bash
-set -euxo pipefail
-shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
+
+# ---------------------------------------------------------------------------
+# Ensure jq is available (the "cli" image may not include it)
+# ---------------------------------------------------------------------------
+if ! command -v jq &>/dev/null; then
+    echo "INFO: jq not found in PATH; installing static binary..."
+    case "$(uname -m)" in
+        x86_64)  _jq_arch="amd64"; _jq_sha256="5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5" ;;
+        aarch64) _jq_arch="arm64"; _jq_sha256="4dd2d8a0661df0b22f1bb9a1f9830f06b6f3b8f7d91211a1ef5d7c4f06a8b4a5" ;;
+        *)       echo "FATAL: unsupported architecture $(uname -m) for jq bootstrap" >&2; exit 1 ;;
+    esac
+    curl -fsSL -o /tmp/jq \
+        "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-${_jq_arch}"
+    echo "${_jq_sha256}  /tmp/jq" | sha256sum --check --strict --quiet
+    chmod +x /tmp/jq
+    export PATH="/tmp:${PATH}"
+    echo "INFO: jq installed → $(jq --version) [${_jq_arch}, checksum verified]"
+fi
 
 # ---------------------------------------------------------------------------
 # OPP post-upgrade smoke tests
@@ -35,13 +79,21 @@ AddResult() {
     true
 }
 
+# XmlEscape: Required for bash 5.x where patsub_replacement is enabled
+# by default, changing how ${var//pattern/replacement} handles & and \ in
+# the replacement string. Without escaping, JUnit XML output is malformed.
 XmlEscape() {
     typeset text="${1:-}"; (($#)) && shift
+    if shopt -q patsub_replacement 2>/dev/null; then
+        shopt -u patsub_replacement
+        local _restore_patsub=true
+    fi
     text="${text//&/&amp;}"
     text="${text//</&lt;}"
     text="${text//>/&gt;}"
     text="${text//\"/&quot;}"
     text="${text//\'/&apos;}"
+    [[ "${_restore_patsub:-}" == true ]] && shopt -s patsub_replacement
     printf '%s' "${text}"
 }
 
@@ -59,11 +111,11 @@ WriteJunit() {
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"opp-smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        echo "<testsuite name=\"lp-interop--OPP--smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
-            echo "  <testcase classname=\"opp-smoke\" name=\"${name}\">"
+            echo "  <testcase classname=\"lp-interop--OPP--smoke\" name=\"${name}\">"
             if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
                 typeset msg=""
                 msg="$(XmlEscape "${tcMessagesArr[$i]}")"
@@ -88,14 +140,23 @@ CollectExitArtifacts() {
     oc get nodes -o yaml > "${ARTIFACT_DIR}/nodes.yaml" || true
 }
 
-trap CollectExitArtifacts EXIT
+# shellcheck disable=SC2317
+_propagate_junit () {
+    local _step_prefix
+    _step_prefix="$(basename "${BASH_SOURCE[1]:-$0}" .sh | sed 's/-commands$//')"
+    find "${ARTIFACT_DIR}" -name '*.xml' -print0 2>/dev/null | while IFS= read -r -d '' _xf; do
+        cp "${_xf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_xf}")" 2>/dev/null || true
+    done
+}
+
+trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
 
 # ---------------------------------------------------------------------------
 # Test 1: cluster-health
 # ---------------------------------------------------------------------------
 
 TestClusterHealth() {
-    : "=== Test: cluster-health ==="
+    echo ">>> PHASE: Test — cluster-health"
     typeset failMsg=""
 
     # ClusterOperators: Available=True, Degraded!=True
@@ -178,7 +239,13 @@ TestClusterHealth() {
 # ---------------------------------------------------------------------------
 
 TestOppOperators() {
-    : "=== Test: opp-operators ==="
+    echo ">>> PHASE: Test — opp-operators"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: opp-operators check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "opp-operators" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "opp-operators" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     typeset -a operatorsArr=()
@@ -272,7 +339,13 @@ TestOppOperators() {
 # ---------------------------------------------------------------------------
 
 TestAcmConnectivity() {
-    : "=== Test: acm-connectivity ==="
+    echo ">>> PHASE: Test — acm-connectivity"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: acm-connectivity check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "acm-connectivity" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "acm-connectivity" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     # Check if ManagedCluster resources exist
@@ -319,7 +392,13 @@ TestAcmConnectivity() {
 # ---------------------------------------------------------------------------
 
 TestAcsSensors() {
-    : "=== Test: acs-sensors ==="
+    echo ">>> PHASE: Test — acs-sensors"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: acs-sensors check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "acs-sensors" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "acs-sensors" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     # Check SecuredCluster CR status first
@@ -389,11 +468,18 @@ TestAcsSensors() {
 # ---------------------------------------------------------------------------
 
 TestQuayPull() {
-    : "=== Test: quay-pull ==="
+    echo ">>> PHASE: Test — quay-pull"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: quay-pull check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "quay-pull" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "quay-pull" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
     typeset failMsg=""
 
     # Find the Quay registry route
     typeset quayRoute=""
+    set +x  # suppress xtrace — route hostnames are sensitive
     if ! quayRoute="$(oc get routes --all-namespaces -o json | jq -r '
         .items[]
         | select(.metadata.name | test("quay"; "i"))
@@ -402,14 +488,17 @@ TestQuayPull() {
     ' | head -1)"; then
         : "Route query failed, trying QuayRegistry CR..."
     fi
+    set -x
 
     if [[ -z "${quayRoute}" ]]; then
         # Try looking for QuayRegistry CR to find the route
+        set +x  # suppress xtrace — registry endpoint URLs are sensitive
         if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json | jq -r '
             .items[0].status.registryEndpoint // empty
         ' | sed 's|^https://||')"; then
             : "QuayRegistry CR query failed"
         fi
+        set -x
     fi
 
     if [[ -z "${quayRoute}" ]]; then
@@ -439,9 +528,11 @@ TestQuayPull() {
     # Attempt to pull the Quay health endpoint (API check instead of image pull
     # since we may not have registry credentials configured)
     typeset httpCode=""
+    set +x  # suppress xtrace — URL contains route hostname
     if ! httpCode="$(curl -sk -o /dev/null -w '%{http_code}' "https://${quayRoute}/api/v1/discovery" --max-time 30)"; then
         httpCode=""
     fi
+    set -x
 
     if [[ "${httpCode}" =~ ^(200|401|403)$ ]]; then
         : "PASS: Quay registry responding (HTTP ${httpCode}) at ${quayRoute}"
@@ -466,7 +557,7 @@ Main() {
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
 
-    : "OPP Smoke Tests starting"
+    echo ">>> PHASE: OPP Smoke Tests starting"
     : "Operators: ${OPP_OPERATORS}"
     : "Settle window: ${SMOKE_SETTLE_SECONDS}s"
     : "Artifacts dir: ${ARTIFACT_DIR}"

@@ -41,6 +41,22 @@ oc --context "$CTX" get pods -n ci -l 'component in (pod-scaler-producer,pod-sca
 
 If **`pod-scaler-producer`** is unhealthy, fix it **before** blaming workloads—see alerts **`pod-scaler-producer-Singleton-Down`** / **`pod-scaler-ui-Down`** ([`pod-scaler-prometheusrule.yaml`](../../clusters/core-ci/ci-monitoring/pod-scaler-prometheusrule.yaml) on core-ci).
 
+### 1b) Authoritative decrease savings (build farm)
+
+Admission on **build01–13** exposes decrease/savings metrics scraped into **core-ci Thanos**. Grafana dashboard **Pod Scaler** on [ci-monitoring](https://grafana-ci-monitoring.apps.core.ci.devcluster.openshift.com) (datasource `thanos-query`, UID `dptp-pod-scaler-savings`).
+
+- **Allocated savings** = request/limit delta at admission, not runtime usage.
+- **Dry-run** series show volume if memory limits were applied (Option 1 keeps limits dry-run).
+- **OOM / throttle** panels are context only — not attributed to pod-scaler.
+
+Verify scrape after deploy:
+
+```bash
+CTX=build06
+oc --context "$CTX" -n openshift-monitoring get servicemonitor pod-scaler-admission
+# Thanos (core-ci): up{namespace="ci",container="pod-scaler"} or pod_scaler_authoritative_decrease_total
+```
+
 ### 2) Capture admission / producer logs around the timestamp
 
 ```bash

@@ -10,6 +10,9 @@ chain:
     - name: HYPERSHIFT_GCP_BOOT_IMAGE
       default: ""
       documentation: "GCP boot image for hosted cluster nodes (RHCOS image path). If empty, falls back to a pinned default (see TODO GCP-440)."
+    - name: HYPERSHIFT_GCP_ZONE
+      default: ""
+      documentation: "GCP zone for hosted cluster nodes"
     - name: HYPERSHIFT_GCP_CI_DNS_DOMAIN
       default: ""
       documentation: "DNS domain for HyperShift CI hosted clusters"
@@ -18,6 +21,7 @@ chain:
 
       # Load configuration from SHARED_DIR (populated by prior steps)
       GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
+      GCP_ZONE="${HYPERSHIFT_GCP_ZONE}"
       HC_PROJECT_ID="$(<"${SHARED_DIR}/hosted-cluster-project-id")"
       CLUSTER_NAME="$(<"${SHARED_DIR}/hosted-cluster-name")"
 
@@ -59,6 +63,7 @@ chain:
         --pull-secret /etc/ci-pull-credentials/.dockerconfigjson \
         --project "${HC_PROJECT_ID}" \
         --region "${GCP_REGION}" \
+        --zone "${GCP_ZONE}" \
         --network "${VPC_NAME}" \
         --private-service-connect-subnet "${PSC_SUBNET}" \
         --endpoint-access PublicAndPrivate \

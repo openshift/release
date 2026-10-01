@@ -46,6 +46,15 @@ resources:
 tests:
 - as: cr--outage-pod--aws
   cron: 0 6,18 * * *
+  reporter_config:
+    channel: '#ocp-chaos--triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-lp-chaos
@@ -67,6 +76,15 @@ tests:
   timeout: 6h0m0s
 - as: cr--outage-node--aws
   cron: 0 3,15 * * *
+  reporter_config:
+    channel: '#ocp-chaos--triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-lp-chaos

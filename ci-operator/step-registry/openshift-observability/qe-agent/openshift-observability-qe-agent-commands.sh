@@ -83,6 +83,80 @@ fi
 echo "Skill '${AGENT_SKILL}' loaded (${SKILL_BYTE_COUNT} bytes)."
 
 # ---------------------------------------------------------------------------
+# 4a. Shared skill modules and attribution inputs. Skills keep bulky, shared
+#     procedures in modules under resources/shared/ (referenced files do not
+#     count toward skillsaw's per-skill token budget) and read them from a
+#     fixed path in the pod:
+#       cluster-stability  Step 0a of every skill (MachineConfigPool check)
+#       junit-triage       Step 1 of every skill (JUnit parsing, high-failure triage)
+#       cluster-instability Step 4 of every skill (CLUSTER_INSTABILITY criteria)
+#       attribution        Step 4a of every skill (git-level attribution)
+#       test-fix-export    Steps 5a and 5c of every skill (test fix, CHANGES.md)
+#       product-bug-report Step 5b of every skill (bug report + Jira payload)
+#       analysis-summary   Steps 5d and 6 of every skill (incident note, analysis)
+#     This section puts them there and writes the tested refs (from JOB_SPEC)
+#     next to the other artifacts. Best-effort: a failure logs a warning and
+#     never fails the step. A skill whose module is missing follows the short
+#     fallback written in its own pointer step (attribution.json status "failed"
+#     for attribution), so a missing module is visible rather than silent.
+# ---------------------------------------------------------------------------
+readonly MODULE_BASE_URL="${SKILL_BASE_URL%/skills}/shared"
+readonly MODULE_DIR="/tmp/qe-agent-modules"
+# 50 KB limit per module, counted in bytes like the skill limit above.
+readonly MAX_MODULE_BYTES=51200
+ATTRIBUTION_LOADED=false
+
+for _module in attribution cluster-stability junit-triage cluster-instability test-fix-export product-bug-report analysis-summary; do
+  _module_url="${MODULE_BASE_URL}/${_module}.md"
+  _module_content=$(curl -fsS --max-redirs 0 --connect-timeout 10 --max-time 30 --retry 3 "${_module_url}") || true
+  if [[ -z "${_module_content}" ]]; then
+    echo "WARNING: could not fetch module '${_module}' from ${_module_url} — the skill will use its fallback."
+  elif [[ $(printf '%s' "${_module_content}" | wc -c) -gt ${MAX_MODULE_BYTES} ]]; then
+    echo "WARNING: module '${_module}' exceeds ${MAX_MODULE_BYTES} bytes — the skill will use its fallback."
+  elif mkdir -p "${MODULE_DIR}" && printf '%s\n' "${_module_content}" > "${MODULE_DIR}/${_module}.md"; then
+    echo "Module '${_module}' written to ${MODULE_DIR}/${_module}.md."
+    [[ "${_module}" == "attribution" ]] && ATTRIBUTION_LOADED=true
+  else
+    echo "WARNING: could not write ${MODULE_DIR}/${_module}.md — the skill will use its fallback."
+  fi
+done
+
+if ! command -v jq &>/dev/null; then
+  echo "WARNING: jq is unavailable, cannot build qe-agent-refs.json — attribution falls back to clone-time HEAD."
+else
+  # Only the fields the module needs; PR titles and authors are deliberately
+  # left out. clone_url is empty unless the org is on the allowlist, and
+  # openshift-priv (private mirror) maps to the public openshift org.
+  printf '%s' "${JOB_SPEC:-}" | jq -c --arg skill "${AGENT_SKILL}" '
+    (.refs // (.extra_refs // [])[0] // {}) as $r
+    | ($r.org // "") as $org
+    | (if $org == "openshift-priv" then "openshift" else $org end) as $pub
+    | {
+        agent_skill: $skill,
+        job_type: (.type // ""),
+        job: (.job // ""),
+        build_id: (.buildid // ""),
+        repo: {
+          org: $org,
+          repo: ($r.repo // ""),
+          base_ref: ($r.base_ref // ""),
+          base_sha: ($r.base_sha // ""),
+          clone_url: (if ($pub | IN("openshift", "grafana", "open-telemetry", "openshift-eng", "os-observability", "rhobs")) and ($r.repo // "") != ""
+                      then "https://github.com/\($pub)/\($r.repo)" else "" end)
+        },
+        pulls: [(.refs.pulls // [])[] | {number: .number, sha: .sha}],
+        extra_refs: [(.extra_refs // [])[] | {org: (.org // ""), repo: (.repo // ""), base_ref: (.base_ref // ""), base_sha: (.base_sha // "")}]
+      }' > "${ARTIFACT_DIR}/qe-agent-refs.json" 2>/dev/null || true
+
+  if [[ -s "${ARTIFACT_DIR}/qe-agent-refs.json" ]]; then
+    echo "Attribution refs → ${ARTIFACT_DIR}/qe-agent-refs.json (job_type=$(jq -r '.job_type' "${ARTIFACT_DIR}/qe-agent-refs.json" 2>/dev/null || echo unknown))"
+  else
+    echo "WARNING: could not derive refs from JOB_SPEC — the module will fall back to clone-time HEAD."
+    rm -f "${ARTIFACT_DIR}/qe-agent-refs.json"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # 5. Run Claude non-interactively with the skill as system prompt.
 #
 #    The full stream-json output is captured to a temp file so we can extract
@@ -224,6 +298,23 @@ if command -v jq &>/dev/null; then
   if [[ -s "${ARTIFACT_DIR}/qe-agent-commands.log" ]]; then
     _CMD_COUNT=$(grep -c '^\[' "${ARTIFACT_DIR}/qe-agent-commands.log" 2>/dev/null || echo 0)
     echo "Audit log: ${_CMD_COUNT} tool calls → ${ARTIFACT_DIR}/qe-agent-commands.log"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Attribution summary — one greppable line so the team can see at a glance
+# whether the module ran and whether the agent reported deviations. The full
+# detail (candidates, improvement notes) stays in attribution.json.
+# ---------------------------------------------------------------------------
+if command -v jq &>/dev/null; then
+  if [[ -s "${ARTIFACT_DIR}/attribution.json" ]]; then
+    jq -r '
+      (if type == "array" then . else [.] end)
+      | "Attribution: entries=\(length) status=\([.[].status // "unknown"] | join(",")) candidates=\([.[] | ((.tracks.product.candidates // []) + (.tracks.test.candidates // [])) | length] | add // 0) deviations=\([.[] | (.improvement.deviations // []) | length] | add // 0)"
+    ' "${ARTIFACT_DIR}/attribution.json" 2>/dev/null \
+      || echo "Attribution: attribution.json present but not parsable — see ${ARTIFACT_DIR}/attribution.json"
+  else
+    echo "Attribution: no attribution.json written (module loaded=${ATTRIBUTION_LOADED}) — the agent did not follow Step 4a or ran out of budget."
   fi
 fi
 

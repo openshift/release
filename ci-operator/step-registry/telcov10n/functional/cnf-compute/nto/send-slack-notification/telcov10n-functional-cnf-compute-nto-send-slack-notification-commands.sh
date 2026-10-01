@@ -19,5 +19,5 @@ python3 /eco-ci-cd/scripts/slack-notification/send-slack-notification.py \
   --webhook-url "$(cat /var/run/slack-webhook-url/url)" \
   --version "$(cat ${SHARED_DIR}/cluster_version)" \
   --job-name ${JOB_NAME} \
-  --link "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}" \
+  --link "https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/${JOB_NAME}/${BUILD_ID}" \
   --users rshemtov mniranja snarula

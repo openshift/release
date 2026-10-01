@@ -1,8 +1,19 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   project_image:
     dockerfile_path: Dockerfile.prow
 prowgen:
   enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -31,6 +42,19 @@ tests:
     report_template: |
       Weekly check-links job has found broken URLs in <https://github.com/openshift/managed-cluster-config|Managed Cluster Config repository >.
       To see list of broken URLs, <{{.Status.URL}}|see log>.
+- as: hive-e2e-sss-dryrun
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      BACKPLANE_CLUSTER_ID: 1g268u7pp694gj152nj16me4sv615lpv
+      BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-63154
+    pre:
+    - ref: rosa-hive-backplane-login
+    test:
+    - ref: rosa-hive-sss-dryrun
 zz_generated_metadata:
   branch: master
   org: openshift

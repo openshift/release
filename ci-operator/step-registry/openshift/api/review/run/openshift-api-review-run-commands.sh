@@ -199,7 +199,7 @@ export GITHUB_TOKEN
 
 # ---- Post review findings ----
 
-PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_api/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_api/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
 
 FOOTER="---
 > **Run locally:** \`claude -p \"/api-review\"\` from a clone of this PR.

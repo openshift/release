@@ -25,9 +25,9 @@ if [[ ! "${RUN_ID}" =~ ^[a-z][a-z0-9]{2,15}$ ]]; then
   exit 0  # Don't fail job
 fi
 
-# Validate TFC token mount exists
-if [[ ! -f "/etc/terraform-cloud/token" ]]; then
-  log "ERROR: /etc/terraform-cloud/token not found"
+# Validate Terraform CLI credentials mount exists
+if [[ ! -r "${TF_CLI_CONFIG_FILE}" ]]; then
+  log "ERROR: ${TF_CLI_CONFIG_FILE} not found or not readable"
   log "Auto-destroy will clean up resources in 24h"
   exit 0  # Don't fail job
 fi
@@ -73,9 +73,23 @@ export PATH="/tmp:${PATH}"
 cd "${REPO_ROOT}"  # gcp-hcp-infra repo root (from: src)
 
 REGION="${GCP_REGION:-us-central1}"
+TESTED_SHA_PATH="${SHARED_DIR}/gcp-hcp-tested-sha"
+
+if [[ ! -s "${TESTED_SHA_PATH}" ]]; then
+  log "ERROR: Tested gcp-hcp-infra SHA is missing or empty: ${TESTED_SHA_PATH}"
+  log "Auto-destroy will clean up resources in 24h"
+  exit 0  # Don't fail job
+fi
+GIT_REVISION="$(<"${TESTED_SHA_PATH}")"
+
+if [[ ! "${GIT_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+  log "ERROR: Tested gcp-hcp-infra SHA is not a full lowercase Git SHA"
+  log "Auto-destroy will clean up resources in 24h"
+  exit 0  # Don't fail job
+fi
 
 log "Re-rendering template for run ID: ${RUN_ID}"
-RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}")"
+RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}" "${GIT_REVISION}")"
 
 if [[ ! -d "${RENDERED_DIR}" ]]; then
   log "ERROR: Render script failed - directory not created"
@@ -84,14 +98,6 @@ if [[ ! -d "${RENDERED_DIR}" ]]; then
 fi
 
 cd "${RENDERED_DIR}"
-
-# Configure TFC authentication via .terraformrc (avoids token in env vars)
-(umask 077 && cat > "$HOME/.terraformrc" <<TFRC
-credentials "app.terraform.io" {
-  token = "$(cat /etc/terraform-cloud/token)"
-}
-TFRC
-)
 
 export TF_INPUT=false
 export TF_IN_AUTOMATION=true

@@ -53,6 +53,7 @@ echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"
 # Copy the .env file from the last install dir on the hypervisor
 echo "=== Copying .env from ${LAST_OPENSHIFT_DPF} on hypervisor ==="
 scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/.env "${SHARED_DIR}/.env"
+sed -i 's/^PAYLOAD_URL=.*$/PAYLOAD_URL=/' "${SHARED_DIR}/.env"
 echo ".env copied to \${SHARED_DIR}/.env successfully"
 
 echo "Copying .env to artifacts..."

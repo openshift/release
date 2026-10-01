@@ -4,8 +4,11 @@ set -x
 # Check if proxy is set
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   echo "Private cluster setting proxy"
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   # shellcheck disable=SC1090
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 if test ! -f "${KUBECONFIG}"

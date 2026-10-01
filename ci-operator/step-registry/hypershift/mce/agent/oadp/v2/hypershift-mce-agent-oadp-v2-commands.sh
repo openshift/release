@@ -6,7 +6,10 @@ set -o pipefail
 set -x
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"

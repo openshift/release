@@ -25,7 +25,7 @@ WEBHOOK_URL="$(cat "$WEBHOOK_URL_FILE")"
 
 JOB_NAME="${JOB_NAME:-unknown}"
 BUILD_ID="${BUILD_ID:-unknown}"
-JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
+JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/${JOB_NAME}/${BUILD_ID}"
 
 if [[ -f "${SHARED_DIR}/cluster_version" ]]; then
   BUILD_VERSION="$(cat "${SHARED_DIR}/cluster_version")"

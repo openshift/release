@@ -1,6 +1,34 @@
 #!/bin/bash
-set -eux -o pipefail
+set -euo pipefail
 shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=${1:-$?}
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+_jrc=0
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}' EXIT
+
+echo ">>> PHASE: initialization"
 
 # NOTE: UPGRADE_TIMEOUT, POLL_INTERVAL, STALL_WINDOW, OPP_OPERATORS are set via step config YAML
 # (naming deviates from OPP__ convention)
@@ -67,8 +95,8 @@ function DebugOnExit () {
     true
 }
 
-trap '{ exitCode=$?; DebugOnExit; true; }' EXIT
-trap '{ exitCode=143; DebugOnExit; trap - EXIT; exit 143; }' TERM
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; exitCode=${_jrc}; DebugOnExit' EXIT
+trap 'exit 143' TERM
 
 set +x
 KUBECONFIG="" oc registry login
@@ -217,6 +245,7 @@ function UpdateCcoAnnotation () {
 
 function InitiateUpgrade () {
     typeset isForce="${1:-}"; (($#)) && shift
+    echo ">>> PHASE: Initiating upgrade"
     : "Initiating upgrade to ${upgradeTarget}"
     : "Force flag: ${isForce}"
     oc adm upgrade --to-image="${upgradeTarget}" --allow-explicit-upgrade --force="${isForce}"
@@ -234,6 +263,7 @@ function InitiateUpgrade () {
 }
 
 function MonitorUpgrade () {
+    echo ">>> PHASE: Monitoring upgrade"
     typeset -i pollCount=0
     typeset -i lastProgressChange=0
     lastProgressChange=$(date +%s)
@@ -299,6 +329,7 @@ function MonitorUpgrade () {
 }
 
 function StabilizeCluster () {
+    echo ">>> PHASE: Stabilizing cluster"
     : "Waiting for cluster stability (minimum-stable-period=5m, timeout=30m)"
     if ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
         : "Cluster stabilization failed; gathering diagnostics"
@@ -312,6 +343,7 @@ function StabilizeCluster () {
 }
 
 function ValidatePlatformHealth () {
+    echo ">>> PHASE: Validating platform health"
     : "Validating platform health"
 
     typeset avail="" progressing="" degraded=""
@@ -351,6 +383,7 @@ function ValidatePlatformHealth () {
 }
 
 function ValidateOppOperators () {
+    echo ">>> PHASE: Validating OPP operators"
     : "Validating OPP operator health"
     typeset -a operatorsArr=()
     IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
@@ -430,6 +463,8 @@ function Main () {
     sourceMinorVersion="$(echo "${sourceVersion}" | cut -f2 -d.)"
     : "Source release: ${sourceVersion} (minor: ${sourceMinorVersion})"
 
+    echo ">>> PHASE: OCP upgrade starting"
+
     isForceUpdate="false"
     if ! CheckSigned "${upgradeTarget}"; then
         : "Target is unsigned; will use --force"
@@ -450,4 +485,35 @@ function Main () {
     true
 }
 
+SUITE_NAME="${SUITE_NAME:-ocp-upgrade}"
+# --- JUnit wrapper ---
+# shellcheck disable=SC2317  # invoked via trap
+WriteJunit() {
+  local rc=${1:-0}
+  TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  JUNIT_FILE="${ARTIFACT_DIR}/junit_${SUITE_NAME}.xml"
+  if [[ $rc -eq 0 ]]; then
+    cat > "${JUNIT_FILE}" <<JEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${SUITE_NAME}" tests="1" failures="0" time="0">
+  <testcase name="${SUITE_NAME}" classname="interop.opp">
+    <system-out>Step completed successfully at ${TIMESTAMP}</system-out>
+  </testcase>
+</testsuite>
+JEOF
+  else
+    cat > "${JUNIT_FILE}" <<JEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${SUITE_NAME}" tests="1" failures="1" time="0">
+  <testcase name="${SUITE_NAME}" classname="interop.opp">
+    <failure message="${SUITE_NAME} failed with exit code ${rc}">
+Step failed at ${TIMESTAMP} with exit code ${rc}
+    </failure>
+  </testcase>
+</testsuite>
+JEOF
+  fi
+}
+
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; exitCode=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit 0' EXIT
 Main "$@"

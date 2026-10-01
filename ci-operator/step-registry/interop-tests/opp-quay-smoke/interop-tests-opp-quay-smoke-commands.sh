@@ -1,5 +1,32 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
 
 ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -36,7 +63,7 @@ function RecordResult () {
     true
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 function GenerateJunit () {
     typeset -i total=${#allTests[@]}
     typeset -i failures=0 skipped=0
@@ -56,9 +83,9 @@ EOF
 
     for t in "${allTests[@]}"; do
         typeset escapedName=''
-        escapedName=$(printf '%s' "${t}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+        escapedName="$(printf '%s' "${t}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')"
         typeset escapedMsg=''
-        escapedMsg=$(printf '%s' "${testFailureMsg[${t}]}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+        escapedMsg="$(printf '%s' "${testFailureMsg[${t}]}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')"
 
         if [[ "${testStatus[${t}]}" == "failed" ]]; then
             echo "    <testcase name=\"${escapedName}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${junitFile}"
@@ -77,7 +104,13 @@ EOF
     true
 }
 
-trap '{( GenerateJunit; true )}' EXIT
+# shellcheck disable=SC2317
+_propagate_junit () {
+    mkdir -p "${SHARED_DIR}/junit"
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+}
+
+trap '_opp_cleanup; GenerateJunit; _propagate_junit' EXIT
 
 function DiscoverQuay () {
     typeset registryJson="" discoverErr=""
@@ -103,8 +136,8 @@ print(len(json.load(sys.stdin).get('items',[])))
     fi
 
     QUAY_NS="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['namespace'])")"
-    QUAY_REGISTRY=$(oc get quayregistry -n "${QUAY_NS}" -o jsonpath='{.items[0].metadata.name}')
-    QUAY_HOST=$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.status.registryEndpoint}')
+    QUAY_REGISTRY="$(oc get quayregistry -n "${QUAY_NS}" -o jsonpath='{.items[0].metadata.name}')"
+    QUAY_HOST="$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.status.registryEndpoint}')"
     QUAY_HOST="${QUAY_HOST#https://}"
     if [[ -z "${QUAY_HOST}" ]]; then
         echo "ERROR: Quay registry route not ready (empty host)" >&2
@@ -124,8 +157,8 @@ function GetQuayAuth () {
     set +x
 
     if oc get secret quayadmin -n "${QUAY_NS}" 2>/dev/null; then
-        QUAY_TOKEN=$(oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d 2>/dev/null) || QUAY_TOKEN=""
-        QUAY_PASSWORD=$(oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null) || QUAY_PASSWORD=""
+        QUAY_TOKEN="$(oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d 2>/dev/null)" || QUAY_TOKEN=""
+        QUAY_PASSWORD="$(oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)" || QUAY_PASSWORD=""
         QUAY_USER="quayadmin"
         if [[ -n "${QUAY_TOKEN}" || -n "${QUAY_PASSWORD}" ]]; then
             "${xtraceOn}" && set -x
@@ -136,7 +169,7 @@ function GetQuayAuth () {
     fi
 
     if oc get secret quaydevel -n "${QUAY_NS}" 2>/dev/null; then
-        QUAY_PASSWORD=$(oc get secret quaydevel -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null) || QUAY_PASSWORD=""
+        QUAY_PASSWORD="$(oc get secret quaydevel -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)" || QUAY_PASSWORD=""
         QUAY_USER="quaydevel"
         if [[ -n "${QUAY_PASSWORD}" ]]; then
             "${xtraceOn}" && set -x
@@ -147,13 +180,13 @@ function GetQuayAuth () {
     fi
 
     typeset initPassword=''
-    initPassword=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(20)))")
+    initPassword="$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(20)))")"
     typeset initResult=''
-    initResult=$(curl -sk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
+    initResult="$(curl -sk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
         -H "Content-Type: application/json" \
-        -d "{\"username\":\"quayadmin\",\"password\":\"${initPassword}\",\"email\":\"quayadmin@example.com\",\"access_token\":true}" 2>/dev/null) || initResult=""
+        -d "{\"username\":\"quayadmin\",\"password\":\"${initPassword}\",\"email\":\"quayadmin@example.com\",\"access_token\":true}" 2>/dev/null)" || initResult=""
 
-    QUAY_TOKEN=$(echo "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null) || QUAY_TOKEN=""
+    QUAY_TOKEN="$(echo "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)" || QUAY_TOKEN=""
     if [[ -n "${QUAY_TOKEN}" ]]; then
         QUAY_USER="quayadmin"
         QUAY_PASSWORD="${initPassword}"
@@ -184,24 +217,24 @@ function CreateTestOrg () {
     if [[ -z "${QUAY_TOKEN}" && -n "${QUAY_PASSWORD}" ]]; then
         typeset cookieFile="/tmp/quay-cookies.txt"
         typeset csrf=''
-        csrf=$(curl -sk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c "${cookieFile}" | \
-            python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))" 2>/dev/null) || csrf=""
+        csrf="$(curl -sk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c "${cookieFile}" | \
+            python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))" 2>/dev/null)" || csrf=""
 
         if [[ -n "${csrf}" ]]; then
             typeset signinResult=''
             typeset signinPayload=''
             set +x
-            signinPayload=$(python3 -c "
+            signinPayload="$(python3 -c "
 import json, sys
 print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}))
-" "${QUAY_USER}" "${QUAY_PASSWORD}")
-            signinResult=$(curl -sk --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
+" "${QUAY_USER}" "${QUAY_PASSWORD}")"
+            signinResult="$(curl -sk --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
                 -H "Content-Type: application/json" \
                 -H "X-CSRF-Token: ${csrf}" \
                 -b "${cookieFile}" -c "${cookieFile}" \
-                -d "${signinPayload}" 2>/dev/null) || signinResult=""
-            QUAY_TOKEN=$(echo "${signinResult}" | \
-                python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null) || QUAY_TOKEN=""
+                -d "${signinPayload}" 2>/dev/null)" || signinResult=""
+            QUAY_TOKEN="$(echo "${signinResult}" | \
+                python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null)" || QUAY_TOKEN=""
             "${xtraceOn}" && set -x
         fi
         rm -f "${cookieFile}"
@@ -243,9 +276,9 @@ function RunPushPull () {
     [[ "${-}" == *x* ]] && xtraceOn=true
     set +x
     if [[ -n "${QUAY_TOKEN}" ]]; then
-        registryAuth=$(echo -n "\$oauthtoken:${QUAY_TOKEN}" | base64 -w0)
+        registryAuth="$(echo -n "\$oauthtoken:${QUAY_TOKEN}" | base64 -w0)"
     else
-        registryAuth=$(echo -n "${QUAY_USER}:${QUAY_PASSWORD}" | base64 -w0)
+        registryAuth="$(echo -n "${QUAY_USER}:${QUAY_PASSWORD}" | base64 -w0)"
     fi
 
     cat > "${authFile}" <<EOF
@@ -284,7 +317,7 @@ function RunOdfStorageCheck () {
     start=$(date +%s)
 
     typeset noobaaPhase=''
-    noobaaPhase=$(oc get noobaa -n openshift-storage -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || noobaaPhase=""
+    noobaaPhase="$(oc get noobaa -n openshift-storage -o jsonpath='{.items[0].status.phase}' 2>/dev/null)" || noobaaPhase=""
     if [[ "${noobaaPhase}" != "Ready" ]]; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "NooBaa not Ready (phase: ${noobaaPhase:-not found})" "${elapsed}"
@@ -488,7 +521,7 @@ function RunAcsScan () {
     start=$(date +%s)
 
     typeset acsHost='' acsPassword=''
-    acsHost=$(oc get route -n stackrox central -o jsonpath='{.spec.host}' 2>/dev/null) || acsHost=""
+    acsHost="$(oc get route -n stackrox central -o jsonpath='{.spec.host}' 2>/dev/null)" || acsHost=""
     if [[ -z "${acsHost}" ]]; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "skipped" "ACS not deployed (Central route not found)" "${elapsed}"
@@ -498,7 +531,7 @@ function RunAcsScan () {
     typeset xtraceOn=false
     [[ "${-}" == *x* ]] && xtraceOn=true
     set +x
-    acsPassword=$(oc get secret -n stackrox central-htpasswd -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null) || acsPassword=""
+    acsPassword="$(oc get secret -n stackrox central-htpasswd -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)" || acsPassword=""
     "${xtraceOn}" && set -x
     if [[ -z "${acsPassword}" ]]; then
         elapsed=$(( $(date +%s) - start ))
@@ -508,16 +541,21 @@ function RunAcsScan () {
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
 
+    # Mask credentials: function call args expand in xtrace
+    set +x 2>/dev/null
     if ! RegisterQuayInAcs "${acsHost}" "${acsPassword}"; then
+        "${xtraceOn}" && set -x
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Failed to register Quay in ACS" "${elapsed}"
         return 1
     fi
     if ! RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"; then
+        "${xtraceOn}" && set -x
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "ACS scan request failed" "${elapsed}"
         return 1
     fi
+    "${xtraceOn}" && set -x
 
     typeset -i attempts=0 maxAttempts=40
 
@@ -540,7 +578,9 @@ sys.exit(0 if len(images) > 0 else 1)
         fi
 
         if (( attempts % 4 == 3 )); then
+            set +x 2>/dev/null
             RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}" || true
+            "${xtraceOn}" && set -x
         fi
 
         attempts=$((attempts + 1))
@@ -607,3 +647,4 @@ function Main () {
 }
 
 Main "$@"
+

@@ -6,7 +6,11 @@ set -o errexit
 set -o pipefail
 
 # PowerVC helper release to download for this step.
-readonly POWERVC_TOOL_VERSION="v2.4.8"
+readonly POWERVC_TOOL_VERSION="v2.4.10"
+
+# Secrets directory mounted by the CI infrastructure.
+export SECRETS_DIR="/var/run/powervc-ipi-cicd-secrets/powervc-creds"
+readonly SECRETS_DIR
 
 #######################################
 # Log an informational message with a timestamp.
@@ -14,7 +18,7 @@ readonly POWERVC_TOOL_VERSION="v2.4.8"
 #   Message text.
 #######################################
 function log_info() {
-        echo "[$(date +'%Y-%m-%d %H:%M:%S')] INFO: $*"
+	echo "[$(date +'%Y-%m-%d %H:%M:%S')] INFO: $*"
 }
 
 #######################################
@@ -23,7 +27,7 @@ function log_info() {
 #   Message text.
 #######################################
 function log_error() {
-        echo "[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
+	echo "[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
 }
 
 #######################################
@@ -32,7 +36,7 @@ function log_error() {
 #   Message text.
 #######################################
 function log_warning() {
-        echo "[$(date +'%Y-%m-%d %H:%M:%S')] WARNING: $*" >&2
+	echo "[$(date +'%Y-%m-%d %H:%M:%S')] WARNING: $*" >&2
 }
 
 #######################################
@@ -41,16 +45,17 @@ function log_warning() {
 #   Exit code.
 #######################################
 function cleanup_on_exit() {
-        local rc="${1:-0}"
+	local rc="${1:-0}"
 
-        if [[ "${rc}" -eq 0 ]]; then
-                return 0
-        fi
+	if [[ "${rc}" -eq 0 ]]; then
+		return 0
+	fi
 
-        log_warning "PowerVC checks failed with exit code ${rc}"
+	log_warning "PowerVC checks failed with exit code ${rc}"
 }
 
-# Emit a final failure message for any non-zero script exit.
+# On any non-zero exit, log a warning; cleanup_on_exit suppresses the message
+# for a clean (rc=0) exit so it only fires on genuine failures.
 trap 'cleanup_on_exit $?' EXIT
 
 #######################################
@@ -64,7 +69,7 @@ trap 'cleanup_on_exit $?' EXIT
 #
 # Currently required variables:
 #   CLOUD – name of the target OpenStack/PowerVC cloud passed to
-#           PowerVC-Tool and print-stream-json.sh.
+#           PowerVC-Tool and current-servers.sh.
 #
 # Globals:
 #   CLOUD – (in) must be non-empty; validated but not modified.
@@ -141,22 +146,25 @@ function retry_command() {
 # executable.
 #
 # When SHA verification is enabled (the default) the function downloads both the
-# target file and its matching .sha256 file, verifies the checksum from the
-# target directory, and leaves the executable in place only when verification
-# succeeds.  When disabled the SHA download and check are skipped entirely.
+# target file and its matching .sha256 file, verifies the checksum, and then
+# removes the .sha256 file; the executable is left in place only when
+# verification succeeds.  When disabled the SHA download and check are skipped
+# entirely.
 #
 # Arguments:
 #   $1 - Source URL.
 #   $2 - Destination path for the downloaded file.
 #   $3 - Human-readable description used in log messages.
 #   $4 - (optional) Whether to download and verify the SHA256 checksum.
-#        Accepts "true" or "false". Defaults to "true".
+#        Must be exactly "true" or "false". Defaults to "true". Any other
+#        value is treated as an error rather than silently skipping verification.
 # Returns:
 #   0 if the file is downloaded (and checksum verification passes when enabled).
 #   1 if a download fails or checksum verification fails.
 # Side Effects:
-#   Writes the file and (when enabled) checksum file at the destination path
-#   and changes the downloaded file mode.
+#   Writes the binary at the destination path and marks it executable.
+#   The .sha256 file is a transient intermediary and is removed after
+#   verification (success or failure).
 #######################################
 function download_tool_w_sha() {
 	local url="${1}"
@@ -164,6 +172,11 @@ function download_tool_w_sha() {
 	local description="${3}"
 	local verify_sha="${4:-true}"
 	local rc=0
+
+	if [[ "${verify_sha}" != "true" && "${verify_sha}" != "false" ]]; then
+		log_error "download_tool_w_sha: verify_sha must be 'true' or 'false', got '${verify_sha}'"
+		return 1
+	fi
 
 	log_info "Downloading ${description} from ${url}"
 	if ! retry_command 3 5 "Download ${description}" \
@@ -174,32 +187,33 @@ function download_tool_w_sha() {
 		return 1
 	fi
 
-	chmod +x "${output}"
-
 	if [[ "${verify_sha}" == "true" ]]; then
-		url="${url}.sha256"
-		output="${output}.sha256"
-		log_info "Downloading ${description} SHA256 from ${url}"
+		local sha_url="${url}.sha256"
+		local sha_output="${output}.sha256"
+		log_info "Downloading ${description} SHA256 from ${sha_url}"
 		if ! retry_command 3 5 "Download ${description} SHA256" \
 			curl --fail --location --silent \
 				--show-error --connect-timeout 30 --max-time 120 \
-				--output "${output}" "${url}"; then
-			log_error "Could not download ${url}"
+				--output "${sha_output}" "${sha_url}"; then
+			log_error "Could not download ${sha_url}"
 			return 1
 		fi
 
-		pushd "$(dirname "${output}")" > /dev/null || {
-			log_error "Failed to change directory to $(dirname "${output}")"
+		pushd "$(dirname "${sha_output}")" > /dev/null || {
+			log_error "Failed to change directory to $(dirname "${sha_output}")"
 			return 1
 		}
-		if ! sha256sum --check "$(basename "${output}")"; then
+		if ! sha256sum --check "$(basename "${sha_output}")"; then
 			log_error "sha256 sum failed verification"
-			rm -f "${output}" "${output%.sha256}"
+			rm -f "${sha_output}" "${output}"
 			popd > /dev/null || true
 			return 1
 		fi
+		rm -f "${sha_output}"
 		popd > /dev/null || rc=$?
 	fi
+
+	chmod +x "${output}"
 
 	log_info "Successfully installed ${description}"
 
@@ -212,18 +226,19 @@ function download_tool_w_sha() {
 #
 # The function performs the following steps in order:
 #   1. Changes to /tmp and creates a private, mode-0700 HOME directory under
-#      /tmp/powervc-checks.XXXXXX so secrets written there are not world-
+#      /var/tmp/powervc-checks.XXXXXX so secrets written there are not world-
 #      readable.
 #   2. Creates /tmp/bin and prepends it to PATH.
 #   3. Detects the host architecture (x86_64 → amd64, ppc64le stays as-is)
 #      and downloads the matching ocp-ipi-powervc binary together with
-#      print-stream-json.sh from the GitHub release at POWERVC_TOOL_VERSION.
-#      Each download is retried up to 10 times with a progressive back-off
-#      (attempt × 5 seconds) before the function exits non-zero.
+#      current-servers.sh from the GitHub release at POWERVC_TOOL_VERSION.
+#      Each download is retried up to 3 times with a constant 5-second delay
+#      before the function exits non-zero.
 #   4. Copies clouds.yaml (to both $HOME and $HOME/.config/openstack/) and
 #      ocp-ci-ca.pem from SECRETS_DIR, then rewrites any hardcoded
 #      /tmp/ocp-ci-ca.pem path in both copies to the real $HOME path.
-#   5. Verifies that PowerVC-Tool and openstack are resolvable on PATH.
+#   5. Verifies that PowerVC-Tool, current-servers.sh, jq, and openstack are
+#      resolvable on PATH.
 #
 # Globals:
 #   POWERVC_TOOL_VERSION – (in)  GitHub release tag used to build the download
@@ -248,10 +263,10 @@ function install_required_tools() {
 		exit 1
 	}
 
-	# Make a private directory that is only readable by us
-	HOME="$(mktemp -d /tmp/powervc-checks.XXXXXX)"
+	# Make a private directory that is only readable by us.
+	HOME="$(mktemp -d /var/tmp/powervc-checks.XXXXXX)"
 	chmod 0700 "${HOME}"
-	echo "HOME is now ${HOME}"
+	log_info "HOME is now ${HOME}"
 	export HOME
 
 	mkdir -p "${tmp_bin_dir}" || {
@@ -260,7 +275,7 @@ function install_required_tools() {
 	}
 
 	PATH="${tmp_bin_dir}:${PATH}"
-	echo "PATH is now ${PATH}"
+	log_info "PATH is now ${PATH}"
 	export PATH
 
 	log_info "Installing PowerVC-Tool version ${POWERVC_TOOL_VERSION}"
@@ -286,13 +301,13 @@ function install_required_tools() {
 	fi
 	mv "${tmp_bin_dir}/${tool_bin}" "${tmp_bin_dir}/PowerVC-Tool"
 
-	local print_stream_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/print-stream-json.sh"
-	if ! download_tool_w_sha "${print_stream_url}" "${tmp_bin_dir}/print-stream-json.sh" "print-stream-json ${POWERVC_TOOL_VERSION}"; then
-		log_error "Could not download ${print_stream_url}"
+	local current_servers_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/current-servers.sh"
+	if ! download_tool_w_sha "${current_servers_url}" "${tmp_bin_dir}/current-servers.sh" "current-servers ${POWERVC_TOOL_VERSION}"; then
+		log_error "Could not download ${current_servers_url}"
 		exit 1
 	fi
 
-	# Setup OpenStack configuration
+	# Install the OpenStack credentials.
 	log_info "Setting up OpenStack credentials..."
 	mkdir -p "${HOME}/.config/openstack/" || {
 		log_error "Failed to create OpenStack config directory"
@@ -324,13 +339,15 @@ function install_required_tools() {
 		exit 1
 	}
 
-	# The cloud configuration in the secret uses hardcoded /tmp/ocp-ci-ca.pem
+	# The secret's clouds.yaml hard-codes /tmp/ocp-ci-ca.pem as the CA path,
+	# but the working directory is HOME (set earlier in this function), not /tmp.
+	# Rewrite both installed copies so the tools find the CA file at its real location.
 	sed -i -e "s|/tmp/ocp-ci-ca.pem|${HOME}/ocp-ci-ca.pem|" "${HOME}/clouds.yaml"
 	sed -i -e "s|/tmp/ocp-ci-ca.pem|${HOME}/ocp-ci-ca.pem|" "${HOME}/.config/openstack/clouds.yaml"
 
-	# Verify all required tools are available
+	# Verify all required tools are available.
 	log_info "Verifying installed tools..."
-	local tools=("PowerVC-Tool" "print-stream-json.sh" "openstack")
+	local tools=("PowerVC-Tool" "current-servers.sh" "jq" "openstack")
 	for tool in "${tools[@]}"; do
 		if ! command -v "${tool}" &>/dev/null; then
 			log_error "Required tool '${tool}' is not available"
@@ -345,6 +362,30 @@ function install_required_tools() {
 #######################################
 # Query the OpenShift CI release-stream API and populate the global RELEASES
 # array with every supported major.minor version.
+#
+# NOTE: RELEASES is not consumed by any later step yet (current-servers.sh does
+# not take a releases argument). This function is intentionally kept for future
+# use. Bash cannot export arrays, so RELEASES is left as a plain global rather
+# than exported.
+#
+# When a consumer is added, pass RELEASES to it with one of these approaches
+# (do NOT rely on `export RELEASES` — exporting an array is a silent no-op):
+#
+#   1. Pass as arguments (preferred when you control the callee). Element
+#      boundaries are preserved exactly with no quoting/escaping issues:
+#        current-servers.sh -c "${CLOUD}" --releases "${RELEASES[@]}"
+#      The callee then reads them from "$@".
+#
+#   2. Export a delimited scalar and re-split in the child (when the interface
+#      must be an env var). Safe here because elements are simple major.minor
+#      strings that never contain the delimiter:
+#        # parent:
+#        IFS=',' RELEASES_CSV="${RELEASES[*]}"; export RELEASES_CSV
+#        # child:
+#        IFS=',' read -r -a RELEASES <<< "${RELEASES_CSV}"
+#
+#   (For passing the list to a separate CI step rather than a child process,
+#   write it to "${SHARED_DIR}" instead, per this repo's conventions.)
 #
 # The function:
 #   1. Fetches all release-stream tags from the ppc64le CI endpoint.
@@ -392,10 +433,9 @@ function find_openshift_releases() {
 	   | .[]
 	 '
 	) || true
-	export RELEASES
 
 	if (( ${#RELEASES[@]} == 0 )); then
-		log_error "Could not any releases?"
+		log_error "Could not find any releases"
 		return 1
 	fi
 
@@ -404,57 +444,46 @@ function find_openshift_releases() {
 }
 
 #######################################
-# Verify that RHCOS stream data is available for every supported OpenShift
-# release and RHEL generation on the target PowerVC cloud.
+# Run the PowerVC server inventory check against the target cloud.
 #
-# For each combination of RHEL version (rhel9, rhel10) and every entry in the
-# global RELEASES array, the function invokes print-stream-json.sh to confirm
-# that a corresponding RHCOS image stream entry exists.
+# Invokes current-servers.sh for CLOUD with -s so that standalone and bastion
+# VMs are included in the output alongside cluster nodes, giving CI logs a
+# complete picture of the cloud's server state.
 #
 # Globals:
-#   CLOUD    – (in) name of the target OpenStack/PowerVC cloud.
-#   RELEASES – (in) indexed array of "major.minor" OpenShift version strings,
-#              populated by find_openshift_releases.
+#   CLOUD – (in) name of the target cloud passed to current-servers.sh.
 # Returns:
-#   0 if all checks pass; non-zero if any print-stream-json.sh invocation fails.
+#   0 on success; inherits current-servers.sh's non-zero exit on failure.
 #######################################
-function check_rhcos_images() {
-	local -a rhels
-
-	rhels=("rhel9" "rhel10")
-
-	log_info "Checking RHCOS images for cloud ${CLOUD}"
-	for rhel in "${rhels[@]}"; do
-		for release in "${RELEASES[@]}"; do
-			log_info "Checking ${release} ${rhel}"
-			print-stream-json.sh --cloud "${CLOUD}" --release "release-${release}" --rhel "${rhel}"
-		done
-	done
+function check_current_servers() {
+	current-servers.sh -c "${CLOUD}" -s
 }
 
 #######################################
 # Entry point for the PowerVC checks step.
 #
 # Orchestrates the full check sequence in order:
-#   1. Resolves and exports SECRETS_DIR; exits if the directory is absent.
+#   1. Verifies the SECRETS_DIR constant (set at module load) exists on disk;
+#      exits if it is absent.
 #   2. Calls validate_environment to confirm required variables are set.
 #   3. Calls install_required_tools to download helper binaries and configure
 #      OpenStack credentials.
-#   4. Calls find_openshift_releases to populate the RELEASES array.
-#   5. Calls check_rhcos_images to verify RHCOS stream data for every
-#      supported release/RHEL combination on the target cloud.
+#   4. Calls find_openshift_releases to populate RELEASES (non-fatal: a release
+#      API outage will not prevent the server inventory from running).
+#   5. Calls check_current_servers to list the servers currently running on the
+#      target cloud.
 #
 # Globals:
-#   SECRETS_DIR – (out) path to the mounted PowerVC credentials secret.
-#   CLOUD       – (in)  validated by validate_environment.
+#   SECRETS_DIR – (in) top-level readonly constant set at module load;
+#                      validated in main() and read by install_required_tools.
+#   CLOUD       – (in) validated by validate_environment.
 # Returns:
 #   0 on success; non-zero (and logs an error) if any step fails.
 #######################################
 function main() {
 	log_info "=== PowerVC Checks Script Started ==="
 
-	# Setup secrets directory
-	export SECRETS_DIR=/var/run/powervc-ipi-cicd-secrets/powervc-creds
+	# Verify the secrets directory set at the top of the script is present.
 	if [[ ! -d "${SECRETS_DIR}" ]]; then
 		log_error "Secrets directory does not exist: ${SECRETS_DIR}"
 		exit 1
@@ -466,11 +495,13 @@ function main() {
 	# Download helper binaries.
 	install_required_tools
 
-	# Determine the OpenShift PowerVC supported releases
-	find_openshift_releases
-	
-	# Execute the image checks.
-	check_rhcos_images
+	# Determine the OpenShift PowerVC supported releases.
+	# Non-fatal: RELEASES has no consumer yet, so a release-API outage must not
+	# block the server inventory check.
+	find_openshift_releases || log_warning "Could not determine OpenShift releases; continuing"
+
+	# Execute the server inventory check.
+	check_current_servers
 
 	log_info "=== PowerVC Checks Script Completed ==="
 }

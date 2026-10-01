@@ -51,6 +51,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: libvirt-installer
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   openstack-installer:
     name: "5.0"
     namespace: ocp
@@ -464,7 +468,6 @@ tests:
       EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: vsphere-csi-driver-operator
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
-      LIBVIRT_E2E_FAILURE_ANALYSIS_ENABLED: "true"
       TEST_TYPE: conformance-parallel
       USE_EXTERNAL_DNS: "true"
     workflow: openshift-e2e-libvirt-vpn-fips
@@ -519,7 +522,7 @@ tests:
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-xz
   capabilities:
   - sshd-bastion
-  cron: 0 0 * * 2,4
+  cron: 40 0 * * 2,4
   steps:
     cluster_profile: libvirt-s390x-amd64
     env:
@@ -569,7 +572,6 @@ tests:
       ETCD_DISK_SPEED: slow
       EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: vsphere-csi-driver-operator
       FIPS_ENABLED: "true"
-      LIBVIRT_E2E_FAILURE_ANALYSIS_ENABLED: "true"
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
       USE_EXTERNAL_DNS: "true"
@@ -685,36 +687,6 @@ tests:
       TEST_TYPE: conformance-parallel
       USE_EXTERNAL_DNS: "true"
     workflow: openshift-e2e-libvirt-upi-fips
-- as: ocp-e2e-serial-ovn-techpreview-remote-s2s-libvirt-multi-p-p
-  capabilities:
-  - intranet
-  cron: 0 9 * * 0
-  steps:
-    cluster_profile: libvirt-ppc64le-s2s
-    env:
-      ARCH: ppc64le
-      BRANCH: "5.0"
-      ETCD_DISK_SPEED: slow
-      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: vsphere-csi-driver-operator
-      FEATURE_SET: TechPreviewNoUpgrade
-      TEST_TYPE: conformance-serial
-      USE_EXTERNAL_DNS: "true"
-    workflow: openshift-e2e-libvirt-upi
-- as: ocp-e2e-ovn-techpreview-remote-s2s-libvirt-multi-p-p
-  capabilities:
-  - intranet
-  cron: 0 9 * * 6
-  steps:
-    cluster_profile: libvirt-ppc64le-s2s
-    env:
-      ARCH: ppc64le
-      BRANCH: "5.0"
-      ETCD_DISK_SPEED: slow
-      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: vsphere-csi-driver-operator
-      FEATURE_SET: TechPreviewNoUpgrade
-      TEST_TYPE: conformance-parallel
-      USE_EXTERNAL_DNS: "true"
-    workflow: openshift-e2e-libvirt-upi
 - as: ocp-powervc-checks
   capabilities:
   - intranet

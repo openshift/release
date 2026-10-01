@@ -6,6 +6,34 @@ ref:
     tag: upi-installer
   commands: ipi-conf-azure-multidisk-commands.sh
   env:
+  - name: AZURE_MULTIDISK_CONTROL_PLANE_DISKS
+    default: ""
+    documentation: |-
+      Data disks to attach to control plane machines, one per line, with colon-separated
+      fields: type:name:sizeGB:lun:storageAccountType:mountPath
+
+      type is etcd, swap or user-defined. storageAccountType may be left empty to let the
+      platform choose. mountPath is only read for user-defined disks and must be empty
+      otherwise, since the installer fixes the mount path for the other types.
+
+      The name of a user-defined disk becomes its platformDiskID, which the installer
+      rejects beyond 12 characters.
+
+      Disks are emitted in the order given, because the installer pairs the Nth diskSetup
+      entry with the Nth dataDisks entry on Azure. etcd disk setup is only valid on the
+      control plane.
+
+      When this or AZURE_MULTIDISK_COMPUTE_DISKS is set it fully describes the disk layout
+      and the single-disk AZURE_CONTROL_PLANE_MULTIDISK_* and AZURE_COMPUTE_MULTIDISK_*
+      variables below are ignored. Example:
+
+        etcd:etcddisk:64:0:Premium_LRS:
+        user-defined:containers:32:1:StandardSSD_LRS:/var/lib/containers
+  - name: AZURE_MULTIDISK_COMPUTE_DISKS
+    default: ""
+    documentation: |-
+      Data disks to attach to compute machines, in the same format as
+      AZURE_MULTIDISK_CONTROL_PLANE_DISKS. Swap disk setup is only valid on compute.
   - name: AZURE_CONTROL_PLANE_MULTIDISK_TYPE
     default: ""
     documentation: Using custom azure disk type for controlplane machines

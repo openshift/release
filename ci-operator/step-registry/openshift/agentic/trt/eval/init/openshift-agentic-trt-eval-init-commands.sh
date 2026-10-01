@@ -36,7 +36,16 @@ cat > "${SHARED_DIR}/trt-telemetry.sh" << 'HEREDOC_EOF'
 
 OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 
+if [[ -f "${SHARED_DIR}/github-app-auth.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/github-app-auth.sh"
+fi
+
 agentic_ci() {
+    # Installation tokens last 1h; mint a fresh one before each long child.
+    if declare -F refresh_github_tokens >/dev/null 2>&1; then
+        refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
+    fi
     local timeout_seconds=""
     local extra_args=()
     while [[ "${1:-}" == --* ]]; do

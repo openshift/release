@@ -194,7 +194,7 @@ EOF
 
       run "oc get mcp,node"
       run "oc get mcp worker -o yaml"
-      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\") | {path, mode, overwrite}'"
 
       return 1
     }
@@ -225,7 +225,7 @@ EOF
 
       run "oc get mcp,node"
       run "oc get mcp worker -o yaml"
-      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\") | {path, mode, overwrite}'"
 
       return 1
     }
@@ -256,7 +256,7 @@ EOF
 
       run "oc get mcp,node"
       run "oc get mcp worker -o yaml"
-      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\") | {path, mode, overwrite}'"
 
       return 1
     }

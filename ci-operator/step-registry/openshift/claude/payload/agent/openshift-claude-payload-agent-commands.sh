@@ -74,6 +74,13 @@ fi
 
 case "${AGENT_HARNESS}" in
     claude-code)
+        # Fable requires a newer Claude Code version than the stable channel
+        # provides. agentic-ci's Claude harness executes "claude" from PATH,
+        # so put a same-named shim first while leaving /usr/bin/claude untouched.
+        CLAUDE_LATEST_BIN_DIR="${TMPDIR:-/tmp}/claude-latest-bin"
+        mkdir -p "${CLAUDE_LATEST_BIN_DIR}"
+        ln -sf "$(command -v claude-latest)" "${CLAUDE_LATEST_BIN_DIR}/claude"
+        export PATH="${CLAUDE_LATEST_BIN_DIR}:${PATH}"
         AGENT_DISPLAY_NAME="Claude"
         AGENT_MODEL="${CLAUDE_MODEL}"
         if [[ -n "${AGENT_EFFORT}" ]]; then
@@ -756,9 +763,9 @@ fi
 
 # Send Slack summary including analysis and any revert actions
 if [ "${JOB_TYPE:-}" = "presubmit" ]; then
-    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
 else
-    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
+    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/${JOB_NAME}/${BUILD_ID}"
 fi
 
 echo "Asking ${AGENT_DISPLAY_NAME} to summarize findings for Slack..."

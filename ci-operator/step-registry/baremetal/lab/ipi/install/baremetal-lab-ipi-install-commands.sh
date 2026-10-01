@@ -246,7 +246,7 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
 fi
 
 # Also get a sanitized copy of the install-config.yaml as an artifact for debugging purposes
-grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
+grep -v "password\|username\|pullSecret\|httpProxy\|httpsProxy" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
 
 ### Create manifests
 echo "[INFO] Creating manifests..."

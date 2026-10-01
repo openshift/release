@@ -6,31 +6,26 @@ set -o pipefail
 
 echo "=== TRT Jira Solver ==="
 
-# --- Read tokens and issue from SHARED_DIR (written by init pre-step) ---
-set +x
-GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
-export GH_FORK_TOKEN
-GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
-export GITHUB_TOKEN
-JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
-export JIRA_ISSUE_KEY
-ISSUE_JSON="${SHARED_DIR}/jira-issue.json"
-ISSUE_SUMMARY=$(jq -r '.fields.summary // "No summary"' "${ISSUE_JSON}")
-export ISSUE_SUMMARY
-
-if [[ "${EVAL_MODE:-}" != "true" ]]; then
-    git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
-fi
-
-echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
-
-# --- Metrics instrumentation ---
+[[ -f "${SHARED_DIR}/github-app-auth.sh" ]] || {
+    echo "ERROR: ${SHARED_DIR}/github-app-auth.sh not found — github-app-auth step must run first"
+    exit 1
+}
 [[ -f "${SHARED_DIR}/trt-telemetry.sh" ]] || {
     echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — workflow init step must run first"
     exit 1
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-telemetry.sh"
+load_github_tokens
+configure_github_git_credentials
+
+JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
+export JIRA_ISSUE_KEY
+ISSUE_JSON="${SHARED_DIR}/jira-issue.json"
+ISSUE_SUMMARY=$(jq -r '.fields.summary // "No summary"' "${ISSUE_JSON}")
+export ISSUE_SUMMARY
+
+echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 
 PHASE_SETUP_START=$(date +%s)
 
@@ -247,6 +242,8 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         || true
 fi
 PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
+
+refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
 
 if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
     echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."

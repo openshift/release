@@ -9,7 +9,7 @@ log(){
 }
 
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
-LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
+LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/sa.rosa-cluster-lease-manager.hosted-mgmt.config"
 CLAIM_FILE="${SHARED_DIR}/lease-claim"
 
 if [[ ! -f "${CLAIM_FILE}" ]]; then
@@ -37,6 +37,31 @@ RELEASED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 JOB_NAME="${JOB_NAME:-unknown-job}"
 BUILD_ID="${BUILD_ID:-unknown-build}"
 OPERATOR_NAME=$(cat "${SHARED_DIR}/lease-operator" 2>/dev/null || true)
+
+# ClusterPackage health gate: verify PKO-managed packages are healthy
+# before returning the cluster to the available pool. If any ClusterPackage
+# has Available=False, leave the cluster as in-use for the controller to
+# detect and repair via its PKO health check.
+cluster_oc() {
+    oc --kubeconfig="${SHARED_DIR}/kubeconfig" "$@"
+}
+
+if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+    CP_JSON=$(cluster_oc get clusterpackage -l "hive.openshift.io/managed=true" \
+        --request-timeout=15s -o json 2>/dev/null) || true
+    if [[ -n "${CP_JSON}" ]]; then
+        UNHEALTHY_PKGS=$(echo "${CP_JSON}" | jq -r '
+            .items[] |
+            select(.status.conditions[]? |
+                select(.type=="Available" and .status=="False")) |
+            .metadata.name' 2>/dev/null) || true
+        if [[ -n "${UNHEALTHY_PKGS}" ]]; then
+            log "WARNING: Unhealthy ClusterPackages detected: $(echo "${UNHEALTHY_PKGS}" | tr '\n' ', ' | sed 's/,$//')"
+            log "Leaving cluster ${CM_NAME} as in-use for controller recovery"
+            exit 0
+        fi
+    fi
+fi
 
 if [[ -n "${OPERATOR_NAME}" ]]; then
     # Per-operator mode: remove this operator with CAS retry

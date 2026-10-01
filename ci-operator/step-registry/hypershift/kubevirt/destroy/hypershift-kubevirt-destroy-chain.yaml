@@ -14,6 +14,14 @@ chain:
       echo "Using $HCP_CLI for cli"
 
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+
+      # If the cluster was never created (e.g. RUN_EXTERNAL_INFRA_TEST=false),
+      # skip destruction instead of failing on a non-existent resource.
+      if ! oc get hostedcluster -A --field-selector metadata.name="${CLUSTER_NAME}" -o name 2>/dev/null | grep -q .; then
+        echo "$(date) No HostedCluster named ${CLUSTER_NAME} found, skipping destroy"
+        exit 0
+      fi
+
       echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
       $HCP_CLI destroy cluster kubevirt \
         --name ${CLUSTER_NAME} \

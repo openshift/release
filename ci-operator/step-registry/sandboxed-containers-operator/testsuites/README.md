@@ -60,6 +60,15 @@ Non-blocking behaviour requires **both**:
 > still marks the **overall job red** — it just doesn't stop the steps that follow it.
 > To keep a job green you would additionally exit 0 or use `optional_on_success`.
 
+## Gate
+
+The post suites only run when the gate file `${SHARED_DIR}/testsuites_gate`
+exists. The file is created by the `sandboxed-containers-operator-testsuites-gate`
+step, which runs in the `test` phase via the
+shared `sandboxed-containers-operator-test` chain. When the gate file is absent,
+each suite skips, so the suites never run against an environment where the test
+phase was not reached or sanity checks did not pass.
+
 ## Layout
 
 ```
@@ -104,6 +113,8 @@ workflow:
     - chain: sandboxed-containers-operator-testsuites   # runs first in post
     - ref: cucushift-installer-wait
       ...
+    test:
+    - chain: sandboxed-containers-operator-test         # gate + openshift-extended-test
 ```
 
 ## Adding a suite
@@ -112,7 +123,9 @@ workflow:
    `...-<suite>-ref.yaml` (env `TESTS_<SUITE_NAME>_ENABLE`, default `"false"`;
    name all suite parameters `TESTS_<SUITE_NAME>_<PARAMETER>`) and a
    `...-<suite>-commands.sh` (default `set -euo pipefail`; write
-   `${ARTIFACT_DIR}/junit_<suite>.xml` in both the run and skip paths).
+   `${ARTIFACT_DIR}/junit_<suite>.xml` in both the run and skip paths; skip
+   `when `${SHARED_DIR}/testsuites_gate` is absent — copy the
+   block from `osc/` or `kata-upstream/`).
 2. Append the ref to `sandboxed-containers-operator-testsuites-chain.yaml` with
    `best_effort: true`.
 3. Run `make update` (generates the `*.metadata.json` files) and validate with the

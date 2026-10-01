@@ -15,7 +15,10 @@ if [ ! -f "${SHARED_DIR}/kubeconfig" ]; then
 fi
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 CLUSTER_NAME=$(oc get hostedclusters -n "$HYPERSHIFT_NAMESPACE" -o jsonpath='{.items[0].metadata.name}')

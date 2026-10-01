@@ -88,10 +88,10 @@ update_global_auth() {
 		apply_image_config
 		echo "update the cluster global auth successfully."
 	else
-		echo "failed to add QE optional registry auth, retry and enable log..."
+		echo "failed to add QE optional registry auth, retry without verbose logging..."
 		sleep 1
 		ret=0
-		run "oc --loglevel=10 set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
+		run "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
 		if [[ $ret -eq 0 ]]; then
 			echo "update the cluster global auth successfully after retry."
 		else
@@ -230,7 +230,7 @@ EOF
 
 		run "oc get mcp,node"
 		run "oc get mcp worker -o yaml"
-		run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+		run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\") | {path, mode, overwrite}'"
 
 		return 1
 	}

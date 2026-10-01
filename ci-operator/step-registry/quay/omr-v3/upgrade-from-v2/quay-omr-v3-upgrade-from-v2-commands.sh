@@ -89,12 +89,12 @@ skopeo copy --retry-times=3 --src-authfile="${auth_file}" \
 [[ -s "${image_archive}" ]]
 oc image extract "${OMR_IMAGE}" \
     --registry-config="${auth_file}" \
-    --path="/quay:${extract_dir}"
-if [[ ! -s "${extract_dir}/quay" ]]; then
+    --path="/mirror-registry:${extract_dir}"
+if [[ ! -s "${extract_dir}/mirror-registry" ]]; then
     echo "The extracted OMR v3 installer binary is missing or empty." >&2
     exit 1
 fi
-chmod 0755 "${extract_dir}/quay"
+chmod 0755 "${extract_dir}/mirror-registry"
 
 sha256sum \
     "${SHARED_DIR}/mirror_registry_ca.crt" \
@@ -128,7 +128,7 @@ registry_hostname="$2"
 registry_endpoint="${registry_hostname}:8443"
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 
-if ! "${work_dir}/quay" migrate \
+if ! "${work_dir}/mirror-registry" migrate \
     -data-dir "${data_dir}" \
     -image-archive "${work_dir}/quay-mirror.tar" \
     -cleanup > "${work_dir}/migration.log" 2>&1; then
@@ -176,12 +176,12 @@ chmod 0755 "${work_dir}/migrate-to-v3"
 
 scp "${ssh_options[@]}" "${image_archive}" \
     "${remote}:${remote_work_dir}/quay-mirror.tar"
-scp "${ssh_options[@]}" "${extract_dir}/quay" \
-    "${remote}:${remote_work_dir}/quay"
+scp "${ssh_options[@]}" "${extract_dir}/mirror-registry" \
+    "${remote}:${remote_work_dir}/mirror-registry"
 scp "${ssh_options[@]}" "${work_dir}/migrate-to-v3" \
     "${remote}:${remote_work_dir}/migrate-to-v3"
 ssh "${ssh_options[@]}" "${remote}" \
-    "chmod 0755 '${remote_work_dir}/quay' '${remote_work_dir}/migrate-to-v3'"
+    "chmod 0755 '${remote_work_dir}/mirror-registry' '${remote_work_dir}/migrate-to-v3'"
 
 registry_endpoint=$(<"${SHARED_DIR}/mirror_registry_url")
 registry_hostname="${registry_endpoint%:8443}"

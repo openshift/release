@@ -12,6 +12,45 @@ b64url() {
     | tr -d '\n'
 }
 
+# Delete all remote branches whose names start with
+# "sync-${SOURCE_BRANCH}-to-${TARGET_BRANCH}".
+# Any branch names passed as arguments are skipped (e.g. heads of open PRs).
+delete_sync_branches() {
+  local skip_branches=("$@")
+  local prefix="sync-${SOURCE_BRANCH}-to-${TARGET_BRANCH}"
+  local refs branch keep skip
+
+  echo "🧹 Cleaning up ${prefix}* branches…"
+  refs=$(
+    curl -sS -H "Authorization: token ${GITHUB_TOKEN}" \
+      "https://api.github.com/repos/${REPO}/git/matching-refs/heads/${prefix}" |
+      jq -r '.[].ref // empty' | sed 's|^refs/heads/||'
+  )
+
+  if [[ -z "${refs}" ]]; then
+    echo "ℹ️  No ${prefix}* branches found."
+    return 0
+  fi
+
+  while IFS= read -r branch; do
+    [[ -z "${branch}" ]] && continue
+    skip=false
+    for keep in "${skip_branches[@]}"; do
+      if [[ "${branch}" == "${keep}" ]]; then
+        skip=true
+        break
+      fi
+    done
+    if [[ "${skip}" == "true" ]]; then
+      echo "⏭️  Skipping branch ${branch} (associated with open PR)"
+      continue
+    fi
+    echo "🗑️  Deleting branch ${branch}…"
+    curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X DELETE \
+      "https://api.github.com/repos/${REPO}/git/refs/heads/${branch}" || true
+  done <<< "${refs}"
+}
+
 echo "🔐 Generating JWT…"
 # create the JWT needed to get an app install token needed for API requests
 # the token is short-lived and will expire after EXP below
@@ -52,27 +91,34 @@ BRANCH="sync-${SOURCE_BRANCH}-to-${TARGET_BRANCH}-${TITLE_DATE}"
 PR_TITLE="NO-JIRA: Branch Sync ${SOURCE_BRANCH} to ${TARGET_BRANCH} [${TITLE_DATE}]"
 PR_BODY="Automated branch sync: ${SOURCE_BRANCH} to ${TARGET_BRANCH}."
 
-# exit if no new commits are available to sync
-NEW_COMMITS=$(git rev-list "origin/${TARGET_BRANCH}..origin/${SOURCE_BRANCH}" --count)
-(( NEW_COMMITS == 0 )) && { echo "No changes to sync; exiting."; exit 0; }
-
 # exit if there is already an open PR for branch sync
-OPEN=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" \
-  "https://api.github.com/repos/${REPO}/pulls?state=open&base=${TARGET_BRANCH}&per_page=100" \
-  | jq -r --arg tb "$TARGET_BRANCH" --arg sb "$SOURCE_BRANCH" '
-  .[] | select(.title | test("Branch Sync " + $sb + " to " + $tb + " \\[[0-9]{2}-[0-9]{2}-[0-9]{4}\\]")) | .number' \
-  | head -n1
+OPEN_PR_INFO=$(
+  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" \
+    "https://api.github.com/repos/${REPO}/pulls?state=open&base=${TARGET_BRANCH}&per_page=100" |
+    jq -r --arg tb "$TARGET_BRANCH" --arg sb "$SOURCE_BRANCH" '
+    .[] | select(.title | test("Branch Sync " + $sb + " to " + $tb + " \\[[0-9]{2}-[0-9]{2}-[0-9]{4}\\]")) | "\(.number)\t\(.head.ref)"'
 )
+OPEN_PR_NUMS=()
+OPEN_PR_BRANCHES=()
+while IFS=$'\t' read -r pr_num pr_branch; do
+  [[ -z "${pr_num}" ]] && continue
+  OPEN_PR_NUMS+=("${pr_num}")
+  OPEN_PR_BRANCHES+=("${pr_branch}")
+done <<< "${OPEN_PR_INFO}"
 
-if [[ -n "$OPEN" ]]; then
-  echo "Open branch-sync PR #$OPEN; exiting."
+if [[ ${#OPEN_PR_NUMS[@]} -gt 0 ]]; then
+  echo "ℹ️  Found open branch-sync PR(s): ${OPEN_PR_NUMS[*]} (branches: ${OPEN_PR_BRANCHES[*]})"
+  delete_sync_branches "${OPEN_PR_BRANCHES[@]}"
+  echo "ℹ️  Exiting without creating a new sync PR."
   exit 0
 fi
 
-echo "🧹 Deleting stale branch ${BRANCH}, if any…"
-# if an earlier failed run left the branch behind, delete it now
-curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X DELETE \
-  "https://api.github.com/repos/${REPO}/git/refs/heads/${BRANCH}" || true
+# no open PRs: remove every leftover sync branch before creating a new one
+delete_sync_branches
+
+# exit if no new commits are available to sync
+NEW_COMMITS=$(git rev-list "origin/${TARGET_BRANCH}..origin/${SOURCE_BRANCH}" --count)
+(( NEW_COMMITS == 0 )) && { echo "No changes to sync; exiting."; exit 0; }
 
 # create branch off TARGET, merge SOURCE with -X theirs
 git checkout -b "$BRANCH" "origin/${TARGET_BRANCH}"

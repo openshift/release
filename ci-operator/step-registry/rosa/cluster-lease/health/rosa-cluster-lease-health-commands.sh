@@ -144,6 +144,76 @@ for i in $(seq 0 $((TOTAL - 1))); do
         continue
     fi
 
+    # --- ClusterPackage health check ---
+    # Fetch a cluster-admin kubeconfig from OCM to inspect in-cluster state.
+    # If the kubeconfig fetch fails (transient OCM issue, cluster not yet
+    # accessible), skip the CP check — do NOT mark the cluster as error.
+    CLUSTER_KUBECONFIG=$(mktemp)
+    CP_CHECK_SKIPPED=""
+    if ! ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null | jq -r '.kubeconfig' > "${CLUSTER_KUBECONFIG}" 2>/dev/null || [[ ! -s "${CLUSTER_KUBECONFIG}" ]]; then
+        log "WARNING: ${CM_NAME} could not fetch cluster kubeconfig from OCM, skipping ClusterPackage check"
+        CP_CHECK_SKIPPED="true"
+    fi
+
+    if [[ -z "${CP_CHECK_SKIPPED}" ]]; then
+        # Determine the expected ClusterPackage set from the lease config
+        CLUSTER_TYPE=$(echo "${CM}" | jq -r '.data["cluster-type"] // "classic-sts"')
+        EXPECTED_CPS=$(lease_oc get configmap rosa-cluster-lease-config -n "${LEASE_NAMESPACE}" -o jsonpath="{.data['expected-clusterpackages-${CLUSTER_TYPE}']}" 2>/dev/null || true)
+        if [[ -z "${EXPECTED_CPS}" ]]; then
+            EXPECTED_CPS=$(lease_oc get configmap rosa-cluster-lease-config -n "${LEASE_NAMESPACE}" -o jsonpath='{.data.expected-clusterpackages}' 2>/dev/null || true)
+        fi
+        if [[ -z "${EXPECTED_CPS}" ]]; then
+            # Default: the 8 managed operator ClusterPackages
+            EXPECTED_CPS="configure-alertmanager-operator managed-node-metadata-operator managed-upgrade-operator ocm-agent-operator osd-metrics-exporter rbac-permissions-operator route-monitor-operator splunk-forwarder-operator"
+        fi
+
+        # Get actual ClusterPackages with the managed label from the cluster
+        ACTUAL_CP_JSON=""
+        ACTUAL_CP_JSON=$(oc --kubeconfig="${CLUSTER_KUBECONFIG}" get clusterpackage -l "hive.openshift.io/managed=true" --request-timeout=15s -o json 2>/dev/null) || true
+
+        if [[ -n "${ACTUAL_CP_JSON}" ]]; then
+            # Check for missing CPs (expected but not present)
+            ACTUAL_CP_NAMES=$(echo "${ACTUAL_CP_JSON}" | jq -r '.items[].metadata.name' 2>/dev/null | sort) || true
+            CP_ISSUES=""
+            for expected_cp in ${EXPECTED_CPS}; do
+                if ! echo "${ACTUAL_CP_NAMES}" | grep -qx "${expected_cp}"; then
+                    CP_ISSUES="${CP_ISSUES}missing:${expected_cp} "
+                fi
+            done
+
+            # Check for degraded CPs (present but Available != True)
+            DEGRADED_CPS=$(echo "${ACTUAL_CP_JSON}" | jq -r '
+                .items[] |
+                select(any(.status.conditions[]?;
+                    .type == "Available" and .status == "True") | not) |
+                .metadata.name' 2>/dev/null) || true
+            for degraded_cp in ${DEGRADED_CPS}; do
+                CP_ISSUES="${CP_ISSUES}degraded:${degraded_cp} "
+            done
+
+            if [[ -n "${CP_ISSUES}" ]]; then
+                CP_ISSUES="${CP_ISSUES% }"
+                log "UNHEALTHY: ${CM_NAME} ClusterPackage issues: ${CP_ISSUES}"
+                echo "  ClusterPackage issues: ${CP_ISSUES}" >> "${REPORT}"
+                if [[ "${STATUS}" != "error" ]]; then
+                    lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                        "metadata": {
+                            "labels": { "rosa-cluster-lease/status": "error" },
+                            "annotations": { "rosa-cluster-lease/error-reason": "ClusterPackage: '"${CP_ISSUES}"'", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
+                        }
+                    }' || true
+                fi
+                rm -f "${CLUSTER_KUBECONFIG}"
+                UNHEALTHY=$((UNHEALTHY + 1))
+                continue
+            fi
+        else
+            log "WARNING: ${CM_NAME} could not list ClusterPackages, skipping CP check"
+        fi
+    fi
+    rm -f "${CLUSTER_KUBECONFIG}"
+    # --- End ClusterPackage health check ---
+
     if [[ "${STATUS}" == "error" ]]; then
         log "RESTORED: ${CM_NAME} is healthy again, setting to available"
         lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{

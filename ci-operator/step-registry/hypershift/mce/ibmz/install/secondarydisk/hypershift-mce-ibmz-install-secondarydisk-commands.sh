@@ -3,10 +3,12 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -x
 
+# Tracing is enabled only after the API key is read, otherwise xtrace expands
+# it into the publicly readable build log.
 IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
+set -x
 
 # Check if the system architecture is supported to perform the e2e installation
 arch=$(uname -m)
@@ -87,7 +89,11 @@ export CLUSTER_NAME="hcp-s390x-mgmt-ci-$job_id"
 # Login to IBM Cloud
 # -----------------------------
 echo "Logging in to IBM Cloud..."
+# Tracing is disabled while the API key is handled, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 ibmcloud login --apikey "$IC_API_KEY" -r "$IC_REGION" -g "$RESOURCE_GROUP" || { echo "Login failed"; exit 1; }
+set -x
 
 # Fetching the VSI list with the Zone field
 # ------------------------------

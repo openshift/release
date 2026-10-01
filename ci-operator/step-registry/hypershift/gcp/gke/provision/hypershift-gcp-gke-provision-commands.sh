@@ -7,6 +7,31 @@ BILLING_ACCOUNT_ID="$(<"${CLUSTER_PROFILE_DIR}/billing-account-id")"
 GCP_REGION="${GKE_REGION:-us-central1}"
 RELEASE_CHANNEL="${GKE_RELEASE_CHANNEL:-stable}"
 
+retry_with_backoff() {
+    local max_attempts="$1"
+    local delay="$2"
+    shift 2
+
+    local attempt
+    local rc=0
+    for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+        if "$@"; then
+            return 0
+        else
+            rc=$?
+        fi
+
+        if ((attempt == max_attempts)); then
+            echo "Command failed after ${max_attempts} attempts (exit code ${rc})." >&2
+            return "${rc}"
+        fi
+
+        echo "Attempt ${attempt}/${max_attempts} failed (exit code ${rc}), retrying in ${delay}s..." >&2
+        sleep "${delay}"
+        delay=$((delay * 2))
+    done
+}
+
 # Authenticate with GCP via WIF credential written by hypershift-gcp-wif-auth step
 gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"
 
@@ -60,7 +85,7 @@ set -x
 
 # Enable required APIs in Control Plane project
 echo "Enabling APIs in Control Plane project"
-gcloud services enable \
+retry_with_backoff 5 10 gcloud services enable \
     container.googleapis.com \
     compute.googleapis.com \
     cloudresourcemanager.googleapis.com \
@@ -68,7 +93,7 @@ gcloud services enable \
 
 # Enable required APIs in Hosted Cluster project
 echo "Enabling APIs in Hosted Cluster project"
-gcloud services enable \
+retry_with_backoff 5 10 gcloud services enable \
     compute.googleapis.com \
     dns.googleapis.com \
     iam.googleapis.com \

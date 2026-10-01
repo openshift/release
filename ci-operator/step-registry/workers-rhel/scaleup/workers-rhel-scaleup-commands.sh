@@ -20,7 +20,10 @@ oc version --client
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     echo "Setting proxy"
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Validating parsed Ansible inventory"

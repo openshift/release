@@ -1,0 +1,3746 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  labels:
+    app: grafana
+  name: tide
+  namespace: ci-grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  json: |
+    {
+       "__inputs": [ ],
+       "__requires": [ ],
+       "annotations": {
+          "list": [ ]
+       },
+       "editable": false,
+       "gnetId": null,
+       "graphTooltip": 0,
+       "hideControls": false,
+       "id": null,
+       "links": [ ],
+       "panels": [
+          {
+             "collapse": false,
+             "collapsed": false,
+             "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+             },
+             "id": 2,
+             "panels": [ ],
+             "repeat": null,
+             "repeatIteration": null,
+             "repeatRowId": null,
+             "showTitle": true,
+             "title": "Is Tide OK?",
+             "titleSize": "h6",
+             "type": "row"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "Is the Tide process up and being scraped.",
+             "fieldConfig": {
+                "defaults": {
+                   "links": [ ],
+                   "mappings": [
+                      {
+                         "options": {
+                            "0": {
+                               "text": "DOWN"
+                            },
+                            "1": {
+                               "text": "UP"
+                            }
+                         },
+                         "type": "value"
+                      }
+                   ],
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "red",
+                            "value": null
+                         },
+                         {
+                            "color": "green",
+                            "value": 1
+                         }
+                      ]
+                   },
+                   "unit": "none"
+                }
+             },
+             "gridPos": {
+                "h": 6,
+                "w": 3,
+                "x": 0,
+                "y": 1
+             },
+             "id": 3,
+             "links": [ ],
+             "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "up{job=\"tide\"}",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "",
+                   "refId": "A"
+                }
+             ],
+             "title": "Tide Process",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "Container restarts of the Tide pod in the last 24h. Any value above 0 means the process crashed and was restarted, not a routine rollout to a new pod.",
+             "fieldConfig": {
+                "defaults": {
+                   "decimals": 0,
+                   "links": [ ],
+                   "mappings": [ ],
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "green",
+                            "value": null
+                         },
+                         {
+                            "color": "red",
+                            "value": 1
+                         }
+                      ]
+                   },
+                   "unit": "short"
+                }
+             },
+             "gridPos": {
+                "h": 6,
+                "w": 3,
+                "x": 3,
+                "y": 1
+             },
+             "id": 4,
+             "links": [ ],
+             "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "sum(increase(kube_pod_container_status_restarts_total{job=\"kube-state-metrics\", namespace=\"ci\", container=\"tide\"}[24h]))",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "",
+                   "refId": "A"
+                }
+             ],
+             "title": "Restarts (24h)",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "How long the current Tide pod has been running.",
+             "fieldConfig": {
+                "defaults": {
+                   "links": [ ],
+                   "mappings": [ ],
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [ ]
+                   },
+                   "unit": "s"
+                }
+             },
+             "gridPos": {
+                "h": 6,
+                "w": 3,
+                "x": 6,
+                "y": 1
+             },
+             "id": 5,
+             "links": [ ],
+             "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "time() - process_start_time_seconds{job=\"tide\"}",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "",
+                   "refId": "A"
+                }
+             ],
+             "title": "Pod Age",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "Time since Tide last merged a PR, in any org. Derived from merges_sum (no direct metric for this); goes blank if Tide hasn't merged anything in over 3 days.",
+             "fieldConfig": {
+                "defaults": {
+                   "links": [ ],
+                   "mappings": [ ],
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "green",
+                            "value": null
+                         },
+                         {
+                            "color": "yellow",
+                            "value": 3600
+                         },
+                         {
+                            "color": "red",
+                            "value": 14400
+                         }
+                      ]
+                   },
+                   "unit": "s"
+                }
+             },
+             "gridPos": {
+                "h": 6,
+                "w": 3,
+                "x": 9,
+                "y": 1
+             },
+             "id": 6,
+             "links": [ ],
+             "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "time() - max(last_over_time((timestamp(merges_sum) and ((changes(merges_sum[3m]) > 0) or (merges_sum unless merges_sum offset 3m)))[3d:1m]))",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "",
+                   "refId": "A"
+                }
+             ],
+             "title": "Time Since Last Merge",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "sync-controller query shard outcomes from the most recent cycle: errored/partial shards vs. total shards (same underlying data as the Queries: Current panel below). Background is green when clean, yellow if any shard came back partial, red if any errored.",
+             "fieldConfig": {
+                "defaults": {
+                   "decimals": 0,
+                   "links": [ ],
+                   "mappings": [ ],
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "green",
+                            "value": null
+                         }
+                      ]
+                   },
+                   "unit": "short"
+                },
+                "overrides": [
+                   {
+                      "matcher": {
+                         "id": "byName",
+                         "options": "Errors"
+                      },
+                      "properties": [
+                         {
+                            "id": "thresholds",
+                            "value": {
+                               "mode": "absolute",
+                               "steps": [
+                                  {
+                                     "color": "green",
+                                     "value": null
+                                  },
+                                  {
+                                     "color": "red",
+                                     "value": 1
+                                  }
+                               ]
+                            }
+                         }
+                      ]
+                   },
+                   {
+                      "matcher": {
+                         "id": "byName",
+                         "options": "Partials"
+                      },
+                      "properties": [
+                         {
+                            "id": "thresholds",
+                            "value": {
+                               "mode": "absolute",
+                               "steps": [
+                                  {
+                                     "color": "green",
+                                     "value": null
+                                  },
+                                  {
+                                     "color": "yellow",
+                                     "value": 1
+                                  }
+                               ]
+                            }
+                         }
+                      ]
+                   }
+                ]
+             },
+             "gridPos": {
+                "h": 6,
+                "w": 4,
+                "x": 12,
+                "y": 1
+             },
+             "id": 7,
+             "links": [ ],
+             "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "sum(tide_sync_query_shards{controller=\"sync\", result=\"error\"})",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "Errors",
+                   "refId": "A"
+                },
+                {
+                   "expr": "sum(tide_sync_query_shards{controller=\"sync\", result=\"partial\"})",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "Partials",
+                   "refId": "B"
+                },
+                {
+                   "expr": "sum(tide_sync_query_shards{controller=\"sync\"})",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "Total",
+                   "refId": "C"
+                }
+             ],
+             "title": "Sync Query Errors",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "status-controller query shard outcomes from the most recent cycle: errored/partial shards vs. total shards (same underlying data as the Queries: Current panel below). Background is green when clean, yellow if any shard came back partial, red if any errored.",
+             "fieldConfig": {
+                "defaults": {
+                   "decimals": 0,
+                   "links": [ ],
+                   "mappings": [ ],
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "green",
+                            "value": null
+                         }
+                      ]
+                   },
+                   "unit": "short"
+                },
+                "overrides": [
+                   {
+                      "matcher": {
+                         "id": "byName",
+                         "options": "Errors"
+                      },
+                      "properties": [
+                         {
+                            "id": "thresholds",
+                            "value": {
+                               "mode": "absolute",
+                               "steps": [
+                                  {
+                                     "color": "green",
+                                     "value": null
+                                  },
+                                  {
+                                     "color": "red",
+                                     "value": 1
+                                  }
+                               ]
+                            }
+                         }
+                      ]
+                   },
+                   {
+                      "matcher": {
+                         "id": "byName",
+                         "options": "Partials"
+                      },
+                      "properties": [
+                         {
+                            "id": "thresholds",
+                            "value": {
+                               "mode": "absolute",
+                               "steps": [
+                                  {
+                                     "color": "green",
+                                     "value": null
+                                  },
+                                  {
+                                     "color": "yellow",
+                                     "value": 1
+                                  }
+                               ]
+                            }
+                         }
+                      ]
+                   }
+                ]
+             },
+             "gridPos": {
+                "h": 6,
+                "w": 4,
+                "x": 16,
+                "y": 1
+             },
+             "id": 8,
+             "links": [ ],
+             "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "sum(tide_sync_query_shards{controller=\"status\", result=\"error\"})",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "Errors",
+                   "refId": "A"
+                },
+                {
+                   "expr": "sum(tide_sync_query_shards{controller=\"status\", result=\"partial\"})",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "Partials",
+                   "refId": "B"
+                },
+                {
+                   "expr": "sum(tide_sync_query_shards{controller=\"status\"})",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "Total",
+                   "refId": "C"
+                }
+             ],
+             "title": "Status Query Errors",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "Total PRs merged (any org) in the trailing 1h, compared to the same 1h-wide window 24h ago.",
+             "fieldConfig": {
+                "defaults": {
+                   "decimals": 0,
+                   "links": [ ],
+                   "mappings": [ ],
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [ ]
+                   },
+                   "unit": "short"
+                }
+             },
+             "gridPos": {
+                "h": 6,
+                "w": 4,
+                "x": 20,
+                "y": 1
+             },
+             "id": 9,
+             "links": [ ],
+             "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "((sum(increase(merges_sum[1h])) by ()) + (sum(min_over_time(merges_sum[1h] @ end()) unless (merges_sum @ end() offset 1h)) by ())) or (sum(min_over_time(merges_sum[1h] @ end()) unless (merges_sum @ end() offset 1h)) by ()) or (sum(increase(merges_sum[1h])) by ())",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "Last 1h",
+                   "refId": "A"
+                },
+                {
+                   "expr": "((sum(increase(merges_sum[1h] offset 24h))) + (sum(min_over_time(merges_sum[1h] @ end() offset 24h) unless (merges_sum @ end() offset 25h)))) or (sum(min_over_time(merges_sum[1h] @ end() offset 24h) unless (merges_sum @ end() offset 25h))) or (sum(increase(merges_sum[1h] offset 24h)))",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "Same hour yesterday",
+                   "refId": "B"
+                }
+             ],
+             "title": "Merged: Last 1h vs. Same Hour Yesterday",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "collapse": true,
+             "collapsed": true,
+             "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 7
+             },
+             "id": 10,
+             "panels": [
+                {
+                   "datasource": "prometheus",
+                   "description": "PRs merged per org in the last 3 hours, sorted descending (batches count all their PRs). Orgs with zero merges in the window are omitted.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "decimals": 0,
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               }
+                            ]
+                         },
+                         "unit": "short"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 8,
+                      "x": 0,
+                      "y": 8
+                   },
+                   "id": 11,
+                   "options": {
+                      "displayMode": "gradient",
+                      "orientation": "horizontal",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      },
+                      "valueMode": "color"
+                   },
+                   "targets": [
+                      {
+                         "expr": "sort_desc((((sum(increase(merges_sum[3h])) by (org)) + (sum(min_over_time(merges_sum[3h] @ end()) unless (merges_sum @ end() offset 3h)) by (org))) or (sum(min_over_time(merges_sum[3h] @ end()) unless (merges_sum @ end() offset 3h)) by (org)) or (sum(increase(merges_sum[3h])) by (org))) > 0)",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "PRs Merged by Org (last 3h)",
+                   "type": "bargauge"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Trend of the trailing-3h merged-PR count, restricted to orgs currently merging (same org set as the bar gauge to the left).",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 15,
+                            "gradientMode": "opacity",
+                            "lineInterpolation": "smooth",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "none"
+                            }
+                         },
+                         "decimals": 0,
+                         "min": 0,
+                         "unit": "short"
+                      },
+                      "overrides": [ ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 8,
+                      "x": 8,
+                      "y": 8
+                   },
+                   "id": 12,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(((sum(increase(merges_sum[3h])) by (org)) + (sum(min_over_time(merges_sum[3h]) unless (merges_sum offset 3h)) by (org))) or (sum(min_over_time(merges_sum[3h]) unless (merges_sum offset 3h)) by (org)) or (sum(increase(merges_sum[3h])) by (org))) and on(org) ((((sum(increase(merges_sum[3h])) by (org)) + (sum(min_over_time(merges_sum[3h] @ end()) unless (merges_sum @ end() offset 3h)) by (org))) or (sum(min_over_time(merges_sum[3h] @ end()) unless (merges_sum @ end() offset 3h)) by (org)) or (sum(increase(merges_sum[3h])) by (org))) > 0)",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "PRs Merged by Org (3h sliding window)",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Trend of the trailing-24h merged-PR count, restricted to orgs currently merging.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 15,
+                            "gradientMode": "opacity",
+                            "lineInterpolation": "smooth",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "none"
+                            }
+                         },
+                         "decimals": 0,
+                         "min": 0,
+                         "unit": "short"
+                      },
+                      "overrides": [ ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 8,
+                      "x": 16,
+                      "y": 8
+                   },
+                   "id": 13,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(((sum(increase(merges_sum[24h])) by (org)) + (sum(min_over_time(merges_sum[24h]) unless (merges_sum offset 24h)) by (org))) or (sum(min_over_time(merges_sum[24h]) unless (merges_sum offset 24h)) by (org)) or (sum(increase(merges_sum[24h])) by (org))) and on(org) ((((sum(increase(merges_sum[24h])) by (org)) + (sum(min_over_time(merges_sum[24h] @ end()) unless (merges_sum @ end() offset 24h)) by (org))) or (sum(min_over_time(merges_sum[24h] @ end()) unless (merges_sum @ end() offset 24h)) by (org)) or (sum(increase(merges_sum[24h])) by (org))) > 0)",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "PRs Merged by Org (24h sliding window)",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Tide pools that currently have at least one PR eligible for merge, by repo, sorted descending. Color reflects pool size: green is small, red is large.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "color": {
+                            "mode": "continuous-GrYlRd"
+                         },
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               }
+                            ]
+                         },
+                         "unit": "short"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 6,
+                      "x": 0,
+                      "y": 17
+                   },
+                   "id": 14,
+                   "options": {
+                      "displayMode": "basic",
+                      "orientation": "horizontal",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      },
+                      "valueMode": "color"
+                   },
+                   "targets": [
+                      {
+                         "expr": "sort_desc((avg(pooledprs and ((time() - updatetime) < 240)) by (org, repo, branch)) > 0)",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org}}/{{repo}}:{{branch}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Nonzero Pool Sizes (current)",
+                   "type": "bargauge"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Trend of pool size, restricted to repos currently in a nonzero pool (same repo set as the bar gauge to the left) whose pool size exceeded 1 at some point in the visible window. Gaps are real: either the pool emptied or the data went stale (Tide never emits an explicit 0).",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 15,
+                            "gradientMode": "opacity",
+                            "lineInterpolation": "smooth",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "none"
+                            }
+                         },
+                         "min": 0,
+                         "unit": "short"
+                      },
+                      "overrides": [ ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 12,
+                      "x": 6,
+                      "y": 17
+                   },
+                   "id": 15,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(avg(pooledprs and ((time() - updatetime) < 240)) by (org, repo, branch)) and on(org, repo, branch) (last_over_time((avg(pooledprs and ((time() - updatetime) < 240)) by (org, repo, branch))[1m:] @ end()) > 0) and on(org, repo, branch) (max_over_time((avg(pooledprs and ((time() - updatetime) < 240)) by (org, repo, branch))[$__range:1h] @ end()) > 1)",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org}}/{{repo}}:{{branch}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Pool Sizes (current pools)",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Repos whose pool has stayed nonzero for the last 4h straight (no gaps longer than ~10m) but that had zero merges in the same 4h window. Sorted descending by current pool size.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "red",
+                                  "value": null
+                               }
+                            ]
+                         },
+                         "unit": "short"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 6,
+                      "x": 18,
+                      "y": 17
+                   },
+                   "id": 16,
+                   "options": {
+                      "displayMode": "gradient",
+                      "orientation": "horizontal",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      },
+                      "valueMode": "color"
+                   },
+                   "targets": [
+                      {
+                         "expr": "sort_desc((avg(pooledprs and ((time() - updatetime) < 240)) by (org, repo, branch)) and on(org, repo, branch) (count_over_time((avg(pooledprs and ((time() - updatetime) < 240)) by (org, repo, branch))[4h:5m]) >= 47) unless on(org, repo, branch) ((((sum(increase(merges_sum[4h])) by (org, repo, branch)) + (sum(min_over_time(merges_sum[4h] @ end()) unless (merges_sum @ end() offset 4h)) by (org, repo, branch))) or (sum(min_over_time(merges_sum[4h] @ end()) unless (merges_sum @ end() offset 4h)) by (org, repo, branch)) or (sum(increase(merges_sum[4h])) by (org, repo, branch))) > 0))",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org}}/{{repo}}:{{branch}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Nonzero Pool, No Merges (sustained 4h)",
+                   "type": "bargauge"
+                }
+             ],
+             "repeat": null,
+             "repeatIteration": null,
+             "repeatRowId": null,
+             "showTitle": true,
+             "title": "Are We Merging PRs?",
+             "titleSize": "h6",
+             "type": "row"
+          },
+          {
+             "collapse": true,
+             "collapsed": true,
+             "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 26
+             },
+             "id": 17,
+             "panels": [
+                {
+                   "datasource": "prometheus",
+                   "description": "PRs merged per repo in the last 24 hours, sorted descending (batches count all their PRs). Limited to repos with more than 5 merges in the window.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "decimals": 0,
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               }
+                            ]
+                         },
+                         "unit": "short"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 14,
+                      "w": 6,
+                      "x": 0,
+                      "y": 27
+                   },
+                   "id": 18,
+                   "options": {
+                      "displayMode": "gradient",
+                      "orientation": "horizontal",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      },
+                      "valueMode": "color"
+                   },
+                   "targets": [
+                      {
+                         "expr": "sort_desc((((sum(increase(merges_sum[24h])) by (org, repo, branch)) + (sum(min_over_time(merges_sum[24h] @ end()) unless (merges_sum @ end() offset 24h)) by (org, repo, branch))) or (sum(min_over_time(merges_sum[24h] @ end()) unless (merges_sum @ end() offset 24h)) by (org, repo, branch)) or (sum(increase(merges_sum[24h])) by (org, repo, branch))) > 5)",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org}}/{{repo}}:{{branch}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "PRs Merged by Repo (last 24h)",
+                   "type": "bargauge"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Merges per repo per 30-minute block. Each row is a repo:branch, each cell a 30m window, colored by merge count (blank means none). Same repo set as the panels above: more than 5 merges in the last 24h.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "color": {
+                            "mode": "continuous-GrYlRd"
+                         },
+                         "custom": {
+                            "fillOpacity": 100,
+                            "lineWidth": 1
+                         },
+                         "decimals": 0,
+                         "min": 0,
+                         "unit": "short"
+                      },
+                      "overrides": [ ]
+                   },
+                   "gridPos": {
+                      "h": 14,
+                      "w": 18,
+                      "x": 6,
+                      "y": 27
+                   },
+                   "id": 19,
+                   "options": {
+                      "colWidth": 0.90000000000000002,
+                      "legend": {
+                         "displayMode": "hidden",
+                         "placement": "bottom",
+                         "showLegend": false
+                      },
+                      "rowHeight": 0.90000000000000002,
+                      "showValue": "auto",
+                      "tooltip": {
+                         "mode": "single",
+                         "sort": "none"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "((((sum(increase(merges_sum[30m])) by (org, repo, branch)) + (sum(min_over_time(merges_sum[30m]) unless (merges_sum offset 30m)) by (org, repo, branch))) or (sum(min_over_time(merges_sum[30m]) unless (merges_sum offset 30m)) by (org, repo, branch)) or (sum(increase(merges_sum[30m])) by (org, repo, branch))) and on(org, repo, branch) ((((sum(increase(merges_sum[24h])) by (org, repo, branch)) + (sum(min_over_time(merges_sum[24h] @ end()) unless (merges_sum @ end() offset 24h)) by (org, repo, branch))) or (sum(min_over_time(merges_sum[24h] @ end()) unless (merges_sum @ end() offset 24h)) by (org, repo, branch)) or (sum(increase(merges_sum[24h])) by (org, repo, branch))) > 5)) > 0",
+                         "format": "time_series",
+                         "interval": "30m",
+                         "intervalFactor": 1,
+                         "legendFormat": "{{org}}/{{repo}}:{{branch}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Merge Activity Grid (30m blocks)",
+                   "type": "status-history"
+                }
+             ],
+             "repeat": null,
+             "repeatIteration": null,
+             "repeatRowId": null,
+             "showTitle": true,
+             "title": "Which Repos Are Merging?",
+             "titleSize": "h6",
+             "type": "row"
+          },
+          {
+             "collapse": true,
+             "collapsed": true,
+             "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 41
+             },
+             "id": 20,
+             "panels": [
+                {
+                   "content": "<div style=\"background:#1f3b57;padding:6px 10px;border-radius:4px;margin:-8px -8px 8px -8px;\">\n<b style=\"font-size:1.1em;\">Sync Controller</b>\n</div>\n\nSearches Tide's configured merge-pool queries for mergeable PRs and merges or retests them. Query volume roughly tracks the number of configured queries — each configured query is essentially one GitHub search \"bucket\" — but there's internal batching/filtering per query, so it's not a strict 1:1.\n",
+                   "datasource": null,
+                   "gridPos": {
+                      "h": 4,
+                      "w": 12,
+                      "x": 0,
+                      "y": 42
+                   },
+                   "id": 21,
+                   "mode": "markdown",
+                   "title": "Sync Controller",
+                   "type": "text"
+                },
+                {
+                   "content": "<div style=\"background:#1f4d3b;padding:6px 10px;border-radius:4px;margin:-8px -8px 8px -8px;\">\n<b style=\"font-size:1.1em;\">Status Controller</b>\n</div>\n\nSearches for PRs that may have recently become (or stopped being) mergeable, to keep each PR's GitHub status/labels/context up to date. Unlike sync, these searches are collapsed into org-wide queries rather than following the per-configured-query shape.\n",
+                   "datasource": null,
+                   "gridPos": {
+                      "h": 4,
+                      "w": 12,
+                      "x": 12,
+                      "y": 42
+                   },
+                   "id": 22,
+                   "mode": "markdown",
+                   "title": "Status Controller",
+                   "type": "text"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Duration of Tide's most recent sync-controller loop (fetch pools, evaluate mergeability, merge). Colored against the configured sync_period (2m45s = 165s): yellow at 80% of the period, red at or above it — red means loops are taking longer than the interval that's supposed to trigger the next one.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "links": [ ],
+                         "mappings": [ ],
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               },
+                               {
+                                  "color": "yellow",
+                                  "value": 132
+                               },
+                               {
+                                  "color": "red",
+                                  "value": 165
+                               }
+                            ]
+                         },
+                         "unit": "s"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 4,
+                      "x": 0,
+                      "y": 46
+                   },
+                   "id": 23,
+                   "links": [ ],
+                   "options": {
+                      "colorMode": "background",
+                      "graphMode": "area",
+                      "justifyMode": "auto",
+                      "orientation": "auto",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      }
+                   },
+                   "pluginVersion": "7",
+                   "targets": [
+                      {
+                         "expr": "max(syncdur{job=\"tide\"} and (changes(syncdur{job=\"tide\"}[1h]) > 0))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Sync Loop: Current",
+                   "transparent": false,
+                   "type": "stat"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Trend of sync-controller loop duration. Dashed line marks the configured sync_period (2m45s) for comparison.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 15,
+                            "gradientMode": "opacity",
+                            "lineInterpolation": "stepAfter",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "none"
+                            }
+                         },
+                         "min": 0,
+                         "unit": "s"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "sync_period (2m45s)"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "red",
+                                     "mode": "fixed"
+                                  }
+                               },
+                               {
+                                  "id": "custom.lineStyle",
+                                  "value": {
+                                     "dash": [
+                                        10,
+                                        10
+                                     ],
+                                     "fill": "dash"
+                                  }
+                               },
+                               {
+                                  "id": "custom.fillOpacity",
+                                  "value": 0
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 8,
+                      "x": 4,
+                      "y": 46
+                   },
+                   "id": 24,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "max(syncdur{job=\"tide\"} and (changes(syncdur{job=\"tide\"}[1h]) > 0))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "sync loop duration",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "vector(165)",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "sync_period (2m45s)",
+                         "refId": "B"
+                      }
+                   ],
+                   "title": "Sync Loop: History",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Duration of Tide's most recent status-controller loop (updates GitHub statuses/labels for PRs in pools). Colored against the configured status_update_period (2m30s = 150s): yellow at 80% of the period, red at or above it — red means updates are falling behind their trigger cadence.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "links": [ ],
+                         "mappings": [ ],
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               },
+                               {
+                                  "color": "yellow",
+                                  "value": 120
+                               },
+                               {
+                                  "color": "red",
+                                  "value": 150
+                               }
+                            ]
+                         },
+                         "unit": "s"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 4,
+                      "x": 12,
+                      "y": 46
+                   },
+                   "id": 25,
+                   "links": [ ],
+                   "options": {
+                      "colorMode": "background",
+                      "graphMode": "area",
+                      "justifyMode": "auto",
+                      "orientation": "auto",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      }
+                   },
+                   "pluginVersion": "7",
+                   "targets": [
+                      {
+                         "expr": "max(statusupdatedur{job=\"tide\"} and (changes(statusupdatedur{job=\"tide\"}[1h]) > 0))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Status Loop: Current",
+                   "transparent": false,
+                   "type": "stat"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Trend of status-controller loop duration. Dashed line marks the configured status_update_period (2m30s) for comparison.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 15,
+                            "gradientMode": "opacity",
+                            "lineInterpolation": "stepAfter",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "none"
+                            }
+                         },
+                         "min": 0,
+                         "unit": "s"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "status_update_period (2m30s)"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "red",
+                                     "mode": "fixed"
+                                  }
+                               },
+                               {
+                                  "id": "custom.lineStyle",
+                                  "value": {
+                                     "dash": [
+                                        10,
+                                        10
+                                     ],
+                                     "fill": "dash"
+                                  }
+                               },
+                               {
+                                  "id": "custom.fillOpacity",
+                                  "value": 0
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 8,
+                      "x": 16,
+                      "y": 46
+                   },
+                   "id": 26,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "max(statusupdatedur{job=\"tide\"} and (changes(statusupdatedur{job=\"tide\"}[1h]) > 0))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "status loop duration",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "vector(150)",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "status_update_period (2m30s)",
+                         "refId": "B"
+                      }
+                   ],
+                   "title": "Status Loop: History",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Most recent sync-controller query cycle: how many GitHub search query shards succeeded, came back partial, or errored, alongside the resulting pool completeness ratio.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "links": [ ],
+                         "mappings": [ ],
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               }
+                            ]
+                         },
+                         "unit": "short"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "Partial shards"
+                            },
+                            "properties": [
+                               {
+                                  "id": "thresholds",
+                                  "value": {
+                                     "mode": "absolute",
+                                     "steps": [
+                                        {
+                                           "color": "green",
+                                           "value": null
+                                        },
+                                        {
+                                           "color": "yellow",
+                                           "value": 1
+                                        }
+                                     ]
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "Error shards"
+                            },
+                            "properties": [
+                               {
+                                  "id": "thresholds",
+                                  "value": {
+                                     "mode": "absolute",
+                                     "steps": [
+                                        {
+                                           "color": "green",
+                                           "value": null
+                                        },
+                                        {
+                                           "color": "red",
+                                           "value": 1
+                                        }
+                                     ]
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "Completeness"
+                            },
+                            "properties": [
+                               {
+                                  "id": "unit",
+                                  "value": "percentunit"
+                               },
+                               {
+                                  "id": "thresholds",
+                                  "value": {
+                                     "mode": "absolute",
+                                     "steps": [
+                                        {
+                                           "color": "red",
+                                           "value": null
+                                        },
+                                        {
+                                           "color": "yellow",
+                                           "value": 0.80000000000000004
+                                        },
+                                        {
+                                           "color": "green",
+                                           "value": 0.94999999999999996
+                                        }
+                                     ]
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 4,
+                      "x": 0,
+                      "y": 55
+                   },
+                   "id": 27,
+                   "links": [ ],
+                   "options": {
+                      "colorMode": "background",
+                      "graphMode": "none",
+                      "justifyMode": "auto",
+                      "orientation": "horizontal",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      }
+                   },
+                   "pluginVersion": "7",
+                   "targets": [
+                      {
+                         "expr": "sum(tide_sync_query_shards{controller=\"sync\", result=\"success\"})",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "Success shards",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "sum(tide_sync_query_shards{controller=\"sync\", result=\"partial\"})",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "Partial shards",
+                         "refId": "B"
+                      },
+                      {
+                         "expr": "sum(tide_sync_query_shards{controller=\"sync\", result=\"error\"})",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "Error shards",
+                         "refId": "C"
+                      },
+                      {
+                         "expr": "max(tide_pool_completeness_ratio{controller=\"sync\"})",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "Completeness",
+                         "refId": "D"
+                      }
+                   ],
+                   "title": "Sync Queries: Current",
+                   "transparent": false,
+                   "type": "stat"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "History of sync-controller GitHub search query shard outcomes.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "bars",
+                            "fillOpacity": 100,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "normal"
+                            }
+                         },
+                         "min": 0,
+                         "unit": "short"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "success"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "green",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "partial"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "yellow",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "error"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "red",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 8,
+                      "x": 4,
+                      "y": 55
+                   },
+                   "id": 28,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "sum(tide_sync_query_shards{controller=\"sync\"}) by (result)",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "{{result}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Sync Queries: History",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Most recent status-controller query cycle: how many GitHub search query shards succeeded, came back partial, or errored, alongside the resulting pool completeness ratio.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "links": [ ],
+                         "mappings": [ ],
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               }
+                            ]
+                         },
+                         "unit": "short"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "Partial shards"
+                            },
+                            "properties": [
+                               {
+                                  "id": "thresholds",
+                                  "value": {
+                                     "mode": "absolute",
+                                     "steps": [
+                                        {
+                                           "color": "green",
+                                           "value": null
+                                        },
+                                        {
+                                           "color": "yellow",
+                                           "value": 1
+                                        }
+                                     ]
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "Error shards"
+                            },
+                            "properties": [
+                               {
+                                  "id": "thresholds",
+                                  "value": {
+                                     "mode": "absolute",
+                                     "steps": [
+                                        {
+                                           "color": "green",
+                                           "value": null
+                                        },
+                                        {
+                                           "color": "red",
+                                           "value": 1
+                                        }
+                                     ]
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "Completeness"
+                            },
+                            "properties": [
+                               {
+                                  "id": "unit",
+                                  "value": "percentunit"
+                               },
+                               {
+                                  "id": "thresholds",
+                                  "value": {
+                                     "mode": "absolute",
+                                     "steps": [
+                                        {
+                                           "color": "red",
+                                           "value": null
+                                        },
+                                        {
+                                           "color": "yellow",
+                                           "value": 0.80000000000000004
+                                        },
+                                        {
+                                           "color": "green",
+                                           "value": 0.94999999999999996
+                                        }
+                                     ]
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 4,
+                      "x": 12,
+                      "y": 55
+                   },
+                   "id": 29,
+                   "links": [ ],
+                   "options": {
+                      "colorMode": "background",
+                      "graphMode": "none",
+                      "justifyMode": "auto",
+                      "orientation": "horizontal",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      }
+                   },
+                   "pluginVersion": "7",
+                   "targets": [
+                      {
+                         "expr": "sum(tide_sync_query_shards{controller=\"status\", result=\"success\"})",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "Success shards",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "sum(tide_sync_query_shards{controller=\"status\", result=\"partial\"})",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "Partial shards",
+                         "refId": "B"
+                      },
+                      {
+                         "expr": "sum(tide_sync_query_shards{controller=\"status\", result=\"error\"})",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "Error shards",
+                         "refId": "C"
+                      },
+                      {
+                         "expr": "max(tide_pool_completeness_ratio{controller=\"status\"})",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "Completeness",
+                         "refId": "D"
+                      }
+                   ],
+                   "title": "Status Queries: Current",
+                   "transparent": false,
+                   "type": "stat"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "History of status-controller GitHub search query shard outcomes.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "bars",
+                            "fillOpacity": 100,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "normal"
+                            }
+                         },
+                         "min": 0,
+                         "unit": "short"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "success"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "green",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "partial"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "yellow",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "error"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "red",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 8,
+                      "x": 16,
+                      "y": 55
+                   },
+                   "id": 30,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "sum(tide_sync_query_shards{controller=\"status\"}) by (result)",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "{{result}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Status Queries: History",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Share of sync-controller GitHub search queries that errored in the last 5m, out of all queries (success + partial + error) in that window.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "links": [ ],
+                         "mappings": [ ],
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               },
+                               {
+                                  "color": "yellow",
+                                  "value": 0.01
+                               },
+                               {
+                                  "color": "red",
+                                  "value": 0.050000000000000003
+                               }
+                            ]
+                         },
+                         "unit": "percentunit"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 5,
+                      "w": 4,
+                      "x": 0,
+                      "y": 64
+                   },
+                   "id": 31,
+                   "links": [ ],
+                   "options": {
+                      "colorMode": "background",
+                      "graphMode": "area",
+                      "justifyMode": "auto",
+                      "orientation": "auto",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      }
+                   },
+                   "pluginVersion": "7",
+                   "targets": [
+                      {
+                         "expr": "((sum(rate(tide_query_errors_total{controller=\"sync\"}[5m]))) or vector(0)) / sum(rate(tide_query_duration_seconds_count{controller=\"sync\"}[5m]))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Sync Error Rate (5m)",
+                   "transparent": false,
+                   "type": "stat"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "History of sync-controller GitHub search query error counts by org shard and error class, in trailing 5m windows. Zero-count points are omitted, so a shard/class only appears while it actually has errors.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "bars",
+                            "fillOpacity": 100,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "normal"
+                            }
+                         },
+                         "decimals": 0,
+                         "min": 0,
+                         "unit": "short"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": ":"
+                            },
+                            "properties": [
+                               {
+                                  "id": "custom.hideFrom",
+                                  "value": {
+                                     "legend": true,
+                                     "tooltip": true,
+                                     "viz": true
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 5,
+                      "w": 8,
+                      "x": 4,
+                      "y": 64
+                   },
+                   "id": 32,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(sum(increase(tide_query_errors_total{controller=\"sync\"}[5m])) by (org_shard, error_class)) > 0 or vector(0)",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org_shard}}:{{error_class}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Sync Errors: History",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Share of status-controller GitHub search queries that errored in the last 5m, out of all queries (success + partial + error) in that window.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "links": [ ],
+                         "mappings": [ ],
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               },
+                               {
+                                  "color": "yellow",
+                                  "value": 0.01
+                               },
+                               {
+                                  "color": "red",
+                                  "value": 0.050000000000000003
+                               }
+                            ]
+                         },
+                         "unit": "percentunit"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 5,
+                      "w": 4,
+                      "x": 12,
+                      "y": 64
+                   },
+                   "id": 33,
+                   "links": [ ],
+                   "options": {
+                      "colorMode": "background",
+                      "graphMode": "area",
+                      "justifyMode": "auto",
+                      "orientation": "auto",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      }
+                   },
+                   "pluginVersion": "7",
+                   "targets": [
+                      {
+                         "expr": "((sum(rate(tide_query_errors_total{controller=\"status\"}[5m]))) or vector(0)) / sum(rate(tide_query_duration_seconds_count{controller=\"status\"}[5m]))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Status Error Rate (5m)",
+                   "transparent": false,
+                   "type": "stat"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "History of status-controller GitHub search query error counts by org shard and error class, in trailing 5m windows. Zero-count points are omitted, so a shard/class only appears while it actually has errors.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "bars",
+                            "fillOpacity": 100,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "normal"
+                            }
+                         },
+                         "decimals": 0,
+                         "min": 0,
+                         "unit": "short"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": ":"
+                            },
+                            "properties": [
+                               {
+                                  "id": "custom.hideFrom",
+                                  "value": {
+                                     "legend": true,
+                                     "tooltip": true,
+                                     "viz": true
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 5,
+                      "w": 8,
+                      "x": 16,
+                      "y": 64
+                   },
+                   "id": 34,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(sum(increase(tide_query_errors_total{controller=\"status\"}[5m])) by (org_shard, error_class)) > 0 or vector(0)",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org_shard}}:{{error_class}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Status Errors: History",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Share of sync-controller GitHub search queries that came back partial in the last 5m, out of all queries (success + partial + error) in that window.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "links": [ ],
+                         "mappings": [ ],
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               },
+                               {
+                                  "color": "yellow",
+                                  "value": 0.01
+                               },
+                               {
+                                  "color": "red",
+                                  "value": 0.050000000000000003
+                               }
+                            ]
+                         },
+                         "unit": "percentunit"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 5,
+                      "w": 4,
+                      "x": 0,
+                      "y": 69
+                   },
+                   "id": 35,
+                   "links": [ ],
+                   "options": {
+                      "colorMode": "background",
+                      "graphMode": "area",
+                      "justifyMode": "auto",
+                      "orientation": "auto",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      }
+                   },
+                   "pluginVersion": "7",
+                   "targets": [
+                      {
+                         "expr": "((sum(rate(tide_query_partial_results_total{controller=\"sync\"}[5m]))) or vector(0)) / sum(rate(tide_query_duration_seconds_count{controller=\"sync\"}[5m]))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Sync Partial Rate (5m)",
+                   "transparent": false,
+                   "type": "stat"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "History of sync-controller GitHub search partial-result counts by org shard, in trailing 5m windows. Zero-count points are omitted, so a shard only appears while it actually has partial results.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "bars",
+                            "fillOpacity": 100,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "normal"
+                            }
+                         },
+                         "decimals": 0,
+                         "min": 0,
+                         "unit": "short"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "—"
+                            },
+                            "properties": [
+                               {
+                                  "id": "custom.hideFrom",
+                                  "value": {
+                                     "legend": true,
+                                     "tooltip": true,
+                                     "viz": true
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 5,
+                      "w": 8,
+                      "x": 4,
+                      "y": 69
+                   },
+                   "id": 36,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(sum(increase(tide_query_partial_results_total{controller=\"sync\"}[5m])) by (org_shard)) > 0 or label_replace(vector(0), \"org_shard\", \"—\", \"\", \"\")",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org_shard}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Sync Partials: History",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Share of status-controller GitHub search queries that came back partial in the last 5m, out of all queries (success + partial + error) in that window.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "links": [ ],
+                         "mappings": [ ],
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               },
+                               {
+                                  "color": "yellow",
+                                  "value": 0.01
+                               },
+                               {
+                                  "color": "red",
+                                  "value": 0.050000000000000003
+                               }
+                            ]
+                         },
+                         "unit": "percentunit"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 5,
+                      "w": 4,
+                      "x": 12,
+                      "y": 69
+                   },
+                   "id": 37,
+                   "links": [ ],
+                   "options": {
+                      "colorMode": "background",
+                      "graphMode": "area",
+                      "justifyMode": "auto",
+                      "orientation": "auto",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      }
+                   },
+                   "pluginVersion": "7",
+                   "targets": [
+                      {
+                         "expr": "((sum(rate(tide_query_partial_results_total{controller=\"status\"}[5m]))) or vector(0)) / sum(rate(tide_query_duration_seconds_count{controller=\"status\"}[5m]))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Status Partial Rate (5m)",
+                   "transparent": false,
+                   "type": "stat"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "History of status-controller GitHub search partial-result counts by org shard, in trailing 5m windows. Zero-count points are omitted, so a shard only appears while it actually has partial results.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "bars",
+                            "fillOpacity": 100,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "normal"
+                            }
+                         },
+                         "decimals": 0,
+                         "min": 0,
+                         "unit": "short"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "—"
+                            },
+                            "properties": [
+                               {
+                                  "id": "custom.hideFrom",
+                                  "value": {
+                                     "legend": true,
+                                     "tooltip": true,
+                                     "viz": true
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 5,
+                      "w": 8,
+                      "x": 16,
+                      "y": 69
+                   },
+                   "id": 38,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(sum(increase(tide_query_partial_results_total{controller=\"status\"}[5m])) by (org_shard)) > 0 or label_replace(vector(0), \"org_shard\", \"—\", \"\", \"\")",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org_shard}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "Status Partials: History",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Most recent p50/p95/p99 duration of sync-controller GitHub search queries.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "links": [ ],
+                         "mappings": [ ],
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               },
+                               {
+                                  "color": "yellow",
+                                  "value": 30
+                               },
+                               {
+                                  "color": "red",
+                                  "value": 60
+                               }
+                            ]
+                         },
+                         "unit": "s"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 15,
+                      "w": 4,
+                      "x": 0,
+                      "y": 74
+                   },
+                   "id": 39,
+                   "links": [ ],
+                   "options": {
+                      "colorMode": "background",
+                      "graphMode": "none",
+                      "justifyMode": "auto",
+                      "orientation": "horizontal",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      }
+                   },
+                   "pluginVersion": "7",
+                   "targets": [
+                      {
+                         "expr": "histogram_quantile(0.50, sum(rate(tide_query_duration_seconds_bucket{controller=\"sync\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "p50",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "histogram_quantile(0.95, sum(rate(tide_query_duration_seconds_bucket{controller=\"sync\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "p95",
+                         "refId": "B"
+                      },
+                      {
+                         "expr": "histogram_quantile(0.99, sum(rate(tide_query_duration_seconds_bucket{controller=\"sync\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "p99",
+                         "refId": "C"
+                      }
+                   ],
+                   "title": "Sync Query Duration: Current",
+                   "transparent": false,
+                   "type": "stat"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "sync-controller query duration: p50 line with a shaded p95-p99 spread band.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 15,
+                            "gradientMode": "opacity",
+                            "lineInterpolation": "smooth",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "none"
+                            }
+                         },
+                         "min": 0,
+                         "unit": "s"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "p50"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "blue",
+                                     "mode": "fixed"
+                                  }
+                               },
+                               {
+                                  "id": "custom.lineWidth",
+                                  "value": 2
+                               },
+                               {
+                                  "id": "custom.fillOpacity",
+                                  "value": 0
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "p95 (band base)"
+                            },
+                            "properties": [
+                               {
+                                  "id": "custom.stacking",
+                                  "value": {
+                                     "group": "band",
+                                     "mode": "normal"
+                                  }
+                               },
+                               {
+                                  "id": "custom.lineWidth",
+                                  "value": 0
+                               },
+                               {
+                                  "id": "custom.fillOpacity",
+                                  "value": 0
+                               },
+                               {
+                                  "id": "custom.hideFrom",
+                                  "value": {
+                                     "legend": true,
+                                     "tooltip": true,
+                                     "viz": false
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "p95-p99 spread"
+                            },
+                            "properties": [
+                               {
+                                  "id": "custom.stacking",
+                                  "value": {
+                                     "group": "band",
+                                     "mode": "normal"
+                                  }
+                               },
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "orange",
+                                     "mode": "fixed"
+                                  }
+                               },
+                               {
+                                  "id": "custom.lineWidth",
+                                  "value": 0
+                               },
+                               {
+                                  "id": "custom.fillOpacity",
+                                  "value": 25
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 8,
+                      "x": 4,
+                      "y": 74
+                   },
+                   "id": 40,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "histogram_quantile(0.50, sum(rate(tide_query_duration_seconds_bucket{controller=\"sync\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "p50",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "histogram_quantile(0.95, sum(rate(tide_query_duration_seconds_bucket{controller=\"sync\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "p95 (band base)",
+                         "refId": "B"
+                      },
+                      {
+                         "expr": "histogram_quantile(0.99, sum(rate(tide_query_duration_seconds_bucket{controller=\"sync\"}[5m])) by (le)) - histogram_quantile(0.95, sum(rate(tide_query_duration_seconds_bucket{controller=\"sync\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "p95-p99 spread",
+                         "refId": "C"
+                      }
+                   ],
+                   "title": "Sync Query Duration: History",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "History of sync-controller GitHub search query durations, bucketed by the histogram's own boundaries, as a % of queries in each trailing 5m window.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "bars",
+                            "fillOpacity": 100,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "normal"
+                            }
+                         },
+                         "max": 1,
+                         "min": 0,
+                         "unit": "percentunit"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "<1s"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "green",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "1-5s"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "blue",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "5-10s"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "yellow",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "10-20s"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "orange",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "20s+"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "red",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 6,
+                      "w": 8,
+                      "x": 4,
+                      "y": 83
+                   },
+                   "id": 41,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "",
+                         "sortDesc": false
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"1\"}[5m]))) / (sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"+Inf\"}[5m])))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "<1s",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"5\"}[5m]))) - (sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"1\"}[5m])))) / (sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"+Inf\"}[5m])))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "1-5s",
+                         "refId": "B"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"10\"}[5m]))) - (sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"5\"}[5m])))) / (sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"+Inf\"}[5m])))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "5-10s",
+                         "refId": "C"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"20\"}[5m]))) - (sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"10\"}[5m])))) / (sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"+Inf\"}[5m])))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "10-20s",
+                         "refId": "D"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"+Inf\"}[5m]))) - (sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"20\"}[5m])))) / (sum(increase(tide_query_duration_seconds_bucket{controller=\"sync\", le=\"+Inf\"}[5m])))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "20s+",
+                         "refId": "E"
+                      }
+                   ],
+                   "title": "Sync Query Duration Buckets (experimental)",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "Most recent p50/p95/p99 duration of status-controller GitHub search queries.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "links": [ ],
+                         "mappings": [ ],
+                         "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                               {
+                                  "color": "green",
+                                  "value": null
+                               },
+                               {
+                                  "color": "yellow",
+                                  "value": 30
+                               },
+                               {
+                                  "color": "red",
+                                  "value": 60
+                               }
+                            ]
+                         },
+                         "unit": "s"
+                      }
+                   },
+                   "gridPos": {
+                      "h": 15,
+                      "w": 4,
+                      "x": 12,
+                      "y": 74
+                   },
+                   "id": 42,
+                   "links": [ ],
+                   "options": {
+                      "colorMode": "background",
+                      "graphMode": "none",
+                      "justifyMode": "auto",
+                      "orientation": "horizontal",
+                      "reduceOptions": {
+                         "calcs": [
+                            "lastNotNull"
+                         ],
+                         "fields": "",
+                         "values": false
+                      }
+                   },
+                   "pluginVersion": "7",
+                   "targets": [
+                      {
+                         "expr": "histogram_quantile(0.50, sum(rate(tide_query_duration_seconds_bucket{controller=\"status\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "p50",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "histogram_quantile(0.95, sum(rate(tide_query_duration_seconds_bucket{controller=\"status\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "p95",
+                         "refId": "B"
+                      },
+                      {
+                         "expr": "histogram_quantile(0.99, sum(rate(tide_query_duration_seconds_bucket{controller=\"status\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "instant": true,
+                         "intervalFactor": 2,
+                         "legendFormat": "p99",
+                         "refId": "C"
+                      }
+                   ],
+                   "title": "Status Query Duration: Current",
+                   "transparent": false,
+                   "type": "stat"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "status-controller query duration: p50 line with a shaded p95-p99 spread band.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 15,
+                            "gradientMode": "opacity",
+                            "lineInterpolation": "smooth",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "none"
+                            }
+                         },
+                         "min": 0,
+                         "unit": "s"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "p50"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "blue",
+                                     "mode": "fixed"
+                                  }
+                               },
+                               {
+                                  "id": "custom.lineWidth",
+                                  "value": 2
+                               },
+                               {
+                                  "id": "custom.fillOpacity",
+                                  "value": 0
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "p95 (band base)"
+                            },
+                            "properties": [
+                               {
+                                  "id": "custom.stacking",
+                                  "value": {
+                                     "group": "band",
+                                     "mode": "normal"
+                                  }
+                               },
+                               {
+                                  "id": "custom.lineWidth",
+                                  "value": 0
+                               },
+                               {
+                                  "id": "custom.fillOpacity",
+                                  "value": 0
+                               },
+                               {
+                                  "id": "custom.hideFrom",
+                                  "value": {
+                                     "legend": true,
+                                     "tooltip": true,
+                                     "viz": false
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "p95-p99 spread"
+                            },
+                            "properties": [
+                               {
+                                  "id": "custom.stacking",
+                                  "value": {
+                                     "group": "band",
+                                     "mode": "normal"
+                                  }
+                               },
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "orange",
+                                     "mode": "fixed"
+                                  }
+                               },
+                               {
+                                  "id": "custom.lineWidth",
+                                  "value": 0
+                               },
+                               {
+                                  "id": "custom.fillOpacity",
+                                  "value": 25
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 8,
+                      "x": 16,
+                      "y": 74
+                   },
+                   "id": 43,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "histogram_quantile(0.50, sum(rate(tide_query_duration_seconds_bucket{controller=\"status\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "p50",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "histogram_quantile(0.95, sum(rate(tide_query_duration_seconds_bucket{controller=\"status\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "p95 (band base)",
+                         "refId": "B"
+                      },
+                      {
+                         "expr": "histogram_quantile(0.99, sum(rate(tide_query_duration_seconds_bucket{controller=\"status\"}[5m])) by (le)) - histogram_quantile(0.95, sum(rate(tide_query_duration_seconds_bucket{controller=\"status\"}[5m])) by (le))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "p95-p99 spread",
+                         "refId": "C"
+                      }
+                   ],
+                   "title": "Status Query Duration: History",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "History of status-controller GitHub search query durations, bucketed by the histogram's own boundaries, as a % of queries in each trailing 5m window.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "bars",
+                            "fillOpacity": 100,
+                            "gradientMode": "none",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "normal"
+                            }
+                         },
+                         "max": 1,
+                         "min": 0,
+                         "unit": "percentunit"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "<1s"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "green",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "1-5s"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "blue",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "5-10s"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "yellow",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "10-20s"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "orange",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "20s+"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "red",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 6,
+                      "w": 8,
+                      "x": 16,
+                      "y": 83
+                   },
+                   "id": 44,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "",
+                         "sortDesc": false
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"1\"}[5m]))) / (sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"+Inf\"}[5m])))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "<1s",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"5\"}[5m]))) - (sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"1\"}[5m])))) / (sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"+Inf\"}[5m])))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "1-5s",
+                         "refId": "B"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"10\"}[5m]))) - (sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"5\"}[5m])))) / (sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"+Inf\"}[5m])))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "5-10s",
+                         "refId": "C"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"20\"}[5m]))) - (sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"10\"}[5m])))) / (sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"+Inf\"}[5m])))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "10-20s",
+                         "refId": "D"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"+Inf\"}[5m]))) - (sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"20\"}[5m])))) / (sum(increase(tide_query_duration_seconds_bucket{controller=\"status\", le=\"+Inf\"}[5m])))",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "20s+",
+                         "refId": "E"
+                      }
+                   ],
+                   "title": "Status Query Duration Buckets (experimental)",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "History of sync-controller GitHub search queries by how many PRs they returned, as a % of queries in each trailing 5m window. Log-scaled so the rare 26+ PRs tail (usually well under 1%) stays legible next to the dominant buckets; zero-value points are omitted since a log axis can't represent them.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 0,
+                            "gradientMode": "opacity",
+                            "lineInterpolation": "smooth",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "scaleDistribution": {
+                               "log": 10,
+                               "type": "log"
+                            },
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "none"
+                            }
+                         },
+                         "unit": "percentunit"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "0 PRs"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "dark-blue",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "1-5 PRs"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "blue",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "6-25 PRs"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "orange",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "26+ PRs"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "red",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 12,
+                      "x": 0,
+                      "y": 89
+                   },
+                   "id": 45,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "",
+                         "sortDesc": false
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"0\"}[5m]))) / (sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"+Inf\"}[5m]))) > 0",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "0 PRs",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"5\"}[5m]))) - (sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"0\"}[5m])))) / (sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"+Inf\"}[5m]))) > 0",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "1-5 PRs",
+                         "refId": "B"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"25\"}[5m]))) - (sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"5\"}[5m])))) / (sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"+Inf\"}[5m]))) > 0",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "6-25 PRs",
+                         "refId": "C"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"+Inf\"}[5m]))) - (sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"25\"}[5m])))) / (sum(increase(tide_query_prs_returned_bucket{controller=\"sync\", le=\"+Inf\"}[5m]))) > 0",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "26+ PRs",
+                         "refId": "D"
+                      }
+                   ],
+                   "title": "Sync PRs Returned per Query",
+                   "type": "timeseries"
+                },
+                {
+                   "datasource": "prometheus",
+                   "description": "History of status-controller GitHub search queries by how many PRs they returned, as a % of queries in each trailing 5m window. Log-scaled so the rare 26+ PRs tail (usually well under 1%) stays legible next to the dominant buckets; zero-value points are omitted since a log axis can't represent them.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 0,
+                            "gradientMode": "opacity",
+                            "lineInterpolation": "smooth",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "scaleDistribution": {
+                               "log": 10,
+                               "type": "log"
+                            },
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "none"
+                            }
+                         },
+                         "unit": "percentunit"
+                      },
+                      "overrides": [
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "0 PRs"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "dark-blue",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "1-5 PRs"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "blue",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "6-25 PRs"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "orange",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         },
+                         {
+                            "matcher": {
+                               "id": "byName",
+                               "options": "26+ PRs"
+                            },
+                            "properties": [
+                               {
+                                  "id": "color",
+                                  "value": {
+                                     "fixedColor": "red",
+                                     "mode": "fixed"
+                                  }
+                               }
+                            ]
+                         }
+                      ]
+                   },
+                   "gridPos": {
+                      "h": 9,
+                      "w": 12,
+                      "x": 12,
+                      "y": 89
+                   },
+                   "id": 46,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "",
+                         "sortDesc": false
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "(sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"0\"}[5m]))) / (sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"+Inf\"}[5m]))) > 0",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "0 PRs",
+                         "refId": "A"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"5\"}[5m]))) - (sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"0\"}[5m])))) / (sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"+Inf\"}[5m]))) > 0",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "1-5 PRs",
+                         "refId": "B"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"25\"}[5m]))) - (sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"5\"}[5m])))) / (sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"+Inf\"}[5m]))) > 0",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "6-25 PRs",
+                         "refId": "C"
+                      },
+                      {
+                         "expr": "((sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"+Inf\"}[5m]))) - (sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"25\"}[5m])))) / (sum(increase(tide_query_prs_returned_bucket{controller=\"status\", le=\"+Inf\"}[5m]))) > 0",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "26+ PRs",
+                         "refId": "D"
+                      }
+                   ],
+                   "title": "Status PRs Returned per Query",
+                   "type": "timeseries"
+                }
+             ],
+             "repeat": null,
+             "repeatIteration": null,
+             "repeatRowId": null,
+             "showTitle": true,
+             "title": "Controller Loops",
+             "titleSize": "h6",
+             "type": "row"
+          },
+          {
+             "collapse": true,
+             "collapsed": true,
+             "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 98
+             },
+             "id": 47,
+             "panels": [
+                {
+                   "datasource": "prometheus",
+                   "description": "Rate of Tide's own GraphQL (/graphql) requests through ghproxy, split by org. Org is extracted from ghproxy's token_hash label, which for GitHub App installation tokens is \"<app slug> - <org>\" (Tide authenticates as the openshift-merge-bot app, one installation token per org). Filtered to user_agent=\"tide\" because that same app/token is also used by a few other bots (pj-rehearse, auto-config-brancher, private-prow-configs-mirror) whose traffic would otherwise be mixed in. There's no metric for actual per-query GraphQL point cost, so this request rate is the closest available proxy for relative GraphQL load/cost per org.",
+                   "fieldConfig": {
+                      "defaults": {
+                         "custom": {
+                            "axisPlacement": "auto",
+                            "drawStyle": "line",
+                            "fillOpacity": 15,
+                            "gradientMode": "opacity",
+                            "lineInterpolation": "smooth",
+                            "lineWidth": 2,
+                            "pointSize": 5,
+                            "showPoints": "never",
+                            "spanNulls": false,
+                            "stacking": {
+                               "group": "A",
+                               "mode": "none"
+                            }
+                         },
+                         "min": 0,
+                         "unit": "reqps"
+                      },
+                      "overrides": [ ]
+                   },
+                   "gridPos": {
+                      "h": 12,
+                      "w": 24,
+                      "x": 0,
+                      "y": 99
+                   },
+                   "id": 48,
+                   "options": {
+                      "legend": {
+                         "calcs": [
+                            "mean",
+                            "last",
+                            "max"
+                         ],
+                         "displayMode": "table",
+                         "placement": "right",
+                         "sortBy": "Last",
+                         "sortDesc": true
+                      },
+                      "tooltip": {
+                         "mode": "multi",
+                         "sort": "desc"
+                      }
+                   },
+                   "targets": [
+                      {
+                         "expr": "label_replace(sum(rate(github_request_duration_count{token_hash=~\"openshift-merge-bot - .*\", user_agent=\"tide\", path=\"/graphql\"}[5m])) by (token_hash), \"org\", \"$1\", \"token_hash\", \"openshift-merge-bot - (.*)\")",
+                         "format": "time_series",
+                         "intervalFactor": 2,
+                         "legendFormat": "{{org}}",
+                         "refId": "A"
+                      }
+                   ],
+                   "title": "GraphQL (v4) Request Rate by Org",
+                   "type": "timeseries"
+                }
+             ],
+             "repeat": null,
+             "repeatIteration": null,
+             "repeatRowId": null,
+             "showTitle": true,
+             "title": "How Much GitHub API Is Tide Using?",
+             "titleSize": "h6",
+             "type": "row"
+          }
+       ],
+       "refresh": "",
+       "rows": [ ],
+       "schemaVersion": 40,
+       "style": "dark",
+       "tags": [ ],
+       "templating": {
+          "list": [ ]
+       },
+       "time": {
+          "from": "now-2d",
+          "to": "now"
+       },
+       "timepicker": {
+          "refresh_intervals": [
+             "5s",
+             "10s",
+             "30s",
+             "1m",
+             "5m",
+             "15m",
+             "30m",
+             "1h",
+             "2h",
+             "1d"
+          ],
+          "time_options": [
+             "5m",
+             "15m",
+             "1h",
+             "6h",
+             "12h",
+             "24h",
+             "2d",
+             "7d",
+             "30d"
+          ]
+       },
+       "timezone": "browser",
+       "title": "tide dashboard",
+       "uid": "d69a91f76d8110d3e72885ee5ce8038e",
+       "version": 0
+    }

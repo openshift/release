@@ -76,4 +76,4 @@ log "Patching install-config.yaml"
 yq4 eval-all --inplace '. as $item ireduce ({}; . *+ $item)' "${CONFIG}" "${PATCH}"
 
 log "Reading install-config.yaml (withount credentials) and saving to artifacts path ${ARTIFACT_DIR}/install-config.yaml"
-grep -v "password\|username\|pullSecret\|{\"auths\":{" "${CONFIG}" | tee "${ARTIFACT_DIR}"/install-config.yaml || true
+grep -v "password\|username\|pullSecret\|{\"auths\":{\|httpProxy\|httpsProxy" "${CONFIG}" | tee "${ARTIFACT_DIR}"/install-config.yaml || true

@@ -2,6 +2,17 @@
 
 export OPENSHIFT_CI_STEP_NAME="stackrox-stackrox-begin"
 
+# Test Pod DNS config override:
+# - log effective config from /etc/resolv.conf
+# - sanity resolve quay.io
+echo "=== pod-dns: effective /etc/resolv.conf ==="
+cat /etc/resolv.conf 2>/dev/null || true
+if getent hosts quay.io >/dev/null 2>&1; then
+    echo "=== pod-dns: sanity OK (quay.io -> $(getent hosts quay.io | head -1 | awk '{print $1}')) ==="
+else
+    echo "=== pod-dns: sanity WARN (quay.io not resolvable) ==="
+fi
+
 # Log rox-ci-image info for traceability.
 echo "INFO: rox-ci-image:"
 kubectl get imagestreamtag pipeline:root -o jsonpath='{.tag.from.name}{"\n"}Created: {.image.dockerImageMetadata.Created}{"\n"}Labels: {.image.dockerImageMetadata.Config.Labels}{"\n"}' || true

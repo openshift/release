@@ -50,14 +50,18 @@ scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
 
 cat >"${SHARED_DIR}"/run-e2e-tests.sh <<'EOF'
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 # HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
 if [ -d "$KUBECONFIG" ]; then
 for kubeconfig in $(find ${KUBECONFIG} -type f); do
     export KUBECONFIG=${kubeconfig}
 done
 fi
+
+# Tracing is enabled only after config.sh is sourced, otherwise xtrace expands
+# PULL_SECRET from it into the publicly readable build log.
 source ~/config.sh
+set -o xtrace
 export REGISTRY_AUTH_FILE=~/pull-secret
 openshift-tests run \
     -v 5 \

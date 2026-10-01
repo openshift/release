@@ -27,7 +27,7 @@ resources:
       memory: 2Gi
 tests:
 - always_run: false
-  as: nvidia-gpu-operator-e2e-rt-25-10-x
+  as: nvidia-gpu-operator-e2e-rt-26-3-x
   reporter_config:
     channel: '#wg-nvidia-gpu-nno-operator-ci'
     job_states_to_report:
@@ -52,7 +52,56 @@ tests:
       NVIDIAGPU_CLEANUP: "false"
       NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH: '[{"op": "add", "path": "/spec/driver/env",
         "value": [{"name": "IGNORE_PREEMPT_RT_PRESENCE", "value": "1"}]}]'
-      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v25.10
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v26.3
+      SINGLE_NODE_AWS_INSTANCE_TYPE: g4dn.2xlarge
+      TEST_FEATURES: nvidiagpu
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: mco-conf-day1-kerneltype
+    - chain: ipi-install
+    test:
+    - as: gpu-operator-e2e
+      commands: make run-tests
+      env:
+      - name: NVIDIAGPU_CLEANUP
+      - name: NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH
+      - name: NVIDIAGPU_SUBSCRIPTION_CHANNEL
+      - name: TEST_FEATURES
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+- always_run: false
+  as: nvidia-gpu-operator-e2e-rt-26-7-x
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |
+      {{if eq .Status.State "success"}}
+        :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}}
+        :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+        {{if eq .Status.State "aborted"}}
+          The job was aborted, check for orphaned cloud resources.
+        {{end}}
+      {{end}}
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      MCO_CONF_DAY1_INSTALL_KERNEL_MCPS: master
+      MCO_CONF_DAY1_INSTALL_KERNEL_TYPE: realtime
+      NVIDIAGPU_CLEANUP: "false"
+      NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH: '[{"op": "add", "path": "/spec/driver/env",
+        "value": [{"name": "IGNORE_PREEMPT_RT_PRESENCE", "value": "1"}]}]'
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v26.7
       SINGLE_NODE_AWS_INSTANCE_TYPE: g4dn.2xlarge
       TEST_FEATURES: nvidiagpu
     post:

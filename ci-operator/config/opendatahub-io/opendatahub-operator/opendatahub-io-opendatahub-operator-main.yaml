@@ -102,7 +102,7 @@ tests:
       cli: latest
       commands: |
         unset GOFLAGS
-        make e2e-test -e E2E_TEST_FLAGS="-timeout 80m" -e OPERATOR_NAMESPACE=opendatahub-operator -e E2E_AUTO_RESOLVE=true
+        make e2e-test -e E2E_TEST_FLAGS="-timeout 120m" -e OPERATOR_NAMESPACE=opendatahub-operator -e E2E_AUTO_RESOLVE=true
       from: src
       resources:
         requests:
@@ -153,24 +153,13 @@ tests:
       cli: latest
       commands: |
         unset GOFLAGS
-        E2E_TEST_DSC_MONITORING_NAMESPACE=redhat-ods-monitoring make e2e-test -e ODH_PLATFORM_TYPE=rhoai -e E2E_TEST_FLAGS="-timeout 80m" -e OPERATOR_NAMESPACE=redhat-ods-operator -e E2E_AUTO_RESOLVE=true
+        E2E_TEST_DSC_MONITORING_NAMESPACE=redhat-ods-monitoring make e2e-test -e ODH_PLATFORM_TYPE=rhoai -e E2E_TEST_FLAGS="-timeout 120m" -e OPERATOR_NAMESPACE=redhat-ods-operator -e E2E_AUTO_RESOLVE=true
       from: src
       resources:
         requests:
           cpu: 2000m
           memory: 3Gi
       timeout: 3h0m0s
-    - as: cleanup-olm-catalog
-      cli: latest
-      commands: |
-        oc delete catalogsource --all -n redhat-ods-operator --ignore-not-found
-        oc wait --for=delete pod -l olm.catalogSource -n redhat-ods-operator --timeout=60s || true
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 2m0s
     - ref: tls-scanner-run
     workflow: generic-claim
 - as: opendatahub-operator-image-mirror

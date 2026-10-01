@@ -7,7 +7,10 @@ if [[ ${DYNAMIC_GLOBAL_PULL_SECRET_ENABLED} == "false" ]]; then
 fi
 
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 HOSTEDCLUSTER_NAMESPACE="${HOSTEDCLUSTER_NAMESPACE:-clusters}"

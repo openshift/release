@@ -6,12 +6,14 @@ set -o pipefail
 
 echo "=== TRT Review Responder Eval Respond ==="
 
-# --- Read tokens and metadata ---
-set +x
-GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
-export GH_FORK_TOKEN
-GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
-export GITHUB_TOKEN
+[[ -f "${SHARED_DIR}/github-app-auth.sh" ]] || {
+    echo "ERROR: ${SHARED_DIR}/github-app-auth.sh not found — github-app-auth step must run first"
+    exit 1
+}
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/github-app-auth.sh"
+load_github_tokens
+configure_github_git_credentials
 
 # prow-agent-eval writes metadata with a case-name prefix.
 # Read the first case and resolve prefixed filenames.
@@ -19,8 +21,6 @@ CASE_NAME=$(head -1 "${SHARED_DIR}/eval-cases")
 PR_NUM=$(cat "${SHARED_DIR}/${CASE_NAME}.pr-number")
 EVAL_BRANCH=$(cat "${SHARED_DIR}/${CASE_NAME}.eval-head-branch")
 JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/${CASE_NAME}.jira-issue-key")
-
-git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
 
 echo "PR: #${PR_NUM} | Branch: ${EVAL_BRANCH} | JIRA: ${JIRA_ISSUE_KEY}"
 

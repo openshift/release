@@ -99,6 +99,13 @@ for release in ${releases[@]}; do
 	annotate "ocp-arm64" "${release}-art-latest-arm64" "ocp-${release}-arm64.json"
 	annotate "ocp-multi" "${release}-art-latest-multi" "ocp-${release}-multi.json"
 
+	# The art23398 assembly is defined in ocp-build-data's openshift-5.0 releases.yml.
+	# Match the imagestreams created by doozer release:gen-payload.
+	annotate "ocp" "${release}-art-assembly-art23398" "konflux-ocp-${release}-art23398.json"
+	annotate "ocp-s390x" "${release}-art-assembly-art23398-s390x" "konflux-ocp-${release}-art23398-s390x.json"
+	annotate "ocp-ppc64le" "${release}-art-assembly-art23398-ppc64le" "konflux-ocp-${release}-art23398-ppc64le.json"
+	annotate "ocp-arm64" "${release}-art-assembly-art23398-arm64" "konflux-ocp-${release}-art23398-arm64.json"
+
 	annotate "ocp-priv" "${release}-art-latest-priv" "ocp-${release}.json" "private"
 	annotate "ocp-s390x-priv" "${release}-art-latest-s390x-priv" "ocp-${release}-s390x.json" "private"
 	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le-priv" "ocp-${release}-ppc64le.json" "private"
@@ -153,5 +160,8 @@ annotate "ocp-s390x" "5-dev-preview-s390x" "ocp-5-dev-preview-s390x.json"
 annotate "ocp-ppc64le" "5-dev-preview-ppc64le" "ocp-5-dev-preview-ppc64le.json"
 annotate "ocp-arm64" "5-dev-preview-arm64" "ocp-5-dev-preview-arm64.json"
 annotate "ocp-multi" "5-dev-preview-multi" "ocp-5-dev-preview-multi.json"
+
+# HyperShift release streams
+annotate "hypershift" "hypershift-operator-main-nightly" "hcp-main.json"
 
 exit $global_failure

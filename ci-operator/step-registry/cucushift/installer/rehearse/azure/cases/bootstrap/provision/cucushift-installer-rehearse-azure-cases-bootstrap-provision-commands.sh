@@ -109,7 +109,7 @@ mkdir -p ${install_dir}
 cat "${SHARED_DIR}/install-config.yaml" > "${install_dir}/install-config.yaml"
 
 echo "Creating cluster ..."
-cat "${install_dir}/install-config.yaml" | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${install_dir}/install-config.yaml" | tee "${ARTIFACT_DIR}/install-config.yaml"
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 openshift-install create cluster --dir="${install_dir}" 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 

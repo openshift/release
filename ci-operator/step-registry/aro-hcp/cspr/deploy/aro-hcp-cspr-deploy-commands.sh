@@ -75,6 +75,3 @@ run_pipeline MgmtAgent
 run_pipeline Fleet.Registration
 
 run_pipeline Monitoring
-
-# Observability is a dev-only stamped pipeline outside the Region topology.
-run_pipeline Observability

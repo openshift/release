@@ -13,9 +13,9 @@ echo "Claude session archive detected. Generating continue-session page..."
 
 # Build the Prow job URL
 if [[ "${JOB_TYPE:-}" == "presubmit" ]]; then
-    PROW_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    PROW_URL="https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
 else
-    PROW_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
+    PROW_URL="https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/${JOB_NAME}/${BUILD_ID}"
 fi
 
 cat > "${ARTIFACT_DIR}/continue-session-summary.html" <<HTMLEOF

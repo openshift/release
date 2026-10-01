@@ -1,0 +1,52 @@
+base_images:
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: vcf-migration-operator
+  - dockerfile_literal: |
+      FROM quay.io/operator-framework/operator-sdk:v1.42.0 as osdk
+      FROM src
+      COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    from: src
+    to: operator-sdk-vcf
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      cpu: "2"
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-vsphere-vcf-migration
+  cron: 0 0 1 9 *
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      VCF_MIGRATION_OPERATOR_IMAGE: pipeline:vcf-migration-operator
+    env:
+      CSI_MANAGEMENT_REMOVED: "true"
+      FEATURE_GATES: '["VSphereMultiVCenterDay2=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      PERSISTENT_MONITORING: "false"
+      SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
+    workflow: vcf-migration-e2e
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: vcf-migration-operator
+  variant: "5.0"

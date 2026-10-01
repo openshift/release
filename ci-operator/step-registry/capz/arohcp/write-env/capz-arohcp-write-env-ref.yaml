@@ -1,17 +1,14 @@
 ref:
   as: capz-arohcp-write-env
-  from: cli
+  from: root
   commands: capz-arohcp-write-env-commands.sh
   credentials:
   - collection: hcm-aro
-    group: aro-hcp-int
-    mount_path: /var/run/aro-hcp-int
-  - collection: hcm-aro
-    group: aro-hcp-stg
-    mount_path: /var/run/aro-hcp-stg
-  - collection: hcm-aro
     group: aro-hcp-prod
     mount_path: /var/run/aro-hcp-prod
+  - collection: hcm-aro
+    group: aro-hcp-prod-rh
+    mount_path: /var/run/aro-hcp-prod-rh
   - collection: stolostron-capi-tests
     group: quay-pull-credentials
     mount_path: /etc/quay-pull-credentials
@@ -21,9 +18,14 @@ ref:
       memory: 100Mi
   env:
   - name: VAULT_SECRET_PROFILE
-    default: "stg"
+    default: "prod-rh"
     documentation: |-
-      Selects which environment's cluster secrets to resolve (int, stg, prod).
+      Selects which production tenant's cluster secrets to resolve (prod, prod-rh).
+  - name: CUSTOMER_SUBSCRIPTION
+    default: "ARO HCP E2E Hosted Clusters - Prod - 00"
+    documentation: |-
+      Subscription name used to resolve the subscription ID when the selected
+      profile does not provide a top-level subscription-id field.
   - name: ARO_REPO_URL
     default: "https://github.com/stolostron/cluster-api-installer.git"
     documentation: Git URL for the cluster-api-installer repository.

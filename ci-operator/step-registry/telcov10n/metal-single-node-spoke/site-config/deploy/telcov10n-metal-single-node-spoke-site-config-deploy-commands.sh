@@ -283,11 +283,11 @@ function generate_cluster_instance {
   echo "************ telcov10n Generate Cluster Instance file from template ************"
 
   cat << EOF > ${ztp_cluster_manifest_file}
-# ---
-# apiVersion: v1
-# kind: Namespace
-# metadata:
-#   name: ${SPOKE_CLUSTER_NAME}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${SPOKE_CLUSTER_NAME}
 ---
 apiVersion: siteconfig.open-cluster-management.io/v1alpha1
 kind: ClusterInstance

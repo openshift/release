@@ -53,6 +53,10 @@ declare -A ipmap=(
     ["ingress.apps"]=$INGRESS_IP
 )
 
+if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
+    ipmap["api-int"]=$API_IP
+fi
+
 verify_resolution "$CLUSTER_NAME" ipmap "$BASE_DOMAIN" "$WAIT_TIME" "$TRY_COUNT"
 
 if [[ -s "${SHARED_DIR}/HIVE_FIP_API" && -s "${SHARED_DIR}/HIVE_FIP_INGRESS" && -s "${SHARED_DIR}/HIVE_CLUSTER_NAME" ]]; then

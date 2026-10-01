@@ -90,9 +90,11 @@ patch_csv_images(){
   fi
 
   if [[ $PATCH_CONSOLE_PLUGIN_IMAGE ]]; then
-    if [[ $OCP_VERSION -ge "416" && $OCP_VERSION -le "421" ]]; then
+    # OCP_VERSION omits the dot (421 = 4.21, 50 = 5.0). Restrict legacy
+    # image selection to OCP 4.x: numerically, 50 is less than 415.
+    if [[ $OCP_VERSION == 4* && $OCP_VERSION -ge "416" && $OCP_VERSION -le "421" ]]; then
       OVERRIDE_VAR="RELATED_IMAGE_WEB_CONSOLE_PF5"
-    elif [[ $OCP_VERSION -le "415" ]]; then
+    elif [[ $OCP_VERSION == 4* && $OCP_VERSION -le "415" ]]; then
       OVERRIDE_VAR="RELATED_IMAGE_WEB_CONSOLE_PF4"
     else
       OVERRIDE_VAR="RELATED_IMAGE_WEB_CONSOLE"

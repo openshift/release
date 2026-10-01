@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euox pipefail
+set -euo pipefail
 
 CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
 POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
@@ -434,7 +434,7 @@ cat > ${BASTION_CI_SCRIPTS_DIR}/setup-sno.sh << EOF
 # Sample usage: ./setup-sno.sh test-cluster ocp-dev-ppc64le.com 192.168.140.0/24 /dev/disk/by-id/wwn-0x600507681381021ca800000000002cf2 https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-rootfs.ppc64le.img https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-kernel-ppc64le https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-initramfs.ppc64le.img http://rh-sno-ci-bastion.ocp-dev-ppc64le.com fa:c2:10:e3:5a:20 192.168.140.105
 #
 
-set -euox pipefail
+set -euo pipefail
 
 export CLUSTER_NAME=\$1
 export BASE_DOMAIN=\$2

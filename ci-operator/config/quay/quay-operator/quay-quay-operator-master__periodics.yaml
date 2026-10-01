@@ -1,0 +1,111 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi
+    to: quay-operator
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
+  - dockerfile_literal: |
+      FROM pipeline:src-oc
+      RUN mkdir -p /tmp/quay-sts-bin && \
+          GOFLAGS="" GOBIN=/tmp/quay-sts-bin go install github.com/google/go-containerregistry/cmd/crane@v0.20.3 && \
+          GOFLAGS="" GOBIN=/tmp/quay-sts-bin go install github.com/itchyny/gojq/cmd/gojq@v0.12.17 && \
+          ln -s /tmp/quay-sts-bin/gojq /tmp/quay-sts-bin/jq
+    from: src-oc
+    to: src-oc-sts
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/python-311:1
+      RUN pip install --no-cache-dir boto3==1.35.99
+    to: quay-sts-tools
+  - dockerfile_literal: |
+      FROM quay.io/projectquay/quay:3.18.0
+    to: quay-app
+operator:
+  bundles:
+  - as: quay
+    context_dir: bundle/
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/projectquay/quay-operator:v3.99.0-dev
+    with: quay-operator
+  - pullspec: quay.io/projectquay/quay:v3.99.0-dev
+    with: quay-app
+  - pullspec: quay.io/projectquay/quay:latest
+    with: quay-app
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    integration:
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      CHAINSAW_SUITE: e2e
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      SETUP_NOOBAA: "true"
+    post:
+    - ref: quay-gather
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: quay-install-odf-operator
+    - ref: quay-install-operator-bundle
+    test:
+    - ref: quay-test-chainsaw
+    workflow: ipi-aws
+- as: e2e-destructive
+  cron: 0 12 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      CHAINSAW_SUITE: destructive
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      SETUP_NOOBAA: "true"
+    post:
+    - ref: quay-gather
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: quay-install-odf-operator
+    - ref: quay-install-operator-bundle
+    test:
+    - ref: quay-test-chainsaw
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-operator
+  variant: periodics
