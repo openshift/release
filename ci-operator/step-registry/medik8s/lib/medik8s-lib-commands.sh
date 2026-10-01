@@ -118,19 +118,27 @@ resolve_commit_sha() {
 # Usage: fetch_latest_fbc_sha <image_name> [max_pages]
 fetch_latest_fbc_sha() {
     local image_name="$1" max_pages="${2:-5}"
-    local page sha quay_response
+    local page sha has_additional quay_response
     for page in $(seq 1 "$max_pages"); do
+        # Leave curl's stderr intact so a 401/403, DNS failure, or timeout is
+        # distinguishable in the logs; stdout stays reserved for the JSON body.
         if ! quay_response=$(curl -sSf --connect-timeout 10 --max-time 30 \
-            "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=100&page=${page}&onlyActiveTags=true" 2>/dev/null); then
+            "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=100&page=${page}&onlyActiveTags=true"); then
             return 1
         fi
+        # This helper runs inside `if FBC_COMMIT_SHA=$(...)`, which suppresses
+        # errexit, so an HTTP-200 non-JSON body would make jq fail silently and
+        # look like an empty scan. Check each jq exit status explicitly (pipefail
+        # is set) so a parse failure is reported as a failed response, not an
+        # empty result, and the caller's retry loop can act on it.
         sha=$(echo "$quay_response" \
-            | jq -r '[.tags[] | select(.name | test("^[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty')
+            | jq -r '[.tags[] | select(.name | test("^[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty') || return 1
         if [[ -n "$sha" ]]; then
             echo "$sha"
             return 0
         fi
-        if [[ "$(echo "$quay_response" | jq -r '.has_additional')" != "true" ]]; then
+        has_additional=$(echo "$quay_response" | jq -r '.has_additional') || return 1
+        if [[ "$has_additional" != "true" ]]; then
             break
         fi
     done
