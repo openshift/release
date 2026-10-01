@@ -79,6 +79,7 @@ quay:
 | `quay[].jobs[].env` | Optional per-job env; keys replace branch env of the same name |
 | `quay[].jobs[].as` | Optional ci-operator test name. Defaults to `{cloud}-{storage}-{source}` for `periodic` (for example `aws-s3-nightly`) and `{cloud}-{storage}` for `presubmit` (for example `aws-s3`) -- cron changes only timing, never the name. Split the job into its own row when only some clouds need a different name. |
 | `quay[].jobs[].arches` | Optional non-empty list of `amd64` / `arm64` / `s390x`, no duplicates. Defaults to `[global_defaults.arch]`. Expands into the cartesian product alongside `ocp` and `clouds`. |
+| `quay[].jobs[].post_refs` | Optional non-empty list of step-registry ref names, no duplicates, prepended to the cloud's `post` steps (for example `[quay-pipeline-view]`). A ref already in `post` fails generation. Split the job into its own row when only some clouds need it. |
 
 The `libvirt` cloud maps to S3 storage (`STORAGE_BY_CLOUD` in `model.py`); its `s390x` arch cell provisions through the IBM Z libvirt workflow (`quay-tests-libvirt-s390x`) instead of an `ipi-*` cloud installer.
 
@@ -95,7 +96,7 @@ Each cell is assembled by deep-merge, later layers win. `kind: presubmit` jobs r
 5. `templates/tests/{test}.yaml.j2`
 6. `templates/presubmit/tests/{test}.yaml.j2`, when present, merged on top of layer 5 (presubmit only); if it does not exist, presubmit uses layer 5 unchanged
 7. Kind settings in `generate.py`: periodic sets `cron` from the resolved `cron` field (alias or raw expression); presubmit copies `always_run` / `optional` / `run_if_changed` / `skip_if_only_changed` onto the test when set
-8. Branch `env`, then job `env` / `as`
+8. Branch `env`, then job `env` / `as` / `post_refs`
 
 `templates/arches/{arch}.yaml.j2` adds the arch's OCP release (for example `releases.arm64-latest`) and the install override / node-arch env; `templates/clouds/{cloud}-{arch}.yaml.j2` overlays the cloud's arch-specific machine type (for s390x, the libvirt-s390x layer also carries the workflow, cluster profile and install target). `templates/base.yaml.j2` and `templates/presubmit/base.yaml.j2` keep `releases.latest.candidate.architecture` hard-coded to `amd64` -- that release is for CI tooling (build root, `cli` base image), which stays `amd64` regardless of the test cluster's arch. `templates/presubmit/base.yaml.j2` also adds `capabilities: [arm64]` to the `quay-server` image item (not the Playwright runner) when `arch != amd64`, and only emits the `quay:latest` `promotion` block when `layout == base and arch == amd64` -- a non-`amd64` `layout: base` variant never promotes.
 
