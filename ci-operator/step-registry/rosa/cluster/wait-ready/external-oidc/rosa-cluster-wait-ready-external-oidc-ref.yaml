@@ -1,0 +1,32 @@
+ref:
+  as: rosa-cluster-wait-ready-external-oidc
+  from: rosa-aws-cli
+  grace_period: 10m
+  timeout: 60m
+  commands: rosa-cluster-wait-ready-external-oidc-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for ocm login. The supported values are [production, staging, integration].
+  - name: EXTERNAL_OIDC_READY_TIMEOUT
+    default: "1800"
+    documentation: Global timeout in seconds for all external OIDC readiness checks. Default is 1800 (30 minutes).
+
+  documentation: |-
+    This step verifies that external authentication (external OIDC) is ready on a
+    ROSA HCP cluster after rosa-conf-external-oidc-create has configured the
+    provider. It logs into OCM and:
+    1. Polls the cluster's external_auth_config until at least one external auth
+       provider is reported configured (and no provider reports a failing
+       condition).
+    2. Logs into the management cluster via the OCM API and waits for the hosted
+       control plane kube-apiserver Deployment to finish rolling out (and its
+       pods to be Running) in the HCP namespace, which confirms the external OIDC
+       configuration has been applied to the kube-apiserver.
+
+    The step is a no-op for clusters that were not provisioned with external
+    authentication enabled.
