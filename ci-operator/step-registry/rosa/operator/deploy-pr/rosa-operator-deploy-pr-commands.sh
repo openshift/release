@@ -4,9 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# The HyperShift operator deployment that both modes target.
-# ho mode:  patches its container image directly.
-# cpo mode: patches its --control-plane-operator-image arg so new HCPs use the PR image.
+# Overrides the MC's HyperShift operator deployment with PR-built images: the operator
+# container image (OPERATOR_IMAGE) and --control-plane-operator-image (CPO_OPERATOR_IMAGE),
+# so the operator and control plane are tested together from the same build.
 HO_DEPLOY="operator"
 HO_NS="hypershift"
 
@@ -14,11 +14,11 @@ LOCK_ACQUIRED=""
 MC_KUBECONFIG=""
 
 lock_name() {
-  echo "ho-deploy-lock"
+  echo "operator-deploy-lock"
 }
 
 pull_secret_name() {
-  echo "ci-registry-pull-${OPERATOR_TYPE}"
+  echo "ci-registry-pull-operator"
 }
 
 cleanup() {
@@ -48,13 +48,13 @@ read_profile_file() {
 }
 
 # Validate inputs
-if [[ "${OPERATOR_TYPE}" != "ho" && "${OPERATOR_TYPE}" != "cpo" ]]; then
-  echo "OPERATOR_TYPE must be 'ho' or 'cpo', got: '${OPERATOR_TYPE}'"
+if [[ -z "${OPERATOR_IMAGE:-}" ]]; then
+  echo "OPERATOR_IMAGE is required (the PR-built HyperShift operator image, injected via dependencies)"
   exit 1
 fi
 
-if [[ -z "${OPERATOR_IMAGE:-}" ]]; then
-  echo "OPERATOR_IMAGE is required (injected via dependencies)"
+if [[ -z "${CPO_OPERATOR_IMAGE:-}" ]]; then
+  echo "CPO_OPERATOR_IMAGE is required (the PR-built control plane operator image, injected via dependencies)"
   exit 1
 fi
 
@@ -63,8 +63,8 @@ if [[ -z "${CLUSTER_SECTOR:-}" ]]; then
   exit 1
 fi
 
-echo "OPERATOR_TYPE: ${OPERATOR_TYPE}"
-echo "PR-built image: ${OPERATOR_IMAGE}"
+echo "PR-built HyperShift operator image: ${OPERATOR_IMAGE}"
+echo "PR-built control plane operator image: ${CPO_OPERATOR_IMAGE}"
 
 # Log in to OCM
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
@@ -108,7 +108,7 @@ ocm get "/api/clusters_mgmt/v1/clusters/${MC_CLUSTER_ID}/credentials" | jq -r .k
 echo "${MC_NAME}" > "${SHARED_DIR}/mc-cluster-name"
 echo "${MC_CLUSTER_ID}" > "${SHARED_DIR}/mc-cluster-id"
 
-# Acquire a per-operator-type lock to prevent concurrent deployments
+# Acquire a lock to prevent concurrent deployments to the same MC.
 LOCK_NAME=$(lock_name)
 LOCK_NS="${HO_NS}"
 JOB_ID="${JOB_NAME:-unknown}-${BUILD_ID:-unknown}"
@@ -130,7 +130,7 @@ if [[ -n "${EXISTING_LOCK}" ]]; then
       fi
     else
       echo "Locked by another job: ${EXISTING_LOCK} (acquired: ${LOCK_TIME}, age: ${LOCK_AGE}s)"
-      echo "Cannot deploy PR-built ${OPERATOR_TYPE} while another job holds the lock."
+      echo "Cannot deploy PR-built operator while another job holds the lock."
       exit 1
     fi
   else
@@ -164,49 +164,41 @@ echo "Created CI registry pull secret '${PULL_SECRET}' on MC"
 
 KUBECONFIG="${MC_KUBECONFIG}" oc secrets link "${HO_DEPLOY}" "${PULL_SECRET}" --for=pull -n "${HO_NS}" 2>/dev/null || true
 
-if [[ "${OPERATOR_TYPE}" == "ho" ]]; then
-  # Save the current HyperShift operator image so the restore step can roll back.
-  ORIGINAL_IMAGE=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment "${HO_DEPLOY}" -n "${HO_NS}" \
-    -o jsonpath='{.spec.template.spec.containers[?(@.name=="operator")].image}')
-  echo "${ORIGINAL_IMAGE}" > "${SHARED_DIR}/operator-original-image"
-  echo "Current HyperShift operator image: ${ORIGINAL_IMAGE}"
+# Snapshot the original image and args before mutating anything, so restore can always roll
+# back even if a later patch fails partway through. (-o json|jq, not jsonpath, so a missing
+# args field still yields a valid JSON array.)
+ORIGINAL_IMAGE=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment "${HO_DEPLOY}" -n "${HO_NS}" \
+  -o jsonpath='{.spec.template.spec.containers[?(@.name=="operator")].image}')
+echo "${ORIGINAL_IMAGE}" > "${SHARED_DIR}/operator-original-image"
+ORIGINAL_ARGS=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment "${HO_DEPLOY}" -n "${HO_NS}" -o json \
+  | jq -c 'first(.spec.template.spec.containers[] | select(.name == "operator") | (.args // [])) // []')
+echo "${ORIGINAL_ARGS}" > "${SHARED_DIR}/operator-original-args"
+echo "Original operator image: ${ORIGINAL_IMAGE}"
+echo "Original operator args: ${ORIGINAL_ARGS}"
 
-  # Replace the HyperShift operator image with the PR build.
-  KUBECONFIG="${MC_KUBECONFIG}" oc set image "deployment/${HO_DEPLOY}" -n "${HO_NS}" \
-    "${HO_DEPLOY}=${OPERATOR_IMAGE}"
+# Override the operator container image with the PR-built HyperShift operator.
+KUBECONFIG="${MC_KUBECONFIG}" oc set image "deployment/${HO_DEPLOY}" -n "${HO_NS}" \
+  "${HO_DEPLOY}=${OPERATOR_IMAGE}"
 
-  # Ensure the pull secret is in the deployment's imagePullSecrets.
-  EXISTING_PULL_SECRETS=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment "${HO_DEPLOY}" -n "${HO_NS}" \
-    -o jsonpath='{.spec.template.spec.imagePullSecrets[*].name}' 2>/dev/null || echo "")
-  if ! echo " ${EXISTING_PULL_SECRETS} " | grep -q " ${PULL_SECRET} "; then
-    if [[ -z "${EXISTING_PULL_SECRETS}" ]]; then
-      KUBECONFIG="${MC_KUBECONFIG}" oc patch deployment "${HO_DEPLOY}" -n "${HO_NS}" \
-        --type=json -p '[{"op":"add","path":"/spec/template/spec/imagePullSecrets","value":[{"name":"'"${PULL_SECRET}"'"}]}]'
-    else
-      KUBECONFIG="${MC_KUBECONFIG}" oc patch deployment "${HO_DEPLOY}" -n "${HO_NS}" \
-        --type=json -p '[{"op":"add","path":"/spec/template/spec/imagePullSecrets/-","value":{"name":"'"${PULL_SECRET}"'"}}]'
-    fi
+# Ensure the pull secret is in the deployment's imagePullSecrets.
+EXISTING_PULL_SECRETS=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment "${HO_DEPLOY}" -n "${HO_NS}" \
+  -o jsonpath='{.spec.template.spec.imagePullSecrets[*].name}' 2>/dev/null || echo "")
+if ! echo " ${EXISTING_PULL_SECRETS} " | grep -q " ${PULL_SECRET} "; then
+  if [[ -z "${EXISTING_PULL_SECRETS}" ]]; then
+    KUBECONFIG="${MC_KUBECONFIG}" oc patch deployment "${HO_DEPLOY}" -n "${HO_NS}" \
+      --type=json -p '[{"op":"add","path":"/spec/template/spec/imagePullSecrets","value":[{"name":"'"${PULL_SECRET}"'"}]}]'
+  else
+    KUBECONFIG="${MC_KUBECONFIG}" oc patch deployment "${HO_DEPLOY}" -n "${HO_NS}" \
+      --type=json -p '[{"op":"add","path":"/spec/template/spec/imagePullSecrets/-","value":{"name":"'"${PULL_SECRET}"'"}}]'
   fi
-
-elif [[ "${OPERATOR_TYPE}" == "cpo" ]]; then
-  # Save the current HyperShift operator deployment args so the restore step can roll back.
-  # The CPO override is done by injecting --control-plane-operator-image into the HO deployment;
-  # the HO then passes this image to all newly provisioned hosted control planes.
-  # Use -o json | jq rather than -o jsonpath so that a missing args field (jsonpath
-  # emits nothing, not "[]") always yields a valid JSON array for the patch below.
-  ORIGINAL_ARGS=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment "${HO_DEPLOY}" -n "${HO_NS}" -o json \
-    | jq -c 'first(.spec.template.spec.containers[] | select(.name == "operator") | (.args // [])) // []')
-  echo "${ORIGINAL_ARGS}" > "${SHARED_DIR}/operator-original-args"
-  echo "Current HyperShift operator args: ${ORIGINAL_ARGS}"
-
-  # Inject/replace --control-plane-operator-image in the HyperShift operator deployment.
-  UPDATED_ARGS=$(echo "${ORIGINAL_ARGS}" | \
-    jq -c '[.[] | select(startswith("--control-plane-operator-image=") | not)] + ["--control-plane-operator-image='"${OPERATOR_IMAGE}"'"]')
-  # Use --type=strategic so that only the named container's args are updated and
-  # other containers or fields in the pod spec are not replaced.
-  KUBECONFIG="${MC_KUBECONFIG}" oc patch deployment "${HO_DEPLOY}" -n "${HO_NS}" --type=strategic \
-    -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"${HO_DEPLOY}\",\"args\":${UPDATED_ARGS}}]}}}}"
 fi
+
+# Override --control-plane-operator-image so new HCPs use the PR-built control plane operator.
+# --type=strategic patches only this container's args, leaving the rest of the pod spec intact.
+UPDATED_ARGS=$(echo "${ORIGINAL_ARGS}" | \
+  jq -c '[.[] | select(startswith("--control-plane-operator-image=") | not)] + ["--control-plane-operator-image='"${CPO_OPERATOR_IMAGE}"'"]')
+KUBECONFIG="${MC_KUBECONFIG}" oc patch deployment "${HO_DEPLOY}" -n "${HO_NS}" --type=strategic \
+  -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"${HO_DEPLOY}\",\"args\":${UPDATED_ARGS}}]}}}}"
 
 # Wait for the HyperShift operator deployment to finish rolling out with the new configuration.
 echo "Waiting for HyperShift operator deployment rollout..."
@@ -221,4 +213,4 @@ if [[ "${READY_REPLICAS}" -lt 1 ]]; then
   exit 1
 fi
 
-echo "PR-built ${OPERATOR_TYPE} active on ${MC_NAME}"
+echo "PR-built HyperShift operator and control plane operator active on ${MC_NAME}"
