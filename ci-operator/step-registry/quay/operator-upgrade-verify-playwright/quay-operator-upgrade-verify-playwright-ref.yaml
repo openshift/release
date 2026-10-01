@@ -109,6 +109,22 @@ ref:
       exclude unsupported auth backends (OIDC/LDAP), all webhook tests (out of
       scope), and tests tracking known product bugs / UI-version gaps. See
       E2E_FAILURE_REPORT.md for the rationale behind each quarantined entry.
+  - name: UPGRADE_CLEAN
+    default: "true"
+    documentation: |-
+      Gates the post-verify cleanup test authored in the quay/quay @upgrade-verify
+      suite. After every verify assertion passes, that test deletes the organization
+      and standalone DB user seeded on n-1 (via the superuser API) so the upgrade
+      job leaves no residual state behind. Cleanup is opt-out: it runs for any value
+      except "0", "false", or "no" (case-insensitive). Set one of those to keep the
+      seeded fixtures for debugging; a failed verify assertion also skips cleanup.
+  - name: QUAYNAMESPACE
+    default: "quay"
+    documentation: |-
+      Namespace the QuayRegistry is deployed in. The runner uses it only to
+      port-forward the in-cluster Jaeger query API and to gather virtual-builder
+      diagnostics, so it must match the namespace used by the deploy step
+      (quay-install-quay-external-storage defaults to "quay").
   documentation: |-
     Execute the existing Quay Playwright e2e implementation as the uniquely named
     n verify invocation of an operator-upgrade workflow. The commands file is a
