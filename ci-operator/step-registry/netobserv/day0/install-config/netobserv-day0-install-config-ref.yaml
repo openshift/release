@@ -1,0 +1,29 @@
+ref:
+  as: netobserv-day0-install-config
+  from: netobserv-perfscale
+  cli: latest
+  commands: netobserv-day0-install-config-commands.sh
+  env:
+  - name: NETOBSERV_INSTALLATION_POLICY
+    default: "NoAction"
+    documentation: |-
+      Sets networkObservability.installationPolicy in install-config.yaml.
+      Use "NoAction" to disable day-0 installation (default for day0 measurement jobs).
+      Use "InstallAndEnable" to enable at install time.
+  - name: FEATURE_SET
+    default: "CustomNoUpgrade"
+    documentation: |-
+      featureSet value written to install-config.yaml.
+  - name: FEATURE_GATES
+    default: '["NetworkObservabilityInstallationPolicy=true"]'
+    documentation: |-
+      JSON array of feature gates to enable. Written as a YAML list under featureGates.
+  timeout: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Patches install-config.yaml to set networkObservability.installationPolicy and
+    required featureSet/featureGates for controlling day-0 NetObserv installation.
+    Must run after ipi-conf-aws writes the base install-config.yaml and before ipi-install.

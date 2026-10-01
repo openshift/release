@@ -1,0 +1,35 @@
+ref:
+  as: netobserv-day0-measure-resource-before
+  from: netobserv-perfscale
+  cli: latest
+  commands: netobserv-day0-measure-resource-before-commands.sh
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
+    mount_path: /secret
+  env:
+  - name: STABILIZATION_PERIOD
+    default: "120"
+    documentation: |-
+      Seconds to wait before querying Prometheus, allowing metrics to stabilize.
+  - name: MEASUREMENT_DURATION
+    default: "120"
+    documentation: |-
+      Duration in seconds over which Prometheus range queries are collected.
+  - name: QUERIES_CONFIG_URL
+    default: "https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/queries/day0_prometheus_queries.yaml"
+    documentation: |-
+      URL to the YAML file listing Prometheus queries for day0 resource measurement.
+  - name: ES_INDEX
+    default: "prod-netobserv-datapoints"
+    documentation: |-
+      Elasticsearch index to upload day0 resource measurement datapoints.
+  timeout: 20m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Captures cluster resource usage BEFORE NetObserv is installed (baseline).
+    Automatically detects NetObserv state via flowcollector presence.
+    Must run before netobserv-day0-patch-cno.
