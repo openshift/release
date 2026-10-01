@@ -123,7 +123,7 @@ create_registries_conf() {
 }
 
 mirror_catalog_and_operators() {
-    local fbc_image="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
+    local fbc_image="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_IMAGE_TAG:-$FBC_COMMIT_SHA}"
     log "Mirroring FBC catalog and operator images..."
     log "  FBC image: ${fbc_image}"
     log "  Target: ${MIRROR_REGISTRY_HOST}"
@@ -269,7 +269,7 @@ ITMS_EOF
 }
 
 create_catalogsource() {
-    local original_image="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
+    local original_image="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_IMAGE_TAG:-$FBC_COMMIT_SHA}"
     local image_path="${original_image#quay.io/}"
     local catalog_image="${MIRROR_REGISTRY_HOST}/${image_path}"
 
@@ -347,10 +347,11 @@ main() {
     ensure_marketplace
     create_catalogsource
     # shellcheck disable=SC2034 # used by medik8s-lib.sh wait_for_catalogsource()
-    CATALOG_IMAGE="${MIRROR_REGISTRY_HOST}/${FBC_IMAGE_REPO#quay.io/}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
+    CATALOG_IMAGE="${MIRROR_REGISTRY_HOST}/${FBC_IMAGE_REPO#quay.io/}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_IMAGE_TAG:-$FBC_COMMIT_SHA}"
     wait_for_catalogsource
 
     echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_commit_sha"
+    echo "${FBC_IMAGE_TAG:-$FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_image_tag"
     echo "${CATALOG_SOURCE_NAME}" > "${SHARED_DIR}/catsrc_name"
     log "=== Done. Disconnected CatalogSource ${CATALOG_SOURCE_NAME} is READY ==="
 }

@@ -6,8 +6,9 @@ cat <<'MEDIK8S_LIB_EOF' > "${SHARED_DIR}/medik8s-lib.sh"
 # Written by the medik8s-lib ref step; do not edit directly.
 #
 # Required caller variables per function:
-#   resolve_commit_sha: OCP_VERSION, FBC_COMMIT_SHA (in/out), FBC_SHA_PINNED (in/out)
-#   verify_fbc_image:   OCP_VERSION, FBC_COMMIT_SHA, FBC_SHA_PINNED
+#   resolve_commit_sha: OCP_VERSION, FBC_COMMIT_SHA (in/out), FBC_SHA_PINNED (in/out),
+#                       FBC_IMAGE_TAG (out; Quay image tag, normally bare SHA)
+#   verify_fbc_image:   OCP_VERSION, FBC_COMMIT_SHA, FBC_SHA_PINNED, FBC_IMAGE_TAG
 #   wait_for_mcp_rollout: (none - takes argument)
 #   ensure_marketplace: (none)
 #   wait_for_catalogsource: CATALOG_SOURCE_NAME; CATALOG_IMAGE (optional, for debug)
@@ -63,7 +64,8 @@ set_proxy() {
 resolve_commit_sha() {
     if [[ -n "$FBC_COMMIT_SHA" ]]; then
         FBC_SHA_PINNED="true"
-        log "Using provided FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
+        FBC_IMAGE_TAG="${FBC_IMAGE_TAG:-$FBC_COMMIT_SHA}"
+        log "Using provided FBC_COMMIT_SHA: $FBC_COMMIT_SHA (image tag: $FBC_IMAGE_TAG)"
         return 0
     fi
 
@@ -77,35 +79,65 @@ resolve_commit_sha() {
     local image_name="${FBC_IMAGE_PREFIX}-${OCP_VERSION}"
     log "Resolving latest active FBC image for ${image_name} from Quay..."
 
-    local quay_response
-    if ! quay_response=$(curl -sSf --retry 3 --retry-delay 2 \
-        --connect-timeout 10 --max-time 30 \
-        "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=50&onlyActiveTags=true" 2>&1); then
-        log "ERROR: Quay API request failed for ${image_name}: ${quay_response}"
-        exit 1
+    # Quay returns newest tags first with a hard page size. Konflux publishes many
+    # non-SHA tags (per-arch, on-pr, pipeline build names) that drown bare SHA
+    # tags off page 1 — so paginate until we find a bare 40-char SHA tag.
+    local page=1 max_pages=10 quay_response page_sha best_sha="" best_ts=0 page_ts has_more
+    while (( page <= max_pages )); do
+        if ! quay_response=$(curl -sSf --retry 3 --retry-delay 2 \
+            --connect-timeout 10 --max-time 30 \
+            "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=100&page=${page}&onlyActiveTags=true" 2>&1); then
+            log "ERROR: Quay API request failed for ${image_name} (page ${page}): ${quay_response}"
+            exit 1
+        fi
+
+        page_sha=$(echo "$quay_response" \
+            | jq -r '[.tags[] | select(.name | test("^[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty')
+        page_ts=$(echo "$quay_response" \
+            | jq -r --arg sha "$page_sha" '[.tags[] | select(.name == $sha)][0].start_ts // 0')
+        if [[ -n "$page_sha" && "$page_ts" -gt "$best_ts" ]]; then
+            best_sha="$page_sha"
+            best_ts="$page_ts"
+            # Newest tags are on early pages; once we have a bare SHA from page 1
+            # we can stop. Later pages only have older SHAs.
+            if (( page == 1 )); then
+                break
+            fi
+        fi
+
+        has_more=$(echo "$quay_response" | jq -r '.has_additional // false')
+        if [[ "$has_more" != "true" ]]; then
+            break
+        fi
+        # If page 1 had no bare SHA, keep scanning newer-ish pages until we find one.
+        if [[ -n "$best_sha" ]]; then
+            break
+        fi
+        page=$((page + 1))
+    done
+
+    if [[ -n "$best_sha" ]]; then
+        FBC_COMMIT_SHA="$best_sha"
+        FBC_IMAGE_TAG="$best_sha"
+        log "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA (bare Quay SHA tag, page ${page})"
+        return 0
     fi
 
-    FBC_COMMIT_SHA=$(echo "$quay_response" \
-        | jq -r '[.tags[] | select(.name | test("^[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty')
-
-    if [[ -z "$FBC_COMMIT_SHA" ]]; then
-        log "ERROR: No active SHA tag found for ${image_name} on Quay"
-        exit 1
-    fi
-
-    log "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA (from Quay active tags)"
+    log "ERROR: No active bare SHA tag found for ${image_name} on Quay (scanned ${page} page(s))"
+    exit 1
 }
 
 verify_fbc_image() {
     local image_name="${FBC_IMAGE_PREFIX}-${OCP_VERSION}"
+    FBC_IMAGE_TAG="${FBC_IMAGE_TAG:-$FBC_COMMIT_SHA}"
 
     if [[ "${FBC_SHA_PINNED:-}" == "true" ]]; then
-        local fbc_image="${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
+        local fbc_image="${FBC_IMAGE_REPO}/${image_name}:${FBC_IMAGE_TAG}"
         log "Verifying pinned FBC image: $fbc_image"
         local manifest_status
         manifest_status=$(curl -sS -o /dev/null -w '%{http_code}' \
             --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
-            "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_COMMIT_SHA}" \
+            "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_IMAGE_TAG}" \
             -H "Accept: application/vnd.oci.image.index.v1+json" || true)
         if [[ "$manifest_status" != "200" ]]; then
             log "ERROR: Pinned FBC image not found (HTTP ${manifest_status})"
@@ -113,7 +145,7 @@ verify_fbc_image() {
         fi
     fi
 
-    log "Using FBC image: ${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
+    log "Using FBC image: ${FBC_IMAGE_REPO}/${image_name}:${FBC_IMAGE_TAG} (commit ${FBC_COMMIT_SHA})"
 }
 
 wait_for_mcp_rollout() {
