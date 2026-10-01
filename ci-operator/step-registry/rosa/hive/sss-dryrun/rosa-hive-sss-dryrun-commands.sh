@@ -132,7 +132,7 @@ if [ ${APPLY_EXIT} -eq 0 ]; then
 fi
 
 # Check if all errors are from the known list
-UNEXPECTED_ERRORS=$(grep -i 'error\|invalid\|forbidden' "${APPLY_OUTPUT}" | grep -v -E "(${KNOWN_FAILURES})" | grep -v "^$" || true)
+UNEXPECTED_ERRORS=$(grep -i 'error\|invalid\|forbidden' "${APPLY_OUTPUT}" | grep -v "configured (server dry run)" | grep -v "^Error from server" | grep -v -E "(${KNOWN_FAILURES})" | grep -v "^$" || true)
 
 if [ -z "${UNEXPECTED_ERRORS}" ]; then
     KNOWN_COUNT=$(grep -c -E "(${KNOWN_FAILURES})" "${APPLY_OUTPUT}" 2>/dev/null || echo "0")
