@@ -25,8 +25,25 @@ if [[ -z "${HOSTNAME_ADDITIONAL}" || "${HOSTNAME_ADDITIONAL}" == "null" ]]; then
   exit 1
 fi
 
+# The primary hypervisor connects directly on the standard libvirt port (16509).
+# The additional hypervisor uses the bastion sshd-10 route. CoreDNS in bastion-z
+# resolves short names (e.g. akvmocp03 -> sshd-10.bastion-z.svc.cluster.local),
+# and the sshd-10 service exposes the arm64 libvirt endpoint on port 16511 (libvirt-arm64).
+# Strip any domain suffix to derive the short hostname and validate formatting.
+HOSTNAME_ADDITIONAL_SHORT="${HOSTNAME_ADDITIONAL%%.*}"
+if [[ -z "${HOSTNAME_ADDITIONAL_SHORT}" || "${HOSTNAME_ADDITIONAL_SHORT}" =~ [^a-zA-Z0-9-] ]]; then
+  echo "ERROR: Malformed or invalid additional hostname '${HOSTNAME_ADDITIONAL}'"
+  exit 1
+fi
+
+ADDITIONAL_PORT="${ADDITIONAL_LIBVIRT_PORT:-16511}"
+if [[ ! "${ADDITIONAL_PORT}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: Invalid ADDITIONAL_LIBVIRT_PORT '${ADDITIONAL_PORT}'"
+  exit 1
+fi
+
 PRIMARY_LIBVIRT_URI="qemu+tcp://${HOSTNAME_PRIMARY}/system"
-ADDITIONAL_LIBVIRT_URI="qemu+tcp://${HOSTNAME_ADDITIONAL}/system"
+ADDITIONAL_LIBVIRT_URI="qemu+tcp://${HOSTNAME_ADDITIONAL_SHORT}:${ADDITIONAL_PORT}/system"
 
 VIRSH_PRIMARY="mock-nss.sh virsh --connect ${PRIMARY_LIBVIRT_URI}"
 VIRSH_ADDITIONAL="mock-nss.sh virsh --connect ${ADDITIONAL_LIBVIRT_URI}"
