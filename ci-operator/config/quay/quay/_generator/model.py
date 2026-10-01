@@ -105,14 +105,11 @@ class Cell:
 
     @property
     def test_as(self) -> str:
-        base = (
-            f"{self.cloud}-{self.storage}-{self.source}"
-            if self.kind == "periodic"
-            else f"{self.cloud}-{self.storage}"
-        )
-        if self.arch == "amd64":
-            return base
-        return f"{base}-{self.arch}"
+        # No arch suffix: a non-amd64 arch is already in the variant, which
+        # Prow puts ahead of `as` in the job name.
+        if self.kind == "periodic":
+            return f"{self.cloud}-{self.storage}-{self.source}"
+        return f"{self.cloud}-{self.storage}"
 
     @property
     def filename(self) -> str:

@@ -8,6 +8,7 @@ import pytest
 import yaml
 from conftest import PHASE0_MATRIX
 from generate import (
+    ALLOWED_ARCHES,
     GENERATED_HEADER,
     GENERATOR_DIR,
     _check_configs,
@@ -89,7 +90,7 @@ def test_expand_matrix_cells() -> None:
 
     arm_cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "arm64")
     assert arm_cell.filename == "quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml"
-    assert arm_cell.test_as == "aws-s3-nightly-arm64"
+    assert arm_cell.test_as == "aws-s3-nightly"
 
     master_cell = next(c for c in cells if c.branch == "master")
     assert master_cell.filename == MASTER_NAME
@@ -98,6 +99,18 @@ def test_expand_matrix_cells() -> None:
     assert master_cell.optional is True
     assert master_cell.quay_version is None
     assert "QUAY_EXTRA_CONFIG" not in cell.env
+
+
+def test_job_names_have_no_trailing_arch_suffix() -> None:
+    # Prow names a job ...-<variant>-<as>; an arch already in the variant
+    # must not be repeated at the end of `as`.
+    results, _retired = generate_all()
+    for _group, filename, config in results:
+        variant = config["zz_generated_metadata"].get("variant", "")
+        for test in config["tests"]:
+            for arch in ALLOWED_ARCHES - {"amd64"}:
+                if arch in variant.split("-"):
+                    assert not test["as"].endswith(f"-{arch}"), f"{filename}: {test['as']}"
 
 
 def test_adding_ocp_version_expands_cells() -> None:
@@ -318,7 +331,7 @@ def test_golden_redhat_318_arm64_canary_bytes() -> None:
     assert dumped.startswith(GENERATED_HEADER)
 
     test = config["tests"][0]
-    assert test["as"] == "aws-s3-nightly-arm64"
+    assert test["as"] == "aws-s3-nightly"
     assert test["cron"] == "@weekly"
     assert test["steps"]["dependencies"] == {
         "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE": "release:arm64-latest"
@@ -337,7 +350,7 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     assert filename in by_name
     config = by_name[filename]
     test = config["tests"][0]
-    assert test["as"] == "libvirt-s3-nightly-s390x"
+    assert test["as"] == "libvirt-s3-nightly"
     assert test["cron"] == "0 8 * * 2"
     assert test["capabilities"] == ["intranet"]
     assert test["steps"]["cluster_profile"] == "libvirt-s390x-vpn"
@@ -1095,9 +1108,9 @@ def test_master_arm64_variant_without_promotion(tmp_path: Path) -> None:
 
     tests = config["tests"]
     by_as = {test["as"]: test for test in tests}
-    assert set(by_as) == {"aws-s3-arm64"}
+    assert set(by_as) == {"aws-s3"}
 
-    aws_test = by_as["aws-s3-arm64"]
+    aws_test = by_as["aws-s3"]
     assert aws_test["steps"]["env"]["COMPUTE_NODE_TYPE"] == "m6g.4xlarge"
     assert aws_test["steps"]["dependencies"] == {
         "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE": "release:arm64-latest",
