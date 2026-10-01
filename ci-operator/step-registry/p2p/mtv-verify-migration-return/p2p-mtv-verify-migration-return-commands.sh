@@ -44,7 +44,9 @@ typeset virtctlBin="" sshKeyFile="" sshReady=false
 typeset migrationSuffix="${MTV_MIGRATION_SUFFIX:-}"
 typeset diagDir=""
 typeset pvcCheck="${MTV_PVC_CHECK:-true}"
-typeset rootdiskSize="${MTV_VM_ROOTDISK_SIZE:-}"
+typeset rootdiskSize="${MTV_VM_ROOTDISK_SIZE:-32Gi}"
+typeset rootdiskAccessMode="${MTV_VM_ROOTDISK_ACCESS_MODE:-ReadWriteMany}"
+typeset rootdiskVolumeMode="${MTV_VM_ROOTDISK_VOLUME_MODE:-Block}"
 
 (( vmCount >= 1 )) \
   || { printf 'ERROR: MTV_TEST_VM_COUNT must be a positive integer (got: %s)\n' "${MTV_TEST_VM_COUNT}" >&2; false; }
@@ -317,12 +319,16 @@ function VerifyAllVmsSsh () {
   (( failed == 0 ))
 }
 
-# RedactOutput — mask URLs, IPv4 addresses, and AWS node hostnames (ip-A-B-C-D.*) in
-# ssh/virtctl error text and diagnostics artifacts.
+# RedactOutput — mask URLs, IPv4 addresses, AWS node hostnames (ip-A-B-C-D.*), and
+# remaining dotted hostnames (api.cluster.example) in oc/ssh error text and artifacts.
+# Bare hostnames must be last: URL/IP substitutions run first so they are not
+# double-matched. Example: "lookup api.ci.l2s4.p1.openshiftapps.com on 172.30.0.10:53"
+# becomes "lookup <REDACTED-HOST> on <REDACTED-IP>:53".
 function RedactOutput () {
   sed -E -e 's#https?://[^[:space:]]+#<REDACTED-URL>#g' \
     -e 's#ip-[0-9]+-[0-9]+-[0-9]+-[0-9]+[.a-z0-9-]*#<REDACTED-NODE>#g' \
-    -e 's#[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+#<REDACTED-IP>#g'
+    -e 's#[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+#<REDACTED-IP>#g' \
+    -e 's#[[:alnum:]_-]+(\.[[:alnum:]_-]+)+#<REDACTED-HOST>#g'
 }
 
 # EnsurePasswdEntry — the OpenSSH client refuses to run when the pod's random UID
@@ -647,9 +653,10 @@ function VerifyPvcAttachment () {
   return "${_rc}"
 }
 
-# VerifyPvcIntegrity — verify the rootdisk PVC on the destination is Bound and, when
-# MTV_VM_ROOTDISK_SIZE is set, that the requested storage size is preserved. The observed
-# capacity is logged for human review in all cases.
+# VerifyPvcIntegrity — verify destination rootdisk PVC Bound phase plus retained
+# spec metadata: requested size, accessModes, and volumeMode (defaults match
+# P2P_HS_VM_DISK_SIZE / RWX Block from p2p-create-cclm-test-vms). Observed
+# capacity is logged for human review (provisioners may round up).
 # Skipped (rc=77) when MTV_PVC_CHECK=false.
 function VerifyPvcIntegrity () {
   [[ "${pvcCheck}" == "true" ]] || return 77
@@ -697,6 +704,29 @@ function VerifyPvcIntegrity () {
         if [[ "${requestedSize}" != "${rootdiskSize}" ]]; then
           printf 'ERROR: PVC %s requested storage=%s, expected %s (MTV_VM_ROOTDISK_SIZE)\n' \
             "${pvcName}" "${requestedSize}" "${rootdiskSize}" >&2
+          (( ++failed ))
+        fi
+      fi
+
+      # Access mode — live migration requires ReadWriteMany on the rootdisk PVC.
+      if [[ -n "${rootdiskAccessMode}" ]]; then
+        typeset hasMode
+        hasMode="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r --arg m "${rootdiskAccessMode}" \
+          'any(.spec.accessModes[]?; . == $m)')"
+        if [[ "${hasMode}" != "true" ]]; then
+          printf 'ERROR: PVC %s accessModes missing %s (MTV_VM_ROOTDISK_ACCESS_MODE)\n' \
+            "${pvcName}" "${rootdiskAccessMode}" >&2
+          (( ++failed ))
+        fi
+      fi
+
+      # Volume mode — must match the DataVolume created by p2p-create-cclm-test-vms.
+      if [[ -n "${rootdiskVolumeMode}" ]]; then
+        typeset volMode
+        volMode="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '.spec.volumeMode // ""')"
+        if [[ "${volMode}" != "${rootdiskVolumeMode}" ]]; then
+          printf 'ERROR: PVC %s volumeMode=%s, expected %s (MTV_VM_ROOTDISK_VOLUME_MODE)\n' \
+            "${pvcName}" "${volMode}" "${rootdiskVolumeMode}" >&2
           (( ++failed ))
         fi
       fi

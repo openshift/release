@@ -114,13 +114,22 @@ ref:
     default: "true"
     documentation: |-
       When true, run VerifyPvcAttachment (VM spec references rootdisk PVC as a volume)
-      and VerifyPvcIntegrity (PVC is Bound; requested storage matches MTV_VM_ROOTDISK_SIZE
-      when set). Set false to skip both checks for cirros guests or cold-migration plans
-      where PVC names differ from the rootdisk convention.
+      and VerifyPvcIntegrity (PVC is Bound; requested size, accessModes, and volumeMode
+      match the env defaults below). Set false to skip both checks for cirros guests or
+      cold-migration plans where PVC names differ from the rootdisk convention.
   - name: MTV_VM_ROOTDISK_SIZE
-    default: ""
+    default: "32Gi"
     documentation: |-
-      Expected value of spec.resources.requests.storage on the destination rootdisk PVC
-      (e.g. "20Gi"). When empty, the size comparison inside VerifyPvcIntegrity is skipped
-      and only the Bound phase is checked. Must match P2P_HS_VM_DISK_SIZE in
-      p2p-create-cclm-test-vms.
+      Expected spec.resources.requests.storage on the destination rootdisk PVC.
+      Must match P2P_HS_VM_DISK_SIZE in p2p-create-cclm-test-vms (default 32Gi).
+      When empty, the size comparison is skipped.
+  - name: MTV_VM_ROOTDISK_ACCESS_MODE
+    default: "ReadWriteMany"
+    documentation: |-
+      Access mode that must be present on the destination rootdisk PVC.
+      Live migration requires ReadWriteMany. When empty, the accessModes check is skipped.
+  - name: MTV_VM_ROOTDISK_VOLUME_MODE
+    default: "Block"
+    documentation: |-
+      Expected spec.volumeMode on the destination rootdisk PVC. Must match the
+      DataVolume created by p2p-create-cclm-test-vms (Block). When empty, skipped.
