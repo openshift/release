@@ -31,14 +31,20 @@ webhooks:
       operator: DoesNotExist
       values: []
   matchConditions:
-  - name: requests-gpu
+  # Keep device-specific decisions in the webhook. Any qualified resource is
+  # a safe superset of the GPU and KVM resources it currently handles.
+  - name: uses-extended-resource
     expression: >-
       object.spec.containers.exists(c,
         has(c.resources) &&
-        ((has(c.resources.requests) && 'nvidia.com/gpu' in c.resources.requests) ||
-         (has(c.resources.limits) && 'nvidia.com/gpu' in c.resources.limits))) ||
+        ((has(c.resources.requests) &&
+          c.resources.requests.exists(r, r.contains('/'))) ||
+         (has(c.resources.limits) &&
+          c.resources.limits.exists(r, r.contains('/'))))) ||
       (has(object.spec.initContainers) &&
        object.spec.initContainers.exists(c,
          has(c.resources) &&
-         ((has(c.resources.requests) && 'nvidia.com/gpu' in c.resources.requests) ||
-          (has(c.resources.limits) && 'nvidia.com/gpu' in c.resources.limits))))
+         ((has(c.resources.requests) &&
+           c.resources.requests.exists(r, r.contains('/'))) ||
+          (has(c.resources.limits) &&
+           c.resources.limits.exists(r, r.contains('/'))))))
