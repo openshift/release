@@ -179,15 +179,9 @@ AWS_PRIVATE_CREDENTIALS_FILE="/etc/hypershift-pool-aws-credentials/credentials"
 AWS_PRIVATE_REGION="${HYPERSHIFT_AWS_REGION}"
 if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT}" == "true" ]]; then
   AWS_PRIVATE_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-  if [[ -n "${AWS_REGION_OVERWRITE:-}" ]]; then
-    echo "AWS region override found. Using ${AWS_REGION_OVERWRITE}."
-    AWS_PRIVATE_REGION="${AWS_REGION_OVERWRITE}"
-  elif [[ -f "${SHARED_DIR}/aws-region" ]]; then
+  if [[ -f "${SHARED_DIR}/aws-region" ]]; then
     echo "Region override found. Using it."
     AWS_PRIVATE_REGION="$(cat "${SHARED_DIR}/aws-region")"
-  else
-    echo "No region override found. Using leased resource."
-    AWS_PRIVATE_REGION="${LEASED_RESOURCE}"
   fi
 fi
 
