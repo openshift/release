@@ -118,7 +118,7 @@ log "Server-side dry-run apply of processed SelectorSyncSets"
 # Known SSS that exceed the 256KB annotation limit (oc apply adds
 # kubectl.kubernetes.io/last-applied-configuration which doubles their size).
 # These are false positives — the SSS themselves are valid.
-KNOWN_FAILURES="acm-policies|osd-oauth-templates-login|rosa-oauth-templates-login|rosa-oauth-templates-policies|rosa-oauth-templates-providers"
+KNOWN_FAILURES="acm-policies|osd-oauth-templates-login|rosa-oauth-templates-errors|rosa-oauth-templates-login|rosa-oauth-templates-policies|rosa-oauth-templates-providers"
 
 APPLY_OUTPUT="${ARTIFACT_DIR}/apply-output.txt"
 set +e
