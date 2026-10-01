@@ -118,12 +118,14 @@ if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-false}" == "true" ]]; then
   fi
 fi
 
+E2E_AWS_AVAILABILITY_ZONES="${HYPERSHIFT_AWS_ZONES:-${E2E_AWS_REGION}a,${E2E_AWS_REGION}b,${E2E_AWS_REGION}c}"
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-''} \
   -test.parallel=20 \
   --e2e.aws-credentials-file="${E2E_AWS_CREDENTIALS_FILE}" \
   --e2e.aws-region="${E2E_AWS_REGION}" \
-  --e2e.availability-zones="${E2E_AWS_REGION}a,${E2E_AWS_REGION}b,${E2E_AWS_REGION}c" \
+  --e2e.availability-zones="${E2E_AWS_AVAILABILITY_ZONES}" \
   --e2e.aws-private-credentials-file="${E2E_AWS_PRIVATE_CREDENTIALS_FILE}" \
   --e2e.aws-private-region="${E2E_AWS_PRIVATE_REGION}" \
   ${AWS_OBJECT_PARAMS:-} \
