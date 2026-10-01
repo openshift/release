@@ -24,15 +24,17 @@ GANGWAY_API=${GANGWAY_API:-"https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com
 # It explicitly leaves out testing older MCE versions. The focus is always on the latest one.
 
 # Each MCE supports the latest three HostedCluster versions
+# The key is the MCE version and the value is the HostedCluster versions
 declare -A mce_to_guest=(
-    [2.17]="4.20 4.21 4.22"
+    [5.0]="4.22 4.23 5.0"
 )
 
 # Each MCE is available on the latest hub version and two versions back
+# The key is the hub version and the value is the MCE version
 declare -A hub_to_mce=(
-    [4.20]="2.17"
-    [4.21]="2.17"
-    [4.22]="2.17"
+    [4.22]="5.0"
+    [4.23]="5.0"
+    [5.0]="5.0"
 )
 
 function get_payload_list() {
