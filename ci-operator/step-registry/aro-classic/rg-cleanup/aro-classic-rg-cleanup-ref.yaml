@@ -1,0 +1,35 @@
+ref:
+  as: aro-classic-rg-cleanup
+  from: src
+  commands: aro-classic-rg-cleanup-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+  timeout: 3h0m0s
+  credentials:
+  - collection: aro-ci
+    group: aro-ea-sub2-cleanup
+    mount_path: /var/run/aro-ea-sub2-cleanup
+  env:
+  - name: CLEANUP_SUBSCRIPTION_ID
+    default: "fe16a035-e540-4ab7-80d9-373fa9a3d6ae"
+    documentation: Subscription to prune. Defaults to "ARO SRE Team - InProgress (EA Subscription 2)".
+  - name: CLEANUP_SWEEPER_COMMIT
+    documentation: |-
+      Full 40-character Azure/ARO-HCP commit SHA that cleanup-sweeper is built from.
+      Required. Upgrade by bumping the SHA and validating it with a dry-run before
+      enabling deletion.
+  - name: CLEANUP_DRY_RUN
+    default: "true"
+    documentation: |-
+      Report deletion candidates without deleting them. Setting "false" permits
+      deletion only when JOB_TYPE is periodic; rehearsals and other job types always
+      run as dry-run.
+  documentation: |-
+    Prune stale resource groups in an ARO Classic/SRE subscription with ARO-HCP
+    cleanup-sweeper (rg-ordered), built from a pinned ARO-HCP commit. The policy is
+    embedded in the commands script and mirrors the retired ADO pruner (ARO-RP
+    hack/clean): delete RGs older than 48h unless they are persist=true, managed by a
+    live resource, locked, or on the shared denylist. RGs need a parseable createdAt
+    tag to be candidates.
