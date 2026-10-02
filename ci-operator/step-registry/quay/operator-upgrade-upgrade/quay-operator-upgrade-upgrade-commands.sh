@@ -76,8 +76,12 @@ wait_catalog() {
   fail "CatalogSource $1 did not become READY within ${CATALOG_TIMEOUT}"
 }
 
+# The Quay operator labels the app Deployment's own metadata with
+# quay-component=quay (the "quay" component); quay-component=quay-app is only the
+# pod-template/selector label, so `oc get deployment -l quay-component=quay-app`
+# matches nothing. Select on the Deployment's metadata label instead.
 app_images() {
-  oc get deployment -n "${QUAY_NS}" -l quay-component=quay-app \
+  oc get deployment -n "${QUAY_NS}" -l quay-component=quay \
     -o jsonpath='{range .items[*]}{.metadata.name}{"="}{range .spec.template.spec.containers[?(@.name=="quay-app")]}{.image}{end}{"\n"}{end}' 2>/dev/null || true
 }
 
