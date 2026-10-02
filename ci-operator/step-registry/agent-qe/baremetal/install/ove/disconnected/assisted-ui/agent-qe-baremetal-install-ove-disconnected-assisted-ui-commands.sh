@@ -20,13 +20,20 @@ PULL_SECRET=$(jq -c -n '{"auths":{"test":{"auth":"dXNlcjpwYXNzCg=="}}}')
 RENDEZVOUS_IP=$(<"${SHARED_DIR}/node-zero-ip.txt")
 PROXY_URL=$(<"${CLUSTER_PROFILE_DIR}/proxy")
 
-export CLUSTER_NAME
-export BASE_DOMAIN
-export PULL_SECRET
-export RENDEZVOUS_IP
-export PROXY_URL
+export CLUSTER_NAME BASE_DOMAIN PULL_SECRET RENDEZVOUS_IP PROXY_URL \
+       WORKER_MACS="" TOPOLOGY_TYPE="${TOPOLOGY_TYPE:-COMPACT}" ADDITIONAL_OPERATORS="${ADDITIONAL_OPERATORS:-}"
 
-if [ "${LOAD_BALANCER_TYPE:-cluster-managed}" = "cluster-managed" ]; then
+if [[ "${TOPOLOGY_TYPE}" == "HA" ]]; then
+  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+     name=$(echo "$bmhost" | jq -r '.name')
+     if [[ "$name" == *"worker"* ]]; then
+       mac_address=$(echo "$bmhost" | jq -r '.mac')
+       WORKER_MACS="$WORKER_MACS,$mac_address"
+     fi
+  done
+fi
+
+if [[ "${LOAD_BALANCER_TYPE:-cluster-managed}" == "cluster-managed" && "${TOPOLOGY_TYPE}" != "SNO" ]]; then
   API_IP=$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
   INGRESS_IP=$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
   export API_IP INGRESS_IP
@@ -37,6 +44,7 @@ fi
 if ! python3.11 assisted-ui/run_agent_tui.py; then
  echo "Assisted UI workflow failed."
  cp -r /tmp/screenshots/* "$ARTIFACT_DIR"
+ cp -r /tmp/videos/* "$ARTIFACT_DIR"
  exit 1
 fi
 
