@@ -16,6 +16,107 @@ MOUNTED_HOST_INVENTORY="/var/host_variables"
 MOUNTED_GROUP_INVENTORY="/var/group_variables"
 
 # ----------------------------------------------------------------------
+# apply_gangway_overrides
+#
+# Applies Gangway API overrides for job parameters. This function MUST be
+# called AFTER export_env_vars_from_json to ensure Gangway overrides have
+# the highest precedence (JSON settings < Gangway overrides).
+#
+# When triggering jobs via Gangway API, environment variables can be
+# overridden using the MULTISTAGE_PARAM_OVERRIDE_* prefix. This function
+# checks for those overrides and applies them, overwriting any values
+# that came from INFRA_SETTINGS or TEST_SETTINGS JSON.
+#
+# Supported overrides:
+#   MULTISTAGE_PARAM_OVERRIDE_HUB_CLUSTER -> HUB_CLUSTER
+#   MULTISTAGE_PARAM_OVERRIDE_SPOKE_CLUSTER -> SPOKE_CLUSTER
+#   MULTISTAGE_PARAM_OVERRIDE_DURATION -> DURATION
+#   MULTISTAGE_PARAM_OVERRIDE_HUB_LOCKDOWN_URI -> HUB_LOCKDOWN_URI
+#   MULTISTAGE_PARAM_OVERRIDE_LOCKDOWN_URI -> LOCKDOWN_URI
+#   MULTISTAGE_PARAM_OVERRIDE_SPOKE_LOCKDOWN_URI -> SPOKE_LOCKDOWN_URI
+#   MULTISTAGE_PARAM_OVERRIDE_OCP_RELEASE_IMAGE -> OCP_RELEASE_IMAGE
+#   MULTISTAGE_PARAM_OVERRIDE_ZTP_GIT_BRANCH -> ZTP_GIT_BRANCH
+#   MULTISTAGE_PARAM_OVERRIDE_REPORT_HEADLINE -> REPORT_HEADLINE
+#   MULTISTAGE_PARAM_OVERRIDE_REBOOT_COUNT -> REBOOT_COUNT
+#   MULTISTAGE_PARAM_OVERRIDE_BASELINE -> BASELINE
+#   MULTISTAGE_PARAM_OVERRIDE_RDS_REFERENCE_BRANCH -> REFERENCE_BRANCH
+#   MULTISTAGE_PARAM_OVERRIDE_THRESHOLD_DURATION -> THRESHOLD_DURATION
+#   MULTISTAGE_PARAM_OVERRIDE_REPORT_PUBLISH_MODE -> REPORT_PUBLISH_MODE
+# ----------------------------------------------------------------------
+
+apply_gangway_overrides() {
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_HUB_CLUSTER:-}" ]]; then
+        export HUB_CLUSTER="${MULTISTAGE_PARAM_OVERRIDE_HUB_CLUSTER}"
+        echo "Using Gangway override: HUB_CLUSTER=${HUB_CLUSTER}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_SPOKE_CLUSTER:-}" ]]; then
+        export SPOKE_CLUSTER="${MULTISTAGE_PARAM_OVERRIDE_SPOKE_CLUSTER}"
+        echo "Using Gangway override: SPOKE_CLUSTER=${SPOKE_CLUSTER}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_DURATION:-}" ]]; then
+        export DURATION="${MULTISTAGE_PARAM_OVERRIDE_DURATION}"
+        echo "Using Gangway override: DURATION=${DURATION}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_HUB_LOCKDOWN_URI:-}" ]]; then
+        export HUB_LOCKDOWN_URI="${MULTISTAGE_PARAM_OVERRIDE_HUB_LOCKDOWN_URI}"
+        echo "Using Gangway override: HUB_LOCKDOWN_URI=${HUB_LOCKDOWN_URI}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCKDOWN_URI:-}" ]]; then
+        export LOCKDOWN_URI="${MULTISTAGE_PARAM_OVERRIDE_LOCKDOWN_URI}"
+        echo "Using Gangway override: LOCKDOWN_URI=${LOCKDOWN_URI}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_SPOKE_LOCKDOWN_URI:-}" ]]; then
+        export SPOKE_LOCKDOWN_URI="${MULTISTAGE_PARAM_OVERRIDE_SPOKE_LOCKDOWN_URI}"
+        echo "Using Gangway override: SPOKE_LOCKDOWN_URI=${SPOKE_LOCKDOWN_URI}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OCP_RELEASE_IMAGE:-}" ]]; then
+        export OCP_RELEASE_IMAGE="${MULTISTAGE_PARAM_OVERRIDE_OCP_RELEASE_IMAGE}"
+        echo "Using Gangway override: OCP_RELEASE_IMAGE=${OCP_RELEASE_IMAGE}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_ZTP_GIT_BRANCH:-}" ]]; then
+        export ZTP_GIT_BRANCH="${MULTISTAGE_PARAM_OVERRIDE_ZTP_GIT_BRANCH}"
+        echo "Using Gangway override: ZTP_GIT_BRANCH=${ZTP_GIT_BRANCH}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_REPORT_HEADLINE:-}" ]]; then
+        export REPORT_HEADLINE="${MULTISTAGE_PARAM_OVERRIDE_REPORT_HEADLINE}"
+        echo "Using Gangway override: REPORT_HEADLINE=${REPORT_HEADLINE}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_REBOOT_COUNT:-}" ]]; then
+        export REBOOT_COUNT="${MULTISTAGE_PARAM_OVERRIDE_REBOOT_COUNT}"
+        echo "Using Gangway override: REBOOT_COUNT=${REBOOT_COUNT}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_BASELINE:-}" ]]; then
+        export BASELINE="${MULTISTAGE_PARAM_OVERRIDE_BASELINE}"
+        echo "Using Gangway override: BASELINE=${BASELINE}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_RDS_REFERENCE_BRANCH:-}" ]]; then
+        export REFERENCE_BRANCH="${MULTISTAGE_PARAM_OVERRIDE_RDS_REFERENCE_BRANCH}"
+        echo "Using Gangway override: REFERENCE_BRANCH=${REFERENCE_BRANCH}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_THRESHOLD_DURATION:-}" ]]; then
+        export THRESHOLD_DURATION="${MULTISTAGE_PARAM_OVERRIDE_THRESHOLD_DURATION}"
+        echo "Using Gangway override: THRESHOLD_DURATION=${THRESHOLD_DURATION}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_REPORT_PUBLISH_MODE:-}" ]]; then
+        export REPORT_PUBLISH_MODE="${MULTISTAGE_PARAM_OVERRIDE_REPORT_PUBLISH_MODE}"
+        echo "Using Gangway override: REPORT_PUBLISH_MODE=${REPORT_PUBLISH_MODE}"
+    fi
+}
+
+# ----------------------------------------------------------------------
 # setup_direct_ssh
 #
 # Configures direct SSH to a bastion host. Appends
