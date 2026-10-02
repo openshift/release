@@ -1,0 +1,36 @@
+ref:
+  as: sandboxed-containers-operator-upgrade-hcp-aws-post-validate
+  from: src
+  cli: latest
+  commands: sandboxed-containers-operator-testsuites-osc-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 130m0s
+  grace_period: 10m0s
+  env:
+  - name: TESTS_OSC_ENABLE
+    default: "false"
+    documentation: |-
+      Enable-gate for the OSC golang e2e suite (skip-by-default).
+      "true"        -> the step runs the tests.
+      "false"/unset -> the step writes a skipped JUnit and exits 0.
+  - name: TESTS_OSC_FOCUS
+    default: ""
+    documentation: |-
+      Ginkgo focus passed to `go test` as -ginkgo.focus (e.g. a single test ID
+      like "66108"). Empty runs the whole suite.
+  - name: TESTS_OSC_TIMEOUT
+    default: "120m"
+    documentation: |-
+      Value passed to `go test -timeout`. Must stay below the ref `timeout`
+      (130m) so the runner has time to publish results before the step is killed.
+  documentation: |-
+    Post-upgrade OSC validation: re-run the OSC golang (Ginkgo v2) e2e tests
+    after the hosted cluster has been upgraded, to confirm that the Sandboxed
+    Containers Operator survives the upgrade intact.
+
+    Identical to sandboxed-containers-operator-testsuites-osc but carries a
+    distinct step name so both can appear in the same workflow test phase
+    (ci-operator rejects duplicate step names within a phase).
