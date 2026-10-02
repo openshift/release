@@ -41,10 +41,15 @@ tests:
   run_if_changed: ^(ci-operator/step-registry/hyperfleet/risk-scorer/|hack/hyperfleet/validate-risk-scorer-step\.sh).*
 - as: ship-status-component-monitor-config
   commands: /app/component-monitor --validate-only --config-path=core-services/ship-status/component-monitor-config.yaml
+    --kubeconfig-dir=/etc/kubeconfig
   container:
     clone: true
     from: ship-status-component-monitor
   run_if_changed: ^core-services/ship-status/component-monitor-config\.yaml$
+  secret:
+    bundle: component-monitor-kubeconfigs
+    mount_path: /etc/kubeconfig
+    namespace: test-credentials
 - as: ship-status-dashboard-config
   commands: /app/dashboard --validate-only --config=core-services/ship-status/dashboard-config.yaml
   container:
