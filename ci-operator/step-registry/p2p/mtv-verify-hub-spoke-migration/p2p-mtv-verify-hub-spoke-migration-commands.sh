@@ -331,6 +331,40 @@ function RedactOutput () {
     -e 's#[[:alnum:]_-]+(\.[[:alnum:]_-]+)+#<REDACTED-HOST>#g'
 }
 
+# KubeQuantityToBytes — convert a Kubernetes resource.Quantity (storage) to integer bytes.
+# CDI/the API often rewrite "32Gi" as "34359738368"; string equality then false-fails.
+# Accepts a bare integer or an integer plus a binary (Ki/Mi/Gi/Ti/Pi/Ei) or decimal
+# (k/M/G/T/P/E) suffix. Prints the byte count on stdout; returns 1 if unparseable.
+function KubeQuantityToBytes () {
+  typeset q="${1:-}"
+  [[ -n "${q}" ]] || return 1
+  typeset num suffix
+  if [[ "${q}" =~ ^([0-9]+)([A-Za-z]*)$ ]]; then
+    num="${BASH_REMATCH[1]}"
+    suffix="${BASH_REMATCH[2]}"
+  else
+    return 1
+  fi
+  typeset -i bytes=0
+  case "${suffix}" in
+    '') bytes="${num}" ;;
+    Ki) bytes=$(( num * 1024 )) ;;
+    Mi) bytes=$(( num * 1024 ** 2 )) ;;
+    Gi) bytes=$(( num * 1024 ** 3 )) ;;
+    Ti) bytes=$(( num * 1024 ** 4 )) ;;
+    Pi) bytes=$(( num * 1024 ** 5 )) ;;
+    Ei) bytes=$(( num * 1024 ** 6 )) ;;
+    k)  bytes=$(( num * 1000 )) ;;
+    M)  bytes=$(( num * 1000 ** 2 )) ;;
+    G)  bytes=$(( num * 1000 ** 3 )) ;;
+    T)  bytes=$(( num * 1000 ** 4 )) ;;
+    P)  bytes=$(( num * 1000 ** 5 )) ;;
+    E)  bytes=$(( num * 1000 ** 6 )) ;;
+    *) return 1 ;;
+  esac
+  printf '%s' "${bytes}"
+}
+
 # EnsurePasswdEntry — the OpenSSH client refuses to run when the pod's random UID
 # has no passwd entry; the cli-with-ssh image makes /etc/passwd group-writable.
 function EnsurePasswdEntry () {
@@ -726,7 +760,10 @@ function VerifyPvcIntegrity () {
         dstModes="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '(.spec.accessModes // []) | sort | join(",")')"
         srcVolMode="$(printf '%s' "${srcPvcJson}" | OcWithRedactedStderr jq -r '.spec.volumeMode // ""')"
         dstVolMode="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '.spec.volumeMode // ""')"
-        if [[ "${dstSize}" != "${srcSize}" ]]; then
+        typeset srcBytes dstBytes
+        srcBytes="$(KubeQuantityToBytes "${srcSize}")" || srcBytes=""
+        dstBytes="$(KubeQuantityToBytes "${dstSize}")" || dstBytes=""
+        if [[ -z "${srcBytes}" || -z "${dstBytes}" || "${dstBytes}" != "${srcBytes}" ]]; then
           printf 'ERROR: PVC %s requested storage dest=%s source=%s\n' \
             "${pvcName}" "${dstSize}" "${srcSize}" >&2
           (( ++failed ))
@@ -746,11 +783,14 @@ function VerifyPvcIntegrity () {
           "${pvcName}" >&2
       fi
 
-      # Size check — compare spec.resources.requests.storage when MTV_VM_ROOTDISK_SIZE is set.
+      # Size check — compare requested storage as Kubernetes quantities (bytes),
+      # not strings: dest may be "34359738368" while MTV_VM_ROOTDISK_SIZE is "32Gi".
       if [[ -n "${rootdiskSize}" ]]; then
-        typeset requestedSize
+        typeset requestedSize requestedBytes expectedBytes
         requestedSize="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '.spec.resources.requests.storage // ""')"
-        if [[ "${requestedSize}" != "${rootdiskSize}" ]]; then
+        requestedBytes="$(KubeQuantityToBytes "${requestedSize}")" || requestedBytes=""
+        expectedBytes="$(KubeQuantityToBytes "${rootdiskSize}")" || expectedBytes=""
+        if [[ -z "${requestedBytes}" || -z "${expectedBytes}" || "${requestedBytes}" != "${expectedBytes}" ]]; then
           printf 'ERROR: PVC %s requested storage=%s, expected %s (MTV_VM_ROOTDISK_SIZE)\n' \
             "${pvcName}" "${requestedSize}" "${rootdiskSize}" >&2
           (( ++failed ))
