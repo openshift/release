@@ -1,3 +1,12 @@
+base_images:
+  ship-status-component-monitor:
+    name: component-monitor
+    namespace: ship-status-dash
+    tag: latest
+  ship-status-dashboard:
+    name: dashboard
+    namespace: ship-status-dash
+    tag: latest
 build_root:
   image_stream_tag:
     name: builder
@@ -30,6 +39,23 @@ tests:
   container:
     from: src
   run_if_changed: ^(ci-operator/step-registry/hyperfleet/risk-scorer/|hack/hyperfleet/validate-risk-scorer-step\.sh).*
+- as: ship-status-component-monitor-config
+  commands: /app/component-monitor --validate-only --config-path=core-services/ship-status/component-monitor-config.yaml
+    --kubeconfig-dir=/etc/kubeconfig
+  container:
+    clone: true
+    from: ship-status-component-monitor
+  run_if_changed: ^core-services/ship-status/component-monitor-config\.yaml$
+  secret:
+    bundle: component-monitor-kubeconfigs
+    mount_path: /etc/kubeconfig
+    namespace: test-credentials
+- as: ship-status-dashboard-config
+  commands: /app/dashboard --validate-only --config=core-services/ship-status/dashboard-config.yaml
+  container:
+    clone: true
+    from: ship-status-dashboard
+  run_if_changed: ^core-services/ship-status/dashboard-config\.yaml$
 zz_generated_metadata:
   branch: main
   org: openshift
