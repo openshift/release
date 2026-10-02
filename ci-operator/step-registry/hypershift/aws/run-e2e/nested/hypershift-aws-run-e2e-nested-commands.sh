@@ -109,16 +109,30 @@ export E2E_AWS_CREDENTIALS_FILE="/etc/hypershift-pool-aws-credentials/credential
 export E2E_AWS_REGION="${HYPERSHIFT_AWS_REGION}"
 export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${E2E_AWS_CREDENTIALS_FILE}"
 export E2E_AWS_PRIVATE_REGION="${HYPERSHIFT_AWS_REGION}"
+export E2E_AWS_AVAILABILITY_ZONES="${E2E_AWS_REGION}a,${E2E_AWS_REGION}b,${E2E_AWS_REGION}c"
+
 if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-false}" == "true" ]]; then
-  export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+  export E2E_AWS_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+  export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${E2E_AWS_CREDENTIALS_FILE}"
   if [[ -f "${SHARED_DIR}/aws-region" ]]; then
     echo "Region override found. Using it."
     E2E_AWS_PRIVATE_REGION="$(cat "${SHARED_DIR}/aws-region")"
     E2E_AWS_REGION="${E2E_AWS_PRIVATE_REGION}"
   fi
+  # The zones must match the management cluster zones for PrivateLink connectivity.
+  # We need to discover the zones from the management cluster nodes az the install
+  # scripts for the management cluster will choose zones by itself.
+  E2E_AWS_AVAILABILITY_ZONES="$(
+      oc --kubeconfig="${KUBECONFIG}" get nodes -ojsonpath='{range .items[*]}{.metadata.labels.topology\.kubernetes\.io/zone}{"\n"}{end}' |
+        sort -u |
+        paste -sd, -
+    )"
+  if [[ -z "${E2E_AWS_AVAILABILITY_ZONES}" ]]; then
+    echo "Failed to discover availability zones from management cluster nodes" >&2
+    exit 1
+  fi
+  echo "Using management cluster availability zones: ${E2E_AWS_AVAILABILITY_ZONES}"
 fi
-
-E2E_AWS_AVAILABILITY_ZONES="${HYPERSHIFT_AWS_ZONES:-${E2E_AWS_REGION}a,${E2E_AWS_REGION}b,${E2E_AWS_REGION}c}"
 
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-''} \
