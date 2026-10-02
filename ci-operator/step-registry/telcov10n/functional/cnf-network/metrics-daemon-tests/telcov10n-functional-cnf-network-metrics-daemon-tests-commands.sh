@@ -55,4 +55,4 @@ scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_
 
 echo "Store report for reporter step"
 # shellcheck disable=SC2154
-cp "${ARTIFACT_DIR}/junit_nmd_report.xml" "${SHARED_DIR}/junit_nmd_report.xml"
+cp "${ARTIFACT_DIR}/junit_nmd_report.xml" "${SHARED_DIR}/polarion_nmd_report.xml"
