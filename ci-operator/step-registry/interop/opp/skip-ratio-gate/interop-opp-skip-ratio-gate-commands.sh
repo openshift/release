@@ -80,13 +80,23 @@ def parse_junit(path):
     return suites
 
 
-def write_evidence_incomplete_junit(artifact_dir, threshold, reason):
+def write_evidence_incomplete_junit(artifact_dir, threshold, reason,
+                                    evidence_required=False):
     """Write evidence-incomplete gate JUnit when no valid measurement is possible."""
     out = Path(artifact_dir) / "skip-ratio-gate.xml"
+    fail_count = 1 if evidence_required else 0
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        f'<testsuite name="lp-interop--OPP--skip-gate" tests="1" failures="0">',
+        f'<testsuite name="lp-interop--OPP--skip-gate" tests="1" failures="{fail_count}">',
         f'  <testcase name="skip-ratio-gate (evidence-incomplete)" classname="interop.opp.skip-ratio-gate">',
+    ]
+    if evidence_required:
+        lines.append(
+            f'    <failure message="EVIDENCE-INCOMPLETE: {reason}">'
+            f'Skip-ratio gate requires valid test results to measure. '
+            f'Threshold={threshold:.4f}</failure>'
+        )
+    lines += [
         f'    <system-out>EVIDENCE-INCOMPLETE: {reason}. '
         f'Skip-ratio gate requires valid test results to measure. '
         f'Threshold={threshold:.4f}</system-out>',
@@ -145,6 +155,7 @@ def main():
         or os.environ.get("ARTIFACT_DIR", "")
     )
     fail_on_breach = os.environ.get("FAIL_ON_BREACH", "true").lower() != "false"
+    evidence_required = os.environ.get("EVIDENCE_REQUIRED", "true").lower() != "false"
     artifact_dir = os.environ.get("ARTIFACT_DIR", junit_dir)
 
     if not junit_dir:
@@ -167,8 +178,8 @@ def main():
     if not xml_files:
         reason = f"no JUnit XML files in {junit_dir}"
         print(f"EVIDENCE-INCOMPLETE: {reason}", file=sys.stderr)
-        write_evidence_incomplete_junit(artifact_dir, threshold, reason)
-        sys.exit(0)
+        write_evidence_incomplete_junit(artifact_dir, threshold, reason, evidence_required)
+        sys.exit(1 if evidence_required else 0)
 
     all_suites = []
     for xf in xml_files:
@@ -177,14 +188,14 @@ def main():
     if _parse_failures:
         reason = f"{_parse_failures} JUnit XML file(s) could not be parsed"
         print(f"EVIDENCE-INCOMPLETE: {reason}", file=sys.stderr)
-        write_evidence_incomplete_junit(artifact_dir, threshold, reason)
-        sys.exit(0)
+        write_evidence_incomplete_junit(artifact_dir, threshold, reason, evidence_required)
+        sys.exit(1 if evidence_required else 0)
 
     if not all_suites:
         reason = "XML files found but no <testsuite> elements"
         print(f"EVIDENCE-INCOMPLETE: {reason}", file=sys.stderr)
-        write_evidence_incomplete_junit(artifact_dir, threshold, reason)
-        sys.exit(0)
+        write_evidence_incomplete_junit(artifact_dir, threshold, reason, evidence_required)
+        sys.exit(1 if evidence_required else 0)
 
     # Aggregate totals
     total_passed = sum(s["passed"] for s in all_suites)
@@ -198,8 +209,8 @@ def main():
     if grand_total == 0:
         reason = "test suites report 0 total tests"
         print(f"EVIDENCE-INCOMPLETE: {reason}", file=sys.stderr)
-        write_evidence_incomplete_junit(artifact_dir, threshold, reason)
-        sys.exit(0)
+        write_evidence_incomplete_junit(artifact_dir, threshold, reason, evidence_required)
+        sys.exit(1 if evidence_required else 0)
 
     skip_ratio = total_skipped / grand_total if grand_total > 0 else 0.0
     breach = skip_ratio > threshold
