@@ -11,7 +11,7 @@ mkdir -p "${ARTIFACT_DIR}/junit"
 # Decompress and prepare the CBO test extension binary
 echo "Preparing cluster-baremetal-operator test extension binary..."
 BINARY=/tmp/cluster-baremetal-operator-tests-ext
-gunzip -c /usr/bin/cluster-baremetal-operator-tests-ext.gz > "${BINARY}"
+gunzip -c /cbo-tests/usr/bin/cluster-baremetal-operator-tests-ext.gz > "${BINARY}"
 chmod +x "${BINARY}"
 
 # Verify binary
