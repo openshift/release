@@ -14,10 +14,17 @@ validate_inputs() {
   : "${ZTP_GIT_REPO:?ZTP_GIT_REPO is required}"
   : "${ZTP_GIT_BRANCH:?ZTP_GIT_BRANCH is required}"
   : "${TARGET_SPOKE_CLUSTER:?TARGET_SPOKE_CLUSTER is required}"
+  if [[ ! -s "${SHARED_DIR}/ibi-seed-version" ]]; then
+    echo "Missing seed version: the Prow ibi-seed-prepare step must record it before preinstall." >&2
+    return 1
+  fi
   SEED_VERSION=$(<"${SHARED_DIR}/ibi-seed-version")
   [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]
-  [[ "${SEED_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]
-  [[ "${SEED_VERSION}" == "${VERSION}."* ]]
+  if [[ ! "${SEED_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ||
+        "${SEED_VERSION}" != "${VERSION}."* ]]; then
+    echo "Recorded seed version must be a full OpenShift version in the ${VERSION} release family." >&2
+    return 1
+  fi
   TARGET_SPOKE_NAME=$(printf '%s' "${TARGET_SPOKE_CLUSTER}" | tr -d "[]'\" ")
   [[ "${TARGET_SPOKE_NAME}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]
 }
@@ -68,6 +75,24 @@ redact_bastion() {
   done
 }
 
+verify_installer_version() {
+  local installer_output
+  local installer_version
+
+  echo "Checking the cached installer for OpenShift ${SEED_VERSION}."
+  if ! installer_output=$(ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
+    "/opt/cache/${SEED_VERSION}/openshift-install version" 2>&1); then
+    printf '%s\n' "${installer_output}" | redact_bastion >&2
+    return 1
+  fi
+
+  installer_version=$(printf '%s\n' "${installer_output}" | awk '$1 == "openshift-install" { print $2 }')
+  if [[ "${installer_version}" != "${SEED_VERSION}" ]]; then
+    echo "Cached installer version '${installer_version}' does not match the recorded seed version '${SEED_VERSION}'." >&2
+    return 1
+  fi
+}
+
 prepare_launcher() {
   local site_config_url="${ZTP_GIT_REPO%.git}/-/raw/${ZTP_GIT_BRANCH}/${VERSION}/${TARGET_SPOKE_NAME}/clusterinstance"
   cd /eco-ci-cd
@@ -116,6 +141,7 @@ main() {
   restore_target_inventory
   create_work_directories
   configure_ssh
+  verify_installer_version
   prepare_launcher
 
   local run_rc=0
