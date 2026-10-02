@@ -73,5 +73,8 @@ if [[ -n "${ROSA_LABEL_FILTER:-}" ]]; then
   export ROSA_LABEL_FILTER="${ROSA_LABEL_FILTER}"
 fi
 
+# OCP release image for the e2e HCP cluster (empty uses the default).
+export OCP_VERSION="${OCP_VERSION:-}"
+
 echo "Running e2e tests..."
 ./ci/e2e-tests.sh
