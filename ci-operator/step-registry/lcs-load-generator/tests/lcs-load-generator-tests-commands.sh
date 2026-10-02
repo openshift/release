@@ -406,11 +406,22 @@ LCS_STACK_CONFIG
   local lcs_memory_request="2Gi"
   local lcs_memory_limit="4Gi"
   local profiling_empty_dir='          emptyDir: {}'
+
+  # Liveness probe defaults
+  local lcs_liveness_timeout="5"
+  local lcs_liveness_period="15"
+  local lcs_liveness_failure="3"
+  local lcs_liveness_initial="30"
+
   if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
     lcs_memory_request="4Gi"
     lcs_memory_limit="8Gi"
     profiling_empty_dir='          emptyDir:
             sizeLimit: 12Gi'
+    lcs_liveness_timeout="30"
+    lcs_liveness_period="30"
+    lcs_liveness_failure="10"
+    lcs_liveness_initial="60"
   fi
 
   cat <<DEPLOYMENT | oc apply -f -
@@ -478,9 +489,10 @@ ${lcs_command_override}
             httpGet:
               path: /liveness
               port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 15
-            timeoutSeconds: 5
+            initialDelaySeconds: ${lcs_liveness_initial}
+            periodSeconds: ${lcs_liveness_period}
+            timeoutSeconds: ${lcs_liveness_timeout}
+            failureThreshold: ${lcs_liveness_failure}
         - name: mock-llm
           image: ${MOCK_LLM_IMAGE}
           securityContext:
