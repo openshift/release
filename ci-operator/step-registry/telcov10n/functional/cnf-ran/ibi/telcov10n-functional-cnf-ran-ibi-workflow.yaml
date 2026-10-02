@@ -1,26 +1,28 @@
 workflow:
   as: telcov10n-functional-cnf-ran-ibi
   documentation: |-
-    Deploy the seed and target hubs, prepare the seed SNO, and record its
-    exact OpenShift release. Mirror that release and its installer to the
-    target, generate and mirror the seed image, run target preinstall,
-    and deploy the target spoke using the recorded seed release.
+    Deploy the seed and target hubs, mirror the target OpenShift release,
+    prepare the seed SNO, and generate and mirror the seed image.
+    Run target preinstall with the full version detected from the seed cluster,
+    then deploy the target spoke using the existing deployment playbook.
   steps:
-    env:
-      IBI_USE_SEED_RELEASE: "true"
     pre:
     # Seed hub setup — kni-qe-127 deployed at VERSION
     - ref: telcov10n-functional-cnf-ran-hub-deploy
+    - ref: telcov10n-functional-cnf-ran-ibi-seed-dns-workaround
     - ref: telcov10n-functional-cnf-ran-hub-config
     - ref: telcov10n-functional-cnf-ran-mirror-spoke-operators
     # Target hub setup — kni-qe-128 deployed at VERSION
     # Note: ibi-target-hub-deploy saves target-* prefixed inventory files in SHARED_DIR
     #       alongside the flat copies so they survive ibu-restore-seed-inventory below.
     - ref: telcov10n-functional-cnf-ran-ibi-target-hub-deploy
+    - ref: telcov10n-functional-cnf-ran-ibi-target-dns-workaround
     - ref: telcov10n-functional-cnf-ran-ibi-target-hub-config
     - ref: telcov10n-functional-cnf-ran-ibi-target-mirror-spoke-operators
     # Preserve ACM/MCE mirror mappings on both hubs after operator mirroring.
     - ref: telcov10n-functional-cnf-ran-ibi-hub-prepare
+    # Mirror OCP release images to target bastion registry (while on target inventory)
+    - ref: telcov10n-functional-cnf-ran-ibu-target-mirror-ocp
     # Restore seed hub (kni-qe-127) flat inventory overwritten by ibi-target-hub-deploy
     # Note: no ibu-target-deploy-minio — IBI stores seed image in container registry, not MinIO
     - ref: telcov10n-functional-cnf-ran-ibu-restore-seed-inventory
@@ -28,8 +30,6 @@ workflow:
     - ref: telcov10n-functional-cnf-ran-ibu-deploy-spoke-sno-seed
     # Save seed kubeconfig and prepare CoreOS extensions while ACM still manages the seed
     - ref: telcov10n-functional-cnf-ran-ibi-seed-prepare
-    # Use target-prefixed inventory to mirror the exact seed release and installer.
-    - ref: telcov10n-functional-cnf-ran-ibu-target-mirror-ocp
     # Prune ArgoCD apps and remove seed spoke from ACM before seed image generation
     - ref: telcov10n-functional-cnf-ran-ibu-prune-argocd-apps
     # Run seedgeneration tests without a post-generation power-off
