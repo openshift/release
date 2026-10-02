@@ -8,12 +8,12 @@ AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json
 OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-oadp-plugin:latest}"
 
 # This needs to match the variant from the TEST_PLAN env var in the workflow
-CLUSTER_PREFIX="${CLUSTER_PREFIX:-public}"
+CLUSTER_PREFIX="${CLUSTER_PREFIX:-oauth-lb}"
 
-echo "Discovering the public self-managed-Azure guest cluster..."
+echo "Discovering the self-managed-Azure guest cluster..."
 CLUSTER_NAME="$(oc get hostedcluster -n clusters -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep "${CLUSTER_PREFIX}" | head -n1 || true)"
 if [[ -z "${CLUSTER_NAME}" ]]; then
-  echo "!!! Unable to find a public HostedCluster in the 'clusters' namespace"
+  echo "!!! Unable to find a HostedCluster in the 'clusters' namespace"
   oc get hostedcluster -n clusters
   exit 1
 fi
