@@ -10,7 +10,7 @@ export ARTIFACT_DIR=${ARTIFACT_DIR:-/tmp/artifacts}
 export HOSTEDCLUSTER_PLATFORM=${HOSTEDCLUSTER_PLATFORM:-"aws"}
 export JOB_PARALLEL=${JOB_PARALLEL:-"5"}
 export CHECK_INTERVAL=${CHECK_INTERVAL:-300}
-export CHECK_TIMEOUT=${CHECK_TIMEOUT:-18000}
+export CHECK_TIMEOUT=${CHECK_TIMEOUT:-86400} # 86400 seconds = 24 hours
 
 TOKEN_PATH=${TOKEN_PATH:-/etc/mce-prow-gangway-credentials/token}
 GANGWAY_API=${GANGWAY_API:-"https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"}
@@ -132,9 +132,13 @@ function wait_for_jobs() {
                 fi
             done
 
+            # For the purpose of tracking the job status, we consider the following statuses as pending:
+            # `SCHEDULING` means the job has been created and is waiting to be scheduled;
+            # `TRIGGERED` means it has been scheduled but hasn’t started running;
+            # `PENDING` means it is running and Prow is waiting for it to finish
             if [ "$http_status" -ne 200 ]; then
                 echo "${prefix}, JOB_URL=, JOB_STATUS=QueryNotFound" >> "${SHARED_DIR}/job_list"
-            elif [ "$job_status" == "PENDING" ] || [ "$job_status" == "TRIGGERED" ]; then
+            elif [ "$job_status" == "SCHEDULING" ] || [ "$job_status" == "PENDING" ] || [ "$job_status" == "TRIGGERED" ]; then
                 echo "$line" >> /tmp/job_list_next_pending
             else
                 echo "${prefix}, JOB_URL=${job_url}, JOB_STATUS=${job_status}" >> "${SHARED_DIR}/job_list"
