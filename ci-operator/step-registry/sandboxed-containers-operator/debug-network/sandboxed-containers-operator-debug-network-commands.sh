@@ -41,11 +41,11 @@ echo "WORKER=${WORKER}" | tee -a "${OUT}/summary.txt"
 if [[ -n "${WORKER}" && -n "${TRUSTEE_HOST}" ]]; then
   # 2. DNS resolution of the KBS/apps route from a worker node (public vs private IP).
   run "DNS resolution of ${TRUSTEE_HOST} from worker" \
-    oc debug node/"${WORKER}" -- chroot /host getent hosts "${TRUSTEE_HOST}"
+    oc debug node/"${WORKER}" -n default -- chroot /host getent hosts "${TRUSTEE_HOST}"
 
   # 3. Connectivity + timing to the KBS route from a worker node.
   run "curl timing to https://${TRUSTEE_HOST}/ from worker" \
-    oc debug node/"${WORKER}" -- chroot /host curl -k -sS -o /dev/null \
+    oc debug node/"${WORKER}" -n default -- chroot /host curl -k -sS -o /dev/null \
       -w 'http_code=%{http_code} time_namelookup=%{time_namelookup} time_connect=%{time_connect} time_total=%{time_total}\n' \
       --max-time 15 "https://${TRUSTEE_HOST}/"
 else
@@ -67,6 +67,24 @@ if [[ -n "${CAA_PODS}" ]]; then
   done <<< "${CAA_PODS}"
 else
   echo "No CAA pod found" | tee -a "${OUT}/summary.txt"
+fi
+
+# 6. KbsConfig: confirm acr-registry-auth (and other resources) are actually
+#    registered, to rule out a registration/propagation gap.
+run "kbsconfig kbsSecretResources" \
+  oc get kbsconfig -n trustee-operator-system -o jsonpath='{.items[0].spec.kbsSecretResources}'
+
+# 7. Trustee/KBS pod logs, best-effort, one file per pod (shows real attestation
+#    and resource-fetch attempts from the guest during the test run).
+KBS_PODS=$(oc get pods -n trustee-operator-system -l app=kbs --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true)
+if [[ -n "${KBS_PODS}" ]]; then
+  while IFS= read -r pod; do
+    [[ -z "${pod}" ]] && continue
+    timeout 60 oc logs -n trustee-operator-system "${pod}" --all-containers --tail=4000 \
+      > "${OUT}/kbs-log-${pod}.txt" 2>&1
+  done <<< "${KBS_PODS}"
+else
+  echo "No KBS pod found" | tee -a "${OUT}/summary.txt"
 fi
 
 echo "Debug-network step finished at $(date -u)" | tee -a "${OUT}/summary.txt"
