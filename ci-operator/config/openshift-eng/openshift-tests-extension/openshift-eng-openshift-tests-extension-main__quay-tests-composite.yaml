@@ -17,7 +17,9 @@ images:
   - dockerfile_literal: |
       # Stage 1: Build quay-tests extension binary
       FROM src AS extension-builder
-      RUN make build && gzip -c quay-tests > quay-tests-ext.gz
+      WORKDIR /go/src/github.com/openshift-eng/openshift-tests-extension/quay-tests
+      RUN GO_COMPLIANCE_POLICY="exempt_all" go build -o quay-tests ./cmd/quay-tests/... && \
+          gzip -c quay-tests > quay-tests-ext.gz
 
       # Stage 2: Create composite container
       FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -27,10 +29,10 @@ images:
       RUN chmod +x /usr/bin/openshift-tests
 
       # Copy quay-tests extension binary (compressed)
-      COPY --from=extension-builder /go/src/github.com/quay/quay-tests/quay-tests-ext.gz /usr/bin/quay-tests-ext.gz
+      COPY --from=extension-builder /go/src/github.com/openshift-eng/openshift-tests-extension/quay-tests/quay-tests-ext.gz /usr/bin/quay-tests-ext.gz
 
       # Copy test scripts
-      COPY --from=extension-builder /go/src/github.com/quay/quay-tests/scripts /usr/share/quay-tests/scripts
+      COPY --from=extension-builder /go/src/github.com/openshift-eng/openshift-tests-extension/quay-tests/scripts /usr/share/quay-tests/scripts
 
       # Set working directory
       WORKDIR /usr/share/quay-tests
@@ -46,7 +48,7 @@ images:
       src:
         as:
         - src
-    to: opp-interop-tests
+    to: quay-tests-composite
 resources:
   '*':
     limits:
@@ -55,7 +57,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 zz_generated_metadata:
-  branch: master
-  org: quay
-  repo: quay-tests
-  variant: ote-composite
+  branch: main
+  org: openshift-eng
+  repo: openshift-tests-extension
+  variant: quay-tests-composite
