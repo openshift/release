@@ -44,10 +44,23 @@ OC_RETRY_COUNT=${OC_RETRY_COUNT:-3}
 OC_RETRY_INTERVAL=${OC_RETRY_INTERVAL:-20}
 
 
-# Early exit if installation disabled
+# Early exit if installation disabled.
+#
+# When OSC_INSTALL is false the operator is installed by something else, e.g.
+# openshift-tests-private. That installer can only subscribe from a
+# CatalogSource that already exists, and for Pre-GA builds the CatalogSource is
+# created by the helm chart further down in the install path. So when a custom
+# catalog image is requested we still create the CatalogSource here, then
+# return without installing the operator.
+CATSRC_ONLY=false
 if [[ "${OSC_INSTALL}" != "true" ]]; then
   echo ">>> Skipping OSC operator installation (OSC_INSTALL=${OSC_INSTALL})"
-  exit 0
+  if [[ -z "${CATALOG_SOURCE_IMAGE}" ]]; then
+    echo ">>> No CATALOG_SOURCE_IMAGE set; default catalogs are used, nothing to do"
+    exit 0
+  fi
+  echo ">>> CATALOG_SOURCE_IMAGE is set; creating the CatalogSource only"
+  CATSRC_ONLY=true
 fi
 
 # Verify helm is available (pre-installed in base image)
@@ -248,6 +261,42 @@ function setup_catalog_source() {
       -p "{\"data\":{\"catalogsourcename\":\"${OSC_DEV_CATALOG_NAME}\"}}"
     echo ">>> Patched osc-config with catalogsourcename=${OSC_DEV_CATALOG_NAME}"
   fi
+}
+
+# Create the Pre-GA CatalogSource that the helm chart would otherwise create.
+#
+# Only used by CatalogSource-only mode (OSC_INSTALL=false), where the chart is
+# never rendered but another installer still needs the catalog to exist.
+# Keep this in sync with charts/osc-operator/templates/catalogsource.yaml.
+function create_dev_catalog_source() {
+  echo ">>> Creating CatalogSource ${OSC_DEV_CATALOG_NAME} (image: ${CATALOG_SOURCE_IMAGE})"
+
+  local catsrc_path="${SHARED_DIR}/catsrc_${OSC_DEV_CATALOG_NAME}.yaml"
+
+  cat <<EOF | tee "${catsrc_path}"
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${OSC_DEV_CATALOG_NAME}
+  namespace: openshift-marketplace
+spec:
+  displayName: OSC Operator Dev Catalog version 2
+  sourceType: grpc
+  image: "${CATALOG_SOURCE_IMAGE}"
+  publisher: Confidential Containers Team
+EOF
+
+  oc_with_retry oc apply -f "${catsrc_path}"
+
+  if ! wait_until "CatalogSource ${OSC_DEV_CATALOG_NAME} READY" 300 5 \
+    "oc get catalogsource ${OSC_DEV_CATALOG_NAME} -n openshift-marketplace -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null | grep -q READY"; then
+    echo ">>> ERROR: CatalogSource ${OSC_DEV_CATALOG_NAME} did not become READY"
+    oc get catalogsource "${OSC_DEV_CATALOG_NAME}" -n openshift-marketplace -o yaml || true
+    oc get pods -n openshift-marketplace || true
+    return 1
+  fi
+
+  echo ">>> CatalogSource ${OSC_DEV_CATALOG_NAME} is READY"
 }
 
 function fetch_osc_charts() {
@@ -767,6 +816,18 @@ echo "========================================="
 
 # Phase 1: Set up CatalogSource (if Pre-GA)
 setup_catalog_source
+
+# CatalogSource-only mode: the operator is installed by the test suite, so
+# create the catalog it will subscribe from and stop here.
+if [[ "${CATSRC_ONLY}" == "true" ]]; then
+  create_dev_catalog_source
+  echo "========================================="
+  echo ">>> CatalogSource-only mode complete"
+  echo ">>> CatalogSource: ${OSC_DEV_CATALOG_NAME}"
+  echo ">>> Operator install left to the test suite (OSC_INSTALL=false)"
+  echo "========================================="
+  exit 0
+fi
 
 # Phase 2: Fetch charts
 CHARTS_DIR=$(fetch_osc_charts)
