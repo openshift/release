@@ -44,13 +44,6 @@ if [[ ${VERSION} == "4.16" ]]; then
     ZTP_CLUSTERS_PATH="${VERSION}/${TARGET_SPOKE_NAME}/siteconfig"
 fi
 
-RELEASE_ARGS=()
-if [[ "${IBI_USE_SEED_RELEASE:-false}" == "true" ]]; then
-    SEED_RELEASE_IMAGE=$(<"${SHARED_DIR}/ibi-seed-release-image")
-    [[ "${SEED_RELEASE_IMAGE}" =~ @sha256:[a-f0-9]{64}$ ]]
-    RELEASE_ARGS=(--extra-vars "spoke_release_image=${SEED_RELEASE_IMAGE}")
-fi
-
 echo "Running ZTP deployment for target SNO spoke cluster: ${TARGET_SPOKE_CLUSTER}"
 echo "ZTP clusters path: ${ZTP_CLUSTERS_PATH}"
 echo "ZTP policies path: ${ZTP_POLICIES_PATH}"
@@ -61,5 +54,4 @@ ansible-playbook ./playbooks/ran/deploy-spoke-sno.yaml \
         ztp_git_repo_url=${ZTP_GIT_REPO} \
         ztp_clusters_git_path=${ZTP_CLUSTERS_PATH} \
         ztp_policies_git_path=${ZTP_POLICIES_PATH} \
-        ztp_git_repo_branch=${ZTP_GIT_BRANCH}" \
-    "${RELEASE_ARGS[@]}"
+        ztp_git_repo_branch=${ZTP_GIT_BRANCH}"
