@@ -81,11 +81,26 @@ it does not configure Jira or other publishing integrations. The post-step
 needs Prow job, build, and pull identity, and treats missing artifacts as
 incomplete evidence. It never changes the original test result.
 
-The Claude invocation uses `--bare`, `--disable-slash-commands`, an empty
-settings source, and strict MCP configuration to avoid loading instructions
-from the Console checkout. The agent has shell access to a disposable CI pod
-and test cluster, so only run this on ephemeral test jobs. The post-step is
-best-effort and precedes `ipi-gcp-post` to preserve teardown.
+The Claude invocation uses `--bare`, `--restricted`,
+`--disable-slash-commands`, an empty settings source, and strict MCP
+configuration to avoid loading instructions
+from the Console checkout. It has no Bash or MCP tool. The trusted wrapper
+collects bounded Console cluster observations and unchanged-code reruns before
+model invocation; only the wrapper performs verification commands afterward.
+The model receives copies of the selected context and evidence under the
+artifact directory and has file-tool access only to its source checkout and
+that directory. Settings block reads outside those paths and explicitly deny
+the shared cluster directory, kubeconfig, and Vertex credential path. The
+wrapper removes generated Playwright authentication files before the model
+starts. The post-step is best-effort and precedes `ipi-gcp-post` to preserve
+teardown.
+
+The Vertex credential mount remains necessary for the Claude CLI itself to
+authenticate. Restricted mode and the file-tool read rules keep it outside
+model-controlled tool access; this is a tool boundary, not a separate container
+mount namespace. The wrapper still executes a candidate test patch with
+cluster access during independent verification. Review that execution path and
+its CI permissions before enabling the agent on normal jobs.
 
 Validate the skill with `skillsaw lint SKILL.md`; also
 run the focused checks with
