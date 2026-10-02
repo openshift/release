@@ -223,35 +223,47 @@ function collect_diagnostic_data {
 function collect_mapi_vsphere_metrics() {
   echo "$(date -u --rfc-3339=seconds) - Collecting vSphere request metrics (mapi_vsphere_request_duration_seconds) from in-cluster Prometheus"
 
-  function prom_query() {
-    oc --insecure-skip-tls-verify rsh -T -n openshift-monitoring -c thanos-query deploy/thanos-querier \
-      curl -f --silent http://localhost:9090/api/v1/query --data-urlencode "query=$1"
-  }
+  # Everything is fetched in a single oc rsh call, mirroring the
+  # gather-extra-commands.sh thanos-querier pattern (one bash -c script run
+  # remotely via curl against the pod's local Prometheus HTTP API), rather
+  # than invoking curl directly as the rsh command: that avoids depending on
+  # how oc rsh splits/forwards a bare multi-flag command line. stderr and the
+  # raw response are always saved so a bad query is debuggable from artifacts
+  # instead of silently producing an empty tab.
+  local debug_log="${vcenter_state}/mapi-vsphere-query-debug.log"
+  local raw
+  raw=$(oc --insecure-skip-tls-verify rsh -T -n openshift-monitoring -c thanos-query deploy/thanos-querier /bin/bash -c '
+    set -euo pipefail
+    query() {
+      curl -f --silent http://localhost:9090/api/v1/query --data-urlencode "query=$1" || echo "{\"data\":{\"result\":[]}}"
+    }
+    echo "{\"counts\":$(query "sum by (client, operation, status) (mapi_vsphere_request_duration_seconds_count)")}"
+    echo "{\"p50\":$(query "histogram_quantile(0.50, sum by (le, client, operation) (mapi_vsphere_request_duration_seconds_bucket))")}"
+    echo "{\"p95\":$(query "histogram_quantile(0.95, sum by (le, client, operation) (mapi_vsphere_request_duration_seconds_bucket))")}"
+    echo "{\"p99\":$(query "histogram_quantile(0.99, sum by (le, client, operation) (mapi_vsphere_request_duration_seconds_bucket))")}"
+  ' 2>"${debug_log}")
+  echo "${raw}" >> "${debug_log}"
 
-  local counts_json p50_json p95_json p99_json
-  counts_json=$(prom_query 'sum by (client, operation, status) (mapi_vsphere_request_duration_seconds_count)' 2>/dev/null)
+  local merged
+  if [[ -z "${raw}" ]] || ! merged=$(jq -s 'reduce .[] as $o ({}; . + $o)' <<<"${raw}" 2>>"${debug_log}"); then
+    echo "$(date -u --rfc-3339=seconds) - unable to query mapi_vsphere_request_duration_seconds, see ${debug_log}"
+    echo '{"available": false}' > "${vcenter_state}/mapi-vsphere-metrics.json"
+    return
+  fi
 
-  if [[ -z "${counts_json}" ]] || [[ "$(echo "${counts_json}" | jq -r '.data.result | length' 2>/dev/null)" == "0" ]]; then
+  if [[ "$(echo "${merged}" | jq -r '.counts.data.result | length // 0')" == "0" ]]; then
     echo "$(date -u --rfc-3339=seconds) - mapi_vsphere_request_duration_seconds not found on this cluster, skipping"
     echo '{"available": false}' > "${vcenter_state}/mapi-vsphere-metrics.json"
     return
   fi
 
-  p50_json=$(prom_query 'histogram_quantile(0.50, sum by (le, client, operation) (mapi_vsphere_request_duration_seconds_bucket))' 2>/dev/null)
-  p95_json=$(prom_query 'histogram_quantile(0.95, sum by (le, client, operation) (mapi_vsphere_request_duration_seconds_bucket))' 2>/dev/null)
-  p99_json=$(prom_query 'histogram_quantile(0.99, sum by (le, client, operation) (mapi_vsphere_request_duration_seconds_bucket))' 2>/dev/null)
-
-  jq -n \
-    --argjson counts "${counts_json:-{\"data\":{\"result\":[]}}}" \
-    --argjson p50 "${p50_json:-{\"data\":{\"result\":[]}}}" \
-    --argjson p95 "${p95_json:-{\"data\":{\"result\":[]}}}" \
-    --argjson p99 "${p99_json:-{\"data\":{\"result\":[]}}}" \
-    '
-    def quantiles($data): reduce $data.data.result[] as $r ({}; .[$r.metric.client + "|" + $r.metric.operation] = ($r.value[1] | tonumber));
-    (quantiles($p50)) as $p50 |
-    (quantiles($p95)) as $p95 |
-    (quantiles($p99)) as $p99 |
-    (reduce $counts.data.result[] as $r ({};
+  echo "${merged}" | jq '
+    def quantiles(key): reduce (.[key].data.result[]?) as $r ({}; .[$r.metric.client + "|" + $r.metric.operation] = ($r.value[1] | tonumber));
+    . as $all |
+    (quantiles("p50")) as $p50 |
+    (quantiles("p95")) as $p95 |
+    (quantiles("p99")) as $p99 |
+    (reduce $all.counts.data.result[] as $r ({};
       ($r.metric.client + "|" + $r.metric.operation) as $k |
       .[$k].client = $r.metric.client |
       .[$k].operation = $r.metric.operation |
