@@ -1438,6 +1438,27 @@ tests:
 
         az aro get-admin-kubeconfig -g "${RESOURCEGROUP}" -n "${CLUSTER}" \
           --file "${SHARED_DIR}/kubeconfig"
+
+        # The admin kubeconfig carries no CA, so oc trusts the API only
+        # through the system bundle. ARO installs the API's publicly
+        # issued certificate as a named certificate after the install
+        # completes, and az aro create can return before it has: until
+        # then the API presents the cluster's own certificate and every
+        # request fails with "x509: certificate signed by unknown
+        # authority". Measured on one cluster: install complete at
+        # 07:18:53, named certificate at 07:26:13. Wait for a
+        # certificate oc can verify rather than skipping verification.
+        deadline=$((SECONDS + 1800))
+        until KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get --raw /readyz >/dev/null 2>&1; do
+          if (( SECONDS >= deadline )); then
+            echo "the API certificate is still not verifiable after 30m" >&2
+            KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get --raw /readyz || true
+            exit 1
+          fi
+          sleep 20
+        done
+        echo "API certificate verifies after $(( SECONDS - deadline + 1800 ))s"
+
         KUBECONFIG="${SHARED_DIR}/kubeconfig" oc wait clusteroperators --all \
           --for=condition=Available --timeout=30m
       env:
