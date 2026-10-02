@@ -14,9 +14,9 @@ and screenshots for matched failures. It uses the exact job's 14-day
 unmodified code, and runs the
 standalone `SKILL.md` in the step registry and
 `ci-operator/config/openshift/console/tools/openshift-console-qe-agent-driver.py`
-from the same pinned release commit. The step registry embeds the shell
+with SHA-256 checks. The step registry embeds the shell
 commands but does not mount neighboring files, so the short shell entrypoint
-downloads the Python driver from that immutable commit before
+downloads the Python driver from the selected release revision before
 reading the completed test artifacts. Console-repository skills are never
 loaded. Only test and helper changes are accepted. After the agent exits, a fresh checkout applies the candidate
 patch, checks lint/types, and runs each target five times with retries disabled
@@ -28,16 +28,17 @@ agent-supplied verification status.
 ## Rollout
 
 The ref defaults to `CONSOLE_FLAKE_AGENT_ENABLED=false`. Main's standard job
-sets `CONSOLE_FLAKE_AGENT_ENABLED=rehearsal` before rollout. This runs the
-agent only in a matching `openshift/release` PR rehearsal, using that PR's
-immutable head SHA to fetch the driver and skill. The agent post-step is
-optional on success, so a passing e2e test does not start its pod. Teardown
-steps still run. A failed e2e test receives the same investigation and
-independent verification as a normal run. After the rehearsal is reviewed and
-the step is merged, set `CONSOLE_FLAKE_SKILL_REVISION` to the full 40-character
-merged commit containing the reviewed driver and skill, then set
-`CONSOLE_FLAKE_AGENT_ENABLED=true` on main's standard job. TechPreview and
-release-branch jobs are outside this pilot.
+sets `CONSOLE_FLAKE_AGENT_ENABLED=true`, so failed e2e runs invoke the agent
+after this change merges. The agent post-step is optional on success, so a
+passing e2e test does not start its pod. Teardown steps still run. TechPreview
+and release-branch jobs are outside this pilot.
+
+The regular job fetches the driver and skill from `openshift/release` main and
+verifies each file against its reviewed SHA-256 in the Console job config.
+This allows activation immediately after merge even if GitHub creates a squash
+commit. A checksum mismatch stops the agent before model invocation; update
+both pins with any deliberate driver or skill change. A release PR rehearsal
+still uses that PR's immutable head SHA, with the same checksum checks.
 
 The main job is marked rehearseable, so an `openshift/release` PR can run
 `/pj-rehearse pull-ci-openshift-console-main-e2e-gcp-console`. A rehearsal

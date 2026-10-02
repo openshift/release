@@ -23,11 +23,7 @@ bootstrap_failure() {
   echo "No verified fix proposal produced."
 }
 
-if [[ "${_mode}" == rehearsal ]]; then
-  if [[ ! "${JOB_NAME:-}" =~ ^rehearse-([0-9]+)-pull-ci-openshift-console-main-e2e-gcp-console$ ]]; then
-    echo "Console QE Agent rehearsal mode is inactive outside the Console main rehearsal."
-    exit 0
-  fi
+if [[ "${JOB_NAME:-}" =~ ^rehearse-([0-9]+)-pull-ci-openshift-console-main-e2e-gcp-console$ ]]; then
   _rehearsal_pr="${BASH_REMATCH[1]}"
   _revision="$(jq -er --arg pr "${_rehearsal_pr}" '
     .refs | select(.org == "openshift" and .repo == "release") |
@@ -38,24 +34,34 @@ if [[ "${_mode}" == rehearsal ]]; then
     exit 0
   }
   export CONSOLE_FLAKE_SKILL_REVISION="${_revision}"
+elif [[ "${_mode}" == rehearsal ]]; then
+    echo "Console QE Agent rehearsal mode is inactive outside the Console main rehearsal."
+    exit 0
 else
   _revision="${CONSOLE_FLAKE_SKILL_REVISION:-}"
 fi
-if [[ ! "${_revision}" =~ ^[0-9a-f]{40}$ ]]; then
-  bootstrap_failure "pin CONSOLE_FLAKE_SKILL_REVISION to a merged release commit"
+if [[ ! "${_revision}" =~ ^([0-9a-f]{40}|main)$ ]]; then
+  bootstrap_failure "CONSOLE_FLAKE_SKILL_REVISION must be a release commit or main"
   exit 0
 fi
 
 _driver_url="https://raw.githubusercontent.com/openshift/release/${_revision}/ci-operator/config/openshift/console/tools/openshift-console-qe-agent-driver.py"
-if ! python3 - "${_driver_url}" "${CONSOLE_AGENT_RUNROOT}/driver.py" <<'PY'
+if ! python3 - "${_driver_url}" "${CONSOLE_AGENT_RUNROOT}/driver.py" "${CONSOLE_FLAKE_DRIVER_SHA256:-}" <<'PY'
+import hashlib
 import pathlib
+import re
 import sys
 import urllib.request
 
+expected = sys.argv[3]
+if not re.fullmatch(r'[0-9a-f]{64}', expected):
+    raise ValueError('pinned Console driver SHA-256 is missing or malformed')
 with urllib.request.urlopen(sys.argv[1], timeout=30) as response:
     source = response.read(102401)
 if len(source) > 102400:
     raise ValueError('pinned Console agent driver exceeds 100 KiB')
+if hashlib.sha256(source).hexdigest() != expected:
+    raise ValueError('pinned Console agent driver SHA-256 does not match')
 compile(source, sys.argv[2], 'exec')
 pathlib.Path(sys.argv[2]).write_bytes(source)
 PY

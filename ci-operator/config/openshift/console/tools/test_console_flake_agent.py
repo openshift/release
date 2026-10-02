@@ -1,6 +1,7 @@
 """Focused local checks for Console CI artifact ingestion and verification gates."""
 
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -49,7 +50,7 @@ class WrapperTests(unittest.TestCase):
             self.assertIn('inactive outside', result.stdout)
             self.assertEqual(list(Path(folder).iterdir()), [])
 
-    def test_rehearsal_fetches_driver_from_its_pr_head(self):
+    def test_enabled_rehearsal_fetches_driver_from_its_pr_head(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             bin_dir = root / 'bin'
@@ -61,7 +62,8 @@ class WrapperTests(unittest.TestCase):
             sha = 'a' * 40
             env = {**os.environ, 'PATH': str(bin_dir) + os.pathsep + os.environ['PATH'],
                    'TEST_PYTHON_ARGS': str(root / 'python-args'),
-                   'ARTIFACT_DIR': str(artifacts), 'CONSOLE_FLAKE_AGENT_ENABLED': 'rehearsal',
+                   'ARTIFACT_DIR': str(artifacts), 'CONSOLE_FLAKE_AGENT_ENABLED': 'true',
+                   'CONSOLE_FLAKE_SKILL_REVISION': 'main',
                    'JOB_NAME': 'rehearse-98765-pull-ci-openshift-console-main-e2e-gcp-console',
                    'JOB_SPEC': json.dumps({'refs': {'org': 'openshift', 'repo': 'release',
                                                     'pulls': [{'number': 98765, 'sha': sha}]}})}
@@ -74,6 +76,66 @@ class WrapperTests(unittest.TestCase):
             self.assertEqual(json.loads((artifacts / 'console-flake-result.json').read_text())
                              ['verification_status'], 'skipped')
             self.assertNotIn('PROPOSED SOLUTION', result.stdout)
+
+    def test_regular_job_fetches_hash_pinned_main_driver(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            bin_dir = root / 'bin'
+            bin_dir.mkdir()
+            fake_python = bin_dir / 'python3'
+            fake_python.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$TEST_PYTHON_ARGS"\nexit 1\n')
+            fake_python.chmod(0o755)
+            driver_hash = 'b' * 64
+            env = {**os.environ, 'PATH': str(bin_dir) + os.pathsep + os.environ['PATH'],
+                   'TEST_PYTHON_ARGS': str(root / 'python-args'),
+                   'ARTIFACT_DIR': str(root / 'artifacts'),
+                   'CONSOLE_FLAKE_AGENT_ENABLED': 'true',
+                   'CONSOLE_FLAKE_SKILL_REVISION': 'main',
+                   'CONSOLE_FLAKE_DRIVER_SHA256': driver_hash,
+                   'JOB_NAME': 'pull-ci-openshift-console-main-e2e-gcp-console'}
+            result = subprocess.run(['bash', str(WRAPPER)], env=env,
+                                    capture_output=True, text=True, check=True)
+            args = (root / 'python-args').read_text()
+            self.assertIn('/openshift/release/main/', args)
+            self.assertIn(driver_hash, args)
+            self.assertEqual(json.loads((root / 'artifacts/console-flake-result.json').read_text())
+                             ['verification_status'], 'skipped')
+            self.assertNotIn('PROPOSED SOLUTION', result.stdout)
+
+    def test_driver_download_requires_exact_sha256(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fake_driver = root / 'driver.py'
+            fake_driver.write_text('''import os
+import sys
+from pathlib import Path
+if sys.argv[1] == 'init':
+    Path(os.environ['TEST_DRIVER_MARKER']).write_text('started')
+    sys.exit(2)
+''')
+            sitecustomize = root / 'sitecustomize.py'
+            sitecustomize.write_text('''import os
+import urllib.request
+urllib.request.urlopen = lambda *_args, **_kwargs: open(os.environ['TEST_DRIVER_SOURCE'], 'rb')
+''')
+            env = {**os.environ, 'PYTHONPATH': str(root),
+                   'TEST_DRIVER_SOURCE': str(fake_driver),
+                   'TEST_DRIVER_MARKER': str(root / 'started'),
+                   'CONSOLE_FLAKE_AGENT_ENABLED': 'true',
+                   'CONSOLE_FLAKE_SKILL_REVISION': 'main',
+                   'JOB_NAME': 'pull-ci-openshift-console-main-e2e-gcp-console'}
+            actual_hash = hashlib.sha256(fake_driver.read_bytes()).hexdigest()
+            for expected_hash, should_start in ((actual_hash, True), ('a' * 64, False)):
+                (root / 'started').unlink(missing_ok=True)
+                env['ARTIFACT_DIR'] = str(root / ('accepted' if should_start else 'rejected'))
+                env['CONSOLE_FLAKE_DRIVER_SHA256'] = expected_hash
+                result = subprocess.run(['bash', str(WRAPPER)], env=env,
+                                        capture_output=True, text=True, check=True)
+                self.assertEqual((root / 'started').exists(), should_start, result.stderr)
+                if not should_start:
+                    self.assertEqual(json.loads((Path(env['ARTIFACT_DIR']) /
+                                                 'console-flake-result.json').read_text())
+                                     ['verification_status'], 'skipped')
 
     def test_successful_job_exits_zero_when_ci_shell_uses_errexit(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -198,6 +260,30 @@ class DriverTests(unittest.TestCase):
         namespace = {'__name__': 'console_driver'}
         exec(compile(DRIVER.read_text(), str(DRIVER), 'exec'), namespace)
         self.driver = types.SimpleNamespace(**namespace)
+
+    def test_prepare_checks_skill_hash_before_investigation(self):
+        commit = 'a' * 40
+        self.driver.dump(self.driver.CONTEXT, {'tested_commit': commit})
+        skill = '---\nname: console-flake\n---\n'
+        expected = hashlib.sha256(skill.encode()).hexdigest()
+        with mock.patch.dict(os.environ, {'CONSOLE_FLAKE_SKILL_REVISION': 'main',
+                                          'CONSOLE_FLAKE_SKILL_SHA256': 'b' * 64}), \
+             mock.patch.dict(self.driver.prepare.__globals__, {
+                 'git': lambda *_args, **_kwargs: types.SimpleNamespace(stdout=commit.encode()),
+                 'get_limited': lambda *_args: skill,
+                 'history_data': lambda *_args: self.fail('history fetched before skill check'),
+             }):
+            with self.assertRaisesRegex(ValueError, 'SHA-256 does not match'):
+                self.driver.prepare()
+        with mock.patch.dict(os.environ, {'CONSOLE_FLAKE_SKILL_REVISION': 'main',
+                                          'CONSOLE_FLAKE_SKILL_SHA256': expected}), \
+             mock.patch.dict(self.driver.prepare.__globals__, {
+                 'git': lambda *_args, **_kwargs: types.SimpleNamespace(stdout=commit.encode()),
+                 'get_limited': lambda *_args: skill,
+                 'history_data': lambda *_args: self.fail('passed skill check'),
+             }):
+            with self.assertRaisesRegex(AssertionError, 'passed skill check'):
+                self.driver.prepare()
 
     def test_original_junit_deduplicates_retries_and_preserves_projects(self):
         xml = '''<testsuites><testsuite name="console/example.spec.ts" hostname="console">

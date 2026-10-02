@@ -451,11 +451,16 @@ def prepare():
     if commit != image_commit:
         raise ValueError('test context does not match the source image')
     revision = os.environ.get('CONSOLE_FLAKE_SKILL_REVISION', '')
-    if not re.fullmatch('[0-9a-f]{40}', revision):
-        raise ValueError('pin CONSOLE_FLAKE_SKILL_REVISION to a merged release commit')
+    if not re.fullmatch(r'(?:[0-9a-f]{40}|main)', revision):
+        raise ValueError('CONSOLE_FLAKE_SKILL_REVISION must be a release commit or main')
+    expected_skill_hash = os.environ.get('CONSOLE_FLAKE_SKILL_SHA256', '')
+    if not re.fullmatch(r'[0-9a-f]{64}', expected_skill_hash):
+        raise ValueError('pinned Console skill SHA-256 is missing or malformed')
     skill_url = (f'https://raw.githubusercontent.com/openshift/release/{revision}/'
                  'ci-operator/step-registry/openshift/console/qe-agent/SKILL.md')
     skill = get_limited(skill_url, 102400, 30)
+    if hashlib.sha256(skill.encode('utf-8')).hexdigest() != expected_skill_hash:
+        raise ValueError('pinned Console skill SHA-256 does not match')
     if not skill.startswith('---\nname: console-flake\n'):
         raise ValueError('pinned skill has unexpected content')
     (ROOT / 'skill.md').write_text(skill)
