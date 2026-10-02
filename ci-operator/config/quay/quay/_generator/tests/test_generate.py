@@ -82,6 +82,7 @@ def test_expand_matrix_cells() -> None:
         ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x", False),
         (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64", False),
         (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64", False),
+        (None, "master", "azure", "4.22", "e2e-install", None, "presubmit", "amd64", False),
     }
     cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "amd64")
     assert cell.filename == PHASE0_NAME
@@ -370,12 +371,12 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     assert "ipi-aws-post" not in post_refs
 
 
-def test_master_presubmit_expands_both_clouds() -> None:
+def test_master_presubmit_expands_all_clouds() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
     tests = by_name[MASTER_NAME]["tests"]
     by_as = {test["as"]: test for test in tests}
-    assert set(by_as) == {"aws-s3", "gcp-gcs"}
+    assert set(by_as) == {"aws-s3", "gcp-gcs", "azure-blob"}
 
     gcp_test = by_as["gcp-gcs"]
     assert gcp_test["optional"] is True
