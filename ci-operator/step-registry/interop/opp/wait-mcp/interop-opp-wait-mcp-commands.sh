@@ -67,11 +67,16 @@ trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; exit ${_jrc}' EXIT
 echo ">>> PHASE: initialization"
 
 typeset -ri mcpWaitTimeout="${MCP_WAIT_TIMEOUT:-3600}"
+typeset -ri progressExtension="${MCP_WAIT_PROGRESS_EXTENSION:-1200}"
+typeset -ri maxTimeout="${MCP_WAIT_MAX_TIMEOUT:-5400}"
 typeset -ri consecutiveRequired="${MCP_CONSECUTIVE_CHECKS:-3}"
 typeset -ri settleDelay="${MCP_SETTLE_DELAY:-90}"
 typeset -ri maxUnavailable="${MCP_MAX_UNAVAILABLE:-3}"
 typeset -ri pollInterval=30
 typeset -a readyHistory=()
+typeset -i extensionsApplied=0
+typeset -i pollsSinceLastExtension=0
+typeset -ri extensionCheckInterval=5
 
 function IsReadyCountProgressing () {
     # Check if the MCP ready count is trending upward over the last 6 polls.
@@ -202,10 +207,16 @@ typeset mcList=''
 mcList="$(oc get machineconfig --sort-by=.metadata.creationTimestamp -o custom-columns=NAME:.metadata.name,CREATED:.metadata.creationTimestamp 2>/dev/null)" || true
 echo "${mcList}" | tail -10
 
-typeset -ri deadline=$(( SECONDS + mcpWaitTimeout ))
+typeset -i startSeconds=${SECONDS}
+typeset -i effectiveTimeout=${mcpWaitTimeout}
+if (( effectiveTimeout > maxTimeout )); then
+    effectiveTimeout=${maxTimeout}
+fi
+typeset -i deadline=$(( startSeconds + effectiveTimeout ))
 typeset -i consecutivePasses=0
 
-echo "Polling MCPs for up to ${mcpWaitTimeout}s (need ${consecutiveRequired} consecutive clean polls)..."
+echo "Polling MCPs for up to ${effectiveTimeout}s (need ${consecutiveRequired} consecutive clean polls)..."
+echo "Progress-based extension: +${progressExtension}s per detection, max total ${maxTimeout}s"
 
 while (( SECONDS < deadline )); do
     typeset -i remaining=$(( deadline - SECONDS ))
@@ -252,7 +263,7 @@ else:
     typeset -i totalReady=0
     totalReady="${remainder##*|}" 2>/dev/null || totalReady=0
     readyHistory+=("${totalReady}")
-    typeset -i elapsed=$(( SECONDS - (deadline - mcpWaitTimeout) ))
+    typeset -i elapsed=$(( SECONDS - startSeconds ))
 
     if [[ "${statusKey}" == "STABLE" ]]; then
         (( consecutivePasses += 1 )) || true
@@ -267,14 +278,40 @@ else:
             echo "Stability interrupted after ${consecutivePasses} clean polls, resetting"
         fi
         consecutivePasses=0
-        echo "Waiting at ${elapsed}/${mcpWaitTimeout}s: ${statusDetail}"
+        (( pollsSinceLastExtension += 1 )) || true
+        echo "Waiting at ${elapsed}/${effectiveTimeout}s: ${statusDetail}"
+
+        # Progress-based timeout extension: if MCPs are making progress,
+        # extend the deadline to avoid timing out on slow-but-healthy rollouts.
+        if (( pollsSinceLastExtension >= extensionCheckInterval )); then
+            if IsReadyCountProgressing; then
+                typeset -i proposedDeadline=$(( deadline + progressExtension ))
+                typeset -i maxDeadline=$(( startSeconds + maxTimeout ))
+                if (( proposedDeadline > maxDeadline )); then
+                    proposedDeadline=${maxDeadline}
+                fi
+                if (( proposedDeadline > deadline )); then
+                    typeset -i appliedExtension=$(( proposedDeadline - deadline ))
+                    deadline=${proposedDeadline}
+                    effectiveTimeout=$(( deadline - startSeconds ))
+                    (( extensionsApplied += 1 )) || true
+                    pollsSinceLastExtension=0
+                    echo "Progress detected: extending deadline by ${appliedExtension}s (total wait now ${effectiveTimeout}s/${maxTimeout}s max, extension #${extensionsApplied})"
+                else
+                    echo "Progress detected but max timeout ${maxTimeout}s would be exceeded — no further extensions"
+                fi
+            fi
+        fi
     fi
 
     sleep "${pollInterval}"
 done
 
-typeset -i elapsed=$(( SECONDS - (deadline - mcpWaitTimeout) ))
+typeset -i elapsed=$(( SECONDS - startSeconds ))
 echo "MCPs did not stabilize within ${elapsed}s — classifying timeout..."
+if (( extensionsApplied > 0 )); then
+    echo "Deadline was extended ${extensionsApplied} time(s) due to detected progress (initial timeout: ${mcpWaitTimeout}s, effective: ${effectiveTimeout}s)"
+fi
 echo ""
 echo "Final MCP state:"
 oc get mcp -o wide 2>/dev/null || true
@@ -298,7 +335,7 @@ case "${classification}" in
         echo "Ready count trend: ${readyHistory[*]}"
         if IsReadyCountProgressing; then
             echo "FAILURE CLASS: Infrastructure timeout (non-blocking)"
-            echo "MCP rollout is healthy (Degraded=False, ready count increasing) but too slow for the ${mcpWaitTimeout}s timeout"
+            echo "MCP rollout is healthy (Degraded=False, ready count increasing) but too slow for the ${effectiveTimeout}s timeout"
             AssertClusterHealthy
             exit $?
         else
