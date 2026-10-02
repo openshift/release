@@ -400,7 +400,7 @@ LCS_STACK_CONFIG
 
   local lcs_command_override='          command: ["python3", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
   if [[ "${ENABLE_MEMRAY}" == "true" ]]; then
-    lcs_command_override='          command: ["memray", "run", "--output", "/mnt/profiling/memray-output.bin", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
+    lcs_command_override='          command: ["memray", "run", "--force", "--output", "/mnt/profiling/memray-output.bin", "-m", "lightspeed_stack", "--config", "/app-config/lightspeed-stack.yaml", "--synthesized-config-output", "/tmp/.generated/run.yaml"]'
   fi
 
   local lcs_memory_request="2Gi"
