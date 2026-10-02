@@ -1,0 +1,31 @@
+ref:
+  as: sandboxed-containers-operator-provision-acr-endpoint
+  from: upi-installer
+  timeout: 1h0m0s
+  grace_period: 10m
+  commands: sandboxed-containers-operator-provision-acr-endpoint-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: ACR_RESOURCE_GROUP
+    default: "osc-ci-mirror-rg"
+    documentation: Resource group for the persistent ACR.
+  - name: ACR_NAME
+    default: "osccimirror"
+    documentation: Name of the persistent ACR.
+  - name: ACR_LOCATION
+    default: "eastus"
+    documentation: Azure region for ACR creation (only used on first run).
+  - name: ACR_ENDPOINT_SUBNET
+    default: ""
+    documentation: Subnet for the ACR private endpoint. Auto-discovered if empty.
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    Creates or reuses a persistent ACR for disconnected testing.
+    First run creates the ACR and mirrors OCP release images.
+    Subsequent runs skip the mirror. Each run creates a private
+    endpoint in the cluster VNet for access.
