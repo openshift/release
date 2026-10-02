@@ -108,6 +108,78 @@ exit 1
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((root / 'finalized').is_file())
 
+    def test_model_has_no_shell_tool_or_cluster_environment(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            bin_dir = root / 'bin'
+            bin_dir.mkdir()
+            fake_python = bin_dir / 'python3'
+            fake_python.write_text('''#!/bin/sh
+if [ "$1" = "-" ]; then
+  printf 'pass\\n' > "$3"
+  exit 0
+fi
+case "$2" in
+  init)
+    mkdir -p "$ARTIFACT_DIR/console-flake-evidence"
+    printf '{}\\n' > "$CONSOLE_AGENT_RUNROOT/console-flake-context.json"
+    ;;
+  prepare)
+    mkdir -p "$CONSOLE_AGENT_RUNROOT/agent"
+    printf '[]\\n' > "$CONSOLE_AGENT_RUNROOT/selected.json"
+    printf 'skill\\n' > "$CONSOLE_AGENT_RUNROOT/skill.md"
+    ;;
+  model-inputs)
+    printf '{}\\n' > "$CONSOLE_AGENT_RUNROOT/model-settings.json"
+    ;;
+  finalize)
+    printf 'done\\n' > "$TEST_MARKER"
+    ;;
+esac
+exit 0
+''')
+            fake_python.chmod(0o755)
+            fake_claude = bin_dir / 'claude'
+            fake_claude.write_text('''#!/bin/sh
+printf '%s\\n' "$@" > "$TEST_MODEL_ARGS"
+printf 'SHARED_DIR=%s\\nKUBECONFIG=%s\\nBRIDGE_KUBEADMIN_PASSWORD=%s\\n' \\
+  "${SHARED_DIR-unset}" "${KUBECONFIG-unset}" "${BRIDGE_KUBEADMIN_PASSWORD-unset}" \\
+  > "$TEST_MODEL_ENV"
+''')
+            fake_claude.chmod(0o755)
+            fake_timeout = bin_dir / 'timeout'
+            fake_timeout.write_text('#!/bin/sh\nshift\nexec "$@"\n')
+            fake_timeout.chmod(0o755)
+            env = {**os.environ, 'PATH': str(bin_dir) + os.pathsep + os.environ['PATH'],
+                   'TEST_MARKER': str(root / 'finalized'),
+                   'TEST_MODEL_ARGS': str(root / 'model-args'),
+                   'TEST_MODEL_ENV': str(root / 'model-env'),
+                   'ARTIFACT_DIR': str(root / 'artifacts'),
+                   'SHARED_DIR': str(root / 'shared'),
+                   'KUBECONFIG': str(root / 'shared/kubeconfig'),
+                   'BRIDGE_KUBEADMIN_PASSWORD': 'private-password',
+                   'CONSOLE_FLAKE_AGENT_ENABLED': 'rehearsal',
+                   'JOB_NAME': 'rehearse-98765-pull-ci-openshift-console-main-e2e-gcp-console',
+                   'JOB_SPEC': json.dumps({'refs': {'org': 'openshift', 'repo': 'release',
+                                                    'pulls': [{'number': 98765, 'sha': 'a' * 40}]}})}
+            result = subprocess.run(['bash', str(WRAPPER)], env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((root / 'finalized').is_file())
+            self.assertTrue((root / 'model-args').is_file(), result.stdout + result.stderr)
+            args = (root / 'model-args').read_text().splitlines()
+            self.assertIn('--restricted', args)
+            self.assertIn('--settings', args)
+            self.assertIn('--add-dir', args)
+            self.assertIn('--disallowedTools', args)
+            self.assertIn('Bash,mcp__*', args)
+            self.assertNotIn('Bash', args[args.index('--tools') + 1])
+            self.assertNotIn('Bash', args[args.index('--allowedTools') + 1])
+            model_env = (root / 'model-env').read_text()
+            self.assertIn('SHARED_DIR=unset', model_env)
+            self.assertIn('KUBECONFIG=unset', model_env)
+            self.assertIn('BRIDGE_KUBEADMIN_PASSWORD=unset', model_env)
+
 
 class DriverTests(unittest.TestCase):
     def setUp(self):
@@ -203,6 +275,37 @@ hostname="knative-setup"><testcase name="install operator"/></testsuite></testsu
         self.assertFalse(result['passed'])
         self.assertFalse(result['executed'])
         self.assertIn('test missing from checkout', result['error'])
+
+    def test_model_inputs_exclude_auth_state_and_block_credential_reads(self):
+        self.driver.EVIDENCE.mkdir()
+        self.driver.dump(self.driver.CONTEXT, {'failed_tests': []})
+        self.driver.dump(self.root / 'selected.json', [])
+        auth = self.driver.AGENT / 'frontend/e2e/.auth/admin.json'
+        auth.parent.mkdir(parents=True)
+        auth.write_text('private browser state')
+        test_config = self.driver.AGENT / 'frontend/e2e/.test-config.json'
+        test_config.write_text('{"authToken":"private"}')
+        env = {**os.environ, 'KUBECONFIG': str(self.shared / 'kubeconfig'),
+               'GOOGLE_APPLICATION_CREDENTIALS': '/var/run/claude-code-service-account/google-token'}
+
+        def fake_oc(command, **_):
+            self.assertEqual(command[:2], ['oc', 'get'])
+            return subprocess.CompletedProcess(command, 0, stdout='healthy\n', stderr='')
+
+        with mock.patch.dict(self.driver.model_inputs.__globals__,
+                             {'cluster_env': lambda: env}), \
+             mock.patch.object(self.driver.subprocess, 'run', side_effect=fake_oc):
+            self.driver.model_inputs()
+        self.assertFalse(auth.exists())
+        self.assertFalse(test_config.exists())
+        self.assertEqual(self.driver.read(self.driver.EVIDENCE / 'model-selected.json'), [])
+        self.assertEqual(len(self.driver.read(self.driver.EVIDENCE / 'cluster-diagnostics.json')), 4)
+        settings = self.driver.read(self.root / 'model-settings.json')
+        self.assertTrue(settings['permissions']['blockReadsOutsideWorkingDirectories'])
+        self.assertIn('Read(//var/run/claude-code-service-account/**)',
+                      settings['permissions']['deny'])
+        self.assertIn('Read(//' + str(self.shared).lstrip('/') + '/**)',
+                      settings['permissions']['deny'])
 
     def test_original_artifact_path_is_bound_to_this_pr_and_job(self):
         env = {'JOB_NAME': 'pull-ci-openshift-console-main-e2e-gcp-console',

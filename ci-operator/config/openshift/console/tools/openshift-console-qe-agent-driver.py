@@ -569,6 +569,51 @@ def baseline():
                 return
 
 
+def model_inputs():
+    """Publish bounded inputs and trusted, read-only cluster observations for the model."""
+    shutil.copyfile(CONTEXT, EVIDENCE / 'model-context.json')
+    shutil.copyfile(ROOT / 'selected.json', EVIDENCE / 'model-selected.json')
+    env = cluster_env()
+    blocked = (env['SHARED_DIR'], env['KUBECONFIG'],
+               env.get('GOOGLE_APPLICATION_CREDENTIALS', ''),
+               '/var/run/claude-code-service-account', '/var/run/secrets',
+               '/proc', str(SOURCE), str(AGENT / 'frontend/e2e/.auth'),
+               str(AGENT / 'frontend/e2e/.test-config.json'))
+    deny = [f'Read(//{path.lstrip("/").rstrip("/")}/**)' for path in blocked if path]
+    dump(ROOT / 'model-settings.json', {
+        'permissions': {'blockReadsOutsideWorkingDirectories': True, 'deny': deny},
+    })
+    commands = (
+        ('console-operator', ['oc', 'get', 'clusteroperator', 'console',
+                              '-o', 'custom-columns=NAME:.metadata.name,AVAILABLE:.status.conditions[?(@.type=="Available")].status,DEGRADED:.status.conditions[?(@.type=="Degraded")].status']),
+        ('console-deployment', ['oc', 'get', 'deployment', 'console', '-n', 'openshift-console',
+                                '-o', 'custom-columns=NAME:.metadata.name,READY:.status.readyReplicas,DESIRED:.spec.replicas,AVAILABLE:.status.availableReplicas']),
+        ('console-pods', ['oc', 'get', 'pods', '-n', 'openshift-console',
+                          '-o', 'custom-columns=NAME:.metadata.name,PHASE:.status.phase,RESTARTS:.status.containerStatuses[*].restartCount']),
+        ('console-warning-events', ['oc', 'get', 'events', '-n', 'openshift-console',
+                                    '--field-selector=type=Warning',
+                                    '-o', 'custom-columns=NAME:.metadata.name,REASON:.reason,COUNT:.count']),
+    )
+    observations = []
+    for label, command in commands:
+        try:
+            result = subprocess.run(command, env=env, capture_output=True, text=True,
+                                    timeout=15)
+            observations.append({'label': label, 'exit_code': result.returncode,
+                                 'output': sanitize((result.stdout + '\n' + result.stderr)[:6000])})
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            observations.append({'label': label, 'error': type(exc).__name__})
+    dump(EVIDENCE / 'cluster-diagnostics.json', observations)
+    for relative in ('frontend/e2e/.auth', 'frontend/e2e/.test-config.json',
+                     'frontend/e2e/test-results',
+                     'frontend/test-results', 'frontend/playwright-report'):
+        generated = AGENT / relative
+        if generated.is_dir() and not generated.is_symlink():
+            shutil.rmtree(generated)
+        elif generated.is_file() or generated.is_symlink():
+            generated.unlink()
+
+
 def candidate_patch():
     ignored = set(GENERATED)
     untracked = git('ls-files', '--others', '--exclude-standard', '-z', cwd=AGENT).stdout.decode().split('\0')
@@ -843,6 +888,8 @@ if __name__ == '__main__':
             prepare()
         elif command == 'baseline':
             baseline()
+        elif command == 'model-inputs':
+            model_inputs()
         elif command == 'verify':
             verify()
         elif command == 'reject':

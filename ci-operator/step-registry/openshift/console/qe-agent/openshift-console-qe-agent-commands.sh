@@ -75,28 +75,38 @@ fi
 export CONSOLE_AGENT_INVESTIGATION_DEADLINE=$(( $(date +%s) + 3600 ))
 if python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" prepare; then
   python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" baseline || true
+  _model_inputs_ready=false
+  if python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" model-inputs; then
+    _model_inputs_ready=true
+  else
+    echo "Console QE Agent could not prepare restricted model inputs."
+  fi
   _context_digest="$(sha256sum "${CONSOLE_AGENT_RUNROOT}/console-flake-context.json")"
   _selected_digest="$(sha256sum "${CONSOLE_AGENT_RUNROOT}/selected.json")"
   _remaining=$(( CONSOLE_AGENT_INVESTIGATION_DEADLINE - $(date +%s) ))
-  if [[ ${_remaining} -gt 0 ]] && command -v claude >/dev/null 2>&1; then
-    export CONSOLE_AGENT_CONTEXT="${CONSOLE_AGENT_RUNROOT}/console-flake-context.json"
-    export CONSOLE_AGENT_SELECTED="${CONSOLE_AGENT_RUNROOT}/selected.json"
+  if [[ "${_model_inputs_ready}" == true && ${_remaining} -gt 0 ]] && command -v claude >/dev/null 2>&1; then
+    export CONSOLE_AGENT_CONTEXT="${ARTIFACT_DIR}/console-flake-evidence/model-context.json"
+    export CONSOLE_AGENT_SELECTED="${ARTIFACT_DIR}/console-flake-evidence/model-selected.json"
     export CONSOLE_AGENT_HISTORY="${ARTIFACT_DIR}/console-flake-evidence/history.json"
     export CONSOLE_AGENT_BASELINE="${ARTIFACT_DIR}/console-flake-evidence/baseline.json"
+    export CONSOLE_AGENT_DIAGNOSTICS="${ARTIFACT_DIR}/console-flake-evidence/cluster-diagnostics.json"
     export CONSOLE_AGENT_EVIDENCE_DIR="${ARTIFACT_DIR}/console-flake-evidence"
     export CONSOLE_AGENT_ARTIFACT_DIR="${ARTIFACT_DIR}"
     export CONSOLE_AGENT_WORKDIR="${CONSOLE_AGENT_RUNROOT}/agent"
     export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'
     (
       cd "${CONSOLE_AGENT_WORKDIR}" || exit 1
-      timeout "${_remaining}s" claude --print --bare --disable-slash-commands \
-        --setting-sources "" --strict-mcp-config --no-chrome \
-        --permission-mode dontAsk --tools "Bash,Read,Write,Edit,Grep,Glob" \
-        --allowedTools "Bash,Read,Write,Edit,Grep,Glob" \
+      timeout "${_remaining}s" env -u SHARED_DIR -u KUBECONFIG \
+        -u BRIDGE_KUBEADMIN_PASSWORD -u BRIDGE_HTPASSWD_PASSWORD \
+        claude --print --bare --restricted --disable-slash-commands \
+        --setting-sources "" --settings "${CONSOLE_AGENT_RUNROOT}/model-settings.json" \
+        --add-dir "${ARTIFACT_DIR}" --strict-mcp-config --no-chrome \
+        --permission-mode dontAsk --tools "Read,Write,Edit,Grep,Glob" \
+        --allowedTools "Read,Write,Edit,Grep,Glob" --disallowedTools "Bash,mcp__*" \
         --model "${CLAUDE_MODEL:-claude-opus-4-6}" --max-budget-usd 5 \
         --no-session-persistence --verbose --output-format stream-json \
         --system-prompt "$(cat "${CONSOLE_AGENT_RUNROOT}/skill.md")" \
-        "Read ${CONSOLE_AGENT_SELECTED}, ${CONSOLE_AGENT_CONTEXT}, ${CONSOLE_AGENT_HISTORY}, and ${CONSOLE_AGENT_BASELINE}. Investigate only the tests in ${CONSOLE_AGENT_SELECTED}; use the full context only to compare failure patterns. Write preliminary diagnoses and analysis before extra reruns. Follow the standalone Console CI skill." \
+        "Read ${CONSOLE_AGENT_SELECTED}, ${CONSOLE_AGENT_CONTEXT}, ${CONSOLE_AGENT_HISTORY}, ${CONSOLE_AGENT_BASELINE}, and ${CONSOLE_AGENT_DIAGNOSTICS}. Investigate only the tests in ${CONSOLE_AGENT_SELECTED}; use the full context only to compare failure patterns. Write preliminary diagnoses and analysis. Follow the standalone Console CI skill." \
         > "${CONSOLE_AGENT_RUNROOT}/session.jsonl" 2>&1
     ) || true
   else
