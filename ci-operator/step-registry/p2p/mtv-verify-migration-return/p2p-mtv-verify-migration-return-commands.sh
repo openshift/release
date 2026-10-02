@@ -44,9 +44,12 @@ typeset virtctlBin="" sshKeyFile="" sshReady=false
 typeset migrationSuffix="${MTV_MIGRATION_SUFFIX:-}"
 typeset diagDir=""
 typeset pvcCheck="${MTV_PVC_CHECK:-true}"
-typeset rootdiskSize="${MTV_VM_ROOTDISK_SIZE:-32Gi}"
-typeset rootdiskAccessMode="${MTV_VM_ROOTDISK_ACCESS_MODE:-ReadWriteMany}"
-typeset rootdiskVolumeMode="${MTV_VM_ROOTDISK_VOLUME_MODE:-Block}"
+# Unset-only defaults (${VAR-default}): an explicit empty value disables that
+# dest-vs-env assertion, matching the ref.yaml opt-out contract. :- would
+# replace empty with the default and make the documented skip impossible.
+typeset rootdiskSize="${MTV_VM_ROOTDISK_SIZE-32Gi}"
+typeset rootdiskAccessMode="${MTV_VM_ROOTDISK_ACCESS_MODE-ReadWriteMany}"
+typeset rootdiskVolumeMode="${MTV_VM_ROOTDISK_VOLUME_MODE-Block}"
 
 (( vmCount >= 1 )) \
   || { printf 'ERROR: MTV_TEST_VM_COUNT must be a positive integer (got: %s)\n' "${MTV_TEST_VM_COUNT}" >&2; false; }
@@ -750,9 +753,18 @@ function VerifyPvcIntegrity () {
 
       # Source↔dest metadata comparison when the source PVC is still present.
       # StorageClass is not compared: MTV storage maps may remap it.
+      # --ignore-not-found: empty stdout + rc=0 is a confirmed missing PVC
+      # (hub-spoke cleanup). Any other oc failure (auth, connectivity, API)
+      # is a hard fail — do not treat it as absent and skip the comparison.
       typeset srcPvcJson=""
-      srcPvcJson="$(SourceOc get "pvc/${pvcName}" -n "${MTV_TEST_VM_NAMESPACE}" -o json)" || srcPvcJson=""
-      if [[ -n "${srcPvcJson}" ]]; then
+      typeset -i srcLookupRc=0
+      srcPvcJson="$(SourceOc get "pvc/${pvcName}" -n "${MTV_TEST_VM_NAMESPACE}" \
+        -o json --ignore-not-found)" || srcLookupRc=$?
+      if (( srcLookupRc != 0 )); then
+        printf 'ERROR: source PVC %s lookup failed (rc=%d); not treating as absent\n' \
+          "${pvcName}" "${srcLookupRc}" >&2
+        (( ++failed ))
+      elif [[ -n "${srcPvcJson}" ]]; then
         typeset srcSize dstSize srcModes dstModes srcVolMode dstVolMode
         srcSize="$(printf '%s' "${srcPvcJson}" | OcWithRedactedStderr jq -r '.spec.resources.requests.storage // ""')"
         dstSize="$(printf '%s' "${pvcJson}" | OcWithRedactedStderr jq -r '.spec.resources.requests.storage // ""')"
