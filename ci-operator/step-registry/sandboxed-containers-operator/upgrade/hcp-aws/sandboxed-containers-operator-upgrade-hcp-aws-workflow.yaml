@@ -1,0 +1,61 @@
+workflow:
+  as: sandboxed-containers-operator-upgrade-hcp-aws
+  documentation: |-
+    Install OSC on an AWS HyperShift hosted cluster, validate it, upgrade the
+    hosted cluster to the target release, then re-validate OSC to confirm the
+    operator survives the upgrade.
+
+    Phase sequence:
+      pre:  IPI management cluster → HyperShift install → hosted cluster create
+            → kubeconfig swap to hosted cluster → OSC install
+      test: OSC baseline validate → hosted CP upgrade → nodepool upgrade
+            → OSC post-upgrade validate
+      post: must-gather → OSC cleanup → kubeconfig restore → cluster deprovision
+
+    Cluster profile: aws-qe (HyperShift-capable AWS credentials and domain).
+    To use the OSC-owned AWS account, switch cluster_profile to
+    aws-sandboxed-containers-operator and set BASE_DOMAIN /
+    HYPERSHIFT_BASE_DOMAIN to match that account's Route53 zone (requires
+    DPTP coordination for OIDC S3 bucket access).
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      # OSC install — override at job level for pre-GA catalog images
+      OSC_INSTALL: "true"
+      WORKLOAD_TO_TEST: "kata"
+      TESTS_OSC_ENABLE: "true"
+      ENABLEPEERPODS: "false"
+      FORCE_SUCCESS_EXIT: "no"
+      ENABLE_MUST_GATHER: "true"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+      MUST_GATHER_TIMEOUT: "35m"
+      # Management cluster sizing — 2-node single-AZ to reduce cost
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: "m5.xlarge"
+      ZONES_COUNT: "1"
+      CONTROL_PLANE_INSTANCE_TYPE: "m5.xlarge"
+      CONTROL_PLANE_REPLICAS: "3"
+      # Hosted cluster sizing
+      HYPERSHIFT_NODE_COUNT: "2"
+      HYPERSHIFT_INSTANCE_TYPE: "m5.xlarge"
+      HYPERSHIFT_CP_AVAILABILITY_POLICY: "SingleReplica"
+      HYPERSHIFT_INFRA_AVAILABILITY_POLICY: "SingleReplica"
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-provision
+    - ref: cucushift-hypershift-extended-enable-guest
+    - ref: sandboxed-containers-operator-install-osc-operator
+    test:
+    - ref: sandboxed-containers-operator-testsuites-osc
+    - ref: cucushift-upgrade-hypershift-control-plane-toimage
+    - ref: cucushift-upgrade-hypershift-worker-node-toimage
+    - ref: sandboxed-containers-operator-testsuites-osc
+    post:
+    - ref: sandboxed-containers-operator-gather-must-gather
+      best_effort: true
+      optional_on_success: true
+    - ref: sandboxed-containers-operator-post
+      best_effort: true
+    - ref: cucushift-hypershift-extended-disable-guest
+      best_effort: true
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-deprovision
