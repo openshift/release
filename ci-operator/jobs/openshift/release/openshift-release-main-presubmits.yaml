@@ -1755,6 +1755,66 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
+    context: ci/prow/ship-status-component-monitor-config
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - ./core-services/ship-status/component-monitor-config.yaml
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-ship-status-component-monitor-config
+    rerun_command: /test ship-status-component-monitor-config
+    run_if_changed: ^core-services/ship-status/(component-monitor-config|dashboard-config)\.yaml$
+    spec:
+      containers:
+      - args:
+        - --validate-only
+        - --config-path=./core-services/ship-status/component-monitor-config.yaml
+        command:
+        - /app/component-monitor
+        image: quay-proxy.ci.openshift.org/openshift/ci:ship-status-dash_component-monitor_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )ship-status-component-monitor-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/ship-status-dashboard-config
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - ./core-services/ship-status/dashboard-config.yaml
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-ship-status-dashboard-config
+    rerun_command: /test ship-status-dashboard-config
+    run_if_changed: ^core-services/ship-status/(component-monitor-config|dashboard-config)\.yaml$
+    spec:
+      containers:
+      - args:
+        - --validate-only
+        - --config=./core-services/ship-status/dashboard-config.yaml
+        command:
+        - /app/dashboard
+        image: quay-proxy.ci.openshift.org/openshift/ci:ship-status-dash_dashboard_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )ship-status-dashboard-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/sync-rover-groups
     decorate: true
     decoration_config:
