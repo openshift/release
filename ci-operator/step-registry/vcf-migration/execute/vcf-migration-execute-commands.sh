@@ -14,7 +14,7 @@ function log() {
 }
 
 function dump_operator_logs() {
-  mkdir -p "${ARTIFACT_DIR}"
+  log "dumping VCF migration operator logs"
   oc -n "${MIGRATION_NAMESPACE}" logs "deployment/${OPERATOR_DEPLOYMENT}" --all-containers 2>&1 \
     | tee "${ARTIFACT_DIR}/vcf-migration-operator.log" || true
 }
