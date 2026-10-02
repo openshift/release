@@ -43,7 +43,7 @@ tests:
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: sbr-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
-        && !tier:upgrade-cluster'
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       MEDIK8S_BUNDLE_IMAGES: storage-based-remediation
       ODF_OPERATOR_CHANNEL: stable-5.0
@@ -89,7 +89,7 @@ tests:
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: snr-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
-        && !tier:upgrade-cluster'
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       MEDIK8S_BUNDLE_IMAGES: self-node-remediation,node-healthcheck-operator
       TEST_NAME: e2e-snr-aws
@@ -131,7 +131,7 @@ tests:
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: nhc-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
-        && !tier:upgrade-cluster'
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       MEDIK8S_BUNDLE_IMAGES: node-healthcheck-operator,self-node-remediation
       TEST_NAME: e2e-nhc-aws
@@ -217,7 +217,7 @@ tests:
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: nmo-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
-        && !tier:upgrade-cluster'
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       MEDIK8S_BUNDLE_IMAGES: node-maintenance-operator
       TEST_NAME: e2e-nmo-aws
@@ -259,10 +259,263 @@ tests:
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: mdr-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
-        && !tier:upgrade-cluster'
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       MEDIK8S_BUNDLE_IMAGES: machine-deletion-remediation,node-healthcheck-operator
       TEST_NAME: e2e-mdr-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-upstream-bundle-install
+    - as: e2e-test
+      cli: latest
+      commands: |
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_IS_DOWNSTREAM
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-sbr-daily-aws-odf
+  capabilities:
+  - intranet
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      ECO_IS_DOWNSTREAM: "false"
+      ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      MEDIK8S_BUNDLE_IMAGES: storage-based-remediation
+      ODF_OPERATOR_CHANNEL: stable-5.0
+      ODF_VERSION_MAJOR_MINOR: "5.0"
+      TEST_NAME: e2e-sbr-daily-aws-odf
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-upstream-bundle-install
+    - ref: medik8s-deploy-odf-dev-catalog
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
+    - as: e2e-test
+      cli: latest
+      commands: |
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_IS_DOWNSTREAM
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-snr-daily-aws
+  capabilities:
+  - intranet
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_IS_DOWNSTREAM: "false"
+      ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      MEDIK8S_BUNDLE_IMAGES: self-node-remediation,node-healthcheck-operator
+      TEST_NAME: e2e-snr-daily-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-upstream-bundle-install
+    - as: e2e-test
+      cli: latest
+      commands: |
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_IS_DOWNSTREAM
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-nhc-daily-aws
+  capabilities:
+  - intranet
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_IS_DOWNSTREAM: "false"
+      ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      MEDIK8S_BUNDLE_IMAGES: node-healthcheck-operator,self-node-remediation
+      TEST_NAME: e2e-nhc-daily-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-upstream-bundle-install
+    - ref: ssh-bastion
+    - as: e2e-test
+      cli: latest
+      commands: |
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_IS_DOWNSTREAM
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-far-daily-aws
+  capabilities:
+  - intranet
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_IS_DOWNSTREAM: "false"
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      MEDIK8S_BUNDLE_IMAGES: fence-agents-remediation
+      TEST_NAME: e2e-far-daily-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-upstream-bundle-install
+    - ref: medik8s-aws-credentials
+    - as: e2e-test
+      cli: latest
+      commands: |
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_IS_DOWNSTREAM
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    workflow: ipi-aws
+- as: e2e-nmo-daily-aws
+  capabilities:
+  - intranet
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_IS_DOWNSTREAM: "false"
+      ECO_TEST_FEATURES: nmo-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      MEDIK8S_BUNDLE_IMAGES: node-maintenance-operator
+      TEST_NAME: e2e-nmo-daily-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-upstream-bundle-install
+    - as: e2e-test
+      cli: latest
+      commands: |
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_IS_DOWNSTREAM
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-mdr-daily-aws
+  capabilities:
+  - intranet
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_IS_DOWNSTREAM: "false"
+      ECO_TEST_FEATURES: mdr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      MEDIK8S_BUNDLE_IMAGES: machine-deletion-remediation,node-healthcheck-operator
+      TEST_NAME: e2e-mdr-daily-aws
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
