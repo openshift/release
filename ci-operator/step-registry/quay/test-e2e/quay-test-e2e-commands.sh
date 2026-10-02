@@ -830,6 +830,17 @@ fi
 # --workers flag overrides the config value; override via PLAYWRIGHT_WORKERS if needed.
 PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-2}"
 
+# Optional override for Playwright's maxFailures. The suite's playwright.config.ts
+# stops the whole run early after a small number of failures in CI, which leaves
+# later tests reported as "did not run" and hides the full picture. Set
+# PLAYWRIGHT_MAX_FAILURES=0 to run every selected test to completion (0 = no
+# limit); leave empty to honor the suite's own config default.
+MAX_FAILURES_ARGS=()
+if [[ -n "${PLAYWRIGHT_MAX_FAILURES:-}" ]]; then
+  MAX_FAILURES_ARGS=(--max-failures "${PLAYWRIGHT_MAX_FAILURES}")
+  echo "Overriding Playwright maxFailures: ${PLAYWRIGHT_MAX_FAILURES}"
+fi
+
 startJaegerPortForward
 
 echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
@@ -856,10 +867,28 @@ if [[ -n "${PLAYWRIGHT_GREP}" ]]; then
   fi
   echo "PLAYWRIGHT_GREP selected ${selected_tests} test(s)."
 fi
+playwright_rc=0
 npx playwright test \
   "${GREP_ARGS[@]}" \
   "${GREP_INVERT_ARGS[@]}" \
+  "${MAX_FAILURES_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
   --reporter=list,junit,html,json \
-  2>&1 | scrub_playwright_secrets | tee "${ARTIFACT_DIR}/playwright-output.log"
+  2>&1 | scrub_playwright_secrets | tee "${ARTIFACT_DIR}/playwright-output.log" || playwright_rc=$?
 popd
+
+# The EXIT trap (copyArtifacts) always publishes this phase's JUnit + HTML report,
+# so per-test results are visible in the Prow UI regardless of outcome. In
+# best-effort mode a test failure must NOT fail this ci-operator step: the upgrade
+# phases run as a sequential multi-stage chain (seed -> upgrade -> verify ->
+# functional), and a non-zero step aborts the chain so the later phases never run
+# and never publish their JUnit. Swallow the failure so every phase executes and
+# reports; the aggregated JUnit (not the job color) carries the pass/fail detail.
+# Non-best-effort callers (e.g. the e2e-install gate) still fail on a non-zero rc.
+if [[ "${PLAYWRIGHT_BEST_EFFORT:-false}" == "true" ]]; then
+  if (( playwright_rc != 0 )); then
+    echo "PLAYWRIGHT_BEST_EFFORT=true: Playwright exited ${playwright_rc}; not failing the step so subsequent phases still run. See the JUnit report for per-test results."
+  fi
+  exit 0
+fi
+exit "${playwright_rc}"

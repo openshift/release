@@ -109,6 +109,22 @@ ref:
       exclude unsupported auth backends (OIDC/LDAP), all webhook tests (out of
       scope), and tests tracking known product bugs / UI-version gaps. See
       E2E_FAILURE_REPORT.md for the rationale behind each quarantined entry.
+  - name: PLAYWRIGHT_MAX_FAILURES
+    default: "0"
+    documentation: |-
+      Override Playwright's maxFailures so this phase runs every selected test to
+      completion (0 = no limit) instead of stopping at the first failure, so the
+      JUnit report shows the full per-test pass/fail picture in the Prow UI.
+  - name: PLAYWRIGHT_BEST_EFFORT
+    default: "true"
+    documentation: |-
+      Run this Playwright phase best-effort. The runner always publishes its JUnit
+      and HTML report (via the EXIT trap), and a test failure does NOT fail the
+      ci-operator step, so the sequential upgrade chain (seed -> upgrade -> verify
+      -> functional) keeps running and every phase publishes its report. Per-test
+      pass/fail lives in the aggregated JUnit, not the job status. This applies to
+      the Playwright test phases only; non-test steps (operator install, storage
+      install, the OLM upgrade, provisioning) still hard-fail and abort the job.
   - name: QUAYNAMESPACE
     default: "quay"
     documentation: |-
