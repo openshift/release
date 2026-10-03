@@ -3,10 +3,10 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-v1\.24$
-    - ^release-v1\.24-
+    - ^main$
+    - ^main-
     cluster: build11
-    context: ci/prow/openshift-pipelines-ocp5.0-lp-interop-e2e-ginkgo
+    context: ci/prow/openshift-pipelines-ocp5.0-e2e-osp-e2e-ginkgo
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -15,13 +15,12 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-osp-qe
-      ci-operator.openshift.io/variant: openshift-pipelines-ocp5.0-lp-interop
+      ci-operator.openshift.io/variant: openshift-pipelines-ocp5.0-e2e-osp
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-pipelines-release-tests-ginkgo-release-v1.24-openshift-pipelines-ocp5.0-lp-interop-e2e-ginkgo
+    name: pull-ci-openshift-pipelines-release-tests-ginkgo-main-openshift-pipelines-ocp5.0-e2e-osp-e2e-ginkgo
     optional: true
-    rerun_command: /test openshift-pipelines-ocp5.0-lp-interop-e2e-ginkgo
+    rerun_command: /test openshift-pipelines-ocp5.0-e2e-osp-e2e-ginkgo
     spec:
       containers:
       - args:
@@ -35,7 +34,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-ginkgo
-        - --variant=openshift-pipelines-ocp5.0-lp-interop
+        - --variant=openshift-pipelines-ocp5.0-e2e-osp
         command:
         - ci-operator
         env:
@@ -106,25 +105,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )openshift-pipelines-ocp5.0-lp-interop-e2e-ginkgo,?($|\s.*)
+    trigger: (?m)^/test( | .* )openshift-pipelines-ocp5.0-e2e-osp-e2e-ginkgo,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-v1\.24$
-    - ^release-v1\.24-
+    - ^main$
+    - ^main-
     cluster: build01
-    context: ci/prow/openshift-pipelines-ocp5.0-lp-interop-images
+    context: ci/prow/openshift-pipelines-ocp5.0-e2e-osp-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
     labels:
-      ci-operator.openshift.io/variant: openshift-pipelines-ocp5.0-lp-interop
+      ci-operator.openshift.io/variant: openshift-pipelines-ocp5.0-e2e-osp
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-pipelines-release-tests-ginkgo-release-v1.24-openshift-pipelines-ocp5.0-lp-interop-images
-    rerun_command: /test openshift-pipelines-ocp5.0-lp-interop-images
+    name: pull-ci-openshift-pipelines-release-tests-ginkgo-main-openshift-pipelines-ocp5.0-e2e-osp-images
+    rerun_command: /test openshift-pipelines-ocp5.0-e2e-osp-images
     spec:
       containers:
       - args:
@@ -132,7 +130,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=openshift-pipelines-ocp5.0-lp-interop
+        - --variant=openshift-pipelines-ocp5.0-e2e-osp
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -165,63 +163,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )openshift-pipelines-ocp5.0-lp-interop-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-v1\.24$
-    - ^release-v1\.24-
-    cluster: build01
-    context: ci/prow/openshift-pipelines-ocp5.0-lp-rosa-hypershift-images
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - Dockerfile
-    labels:
-      ci-operator.openshift.io/variant: openshift-pipelines-ocp5.0-lp-rosa-hypershift
-      ci.openshift.io/generator: prowgen
-      job-release: "5.0"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-pipelines-release-tests-ginkgo-release-v1.24-openshift-pipelines-ocp5.0-lp-rosa-hypershift-images
-    rerun_command: /test openshift-pipelines-ocp5.0-lp-rosa-hypershift-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=openshift-pipelines-ocp5.0-lp-rosa-hypershift
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )openshift-pipelines-ocp5.0-lp-rosa-hypershift-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )openshift-pipelines-ocp5.0-e2e-osp-images,?($|\s.*)
