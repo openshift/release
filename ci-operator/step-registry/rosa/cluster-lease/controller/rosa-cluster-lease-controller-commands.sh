@@ -13,6 +13,7 @@ LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
 STALE_LEASE_HOURS="${STALE_LEASE_HOURS:-1}"
 ERROR_REPLACE_HOURS="${ERROR_REPLACE_HOURS:-1}"
+REVOLVING_DOOR_HOURS="${REVOLVING_DOOR_HOURS:-2}"
 MAX_CLUSTER_AGE_HOURS="${MAX_CLUSTER_AGE_HOURS:-0}"
 REFRESH_DAY="${REFRESH_DAY:-6}"
 MAX_REFRESH_PER_RUN="${MAX_REFRESH_PER_RUN:-2}"
@@ -390,6 +391,7 @@ ocm_ensure_env() {
 NOW_EPOCH=$(date +%s)
 STALE_THRESHOLD=$((STALE_LEASE_HOURS * 3600))
 ERROR_THRESHOLD=$((ERROR_REPLACE_HOURS * 3600))
+REVOLVING_DOOR_THRESHOLD=$((REVOLVING_DOOR_HOURS * 3600))
 REPORT="${ARTIFACT_DIR}/controller-report.txt"
 echo "Lease Controller Report - $(date -u)" > "${REPORT}"
 echo "======================================" >> "${REPORT}"
@@ -966,12 +968,17 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         else
             log "RESTORED: ${CM_NAME} is healthy again"
             if ! dry_run_guard "Would restore ${CM_NAME} to available"; then
+                REVOLVING_DOOR_ANNOTATION=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/revolving-door"] // ""')
                 lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                     "metadata": {
                         "labels": { "rosa-cluster-lease/status": "available" },
-                        "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "" }
+                        "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "", "rosa-cluster-lease/revolving-door": "" }
                     }
                 }' || true
+                if [[ "${REVOLVING_DOOR_ANNOTATION}" == "true" ]]; then
+                    lease_oc delete configmap "${CM_NAME}-replace-history" -n "${LEASE_NAMESPACE}" 2>/dev/null || true
+                    log "Cleared revolving-door state for ${CM_NAME}"
+                fi
             fi
             echo "RESTORED: ${CM_NAME}" >> "${REPORT}"
         fi
@@ -1087,6 +1094,34 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
         continue
     fi
 
+    # --- Revolving door detection ---
+    CURRENT_ERROR_REASON=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/error-reason"] // ""')
+    REPLACE_HISTORY=$(lease_oc get configmap "${CM_NAME}-replace-history" -n "${LEASE_NAMESPACE}" -o json 2>/dev/null || true)
+
+    if [[ -n "${REPLACE_HISTORY}" ]]; then
+        LAST_REPLACE_REASON=$(echo "${REPLACE_HISTORY}" | jq -r '.data["last-replace-reason"] // ""')
+        LAST_REPLACE_AT=$(echo "${REPLACE_HISTORY}" | jq -r '.data["last-replace-at"] // ""')
+
+        if [[ -n "${LAST_REPLACE_AT}" && -n "${LAST_REPLACE_REASON}" ]]; then
+            LAST_REPLACE_EPOCH=$(date -d "${LAST_REPLACE_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${LAST_REPLACE_AT}" +%s 2>/dev/null || echo "0")
+            REPLACE_AGE=$(( NOW_EPOCH - LAST_REPLACE_EPOCH ))
+
+            if [[ ${REPLACE_AGE} -lt ${REVOLVING_DOOR_THRESHOLD} && "${CURRENT_ERROR_REASON}" == "${LAST_REPLACE_REASON}" ]]; then
+                log "WARNING: Revolving door detected for ${CM_NAME}: same error '${CURRENT_ERROR_REASON}' after replacement. Skipping replacement — likely an environment-level issue, not a cluster issue."
+                if ! dry_run_guard "Would annotate ${CM_NAME} as revolving-door"; then
+                    lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                        "metadata": {
+                            "annotations": { "rosa-cluster-lease/revolving-door": "true" }
+                        }
+                    }' || true
+                fi
+                echo "REVOLVING-DOOR: ${CM_NAME} (same error: ${CURRENT_ERROR_REASON})" >> "${REPORT}"
+                continue
+            fi
+        fi
+    fi
+    # --- End revolving door detection ---
+
     log "REPLACE: ${CM_NAME} has been in error for $((ERROR_AGE / 3600))h, deleting"
     echo "REPLACE: ${CM_NAME} (error for $((ERROR_AGE / 3600))h)" >> "${REPORT}"
 
@@ -1107,6 +1142,18 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
             continue
         fi
     fi
+
+    # Record replacement in history for revolving-door detection
+    lease_oc apply -n "${LEASE_NAMESPACE}" -f - <<HISTORY_EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${CM_NAME}-replace-history
+  namespace: ${LEASE_NAMESPACE}
+data:
+  last-replace-reason: "${CURRENT_ERROR_REASON}"
+  last-replace-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+HISTORY_EOF
 
     # Remove the ConfigMap (next reconcile will provision a replacement)
     lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}"
