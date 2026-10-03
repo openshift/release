@@ -1,20 +1,41 @@
 workflow:
   as: telcov10n-functional-cnf-ran-ibi
   documentation: |-
-    IBI (Image Based Installation) workflow for CNF RAN testing.
-    Pre: deploy seed hub (kni-qe-127) at VERSION, install operators,
-         mirror spoke operators to seed bastion's disconnected registry,
-         then deploy seed SNO spoke (helix81) via ZTP.
-         Target hub (kni-qe-128) and IBI installation steps TBD.
-    Test: TBD - seedgeneration, IBI install, deploymenttypes, IBBF/IBR, ZTP IBI tests.
-    Post: TBD - report results, Slack notification.
+    Deploy the seed and target hubs, mirror the target OpenShift release,
+    prepare the seed SNO, and generate and mirror the seed image.
+    Run target preinstall with the full version detected from the seed cluster,
+    then deploy the target spoke using the existing deployment playbook.
   steps:
     pre:
     # Seed hub setup — kni-qe-127 deployed at VERSION
     - ref: telcov10n-functional-cnf-ran-hub-deploy
+    - ref: telcov10n-functional-cnf-ran-ibi-seed-dns-workaround
     - ref: telcov10n-functional-cnf-ran-hub-config
     - ref: telcov10n-functional-cnf-ran-mirror-spoke-operators
-
-    post:
-    - ref: wait
-
+    # Target hub setup — kni-qe-128 deployed at VERSION
+    # Note: ibi-target-hub-deploy saves target-* prefixed inventory files in SHARED_DIR
+    #       alongside the flat copies so they survive ibu-restore-seed-inventory below.
+    - ref: telcov10n-functional-cnf-ran-ibi-target-hub-deploy
+    - ref: telcov10n-functional-cnf-ran-ibi-target-dns-workaround
+    - ref: telcov10n-functional-cnf-ran-ibi-target-hub-config
+    - ref: telcov10n-functional-cnf-ran-ibi-target-mirror-spoke-operators
+    # Preserve ACM/MCE mirror mappings on both hubs after operator mirroring.
+    - ref: telcov10n-functional-cnf-ran-ibi-hub-prepare
+    # Mirror OCP release images to target bastion registry (while on target inventory)
+    - ref: telcov10n-functional-cnf-ran-ibu-target-mirror-ocp
+    # Restore seed hub (kni-qe-127) flat inventory overwritten by ibi-target-hub-deploy
+    # Note: no ibu-target-deploy-minio — IBI stores seed image in container registry, not MinIO
+    - ref: telcov10n-functional-cnf-ran-ibu-restore-seed-inventory
+    # Deploy the bare-metal seed SNO via ZTP on the seed hub (kni-qe-127)
+    - ref: telcov10n-functional-cnf-ran-ibu-deploy-spoke-sno-seed
+    # Save seed kubeconfig and prepare CoreOS extensions while ACM still manages the seed
+    - ref: telcov10n-functional-cnf-ran-ibi-seed-prepare
+    # Prune ArgoCD apps and remove seed spoke from ACM before seed image generation
+    - ref: telcov10n-functional-cnf-ran-ibu-prune-argocd-apps
+    # Run seedgeneration tests without a post-generation power-off
+    - ref: telcov10n-functional-cnf-ran-ibi-eco-gotests-seed
+    # Mirror generated seed image from seed bastion registry to target bastion registry
+    - ref: telcov10n-functional-cnf-ran-ibu-mirror-seed-image
+    # Preinstall restores the seed image before final target configuration.
+    - ref: telcov10n-functional-cnf-ran-ibi-target-preinstall
+    - ref: telcov10n-functional-cnf-ran-ibu-target-deploy-spoke-sno
