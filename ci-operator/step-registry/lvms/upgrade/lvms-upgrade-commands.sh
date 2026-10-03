@@ -7,10 +7,107 @@ declare -r LVMS_NAMESPACE=${LVMS_NAMESPACE:-"openshift-lvm-storage"}
 declare -r TARGET_LVMS_SOURCE=${TARGET_LVMS_SOURCE:-"lvm-catalogsource"}
 declare -r IDMS_NAME=${IDMS_NAME:-"lvm-operator-idms"}
 declare TARGET_LVM_INDEX_IMAGE=${TARGET_LVM_INDEX_IMAGE:-""}
+# When ZSTREAM_VERSION is set (Y-upgrade presubmits), the target index image is
+# resolved from the release PR's catalog snapshot instead of the production
+# Konflux tag, so the upgrade validates the catalog proposed in the PR.
+declare -r ZSTREAM_VERSION=${ZSTREAM_VERSION:-""}
+
+declare -r QUAY_API="https://quay.io/api/v1"
+declare -r QUAY_REPO="redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog"
 
 function get_target_version_from_channel() {
     local channel="${1}"
     echo "${channel}" | sed -E 's/^[a-z]+-//'
+}
+
+# Resolve a Konflux catalog snapshot name to its quay.io manifest digest by
+# matching the snapshot timestamp against the closest quay tag for that version.
+resolve_snapshot_to_digest() {
+    local snapshot="$1"
+
+    local version_prefix date_str time_str
+    version_prefix=$(echo "${snapshot}" | grep -oP 'lvm-operator-catalog-\d+-\d+')
+    date_str=$(echo "${snapshot}" | grep -oP '\d{8}(?=-\d{6}-)')
+    time_str=$(echo "${snapshot}" | grep -oP '(?<=\d{8}-)\d{6}')
+
+    if [[ -z "${version_prefix}" || -z "${date_str}" || -z "${time_str}" ]]; then
+        echo "Cannot parse snapshot name: ${snapshot}" >&2
+        return 1
+    fi
+
+    local snap_year snap_month snap_day snap_hour snap_min snap_sec snap_epoch
+    snap_year=${date_str:0:4}
+    snap_month=${date_str:4:2}
+    snap_day=${date_str:6:2}
+    snap_hour=${time_str:0:2}
+    snap_min=${time_str:2:2}
+    snap_sec=${time_str:4:2}
+    snap_epoch=$(date -d "${snap_year}-${snap_month}-${snap_day}T${snap_hour}:${snap_min}:${snap_sec}Z" +%s 2>/dev/null || echo 0)
+
+    local version_dot
+    version_dot=$(echo "${version_prefix}" | sed 's/lvm-operator-catalog-//; s/-/./')
+
+    local tags_json
+    tags_json=$(curl -sSL --connect-timeout 10 --max-time 30 \
+        "${QUAY_API}/repository/${QUAY_REPO}/tag/?limit=50&filter_tag_name=like:v${version_dot}-")
+
+    local result
+    result=$(echo "${tags_json}" | jq -r --arg snap_epoch "${snap_epoch}" --arg vpfx "v${version_dot}-" '
+        [.tags[]
+         | select(.name | startswith($vpfx))
+         | select(.name | test("^v[0-9]+\\.[0-9]+-[a-f0-9]{40}$"))
+         | select(.last_modified != null and .last_modified != "")
+         | .tag_epoch = (.last_modified | strptime("%a, %d %b %Y %H:%M:%S %z") | mktime)
+         | .abs_delta = ((.tag_epoch - ($snap_epoch | tonumber)) | fabs)
+        ] | sort_by(.abs_delta) | .[0] // empty |
+        [.name, .manifest_digest] | @tsv
+    ')
+
+    if [[ -z "${result}" ]]; then
+        echo "No matching quay tag found for snapshot ${snapshot}" >&2
+        return 1
+    fi
+
+    local tag_name digest
+    tag_name=$(echo "${result}" | cut -f1)
+    digest=$(echo "${result}" | cut -f2)
+
+    echo "Resolved: ${snapshot} → ${tag_name} (${digest})" >&2
+    echo "${digest}"
+}
+
+# Resolve the target LVMS catalog index image from the release PR's catalog
+# snapshot for ZSTREAM_VERSION. Mirrors the z-stream resolution used by
+# lvms-catalogsource so the upgrade target uses the PR's proposed catalog.
+resolve_target_index_from_pr() {
+    if [[ -z "${PULL_NUMBER:-}" ]]; then
+        echo "ERROR: ZSTREAM_VERSION is set but PULL_NUMBER is not available" >&2
+        return 1
+    fi
+    echo "Resolving target catalog image for version ${ZSTREAM_VERSION} from PR #${PULL_NUMBER}" >&2
+
+    local catalog_prefix pr_files snapshot digest
+    catalog_prefix="lvm-operator-catalog-$(echo "${ZSTREAM_VERSION}" | tr '.' '-')"
+
+    pr_files=$(curl -sSL --connect-timeout 10 --max-time 30 \
+        "https://api.github.com/repos/openshift/lvm-operator/pulls/${PULL_NUMBER}/files")
+    snapshot=$(echo "${pr_files}" | jq -r \
+        '[.[] | select(.filename | contains("catalog")) | .patch // ""] | join("\n")' \
+        | grep -oP "(?<=snapshot: )${catalog_prefix}\S*" | head -1)
+
+    if [[ -z "${snapshot}" ]]; then
+        echo "ERROR: No catalog snapshot found for ${ZSTREAM_VERSION} in PR #${PULL_NUMBER}" >&2
+        return 1
+    fi
+    echo "Found snapshot: ${snapshot}" >&2
+
+    digest=$(resolve_snapshot_to_digest "${snapshot}")
+    if [[ -z "${digest}" ]]; then
+        echo "ERROR: Failed to resolve snapshot ${snapshot} to a quay.io digest" >&2
+        return 1
+    fi
+
+    echo "quay.io/${QUAY_REPO}@${digest}"
 }
 
 function setup_target_catalogsource() {
@@ -18,7 +115,14 @@ function setup_target_catalogsource() {
     target_version=$(get_target_version_from_channel "${TARGET_LVMS_CHANNEL}")
 
     if [[ -z "${TARGET_LVM_INDEX_IMAGE}" ]]; then
-        TARGET_LVM_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${target_version}"
+        if [[ -n "${ZSTREAM_VERSION}" ]]; then
+            # Y-upgrade presubmit: use the catalog proposed in the release PR.
+            TARGET_LVM_INDEX_IMAGE=$(resolve_target_index_from_pr)
+            echo "Resolved target catalog image from PR: ${TARGET_LVM_INDEX_IMAGE}"
+        else
+            # Default: production Konflux catalog for the target version.
+            TARGET_LVM_INDEX_IMAGE="quay.io/${QUAY_REPO}:v${target_version}"
+        fi
     fi
 
     echo "Creating/updating CatalogSource '${TARGET_LVMS_SOURCE}' with target index image: ${TARGET_LVM_INDEX_IMAGE}"
