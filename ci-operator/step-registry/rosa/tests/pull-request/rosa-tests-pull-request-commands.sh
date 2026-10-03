@@ -73,20 +73,36 @@ run_testing_steps () {
   fi
   log "[CI] Start e2e testing with command $cmd\n"
 
-  # Execute the day1-post running cmd combined with focus
-  eval "${cmd}" || true
+  # Execute the running cmd combined with focus; RUN_EXIT is read by the caller.
+  # Set as a global rather than returned, so that calling this function stays a plain
+  # command: invoking it in a condition context would disable errexit for its whole body.
+  RUN_EXIT=0
+  eval "${cmd}" || RUN_EXIT=$?
 
-  cp "${JUNIT_XML}" "${ARTIFACT_DIR}/"
-  log "[CI] Testing is finished and uploaded."
+  if [[ -f "${JUNIT_XML}" ]]; then
+    cp "${JUNIT_XML}" "${ARTIFACT_DIR}/"
+    log "[CI] Testing is finished and uploaded."
+  else
+    log "[CI] WARN: no junit at ${JUNIT_XML}; the test runner likely died before writing results"
+  fi
 }
 
 declare -a run_times=(
   "day1-post"
   "day2"
   "destructive"
-  "destroy" 
+  "destroy"
   "destroy-post"
 )
+RUN_EXIT=0
+test_exit=0
 for run_time in "${run_times[@]}"; do
   run_testing_steps $run_time
+  if [[ ${RUN_EXIT} -ne 0 ]]; then
+    test_exit=${RUN_EXIT}
+    log "[CI] runtime ${run_time} failed with exit ${test_exit}; stopping"
+    break
+  fi
 done
+
+exit ${test_exit}

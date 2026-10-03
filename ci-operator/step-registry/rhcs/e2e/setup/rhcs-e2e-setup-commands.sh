@@ -84,20 +84,22 @@ make install
 # Below step will skip gcc checking
 export CGO_ENABLED=0
 
+# The exit status of ginkgo is the source of truth for pass/fail. pipefail is set, so the
+# pipe to tee preserves it. Hold it until the end so the statefiles are saved and the
+# cleanup below still runs when preparation failed.
+setup_exit=0
 ginkgo run \
     --label-filter day1-prepare \
     --timeout 2h \
     -r \
-    --focus-file tests/e2e/.* 2>&1| tee ${SHARED_DIR}/rhcs_preparation.log || true
+    --focus-file tests/e2e/.* 2>&1| tee ${SHARED_DIR}/rhcs_preparation.log || setup_exit=$?
 
+# rhcs-e2e-teardown needs these to destroy whatever did get provisioned, so save them
+# even when preparation failed part way through.
 save_state_files
-
-prepareFailure=$(tail -n 100 ${SHARED_DIR}/rhcs_preparation.log | { grep "\[FAIL\]" || true; })
 
 # clean files before leaving
 rm -rf ${SHARED_DIR}/tf-manifests
 rm -rf ${SHARED_DIR}/rhcs_preparation.log
 
-if [ ! -z "$prepareFailure" ]; then
-    exit 1
-fi
+exit ${setup_exit}
