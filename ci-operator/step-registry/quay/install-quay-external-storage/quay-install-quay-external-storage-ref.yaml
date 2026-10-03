@@ -1,0 +1,53 @@
+ref:
+  as: quay-install-quay-external-storage
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-install-quay-external-storage-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: QUAY_UPGRADE_QUAY_NAMESPACE
+    default: "quay"
+    documentation: Namespace the QuayRegistry is created in (matches the upgrade/prepare-e2e defaults).
+  - name: QUAY_UPGRADE_QUAY_REGISTRY
+    default: "quay"
+    documentation: Name of the QuayRegistry created (matches the upgrade/prepare-e2e defaults).
+  - name: QUAY_INSTALL_READINESS_TIMEOUT
+    default: "15m"
+    documentation: Deadline (Ns/Nm/Nh) for the QuayRegistry to report Available.
+  - name: QUAY_EXTRA_CONFIG
+    default: ""
+    documentation: |-
+      Optional extra Quay config.yaml snippet merged over the feature defaults
+      (list-append semantics), matching quay-deploy-aws-s3. Use it to enable the
+      feature flags and SUPER_USERS/GLOBAL_READONLY_SUPER_USERS the e2e suite
+      expects on the deployed registry.
+  - name: ENABLE_BUILD_SUPPORT
+    default: "false"
+    documentation: |-
+      When "true", configure the virtual builder and unmanaged TLS: the step folds
+      ${SHARED_DIR}/config_builder.yaml into the bundle and mounts ssl.cert/ssl.key/
+      build_cluster.crt (written by quay-provisioning-tls and quay-provisioning-
+      builder, which must run first) and sets the tls component managed=false.
+  documentation: |-
+    Deploy a QuayRegistry named ${QUAY_UPGRADE_QUAY_REGISTRY} in namespace
+    ${QUAY_UPGRADE_QUAY_NAMESPACE} backed by externally provisioned object storage
+    with objectstorage unmanaged. The Quay operator must already be installed
+    (e.g. by quay-operator-upgrade-install-source); this step does NOT create an
+    OperatorGroup/Subscription. It reads the backend-agnostic storage contract
+    ${SHARED_DIR}/quay-storage-config.yaml written by a provision-storage-<backend>
+    step (S3/GCS/Azure) and assembles the same effective Quay config as
+    quay-deploy-aws-s3: feature defaults with SUPER_USERS: [admin], the Mailpit
+    (${SHARED_DIR}/quay-mail-config.yaml) and Jaeger/OTel
+    (${SHARED_DIR}/quay-otel-config.yaml) fragments, QUAY_EXTRA_CONFIG overrides,
+    and -- when ENABLE_BUILD_SUPPORT is "true" -- the virtual-builder config plus
+    unmanaged TLS cert material. Each fragment is a no-op when its provisioning
+    step did not run, so the post-upgrade full e2e suite gets the same
+    capabilities (mailing, tracing, builds) it has on a fresh install.

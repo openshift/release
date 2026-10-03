@@ -1,8 +1,8 @@
 ref:
-  as: quay-test-e2e
+  as: quay-operator-upgrade-verify-playwright
   cli: latest
   from: quay-playwright-runner
-  commands: quay-test-e2e-commands.sh
+  commands: quay-operator-upgrade-verify-playwright-commands.sh
   resources:
     requests:
       cpu: "2"
@@ -90,14 +90,18 @@ ref:
       Optional child directory under ARTIFACT_DIR for this invocation's
       Playwright artifacts. Use distinct values when this ref runs in multiple
       phases of one job.
+  - name: PLAYWRIGHT_STEP_NAME
+    default: quay-operator-upgrade-verify-playwright
+    documentation: |-
+      Name of this registry step, used only to compose the GCS URL in the
+      custom-link-playwright-report.html surfaced by Prow's html lens. Must match
+      this ref's `as:` so the "Playwright HTML report" link resolves to this
+      phase's own report rather than a sibling phase's.
   - name: PLAYWRIGHT_GREP
     default: ""
     documentation: |-
       Optional positive regex passed to `playwright test --grep`. Unlike
       PLAYWRIGHT_GREP_INVERT, this selects tests for a tagged smoke phase.
-  - name: QUAY_OPERATOR_CHANNEL
-    default: "stable-3.16"
-    documentation: Installed Quay operator channel (informational in this step).
   - name: PLAYWRIGHT_GREP_INVERT
     default: "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@webhook"
     documentation: |-
@@ -105,8 +109,45 @@ ref:
       exclude unsupported auth backends (OIDC/LDAP), all webhook tests (out of
       scope), and tests tracking known product bugs / UI-version gaps. See
       E2E_FAILURE_REPORT.md for the rationale behind each quarantined entry.
+  - name: PLAYWRIGHT_MAX_FAILURES
+    default: "0"
+    documentation: |-
+      Override Playwright's maxFailures for the verify phase. The quay/quay
+      playwright.config.ts stops the run early after the first failure(s) in CI,
+      which leaves the remaining @upgrade-verify assertions reported as "did not
+      run" and hides which data did/did not survive the upgrade. "0" means no
+      limit, so every verify assertion runs to completion and the full
+      data-survival picture is reported in one run.
+  - name: PLAYWRIGHT_BEST_EFFORT
+    default: "true"
+    documentation: |-
+      Run this Playwright phase best-effort. The runner always publishes its JUnit
+      and HTML report (via the EXIT trap), and a test failure does NOT fail the
+      ci-operator step, so the sequential upgrade chain (seed -> upgrade -> verify
+      -> functional) keeps running and every phase publishes its report. Per-test
+      pass/fail lives in the aggregated JUnit, not the job status. This applies to
+      the Playwright test phases only; non-test steps (operator install, storage
+      install, the OLM upgrade, provisioning) still hard-fail and abort the job.
+  - name: UPGRADE_CLEAN
+    default: "true"
+    documentation: |-
+      Gates the post-verify cleanup test authored in the quay/quay @upgrade-verify
+      suite. After every verify assertion passes, that test deletes the organization
+      and standalone DB user seeded on n-1 (via the superuser API) so the upgrade
+      job leaves no residual state behind. Cleanup is opt-out: it runs for any value
+      except "0", "false", or "no" (case-insensitive). Set one of those to keep the
+      seeded fixtures for debugging; a failed verify assertion also skips cleanup.
+  - name: QUAYNAMESPACE
+    default: "quay"
+    documentation: |-
+      Namespace the QuayRegistry is deployed in. The runner uses it only to
+      port-forward the in-cluster Jaeger query API and to gather virtual-builder
+      diagnostics, so it must match the namespace used by the deploy step
+      (quay-install-quay-external-storage defaults to "quay").
   documentation: |-
-    Execute Quay Playwright e2e smoke tests against a deployed Quay instance.
+    Execute the existing Quay Playwright e2e implementation as the uniquely named
+    n verify invocation of an operator-upgrade workflow. The commands file is a
+    symlink to quay-test-e2e-commands.sh, so behavior stays in one implementation.
     By default the suite is cloned at runtime from PLAYWRIGHT_GIT_REPO; set
     PLAYWRIGHT_USE_IMAGE_TESTS "true" to run the suite baked into the
     quay-playwright-runner image at /app instead.

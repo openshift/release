@@ -1,0 +1,39 @@
+chain:
+  as: quay-operator-upgrade-verify
+  steps:
+  - ref: quay-operator-upgrade-verify-playwright
+  env:
+  - name: PLAYWRIGHT_GREP
+    default: '@upgrade-verify'
+    documentation: |-
+      Positive Playwright selector for the post-upgrade verify phase. Selects only
+      the upgrade verify specs (authored in quay/quay) that read the deterministic
+      fixtures seeded on the n-1 server and assert they survived the OLM operator
+      upgrade. Runs on the n (3.18) server after quay-operator-upgrade-upgrade.
+  - name: PLAYWRIGHT_PHASE
+    default: "n"
+    documentation: Select the independently configured PLAYWRIGHT_N_* suite controls (the n / redhat-3.18 branch).
+  - name: PLAYWRIGHT_REQUIRE_EXPLICIT_REF
+    default: "true"
+    documentation: Prevent derived or fallback Playwright refs in the target phase; the n suite ref must be set explicitly.
+  - name: PLAYWRIGHT_CREDENTIALS_SOURCE
+    default: mounted-secret
+    documentation: |-
+      Read the quay-tests credential mount. The admin user created during the seed
+      phase persists across the upgrade, so the suite signs in with the same
+      mounted credentials.
+  - name: PLAYWRIGHT_ARTIFACT_SUBDIR
+    default: n-verify
+    documentation: Keep post-upgrade persistence-verify reports separate from seed and functional reports.
+  - name: UPGRADE_CLEAN
+    default: "true"
+    documentation: |-
+      Confirm the post-verify cleanup: after the @upgrade-verify assertions pass,
+      the suite deletes the organization and standalone DB user seeded on n-1 so the
+      upgrade job leaves no residual state. Opt-out via "0", "false", or "no".
+  documentation: |-
+    Thin n verify wrapper around quay-test-e2e. Runs the quay/quay @upgrade-verify
+    specs against the upgraded n (3.18) Quay to confirm the data seeded on n-1
+    survived the operator upgrade, then removes the seeded fixtures (UPGRADE_CLEAN).
+    Pins the target suite through PLAYWRIGHT_N_GIT_* and inherits
+    PLAYWRIGHT_GREP_INVERT exclusions by default.
