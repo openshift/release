@@ -501,6 +501,310 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e-upstream
+- as: test-e2e-stage-fbc-4-22-hypershift
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_NODE_COUNT: "2"
+    post:
+    - chain: kueue-operator-post
+    pre:
+    - ref: merge-stage-registry-credentials-for-hypershift
+    - ref: openshift-cluster-bot-rbac
+    - chain: hypershift-hostedcluster-create
+    test:
+    - as: install-kueue-from-stage-catalog
+      cli: latest
+      commands: |
+        # On HyperShift, pull secret was injected at cluster creation via
+        # merge-stage-registry-credentials-for-hypershift.
+        # Create the CatalogSource pointing to stage FBC:
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          name: qe-app-registry
+          namespace: openshift-marketplace
+        spec:
+          displayName: Stage FBC Operators
+          grpcPodConfig:
+            extractContent:
+              cacheDir: /tmp/cache
+              catalogDir: /configs
+            memoryTarget: 30Mi
+          image: quay.io/openshift-art/stage-fbc-fragments:ocp-4.22
+          publisher: OpenShift QE
+          sourceType: grpc
+        EOF
+
+        echo "Waiting for CatalogSource to be READY..."
+        STATE=""
+        RETRIES=30
+        for i in $(seq 1 $RETRIES); do
+          STATE=$(oc get catalogsource qe-app-registry -n openshift-marketplace -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+          echo "  CatalogSource state=$STATE"
+          if [[ "$STATE" == "READY" ]]; then
+            echo "CatalogSource is READY!"
+            break
+          fi
+          sleep 10
+        done
+        if [[ "$STATE" != "READY" ]]; then
+          echo "ERROR: CatalogSource qe-app-registry never became READY"
+          oc get catalogsource -n openshift-marketplace -o yaml
+          exit 1
+        fi
+
+        echo "Creating Kueue operator namespace and OperatorGroup..."
+        oc create ns openshift-kueue-operator || true
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: kueue-operator
+          namespace: openshift-kueue-operator
+        spec:
+          targetNamespaces:
+          - openshift-kueue-operator
+        EOF
+
+        echo "Creating Subscription from stage catalog..."
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: kueue-operator
+          namespace: openshift-kueue-operator
+        spec:
+          channel: stable
+          name: kueue-operator
+          source: qe-app-registry
+          sourceNamespace: openshift-marketplace
+          installPlanApproval: Automatic
+        EOF
+
+        echo "Waiting for Kueue CSV to succeed..."
+        PHASE=""
+        RETRIES=60
+        for i in $(seq 1 $RETRIES); do
+          CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [[ -n "$CSV" ]]; then
+            PHASE=$(oc get csv "$CSV" -n openshift-kueue-operator -o jsonpath='{.status.phase}')
+            echo "  CSV=$CSV phase=$PHASE"
+            if [[ "$PHASE" == "Succeeded" ]]; then
+              echo "Kueue operator installed successfully from stage FBC!"
+              break
+            fi
+          fi
+          sleep 10
+        done
+        if [[ "$PHASE" != "Succeeded" ]]; then
+          echo "ERROR: Timed out waiting for Kueue CSV"
+          oc get sub,csv,installplan -n openshift-kueue-operator -o yaml
+          exit 1
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 300Mi
+    - ref: cert-manager-install-operator
+    - chain: jobset-install
+    - chain: leader-worker-set-install
+    - as: e2e-kueue-downstream
+      cli: latest
+      commands: make e2e-ci-test
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: hypershift-hostedcluster-workflow
+- as: test-e2e-stage-fbc-downstream-4-22
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.22"
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: enable-qe-catalogsource-staging
+    - ref: cert-manager-install-operator
+    - as: install-kueue-from-stage-catalog
+      cli: latest
+      commands: |
+        echo "Creating Kueue operator namespace and OperatorGroup..."
+        oc create ns openshift-kueue-operator || true
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: kueue-operator
+          namespace: openshift-kueue-operator
+        spec:
+          targetNamespaces:
+          - openshift-kueue-operator
+        EOF
+
+        echo "Creating Subscription from stage catalog (qe-app-registry)..."
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: kueue-operator
+          namespace: openshift-kueue-operator
+        spec:
+          channel: stable
+          name: kueue-operator
+          source: qe-app-registry
+          sourceNamespace: openshift-marketplace
+          installPlanApproval: Automatic
+        EOF
+
+        echo "Waiting for Kueue CSV to succeed..."
+        PHASE=""
+        RETRIES=60
+        for i in $(seq 1 $RETRIES); do
+          CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [[ -n "$CSV" ]]; then
+            PHASE=$(oc get csv "$CSV" -n openshift-kueue-operator -o jsonpath='{.status.phase}')
+            echo "  CSV=$CSV phase=$PHASE"
+            if [[ "$PHASE" == "Succeeded" ]]; then
+              echo "Kueue operator installed successfully from stage FBC!"
+              break
+            fi
+          fi
+          sleep 10
+        done
+        if [[ "$PHASE" != "Succeeded" ]]; then
+          echo "ERROR: Timed out waiting for Kueue CSV"
+          oc get sub,csv,installplan -n openshift-kueue-operator -o yaml
+          exit 1
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 300Mi
+    - chain: jobset-install
+    - chain: leader-worker-set-install
+    - as: e2e-kueue-downstream
+      cli: latest
+      commands: make e2e-ci-test
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+- as: test-e2e-stage-fbc-upstream-4-22
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.22"
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: enable-qe-catalogsource-staging
+    - ref: cert-manager-install-operator
+    - as: install-kueue-from-stage-catalog
+      cli: latest
+      commands: |
+        echo "Creating Kueue operator namespace and OperatorGroup..."
+        oc create ns openshift-kueue-operator || true
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: kueue-operator
+          namespace: openshift-kueue-operator
+        spec:
+          targetNamespaces:
+          - openshift-kueue-operator
+        EOF
+
+        echo "Creating Subscription from stage catalog (qe-app-registry)..."
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: kueue-operator
+          namespace: openshift-kueue-operator
+        spec:
+          channel: stable
+          name: kueue-operator
+          source: qe-app-registry
+          sourceNamespace: openshift-marketplace
+          installPlanApproval: Automatic
+        EOF
+
+        echo "Waiting for Kueue CSV to succeed..."
+        PHASE=""
+        RETRIES=60
+        for i in $(seq 1 $RETRIES); do
+          CSV=$(oc get csv -n openshift-kueue-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [[ -n "$CSV" ]]; then
+            PHASE=$(oc get csv "$CSV" -n openshift-kueue-operator -o jsonpath='{.status.phase}')
+            echo "  CSV=$CSV phase=$PHASE"
+            if [[ "$PHASE" == "Succeeded" ]]; then
+              echo "Kueue operator installed successfully from stage FBC!"
+              break
+            fi
+          fi
+          sleep 10
+        done
+        if [[ "$PHASE" != "Succeeded" ]]; then
+          echo "ERROR: Timed out waiting for Kueue CSV"
+          oc get sub,csv,installplan -n openshift-kueue-operator -o yaml
+          exit 1
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 300Mi
+    - chain: jobset-install
+    - chain: leader-worker-set-install
+    - as: e2e-kueue-upstream
+      cli: latest
+      commands: make e2e-upstream-test
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
 - as: test-e2e-downstream-5-0
   capabilities:
   - arm64
