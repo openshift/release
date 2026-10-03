@@ -95,15 +95,35 @@ prune_aws_security_groups() {
 # Cleanup persistent AWS resources
 # * AMI/snapshot (on failure just delete kata-config)
 # * prune aws security groups (they contain cross-references and can not be removed otherwised)
+# * IRSA role + policy created in peerpods-param-cm (STS mode only)
 cleanup_aws() {
 	local ami_id aws_region aws_creds cm_data snapshot_id
 
-	# Get aws credentials from secrets
-	aws_creds=$(oc -n kube-system get secret aws-creds -o json)
-	AWS_ACCESS_KEY_ID="$(echo "${aws_creds}" | jq -r .data.aws_access_key_id | base64 -d)"
-	export AWS_ACCESS_KEY_ID
-	AWS_SECRET_ACCESS_KEY="$(echo "${aws_creds}" | jq -r .data.aws_secret_access_key | base64 -d)"
-	export AWS_SECRET_ACCESS_KEY
+	if [[ "${IDENTITY_MODE:-cco}" == "sts" ]]; then
+		# STS clusters do not have kube-system/aws-creds; use the CI profile credentials
+		export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
+		# Clean up the IRSA role and policy created during peerpods setup
+		if [[ -s "${SHARED_DIR}/osc-irsa-role-arn" ]]; then
+			local role_arn role_name policy_arn
+			role_arn=$(cat "${SHARED_DIR}/osc-irsa-role-arn")
+			role_name=$(basename "${role_arn}")
+			if [[ -s "${SHARED_DIR}/osc-irsa-policy-arn" ]]; then
+				policy_arn=$(cat "${SHARED_DIR}/osc-irsa-policy-arn")
+				aws iam detach-role-policy --role-name "${role_name}" --policy-arn "${policy_arn}" || true
+				aws iam delete-policy --policy-arn "${policy_arn}" || true
+			fi
+			aws iam delete-role --role-name "${role_name}" || true
+			echo "Deleted IRSA role: ${role_arn}"
+		fi
+	else
+		# Get aws credentials from secrets
+		aws_creds=$(oc -n kube-system get secret aws-creds -o json)
+		AWS_ACCESS_KEY_ID="$(echo "${aws_creds}" | jq -r .data.aws_access_key_id | base64 -d)"
+		export AWS_ACCESS_KEY_ID
+		AWS_SECRET_ACCESS_KEY="$(echo "${aws_creds}" | jq -r .data.aws_secret_access_key | base64 -d)"
+		export AWS_SECRET_ACCESS_KEY
+	fi
 
 	# Check if cm exists
 	if ! oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm -o yaml; then
@@ -163,12 +183,31 @@ cleanup_aws() {
 	exit $?
 }
 
-# Remove our NSG on ARO+peer-pods (do nothing on plain azure)
+# Remove our NSG on ARO+peer-pods; also cleans up STS role assignments on plain azure
 cleanup_azure() {
 	local IS_ARO
 	IS_ARO=$(oc get crd clusters.aro.openshift.io &>/dev/null && echo true || echo false)
+
 	if [[ "${IS_ARO}" != "true" ]]; then
-		echo "We are not on ARO"
+		# STS mode: delete subscription-level role assignments saved during peerpods setup.
+		# These live outside the cluster resource group and survive cluster destroy.
+		if [[ "${IDENTITY_MODE:-cco}" == "sts" ]] && [[ -s "${SHARED_DIR}/osc-azure-role-assignment-ids" ]]; then
+			local AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+			az login \
+				--service-principal \
+				--username "$(jq -r .clientId "${AZURE_AUTH_LOCATION}")" \
+				--password "$(jq -r .clientSecret "${AZURE_AUTH_LOCATION}")" \
+				--tenant "$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")" \
+				--output none
+			echo "Deleting subscription-level role assignments for OSC managed identity..."
+			while IFS= read -r assignment_id; do
+				[[ -z "${assignment_id}" ]] && continue
+				az role assignment delete --ids "${assignment_id}" || \
+					echo "Warning: failed to delete role assignment ${assignment_id}"
+			done < "${SHARED_DIR}/osc-azure-role-assignment-ids"
+		else
+			echo "We are not on ARO"
+		fi
 		return
 	fi
 	if [[ "${ENABLEPEERPODS:-false}" != "true" ]]; then
