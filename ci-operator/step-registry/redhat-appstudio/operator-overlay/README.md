@@ -30,5 +30,5 @@ Both refs use `from: konflux-overlay-install` and `cli: latest` for `oc`.
 
 ## Testing
 
-- **Release PR:** `/pj-rehearse pull-ci-redhat-appstudio-infra-deployments-main-appstudio-operator-overlay-e2e-tests`
-- **Infra PR:** `/test appstudio-operator-overlay-e2e-tests` after openshift/release is merged.
+- **Release PR:** `/pj-rehearse pull-ci-redhat-appstudio-infra-deployments-main-appstudio-rd-dev-overlay-e2e-tests`
+- **Infra PR:** `/test appstudio-rd-dev-overlay-e2e-tests` after openshift/release is merged.
