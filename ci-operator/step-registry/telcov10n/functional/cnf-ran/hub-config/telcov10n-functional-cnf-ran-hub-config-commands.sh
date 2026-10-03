@@ -2,8 +2,8 @@
 set -e
 set -o pipefail
 
-if [ -f "${SHARED_DIR}/skip.txt" ]; then
-  echo "Detected skip.txt — skipping"
+if [ -f "${SHARED_DIR}/skip.txt" ] || [ -f "${SHARED_DIR}/skip_infra.txt" ]; then
+  echo "Detected skip — skipping"
   exit 0
 fi
 
