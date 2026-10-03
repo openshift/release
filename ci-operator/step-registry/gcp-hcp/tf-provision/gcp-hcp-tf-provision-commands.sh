@@ -255,17 +255,10 @@ import_orphaned_firestore() {
   log "Detected Firestore provider bug (hashicorp/terraform-provider-google#22533)"
   log "Database exists in GCP but not in state — attempting import..."
 
-  # Extract MC project ID from terraform state (the project resource is
-  # created before Firestore, so it should be in state)
-  local mc_project
-  mc_project=$(terraform output -json 2>/dev/null | jq -r '.management_cluster.value.project_id // empty' 2>/dev/null || echo "")
-
-  if [[ -z "${mc_project}" ]]; then
-    log "WARNING: Could not extract MC project ID from outputs, trying state..."
-    mc_project=$(terraform show -json 2>/dev/null | \
-      jq -r '.. | objects | select(.address? == "module.management_cluster.module.project.google_project.main") | .values.project_id // empty' 2>/dev/null || echo "")
-  fi
-
+  # The project ID is deterministic and was computed before apply so cleanup
+  # can recover from partial provisioning. Terraform outputs and state may be
+  # incomplete when the provider drops Firestore after creating it.
+  local mc_project="${MC_PROJECT_ID:-}"
   if [[ -z "${mc_project}" ]]; then
     log "ERROR: Could not determine MC project ID for import"
     return 1
