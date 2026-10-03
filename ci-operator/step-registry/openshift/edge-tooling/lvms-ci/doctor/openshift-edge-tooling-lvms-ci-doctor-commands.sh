@@ -132,6 +132,10 @@ load_secrets
 configure_claude
 
 # Use the edge-tooling source pre-installed in the image
+# TODO: Remove this once the ci-doctor-json-data-model branch is merged into main
+cd /tmp
+git clone https://github.com/redhat-chai-bot/openshift-eng_edge-tooling.git -b ci-doctor-json-data-model
+EDGE_TOOLING_DIR="/tmp/openshift-eng_edge-tooling"
 SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/lvms-ci"
 cd "${SRC_DIR}"
