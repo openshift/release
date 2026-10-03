@@ -1,0 +1,51 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        rebasebot --source-repo Azure/azure-service-operator \
+                  --source-ref-hook _BUILTIN_/source-ref-hooks/latest-stable-release.sh \
+                  --dest openshift/azure-service-operator:main \
+                  --rebase openshift-cloud-team/azure-service-operator:rebase-bot-main \
+                  --update-go-modules \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - collection: rebasebot-credentials
+        group: secret
+        mount_path: /secrets/rebasebot
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: azure-service-operator
+  variant: periodics
