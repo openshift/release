@@ -27,6 +27,18 @@ if [[ -z "${HOSTNAME}" ]]; then
   exit 1
 fi
 
+function chrony_machineconfigs () {
+  local target_dir="${1}"
+  if [ -f "${SHARED_DIR}/99-chrony-worker.yaml" ]; then
+    echo "Copying 99-chrony-worker.yaml to ${target_dir}..."
+    cp "${SHARED_DIR}/99-chrony-worker.yaml" "${target_dir}/"
+  fi
+  if [ -f "${SHARED_DIR}/99-chrony-master.yaml" ]; then
+    echo "Copying 99-chrony-master.yaml to ${target_dir}..."
+    cp "${SHARED_DIR}/99-chrony-master.yaml" "${target_dir}/"
+  fi
+}
+
 function save_credentials () {
   # Save credentials for diagnostic steps going forward
   echo "Saving authentication files for next steps..."
@@ -177,6 +189,9 @@ cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
   cp ${SHARED_DIR}/agent-config.yaml ${INSTALL_DIR}
+  # chrony must be injected before pxe-files so it is baked into the boot image
+  mkdir -p "${INSTALL_DIR}/openshift"
+  chrony_machineconfigs "${INSTALL_DIR}/openshift"
   ${OCPINSTALL} --dir ${INSTALL_DIR} agent create pxe-files
   save_credentials
 
@@ -363,6 +378,7 @@ else
   # Generate manifests for cluster modifications
   echo "Generating manifests..."
   ${OCPINSTALL} --dir "${INSTALL_DIR}" create manifests
+  chrony_machineconfigs "${INSTALL_DIR}/manifests"
 fi
 
 # Check for the node tuning yaml config, and save it in the installation directory
@@ -372,19 +388,6 @@ if [ -f "${NODE_TUNING_YAML}" ]; then
   cp ${NODE_TUNING_YAML} "${INSTALL_DIR}/manifests"
 fi
 
-# Sets up the chrony machineconfig for the worker nodes
-CHRONY_WORKER_YAML="${SHARED_DIR}/99-chrony-worker.yaml"
-if [ -f "${CHRONY_WORKER_YAML}" ]; then
-  echo "Saving ${CHRONY_WORKER_YAML} to the install directory..."
-  cp ${CHRONY_WORKER_YAML} "${INSTALL_DIR}/manifests"
-fi
-
-# Sets up the chrony machineconfig for the master nodes
-CHRONY_MASTER_YAML="${SHARED_DIR}/99-chrony-master.yaml"
-if [ -f "${CHRONY_MASTER_YAML}" ]; then
-  echo "Saving ${CHRONY_MASTER_YAML} to the install directory..."
-  cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
-fi
 
 # Check for the master mcp yaml config, and save it in the installation directory
 MCP_MASTER_YAML="${SHARED_DIR}/manifest_master.machineconfigpool.yaml"
