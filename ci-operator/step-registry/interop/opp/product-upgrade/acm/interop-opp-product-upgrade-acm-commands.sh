@@ -48,6 +48,10 @@ _junit_emit_safe() {
 XMLEOF
   } > "${tmpf}"
   mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_acm_upgrade.xml"
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_acm_upgrade.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
 }
 
 echo ">>> PHASE: initialization"
@@ -433,18 +437,21 @@ get_channel_head() {
 _finalize_exit() {
   local rc=$?
   set +e
+  # Fallback for unclassified exits
+  if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+    _JUNIT_KIND="unclassified-failure"
+    _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+    _EXIT_CLASS="infra"
+  fi
   if [[ -n "${_JUNIT_KIND}" ]]; then
     _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
-  fi
-  # Preserve existing cleanup behaviour from the old EXIT traps
-  (exit "${rc}"); _opp_cleanup
-  if (( rc != 0 )); then
-    CollectDiagnostics
+    mkdir -p "${SHARED_DIR}/junit"
+    cp -f "${ARTIFACT_DIR}/junit_acm_upgrade.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
   fi
   if [[ "${_EXIT_CLASS}" == "product" ]]; then
-    return 0   # product failure -- don't fail the CI step
+    exit 0
   fi
-  return "${rc}"
+  exit "${rc}"
 }
 trap '_finalize_exit' EXIT
 
