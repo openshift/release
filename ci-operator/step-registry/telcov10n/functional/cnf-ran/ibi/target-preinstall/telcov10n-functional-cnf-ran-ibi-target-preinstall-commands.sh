@@ -86,7 +86,7 @@ verify_installer_version() {
     return 1
   fi
 
-  installer_version=$(printf '%s\n' "${installer_output}" | awk '$1 == "openshift-install" { print $2 }')
+  installer_version=$(printf '%s\n' "${installer_output}" | awk '$1 ~ /(^|\/)openshift-install$/ && NF == 2 { print $2 }')
   if [[ "${installer_version}" != "${SEED_VERSION}" ]]; then
     echo "Cached installer version '${installer_version}' does not match the recorded seed version '${SEED_VERSION}'." >&2
     return 1
