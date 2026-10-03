@@ -1,0 +1,33 @@
+chain:
+  as: p2p-cclm-n-parallel-migration-test
+  steps:
+    - ref: p2p-create-migration-test-vm
+    - ref: p2p-mtv-execute-n-parallel-migration
+  documentation: |-
+    End-to-end N-plan parallel bi-directional CCLM migration test.
+
+    Creates MTV_PLAN_COUNT × MTV_VMS_PER_PLAN VMs on spoke-1 (default: 5 × 1 = 5 VMs),
+    then migrates each VM in its own independent plan so all migrations run concurrently.
+
+    Use this chain (instead of p2p-cclm-parallel-bidir-migration-test) when you want
+    fine-grained parallelism — one VM per plan — rather than batching several VMs into
+    two plans.  Typical job env:
+      CNV_TEST_VM_COUNT: "5"    # must equal MTV_PLAN_COUNT × MTV_VMS_PER_PLAN
+      MTV_PLAN_COUNT: "5"
+      MTV_VMS_PER_PLAN: "1"
+
+    Requires p2p-mtv-bidir-mig-config (providers, forward + return maps),
+    p2p-install-odf-spokes, p2p-acm-cnv-install-policy, and
+    acm-interop-p2p-submariner-install (pod-to-pod connectivity without Globalnet).
+
+    Step 1 (p2p-create-migration-test-vm):
+      Creates CNV_TEST_VM_COUNT VMs (test-vm-1 … test-vm-K×N) on spoke-1.
+      Optionally attaches a secondary data disk when CNV_TEST_VM_DATA_DISK_ENABLED=true.
+
+    Step 2 (p2p-mtv-execute-n-parallel-migration):
+      Leg 1 — forward: K plans submitted simultaneously (spoke-1 → spoke-2).
+      Leg 2 — return:  K return plans submitted simultaneously (spoke-2 → spoke-1).
+      A single polling loop per leg waits until all K migrations Succeeded.
+
+    Debug mode: set P2P_CCLM_DEBUG_MODE=true so failures exit 0,
+    allowing downstream investigation steps to run.

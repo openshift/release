@@ -83,6 +83,28 @@ ref:
   - name: CNV_TEST_VM_CLEAN
     default: "false"
     documentation: Set to "true" to delete prior VM/DV/prime-* PVCs before create.
+  # ---- Secondary data disk (CNV_TEST_VM_DATA_DISK_ENABLED=true) ----
+  - name: CNV_TEST_VM_DATA_DISK_ENABLED
+    default: "false"
+    documentation: |-
+      When true, attach a blank secondary DataVolume to each VM after the root disk is ready.
+      The data disk uses CNV_TEST_VM_DATA_DISK_STORAGE_CLASS (default: ocs-storagecluster-cephfs),
+      which is intentionally different from the root-disk storage class, so MTV must map both
+      source storage classes in its StorageMap.
+      Set MTV_ADDITIONAL_SOURCE_STORAGE_NAME to the same value in the job env so that
+      p2p-mtv-create-migration-maps adds the extra entry to the StorageMap.
+  - name: CNV_TEST_VM_DATA_DISK_STORAGE_CLASS
+    default: "ocs-storagecluster-cephfs"
+    documentation: StorageClass for the secondary data DataVolume (filesystem-backed, RWX).
+  - name: CNV_TEST_VM_DATA_DISK_VOLUME_MODE
+    default: "Filesystem"
+    documentation: VolumeMode for the secondary DataVolume (Filesystem or Block).
+  - name: CNV_TEST_VM_DATA_DISK_ACCESS_MODE
+    default: "ReadWriteMany"
+    documentation: AccessMode for the secondary DataVolume; must be RWX for live migration.
+  - name: CNV_TEST_VM_DATA_DISK_SIZE
+    default: "5Gi"
+    documentation: Capacity request for the secondary data DataVolume.
   - name: P2P_CCLM_DEBUG_MODE
     default: "false"
     documentation: |-
