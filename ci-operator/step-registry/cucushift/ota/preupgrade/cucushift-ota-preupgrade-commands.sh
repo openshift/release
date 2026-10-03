@@ -306,17 +306,34 @@ function verify_no_update_with_overrides(){
 }
 
 function bump_channel(){
-    # Get current version and calculate target Y-version
-    local version x_ver y_ver target_y_ver target_channel
-    version="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}')"
-    if [ -z "${version}" ]; then
-        echo "Failed to get cluster version!"
-        return 1
+    local version x_ver y_ver target_x_ver target_y_ver target_channel
+
+    # Prefer the target release image to determine the upgrade channel,
+    # so cross-major-version upgrades (e.g. 4.22 -> 5.0) pick the right
+    # channel instead of naively incrementing the source minor version.
+    if [[ -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+        local target_ver
+        target_ver=$(oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --output=json \
+            | jq -r '.metadata.version' | cut -f1,2 -d.)
+        if [[ -n "${target_ver}" ]] && [[ "${target_ver}" != "null" ]]; then
+            target_x_ver=$(echo "${target_ver}" | cut -f1 -d.)
+            target_y_ver=$(echo "${target_ver}" | cut -f2 -d.)
+            target_channel="candidate-${target_ver}"
+        fi
     fi
-    x_ver=$(echo "${version}" | cut -f1 -d.)
-    y_ver=$(echo "${version}" | cut -f2 -d.)
-    target_y_ver=$((y_ver + 1))
-    target_channel="candidate-${x_ver}.${target_y_ver}"
+
+    # Fallback: increment source minor version (works for same-major upgrades)
+    if [[ -z "${target_channel:-}" ]]; then
+        version="$(oc get clusterversion version -o jsonpath='{.status.history[0].version}')"
+        if [ -z "${version}" ]; then
+            echo "Failed to get cluster version!"
+            return 1
+        fi
+        target_x_ver=$(echo "${version}" | cut -f1 -d.)
+        y_ver=$(echo "${version}" | cut -f2 -d.)
+        target_y_ver=$((y_ver + 1))
+        target_channel="candidate-${target_x_ver}.${target_y_ver}"
+    fi
 
     # Set the channel to candidate-x.y for Y-version upgrade
     echo "Setting channel to ${target_channel}..."
@@ -335,7 +352,7 @@ function bump_channel(){
     echo "Successfully set channel to ${target_channel}"
 
     # Export the target version pattern for the caller
-    export target_version_pattern="${x_ver}.${target_y_ver}"
+    export target_version_pattern="${target_x_ver}.${target_y_ver}"
     return 0
 }
 
