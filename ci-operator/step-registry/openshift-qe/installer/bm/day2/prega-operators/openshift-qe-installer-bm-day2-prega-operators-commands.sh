@@ -81,7 +81,7 @@ if [ ${OCP_BUILD} == "dev" ]; then
   apiVersion: operators.coreos.com/v1alpha1
   kind: CatalogSource
   metadata:
-    name: prega-operator-index
+    name: ${OPERATOR_SOURCE_INDEX}
     namespace: openshift-marketplace
   spec:
     image: quay.io/prega/prega-operator-index:${OPERATOR_PREGA_VERSION}
@@ -91,7 +91,7 @@ EOF
 
   echo "Waiting for CatalogSource to be ready"
   sleep 300
-  kubectl wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY catalogsource/prega-operator-index -n openshift-marketplace --timeout=300s
+  kubectl wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY catalogsource/${OPERATOR_SOURCE_INDEX} -n openshift-marketplace --timeout=300s
   echo "CatalogSource is ready"
   oc get catalogsources.operators.coreos.com -n openshift-marketplace
   oc get packagemanifests.packages.operators.coreos.com
