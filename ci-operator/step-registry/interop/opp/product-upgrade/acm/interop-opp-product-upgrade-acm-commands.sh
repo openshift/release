@@ -2,6 +2,11 @@
 set -euo pipefail
 shopt -s inherit_errexit
 
+# --- Typed exit globals (INTEROP-9527) ---
+_JUNIT_KIND=""
+_JUNIT_MESSAGE=""
+_EXIT_CLASS=""    # "product" or "infra"
+
 # === Known-Issue Skip Framework ===
 # This script uses _detect_known_issue() to emit JUnit SKIPPED results
 # for tracked bugs instead of failing the job. Unknown failures still FAIL.
@@ -27,41 +32,23 @@ _opp_cleanup() {
   fi
 }
 
-# --- JUnit XML wrapper: emit result for skip-ratio-gate ---
-_junit_start=$(date +%s)
-_junit_emitted=0
-_jrc=0  # initialized here, assigned inside trap string
-_junit_emit() {
-  # Emit a JUnit XML result for the ACM upgrade step and propagate
-  # it to SHARED_DIR/junit so downstream steps can aggregate results.
-  (( _junit_emitted )) && return 0
-  _junit_emitted=1
-  local _jr=${1:-0}
-  local _je
-  _je=$(date +%s) || _je=${_junit_start}
-  local _jd=$((_je - _junit_start))
-  local _jn="acm-upgrade"
-  local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
-  local _fc=0 _fx=""
-  if (( _jr != 0 )); then
-    _fc=1
-    _fx="<failure message=\"${_jn} exited with code ${_jr}\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
-  fi
-  cat > "${_jf}" <<JUNITEOF || true
+# --- Atomic JUnit Writer (INTEROP-9527) ---
+_junit_emit_safe() {
+  local kind="$1" message="$2" rc="${3:-0}"
+  local tmpf
+  tmpf="${ARTIFACT_DIR}/.junit_acm_upgrade.tmp.$$"
+  {
+    cat <<XMLEOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="${_fc}" errors="0" skipped="0" time="${_jd}">
-  <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
-    ${_fx}
+<testsuite name="interop-opp-product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+  <testcase name="${kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
   </testcase>
 </testsuite>
-JUNITEOF
-  if [[ -n "${SHARED_DIR:-}" ]]; then
-    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
-  fi
+XMLEOF
+  } > "${tmpf}"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_acm_upgrade.xml"
 }
-
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; exit ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -96,8 +83,6 @@ function CollectDiagnostics () {
     } > "${artifactFile}"
     true
 }
-
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; if (( _exit_code != 0 )); then CollectDiagnostics; fi; exit ${_jrc}' EXIT
 
 function GetCurrentCsv () {
     # Return the currentCSV name from the operator subscription status.
@@ -437,6 +422,32 @@ _detect_known_issue() {
 JUNIT_EOF
 }
 
+# --- Channel head helper (INTEROP-9527) ---
+get_channel_head() {
+  local pkg="$1" ch="$2"
+  oc get packagemanifest "${pkg}" -n openshift-marketplace \
+     -o jsonpath="{.status.channels[?(@.name==\"${ch}\")].currentCSV}" 2>/dev/null || echo "unknown"
+}
+
+# --- Single typed finalizer (INTEROP-9527) ---
+_finalize_exit() {
+  local rc=$?
+  set +e
+  if [[ -n "${_JUNIT_KIND}" ]]; then
+    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+  fi
+  # Preserve existing cleanup behaviour from the old EXIT traps
+  (exit "${rc}"); _opp_cleanup
+  if (( rc != 0 )); then
+    CollectDiagnostics
+  fi
+  if [[ "${_EXIT_CLASS}" == "product" ]]; then
+    return 0   # product failure -- don't fail the CI step
+  fi
+  return "${rc}"
+}
+trap '_finalize_exit' EXIT
+
 # === Main ===
 
 function Main () {
@@ -453,14 +464,45 @@ function Main () {
     currentCsv="$(GetCurrentCsv)"
     if [[ -z "${currentCsv}" ]]; then
         echo >&2 "ERROR: No ACM subscription found or no currentCSV set"
-        exit 3
+        _JUNIT_KIND="no-subscription"
+        _JUNIT_MESSAGE="No ACM subscription found or no currentCSV set"
+        _EXIT_CLASS="infra"
+        return 3
     fi
 
     currentVersion="$(GetInstalledVersion)"
     currentChannel="$(GetCurrentChannel)"
     echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
 
-    targetChannel="$(ResolveTargetChannel)"
+    # --- CatalogSource readiness check (INTEROP-9527) ---
+    local cs_timeout="${ACM_CATALOGSOURCE_TIMEOUT:-300}"
+    echo "Waiting up to ${cs_timeout}s for CatalogSource 'redhat-operators' to be READY ..."
+    if ! oc wait catalogsource/redhat-operators -n openshift-marketplace \
+           --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
+           --timeout="${cs_timeout}s"; then
+      echo "ERROR: CatalogSource redhat-operators not READY after ${cs_timeout}s"
+      _JUNIT_KIND="catalogsource-readiness"
+      _JUNIT_MESSAGE="CatalogSource redhat-operators not READY after ${cs_timeout}s"
+      _EXIT_CLASS="infra"
+      return 1
+    fi
+
+    # --- Safe ResolveTargetChannel call (INTEROP-9527) ---
+    local resolve_rc=0
+    targetChannel="$(ResolveTargetChannel)" || resolve_rc=$?
+    if (( resolve_rc == 3 )); then
+      local head
+      head=$(get_channel_head "${ACM_SUBSCRIPTION_NAME}" "${currentChannel}")
+      _JUNIT_KIND="acm-upgrade-not-needed"
+      _JUNIT_MESSAGE="Channel ${currentChannel} head (${head}) already installed -- nothing to upgrade"
+      _EXIT_CLASS="product"
+      return 1   # _finalize_exit will see product -> exit 0, but emit a JUnit failure
+    elif (( resolve_rc != 0 )); then
+      _JUNIT_KIND="resolve-target-channel"
+      _JUNIT_MESSAGE="ResolveTargetChannel failed"
+      _EXIT_CLASS="infra"
+      return "${resolve_rc}"
+    fi
     echo "Target channel: ${targetChannel}"
 
     prePatchPlan=""
@@ -476,14 +518,20 @@ function Main () {
         echo "Already on target channel ${targetChannel}; checking if upgrade is available..."
         if [[ -z "${prePatchPlan}" ]]; then
             echo "No pending upgrade on current channel; nothing to do"
-            exit 0
+            _JUNIT_KIND="acm-upgrade-not-needed"
+            _JUNIT_MESSAGE="Already on target channel ${targetChannel} with no pending upgrade"
+            _EXIT_CLASS="product"
+            return 1
         fi
         planPhase="$(oc get installplan "${prePatchPlan}" \
             -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
             -o jsonpath='{.status.phase}' || true)"
         if [[ "${planPhase}" == "Complete" ]]; then
             echo "InstallPlan ${prePatchPlan} already complete; no pending upgrade"
-            exit 0
+            _JUNIT_KIND="acm-upgrade-not-needed"
+            _JUNIT_MESSAGE="InstallPlan ${prePatchPlan} already complete -- no pending upgrade"
+            _EXIT_CLASS="product"
+            return 1
         fi
         installPlan="${prePatchPlan}"
     else
@@ -510,7 +558,10 @@ function Main () {
 
         if [[ -z "${installPlan}" ]]; then
             echo >&2 "ERROR: No new InstallPlan appeared after channel change (waited 3m)"
-            exit 2
+            _JUNIT_KIND="installplan-timeout"
+            _JUNIT_MESSAGE="No new InstallPlan appeared after channel change (waited 3m)"
+            _EXIT_CLASS="infra"
+            return 2
         fi
     fi
 
@@ -543,7 +594,10 @@ function Main () {
             _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
                 "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
         else
-            exit 1
+            _JUNIT_KIND="mce-upgrade-failure"
+            _JUNIT_MESSAGE="MCE upgrade validation failed"
+            _EXIT_CLASS="infra"
+            return 1
         fi
     else
         echo "${_acm_upgrade_output}"
@@ -559,7 +613,10 @@ function Main () {
             _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
                 "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
         else
-            exit 1
+            _JUNIT_KIND="hub-health-failure"
+            _JUNIT_MESSAGE="ACM hub health validation failed"
+            _EXIT_CLASS="infra"
+            return 1
         fi
     else
         echo "${_acm_upgrade_output}"
