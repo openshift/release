@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 echo "=== Waiting for ODF StorageClass ${STORAGE_CLASS} ==="
 COUNTER=0
 while [ $COUNTER -lt 300 ]; do
@@ -37,22 +41,27 @@ else
   echo "WARNING: HCO CLI download route not found, skipping readiness check"
 fi
 
-echo "=== Discovering validation image from CNV CSV ==="
-CSV_NAME=$(oc get csv -n "${TARGET_NAMESPACE}" -o json | \
-  jq -r '.items[] | select(.metadata.name | startswith("kubevirt-hyperconverged")).metadata.name')
-if [[ -z "${CSV_NAME}" ]]; then
-  echo "ERROR: Could not find kubevirt-hyperconverged CSV in ${TARGET_NAMESPACE}"
-  exit 1
-fi
-echo "Found CSV: ${CSV_NAME}"
+echo "=== Discovering validation image ==="
+if [[ -f "${SHARED_DIR}/validation-image-override" ]]; then
+  OCP_VIRT_VALIDATION_IMAGE=$(cat "${SHARED_DIR}/validation-image-override")
+  echo "Using mirrored image from SHARED_DIR: ${OCP_VIRT_VALIDATION_IMAGE}"
+else
+  CSV_NAME=$(oc get csv -n "${TARGET_NAMESPACE}" -o json | \
+    jq -r '.items[] | select(.metadata.name | startswith("kubevirt-hyperconverged")).metadata.name')
+  if [[ -z "${CSV_NAME}" ]]; then
+    echo "ERROR: Could not find kubevirt-hyperconverged CSV in ${TARGET_NAMESPACE}"
+    exit 1
+  fi
+  echo "Found CSV: ${CSV_NAME}"
 
-OCP_VIRT_VALIDATION_IMAGE=$(oc get csv -n "${TARGET_NAMESPACE}" "${CSV_NAME}" -o json | \
-  jq -r '.spec.relatedImages[] | select(.name | contains("ocp-virt-validation-checkup")).image')
-if [[ -z "${OCP_VIRT_VALIDATION_IMAGE}" ]]; then
-  echo "ERROR: Could not find ocp-virt-validation-checkup image in CSV ${CSV_NAME}"
-  exit 1
+  OCP_VIRT_VALIDATION_IMAGE=$(oc get csv -n "${TARGET_NAMESPACE}" "${CSV_NAME}" -o json | \
+    jq -r '.spec.relatedImages[] | select(.name | contains("ocp-virt-validation-checkup")).image')
+  if [[ -z "${OCP_VIRT_VALIDATION_IMAGE}" ]]; then
+    echo "ERROR: Could not find ocp-virt-validation-checkup image in CSV ${CSV_NAME}"
+    exit 1
+  fi
+  echo "Validation image: ${OCP_VIRT_VALIDATION_IMAGE}"
 fi
-echo "Validation image: ${OCP_VIRT_VALIDATION_IMAGE}"
 
 echo "=== Generating and applying validation checkup manifests ==="
 oc create namespace ocp-virt-validation 2>/dev/null || true
