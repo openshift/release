@@ -1,0 +1,87 @@
+base_images:
+  cli:
+    name: "4.23"
+    namespace: ocp
+    tag: cli
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.23"
+    namespace: ocp
+    tag: upi-installer
+prowgen:
+  expose: true
+  private: true
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.23"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.23"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: azure-ipi-f28-compliance
+  cron: 56 13 25 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_NAME: compliance-operator
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      FILTERS_ADDITIONAL: ""
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-f28-compliance-destructive
+  cron: 8 9 3 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_NAME: compliance-operator
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@complianceoperator'
+      FILTERS_ADDITIONAL: ""
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&;~DEPRECATED&;Disruptive&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "60"
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: openshift-tests-private
+  variant: arm64-nightly
