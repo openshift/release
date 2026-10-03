@@ -74,7 +74,11 @@ function CollectDiagnostics () {
     {
         printf '=== ACM Operator Upgrade Diagnostics ===\n\n'
         printf '=== Subscription ===\n'
-        oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" -n "${ACM_SUBSCRIPTION_NAMESPACE}" -o yaml 2>&1 || true
+        # Allow-list operational fields; omit annotations, labels, and spec.config.
+        oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            -o jsonpath='Name: {.metadata.name}{"\n"}Namespace: {.metadata.namespace}{"\n"}Generation: {.metadata.generation}{"\n"}Package: {.spec.name}{"\n"}Channel: {.spec.channel}{"\n"}Source: {.spec.source}{"\n"}Source namespace: {.spec.sourceNamespace}{"\n"}InstallPlan approval: {.spec.installPlanApproval}{"\n"}Current CSV: {.status.currentCSV}{"\n"}Installed CSV: {.status.installedCSV}{"\n"}InstallPlan: {.status.installPlanRef.name}{"\n"}State: {.status.state}{"\n"}Conditions:{"\n"}{range .status.conditions[*]}- type={.type} status={.status} reason={.reason}{"\n"}{end}' \
+            2>&1 || true
         printf '\n=== CSVs in %s ===\n' "${ACM_SUBSCRIPTION_NAMESPACE}"
         oc get csv -n "${ACM_SUBSCRIPTION_NAMESPACE}" 2>&1 || true
         printf '\n=== InstallPlan ===\n'
@@ -130,46 +134,105 @@ function ResolveTargetChannel () {
     fi
 
     typeset currentChannel
-    currentChannel="$(GetCurrentChannel)"
+    if ! currentChannel="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.channel}')"; then
+        echo >&2 "ERROR: Failed to query current subscription channel"
+        return 1
+    fi
     if [[ -z "${currentChannel}" ]]; then
         echo >&2 "ERROR: Cannot determine current subscription channel"
-        return 3
+        return 1
     fi
 
     typeset catalogNamespace
-    catalogNamespace="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+    if ! catalogNamespace="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.sourceNamespace}' || true)"
+        -o jsonpath='{.spec.sourceNamespace}')"; then
+        echo >&2 "ERROR: Failed to query subscription source namespace"
+        return 1
+    fi
+    if [[ -z "${catalogNamespace}" ]]; then
+        echo >&2 "ERROR: Subscription source namespace is empty"
+        return 1
+    fi
+
+    typeset catalogSource
+    if ! catalogSource="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.source}')"; then
+        echo >&2 "ERROR: Failed to query subscription catalog source"
+        return 1
+    fi
+    if [[ -z "${catalogSource}" ]]; then
+        echo >&2 "ERROR: Subscription catalog source is empty"
+        return 1
+    fi
 
     typeset packageName
-    packageName="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+    if ! packageName="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.name}' || true)"
+        -o jsonpath='{.spec.name}')"; then
+        echo >&2 "ERROR: Failed to query subscription package name"
+        return 1
+    fi
+    if [[ -z "${packageName}" ]]; then
+        echo >&2 "ERROR: Subscription package name is empty"
+        return 1
+    fi
 
     typeset channels
-    channels="$(oc get packagemanifest "${packageName}" \
+    if ! channels="$(oc get packagemanifest "${packageName}" \
         -n "${catalogNamespace}" \
-        -o jsonpath='{.status.channels[*].name}' || true)"
+        -o jsonpath='{.status.channels[*].name}')"; then
+        echo >&2 "ERROR: Failed to query packagemanifest for ${packageName}"
+        return 1
+    fi
 
     if [[ -z "${channels}" ]]; then
         echo >&2 "ERROR: No channels found in packagemanifest for ${packageName}"
-        return 3
+        return 1
+    fi
+
+    typeset manifestSource manifestSourceNamespace
+    if ! manifestSource="$(oc get packagemanifest "${packageName}" \
+        -n "${catalogNamespace}" \
+        -o jsonpath='{.status.catalogSource}')" || [[ -z "${manifestSource}" ]]; then
+        echo >&2 "ERROR: Packagemanifest for ${packageName} has no valid catalog source"
+        return 1
+    fi
+    if ! manifestSourceNamespace="$(oc get packagemanifest "${packageName}" \
+        -n "${catalogNamespace}" \
+        -o jsonpath='{.status.catalogSourceNamespace}')" || [[ -z "${manifestSourceNamespace}" ]]; then
+        echo >&2 "ERROR: Packagemanifest for ${packageName} has no valid catalog source namespace"
+        return 1
+    fi
+    if [[ "${manifestSource}" != "${catalogSource}" ||
+          "${manifestSourceNamespace}" != "${catalogNamespace}" ]]; then
+        echo >&2 "ERROR: Packagemanifest catalog source does not match the subscription"
+        return 1
     fi
 
     typeset currentVersion nextChannel=""
     currentVersion="$(echo "${currentChannel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
+    if [[ -z "${currentVersion}" ]]; then
+        echo >&2 "ERROR: Current channel ${currentChannel} does not contain a valid version"
+        return 1
+    fi
 
     typeset -a channelList
     read -ra channelList <<< "${channels}"
+    typeset -i validChannelCount=0
+    typeset currentChannelFound=false
     for ch in "${channelList[@]}"; do
         typeset chVersion
         chVersion="$(echo "${ch}" | grep -oE '[0-9]+\.[0-9]+' || true)"
         if [[ -z "${chVersion}" ]]; then
             continue
         fi
-        if [[ -z "${currentVersion}" ]]; then
-            nextChannel="${ch}"
-            break
+        (( validChannelCount += 1 ))
+        if [[ "${ch}" == "${currentChannel}" ]]; then
+            currentChannelFound=true
         fi
         typeset currentMajor currentMinor chMajor chMinor
         currentMajor="${currentVersion%%.*}"
@@ -193,6 +256,15 @@ function ResolveTargetChannel () {
             fi
         fi
     done
+
+    if (( validChannelCount == 0 )); then
+        echo >&2 "ERROR: Packagemanifest for ${packageName} has no versioned channels"
+        return 1
+    fi
+    if [[ "${currentChannelFound}" != true ]]; then
+        echo >&2 "ERROR: Current channel ${currentChannel} is absent from the packagemanifest"
+        return 1
+    fi
 
     if [[ -z "${nextChannel}" ]]; then
         echo >&2 "ERROR: No upgrade channel found newer than ${currentChannel}"
@@ -445,11 +517,15 @@ _finalize_exit() {
   fi
   if [[ -n "${_JUNIT_KIND}" ]]; then
     _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
-    mkdir -p "${SHARED_DIR}/junit"
-    cp -f "${ARTIFACT_DIR}/junit_acm_upgrade.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
   fi
+  # Product no-op results should not emit trace or cluster diagnostics.
   if [[ "${_EXIT_CLASS}" == "product" ]]; then
+    (exit 0); _opp_cleanup
     exit 0
+  fi
+  (exit "${rc}"); _opp_cleanup
+  if (( rc != 0 )); then
+    CollectDiagnostics
   fi
   exit "${rc}"
 }
@@ -478,20 +554,36 @@ function Main () {
     fi
 
     currentVersion="$(GetInstalledVersion)"
-    currentChannel="$(GetCurrentChannel)"
+    if ! currentChannel="$(GetCurrentChannel)"; then
+        echo >&2 "ERROR: Failed to query current subscription channel"
+        _JUNIT_KIND="current-channel"
+        _JUNIT_MESSAGE="Failed to query current subscription channel"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
+    if [[ -z "${currentChannel}" ]] ||
+       ! grep -qE '[0-9]+\.[0-9]+' <<< "${currentChannel}"; then
+        echo >&2 "ERROR: Current subscription channel is empty or invalid: ${currentChannel:-<empty>}"
+        _JUNIT_KIND="current-channel"
+        _JUNIT_MESSAGE="Current subscription channel is empty or invalid"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
     echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
 
-    # --- CatalogSource readiness check (INTEROP-9527) ---
-    local cs_timeout="${ACM_CATALOGSOURCE_TIMEOUT:-300}"
-    echo "Waiting up to ${cs_timeout}s for CatalogSource 'redhat-operators' to be READY ..."
-    if ! oc wait catalogsource/redhat-operators -n openshift-marketplace \
-           --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
-           --timeout="${cs_timeout}s"; then
-      echo "ERROR: CatalogSource redhat-operators not READY after ${cs_timeout}s"
-      _JUNIT_KIND="catalogsource-readiness"
-      _JUNIT_MESSAGE="CatalogSource redhat-operators not READY after ${cs_timeout}s"
-      _EXIT_CLASS="infra"
-      return 1
+    if [[ -z "${ACM_TARGET_CHANNEL}" ]]; then
+      # --- CatalogSource readiness check (INTEROP-9527) ---
+      local cs_timeout="${ACM_CATALOGSOURCE_TIMEOUT:-300}"
+      echo "Waiting up to ${cs_timeout}s for CatalogSource 'redhat-operators' to be READY ..."
+      if ! oc wait catalogsource/redhat-operators -n openshift-marketplace \
+             --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
+             --timeout="${cs_timeout}s"; then
+        echo "ERROR: CatalogSource redhat-operators not READY after ${cs_timeout}s"
+        _JUNIT_KIND="catalogsource-readiness"
+        _JUNIT_MESSAGE="CatalogSource redhat-operators not READY after ${cs_timeout}s"
+        _EXIT_CLASS="infra"
+        return 1
+      fi
     fi
 
     # --- Safe ResolveTargetChannel call (INTEROP-9527) ---
@@ -509,6 +601,13 @@ function Main () {
       _JUNIT_MESSAGE="ResolveTargetChannel failed"
       _EXIT_CLASS="infra"
       return "${resolve_rc}"
+    fi
+    if ! grep -qE '[0-9]+\.[0-9]+' <<< "${targetChannel}"; then
+      echo >&2 "ERROR: Target channel does not contain a valid version: ${targetChannel:-<empty>}"
+      _JUNIT_KIND="target-channel"
+      _JUNIT_MESSAGE="Target channel is empty or invalid"
+      _EXIT_CLASS="infra"
+      return 1
     fi
     echo "Target channel: ${targetChannel}"
 
