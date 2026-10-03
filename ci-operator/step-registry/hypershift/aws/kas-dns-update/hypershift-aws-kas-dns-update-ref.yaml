@@ -1,0 +1,52 @@
+ref:
+  as: hypershift-aws-kas-dns-update
+  from: upi-installer
+  cli: latest
+  timeout: 60m0s
+  grace_period: 10m
+  commands: hypershift-aws-kas-dns-update-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: HYPERSHIFT_NAMESPACE
+    default: "clusters"
+    documentation: "The namespace holding the HostedCluster."
+  - name: HYPERSHIFT_DYNAMIC_DNS_BASE_DOMAIN
+    default: ""
+    documentation: |-
+      Base domain owning the Route53 public hosted zone that holds the kube-apiserver
+      DNS record. Defaults to the parent domain of the KAS DNS name itself.
+  - name: KAS_DNS_TTL
+    default: "60"
+    documentation: "TTL, in seconds, of the CNAME record created for the KAS DNS name."
+  - name: DNS_RESOLUTION_TIMEOUT
+    default: "600"
+    documentation: |-
+      How long, in seconds, to wait for the KAS DNS name to resolve in this pod once
+      Route53 reports the change as INSYNC.
+  - name: KAS_ROLLOUT_TIMEOUT
+    default: "600"
+    documentation: |-
+      How long, in seconds, to wait for the kube-apiserver deployment to be updated with
+      the named certificate, and then for that rollout to complete.
+  - name: KAS_REACHABILITY_TIMEOUT
+    default: "900"
+    documentation: |-
+      How long, in seconds, to keep retrying the custom admin kubeconfig against the
+      KAS DNS name before failing the step.
+  documentation: |-
+    Points the custom kube-apiserver DNS name (HostedCluster.spec.kubeAPIServerDNSName)
+    at the hosted cluster's control plane endpoint and makes it usable.
+
+    The step reads the DNS name from ${SHARED_DIR}/kas_dns_name (written by
+    hypershift-aws-create), falling back to the HostedCluster spec. It upserts the
+    Route53 CNAME record for that name - creating it when absent, so a name unique to
+    the job run is supported - installs a self-signed serving certificate for the name
+    via spec.configuration.apiServer.servingCerts.namedCertificates, and verifies that
+    the generated custom admin kubeconfig reaches the API server.
+
+    Pair with hypershift-aws-kas-dns-cleanup in post to remove the record. The zone and
+    the exact record set to delete are handed over in ${SHARED_DIR}/kas_dns_zone_id and
+    ${SHARED_DIR}/kas_dns_delete_batch.json.

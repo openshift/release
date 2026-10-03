@@ -5,7 +5,9 @@ set -o errexit
 set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-REGION="${LEASED_RESOURCE}"
+# Mirror aws-provision-kms-key: the key lives in whichever region that step created it
+# in, which is not necessarily the leased one.
+REGION="${REGION:-$LEASED_RESOURCE}"
 
 function delete_kms_key()
 {
