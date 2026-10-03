@@ -420,14 +420,44 @@ EOF
     # BEGIN NAP FAILURE ARTIFACT COLLECTOR
     # Publish only fixed keys and allowlisted values. Cluster-provided strings stay in
     # the private temporary directory and are used only for in-memory categorization.
+    nap_diagnostic_timeout() {
+        local maximum_seconds="$1"
+        local remaining_seconds
+        shift
+
+        remaining_seconds=$((nap_diagnostic_deadline - SECONDS))
+        if (( remaining_seconds > maximum_seconds )); then
+            remaining_seconds="${maximum_seconds}"
+        fi
+        # The one-second KILL grace is part of both the per-command limit and the
+        # aggregate deadline, rather than extending either limit after TERM.
+        if (( remaining_seconds <= 1 )); then
+            return 1
+        fi
+        timeout --kill-after=1s "$((remaining_seconds - 1))s" "$@"
+    }
+
     capture_nap_json() {
         local output="$1"
+        local captured_bytes=0
+        local capture_succeeded=false
         shift
 
         # Suppress the enclosing group's stderr before the shell opens the private
-        # output path. A redirection failure would otherwise disclose that path.
-        if { "$@" > "${output}"; } 2>/dev/null \
-            && jq -e '.items | type == "array"' "${output}" >/dev/null 2>/dev/null; then
+        # output path. Limit the pipe before writing, and reject rather than aggregate
+        # sources that exceed either the byte or item admission bound.
+        if { nap_diagnostic_timeout 5 "$@" | head -c 262145 > "${output}"; } 2>/dev/null; then
+            capture_succeeded=true
+            captured_bytes="$(wc -c < "${output}" 2>/dev/null || printf '262145')"
+        fi
+        if [[ "${capture_succeeded}" == "true" ]] \
+            && [[ "${captured_bytes}" =~ ^[0-9]+$ ]] \
+            && (( captured_bytes <= 262144 )) \
+            && nap_diagnostic_timeout 3 jq -e '
+                (.items | type == "array") and
+                (.items | length <= 256) and
+                (.items | all(type == "object"))
+            ' "${output}" >/dev/null 2>/dev/null; then
             return 0
         fi
 
@@ -445,7 +475,10 @@ EOF
         local nodeclaims_available=false
         local karpenter_events_available=false
         local scheduler_events_available=false
+        local placeholder_pods_available=false
+        local nodes_available=false
         local metrics_available=false
+        local details_available=false
         local nodeclaim_count=0
         local karpenter_event_count=0
         local scheduler_event_count=0
@@ -471,7 +504,11 @@ EOF
         local no_instance_type_category=0
         local scheduling_constraint_category=0
         local metrics=""
+        local details=""
         local metrics_pattern=$'^([0-9]{1,4}\t){23}[0-9]{1,4}$'
+        # Reserve the final second of the advertised collector limit for private
+        # capture cleanup and best-effort artifact writes.
+        local nap_diagnostic_deadline=$((SECONDS + 14))
 
         [[ $- == *x* ]] && xtrace_enabled=true
         set +x
@@ -480,38 +517,54 @@ EOF
 
         if capture_dir="$(mktemp -d 2>/dev/null)"; then
             if capture_nap_json "${capture_dir}/nodeclaims.json" \
-                oc --request-timeout=15s get nodeclaims.karpenter.sh -o json; then
+                oc --request-timeout=4s get nodeclaims.karpenter.sh -o json; then
                 nodeclaims_available=true
             fi
 
             if capture_nap_json "${capture_dir}/karpenter-events.json" \
-                oc --request-timeout=15s get events -A \
+                oc --request-timeout=4s get events -A \
                 --field-selector source=karpenter-events -o json; then
                 karpenter_events_available=true
             fi
 
             if capture_nap_json "${capture_dir}/scheduler-events.json" \
-                oc --request-timeout=15s get events -n default \
+                oc --request-timeout=4s get events -n default \
                 --field-selector involvedObject.kind=Pod -o json; then
                 scheduler_events_available=true
             fi
 
+            if capture_nap_json "${capture_dir}/placeholder-pods.json" \
+                oc --request-timeout=4s get pods -n default \
+                -l app=nap-placeholder -o json; then
+                placeholder_pods_available=true
+            fi
+
+            if capture_nap_json "${capture_dir}/nodes.json" \
+                oc --request-timeout=4s get nodes -o json; then
+                nodes_available=true
+            fi
+
             # jq emits digits only. The shell validates the complete fixed-width tuple
             # before assigning it to allowlisted output keys.
-            if metrics="$(jq -nr \
+            if metrics="$(nap_diagnostic_timeout 4 jq -nr \
                 --slurpfile nodeclaims "${capture_dir}/nodeclaims.json" \
                 --slurpfile karpenter_events "${capture_dir}/karpenter-events.json" \
                 --slurpfile scheduler_events "${capture_dir}/scheduler-events.json" '
                     def cap: if . > 9999 then 9999 else . end;
-                    ($nodeclaims[0].items) as $nodeclaims |
-                    ($karpenter_events[0].items) as $karpenter_events |
-                    ($scheduler_events[0].items | map(select(
-                        (((.involvedObject.name? | select(type == "string")) // "") | startswith("nap-placeholder-")) and
-                        ([.reason?, .source.component?, .reportingController?]
-                            | map(select(type == "string"))
-                            | any(test("schedul"; "i")))
+                    def object_or_empty: if type == "object" then . else {} end;
+                    def array_or_empty: if type == "array" then . else [] end;
+                    def conditions:
+                        .status | object_or_empty | .conditions | array_or_empty | .[] |
+                        object_or_empty;
+                    ($nodeclaims[0].items // []) as $nodeclaims |
+                    ($karpenter_events[0].items // []) as $karpenter_events |
+                    ($scheduler_events[0].items // [] | map(select(
+                        (((.involvedObject | object_or_empty | .name? |
+                            select(type == "string")) // "") |
+                            startswith("nap-placeholder-")) and
+                        .type? == "Warning" and .reason? == "FailedScheduling"
                     ))) as $scheduler_events |
-                    (([$nodeclaims[]?.status.conditions[]? | .reason?, .message?] +
+                    (([$nodeclaims[]? | conditions | .reason?, .message?] +
                       [$karpenter_events[]? | .reason?, .message?] +
                       [$scheduler_events[]? | .reason?, .message?])
                         | map(select(type == "string"))) as $diagnostic_text |
@@ -523,18 +576,18 @@ EOF
                         ($karpenter_events | map(select(.type? == "Normal")) | length | cap),
                         ($scheduler_events | map(select(.type? == "Warning")) | length | cap),
                         ($scheduler_events | map(select(.type? == "Normal")) | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Initialized" and .status? == "True") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Initialized" and .status? == "False") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Initialized" and .status? == "Unknown") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Launched" and .status? == "True") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Launched" and .status? == "False") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Launched" and .status? == "Unknown") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Ready" and .status? == "True") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Ready" and .status? == "False") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Ready" and .status? == "Unknown") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Registered" and .status? == "True") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Registered" and .status? == "False") ] | length | cap),
-                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Registered" and .status? == "Unknown") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Initialized" and .status? == "True") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Initialized" and .status? == "False") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Initialized" and .status? == "Unknown") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Launched" and .status? == "True") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Launched" and .status? == "False") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Launched" and .status? == "Unknown") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Ready" and .status? == "True") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Ready" and .status? == "False") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Ready" and .status? == "Unknown") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Registered" and .status? == "True") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Registered" and .status? == "False") ] | length | cap),
+                        ([ $nodeclaims[]? | conditions | select(.type? == "Registered" and .status? == "Unknown") ] | length | cap),
                         (if any($diagnostic_text[]?; test("quota|cores? limit"; "i")) then 1 else 0 end),
                         (if any($diagnostic_text[]?; test("(sku|vm size).*(not available|unavailable|unsupported|restricted)"; "i")) then 1 else 0 end),
                         (if any($diagnostic_text[]?; test("out of capacity|insufficient capacity|overconstrainedallocationrequest|allocation failed"; "i")) then 1 else 0 end),
@@ -554,6 +607,199 @@ EOF
                     quota_category sku_unavailable_category out_of_capacity_category \
                     no_instance_type_category scheduling_constraint_category <<< "${metrics}"
                 metrics_available=true
+            fi
+
+            # Produce a second, bounded artifact containing only fixed keys and
+            # strictly allowlisted values. Raw names, messages, metadata, IDs, and
+            # environment values never leave the private capture directory.
+            if details="$(nap_diagnostic_timeout 4 jq -cn \
+                --argjson nodeclaims_available "${nodeclaims_available}" \
+                --argjson karpenter_events_available "${karpenter_events_available}" \
+                --argjson scheduler_events_available "${scheduler_events_available}" \
+                --argjson placeholder_pods_available "${placeholder_pods_available}" \
+                --argjson nodes_available "${nodes_available}" \
+                --slurpfile nodeclaims "${capture_dir}/nodeclaims.json" \
+                --slurpfile karpenter_events "${capture_dir}/karpenter-events.json" \
+                --slurpfile scheduler_events "${capture_dir}/scheduler-events.json" \
+                --slurpfile placeholder_pods "${capture_dir}/placeholder-pods.json" \
+                --slurpfile nodes "${capture_dir}/nodes.json" '
+                    def cap: if . > 9999 then 9999 else . end;
+                    def object_or_empty: if type == "object" then . else {} end;
+                    def array_or_empty: if type == "array" then . else [] end;
+                    def conditions:
+                        .status | object_or_empty | .conditions | array_or_empty | .[] |
+                        object_or_empty;
+                    def pod_phase: .status | object_or_empty | .phase?;
+                    def pod_node_name:
+                        ((.spec | object_or_empty | .nodeName? | select(type == "string")) // "");
+                    def quantity:
+                        select(type == "string" and
+                            test("^[0-9]{1,20}([.][0-9]{1,9})?(m|Ki|Mi|Gi|Ti|Pi|Ei)?$"));
+                    def bounded_values($limit):
+                        unique as $all |
+                        {
+                            values: $all[:$limit],
+                            total: ($all | length | cap),
+                            truncated: (($all | length) > $limit)
+                        };
+                    def requirement_values($texts; $pattern; $allowed):
+                        [$texts[] |
+                            (capture($pattern)? // empty) |
+                            .values |
+                            split(",")[] |
+                            gsub("^\\s+|\\s+$"; "")] |
+                        map(select(. as $value | $allowed | index($value))) |
+                        bounded_values(16);
+                    def event_count($texts; $pattern):
+                        [$texts[] | select(test($pattern; "i"))] | length | cap;
+
+                    ($nodeclaims[0].items // []) as $nodeclaims |
+                    ($karpenter_events[0].items // []) as $karpenter_events |
+                    ($scheduler_events[0].items // [] | map(select(
+                        (((.involvedObject | object_or_empty | .name? |
+                            select(type == "string")) // "") |
+                            startswith("nap-placeholder-")) and
+                        .type? == "Warning" and .reason? == "FailedScheduling"
+                    ))) as $scheduler_events |
+                    ($placeholder_pods[0].items // [] | map(select(
+                        ((.metadata | object_or_empty | .name? |
+                            select(type == "string")) // "") |
+                            startswith("nap-placeholder-")))) as $pods |
+                    ($nodes[0].items // []) as $nodes |
+                    ([$nodeclaims[]? | conditions | .reason?, .message?] +
+                     [$karpenter_events[]? | .reason?, .message?] |
+                        map(select(type == "string"))) as $karpenter_text |
+                    ([$karpenter_text[] |
+                        select(test("no (available |compatible )?instance( type)?|no instance.*satisf"; "i"))])
+                        as $no_instance_text_all |
+                    ($no_instance_text_all[:64]) as $no_instance_text |
+                    ([$scheduler_events[]?.message? | select(type == "string")]) as $scheduler_text_all |
+                    ($scheduler_events[:64]) as $scheduler_event_sample |
+                    ([$scheduler_event_sample[]?.message? | select(type == "string")]) as $scheduler_text |
+                    ([$pods[]? | .spec | object_or_empty | .containers | array_or_empty | .[] |
+                        object_or_empty |
+                        {
+                            cpu: ((.resources | object_or_empty | .requests |
+                                object_or_empty | .cpu? | quantity) // null),
+                            memory: ((.resources | object_or_empty | .requests |
+                                object_or_empty | .memory? | quantity) // null)
+                        } |
+                        select(.cpu != null or .memory != null)] |
+                        group_by([.cpu, .memory]) |
+                        map({cpu: .[0].cpu, memory: .[0].memory, container_count: (length | cap)}))
+                        as $request_profiles |
+                    ([$nodes[]? |
+                        {
+                            ready: any(conditions;
+                                .type? == "Ready" and .status? == "True"),
+                            schedulable: ((.spec | object_or_empty | .unschedulable?) != true),
+                            cpu: ((.status | object_or_empty | .allocatable |
+                                object_or_empty | .cpu? | quantity) // null),
+                            memory: ((.status | object_or_empty | .allocatable |
+                                object_or_empty | .memory? | quantity) // null),
+                            pods: ((.status | object_or_empty | .allocatable |
+                                object_or_empty | .pods? | quantity) // null)
+                        } |
+                        select(.cpu != null or .memory != null or .pods != null)] |
+                        group_by([.ready, .schedulable, .cpu, .memory, .pods]) |
+                        map({
+                            ready: .[0].ready,
+                            schedulable: .[0].schedulable,
+                            cpu: .[0].cpu,
+                            memory: .[0].memory,
+                            pods: .[0].pods,
+                            node_count: (length | cap)
+                        })) as $allocatable_profiles |
+                    {
+                        schema_version: 2,
+                        diagnostic_coverage: "limited",
+                        collection_limits: {
+                            max_bytes_per_source: 262144,
+                            max_items_per_source: 256,
+                            max_collector_seconds: 15
+                        },
+                        source_availability: {
+                            nodeclaims: $nodeclaims_available,
+                            karpenter_events: $karpenter_events_available,
+                            scheduler_events: $scheduler_events_available,
+                            placeholder_pods: $placeholder_pods_available,
+                            nodes: $nodes_available
+                        },
+                        no_instance_type_rejections: {
+                            observed_message_total: ($no_instance_text_all | length | cap),
+                            sampled_message_count: ($no_instance_text | length | cap),
+                            messages_truncated: (($no_instance_text_all | length) > 64),
+                            requirements: {
+                                sku_name: requirement_values($no_instance_text_all;
+                                    "karpenter[.]azure[.]com/sku-name\\s+In\\s+[[](?<values>[^]]{1,512})[]]";
+                                    ["Standard_D16s_v5", "Standard_E16s_v5",
+                                     "Standard_D16s_v6", "Standard_D16s_v7"]),
+                                sku_family: requirement_values($no_instance_text_all;
+                                    "karpenter[.]azure[.]com/sku-family\\s+In\\s+[[](?<values>[^]]{1,128})[]]";
+                                    ["D", "E", "F"]),
+                                sku_cpu: requirement_values($no_instance_text_all;
+                                    "karpenter[.]azure[.]com/sku-cpu\\s+In\\s+[[](?<values>[^]]{1,128})[]]";
+                                    ["16"]),
+                                sku_version: requirement_values($no_instance_text_all;
+                                    "karpenter[.]azure[.]com/sku-version\\s+In\\s+[[](?<values>[^]]{1,128})[]]";
+                                    ["3", "4", "5", "6", "7"]),
+                                architecture: requirement_values($no_instance_text_all;
+                                    "kubernetes[.]io/arch\\s+In\\s+[[](?<values>[^]]{1,64})[]]";
+                                    ["amd64", "arm64"]),
+                                operating_system: requirement_values($no_instance_text_all;
+                                    "kubernetes[.]io/os\\s+In\\s+[[](?<values>[^]]{1,64})[]]";
+                                    ["linux", "windows"]),
+                                capacity_type: requirement_values($no_instance_text_all;
+                                    "karpenter[.]sh/capacity-type\\s+In\\s+[[](?<values>[^]]{1,64})[]]";
+                                    ["on-demand", "spot"])
+                            }
+                        },
+                        scheduler_rejections: {
+                            failed_scheduling_event_total: ($scheduler_events | length | cap),
+                            sampled_event_count: ($scheduler_event_sample | length | cap),
+                            events_truncated: (($scheduler_events | length) > 64),
+                            insufficient_cpu_event_count: event_count($scheduler_text_all; "insufficient cpu"),
+                            insufficient_memory_event_count: event_count($scheduler_text_all; "insufficient memory"),
+                            too_many_pods_event_count: event_count($scheduler_text_all; "too many pods"),
+                            node_affinity_mismatch_event_count: event_count($scheduler_text_all; "didn.t match.*node (selector|affinity)"),
+                            untolerated_taint_event_count: event_count($scheduler_text_all; "untolerated taint")
+                        },
+                        placeholder_pods: {
+                            total: ($pods | length | cap),
+                            pending: ([$pods[] | select(pod_phase == "Pending")] | length | cap),
+                            running: ([$pods[] | select(pod_phase == "Running")] | length | cap),
+                            succeeded: ([$pods[] | select(pod_phase == "Succeeded")] | length | cap),
+                            failed: ([$pods[] | select(pod_phase == "Failed")] | length | cap),
+                            scheduled: ([$pods[] | select((pod_node_name | length) > 0)] | length | cap),
+                            pending_unscheduled: ([$pods[] | select(
+                                pod_phase == "Pending" and (pod_node_name | length) == 0)]
+                                | length | cap),
+                            request_profile_total: ($request_profiles | length | cap),
+                            request_profiles_truncated: (($request_profiles | length) > 8),
+                            request_profiles: $request_profiles[:8]
+                        },
+                        nodes: {
+                            total: ($nodes | length | cap),
+                            ready: ([$nodes[] | select(any(conditions;
+                                .type? == "Ready" and .status? == "True"))] | length | cap),
+                            schedulable: ([$nodes[] | select(
+                                (.spec | object_or_empty | .unschedulable?) != true)] | length | cap),
+                            allocatable_profile_total: ($allocatable_profiles | length | cap),
+                            allocatable_profiles_truncated: (($allocatable_profiles | length) > 8),
+                            allocatable_profiles: $allocatable_profiles[:8]
+                        }
+                    }
+                ' 2>/dev/null)" \
+                && (( ${#details} <= 32768 )) \
+                && nap_diagnostic_timeout 2 jq -e '
+                    type == "object" and
+                    .schema_version == 2 and
+                    ([paths(scalars) as $p | getpath($p) | strings |
+                        length <= 128] | all)
+                ' >/dev/null 2>/dev/null <<< "${details}"; then
+                details_available=true
+            else
+                details=""
             fi
         else
             capture_dir=""
@@ -575,6 +821,9 @@ metrics_available=${metrics_available}
 nodeclaims_available=${nodeclaims_available}
 karpenter_events_available=${karpenter_events_available}
 scheduler_events_available=${scheduler_events_available}
+placeholder_pods_available=${placeholder_pods_available}
+nodes_available=${nodes_available}
+details_available=${details_available}
 nodeclaim_count=${nodeclaim_count}
 karpenter_event_count=${karpenter_event_count}
 scheduler_event_count=${scheduler_event_count}
@@ -603,6 +852,12 @@ EOF
             } 2>/dev/null || {
                 rm -f -- "${ARTIFACT_DIR}/nap-failure-summary.txt" 2>/dev/null || true
             }
+
+            if [[ "${details_available}" == "true" ]]; then
+                { printf '%s\n' "${details}" > "${ARTIFACT_DIR}/nap-failure-details.json"; } 2>/dev/null || {
+                    rm -f -- "${ARTIFACT_DIR}/nap-failure-details.json" 2>/dev/null || true
+                }
+            fi
         fi
 
         if [[ "${xtrace_enabled}" == "true" ]]; then
