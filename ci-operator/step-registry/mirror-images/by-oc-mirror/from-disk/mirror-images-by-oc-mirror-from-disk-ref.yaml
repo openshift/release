@@ -1,0 +1,35 @@
+ref:
+  as: mirror-images-by-oc-mirror-from-disk
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  grace_period: 30m
+  timeout: 4h0m0s
+  commands: mirror-images-by-oc-mirror-from-disk-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  env:
+  - name: ENABLE_IDMS
+    default: "yes"
+    documentation: |-
+      When "yes" (default), writes an ImageDigestMirrorSet to
+      SHARED_DIR/idms-oc-mirror.yaml and generates imageDigestSources in the
+      install-config patch. Set to "no" to use the legacy ImageContentSourcePolicy
+      (imageContentSources) instead.
+  documentation: |-
+    Push the disk archive previously written by mirror-images-by-oc-mirror-to-disk
+    into the bastion mirror registry using oc-mirror v2 (disk-to-mirror phase).
+
+    Reads SHARED_DIR/oc-mirror-disk-archive-dir for the archive path on the bastion
+    and SHARED_DIR/mirror_registry_url for the registry endpoint. On success writes:
+      SHARED_DIR/idms-oc-mirror.yaml       - ImageDigestMirrorSet for the cluster
+      SHARED_DIR/itms-oc-mirror.yaml       - ImageTagMirrorSet (if produced)
+      SHARED_DIR/install-config-mirror.yaml.patch - imageDigestSources/imageContentSources
+                                             block ready to be merged into install-config.yaml
