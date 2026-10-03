@@ -74,6 +74,11 @@ if [[ -n "${ROSA_LABEL_FILTER:-}" ]]; then
 fi
 
 # OCP release image for the e2e HCP cluster (empty uses the default).
+# An explicit OCP_IMAGE wins over one resolved by rosa-hyperfleet-resolve-ocp-image.
+RESOLVED_OCP_IMAGE_FILE="${SHARED_DIR}/ocp-image"
+if [[ -z "${OCP_IMAGE:-}" ]] && [[ -r "${RESOLVED_OCP_IMAGE_FILE}" ]]; then
+  OCP_IMAGE="$(cat "${RESOLVED_OCP_IMAGE_FILE}")"
+fi
 export OCP_IMAGE="${OCP_IMAGE:-}"
 
 echo "Running e2e tests..."
