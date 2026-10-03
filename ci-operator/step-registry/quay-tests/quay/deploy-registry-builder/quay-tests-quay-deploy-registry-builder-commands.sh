@@ -124,3 +124,5 @@ for pod in $(oc -n ${QUAYNAMESPACE} get pods -o name 2>/dev/null); do
   podname=$(basename "$pod")
   oc -n ${QUAYNAMESPACE} logs "$pod" --all-containers >"$ARTIFACT_DIR/debug_logs_${podname}.txt" 2>&1 || true
 done
+
+sleep 8h
