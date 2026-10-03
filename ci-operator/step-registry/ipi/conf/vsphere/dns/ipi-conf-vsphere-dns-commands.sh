@@ -129,11 +129,13 @@ for ((i = 0; i < ${#HOSTNAMES[@]}; i++)); do
   fi
 done
 
-# Snowflake for the default api-int, which shares a vip with the default api.
-# api-int record is needed just for Windows nodes
-# TODO: Remove the api-int entry in future
-echo "Adding "api-int.$cluster_domain." to batch files"
-dns_reserve_and_defer_cleanup ${vips[0]} "api-int.$cluster_domain." "A"
+if [ "${VSPHERE_ENABLE_API_INT:-false}" = "true" ]; then
+  # Optional public api-int record (same VIP as api) for scenarios that need it in public DNS.
+  echo "Adding api-int.${cluster_domain}. to batch files"
+  dns_reserve_and_defer_cleanup "${vips[0]}" "api-int.${cluster_domain}." "A"
+else
+  echo "Skipping api-int.${cluster_domain}. (set VSPHERE_ENABLE_API_INT=true to create)"
+fi
 
 id=$(aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/dns-create.json --query '"ChangeInfo"."Id"' --output text)
 
