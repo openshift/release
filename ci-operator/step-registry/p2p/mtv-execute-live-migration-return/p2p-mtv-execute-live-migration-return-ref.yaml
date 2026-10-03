@@ -73,7 +73,25 @@ ref:
     documentation: StorageMap referenced by the return Plan (created by p2p-mtv-create-return-migration-maps).
   - name: MTV_PLAN_TYPE
     default: "live"
-    documentation: Plan spec.type — live for CCLM, cold for powered-off migration.
+    documentation: Plan spec.type — live for CCLM, cold for powered-off migration. When cold, source VMs are halted before Plan creation. Ignored for the live half when MTV_COLD_VM_COUNT splits the VM set.
+  - name: MTV_COLD_VM_COUNT
+    default: "0"
+    documentation: |-
+      When 0 < N < MTV_TEST_VM_COUNT, start two return Plans at once:
+      VMs 1..N on a cold Plan (halted first) and VMs N+1..COUNT on a live Plan.
+      Must match the forward-leg MTV_COLD_VM_COUNT. Job env applies to both legs.
+  - name: MTV_COLD_PLAN_NAME
+    default: "cclm-plan-return-cold"
+    documentation: Plan metadata.name for the cold half of the return leg (must not collide with the forward cold Plan).
+  - name: MTV_COLD_MIGRATION_NAME
+    default: "cclm-run-return-cold"
+    documentation: Migration metadata.name for the cold half of the return leg.
+  - name: P2P_HS_SPOKE_VM_PREFIX
+    default: "test-vm"
+    documentation: VM name prefix when MTV_TEST_VM_COUNT>1 (VMs are <prefix>-1..N).
+  - name: MTV_COLD_VM_STOP_TIMEOUT
+    default: "10m"
+    documentation: oc wait --for=delete timeout for each source VMI when MTV_PLAN_TYPE=cold.
   - name: MTV_PLAN_READY_TIMEOUT
     default: "15m"
     documentation: Timeout for Provider/Map/Plan Ready waits.

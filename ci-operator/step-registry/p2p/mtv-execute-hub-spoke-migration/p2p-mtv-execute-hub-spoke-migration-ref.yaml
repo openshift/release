@@ -66,7 +66,15 @@ ref:
     documentation: Namespace where MTV Plan and Migration CRs live on the hub.
   - name: MTV_HS_PLAN_TYPE
     default: "live"
-    documentation: Plan spec.type — live for CCLM, cold for powered-off migration.
+    documentation: Plan spec.type — live for CCLM, cold for powered-off migration. When cold, source VMs are halted before each direction's Plan.
+  - name: MTV_HS_COLD_VM_COUNT
+    default: "0"
+    documentation: |-
+      When 0 < N < P2P_HS_VM_COUNT, each parallel-enabled leg (spoke→hub and the
+      hub→spoke return) starts a cold Plan (VMs 1..N) and a live Plan (VMs N+1..COUNT)
+      at the same time. MTV warm is not supported for OpenShift sources; live is the
+      running-VM path. Return uses Plan names suffixed with -cold so they do not
+      collide with the forward CRs.
   - name: MTV_HS_HUB_PROVIDER
     default: "host"
     documentation: |-
@@ -196,6 +204,9 @@ ref:
   - name: MTV_HS_MIGRATION_POLL_INTERVAL_SECONDS
     default: "30"
     documentation: Sleep between Migration status polls.
+  - name: MTV_COLD_VM_STOP_TIMEOUT
+    default: "10m"
+    documentation: oc wait --for=delete timeout for each source VMI when MTV_HS_PLAN_TYPE=cold.
   - name: MTV_HS_CNV_NAMESPACE
     default: "openshift-cnv"
     documentation: OpenShift Virtualization namespace on both hub and spoke (KubeVirt/HCO).
