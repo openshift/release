@@ -2,6 +2,10 @@
 
 set -uo pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function on_failure() {
   echo "============================================"
   echo "DEBUG: collect-validation-results failed"
