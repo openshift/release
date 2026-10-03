@@ -1,0 +1,28 @@
+ref:
+  as: firewatch-test-jira-token
+  from_image:
+    namespace: firewatch
+    name: firewatch
+    tag: main
+  commands: firewatch-test-jira-token-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: firewatch-tool-jira-credentials
+      mount_path: /tmp/secrets/jira
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: FIREWATCH_JIRA_SERVER
+    default: https://redhat.atlassian.net
+    documentation: The Jira server to test connection against.
+  - name: FIREWATCH_JIRA_API_TOKEN_PATH
+    default: /tmp/secrets/jira/access_token
+    documentation: The path to the file containing the Jira API token.
+  documentation: |-
+    Tests the Jira Cloud connection and token validity by attempting to:
+    1. Generate Jira config using the token
+    2. Connect to Jira server
+    3. Verify authentication
+    4. Check project access (LPINTEROP)
