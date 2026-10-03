@@ -1,0 +1,54 @@
+ref:
+  as: kuadrant-s390x-install-metallb
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: kuadrant-s390x-install-metallb-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 30m0s
+  env:
+  - name: METALLB_NAMESPACE
+    default: "metallb-system"
+    documentation: |-
+      Namespace for the MetalLB operator and MetalLB CR.
+  - name: METALLB_CATALOG_SOURCE
+    default: "redhat-operators"
+    documentation: |-
+      CatalogSource for the Red Hat MetalLB operator.
+  - name: METALLB_CHANNEL
+    default: "stable"
+    documentation: |-
+      Subscription channel. Use "stable" (Automatic approval) for the latest
+      published MetalLB operator CSV, or "!default" to use the package default channel.
+  - name: METALLB_ADDRESS_POOL
+    default: ""
+    documentation: |-
+      Optional explicit pool range, e.g. "192.168.3.240-192.168.3.250". When empty,
+      the step derives 192.168.<lease.subnet>.240-250 from CLUSTER_PROFILE_DIR/leases
+      or from SHARED_DIR/install-config.yaml machineNetwork.
+  - name: METALLB_POOL_START_HOST
+    default: "240"
+    documentation: |-
+      Host octet start when deriving the pool from the libvirt lease /24.
+  - name: METALLB_POOL_END_HOST
+    default: "250"
+    documentation: |-
+      Host octet end when deriving the pool from the libvirt lease /24.
+  - name: METALLB_POOL_NAME
+    default: "default-pool"
+    documentation: |-
+      Name of the IPAddressPool (matches the known-good RHCL s390x reference cluster).
+  - name: METALLB_ADVERTISEMENT_NAME
+    default: "default-adv"
+    documentation: |-
+      Name of the L2Advertisement.
+  documentation: |-
+    Installs the Red Hat MetalLB operator from redhat-operators (stable / latest
+    CSV via Automatic approval), creates the MetalLB instance, and configures an
+    L2 IPAddressPool from the libvirt-s390x lease subnet (192.168.<subnet>.240-250
+    by default). Required so Istio Gateway LoadBalancer Services get EXTERNAL-IPs
+    and reach Programmed=True on Orange Zone UPI clusters.
