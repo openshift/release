@@ -11,6 +11,45 @@ function version_le() {
   [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
 }
 
+function set_aws_china_ami_defaults() {
+  [[ "${CLUSTER_TYPE}" == "aws-china" ]] || return 0
+
+  # Explicit per-pool AMIs are authoritative. Only select a default when at
+  # least one pool does not provide an AMI.
+  if [[ -n "${CONTROL_PLANE_AMI}" && -n "${COMPUTE_AMI}" ]]; then
+    return 0
+  fi
+
+  local os_image_stream="${OS_IMAGE_STREAM}"
+  if [[ -z "${os_image_stream}" ]]; then
+    if version_le "5.0" "${ocp_version}"; then
+      os_image_stream="rhel-10"
+    else
+      os_image_stream="rhel-9"
+    fi
+  fi
+
+  local aws_china_ami
+  case "${os_image_stream}:${REGION}" in
+  rhel-9:cn-north-1) aws_china_ami="ami-035fe32643a65840e" ;;
+  rhel-9:cn-northwest-1) aws_china_ami="ami-0564c0e0e53053388" ;;
+  rhel-10:cn-north-1) aws_china_ami="ami-0c44fa4362ed032e9" ;;
+  rhel-10:cn-northwest-1) aws_china_ami="ami-0d963f1d723bafec1" ;;
+  rhel-9:*|rhel-10:*)
+    echo "ERROR: Unsupported AWS China region '${REGION}'" >&2
+    return 1
+    ;;
+  *)
+    echo "ERROR: Unsupported AWS China OS image stream '${os_image_stream}'" >&2
+    return 1
+    ;;
+  esac
+
+  CONTROL_PLANE_AMI="${CONTROL_PLANE_AMI:-${aws_china_ami}}"
+  COMPUTE_AMI="${COMPUTE_AMI:-${aws_china_ami}}"
+  export CONTROL_PLANE_AMI COMPUTE_AMI
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -332,6 +371,10 @@ rm /tmp/pull-secret
 #   yq-go m -x -i "${CONFIG}" "${PATCH}"
 #   rm "${PATCH}"
 # fi
+
+# Select the region- and osImageStream-specific RHCOS AMI for AWS China after
+# Boskos chooses the region.
+set_aws_china_ami_defaults
 
 # custom rhcos ami for non-public regions
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && [[ -z "${COMPUTE_AMI}" ]]; then
