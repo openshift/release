@@ -1,0 +1,58 @@
+ref:
+  as: redhat-performance-benchmark-runner-ibm
+  from_image:
+    namespace: ci
+    name: benchmark-runner
+    tag: latest
+  commands: redhat-performance-benchmark-runner-ibm-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: benchmark-runner-ibm-test
+    mount_path: /secret
+  grace_period: 30s
+  timeout: 24h0m0s
+  env:
+  - name: RUN_TYPE
+    default: test_ci
+    documentation: Run type (test_ci, func_ci, perf_ci). Controls VM sizing and workload parameters.
+  - name: KUBEADMIN_PASSWORD_PATH
+    default: ""
+    documentation: Path to kubeadmin password file on the cluster host. Set via Vault or env override. Falls back to /root/.kube/kubeadmin-password if empty.
+  - name: KUBECONFIG_PATH
+    default: ""
+    documentation: Path to kubeconfig file on the cluster host. Set via Vault or env override. Falls back to /root/.kube/config if empty.
+  - name: WORKLOAD
+    default: all-ephemeral
+    documentation: Benchmark workload to run (e.g. sysbench_pod, uperf_pod, all-ephemeral).
+  - name: SCALE
+    default: "1"
+    documentation: Number of VMs/pods for scale workloads.
+  - name: LSO_DISK_ID
+    default: ""
+    documentation: LSO disk ID for local storage workloads.
+  - name: WORKER_DISK_IDS
+    default: ""
+    documentation: JSON dict mapping worker nodes to LSO disk ID lists.
+  - name: REDIS
+    default: ""
+    documentation: Redis endpoint for scale workload synchronization.
+  - name: THREADS_LIMIT
+    default: ""
+    documentation: Maximum concurrent threads for scale workloads.
+  - name: WINDOWS_IMAGE
+    default: ""
+    documentation: Windows image type for scale workloads (windows11, windows_server_2022, windows_server_2025).
+  - name: ENABLE_PROMETHEUS_SNAPSHOT
+    default: "True"
+    documentation: Collect Prometheus snapshot during workload run.
+  - name: TIMEOUT
+    default: "8000"
+    documentation: Benchmark-runner internal timeout in seconds for workload completion.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: >-
+    Runs benchmark-runner ephemeral workloads on IBM test cluster.
+    Weekly CI validation of all ephemeral workloads (stressng, uperf,
+    sysbench, hammerdb, vdbench, fio — pod and VM variants).
