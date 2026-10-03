@@ -1,10 +1,39 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - build_args:
+    - name: TARGETOS
+      value: linux
+    - name: TARGETARCH
+      value: amd64
+    dockerfile_path: Dockerfile.konflux
+    to: mcp-lifecycle-module-operator
 prowgen:
   enable_secrets_store_csi_driver: true
+releases:
+  hypershift-guest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.22"
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -17,6 +46,100 @@ tests:
   commands: GOFLAGS='' make unit-test
   container:
     from: src
+- as: tls-scan-pqc
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  steps:
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: mcp-lifecycle-module-operator-system
+    test:
+    - ref: cert-manager-install-operator
+    - as: deploy
+      cli: latest
+      commands: |
+        export GOFLAGS=''
+        # The deploy target uses `kubectl`, but the `cli: latest` image only
+        # ships `oc`. Make `kubectl` resolve to `oc` (a functional superset).
+        mkdir -p "${HOME}/bin"
+        ln -sf "$(command -v oc)" "${HOME}/bin/kubectl"
+        export PATH="${HOME}/bin:${PATH}"
+        make deploy IMG="${OPERATOR_IMAGE}" MCPLO_OPERAND_IMAGE="quay.io/opendatahub/odh-mcp-lifecycle-operator:odh-stable"
+        oc -n mcp-lifecycle-module-operator-system rollout status deploy/mcp-lifecycle-module-operator-controller-manager --timeout=5m
+        oc apply -f - <<EOF
+        apiVersion: components.platform.opendatahub.io/v1alpha1
+        kind: MCPLifecycleOperator
+        metadata:
+          name: default
+        spec:
+          managementState: Managed
+        EOF
+        oc wait --for=condition=Ready mcplifecycleoperator/default --timeout=10m
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: mcp-lifecycle-module-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - ref: tls-scanner-run
+    workflow: generic-claim
+- as: tls-scan-modern-adherence
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-opendatahub
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:hypershift-guest
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
+      HYPERSHIFT_NODE_COUNT: "2"
+      SCAN_NAMESPACE: mcp-lifecycle-module-operator-system
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+      TLS_PROFILE_TYPE: Modern
+    test:
+    - ref: cert-manager-install-operator
+    - ref: tls-13
+    - as: deploy
+      cli: latest
+      commands: |
+        export GOFLAGS=''
+        # The deploy target uses `kubectl`, but the `cli: latest` image only
+        # ships `oc`. Make `kubectl` resolve to `oc` (a functional superset).
+        mkdir -p "${HOME}/bin"
+        ln -sf "$(command -v oc)" "${HOME}/bin/kubectl"
+        export PATH="${HOME}/bin:${PATH}"
+        make deploy IMG="${OPERATOR_IMAGE}" MCPLO_OPERAND_IMAGE="quay.io/opendatahub/odh-mcp-lifecycle-operator:odh-stable"
+        oc -n mcp-lifecycle-module-operator-system rollout status deploy/mcp-lifecycle-module-operator-controller-manager --timeout=5m
+        oc apply -f - <<EOF
+        apiVersion: components.platform.opendatahub.io/v1alpha1
+        kind: MCPLifecycleOperator
+        metadata:
+          name: default
+        spec:
+          managementState: Managed
+        EOF
+        oc wait --for=condition=Ready mcplifecycleoperator/default --timeout=10m
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: mcp-lifecycle-module-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - ref: tls-scanner-run
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
