@@ -1,0 +1,83 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: mitigation-loader
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - ref: block-copyfail-deploy
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+- as: e2e-aws-ovn-ipsec
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ovn-conf-ipsec-manifest
+    - chain: ipi-install
+    test:
+    - ref: block-copyfail-deploy
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+- as: e2e-aws-periodic
+  cron: 0 6 * * 1
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - ref: block-copyfail-deploy
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+- as: e2e-aws-ovn-ipsec-periodic
+  cron: 0 6 * * 3
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ovn-conf-ipsec-manifest
+    - chain: ipi-install
+    test:
+    - ref: block-copyfail-deploy
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: block-copyfail
