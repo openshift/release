@@ -66,25 +66,38 @@ BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/gro
 
 
 echo "Run compute NROP gotests via ssh tunnel"
-# Temporarily disable set -e to capture SSH exit code
+# Keep going after a suite failure so schedrst and must-gather e2e still run.
 set +e
-timeout -s 9 8h ssh \
-  -o ServerAliveInterval=60 \
-  -o ServerAliveCountMax=3 \
-  -o StrictHostKeyChecking=no \
-  -o UserKnownHostsFile=/dev/null \
-  "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key bash -s -- << EOF
+
+run_nrop_script() {
+  local script_name="$1"
+  echo
+  echo "--------------------------------------------------"
+  echo "Running gotests script: ${script_name}"
+  echo "--------------------------------------------------"
+  echo
+  timeout -s 9 8h ssh \
+    -o ServerAliveInterval=60 \
+    -o ServerAliveCountMax=3 \
+    -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile=/dev/null \
+    "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key bash -s -- << EOF
 set -o nounset
 set -o errexit
 set -o pipefail
 
-echo
-echo "--------------------------------------------------"
-echo "Running gotests script: ${SCOPE}_nrop_test_script.sh"
-echo "--------------------------------------------------"
-echo 
-bash /tmp/wip/artifacts/${SCOPE}_nrop_test_script.sh || true
+bash /tmp/wip/artifacts/${script_name} || true
 EOF
+}
+
+run_nrop_script "${SCOPE}_nrop_test_script.sh"
+
+echo "Collect must-gather before schedrst tests"
+ansible-playbook ./playbooks/compute/nrop_must_gather.yml -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig scope=${SCOPE} test_env=${TEST_ENV}" || true
+
+run_nrop_script "${SCOPE}_nrop_test_script_schedrst.sh"
+run_nrop_script "${SCOPE}_nrop_test_script_mustgather.sh"
 
 echo "Copy must gather to artifacts directory"
 
