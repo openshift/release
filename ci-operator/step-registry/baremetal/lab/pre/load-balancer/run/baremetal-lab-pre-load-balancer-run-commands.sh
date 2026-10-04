@@ -21,6 +21,11 @@ interface "eth1" {
     also request routers, domain-name, domain-name-servers, domain-search,
         dhcp6.name-servers, dhcp6.domain-search, dhcp6.fqdn, dhcp6.sntp-servers;
 }
+
+interface "eth2" {
+    also request routers, domain-name, domain-name-servers, domain-search,
+        dhcp6.name-servers, dhcp6.domain-search, dhcp6.fqdn, dhcp6.sntp-servers;
+}
 '
 
 echo "Pushing the configuration and starting the load balancer in the auxiliary host..."
@@ -120,114 +125,55 @@ for dev in "${devices[@]}"; do
   fi
 done
 
-echo "Injecting static IP assignments to eth2 (Internal interface)..."
-if [ "${ipv4_enabled}" == "true" ]; then
-  if { [ "${LOAD_BALANCER_TYPE:-cluster-managed}" == "user-managed" ] || [ "${AGENT_PLATFORM_TYPE:-}" == "none" ]; }; then
-    if [ "${DISCONNECTED}" == "true" ]; then
-      nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "$INTERNAL_API_IPV4"/22 dev eth2
-      echo "Disconnected environment: Adding Ingress IP address to eth2 as alias..."
-      nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "$INTERNAL_INGRESS_IPV4"/22 dev eth2
-    else
-      nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "$INTERNAL_INGRESS_IPV4"/22 dev eth2
-    fi
-  else
-    # Required for internal communication, uses a separate IP to avoid conflicts with VIPs or node IPs.
-    LAST_OCTET="${INTERNAL_API_IPV4##*.}"
-    if [ "$LAST_OCTET" -lt 155 ]; then
-      # Nodes 1 to 154 -> Containers get 80.101 to 80.254
-      HAPROXY_IPv4="${INTERNAL_API_IPV4%.*.*}.80.$((LAST_OCTET+100))"/22
-    else
-      # Fallback for Nodes 155 to 248 -> Containers get 83.161 to 83.254
-      HAPROXY_IPv4="${INTERNAL_API_IPV4%.*.*}.83.$((LAST_OCTET+6))"/22
-    fi
-    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${HAPROXY_IPv4}" dev eth2
-    echo "Skipping assignment of IPv4 VIPs to eth2 because the load balancer is cluster-managed."
-  fi
-fi
-if [ "${ipv6_enabled}" == "true" ]; then
-  if { [ "${LOAD_BALANCER_TYPE:-cluster-managed}" == "user-managed" ] || [ "${AGENT_PLATFORM_TYPE:-}" == "none" ]; }; then
-    if [ "${DISCONNECTED}" == "true" ]; then
-      nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "$INTERNAL_API_IPV6"/64 dev eth2
-      echo "Disconnected environment: Adding Ingress IPv6 address to eth2 as alias..."
-      nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "$INTERNAL_INGRESS_IPV6"/64 dev eth2
-    else
-      nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "$INTERNAL_INGRESS_IPV6"/64 dev eth2
-    fi
-  else
-    # Required for internal communication, uses a separate IP to avoid conflicts with VIPs or node IPs.
-    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${INTERNAL_API_IPV6/::1/::4}"/64 dev eth2
-    echo "Skipping assignment of IPv6 VIPs to eth2 because the load balancer is cluster-managed."
-  fi
-fi
-nsenter -t "$CONTAINER_PID" -n /sbin/ip link set eth2 up
+if [ "${ipv4_enabled:-false}" == "true" ]; then
+  echo "Launching global IPv4 DHCP client..."
+  nsenter -m -u -n -i -p -t "$CONTAINER_PID" \
+    /sbin/dhclient -nw -v \
+    -pf "/etc/haproxy/dhclient.v4.pid" \
+    -lf "/etc/haproxy/dhclient.v4.lease" eth1 eth2 201>&-
 
-# --- EXTERNAL IPv4 DHCP SERVICE ---
-if [ "${ipv4_enabled}" == "true" ]; then
-  if [ "${ipv6_enabled}" != "true" ]; then
-    nsenter -t "$CONTAINER_PID" -n /sbin/sysctl -w net.ipv6.conf.eth1.disable_ipv6=1
-  fi
-  if [ "${DISCONNECTED}" != "true" ]; then
-    echo "Launching isolated IPv4 DHCP client exclusively for eth1..."
-    nsenter -m -u -n -i -p -t "$CONTAINER_PID" /sbin/dhclient -nw -v \
-      -pf "/etc/haproxy/dhclient.v4.pid" \
-      -lf "/etc/haproxy/dhclient.v4.lease" eth1 201>&-
-
-    echo "Waiting for interfaces to obtain IPv4 addresses inside the container namespace..."
-    for i in {1..60}; do
-      if nsenter -t "$CONTAINER_PID" -n /sbin/ip -o -4 a list "${api_ip_interface}" | grep -q 'inet '; then
-        echo "IPv4 network layer state successfully verified."
+  echo "Waiting for interfaces to obtain IPv4 addresses inside the container namespace..."
+  for i in {1..60}; do
+    if nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -4 a list "${api_ip_interface}" | grep -q 'inet '; then
+      if [ "${DISCONNECTED}" == "true" ] || nsenter -m -u -n -i -p -t "$CONTAINER_PID" /sbin/ip -o -4 a list eth2 | grep -q 'inet '; then
+        echo "IPv4 addresses successfully assigned."
         break
       fi
+    fi
 
-      if [ "$i" -eq 60 ]; then
-        echo "Timed out waiting for DHCP IPv4 assignment on eth1. Exiting."
-        exit 1
-      fi
-      sleep 0.5
-    done
-  else
-    echo "Disconnected environment active. Skipping external IPv4 DHCP."
-  fi
+    if [ "$i" -eq 60 ]; then
+      echo "Timed out waiting for DHCP IPv4 assignment inside container. Exiting."
+      exit 1
+    fi
+    sleep 0.5
+  done
 else
   echo "IPv4 is disabled. Skipping IPv4 lease request."
 fi
 
-# --- EXTERNAL IPv6 DHCP SERVICE ---
-if [ "${ipv6_enabled}" == "true" ]; then
-  if [ "${DISCONNECTED}" != "true" ]; then
-    echo "Waiting for eth1 IPv6 Link-Local address to stabilize..."
-    for j in {1..20}; do
-      if nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list eth1 | grep -q 'inet6 fe80:' && \
-         ! nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list eth1 | grep -q 'tentative'; then
-        echo "eth1 IPv6 Link-Local interface is ready."
-        break
-      fi
-      if [ "$j" -eq 20 ]; then
-        echo "Timed out waiting for eth1 IPv6 Link-Local initialization. Exiting."
-        exit 1
-      fi
-      sleep 0.5
-    done
+if [ "${ipv6_enabled:-false}" == "true" ] && [[ " ${devices[*]} " == *" eth2.br-int "* ]]; then
 
-    echo "Waiting for SLAAC to automatically assign global IPv6 addresses inside the container namespace..."
-    for i in {1..60}; do
-      if nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list "${api_ip_interface}" | grep global | grep -q 'inet6 '; then
-        echo "IPv6 global network layer state successfully verified."
-        break
-      fi
+  echo "Waiting for eth2 IPv6 Link-Local address to be ready..."
+  for j in {1..20}; do
+    # Using only -n namespace argument to guarantee stability
+    if nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list eth2 | grep -q 'inet6 fe80:' && \
+       ! nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list eth2 | grep -q 'tentative'; then
+      echo "eth2 IPv6 link-local interface is ready and available."
+      break
+    fi
+    [ "$j" -eq 20 ] && { echo "Timed out waiting for eth2 link-local interface state. Exiting."; exit 1; }
+    sleep 0.5
+  done
 
-      if [ "$i" -eq 60 ]; then
-        echo "Timed out waiting for SLAAC auto-configuration on eth1. Exiting."
-        exit 1
-      fi
-      sleep 0.5
-    done
-  else
-    echo "Disconnected environment active. Disabling IPv6 tracking profiles."
-    nsenter -t "$CONTAINER_PID" -n /sbin/sysctl -w net.ipv6.conf.eth1.disable_ipv6=1
-  fi
+  echo "Launching IPv6 DHCP client for eth2..."
+  nsenter -m -u -n -i -p -t "$CONTAINER_PID" \
+    /sbin/dhclient -6 -v \
+    -cf /dev/null \
+    -pf "/etc/haproxy/dhclient.eth2.v6.pid" \
+    -lf "/etc/haproxy/dhclient.eth2.v6.lease" eth2 201>&-
+  sleep 2
 else
-  echo "IPv6 is disabled. Skipping SLAAC address allocation."
+  echo "IPv6 is disabled or br-int is absent. Skipping IPv6 lease request."
 fi
 
 cleanup
@@ -236,58 +182,71 @@ trap - EXIT INT TERM
 echo "Sending HUP to HAProxy to trigger the configuration reload..."
 podman kill --signal HUP "$CONTAINER_NAME"
 
-# --- MERGED VARIABLE GATHERING BLOCK ---
-echo "Gathering the IP Addresses for downstream tasks..."
+echo "Gather the IP Address for the new interface"
 api_ip=""
-api_int_ip=""
-api_ip_v6=""
-api_int_ip_v6=""
-ingress_vip=""
-ingress_vip_v6=""
-
 if [ "${ipv4_enabled:-false}" == "true" ]; then
-  if [ "${DISCONNECTED}" == "true" ]; then
-    api_ip="$INTERNAL_API_IPV4"
-  else
-    api_ip=$(nsenter -t "$CONTAINER_PID" -n /sbin/ip -o -4 a list ${api_ip_interface} | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
-  fi
-  api_int_ip="$api_ip"
-  if [ "${DISCONNECTED}" != "true" ] && \
-     { [ "${LOAD_BALANCER_TYPE}" == "user-managed" ] || [ "${AGENT_PLATFORM_TYPE}" == "none" ]; }; then
-    # Connected user-managed LBs use the reserved ingress VIP on eth2 for
-    # both API and ingress listeners. Keep node-to-API traffic on that network.
-    api_int_ip="$INTERNAL_INGRESS_IPV4"
-  fi
-  ingress_vip="$INTERNAL_INGRESS_IPV4"
-
+  api_ip=$(nsenter -m -u -n -i -p -t "$CONTAINER_PID" -n  \
+    /sbin/ip -o -4 a list ${api_ip_interface} | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
   if [ "${#api_ip}" -eq 0 ]; then
-    echo "No IPv4 Address has been mapped for the API VIP, failing."
+    echo "No IPv4 Address has been set for the external API VIP, failing"
     exit 1
   fi
 fi
 
+api_ip_v6=""
 if [ "${ipv6_enabled:-false}" == "true" ]; then
-  if [ "${DISCONNECTED}" == "true" ]; then
-    api_ip_v6="$INTERNAL_API_IPV6"
-  else
-    api_ip_v6=$(nsenter -t "$CONTAINER_PID" -n /sbin/ip -o -6 a list ${api_ip_interface} | grep global | sed 's/.*inet6 \(.*\)\/[0-9]* scope global.*/\1/')
-  fi
-  api_int_ip_v6="$api_ip_v6"
-  if [ "${DISCONNECTED}" != "true" ] && \
-     { [ "${LOAD_BALANCER_TYPE}" == "user-managed" ] || [ "${AGENT_PLATFORM_TYPE}" == "none" ]; }; then
-    # Using eth1 here makes internal IPv6 clients traverse AUX on the way out,
-    # while HAProxy replies directly over eth2, bypassing AUX's connection tracking.
-    api_int_ip_v6="$INTERNAL_INGRESS_IPV6"
-  fi
-  ingress_vip_v6="$INTERNAL_INGRESS_IPV6"
+  echo "Waiting for ${api_ip_interface} global IPv6 address to be ready..."
+  for i in {1..60}; do
+    if nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list ${api_ip_interface} | grep global | grep -q 'inet6' && \
+       ! nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list ${api_ip_interface} | grep global | grep -q 'tentative'; then
+      api_ip_v6=$(nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list ${api_ip_interface} | grep global | sed -n 's/.*inet6 \([^ ]*\)\/.*/\1/p' | head -n1)
+      if [ -n "$api_ip_v6" ]; then
+        echo "Global IPv6 address ready: $api_ip_v6"
+        break
+      fi
+    fi
+    if [ "$i" -eq 60 ]; then
+      echo "No global IPv6 Address has been set for the external API VIP, failing"
+      exit 1
+    fi
+    sleep 0.5
+  done
+fi
 
-  if [ "${#api_ip_v6}" -eq 0 ]; then
-    echo "No global IPv6 Address has been mapped for the API VIP, failing."
-    exit 1
+api_int_ip="$api_ip"
+api_int_ip_v6="$api_ip_v6"
+
+if [ x"${DISCONNECTED}" != x"true" ]; then
+  if [ "${ipv4_enabled:-false}" == "true" ]; then
+    api_int_ip=$(nsenter -m -u -n -i -p -t "$CONTAINER_PID" \
+    /sbin/ip -o -4 a list eth2 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
+    if [ "${#api_int_ip}" -eq 0 ]; then
+      echo "No IPv4 Address has been set for internal api-int, failing"
+      exit 1
+    fi
+  fi
+
+  if [ "${ipv6_enabled:-false}" == "true" ]; then
+    echo "Waiting for eth2 global IPv6 address to be ready..."
+    for i in {1..60}; do
+      if nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list eth2 | grep global | grep -q 'inet6' && \
+         ! nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list eth2 | grep global | grep -q 'tentative'; then
+        api_int_ip_v6=$(nsenter -n -t "$CONTAINER_PID" /sbin/ip -o -6 a list eth2 | grep global | sed -n 's/.*inet6 \([^ ]*\)\/.*/\1/p' | head -n1)
+        if [ -n "$api_int_ip_v6" ]; then
+          echo "Global IPv6 address ready on eth2: $api_int_ip_v6"
+          break
+        fi
+      fi
+      if [ "$i" -eq 60 ]; then
+        echo "No global IPv6 Address has been set for internal IPv6 api-int, failing"
+        exit 1
+      fi
+      sleep 0.5
+    done
   fi
 fi
 
-printf "ingress_vip: %s\napi_vip: %s\ningress_vip_v6: %s\napi_vip_v6: %s\napi_int: %s\napi_int_v6: %s" "$ingress_vip" "$api_ip" "$ingress_vip_v6" "$api_ip_v6" "$api_int_ip" "$api_int_ip_v6" > "$BUILD_DIR/external_vips.yaml"
+printf "ingress_vip: %s\napi_vip: %s\ningress_vip_v6: %s\napi_vip_v6: %s\napi_int: %s\napi_int_v6: %s" "$api_ip" "$api_ip" "$api_ip_v6" "$api_ip_v6" "$api_int_ip" "$api_int_ip_v6" > "$BUILD_DIR/external_vips.yaml"
 EOF
 
 echo "Syncing back the external_vips.yaml file"
