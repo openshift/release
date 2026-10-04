@@ -1,0 +1,26 @@
+workflow:
+  as: ovs-doca-aws
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-aws
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: rhcos-conf-osstream
+    - ref: ovs-doca-build-osimage
+    - chain: ipi-install
+    test:
+    - ref: ovs-doca-validate-node-package
+    post:
+    - chain: ipi-aws-post
+  documentation: |-
+    Provisions an IPI AWS cluster whose nodes boot a DOCA-enabled layered RHCOS image.
+
+    This mirrors the `ipi-aws` workflow but expands the `ipi-aws-pre` chain so that
+    `ovs-doca-build-osimage` can run between OS stream selection and installation. That step
+    builds the layered image from entitled Red Hat content and drops a MachineConfig carrying
+    `spec.osImageURL` into ${SHARED_DIR}, which the installer then applies as a day-0 manifest
+    — nodes come up on the DOCA image rather than being reconfigured after the fact.
+
+    Set `OS_IMAGE_STREAM_MCP_WORKER: rhel-10` to put the worker pool on the RHEL 10 side of the
+    dual stream, and run the build step on arm64 via `node_architecture_overrides` when
+    targeting aarch64 so the RPM transaction executes natively.

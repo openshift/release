@@ -1,0 +1,50 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-aws
+  capabilities:
+  - arm64
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      CONTROL_PLANE_REPLICAS: "1"
+      OCP_ARCH: arm64
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+      OVS_DOCA_MCP: worker
+      OVS_DOCA_PACKAGES: doca-networking-runtime openvswitch-selinux-extra-policy
+        mft libunwind
+      OVS_DOCA_REMOVE_PACKAGES: openvswitch[0-9]*
+    node_architecture_overrides:
+      ipi-deprovision-deprovision: arm64
+      ipi-install-install: arm64
+      ovs-doca-build-osimage: arm64
+    workflow: ovs-doca-aws
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 4.22-arm64-rhel10-ovs-doca
