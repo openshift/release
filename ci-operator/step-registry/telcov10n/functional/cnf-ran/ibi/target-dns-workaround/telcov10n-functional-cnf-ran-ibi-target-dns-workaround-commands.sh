@@ -28,6 +28,10 @@ address=/disconnected.registry.local/2620:52:9:16b8:6e00::112
 host-record=api.kni-qe-128.telcov10n.eng.rdu2.dc.redhat.com,2620:52:9:16b8:6e00::113
 host-record=api-int.kni-qe-128.telcov10n.eng.rdu2.dc.redhat.com,2620:52:9:16b8:6e00::113
 address=/apps.kni-qe-128.telcov10n.eng.rdu2.dc.redhat.com/2620:52:9:16b8:6e00::113
+
+host-record=api.ibi-target.lab.eng.tlv2.redhat.com,10.46.55.169
+host-record=api-int.ibi-target.lab.eng.tlv2.redhat.com,10.46.55.169
+address=/apps.ibi-target.lab.eng.tlv2.redhat.com/10.46.55.169
 EOF
 
 dnsmasq --test
