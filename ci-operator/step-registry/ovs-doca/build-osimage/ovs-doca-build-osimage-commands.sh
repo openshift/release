@@ -112,14 +112,25 @@ fi
 
 ENT_CERT_PATH="$(find "${ENT_DIR}" -name '*.pem' ! -name '*-key.pem' | head -1)"
 if [[ -z "${ENT_CERT_PATH}" ]]; then
-  echo "ERROR: no entitlement certificate found after registration."
+  echo "ERROR: no entitlement certificate found."
   exit 1
 fi
-ENT_CERT="$(basename "${ENT_CERT_PATH}")"
-ENT_KEY="${ENT_CERT%.pem}-key.pem"
-if [[ ! -f "${ENT_DIR}/${ENT_KEY}" ]]; then
-  echo "ERROR: entitlement key ${ENT_KEY} not found alongside ${ENT_CERT}."
+ENT_KEY_PATH="${ENT_CERT_PATH%.pem}-key.pem"
+if [[ ! -f "${ENT_KEY_PATH}" ]]; then
+  echo "ERROR: no entitlement key found alongside the certificate."
   exit 1
+fi
+
+# Rename to stable, content-free filenames. RHSM names entitlement certificates after their
+# serial number, and that filename would otherwise end up in the generated repo file, which
+# is printed to the build log and copied into an image layer. The serial is not a credential
+# -- it cannot be authenticated with -- but it identifies the subscription, and this repo and
+# the images it pushes are public. Nothing is gained by disclosing it.
+ENT_CERT="entitlement.pem"
+ENT_KEY="entitlement-key.pem"
+if [[ "$(basename "${ENT_CERT_PATH}")" != "${ENT_CERT}" ]]; then
+  mv "${ENT_CERT_PATH}" "${ENT_DIR}/${ENT_CERT}"
+  mv "${ENT_KEY_PATH}"  "${ENT_DIR}/${ENT_KEY}"
 fi
 
 # Build a repo file for the entitled content. RHCOS ships no redhat.repo, and the one
