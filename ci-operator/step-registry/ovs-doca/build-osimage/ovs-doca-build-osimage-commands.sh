@@ -141,6 +141,7 @@ for component in ${OVS_DOCA_REPO_COMPONENTS}; do
 name=Red Hat Enterprise Linux ${OVS_DOCA_RELEASEVER} aarch64 - ${component}
 baseurl=https://${OVS_DOCA_CDN_HOST}/content/dist/rhel10/${OVS_DOCA_RELEASEVER}/aarch64/${component}/os
 enabled=1
+priority=1
 gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 sslverify=1
@@ -150,6 +151,35 @@ sslclientkey=/etc/pki/entitlement/${ENT_KEY}
 
 EOF
 done
+
+# Red Hat's Supplementary channel ships the DOCA packages but not their full dependency
+# closure, so a small NVIDIA repository is layered underneath purely to fill the gaps.
+# The priority values matter: Red Hat repos are priority 1 and NVIDIA is 99, so dnf takes
+# Red Hat content wherever it exists and reaches for NVIDIA only for what Red Hat lacks.
+#
+# Verified against DOCA 3.5.0 on aarch64/el10: of 142 packages, 135 resolve from Red Hat
+# and exactly 7 come from NVIDIA -- collectx-clxapi (Supplementary has only the older,
+# differently-named collectx-bringup) plus the DOCA-OFED rdma-core family
+# (libibverbs, libibumad, librdmacm, infiniband-diags, rdma-core-devel) and openmpi,
+# which carry the libmlx5 MLX5_1.25.1 / MLX5_1.27 symbols that stock rdma-core does not.
+#
+# Set OVS_DOCA_NVIDIA_BASEURL to an empty string to build from Red Hat content only. That
+# currently fails to resolve, and is useful mainly for re-checking whether the Red Hat
+# channel gaps have since been closed.
+if [[ -n "${OVS_DOCA_NVIDIA_BASEURL}" ]]; then
+  echo "Adding the NVIDIA gap-filler repository (priority 99)"
+  cat >> "${REPO_FILE}" <<EOF
+[ovs-doca-nvidia]
+name=NVIDIA DOCA (dependency gap filler)
+baseurl=${OVS_DOCA_NVIDIA_BASEURL}
+enabled=1
+priority=99
+gpgcheck=0
+
+EOF
+else
+  echo "OVS_DOCA_NVIDIA_BASEURL is empty: building from Red Hat content only."
+fi
 echo "Repository configuration (credentials are supplied by certificate, not by URL):"
 cat "${REPO_FILE}"
 
@@ -171,8 +201,17 @@ RUN dnf -y remove ${OVS_DOCA_REMOVE_PACKAGES} || true
 EOF
 fi
 
+# install_weak_deps=False is load-bearing, not tidiness: the DOCA stack Recommends
+# openvswitch3.5 from fast-datapath, which would quietly reinstate the very stock
+# openvswitch the remove step above just took out.
+#
+# --allowerasing lets the NVIDIA rdma-core family replace the stock one already present in
+# the CoreOS base. NVIDIA versions these 2607.0.8 against Red Hat's 61.0, so rpm treats it
+# as an upgrade; if a future base image makes that a genuine conflict instead, this is the
+# line that will need `rpm-ostree override replace` as in the original ovs-doca work.
 cat >> "${CONTAINERFILE}" <<EOF
-RUN dnf -y install ${OVS_DOCA_PACKAGES}
+RUN dnf -y install --allowerasing --setopt=install_weak_deps=False ${OVS_DOCA_PACKAGES}
+RUN rpm -q ${OVS_DOCA_PACKAGES}
 RUN rm -f /etc/yum.repos.d/ovs-doca.repo \\
  && dnf clean all \\
  && rm -rf /var/cache/dnf /var/cache/yum
