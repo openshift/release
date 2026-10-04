@@ -125,15 +125,24 @@ fi
 # Build a repo file for the entitled content. RHCOS ships no redhat.repo, and the one
 # subscription-manager generates here targets this pod's RHEL version rather than the
 # RHEL 10 base we are layering onto, so the repos are written explicitly.
+#
+# The URL shape and the repository names below were taken from the redhat.repo that
+# subscription-manager generates for an entitled RHEL 10 aarch64 system:
+#
+#   https://cdn.redhat.com/content/dist/rhel10/<releasever>/aarch64/<component>/os
+#
+# The DOCA packages live in the 'supplementary' component, not in a DOCA-specific
+# channel and not in fast-datapath.
 REPO_FILE="${TMP_DIR}/ovs-doca.repo"
 : > "${REPO_FILE}"
-for repo_id in ${OVS_DOCA_REPOS}; do
+for component in ${OVS_DOCA_REPO_COMPONENTS}; do
   cat >> "${REPO_FILE}" <<EOF
-[${repo_id}]
-name=${repo_id}
-baseurl=https://${OVS_DOCA_CDN_HOST}/content/dist/${repo_id}
+[ovs-doca-${component}]
+name=Red Hat Enterprise Linux ${OVS_DOCA_RELEASEVER} aarch64 - ${component}
+baseurl=https://${OVS_DOCA_CDN_HOST}/content/dist/rhel10/${OVS_DOCA_RELEASEVER}/aarch64/${component}/os
 enabled=1
-gpgcheck=0
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 sslverify=1
 sslcacert=/etc/rhsm/ca/redhat-uep.pem
 sslclientcert=/etc/pki/entitlement/${ENT_CERT}

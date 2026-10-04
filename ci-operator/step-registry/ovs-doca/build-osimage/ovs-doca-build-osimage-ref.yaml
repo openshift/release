@@ -28,22 +28,33 @@ ref:
       The first tag that resolves in the payload wins. Defaults to preferring the RHEL 10
       CoreOS variant of the 4.22 dual stream, falling back to the default rhel-coreos tag.
   - name: OVS_DOCA_PACKAGES
-    default: "doca-networking-runtime openvswitch-selinux-extra-policy mft libunwind"
+    default: "doca-networking-runtime openvswitch-selinux-extra-policy mft"
     documentation: |-
       Space-separated list of packages to install into the layered CoreOS image.
+      libunwind is deliberately absent: it does not exist as a package in RHEL 10 and
+      nothing in the DOCA stack requires it.
   - name: OVS_DOCA_REMOVE_PACKAGES
     default: "openvswitch[0-9]*"
     documentation: |-
       Space-separated list of package globs to remove before installing OVS_DOCA_PACKAGES.
       The stock openvswitch packages conflict with the DOCA-provided ones and must go first.
       Set to an empty string to skip the removal.
-  - name: OVS_DOCA_REPOS
-    default: "rhel-10-for-aarch64-baseos-rpms rhel-10-for-aarch64-appstream-rpms doca-3.5-for-rhel-10-aarch64-rpms"
+  - name: OVS_DOCA_REPO_COMPONENTS
+    default: "baseos appstream supplementary"
     documentation: |-
-      Space-separated list of Red Hat CDN repository IDs to enable inside the layering build.
-      Each ID is expanded to https://${OVS_DOCA_CDN_HOST}/content/dist/<id-derived-path> via the
-      entitlement certificate obtained from the activation key. Override if the DOCA channel
-      is published under a different repository ID.
+      Space-separated list of RHEL CDN components to enable inside the layering build. Each is
+      expanded to
+      https://${OVS_DOCA_CDN_HOST}/content/dist/rhel10/${OVS_DOCA_RELEASEVER}/aarch64/<component>/os
+      and authenticated with the entitlement certificate.
+
+      The DOCA packages (doca-networking-runtime, doca-openvswitch, mft, and the 1.0-41 build of
+      openvswitch-selinux-extra-policy) ship in 'supplementary'. There is no DOCA-specific
+      repository, and fast-datapath carries only older openvswitch-selinux-extra-policy builds.
+  - name: OVS_DOCA_RELEASEVER
+    default: "10"
+    documentation: |-
+      The $releasever used to build the CDN paths. '10' tracks the latest RHEL 10 minor; pin to
+      a specific minor such as '10.2' to match a fixed RHCOS base.
   - name: OVS_DOCA_CDN_HOST
     default: "cdn.redhat.com"
     documentation: The Red Hat CDN host serving entitled content.
