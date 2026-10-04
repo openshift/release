@@ -5,10 +5,17 @@ set -o nounset
 set -o pipefail
 
 TMP_DIR="$(mktemp -d /tmp/ovs-doca-osimage.XXXXXX)"
+RHSM_CREDS_DIR="/var/run/rhsm-creds"
+
+# Set to true only once an activation-key registration actually succeeds, so that the trap
+# does not try to unregister a system that was never registered.
+REGISTERED=false
 
 cleanup() {
-  # Always hand the entitlement back; CI pods are short-lived but subscriptions are not.
-  subscription-manager unregister >/dev/null 2>&1 || true
+  if [[ "${REGISTERED}" == "true" ]]; then
+    # Hand the entitlement back; CI pods are short-lived but subscriptions are not.
+    subscription-manager unregister > /dev/null 2>&1 || true
+  fi
   rm -rf "${TMP_DIR}"
 }
 trap cleanup EXIT
@@ -35,23 +42,73 @@ if [[ -z "${BASE_IMAGE}" ]]; then
 fi
 echo "Base image: ${BASE_IMAGE}"
 
-# Disable tracing due to activation key handling
-[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
-set +x
-echo "Registering with Red Hat Subscription Management..."
-subscription-manager register \
-  --org="$(cat /var/run/rhsm-creds/subscription-manager-org)" \
-  --activationkey="$(cat /var/run/rhsm-creds/subscription-manager-act-key)" >/dev/null
-${WAS_TRACING} && set -x
-echo "Registered."
-
 # Collect the entitlement material so it can be bind-mounted into the build. Bind mounts are
 # not committed to image layers, so the certificates never leave this pod.
 ENT_DIR="${TMP_DIR}/entitlement"
 CA_DIR="${TMP_DIR}/rhsm-ca"
 mkdir -p "${ENT_DIR}" "${CA_DIR}"
-cp /etc/pki/entitlement/*.pem "${ENT_DIR}/"
-cp /etc/rhsm/ca/redhat-uep.pem "${CA_DIR}/"
+chmod 0700 "${ENT_DIR}"
+
+# Two ways to obtain entitlement, in order of preference:
+#
+#   1. A pre-issued entitlement certificate pair mounted straight from the secret collection.
+#      This needs no subscription-manager binary, no root in the step pod, and no registration
+#      round-trip, so it is both faster and far less brittle. The trade-off is that entitlement
+#      certificates expire and have to be rotated in GSM.
+#   2. Registering with an activation key and harvesting the certificate that RHSM issues.
+#      More self-maintaining, but it requires subscription-manager in the step image and write
+#      access to /etc/pki/entitlement, and it leaves a registered system behind if the pod is
+#      killed before the EXIT trap runs.
+if compgen -G "${RHSM_CREDS_DIR}/entitlement*.pem" > /dev/null; then
+  echo "Using the pre-issued entitlement certificate from ${RHSM_CREDS_DIR}"
+  cp "${RHSM_CREDS_DIR}"/entitlement*.pem "${ENT_DIR}/"
+  if [[ -f "${RHSM_CREDS_DIR}/redhat-uep.pem" ]]; then
+    cp "${RHSM_CREDS_DIR}/redhat-uep.pem" "${CA_DIR}/"
+  elif [[ -f /etc/rhsm/ca/redhat-uep.pem ]]; then
+    cp /etc/rhsm/ca/redhat-uep.pem "${CA_DIR}/"
+  else
+    echo "ERROR: no redhat-uep.pem CA certificate available."
+    echo "Add it to the ovs-doca/rhsm-activation-key secret alongside the entitlement certificate."
+    exit 1
+  fi
+else
+  if ! command -v subscription-manager > /dev/null; then
+    echo "ERROR: no entitlement certificate was mounted at ${RHSM_CREDS_DIR}/entitlement*.pem"
+    echo "and subscription-manager is not present in this image, so the activation key cannot"
+    echo "be redeemed. Add entitlement.pem + entitlement-key.pem to the ovs-doca/rhsm-activation-key"
+    echo "secret, or use a step image that ships subscription-manager."
+    exit 1
+  fi
+
+  echo "Registering with Red Hat Subscription Management using the activation key..."
+  # Disable tracing due to activation key handling
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
+  for attempt in 1 2 3; do
+    if subscription-manager register \
+        --org="$(cat "${RHSM_CREDS_DIR}/subscription-manager-org")" \
+        --activationkey="$(cat "${RHSM_CREDS_DIR}/subscription-manager-act-key")" > /dev/null 2>&1; then
+      REGISTERED=true
+      break
+    fi
+    set +x
+    echo "Registration attempt #${attempt} failed"
+    subscription-manager unregister > /dev/null 2>&1 || true
+    sleep 10
+  done
+  ${WAS_TRACING} && set -x
+
+  if [[ "${REGISTERED}" != "true" ]]; then
+    echo "ERROR: could not register with Red Hat Subscription Management after 3 attempts."
+    echo "Re-run with the subscription-manager output enabled locally to diagnose; it is"
+    echo "suppressed here because its command line carries the activation key."
+    exit 1
+  fi
+  echo "Registered."
+
+  cp /etc/pki/entitlement/*.pem "${ENT_DIR}/"
+  cp /etc/rhsm/ca/redhat-uep.pem "${CA_DIR}/"
+fi
 
 ENT_CERT_PATH="$(find "${ENT_DIR}" -name '*.pem' ! -name '*-key.pem' | head -1)"
 if [[ -z "${ENT_CERT_PATH}" ]]; then

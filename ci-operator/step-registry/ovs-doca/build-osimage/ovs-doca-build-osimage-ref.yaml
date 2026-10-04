@@ -65,11 +65,26 @@ ref:
     Builds a DOCA-enabled layered RHCOS image and stages it for day-0 installation.
 
     This step runs before ipi-install. It resolves the RHEL 10 CoreOS image from the release
-    payload, registers with Red Hat Subscription Management using an activation key mounted
-    from the test-credentials namespace, and runs a podman build that removes the stock
+    payload, obtains a Red Hat entitlement, and runs a podman build that removes the stock
     openvswitch packages and installs the DOCA networking stack from entitled Red Hat content.
     The entitlement certificates are bind-mounted into the build and therefore never land in
     an image layer.
+
+    The entitlement is obtained one of two ways, depending on what the ovs-doca/rhsm-activation-key
+    secret contains:
+
+      entitlement.pem + entitlement-key.pem (preferred)
+        A pre-issued entitlement certificate pair, used directly. Needs no subscription-manager
+        binary and no write access to /etc/pki/entitlement in the step pod, so it is the more
+        reliable option in CI. Optionally include redhat-uep.pem; otherwise the one from the
+        step image is used. These certificates expire and must be rotated in GSM.
+
+      subscription-manager-org + subscription-manager-act-key (fallback)
+        An activation key, redeemed by registering the step pod with RHSM and harvesting the
+        certificate it issues. Self-maintaining, but it requires subscription-manager in the
+        step image and the ability to write /etc/pki/entitlement, and a pod killed before the
+        EXIT trap fires will leave a registered system behind. Registration is retried three
+        times and its output is suppressed because the command line carries the key.
 
     The resulting image is pushed by digest, and a MachineConfig carrying spec.osImageURL is
     written to ${SHARED_DIR}/manifest_*.yaml so the installer applies it as part of the initial
