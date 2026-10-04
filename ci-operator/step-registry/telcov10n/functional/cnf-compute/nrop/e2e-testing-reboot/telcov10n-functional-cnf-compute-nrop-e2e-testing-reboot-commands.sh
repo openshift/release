@@ -80,10 +80,10 @@ set -o pipefail
 
 echo
 echo "--------------------------------------------------"
-echo "Running gotests script: ${SCOPE}_nrop_test_script.sh"
+echo "Running gotests script: reboot_nrop_test_script.sh"
 echo "--------------------------------------------------"
 echo 
-bash /tmp/wip/artifacts/${SCOPE}_nrop_test_script.sh || true
+bash /tmp/wip/artifacts/reboot_nrop_test_script.sh || true
 EOF
 
 echo "Copy must gather to artifacts directory"
