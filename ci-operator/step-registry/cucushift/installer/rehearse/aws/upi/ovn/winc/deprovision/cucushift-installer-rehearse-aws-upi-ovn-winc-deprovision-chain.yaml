@@ -1,7 +1,6 @@
 chain:
   as: cucushift-installer-rehearse-aws-upi-ovn-winc-deprovision
   steps:
-  - ref: cucushift-installer-rehearse-aws-upi-ovn-winc-debug-wait
   - chain: gather
   - ref: gather-aws-console
   - ref: windows-byoh-destroy
@@ -11,6 +10,9 @@ chain:
   - ref: ipi-deprovision-deprovision
   - ref: upi-deprovision-aws-check-destroy
   documentation: |-
-    Deprovision the UPI cluster on AWS (platform "none"). Optionally waits one hour
-    for debugging, gathers diagnostics, destroys Windows BYOH nodes, then tears down
-    cluster infrastructure. The wait is disabled by default.
+    Deprovision the UPI cluster on AWS (platform "none"). Runs gather, Windows
+    BYOH node destruction, and standard AWS deprovisioning. Callers that need a
+    pre-deprovision debugging window (e.g. debug-winc-aws-upi) add the stock
+    ref:wait step in their own post override; the chain itself does not include
+    any wait. Provision and test failures remain failures; the gather and
+    deprovision steps always run.
