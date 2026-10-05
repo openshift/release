@@ -1,0 +1,22 @@
+ref:
+  as: quay-operator-upgrade-report
+  from: quay-playwright-runner
+  commands: quay-operator-upgrade-report-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 500Mi
+  documentation: |-
+    Final step of the operator-upgrade test. It does two things:
+
+    1. Combined report: the seed and verify Playwright phases export a "blob"
+       report to SHARED_DIR/quay-upgrade-blobs (PLAYWRIGHT_EXPORT_BLOB=true); this
+       step runs `playwright merge-reports` to produce one combined Playwright HTML
+       report covering both phases and links it in Spyglass.
+    2. Gate: the best-effort Playwright phases (seed/verify/functional) each write
+       their result to SHARED_DIR/quay-upgrade-results/<phase>.rc and exit 0 so the
+       chain keeps running and every phase publishes its own report. This step reads
+       those markers and exits non-zero if ANY phase had test failures, turning the
+       job RED while still having run the complete set of phases. Non-test steps
+       (operator install, storage install, the OLM upgrade, provisioning) are not
+       best-effort and still abort the job directly on failure.

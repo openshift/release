@@ -1,0 +1,45 @@
+{# Operator-channel upgrade lane (n-1 -> n). Structural + static-shared parts live
+   here; version/edge-specific values (PLAYWRIGHT_N_*, QUAY_UPGRADE_*_CHANNEL,
+   QUAYNAMESPACE, credentials) come from the matrix job env. The OCP cluster is a
+   stable release (see base.yaml.j2), and the OCP e2e releases block is unused.
+   QUAY_EXTRA_CONFIG is shared with the e2e-install lane via _e2e-install.defaults.j2
+   so a feature added there reaches both lanes. #}
+{% import "tests/_e2e-install.defaults.j2" as d %}
+tests:
+- timeout: 4h0m0s
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      # Upgrade edge, all derived from quay_version (n) + upgrade_from (n-1):
+      #   target channel = stable-<quay_version>, source channel = stable-<upgrade_from>,
+      #   n branch = the release branch, n-1 branch = redhat-<upgrade_from>.
+      QUAY_UPGRADE_TARGET_CHANNEL: "{{ operator_channel }}"
+      QUAY_UPGRADE_SOURCE_CHANNEL: "stable-{{ upgrade_from }}"
+      PLAYWRIGHT_N_GIT_BRANCH: "{{ branch }}"
+      PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH: "redhat-{{ upgrade_from }}"
+      # Static upgrade-lane settings (not version-specific). The per-phase repos
+      # default to PLAYWRIGHT_GIT_REPO (base.yaml.j2), so only branches differ.
+      PLAYWRIGHT_CREDENTIALS_SOURCE: mounted-secret
+      PLAYWRIGHT_USE_IMAGE_TESTS: "false"
+      # Shared by seed, verify, and functional Playwright phases (steps.env).
+      PLAYWRIGHT_WORKERS: "4"
+      QUAYNAMESPACE: quay
+      ENABLE_BUILD_SUPPORT: "true"
+      QUAY_EXTRA_CONFIG: |
+{{ d.quay_extra_config() | indent(8, true) }}
+    test:
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-operator-upgrade-install-source
+    - ref: quay-provisioning-tls
+    - ref: quay-provisioning-builder
+    - ref: quay-deploy-mailpit
+    - ref: quay-deploy-jaeger
+    - ref: quay-provisioning-storage-s3
+    - ref: quay-install-external-storage
+    - ref: quay-operator-upgrade-prepare-e2e
+    - chain: quay-operator-upgrade-seed
+    - ref: quay-operator-upgrade-channel
+    - chain: quay-operator-upgrade-verify
+    - chain: quay-operator-upgrade-functional
+    - ref: quay-operator-upgrade-report

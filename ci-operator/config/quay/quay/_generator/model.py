@@ -62,6 +62,16 @@ class Cell:
     skip_if_only_changed: str | None = None
     fips: bool = False
     storage_override: str | None = None
+    # The n-1 Quay version for the upgrade lane (e.g. "3.17"). The target version,
+    # channels, and branches are derived from quay_version + upgrade_from, so a row
+    # needs only this one field.
+    upgrade_from: str | None = None
+
+    @property
+    def upgrade_from_nodot(self) -> str:
+        if self.upgrade_from is None:
+            raise ValueError("upgrade_from_nodot requires upgrade_from to be set")
+        return self.upgrade_from.replace(".", "")
 
     @property
     def quay_version_dashed(self) -> str:
@@ -124,10 +134,18 @@ class Cell:
     @property
     def variant(self) -> str:
         cloud = self.cloud if self.arch == "amd64" else f"{self.cloud}-{self.arch}"
+        # The upgrade lane carries the storage token (e.g. aws-ocp422-s3-upgrade) so
+        # the variant/filename stays unambiguous across storage backends.
+        if self.test == "upgrade":
+            return f"{cloud}-ocp{self.ocp_version_nodot}-{self.storage}-{self.test}"
         return f"{cloud}-ocp{self.ocp_version_nodot}-{self.test}"
 
     @property
     def test_as(self) -> str:
+        # The upgrade lane names the job after the n-1 version it upgrades from
+        # (e.g. upgrade_from "3.17" -> "from-317"), derived rather than hand-set.
+        if self.test == "upgrade":
+            return f"from-{self.upgrade_from_nodot}"
         # No arch suffix: a non-amd64 arch is already in the variant, which
         # Prow puts ahead of `as` in the job name.
         base = (
@@ -174,4 +192,7 @@ class Cell:
             ctx["operator_channel"] = self.operator_channel
             ctx["index_image_repo"] = self.index_image_repo
             ctx["index_image_tag"] = self.index_image_tag
+        if self.upgrade_from is not None:
+            ctx["upgrade_from"] = self.upgrade_from
+            ctx["upgrade_from_nodot"] = self.upgrade_from_nodot
         return ctx

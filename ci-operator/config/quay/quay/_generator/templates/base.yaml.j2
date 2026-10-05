@@ -11,11 +11,20 @@ prowgen:
   enable_secrets_store_csi_driver: true
 releases:
   latest:
+{% if test == 'upgrade' %}
+    # The upgrade lane exercises an OLM operator upgrade on a released (stable)
+    # OpenShift cluster, not a nightly OCP payload.
+    release:
+      architecture: amd64
+      channel: stable
+      version: "{{ ocp_version }}"
+{% else %}
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
       version: "{{ ocp_version }}"
+{% endif %}
 resources:
   '*':
     limits:
@@ -28,7 +37,12 @@ tests:
   steps:
     env:
       PLAYWRIGHT_GIT_REPO: https://github.com/quay/quay.git
+{% if test != 'upgrade' %}
+      # The upgrade lane installs n-1 and moves the Subscription channel itself
+      # (QUAY_UPGRADE_SOURCE_CHANNEL/QUAY_UPGRADE_TARGET_CHANNEL), so it must not
+      # pin a single operator channel. No upgrade step declares this env.
       QUAY_OPERATOR_CHANNEL: "{{ operator_channel }}"
+{% endif %}
 zz_generated_metadata:
   branch: "{{ branch }}"
   org: "{{ org }}"

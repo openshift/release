@@ -1,12 +1,12 @@
 ref:
-  as: quay-test-e2e
+  as: quay-operator-upgrade-seed-playwright
   cli: latest
   from: quay-playwright-runner
-  commands: quay-test-e2e-commands.sh
+  commands: quay-operator-upgrade-seed-playwright-commands.sh
   resources:
     requests:
-      cpu: "2"
-      memory: 4Gi
+      cpu: "4"
+      memory: 8Gi
   timeout: 2h0m0s
   grace_period: 15m0s
   credentials:
@@ -38,21 +38,8 @@ ref:
       (${SHARED_DIR}/playwright_git_ref, written by the deploy step: the
       upstream vX.Y.Z tag matching the image's version label, or the
       redhat-X.Y branch when no such tag exists); if that is absent, or is
-      present but not fetchable from PLAYWRIGHT_GIT_REPO, it clones the upstream
-      commit recorded in the deployed quay-app image's labels
-      (io.openshift.build.commit.id, then vcs-ref, then
-      org.opencontainers.image.revision; the first fetchable from
-      PLAYWRIGHT_GIT_REPO wins). When none is fetchable, PLAYWRIGHT_REF_MODE
-      decides what happens.
-  - name: PLAYWRIGHT_REF_MODE
-    default: "derived"
-    documentation: |-
-      What to do when no image label commit is fetchable from
-      PLAYWRIGHT_GIT_REPO. "strict" fails the step and never falls back to a
-      branch; product nightlies set it so the suite always matches the image
-      under test. "derived" (default) clones the upstream vX.Y.Z tag matching
-      the image's version label, else branch redhat-X.Y, else
-      PLAYWRIGHT_GIT_FALLBACK_BRANCH, with a warning.
+      present but not fetchable from PLAYWRIGHT_GIT_REPO, it falls back to
+      PLAYWRIGHT_GIT_FALLBACK_BRANCH with a warning.
   - name: PLAYWRIGHT_PHASE
     default: ""
     documentation: |-
@@ -61,7 +48,7 @@ ref:
       controls. Empty retains the normal PLAYWRIGHT_GIT_* behavior.
   - name: PLAYWRIGHT_N_MINUS_ONE_GIT_REPO
     default: ""
-    documentation: Explicit repository for the n-1 Playwright suite when PLAYWRIGHT_PHASE=n-minus-one.
+    documentation: Repository for the n-1 Playwright suite when PLAYWRIGHT_PHASE=n-minus-one. Defaults to PLAYWRIGHT_GIT_REPO when unset.
   - name: PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH
     default: ""
     documentation: Explicit branch, tag, or commit SHA for the n-1 Playwright suite.
@@ -70,7 +57,7 @@ ref:
     documentation: Use the runner-image suite for the n-1 phase instead of its explicit Git controls.
   - name: PLAYWRIGHT_N_GIT_REPO
     default: ""
-    documentation: Explicit repository for the target n Playwright suite when PLAYWRIGHT_PHASE=n.
+    documentation: Repository for the target n Playwright suite when PLAYWRIGHT_PHASE=n. Defaults to PLAYWRIGHT_GIT_REPO when unset.
   - name: PLAYWRIGHT_N_GIT_BRANCH
     default: ""
     documentation: Explicit branch, tag, or commit SHA for the target n Playwright suite.
@@ -80,12 +67,10 @@ ref:
   - name: PLAYWRIGHT_GIT_FALLBACK_BRANCH
     default: "redhat-3.18"
     documentation: |-
-      Last-resort branch in PLAYWRIGHT_REF_MODE "derived", cloned when the
-      image yields no usable version label or its derived ref cannot be
-      fetched from PLAYWRIGHT_GIT_REPO. Also used when neither
-      PLAYWRIGHT_GIT_BRANCH nor a usable auto-derived ref is available, so the
-      run still executes (with a warning) rather than hard-failing. Unused in
-      PLAYWRIGHT_REF_MODE "strict".
+      Last-resort branch cloned when neither PLAYWRIGHT_GIT_BRANCH nor a usable
+      auto-derived ref is available, so the run still executes (with a warning)
+      rather than hard-failing. Also used when an auto-derived ref exists but
+      cannot be fetched from PLAYWRIGHT_GIT_REPO.
   - name: PLAYWRIGHT_REQUIRE_EXPLICIT_REF
     default: "false"
     documentation: |-
@@ -105,14 +90,18 @@ ref:
       Optional child directory under ARTIFACT_DIR for this invocation's
       Playwright artifacts. Use distinct values when this ref runs in multiple
       phases of one job.
+  - name: PLAYWRIGHT_STEP_NAME
+    default: quay-operator-upgrade-seed-playwright
+    documentation: |-
+      Name of this registry step, used only to compose the GCS URL in the
+      custom-link-playwright-report.html surfaced by Prow's html lens. Must match
+      this ref's `as:` so the "Playwright HTML report" link resolves to this
+      phase's own report rather than a sibling phase's.
   - name: PLAYWRIGHT_GREP
     default: ""
     documentation: |-
       Optional positive regex passed to `playwright test --grep`. Unlike
       PLAYWRIGHT_GREP_INVERT, this selects tests for a tagged smoke phase.
-  - name: QUAY_OPERATOR_CHANNEL
-    default: "stable-3.16"
-    documentation: Installed Quay operator channel (informational in this step).
   - name: PLAYWRIGHT_GREP_INVERT
     default: "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@webhook"
     documentation: |-
@@ -128,28 +117,51 @@ ref:
       @feature:BUILD_SUPPORT builds contend at that concurrency and time out
       flakily. Default is 2; raise via the job env (for example "4") when the
       cluster and Quay load can absorb more parallelism.
-  - name: QUAY_API_WARMUP_BUDGET_SECONDS
-    default: "120"
+  - name: PLAYWRIGHT_MAX_FAILURES
+    default: "0"
     documentation: |-
-      Seconds the authenticated API warmup may spend retrying POST
-      /api/v1/signin before the Playwright suite starts. The route preflight
-      only proves the discovery GET answers; the suite's global setup begins
-      with a signin POST, the first DB-backed request of the run, which on
-      freshly (re)started Quay pods (for example right after the operator
-      channel upgrade) can outlast the suite's short apiRequestContext timeout
-      and abort the phase before any test runs. The warmup signs in once and
-      only warns when it cannot, so this value never changes a lane's
-      pass/fail outcome. "0" disables the warmup.
+      Override Playwright's maxFailures so this phase runs every selected test to
+      completion (0 = no limit) instead of stopping at the first failure, so the
+      JUnit report shows the full per-test pass/fail picture in the Prow UI.
+  - name: PLAYWRIGHT_BEST_EFFORT
+    default: "true"
+    documentation: |-
+      Run this Playwright phase best-effort. The runner always publishes its JUnit
+      and HTML report (via the EXIT trap), and a test failure does NOT fail the
+      ci-operator step, so the sequential upgrade chain (seed -> upgrade -> verify
+      -> functional) keeps running and every phase publishes its report. Per-test
+      pass/fail lives in the aggregated JUnit, not the job status. This applies to
+      the Playwright test phases only; non-test steps (operator install, storage
+      install, the OLM upgrade, provisioning) still hard-fail and abort the job.
+  - name: PLAYWRIGHT_EXPORT_BLOB
+    default: "true"
+    documentation: |-
+      Emit a Playwright "blob" report and copy it to SHARED_DIR/quay-upgrade-blobs
+      so the final quay-operator-upgrade-report step can merge the seed and verify
+      phases into a single combined Playwright HTML report.
+  - name: PLAYWRIGHT_REF_MODE
+    default: "derived"
+    documentation: |-
+      What to do when no image label commit is fetchable from
+      PLAYWRIGHT_GIT_REPO. "strict" fails the step and never falls back to a
+      branch; product nightlies set it so the suite always matches the image
+      under test. "derived" (default) clones the upstream vX.Y.Z tag matching
+      the image's version label, else branch redhat-X.Y, else
+      PLAYWRIGHT_GIT_FALLBACK_BRANCH, with a warning.
+  - name: QUAYNAMESPACE
+    default: "quay"
+    documentation: |-
+      Namespace the QuayRegistry is deployed in. The runner uses it only to
+      port-forward the in-cluster Jaeger query API and to gather virtual-builder
+      diagnostics, so it must match the namespace used by the deploy step
+      (quay-install-external-storage defaults to "quay").
   documentation: |-
-    Execute Quay Playwright e2e smoke tests against a deployed Quay instance.
+    Execute the existing Quay Playwright e2e implementation as the uniquely named
+    n-1 seed invocation of an operator-upgrade workflow. The commands file is a
+    symlink to quay-test-e2e-commands.sh, so behavior stays in one implementation.
     By default the suite is cloned at runtime from PLAYWRIGHT_GIT_REPO; set
     PLAYWRIGHT_USE_IMAGE_TESTS "true" to run the suite baked into the
     quay-playwright-runner image at /app instead.
-    After the route preflight passes, the step warms POST /api/v1/signin once
-    (see QUAY_API_WARMUP_BUDGET_SECONDS) so the suite's global setup -- whose
-    first request is that same signin -- does not hit a cold DB-backed
-    endpoint on freshly (re)started Quay pods. The warmup is best effort and
-    records its attempts in the api-warmup.jsonl artifact.
     When quay-deploy-jaeger ran successfully (${SHARED_DIR}/jaeger_deployed
     exists), this step port-forwards the in-cluster Jaeger query API and exports
     JAEGER_QUERY_URL=http://127.0.0.1:16686 so the suite can attach the server
