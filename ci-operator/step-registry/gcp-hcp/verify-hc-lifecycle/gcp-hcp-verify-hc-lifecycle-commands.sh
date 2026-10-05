@@ -20,7 +20,7 @@ fi
 for f in api-endpoint oidc-endpoint customer-project-id region region-project-id; do
   if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
     echo "ERROR: ${f} not found or empty in SHARED_DIR"
-    echo "The gcp-hcp-tf-provision step must write this file"
+    echo "A workflow pre-step must write this file"
     exit 1
   fi
 done
@@ -101,16 +101,14 @@ wait_for_platform_api() {
 if ! wait_for_platform_api; then
   echo ""
   echo "=== gcphcpctl API readiness diagnostics ==="
-  echo "API endpoint: $(cat "${SHARED_DIR}/api-endpoint")"
-  echo "Customer project: $(cat "${SHARED_DIR}/customer-project-id")"
+  echo "Configured customer project: $(cat "${SHARED_DIR}/customer-project-id")"
   echo "DNS lookup:"
   getent hosts "$(sed -E 's#https?://([^/]+)/?.*#\1#' "${SHARED_DIR}/api-endpoint")" || true
   exit 1
 fi
 
 echo "Configuration:"
-echo "  API endpoint:       $(cat "${SHARED_DIR}/api-endpoint")"
-echo "  OIDC endpoint:      $(cat "${SHARED_DIR}/oidc-endpoint")"
+echo "  Target endpoints:    configured"
 echo "  Customer project:   $(cat "${SHARED_DIR}/customer-project-id")"
 echo "  HC version:         ${HC_VERSION:-5.0.0-ec.6}"
 echo "  Channel group:      ${HC_CHANNEL_GROUP:-candidate}"
