@@ -29,7 +29,7 @@ if [[ ! -s "${SHARED_DIR}/injector_image" ]]; then
     echo "Include the medik8s-lib ref before this step." >&2
     exit 1
 fi
-INJECTOR_IMAGE=$(sed 's/:[^/]*$//' "${SHARED_DIR}/injector_image")
+SBR_INJECTOR_IMAGE=$(sed 's/:[^/]*$//' "${SHARED_DIR}/injector_image")
 declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation}"
 # Must-gather image used by the observability/must-gather e2e specs. It must be
 # mirrored here so the disconnected cluster can pull it, and exported to
@@ -165,7 +165,7 @@ kind: ImageSetConfiguration
 mirror:
   additionalImages:
   - name: ${WORKLOAD_IMAGE}:latest
-  - name: ${INJECTOR_IMAGE}:latest
+  - name: ${SBR_INJECTOR_IMAGE}:latest
   - name: ${MUST_GATHER_IMAGE}
   operators:
   - catalog: ${fbc_image}
