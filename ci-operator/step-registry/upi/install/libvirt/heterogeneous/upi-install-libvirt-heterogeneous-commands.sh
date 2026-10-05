@@ -4,6 +4,28 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+require_commands() {
+  local cmd
+  local -a missing=()
+
+  for cmd in "$@"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      missing+=("$cmd")
+    fi
+  done
+
+  if (( ${#missing[@]} > 0 )); then
+    printf 'ERROR: missing dependencies: %s\n' "${missing[*]}" >&2
+    printf 'Fix the step image before retrying.\n' >&2
+    exit 1
+  fi
+}
+
+require_commands \
+  yq-v4 oc mock-nss.sh virsh curl envsubst \
+  awk grep sed tar gzip base64 basename stat mktemp \
+  date mkdir rm cp touch sleep chmod uname
+
 if [ "${ADDITIONAL_WORKER_ARCHITECTURE:-}" != "arm64" ]; then
   echo "ERROR: upi-install-libvirt-heterogeneous currently supports arm64 as additional worker architecture; found '${ADDITIONAL_WORKER_ARCHITECTURE:-}'"
   exit 1
