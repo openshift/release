@@ -73,11 +73,11 @@ get_artifacts_url() {
 
   if [ -n "${PULL_NUMBER:-}" ]; then
     local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-plugin-export-overlays-"${RELEASE_BRANCH_NAME}"-}"
-    local part_2="redhat-developer-rhdh-plugin-export-overlays-ocp-helm"
+    local part_2="redhat-developer-rhdh-plugin-export-overlays-ocp-e2e"
     artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts"
   else
     local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-plugin-export-overlays-"${RELEASE_BRANCH_NAME}"-}"
-    local part_2="redhat-developer-rhdh-plugin-export-overlays-ocp-helm"
+    local part_2="redhat-developer-rhdh-plugin-export-overlays-ocp-e2e"
     artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts"
   fi
 

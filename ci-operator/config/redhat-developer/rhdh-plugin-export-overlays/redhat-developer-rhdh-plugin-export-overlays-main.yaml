@@ -35,11 +35,13 @@ tests:
   optional: true
   steps:
     allow_skip_on_success: true
+    env:
+      INSTALLATION_METHOD: helm
     post:
     - ref: redhat-developer-rhdh-plugin-export-overlays-send-data-router
     - chain: gather
     test:
-    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-helm
+    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-e2e
     workflow: generic-claim
 - always_run: false
   as: e2e-ocp-helm-nightly-pr-scoped
@@ -56,11 +58,13 @@ tests:
   optional: true
   steps:
     allow_skip_on_success: true
+    env:
+      INSTALLATION_METHOD: helm
     post:
     - ref: redhat-developer-rhdh-plugin-export-overlays-send-data-router
     - chain: gather
     test:
-    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-helm
+    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-e2e
     workflow: generic-claim
 - always_run: false
   as: e2e-ocp-helm-nightly
@@ -73,17 +77,90 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  cron: 30 3 * * MON,TUE,WED,THU,FRI
+  cron: 30 3 * * MON,WED,FRI
   max_concurrency: 1
   optional: true
   presubmit: true
   steps:
     allow_skip_on_success: true
+    env:
+      INSTALLATION_METHOD: helm
     post:
     - ref: redhat-developer-rhdh-plugin-export-overlays-send-data-router
     - chain: gather
     test:
-    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-helm
+    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-e2e
+    workflow: generic-claim
+- always_run: false
+  as: e2e-ocp-operator
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  max_concurrency: 2
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    env:
+      INSTALLATION_METHOD: operator
+    post:
+    - ref: redhat-developer-rhdh-plugin-export-overlays-send-data-router
+    - chain: gather
+    test:
+    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-e2e
+    workflow: generic-claim
+- always_run: false
+  as: e2e-ocp-operator-nightly-pr-scoped
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  max_concurrency: 2
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    env:
+      INSTALLATION_METHOD: operator
+    post:
+    - ref: redhat-developer-rhdh-plugin-export-overlays-send-data-router
+    - chain: gather
+    test:
+    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-e2e
+    workflow: generic-claim
+- always_run: false
+  as: e2e-ocp-operator-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  cron: 30 3 * * TUE,THU
+  max_concurrency: 1
+  optional: true
+  presubmit: true
+  steps:
+    allow_skip_on_success: true
+    env:
+      INSTALLATION_METHOD: operator
+    post:
+    - ref: redhat-developer-rhdh-plugin-export-overlays-send-data-router
+    - chain: gather
+    test:
+    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-e2e
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
