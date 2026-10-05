@@ -75,7 +75,7 @@ ADDITIONAL_LIBVIRT_URI="qemu+tcp://${HOSTNAME_ADDITIONAL}:${ADDITIONAL_PORT}/sys
 VIRSH_PRIMARY="mock-nss.sh virsh --connect ${PRIMARY_LIBVIRT_URI}"
 VIRSH_ADDITIONAL="mock-nss.sh virsh --connect ${ADDITIONAL_LIBVIRT_URI}"
 
-ADDITIONAL_POOL="${ADDITIONAL_POOL_NAME:-default}"
+ADDITIONAL_POOL="${ADDITIONAL_POOL_NAME:-multiarch-ci-pool}"
 HTTPD_POOL="${HTTPD_POOL_NAME:-httpd}"
 HTTPD_BASE_URL="http://${HTTPD_IP}:${HTTPD_PORT}"
 
@@ -332,12 +332,12 @@ else
 fi
 
 # Stage kernel and initramfs to additional hypervisor's boot pool / scratch
-HOST_BOOT_ARTIFACT_BASE=/var/lib/libvirt/boot/
+HOST_BOOT_ARTIFACT_BASE=/var/lib/libvirt/images/openshift-images/
 HOST_PATH_KERNEL=${HOST_BOOT_ARTIFACT_BASE}${KERNEL_FILENAME}
 HOST_PATH_INITRAMFS=${HOST_BOOT_ARTIFACT_BASE}${INITRAMFS_FILENAME}
 
-if check_exists_in_additional_pool boot-scratch "$KERNEL_FILENAME"; then
-  echo "kernel ($KERNEL_FILENAME) already exists in boot-scratch on additional host, skipping transfer"
+if check_exists_in_additional_pool "${ADDITIONAL_POOL}" "$KERNEL_FILENAME"; then
+  echo "kernel ($KERNEL_FILENAME) already exists in ${ADDITIONAL_POOL} on additional host, skipping transfer"
 else
   echo "Downloading kernel..."
   curl -sSfL -o "/tmp/$KERNEL_FILENAME" "$KERNEL_URL"
@@ -345,12 +345,12 @@ else
     echo "ERROR: Downloaded kernel file is empty"
     exit 1
   fi
-  upload_to_additional_pool boot-scratch "/tmp/$KERNEL_FILENAME" "${KERNEL_FILENAME}" "$HOST_PATH_KERNEL"
+  upload_to_additional_pool "${ADDITIONAL_POOL}" "/tmp/$KERNEL_FILENAME" "${KERNEL_FILENAME}" "$HOST_PATH_KERNEL"
   rm -f "/tmp/$KERNEL_FILENAME"
 fi
 
-if check_exists_in_additional_pool boot-scratch "$INITRAMFS_FILENAME"; then
-  echo "initramfs ($INITRAMFS_FILENAME) already exists in boot-scratch on additional host, skipping transfer"
+if check_exists_in_additional_pool "${ADDITIONAL_POOL}" "$INITRAMFS_FILENAME"; then
+  echo "initramfs ($INITRAMFS_FILENAME) already exists in ${ADDITIONAL_POOL} on additional host, skipping transfer"
 else
   echo "Downloading initramfs..."
   curl -sSfL -o "/tmp/$INITRAMFS_FILENAME" "$INITRAMFS_URL"
@@ -358,7 +358,7 @@ else
     echo "ERROR: Downloaded initramfs file is empty"
     exit 1
   fi
-  upload_to_additional_pool boot-scratch "/tmp/$INITRAMFS_FILENAME" "${INITRAMFS_FILENAME}" "$HOST_PATH_INITRAMFS"
+  upload_to_additional_pool "${ADDITIONAL_POOL}" "/tmp/$INITRAMFS_FILENAME" "${INITRAMFS_FILENAME}" "$HOST_PATH_INITRAMFS"
   rm -f "/tmp/$INITRAMFS_FILENAME"
 fi
 
@@ -389,7 +389,8 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
     --capacity "${DOMAIN_DISK_SIZE}" \
     --format qcow2
 
-  domain_qcow2_image_host_path="/var/lib/libvirt/images/${node_name}.qcow2"
+  domain_qcow2_image_host_path="$(${VIRSH_ADDITIONAL} vol-path \
+    --pool "${ADDITIONAL_POOL}" "${node_name}.qcow2")"
 
   echo "Rendering install domain XML for ${node_name}..."
   domain_install_xml=$(mktemp --tmpdir domain-"${node_name}"-install.xml.XXXXX)
