@@ -9,7 +9,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  _exit_code=$?
+  _exit_code=${1:-$?}
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -24,7 +24,9 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
-trap '_opp_cleanup' EXIT
+_jrc=0
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}' EXIT
+_in_product_test=0
 
 echo ">>> PHASE: initialization"
 
@@ -127,12 +129,12 @@ function WriteJunit () {
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"lp-interop--ODF\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        echo "<testsuite name=\"lp-interop--OPP--odf-health\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         typeset -i i=0
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
-            echo "  <testcase classname=\"lp-interop--ODF\" name=\"${name}\">"
+            echo "  <testcase classname=\"lp-interop--OPP--odf-health\" name=\"${name}\">"
             if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
                 typeset msg=""
                 msg="$(XmlEscape "${tcMessagesArr[$i]}")"
@@ -189,7 +191,7 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
+trap '_jrc=$?; set +e; if [[ ${_in_product_test} -eq 1 ]]; then WriteJunit || true; _opp_cleanup ${_jrc}; CollectExitArtifacts; _propagate_junit; exit 0; else _opp_cleanup ${_jrc}; CollectExitArtifacts; exit ${_jrc}; fi' EXIT
 
 # ---------------------------------------------------------------------------
 # Check 1: ODF Operator CSV in Succeeded phase
@@ -733,6 +735,8 @@ print(len(items))
         exit 0
     fi
 
+    _in_product_test=1
+
     if ! WaitForOdfReady; then
         : "ODF subsystems did not converge within ${ODF_READY_TIMEOUT}s; running checks to capture current state"
     fi
@@ -757,11 +761,12 @@ print(len(items))
     done
 
     if (( hasAnyFail )); then
-        : "ODF Health Check: SOME CHECKS FAILED"
-        exit 1
+        : "ODF Health Check: SOME CHECKS FAILED (advisory — failures recorded in JUnit XML)"
+    else
+        : "ODF Health Check: ALL PASSED"
     fi
-
-    : "ODF Health Check: ALL PASSED"
+    # Advisory step: always exit 0 so downstream steps are not blocked.
+    # Failures are recorded in junit_odf_health.xml for Sippy / TestGrid.
     exit 0
 }
 

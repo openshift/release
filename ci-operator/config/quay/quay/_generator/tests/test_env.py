@@ -128,7 +128,7 @@ def test_cell_settings_overwrite_as_and_env() -> None:
 
 def test_periodic_names_use_cloud_storage_source() -> None:
     generated, _retired = generate_all()
-    assert len(generated) == 6
+    assert len(generated) == 8
     group, _filename, config = next(
         g for g in generated if g[0][0].branch == "redhat-3.18" and g[0][0].ocp_version == "4.22"
     )
@@ -143,8 +143,9 @@ def test_source_nightly_env() -> None:
     env = config["tests"][0]["steps"]["env"]
     assert env["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
     assert env["QUAY_INDEX_IMAGE_REPO"] == (
-        "quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22"
+        "quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc"
     )
+    assert env["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.22__quay-rhel9-operator"
     assert env["QUAY_OPERATOR_CHANNEL"] == "stable-3.18"
 
 

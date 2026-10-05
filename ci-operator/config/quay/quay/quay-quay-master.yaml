@@ -48,7 +48,7 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
       ENABLE_BUILD_SUPPORT: "true"
-      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@webhook|saves
+      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves
         and loads architecture filter with mirror configuration|loads existing architecture
         filter from saved mirror configuration|image build context carries the baked
         classifier artifact path|Nginx 502 error page when backend is unreachable'
@@ -71,15 +71,18 @@ tests:
           - admin
         GLOBAL_READONLY_SUPER_USERS:
           - readonly
+      QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      QUAY_INDEX_IMAGE_TAG: quay-3.18__v4.22__quay-rhel9-operator
       QUAY_OPERATOR_CHANNEL: stable-3.18
-      QUAY_OPERATOR_SOURCE: redhat-operators
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
     post:
     - ref: quay-gather-jaeger-traces
     - ref: quay-gather
     - ref: quay-deprovision
     - chain: ipi-aws-post
     test:
-    - ref: quay-enable-catalogsource
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
     - ref: quay-provisioning-tls
     - ref: quay-provisioning-builder
     - ref: quay-deploy-mailpit
@@ -99,7 +102,7 @@ tests:
     env:
       COMPUTE_NODE_TYPE: n1-standard-16
       ENABLE_BUILD_SUPPORT: "true"
-      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@webhook|saves
+      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves
         and loads architecture filter with mirror configuration|loads existing architecture
         filter from saved mirror configuration|image build context carries the baked
         classifier artifact path|Nginx 502 error page when backend is unreachable'
@@ -122,8 +125,10 @@ tests:
           - admin
         GLOBAL_READONLY_SUPER_USERS:
           - readonly
+      QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      QUAY_INDEX_IMAGE_TAG: quay-3.18__v4.22__quay-rhel9-operator
       QUAY_OPERATOR_CHANNEL: stable-3.18
-      QUAY_OPERATOR_SOURCE: redhat-operators
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_STORAGE_PROVIDER: gcp
     post:
     - ref: quay-gather-jaeger-traces
@@ -131,7 +136,8 @@ tests:
     - ref: quay-deprovision
     - chain: ipi-gcp-post
     test:
-    - ref: quay-enable-catalogsource
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
     - ref: quay-provisioning-tls
     - ref: quay-provisioning-builder
     - ref: quay-deploy-mailpit
@@ -140,6 +146,63 @@ tests:
     - ref: quay-deploy-custom-image
     - ref: quay-test-e2e
     workflow: ipi-gcp
+  timeout: 4h0m0s
+- always_run: false
+  as: azure-blob
+  optional: true
+  steps:
+    cluster_profile: azure-quay-qe
+    dependencies:
+      QUAY_CI_IMAGE: pipeline:quay-server
+    env:
+      BASE_DOMAIN_RESOURCE_GROUP: os4-common
+      COMPUTE_NODE_TYPE: Standard_D8as_v7
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8as_v7
+      ENABLE_BUILD_SUPPORT: "true"
+      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves
+        and loads architecture filter with mirror configuration|loads existing architecture
+        filter from saved mirror configuration|image build context carries the baked
+        classifier artifact path|Nginx 502 error page when backend is unreachable'
+      PLAYWRIGHT_USE_IMAGE_TESTS: "true"
+      QUAY_BUILDER_IMAGE: registry.redhat.io/quay/quay-builder-rhel9@sha256:9ced74943d3147fb6eac6df05c50a47553d550586be736068c47767c6f68c777
+      QUAY_EXTRA_CONFIG: |
+        FEATURE_PROGRAMMATIC_BOOTSTRAP: false
+        FEATURE_USER_METADATA: true
+        FEATURE_IMMUTABLE_TAGS: true
+        FEATURE_SPARSE_INDEX: true
+        FEATURE_QUOTA_NOTIFICATIONS: true
+        FEATURE_EDIT_QUOTA: true
+        FEATURE_CHANGE_TAG_EXPIRATION: true
+        FEATURE_IMAGE_PULL_STATS: false
+        LOG_ARCHIVE_LOCATION: default
+        ACTION_LOG_ARCHIVE_LOCATION: default
+        SESSION_TIMEOUT: 2h
+        DEFAULT_UI: react
+        SUPER_USERS:
+          - admin
+        GLOBAL_READONLY_SUPER_USERS:
+          - readonly
+      QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      QUAY_INDEX_IMAGE_TAG: quay-3.18__v4.22__quay-rhel9-operator
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_STORAGE_PROVIDER: azure
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+    - chain: ipi-azure-post
+    test:
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-provisioning-tls
+    - ref: quay-provisioning-builder
+    - ref: quay-deploy-mailpit
+    - ref: quay-deploy-jaeger
+    - ref: quay-deploy-azure-blob
+    - ref: quay-deploy-custom-image
+    - ref: quay-test-e2e
+    workflow: ipi-azure
   timeout: 4h0m0s
 zz_generated_metadata:
   branch: master

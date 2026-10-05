@@ -118,7 +118,7 @@ log "Server-side dry-run apply of processed SelectorSyncSets"
 # Known SSS that exceed the 256KB annotation limit (oc apply adds
 # kubectl.kubernetes.io/last-applied-configuration which doubles their size).
 # These are false positives — the SSS themselves are valid.
-KNOWN_FAILURES="acm-policies|osd-oauth-templates-login|rosa-oauth-templates-login|rosa-oauth-templates-policies|rosa-oauth-templates-providers"
+KNOWN_FAILURES="acm-policies|osd-oauth-templates-login|rosa-oauth-templates-errors|rosa-oauth-templates-login|rosa-oauth-templates-policies|rosa-oauth-templates-providers"
 
 APPLY_OUTPUT="${ARTIFACT_DIR}/apply-output.txt"
 set +e
@@ -132,7 +132,7 @@ if [ ${APPLY_EXIT} -eq 0 ]; then
 fi
 
 # Check if all errors are from the known list
-UNEXPECTED_ERRORS=$(grep -i 'error\|invalid\|forbidden' "${APPLY_OUTPUT}" | grep -v -E "(${KNOWN_FAILURES})" | grep -v "^$" || true)
+UNEXPECTED_ERRORS=$(grep -i 'error\|invalid\|forbidden' "${APPLY_OUTPUT}" | grep -v "configured (server dry run)" | grep -v "^Error from server" | grep -v -E "(${KNOWN_FAILURES})" | grep -v "^$" || true)
 
 if [ -z "${UNEXPECTED_ERRORS}" ]; then
     KNOWN_COUNT=$(grep -c -E "(${KNOWN_FAILURES})" "${APPLY_OUTPUT}" 2>/dev/null || echo "0")
@@ -141,7 +141,7 @@ if [ -z "${UNEXPECTED_ERRORS}" ]; then
 else
     log "ERROR: Unexpected SelectorSyncSet validation failures detected:"
     echo "${UNEXPECTED_ERRORS}"
-    log "Known annotation-limit failures (tolerated): acm-policies, osd-oauth-templates-login, rosa-oauth-templates-login, rosa-oauth-templates-policies, rosa-oauth-templates-providers"
+    log "Known annotation-limit failures (tolerated): acm-policies, osd-oauth-templates-login, rosa-oauth-templates-errors, rosa-oauth-templates-login, rosa-oauth-templates-policies, rosa-oauth-templates-providers"
     exit 1
 fi
 

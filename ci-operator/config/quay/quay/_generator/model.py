@@ -27,6 +27,9 @@ DEPLOY_REF_BY_CLOUD = {
     "azure": "quay-deploy-azure-blob",
     "libvirt": "quay-deploy-aws-s3",
 }
+# No rhel-9-release-golang-1.25-openshift-<ocp> build root tag exists for older OCP (e.g. 4.14).
+# The build root only builds the Playwright runner image, so older clusters reuse it.
+BUILD_ROOT_OCP_FLOOR = "4.22"
 
 
 @dataclass(frozen=True)
@@ -50,6 +53,7 @@ class Cell:
     optional: bool | None = None
     run_if_changed: str | None = None
     skip_if_only_changed: str | None = None
+    fips: bool = False
 
     @property
     def quay_version_dashed(self) -> str:
@@ -64,6 +68,13 @@ class Cell:
     @property
     def ocp_version_nodot(self) -> str:
         return self.ocp_version.replace(".", "")
+
+    @property
+    def build_root_ocp_version(self) -> str:
+        def key(version: str) -> tuple[int, ...]:
+            return tuple(int(part) for part in version.split("."))
+
+        return max(self.ocp_version, BUILD_ROOT_OCP_FLOOR, key=key)
 
     @property
     def storage(self) -> str:
@@ -85,9 +96,18 @@ class Cell:
 
     @property
     def index_image_repo(self) -> str:
-        dashed = self.quay_version_dashed
-        ocp = self.ocp_version_dashed
-        return "quay.io/redhat-user-workloads/quay-eng-tenant/" f"stable-{dashed}-v{ocp}"
+        # ART publishes every Quay FBC to a single shared, public repo; the
+        # per-release/per-OCP build is selected by index_image_tag, not the repo.
+        return "quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc"
+
+    @property
+    def index_image_tag(self) -> str:
+        # ART floating-tag convention: <group>__v<ocp_version>__<component_name>.
+        # The floating tag (no trailing __g<sha> commit suffix) always points at
+        # the latest successful build for that release/OCP pair.
+        if self.quay_version is None:
+            raise ValueError("index_image_tag requires quay_version to be set")
+        return f"quay-{self.quay_version}__v{self.ocp_version}__quay-rhel9-operator"
 
     @property
     def variant(self) -> str:
@@ -96,14 +116,14 @@ class Cell:
 
     @property
     def test_as(self) -> str:
+        # No arch suffix: a non-amd64 arch is already in the variant, which
+        # Prow puts ahead of `as` in the job name.
         base = (
             f"{self.cloud}-{self.storage}-{self.source}"
             if self.kind == "periodic"
             else f"{self.cloud}-{self.storage}"
         )
-        if self.arch == "amd64":
-            return base
-        return f"{base}-{self.arch}"
+        return f"{base}-fips" if self.fips else base
 
     @property
     def filename(self) -> str:
@@ -121,6 +141,7 @@ class Cell:
             "ocp_version": self.ocp_version,
             "ocp_version_dashed": self.ocp_version_dashed,
             "ocp_version_nodot": self.ocp_version_nodot,
+            "build_root_ocp_version": self.build_root_ocp_version,
             "cloud": self.cloud,
             "storage": self.storage,
             "test": self.test,
@@ -133,10 +154,12 @@ class Cell:
             "deploy_ref": self.deploy_ref,
             "kind": self.kind,
             "layout": self.layout,
+            "fips": self.fips,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version
             ctx["quay_version_dashed"] = self.quay_version_dashed
             ctx["operator_channel"] = self.operator_channel
             ctx["index_image_repo"] = self.index_image_repo
+            ctx["index_image_tag"] = self.index_image_tag
         return ctx

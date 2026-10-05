@@ -66,6 +66,7 @@ JOB_KEYS = {
     "optional",
     "run_if_changed",
     "skip_if_only_changed",
+    "fips",
 }
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
 TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
@@ -341,6 +342,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             optional = _job_bool_field(job, "optional", where)
             run_if_changed = _job_str_field(job, "run_if_changed", where)
             skip_if_only_changed = _job_str_field(job, "skip_if_only_changed", where)
+            fips = _job_bool_field(job, "fips", where) or False
             cron_raw = job.get("cron")
             source_raw = job.get("source")
             if kind == "periodic":
@@ -369,6 +371,8 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         f"branch {branch!r} has none"
                     )
             else:
+                if fips:
+                    raise ValueError(f"{where}.fips is only valid for kind: periodic")
                 if cron_raw is not None:
                     raise ValueError(f"{where} presubmit job must not set cron")
                 cron = None
@@ -411,6 +415,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         optional=optional,
                         run_if_changed=run_if_changed,
                         skip_if_only_changed=skip_if_only_changed,
+                        fips=fips,
                     )
                 )
     return cells

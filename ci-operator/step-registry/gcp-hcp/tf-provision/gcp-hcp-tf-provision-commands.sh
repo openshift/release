@@ -17,10 +17,13 @@ done
 
 log "All required tools available"
 
-# Validate TFC token mount exists
-if [[ ! -f "/etc/terraform-cloud/token" ]]; then
-  log "ERROR: /etc/terraform-cloud/token not found"
-  log "The tfcloud-ci-secret vault mount must be configured"
+# Validate the mounted Terraform CLI config and read its token for API calls.
+if [[ ! -r "${TF_CLI_CONFIG_FILE}" ]]; then
+  log "ERROR: ${TF_CLI_CONFIG_FILE} not found or not readable"
+  exit 1
+fi
+if ! TFC_TOKEN=$(jq -er '.credentials["app.terraform.io"].token | strings | select(length > 0)' "${TF_CLI_CONFIG_FILE}" 2>/dev/null); then
+  log "ERROR: HCP Terraform credentials file has no valid app.terraform.io token"
   exit 1
 fi
 
@@ -92,7 +95,7 @@ if [[ ! "${RUN_ID}" =~ ^[a-z][a-z0-9]{2,15}$ ]]; then
 fi
 
 WORKSPACE_NAME="platform-e2e-${RUN_ID}"
-REGION="${GCP_REGION:-us-central1}"
+REGION="${GCP_REGION:-northamerica-northeast2}"
 TESTED_SHA_PATH="${SHARED_DIR}/gcp-hcp-tested-sha"
 
 if [[ ! -s "${TESTED_SHA_PATH}" ]]; then
@@ -150,6 +153,7 @@ echo "${MC_PROJECT_ID}-gke" > "${SHARED_DIR}/mc-cluster-name"
 echo "${SERVICE_PROJECT_ID}" > "${SHARED_DIR}/service-project-id"
 echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
 echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
+echo "${REGION}" > "${SHARED_DIR}/region"
 
 log "Early SHARED_DIR outputs written (for cleanup on failure):"
 log "  Region Project:  ${REGION_PROJECT_ID}"
@@ -159,17 +163,6 @@ log "  Service Project: ${SERVICE_PROJECT_ID}"
 # --- Configure Terraform ---
 
 cd "${RENDERED_DIR}"
-
-# Read TFC token once — used for both .terraformrc and API calls
-TFC_TOKEN="$(cat /etc/terraform-cloud/token)"
-
-# Configure TFC authentication via .terraformrc (avoids token in env vars)
-(umask 077 && cat > "$HOME/.terraformrc" <<TFRC
-credentials "app.terraform.io" {
-  token = "${TFC_TOKEN}"
-}
-TFRC
-)
 
 # Disable terraform's interactive prompts
 export TF_INPUT=false
@@ -263,17 +256,10 @@ import_orphaned_firestore() {
   log "Detected Firestore provider bug (hashicorp/terraform-provider-google#22533)"
   log "Database exists in GCP but not in state — attempting import..."
 
-  # Extract MC project ID from terraform state (the project resource is
-  # created before Firestore, so it should be in state)
-  local mc_project
-  mc_project=$(terraform output -json 2>/dev/null | jq -r '.management_cluster.value.project_id // empty' 2>/dev/null || echo "")
-
-  if [[ -z "${mc_project}" ]]; then
-    log "WARNING: Could not extract MC project ID from outputs, trying state..."
-    mc_project=$(terraform show -json 2>/dev/null | \
-      jq -r '.. | objects | select(.address? == "module.management_cluster.module.project.google_project.main") | .values.project_id // empty' 2>/dev/null || echo "")
-  fi
-
+  # The project ID is deterministic and was computed before apply so cleanup
+  # can recover from partial provisioning. Terraform outputs and state may be
+  # incomplete when the provider drops Firestore after creating it.
+  local mc_project="${MC_PROJECT_ID:-}"
   if [[ -z "${mc_project}" ]]; then
     log "ERROR: Could not determine MC project ID for import"
     return 1
@@ -393,7 +379,7 @@ if [[ -n "${INFRA_ID}" ]]; then
 fi
 
 # Validate critical outputs were written (early writes + terraform outputs)
-for output_file in region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id api-endpoint oidc-endpoint workspace-name run-id; do
+for output_file in region region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id api-endpoint oidc-endpoint workspace-name run-id; do
   if [[ ! -s "${SHARED_DIR}/${output_file}" ]]; then
     log "ERROR: Output file ${output_file} is empty or missing"
     exit 1

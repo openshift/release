@@ -7,6 +7,10 @@ base_images:
     name: "5.1"
     namespace: ocp-priv
     tag: pf-status-relay
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp-priv
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/pf-status-relay-operator
@@ -72,11 +76,26 @@ tests:
     env:
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: openshift-pf-status-relay-operator
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-pf-status-relay-operator
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_REQUEST: 1Gi
+      SCANNER_NAMESPACE: openshift-pf-status-relay-operator
     test:
+    - as: wait-for-operator
+      cli: latest
+      commands: |
+        set -euo pipefail
+        oc wait --for=condition=Available -n openshift-pf-status-relay-operator deployment/pf-status-relay-operator-controller-manager --timeout=5m
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-13
     - as: e2e-test
       cli: latest
       commands: |
-        oc wait --for condition=Available -n openshift-pf-status-relay-operator deployment pf-status-relay-operator-controller-manager --timeout=5m
         oc logs -n openshift-pf-status-relay-operator deployment/pf-status-relay-operator-controller-manager --all-containers > "${ARTIFACT_DIR}/operator-controller-manager.log" 2>&1 || true
         make e2e GINKGO_ARGS="--ginkgo.junit-report=${ARTIFACT_DIR}/junit_e2e.xml"
       from: src
@@ -84,6 +103,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - ref: tls-scanner-run
     workflow: optional-operators-ci-operator-sdk-aws
 - as: verify-deps
   steps:

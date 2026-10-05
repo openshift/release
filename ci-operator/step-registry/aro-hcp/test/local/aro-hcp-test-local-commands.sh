@@ -42,11 +42,13 @@ make frontend-grant-ingress DEPLOY_ENV="${DEPLOY_ENV}"
 # This block runs the tests against CUSTOMER_SUBSCRIPTION.
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
+echo "Selected ARO HCP e2e suite: ${ARO_HCP_E2E_SUITE:-rp-api-compat-all/parallel}"
 make e2e-local/run -o test/aro-hcp-tests \
   FRONTEND_ADDRESS="${FRONTEND_ADDRESS}" \
   ADMIN_API_ADDRESS="${ADMIN_API_ADDRESS}" \
   SKIP_CERT_VERIFICATION=true \
-  ARO_HCP_CLOUD="dev"
+  ARO_HCP_CLOUD="dev" \
+  ARO_HCP_E2E_SUITE="${ARO_HCP_E2E_SUITE:-rp-api-compat-all/parallel}"
 
 # the make target produces a junit.xml in ARTIFACT_DIR.  We want to copy to SHARED_DIR so we can create
 # direct debugging links for the individual tests that failed. Gzip it due to 3mb SHARED_DIR limit.

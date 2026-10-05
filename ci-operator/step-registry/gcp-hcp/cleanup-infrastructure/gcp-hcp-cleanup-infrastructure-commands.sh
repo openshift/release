@@ -52,7 +52,7 @@ MC_PROJECT=$(<"${SHARED_DIR}/mc-project-id")
 MC_CLUSTER=$(<"${SHARED_DIR}/mc-cluster-name")
 SERVICE_PROJECT=$(cat "${SHARED_DIR}/service-project-id" 2>/dev/null || echo "")
 CUSTOMER_PROJECT=$(cat "${SHARED_DIR}/customer-project-id" 2>/dev/null || echo "")
-REGION=${GCP_REGION:-us-central1}
+REGION=${GCP_REGION:-northamerica-northeast2}
 
 # Get project numbers
 REGION_PROJECT_NUMBER=$(gcloud projects describe "${REGION_PROJECT}" --format='value(projectNumber)' 2>/dev/null || echo "")
@@ -308,13 +308,16 @@ clear_tfc_workspace() {
   local workspace_name
   workspace_name=$(<"${SHARED_DIR}/workspace-name")
 
-  if [[ ! -f "/etc/terraform-cloud/token" ]]; then
-    log "  WARNING: TFC token not found, skipping TFC cleanup"
+  if [[ ! -r "${TF_CLI_CONFIG_FILE}" ]]; then
+    log "  WARNING: HCP Terraform credentials not found, skipping TFC cleanup"
     return 0
   fi
 
   local tfc_token
-  tfc_token=$(<"/etc/terraform-cloud/token")
+  if ! tfc_token=$(jq -er '.credentials["app.terraform.io"].token | strings | select(length > 0)' "${TF_CLI_CONFIG_FILE}" 2>/dev/null); then
+    log "  WARNING: HCP Terraform credentials are invalid, skipping TFC cleanup"
+    return 0
+  fi
   local tfc_org="${TFC_ORGANIZATION:-hp-platform-engineering}"
 
   log "  Workspace: ${workspace_name}"
@@ -380,14 +383,6 @@ terraform {
   }
 }
 TFEOF
-
-  # Configure TFC auth
-  (umask 077 && cat > "$HOME/.terraformrc" <<TFRC
-credentials "app.terraform.io" {
-  token = "${tfc_token}"
-}
-TFRC
-  )
 
   export TF_INPUT=false
   export TF_IN_AUTOMATION=true

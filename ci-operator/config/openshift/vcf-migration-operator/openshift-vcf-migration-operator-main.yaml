@@ -15,6 +15,7 @@ images:
       COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
     from: src
     to: operator-sdk-vcf
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)|((^|/)\.tekton/)|(^renovate\.json$)|(^bundle\.konflux\.Dockerfile$)
 promotion:
   to:
   - namespace: vcf
@@ -40,44 +41,45 @@ tests:
   commands: unset VERSION; NO_DOCKER=1 make bundle-verify
   container:
     from: operator-sdk-vcf
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)
 - as: fmt
   commands: NO_DOCKER=1 make fmt && make verify-diff
   container:
     from: src
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)
 - as: generate
   commands: NO_DOCKER=1 make generate && make verify-diff
   container:
     from: src
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)
 - as: lint
   commands: NO_DOCKER=1 make lint
   container:
     from: src
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)
 - as: manifests
   commands: NO_DOCKER=1 make manifests && make verify-diff
   container:
     from: src
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)
 - as: unit
   commands: make test
   container:
     from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)|((^|/)\.tekton/)|(^renovate\.json$)|(^bundle\.konflux\.Dockerfile$)
 - as: vendor
   commands: NO_DOCKER=1 make vendor && make verify-diff
   container:
     from: src
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)
 - as: vet
   commands: NO_DOCKER=1 make vet
   container:
     from: src
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)
 - as: e2e-vsphere-vcf-migration
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)|((^|/)\.tekton/)|(^renovate\.json$)|(^bundle\.konflux\.Dockerfile$)|((^|/)(?:\.gitignore|PROJECT|LICENSE)$)
   steps:
     cluster_profile: vsphere-elastic
     dependencies:

@@ -515,6 +515,63 @@ tests:
       USE_EXTERNAL_DNS: "true"
       VOLUME_CAPACITY: 120G
     workflow: openshift-e2e-libvirt-vpn
+- as: e2e-external-ibmz-agent-libvirt
+  capabilities:
+  - intranet
+  cron: 0 13 * * 0
+  reporter_config:
+    channel: '#forum-ocp-platform-external-ci'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: libvirt-s390x-vpn
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "5.1"
+      DISABLE_LOAD_BALANCER_MONITOR: "true"
+      ETCD_DISK_SPEED: slow
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: vsphere-csi-driver-operator
+      INSTALLER_TYPE: agent
+      NODE_TUNING: "true"
+      PLATFORM_NAME: ibmz
+      PLATFORM_TYPE: external
+      TEST_TYPE: conformance-parallel
+      USE_EXTERNAL_DNS: "true"
+      VOLUME_CAPACITY: 120G
+    workflow: openshift-e2e-libvirt-vpn
+- as: e2e-external-ibmz-upi-libvirt
+  capabilities:
+  - intranet
+  cron: 0 15 * * 0
+  reporter_config:
+    channel: '#forum-ocp-platform-external-ci'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::ibm: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. cc #forum-ocp-ibmz (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: libvirt-s390x-vpn
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "5.1"
+      DISABLE_LOAD_BALANCER_MONITOR: "true"
+      ETCD_DISK_SPEED: slow
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: vsphere-csi-driver-operator
+      NODE_TUNING: "true"
+      PLATFORM_NAME: ibmz
+      PLATFORM_TYPE: external
+      TEST_TYPE: conformance-parallel
+      USE_EXTERNAL_DNS: "true"
+      VOLUME_CAPACITY: 120G
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-multi-z-xz
   capabilities:
   - sshd-bastion

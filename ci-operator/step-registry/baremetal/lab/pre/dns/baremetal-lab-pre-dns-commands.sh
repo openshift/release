@@ -23,6 +23,13 @@ if [ "${ipv6_enabled:-false}" == "true" ] && [ -z "${api_vip_v6:-}" ]; then echo
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 DNS_FORWARD=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
 
+if [[ ${TOPOLOGY_TYPE:-COMPACT} == "SNO" ]]; then
+  ip=$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")
+  api_vip=${ip}
+  api_int=${ip}
+  ingress_vip=${ip}
+fi
+
 if [ "${ipv4_enabled:-false}" == "true" ]; then
   # shellcheck disable=SC2154
   DNS_FORWARD="${DNS_FORWARD}

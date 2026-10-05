@@ -9,6 +9,14 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 # fi
 
 export_env_vars_from_json 'reboot' "${TEST_SETTINGS:-}" "${TEST_SETTINGS_DEFAULTS:-}"
+apply_gangway_overrides
+
+# Validate REBOOT_COUNT is a non-negative integer
+if ! [[ "${REBOOT_COUNT}" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: REBOOT_COUNT must be a non-negative integer, got: '${REBOOT_COUNT}'"
+    exit 1
+fi
+
 setup_continue_on_fail
 setup_debug_on_fail
 

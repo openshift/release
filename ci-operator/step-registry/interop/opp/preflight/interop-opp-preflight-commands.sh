@@ -11,7 +11,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  _exit_code=$?
+  _exit_code=${1:-$?}
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -26,7 +26,8 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
-trap '_opp_cleanup' EXIT
+_jrc=0
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -72,8 +73,8 @@ function DebugOnExit () {
     true
 }
 
-trap '_opp_cleanup; EXIT_CODE=${_exit_code}; DebugOnExit' EXIT
-trap '{ EXIT_CODE=143; DebugOnExit; trap - EXIT; exit 143; }' TERM
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; EXIT_CODE=${_jrc}; DebugOnExit' EXIT
+trap 'exit 143' TERM
 
 # ──────────────────────────────────────────────────────────────────────
 #  Known removed / deprecated APIs per OCP minor version.
@@ -481,4 +482,35 @@ with open(sys.argv[1], 'w') as f:
     true
 }
 
+SUITE_NAME="${SUITE_NAME:-preflight}"
+# --- JUnit wrapper ---
+# shellcheck disable=SC2317  # invoked via trap
+WriteJunit() {
+  local rc=${1:-0}
+  TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  JUNIT_FILE="${ARTIFACT_DIR}/junit_${SUITE_NAME}.xml"
+  if [[ $rc -eq 0 ]]; then
+    cat > "${JUNIT_FILE}" <<JEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${SUITE_NAME}" tests="1" failures="0" time="0">
+  <testcase name="${SUITE_NAME}" classname="interop.opp">
+    <system-out>Step completed successfully at ${TIMESTAMP}</system-out>
+  </testcase>
+</testsuite>
+JEOF
+  else
+    cat > "${JUNIT_FILE}" <<JEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${SUITE_NAME}" tests="1" failures="1" time="0">
+  <testcase name="${SUITE_NAME}" classname="interop.opp">
+    <failure message="${SUITE_NAME} failed with exit code ${rc}">
+Step failed at ${TIMESTAMP} with exit code ${rc}
+    </failure>
+  </testcase>
+</testsuite>
+JEOF
+  fi
+}
+
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; EXIT_CODE=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit 0' EXIT
 Main "$@"

@@ -1,8 +1,7 @@
 #!/bin/bash
-set -o nounset -o errexit -o
+set -euo pipefail
 
 # Variables
-GLOBAL_DEADLINE=$(( $(date +%s) + 1200 ))         # 20 minutes global timebox
 SKIP_HOST_SSH=0
 
 # Logging
@@ -24,6 +23,70 @@ if [[ ! -e "${SHARED_DIR}/server-ip" ]]; then
 fi
 
 # Helpers
+prepare_test_image_config() {
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/ds-vars.conf"
+
+  # IPv6 clusters are disconnected. IDMS is available starting with OCP 4.13.
+  if [[ "${DS_IP_STACK}" != "v6" ]] || ! printf '%s\n%s' "4.13" "${DS_OPENSHIFT_VERSION}" | sort -C -V; then
+    return 0
+  fi
+
+  local test_image_repo="${DS_REGISTRY}/localimages/local-test-image"
+  log "Configuring the test image mirror before degrading the cluster..."
+  ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${test_image_repo}" << 'IDMS_EOF'
+set -euo pipefail
+local_repo="$1"
+oc apply -f - <<EOF
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: test-image-idms
+spec:
+  imageDigestMirrors:
+  - source: quay.io/openshifttest/hello-sdn
+    mirrors:
+    - ${local_repo}
+EOF
+
+# Updated=True alone can still describe the configuration preceding the IDMS.
+# First verify that the desired rendered config contains the mirror, then check
+# that all masters have applied it. Do not wait for Updating=True: a fast/no-op
+# rollout can miss that transition, and the empty worker pool never needs one.
+deadline=$((SECONDS + 900))
+while (( SECONDS < deadline )); do
+    if pool=$(oc get mcp master -o json); then
+        rendered_config=$(jq -r '.spec.configuration.name' <<< "${pool}")
+        if registries_conf=$(oc get machineconfig "${rendered_config}" -o json | jq -r '
+            .spec.config.storage.files[]
+            | select(.path == "/etc/containers/registries.conf")
+            | .contents.source | split(",")[1] | @base64d') &&
+            [[ "${registries_conf}" == *'"quay.io/openshifttest/hello-sdn"'* && "${registries_conf}" == *"\"${local_repo}\""* ]] &&
+            jq -e '
+                .status.observedGeneration >= .metadata.generation and
+                .status.configuration.name == .spec.configuration.name and
+                .status.machineCount > 0 and
+                .status.updatedMachineCount == .status.machineCount and
+                .status.readyMachineCount == .status.machineCount and
+                any(.status.conditions[]; .type == "Updated" and .status == "True")
+            ' <<< "${pool}" > /dev/null; then
+            echo "All masters have applied the test image mirror configuration."
+            exit 0
+        fi
+    fi
+    sleep 10
+done
+
+echo "Timed out waiting for masters to apply the test image mirror configuration."
+oc get mcp master
+exit 1
+IDMS_EOF
+
+  # Record success only after all masters have applied the mirror configuration.
+  # The e2e step will mirror image contents and reuse this IDMS after shutdown.
+  printf '%s\n' "${test_image_repo}" > "${SHARED_DIR}/test-image-idms-prepared"
+}
+
 must_have_time() {
   local now left
   now=$(date +%s)
@@ -71,8 +134,6 @@ wait_for_image_registry_stable() {
 }
 
 
-wait_for_image_registry_stable
-
 # Host SSH setup (optional)
 SKIP_HOST_SSH="${SKIP_HOST_SSH:-0}"
 
@@ -83,6 +144,16 @@ else
   # shellcheck source=/dev/null
   source "${SHARED_DIR}/packet-conf.sh"
 fi
+
+# Complete cluster-wide configuration while both masters can apply it. A failure
+# here must stop the step before we intentionally take master-1 offline.
+if [[ ${SKIP_HOST_SSH} -eq 0 && -n "${IP:-}" ]]; then
+  prepare_test_image_config
+fi
+
+# Keep the original 20-minute stabilization/degradation budget after IDMS setup.
+GLOBAL_DEADLINE=$(( $(date +%s) + 1200 ))
+wait_for_image_registry_stable
 
 # Degrade master-1 via hypervisor
 if [[ ${SKIP_HOST_SSH} -eq 0 && -n "${IP:-}" ]]; then
