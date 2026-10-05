@@ -108,7 +108,12 @@ if ! wait_for_platform_api; then
 fi
 
 echo "Configuration:"
-echo "  Target endpoints:    configured"
+if [[ -s "${SHARED_DIR}/api-endpoint" ]]; then
+  echo "  API endpoint:       $(cat "${SHARED_DIR}/api-endpoint")"
+fi
+if [[ -s "${SHARED_DIR}/oidc-endpoint" ]]; then
+  echo "  OIDC endpoint:      $(cat "${SHARED_DIR}/oidc-endpoint")"
+fi
 echo "  Customer project:   $(cat "${SHARED_DIR}/customer-project-id")"
 echo "  HC version:         ${HC_VERSION:-5.0.0-ec.6}"
 echo "  Channel group:      ${HC_CHANNEL_GROUP:-candidate}"
