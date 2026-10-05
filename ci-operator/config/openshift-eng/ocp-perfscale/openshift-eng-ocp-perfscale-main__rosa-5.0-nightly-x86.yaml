@@ -287,6 +287,28 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: wait-for-stable-cluster
+      cli: latest
+      commands: |
+        set -o errexit
+        set -o pipefail
+        echo "=== Waiting for cluster operators to stabilize ==="
+        echo "Waiting for all cluster operators to be Available..."
+        oc wait co --all --for=condition=Available=True --timeout=10m
+        echo "Waiting for all cluster operators to stop Progressing..."
+        oc wait co --all --for=condition=Progressing=False --timeout=10m
+        echo "Waiting for all cluster operators to not be Degraded..."
+        oc wait co --all --for=condition=Degraded=False --timeout=10m
+        echo "=== All cluster operators are stable ==="
+        echo "Sleeping 10 minutes to let everything settle..."
+        sleep 600
+        echo "=== Cluster operator status after settling period ==="
+        oc get co
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - chain: openshift-qe-build-farm
     - ref: openshift-qe-orion
     - as: capture-prometheus-dump
