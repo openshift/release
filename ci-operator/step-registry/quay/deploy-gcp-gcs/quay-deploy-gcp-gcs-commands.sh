@@ -539,6 +539,24 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   TLS_MANAGED="false"
   cat "${SHARED_DIR}/config_builder.yaml" >> config.yaml
 
+  # QUAY_BUILDER_IMAGE=from-csv defers the builder image to the installed
+  # operator: use the RELATED_IMAGE_COMPONENT_BUILDER the Subscription's CSV
+  # ships, so the builder matches the installed operator. No fallback.
+  if grep -qE '^ *BUILDER_CONTAINER_IMAGE: from-csv$' config.yaml; then
+    csv_json=$(oc -n quay-enterprise get csv "$CSV" -o json)
+    mapfile -t builder_images < <(jq -r '[.spec.install.spec.deployments[]?.spec.template.spec.containers[]?.env[]?
+        | select(.name == "RELATED_IMAGE_COMPONENT_BUILDER") | .value // empty | select(. != "")]
+        | unique | .[]' <<<"$csv_json")
+    if [[ ${#builder_images[@]} -ne 1 ]]; then
+      echo "ERROR: CSV ${CSV} must set exactly one non-empty RELATED_IMAGE_COMPONENT_BUILDER value; got: ${builder_images[*]:-none}" >&2
+      QL_INSTALL_STATUS="failed"
+      QL_INSTALL_FAILURE="Quay Operator CSV ${CSV} has no unique builder image"
+      exit 1
+    fi
+    echo "Builder image from CSV ${CSV}: ${builder_images[0]}" >&2
+    sed -i -E "s|^( *BUILDER_CONTAINER_IMAGE:) from-csv$|\1 ${builder_images[0]}|" config.yaml
+  fi
+
   oc create secret generic -n quay-enterprise config-bundle-secret \
     --from-file config.yaml=./config.yaml \
     --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
