@@ -5,6 +5,7 @@ ref:
     name: terraform-windows-provisioner
     tag: latest
   commands: windows-byoh-provision-commands.sh
+  grace_period: 5m
   resources:
     requests:
       cpu: 100m
@@ -37,8 +38,13 @@ ref:
     This step:
     1. Uses pre-built terraform-windows-provisioner image (ci/terraform-windows-provisioner:latest)
     2. Provisions Windows worker nodes on the detected cloud platform (AWS, Azure, GCP, vSphere, Nutanix, None)
-    3. Waits for nodes to become Ready
-    4. Exports instance information to SHARED_DIR for WMCO BYOH e2e tests
+    3. Saves Terraform cleanup state to protected SHARED_DIR before readiness polling
+    4. Waits for nodes to become Ready
+    5. Exports instance information to SHARED_DIR for WMCO BYOH e2e tests
+
+    On failure, the step preserves the original nonzero exit status and collects bounded,
+    best-effort WMCO workload status, operator logs, namespace events, CSR status, and
+    Windows node readiness diagnostics. It never reads Secret values for diagnostics.
 
     The container image includes:
     - Terraform 1.9.5 (pre-installed, no download needed)
@@ -50,6 +56,6 @@ ref:
     Instance information is exported in the format expected by WMCO BYOH tests:
     ${SHARED_DIR}/<ip>_windows_instance.txt
 
-    Terraform state is stored in ${ARTIFACT_DIR}/terraform_byoh/ for access by destroy step.
-    Note: ARTIFACT_DIR is used instead of SHARED_DIR because SHARED_DIR points to the cluster-profile
-    secret mount which is not shared between steps.
+    Terraform state can contain sensitive values. It is kept only in protected SHARED_DIR,
+    archived there immediately after the provisioner returns (including after partial failures
+    when state exists), and is never copied to ARTIFACT_DIR.

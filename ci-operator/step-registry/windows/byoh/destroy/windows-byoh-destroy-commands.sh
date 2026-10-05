@@ -3,29 +3,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+umask 077
+
 echo "=== Windows BYOH Cleanup ==="
-
-# Debug: Print environment variables
-echo "DEBUG: SHARED_DIR=${SHARED_DIR}"
-echo "DEBUG: CLUSTER_PROFILE_DIR=${CLUSTER_PROFILE_DIR}"
-echo "DEBUG: ARTIFACT_DIR=${ARTIFACT_DIR:-not set}"
-
-# Test: Check if SHARED_DIR marker file exists (written by provision)
-echo "Testing if SHARED_DIR is shared between steps..."
-if [[ -f "${SHARED_DIR}/test-shared-dir-marker.txt" ]]; then
-    echo "SHARED_DIR IS SHARED - marker file found: $(cat "${SHARED_DIR}/test-shared-dir-marker.txt")"
-else
-    echo "✗ SHARED_DIR NOT SHARED - marker file not found"
-fi
-shopt -s nullglob
-files=("${SHARED_DIR}"/*test-shared* "${SHARED_DIR}"/*byoh*)
-if [[ ${#files[@]} -gt 0 ]]; then
-    for file in "${files[@]}"; do
-        echo "Found: $(basename "$file")"
-    done
-else
-    echo "No test files found in SHARED_DIR"
-fi
 
 # Read instance name saved by provision step (from SHARED_DIR)
 if [[ -f "${SHARED_DIR}/byoh_instance_name.txt" ]]; then
@@ -52,22 +32,32 @@ for p in aws azure gcp vsphere nutanix none; do
 done
 if [[ -z "${PLATFORM}" ]]; then
     echo "ERROR: No terraform tarball found in ${SHARED_DIR}/ (checked: aws, azure, gcp, vsphere, nutanix, none)"
-    ls -la "${SHARED_DIR}/" || true
     exit 1
 fi
+
+# Keep extracted state in protected shared storage. Terraform state can contain
+# credentials and must never be copied to the public artifact directory.
+export BYOH_TMP_DIR="${SHARED_DIR}/terraform_byoh_destroy/"
+rm -rf "${BYOH_TMP_DIR}"
+mkdir -p "${BYOH_TMP_DIR}${PLATFORM}"
+
+cleanup_state() {
+    local status=$?
+    trap - EXIT
+    rm -rf "${BYOH_TMP_DIR}" || true
+    exit "${status}"
+}
+trap cleanup_state EXIT
+
 if [[ -f "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar" ]]; then
     echo "Extracting terraform files from ${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar..."
-    mkdir -p "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}"
-    tar -xf "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar" -C "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}"
-    echo "Terraform files extracted to ${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}/"
-    ls -lh "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}/"
+    tar -xf "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar" -C "${BYOH_TMP_DIR}${PLATFORM}"
+    echo "Terraform cleanup state extracted in protected shared storage"
 else
     echo "ERROR: Terraform tarball not found at ${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar"
     echo "Destroy step requires terraform files created by provision step"
     exit 1
 fi
-
-export BYOH_TMP_DIR="${ARTIFACT_DIR}/terraform_byoh/"
 
 # Extract SSH public key from cluster profile (required by byoh.sh even for destroy)
 if [[ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]]; then
@@ -96,12 +86,12 @@ if [[ -f "${CLUSTER_PROFILE_DIR}/gce.json" ]]; then
 fi
 
 # Use provisioner directory from image (scripts are pre-installed)
-WORK_DIR="/usr/local/share/byoh-provisioner"
+WORK_DIR="${BYOH_PROVISIONER_DIR:-/usr/local/share/byoh-provisioner}"
 echo "Using provisioner directory: ${WORK_DIR}"
 
 
 # Verify byoh.sh is available
-if ! command -v byoh.sh &> /dev/null; then
+if [[ ! -x "${WORK_DIR}/byoh.sh" ]]; then
     echo "ERROR: byoh.sh not found in terraform-windows-provisioner image"
     exit 1
 fi
@@ -115,7 +105,7 @@ if [[ -f "${TERRAFORM_STATE_FILE}" ]]; then
 else
     echo "ERROR: Terraform state not found at ${TERRAFORM_STATE_FILE}"
     echo "Expected location: ${TERRAFORM_STATE_FILE}"
-    echo "Provision step should have created this file in ARTIFACT_DIR"
+    echo "Provision step should have saved this file in protected shared storage"
     exit 1
 fi
 
