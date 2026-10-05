@@ -1,0 +1,37 @@
+ref:
+  as: distributed-tracing-tests-rapidast
+  from: obs-tests-runner
+  timeout: 1h0m0s
+  grace_period: 2m0s
+  commands: distributed-tracing-tests-rapidast-commands.sh
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+  env:
+  - name: RAPIDAST_TEST_DIR
+    default: "tests/e2e-rh-sdl/rapidast-otel"
+    documentation: |-
+      RapiDAST test directory in the distributed-tracing-qe repository.
+      Use tests/e2e-rh-sdl/rapidast-otel for the OpenTelemetry operator or tests/e2e-rh-sdl/rapidast-tempo for the Tempo operator.
+  - name: RHOSDT_VERSION
+    default: ""
+    documentation: |-
+      The Red Hat build of OpenTelemetry version (e.g. 3.11). It is used to place the scan results in the
+      rhosdt/<version>/<operand> directory of the results bucket. The step fails if left empty.
+  - name: DISTRIBUTED_TRACING_QE_BRANCH
+    default: "main"
+    documentation: The branch of openshift/distributed-tracing-qe to run the RapiDAST tests from.
+  - name: RAPIDAST_GCS_KEY_FILE
+    default: "/var/run/vault/dt-secrets/rapidast-sa-rhosdt-key"
+    documentation: |-
+      Path of the Google Cloud service account key that RapiDAST uses to upload the scan results.
+      The file is provided by the rapidast-sa-rhosdt-key key of the distributed-tracing-team secret collection.
+  credentials:
+  - collection: distributed-tracing
+    group: distributed-tracing-team
+    mount_path: /var/run/vault/dt-secrets
+  documentation: |-
+    The distributed-tracing-tests-rapidast step runs the RapiDAST dynamic application security tests of
+    openshift/distributed-tracing-qe (tests/e2e-rh-sdl) against the operator that is installed on the cluster.
+    It mirrors the dast-test task of the Konflux integration test pipelines. The step fails if the scan reports high risk findings.

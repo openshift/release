@@ -1,0 +1,70 @@
+ref:
+  as: distributed-tracing-tests-opentelemetry-premerge
+  from: obs-tests-runner
+  timeout: 3h0m0s
+  grace_period: 2m0s
+  commands: distributed-tracing-tests-opentelemetry-premerge-commands.sh
+  resources:
+    requests:
+      cpu: "1"
+      memory: 3Gi
+  env:
+  - name: TEST_DIRS
+    default: >-
+      tests/e2e
+      tests/e2e-autoscale
+      tests/e2e-crd-validations
+      tests/e2e-openshift
+      tests/e2e-instrumentation
+      tests/e2e-pdb
+      tests/e2e-otel
+      tests/e2e-multi-instrumentation
+      tests/e2e-targetallocator-cr
+      tests/e2e-targetallocator
+    documentation: |-
+      Space separated chainsaw test directories (or single test case directories) of the operator repository to run
+      in the main test batch. The default is the full suite that the Konflux e2e pipelines run.
+  - name: SIDECAR_TEST_DIRS
+    default: "tests/e2e-prometheuscr tests/e2e-sidecar"
+    documentation: |-
+      Space separated test directories that carry the chainsaw label sidecar=native|legacy. They are run in a separate
+      batch with a selector derived from the OpenShift version. Set to an empty string to skip the batch.
+  - name: RUN_METADATA_FILTER_TESTS
+    default: "true"
+    documentation: |-
+      Run tests/e2e-metadata-filters after patching ANNOTATIONS_FILTER and LABELS_FILTER into the operator CSV.
+  - name: RUN_TLS_PROFILE_TESTS
+    default: "true"
+    documentation: |-
+      Run tests/e2e-openshift-tls-profile. These tests change the cluster wide APIServer TLS profile.
+  - name: SKIP_TESTS
+    default: ""
+    documentation: |-
+      Space separated test cases to skip from the test run. Each entry is a path that starts with tests/ and is removed
+      from the working copy of the repository before the tests start.
+      Example: tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation
+  - name: OTEL_COLLECTOR_IMAGE
+    default: ""
+    documentation: The OpenTelemetry Collector image used by the operator in testing. Filled from the opentelemetry-collector pipeline image.
+  - name: TARGETALLOCATOR_IMG
+    default: ""
+    documentation: The OpenTelemetry Target Allocator image used by the operator in testing. Filled from the opentelemetry-target-allocator-art pipeline image.
+  dependencies:
+  - name: "opentelemetry-collector"
+    env: OTEL_COLLECTOR_IMAGE
+  - name: "opentelemetry-target-allocator-art"
+    env: TARGETALLOCATOR_IMG
+  documentation: |-
+    The distributed-tracing-tests-opentelemetry-premerge step runs the OpenTelemetry Operator e2e tests of the product
+    branch against an operator that was installed from a bundle built in the same CI run.
+
+    Unlike the stage and downstream steps, the test suite is taken from the pull request source that is baked into the
+    obs-tests-runner image (tests/e2e-openshift/Dockerfile) instead of being cloned from a branch.
+
+    This step requires the following pipeline images to be built by the ci-operator config:
+    - obs-tests-runner: test runner image that contains the operator repository in /tmp/opentelemetry-operator
+    - opentelemetry-collector: Red Hat build of the OpenTelemetry Collector
+    - opentelemetry-target-allocator-art: Red Hat build of the Target Allocator
+
+    The collector and target allocator images are passed to the operator by patching the RELATED_IMAGE_COLLECTOR and
+    RELATED_IMAGE_TARGET_ALLOCATOR environment variables into the operator ClusterServiceVersion.

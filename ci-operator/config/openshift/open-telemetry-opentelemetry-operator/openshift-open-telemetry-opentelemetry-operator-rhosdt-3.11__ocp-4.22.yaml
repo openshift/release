@@ -1,0 +1,176 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.0
+canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: Dockerfile.art
+    to: opentelemetry-operator-art
+  - context_dir: .
+    dockerfile_path: Dockerfile.ta.art
+    to: opentelemetry-target-allocator-art
+  - context_dir: .
+    dockerfile_path: ./tests/e2e-openshift/Dockerfile
+    to: obs-tests-runner
+  - build_args:
+    - name: COLLECTOR_REPO
+      value: https://github.com/os-observability/redhat-opentelemetry-collector.git
+    - name: COLLECTOR_BRANCH
+      value: rhosdt-3.11
+    dockerfile_literal: |
+      # Mirrors Dockerfile.art of os-observability/redhat-opentelemetry-collector (rhosdt-3.11). Keep in sync.
+      FROM registry.redhat.io/openshift/golang-builder:golang-builder-v1.26-rhel9 AS src
+      ARG COLLECTOR_REPO
+      ARG COLLECTOR_BRANCH
+      WORKDIR /opt/app-root/src
+      USER root
+      RUN git clone --depth 1 --branch "${COLLECTOR_BRANCH}" --recurse-submodules --shallow-submodules "${COLLECTOR_REPO}" .
+      FROM registry.redhat.io/openshift/golang-builder:golang-builder-v1.26-rhel9 AS bpf-generator
+      WORKDIR /opt/app-root/src
+      USER root
+      COPY --from=src /opt/app-root/src/.obi-src .obi-src
+      RUN GOFLAGS=-mod=mod make -C .obi-src generate
+      FROM registry.redhat.io/openshift/golang-builder:golang-builder-v1.26-rhel9 AS builder
+      WORKDIR /opt/app-root/src
+      USER root
+      COPY --from=src /opt/app-root/src .
+      COPY --from=bpf-generator /opt/app-root/src/.obi-src .obi-src
+      RUN CGO_ENABLED=0 go build -C ./_build -mod=mod -o opentelemetry-collector -trimpath -ldflags "-w"
+      FROM registry.redhat.io/ubi9/ubi-micro AS target-base
+      FROM registry.redhat.io/ubi9/ubi AS install-additional-packages
+      COPY --from=target-base / /mnt/rootfs
+      RUN rpm --root /mnt/rootfs --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      RUN dnf install --installroot /mnt/rootfs --releasever 9 --setopt install_weak_deps=false --setopt reposdir=/etc/yum.repos.d --nodocs -y systemd && dnf clean all && rm -rf /mnt/rootfs/var/cache/*
+      FROM registry.redhat.io/ubi9/ubi-micro
+      WORKDIR /
+      COPY --from=install-additional-packages /mnt/rootfs/ /
+      COPY --from=builder /opt/app-root/src/_build/opentelemetry-collector /usr/bin/opentelemetry-collector
+      COPY --from=builder /opt/app-root/src/configs/otelcol.yaml /etc/otelcol/config.yaml
+      ARG USER_UID=1001
+      RUN useradd -u ${USER_UID} otelcol && usermod -a -G systemd-journal otelcol
+      USER ${USER_UID}
+      ENTRYPOINT ["/usr/bin/opentelemetry-collector"]
+      CMD ["--config", "/etc/otelcol/config.yaml"]
+      EXPOSE 4317 55678 55679
+    to: opentelemetry-collector
+operator:
+  bundles:
+  - as: opentelemetry-bundle
+    context_dir: ./bundle/openshift
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:[0-9][0-9.]*
+    with: pipeline:opentelemetry-operator-art
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-critical
+  steps:
+    cluster_profile: aws-observability
+    env:
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+      OPERATORS: |
+        [
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"}
+        ]
+      RUN_METADATA_FILTER_TESTS: "false"
+      RUN_TLS_PROFILE_TESTS: "false"
+      SIDECAR_TEST_DIRS: tests/e2e-sidecar
+      TEST_DIRS: tests/e2e/smoke-collector/smoke-collector-daemonset tests/e2e/smoke-collector/smoke-collector-deployment
+        tests/e2e/smoke-collector/smoke-collector-statefulset tests/e2e/smoke-collector/smoke-targetallocator
+        tests/e2e/smoke-deletion tests/e2e/smoke-restarting-deployment tests/e2e/operator-metrics
+        tests/e2e/managed-reconcile tests/e2e/multiple-configmaps tests/e2e/ingress
+        tests/e2e-crd-validations tests/e2e-openshift/route tests/e2e-openshift/otlp-metrics-traces
+        tests/e2e-openshift/monitoring tests/e2e-openshift/scrape-in-cluster-monitoring
+        tests/e2e-openshift/networkpolicy tests/e2e-openshift/env-config tests/e2e-targetallocator-cr
+        tests/e2e-targetallocator/targetallocator-features tests/e2e-instrumentation/instrumentation-java
+        tests/e2e-instrumentation/instrumentation-python tests/e2e-instrumentation/instrumentation-nodejs
+        tests/e2e-otel/filelog tests/e2e-otel/kubeletstatsreceiver tests/e2e-otel/k8sclusterreceiver
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace opentelemetry-operator-system
+        oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
+        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
+        oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: opentelemetry-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: install-operators
+    - ref: distributed-tracing-tests-opentelemetry-premerge
+    workflow: cucushift-installer-rehearse-aws-ipi
+- always_run: false
+  as: e2e-full
+  optional: true
+  steps:
+    cluster_profile: aws-observability
+    env:
+      AGENT_SKILL: otel
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+      OPERATORS: |
+        [
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.5", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.5", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
+        ]
+      RHOSDT_VERSION: "3.11"
+      SKIP_TESTS: tests/e2e-otel/*aws* tests/e2e-otel/google* tests/e2e-instrumentation/instrumentation-go
+        tests/e2e-otel/azuremonitorlogs
+    post:
+    - ref: openshift-observability-qe-agent
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace opentelemetry-operator-system
+        oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
+        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
+        oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: opentelemetry-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: install-operators
+    - ref: distributed-tracing-tests-rapidast
+    - ref: distributed-tracing-tests-opentelemetry-premerge
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: rhosdt-3.11
+  org: openshift
+  repo: open-telemetry-opentelemetry-operator
+  variant: ocp-4.22
