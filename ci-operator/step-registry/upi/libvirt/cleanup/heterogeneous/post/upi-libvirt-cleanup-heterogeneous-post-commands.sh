@@ -77,7 +77,11 @@ if ${VIRSH_PRIMARY} pool-list 2>/dev/null | grep -qw "${POOL_NAME}"; then
 fi
 
 echo "Removing stale httpd volumes on primary host..."
-if ${VIRSH_PRIMARY} pool-list 2>/dev/null | grep -qw "${HTTPD_POOL_NAME}"; then
+PRIMARY_INIT_ALL_POOLS=$(${VIRSH_PRIMARY} pool-list --all --name 2>&1) || {
+  echo "ERROR: Failed to list pools on primary hypervisor during initial httpd pool check: ${PRIMARY_INIT_ALL_POOLS}"
+  exit 1
+}
+if echo "${PRIMARY_INIT_ALL_POOLS}" | grep -Fxq "${HTTPD_POOL_NAME}"; then
   PRIMARY_INIT_HTTPD_VOLS=$(${VIRSH_PRIMARY} vol-list --pool "${HTTPD_POOL_NAME}" 2>&1) || {
     echo "ERROR: Failed to list initial volumes on primary httpd pool ${HTTPD_POOL_NAME}: ${PRIMARY_INIT_HTTPD_VOLS}"
     exit 1
@@ -85,6 +89,8 @@ if ${VIRSH_PRIMARY} pool-list 2>/dev/null | grep -qw "${HTTPD_POOL_NAME}"; then
   for VOLUME in $(echo "${PRIMARY_INIT_HTTPD_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }'); do
     ${VIRSH_PRIMARY} vol-delete --pool "${HTTPD_POOL_NAME}" "${VOLUME}" >/dev/null 2>&1 || true
   done
+else
+  echo "HTTPD pool absent; no HTTPD volumes to clean"
 fi
 
 echo "Removing obsolete pools on primary host..."
@@ -147,12 +153,23 @@ if [[ $? -ne 0 ]]; then
 fi
 CONFLICTING_VOLUMES_P=$(echo "${PRIMARY_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }' || true)
 
-PRIMARY_HTTPD_VOLS=$(${VIRSH_PRIMARY} vol-list --pool "${HTTPD_POOL_NAME}" 2>&1)
+CONFLICTING_HTTPD_VOLUMES_P=""
+PRIMARY_VERIFY_ALL_POOLS=$(${VIRSH_PRIMARY} pool-list --all --name 2>&1)
 if [[ $? -ne 0 ]]; then
-  echo "ERROR: Failed to list volumes on primary httpd pool ${HTTPD_POOL_NAME}: ${PRIMARY_HTTPD_VOLS}"
+  echo "ERROR: Failed to list pools on primary hypervisor during conflict verification: ${PRIMARY_VERIFY_ALL_POOLS}"
   exit 1
 fi
-CONFLICTING_HTTPD_VOLUMES_P=$(echo "${PRIMARY_HTTPD_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }' || true)
+
+if echo "${PRIMARY_VERIFY_ALL_POOLS}" | grep -Fxq "${HTTPD_POOL_NAME}"; then
+  PRIMARY_HTTPD_VOLS=$(${VIRSH_PRIMARY} vol-list --pool "${HTTPD_POOL_NAME}" 2>&1)
+  if [[ $? -ne 0 ]]; then
+    echo "ERROR: Failed to list volumes on primary httpd pool ${HTTPD_POOL_NAME}: ${PRIMARY_HTTPD_VOLS}"
+    exit 1
+  fi
+  CONFLICTING_HTTPD_VOLUMES_P=$(echo "${PRIMARY_HTTPD_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }' || true)
+else
+  echo "HTTPD pool absent; no HTTPD volumes to check"
+fi
 
 PRIMARY_POOLS=$(${VIRSH_PRIMARY} pool-list --all --name 2>&1)
 if [[ $? -ne 0 ]]; then
