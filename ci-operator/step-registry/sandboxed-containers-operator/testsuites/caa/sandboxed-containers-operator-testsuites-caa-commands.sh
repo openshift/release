@@ -42,10 +42,10 @@ EOF
 fi
 
 # --- Configuration -----------------------------------------------------------
-# The CAA test runner lives in the operator repo. We always run it from the
-# development branch.
-OPERATOR_REPO="https://github.com/openshift/sandboxed-containers-operator"
-OPERATOR_REF="devel"
+# Where run_caa_tests.sh comes from. Defaults live in the ref so a job can point
+# the suite at a fork, a release branch or a pinned commit.
+RUNNER_REPO="${TESTS_CAA_RUNNER_REPO:-https://github.com/openshift/sandboxed-containers-operator}"
+RUNNER_REPO_REF="${TESTS_CAA_RUNNER_REPO_REF:-devel}"
 
 # User-facing parameters (see the ref for defaults/documentation). They follow
 # the TESTS_<SUITE_NAME>_<PARAMETER> convention shared by all OSC test suites:
@@ -151,17 +151,39 @@ case "${PROVIDER}" in
         ;;
 esac
 
-# --- Fetch the operator repo (hosts run_caa_tests.sh) ------------------------
-OPERATOR_DIR="$(mktemp -d /tmp/osc-XXXXXX)"
-echo "Cloning ${OPERATOR_REPO} (${OPERATOR_REF})"
-git clone --depth 1 -b "${OPERATOR_REF}" "${OPERATOR_REPO}" "${OPERATOR_DIR}"
+# --- Fetch the runner repo (hosts run_caa_tests.sh) --------------------------
+# fetch+checkout instead of `clone -b` so TESTS_CAA_RUNNER_REPO_REF accepts a
+# branch, a tag or a full commit SHA. The shallow fetch covers all three on
+# github.com; the retry unshallows for servers that refuse fetch-by-SHA.
+# A user-supplied repo URL may embed credentials, so log the ref only.
+# Stderr is suppressed on fetch: git writes the full URL to stderr on failure,
+# which would leak internal hostnames or embedded credentials into CI logs.
+RUNNER_DIR="$(mktemp -d /tmp/osc-XXXXXX)"
+echo "Fetching runner repo (ref ${RUNNER_REPO_REF})"
+git init -q "${RUNNER_DIR}"
+git -C "${RUNNER_DIR}" fetch -q --depth 1 "${RUNNER_REPO}" "${RUNNER_REPO_REF}" 2>/dev/null \
+    || git -C "${RUNNER_DIR}" fetch -q "${RUNNER_REPO}" "${RUNNER_REPO_REF}" 2>/dev/null \
+    || { echo "ERROR: failed to fetch ref ${RUNNER_REPO_REF}; verify TESTS_CAA_RUNNER_REPO and TESTS_CAA_RUNNER_REPO_REF"; exit 1; }
+git -C "${RUNNER_DIR}" checkout -q FETCH_HEAD
+# Record the commit actually used: the default ref tracks a moving branch, so
+# this is what tells a later reader whether the runner changed between runs.
+echo "Runner commit: $(git -C "${RUNNER_DIR}" rev-parse HEAD)"
 
 # --- Run the CAA test runner -------------------------------------------------
 # The runner writes per-suite JUnit under ${RESULTS_DIR}/<timestamp>/.
 RESULTS_DIR="$(mktemp -d /tmp/caa-results-XXXXXX)"
 export RESULTS_DIR
 
-RUNNER="${OPERATOR_DIR}/test/e2e/run_caa_tests.sh"
+RUNNER="${RUNNER_DIR}/test/e2e/run_caa_tests.sh"
+# test/e2e only exists on devel today, so a ref that predates it (or a fork
+# that never carried it) resolves to nothing. Say so instead of letting the
+# invocation below fail with a bare "No such file or directory".
+if [[ ! -x "${RUNNER}" ]]; then
+    echo "ERROR: test/e2e/run_caa_tests.sh not found at ref ${RUNNER_REPO_REF}"
+    echo "       Set TESTS_CAA_RUNNER_REPO_REF to a ref that carries the runner."
+    exit 1
+fi
+
 runner_args=(-p "${PROVIDER}")
 [[ -n "${PROFILE}" ]]        && runner_args+=(-t "${PROFILE}")
 [[ -n "${TIMEOUT}" ]]        && runner_args+=(--timeout "${TIMEOUT}")
