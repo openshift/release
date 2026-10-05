@@ -51,4 +51,10 @@ else
 EOF
 fi
 
+if [[ -n "${PROXY_NO_PROXY:-}" ]]; then
+  cat >> "${CONFIG_PATCH}" << EOF
+  noProxy: ${PROXY_NO_PROXY}
+EOF
+fi
+
 yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
