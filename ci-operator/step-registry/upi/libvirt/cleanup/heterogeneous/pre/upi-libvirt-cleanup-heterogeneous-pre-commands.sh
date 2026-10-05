@@ -127,7 +127,7 @@ for DOMAIN in $(echo "${ADD_INIT_DOMAINS}" | grep -E "^${LEASED_RESOURCE}([-.]|$
 done
 
 echo "Removing stale pool volumes on additional host..."
-ADDITIONAL_POOL="${ADDITIONAL_POOL_NAME:-default}"
+ADDITIONAL_POOL="${ADDITIONAL_POOL_NAME:-multiarch-ci-pool}"
 if ${VIRSH_ADDITIONAL} pool-list 2>/dev/null | grep -qw "${ADDITIONAL_POOL}"; then
   ADD_INIT_VOLS=$(${VIRSH_ADDITIONAL} vol-list --pool "${ADDITIONAL_POOL}" 2>&1) || {
     echo "ERROR: Failed to list initial volumes on additional pool ${ADDITIONAL_POOL}: ${ADD_INIT_VOLS}"
