@@ -115,7 +115,6 @@ export E2E_BASE_DOMAIN="ci.hypershift.devcluster.openshift.com"
 if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-false}" == "true" ]]; then
   export E2E_AWS_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
   export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${E2E_AWS_CREDENTIALS_FILE}"
-  export E2E_BASE_DOMAIN="origin-ci-int-aws.dev.rhcloud.com"
   if [[ -f "${SHARED_DIR}/aws-region" ]]; then
     echo "Region override found. Using it."
     E2E_AWS_PRIVATE_REGION="$(cat "${SHARED_DIR}/aws-region")"
@@ -134,6 +133,25 @@ if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-false}" == "true" ]]; then
     exit 1
   fi
   echo "Using management cluster availability zones: ${E2E_AWS_AVAILABILITY_ZONES}"
+
+  MANAGEMENT_PUBLIC_ZONE_ID="$(oc --kubeconfig="${KUBECONFIG}" get dns cluster -o jsonpath='{.spec.publicZone.id}')"
+  if [[ -z "${MANAGEMENT_PUBLIC_ZONE_ID}" ]]; then
+    echo "Failed to get the management cluster public DNS zone ID" >&2
+    exit 1
+  fi
+
+  E2E_BASE_DOMAIN="$(AWS_SHARED_CREDENTIALS_FILE="${E2E_AWS_CREDENTIALS_FILE}" \
+    aws route53 get-hosted-zone \
+      --id "${MANAGEMENT_PUBLIC_ZONE_ID}" \
+      --query 'HostedZone.Name' \
+      --output text \
+      --region us-east-1)"
+  E2E_BASE_DOMAIN="${E2E_BASE_DOMAIN%.}" # Remove the trailing dot
+  if [[ -z "${E2E_BASE_DOMAIN}" || "${E2E_BASE_DOMAIN}" == "None" ]]; then
+    echo "Failed to resolve the management cluster public DNS zone name" >&2
+    exit 1
+  fi
+  echo "Using management cluster base domain: ${E2E_BASE_DOMAIN}"
 fi
 
 hack/ci-test-e2e.sh -test.v \
