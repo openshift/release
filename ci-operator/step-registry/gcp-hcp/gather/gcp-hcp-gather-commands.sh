@@ -301,6 +301,16 @@ collect_gke_bounded() {
   fi
 }
 
+collect_region_load_balancer_errors() {
+  local scope_dir="$1"
+  local region_project="$2"
+
+  run_capture "${scope_dir}" "load-balancer-5xx-logs" "${scope_dir}/load-balancer-5xx.json" 90s \
+    gcloud logging read 'resource.type="http_load_balancer" AND httpRequest.status>=500' \
+      --project="${region_project}" --freshness=6h --limit=200 --order=desc \
+      --format='json(timestamp,severity,httpRequest.status,httpRequest.requestMethod,httpRequest.latency,httpRequest.responseSize,resource.labels,jsonPayload.statusDetails,jsonPayload.proxyStatus)'
+}
+
 collect_hosted_cluster() {
   local scope_dir="$1"
   local hosted_cluster="$2"
@@ -524,7 +534,10 @@ region_kubeconfig="$(mktemp "${temp_root}/region-kubeconfig.XXXXXX")"
 management_kubeconfig="$(mktemp "${temp_root}/management-kubeconfig.XXXXXX")"
 hosted_kubeconfig="$(mktemp "${temp_root}/hosted-kubeconfig.XXXXXX")"
 
+region_gcp_logs_pid=""
 if [[ "${auth_ok}" == "true" && -n "${region_project}" ]]; then
+  collect_region_load_balancer_errors "${region_dir}" "${region_project}" &
+  region_gcp_logs_pid=$!
   region_project_number="$(timeout 30s gcloud projects describe "${region_project}" --format='value(projectNumber)' 2>/dev/null)"
   project_lookup_exit=$?
   access_token="$(timeout 30s gcloud auth print-access-token 2>/dev/null)"
@@ -592,7 +605,7 @@ else
   customer_pid=""
 fi
 
-for pid in "${region_pid}" "${management_pid}" "${hosted_pid}" "${customer_pid}"; do
+for pid in "${region_pid}" "${region_gcp_logs_pid}" "${management_pid}" "${hosted_pid}" "${customer_pid}"; do
   [[ -n "${pid}" ]] && wait "${pid}"
 done
 
