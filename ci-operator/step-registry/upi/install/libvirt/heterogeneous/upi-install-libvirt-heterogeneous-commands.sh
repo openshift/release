@@ -63,7 +63,7 @@ HTTPD_IP="$(leaseLookup 'httpd-ip')"
 HTTPD_PORT="$(leaseLookup 'httpd-port')"
 SUBNET="$(leaseLookup 'subnet')"
 
-ADDITIONAL_PORT="${ADDITIONAL_LIBVIRT_PORT:-16511}"
+ADDITIONAL_PORT="${ADDITIONAL_LIBVIRT_PORT:-16509}"
 if [[ ! "${ADDITIONAL_PORT}" =~ ^[0-9]+$ ]]; then
   echo "ERROR: Invalid ADDITIONAL_LIBVIRT_PORT '${ADDITIONAL_PORT}'"
   exit 1
