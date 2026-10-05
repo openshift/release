@@ -31,12 +31,13 @@ CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.ve
 
 # Auto-detect namespace based on cluster version if not explicitly set
 if [[ -z "${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
+  MAJOR_VERSION=$(echo $CLUSTER_VERSION | cut -d. -f1)
   MINOR_VERSION=$(echo $CLUSTER_VERSION | cut -d. -f2)
 
   echo "Detected OpenShift version: ${CLUSTER_VERSION}"
 
-  # For OpenShift 4.20+, use openshift-lvm-storage, otherwise use openshift-storage
-  if [[ ${MINOR_VERSION} -ge 20 ]]; then
+  # For OpenShift 5.x+ or 4.20+, use openshift-lvm-storage, otherwise use openshift-storage
+  if [[ ${MAJOR_VERSION} -ge 5 ]] || [[ ${MAJOR_VERSION} -eq 4 && ${MINOR_VERSION} -ge 20 ]]; then
     LVM_OPERATOR_SUB_INSTALL_NAMESPACE="openshift-lvm-storage"
   else
     LVM_OPERATOR_SUB_INSTALL_NAMESPACE="openshift-storage"
