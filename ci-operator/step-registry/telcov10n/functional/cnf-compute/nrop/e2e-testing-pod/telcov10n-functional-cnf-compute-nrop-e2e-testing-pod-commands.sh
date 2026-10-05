@@ -104,11 +104,14 @@ echo "Copy must gather to artifacts directory"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
   "${BASTION_USER}@${BASTION_IP}":/tmp/wip/artifacts/* "${ARTIFACT_DIR}"
 
+scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
+  "${BASTION_USER}@${BASTION_IP}":/tmp/wip/tests "${ARTIFACT_DIR}"
+
 
 echo "Copy junit test reports to shared directory for reporter step"
 if ls ${ARTIFACT_DIR}/tests/junit/*.xml 1> /dev/null 2>&1; then
     echo "Copy junit test reports to shared directory for reporter step"
-	tar -cvzf "${SHARED_DIR}/${SCOPE}_junit.tar.gz" ${ARTIFACT_DIR}/tests/junit/*.xml
+	 cp -v "${ARTIFACT_DIR}"/tests/junit/*.xml "${SHARED_DIR}/" 2>/dev/null
     touch "${SHARED_DIR}/gotest-completed"
 else
     echo "No junit test reports found to copy to SHARED_DIR"
