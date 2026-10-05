@@ -101,10 +101,6 @@ def run(cmd):
 shared_dir = os.environ["SHARED_DIR"]
 
 # Node info
-worker_nodes = json.loads(run(
-    "oc get nodes -l node-role.kubernetes.io/worker "
-    "-o jsonpath='{.items[*].status.nodeInfo}' 2>/dev/null || echo '[]'"
-) or "[]")
 worker_instance_type = run(
     "oc get nodes -l node-role.kubernetes.io/worker "
     "-o jsonpath='{.items[0].metadata.labels.node\\.kubernetes\\.io/instance-type}'"
