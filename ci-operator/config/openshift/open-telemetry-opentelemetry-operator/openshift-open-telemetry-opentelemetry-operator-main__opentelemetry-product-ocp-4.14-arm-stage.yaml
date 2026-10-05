@@ -3,10 +3,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
-  operator-sdk:
-    name: cli-operator-sdk
-    namespace: ocp
-    tag: v1.39.2
 build_root:
   image_stream_tag:
     name: builder
@@ -62,12 +58,13 @@ tests:
       AGENT_SKILL: otel
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-bundle@sha256:b760df73ba4b903adfc466b427453907850b88a43c7d77c2aadec9d880577243
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc@sha256:128c3e8b1951b905e7837159a24ac1059e271728d43d0a57ed784f41e1471680
       MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.11
       OCP_ARCH: arm64
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "opentelemetry-operator-system", "target_namespaces": "", "operator_group": "opentelemetry-operator-system"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
         ]
       SKIP_TESTS: tests/e2e-targetallocator/targetallocator-features tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
@@ -80,26 +77,7 @@ tests:
     - ref: openshift-observability-qe-agent
     test:
     - ref: idp-htpasswd
-    - as: install-opentelemetry-operator
-      cli: latest
-      commands: |
-        if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE:-}" ]]; then
-          echo "ERROR: MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
-          exit 1
-        fi
-        oc create -f https://raw.githubusercontent.com/openshift/distributed-tracing-qe/refs/heads/main/resources/otel-icsp.yaml
-        oc create namespace opentelemetry-operator-system
-        oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE"
-        oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
-      env:
-      - default: ""
-        name: MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 400Mi
+    - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-stage
     workflow: cucushift-installer-rehearse-azure-ipi

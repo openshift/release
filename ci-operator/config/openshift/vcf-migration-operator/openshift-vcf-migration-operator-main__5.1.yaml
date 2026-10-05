@@ -15,6 +15,7 @@ images:
       COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
     from: src
     to: operator-sdk-vcf
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|\.md$|((^|/)\.github/)|((^|/)\.tekton/)|(^renovate\.json$)|(^bundle\.konflux\.Dockerfile$)
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -34,6 +35,13 @@ resources:
 tests:
 - as: e2e-vsphere-vcf-migration
   cron: 10 3,14,20 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     dependencies:

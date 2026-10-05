@@ -2,6 +2,13 @@
 
 set -euo pipefail
 
+if [[ "${ENABLE_NAP:-}" == "true" && -n "${NAP_SKU_NAMES:-}" ]]; then
+    if [[ ! "${NAP_SKU_NAMES}" =~ ^Standard_[A-Za-z0-9_]+(,Standard_[A-Za-z0-9_]+)*$ ]]; then
+        echo "NAP_SKU_NAMES must be comma-separated Standard_ SKU names containing only letters, digits, and underscores" >&2
+        exit 1
+    fi
+fi
+
 # Azure CLI does not consistently retry DNS and lower-level transport failures.
 # Keep direct retries scoped to safe repeats. AKS and node-pool creates remain
 # single-shot because repeating them after an ambiguous response is unsafe.
@@ -267,6 +274,20 @@ if [[ "${ENABLE_NAP:-}" == "true" ]]; then
         done
     fi
 
+    NAP_SKU_SELECTOR="family"
+    NAP_SKU_VALUES="            - \"${NAP_SKU_FAMILY:-D}\""
+    NAP_SKU_VERSION_EXTENSION=""
+    if [[ -n "${NAP_SKU_NAMES:-}" ]]; then
+        NAP_SKU_SELECTOR="name"
+        IFS=',' read -ra NAP_SKU_ARRAY <<< "${NAP_SKU_NAMES}"
+        NAP_SKU_VALUES=$(printf '            - "%s"\n' "${NAP_SKU_ARRAY[@]}")
+        for sku_name in "${NAP_SKU_ARRAY[@]}"; do
+            if [[ "${sku_name}" == *_v7 ]]; then
+                NAP_SKU_VERSION_EXTENSION=$'\n            - "7"'
+            fi
+        done
+    fi
+
     NODEPOOL_YAML=$(cat <<EOF
 apiVersion: karpenter.sh/v1
 kind: NodePool
@@ -293,10 +314,10 @@ spec:
           operator: In
           values:
             - on-demand
-        - key: karpenter.azure.com/sku-family
+        - key: karpenter.azure.com/sku-${NAP_SKU_SELECTOR}
           operator: In
           values:
-            - "${NAP_SKU_FAMILY:-D}"
+${NAP_SKU_VALUES}
         - key: karpenter.azure.com/sku-cpu
           operator: In
           values:
@@ -304,11 +325,10 @@ spec:
         - key: karpenter.azure.com/sku-version
           operator: In
           values:
-            - "2"
             - "3"
             - "4"
             - "5"
-            - "6"
+            - "6"${NAP_SKU_VERSION_EXTENSION}
 $(if [[ -n "$ZONE_VALUES" ]]; then
 cat <<ZONES
         - key: topology.kubernetes.io/zone
@@ -397,6 +417,201 @@ EOF
         awk 'NR>1 && $2 ~ /[a-z]+-[0-9]+$/ { zones[$2]++ } END { for (z in zones) printf "  %s: %d nodes\n", z, zones[z] }' "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>/dev/null || true
     }
 
+    # BEGIN NAP FAILURE ARTIFACT COLLECTOR
+    # Publish only fixed keys and allowlisted values. Cluster-provided strings stay in
+    # the private temporary directory and are used only for in-memory categorization.
+    capture_nap_json() {
+        local output="$1"
+        shift
+
+        # Suppress the enclosing group's stderr before the shell opens the private
+        # output path. A redirection failure would otherwise disclose that path.
+        if { "$@" > "${output}"; } 2>/dev/null \
+            && jq -e '.items | type == "array"' "${output}" >/dev/null 2>/dev/null; then
+            return 0
+        fi
+
+        # Replace failed or invalid captures with safe input for the aggregator. If
+        # even that write fails, remove any partial raw capture and report unavailable.
+        if ! { printf '{"items":[]}\n' > "${output}"; } 2>/dev/null; then
+            rm -f -- "${output}" 2>/dev/null || true
+        fi
+        return 1
+    }
+
+    collect_nap_failure_artifacts() {
+        local xtrace_enabled=false
+        local capture_dir=""
+        local nodeclaims_available=false
+        local karpenter_events_available=false
+        local scheduler_events_available=false
+        local metrics_available=false
+        local nodeclaim_count=0
+        local karpenter_event_count=0
+        local scheduler_event_count=0
+        local karpenter_warning_count=0
+        local karpenter_normal_count=0
+        local scheduler_warning_count=0
+        local scheduler_normal_count=0
+        local initialized_true=0
+        local initialized_false=0
+        local initialized_unknown=0
+        local launched_true=0
+        local launched_false=0
+        local launched_unknown=0
+        local ready_true=0
+        local ready_false=0
+        local ready_unknown=0
+        local registered_true=0
+        local registered_false=0
+        local registered_unknown=0
+        local quota_category=0
+        local sku_unavailable_category=0
+        local out_of_capacity_category=0
+        local no_instance_type_category=0
+        local scheduling_constraint_category=0
+        local metrics=""
+        local metrics_pattern=$'^([0-9]{1,4}\t){23}[0-9]{1,4}$'
+
+        [[ $- == *x* ]] && xtrace_enabled=true
+        set +x
+
+        echo "Collecting NAP failure diagnostics"
+
+        if capture_dir="$(mktemp -d 2>/dev/null)"; then
+            if capture_nap_json "${capture_dir}/nodeclaims.json" \
+                oc --request-timeout=15s get nodeclaims.karpenter.sh -o json; then
+                nodeclaims_available=true
+            fi
+
+            if capture_nap_json "${capture_dir}/karpenter-events.json" \
+                oc --request-timeout=15s get events -A \
+                --field-selector source=karpenter-events -o json; then
+                karpenter_events_available=true
+            fi
+
+            if capture_nap_json "${capture_dir}/scheduler-events.json" \
+                oc --request-timeout=15s get events -n default \
+                --field-selector involvedObject.kind=Pod -o json; then
+                scheduler_events_available=true
+            fi
+
+            # jq emits digits only. The shell validates the complete fixed-width tuple
+            # before assigning it to allowlisted output keys.
+            if metrics="$(jq -nr \
+                --slurpfile nodeclaims "${capture_dir}/nodeclaims.json" \
+                --slurpfile karpenter_events "${capture_dir}/karpenter-events.json" \
+                --slurpfile scheduler_events "${capture_dir}/scheduler-events.json" '
+                    def cap: if . > 9999 then 9999 else . end;
+                    ($nodeclaims[0].items) as $nodeclaims |
+                    ($karpenter_events[0].items) as $karpenter_events |
+                    ($scheduler_events[0].items | map(select(
+                        (((.involvedObject.name? | select(type == "string")) // "") | startswith("nap-placeholder-")) and
+                        ([.reason?, .source.component?, .reportingController?]
+                            | map(select(type == "string"))
+                            | any(test("schedul"; "i")))
+                    ))) as $scheduler_events |
+                    (([$nodeclaims[]?.status.conditions[]? | .reason?, .message?] +
+                      [$karpenter_events[]? | .reason?, .message?] +
+                      [$scheduler_events[]? | .reason?, .message?])
+                        | map(select(type == "string"))) as $diagnostic_text |
+                    [
+                        ($nodeclaims | length | cap),
+                        ($karpenter_events | length | cap),
+                        ($scheduler_events | length | cap),
+                        ($karpenter_events | map(select(.type? == "Warning")) | length | cap),
+                        ($karpenter_events | map(select(.type? == "Normal")) | length | cap),
+                        ($scheduler_events | map(select(.type? == "Warning")) | length | cap),
+                        ($scheduler_events | map(select(.type? == "Normal")) | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Initialized" and .status? == "True") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Initialized" and .status? == "False") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Initialized" and .status? == "Unknown") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Launched" and .status? == "True") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Launched" and .status? == "False") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Launched" and .status? == "Unknown") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Ready" and .status? == "True") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Ready" and .status? == "False") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Ready" and .status? == "Unknown") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Registered" and .status? == "True") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Registered" and .status? == "False") ] | length | cap),
+                        ([ $nodeclaims[]?.status.conditions[]? | select(.type? == "Registered" and .status? == "Unknown") ] | length | cap),
+                        (if any($diagnostic_text[]?; test("quota|cores? limit"; "i")) then 1 else 0 end),
+                        (if any($diagnostic_text[]?; test("(sku|vm size).*(not available|unavailable|unsupported|restricted)"; "i")) then 1 else 0 end),
+                        (if any($diagnostic_text[]?; test("out of capacity|insufficient capacity|overconstrainedallocationrequest|allocation failed"; "i")) then 1 else 0 end),
+                        (if any($diagnostic_text[]?; test("no (available |compatible )?instance( type)?|no instance.*satisf"; "i")) then 1 else 0 end),
+                        (if any($diagnostic_text[]?; test("failedschedul|failed schedul|unschedulable|did not match|didn.t match|insufficient (cpu|memory)"; "i")) then 1 else 0 end)
+                    ] | @tsv
+                ' 2>/dev/null)" \
+                && [[ "${metrics}" =~ ${metrics_pattern} ]]; then
+                IFS=$'\t' read -r \
+                    nodeclaim_count karpenter_event_count scheduler_event_count \
+                    karpenter_warning_count karpenter_normal_count \
+                    scheduler_warning_count scheduler_normal_count \
+                    initialized_true initialized_false initialized_unknown \
+                    launched_true launched_false launched_unknown \
+                    ready_true ready_false ready_unknown \
+                    registered_true registered_false registered_unknown \
+                    quota_category sku_unavailable_category out_of_capacity_category \
+                    no_instance_type_category scheduling_constraint_category <<< "${metrics}"
+                metrics_available=true
+            fi
+        else
+            capture_dir=""
+            echo "NAP failure diagnostics unavailable"
+        fi
+
+        # Delete private captures before attempting the public artifact write. Artifact
+        # storage is best-effort, and its path must never appear in the parent log.
+        if [[ -n "${capture_dir}" ]]; then
+            rm -rf -- "${capture_dir}" 2>/dev/null || true
+            capture_dir=""
+        fi
+
+        if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+            {
+                cat > "${ARTIFACT_DIR}/nap-failure-summary.txt" <<EOF
+diagnostic_coverage=limited
+metrics_available=${metrics_available}
+nodeclaims_available=${nodeclaims_available}
+karpenter_events_available=${karpenter_events_available}
+scheduler_events_available=${scheduler_events_available}
+nodeclaim_count=${nodeclaim_count}
+karpenter_event_count=${karpenter_event_count}
+scheduler_event_count=${scheduler_event_count}
+karpenter_event_type_Warning_count=${karpenter_warning_count}
+karpenter_event_type_Normal_count=${karpenter_normal_count}
+scheduler_event_type_Warning_count=${scheduler_warning_count}
+scheduler_event_type_Normal_count=${scheduler_normal_count}
+condition_Initialized_True_count=${initialized_true}
+condition_Initialized_False_count=${initialized_false}
+condition_Initialized_Unknown_count=${initialized_unknown}
+condition_Launched_True_count=${launched_true}
+condition_Launched_False_count=${launched_false}
+condition_Launched_Unknown_count=${launched_unknown}
+condition_Ready_True_count=${ready_true}
+condition_Ready_False_count=${ready_false}
+condition_Ready_Unknown_count=${ready_unknown}
+condition_Registered_True_count=${registered_true}
+condition_Registered_False_count=${registered_false}
+condition_Registered_Unknown_count=${registered_unknown}
+category_quota=${quota_category}
+category_sku_unavailable=${sku_unavailable_category}
+category_out_of_capacity=${out_of_capacity_category}
+category_no_instance_type=${no_instance_type_category}
+category_scheduling_constraint=${scheduling_constraint_category}
+EOF
+            } 2>/dev/null || {
+                rm -f -- "${ARTIFACT_DIR}/nap-failure-summary.txt" 2>/dev/null || true
+            }
+        fi
+
+        if [[ "${xtrace_enabled}" == "true" ]]; then
+            set -x
+        fi
+        return 0
+    }
+    # END NAP FAILURE ARTIFACT COLLECTOR
+
     echo "Waiting for NAP to provision nodes"
     # Wait for the desired number of Ready nodes (NAP-provisioned + system pool)
     DESIRED_NODES=$((${AKS_NODE_COUNT:-9} + 3))
@@ -413,6 +628,7 @@ EOF
             oc get nodes || true
             oc get nodepool.karpenter.sh -o yaml || true
             collect_nap_artifacts
+            collect_nap_failure_artifacts
             exit 1
         fi
         echo "Waiting for NAP nodes: $READY_NODES/$DESIRED_NODES ready (${NAP_ELAPSED}s/${NAP_TIMEOUT}s)..."

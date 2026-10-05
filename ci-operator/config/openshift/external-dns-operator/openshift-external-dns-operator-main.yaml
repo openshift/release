@@ -83,6 +83,36 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - always_run: false
+  as: e2e-aws-fips-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create ns external-dns-operator
+        operator-sdk run bundle --timeout=10m -n external-dns-operator --security-context-config restricted "$OO_BUNDLE"
+        oc wait --for condition=Available -n external-dns-operator deployment/external-dns-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: external-dns-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: fips-check-fips-or-die
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
   as: e2e-gcp-operator
   pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

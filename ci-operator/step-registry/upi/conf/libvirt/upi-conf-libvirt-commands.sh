@@ -47,7 +47,11 @@ else
 fi
 
 # Build platform section based on PLATFORM_TYPE
-if [ "${PLATFORM_TYPE:-none}" == "external" ]; then
+if [[ "${PLATFORM_TYPE:-none}" == "external" ]]; then
+  if [[ -z "${PLATFORM_NAME:-}" ]]; then
+    echo "PLATFORM_NAME must be set when PLATFORM_TYPE=external" >&2
+    exit 1
+  fi
   PLATFORM_BLOCK="platform:
   external:
     platformName: \"${PLATFORM_NAME}\""

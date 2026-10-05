@@ -1,0 +1,444 @@
+build_root:
+  image_stream_tag:
+    name: eco-ci-cd
+    namespace: telcov10n-ci
+    tag: eco-ci-cd
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 300Mi
+tests:
+- as: deploy-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: mirror-and-deploy-spoke
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+      INFRA_SETTINGS: |-
+        {
+          "mirror_spoke_operators": {
+            "skip": false
+          },
+          "mirror_ocp": {
+            "skip": false
+          },
+          "mirror_ran_test_images": {
+            "skip": false,
+            "ran_images": {
+              "images": [
+                "quay.io/telcov10n-ci/oslat:latest",
+                "quay.io/telcov10n-ci/cyclictest:latest",
+                "quay.io/telcov10n-ci/cnf-tests:4.8",
+                "quay.io/telcov10n-ci/stress-ng:latest",
+                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
+                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
+                "quay.io/telcov10n-ci/process-exporter:ppid-2",
+                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
+                "quay.io/telcov10n-ci/curl:latest",
+                "quay.io/telcov10n-ci/sampleapp:latest",
+                "quay.io/telcov10n-ci/kubectl:latest",
+                "quay.io/telcov10n-ci/rtla:latest",
+                "quay.io/telcov10n-ci/oran-subscriber:latest"
+              ]
+            }
+          },
+          "deploy_spoke_ztp": {
+            "skip": false
+          }
+        }
+      SPOKE_CLUSTER: spoke-name
+      TEST_SETTINGS: |-
+        {
+          "collect_node_info": {
+            "report_headline": "Customizable Deployment - {{ arch }} SNO {{ ocp_version }}"
+          },
+          "bios_validation": {
+            "skip": false,
+            "bios_profile_path": "dell/bios-profile.yaml"
+          }
+        }
+    workflow: telcov10n-system-telco-kpis-12hr-phase1-setup
+- as: mirror-ocp-only-and-deploy-spoke
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+      INFRA_SETTINGS: |-
+        {
+          "mirror_spoke_operators": {
+            "skip": true
+          },
+          "mirror_ocp": {
+            "skip": false
+          },
+          "mirror_ran_test_images": {
+            "skip": true
+          },
+          "deploy_spoke_ztp": {
+            "skip": false
+          }
+        }
+      SPOKE_CLUSTER: spoke-name
+      TEST_SETTINGS: |-
+        {
+          "collect_node_info": {
+            "report_headline": "Customizable Deployment - {{ arch }} SNO {{ ocp_version }}"
+          },
+          "bios_validation": {
+            "skip": false,
+            "bios_profile_path": "dell/bios-profile.yaml"
+          }
+        }
+    workflow: telcov10n-system-telco-kpis-12hr-phase1-setup
+- as: run-oslat-test
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false
+          }
+        }
+      SPOKE_CLUSTER: spoke-name
+      TEST_SETTINGS: |-
+        {
+          "oslat": {
+            "skip": false
+          }
+        }
+    post:
+    - ref: telcov10n-system-telco-kpis-reporting-generate-report
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    test:
+    - ref: telcov10n-system-telco-kpis-tests-run-oslat-test
+- as: run-cyclictest-test
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false
+          }
+        }
+      SPOKE_CLUSTER: spoke-name
+      TEST_SETTINGS: |-
+        {
+          "cyclictest": {
+            "skip": false
+          }
+        }
+    post:
+    - ref: telcov10n-system-telco-kpis-reporting-generate-report
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    test:
+    - ref: telcov10n-system-telco-kpis-tests-run-cyclictest-test
+- as: run-ptp-test
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false
+          }
+        }
+      SPOKE_CLUSTER: spoke-name
+      TEST_SETTINGS: |-
+        {
+          "ptp": {
+            "skip": false
+          }
+        }
+    post:
+    - ref: telcov10n-system-telco-kpis-reporting-generate-report
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    test:
+    - ref: telcov10n-system-telco-kpis-tests-run-ptp-test
+- as: run-reboot-test
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false
+          }
+        }
+      SPOKE_CLUSTER: spoke-name
+      TEST_SETTINGS: |-
+        {
+          "reboot": {
+            "skip": false,
+            "reboot_count": "6"
+          }
+        }
+    post:
+    - ref: telcov10n-system-telco-kpis-reporting-generate-report
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    test:
+    - ref: telcov10n-system-telco-kpis-tests-run-reboot-test
+- as: run-cpu-util-test
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false
+          }
+        }
+      SPOKE_CLUSTER: spoke-name
+      TEST_SETTINGS: |-
+        {
+          "cpu_util": {
+            "skip": false,
+            "baseline": false
+          }
+        }
+    post:
+    - ref: telcov10n-system-telco-kpis-reporting-generate-report
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    test:
+    - ref: telcov10n-system-telco-kpis-tests-run-cpu-util-test
+- as: run-rds-compare-test
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false
+          }
+        }
+      SPOKE_CLUSTER: spoke-name
+      TEST_SETTINGS: |-
+        {
+          "rds_compare": {
+            "skip": false,
+            "baseline": false
+          }
+        }
+    post:
+    - ref: telcov10n-system-telco-kpis-reporting-generate-report
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    test:
+    - ref: telcov10n-system-telco-kpis-tests-run-rds-compare-test
+- as: run-rfc2544-test
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false
+          }
+        }
+      SPOKE_CLUSTER: spoke-name
+      TEST_SETTINGS: |-
+        {
+          "rfc2544": {
+            "skip": false
+          }
+        }
+    post:
+    - ref: telcov10n-system-telco-kpis-reporting-generate-report
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    test:
+    - ref: telcov10n-system-telco-kpis-tests-run-rfc2544-test
+- as: run-ztp-ai-deployment-time-test
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#proj-dev-kpi-triage'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: hub-name
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false
+          }
+        }
+      SPOKE_CLUSTER: spoke-name
+      TEST_SETTINGS: |-
+        {
+          "ztp_ai_deployment_time": {
+            "skip": false,
+            "threshold_duration": "2h0m"
+          }
+        }
+    post:
+    - ref: telcov10n-system-telco-kpis-reporting-generate-report
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    test:
+    - ref: telcov10n-system-telco-kpis-tests-run-ztp-ai-deployment-time-test
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: telco-kpis-customizable

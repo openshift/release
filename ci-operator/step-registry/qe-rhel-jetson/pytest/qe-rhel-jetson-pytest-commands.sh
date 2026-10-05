@@ -61,34 +61,41 @@ else
     echo "=== Running tests serially (JETSON_PYTEST_WORKERS=${JETSON_PYTEST_WORKERS:-0}) ==="
 fi
 
+TEST_RC=0
 JETSON_HOST="${EFFECTIVE_HOST}" \
 JETSON_PORT="${EFFECTIVE_PORT}" \
 JETSON_USERNAME="root" \
 JETSON_KEY_PATH="${SSH_KEY}" \
 RUN_SC7_WRAPPER="${RUN_SC7_WRAPPER:-0}" \
-pytest ${TEST_SUITE} ${PYTEST_ARGS}
+pytest ${TEST_SUITE} ${PYTEST_ARGS} || TEST_RC=$?
 
 # Collect device logs archives for Prow artifact upload
 echo "=== Collecting device log artifacts ==="
+ARTIFACT_RC=0
 if [[ -d "${WORK_DIR}/device_logs" ]]; then
     echo "Found device logs directory"
-    mkdir -p "${ARTIFACT_DIR}/device_logs"
+    mkdir -p "${ARTIFACT_DIR}/device_logs" || ARTIFACT_RC=$?
 
     # Copy all tar.gz archives
     LOGS_COPIED=0
     for LOG_ARCHIVE in "${WORK_DIR}/device_logs"/*.tar.gz; do
         if [[ -f "${LOG_ARCHIVE}" ]]; then
-            cp -v "${LOG_ARCHIVE}" "${ARTIFACT_DIR}/device_logs/"
+            cp -v "${LOG_ARCHIVE}" "${ARTIFACT_DIR}/device_logs/" || ARTIFACT_RC=$?
             LOGS_COPIED=$((LOGS_COPIED + 1))
         fi
     done
 
     if [[ ${LOGS_COPIED} -gt 0 ]]; then
         echo "Copied ${LOGS_COPIED} device log archive(s) to artifacts"
-        ls -lh "${ARTIFACT_DIR}/device_logs/"
+        ls -lh "${ARTIFACT_DIR}/device_logs/" || ARTIFACT_RC=$?
     else
         echo "No .tar.gz files found in device_logs directory"
     fi
 else
     echo "No device_logs directory found (tests may not have generated logs)"
 fi
+
+if [[ "${TEST_RC}" -ne 0 ]]; then
+    exit "${TEST_RC}"
+fi
+exit "${ARTIFACT_RC}"

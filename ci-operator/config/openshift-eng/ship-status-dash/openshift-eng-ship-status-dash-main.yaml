@@ -17,6 +17,8 @@ images:
     to: mock-oauth-proxy
   - dockerfile_path: images/migrate/Dockerfile
     to: migrate
+  - dockerfile_path: images/seed-slo/Dockerfile
+    to: seed-slo
   - dockerfile_path: .devcontainer/Dockerfile
     to: ship-status-dash-devcontainer
 promotion:
@@ -24,6 +26,7 @@ promotion:
   - excluded_images:
     - mock-monitored-component
     - mock-oauth-proxy
+    - seed-slo
     - ship-status-dash-devcontainer
     namespace: ship-status-dash
     tag: latest
@@ -35,6 +38,7 @@ promotion:
     - migrate
     - mock-monitored-component
     - mock-oauth-proxy
+    - seed-slo
     name: ship-status-dash
     namespace: ci
 prowgen:
@@ -48,7 +52,9 @@ resources:
       memory: 200Mi
 tests:
 - as: lint
-  commands: HOME=/tmp make lint
+  commands: |
+    HOME=/tmp make lint
+    HOME=/tmp make verify-apm
   container:
     from: src
 - as: unit

@@ -9,6 +9,7 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 # fi
 
 export_env_vars_from_json 'rds_compare' "${TEST_SETTINGS:-}" "${TEST_SETTINGS_DEFAULTS:-}"
+apply_gangway_overrides
 setup_continue_on_fail
 setup_debug_on_fail
 
