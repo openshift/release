@@ -110,10 +110,12 @@ export E2E_AWS_REGION="${HYPERSHIFT_AWS_REGION}"
 export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${E2E_AWS_CREDENTIALS_FILE}"
 export E2E_AWS_PRIVATE_REGION="${HYPERSHIFT_AWS_REGION}"
 export E2E_AWS_AVAILABILITY_ZONES="${E2E_AWS_REGION}a,${E2E_AWS_REGION}b,${E2E_AWS_REGION}c"
+export E2E_BASE_DOMAIN="ci.hypershift.devcluster.openshift.com"
 
 if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-false}" == "true" ]]; then
   export E2E_AWS_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
   export E2E_AWS_PRIVATE_CREDENTIALS_FILE="${E2E_AWS_CREDENTIALS_FILE}"
+  export E2E_BASE_DOMAIN="origin-ci-int-aws.dev.rhcloud.com"
   if [[ -f "${SHARED_DIR}/aws-region" ]]; then
     echo "Region override found. Using it."
     E2E_AWS_PRIVATE_REGION="$(cat "${SHARED_DIR}/aws-region")"
@@ -144,7 +146,7 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.aws-private-region="${E2E_AWS_PRIVATE_REGION}" \
   ${AWS_OBJECT_PARAMS:-} \
   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
-  --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
+  --e2e.base-domain="${E2E_BASE_DOMAIN}" \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" \
   ${PKI_RECONCILIATION_PARAMS:-} \
