@@ -6,8 +6,8 @@ workflow:
     management cluster) using OADP with Azure Blob Storage.
 
     It provisions the nested management cluster, installs HyperShift, creates
-    self-managed Azure guest clusters, installs OLM and the OADP operator with
-    Azure-specific configuration against the public guest cluster, runs backup/restore
+    self-managed Azure clusters, installs OLM and the OADP operator with
+    Azure-specific configuration against the guest cluster, runs backup/restore
     E2E tests, and then runs a minimal conformance suite.
   steps:
     pre:
@@ -15,34 +15,26 @@ workflow:
     - chain: hypershift-setup-nested-management-cluster
     - ref: hypershift-azure-setup-private-link
     - ref: hypershift-install
-    - ref: hypershift-resolve-nodepool-releases
-    - ref: hypershift-write-test-plan
-    - chain: hypershift-azure-create-selfmanaged-guests
+    - chain: hypershift-azure-create
     - ref: operatorhub-subscribe-oadp-operator
     - ref: hypershift-self-managed-azure-oadp-setup
     test:
     - chain: hypershift-e2e-backuprestore
     post:
-    - chain: hypershift-azure-dump-selfmanaged-guests
+    - chain: hypershift-dump
     - ref: hypershift-self-managed-azure-oadp-destroy
-    - chain: hypershift-azure-destroy-selfmanaged-guests
+    - chain: hypershift-azure-destroy
     - chain: hypershift-destroy-nested-management-cluster
     env:
       CLOUD_PROVIDER: "Azure"
-      HYPERSHIFT_PLATFORM: "azure"
-      HYPERSHIFT_NODE_COUNT: "6"
+      HYPERSHIFT_NODE_COUNT: "3"
       HYPERSHIFT_AZURE_LOCATION: "centralus"
+      HYPERSHIFT_AZURE_SELF_MANAGED: "true"
       AZURE_SELF_MANAGED: "true"
+      HYPERSHIFT_BASE_DOMAIN: "hcp-sm-azure.azure.devcluster.openshift.com"
       HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "sm.hcp-sm-azure.azure.devcluster.openshift.com"
       HYPERSHIFT_ETCD_STORAGE_CLASS: "managed-csi-premium-v2"
-      TEST_PLAN: |
-        name: backuprestore
-        platform: azure
-        testMatrix:
-          parallel:
-          - name: backuprestore
-            variant: oauth-lb
-            labelFilter: backup-restore
       TEST_SKIPS: >-
         etcd leader changes are not excessive\|
         In-tree Volumes \[Driver: azure-disk\]
+      USE_HYPERSHIFT_AZURE_CREDS: "true"

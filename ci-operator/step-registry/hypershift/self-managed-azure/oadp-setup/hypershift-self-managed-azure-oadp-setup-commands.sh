@@ -6,29 +6,7 @@ export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
 
 AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
 OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-oadp-plugin:latest}"
-
-# This needs to match the variant from the TEST_PLAN env var in the workflow
-CLUSTER_PREFIX="${CLUSTER_PREFIX:-oauth-lb}"
-
-echo "Discovering the self-managed-Azure guest cluster..."
-CLUSTER_NAME="$(oc get hostedcluster -n clusters -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep "${CLUSTER_PREFIX}" | head -n1 || true)"
-if [[ -z "${CLUSTER_NAME}" ]]; then
-  echo "!!! Unable to find a HostedCluster in the 'clusters' namespace"
-  oc get hostedcluster -n clusters
-  exit 1
-fi
-echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
-KUBECONFIG_SECRET_NAME="$(oc get hostedcluster "${CLUSTER_NAME}" -n clusters -o jsonpath='{.status.kubeconfig.name}')"
-if [[ -z "${KUBECONFIG_SECRET_NAME}" ]]; then
-  echo "!!! HostedCluster ${CLUSTER_NAME} does not report a kubeconfig secret"
-  exit 1
-fi
-oc get secret -n clusters "${KUBECONFIG_SECRET_NAME}" -ojsonpath='{.data.kubeconfig}' | base64 -d > "${SHARED_DIR}/nested_kubeconfig"
-if [[ ! -s "${SHARED_DIR}/nested_kubeconfig" ]]; then
-  echo "!!! Kubeconfig secret ${KUBECONFIG_SECRET_NAME} is empty"
-  exit 1
-fi
-
+CLUSTER_NAME="$(echo -n "${PROW_JOB_ID:-unknown}" | sha256sum | cut -c1-20)"
 RESOURCEGROUP="$(cat "${SHARED_DIR}/azure_pls_resource_group")"
 CONTAINER_PREFIX="hypershift-oadp-"
 CONTAINER_NAME="${CONTAINER_PREFIX}${CLUSTER_NAME:0:$((63 - ${#CONTAINER_PREFIX}))}"
