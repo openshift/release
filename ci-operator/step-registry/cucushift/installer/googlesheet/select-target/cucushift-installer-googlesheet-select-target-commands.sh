@@ -501,17 +501,28 @@ if ! sheet_exists "${SHEET_NAME_RECORDS}"; then
   add_headers "${SHEET_NAME_RECORDS}" "${HEADERS}"
 fi
 
-# The Status=Running is being running by another jobs, it won't be selected.
-SELECTED_CONDITIONS=$(echo "${CLUSTER_PARAMETER_SELECT_CONDITIONS}" | jq -cr 'map(. + [{"column":"Status","value":"Running","operator":"not_equals"}])')
-echo "Seaching record by condition: $(echo "${SELECTED_CONDITIONS}" | jq -cr .)"
-
-find_matching_rows "$(jq -rc . "${OUT_DATA_SUMMARY}")" "${SELECTED_CONDITIONS}" "${OUT_MATCH}"
-match_count=$(jq -r '.|length' "${OUT_MATCH}")
-echo "Found ${match_count} records match condition."
-if [[ ${match_count} == "0" ]]; then
-  echo "No match record found, skip test"
-  exit 1
+if [[ -n "${ROW_INDEX:-}" ]]; then
+  # ROW_INDEX is 1-based (excluding header), so sheet row = ROW_INDEX + 1
+  sheet_row=$((ROW_INDEX + 1))
+  echo "ROW_INDEX=${ROW_INDEX}: directly selecting sheet row ${sheet_row}"
+  row_data=$(jq -r --argjson i "${ROW_INDEX}" '.[$i] // empty' "${OUT_DATA_SUMMARY}")
+  if [[ -z "$row_data" ]]; then
+    echo "ERROR: ROW_INDEX=${ROW_INDEX} is out of range"
+    exit 1
+  fi
+  echo "{\"row\": ${sheet_row}, \"data\": ${row_data}}" | jq -r . > "${OUT_SELECT}"
 else
+  # The Status=Running is being running by another jobs, it won't be selected.
+  SELECTED_CONDITIONS=$(echo "${CLUSTER_PARAMETER_SELECT_CONDITIONS}" | jq -cr 'map(. + [{"column":"Status","value":"Running","operator":"not_equals"}])')
+  echo "Seaching record by condition: $(echo "${SELECTED_CONDITIONS}" | jq -cr .)"
+
+  find_matching_rows "$(jq -rc . "${OUT_DATA_SUMMARY}")" "${SELECTED_CONDITIONS}" "${OUT_MATCH}"
+  match_count=$(jq -r '.|length' "${OUT_MATCH}")
+  echo "Found ${match_count} records match condition."
+  if [[ ${match_count} == "0" ]]; then
+    echo "No match record found, skip test"
+    exit 1
+  fi
   # {
   #   "row": 2,
   #   "data": [
@@ -522,24 +533,23 @@ else
   # }
   selected_record=$(jq -r '.[0]' "${OUT_MATCH}")
   echo "${selected_record}" | jq -r . > "${OUT_SELECT}"
-
-  # convert to kv format
-  #
-  echo '{}' > "${OUT_SELECT_DICT}"
-  for header in $(echo "${HEADERS}" | jq -r '.[]'); do
-    idx=$(find_column_index "${HEADERS}" "${header}")
-    value="$(jq -r --argjson i "${idx}" '.data[$i] // ""' "${OUT_SELECT}")"
-    item="{\"$header\": \"${value}\"}"
-    cat <<< "$(jq --argjson item "$item" '. += $item' "$OUT_SELECT_DICT")" > "$OUT_SELECT_DICT"
-  done
-
-  echo "Select the first item as the cluster parameter:"
-  jq -cr . "${OUT_SELECT}"
-  jq -r . "${OUT_SELECT_DICT}"
-
-  # Lock selected record
-  echo "Update Status column to \"Running\""
-  row_number=$(jq -r '.row' "${OUT_SELECT}")
-  existing_data=$(jq -r '.data' "${OUT_SELECT}")
-  update_row_by_data_json "${SHEET_NAME_SUMMARY}" "${row_number}" "${existing_data}" "{\"Status\":\"Running\",\"RowUpdated\":\"$(current_date)\"}" "${HEADERS}"
 fi
+
+# convert to kv format
+echo '{}' > "${OUT_SELECT_DICT}"
+for header in $(echo "${HEADERS}" | jq -r '.[]'); do
+  idx=$(find_column_index "${HEADERS}" "${header}")
+  value="$(jq -r --argjson i "${idx}" '.data[$i] // ""' "${OUT_SELECT}")"
+  item="{\"$header\": \"${value}\"}"
+  cat <<< "$(jq --argjson item "$item" '. += $item' "$OUT_SELECT_DICT")" > "$OUT_SELECT_DICT"
+done
+
+echo "Selected cluster parameter:"
+jq -cr . "${OUT_SELECT}"
+jq -r . "${OUT_SELECT_DICT}"
+
+# Lock selected record
+echo "Update Status column to \"Running\""
+row_number=$(jq -r '.row' "${OUT_SELECT}")
+existing_data=$(jq -r '.data' "${OUT_SELECT}")
+update_row_by_data_json "${SHEET_NAME_SUMMARY}" "${row_number}" "${existing_data}" "{\"Status\":\"Running\",\"RowUpdated\":\"$(current_date)\"}" "${HEADERS}"
