@@ -140,6 +140,15 @@ EOF
 ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
+set +e
+ping -c 5 10.6.192.11
+ping -c 5 10.6.193.11
+ping -c 5 10.6.194.11
+ping -c 5 10.6.195.17
+ping -c 5 10.6.196.16
+set -e
+
+
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
