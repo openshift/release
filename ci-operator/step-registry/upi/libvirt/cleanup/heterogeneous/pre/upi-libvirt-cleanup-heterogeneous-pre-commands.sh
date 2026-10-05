@@ -1,5 +1,24 @@
 #!/bin/bash
 
+require_commands() {
+  local cmd
+  local -a missing=()
+
+  for cmd in "$@"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      missing+=("$cmd")
+    fi
+  done
+
+  if (( ${#missing[@]} > 0 )); then
+    printf 'ERROR: missing dependencies: %s\n' "${missing[*]}" >&2
+    printf 'Fix the step image before retrying.\n' >&2
+    exit 1
+  fi
+}
+
+require_commands yq-v4 mock-nss.sh virsh grep awk sleep
+
 # Ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE:-}" ]]; then
   echo "ERROR: Failed to acquire lease (LEASED_RESOURCE is unset)"
