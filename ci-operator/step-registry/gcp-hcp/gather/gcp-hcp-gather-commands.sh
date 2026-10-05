@@ -32,9 +32,32 @@ record_error() {
   local scope_dir="$1"
   local collector="$2"
   local exit_code="$3"
+  local diagnostic_file="${4:-}"
   local timed_out="false"
+  local category=""
   [[ "${exit_code}" == "124" ]] && timed_out="true"
-  printf '%s: exit=%s timeout=%s\n' "${collector}" "${exit_code}" "${timed_out}" >>"${scope_dir}/.errors"
+
+  # Keep public summaries useful without copying arbitrary stderr, which can
+  # contain request data or credentials. Categories are intentionally coarse.
+  if [[ "${timed_out}" == "true" ]]; then
+    category="timeout"
+  elif [[ -n "${diagnostic_file}" && -s "${diagnostic_file}" ]]; then
+    if grep -Eiq 'unauthorized|unauthenticated|authentication required|invalid bearer|provide credentials|token expired|HTTP/[0-9.]+ 401|status(code)?[=: ]+401' "${diagnostic_file}"; then
+      category="authentication"
+    elif grep -Eiq 'forbidden|permission denied|permission_denied|does not have permission|not authorized|HTTP/[0-9.]+ 403|status(code)?[=: ]+403' "${diagnostic_file}"; then
+      category="permission-denied"
+    elif grep -Eiq 'connection refused|connection reset|no route to host|network is unreachable|TLS handshake|i/o timeout|no such host' "${diagnostic_file}"; then
+      category="network"
+    elif grep -Eiq 'HTTP/[0-9.]+ 5[0-9][0-9]|status(code)?[=: ]+5[0-9][0-9]|InternalError|Internal Server Error|(^|[^[:alnum:]_])INTERNAL([^[:alnum:]_]|$)|INTERNAL_ERROR|INTERNAL_SERVER_ERROR|ServiceUnavailable' "${diagnostic_file}"; then
+      category="server-error"
+    elif grep -Eiq 'not found|NotFound|NOT_FOUND|HTTP/[0-9.]+ 404|status(code)?[=: ]+404' "${diagnostic_file}"; then
+      category="not-found"
+    fi
+  fi
+
+  printf '%s: exit=%s timeout=%s' "${collector}" "${exit_code}" "${timed_out}" >>"${scope_dir}/.errors"
+  [[ -n "${category}" ]] && printf ' category=%s' "${category}" >>"${scope_dir}/.errors"
+  printf '\n' >>"${scope_dir}/.errors"
   touch "${scope_dir}/.partial"
 }
 
@@ -49,7 +72,7 @@ run_capture() {
   timeout "${duration}" "$@" >"${output_file}" 2>"${output_file}.stderr"
   local exit_code=$?
   if (( exit_code != 0 )); then
-    record_error "${scope_dir}" "${collector}" "${exit_code}"
+    record_error "${scope_dir}" "${collector}" "${exit_code}" "${output_file}.stderr"
   fi
   return 0
 }
@@ -69,7 +92,7 @@ inspect_namespace() {
     >"${scope_dir}/inspect-${namespace}.log" 2>&1
   local exit_code=$?
   if (( exit_code != 0 )); then
-    record_error "${scope_dir}" "inspect/${namespace}" "${exit_code}"
+    record_error "${scope_dir}" "inspect/${namespace}" "${exit_code}" "${scope_dir}/inspect-${namespace}.log"
   fi
   return 0
 }
@@ -124,7 +147,7 @@ collect_gke() {
   timeout 30s kubectl --kubeconfig="${kubeconfig}" get namespaces -o json >"${output}" 2>"${output}.stderr"
   exit_code=$?
   if (( exit_code != 0 )); then
-    record_error "${scope_dir}" "namespaces" "${exit_code}"
+    record_error "${scope_dir}" "namespaces" "${exit_code}" "${output}.stderr"
     touch "${scope_dir}/.unavailable"
     return 0
   fi
@@ -192,7 +215,7 @@ collect_gke() {
       record_error "${scope_dir}" "argocd-debug-applications-json" 1
     fi
   else
-    record_error "${scope_dir}" "applications.argoproj.io" "${exit_code}"
+    record_error "${scope_dir}" "applications.argoproj.io" "${exit_code}" "${output}.stderr"
   fi
 
   output="${scope_dir}/custom-resources/hostedclusters.hypershift.openshift.io.json"
@@ -203,7 +226,7 @@ collect_gke() {
       record_error "${scope_dir}" "hostedclusters-json" 1
     fi
   else
-    record_error "${scope_dir}" "hostedclusters.hypershift.openshift.io" "${exit_code}"
+    record_error "${scope_dir}" "hostedclusters.hypershift.openshift.io" "${exit_code}" "${output}.stderr"
   fi
 
   cat "${application_candidates}" >>"${candidates}"
@@ -296,7 +319,7 @@ collect_hosted_cluster() {
     >"${scope_dir}/login.log" 2>&1
   exit_code=$?
   if (( exit_code != 0 )); then
-    record_error "${scope_dir}" "gcphcpctl-login" "${exit_code}"
+    record_error "${scope_dir}" "gcphcpctl-login" "${exit_code}" "${scope_dir}/login.log"
     touch "${scope_dir}/.unavailable"
     return 0
   fi
@@ -305,7 +328,7 @@ collect_hosted_cluster() {
     >"${scope_dir}/nodes.txt" 2>"${scope_dir}/nodes.stderr"
   exit_code=$?
   if (( exit_code != 0 )); then
-    record_error "${scope_dir}" "hosted-nodes" "${exit_code}"
+    record_error "${scope_dir}" "hosted-nodes" "${exit_code}" "${scope_dir}/nodes.stderr"
     touch "${scope_dir}/.unavailable"
     return 0
   fi
@@ -316,7 +339,7 @@ collect_hosted_cluster() {
     >"${scope_dir}/must-gather.log" 2>&1
   exit_code=$?
   if (( exit_code != 0 )); then
-    record_error "${scope_dir}" "must-gather" "${exit_code}"
+    record_error "${scope_dir}" "must-gather" "${exit_code}" "${scope_dir}/must-gather.log"
   fi
 }
 
