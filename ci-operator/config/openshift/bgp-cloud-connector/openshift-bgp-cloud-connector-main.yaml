@@ -766,10 +766,186 @@ tests:
           memory: 200Mi
       timeout: 45m0s
     - ref: aro-deprovision
+    - as: delete-cluster-application
+      best_effort: true
+      commands: |
+        # Remove the cluster's application that aro-provision-cluster-sp made;
+        # az aro delete does not delete it.
+        set -o nounset
+        set -o pipefail
+
+        id_file="${SHARED_DIR}/aro-cluster-app-id"
+        if [[ ! -s "${id_file}" ]]; then
+          echo "no application was recorded, so there is nothing to delete"
+          exit 0
+        fi
+
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        az login --service-principal -u "$(jq -r .clientId "${sp}")" \
+          -p "$(jq -r .clientSecret "${sp}")" --tenant "$(jq -r .tenantId "${sp}")" --output none
+
+        for attempt in $(seq 1 6); do
+          if az ad app delete --id "$(<"${id_file}")"; then
+            echo "deleted the cluster's application on attempt ${attempt}"
+            exit 0
+          fi
+          sleep 10
+        done
+        echo "could not delete the cluster's application" >&2
+        exit 1
+      from_image:
+        name: "4.17"
+        namespace: ocp
+        tag: upi-installer
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
+      timeout: 10m0s
     pre:
     - ref: azure-provision-resourcegroup
     - ref: aro-provision-vnet
-    - ref: aro-provision-cluster
+    - as: aro-provision-cluster-sp
+      commands: |
+        # aro-provision-cluster with the cluster's application made here
+        # rather than by az aro create. Given no --client-id, az aro create
+        # creates the application and adds its password in the next Graph
+        # call, with no retry, and Graph refuses that call on most runs
+        # (Request_ResourceNotFound, sometimes Insufficient privileges).
+        # Here the password is retried, and each refusal is logged.
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        CLUSTER="${NAMESPACE}-${UNIQUE_HASH}"
+        RESOURCEGROUP="$(<"${SHARED_DIR}/resourcegroup")"
+        VNET="$(<"${SHARED_DIR}/vnet")"
+        LOCATION="${LEASED_RESOURCE}"
+        PULL_SECRET_FILE="${CLUSTER_PROFILE_DIR}/pull-secret"
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+
+        echo "${CLUSTER}" >"${SHARED_DIR}/cluster-name"
+        echo "${LOCATION}" >"${SHARED_DIR}/location"
+
+        echo "az-cli version information"
+        az version
+
+        az cloud set --name AzureCloud
+        az login --service-principal -u "$(jq -r .clientId "${sp}")" \
+          -p "$(jq -r .clientSecret "${sp}")" --tenant "$(jq -r .tenantId "${sp}")" --output none
+
+        for provider in Microsoft.RedHatOpenShift Microsoft.Compute Microsoft.Storage Microsoft.Authorization; do
+          az provider register -n "${provider}" --wait
+        done
+
+        app_id="$(az ad app create --display-name "${CLUSTER}" --query appId -o tsv)"
+        # Recorded before anything can fail, so delete-cluster-application
+        # finds it whatever happens next.
+        echo "${app_id}" >"${SHARED_DIR}/aro-cluster-app-id"
+        echo "created the cluster's application"
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        err="$(mktemp)"
+        client_secret=""
+        for attempt in $(seq 1 18); do
+          if client_secret="$(az ad app credential reset --id "${app_id}" --query password -o tsv 2>"${err}")" \
+             && [[ -n "${client_secret}" ]]; then
+            echo "added its password on attempt ${attempt}"
+            break
+          fi
+          client_secret=""
+          reason="$(grep -oE 'Request_ResourceNotFound|Insufficient privileges|Authorization_RequestDenied' "${err}" | head -1 || true)"
+          echo "attempt ${attempt}: ${reason:-$(grep -m1 . "${err}" | redact)}"
+          sleep 10
+        done
+        if [[ -z "${client_secret}" ]]; then
+          echo "could not add a password to the cluster's application; last error:" >&2
+          redact <"${err}" | head -5 >&2
+          exit 1
+        fi
+
+        # Given --client-id, az aro create looks the service principal up
+        # by appId and passes the result to its permission check before it
+        # would create one; a lookup that finds nothing reaches that check
+        # as None and fails there. So it is created here, and az aro create
+        # runs only once the same lookup returns it.
+        sp_id=""
+        for attempt in $(seq 1 18); do
+          sp_id="$(az ad sp list --filter "appId eq '${app_id}'" --query '[0].id' -o tsv 2>/dev/null || true)"
+          if [[ -n "${sp_id}" ]]; then
+            echo "its service principal is visible on attempt ${attempt}"
+            break
+          fi
+          if ! az ad sp create --id "${app_id}" --output none 2>"${err}"; then
+            reason="$(grep -oE 'Request_ResourceNotFound|Insufficient privileges|Authorization_RequestDenied|already exists' "${err}" | head -1 || true)"
+            echo "creating its service principal, attempt ${attempt}: ${reason:-$(grep -m1 . "${err}" | redact)}"
+          fi
+          sleep 10
+        done
+        if [[ -z "${sp_id}" ]]; then
+          echo "the cluster's service principal never became visible; last error:" >&2
+          redact <"${err}" | head -5 >&2
+          exit 1
+        fi
+
+        create=(az aro create --resource-group "${RESOURCEGROUP}" --name "${CLUSTER}" --vnet "${VNET}"
+          --master-subnet master-subnet --worker-subnet worker-subnet --client-id "${app_id}")
+        if [[ -f "${PULL_SECRET_FILE}" ]]; then
+          create+=(--pull-secret "@${PULL_SECRET_FILE}")
+        fi
+
+        if [[ -n "${ARO_CLUSTER_VERSION}" ]]; then
+          echo "Available versions in ${LOCATION}:"
+          az aro get-versions -l "${LOCATION}" -o table
+          version="${ARO_CLUSTER_VERSION}"
+          if [[ "${version}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            version="$(az aro get-versions -l "${LOCATION}" -o json | jq -r '.[]' | grep "^${version}\." | sort -V | tail -1)"
+            if [[ -z "${version}" ]]; then
+              echo "No versions found matching ${ARO_CLUSTER_VERSION}.x" >&2
+              exit 1
+            fi
+          fi
+          echo "Using version ${version}"
+          create+=(--version "${version}")
+        fi
+
+        echo "Running: ${create[*]} --client-secret <redacted>"
+        "${create[@]}" --client-secret "${client_secret}" >"${SHARED_DIR}/clusterinfo"
+
+        echo "Cluster created, sleeping 600 seconds"
+        sleep 600
+
+        echo "Retrieving credentials"
+        KUBEAPI="$(jq -r '.apiserverProfile.url' "${SHARED_DIR}/clusterinfo")"
+        KUBECRED="$(az aro list-credentials --name "${CLUSTER}" --resource-group "${RESOURCEGROUP}")"
+        KUBEUSER="$(jq -r '.kubeadminUsername' <<<"${KUBECRED}")"
+        KUBEPASS="$(jq -r '.kubeadminPassword' <<<"${KUBECRED}")"
+        echo "${KUBECRED}" >"${SHARED_DIR}/clustercreds"
+
+        echo "Logging into the cluster"
+        oc login "${KUBEAPI}" --username="${KUBEUSER}" --password="${KUBEPASS}" --insecure-skip-tls-verify=true
+
+        echo "Generating kubeconfig in ${SHARED_DIR}/kubeconfig"
+        oc config view --raw >"${SHARED_DIR}/kubeconfig"
+      env:
+      - default: ""
+        documentation: OpenShift version for the ARO cluster; a minor version such
+          as "4.21" selects the latest patch ARO offers in the leased region.
+        name: ARO_CLUSTER_VERSION
+      from_image:
+        name: "4.17"
+        namespace: ocp
+        tag: upi-installer
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
+      timeout: 2h0m0s
     - ref: ipi-install-rbac
     test:
     - as: grant-network-role
