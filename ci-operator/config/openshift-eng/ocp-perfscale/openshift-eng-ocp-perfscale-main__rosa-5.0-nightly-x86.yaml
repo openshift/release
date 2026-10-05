@@ -253,7 +253,19 @@ tests:
 
         for node in ${MASTERS}; do
           echo "Modifying kube-apiserver manifest on ${node}..."
-          oc debug "node/${node}" -- chroot /host sed -i '/name: kube-apiserver/,/env:/{/env:/a\        - name: GOEXPERIMENT\n          value: nogreenteagc}' /etc/kubernetes/manifests/kube-apiserver-pod.yaml
+          oc debug "node/${node}" -- chroot /host python3 -c '
+        import json
+        manifest = "/etc/kubernetes/manifests/kube-apiserver-pod.yaml"
+        with open(manifest) as f:
+            pod = json.load(f)
+        for c in pod["spec"]["containers"]:
+            if c["name"] == "kube-apiserver":
+                c.setdefault("env", []).append({"name": "GOEXPERIMENT", "value": "nogreenteagc"})
+                break
+        with open(manifest, "w") as f:
+            json.dump(pod, f, indent=2)
+        print("GOEXPERIMENT=nogreenteagc injected successfully")
+        '
           echo "Done modifying ${node}"
         done
 
