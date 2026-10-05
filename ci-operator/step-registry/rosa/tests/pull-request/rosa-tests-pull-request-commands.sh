@@ -18,11 +18,11 @@ log(){
 #configure aws
 aws_region=${REGION:-us-east-2}
 configure_aws "${CLUSTER_PROFILE_DIR}/.awscred" "${aws_region}"
-configure_aws_shared_vpc ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
+configure_aws_shared_vpc "${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 
 # Log in to rosa/ocm
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-rosa_login ${OCM_LOGIN_ENV} $OCM_TOKEN
+rosa_login "${OCM_LOGIN_ENV}" "$OCM_TOKEN"
 
 # Get the focus IDs from the tests
 COMMIT_FOCUS="/rosa/tests/ci/data/commit-focus"
@@ -97,11 +97,10 @@ declare -a run_times=(
 RUN_EXIT=0
 test_exit=0
 for run_time in "${run_times[@]}"; do
-  run_testing_steps $run_time
+  run_testing_steps "$run_time"
   if [[ ${RUN_EXIT} -ne 0 ]]; then
     test_exit=${RUN_EXIT}
-    log "[CI] runtime ${run_time} failed with exit ${test_exit}; stopping"
-    break
+    log "[CI] runtime ${run_time} failed with exit ${test_exit}"
   fi
 done
 

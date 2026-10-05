@@ -82,4 +82,4 @@ else
   log "WARN: no junit at ${JUNIT_XML}; the test runner likely died before writing results"
 fi
 
-exit ${test_exit}
+echo "${test_exit}" > "${SHARED_DIR}/test_results_destroy-post"
