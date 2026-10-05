@@ -58,6 +58,9 @@ chain:
     - name: HYPERSHIFT_AZURE_SELF_MANAGED
       default: "false"
       documentation: "If true , a self-managed HCP will be installed in azure cloud provider."
+    - name: HYPERSHIFT_ETCD_STORAGE_CLASS
+      default: ""
+      documentation: "Storage class to use for the hosted cluster's etcd PVCs."
     - name: HYPERSHIFT_ETCD_ENCRYPTION
       default: "false"
       documentation: |-
@@ -253,6 +256,10 @@ chain:
         --network-security-group-id=${NSG_ID} \
         --generate-ssh
       )
+
+      if [[ -n "${HYPERSHIFT_ETCD_STORAGE_CLASS}" ]]; then
+        COMMAND+=(--etcd-storage-class="${HYPERSHIFT_ETCD_STORAGE_CLASS}")
+      fi
       
       if [[ $ENABLE_ICSP == "true" ]]; then
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
