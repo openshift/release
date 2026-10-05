@@ -44,10 +44,11 @@ workflow:
     **Phase 2 — CCLM spoke round-trip (P2P_MIGRATION_DIRECTION=both)**:
     - Create test VMs (prefix P2P_HS_SPOKE_VM_PREFIX) on spoke only
     - Create MTV NetworkMaps and StorageMaps for both directions
-    - Leg 1: migrate spoke VMs → hub (spoke is source, hub is destination)
+    - Leg 1: when MTV_HS_COLD_VM_COUNT is set, start a cold Plan and a live Plan
+      at the same time (disjoint VM sets). MTV warm is not supported for OpenShift
+      sources; live is the running-VM path.
     - Cleanup spoke source resources after successful leg 1
-    - Leg 2: return the same VMs hub → spoke (hub is source, spoke is destination)
-      only runs when leg 1 succeeds; error propagation gates the return migration
+    - Leg 2: return with the same cold+live split (Plan names suffixed -cold)
 
     MTV management plane runs on the hub (host provider = hub cluster itself).
     Spoke clusters are registered as OpenShift providers via ACM ManifestWork.

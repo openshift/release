@@ -9,6 +9,13 @@ chain:
   documentation: |-
     End-to-end bi-directional CCLM migration test for the same VMs across two spoke clusters.
 
+    When MTV_COLD_VM_COUNT is 0 < N < MTV_TEST_VM_COUNT, both the forward and return
+    execute steps start a cold Plan (VMs 1..N, halted) and a live Plan (VMs N+1..COUNT,
+    still Running) at the same time, then wait for both Migrations. Return uses
+    cclm-plan-return-cold / cclm-run-return-cold so the CRs do not collide with the
+    forward cold Plan. MTV warm is not supported for OpenShift Virtualization sources;
+    live is the running-VM path.
+
     Requires p2p-mtv-bidir-mig-config (ForkliftController, providers, forward + return
     network/storage maps), p2p-install-odf-spokes, p2p-acm-cnv-install-policy, and
     acm-interop-p2p-submariner-install (pod-to-pod connectivity without Globalnet).
@@ -17,9 +24,8 @@ chain:
       Creates ODF-backed RWX VMs on the source spoke (spoke-1, index 1).
 
     Step 2 (p2p-mtv-execute-live-migration):
-      Forward leg — live-migrates the happy-path VMs from spoke-1 to spoke-2.
-      Uses forward Plan/Migration CRs (cclm-plan / cclm-run-1) and forward maps
-      (spoke-network-map / spoke-storage-map).
+      Forward leg — if MTV_COLD_VM_COUNT is set, cold + live Plans start together
+      (cclm-plan-cold / cclm-plan). Otherwise all VMs use MTV_PLAN_TYPE (default live).
 
     Step 3 (p2p-mtv-verify-migration):
       Post-forward checks — destination VMIs Running, runStrategy==Always
@@ -27,9 +33,7 @@ chain:
       data integrity, guest disk I/O, and guest network (all hard-fail).
 
     Step 4 (p2p-mtv-execute-live-migration-return):
-      Return leg — live-migrates the same VMs from spoke-2 back to spoke-1.
-      Uses return Plan/Migration CRs (cclm-plan-return / cclm-run-return) and return
-      maps (spoke-network-map-return / spoke-storage-map-return).
+      Return leg — same cold+live split as the forward leg, spoke-2 → spoke-1.
 
     Step 5 (p2p-mtv-verify-migration-return):
       Post-return checks — same assertions as step 3 on the reversed spokes.

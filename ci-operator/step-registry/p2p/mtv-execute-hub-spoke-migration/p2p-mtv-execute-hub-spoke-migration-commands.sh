@@ -38,6 +38,11 @@ fi
 [[ -r "${KUBECONFIG}" ]]
 
 typeset -i vmCount="${P2P_HS_VM_COUNT}"
+typeset -i coldVmCount="${MTV_HS_COLD_VM_COUNT:-0}"
+typeset parallelColdLive=false
+(( coldVmCount > 0 && coldVmCount < vmCount )) && parallelColdLive=true
+# Set true for a RunOneMigrationDirection call that should split cold+live.
+typeset activeParallel=false
 typeset -i migrationPollInterval="${MTV_HS_MIGRATION_POLL_INTERVAL_SECONDS}"
 typeset -i syncStuckMinutes="${MTV_HS_SYNC_STUCK_MINUTES}"
 typeset isCclmDebugMode="${P2P_CCLM_DEBUG_MODE:-false}"
@@ -333,7 +338,14 @@ PreflightAllSourceVmsRunning() {
         typeset vmName="${vmPrefix}-${i}"
         oc --kubeconfig="${kc}" get "virtualmachine/${vmName}" -n "${vmNs}" 1>/dev/null
 
-        if [[ "${MTV_HS_PLAN_TYPE}" == 'live' ]]; then
+        if [[ "${MTV_HS_PLAN_TYPE}" == 'live' && "${activeParallel}" != "true" ]]; then
+            phase="$(oc --kubeconfig="${kc}" get "virtualmachineinstance/${vmName}" -n "${vmNs}" \
+                -o jsonpath='{.status.phase}' || true)"
+            [[ "${phase}" == 'Running' ]] || {
+                : "ERROR: Source VM ${vmName} is not Running (phase='${phase}')"
+                return 1
+            }
+        elif [[ "${activeParallel}" == "true" && "${i}" -gt "${coldVmCount}" ]]; then
             phase="$(oc --kubeconfig="${kc}" get "virtualmachineinstance/${vmName}" -n "${vmNs}" \
                 -o jsonpath='{.status.phase}' || true)"
             [[ "${phase}" == 'Running' ]] || {
@@ -341,6 +353,51 @@ PreflightAllSourceVmsRunning() {
                 return 1
             }
         fi
+    done
+}
+
+# StopSourceVms — power off all source VMs before a cold Plan (per direction).
+# Patches runStrategy=Halted, waits for VMI deletion, confirms printableStatus=Stopped.
+# No-op for live plans. Idempotent if VMs are already Halted.
+StopSourceVms() {
+    typeset kc="${1:?}"
+    typeset vmPrefix="${2:?}"
+    typeset vmNs="${3:?}"
+    typeset -i i
+    typeset vmName vmStatus
+    typeset -i wMax=600
+
+    typeset -i from="${4:-1}"
+    typeset -i to="${5:-${vmCount}}"
+
+    if [[ "${activeParallel}" == "true" ]]; then
+        to="${5:-${coldVmCount}}"
+    elif [[ "${MTV_HS_PLAN_TYPE}" != 'cold' ]]; then
+        return 0
+    fi
+
+    for ((i = from; i <= to; i++)); do
+        vmName="${vmPrefix}-${i}"
+        oc --kubeconfig="${kc}" get "virtualmachine/${vmName}" -n "${vmNs}" 1>/dev/null
+        oc --kubeconfig="${kc}" patch "virtualmachine/${vmName}" -n "${vmNs}" \
+            --type merge -p '{"spec":{"runStrategy":"Halted"}}' 1>/dev/null
+        oc --kubeconfig="${kc}" wait "virtualmachineinstance/${vmName}" -n "${vmNs}" \
+            --for=delete --timeout="${MTV_COLD_VM_STOP_TIMEOUT:-10m}" 1>/dev/null || true
+
+        SECONDS=0
+        vmStatus=""
+        while (( SECONDS < wMax )); do
+            vmStatus="$(oc --kubeconfig="${kc}" get "virtualmachine/${vmName}" -n "${vmNs}" \
+                -o jsonpath='{.status.printableStatus}' || true)"
+            [[ "${vmStatus}" == 'Stopped' ]] && break
+            printf 'INFO: Waiting for VM %s Stopped (%s/%ss): %s\n' \
+                "${vmName}" "${SECONDS}" "${wMax}" "${vmStatus}" >&2
+            sleep 5
+        done
+        [[ "${vmStatus}" == 'Stopped' ]] || {
+            printf 'ERROR: VM %s not Stopped (status=%s)\n' "${vmName}" "${vmStatus}" >&2
+            return 1
+        }
     done
 }
 
@@ -452,10 +509,12 @@ CleanupDestinationStaleResources() {
 BuildVmsJson() {
     typeset vmPrefix="${1:?}"
     typeset vmNs="${2:?}"
-    typeset -i i
+    typeset -i i from=1 to="${vmCount}"
     typeset vmsJson='[]'
+    (($# >= 4)) && from="${4}"
+    (($# >= 5)) && to="${5}"
 
-    for ((i = 1; i <= vmCount; i++)); do
+    for ((i = from; i <= to; i++)); do
         vmsJson="$(jq -c \
             --arg name "${vmPrefix}-${i}" \
             --arg ns   "${vmNs}" \
@@ -473,6 +532,7 @@ ApplyPlan() {
     typeset storMapName="${5:?}"
     typeset targetNs="${6:?}"
     typeset vmsJson="${7:?}"
+    typeset planType="${8:-${MTV_HS_PLAN_TYPE}}"
 
     jq -cn \
         --arg name     "${planName}" \
@@ -483,7 +543,7 @@ ApplyPlan() {
         --arg storMap  "${storMapName}" \
         --arg tgtNs    "${targetNs}" \
         --argjson vms  "${vmsJson}" \
-        --arg planType "${MTV_HS_PLAN_TYPE}" \
+        --arg planType "${planType}" \
         '{
             apiVersion: "forklift.konveyor.io/v1beta1",
             kind: "Plan",
@@ -651,6 +711,47 @@ WaitMigrationSucceeded() {
     done
 
     false
+}
+
+# WaitMigrationsSucceeded — poll multiple Migrations until every one Succeeded.
+WaitMigrationsSucceeded() {
+    typeset vmPrefix="${1:?}"; shift
+    typeset srcKc="${1:?}"; shift
+    typeset srcNs="${1:?}"; shift
+    typeset dstKc="${1:?}"; shift
+    typeset dstNs="${1:?}"; shift
+    typeset -a migNames=("$@")
+    typeset -i deadline allDone
+    typeset migName succeededStatus failedStatus
+    # shellcheck disable=SC2034
+    typeset -i syncStartedAt=0
+
+    (( ${#migNames[@]} )) || return 1
+    deadline=$((SECONDS + $(ParseOcWaitDurationSeconds "${MTV_HS_MIGRATION_TIMEOUT}")))
+
+    while (( SECONDS < deadline )); do
+        allDone=1
+        for migName in "${migNames[@]}"; do
+            succeededStatus="$(MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+                -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' || true)"
+            failedStatus="$(MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+                -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' || true)"
+            if [[ "${failedStatus}" == 'True' ]]; then
+                printf 'ERROR: Migration %s Failed\n' "${migName}" >&2
+                PrintMigrationPipeline "${migName}" 1>&2
+                return 1
+            fi
+            [[ "${succeededStatus}" == 'True' ]] || allDone=0
+            PrintMigrationPipeline "${migName}"
+        done
+        (( allDone )) && return 0
+        CheckSyncStuck "${migNames[-1]}" "${vmPrefix}" \
+            "${srcKc}" "${srcNs}" "${dstKc}" "${dstNs}" syncStartedAt
+        : "Waiting for ${#migNames[@]} migrations (${SECONDS}/${deadline}s)"
+        sleep "${migrationPollInterval}"
+    done
+    printf 'ERROR: timed out waiting for hub-spoke migrations\n' >&2
+    return 1
 }
 
 # VerifyAllVmsMigrated ” all destination VMIs must be Running after migration.
@@ -902,9 +1003,15 @@ RunOneMigrationDirection() {
     typeset targetNs="${10:?}"
     typeset srcKc="${11:?}"
     typeset dstKc="${12:?}"
-    typeset vmsJson=''
+    typeset runParallel="${13:-}"
+    typeset vmsJson='' coldVmsJson='' liveVmsJson=''
+    typeset coldPlanName="${planName}-cold"
+    typeset coldMigName="${migName}-cold"
 
-    : "=== Starting ${direction} migration: ${srcProvider} ’ ${dstProvider} (${vmCount} VMs) ==="
+    activeParallel=false
+    [[ "${runParallel}" == "parallel" && "${parallelColdLive}" == "true" ]] && activeParallel=true
+
+    : "=== Starting ${direction} migration: ${srcProvider} ’ ${dstProvider} (${vmCount} VMs parallel=${activeParallel}) ==="
 
     JStep "[${direction}] Preflight: Providers and Maps Ready" \
         PreflightHub "${srcProvider}" "${dstProvider}" "${netMapName}" "${storMapName}"
@@ -920,10 +1027,12 @@ RunOneMigrationDirection() {
         RefreshProvidersForLivePlan "${srcProvider}" "${dstProvider}"
     JStep "[${direction}] Preflight: All Source VMs Running" \
         PreflightAllSourceVmsRunning "${srcKc}" "${vmPrefix}" "${vmNs}"
+    if [[ "${activeParallel}" == "true" || "${MTV_HS_PLAN_TYPE}" == 'cold' ]]; then
+        JStep "[${direction}] Pre-migration: Stop source VMs (cold)" \
+            StopSourceVms "${srcKc}" "${vmPrefix}" "${vmNs}"
+    fi
     JStep "[${direction}] Preflight: VM Storage Class Mapped" \
         PreflightVmStorageMapped "${srcKc}" "${vmPrefix}" "${vmNs}" "${storMapName}"
-
-    vmsJson="$(BuildVmsJson "${vmPrefix}" "${vmNs}" "${vmCount}")"
 
     # Always clean up stale VM/DV/PVC on the destination before Plan creation.
     # CleanupDestinationStaleResources skips any VMI already Running (idempotent).
@@ -933,16 +1042,40 @@ RunOneMigrationDirection() {
     JStep "[${direction}] Pre-migration: Cleanup stale destination resources" \
         CleanupDestinationStaleResources "${dstKc}" "${vmPrefix}" "${targetNs}" "${vmCount}"
 
-    JStep "[${direction}] Migration: Apply Plan (${vmCount} VMs)" \
-        ApplyPlan "${planName}" "${srcProvider}" "${dstProvider}" \
-            "${netMapName}" "${storMapName}" "${targetNs}" "${vmsJson}"
-    JStep "[${direction}] Migration: Plan Ready" \
-        WaitPlanReady "${planName}"
-    JStep "[${direction}] Migration: Apply Migration" \
-        ApplyMigration "${migName}" "${planName}"
-    JStep "[${direction}] Migration: Succeeded" \
-        WaitMigrationSucceeded "${migName}" "${vmPrefix}" \
-            "${srcKc}" "${vmNs}" "${dstKc}" "${targetNs}"
+    if [[ "${activeParallel}" == "true" ]]; then
+        coldVmsJson="$(BuildVmsJson "${vmPrefix}" "${vmNs}" "${vmCount}" 1 "${coldVmCount}")"
+        liveVmsJson="$(BuildVmsJson "${vmPrefix}" "${vmNs}" "${vmCount}" $((coldVmCount + 1)) "${vmCount}")"
+        JStep "[${direction}] Migration: Apply cold Plan" \
+            ApplyPlan "${coldPlanName}" "${srcProvider}" "${dstProvider}" \
+                "${netMapName}" "${storMapName}" "${targetNs}" "${coldVmsJson}" "cold"
+        JStep "[${direction}] Migration: Apply live Plan" \
+            ApplyPlan "${planName}" "${srcProvider}" "${dstProvider}" \
+                "${netMapName}" "${storMapName}" "${targetNs}" "${liveVmsJson}" "live"
+        JStep "[${direction}] Migration: Cold Plan Ready" \
+            WaitPlanReady "${coldPlanName}"
+        JStep "[${direction}] Migration: Live Plan Ready" \
+            WaitPlanReady "${planName}"
+        JStep "[${direction}] Migration: Apply cold Migration" \
+            ApplyMigration "${coldMigName}" "${coldPlanName}"
+        JStep "[${direction}] Migration: Apply live Migration" \
+            ApplyMigration "${migName}" "${planName}"
+        JStep "[${direction}] Migration: Cold and live Succeeded" \
+            WaitMigrationsSucceeded "${vmPrefix}" \
+                "${srcKc}" "${vmNs}" "${dstKc}" "${targetNs}" \
+                "${coldMigName}" "${migName}"
+    else
+        vmsJson="$(BuildVmsJson "${vmPrefix}" "${vmNs}" "${vmCount}")"
+        JStep "[${direction}] Migration: Apply Plan (${vmCount} VMs)" \
+            ApplyPlan "${planName}" "${srcProvider}" "${dstProvider}" \
+                "${netMapName}" "${storMapName}" "${targetNs}" "${vmsJson}"
+        JStep "[${direction}] Migration: Plan Ready" \
+            WaitPlanReady "${planName}"
+        JStep "[${direction}] Migration: Apply Migration" \
+            ApplyMigration "${migName}" "${planName}"
+        JStep "[${direction}] Migration: Succeeded" \
+            WaitMigrationSucceeded "${migName}" "${vmPrefix}" \
+                "${srcKc}" "${vmNs}" "${dstKc}" "${targetNs}"
+    fi
     JStep "[${direction}] Verification: All Destination VMIs Running" \
         VerifyAllVmsMigrated "${dstKc}" "${vmPrefix}" "${targetNs}"
 
@@ -1080,7 +1213,8 @@ typeset _revVmNs="${MTV_REV_VM_NAMESPACE:-${MTV_HS_SPOKE_VM_NAMESPACE}}"
             "${_revNetMap}" "${_revStorMap}" \
             "${_revPlan}" "${_revMig}" \
             "${_revVmPrefix}" "${_revVmNs}" "${spokeToHubTargetNs}" \
-            "${spokeKubeconfig}" "${KUBECONFIG}"
+            "${spokeKubeconfig}" "${KUBECONFIG}" \
+            "parallel"
 
         # If "both", cleanup on spoke and run return leg
         if [[ "${cclmDirection}" == 'both' ]]; then
@@ -1095,7 +1229,8 @@ typeset _revVmNs="${MTV_REV_VM_NAMESPACE:-${MTV_HS_SPOKE_VM_NAMESPACE}}"
                 "${_fwdNetMap}" "${_fwdStorMap}" \
                 "${_fwdPlan}" "${_fwdMig}" \
                 "${_revVmPrefix}" "${spokeToHubTargetNs}" "${hubToSpokeTargetNs}" \
-                "${KUBECONFIG}" "${spokeKubeconfig}"
+                "${KUBECONFIG}" "${spokeKubeconfig}" \
+                "parallel"
         fi
     fi
 
@@ -1143,7 +1278,8 @@ typeset _revVmNs="${MTV_REV_VM_NAMESPACE:-${MTV_HS_SPOKE_VM_NAMESPACE}}"
             "${_revNetMap}" "${_revStorMap}" \
             "${_revPlan}" "${_revMig}" \
             "${_fwdVmPrefix}" "${hubToSpokeTargetNs}" "${spokeToHubTargetNs}" \
-            "${destKubeconfig}" "${spokeKubeconfig}"
+            "${destKubeconfig}" "${spokeKubeconfig}" \
+            "parallel"
     fi
 
     true

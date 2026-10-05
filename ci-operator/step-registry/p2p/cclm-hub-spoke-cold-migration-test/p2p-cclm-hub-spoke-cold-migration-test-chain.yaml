@@ -1,0 +1,38 @@
+chain:
+  as: p2p-cclm-hub-spoke-cold-migration-test
+  env:
+  - name: MTV_HS_PLAN_TYPE
+    default: "cold"
+  - name: MTV_PLAN_TYPE
+    default: "cold"
+  - name: MTV_HS_SPOKE_TO_HUB_PLAN
+    default: "cclm-spoke-to-hub-plan-cold"
+  - name: MTV_HS_SPOKE_TO_HUB_MIGRATION
+    default: "cclm-spoke-to-hub-run-cold"
+  - name: MTV_HS_HUB_TO_SPOKE_PLAN
+    default: "cclm-hub-to-spoke-plan-cold"
+  - name: MTV_HS_HUB_TO_SPOKE_MIGRATION
+    default: "cclm-hub-to-spoke-run-cold"
+  steps:
+    - ref: p2p-stop-migration-test-vm
+    - ref: p2p-mtv-execute-hub-spoke-migration
+    - ref: p2p-mtv-verify-hub-spoke-migration
+  documentation: |-
+    Cold (powered-off) spoke ↔ hub migration for the same VMs already used by
+    p2p-cclm-hub-spoke-migration-test. Run this chain after the live round-trip so
+    the VMs are back on the spoke.
+
+    Chain env forces MTV_HS_PLAN_TYPE=cold (execute) and MTV_PLAN_TYPE=cold (verify)
+    plus distinct Plan/Migration names so the cold CRs coexist with the live ones.
+
+    Step 1 (p2p-stop-migration-test-vm):
+      Halts every spoke VM before the first cold leg.
+
+    Step 2 (p2p-mtv-execute-hub-spoke-migration):
+      Same P2P_MIGRATION_DIRECTION as the live chain (default both). Each cold
+      direction stops source VMs, creates Plan spec.type=cold, and waits for
+      Succeeded. Live-only preflights are skipped.
+
+    Step 3 (p2p-mtv-verify-hub-spoke-migration):
+      Post-cold checks on the final destination. SSH / guest-exec cases are
+      skipped when MTV_PLAN_TYPE=cold.

@@ -1,0 +1,37 @@
+chain:
+  as: p2p-cclm-bidir-cold-migration-test
+  env:
+  - name: MTV_PLAN_TYPE
+    default: "cold"
+  - name: MTV_PLAN_NAME
+    default: "cclm-plan-cold"
+  - name: MTV_MIGRATION_NAME
+    default: "cclm-run-cold"
+  - name: MTV_MIGRATION_SUFFIX
+    default: "-cold"
+  - name: MTV_CLEANUP_DEST_BEFORE_MIGRATION
+    default: "true"
+  steps:
+    - ref: p2p-stop-migration-test-vm
+    - ref: p2p-mtv-execute-live-migration
+    - ref: p2p-mtv-verify-migration
+  documentation: |-
+    Cold (powered-off) spoke-1 → spoke-2 migration for the same VMs already used by
+    p2p-cclm-bidir-migration-test. Run this chain after the live bidir return so the
+    VMs are back on spoke-1.
+
+    Chain env forces MTV_PLAN_TYPE=cold and distinct Plan/Migration names so the cold
+    CRs coexist with the live cclm-plan / cclm-run-1 objects. Destination leftovers
+    from the live forward leg are cleaned up before the cold Plan is applied.
+
+    Step 1 (p2p-stop-migration-test-vm):
+      Halts every test VM on spoke-1 and waits until printableStatus=Stopped.
+
+    Step 2 (p2p-mtv-execute-live-migration):
+      Creates Plan spec.type=cold and a Migration on the hub, waits for Succeeded,
+      and confirms destination VMIs are Running. Live-only preflights (sync
+      controller, DecentralizedLiveMigration, Submariner) are skipped.
+
+    Step 3 (p2p-mtv-verify-migration):
+      Post-cold checks — destination VMIs Running and runStrategy==Always.
+      SSH / guest-exec cases are skipped when MTV_PLAN_TYPE=cold.
