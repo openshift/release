@@ -774,25 +774,45 @@ tests:
         set -o nounset
         set -o pipefail
 
-        id_file="${SHARED_DIR}/aro-cluster-app-id"
-        if [[ ! -s "${id_file}" ]]; then
-          echo "no application was recorded, so there is nothing to delete"
-          exit 0
-        fi
-
         sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
         az login --service-principal -u "$(jq -r .clientId "${sp}")" \
           -p "$(jq -r .clientSecret "${sp}")" --tenant "$(jq -r .tenantId "${sp}")" --output none
 
-        for attempt in $(seq 1 6); do
-          if az ad app delete --id "$(<"${id_file}")"; then
-            echo "deleted the cluster's application on attempt ${attempt}"
+        # A step that is interrupted does not pass on what it wrote to
+        # SHARED_DIR, so the recorded id can be missing even though the
+        # application exists. aro-provision-cluster-sp names it after the
+        # cluster, which this step can work out for itself.
+        id_file="${SHARED_DIR}/aro-cluster-app-id"
+        if [[ -s "${id_file}" ]]; then
+          ids="$(<"${id_file}")"
+        else
+          name="${NAMESPACE}-${UNIQUE_HASH}"
+          # --display-name matches by prefix; keep only the exact name.
+          ids="$(az ad app list --display-name "${name}" --query "[?displayName=='${name}'].appId" -o tsv)"
+          if [[ -z "${ids}" ]]; then
+            echo "no application was recorded or found by name, so there is nothing to delete"
             exit 0
           fi
-          sleep 10
-        done
-        echo "could not delete the cluster's application" >&2
-        exit 1
+          echo "no application was recorded; found $(wc -l <<<"${ids}") by name"
+        fi
+
+        failed=0
+        while read -r id; do
+          deleted=false
+          for attempt in $(seq 1 6); do
+            if az ad app delete --id "${id}"; then
+              echo "deleted the cluster's application on attempt ${attempt}"
+              deleted=true
+              break
+            fi
+            sleep 10
+          done
+          [[ "${deleted}" == true ]] || failed=1
+        done <<<"${ids}"
+        if (( failed )); then
+          echo "could not delete the cluster's application" >&2
+          exit 1
+        fi
       from_image:
         name: "4.17"
         namespace: ocp
