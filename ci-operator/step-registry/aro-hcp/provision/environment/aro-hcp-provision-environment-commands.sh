@@ -189,6 +189,22 @@ if [[ -z "${LEASED_MSI_CONTAINERS:-}" ]]; then
   " "${OVERRIDE_CONFIG_FILE}"
 fi
 
+# AMD A/B test (AROSLSRE-1840): assign roughly half of runs to Standard_E16ads_v6
+# by BUILD_ID parity. No-op unless AMD_AB_TEST is "true".
+AMD_AB_ARM="intel"
+if [[ "${AMD_AB_TEST:-false}" == "true" && "${BUILD_ID:-}" =~ ^[0-9]+$ ]] && (( ${BUILD_ID: -1} % 2 == 0 )); then
+  AMD_AB_ARM="amd"
+  echo "AMD A/B: BUILD_ID=${BUILD_ID} -> arm=amd (Standard_E16ads_v6)"
+  yq -i "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.vmSize = \"Standard_E16ads_v6\"
+  " "${OVERRIDE_CONFIG_FILE}"
+else
+  echo "AMD A/B: AMD_AB_TEST=${AMD_AB_TEST:-false} BUILD_ID=${BUILD_ID:-unset} -> arm=intel (no override applied)"
+fi
+# Durable record of the arm: the AKS node pools are destroyed at deprovision, so
+# without this a finished run cannot be attributed to an arm during analysis.
+echo "${AMD_AB_ARM}" > "${ARTIFACT_DIR}/amd-ab-arm.txt"
+
 echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat "${OVERRIDE_CONFIG_FILE}"
 
