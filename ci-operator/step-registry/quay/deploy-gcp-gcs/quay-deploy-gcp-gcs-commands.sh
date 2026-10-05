@@ -1,0 +1,618 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+fi
+
+# Tracks the Quay install for Sippy's quay-lifecycle suite. Empty
+# QL_INSTALL_STATUS means the install was never attempted.
+QL_INSTALL_START=""
+QL_INSTALL_STATUS=""
+QL_INSTALL_FAILURE=""
+
+# shellcheck disable=SC2329 # invoked only from write_quay_install_junit, below
+function ql_xml_escape() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e "s/'/\&apos;/g" -e 's/"/\&quot;/g'
+}
+
+# shellcheck disable=SC2329 # invoked only from on_exit, below
+function write_quay_install_junit() {
+  local exit_code="$1"
+
+  # No Subscription was ever created: an infra failure, not a Quay install attempt.
+  if [[ -z "${QL_INSTALL_START}" ]]; then
+    return 0
+  fi
+
+  # The install started but the script exited (e.g. a hard timeout kill) before
+  # it recorded a result; that is still a failure, not a skip.
+  if [[ -z "${QL_INSTALL_STATUS}" && "${exit_code}" -ne 0 ]]; then
+    QL_INSTALL_STATUS="failed"
+    QL_INSTALL_FAILURE="step exited with status ${exit_code}"
+  fi
+
+  local install_time=$(( $(date +%s) - QL_INSTALL_START ))
+  local failures=0
+  [[ "${QL_INSTALL_STATUS}" == "failed" ]] && failures=1
+
+  local tmp
+  tmp="$(mktemp "${ARTIFACT_DIR}/junit_quay_install.xml.XXXXXX")"
+  {
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+    printf '<testsuite name="quay-lifecycle" tests="1" failures="%d" skipped="0" time="%d">\n' \
+      "${failures}" "${install_time}"
+    printf '  <testcase name="[sig-quay] install should succeed" time="%d"' "${install_time}"
+    if [[ "${failures}" -eq 1 ]]; then
+      printf '>\n    <failure message="%s">%s</failure>\n  </testcase>\n' \
+        "$(ql_xml_escape "${QL_INSTALL_FAILURE}")" "$(ql_xml_escape "${QL_INSTALL_FAILURE}")"
+    else
+      printf '/>\n'
+    fi
+    echo '</testsuite>'
+  } > "${tmp}"
+  mv "${tmp}" "${ARTIFACT_DIR}/junit_quay_install.xml"
+}
+
+# shellcheck disable=SC2329 # invoked only via the EXIT trap installed below
+function on_exit() {
+  local ec=$?
+  if [ "${MAP_TESTS}" = "true" ]; then
+    LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+      ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-gcp__quay-tests-deploy-quay-gcp.xml || true
+  fi
+  write_quay_install_junit "${ec}"
+  [[ -n "${YQ_TMPDIR:-}" ]] && rm -rf "${YQ_TMPDIR}" || true
+  exit "${ec}"
+}
+trap on_exit EXIT
+
+QUAY_NS="quay-enterprise"
+
+function archive_pod_info() {
+  local ns="${QUAY_NS}"
+  echo "Archiving pod status and logs from namespace ${ns}..."
+  oc get pods -n "${ns}" -o wide > "${ARTIFACT_DIR}/pods_status.txt" 2>&1 || true
+  oc get pods -n "${ns}" -o yaml > "${ARTIFACT_DIR}/pods_full.yaml" 2>&1 || true
+  mkdir -p "${ARTIFACT_DIR}/pod_logs"
+  while read -r pod; do
+    [[ -z "${pod}" ]] && continue
+    containers=$(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.initContainers[*].name} {.spec.containers[*].name}' 2>/dev/null || true)
+    for container in ${containers}; do
+      oc logs "${pod}" -n "${ns}" -c "${container}" > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}.log" 2>&1 || true
+      oc logs "${pod}" -n "${ns}" -c "${container}" --previous > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}_previous.log" 2>&1 || true
+    done
+  done < <(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n')
+}
+
+function print_quayregistry_conditions() {
+  local ns="${QUAY_NS}"
+  if command -v jq >/dev/null 2>&1; then
+    oc -n "${ns}" get quayregistry quay -o json 2>/dev/null \
+      | jq -r '.status.conditions[]? | "\(.type)=\(.status) reason=\(.reason // "") msg=\(.message // "")"' >&2 || true
+  else
+    oc -n "${ns}" get quayregistry quay -o yaml 2>/dev/null >&2 || true
+  fi
+}
+
+# Resolve a digest pullspec through the cluster's configured mirrors, most specific
+# first, with the original pullspec last. The kubelet reports the quay-app image
+# under its SOURCE pullspec (registry.redhat.io/quay/quay-rhel9@<digest>), but on
+# the nightly jobs that digest is only ever published in the Konflux repo the
+# ImageContentSourcePolicy created by quay-enable-catalogsource points at. CRI-O
+# rewrites the pull; `oc image info` is a plain client-side registry call and does
+# not, so asking registry.redhat.io for it returns "manifest unknown".
+function mirror_pullspecs() {
+  local pullspec="$1" repo digest
+  if [[ "${pullspec}" == *@* ]]; then
+    repo="${pullspec%@*}"
+    digest="${pullspec#*@}"
+    oc get imagecontentsourcepolicies,imagedigestmirrorsets -o json 2>/dev/null \
+      | jq -r --arg repo "${repo}" --arg digest "${digest}" '
+          .items[]?.spec
+          | (.repositoryDigestMirrors // .imageDigestMirrors // [])[]?
+          | select(.source == $repo)
+          | .mirrors[]?
+          | "\(.)@\($digest)"' 2>/dev/null || true
+  fi
+  printf '%s\n' "${pullspec}"
+}
+
+# Derive the Playwright test ref from the deployed Quay app image so the e2e suite
+# is version-matched to the product with no manual pin. Written to
+# ${SHARED_DIR}/playwright_git_ref for the test-e2e step; best-effort (the test step
+# keeps its own fallback for a ref that turns out not to be fetchable). This script
+# runs without `set -x`, so the pull-secret authfile below is never traced; it is
+# also removed immediately.
+#
+# The source-commit labels (org.opencontainers.image.revision / vcs-ref) are NOT
+# usable here. The deployed image is built midstream, so that commit is a midstream
+# commit and is never present in the upstream PLAYWRIGHT_GIT_REPO: eleven product
+# digests spanning 3.16-3.18 were checked and none of them resolved upstream. That
+# is how the label is built, not a bad digest, so there is nothing to recover.
+#
+# The version label does resolve. Upstream carries a vX.Y.Z tag for 12 of the 13
+# released versions those images report (v3.16.6 is the lone exception), so:
+#   a. version X.Y.Z with an upstream tag vX.Y.Z  -> pin that tag.
+#   b. anything else -> deliberately pin branch redhat-X.Y for the image's series.
+#      This is the expected path for a nightly, which has no upstream commit or tag
+#      equivalent at all, so it is logged as a deliberate pin rather than a warning:
+#      a warning that fires on correct behaviour teaches people to ignore warnings.
+# The labels actually read are logged verbatim every run, so a build whose labels
+# do not match these expectations says so in its own log.
+function derive_playwright_ref() {
+  local ns="${QUAY_NS}"
+  local app_img authfile errfile candidate info="" version release series ref
+  local repo="${PLAYWRIGHT_GIT_REPO:-https://github.com/quay/quay.git}"
+  app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
+    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+  if [[ -z "${app_img}" ]]; then
+    echo "WARNING: could not determine quay-app imageID; Playwright ref will fall back" >&2
+    return 0
+  fi
+  echo "Deployed Quay app image: ${app_img}" >&2
+  authfile=$(mktemp)
+  errfile=$(mktemp)
+  oc get secret/pull-secret -n openshift-config \
+    --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
+  # stderr is captured separately, never merged into ${info}: a stray warning on the
+  # success path would be prepended to the JSON, jq would return an empty label, and
+  # the step would report a missing label for what is really a readable image.
+  for candidate in $(mirror_pullspecs "${app_img}"); do
+    if info=$(oc image info "${candidate}" --filter-by-os linux/amd64 \
+                --registry-config="${authfile}" -o json 2>"${errfile}"); then
+      echo "Read deployed image metadata from ${candidate}" >&2
+      break
+    fi
+    echo "Could not read ${candidate}: $(tr '\n' ' ' < "${errfile}")" >&2
+    info=""
+  done
+  rm -f "${authfile}" "${errfile}"
+  if [[ -z "${info}" ]]; then
+    echo "WARNING: deployed image not readable from any configured mirror; Playwright ref will fall back" >&2
+    return 0
+  fi
+  version=$(jq -r '.config.config.Labels["version"] // ""' <<<"${info}" 2>/dev/null || true)
+  release=$(jq -r '.config.config.Labels["release"] // ""' <<<"${info}" 2>/dev/null || true)
+  echo "Deployed image labels: version='${version}' release='${release}' revision='$(
+    jq -r '.config.config.Labels["org.opencontainers.image.revision"] // ""' <<<"${info}" 2>/dev/null || true)'" >&2
+  if [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+     && git ls-remote --exit-code "${repo}" "refs/tags/v${version}" >/dev/null 2>&1; then
+    ref="v${version}"
+    echo "Pinning Playwright ref to upstream tag ${ref}, matching the deployed version label" >&2
+    echo "${ref}" > "${SHARED_DIR}/playwright_git_ref"
+    return 0
+  fi
+  # The version label's X.Y prefix is the product series, so it is the first choice
+  # even when the version itself carries a suffix a tag would never match. Release is
+  # only X.Y on product builds - a build-id release such as 6.1759012345 also matches
+  # an X.Y shape - so it is consulted only when version yields nothing.
+  series=""
+  if [[ "${version}" =~ ^([0-9]+\.[0-9]+) ]]; then
+    series="${BASH_REMATCH[1]}"
+  elif [[ "${release}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    series="${release}"
+  fi
+  if [[ -z "${series}" ]]; then
+    echo "WARNING: deployed image has no usable version or release label (version='${version}' release='${release}'); Playwright ref will fall back" >&2
+    return 0
+  fi
+  ref="redhat-${series}"
+  echo "No upstream tag matches the deployed image; deliberately pinning Playwright ref to branch ${ref}." >&2
+  echo "This is the expected outcome for a build with no released upstream tag, not a degraded one." >&2
+  echo "${ref}" > "${SHARED_DIR}/playwright_git_ref"
+}
+
+function print_failing_pod_logs() {
+  local ns="${QUAY_NS}"
+  local name status restarts
+  while read -r name _ status restarts _; do
+    [[ -z "${name}" ]] && continue
+    case "${status}" in
+      CrashLoopBackOff|Error|ErrImagePull|ImagePullBackOff|CreateContainerConfigError|CreateContainerError|OOMKilled|Init:CrashLoopBackOff|Init:Error|Failed) ;;
+      *) continue ;;
+    esac
+    echo "===== ${name} status=${status} restarts=${restarts} =====" >&2
+    local containers
+    containers=$(oc get pod "${name}" -n "${ns}" -o jsonpath='{.spec.initContainers[*].name} {.spec.containers[*].name}' 2>/dev/null || true)
+    for container in ${containers}; do
+      echo "----- ${name}/${container} (tail 80) -----" >&2
+      oc logs "${name}" -n "${ns}" -c "${container}" --tail=80 2>&1 || true
+      echo "----- ${name}/${container} previous (tail 40) -----" >&2
+      oc logs "${name}" -n "${ns}" -c "${container}" --previous --tail=40 2>&1 || true
+    done
+  done < <(oc get pods -n "${ns}" --no-headers 2>/dev/null || true)
+}
+
+#Get the credentials and Email of new Quay User
+QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
+
+QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
+QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
+
+# GCS HMAC interoperability credentials (S3-compatible access/secret) used by Quay's
+# GoogleCloudStorage driver. Read from the mounted secret; never echoed.
+GCP_ACCESS_KEY=$(cat /var/run/quay-qe-gcp-secret/access_key)
+GCP_SECRET_KEY=$(cat /var/run/quay-qe-gcp-secret/secret_key)
+
+# Create GCS storage bucket. Names are globally unique; a bare $RANDOM (0-32767)
+# collides with leftover quay-tests buckets that use the same quayprowci prefix, so
+# derive from the namespace/hash plus timestamp. GCS bucket names must be lowercase
+# and use only [a-z0-9-].
+function new_gcs_bucket_name() {
+  local suffix
+  suffix="${NAMESPACE:-ns}-${UNIQUE_HASH:-$(date +%s)}-${RANDOM}-$(date +%s)"
+  suffix="$(printf '%s' "${suffix}" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-')"
+  printf 'quayprowci-gcp-%s\n' "${suffix}"
+}
+
+#Copy GCP auth.json from mounted secret to the terraform working directory
+mkdir -p QUAY_GCP && cd QUAY_GCP
+cp /var/run/quay-qe-gcp-secret/auth.json .
+
+cat >>variables.tf <<EOF
+variable "gcp_storage_bucket" {
+  default = "quaygcp"
+}
+EOF
+
+cat >>create_gcp_storage_bucket.tf <<EOF
+provider "google" {
+  credentials = file("auth.json")
+
+  project = "openshift-qe"
+  region  = "us-central1"
+  zone    = "us-central1-c"
+}
+
+resource "google_storage_bucket" "quaygcp" {
+  name          = var.gcp_storage_bucket
+  location      = "US"
+  force_destroy = true
+}
+EOF
+
+terraform init
+tf_apply_rc=1
+for _ in 1 2 3 4 5; do
+  QUAY_GCP_STORAGE_ID="$(new_gcs_bucket_name)"
+  echo "quay gcp storage bucket name is ${QUAY_GCP_STORAGE_ID}"
+  export TF_VAR_gcp_storage_bucket="${QUAY_GCP_STORAGE_ID}"
+  tf_apply_rc=0
+  terraform apply -auto-approve || tf_apply_rc=$?
+  if [[ "${tf_apply_rc}" -eq 0 ]]; then
+    break
+  fi
+  echo "terraform apply failed with exit code ${tf_apply_rc}; retrying with a new bucket name" >&2
+  terraform destroy -auto-approve || true
+done
+
+#Share Terraform Var and Terraform Directory for deprovision on success and failure.
+#auth.json is excluded from the tarball; quay-deprovision re-mounts it from the secret.
+echo "${QUAY_GCP_STORAGE_ID}" > ${SHARED_DIR}/QUAY_GCP_STORAGE_ID
+tar -cvzf terraform.tgz --exclude=".terraform" --exclude="auth.json" *
+cp terraform.tgz ${SHARED_DIR}
+
+if [[ "${tf_apply_rc}" -ne 0 ]]; then
+  echo "terraform apply failed with exit code ${tf_apply_rc}" >&2
+  exit "${tf_apply_rc}"
+fi
+
+#Deploy Quay Operator to OCP namespace 'quay-enterprise'
+cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quay-enterprise
+EOF
+
+cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: quay
+  namespace: quay-enterprise
+spec:
+  targetNamespaces:
+  - quay-enterprise
+EOF
+
+QL_INSTALL_START="$(date +%s)"
+SUB=$(
+  cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: quay-operator
+  namespace: quay-enterprise
+spec:
+  installPlanApproval: Automatic
+  name: quay-operator
+  channel: $QUAY_OPERATOR_CHANNEL
+  source: $QUAY_OPERATOR_SOURCE
+  sourceNamespace: openshift-marketplace
+EOF
+)
+
+echo "The Quay Operator subscription is $SUB"
+
+CSV_READY=false
+for _ in {1..60}; do
+  CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
+  if [[ -n "$CSV" ]]; then
+    if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+      echo "ClusterServiceVersion \"$CSV\" ready"
+      CSV_READY=true
+      break
+    fi
+  fi
+  sleep 10
+done
+if [[ "$CSV_READY" != "true" ]]; then
+  QL_INSTALL_STATUS="failed"
+  QL_INSTALL_FAILURE="Timed out waiting for Quay Operator CSV to reach Succeeded phase"
+  echo "Timed out waiting for Quay Operator CSV to reach Succeeded phase" >&2
+  echo "=== CSV Status ===" >&2
+  oc -n quay-enterprise get csv -o wide 2>&1 || true
+  echo "=== Subscription Status ===" >&2
+  oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status}' 2>&1 || true
+  echo "" >&2
+  echo "=== CatalogSource Status ===" >&2
+  oc get catalogsource -n openshift-marketplace -o wide 2>&1 || true
+  archive_pod_info
+  exit 1
+fi
+echo "Quay Operator is deployed successfully"
+
+echo "Waiting for QuayRegistry CRD to be available..."
+for _ in {1..30}; do
+  if oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+    echo "QuayRegistry CRD is available"
+    break
+  fi
+  sleep 5
+done
+if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+  QL_INSTALL_STATUS="failed"
+  QL_INSTALL_FAILURE="Timed out waiting for QuayRegistry CRD"
+  echo "Timed out waiting for QuayRegistry CRD" >&2
+  echo "=== Operator Pod Logs ===" >&2
+  oc logs -n quay-enterprise -l name=quay-operator --tail=100 2>&1 || true
+  echo "=== Events ===" >&2
+  oc get events -n quay-enterprise --sort-by='.lastTimestamp' 2>&1 | tail -30 || true
+  archive_pod_info
+  exit 1
+fi
+
+#Deploy Quay, here disable monitoring component. Storage is unmanaged GoogleCloudStorage.
+cat >>config.yaml <<EOF
+CREATE_PRIVATE_REPO_ON_PUSH: true
+CREATE_NAMESPACE_ON_PUSH: true
+FEATURE_EXTENDED_REPOSITORY_NAMES: true
+FEATURE_QUOTA_MANAGEMENT: true
+FEATURE_AUTO_PRUNE: true
+FEATURE_PROXY_CACHE: true
+FEATURE_USER_INITIALIZE: true
+PERMANENTLY_DELETE_TAGS: true
+RESET_CHILD_MANIFEST_EXPIRATION: true
+FEATURE_PROXY_STORAGE: true
+FEATURE_SUPERUSER_CONFIGDUMP: true
+FEATURE_UI_V2: true
+FEATURE_SUPERUSERS_FULL_ACCESS: true
+FEATURE_UI_MODELCARD: true
+SUPER_USERS:
+  - quay
+USERFILES_LOCATION: default
+USERFILES_PATH: userfiles/
+DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+  - default
+DISTRIBUTED_STORAGE_PREFERENCE:
+  - default
+DISTRIBUTED_STORAGE_CONFIG:
+  default:
+    - GoogleCloudStorage
+    - access_key: $GCP_ACCESS_KEY
+      bucket_name: $QUAY_GCP_STORAGE_ID
+      secret_key: $GCP_SECRET_KEY
+      storage_path: /quaygcp
+FEATURE_ANONYMOUS_ACCESS: true
+BROWSER_API_CALLS_XHR_ONLY: false
+FEATURE_USERNAME_CONFIRMATION: false
+AUTHENTICATION_TYPE: Database
+FEATURE_LISTEN_IP_VERSION: IPv4
+REPO_MIRROR_ROLLBACK: false
+AUTOPRUNE_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
+FEATURE_IMAGE_EXPIRY_TRIGGER: true
+NOTIFICATION_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
+DEFAULT_TAG_EXPIRATION: 2w
+TAG_EXPIRATION_OPTIONS:
+  - 2w
+  - 4w
+  - 8w
+  - 1d
+REDIS_FLUSH_INTERVAL_SECONDS: 30
+FEATURE_IMAGE_PULL_STATS: true
+FEATURE_ORG_MIRROR: true
+FEATURE_IMMUTABLE_TAGS: true
+PULL_METRICS_REDIS:
+        host: quay-quay-redis
+        port: 6379
+        db: 1
+FEATURE_MAILING: false
+FEATURE_OTEL_TRACING: false
+EOF
+
+# Fetch yq once into a private temp dir: used below to merge config
+# fragments and to strip operator-managed keys, which now run
+# unconditionally.
+YQ_TMPDIR="$(mktemp -d)"
+YQ="${YQ_TMPDIR}/yq"
+curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+	-o "${YQ}" && chmod +x "${YQ}"
+
+# Merge a config fragment into config.yaml with list-append semantics ('*+',
+# not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
+# Validate first so a present-but-malformed fragment fails the step clearly
+# instead of corrupting config.yaml.
+function merge_config_fragment() {
+	local fragment="$1"
+	if ! "${YQ}" e 'true' "${fragment}" >/dev/null 2>&1; then
+		echo "ERROR: ${fragment} is not valid YAML" >&2
+		exit 1
+	fi
+	"${YQ}" eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+}
+
+# Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
+# so an explicit override still wins over the service-owned fragments. A
+# missing fragment is a silent no-op, leaving the disabled default above.
+if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
+	echo "Merging Mailpit config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-mail-config.yaml"
+fi
+
+if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
+	echo "Merging Jaeger/OTel config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
+fi
+
+if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
+	echo "Merging extra Quay config into defaults..."
+	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
+	merge_config_fragment extra_config.yaml
+fi
+
+# Strip field-group keys for components this CR keeps managed. The operator
+# injects those values; leaving them in configBundleSecret blocks rollout.
+# Runs unconditionally now: a no-op on the defaults block when no overlay
+# above added any of these keys.
+"${YQ}" -i '
+	del(
+		.FEATURE_SECURITY_SCANNER,
+		.FEATURE_SECURITY_NOTIFICATIONS,
+		.SECURITY_SCANNER_ENDPOINT,
+		.SECURITY_SCANNER_INDEXING_INTERVAL,
+		.SECURITY_SCANNER_V4_ENDPOINT,
+		.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
+		.SECURITY_SCANNER_V4_PSK,
+		.FEATURE_REPO_MIRROR,
+		.REPO_MIRROR_INTERVAL,
+		.REPO_MIRROR_SERVER_HOSTNAME,
+		.REPO_MIRROR_TLS_VERIFY,
+		.BUILDLOGS_REDIS,
+		.USER_EVENTS_REDIS,
+		.DB_URI,
+		.DB_CONNECTION_ARGS,
+		.SERVER_HOSTNAME,
+		.PREFERRED_URL_SCHEME,
+		.EXTERNAL_TLS_TERMINATION
+	)
+' config.yaml
+
+# Build support requires unmanaged TLS plus a virtual builder. When enabled, the
+# quay-provisioning-{tls,builder} steps have already written the
+# cert/key, build-cluster CA, and builder config to SHARED_DIR. Fold the builder
+# config into the bundle (after the extra-config merge, so it is not stripped) and
+# hand the operator the unmanaged cert material. Do not echo config_builder.yaml:
+# it carries the Quay password and builder SA token. (This script runs without
+# set -x, so the append below is not traced.)
+TLS_MANAGED="true"
+if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
+  echo "Build support enabled: configuring unmanaged TLS + virtual builder" >&2
+  for f in config_builder.yaml ssl.cert ssl.key build_cluster.crt; do
+    if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
+      echo "ERROR: ENABLE_BUILD_SUPPORT=true but ${SHARED_DIR}/${f} is missing." >&2
+      echo "       Ensure quay-provisioning-tls and -builder ran first." >&2
+      exit 1
+    fi
+  done
+  TLS_MANAGED="false"
+  cat "${SHARED_DIR}/config_builder.yaml" >> config.yaml
+
+  oc create secret generic -n quay-enterprise config-bundle-secret \
+    --from-file config.yaml=./config.yaml \
+    --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
+    --from-file ssl.key="${SHARED_DIR}/ssl.key" \
+    --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt"
+else
+  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
+fi
+
+echo "Creating Quay registry..." >&2
+cat <<EOF | oc apply -f -
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: quay
+  namespace: quay-enterprise
+spec:
+  configBundleSecret: config-bundle-secret
+  components:
+  - kind: objectstorage
+    managed: false
+  - kind: monitoring
+    managed: false
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: quay
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: clair
+    managed: true
+  - kind: tls
+    managed: ${TLS_MANAGED}
+  - kind: route
+    managed: true
+EOF
+
+echo "Waiting for Quay to become ready (timeout: 15m)..." >&2
+for i in $(seq 1 90); do
+  status="$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
+  if [[ "$status" == "True" ]]; then
+    echo "Quay is ready (after $((i * 10))s)" >&2
+    QL_INSTALL_STATUS="passed"
+    oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+    oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+    quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
+    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
+         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    derive_playwright_ref || true
+    archive_pod_info
+    exit 0
+  fi
+  if (( i % 6 == 0 )); then
+    echo "[$((i * 10))s] Quay not ready yet. Component status:" >&2
+    print_quayregistry_conditions
+  fi
+  sleep 10
+done
+
+echo "Timed out waiting for Quay to become ready" >&2
+ql_conditions="$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions}' 2>/dev/null || true)"
+QL_INSTALL_STATUS="failed"
+QL_INSTALL_FAILURE="Timed out waiting for Quay to become ready: ${ql_conditions}"
+echo "Final QuayRegistry conditions:" >&2
+print_quayregistry_conditions
+echo "Pods in ${QUAY_NS} namespace:" >&2
+oc -n "${QUAY_NS}" get pods -o wide >&2 || true
+print_failing_pod_logs
+echo "Events in ${QUAY_NS} namespace:" >&2
+oc -n "${QUAY_NS}" get events --sort-by='.lastTimestamp' >&2 || true
+
+oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml" || true
+oc -n "${QUAY_NS}" get pods -o yaml >"$ARTIFACT_DIR/quay-pods.yaml" || true
+oc -n "${QUAY_NS}" get events --sort-by='.lastTimestamp' -o yaml >"$ARTIFACT_DIR/quay-events.yaml" || true
+oc -n "${QUAY_NS}" get deployments -o yaml >"$ARTIFACT_DIR/quay-deployments.yaml" || true
+archive_pod_info
+exit 1

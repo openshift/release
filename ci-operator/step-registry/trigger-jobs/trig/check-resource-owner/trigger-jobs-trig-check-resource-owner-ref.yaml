@@ -1,0 +1,37 @@
+ref:
+  as: trigger-jobs-trig-check-resource-owner
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: trigger-jobs-trig-check-resource-owner-commands.sh
+  env:
+  - name: JT__TRIG_JOB_LIST
+    documentation: |-
+      See documentation of this Env. Var. under the `trigger-jobs` Step.
+
+      JSON Schema for `trigCondPars`:
+      ```json
+      {
+        "trigCondFlag": "<file-name-to-store-current-owner>",                   # File name only, no directory.
+        "expOwnerName": "<expected-owner-name>"
+      }
+      ```
+  - name: JT__TRIG_COND_EXEC_FLGS
+    documentation: |-
+      See documentation of this Env. Var. under the `trigger-jobs` Step.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Trigger condition Step to determines resource ownership and creates or deletes `${SHARED_DIR}/${trigCondFlag}` for
+    use by the `trigger-jobs` Step to conditionally trigger Jobs based on checking for its existence.
+
+    **Current Implementation (Placeholder):**
+    Uses ISO week number parity for alternating weekly ownership between two teams:
+    - Odd-numbered ISO weeks: Deletes the ownership file (to skip Jobs).
+    - Even-numbered ISO weeks: Writes `${expOwnerName}` to the ownership file (to trigger Jobs).
+
+    **Planned Implementation:**
+    Will fetch actual ownership schedule from a URL using a dedicated container image.

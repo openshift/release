@@ -1,0 +1,62 @@
+base_images:
+  ship-status-component-monitor:
+    name: component-monitor
+    namespace: ship-status-dash
+    tag: latest
+  ship-status-dashboard:
+    name: dashboard
+    namespace: ship-status-dash
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: agent-model-policy
+  commands: ci-operator/model-policy/validate.sh
+  container:
+    from: src
+  run_if_changed: ^ci-operator/(jobs|model-policy|step-registry)/.*
+- as: core-valid
+  commands: make check-core
+  container:
+    from: src
+- as: services-valid
+  commands: make check-services
+  container:
+    from: src
+  run_if_changed: ^services/.*
+- as: hyperfleet-risk-scorer-test
+  commands: bash hack/hyperfleet/validate-risk-scorer-step.sh
+  container:
+    from: src
+  run_if_changed: ^(ci-operator/step-registry/hyperfleet/risk-scorer/|hack/hyperfleet/validate-risk-scorer-step\.sh).*
+- as: ship-status-component-monitor-config
+  commands: /app/component-monitor --validate-only --config-path=core-services/ship-status/component-monitor-config.yaml
+    --kubeconfig-dir=/etc/kubeconfig
+  container:
+    clone: true
+    from: ship-status-component-monitor
+  run_if_changed: ^core-services/ship-status/component-monitor-config\.yaml$
+  secret:
+    bundle: component-monitor-kubeconfigs
+    mount_path: /etc/kubeconfig
+    namespace: test-credentials
+- as: ship-status-dashboard-config
+  commands: /app/dashboard --validate-only --config=core-services/ship-status/dashboard-config.yaml
+  container:
+    clone: true
+    from: ship-status-dashboard
+  run_if_changed: ^core-services/ship-status/dashboard-config\.yaml$
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release

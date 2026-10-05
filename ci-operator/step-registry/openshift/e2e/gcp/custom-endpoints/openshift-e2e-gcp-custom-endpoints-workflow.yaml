@@ -1,0 +1,28 @@
+workflow:
+  as: openshift-e2e-gcp-custom-endpoints
+  steps:
+    pre:
+    - ref: gcp-provision-minimal-permission
+    - ref: gcp-provision-vpc
+    - ref: gcp-provision-custom-endpoints
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-custom-endpoints
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install-in-bastion
+    - ref: ipi-install-times-collection
+    - ref: nodes-readiness
+    - ref: multiarch-validate-nodes
+    - chain: cucushift-installer-check
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: ipi-deprovision-deprovision-in-bastion
+    - ref: gcp-deprovision-custom-endpoints
+    - ref: gcp-deprovision-bastionhost
+    - ref: gcp-deprovision-vpc
+  documentation: |-
+    The Openshift E2E Cilium workflow executes the common end-to-end test suite with custom endpoints configuration.

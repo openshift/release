@@ -1,0 +1,1 @@
+../../test/write-env/capz-test-write-env-commands.sh

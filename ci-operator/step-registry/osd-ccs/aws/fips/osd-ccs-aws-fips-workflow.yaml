@@ -1,0 +1,21 @@
+workflow:
+  as: osd-ccs-aws-fips
+  steps:
+    env:
+      COMPUTE_MACHINE_TYPE: "m5.xlarge"
+      MULTI_AZ: "true"
+      COMPUTE_NODES: "3"
+      ETCD_ENCRYPTION: "true"
+      DISABLE_WORKLOAD_MONITORING: "false"
+      FIPS: "true"
+    pre:
+    - ref: osd-ccs-cluster-provision-aws
+    - ref: osd-ccs-conf-idp-htpasswd
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: osd-ccs-cluster-operators-wait-ready
+    post:
+    - ref: osd-ccs-cluster-deprovision
+  documentation: |-
+    This workflow installs an osd ccs cluster which enables fips.
+    The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
+    After finish testing, the cluster will be deprovsioned.
