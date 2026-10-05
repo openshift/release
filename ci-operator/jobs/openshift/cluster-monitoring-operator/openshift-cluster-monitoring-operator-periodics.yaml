@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: app.ci
-  cron: "0 8 * * *"
+  cron: 0 8 * * 1-5
   decorate: true
   name: periodic-jira-refresh-release-monitoring
   spec:
@@ -17,6 +17,7 @@ periodics:
         label:approved
         label:backport-risk-assessed
         -label:do-not-merge/hold
+        -label:do-not-merge/work-in-progress
         repo:openshift/prometheus-alertmanager
         repo:openshift/cluster-monitoring-operator
         repo:openshift/kube-state-metrics
@@ -34,7 +35,7 @@ periodics:
       - |-
         --comment=/jira refresh
 
-        Periodic re-evaluation: checking if dependent Jira bug status has changed.
+        Fallback: re-check Jira validity if the automated refresh leaves jira/invalid-bug set.
       - --ceiling=0
       - --confirm
       command:
@@ -47,6 +48,7 @@ periodics:
             name: openshift-prow-github-app
       image: quay.io/openshift/ci:ci_commenter_latest
       imagePullPolicy: Always
+      name: ""
       resources:
         requests:
           cpu: 500m
