@@ -115,7 +115,12 @@ chain:
         export KUBECONFIG=$KUBECONFIG_BAK
       fi
 
-      if [[ -n "${USE_HYPERSHIFT_AZURE_CREDS:-}" ]]; then
+      if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-false}" == "true" && "${USE_HYPERSHIFT_SELF_MANAGED_AZURE_CREDS:-false}" == "true" ]]; then
+        echo "USE_HYPERSHIFT_AZURE_CREDS and USE_HYPERSHIFT_SELF_MANAGED_AZURE_CREDS cannot both be true" >&2
+        exit 1
+      elif [[ "${USE_HYPERSHIFT_SELF_MANAGED_AZURE_CREDS:-false}" == "true" ]]; then
+        export AZURE_AUTH_LOCATION=/etc/hypershift-ci-jobs-self-managed-azure/credentials.json
+      elif [[ "${USE_HYPERSHIFT_AZURE_CREDS:-false}" == "true" ]]; then
         export AZURE_AUTH_LOCATION=/etc/hypershift-ci-jobs-azurecreds/credentials.json
       fi
 
@@ -278,6 +283,9 @@ chain:
     - mount_path: /etc/hypershift-ci-jobs-azurecreds
       group: ops/hypershift-ci-jobs-azurecreds
       collection: hypershift-team
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+      group: ops/hypershift-ci-jobs-self-managed-azure
+      collection: hypershift-team
     dependencies:
     - name: "release:latest"
       env: HOSTEDCLUSTER_RELEASE_IMAGE_LATEST
@@ -318,6 +326,9 @@ chain:
     - name: USE_HYPERSHIFT_AZURE_CREDS
       default: "false"
       documentation: "Whether to use hypershift-ci-jobs-azurecreds secret for Azure credentials. Set to 'true' to use the secret. Set to 'false' to use the default credentials."
+    - name: USE_HYPERSHIFT_SELF_MANAGED_AZURE_CREDS
+      default: "false"
+      documentation: "Whether to use the self-managed Azure service principal for Azure credentials."
     - name: TEST_CSI_DRIVER_MANIFEST
       default: ""
       documentation: |-
