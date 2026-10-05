@@ -1,0 +1,31 @@
+# Static PV backed by AWS EFS filesystem fs-0ce54a067d44bc8ce (us-east-1).
+# EFS filesystem is in vpc-0e1805ef461c09665 with mount targets in all 3 cluster subnets.
+# Mounted read-only by all Prow components at /etc/jobs via the job-configs-nfs PVC.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: job-configs-efs
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: fs-0ce54a067d44bc8ce
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: job-configs-nfs
+  namespace: ci-staging
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: ""
+  volumeName: job-configs-efs
+  resources:
+    requests:
+      storage: 10Gi
