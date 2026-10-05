@@ -100,10 +100,69 @@ hcp create cluster kubevirt \
 
 echo "$(date) Rendered HCP manifests to ${HC_MANIFEST}"
 
-# Apply the rendered manifests as-is.
-# APIServer servicePublishingStrategy stays type: LoadBalancer so MetalLB assigns
-# a stable VIP (used by the guest kubeconfig, routes, etc.).
-# We pin the NodePort separately below so haproxy on the LPAR always finds port FIXED_NODEPORT.
+# Patch the kube-apiserver Service in the rendered manifest:
+#   - type: NodePort  (so the LPAR haproxy can reach it on a fixed port)
+#   - nodePort: FIXED_NODEPORT  (deterministic per-lease port)
+#   - server hint in the same document: MGMT_HOST_IP:FIXED_NODEPORT
+#
+# Strategy: split the multi-document YAML on '---', process each document
+# through Python, reassemble with '---' separators, then overwrite the file.
+echo "$(date) Patching kube-apiserver Service → type=NodePort, nodePort=${FIXED_NODEPORT}, host=${MGMT_HOST_IP}"
+python3 - "${HC_MANIFEST}" "${FIXED_NODEPORT}" "${MGMT_HOST_IP}" <<'PYEOF'
+import sys, re
+
+manifest_path = sys.argv[1]
+fixed_nodeport = int(sys.argv[2])
+mgmt_host_ip   = sys.argv[3]
+
+with open(manifest_path) as f:
+    raw = f.read()
+
+# Split on document separators, preserving them
+docs = re.split(r'^---\s*$', raw, flags=re.MULTILINE)
+
+patched_docs = []
+for doc in docs:
+    # Target: the kube-apiserver Service — hcp render may name it either
+    # "APIServer" or "kube-apiserver" depending on the HyperShift version.
+    is_service     = bool(re.search(r'^\s*kind:\s*Service\s*$', doc, re.MULTILINE))
+    is_kas_service = bool(re.search(r'^\s*name:\s*(kube-apiserver|APIServer)\s*$', doc, re.MULTILINE))
+    if is_service and is_kas_service:
+
+        # Switch type to NodePort
+        doc = re.sub(r'(\btype:\s*)LoadBalancer', r'\1NodePort', doc)
+        doc = re.sub(r'(\btype:\s*)ClusterIP',   r'\1NodePort', doc)
+
+        # If a nodePort line already exists on the apiserver port, replace it;
+        # otherwise inject it after the port: 6443 line.
+        if re.search(r'^\s*nodePort:\s*\d+', doc, re.MULTILINE):
+            doc = re.sub(r'(\s*nodePort:\s*)\d+', lambda m: m.group(1) + str(fixed_nodeport), doc)
+        else:
+            doc = re.sub(
+                r'((\s*)port:\s*6443)',
+                lambda m: m.group(1) + '\n' + m.group(2) + 'nodePort: ' + str(fixed_nodeport),
+                doc,
+            )
+
+        print(f"  [patch] kube-apiserver Service → type=NodePort, nodePort={fixed_nodeport}",
+              file=sys.stderr)
+
+    patched_docs.append(doc)
+
+with open(manifest_path, 'w') as f:
+    f.write('---'.join(patched_docs))
+PYEOF
+
+echo "$(date) Patched manifest written to ${HC_MANIFEST}"
+echo "$(date) kube-apiserver Service after patch:"
+python3 -c "
+import re, sys
+raw = open(sys.argv[1]).read()
+for doc in re.split(r'^---\s*$', raw, flags=re.MULTILINE):
+    if re.search(r'kind:\s*Service', doc) and re.search(r'name:\s*(kube-apiserver|APIServer)', doc):
+        print(doc)
+" "${HC_MANIFEST}" || true
+
 echo "$(date) Applying HCP manifests"
 oc apply -f "${HC_MANIFEST}"
 
