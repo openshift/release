@@ -1,0 +1,50 @@
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: img-retr
+  steps:
+    test:
+    - as: ci-op-emul--step--0
+      commands: |-
+        shopt -op; shopt -p; printenv; set -x
+        set +eu -o pipefail; shopt -s inherit_errexit
+        typeset f=/tmp/test.wait
+        typeset -i e=240
+        echo "${e}" 1> "${f}"
+        while true; do
+            read -r e 0< "${f}" || e=0
+            ((--e >= 0)) || { rm -f "${f}"; break; }
+            echo "${e}" 1> "${f}"
+            sleep 60
+        done
+        true
+      credentials:
+      - bundle: cluster-secrets-aws-chaos
+        mount_path: /secret/telemetry
+        namespace: test-credentials
+      - bundle: chaos-es-creds
+        mount_path: /secret/es
+      from_image:
+        name: prow-scripts
+        namespace: chaos
+        tag: latest
+      resources:
+        limits:
+          memory: 1Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 24h0m0s
+  timeout: 24h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: ciOpEmul--imgRetr
