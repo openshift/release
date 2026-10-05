@@ -1,0 +1,55 @@
+base_images:
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: latest
+images:
+  items:
+  - dockerfile_literal: |
+      FROM this-is-ignored
+      USER root
+      RUN <<run-EOF
+      set -exo pipefail; shopt -s inherit_errexit
+      dnf install -y sshpass openssh-clients
+      dnf clean all
+      run-EOF
+    from: openshift-virtualization-tests
+    to: openshift-virtualization-tests-sshpass
+resources:
+  '*':
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: img-retr
+  steps:
+    test:
+    - as: ci-op-emul--step--0
+      commands: |-
+        shopt -op; shopt -p; printenv; set -x
+        set +eu -o pipefail; shopt -s inherit_errexit
+        true
+      credentials:
+      - bundle: cluster-secrets-aws-interop-qe
+        mount_path: /secrets
+        namespace: test-credentials
+      - collection: cnv-ci-secrets
+        group: cnv-ci-brew-pull-secret
+        mount_path: /var/run/cnv-ci-brew-pull-secret
+      - collection: openshift-virtualization-tests
+        group: secrets
+        mount_path: /bw
+      from: openshift-virtualization-tests-sshpass
+      resources:
+        limits:
+          memory: 1Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: ciOpEmul--imgRetr
