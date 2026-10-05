@@ -1298,6 +1298,7 @@ echo "=== Testsuite make targets (from RUN_* flags) ==="
 echo "  RUN_SMOKE=${RUN_SMOKE} RUN_AUTHORINO=${RUN_AUTHORINO} RUN_LIMITADOR=${RUN_LIMITADOR}"
 echo "  RUN_DNSTLS=${RUN_DNSTLS} RUN_OBSERVABILITY=${RUN_OBSERVABILITY} RUN_KUADRANT=${RUN_KUADRANT}"
 echo "  RUN_DATAPLANE_TRACING_ONLY=${RUN_DATAPLANE_TRACING_ONLY}"
+echo "  PYTEST_FLAGS=${PYTEST_FLAGS}"
 
 # Independent targets: each records failure into rc but does not skip the next.
 # Non-smoke uses --reruns 0 (Makefile defaults to --reruns 3; last CLI flag wins).
@@ -1307,9 +1308,9 @@ echo "  RUN_DATAPLANE_TRACING_ONLY=${RUN_DATAPLANE_TRACING_ONLY}"
 [[ "${RUN_DNSTLS}" == "true" ]] && append_make_target dnstls "--reruns 0"
 [[ "${RUN_OBSERVABILITY}" == "true" ]] && append_make_target observability "--reruns 0"
 [[ "${RUN_KUADRANT}" == "true" ]] && append_make_target kuadrant "--reruns 0"
-# Makefile testsuite/% runs a path; junit xml is junit-data_plane_tracing.xml.
+# Makefile testsuite/% runs a path. When PYTEST_FLAGS includes -k, only that test.
 [[ "${RUN_DATAPLANE_TRACING_ONLY}" == "true" ]] && \
-  append_make_target "testsuite/tests/singlecluster/tracing/data_plane_tracing" "--reruns 0"
+  append_make_target "testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing.py" "--reruns 0"
 
 CONTAINER_SCRIPT+="make polish-junit || true
 # Debug summary before JUnit dump (survives even if follow logs drop mid-run).
@@ -1662,8 +1663,27 @@ dump_dataplane_tracing_rca() {
     sleep 1
   done
   curl -fsS --max-time 5 "http://127.0.0.1:16686/api/services" -o "${out}/jaeger-services.json" 2>"${out}/jaeger-services.err" || true
+  curl -fsS --max-time 5 "http://127.0.0.1:16686/api/traces?service=wasm-shim&limit=5" \
+    -o "${out}/jaeger-traces-wasm-shim.json" 2>"${out}/jaeger-traces-wasm-shim.err" || true
+  curl -fsS --max-time 5 "http://127.0.0.1:16686/api/traces?service=kuadrant-filter&limit=5" \
+    -o "${out}/jaeger-traces-kuadrant-filter.json" 2>"${out}/jaeger-traces-kuadrant-filter.err" || true
   kill "${pf_pid}" 2>/dev/null || true
   wait "${pf_pid}" 2>/dev/null || true
+
+  oc get gateway -A >"${out}/gateways.list" 2>&1 || true
+  oc get httproute -A >"${out}/httproutes.list" 2>&1 || true
+  mkdir -p "${out}/istio-proxy"
+  local dumped=0
+  local ns name
+  while read -r ns name; do
+    [[ -z "${name}" ]] && continue
+    oc logs -n "${ns}" "${name}" -c istio-proxy --tail=500 2>&1 \
+      | grep -E -i 'wasm|kuadrant|tracing|otlp|4317|4318|fail closed|out of bounds|plugin' \
+      >"${out}/istio-proxy/${ns}_${name}.txt" || true
+    dumped=$((dumped + 1))
+    [[ "${dumped}" -ge 12 ]] && break
+  done < <(oc get pods -A -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{" "}{range .spec.containers[*]}{.name}{"\n"}{end}{end}' \
+    | awk '$3=="istio-proxy"{print $1,$2}' | sort -u)
 
   python3 - "${out}" <<'PY'
 import json, os, re, sys
@@ -1706,24 +1726,19 @@ svc_l = [str(s).lower() for s in services]
 has_filter = any("kuadrant-filter" in s or s == "wasm-shim" for s in svc_l)
 has_operator = any("kuadrant-operator" in s for s in svc_l)
 
-if not has_wp:
+wired = wp_tracing or ef_tracing
+if not wired and not has_wp and not has_ef:
     verdict = "INCONCLUSIVE"
-    why = "No WasmPlugin while dumping (too early, or tests already deleted Gateways)."
-elif not wp_tracing and not ef_tracing:
+    why = "No WasmPlugin/EnvoyFilter yet (too early, or tests already deleted Gateways)."
+elif not wired:
     verdict = "KUADRANT_OPERATOR"
-    why = "WasmPlugin exists but neither pluginConfig nor any EnvoyFilter mentions tracing/jaeger/:4317. Operator did not wire dataplane OTLP."
-elif wp_tracing and not ef_tracing:
-    verdict = "KUADRANT_OPERATOR"
-    why = "WasmPlugin has tracing config but there is no tracing EnvoyFilter (kuadrant-tracing / jaeger cluster). Operator did not create the Envoy upstream."
-elif ef_tracing and has_filter:
+    why = "CRs exist but neither WasmPlugin nor EnvoyFilter mentions tracing/jaeger. Operator did not wire dataplane OTLP."
+elif has_filter:
     verdict = "UNEXPECTED"
-    why = "Tracing CRs exist and Jaeger already has kuadrant-filter — tests failing for another reason (request_id tag)."
-elif (wp_tracing or ef_tracing) and not has_filter:
-    verdict = "OSSM_OR_ENVOY_EGRESS"
-    why = "Operator wired tracing (WasmPlugin and/or tracing EnvoyFilter present) but Jaeger has no kuadrant-filter service. Envoy likely cannot reach jaeger-collector (OSSM mTLS/egress) or wasm is not exporting."
+    why = "Tracing CRs exist and Jaeger already has wasm-shim/kuadrant-filter — failing for another reason (request_id tag)."
 else:
-    verdict = "INCONCLUSIVE"
-    why = "Could not classify from this snapshot."
+    verdict = "OSSM_OR_ENVOY_EGRESS"
+    why = "Operator wired tracing (EnvoyFilter and/or WasmPlugin) but Jaeger has no wasm-shim/kuadrant-filter. Envoy cannot reach jaeger-collector (OSSM mTLS/egress) or wasm is not exporting."
 
 lines = [
     f"verdict={verdict}",
