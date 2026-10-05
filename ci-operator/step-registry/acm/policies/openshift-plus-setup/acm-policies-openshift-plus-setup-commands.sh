@@ -128,10 +128,10 @@ EOF
 
 sleep 60
 
-git clone https://github.com/stolostron/policy-collection.git
+git clone -b fix/dfbugs-10936-aws-blockdevices https://github.com/redhat-chai-bot/stolostron_policy-collection.git policy-collection
 
 cd policy-collection/deploy/ 
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/community/openshift-plus-setup -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus-setup
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/community/openshift-plus-setup -n policies -u https://github.com/redhat-chai-bot/stolostron_policy-collection.git -a openshift-plus-setup
 
 echo "$(oc get policies -A)"
 
