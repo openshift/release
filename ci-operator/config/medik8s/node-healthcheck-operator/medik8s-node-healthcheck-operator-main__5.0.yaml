@@ -172,8 +172,12 @@ tests:
             TTL_SH_TTL=3h \
             CONTAINER_TOOL=podman \
             DEV_IMG="$operator_tag" \
-            VERSION="$NHC_VERSION" PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
-            SKIP_RANGE_LOWER=0.1.0 DOCS_RHWA_VERSION=5.0 \
+            DEV_OLM_BUNDLE_IMAGE="$bundle_tag" \
+            DEV_OLM_CATALOG_IMAGE="$catalog_tag" \
+            VERSION="$NHC_VERSION" \
+            PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
+            SKIP_RANGE_LOWER=0.1.0 \
+            DOCS_RHWA_VERSION=5.0 \
             CONSOLE_PLUGIN_IMAGE="$CONSOLE_PLUGIN_IMAGE" \
             MUST_GATHER_IMAGE="$MUST_GATHER_IMAGE"
 
@@ -181,72 +185,86 @@ tests:
           skopeo inspect --format '{{.Digest}}' "docker://$operator_tag" > "$ARTIFACT_DIR/operator.digest"
           skopeo inspect --format '{{.Digest}}' "docker://$bundle_tag" > "$ARTIFACT_DIR/bundle.digest"
           skopeo inspect --format '{{.Digest}}' "docker://$catalog_tag" > "$ARTIFACT_DIR/catalog.digest"
-          export NHC_UPGRADE_CANDIDATE_NHC_IMAGE="${prefix}@$(cat "$ARTIFACT_DIR/operator.digest")"
-          export NHC_UPGRADE_CANDIDATE_NHC_BUNDLE="${prefix}-bundle@$(cat "$ARTIFACT_DIR/bundle.digest")"
-          export NHC_UPGRADE_CANDIDATE_NHC_CATALOG="${prefix}-catalog@$(cat "$ARTIFACT_DIR/catalog.digest")"
+          CANDIDATE_IMAGE="${prefix}@$(cat "$ARTIFACT_DIR/operator.digest")"
+          CANDIDATE_BUNDLE="${prefix}-bundle@$(cat "$ARTIFACT_DIR/bundle.digest")"
+          CANDIDATE_CATALOG="${prefix}-catalog@$(cat "$ARTIFACT_DIR/catalog.digest")"
 
-          printf 'NHC_UPGRADE_CANDIDATE_NHC_IMAGE=%s\nNHC_UPGRADE_CANDIDATE_NHC_BUNDLE=%s\nNHC_UPGRADE_CANDIDATE_NHC_CATALOG=%s\n' \
-            "$NHC_UPGRADE_CANDIDATE_NHC_IMAGE" "$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE" \
-            "$NHC_UPGRADE_CANDIDATE_NHC_CATALOG" | tee "$ARTIFACT_DIR/candidate-images.txt"
+          printf 'CANDIDATE_IMAGE=%s\nCANDIDATE_BUNDLE=%s\nCANDIDATE_CATALOG=%s\n' \
+            "$CANDIDATE_IMAGE" "$CANDIDATE_BUNDLE" \
+            "$CANDIDATE_CATALOG" | tee "$ARTIFACT_DIR/candidate-images.txt"
         }
 
         verify_candidate() {
           echo '==> Validate candidate bundle and its console plugin reference'
-          operator-sdk bundle validate --image-builder=none "$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE"
+          operator-sdk bundle validate --image-builder=none "$CANDIDATE_BUNDLE"
           local bundle_dir candidate_csv candidate_version
           bundle_dir="$(mktemp -d)"
-          oc image extract "$NHC_UPGRADE_CANDIDATE_NHC_BUNDLE" --path="/manifests/:$bundle_dir" --confirm
+          oc image extract "$CANDIDATE_BUNDLE" --path="/manifests/:$bundle_dir" --confirm
           candidate_csv="$(find "$bundle_dir" -name '*clusterserviceversion.yaml' -print -quit)"
           : "${candidate_csv:?candidate bundle must contain a ClusterServiceVersion}"
           candidate_version="$(sed -n 's/^  version: *//p' "$candidate_csv" | tr -d '"')"
           : "${candidate_version:?NHC bundle CSV must specify spec.version}"
           test "$candidate_version" = "$NHC_VERSION"
           grep -Fq "$CONSOLE_PLUGIN_IMAGE" "$candidate_csv"
-          export NHC_UPGRADE_CANDIDATE_NHC_VERSION="$candidate_version"
+          CANDIDATE_VERSION="$candidate_version"
           echo "==> Candidate bundle verified: version $candidate_version"
         }
 
-        run_tests() {
-          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#10 merges.
-          echo '==> Check out openshift/rhwa-system-tests PR 10'
+        prepare_candidate() {
+          build_candidate
+          verify_candidate
+
+          # Feed the source-built FBC into the same test as the downstream FBC.
+          export NHC_FBC_CATALOG_IMAGE="$CANDIDATE_CATALOG"
+          export NHC_FBC_CANDIDATE_VERSION="$CANDIDATE_VERSION"
+          export NHC_FBC_CANDIDATE_IMAGE="$CANDIDATE_IMAGE"
+          export NHC_FBC_CHANNEL=stable
+          # The source-built images are directly pullable from ttl.sh.
+          unset NHC_FBC_IDMS_PATH
+        }
+
+        checkout_system_tests() {
+          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#18 merges.
+          echo '==> Check out openshift/rhwa-system-tests PR 18'
           git clone --depth=1 --branch main \
             https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
           git -C /tmp/system-tests fetch --depth=1 \
-            https://github.com/openshift/rhwa-system-tests.git refs/pull/10/head
+            https://github.com/openshift/rhwa-system-tests.git refs/pull/18/head
           git -C /tmp/system-tests checkout --detach FETCH_HEAD
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
+        }
 
-          export NHC_UPGRADE_OPERATOR_SDK="$(command -v operator-sdk)"
+        print_run_config() {
+          echo "Candidate catalog: $NHC_FBC_CATALOG_IMAGE"
+          echo "Candidate version: $NHC_FBC_CANDIDATE_VERSION"
+          echo "Candidate controller: $NHC_FBC_CANDIDATE_IMAGE"
+          echo "Channel: $NHC_FBC_CHANNEL"
+          echo "IDMS: ${NHC_FBC_IDMS_PATH:-none}"
+        }
+
+        run_upgrade_test() {
           export ECO_TEST_FEATURES=nhc-operator
+          export ECO_TEST_LABELS=tier:upgrade-operator
+          export ECO_TEST_VERBOSE=true
           export WORKLOAD_IMAGE=unused-by-nhc-upgrade-tests
           # Prow test pods cannot reach worker private IPs over SSH.
           export MEDIK8S_KUBELET_STOP_OCDEBUG=true
 
-          local tier
-          local -a failed_tiers=()
-          for tier in upgrade-operator fresh-install; do
-            echo "==> Start system-tests tier: $tier"
-            export ECO_TEST_LABELS="tier:${tier}"
-            export ECO_REPORTS_DUMP_DIR="$ARTIFACT_DIR/$tier"
-            mkdir -p "$ECO_REPORTS_DUMP_DIR"
-            if ! make -C /tmp/system-tests run-tests 2>&1 | tee "$ECO_REPORTS_DUMP_DIR/run.log"; then
-              failed_tiers+=("$tier")
-              echo "==> System-tests tier failed: $tier"
-            else
-              echo "==> System-tests tier passed: $tier"
-            fi
-          done
-
-          if (( ${#failed_tiers[@]} > 0 )); then
-            printf 'Failed tiers: %s\n' "${failed_tiers[*]}"
-            return 1
-          fi
+          echo '==> Start system-tests tier: upgrade-operator'
+          export ECO_REPORTS_DUMP_DIR="$ARTIFACT_DIR/upgrade-operator"
+          mkdir -p "$ECO_REPORTS_DUMP_DIR"
+          make -C /tmp/system-tests run-tests 2>&1 | tee "$ECO_REPORTS_DUMP_DIR/run.log"
         }
 
-        prepare_runtime
-        build_candidate
-        verify_candidate
-        run_tests
+        main() {
+          prepare_runtime
+          prepare_candidate
+          checkout_system_tests
+          print_run_config
+          run_upgrade_test
+        }
+
+        main
       from: nhc-upgrade-test-runner
       nested_podman: true
       resources:
@@ -380,7 +398,18 @@ tests:
           export NHC_FBC_IDMS_PATH=/tmp/nhc-fbc-idms.yaml
         }
 
-        run_tests() {
+        prepare_candidate() {
+          write_idms
+
+          # Post-MR-617 artifacts that passed the local tier:upgrade-operator run.
+          export NHC_FBC_CATALOG_IMAGE='quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500@sha256:5865bf9dda1a2b2a554a496ada5a9f4f6d0a0ad7efb74578cfc02d47300e1c3a'
+          export NHC_FBC_CANDIDATE_VERSION=5.8.0
+          export NHC_FBC_CANDIDATE_IMAGE='registry.redhat.io/workload-availability/node-healthcheck-rhel9-operator@sha256:6d18d257929d6f7cee3add33bbcd9342fb0c0f3ffd0e754b8b2db4473bd4b43d'
+          export NHC_FBC_CHANNEL=stable
+          export NHC_FBC_IDMS_PATH=/tmp/nhc-fbc-idms.yaml
+        }
+
+        checkout_system_tests() {
           # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#18 merges.
           echo '==> Check out openshift/rhwa-system-tests PR 18'
           git clone --depth=1 --branch main \
@@ -389,27 +418,39 @@ tests:
             https://github.com/openshift/rhwa-system-tests.git refs/pull/18/head
           git -C /tmp/system-tests checkout --detach FETCH_HEAD
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
+        }
 
+        print_run_config() {
+          echo "Candidate catalog: $NHC_FBC_CATALOG_IMAGE"
+          echo "Candidate version: $NHC_FBC_CANDIDATE_VERSION"
+          echo "Candidate controller: $NHC_FBC_CANDIDATE_IMAGE"
+          echo "Channel: $NHC_FBC_CHANNEL"
+          echo "IDMS: ${NHC_FBC_IDMS_PATH:-none}"
+        }
+
+        run_upgrade_test() {
           export ECO_TEST_FEATURES=nhc-operator
           export ECO_TEST_LABELS=tier:upgrade-operator
-          export NHC_FBC_CATALOG_IMAGE='quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500@sha256:5a72bdb2e825a687fdef206b5a8fe4f26c884e427f0acabb6d16c9dca2d94607'
-          export NHC_FBC_CANDIDATE_VERSION=5.8.0
-          export NHC_FBC_CANDIDATE_IMAGE='registry.redhat.io/workload-availability/node-healthcheck-rhel9-operator@sha256:c90eb5266b9734766d7afb84306a0147672e1a1aeb8c7a3dd5c33a9bfc77ffb9'
-          export NHC_FBC_CHANNEL=stable
-          export NHC_FBC_IDMS_PATH=/tmp/nhc-fbc-idms.yaml
+          export ECO_TEST_VERBOSE=true
           export WORKLOAD_IMAGE=unused-by-nhc-upgrade-tests
           # Prow test pods cannot reach worker private IPs over SSH.
           export MEDIK8S_KUBELET_STOP_OCDEBUG=true
 
-          echo "==> Start system-tests tier: upgrade-operator"
+          echo '==> Start system-tests tier: upgrade-operator'
           export ECO_REPORTS_DUMP_DIR="$ARTIFACT_DIR/upgrade-operator"
           mkdir -p "$ECO_REPORTS_DUMP_DIR"
           make -C /tmp/system-tests run-tests 2>&1 | tee "$ECO_REPORTS_DUMP_DIR/run.log"
         }
 
-        prepare_runtime
-        write_idms
-        run_tests
+        main() {
+          prepare_runtime
+          prepare_candidate
+          checkout_system_tests
+          print_run_config
+          run_upgrade_test
+        }
+
+        main
       from: nhc-upgrade-test-runner
       resources:
         requests:
