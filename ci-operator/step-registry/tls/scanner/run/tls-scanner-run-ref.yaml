@@ -51,6 +51,32 @@ ref:
       reading APIServer/cluster from the API. Required for HyperShift hosted
       control planes where the guest APIServer CR may not mirror HostedCluster
       configuration.
+  - name: TLS_SCANNER_PROFILE_SWEEP
+    default: ""
+    documentation: |-
+      Ordered, comma-separated list of TLS profile types (Old, Intermediate,
+      Modern) to sweep on one cluster. For each entry the step patches
+      apiservers/cluster to that profile, waits for the cluster to stabilize,
+      and runs a full scan, writing artifacts under tls-scanner/<profile> and
+      junit_tls_scan_<profile>.xml so the passes do not overwrite each other.
+      Each pass scans with --tls-profile-type set to the profile it just
+      applied, so TLS_PROFILE_TYPE is ignored while sweeping. A pass that finds
+      violations does not stop the sweep; the step exits non-zero at the end if
+      any pass failed. Empty (the default) scans the cluster once, as
+      configured, and changes nothing.
+      Each profile may appear at most once, so a sweep is at most three passes,
+      and each pass waits at most 45m for the cluster to stabilize before it
+      scans - the sweep has to finish inside this step's 4h timeout.
+  - name: TLS_SCANNER_TLS_ADHERENCE
+    default: ""
+    documentation: |-
+      Value for apiservers/cluster spec.tlsAdherence
+      (LegacyAdheringComponentsOnly or StrictAllComponents) applied with every
+      TLS_SCANNER_PROFILE_SWEEP profile change, so an adherence policy set
+      before the sweep is carried across each patch. Empty leaves the field
+      alone. Only meaningful with TLS_SCANNER_PROFILE_SWEEP, and the
+      TLSAdherence feature gate must already be enabled on the cluster (the
+      tls-13 step does this).
   dependencies:
   - env: RELEASE_IMAGE_LATEST
     name: release:latest
@@ -68,5 +94,7 @@ ref:
   grace_period: 5m0s
   documentation: |-
     Runs the TLS scanner against all pods in the target cluster.
+    Set TLS_SCANNER_PROFILE_SWEEP to scan the same cluster once per TLS profile
+    (e.g. "Modern,Intermediate"), reconfiguring apiservers/cluster between passes.
     The scanner runs with cluster-admin privileges and full host access.
     Set PQC_CHECK=true to check post-quantum cryptography readiness (scanner will only check TLS 1.3 and mlkem/mlkem25519 support).
