@@ -9,6 +9,13 @@ if [[ "${ENABLE_NAP:-}" == "true" && -n "${NAP_SKU_NAMES:-}" ]]; then
     fi
 fi
 
+if [[ "${ENABLE_NAP:-}" == "true" && -n "${NAP_MAX_PODS:-}" ]]; then
+    if [[ ! "${NAP_MAX_PODS}" =~ ^[1-9][0-9]{1,2}$ ]] || (( NAP_MAX_PODS > 250 )); then
+        echo "NAP_MAX_PODS must be an integer between 10 and 250" >&2
+        exit 1
+    fi
+fi
+
 # Azure CLI does not consistently retry DNS and lower-level transport failures.
 # Keep direct retries scoped to safe repeats. AKS and node-pool creates remain
 # single-shot because repeating them after an ambiguous response is unsafe.
@@ -358,6 +365,7 @@ metadata:
   name: default
 spec:
   imageFamily: "${NAP_IMAGE_FAMILY}"
+${NAP_MAX_PODS:+  maxPods: ${NAP_MAX_PODS}}
 EOF
 )
 
@@ -368,7 +376,8 @@ EOF
     echo "$NODECLASS_YAML" | oc apply -f -
 
     # Create placeholder pods to trigger NAP node provisioning.
-    # Resource requests are set high enough to ensure one pod per D16-equivalent node.
+    # Require distinct NAP nodes rather than relying on D16-sized resource requests,
+    # which allow multiple placeholders to share a larger node.
     PLACEHOLDER_YAML=$(cat <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -385,6 +394,15 @@ spec:
       labels:
         app: nap-placeholder
     spec:
+      nodeSelector:
+        karpenter.sh/nodepool: default
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: nap-placeholder
+              topologyKey: kubernetes.io/hostname
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
