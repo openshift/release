@@ -837,21 +837,20 @@ marker_value=$(cat "${marker_file}")
 [[ "${marker_value}" -ne 0 ]] || fail "debug_enabled_readiness_failure: marker has 0, expected nonzero"
 echo "PASS: debug enabled readiness failure returns 0 and records nonzero original status"
 
-# Test 4: Successful provisioning is unchanged regardless of debug flag
-run_case debug_enabled_success 0 "" false false true false true
+# Test 4: Successful apply followed by a readiness timeout is debug-overridden
+run_case debug_enabled_apply_success_readiness_timeout 0 "" false false true false true
 # apply succeeds (status 0), archive succeeds, then readiness poll runs and eventually
 # exits 1 from the timeout subshell (mock oc doesn't provide real ready nodes).
 # The important thing is the script does NOT falsely claim success when the
 # readiness poll itself times out. With debug enabled, it should still return 0
 # (debug override catches ANY nonzero exit).
-# This test verifies debug doesn't break the script flow for the archive+readiness path.
-if [[ "${RUN_STATUS}" -eq 0 ]]; then
-    # If the mock happened to succeed (readiness poll returned ok), verify no debug override
-    if ! grep -Fq "DEBUG OVERRIDE" "${RUN_LOG}"; then
-        echo "  Provisioning succeeded without debug override (ideal path)"
-    fi
-fi
-echo "PASS: debug enabled does not break script flow on success path"
+assert_status 0 "${RUN_STATUS}" debug_enabled_apply_success_readiness_timeout
+assert_contains "WARNING: ========== DEBUG OVERRIDE ==========" "${RUN_LOG}"
+marker_file="${RUN_TEST_ROOT}/shared/byoh_debug_original_failure_status"
+[[ -f "${marker_file}" ]] || fail "debug_enabled_apply_success_readiness_timeout: failure status marker not created"
+marker_value=$(cat "${marker_file}")
+[[ "${marker_value}" == "1" ]] || fail "debug_enabled_apply_success_readiness_timeout: marker has '${marker_value}', expected '1'"
+echo "PASS: successful apply followed by readiness timeout returns 0 and records original status 1"
 
 # Test 5: Debug disabled with exit 1 (readiness failure) preserves nonzero
 run_case debug_disabled_readiness_failure 1 "" false false true false false
