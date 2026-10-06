@@ -33,7 +33,7 @@ main() {
         DEBUG_FLAG="-vvv"
     fi
 
-    echo "Running cpu_util test (baseline: ${BASELINE}, duration: ${DURATION}, test_name: ${TEST_NAME})"
+    echo "Running cpu_util test (baseline: ${BASELINE}, duration: ${DURATION}, test_options: ${TEST_OPTIONS}, test_name: ${TEST_NAME})"
     local rc=0
     ansible-playbook ./playbooks/telco-kpis/run-test.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
@@ -43,6 +43,7 @@ main() {
         -e spoke_kubeconfig="${SPOKE_KUBECONFIG}" \
         -e duration="${DURATION}" \
         -e baseline="${BASELINE}" \
+        -e test_options="${TEST_OPTIONS}" \
         -e force_pull_test_runner_image="${FORCE_PULL_TEST_RUNNER_IMAGE}" \
         ${DEBUG_FLAG} || rc=$?
 
