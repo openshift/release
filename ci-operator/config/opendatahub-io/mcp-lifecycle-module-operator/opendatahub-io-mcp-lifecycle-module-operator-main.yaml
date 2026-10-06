@@ -1,10 +1,34 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - build_args:
+    - name: TARGETOS
+      value: linux
+    - name: TARGETARCH
+      value: amd64
+    dockerfile_path: Dockerfile.konflux
+    to: mcp-lifecycle-module-operator
 prowgen:
   enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -17,6 +41,37 @@ tests:
   commands: GOFLAGS='' make unit-test
   container:
     from: src
+- as: tls-scan-pqc
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  cron: 0 6 1,15 * *
+  reporter_config:
+    channel: '#forum-mcp-lifecycle-operator-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: Job {{.Spec.Job}} ended with {{.Status.State}}. <{{.Status.URL}}|View
+      logs>
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OPERATOR_NAMESPACE: mcp-lifecycle-module-operator-system
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: mcp-lifecycle-module-operator-system
+    post:
+    - ref: mcp-lifecycle-module-operator-gather
+    - chain: gather
+    test:
+    - ref: cert-manager-install-operator
+    - ref: mcp-lifecycle-module-operator-deploy
+    - ref: mcp-lifecycle-module-operator-operand
+    - ref: tls-scanner-run
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
