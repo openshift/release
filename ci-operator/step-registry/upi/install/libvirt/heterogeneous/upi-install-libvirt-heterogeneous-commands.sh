@@ -286,13 +286,14 @@ if [[ ! -f "${KUBECONFIG}" ]]; then
   exit 1
 fi
 
+BOOT_IMAGE_ARCH="aarch64"
 echo "Fetching coreos-bootimages for architecture ${ADDITIONAL_WORKER_ARCHITECTURE}..."
-KERNEL_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.artifacts.metal.formats.pxe.kernel.location")
-INITRAMFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.artifacts.metal.formats.pxe.initramfs.location")
-ROOTFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.artifacts.metal.formats.pxe.rootfs.location")
+KERNEL_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${BOOT_IMAGE_ARCH}.artifacts.metal.formats.pxe.kernel.location")
+INITRAMFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${BOOT_IMAGE_ARCH}.artifacts.metal.formats.pxe.initramfs.location")
+ROOTFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${BOOT_IMAGE_ARCH}.artifacts.metal.formats.pxe.rootfs.location")
 
 if [[ -z "${KERNEL_URL}" || "${KERNEL_URL}" == "null" || -z "${INITRAMFS_URL}" || "${INITRAMFS_URL}" == "null" || -z "${ROOTFS_URL}" || "${ROOTFS_URL}" == "null" ]]; then
-  echo "ERROR: Failed to retrieve boot artifact URLs from coreos-bootimages configmap for ${ADDITIONAL_WORKER_ARCHITECTURE}"
+  echo "ERROR: Failed to retrieve boot artifact URLs from coreos-bootimages configmap for ${BOOT_IMAGE_ARCH}"
   exit 1
 fi
 
