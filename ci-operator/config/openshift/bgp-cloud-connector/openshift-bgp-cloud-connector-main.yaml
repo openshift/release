@@ -335,6 +335,97 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: e2e-aws-fips-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+      ZONES_COUNT: "2"
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # Both controllers watch FRRConfiguration and RouteAdvertisements
+        # from SetupWithManager, and CNO creates those two CRDs only in
+        # response to this patch. Without them the caches never sync, the
+        # manager exits after two minutes, and the CSV never installs.
+        # The operator applies this same patch itself as the first phase
+        # of reconcile, but it cannot stay alive long enough to do so;
+        # when that is fixed, this step comes out and the job proves the
+        # install a catalogue user actually performs.
+        oc patch network.operator.openshift.io cluster --type=merge \
+          -p '{"spec":{"additionalRoutingCapabilities":{"providers":["FRR"]},"defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+
+        deadline=$((SECONDS + 900))
+
+        for crd in frrconfigurations.frrk8s.metallb.io routeadvertisements.k8s.ovn.org; do
+          echo "waiting for crd/${crd}..."
+          until oc wait --for=condition=Established "crd/${crd}" --timeout=10s >/dev/null 2>&1; do
+            if (( SECONDS >= deadline )); then
+              oc get network.operator.openshift.io cluster -o yaml >&2
+              echo "timed out waiting for crd/${crd}" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+        done
+
+        # The rollout is what says CNO finished rather than that it
+        # started. Measured at about two minutes on 4.22.
+        echo "waiting for the frr-k8s rollout..."
+        until oc -n openshift-frr-k8s rollout status daemonset/frr-k8s --timeout=2m >/dev/null 2>&1; do
+          if (( SECONDS >= deadline )); then
+            oc -n openshift-frr-k8s get pods >&2
+            echo "timed out waiting for the frr-k8s daemonset" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+
+        oc -n openshift-frr-k8s get daemonset frr-k8s
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: fips-check-fips-or-die
+    - as: test
+      cli: latest
+      commands: hack/ci-e2e-aws.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: e2e-azure-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

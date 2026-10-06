@@ -1,0 +1,26 @@
+base_images:
+  aro-hcp-e2e-tests:
+    name: aro-hcp-e2e-tests
+    namespace: aro-hcp
+    tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: delete-expired-arohcp-e2e-resource-groups
+  cron: 35 * * * *
+  steps:
+    env:
+      CLEANUP_MODE: no-rp
+      CUSTOMER_SUBSCRIPTION: Hypershift Managed Azure
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: hypershift
+  variant: arohcp-cleanup

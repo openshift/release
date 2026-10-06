@@ -210,8 +210,7 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
   env; \
   set +a; \
   make generate-env; \
-  ls -ltra .env; \
-  cat .env"; then
+  ls -ltra .env"; then
   echo ".env file from sourced env.user_${CLUSTER_NAME} was generated successfully"
 else
   echo "ERROR: Failed to generate .env file from sourced env.user_${CLUSTER_NAME} file"
@@ -254,7 +253,12 @@ if [[ -f "${SHARED_DIR}/dpf-hcp-provisioner-operator-override" ]]; then
 fi
 
 echo "Copying .env from hypervisor to artifacts..."
-scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env ${ARTIFACT_DIR}/.env || echo "WARNING: Failed to copy .env to artifacts"
+if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env /tmp/.env.full 2>/dev/null; then
+  sed -E '/^WORKER_[0-9]+_NAME=/!{ /^WORKER_[0-9]+_/d }' /tmp/.env.full > "${ARTIFACT_DIR}/.env"
+  rm -f /tmp/.env.full
+else
+  echo "WARNING: Failed to copy .env to artifacts"
+fi
 
 
 # SSH session to hypervisor
