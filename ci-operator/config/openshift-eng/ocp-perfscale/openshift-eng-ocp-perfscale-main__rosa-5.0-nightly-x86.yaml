@@ -939,6 +939,138 @@ tests:
     - chain: openshift-qe-ingress-perf
     workflow: rosa-aws-sts
 - always_run: false
+  as: data-path-9nodes-kernel-fix-55-31-1
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "6"
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+    test:
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - as: override-os-image
+      cli: latest
+      commands: |-
+        echo "Applying MachineConfig to override OS image on worker nodes..."
+        cat <<'EOF' | oc apply -f -
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          name: 99-custom-os-image
+          labels:
+            machineconfiguration.openshift.io/role: worker
+        spec:
+          osImageURL: quay.io/mcornea/rhel-coreos-10:6.12.0-55.31.1
+        EOF
+        echo "Waiting for MachineConfigPool worker to start updating..."
+        oc wait mcp/worker --for=condition=Updating=True --timeout=300s
+        echo "Waiting for MachineConfigPool worker to finish updating..."
+        oc wait mcp/worker --for=condition=Updated=True --timeout=3600s
+        oc wait mcp/worker --for=condition=Degraded=False --timeout=60s
+        echo "MachineConfigPool worker updated successfully."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+    - as: verify-kernel
+      cli: latest
+      commands: |-
+        EXPECTED_KERNEL="6.12.0-55.31.1.el10"
+        echo "Verifying kernel version ${EXPECTED_KERNEL} on all worker nodes..."
+        FAILED=0
+        for node in $(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}'); do
+          KERNEL=$(oc debug "node/${node}" -- chroot /host uname -r 2>/dev/null | tr -d '[:space:]')
+          echo "Node ${node}: kernel=${KERNEL}"
+          if [[ "${KERNEL}" != "${EXPECTED_KERNEL}"* ]]; then
+            echo "ERROR: Expected kernel ${EXPECTED_KERNEL} but got ${KERNEL} on ${node}"
+            FAILED=1
+          fi
+        done
+        if [[ ${FAILED} -eq 1 ]]; then
+          echo "FAIL: Not all worker nodes have the expected kernel."
+          exit 1
+        fi
+        echo "SUCCESS: All worker nodes running expected kernel ${EXPECTED_KERNEL}"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+    - chain: openshift-qe-ingress-perf
+    workflow: rosa-aws-sts
+- always_run: false
+  as: data-path-9nodes-kernel-fix-55-30-1
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "6"
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+    test:
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - as: override-os-image
+      cli: latest
+      commands: |-
+        echo "Applying MachineConfig to override OS image on worker nodes..."
+        cat <<'EOF' | oc apply -f -
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          name: 99-custom-os-image
+          labels:
+            machineconfiguration.openshift.io/role: worker
+        spec:
+          osImageURL: quay.io/mcornea/rhel-coreos-10:6.12.0-55.30.1
+        EOF
+        echo "Waiting for MachineConfigPool worker to start updating..."
+        oc wait mcp/worker --for=condition=Updating=True --timeout=300s
+        echo "Waiting for MachineConfigPool worker to finish updating..."
+        oc wait mcp/worker --for=condition=Updated=True --timeout=3600s
+        oc wait mcp/worker --for=condition=Degraded=False --timeout=60s
+        echo "MachineConfigPool worker updated successfully."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+    - as: verify-kernel
+      cli: latest
+      commands: |-
+        EXPECTED_KERNEL="6.12.0-55.30.1.el10"
+        echo "Verifying kernel version ${EXPECTED_KERNEL} on all worker nodes..."
+        FAILED=0
+        for node in $(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}'); do
+          KERNEL=$(oc debug "node/${node}" -- chroot /host uname -r 2>/dev/null | tr -d '[:space:]')
+          echo "Node ${node}: kernel=${KERNEL}"
+          if [[ "${KERNEL}" != "${EXPECTED_KERNEL}"* ]]; then
+            echo "ERROR: Expected kernel ${EXPECTED_KERNEL} but got ${KERNEL} on ${node}"
+            FAILED=1
+          fi
+        done
+        if [[ ${FAILED} -eq 1 ]]; then
+          echo "FAIL: Not all worker nodes have the expected kernel."
+          exit 1
+        fi
+        echo "SUCCESS: All worker nodes running expected kernel ${EXPECTED_KERNEL}"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+    - chain: openshift-qe-ingress-perf
+    workflow: rosa-aws-sts
+- always_run: false
   as: default
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
