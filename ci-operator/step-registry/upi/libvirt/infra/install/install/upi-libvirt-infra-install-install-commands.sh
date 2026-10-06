@@ -78,6 +78,17 @@ if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
 else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi
+
+# When co-located on the mgmt bridge, VMs must attach to the mgmt network
+# (which owns the bridge). Resolve once here so both installer paths use it.
+if [[ -f "${SHARED_DIR}/MGMT_NETWORK_NAME" ]]; then
+  NETWORK_NAME="$(cat "${SHARED_DIR}/MGMT_NETWORK_NAME")"
+  echo "Co-located mode: attaching VMs to mgmt network '${NETWORK_NAME}'"
+else
+  NETWORK_NAME="${CLUSTER_NAME}"
+fi
+export NETWORK_NAME
+
 OCPINSTALL="${INSTALL_DIR}/openshift-install"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
@@ -434,13 +445,6 @@ create_node () {
     export DOMAIN_MAC="${MAC_ADDRESS}"
     export QCOW_PATH="${LIBVIRT_IMAGE_PATH}"
     export QCOW_NAME="${DOMAIN_NAME}.qcow2"
-    # When co-located on the mgmt bridge, attach VMs to the mgmt network (which
-    # owns the bridge) rather than the infra cluster's own network name.
-    if [[ -f "${SHARED_DIR}/MGMT_NETWORK_NAME" ]]; then
-      export NETWORK_NAME="$(cat "${SHARED_DIR}/MGMT_NETWORK_NAME")"
-    else
-      export NETWORK_NAME="${CLUSTER_NAME}"
-    fi
     export EXTRA_ARGS
     envsubst < ${CLUSTER_PROFILE_DIR}/domain-install-template.xml > ${INSTALL_DIR}/"${NAME}-install.xml"
     envsubst < ${CLUSTER_PROFILE_DIR}/domain-template.xml > ${INSTALL_DIR}/"${NAME}.xml"
@@ -480,7 +484,7 @@ create_node () {
       --name ${NAME} \
       --memory ${DOMAIN_MEMORY} \
       --vcpus ${DOMAIN_VCPUS} \
-      --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
+      --network network=${NETWORK_NAME},mac=${MAC_ADDRESS} \
       --disk="vol=${POOL_NAME}/${NAME}-volume" \
       --osinfo ${VIRT_INSTALL_OSINFO} \
       --graphics=none \
