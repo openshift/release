@@ -82,10 +82,25 @@ fi
 # Handle timeout exit code
 if [[ "${RUN_EXIT_CODE}" -eq 2 ]]; then
   echo "kube-burner returned exit code 2 (timeout)"
+
+  # Whatever is still in maas-perf-test is the only record of what hung, and the
+  # gather steps run after this one. Capture it before the cluster goes away.
+  DEBUG_DIR="${ARTIFACT_DIR}/maas-perf-test-debug"
+  mkdir -p "${DEBUG_DIR}"
+  oc get jobs,pods -n maas-perf-test -o yaml > "${DEBUG_DIR}/jobs-pods.yaml" 2>&1 || true
+  oc describe pods -n maas-perf-test > "${DEBUG_DIR}/pods-describe.txt" 2>&1 || true
+  oc get events -n maas-perf-test --sort-by=.lastTimestamp > "${DEBUG_DIR}/events.txt" 2>&1 || true
+  for pod in $(oc get pods -n maas-perf-test -o name 2>/dev/null || true); do
+    oc logs -n maas-perf-test "${pod}" --tail=2000 > "${DEBUG_DIR}/$(basename "${pod}").log" 2>&1 || true
+  done
+  # The baseline jobs target the simulator directly, so it is a prime suspect.
+  oc get pods -n llm -o yaml > "${DEBUG_DIR}/llm-pods.yaml" 2>&1 || true
+  oc logs -n llm -l app=llm-d-inference-sim --tail=2000 > "${DEBUG_DIR}/llm-d-inference-sim.log" 2>&1 || true
+
   echo "Checking cluster health before exiting"
   if /tmp/kube-burner-ocp cluster-health; then
     echo "Cluster is still healthy. Ignoring workload timeout"
-    oc delete ns maas-perf-test --ignore-not-found || true
+    # Leave maas-perf-test in place so gather-extra and must-gather can see it.
     exit 0
   fi
 fi
