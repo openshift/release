@@ -124,6 +124,57 @@ tests:
     - ref: quay-deploy-aws-s3
     - ref: quay-test-e2e
     workflow: ipi-aws
+- as: aws-odf-nightly
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      ENABLE_BUILD_SUPPORT: "true"
+      PLAYWRIGHT_GIT_REPO: https://github.com/quay/quay.git
+      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves
+        and loads architecture filter with mirror configuration|loads existing architecture
+        filter from saved mirror configuration'
+      QUAY_EXTRA_CONFIG: |
+        FEATURE_PROGRAMMATIC_BOOTSTRAP: false
+        FEATURE_USER_METADATA: true
+        FEATURE_IMMUTABLE_TAGS: true
+        FEATURE_SPARSE_INDEX: true
+        FEATURE_QUOTA_NOTIFICATIONS: true
+        FEATURE_EDIT_QUOTA: true
+        FEATURE_CHANGE_TAG_EXPIRATION: true
+        FEATURE_IMAGE_PULL_STATS: false
+        LOG_ARCHIVE_LOCATION: default
+        ACTION_LOG_ARCHIVE_LOCATION: default
+        SESSION_TIMEOUT: 2h
+        DEFAULT_UI: react
+        SUPER_USERS:
+          - admin
+        GLOBAL_READONLY_SUPER_USERS:
+          - readonly
+      QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      QUAY_INDEX_IMAGE_TAG: quay-3.18__v4.22__quay-rhel9-operator
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_STORAGE_PROVIDER: odf
+      SETUP_NOOBAA: "true"
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+    - chain: ipi-aws-post
+    test:
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-provisioning-tls
+    - ref: quay-provisioning-builder
+    - ref: quay-deploy-mailpit
+    - ref: quay-deploy-jaeger
+    - ref: quay-install-odf-operator
+    - ref: quay-deploy-odf
+    - ref: quay-test-e2e
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: redhat-3.18
   org: quay
