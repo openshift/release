@@ -78,17 +78,6 @@ if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
 else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi
-
-# When co-located on the mgmt bridge, VMs must attach to the mgmt network
-# (which owns the bridge). Resolve once here so both installer paths use it.
-if [[ -f "${SHARED_DIR}/MGMT_NETWORK_NAME" ]]; then
-  NETWORK_NAME="$(cat "${SHARED_DIR}/MGMT_NETWORK_NAME")"
-  echo "Co-located mode: attaching VMs to mgmt network '${NETWORK_NAME}'"
-else
-  NETWORK_NAME="${CLUSTER_NAME}"
-fi
-export NETWORK_NAME
-
 OCPINSTALL="${INSTALL_DIR}/openshift-install"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
@@ -421,14 +410,7 @@ create_node () {
   if [ "$INSTALLER_TYPE" == "agent" ]; then
     # Calculate the last dynamic vars
     DOMAIN_UUID="$(uuidgen)"
-    # When co-located on the mgmt bridge, use the mgmt nameserver (192.168.X.1
-    # where X is the mgmt subnet). Otherwise use the infra lease's own subnet.
-    if [[ -f "${SHARED_DIR}/MGMT_NAMESERVER" ]]; then
-      BOOT_NAMESERVER="$(cat "${SHARED_DIR}/MGMT_NAMESERVER")"
-    else
-      BOOT_NAMESERVER="192.168.$(leaseLookup 'subnet').1"
-    fi
-    EXTRA_ARGS="rw rd.neednet=1 nameserver=${BOOT_NAMESERVER} ip=dhcp ignition.firstboot ignition.platform.id=metal"
+    EXTRA_ARGS="rw rd.neednet=1 nameserver=192.168.$(leaseLookup 'subnet').1 ip=dhcp ignition.firstboot ignition.platform.id=metal"
 
     if [[ "$ARCH" == "ppc64le" ]]; then
       HTTPD_PORT="$(leaseLookup 'httpd-port')"
@@ -445,6 +427,7 @@ create_node () {
     export DOMAIN_MAC="${MAC_ADDRESS}"
     export QCOW_PATH="${LIBVIRT_IMAGE_PATH}"
     export QCOW_NAME="${DOMAIN_NAME}.qcow2"
+    export NETWORK_NAME="${CLUSTER_NAME}"
     export EXTRA_ARGS
     envsubst < ${CLUSTER_PROFILE_DIR}/domain-install-template.xml > ${INSTALL_DIR}/"${NAME}-install.xml"
     envsubst < ${CLUSTER_PROFILE_DIR}/domain-template.xml > ${INSTALL_DIR}/"${NAME}.xml"
@@ -484,7 +467,7 @@ create_node () {
       --name ${NAME} \
       --memory ${DOMAIN_MEMORY} \
       --vcpus ${DOMAIN_VCPUS} \
-      --network network=${NETWORK_NAME},mac=${MAC_ADDRESS} \
+      --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
       --disk="vol=${POOL_NAME}/${NAME}-volume" \
       --osinfo ${VIRT_INSTALL_OSINFO} \
       --graphics=none \

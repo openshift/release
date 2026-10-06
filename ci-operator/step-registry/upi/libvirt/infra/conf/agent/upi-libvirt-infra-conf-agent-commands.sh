@@ -54,22 +54,13 @@ else
 fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
-# Determine subnet for rendezvousIP — must match the bridge used by the network conf step.
-if [[ -n "${MGMT_SUBNET_OVERRIDE:-}" ]]; then
-  RENDEZVOUS_SUBNET="${MGMT_SUBNET_OVERRIDE}"
-elif [[ -f "${SHARED_DIR}/MGMT_SUBNET" ]]; then
-  RENDEZVOUS_SUBNET="$(cat "${SHARED_DIR}/MGMT_SUBNET")"
-else
-  RENDEZVOUS_SUBNET="$(leaseLookup 'subnet')"
-fi
-
 echo "Creating the agent-config.yaml file..."
 cat >> "${SHARED_DIR}/${INFRA_PREFIX}agent-config.yaml" << EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
   name: ${CLUSTER_NAME}
-rendezvousIP: 192.168.${RENDEZVOUS_SUBNET}.10
+rendezvousIP: 192.168.$(leaseLookup "subnet").10
 hosts:
   - hostname: control-0.${BASE_URL}
     role: master

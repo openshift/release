@@ -56,15 +56,6 @@ else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi
 
-# Determine subnet for machineNetwork — must match the bridge used by the network conf step.
-if [[ -n "${MGMT_SUBNET_OVERRIDE:-}" ]]; then
-  MACHINE_SUBNET="${MGMT_SUBNET_OVERRIDE}"
-elif [[ -f "${SHARED_DIR}/MGMT_SUBNET" ]]; then
-  MACHINE_SUBNET="$(cat "${SHARED_DIR}/MGMT_SUBNET")"
-else
-  MACHINE_SUBNET="$(leaseLookup 'subnet')"
-fi
-
 # Default UPI installation
 echo "Create the install-config.yaml file..."
 cat >> "${SHARED_DIR}/${INFRA_PREFIX}install-config.yaml" << EOF
@@ -82,7 +73,7 @@ networking:
   - cidr: 10.8.0.0/14
     hostPrefix: 23
   machineNetwork:
-  - cidr: "192.168.${MACHINE_SUBNET}.0/24"
+  - cidr: "192.168.$(leaseLookup "subnet").0/24"
   networkType: OVNKubernetes
   serviceNetwork:
   - 172.30.0.0/16
