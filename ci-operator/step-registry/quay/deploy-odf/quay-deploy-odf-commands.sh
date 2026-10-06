@@ -466,9 +466,9 @@ fi
 # USERFILES_LOCATION / LOG_ARCHIVE_LOCATION / ACTION_LOG_ARCHIVE_LOCATION to
 # "default", which would otherwise name a location the operator never creates.
 "${YQ}" -i '
-	(if has("USERFILES_LOCATION") then .USERFILES_LOCATION = "local_us" else . end) |
-	(if has("LOG_ARCHIVE_LOCATION") then .LOG_ARCHIVE_LOCATION = "local_us" else . end) |
-	(if has("ACTION_LOG_ARCHIVE_LOCATION") then .ACTION_LOG_ARCHIVE_LOCATION = "local_us" else . end)
+	with(select(has("USERFILES_LOCATION")); .USERFILES_LOCATION = "local_us") |
+	with(select(has("LOG_ARCHIVE_LOCATION")); .LOG_ARCHIVE_LOCATION = "local_us") |
+	with(select(has("ACTION_LOG_ARCHIVE_LOCATION")); .ACTION_LOG_ARCHIVE_LOCATION = "local_us")
 ' config.yaml
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
