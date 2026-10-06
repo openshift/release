@@ -77,6 +77,6 @@ if [ ! -f "${ARTIFACT_DIR}/junit_test-result.xml" ]; then
 fi
 
 echo "Store report for reporter step"
-cp "${ARTIFACT_DIR}/junit_test-result.xml" "${SHARED_DIR}/junit_test-result.xml"
+cp "${ARTIFACT_DIR}/junit_test-result.xml" "${SHARED_DIR}/polarion_cnf_test_result.xml"
 
 rm -rf $PROJECT_DIR/temp_ssh_key

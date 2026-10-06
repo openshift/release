@@ -69,5 +69,5 @@ echo "Gather artifacts from bastion"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key $BASTION_USER@$BASTION_IP:/tmp/downstream_report/*.xml ${ARTIFACT_DIR}/junit_downstream/
 rm -rf $PROJECT_DIR/temp_ssh_key
 
-echo "Store polarion report for reporter step"
-mv ${ARTIFACT_DIR}/junit_downstream/report_polarion.xml ${SHARED_DIR}/report_polarion.xml
+# report_polarion.xml is no longer stored in SHARED_DIR — the per-suite
+# ptp/cni JUnit files (polarion_cnfgotests_*.xml) cover RP reporting.
