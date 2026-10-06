@@ -4,9 +4,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-echo "Patching network.config/cluster: installationPolicy=${NETOBSERV_INSTALLATION_POLICY}"
+echo "Patching network.config/cluster: installationPolicy=${CNO_NETOBSERV_INSTALLATION_POLICY}"
 oc patch network.config/cluster --type=merge \
-  -p "{\"spec\":{\"networkObservability\":{\"installationPolicy\":\"${NETOBSERV_INSTALLATION_POLICY}\"}}}"
+  -p "{\"spec\":{\"networkObservability\":{\"installationPolicy\":\"${CNO_NETOBSERV_INSTALLATION_POLICY}\"}}}"
 
 echo "Waiting for FlowCollector resource to be created by CNO..."
 for i in $(seq 1 60); do
