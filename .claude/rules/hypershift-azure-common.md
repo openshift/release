@@ -36,7 +36,7 @@ These credentials are used by the `hypershift-azure-create` chain. The primary s
 | `/etc/hypershift-ci-jobs-azurecreds/oidc-issuer-url.json` | OIDC issuer URL for WIF |
 | `/etc/hypershift-ci-jobs-azurecreds/serviceaccount-signer.private` | SA token signing key |
 | `/etc/hypershift-aro-azurecreds/` | ARO Azure creds (fallback when `USE_HYPERSHIFT_AZURE_CREDS` is false) |
-| `/etc/hypershift-selfmanaged-azurecreds/workload-identities.json` | Self-managed workload identities (when `HYPERSHIFT_AZURE_SELF_MANAGED=true`) |
+| `/etc/hypershift-selfmanaged-azurecreds/workload-identities.json` | Azure QE workload identities (when `HYPERSHIFT_USE_AZURE_QE_WORKLOAD_IDENTITIES=true`) |
 
 ## Shared Environment Variables (Both Models)
 
@@ -53,8 +53,10 @@ These env vars are defined in the `hypershift-azure-create` chain.
 | Variable | Purpose |
 |---|---|
 | `USE_HYPERSHIFT_AZURE_CREDS` | Select HyperShift OSD credential set (true/false) |
+| `HYPERSHIFT_USE_SELF_MANAGED_AZURE_CREDS` | Use the self-managed Azure service principal credentials (true/false) |
+| `HYPERSHIFT_USE_SELF_MANAGED_WORKLOAD_IDENTITIES` | Use workload identities from `/etc/hypershift-ci-jobs-self-managed-azure-e2e` (true/false) |
 | `HYPERSHIFT_AZURE_CP_MI` | Enable managed identity auth (true/false) |
-| `HYPERSHIFT_AZURE_SELF_MANAGED` | Use self-managed workload identities file (true/false) |
+| `HYPERSHIFT_USE_AZURE_QE_WORKLOAD_IDENTITIES` | Use workload identities from `/etc/hypershift-selfmanaged-azurecreds` (true/false); intended for the `azure-qe` profile |
 | `HYPERSHIFT_DYNAMIC_DNS` | Custom KAS DNS name |
 | `HYPERSHIFT_CUSTOM_RESOURCE_GROUP` | Use custom resource group from `${SHARED_DIR}/resourcegroup` |
 | `HYPERSHIFT_CUSTOM_VNET` | BYO VNet from `${SHARED_DIR}/azure_vnet_id` |
@@ -67,6 +69,8 @@ These env vars are defined in the `hypershift-azure-create` chain.
 | `HYPERSHIFT_AZURE_FIPS` | Enable FIPS mode |
 | `HYPERSHIFT_NODE_COUNT` | NodePool replica count (default: 3 in create chain) |
 | `DNS_ZONE_RG_NAME` | DNS zone resource group (default: os4-common; also used by destroy chain) |
+
+The application IDs in the Azure QE workload identity bundle must be registered in the Azure tenant used by the selected Azure credentials.
 
 ## Shared SHARED_DIR Artifacts (Both Models)
 
