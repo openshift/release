@@ -314,7 +314,11 @@ echo "========== Image Tag Resolution =========="
 if [[ -n "${IMAGE_REPO}" && -n "${TAG_NAME}" ]]; then
     echo "Using overridden IMAGE_REPO: $IMAGE_REPO, TAG_NAME: $TAG_NAME"
 elif [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
-    IMAGE_REPO="rhdh/rhdh-hub-rhel9"
+    if [[ "${RELEASE_BRANCH_NAME}" == release-1.* ]]; then
+        IMAGE_REPO="rhdh/rhdh-hub-rhel9"
+    else
+        IMAGE_REPO="rhdh/rhdh-hub-rhel10"
+    fi
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
         TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
