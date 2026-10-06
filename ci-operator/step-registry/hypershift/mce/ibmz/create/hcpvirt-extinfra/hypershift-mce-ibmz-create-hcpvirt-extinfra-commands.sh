@@ -59,11 +59,9 @@ cp /tmp/.dockerconfigjson /tmp/pull-secret
 PULL_SECRET_FILE=/tmp/pull-secret
 set -x
 
-# Both mgmt and infra clusters are libvirt NAT bridges on the same LPAR (10.0.1.15).
-# The two bridges (ocp2: 192.168.2.x, ocp3: 192.168.3.x) are L2-isolated — NAT mode
-# does not route between them. The MetalLB VIP (192.168.2.x) is unreachable from the
-# infra bridge, so VMIs can never fetch ignition using the default LoadBalancer address.
-# The LPAR host IP (10.0.1.15) is reachable from both bridges as it is the NAT gateway.
+# The LPAR host IP (10.0.1.15) is the NAT gateway for the libvirt bridge and is
+# reachable from the CI runner pod via haproxy. We pin the kube-apiserver Service
+# to a fixed NodePort so the nested kubeconfig can point at MGMT_HOST_IP:FIXED_NODEPORT.
 echo "$(date) Using HC_NAME=${HC_NAME}, HC_NS=${HC_NS}"
 MGMT_HOST_IP=10.0.1.15
 echo "$(date) LPAR host IP: ${MGMT_HOST_IP}"
@@ -78,7 +76,6 @@ else
 fi
 echo "$(date) Fixed NodePort for lease ${MGMT_CLUSTER_LEASE}: ${FIXED_NODEPORT}"
 
-HC_MANIFEST="/tmp/hcp-kubevirt-manifests.yaml"
 hcp create cluster kubevirt \
   --name ${HC_NAME} \
   --node-pool-replicas 2 \
@@ -95,76 +92,38 @@ hcp create cluster kubevirt \
   --release-image ${OCP_IMAGE_MULTI} \
   --annotations "resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m" \
   --annotations "resource-request-override.hypershift.openshift.io/kube-scheduler.kube-scheduler=memory=512Mi,cpu=500m" \
-  --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m" \
-  --render-sensitive --render > "${HC_MANIFEST}"
+  --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m"
 
-echo "$(date) Rendered HCP manifests to ${HC_MANIFEST}"
+echo "$(date) HCP cluster created"
 
-# Patch the kube-apiserver Service in the rendered manifest:
-#   - type: NodePort  (so the LPAR haproxy can reach it on a fixed port)
-#   - nodePort: FIXED_NODEPORT  (deterministic per-lease port)
-#   - server hint in the same document: MGMT_HOST_IP:FIXED_NODEPORT
-#
-# Strategy: split the multi-document YAML on '---', process each document
-# through Python, reassemble with '---' separators, then overwrite the file.
-echo "$(date) Patching kube-apiserver Service → type=NodePort, nodePort=${FIXED_NODEPORT}, host=${MGMT_HOST_IP}"
-python3 - "${HC_MANIFEST}" "${FIXED_NODEPORT}" "${MGMT_HOST_IP}" <<'PYEOF'
-import sys, re
+# --- Pin the kube-apiserver Service NodePort to FIXED_NODEPORT ---
+# HyperShift creates a LoadBalancer Service named "kube-apiserver" in the
+# control-plane namespace (HC_NS-HC_NAME) shortly after the HostedCluster is
+# applied. We wait for it to appear, then patch its port entry to the fixed
+# NodePort that haproxy on the LPAR has pre-configured. MetalLB continues to
+# manage the VIP; only the nodePort field is pinned.
+KAPI_SVC_NS="${HC_NS}-${HC_NAME}"
+KAPI_SVC_NAME="kube-apiserver"
 
-manifest_path = sys.argv[1]
-fixed_nodeport = int(sys.argv[2])
-mgmt_host_ip   = sys.argv[3]
+echo "$(date) Waiting for Service ${KAPI_SVC_NAME} to appear in ${KAPI_SVC_NS}"
+for i in {1..60}; do
+  if oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" &>/dev/null; then
+    echo "$(date) Service ${KAPI_SVC_NAME} found (attempt ${i})"
+    break
+  fi
+  echo "$(date) Service not yet present, waiting 10s... (${i}/60)"
+  sleep 10
+done
 
-with open(manifest_path) as f:
-    raw = f.read()
+if ! oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" &>/dev/null; then
+  echo "$(date) ERROR: Service ${KAPI_SVC_NAME} did not appear within 10 minutes"
+  exit 1
+fi
 
-# Split on document separators, preserving them
-docs = re.split(r'^---\s*$', raw, flags=re.MULTILINE)
-
-patched_docs = []
-for doc in docs:
-    # Target: the kube-apiserver Service — hcp render may name it either
-    # "APIServer" or "kube-apiserver" depending on the HyperShift version.
-    is_service     = bool(re.search(r'^\s*kind:\s*Service\s*$', doc, re.MULTILINE))
-    is_kas_service = bool(re.search(r'^\s*name:\s*(kube-apiserver|APIServer)\s*$', doc, re.MULTILINE))
-    if is_service and is_kas_service:
-
-        # Switch type to NodePort
-        doc = re.sub(r'(\btype:\s*)LoadBalancer', r'\1NodePort', doc)
-        doc = re.sub(r'(\btype:\s*)ClusterIP',   r'\1NodePort', doc)
-
-        # If a nodePort line already exists on the apiserver port, replace it;
-        # otherwise inject it after the port: 6443 line.
-        if re.search(r'^\s*nodePort:\s*\d+', doc, re.MULTILINE):
-            doc = re.sub(r'(\s*nodePort:\s*)\d+', lambda m: m.group(1) + str(fixed_nodeport), doc)
-        else:
-            doc = re.sub(
-                r'((\s*)port:\s*6443)',
-                lambda m: m.group(1) + '\n' + m.group(2) + 'nodePort: ' + str(fixed_nodeport),
-                doc,
-            )
-
-        print(f"  [patch] kube-apiserver Service → type=NodePort, nodePort={fixed_nodeport}",
-              file=sys.stderr)
-
-    patched_docs.append(doc)
-
-with open(manifest_path, 'w') as f:
-    f.write('---'.join(patched_docs))
-PYEOF
-
-echo "$(date) Patched manifest written to ${HC_MANIFEST}"
-echo "$(date) kube-apiserver Service after patch:"
-python3 -c "
-import re, sys
-raw = open(sys.argv[1]).read()
-for doc in re.split(r'^---\s*$', raw, flags=re.MULTILINE):
-    if re.search(r'kind:\s*Service', doc) and re.search(r'name:\s*(kube-apiserver|APIServer)', doc):
-        print(doc)
-" "${HC_MANIFEST}" || true
-
-echo "$(date) Applying HCP manifests"
-oc apply -f "${HC_MANIFEST}"
+echo "$(date) Patching ${KAPI_SVC_NAME} port[0].nodePort → ${FIXED_NODEPORT}"
+oc patch svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" --type=json \
+  -p "[{\"op\":\"replace\",\"path\":\"/spec/ports/0/nodePort\",\"value\":${FIXED_NODEPORT}}]"
+echo "$(date) NodePort pinned to ${FIXED_NODEPORT} on Service ${KAPI_SVC_NAME}"
 
 echo "$(date) DEBUG: Sleeping 40 minutes after hcp create to let HC and NodePool settle"
 sleep 2400
