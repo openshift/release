@@ -1,0 +1,23 @@
+workflow:
+  as: hypershift-aws-e2e-v2-osimagestream
+  documentation: |-
+    Temporary workflow for validating OSImageStream (dual-stream RHEL 9/10)
+    in HyperShift E2E tests. Creates a hosted cluster with
+    TechPreviewNoUpgrade so the MCO processes OSImageStream manifests.
+
+    This workflow will be removed once the OSStreams feature gate is
+    graduated to Default for the Hypershift cluster profile
+    (openshift/api#2950). After graduation, the osimagestream tests
+    can run in the standard e2e-v2-aws workflow without TechPreview.
+  steps:
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster
+    test:
+    - chain: hypershift-e2e-v2-osimagestream
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create

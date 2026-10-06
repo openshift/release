@@ -1,0 +1,90 @@
+ref:
+  as: etcd-encryption-vault-install
+  from: tests
+  commands: etcd-encryption-vault-install-commands.sh
+  credentials:
+  - collection: openshift-tests-private
+    group: tests-private-account
+    mount_path: /var/run/vault/tests-private-account
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: VAULT_ENTERPRISE_IMAGE
+    default: "quay.io/openshifttest/vault-enterprise:2.0.0-ent"
+    documentation: |-
+      Full reference for the Vault Enterprise image installed via Helm in encryption-kms jobs.
+      Override at job level to trial a new Vault Enterprise image. On baremetalds jobs the
+      repository, mirror source, Helm repository/tag, and local mirror tag are derived from
+      this value.
+  - name: VAULT_CHART_VERSION
+    default: "0.28.1"
+    documentation: |-
+      Version of the Vault Helm chart to use.
+      Check https://github.com/hashicorp/vault-helm/releases for available versions.
+  - name: VAULT_NAMESPACE
+    default: "vault-kms"
+    documentation: |-
+      Namespace where Vault Enterprise will be installed.
+  - name: VAULT_SECONDARY_NAMESPACE
+    default: "vault-kms-secondary"
+    documentation: |-
+      Namespace where the second Vault Enterprise instance will be installed.
+  - name: VAULT_KMS_PLUGIN_IMAGE
+    default: "quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a"
+    documentation: |-
+      Full reference for the vault-kube-kms plugin image used by encryption-kms tests.
+      Source: quay.io/openshifttest/vault-kube-kms:0.1.0-beta-ubi (manifest list, pinned by digest).
+      Override at job level to trial a new plugin image.
+      On baremetalds jobs the repository, mirror source, and local mirror tag are all
+      derived from this value.
+  - name: VAULT_STORAGE_CLASS
+    default: ""
+    documentation: |-
+      StorageClass for the Vault file backend PVC. When unset, the cluster default
+      StorageClass is used. On equinix-ocp-metal jobs with no StorageClass, the step
+      provisions vault-local-storage with a hostPath PersistentVolume.
+  - name: VAULT_LICENSE_FILE
+    default: "/var/run/vault/tests-private-account/kms-vault-license"
+    documentation: |-
+      Path to the Vault Enterprise license file on the CI test pod filesystem.
+  documentation: |-
+    Installs HashiCorp Vault Enterprise via Helm.
+
+    This step:
+    - Installs Helm if not present
+    - Adds HashiCorp Helm repository
+    - Creates vault namespace with appropriate SCC (anyuid on cloud, hostmount-anyuid on bare metal hostPath storage)
+    - Creates vault-license secret from mounted credential (if available)
+    - Mirrors Vault Enterprise and vault-kube-kms plugin images to the dev-scripts local registry on baremetalds jobs (skopeo copy --all with oc image mirror fallback, purge under the discovered dev-scripts registry repository root, per-image retry, and platform-specific pull verification for the host architecture)
+    - Applies ImageContentSourcePolicy/vault-mirror so cluster nodes pull both images from the local mirror
+    - Installs Vault Enterprise using Helm chart in standalone mode with file storage
+    - Provisions vault-local-storage (hostPath PV with pre-created node directory, SELinux context, recursive ownership for Vault uid 100:gid 1000) on baremetal when no StorageClass exists
+    - Configures server.statefulSet.securityContext.pod (runAsUser/fsGroup 100/1000; required because vault-helm 0.28 skips pod securityContext when global.openshift is true and the enterprise license secret is mounted mode 0440)
+    - Pre-creates hostPath directory ownership and SELinux context on the worker node via oc debug node (no root initContainer; conflicts with runAsNonRoot)
+    - Requests an OpenShift service-CA serving certificate for the client Service, then restarts the Vault StatefulSet so TLS and WaitForFirstConsumer PVC binding proceed on cloud platforms
+    - Initializes and unseals Vault, storing the root token and unseal key in Secrets
+    - Deploys an auto-unseal sidecar so Vault comes back unsealed after pod restarts
+    - Waits for Vault pod to be ready
+    - Installs a second instance in VAULT_SECONDARY_NAMESPACE
+
+    Prerequisites:
+    - OpenShift cluster with adequate resources
+    - Vault Enterprise license secret named 'tests-private-account' in test-credentials namespace
+      (automatically mounted at /var/run/vault/tests-private-account/)
+
+    Outputs:
+    - Vault service available at: vault.${VAULT_NAMESPACE}.svc:8200
+    - Vault pod: vault-0 (Ready state)
+    - Persistent volume: data-vault-0 (file storage for transit keys)
+    - Secrets: vault-root-token, vault-unseal-key (namespace: ${VAULT_NAMESPACE})
+    - CA ConfigMap: vault-ca-bundle (openshift-config namespace)
+    - Second Vault service at: vault-secondary.${VAULT_SECONDARY_NAMESPACE}.svc:8200
+    - Second Vault pod: vault-secondary-0 (Ready state)
+    - Persistent volume: data-vault-secondary-0
+    - Secrets: vault-root-token, vault-unseal-key (namespace: ${VAULT_SECONDARY_NAMESPACE})
+    - CA ConfigMap: vault-ca-bundle-secondary (openshift-config namespace)
+
+    Next step:
+    - Run etcd-encryption-vault-configure to initialize and configure Vault for KMS

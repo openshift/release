@@ -1,0 +1,26 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-custom-dns-provision
+  steps:
+  - chain: ipi-conf-aws
+  - ref: ipi-conf-aws-usage-info
+  - chain: aws-provision-iam-user-minimal-permission
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install
+  - ref: aws-provision-public-custom-dns
+  - ref: gcp-provision-public-dns-zone-record-sets
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
+  - ref: cucushift-installer-check-user-provisioned-dns
+  - chain: cucushift-installer-check
+  - ref: enable-qe-catalogsource
+  env:
+  - name: USER_PROVISIONED_DNS
+    default: "yes"
+    documentation: |-
+      Allow users to select the user provisioned dns option for AWS installations during configuration. Valid options are "yes" and "no". When "yes", the
+      configuration will enable the user provisioned dns option through the install configuration file.
+  documentation: |-
+    Create an IPI cluster with user provisioned DNS.

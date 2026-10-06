@@ -1,0 +1,35 @@
+ref:
+  as: rosa-operator-coverage-collect
+  from: src
+  cli: latest
+  best_effort: true
+  grace_period: 2m
+  commands: rosa-operator-coverage-collect-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 10m0s
+  env:
+  - name: OPERATOR_NAME
+    default: ""
+    documentation: Short name of the operator (e.g. route-monitor-operator).
+  - name: OPERATOR_NAMESPACE
+    default: ""
+    documentation: Namespace where the operator deploys. Defaults to openshift-<OPERATOR_NAME>.
+  - name: OPERATOR_DEPLOYMENT_NAME
+    default: ""
+    documentation: Name of the deployment to collect coverage from. Defaults to OPERATOR_NAME.
+  documentation: |-
+    Collects Go binary coverage data from the operator pod after e2e tests.
+    Sends SIGTERM to flush coverage, copies data via oc cp, and generates
+    reports in multiple formats (Go profile, JSON, HTML).
+
+    Run in post before rosa-operator-cleanup. Requires the operator to be
+    built with -cover and GOCOVERDIR set (via rosa-operator-coverage-setup).
+
+    Artifacts:
+      - coverage.out: standard Go coverage profile
+      - coverage-report.json: JSON summary for dashboard
+      - coverage.html: HTML report for Prow artifact viewer
+      - coverage-func.txt: per-function coverage text

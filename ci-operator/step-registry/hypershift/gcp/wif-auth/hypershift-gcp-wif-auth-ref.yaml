@@ -1,0 +1,30 @@
+ref:
+  as: hypershift-gcp-wif-auth
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  commands: hypershift-gcp-wif-auth-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 2m0s
+  documentation: |-
+    Generates a GCP Workload Identity Federation credential config for the current
+    build cluster and writes it to ${SHARED_DIR}/wif-cred.json.
+
+    Must run as the first pre step so the credential file is durably synced to
+    SHARED_DIR before any step that could be interrupted — including the post-phase
+    deprovision step, which relies on it for authentication.
+
+    Subsequent steps authenticate with:
+      gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"
+
+    The credential config uses credential_source.file (not the token content itself),
+    so gcloud re-reads the projected SA token on each API call — no expiry issue
+    across long-running jobs.
+
+    The cluster profile must contain:
+    - wif-config.json: JSON object with fields project_number, pool_id, service_account,
+      and issuer_map (a map of OIDC issuer URI to WIF provider ID)

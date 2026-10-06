@@ -1,0 +1,44 @@
+binary_build_commands: go mod vendor
+build_root:
+  from_repository: true
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: "2"
+      memory: 4Gi
+tests:
+- as: unit
+  steps:
+    test:
+    - as: unit-steps
+      commands: scripts/openshiftci-presubmit-unittests.sh
+      credentials:
+      - collection: gitops-operator-codecov
+        group: gitops-operator-codecov-token
+        mount_path: /var/run/codecov-token
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+- as: unit-postsubmit
+  postsubmit: true
+  steps:
+    test:
+    - as: unit-steps
+      commands: scripts/openshiftci-presubmit-unittests.sh
+      credentials:
+      - collection: gitops-operator-codecov
+        group: gitops-operator-codecov-token
+        mount_path: /var/run/codecov-token
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+zz_generated_metadata:
+  branch: master
+  org: redhat-developer
+  repo: gitops-operator
