@@ -386,8 +386,15 @@ EOF
 # unconditionally.
 YQ_TMPDIR="$(mktemp -d)"
 YQ="${YQ_TMPDIR}/yq"
-curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-	-o "${YQ}" && chmod +x "${YQ}"
+yq_version="v4.47.2"
+case "$(uname -m)" in
+	x86_64) yq_arch="amd64"; yq_sha256="1bb99e1019e23de33c7e6afc23e93dad72aad6cf2cb03c797f068ea79814ddb0" ;;
+	aarch64) yq_arch="arm64"; yq_sha256="05df1f6aed334f223bb3e6a967db259f7185e33650c3b6447625e16fea0ed31f" ;;
+	*) echo "Unsupported architecture for yq: $(uname -m)" >&2; exit 1 ;;
+esac
+curl -fsSL "https://github.com/mikefarah/yq/releases/download/${yq_version}/yq_linux_${yq_arch}" -o "${YQ}"
+printf '%s  %s\n' "${yq_sha256}" "${YQ}" | sha256sum --check --status
+chmod +x "${YQ}"
 
 # Merge a config fragment into config.yaml with list-append semantics ('*+',
 # not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
