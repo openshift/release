@@ -770,6 +770,60 @@ tests:
     - ref: azure-provision-resourcegroup
     - ref: aro-provision-vnet
     - ref: aro-provision-cluster
+    - as: subscription-report
+      commands: |
+        # azure-provision-resourcegroup selects the profile's subscriptionId;
+        # aro-provision-vnet, aro-provision-cluster and aro-deprovision log in
+        # and use az's default. Report which subscription holds the group, the
+        # vnet and the cluster. Ids are never printed: prow logs are public.
+        set +e
+        set -uo pipefail
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        report() {
+          AZURE_CONFIG_DIR="$(mktemp -d)"
+          export AZURE_CONFIG_DIR
+          sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+          az login --service-principal \
+            --username "$(jq -er .clientId "${sp}")" \
+            --password="$(jq -er .clientSecret "${sp}")" \
+            --tenant "$(jq -er .tenantId "${sp}")" --output none || return
+          profile_sub="$(jq -er .subscriptionId "${sp}")"
+          default_sub="$(az account show --query id -o tsv)"
+          rg="$(<"${SHARED_DIR}/resourcegroup")"
+          cluster="$(<"${SHARED_DIR}/cluster-name")"
+
+          echo "subscriptions visible to the profile's principal: $(az account list --query 'length(@)' -o tsv)"
+          if [[ "${default_sub}" == "${profile_sub}" ]]; then
+            echo "az's default after login is the profile's subscriptionId"
+          else
+            echo "az's default after login is not the profile's subscriptionId"
+          fi
+
+          for which in profile default; do
+            if [[ "${which}" == profile ]]; then sub="${profile_sub}"; else sub="${default_sub}"; fi
+            echo "== ${which} subscription"
+            if [[ "$(az group exists -n "${rg}" --subscription "${sub}")" != true ]]; then
+              echo "  group ${rg}: absent"
+              continue
+            fi
+            echo "  group ${rg}: present"
+            echo "  vnets: $(az network vnet list -g "${rg}" --subscription "${sub}" --query '[].name' -o tsv | paste -sd ' ')"
+            echo "  ARO cluster ${cluster}: $(az aro show -g "${rg}" -n "${cluster}" --subscription "${sub}" \
+              --query provisioningState -o tsv 2>/dev/null || echo absent)"
+          done
+        }
+
+        report 2>&1 | redact
+        exit 0
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - ref: ipi-install-rbac
     test:
     - as: grant-network-role
