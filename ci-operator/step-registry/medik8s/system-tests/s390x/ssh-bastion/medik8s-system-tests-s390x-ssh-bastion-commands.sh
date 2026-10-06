@@ -43,6 +43,19 @@ if [[ ! -f "${SSH_PUB_KEY_FILE}" ]]; then
   exit 1
 fi
 
+# Dedicated bastion login key. Cluster-profile pub/priv pairs have been observed
+# to fail bastion auth on this path (Permission denied) even when workers accept
+# the same private key. Generate our own key for bastion login; keep the cluster
+# pubkey too so either key can open the bastion. Worker hops still use the
+# cluster private key (nodes are installed with that public key).
+bastion_key_dir="$(mktemp -d)"
+ssh-keygen -q -t ed25519 -f "${bastion_key_dir}/id_bastion" -C 'medik8s-s390x-bastion' -N ''
+cat "${bastion_key_dir}/id_bastion.pub" "${SSH_PUB_KEY_FILE}" > "${bastion_key_dir}/authorized_keys"
+cp "${bastion_key_dir}/id_bastion" "${SHARED_DIR}/medik8s_bastion_ssh_key"
+chmod 600 "${SHARED_DIR}/medik8s_bastion_ssh_key"
+echo "Bastion login key fingerprint: $(ssh-keygen -lf "${bastion_key_dir}/id_bastion.pub" | awk '{print $2}')"
+echo "Cluster pubkey fingerprint:    $(ssh-keygen -lf "${SSH_PUB_KEY_FILE}" | awk '{print $2}')"
+
 echo "Creating namespace ${SSH_BASTION_NAMESPACE}..."
 oc apply -f - <<EOF
 apiVersion: v1
@@ -68,7 +81,7 @@ oc adm policy add-scc-to-user privileged -z ssh-bastion -n "${SSH_BASTION_NAMESP
 
 echo "Generating ssh host keys and sshd_config (listen :2222 for hostNetwork)..."
 workdir="$(mktemp -d)"
-trap 'rm -rf "${workdir}"' EXIT
+trap 'rm -rf "${workdir}" "${bastion_key_dir}"' EXIT
 ssh-keygen -q -t rsa -f "${workdir}/ssh_host_rsa_key" -C '' -N ''
 ssh-keygen -q -t ecdsa -f "${workdir}/ssh_host_ecdsa_key" -C '' -N ''
 ssh-keygen -q -t ed25519 -f "${workdir}/ssh_host_ed25519_key" -C '' -N ''
@@ -79,9 +92,12 @@ HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
 SyslogFacility AUTHPRIV
 PermitRootLogin no
+PubkeyAuthentication yes
 AuthorizedKeysFile /home/core/.ssh/authorized_keys
+# Containerized sshd: avoid host-uid/home StrictModes rejections.
+StrictModes no
 PasswordAuthentication no
-ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
 UsePAM no
 X11Forwarding no
 PrintMotd no
@@ -100,7 +116,7 @@ oc -n "${SSH_BASTION_NAMESPACE}" create secret generic ssh-host-keys \
 
 oc -n "${SSH_BASTION_NAMESPACE}" delete secret ssh-authorized-keys --ignore-not-found
 oc -n "${SSH_BASTION_NAMESPACE}" create secret generic ssh-authorized-keys \
-  --from-file="authorized_keys=${SSH_PUB_KEY_FILE}"
+  --from-file="authorized_keys=${bastion_key_dir}/authorized_keys"
 
 echo "Creating ClusterIP Service (forwards to hostNetwork sshd :2222)..."
 oc -n "${SSH_BASTION_NAMESPACE}" apply -f - <<EOF
@@ -208,11 +224,15 @@ if ! oc -n "${SSH_BASTION_NAMESPACE}" rollout status deployment/ssh-bastion --ti
 fi
 oc -n "${SSH_BASTION_NAMESPACE}" get pods,svc -o wide
 
+bastion_pod="$(oc -n "${SSH_BASTION_NAMESPACE}" get pods -l run=ssh-bastion -o jsonpath='{.items[0].metadata.name}')"
+echo "Installed authorized_keys fingerprints in bastion:"
+oc -n "${SSH_BASTION_NAMESPACE}" exec "${bastion_pod}" -- \
+  ssh-keygen -lf /home/core/.ssh/authorized_keys || true
+
 # Prove the bastion pod can reach a worker on the machine network.
 worker_ip="$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)"
 if [[ -n "${worker_ip}" ]]; then
   echo "Checking bastion -> worker ${worker_ip}:22 connectivity from inside the bastion pod..."
-  bastion_pod="$(oc -n "${SSH_BASTION_NAMESPACE}" get pods -l run=ssh-bastion -o jsonpath='{.items[0].metadata.name}')"
   if ! oc -n "${SSH_BASTION_NAMESPACE}" exec "${bastion_pod}" -- \
       bash -c "timeout 10 bash -c 'echo >/dev/tcp/${worker_ip}/22'" 2>/dev/null; then
     echo "ERROR: bastion pod cannot TCP-connect to ${worker_ip}:22 (machine network unreachable)" >&2
@@ -221,6 +241,34 @@ if [[ -n "${worker_ip}" ]]; then
   fi
   echo "Bastion -> worker TCP check succeeded"
 fi
+
+# Prove bastion login works with the dedicated key (same path run-tests will use).
+echo "Verifying bastion SSH login via port-forward with dedicated key..."
+pf_log="$(mktemp)"
+oc -n "${SSH_BASTION_NAMESPACE}" port-forward svc/ssh-bastion 12222:22 >"${pf_log}" 2>&1 &
+pf_pid=$!
+cleanup_pf() { kill "${pf_pid}" 2>/dev/null || true; }
+trap 'cleanup_pf; rm -rf "${workdir}" "${bastion_key_dir}"' EXIT
+for _ in $(seq 1 30); do
+  if (echo >/dev/tcp/127.0.0.1/12222) >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+if ! ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -o ConnectTimeout=10 -p 12222 -i "${SHARED_DIR}/medik8s_bastion_ssh_key" \
+    core@127.0.0.1 'echo bastion-login-ok; hostname'; then
+  echo "ERROR: bastion SSH login failed with dedicated key" >&2
+  echo "--- port-forward log ---" >&2
+  cat "${pf_log}" >&2 || true
+  echo "--- bastion sshd logs ---" >&2
+  oc -n "${SSH_BASTION_NAMESPACE}" logs "${bastion_pod}" --tail=80 >&2 || true
+  dump_bastion_debug
+  exit 1
+fi
+cleanup_pf
+trap 'rm -rf "${workdir}" "${bastion_key_dir}"' EXIT
+echo "Bastion SSH login verification succeeded"
 
 echo "port-forward" > "${SHARED_DIR}/medik8s_ssh_bastion_mode"
 echo "=== ssh-bastion ready ==="
