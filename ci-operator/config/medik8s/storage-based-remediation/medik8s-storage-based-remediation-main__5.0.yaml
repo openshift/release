@@ -143,6 +143,13 @@ tests:
           printf '%s\n' "$revision" > "$ARTIFACT_DIR/sbr-source-commit.txt"
 
           cd /tmp/sbr-source
+          # Reuse the runner's SDK only when it matches this checkout's tool pin.
+          local sdk_version required_sdk_version
+          sdk_version="$(operator-sdk version | sed -n 's/^operator-sdk version: "\([^"]*\)".*/\1/p')"
+          required_sdk_version="$(sed -n 's/^OPERATOR_SDK_VERSION[[:space:]]*[?]*=[[:space:]]*//p' Makefile)"
+          printf 'Operator SDK: %s; required by source: %s\n' "$sdk_version" "$required_sdk_version"
+          test -n "$required_sdk_version" && test "$sdk_version" = "$required_sdk_version"
+
           export SBR_VERSION
           SBR_VERSION="$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)"
           test -n "$SBR_VERSION"
@@ -162,6 +169,8 @@ tests:
 
           echo '==> Build and push operator, agent, bundle, and catalog with the shared target'
           make dev-olm-catalog-push \
+            OPERATOR_SDK=/usr/local/bin/operator-sdk \
+            DEV_OLM_OPERATOR_SDK=/usr/local/bin/operator-sdk \
             DEV_REGISTRY=ttl.sh \
             TTL_SH_TTL=3h \
             CONTAINER_TOOL=podman \

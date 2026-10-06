@@ -153,6 +153,13 @@ tests:
           printf '%s\n' "$revision" > "$ARTIFACT_DIR/nhc-source-commit.txt"
 
           cd /tmp/nhc-source
+          # Reuse the runner's SDK only when it matches this checkout's tool pin.
+          local sdk_version required_sdk_version
+          sdk_version="$(operator-sdk version | sed -n 's/^operator-sdk version: "\([^"]*\)".*/\1/p')"
+          required_sdk_version="$(sed -n 's/^OPERATOR_SDK_VERSION[[:space:]]*[?]*=[[:space:]]*//p' Makefile)"
+          printf 'Operator SDK: %s; required by source: %s\n' "$sdk_version" "$required_sdk_version"
+          test -n "$required_sdk_version" && test "$sdk_version" = "$required_sdk_version"
+
           export NHC_VERSION
           NHC_VERSION="$(sed -n 's/^[[:space:]]*Version = "\([^"]*\)".*/\1/p' version/version.go)"
           local makefile_version
@@ -173,6 +180,8 @@ tests:
 
           echo '==> Build and push operator, bundle, and catalog with the shared target'
           make dev-olm-catalog-push \
+            OPERATOR_SDK=/usr/local/bin/operator-sdk \
+            DEV_OLM_OPERATOR_SDK=/usr/local/bin/operator-sdk \
             DEV_REGISTRY=ttl.sh \
             TTL_SH_TTL=3h \
             CONTAINER_TOOL=podman \
