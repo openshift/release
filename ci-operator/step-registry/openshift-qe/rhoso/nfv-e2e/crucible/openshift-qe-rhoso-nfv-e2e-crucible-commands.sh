@@ -4,17 +4,23 @@ set -o nounset
 set -o pipefail
 
 : "${SCENARIO:?SCENARIO must be set}"
+: "${TIMEOUT_CRUCIBLE:?TIMEOUT_CRUCIBLE must be set}"
 : "${EDPM_HOST:?EDPM_HOST must be set}"
+: "${FRAME_SIZES:?FRAME_SIZES must be set}"
 
+[[ "${TIMEOUT_CRUCIBLE}" =~ ^[1-9][0-9]*$ ]] || { echo 'TIMEOUT_CRUCIBLE must be a positive decimal integer' >&2; exit 1; }
 [[ "${SCENARIO}" =~ ^[A-Za-z0-9._-]+$ ]] || { echo 'SCENARIO contains unsafe characters' >&2; exit 1; }
 [[ "${EDPM_HOST}" =~ ^[A-Za-z0-9._:-]+$ ]] || { echo 'EDPM_HOST contains unsafe characters' >&2; exit 1; }
+[[ "${FRAME_SIZES}" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo 'FRAME_SIZES contains unsafe characters' >&2; exit 1; }
 
 SSH_ARGS=(
   -i "${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key"
   -o StrictHostKeyChecking=no
   -o UserKnownHostsFile=/dev/null
+  -o LogLevel=ERROR
   -o ServerAliveInterval=60
   -o ServerAliveCountMax=240
+  -o ConnectTimeout=30
 )
 jumphost=$(<"${CLUSTER_PROFILE_DIR}/address")
 bastion=$(<"${CLUSTER_PROFILE_DIR}/bastion")
@@ -22,33 +28,39 @@ bastion=$(<"${CLUSTER_PROFILE_DIR}/bastion")
   { echo 'SSH host contains unsafe characters' >&2; exit 1; }
 
 # shellcheck disable=SC2087
-ssh "${SSH_ARGS[@]}" root@"${jumphost}" bash -s -- "${bastion}" "${SCENARIO}" "${EDPM_HOST}" <<'REMOTE'
+ssh "${SSH_ARGS[@]}" root@"${jumphost}" bash -s -- "${bastion}" "${SCENARIO}" "${TIMEOUT_CRUCIBLE}" "${EDPM_HOST}" "${FRAME_SIZES}" <<'REMOTE'
 set -o errexit
 set -o nounset
 set -o pipefail
 
 bastion="$1"
 scenario="$2"
-edpm_host="$3"
+timeout_crucible="$3"
+edpm_host="$4"
+frame_sizes="$5"
 workspace=/home/zuul/netperf-rhoso18-nfv-e2e-validation
-log_file=/tmp/nfv-e2e-deployment.log
+log_file=/tmp/nfv-e2e-crucible.log
 SSH_ARGS=(
   -o StrictHostKeyChecking=no
   -o UserKnownHostsFile=/dev/null
+  -o LogLevel=ERROR
   -o ServerAliveInterval=60
   -o ServerAliveCountMax=240
+  -o ConnectTimeout=30
 )
 
 # shellcheck disable=SC2087
-ssh "${SSH_ARGS[@]}" zuul@"${bastion}" bash -s -- "${scenario}" "${edpm_host}" "${workspace}" "${log_file}" <<'INNER'
+ssh "${SSH_ARGS[@]}" zuul@"${bastion}" bash -s -- "${scenario}" "${timeout_crucible}" "${edpm_host}" "${frame_sizes}" "${workspace}" "${log_file}" <<'INNER'
 set -o errexit
 set -o nounset
 set -o pipefail
 
 scenario="$1"
-edpm_host="$2"
-workspace="$3"
-log_file="$4"
+timeout_crucible="$2"
+edpm_host="$3"
+frame_sizes="$4"
+workspace="$5"
+log_file="$6"
 
 umask 077
 tmp_log=''
@@ -65,8 +77,11 @@ if ! cd -- "${workspace}"; then
   exit 1
 fi
 set +o errexit
-make e2e "SCENARIO=${scenario}" CLEAN_FIRST=1 LAB_ENV=~/nfv-e2e/lab-init.env \
-  E2E_EXTRA="--skip-crucible --edpm-host ${edpm_host}" 2>&1 | tee "${log_file}"
+make e2e-crucible \
+  "SCENARIO=${scenario}" \
+  LAB_ENV=~/nfv-e2e/lab-init.env \
+  E2E_EXTRA="--timeout-crucible ${timeout_crucible} --edpm-host ${edpm_host} --frame-sizes ${frame_sizes}" \
+  2>&1 | tee "${log_file}"
 pipeline_status=("${PIPESTATUS[@]}")
 set -o errexit
 workload_status="${pipeline_status[0]}"
