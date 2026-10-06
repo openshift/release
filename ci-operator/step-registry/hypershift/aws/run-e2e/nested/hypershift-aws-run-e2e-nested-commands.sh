@@ -134,23 +134,14 @@ if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-false}" == "true" ]]; then
   fi
   echo "Using management cluster availability zones: ${E2E_AWS_AVAILABILITY_ZONES}"
 
-  MANAGEMENT_PUBLIC_ZONE_ID="$(oc --kubeconfig="${KUBECONFIG}" get dns cluster -o jsonpath='{.spec.publicZone.id}')"
-  if [[ -z "${MANAGEMENT_PUBLIC_ZONE_ID}" ]]; then
-    echo "Failed to get the management cluster public DNS zone ID" >&2
+  MANAGEMENT_CLUSTER_DOMAIN="$(oc --kubeconfig="${KUBECONFIG}" get dns cluster -o jsonpath='{.spec.baseDomain}')"
+  if [[ "${MANAGEMENT_CLUSTER_DOMAIN}" != *.* ]]; then
+    echo "Failed to get a fully qualified base domain from the management cluster DNS resource" >&2
     exit 1
   fi
 
-  E2E_BASE_DOMAIN="$(AWS_SHARED_CREDENTIALS_FILE="${E2E_AWS_CREDENTIALS_FILE}" \
-    aws route53 get-hosted-zone \
-      --id "${MANAGEMENT_PUBLIC_ZONE_ID}" \
-      --query 'HostedZone.Name' \
-      --output text \
-      --region us-east-1)"
-  E2E_BASE_DOMAIN="${E2E_BASE_DOMAIN%.}" # Remove the trailing dot
-  if [[ -z "${E2E_BASE_DOMAIN}" || "${E2E_BASE_DOMAIN}" == "None" ]]; then
-    echo "Failed to resolve the management cluster public DNS zone name" >&2
-    exit 1
-  fi
+  # spec.baseDomain contains the cluster-specific label followed by the base domain.
+  E2E_BASE_DOMAIN="${MANAGEMENT_CLUSTER_DOMAIN#*.}"
   echo "Using management cluster base domain: ${E2E_BASE_DOMAIN}"
 fi
 
