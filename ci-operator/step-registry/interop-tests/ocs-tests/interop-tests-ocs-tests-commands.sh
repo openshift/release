@@ -148,8 +148,8 @@ RUN:
   bin_dir: "${BIN_FOLDER}"
   log_dir: "${LOGS_FOLDER}"
 REPORTING:
-  default_ocs_must_gather_image: "quay.io/rhceph-dev/ocs-must-gather"
-  default_ocs_must_gather_latest_tag: "latest-${ODF_VERSION_MAJOR_MINOR}"
+  default_ocs_must_gather_image: "registry.redhat.io/odf4/ocs-must-gather-rhel9"
+  default_ocs_must_gather_latest_tag: "v${ODF_VERSION_MAJOR_MINOR}"
 DEPLOYMENT:
   skip_download_client: True
 __EOF__
