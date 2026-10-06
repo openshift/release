@@ -7,6 +7,7 @@ set -o pipefail
 # Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
 # Files are prefixed with "infra-" to stay flat in SHARED_DIR — Kubernetes
 # secrets don't support subdirectories and silently drop them between steps.
+MGMT_LEASED_RESOURCE="${LEASED_RESOURCE:-}"
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
   INFRA_PREFIX="infra-"
@@ -56,6 +57,18 @@ else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi
 
+# MGMT_SUBNET_OVERRIDE: use the mgmt cluster's subnet for machineNetwork so it
+# matches the bridge chosen in the network conf step.
+# Auto-detect from the mgmt lease if not explicitly set (same logic as network conf step).
+if [[ -n "${MGMT_SUBNET_OVERRIDE:-}" ]]; then
+  MACHINE_SUBNET="${MGMT_SUBNET_OVERRIDE}"
+elif [[ -n "${MGMT_LEASED_RESOURCE}" && -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
+  MACHINE_SUBNET="$(yq-v4 -oy ".\"${MGMT_LEASED_RESOURCE}\".subnet" "${CLUSTER_PROFILE_DIR}/leases" 2>/dev/null || true)"
+  [[ -z "${MACHINE_SUBNET}" ]] && MACHINE_SUBNET="$(leaseLookup 'subnet')"
+else
+  MACHINE_SUBNET="$(leaseLookup 'subnet')"
+fi
+
 # Default UPI installation
 echo "Create the install-config.yaml file..."
 cat >> "${SHARED_DIR}/${INFRA_PREFIX}install-config.yaml" << EOF
@@ -73,7 +86,7 @@ networking:
   - cidr: 10.8.0.0/14
     hostPrefix: 23
   machineNetwork:
-  - cidr: "192.168.$(leaseLookup "subnet").0/24"
+  - cidr: "192.168.${MACHINE_SUBNET}.0/24"
   networkType: OVNKubernetes
   serviceNetwork:
   - 172.30.0.0/16
