@@ -92,7 +92,7 @@ tests:
         : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
         exec > >(tee "$ARTIFACT_DIR/nhc-upgrade-tests.log") 2>&1
 
-        export CONSOLE_PLUGIN_IMAGE=quay.io/medik8s/node-remediation-console@sha256:384d35e7aed7be24f8837e33cfd1e94a683a1cdcafb7da58f813ae233e957ff7
+        export CONSOLE_PLUGIN_IMAGE=quay.io/medik8s/node-remediation-console@sha256:80d9e74d0374b72d71988d6da96ff9adeefeb1ab90f4893df65b1b3ab3ecbdd3
         export MUST_GATHER_IMAGE=quay.io/medik8s/must-gather@sha256:a3ba0753e60517c2a7cff68eca778c23198787af36e8214e8838d2c7fc676b97
 
         prepare_runtime() {
@@ -116,6 +116,11 @@ tests:
           operator-sdk version
           podman version
           podman info
+
+          # Fail early if a pinned related image is missing, before building the candidate.
+          echo '==> Verify pinned console plugin and must-gather images are pullable'
+          skopeo inspect --format '{{.Digest}}' "docker://$CONSOLE_PLUGIN_IMAGE"
+          skopeo inspect --format '{{.Digest}}' "docker://$MUST_GATHER_IMAGE"
 
           echo '==> Configure rootless Podman for the catalog base image UID'
           local storage_config
