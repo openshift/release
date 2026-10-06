@@ -226,7 +226,10 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "5.0"
       REPLICAS: "114"
-    test:
+    pre:
+    - chain: rosa-aws-sts-provision
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
     - as: apply-nogreenteagc-kas
       cli: latest
       commands: |
@@ -290,23 +293,24 @@ tests:
       commands: |
         set -o errexit
         set -o pipefail
-        echo "=== Waiting for cluster operators to stabilize ==="
-        echo "Waiting for all cluster operators to be Available..."
-        oc wait co --all --for=condition=Available=True --timeout=10m
-        echo "Waiting for all cluster operators to stop Progressing..."
-        oc wait co --all --for=condition=Progressing=False --timeout=10m
-        echo "Waiting for all cluster operators to not be Degraded..."
-        oc wait co --all --for=condition=Degraded=False --timeout=10m
+        echo "=== Waiting for cluster operators to stabilize after KAS env change ==="
+        echo "Sleeping 2 minutes for KAS restart to propagate..."
+        sleep 120
+        echo "Waiting for all cluster operators to be Available (timeout 30m)..."
+        oc wait co --all --for=condition=Available=True --timeout=30m
+        echo "Waiting for all cluster operators to stop Progressing (timeout 30m)..."
+        oc wait co --all --for=condition=Progressing=False --timeout=30m
+        echo "Waiting for all cluster operators to not be Degraded (timeout 30m)..."
+        oc wait co --all --for=condition=Degraded=False --timeout=30m
         echo "=== All cluster operators are stable ==="
-        echo "Sleeping 10 minutes to let everything settle..."
-        sleep 600
-        echo "=== Cluster operator status after settling period ==="
+        echo "=== Cluster operator status ==="
         oc get co
       from: cli
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
+    test:
     - chain: openshift-qe-build-farm
     - as: capture-prometheus-dump
       cli: latest
