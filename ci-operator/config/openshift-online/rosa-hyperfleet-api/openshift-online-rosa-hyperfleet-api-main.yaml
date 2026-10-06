@@ -88,29 +88,33 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      CI_COMPONENT_IMAGE: platform-api
+      CI_IMAGE_1: platform-api
     env:
-      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/platform-api-release
+      ROSA_REGIONAL_COMPONENTS: |
+        - image: CI_IMAGE_1
+          repo: quay.io/rrp-dev-ci/platform-api-release
     test:
     - ref: rosa-hyperfleet-image-push
 - as: push-operator-image
   postsubmit: true
   steps:
     dependencies:
-      CI_COMPONENT_IMAGE: hyperfleet-operator
+      CI_IMAGE_1: hyperfleet-operator
     env:
-      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/hyperfleet-operator-release
+      ROSA_REGIONAL_COMPONENTS: |
+        - image: CI_IMAGE_1
+          repo: quay.io/rrp-dev-ci/hyperfleet-operator-release
     test:
     - ref: rosa-hyperfleet-image-push
 - always_run: false
   as: on-demand-e2e
   steps:
     dependencies:
-      CI_API_IMAGE: platform-api
-      CI_OPERATOR_IMAGE: hyperfleet-operator
+      CI_IMAGE_1: platform-api
+      CI_IMAGE_2: hyperfleet-operator
     env:
-      ROSA_REGIONAL_EXTRA_COMPONENTS: |
-        - image: CI_API_IMAGE
+      ROSA_REGIONAL_COMPONENTS: |
+        - image: CI_IMAGE_1
           repo: quay.io/rrp-dev-ci/platform-api
           target: argocd/config/regional-cluster/platform-api/values.yaml
           override:
@@ -119,7 +123,7 @@ tests:
                 image:
                   repository: IMAGE_REPO
                   tag: IMAGE_TAG
-        - image: CI_OPERATOR_IMAGE
+        - image: CI_IMAGE_2
           repo: quay.io/rrp-dev-ci/hyperfleet-operator
           target: argocd/config/regional-cluster/hyperfleet/values.yaml
           override:
@@ -133,14 +137,14 @@ tests:
   as: on-demand-e2e-rosa
   steps:
     dependencies:
-      CI_API_IMAGE: platform-api
-      CI_OPERATOR_IMAGE: hyperfleet-operator
+      CI_IMAGE_1: platform-api
+      CI_IMAGE_2: hyperfleet-operator
     env:
       E2E_SKIP_HCP: "true"
       E2E_SKIP_ROSA_CLI: "false"
       ROSA_LABEL_FILTER: hyperfleet-sanity
-      ROSA_REGIONAL_EXTRA_COMPONENTS: |
-        - image: CI_API_IMAGE
+      ROSA_REGIONAL_COMPONENTS: |
+        - image: CI_IMAGE_1
           repo: quay.io/rrp-dev-ci/platform-api
           target: argocd/config/regional-cluster/platform-api/values.yaml
           override:
@@ -149,7 +153,7 @@ tests:
                 image:
                   repository: IMAGE_REPO
                   tag: IMAGE_TAG
-        - image: CI_OPERATOR_IMAGE
+        - image: CI_IMAGE_2
           repo: quay.io/rrp-dev-ci/hyperfleet-operator
           target: argocd/config/regional-cluster/hyperfleet/values.yaml
           override:
