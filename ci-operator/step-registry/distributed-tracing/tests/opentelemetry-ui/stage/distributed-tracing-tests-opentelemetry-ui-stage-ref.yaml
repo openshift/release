@@ -1,0 +1,43 @@
+ref:
+  as: distributed-tracing-tests-opentelemetry-ui-stage
+  from_image:
+    name: playwright-base
+    namespace: ci
+    tag: latest
+  commands: distributed-tracing-tests-opentelemetry-ui-stage-commands.sh
+  timeout: 1h0m0s
+  grace_period: 2m0s
+  resources:
+    requests:
+      cpu: "1"
+      memory: 3Gi
+      # Shared memory for Chromium (the default 64Mi /dev/shm is too small for it).
+      ci-operator.openshift.io/shm: 2G
+    limits:
+      memory: 8Gi
+      ci-operator.openshift.io/shm: 2G
+  env:
+  - name: MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH
+    default: ""
+    documentation: |-
+      The branch to checkout from openshift/open-telemetry-opentelemetry-operator for running the UI tests
+      (tests/e2e-otel-ui), for example rhosdt-3.11.
+      This parameter must be set either in the job config steps.env or via Gangway API pod_spec_options.
+      The job will fail if left empty.
+  documentation: |-
+    The distributed-tracing-tests-opentelemetry-ui-stage step runs the OpenShift web console UI tests of the
+    OpenTelemetry operator (tests/e2e-otel-ui) from the MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH branch of
+    openshift/open-telemetry-opentelemetry-operator against the stage build of the operator: a Chainsaw test enables
+    user workload monitoring, deploys OpenTelemetry collectors with telemetry generators and waits for the
+    metrics, then Playwright verifies the "OpenTelemetry Collector" dashboard under Observe > Dashboards.
+
+    The step requires the OpenTelemetry operator to be installed already and logs in to the console as
+    kubeadmin. It runs in the playwright-base image (Node.js, Chromium, chainsaw, oc), which is built from
+    tests/e2e-otel-ui/Dockerfile.playwright in openshift/distributed-tracing-qe and mirrored into the CI
+    registry, see core-services/image-mirroring/_config.yaml.
+
+    The step fails when a test fails. JUnit files (junit_console_ui_otel_chainsaw.xml from Chainsaw,
+    junit_console_ui_otel_dashboard.xml from Playwright), the console output of Chainsaw
+    (chainsaw-output.log), the Playwright HTML report, traces and screenshots are written to the artifacts
+    directory of the step. On exit the JUnit files, the tail of the Chainsaw output and a context file are
+    copied to SHARED_DIR for the openshift-observability-qe-agent post step (AGENT_SKILL: otel-ui).
