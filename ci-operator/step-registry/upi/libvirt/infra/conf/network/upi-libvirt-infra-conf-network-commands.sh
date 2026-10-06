@@ -8,10 +8,6 @@ set -o pipefail
 # Files are written with an "infra-" prefix so they stay flat in SHARED_DIR —
 # Kubernetes secrets don't support subdirectories; any subdir is silently
 # dropped by the sidecar when it serialises the shared dir between steps.
-#
-# Save the mgmt lease key BEFORE overriding LEASED_RESOURCE so the subnet
-# auto-detect can still look up the mgmt cluster's subnet below.
-MGMT_LEASED_RESOURCE="${LEASED_RESOURCE:-}"
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
   INFRA_PREFIX="infra-"
@@ -58,30 +54,22 @@ else
 fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
-# MGMT_SUBNET_OVERRIDE: when set, place infra cluster on the mgmt cluster's
-# L2 bridge rather than its own lease subnet. This allows infra VMIs to reach
-# the mgmt MetalLB VIP (192.168.X.53) directly without crossing NAT boundaries.
-# Fixed IPs 61-63 are used for the infra control-plane in that shared subnet
-# to avoid collisions with mgmt lease node IPs (which use low-range addresses).
-#
-# If MGMT_SUBNET_OVERRIDE is not set explicitly, auto-detect it by reading the
-# mgmt lease's subnet key from the leases file (using $LEASED_RESOURCE, which
-# is the mgmt lease). This way no workflow env change is needed — the infra
-# chain automatically co-locates itself on the same bridge as the mgmt cluster.
+# Determine which subnet to use for the infra cluster's libvirt bridge.
+# Priority:
+#   1. MGMT_SUBNET_OVERRIDE env var — explicit caller override.
+#   2. $SHARED_DIR/MGMT_SUBNET — written by upi-conf-libvirt-network-commands.sh
+#      (the mgmt cluster's network conf step) which runs before this step and
+#      has the mgmt LEASED_RESOURCE in scope.
+#   3. Infra lease's own subnet — fallback for standalone runs.
 if [[ -n "${MGMT_SUBNET_OVERRIDE:-}" ]]; then
   NET_SUBNET="${MGMT_SUBNET_OVERRIDE}"
-  echo "MGMT_SUBNET_OVERRIDE explicitly set to ${NET_SUBNET}"
-elif [[ -n "${MGMT_LEASED_RESOURCE}" && -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
-  MGMT_LEASE_KEY="${MGMT_LEASED_RESOURCE}"
-  NET_SUBNET="$(yq-v4 -oy ".\"${MGMT_LEASE_KEY}\".subnet" "${CLUSTER_PROFILE_DIR}/leases" 2>/dev/null || true)"
-  if [[ -z "${NET_SUBNET}" ]]; then
-    echo "WARNING: could not read mgmt lease subnet for '${MGMT_LEASE_KEY}', falling back to infra lease subnet"
-    NET_SUBNET="$(leaseLookup 'subnet')"
-  else
-    echo "Auto-detected mgmt subnet from lease '${MGMT_LEASE_KEY}': ${NET_SUBNET}"
-  fi
+  echo "Using MGMT_SUBNET_OVERRIDE=${NET_SUBNET}"
+elif [[ -f "${SHARED_DIR}/MGMT_SUBNET" ]]; then
+  NET_SUBNET="$(cat "${SHARED_DIR}/MGMT_SUBNET")"
+  echo "Using mgmt subnet from SHARED_DIR/MGMT_SUBNET: ${NET_SUBNET}"
 else
   NET_SUBNET="$(leaseLookup 'subnet')"
+  echo "No MGMT_SUBNET file found, using infra lease subnet: ${NET_SUBNET}"
 fi
 CP0_IP="192.168.${NET_SUBNET}.61"
 CP1_IP="192.168.${NET_SUBNET}.62"

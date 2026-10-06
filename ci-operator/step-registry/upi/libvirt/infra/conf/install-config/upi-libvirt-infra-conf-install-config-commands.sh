@@ -7,7 +7,6 @@ set -o pipefail
 # Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
 # Files are prefixed with "infra-" to stay flat in SHARED_DIR — Kubernetes
 # secrets don't support subdirectories and silently drop them between steps.
-MGMT_LEASED_RESOURCE="${LEASED_RESOURCE:-}"
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
   INFRA_PREFIX="infra-"
@@ -57,14 +56,11 @@ else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi
 
-# MGMT_SUBNET_OVERRIDE: use the mgmt cluster's subnet for machineNetwork so it
-# matches the bridge chosen in the network conf step.
-# Auto-detect from the mgmt lease if not explicitly set (same logic as network conf step).
+# Determine subnet for machineNetwork — must match the bridge used by the network conf step.
 if [[ -n "${MGMT_SUBNET_OVERRIDE:-}" ]]; then
   MACHINE_SUBNET="${MGMT_SUBNET_OVERRIDE}"
-elif [[ -n "${MGMT_LEASED_RESOURCE}" && -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
-  MACHINE_SUBNET="$(yq-v4 -oy ".\"${MGMT_LEASED_RESOURCE}\".subnet" "${CLUSTER_PROFILE_DIR}/leases" 2>/dev/null || true)"
-  [[ -z "${MACHINE_SUBNET}" ]] && MACHINE_SUBNET="$(leaseLookup 'subnet')"
+elif [[ -f "${SHARED_DIR}/MGMT_SUBNET" ]]; then
+  MACHINE_SUBNET="$(cat "${SHARED_DIR}/MGMT_SUBNET")"
 else
   MACHINE_SUBNET="$(leaseLookup 'subnet')"
 fi
