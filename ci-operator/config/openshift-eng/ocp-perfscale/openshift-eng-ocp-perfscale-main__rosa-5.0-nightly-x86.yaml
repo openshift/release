@@ -288,22 +288,19 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: wait-for-stable-cluster
+    - as: wait-ready-operators-post-kas
       cli: latest
       commands: |
         set -o errexit
         set -o pipefail
-        echo "=== Waiting for cluster operators to stabilize after KAS env change ==="
-        echo "Sleeping 2 minutes for KAS restart to propagate..."
-        sleep 120
-        echo "Waiting for all cluster operators to be Available (timeout 30m)..."
-        oc wait co --all --for=condition=Available=True --timeout=30m
-        echo "Waiting for all cluster operators to stop Progressing (timeout 30m)..."
-        oc wait co --all --for=condition=Progressing=False --timeout=30m
-        echo "Waiting for all cluster operators to not be Degraded (timeout 30m)..."
-        oc wait co --all --for=condition=Degraded=False --timeout=30m
-        echo "=== All cluster operators are stable ==="
-        echo "=== Cluster operator status ==="
+        echo "=== Re-verifying cluster operators are ready after KAS customization ==="
+        echo "Waiting for all cluster operators to stop Progressing (timeout 60m)..."
+        oc wait co --all --for=condition=Progressing=False --timeout=60m
+        echo "Checking all cluster operators are Available..."
+        oc wait co --all --for=condition=Available=True --timeout=10m
+        echo "Checking no cluster operators are Degraded..."
+        oc wait co --all --for=condition=Degraded=False --timeout=10m
+        echo "=== All cluster operators verified ready after KAS customization ==="
         oc get co
       from: cli
       resources:
