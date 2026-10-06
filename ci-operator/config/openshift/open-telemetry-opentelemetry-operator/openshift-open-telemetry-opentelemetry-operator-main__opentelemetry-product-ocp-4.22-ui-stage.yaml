@@ -1,0 +1,76 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  playwright-base:
+    name: playwright-base
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
+canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
+images:
+  items:
+  - dockerfile_literal: |
+      FROM playwright-base
+      COPY . /tmp/opentelemetry-operator
+    from: playwright-base
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/.
+    to: obs-tests-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: opentelemetry-stage-tests
+  cron: 0 0 30 2 *
+  reporter_config:
+    channel: '#distributed-tracing-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: aws-observability
+    env:
+      AGENT_SKILL: otel-ui
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+      JIRA_PROJECT: OOC
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc@sha256:bbef777a134275d4b8af90cc30d365e15575c66ba1a382b87e7d2ac479e68c87
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.11
+      OPERATORS: |
+        [
+            {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "opentelemetry-operator-system", "target_namespaces": "", "operator_group": "opentelemetry-operator-system"}
+        ]
+    post:
+    - ref: openshift-observability-qe-agent
+    test:
+    - ref: distributed-tracing-install-otel-konflux-catalogsource
+    - ref: install-operators
+    - ref: distributed-tracing-tests-opentelemetry-ui-stage
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: open-telemetry-opentelemetry-operator
+  variant: opentelemetry-product-ocp-4.22-ui-stage
