@@ -11,10 +11,18 @@ ref:
   documentation: |-
     Upgrade ODF on the ACM hub cluster through one or more channels after an EUS OCP upgrade.
 
+    Timeout is 8h (install steps use 3h) because each hop waits sequentially for CSV name
+    change (15m) + CSV Succeeded (15m) + StorageCluster operand completion (90m) + NooBaa
+    Ready (90m) = 3.5h per hop. Operand completion is images/version, not phase=Ready alone:
+    a leftover Ready from the prior hop can satisfy oc wait immediately after the new CSV
+    succeeds. Two EUS hops are 7h worst-case, plus must-gather/diagnostics. 8h is the
+    ceiling that covers that budget.
+
     Iterates ODF_UPGRADE_CHANNEL_HOPS (comma-separated, e.g. "stable-4.21,stable-4.22"),
     patching the odf-operator Subscription channel at each hop, waiting for OLM to detect
     the channel change and install the new CSV (Succeeded), then waiting for StorageCluster
-    and NooBaa to return to Ready phase before moving to the next hop.
+    status.images actualImage to equal desiredImage (and status.version to match the hop)
+    and NooBaa to return to Ready before moving to the next hop.
 
     ODF's OLM upgrade graph requires sequential hops. Jumping directly from stable-4.20 to
     stable-4.22 leaves OLM without an install-plan edge and the installedCSV never changes.
@@ -32,8 +40,9 @@ ref:
     documentation: |-
       Comma-separated ordered list of ODF Subscription channels to upgrade through
       (e.g. "stable-4.21,stable-4.22"). Each hop patches the Subscription, waits for the
-      new CSV to reach Succeeded, and waits for StorageCluster + NooBaa to return to Ready
-      before proceeding to the next hop. Required — step fails if empty.
+      new CSV to reach Succeeded, then waits for StorageCluster operand images to converge
+      (actualImage == desiredImage, version matching the hop) and NooBaa Ready before the
+      next hop. Required — step fails if empty.
   - name: ODF_INSTALL_NAMESPACE
     default: "openshift-storage"
     documentation: Namespace of the ODF operator and StorageCluster on the hub.
@@ -51,4 +60,4 @@ ref:
     documentation: Max seconds to wait for the new CSV to appear and reach Succeeded per hop (15 min).
   - name: ODF_STORAGECLUSTER_POLL_TIMEOUT_SECONDS
     default: "5400"
-    documentation: Max seconds to wait for StorageCluster and NooBaa Ready per hop (90 min).
+    documentation: Max seconds to wait for StorageCluster operand image/version convergence and NooBaa Ready per hop (90 min).
