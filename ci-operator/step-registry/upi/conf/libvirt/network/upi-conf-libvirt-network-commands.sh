@@ -43,11 +43,17 @@ else
 fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
-# Write the mgmt cluster's subnet number to SHARED_DIR so the subsequent
-# infra conf steps can co-locate the infra cluster on the same libvirt bridge.
+# Write mgmt cluster identity to SHARED_DIR for the infra conf/install steps.
+# MGMT_SUBNET     — subnet number (e.g. "2"), used to build the bridge name and IPs.
+# MGMT_NETWORK_NAME — libvirt network name (e.g. "libvirt-s390x-oz-3-2"), used as
+#                     NETWORK_NAME when attaching infra VMs to the mgmt bridge.
+# MGMT_NAMESERVER   — gateway/nameserver IP (192.168.X.1), used in EXTRA_ARGS for
+#                     the infra agent boot kernel command line.
 MGMT_SUBNET="$(leaseLookup 'subnet')"
-printf '%s' "${MGMT_SUBNET}" > "${SHARED_DIR}/MGMT_SUBNET"
-echo "Wrote MGMT_SUBNET=${MGMT_SUBNET} to ${SHARED_DIR}/MGMT_SUBNET"
+printf '%s' "${MGMT_SUBNET}"      > "${SHARED_DIR}/MGMT_SUBNET"
+printf '%s' "${CLUSTER_NAME}"     > "${SHARED_DIR}/MGMT_NETWORK_NAME"
+printf '%s' "192.168.${MGMT_SUBNET}.1" > "${SHARED_DIR}/MGMT_NAMESERVER"
+echo "Wrote MGMT_SUBNET=${MGMT_SUBNET}, MGMT_NETWORK_NAME=${CLUSTER_NAME}, MGMT_NAMESERVER=192.168.${MGMT_SUBNET}.1"
 
 echo "Creating the libvirt network.xml file..."
 
