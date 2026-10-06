@@ -18,6 +18,7 @@ import sys
 import time
 
 kubeconfig = sys.argv[1]
+hub_role = sys.argv[3]
 
 
 def oc(*args, input_text=None):
@@ -119,6 +120,30 @@ def crd_ready():
 
 
 wait_for('ClusterInstance CRD', crd_ready)
+
+# The target hub needs the IBI controller to process ImageClusterInstall objects.
+if hub_role == 'target':
+    engines = read('multiclusterengines.multicluster.openshift.io')['items']
+    if len(engines) != 1:
+        raise RuntimeError('Expected exactly one MultiClusterEngine; found ' + str(len(engines)))
+    mce = engines[0]
+    component = 'image-based-install-operator'
+    mce_components = mce['spec'].get('overrides', {}).get('components', [])
+    ibi = [item for item in mce_components if item.get('name') == component]
+    if len(ibi) > 1:
+        raise RuntimeError('Multiple IBI component entries in MultiClusterEngine')
+    if not ibi or ibi[0].get('enabled') is not True:
+        mce_components = [dict(item, enabled=True) if item.get('name') == component
+                          else item for item in mce_components]
+        if not ibi:
+            mce_components.append({'name': component, 'enabled': True})
+        # Resource version prevents overwriting a concurrent controller update.
+        patch = {'metadata': {'resourceVersion': mce['metadata']['resourceVersion']},
+                 'spec': {'overrides': {'components': mce_components}}}
+        oc('patch', 'multiclusterengines.multicluster.openshift.io', mce['metadata']['name'],
+           '--type=merge', '-p', json.dumps(patch))
+    wait_for('IBI operator', lambda: deployment_ready('multicluster-engine', component))
+
 csv = None
 
 
@@ -192,5 +217,5 @@ PY
   echo "Preparing ${hub} hub prerequisites"
   ansible bastion -i "${WORK_DIR}/${hub}.json" \
     -m ansible.builtin.script \
-    -a "${WORK_DIR}/ready.py /home/telcov10n/project/generated/${cluster}/auth/kubeconfig '{{ disconnected_registry_url }}:{{ disconnected_registry_port }}' executable=python3"
+    -a "${WORK_DIR}/ready.py /home/telcov10n/project/generated/${cluster}/auth/kubeconfig '{{ disconnected_registry_url }}:{{ disconnected_registry_port }}' ${hub} executable=python3"
 done
