@@ -376,7 +376,8 @@ EOF
     echo "$NODECLASS_YAML" | oc apply -f -
 
     # Create placeholder pods to trigger NAP node provisioning.
-    # Resource requests are set high enough to ensure one pod per D16-equivalent node.
+    # Require distinct NAP nodes rather than relying on D16-sized resource requests,
+    # which allow multiple placeholders to share a larger node.
     PLACEHOLDER_YAML=$(cat <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -393,6 +394,15 @@ spec:
       labels:
         app: nap-placeholder
     spec:
+      nodeSelector:
+        karpenter.sh/nodepool: default
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: nap-placeholder
+              topologyKey: kubernetes.io/hostname
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
