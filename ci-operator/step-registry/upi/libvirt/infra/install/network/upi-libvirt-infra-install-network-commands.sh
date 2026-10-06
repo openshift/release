@@ -43,6 +43,18 @@ echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
 echo "Active networks pre creation:"
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-list
 
+# When the infra cluster is co-located on the mgmt bridge (MGMT_SUBNET file is
+# present), the mgmt network already owns the bridge. Attempting to define a
+# second libvirt network on the same bridge would fail with "bridge already in
+# use". Skip network creation and reuse the existing mgmt network instead.
+if [[ -f "${SHARED_DIR}/MGMT_SUBNET" ]]; then
+  MGMT_NETWORK_NAME="$(cat "${SHARED_DIR}/MGMT_NETWORK_NAME")"
+  echo "Co-located mode: skipping net-define/net-start — reusing mgmt network '${MGMT_NETWORK_NAME}'"
+  echo "Active networks (no change):"
+  mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-list
+  exit 0
+fi
+
 # Show network xml
 echo "Printing network xml to be created:"
 cat "${SHARED_DIR}/${INFRA_PREFIX}network.xml"
