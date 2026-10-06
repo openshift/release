@@ -443,9 +443,11 @@ tests:
       CLUSTER_VERSION: "4.22"
       MCE_VERSION: "2.17"
     workflow: hypershift-mce-ibmz-conformance-s390xmgmt
-- as: e2e-ibmz-s390x-mgmt-ovn-conformance-virt
-  cluster: build01
-  cron: 0 12 * * *
+- as: e2e-ibmz-s390x-mgmt-ovn-conformance-virt-oz
+  capabilities:
+  - intranet
+  # Alternate days Mon/Wed/Fri at 06:00 AM IST (00:30 UTC)
+  cron: 30 0 * * 1,3,5
   reporter_config:
     channel: '#ibmz-prowci-notifier'
     job_states_to_report:
@@ -457,20 +459,19 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   steps:
+    cluster_profile: libvirt-s390x-vpn-hcp
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:initial
     env:
-      CLUSTER_VERSION: "4.22"
+      ARCH: s390x
+      BRANCH: 5.0-hcpci
+      ETCD_DISK_SPEED: slow
       MCE_VERSION: "2.17"
-    workflow: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt
-- as: e2e-ibmz-s390x-mgmt-ovn-openshifte2e-virt
-  cluster: build01
-  cron: 30 4 * * 1,4
-  steps:
-    env:
-      CLUSTER_VERSION: "4.22"
-      IC_API_KEY_FILE: /etc/hypershift-agent-ibmz-credentials/ibmcloud-zcomm-apikey
-      MCE_VERSION: "2.17"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-    workflow: hypershift-mce-ibmz-openshift-e2e-test-s390xmgmt-kubevirt
+      NODE_TUNING: "true"
+      USE_EXTERNAL_DNS: "true"
+      USE_RAMFS: "true"
+    workflow: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-oz
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.22
   org: openshift
