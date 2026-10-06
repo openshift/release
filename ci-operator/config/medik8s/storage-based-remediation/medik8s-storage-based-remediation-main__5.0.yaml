@@ -397,6 +397,13 @@ tests:
           printf '%s\n' "$revision" > "$ARTIFACT_DIR/sbr-source-commit.txt"
 
           cd /tmp/sbr-source
+          # Reuse the runner's SDK only when it matches this checkout's tool pin.
+          local sdk_version required_sdk_version
+          sdk_version="$(operator-sdk version | sed -n 's/^operator-sdk version: "\([^"]*\)".*/\1/p')"
+          required_sdk_version="$(sed -n 's/^OPERATOR_SDK_VERSION[[:space:]]*[?]*=[[:space:]]*//p' Makefile)"
+          printf 'Operator SDK: %s; required by source: %s\n' "$sdk_version" "$required_sdk_version"
+          test -n "$required_sdk_version" && test "$sdk_version" = "$required_sdk_version"
+
           export SBR_VERSION
           SBR_VERSION="$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)"
           test -n "$SBR_VERSION"
@@ -416,6 +423,8 @@ tests:
 
           echo '==> Build and push operator, agent, bundle, and catalog with the shared target'
           make dev-olm-catalog-push \
+            OPERATOR_SDK=/usr/local/bin/operator-sdk \
+            DEV_OLM_OPERATOR_SDK=/usr/local/bin/operator-sdk \
             DEV_REGISTRY=ttl.sh \
             TTL_SH_TTL=3h \
             CONTAINER_TOOL=podman \
@@ -472,12 +481,12 @@ tests:
         }
 
         checkout_system_tests() {
-          # TODO: Revert this rehearsal-only checkout after the SBR FBC suite merges upstream.
-          echo '==> Check out the SBR FBC upgrade test branch'
+          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#28 merges.
+          echo '==> Check out openshift/rhwa-system-tests PR 28'
           git clone --depth=1 --branch main \
             https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
           git -C /tmp/system-tests fetch --depth=1 \
-            https://github.com/JonahSussman/medik8s-system-tests.git refs/heads/jsussman/sbr-upgrade-operator-fbc
+            https://github.com/openshift/rhwa-system-tests.git refs/pull/28/head
           git -C /tmp/system-tests checkout --detach FETCH_HEAD
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
           git -C /tmp/system-tests rev-parse HEAD > "$ARTIFACT_DIR/system-tests-commit.txt"
