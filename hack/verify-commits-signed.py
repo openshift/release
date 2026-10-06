@@ -31,10 +31,10 @@ BOT_USERS = {"openshift-bot", "openshift-ci-robot"}
 
 # Hidden marker that identifies the reminder comment, so it is posted only once.
 COMMENT_MARKER = "<!-- commits-signed-reminder -->"
-COMMENT_BODY = f"""{COMMENT_MARKER}
+COMMENT_TEMPLATE = """{marker}
 Hi! Some commits in this pull request are not signed with a signature GitHub can verify.
 
-OpenShift is gradually moving to require signed commits (DPTP-4919). The `ci/prow/commits-signed` check is **informational for now** and does not block merging, but it will become required in the future, so setting up signing now will save you trouble later.
+OpenShift is gradually moving to require signed commits (DPTP-4919). The `ci/prow/commits-signed` check is **informational for now** and does not block merging. Later, a GitHub ruleset will require every commit in a pull request to be signed and verified, and pull requests with unsigned commits will not be able to merge. The enforcement date will be announced ahead of time, so setting up signing now will save you trouble later.
 
 **One-time setup with an SSH key:**
 ```sh
@@ -45,14 +45,23 @@ git config --global commit.gpgsign true
 ```
 Then upload `~/.ssh/github_signing_ed25519.pub` at https://github.com/settings/keys as a **Signing Key** (not an Authentication Key), and consider enabling vigilant mode on the same page. GPG keys work too: https://docs.github.com/authentication/managing-commit-signature-verification
 
-**To re-sign this branch:**
+**To re-sign this branch** (replace `upstream` with your remote for {owner}/{repo}):
 ```sh
-git rebase --exec 'git commit --amend --no-edit -S' main
+{resign}
 git push --force-with-lease
 ```
 
 This reminder is posted once per pull request.
 """
+
+
+def resign_command(base):
+    """Shell commands that rebase the branch onto its base, signing every commit.
+
+    --force-rebase makes git rewrite (and so sign) each commit even when the
+    branch is already up to date with its base.
+    """
+    return f"git fetch upstream\ngit rebase --force-rebase --gpg-sign upstream/{base}"
 
 
 def github_request(url, token, data=None):
@@ -87,7 +96,7 @@ def list_pr_commits(owner, repo, number, token):
         page += 1
 
 
-def post_reminder(owner, repo, number, token):
+def post_reminder(owner, repo, number, base, token):
     """Comment on the pull request once, unless a reminder is already there."""
     page = 1
     while True:
@@ -99,7 +108,8 @@ def post_reminder(owner, repo, number, token):
         if len(batch) < PER_PAGE:
             break
         page += 1
-    github_request(f"{API_BASE}/repos/{owner}/{repo}/issues/{number}/comments", token, {"body": COMMENT_BODY})
+    github_request(f"{API_BASE}/repos/{owner}/{repo}/issues/{number}/comments", token, {"body": COMMENT_TEMPLATE.format(
+        marker=COMMENT_MARKER, owner=owner, repo=repo, resign=resign_command(base))})
     print("Posted a signing reminder on this pull request.")
 
 
@@ -138,6 +148,8 @@ def main():
         print("rebase the branch) so every commit can be verified.")
         return 1
 
+    base = os.environ.get("PULL_BASE_REF") or pull["base"]["ref"]
+
     report = []
     unsigned = []
     for commit in commits:
@@ -161,13 +173,14 @@ def main():
         print(f"{len(unsigned)} of {len(commits)} commits in this pull request are not signed with a")
         print("signature GitHub can verify. Sign your commits and force-push the branch:")
         print("  https://docs.github.com/authentication/managing-commit-signature-verification/signing-commits")
-        print("An existing branch can be re-signed in place with:")
-        print("  git rebase --exec 'git commit --amend --no-edit -S' main")
+        print("An existing branch can be re-signed with (using your remote for this repository):")
+        for line in resign_command(base).splitlines():
+            print(f"  {line}")
         if os.environ.get("COMMENT_ON_UNSIGNED") == "true" and token and not is_bot(pull["user"]):
             # The reminder is best-effort: failing to post it must not change
             # the result of the check.
             try:
-                post_reminder(owner, repo, number, token)
+                post_reminder(owner, repo, number, base, token)
             except urllib.error.URLError as e:
                 print(f"warning: could not post the signing reminder: {e}")
         return 1
