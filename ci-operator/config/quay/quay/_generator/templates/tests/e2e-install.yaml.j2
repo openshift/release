@@ -3,8 +3,13 @@ tests:
 - steps:
     env:
       ENABLE_BUILD_SUPPORT: "true"
+{%- if fips %}
+      FIPS_ENABLED: "true"
+      # FEATURE_FIPS requires MAIL_USE_TLS, which Mailpit does not serve, so
+      # Mailpit stays off and the @feature:MAILING specs self-skip.
+      QUAY_DEPLOY_MAILPIT: "false"
+{%- endif %}
       PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}'
-      QUAY_BUILDER_IMAGE: registry.redhat.io/quay/quay-builder-rhel9@sha256:9ced74943d3147fb6eac6df05c50a47553d550586be736068c47767c6f68c777
       QUAY_EXTRA_CONFIG: |
         FEATURE_PROGRAMMATIC_BOOTSTRAP: false
         FEATURE_USER_METADATA: true
@@ -22,7 +27,13 @@ tests:
           - admin
         GLOBAL_READONLY_SUPER_USERS:
           - readonly
+{%- if fips %}
+        FEATURE_FIPS: true
+{%- endif %}
     test:
+{%- if fips %}
+    - ref: fips-check-fips-or-die
+{%- endif %}
     - ref: merge-stage-registry-credentials
     - ref: quay-enable-catalogsource-art
     - ref: quay-provisioning-tls

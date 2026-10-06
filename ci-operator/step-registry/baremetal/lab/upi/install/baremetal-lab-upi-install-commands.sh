@@ -221,8 +221,7 @@ function update_image_registry() {
   oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
   sleep 60
   echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
-  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
-  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
+  oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
 }
 
 function update_sno_bip_live_iso {

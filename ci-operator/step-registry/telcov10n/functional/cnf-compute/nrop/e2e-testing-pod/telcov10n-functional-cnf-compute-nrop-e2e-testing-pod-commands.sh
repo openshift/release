@@ -66,36 +66,52 @@ BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/gro
 
 
 echo "Run compute NROP gotests via ssh tunnel"
-# Temporarily disable set -e to capture SSH exit code
+# Keep going after a suite failure so schedrst and must-gather e2e still run.
 set +e
-timeout -s 9 8h ssh \
-  -o ServerAliveInterval=60 \
-  -o ServerAliveCountMax=3 \
-  -o StrictHostKeyChecking=no \
-  -o UserKnownHostsFile=/dev/null \
-  "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key bash -s -- << EOF
+
+run_nrop_script() {
+  local script_name="$1"
+  echo
+  echo "--------------------------------------------------"
+  echo "Running gotests script: ${script_name}"
+  echo "--------------------------------------------------"
+  echo
+  timeout -s 9 8h ssh \
+    -o ServerAliveInterval=60 \
+    -o ServerAliveCountMax=3 \
+    -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile=/dev/null \
+    "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key bash -s -- << EOF
 set -o nounset
 set -o errexit
 set -o pipefail
 
-echo
-echo "--------------------------------------------------"
-echo "Running gotests script: ${SCOPE}_nrop_test_script.sh"
-echo "--------------------------------------------------"
-echo 
-bash /tmp/wip/artifacts/${SCOPE}_nrop_test_script.sh || true
+bash /tmp/wip/artifacts/${script_name} || true
 EOF
+}
+
+run_nrop_script "${SCOPE}_nrop_test_script.sh"
+
+echo "Collect must-gather before schedrst tests"
+ansible-playbook ./playbooks/compute/nrop_must_gather.yml -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig scope=${SCOPE} test_env=${TEST_ENV}" || true
+
+run_nrop_script "${SCOPE}_nrop_test_script_schedrst.sh"
+run_nrop_script "${SCOPE}_nrop_test_script_mustgather.sh"
 
 echo "Copy must gather to artifacts directory"
 
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
   "${BASTION_USER}@${BASTION_IP}":/tmp/wip/artifacts/* "${ARTIFACT_DIR}"
 
+scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
+  "${BASTION_USER}@${BASTION_IP}":/tmp/wip/tests "${ARTIFACT_DIR}"
+
 
 echo "Copy junit test reports to shared directory for reporter step"
 if ls ${ARTIFACT_DIR}/tests/junit/*.xml 1> /dev/null 2>&1; then
     echo "Copy junit test reports to shared directory for reporter step"
-	tar -cvzf "${SHARED_DIR}/${SCOPE}_junit.tar.gz" ${ARTIFACT_DIR}/tests/junit/*.xml
+	 cp -v "${ARTIFACT_DIR}"/tests/junit/*.xml "${SHARED_DIR}/" 2>/dev/null
     touch "${SHARED_DIR}/gotest-completed"
 else
     echo "No junit test reports found to copy to SHARED_DIR"

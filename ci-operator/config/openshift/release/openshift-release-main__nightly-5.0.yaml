@@ -1476,6 +1476,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_MACHINE_MANAGEMENT: MachineAPI
       DEDICATED_HOST: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
     leases:
@@ -3106,6 +3107,32 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
       TEST_SUITE: openshift/disruptive-longrunning
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-nodes-isolated
+  cron: 0 14 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_REQUIRES_SSH: "yes"
+      TEST_SUITE: openshift/nodes/isolated
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-nodes-isolated-techpreview
+  interval: 168h
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
+      TEST_SUITE: openshift/nodes/isolated
     observers:
       enable:
       - observers-resource-watch

@@ -178,7 +178,7 @@ for i in $(seq 0 $((num_entries - 1))); do
     image_tag=${full_image##*:}
 
     # Skip postgresql image as we should take the latest always
-    if [[ "${image_name}" == "postgresql" ]]; then
+    if [[ "${image_name}" == postgresql* ]]; then
         echo "skipping mirroring of ${full_image} (postgresql)"
         
         digest=$(get_image_sha "https://${image_registry}/api/v1/repository/${image_org_and_name}/tag/?specificTag=${image_tag}")

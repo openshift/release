@@ -8,6 +8,7 @@ import pytest
 import yaml
 from conftest import PHASE0_MATRIX
 from generate import (
+    ALLOWED_ARCHES,
     GENERATED_HEADER,
     GENERATOR_DIR,
     _check_configs,
@@ -68,17 +69,21 @@ def test_expand_matrix_cells() -> None:
             cell.cron,
             cell.kind,
             cell.arch,
+            cell.fips,
         )
         for cell in cells
     } == {
-        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "azure", "4.22", "e2e-install", "@daily", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64"),
-        ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x"),
-        (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64"),
-        (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64"),
+        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False),
+        ("3.18", "redhat-3.18", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64", False),
+        ("3.18", "redhat-3.18", "azure", "4.22", "e2e-install", "@daily", "periodic", "amd64", False),
+        ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64", False),
+        ("3.18", "redhat-3.18", "aws", "4.14", "e2e-install", "@weekly", "periodic", "amd64", False),
+        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64", False),
+        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", True),
+        ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x", False),
+        (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64", False),
+        (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64", False),
+        (None, "master", "azure", "4.22", "e2e-install", None, "presubmit", "amd64", False),
     }
     cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "amd64")
     assert cell.filename == PHASE0_NAME
@@ -89,7 +94,7 @@ def test_expand_matrix_cells() -> None:
 
     arm_cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "arm64")
     assert arm_cell.filename == "quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml"
-    assert arm_cell.test_as == "aws-s3-nightly-arm64"
+    assert arm_cell.test_as == "aws-s3-nightly"
 
     master_cell = next(c for c in cells if c.branch == "master")
     assert master_cell.filename == MASTER_NAME
@@ -98,6 +103,18 @@ def test_expand_matrix_cells() -> None:
     assert master_cell.optional is True
     assert master_cell.quay_version is None
     assert "QUAY_EXTRA_CONFIG" not in cell.env
+
+
+def test_job_names_have_no_trailing_arch_suffix() -> None:
+    # Prow names a job ...-<variant>-<as>; an arch already in the variant
+    # must not be repeated at the end of `as`.
+    results, _retired = generate_all()
+    for _group, filename, config in results:
+        variant = config["zz_generated_metadata"].get("variant", "")
+        for test in config["tests"]:
+            for arch in ALLOWED_ARCHES - {"amd64"}:
+                if arch in variant.split("-"):
+                    assert not test["as"].endswith(f"-{arch}"), f"{filename}: {test['as']}"
 
 
 def test_adding_ocp_version_expands_cells() -> None:
@@ -141,7 +158,7 @@ def test_e2e_install_template_inverts_full_default_filter() -> None:
     env = jinja_env(GENERATOR_DIR / "templates")
     rendered = render_template(env, "tests/e2e-install.yaml.j2", _phase0_cell().context())
     assert rendered["tests"][0]["steps"]["env"]["PLAYWRIGHT_GREP_INVERT"] == (
-        "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@webhook|"
+        "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|"
         "saves and loads architecture filter with mirror configuration|"
         "loads existing architecture filter from saved mirror configuration"
     )
@@ -318,7 +335,7 @@ def test_golden_redhat_318_arm64_canary_bytes() -> None:
     assert dumped.startswith(GENERATED_HEADER)
 
     test = config["tests"][0]
-    assert test["as"] == "aws-s3-nightly-arm64"
+    assert test["as"] == "aws-s3-nightly"
     assert test["cron"] == "@weekly"
     assert test["steps"]["dependencies"] == {
         "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE": "release:arm64-latest"
@@ -337,7 +354,7 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     assert filename in by_name
     config = by_name[filename]
     test = config["tests"][0]
-    assert test["as"] == "libvirt-s3-nightly-s390x"
+    assert test["as"] == "libvirt-s3-nightly"
     assert test["cron"] == "0 8 * * 2"
     assert test["capabilities"] == ["intranet"]
     assert test["steps"]["cluster_profile"] == "libvirt-s390x-vpn"
@@ -355,12 +372,24 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     assert "ipi-aws-post" not in post_refs
 
 
-def test_master_presubmit_expands_both_clouds() -> None:
+def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    config = by_name["quay-quay-redhat-3.18__aws-ocp414-e2e-install.yaml"]
+    assert config["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-4.22"
+    assert config["releases"]["latest"]["candidate"]["version"] == "4.14"
+    assert config["tests"][0]["cron"] == "@weekly"
+    assert config["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.14__quay-rhel9-operator"
+    ocp50 = by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]
+    assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
+
+
+def test_master_presubmit_expands_all_clouds() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
     tests = by_name[MASTER_NAME]["tests"]
     by_as = {test["as"]: test for test in tests}
-    assert set(by_as) == {"aws-s3", "gcp-gcs"}
+    assert set(by_as) == {"aws-s3", "gcp-gcs", "azure-blob"}
 
     gcp_test = by_as["gcp-gcs"]
     assert gcp_test["optional"] is True
@@ -1095,11 +1124,61 @@ def test_master_arm64_variant_without_promotion(tmp_path: Path) -> None:
 
     tests = config["tests"]
     by_as = {test["as"]: test for test in tests}
-    assert set(by_as) == {"aws-s3-arm64"}
+    assert set(by_as) == {"aws-s3"}
 
-    aws_test = by_as["aws-s3-arm64"]
+    aws_test = by_as["aws-s3"]
     assert aws_test["steps"]["env"]["COMPUTE_NODE_TYPE"] == "m6g.4xlarge"
     assert aws_test["steps"]["dependencies"] == {
         "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE": "release:arm64-latest",
         "QUAY_CI_IMAGE": "pipeline:quay-server",
     }
+
+
+def test_redhat_318_aws_fips_shares_aws_file() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    tests = {test["as"]: test for test in by_name[PHASE0_NAME]["tests"]}
+    assert set(tests) == {"aws-s3-nightly", "aws-s3-nightly-fips"}
+
+    fips = tests["aws-s3-nightly-fips"]
+    assert fips["cron"] == "@weekly"
+    assert fips["steps"]["env"]["FIPS_ENABLED"] == "true"
+    assert fips["steps"]["env"]["QUAY_DEPLOY_MAILPIT"] == "false"
+    assert "FEATURE_FIPS: true" in fips["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()
+    assert fips["steps"]["test"][0] == {"ref": "fips-check-fips-or-die"}
+    assert fips["steps"]["test"][1:] == tests["aws-s3-nightly"]["steps"]["test"]
+
+    plain = tests["aws-s3-nightly"]["steps"]
+    assert "FIPS_ENABLED" not in plain["env"]
+    assert "QUAY_DEPLOY_MAILPIT" not in plain["env"]
+    assert "FEATURE_FIPS" not in plain["env"]["QUAY_EXTRA_CONFIG"]
+
+
+def test_fips_rejects_non_bool() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "fips": "yes",
+        }
+    )
+    with pytest.raises(ValueError, match="fips must be a boolean"):
+        expand_cells(matrix)
+
+
+def test_presubmit_rejects_fips() -> None:
+    matrix = _matrix_with_job(
+        {
+            "kind": "presubmit",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "fips": True,
+        },
+        release_overrides={"branch": "master", "layout": "base"},
+    )
+    with pytest.raises(ValueError, match="fips is only valid for kind: periodic"):
+        expand_cells(matrix)

@@ -95,7 +95,7 @@ if [[ ! "${RUN_ID}" =~ ^[a-z][a-z0-9]{2,15}$ ]]; then
 fi
 
 WORKSPACE_NAME="platform-e2e-${RUN_ID}"
-REGION="${GCP_REGION:-us-central1}"
+REGION="${GCP_REGION:-northamerica-northeast2}"
 TESTED_SHA_PATH="${SHARED_DIR}/gcp-hcp-tested-sha"
 
 if [[ ! -s "${TESTED_SHA_PATH}" ]]; then
@@ -153,6 +153,7 @@ echo "${MC_PROJECT_ID}-gke" > "${SHARED_DIR}/mc-cluster-name"
 echo "${SERVICE_PROJECT_ID}" > "${SHARED_DIR}/service-project-id"
 echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
 echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
+echo "${REGION}" > "${SHARED_DIR}/region"
 
 log "Early SHARED_DIR outputs written (for cleanup on failure):"
 log "  Region Project:  ${REGION_PROJECT_ID}"
@@ -255,17 +256,10 @@ import_orphaned_firestore() {
   log "Detected Firestore provider bug (hashicorp/terraform-provider-google#22533)"
   log "Database exists in GCP but not in state — attempting import..."
 
-  # Extract MC project ID from terraform state (the project resource is
-  # created before Firestore, so it should be in state)
-  local mc_project
-  mc_project=$(terraform output -json 2>/dev/null | jq -r '.management_cluster.value.project_id // empty' 2>/dev/null || echo "")
-
-  if [[ -z "${mc_project}" ]]; then
-    log "WARNING: Could not extract MC project ID from outputs, trying state..."
-    mc_project=$(terraform show -json 2>/dev/null | \
-      jq -r '.. | objects | select(.address? == "module.management_cluster.module.project.google_project.main") | .values.project_id // empty' 2>/dev/null || echo "")
-  fi
-
+  # The project ID is deterministic and was computed before apply so cleanup
+  # can recover from partial provisioning. Terraform outputs and state may be
+  # incomplete when the provider drops Firestore after creating it.
+  local mc_project="${MC_PROJECT_ID:-}"
   if [[ -z "${mc_project}" ]]; then
     log "ERROR: Could not determine MC project ID for import"
     return 1
@@ -385,7 +379,7 @@ if [[ -n "${INFRA_ID}" ]]; then
 fi
 
 # Validate critical outputs were written (early writes + terraform outputs)
-for output_file in region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id api-endpoint oidc-endpoint workspace-name run-id; do
+for output_file in region region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id api-endpoint oidc-endpoint workspace-name run-id; do
   if [[ ! -s "${SHARED_DIR}/${output_file}" ]]; then
     log "ERROR: Output file ${output_file} is empty or missing"
     exit 1
