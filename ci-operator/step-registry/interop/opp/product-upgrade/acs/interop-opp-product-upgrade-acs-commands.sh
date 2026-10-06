@@ -167,6 +167,11 @@ function ResolveTargetChannel () {
     typeset currentVersion nextChannel=""
     currentVersion="$(echo "${currentChannel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
 
+    if [[ -z "${currentVersion}" ]]; then
+        echo >&2 "ERROR: current ACS channel '${currentChannel}' is unversioned; set ACS_TARGET_CHANNEL explicitly"
+        return 3
+    fi
+
     typeset -a channelList
     read -ra channelList <<< "${channels}"
     for ch in "${channelList[@]}"; do
@@ -174,10 +179,6 @@ function ResolveTargetChannel () {
         chVersion="$(echo "${ch}" | grep -oE '[0-9]+\.[0-9]+' || true)"
         if [[ -z "${chVersion}" ]]; then
             continue
-        fi
-        if [[ -z "${currentVersion}" ]]; then
-            nextChannel="${ch}"
-            break
         fi
         typeset currentMajor currentMinor chMajor chMinor
         currentMajor="${currentVersion%%.*}"
