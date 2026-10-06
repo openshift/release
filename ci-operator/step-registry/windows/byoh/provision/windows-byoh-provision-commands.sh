@@ -6,6 +6,7 @@ set -o pipefail
 umask 077
 
 WMCO_NAMESPACE="openshift-windows-machine-config-operator"
+BYOH_DEBUG_CONTINUE="${BYOH_DEBUG_CONTINUE:-false}"
 DIAGNOSTIC_TIMEOUT="${DIAGNOSTIC_TIMEOUT:-30s}"
 DIAGNOSTIC_KILL_AFTER="${DIAGNOSTIC_KILL_AFTER:-5s}"
 DIAGNOSTIC_MAX_LINES=500
@@ -88,11 +89,17 @@ collect_failure_diagnostics() {
         -o 'custom-columns=KIND:.kind,NAME:.metadata.name,READY:.status.readyReplicas,PHASE:.status.phase'
     capture_diagnostic wmco-status \
         oc get csv,subscription -n "${WMCO_NAMESPACE}"
+    # Events: public output uses allowlisted bounded fields only (TYPE, REASON, COUNT, LAST).
+    # MESSAGE is free-form operator text that can contain node hostnames/identity — excluded
+    # from public artifacts; full details with MESSAGE go to protected SHARED_DIR below.
     capture_diagnostic wmco-events \
         oc get events -n "${WMCO_NAMESPACE}" --sort-by=.lastTimestamp \
-        -o 'custom-columns=TYPE:.type,REASON:.reason,MESSAGE:.message,COUNT:.count,LAST:.lastTimestamp'
+        -o 'custom-columns=TYPE:.type,REASON:.reason,COUNT:.count,LAST:.lastTimestamp'
+    # CSRs: public output uses allowlisted bounded fields only (SIGNER, CONDITION).
+    # NAME can encode node identity (e.g. csr-ip-10-0-1-5.ec2.internal) — excluded
+    # from public artifacts; full details with NAME go to protected SHARED_DIR below.
     capture_diagnostic certificate-signing-requests \
-        oc get csr -o 'custom-columns=NAME:.metadata.name,SIGNER:.spec.signerName,CONDITION:.status.conditions[0].type'
+        oc get csr -o 'custom-columns=SIGNER:.spec.signerName,CONDITION:.status.conditions[0].type'
     capture_diagnostic windows-node-summary \
         oc get nodes -l kubernetes.io/os=windows \
         -o 'custom-columns=READY:.status.conditions[?(@.type=="Ready")].status,READY_REASON:.status.conditions[?(@.type=="Ready")].reason,OS_IMAGE:.status.nodeInfo.osImage,KUBELET:.status.nodeInfo.kubeletVersion'
@@ -107,6 +114,25 @@ collect_failure_diagnostics() {
                 --all-containers=true --prefix=true --since=30m --tail=500 2>&1 || true
         } >"${raw_log_file}" 2>&1 || true
         chmod 600 "${raw_log_file}" 2>/dev/null || true
+        # Raw event details with MESSAGE go to protected storage only (may contain
+        # node hostnames/identity in free-form operator messages — no echo of raw stderr)
+        local raw_events_file="${SHARED_DIR}/wmco-failure-events-raw.txt"
+        {
+            echo "WMCO events with MESSAGE (raw, protected)"
+            timeout --kill-after="${DIAGNOSTIC_KILL_AFTER}" "${DIAGNOSTIC_TIMEOUT}" \
+                oc get events -n "${WMCO_NAMESPACE}" --sort-by=.lastTimestamp \
+                -o 'custom-columns=TYPE:.type,REASON:.reason,MESSAGE:.message,COUNT:.count,LAST:.lastTimestamp' 2>&1 || true
+        } >"${raw_events_file}" 2>&1 || true
+        chmod 600 "${raw_events_file}" 2>/dev/null || true
+        # Raw CSR details with NAME go to protected storage only (CSR names may encode
+        # node identity such as csr-ip-10-0-1-5.ec2.internal — no echo of raw stderr)
+        local raw_csr_file="${SHARED_DIR}/wmco-failure-csrs-raw.txt"
+        {
+            echo "CSR details with NAME (raw, protected)"
+            timeout --kill-after="${DIAGNOSTIC_KILL_AFTER}" "${DIAGNOSTIC_TIMEOUT}" \
+                oc get csr -o 'custom-columns=NAME:.metadata.name,SIGNER:.spec.signerName,CONDITION:.status.conditions[0].type' 2>&1 || true
+        } >"${raw_csr_file}" 2>&1 || true
+        chmod 600 "${raw_csr_file}" 2>/dev/null || true
     fi
     echo "WMCO failure diagnostic collection finished"
 }
@@ -228,8 +254,38 @@ handle_exit() {
     stop_watchers
     if (( status != 0 )); then
         echo "Windows BYOH provisioning failed with exit status ${status}"
-        archive_terraform_state || true
+        local archive_ok=false
+        if archive_terraform_state; then
+            archive_ok=true
+        fi
         collect_failure_diagnostics || true
+        if [[ "${BYOH_DEBUG_CONTINUE}" == "true" ]]; then
+            # Debug continuation requires all three safety conditions:
+            # 1. Provisioning was actually attempted (not a config/auth error)
+            if [[ ! -f "${SHARED_DIR}/byoh_apply_started" ]]; then
+                echo "WARNING: Debug override skipped — failure occurred before provisioning started (configuration/authentication error)"
+                echo "Returning original provisioning exit status ${status}"
+                exit "${status}"
+            fi
+            # 2. Protected Terraform cleanup-state export succeeded
+            if [[ "${archive_ok}" != "true" ]]; then
+                echo "WARNING: Debug override skipped — protected Terraform cleanup-state export failed"
+                echo "Returning original provisioning exit status ${status}"
+                exit "${status}"
+            fi
+            # 3. Original failure marker can be safely written
+            if ! printf '%s\n' "${status}" > "${SHARED_DIR}/byoh_debug_original_failure_status"; then
+                echo "WARNING: Debug override skipped — could not write original failure marker"
+                echo "Returning original provisioning exit status ${status}"
+                exit "${status}"
+            fi
+            echo "WARNING: ========== DEBUG OVERRIDE =========="
+            echo "WARNING: Original failure exit status: ${status}"
+            echo "WARNING: Recording original failure and returning exit 0 for debug cluster inspection"
+            echo "WARNING: This is NOT a provisioning success — do not use as release-quality evidence"
+            echo "WARNING: ======================================"
+            exit 0
+        fi
         echo "Returning original provisioning exit status ${status}"
     fi
     exit "${status}"
@@ -357,6 +413,10 @@ set +o errexit
 ./byoh.sh apply "${BYOH_INSTANCE_NAME}" "${BYOH_NUM_WORKERS}" "" "${BYOH_WINDOWS_VERSION}"
 apply_status=$?
 set -o errexit
+# Mark that provisioning was attempted (for debug override eligibility in handle_exit).
+# Early config/auth failures exit before reaching here, so the marker's absence tells
+# handle_exit that no resources were created and debug continuation is unsafe.
+touch "${SHARED_DIR}/byoh_apply_started"
 
 # Persist cleanup state before readiness polling. A failed apply can still have created
 # resources and usable partial state, so archive whatever the provisioner produced.
