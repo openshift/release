@@ -306,14 +306,23 @@ delete_project() {
 # deletion above empties it but never removes the folder itself, leaving an
 # orphan behind on every run. Delete by numeric ID (not display name) to
 # avoid any ambiguity if names are ever reused.
+#
+# platform-ci (this script's own identity) is deliberately not granted
+# folder-admin rights. The TFC apply SA already holds folderAdmin on every
+# e2e folder it creates, so the delete call impersonates that SA instead of
+# widening platform-ci's standalone permissions (requires platform-ci to hold
+# roles/iam.serviceAccountTokenCreator on the TFC apply SA).
+TFC_APPLY_SA="hcp-tf-default-apply@gcp-hcp-ci-tfc-access.iam.gserviceaccount.com"
+
 delete_folder() {
   local folder_id=$1
 
-  log "--- Deleting per-run GCP folder: folders/${folder_id} ---"
+  log "--- Deleting per-run GCP folder: folders/${folder_id} (impersonating ${TFC_APPLY_SA}) ---"
 
   local output
   local exit_code
-  if output=$(gcloud resource-manager folders delete "${folder_id}" --quiet 2>&1); then
+  if output=$(gcloud resource-manager folders delete "${folder_id}" \
+    --impersonate-service-account="${TFC_APPLY_SA}" --quiet 2>&1); then
     exit_code=0
   else
     exit_code=$?
