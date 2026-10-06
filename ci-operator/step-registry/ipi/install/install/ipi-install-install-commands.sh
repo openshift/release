@@ -742,12 +742,21 @@ function inject_spot_instance_config() {
       ;;
   esac
 
+  local keep_on_demand=0
+  if [[ "${mtype}" == "workers" ]]; then
+    keep_on_demand="${SPOT_ON_DEMAND_WORKER_COUNT:-0}"
+  fi
+  read -ra manifest_list <<< "${manifests}"
+  local total=${#manifest_list[@]}
+  local spot_count=$((total - keep_on_demand))
+  local count=0
+
   # Inject spotMarketOptions into the appropriate manifests
   local prefix=
   local found=false
   # Don't rely on file names; iterate through all the manifests and match
   # by kind.
-  for manifest in $manifests; do
+  for manifest in "${manifest_list[@]}"; do
     # E.g, CPMS is not present for single node clusters
     if [[ ! -f ${manifest} ]]; then
       continue
@@ -774,6 +783,12 @@ function inject_spot_instance_config() {
           continue
           ;;
     esac
+    count=$((count + 1))
+    if [[ "${mtype}" == "workers" && ${count} -gt ${spot_count} ]]; then
+      echo "Keeping on-demand instances for ${kind} in ${manifest}"
+      found=true
+      continue
+    fi
     found=true
     echo "Using spot instances for ${kind} in ${manifest}"
     /tmp/yq w -i --tag '!!str' "${manifest}" "${prefix}.spotMarketOptions.maxPrice" ''
