@@ -67,6 +67,8 @@ if ! ${VIRSH_ADDITIONAL} list >/dev/null; then
   exit 1
 fi
 
+CLEANUP_FAILED=0
+
 set +e
 
 # --- Clean Primary Host ---
@@ -90,8 +92,12 @@ if ${VIRSH_PRIMARY} pool-list 2>/dev/null | grep -qw "${POOL_NAME}"; then
     echo "ERROR: Failed to list initial volumes on primary pool ${POOL_NAME}: ${PRIMARY_INIT_VOLS}"
     exit 1
   }
-  for VOLUME in $(echo "${PRIMARY_INIT_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }'); do
-    ${VIRSH_PRIMARY} vol-delete --pool "${POOL_NAME}" "${VOLUME}" >/dev/null 2>&1 || true
+  for VOLUME in $(echo "${PRIMARY_INIT_VOLS}" | awk '{ print $1 }' | grep -E "^${LEASED_RESOURCE}([-.]|$)"); do
+    echo "Deleting primary pool volume: ${VOLUME}"
+    if ! ${VIRSH_PRIMARY} vol-delete --pool "${POOL_NAME}" "${VOLUME}"; then
+      echo "ERROR: Could not delete ${VOLUME} from ${POOL_NAME}" >&2
+      CLEANUP_FAILED=1
+    fi
   done
 fi
 
@@ -105,8 +111,12 @@ if echo "${PRIMARY_INIT_ALL_POOLS}" | grep -Fxq "${HTTPD_POOL_NAME}"; then
     echo "ERROR: Failed to list initial volumes on primary httpd pool ${HTTPD_POOL_NAME}: ${PRIMARY_INIT_HTTPD_VOLS}"
     exit 1
   }
-  for VOLUME in $(echo "${PRIMARY_INIT_HTTPD_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }'); do
-    ${VIRSH_PRIMARY} vol-delete --pool "${HTTPD_POOL_NAME}" "${VOLUME}" >/dev/null 2>&1 || true
+  for VOLUME in $(echo "${PRIMARY_INIT_HTTPD_VOLS}" | awk '{ print $1 }' | grep -E "^${LEASED_RESOURCE}([-.]|$)"); do
+    echo "Deleting primary httpd pool volume: ${VOLUME}"
+    if ! ${VIRSH_PRIMARY} vol-delete --pool "${HTTPD_POOL_NAME}" "${VOLUME}"; then
+      echo "ERROR: Could not delete ${VOLUME} from ${HTTPD_POOL_NAME}" >&2
+      CLEANUP_FAILED=1
+    fi
   done
 else
   echo "HTTPD pool absent; no HTTPD volumes to clean"
@@ -152,8 +162,12 @@ if ${VIRSH_ADDITIONAL} pool-list 2>/dev/null | grep -qw "${ADDITIONAL_POOL}"; th
     echo "ERROR: Failed to list initial volumes on additional pool ${ADDITIONAL_POOL}: ${ADD_INIT_VOLS}"
     exit 1
   }
-  for VOLUME in $(echo "${ADD_INIT_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }'); do
-    ${VIRSH_ADDITIONAL} vol-delete --pool "${ADDITIONAL_POOL}" "${VOLUME}" >/dev/null 2>&1 || true
+  for VOLUME in $(echo "${ADD_INIT_VOLS}" | awk '{ print $1 }' | grep -E "^${LEASED_RESOURCE}([-.]|$)"); do
+    echo "Deleting additional pool volume: ${VOLUME}"
+    if ! ${VIRSH_ADDITIONAL} vol-delete --pool "${ADDITIONAL_POOL}" "${VOLUME}"; then
+      echo "ERROR: Could not delete ${VOLUME} from ${ADDITIONAL_POOL}" >&2
+      CLEANUP_FAILED=1
+    fi
   done
 fi
 
@@ -170,7 +184,11 @@ if [[ $? -ne 0 ]]; then
   echo "ERROR: Failed to list volumes on primary pool ${POOL_NAME}: ${PRIMARY_VOLS}"
   exit 1
 fi
-CONFLICTING_VOLUMES_P=$(echo "${PRIMARY_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }' || true)
+CONFLICTING_VOLUMES_P=$(
+  echo "${PRIMARY_VOLS}" |
+    awk '{ print $1 }' |
+    grep -E "^${LEASED_RESOURCE}([-.]|$)" || true
+)
 
 CONFLICTING_HTTPD_VOLUMES_P=""
 PRIMARY_VERIFY_ALL_POOLS=$(${VIRSH_PRIMARY} pool-list --all --name 2>&1)
@@ -185,7 +203,11 @@ if echo "${PRIMARY_VERIFY_ALL_POOLS}" | grep -Fxq "${HTTPD_POOL_NAME}"; then
     echo "ERROR: Failed to list volumes on primary httpd pool ${HTTPD_POOL_NAME}: ${PRIMARY_HTTPD_VOLS}"
     exit 1
   fi
-  CONFLICTING_HTTPD_VOLUMES_P=$(echo "${PRIMARY_HTTPD_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }' || true)
+  CONFLICTING_HTTPD_VOLUMES_P=$(
+    echo "${PRIMARY_HTTPD_VOLS}" |
+      awk '{ print $1 }' |
+      grep -E "^${LEASED_RESOURCE}([-.]|$)" || true
+  )
 else
   echo "HTTPD pool absent; no HTTPD volumes to check"
 fi
@@ -216,11 +238,15 @@ if [[ $? -ne 0 ]]; then
   echo "ERROR: Failed to list volumes on additional pool ${ADDITIONAL_POOL}: ${ADD_VOLS}"
   exit 1
 fi
-CONFLICTING_VOLUMES_A=$(echo "${ADD_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }' || true)
+CONFLICTING_VOLUMES_A=$(
+  echo "${ADD_VOLS}" |
+    awk '{ print $1 }' |
+    grep -E "^${LEASED_RESOURCE}([-.]|$)" || true
+)
 
 set -e
 
-if [ -n "${CONFLICTING_DOMAINS_P}" ] || [ -n "${CONFLICTING_VOLUMES_P}" ] || [ -n "${CONFLICTING_HTTPD_VOLUMES_P}" ] || [ -n "${CONFLICTING_POOLS_P}" ] || [ -n "${CONFLICTING_NETWORKS_P}" ] || [ -n "${CONFLICTING_DOMAINS_A}" ] || [ -n "${CONFLICTING_VOLUMES_A}" ]; then
+if [ -n "${CONFLICTING_DOMAINS_P}" ] || [ -n "${CONFLICTING_VOLUMES_P}" ] || [ -n "${CONFLICTING_HTTPD_VOLUMES_P}" ] || [ -n "${CONFLICTING_POOLS_P}" ] || [ -n "${CONFLICTING_NETWORKS_P}" ] || [ -n "${CONFLICTING_DOMAINS_A}" ] || [ -n "${CONFLICTING_VOLUMES_A}" ] || [ "${CLEANUP_FAILED}" -ne 0 ]; then
   echo "ERROR: Could not ensure clean state for lease ${LEASED_RESOURCE}"
   [[ -n "${CONFLICTING_DOMAINS_P}" ]] && echo "Conflicting primary domains found"
   [[ -n "${CONFLICTING_VOLUMES_P}" ]] && echo "Conflicting primary pool volumes found"
