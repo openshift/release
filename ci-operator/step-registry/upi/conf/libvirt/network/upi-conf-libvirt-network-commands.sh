@@ -43,6 +43,12 @@ else
 fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
+# Write the mgmt cluster's subnet number to SHARED_DIR so the subsequent
+# infra conf steps can co-locate the infra cluster on the same libvirt bridge.
+MGMT_SUBNET="$(leaseLookup 'subnet')"
+printf '%s' "${MGMT_SUBNET}" > "${SHARED_DIR}/MGMT_SUBNET"
+echo "Wrote MGMT_SUBNET=${MGMT_SUBNET} to ${SHARED_DIR}/MGMT_SUBNET"
+
 echo "Creating the libvirt network.xml file..."
 
 # This network xml forces the IP address of the rendezvous host to use the bootstrap IP.
