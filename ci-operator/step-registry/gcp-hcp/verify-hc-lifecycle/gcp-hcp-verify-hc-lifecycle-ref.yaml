@@ -18,6 +18,9 @@ ref:
   - name: HC_CLEANUP_ON_FAILURE
     default: "false"
     documentation: "Capture diagnostics, then clean test resources after a failed run in a persistent environment"
+  - name: GCPHCPCTL_AUTHZ_BOOTSTRAP
+    default: "true"
+    documentation: "Activate and authorize ephemeral customer projects; disable for a persistent project authorized outside CI"
   - name: GCPHCPCTL_API_MAX_ATTEMPTS
     default: "40"
     documentation: "Maximum authenticated Gecko API readiness attempts"
@@ -38,7 +41,7 @@ ref:
     ready -> login -> deploy workload -> verify -> delete -> destroy infra.
 
     Depends on:
-    - gcp-hcp-tf-provision or gcp-hcp-on-demand-config (must write api-endpoint, oidc-endpoint, customer-project-id, region, and region-project-id)
+    - gcp-hcp-tf-provision or gcp-hcp-on-demand-config (must write api-endpoint, oidc-endpoint, customer-project-id, and region; region-project-id is needed only for authorization bootstrap)
     - hypershift-gcp-wif-auth (provides the WIF ADC credential used by gcphcpctl)
     - gcp-hcp-e2e-tests image (provides /usr/bin/test-e2e and /usr/bin/gcphcpctl)
 
@@ -48,11 +51,14 @@ ref:
     - HC_READY_TIMEOUT: Ready timeout (default: 30m)
     - HC_DELETE_TIMEOUT: Delete timeout (default: 20m)
     - HC_CLEANUP_ON_FAILURE: Clean test resources after failure (default: false)
+    - GCPHCPCTL_AUTHZ_BOOTSTRAP: Activate and authorize an ephemeral customer project (default: true)
     - GCPHCPCTL_API_MAX_ATTEMPTS: API readiness attempts (default: 40)
     - GCPHCPCTL_API_WAIT_SECONDS: Seconds between API readiness attempts (default: 30)
 
-    The WIF principal from wif-config.json is reused for the activation workflow,
-    public API bootstrap, and gcphcpctl lifecycle requests.
+    With authorization bootstrap enabled, the WIF principal from wif-config.json
+    is reused for activation, public API bootstrap, and lifecycle requests.
+    The on-demand INT job disables activation; its identity must be authorized
+    for the persistent customer project outside CI.
 
     This step derives platform-api-subject-email from wif-config.json for the
     Ginkgo bootstrap; no alternate service-account credential is created.

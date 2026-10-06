@@ -17,7 +17,7 @@ if [[ ! -x "/usr/bin/test-e2e" ]]; then
 fi
 
 # Verify required SHARED_DIR files exist
-for f in api-endpoint oidc-endpoint customer-project-id region region-project-id; do
+for f in api-endpoint oidc-endpoint customer-project-id region; do
   if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
     echo "ERROR: ${f} not found or empty in SHARED_DIR"
     echo "A workflow pre-step must write this file"
@@ -34,9 +34,9 @@ fi
 echo "Configuring gcphcpctl with the WIF credential..."
 export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 
-# Reuse the service account configured for WIF for the activation workflow,
-# public API bootstrap, and gcphcpctl lifecycle requests. The WIF auth step
-# uses this same value to construct wif-cred.json.
+# Record the WIF service account for the optional authorization bootstrap.
+# The INT job skips bootstrap and uses this identity for Platform API requests.
+# The WIF auth step also uses it to construct wif-cred.json.
 WIF_CONFIG="${CLUSTER_PROFILE_DIR}/wif-config.json"
 if [[ ! -r "${WIF_CONFIG}" ]]; then
   echo "ERROR: WIF configuration not found or unreadable: ${WIF_CONFIG}"
@@ -118,6 +118,17 @@ echo "  Customer project:   $(cat "${SHARED_DIR}/customer-project-id")"
 echo "  HC version:         ${HC_VERSION:-5.0.0-ec.6}"
 echo "  Channel group:      ${HC_CHANNEL_GROUP:-candidate}"
 echo ""
+
+# A persistent customer project is authorized once outside CI. Verify that
+# access before --setup-infra can create customer-project IAM and networking.
+if [[ "${GCPHCPCTL_AUTHZ_BOOTSTRAP:-true}" == "false" ]]; then
+  echo "Checking pre-provisioned customer API access..."
+  if ! /usr/bin/gcphcpctl cluster list -o json > /dev/null 2>&1; then
+    echo "ERROR: Cannot list clusters in the customer project through the Platform API"
+    echo "Authorize the CI identity for this project outside the scheduled job"
+    exit 1
+  fi
+fi
 
 # The Ginkgo test reads SHARED_DIR files directly via resolveConfig().
 # GCPHCPCTL_PATH points to the binary baked into the test image.
