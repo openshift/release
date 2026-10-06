@@ -7,6 +7,7 @@ set -o pipefail
 # Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
 # Files are prefixed with "infra-" to stay flat in SHARED_DIR — Kubernetes
 # secrets don't support subdirectories and silently drop them between steps.
+MGMT_LEASED_RESOURCE="${LEASED_RESOURCE:-}"
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
   INFRA_PREFIX="infra-"
@@ -54,13 +55,25 @@ else
 fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
+# MGMT_SUBNET_OVERRIDE: use the mgmt cluster's subnet for rendezvousIP so it
+# matches the bridge chosen in the network conf step.
+# Auto-detect from the mgmt lease if not explicitly set (same logic as network conf step).
+if [[ -n "${MGMT_SUBNET_OVERRIDE:-}" ]]; then
+  RENDEZVOUS_SUBNET="${MGMT_SUBNET_OVERRIDE}"
+elif [[ -n "${MGMT_LEASED_RESOURCE}" && -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
+  RENDEZVOUS_SUBNET="$(yq-v4 -oy ".\"${MGMT_LEASED_RESOURCE}\".subnet" "${CLUSTER_PROFILE_DIR}/leases" 2>/dev/null || true)"
+  [[ -z "${RENDEZVOUS_SUBNET}" ]] && RENDEZVOUS_SUBNET="$(leaseLookup 'subnet')"
+else
+  RENDEZVOUS_SUBNET="$(leaseLookup 'subnet')"
+fi
+
 echo "Creating the agent-config.yaml file..."
 cat >> "${SHARED_DIR}/${INFRA_PREFIX}agent-config.yaml" << EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
   name: ${CLUSTER_NAME}
-rendezvousIP: 192.168.$(leaseLookup "subnet").10
+rendezvousIP: 192.168.${RENDEZVOUS_SUBNET}.10
 hosts:
   - hostname: control-0.${BASE_URL}
     role: master
