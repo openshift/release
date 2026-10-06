@@ -59,9 +59,9 @@ echo "Downloading queries config from ${QUERIES_CONFIG_URL}..."
 curl -fsSL "${QUERIES_CONFIG_URL}" -o "${QUERIES_FILE}"
 
 echo "Installing nope.py requirements..."
-python3 -m pip install -q -r scripts/requirements.txt
+python -m pip install -q -r scripts/requirements.txt
 
-UUID=$(python3 -c "import uuid; print(uuid.uuid4())")
+UUID=$(python -c "import uuid; print(uuid.uuid4())")
 echo "Run UUID: ${UUID}"
 
 echo "${UUID}" > "${SHARED_DIR}/day0-uuid-${MEASUREMENT_LABEL}.txt"
@@ -70,7 +70,7 @@ echo "${BUILD_ID}" > "${SHARED_DIR}/day0-build-id.txt"
 # Write all run metadata to a JSON file — nope.py reads and merges into ES doc
 METADATA_FILE="${SHARED_DIR}/day0-metadata-${MEASUREMENT_LABEL}.json"
 export NETOBSERV_ENABLED MEASUREMENT_LABEL DAY0_JOB_TYPE METADATA_FILE
-python3 -c "
+python -c "
 import json, os, re, subprocess
 nodes = json.loads(subprocess.check_output(['oc', 'get', 'nodes', '-o', 'json'], text=True))['items']
 version_output = subprocess.check_output([
@@ -100,7 +100,7 @@ with open(os.environ['METADATA_FILE'], 'w') as f:
 print('Metadata:', json.dumps(meta, indent=2))
 "
 
-python3 scripts/nope.py \
+python scripts/nope.py \
     --yaml-file "${QUERIES_FILE}" \
     --starttime "${START_TIME}" \
     --endtime "${END_TIME}" \

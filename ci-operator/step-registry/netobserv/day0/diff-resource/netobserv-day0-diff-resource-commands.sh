@@ -19,7 +19,7 @@ fi
 
 echo "Computing day0 resource diff..."
 
-python3 - <<PYEOF
+python - <<PYEOF
 import json, os, sys
 
 snapshot_without = "${SNAPSHOT_WITHOUT}"
