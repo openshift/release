@@ -33,7 +33,7 @@ for commit in ${COMMITS}; do
     SHORT=$(git log -1 --format="%h %s" "${commit}")
     AUTHOR=$(git log -1 --format="%an" "${commit}")
 
-    if [ "${AUTHOR}" = "openshift-bot" ] || [ "${AUTHOR}" = "openshift-art-build-bot" ] || [ "${AUTHOR}" = "Chai Bot" ]; then
+    if [ "${AUTHOR}" = "openshift-bot" ] || [ "${AUTHOR}" = "Chai Bot" ]; then
         echo "SKIP: ${SHORT} (bot commit)"
         continue
     fi
