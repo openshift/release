@@ -43,8 +43,47 @@ $WAS_TRACING && set -x
 oc set data secret/pull-secret -n openshift-config \
   --from-file=.dockerconfigjson="${TMP_DIR}/merged.json"
 
+wait_for_mcp_rollout() {
+  local mcp="$1"
+  local updating updated
+  local counter=0
+  local observation_seconds=120
+
+  echo "Waiting up to ${observation_seconds}s for MCP ${mcp} to react to pull-secret update..."
+  while [[ ${counter} -lt ${observation_seconds} ]]; do
+    if ! updating=$(oc get mcp "${mcp}" -o jsonpath='{.status.conditions[?(@.type=="Updating")].status}'); then
+      echo "Failed to read Updating condition for MCP ${mcp}" >&2
+      exit 1
+    fi
+
+    if [[ "${updating}" == "True" ]]; then
+      echo "MCP ${mcp} rollout started (Updating=True)"
+      oc wait "mcp/${mcp}" --for=condition=UPDATED=True --timeout=600s
+      return 0
+    fi
+
+    sleep 5
+    counter=$((counter + 5))
+  done
+
+  if ! updated=$(oc get mcp "${mcp}" -o jsonpath='{.status.conditions[?(@.type=="Updated")].status}'); then
+    echo "Failed to read Updated condition for MCP ${mcp}" >&2
+    exit 1
+  fi
+
+  if [[ "${updating}" == "False" && "${updated}" == "True" ]]; then
+    echo "MCP ${mcp} remained converged after ${observation_seconds}s; skipping rollout wait"
+    return 0
+  fi
+
+  oc wait "mcp/${mcp}" --for=condition=UPDATING=True --timeout=300s
+  oc wait "mcp/${mcp}" --for=condition=UPDATED=True --timeout=600s
+}
+
 NUM_WORKERS="$(oc get mcp worker -ojsonpath='{.status.machineCount}')"
-[[ "${NUM_WORKERS}" != "0" ]] && oc wait mcp worker --for=condition=UPDATING=True --timeout=300s
-oc wait mcp master --for=condition=UPDATING=True --timeout=300s
-[[ "${NUM_WORKERS}" != "0" ]] && oc wait mcp worker --for=condition=UPDATED=True --timeout=600s
-oc wait mcp master --for=condition=UPDATED=True --timeout=600s
+if [[ "${NUM_WORKERS}" != "0" ]]; then
+  wait_for_mcp_rollout worker
+else
+  echo "SNO or compact cluster; skipping worker MCP rollout wait"
+fi
+wait_for_mcp_rollout master
