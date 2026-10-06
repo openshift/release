@@ -54,7 +54,7 @@ If missing: read `${SHARED_DIR}/qe-agent-junit-*.xml`, extract each suite name a
 
 ## Step 2 — Locate Test Source Files
 
-The repo root is the clone from Step 0b. `TEST_DIR=tests/e2e-otel-ui/collector-dashboard`, `TEST_SRC=${TEST_DIR}/ui/specs/collector-dashboard.spec.ts` (one serial `describe`; the case title after `›` locates the test with `grep -n`). Supporting files: `ui/pages/collector-dashboard.page.ts` (`PANELS` with titles and legend templates, selectors), `ui/support/console-login.ts`, `ui/support/env.ts`; fixtures `00-*` (user workload monitoring), `01-otel-collector.yaml` (`cluster-collector` with a `debug` and an always-failing `otlp/unreachable` exporter, plus an idle `second` collector), `02-generate-telemetry.yaml` (Jobs `telemetrygen-traces`, `-metrics`, `-logs`, 15 minutes), `03-*` (RBAC), `check_metrics.sh`. The operator source of the change under test is in `/tmp/opentelemetry-operator` (copied into the agent image; the dashboard is built in `internal/openshift/dashboards/`): read it for the product side of a diagnosis, and reuse it in Step 4a only if it has a `.git` directory.
+The repo root is the clone from Step 0b. `TEST_DIR=tests/e2e-otel-ui/collector-dashboard`, `TEST_SRC=${TEST_DIR}/ui/specs/collector-dashboard.spec.ts` (one serial `describe`; the case title after `›` locates the test with `grep -n`). Supporting files: `ui/pages/collector-dashboard.page.ts` (`PANELS` with titles and legend templates, selectors), `ui/support/console-login.ts`, `ui/support/env.ts`; fixtures `00-*` (user workload monitoring), `01-otel-collector.yaml` (`cluster-collector` with a `debug` and an always-failing `otlp/unreachable` exporter, plus an idle `second` collector), `02-generate-telemetry.yaml` (Jobs `telemetrygen-traces`, `-metrics`, `-logs`, 15 minutes), `03-*` (RBAC), `check_metrics.sh`. The operator source of the change under test is in `/tmp/opentelemetry-operator` (copied into the agent image; the dashboard is built in `internal/openshift/dashboards/`): read it for the product side of a diagnosis, and reuse it in Step 4a only if it has a `.git` directory. It is a copy of the CI clone, with the history but no `origin` remote: skip the fetches of Step 4a for it.
 
 ---
 
@@ -80,13 +80,13 @@ for ns in $(oc get namespaces --no-headers -o custom-columns=:metadata.name | gr
   oc delete namespace "$ns" --ignore-not-found
 done
 oc delete clusterrole,clusterrolebinding chainsaw-otel-ui-metrics-api --ignore-not-found  # not removed with the namespace
-cd /tmp/distributed-tracing-qe && ARTIFACT_DIR="${RUN_DIR}" chainsaw test --config .chainsaw.yaml --skip-delete --quiet \
+cd /tmp/distributed-tracing-qe && ARTIFACT_DIR="${RUN_DIR}" chainsaw test --config .chainsaw.yaml --skip-delete \
   --report-name junit_rerun_otel_ui --report-path "${RUN_DIR}" --report-format XML --test-dir tests/e2e-otel-ui/collector-dashboard
 ```
 
 Read `${RUN_DIR}/junit_console_ui_otel_dashboard.xml` and the Chainsaw output. For a failing spec, `${RUN_DIR}/test-results/*/error-context.md` is the page snapshot at the failure, and the `.png` next to it is the screenshot (open it with the Read tool). The same failure as in the original run goes to Step 4.
 
-**Dashboard queries.** Whether run 1 passed or failed, the namespace is still there (skip this if it failed before the collectors were deployed). Run the dashboard's own queries (variables replaced by "all") against Thanos. Every query must return a series, except the Processor `dropped` queries (never) and the `refused` queries (only after a refusal) where `0` is normal. `ERR` means that the query itself failed, not that it has no series: retry it, and record it as not checked if it still fails:
+**Dashboard queries.** Only after run 1 has finished, passed or failed: the counts are 0 until its `wait-for-dashboard-metrics` step has passed (skip this if it failed before the collectors were deployed). Run the dashboard's own queries (variables replaced by "all") against Thanos. Every query must return a series, except the Processor `dropped` queries (never) and the `refused` queries (only after a refusal) where `0` is normal. `ERR` means that the query itself failed, not that it has no series: retry it, and record it as not checked if it still fails:
 
 ```bash
 NS=$(oc get opentelemetrycollector -A --field-selector metadata.name=cluster-collector -o jsonpath='{.items[0].metadata.namespace}')
@@ -113,7 +113,7 @@ OTEL_UI_NAMESPACE="${NS}" OTEL_UI_DATA_TIMEOUT_SECONDS=120 ARTIFACT_DIR="${ARTIF
   npx playwright test -g "<unique part of the failing case title>" --retries=0
 ```
 
-Record the pass/fail pattern of the four runs (for example `PFPP`). A failure in even 1 of 4 runs still goes through Step 4 first, and is `FLAKY` (Step 5c) only if that finds no other explanation; an incomplete loop is tentative, never `FLAKY`.
+Record the pass/fail pattern of the four runs (for example `PFPP`). They run the unmodified tests: edit a test only in Step 5a or 5c, and verify the fix with further runs. A failure in even 1 of 4 runs still goes through Step 4 first, and is `FLAKY` (Step 5c) only if that finds no other explanation; an incomplete loop is tentative, never `FLAKY`.
 
 ---
 

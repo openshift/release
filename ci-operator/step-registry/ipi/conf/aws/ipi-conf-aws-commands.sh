@@ -377,6 +377,11 @@ if [[ -n "${COMPUTE_AMI}" ]]; then
   yq-v4 eval -i '.compute[0].platform.aws.amiID = env(COMPUTE_AMI)' "${CONFIG}"
 fi
 
+if [[ -n "${COMPUTE_MACHINE_MANAGEMENT}" ]]; then
+  echo "Setting compute machine management: ${COMPUTE_MACHINE_MANAGEMENT}"
+  yq-v4 eval -i '.compute[0].management = env(COMPUTE_MACHINE_MANAGEMENT)' "${CONFIG}"
+fi
+
 
 if [[ ${AWS_METADATA_SERVICE_AUTH} =~ ^(Required|Optional)$ ]]; then
   echo "setting up metadata auth in install-config.yaml. Set metadata service auth to: ${AWS_METADATA_SERVICE_AUTH}"

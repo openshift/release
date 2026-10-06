@@ -202,15 +202,15 @@ local queryCompletenessPanel(controller, title) =
     },
   })
   .addTarget(prometheus.target(
-      'sum(tide_sync_query_shards{controller="%s", result="success"})' % controller,
+      'sum(tide_query_shards{controller="%s", result="success"})' % controller,
       legendFormat='Success shards',
       instant=true,
   )).addTarget(prometheus.target(
-      'sum(tide_sync_query_shards{controller="%s", result="partial"})' % controller,
+      'sum(tide_query_shards{controller="%s", result="partial"})' % controller,
       legendFormat='Partial shards',
       instant=true,
   )).addTarget(prometheus.target(
-      'sum(tide_sync_query_shards{controller="%s", result="error"})' % controller,
+      'sum(tide_query_shards{controller="%s", result="error"})' % controller,
       legendFormat='Error shards',
       instant=true,
   )).addTarget(prometheus.target(
@@ -247,7 +247,7 @@ local queryCompletenessHistoryPanel(controller, title) =
     },
   })
   .addTarget(prometheus.target(
-      'sum(tide_sync_query_shards{controller="%s"}) by (result)' % controller,
+      'sum(tide_query_shards{controller="%s"}) by (result)' % controller,
       legendFormat='{{result}}',
   ));
 
@@ -455,15 +455,15 @@ local queryErrorCountPanel(controller, title) =
     },
   })
   .addTarget(prometheus.target(
-      'sum(tide_sync_query_shards{controller="%s", result="error"})' % controller,
+      'sum(tide_query_shards{controller="%s", result="error"})' % controller,
       legendFormat='Errors',
       instant=true,
   )).addTarget(prometheus.target(
-      'sum(tide_sync_query_shards{controller="%s", result="partial"})' % controller,
+      'sum(tide_query_shards{controller="%s", result="partial"})' % controller,
       legendFormat='Partials',
       instant=true,
   )).addTarget(prometheus.target(
-      'sum(tide_sync_query_shards{controller="%s"})' % controller,
+      'sum(tide_query_shards{controller="%s"})' % controller,
       legendFormat='Total',
       instant=true,
   ));

@@ -280,6 +280,51 @@ tests:
           cpu: "4"
           memory: 4Gi
     workflow: ipi-aws
+- always_run: false
+  as: test-e2e-ci-build-downstream-dra-cc-5-0
+  cron: '@daily'
+  optional: true
+  presubmit: true
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ocp-5-0-latest
+    env:
+      DRA_GPU_ALLOW_MULTIPLE_ALLOCATIONS: "true"
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: cert-manager-install-operator
+    - as: run-sdk
+      cli: latest
+      commands: |
+        oc create namespace openshift-kueue-operator || true
+        oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$OO_BUNDLE" --security-context-config=restricted
+      dependencies:
+      - env: OO_BUNDLE
+        name: kueue-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: dra-example-driver-install
+    - as: e2e-kueue-dra-cc-downstream
+      cli: latest
+      commands: make e2e-ci-test-dra-cc
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-aws
 - as: test-e2e-4-18
   capabilities:
   - arm64

@@ -77,6 +77,7 @@ def test_expand_matrix_cells() -> None:
         ("3.18", "redhat-3.18", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64", False),
         ("3.18", "redhat-3.18", "azure", "4.22", "e2e-install", "@daily", "periodic", "amd64", False),
         ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64", False),
+        ("3.18", "redhat-3.18", "aws", "4.14", "e2e-install", "@weekly", "periodic", "amd64", False),
         ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64", False),
         ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", True),
         ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x", False),
@@ -157,7 +158,7 @@ def test_e2e_install_template_inverts_full_default_filter() -> None:
     env = jinja_env(GENERATOR_DIR / "templates")
     rendered = render_template(env, "tests/e2e-install.yaml.j2", _phase0_cell().context())
     assert rendered["tests"][0]["steps"]["env"]["PLAYWRIGHT_GREP_INVERT"] == (
-        "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@webhook|"
+        "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|"
         "saves and loads architecture filter with mirror configuration|"
         "loads existing architecture filter from saved mirror configuration"
     )
@@ -369,6 +370,18 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     post_refs = [step.get("ref") or step.get("chain") for step in test["steps"]["post"]]
     assert post_refs[-1] == "upi-libvirt-cleanup-post"
     assert "ipi-aws-post" not in post_refs
+
+
+def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    config = by_name["quay-quay-redhat-3.18__aws-ocp414-e2e-install.yaml"]
+    assert config["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-4.22"
+    assert config["releases"]["latest"]["candidate"]["version"] == "4.14"
+    assert config["tests"][0]["cron"] == "@weekly"
+    assert config["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.14__quay-rhel9-operator"
+    ocp50 = by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]
+    assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
 
 
 def test_master_presubmit_expands_all_clouds() -> None:

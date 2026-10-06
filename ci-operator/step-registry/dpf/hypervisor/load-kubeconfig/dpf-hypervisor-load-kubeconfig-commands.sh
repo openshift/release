@@ -57,5 +57,5 @@ sed -i 's/^PAYLOAD_URL=.*$/PAYLOAD_URL=/' "${SHARED_DIR}/.env"
 echo ".env copied to \${SHARED_DIR}/.env successfully"
 
 echo "Copying .env to artifacts..."
-cp "${SHARED_DIR}/.env" "${ARTIFACT_DIR}/.env"
+sed -E '/^WORKER_[0-9]+_NAME=/!{ /^WORKER_[0-9]+_/d }' "${SHARED_DIR}/.env" > "${ARTIFACT_DIR}/.env"
 echo ".env copied to artifacts"

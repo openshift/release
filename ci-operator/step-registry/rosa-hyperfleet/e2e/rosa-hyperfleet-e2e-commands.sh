@@ -25,38 +25,43 @@ git checkout "${CLONE_REF}"
 # ---------------------------------------------------------------------------
 # 2. Resolve which e2e test repo + ref to use
 # ---------------------------------------------------------------------------
-# Priority:
+# Priority, for the api tests (E2E_*) and likewise the zoa tests (ZOA_*) below:
 #   a) Explicit ROSA_REGIONAL_E2E_REF / ROSA_REGIONAL_E2E_REPO env vars
-#   b) Auto-detect from PR context (rosa-hyperfleet-api only):
-#      fetch the fork's clone URL via GitHub API so fork PRs work too
+#   b) PR context: a PR of the tests' own repo, merged into its base
 #   c) Defaults: main branch of openshift-online/rosa-hyperfleet-api
 DEFAULT_E2E_REPO="https://github.com/openshift-online/rosa-hyperfleet-api.git"
+
+# Checks out the PR merged into its base, the same source ci-operator builds
+# the images under test from, on local branch "e2e-under-test" in $1.
+# ci/e2e-tests.sh clones by branch name, so callers clone it via file://$1.
+# refs/pull/N/head lives on the upstream repo, so fork PRs work too.
+checkout_merged_pr() {
+  git init -q "$1"
+  git -C "$1" fetch -q --no-tags "https://github.com/${REPO_OWNER}/${REPO_NAME}.git" \
+    "refs/heads/${PULL_BASE_REF}" "refs/pull/${PULL_NUMBER}/head"
+  git -C "$1" checkout -q -b e2e-under-test "${PULL_BASE_SHA}"
+  git -C "$1" -c user.name=ci -c user.email=ci@openshift.io \
+    merge -q --no-ff --no-edit "${PULL_PULL_SHA}"
+  echo "Testing ${REPO_NAME} PR #${PULL_NUMBER} (${PULL_PULL_SHA}) merged into ${PULL_BASE_REF} (${PULL_BASE_SHA})"
+}
 
 if [[ -n "${ROSA_REGIONAL_E2E_REF:-}" ]]; then
   export E2E_REF="${ROSA_REGIONAL_E2E_REF}"
   export E2E_REPO="${ROSA_REGIONAL_E2E_REPO:-${DEFAULT_E2E_REPO}}"
 elif [[ "${REPO_NAME:-}" == "rosa-hyperfleet-api" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-  E2E_REPO=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
-  export E2E_REPO
-  export E2E_REF="${PULL_HEAD_REF}"
-  echo "Auto-detected from ${REPO_NAME} PR #${PULL_NUMBER}:"
-  echo "  E2E_REPO=${E2E_REPO}"
-  echo "  E2E_REF=${E2E_REF}"
+  checkout_merged_pr "${WORK_DIR}/e2e-src"
+  export E2E_REPO="file://${WORK_DIR}/e2e-src" E2E_REF="e2e-under-test"
 else
   export E2E_REPO="${DEFAULT_E2E_REPO}"
 fi
 
-# Same auto-detection for rosa-hyperfleet-zoa (ZOA e2e tests live in the zoa repo)
+# Same for rosa-hyperfleet-zoa (ZOA e2e tests live in the zoa repo)
 if [[ -n "${ROSA_REGIONAL_ZOA_REF:-}" ]]; then
   export ZOA_REF="${ROSA_REGIONAL_ZOA_REF}"
   export ZOA_REPO="${ROSA_REGIONAL_ZOA_REPO:-https://github.com/openshift-online/rosa-hyperfleet-zoa.git}"
 elif [[ "${REPO_NAME:-}" == "rosa-hyperfleet-zoa" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-  ZOA_REPO=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
-  export ZOA_REPO
-  export ZOA_REF="${PULL_HEAD_REF}"
-  echo "Auto-detected from ${REPO_NAME} PR #${PULL_NUMBER}:"
-  echo "  ZOA_REPO=${ZOA_REPO}"
-  echo "  ZOA_REF=${ZOA_REF}"
+  checkout_merged_pr "${WORK_DIR}/zoa-src"
+  export ZOA_REPO="file://${WORK_DIR}/zoa-src" ZOA_REF="e2e-under-test"
 fi
 
 # ---------------------------------------------------------------------------
@@ -72,6 +77,14 @@ export E2E_SKIP_ROSA_CLI="${E2E_SKIP_ROSA_CLI:-true}"
 if [[ -n "${ROSA_LABEL_FILTER:-}" ]]; then
   export ROSA_LABEL_FILTER="${ROSA_LABEL_FILTER}"
 fi
+
+# OCP release image for the e2e HCP cluster (empty uses the default).
+# An explicit OCP_IMAGE wins over one resolved by rosa-hyperfleet-resolve-ocp-image.
+RESOLVED_OCP_IMAGE_FILE="${SHARED_DIR}/ocp-image"
+if [[ -z "${OCP_IMAGE:-}" ]] && [[ -r "${RESOLVED_OCP_IMAGE_FILE}" ]]; then
+  OCP_IMAGE="$(cat "${RESOLVED_OCP_IMAGE_FILE}")"
+fi
+export OCP_IMAGE="${OCP_IMAGE:-}"
 
 echo "Running e2e tests..."
 ./ci/e2e-tests.sh
