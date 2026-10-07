@@ -49,42 +49,56 @@ approve_installplan_for_csv() {
   [[ "${approved}" == "true" ]] || { echo "ERROR: no install plan found for ${csv_name} in ${ns}" >&2; return 1; }
 }
 
-# Merge Vault Quay robot creds into the cluster pull-secret and create a
-# dockerconfig Secret for CatalogSource.spec.secrets. Do not echo username or
-# password; disable tracing while they are in memory.
+# Merge Vault registry creds into the cluster pull-secret and create a
+# dockerconfig Secret for CatalogSource.spec.secrets. Do not echo usernames
+# or passwords; disable tracing while they are in memory.
+# Quay robot: username/password → quay.io/kuadrant/qe-rhcl-prerelease-images only
+# (do not replace auths["quay.io"]; that breaks CI/must-gather pulls).
+# Stage registry: stage-username/stage-password → registry.stage.redhat.io
+# (RHCL bundle images referenced by the prerelease catalog).
 apply_kuadrant_quay_pull_secret() {
   local ns="$1"
   local user_file="${QUAY_CREDS_DIR}/username"
   local pass_file="${QUAY_CREDS_DIR}/password"
+  local stage_user_file="${QUAY_CREDS_DIR}/stage-username"
+  local stage_pass_file="${QUAY_CREDS_DIR}/stage-password"
   local pull_secret_name="kuadrant-qe-rhcl-prerelease-pull"
   if [[ ! -f "${user_file}" || ! -f "${pass_file}" ]]; then
     echo "ERROR: Quay pull credentials missing under ${QUAY_CREDS_DIR} (need username and password)." >&2
     echo "Vault secret kuadrant-qe-rhcl-prerelease-pull may not have synced to test-credentials." >&2
     return 1
   fi
+  if [[ ! -f "${stage_user_file}" || ! -f "${stage_pass_file}" ]]; then
+    echo "ERROR: Stage registry credentials missing under ${QUAY_CREDS_DIR} (need stage-username and stage-password)." >&2
+    echo "RHCL bundle images are on registry.stage.redhat.io; add those keys to the Vault secret." >&2
+    return 1
+  fi
 
-  echo "=== Merging Kuadrant QE Quay credentials into cluster pull-secret ==="
+  echo "=== Merging Kuadrant QE registry credentials into cluster pull-secret ==="
   [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
   set +x # Disable tracing due to password handling
 
-  local user pass auth
+  local user pass auth stage_user stage_pass stage_auth
   user="$(tr -d '\n' < "${user_file}")"
   pass="$(tr -d '\n' < "${pass_file}")"
   auth="$(printf '%s:%s' "${user}" "${pass}" | base64 -w 0)"
+  stage_user="$(tr -d '\n' < "${stage_user_file}")"
+  stage_pass="$(tr -d '\n' < "${stage_pass_file}")"
+  stage_auth="$(printf '%s:%s' "${stage_user}" "${stage_pass}" | base64 -w 0)"
 
   oc get secret pull-secret -n openshift-config -o json \
     | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
-  jq --arg auth "${auth}" '
-    .auths["quay.io"] = {"auth":$auth,"email":""}
-    | .auths["quay.io/kuadrant/qe-rhcl-prerelease-images"] = {"auth":$auth,"email":""}
+  jq --arg quay_auth "${auth}" --arg stage_auth "${stage_auth}" '
+    .auths["quay.io/kuadrant/qe-rhcl-prerelease-images"] = {"auth":$quay_auth,"email":""}
+    | .auths["registry.stage.redhat.io"] = {"auth":$stage_auth,"email":""}
   ' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
   mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
 
-  jq -n --arg auth "${auth}" '{
+  jq -n --arg quay_auth "${auth}" --arg stage_auth "${stage_auth}" '{
     auths: {
-      "quay.io": {"auth":$auth,"email":""},
-      "quay.io/kuadrant/qe-rhcl-prerelease-images": {"auth":$auth,"email":""}
+      "quay.io/kuadrant/qe-rhcl-prerelease-images": {"auth":$quay_auth,"email":""},
+      "registry.stage.redhat.io": {"auth":$stage_auth,"email":""}
     }
   }' > /tmp/kuadrant-quay-auth.json
   oc create secret generic "${pull_secret_name}" \
@@ -94,9 +108,9 @@ apply_kuadrant_quay_pull_secret() {
     --dry-run=client -o yaml | oc apply -f -
 
   rm -f /tmp/global-pull-secret.json /tmp/global-pull-secret.json.tmp /tmp/kuadrant-quay-auth.json
-  unset user pass auth
+  unset user pass auth stage_user stage_pass stage_auth
   $WAS_TRACING && set -x
-  echo "Created ${ns}/${pull_secret_name} for CatalogSource image pulls"
+  echo "Created ${ns}/${pull_secret_name} for CatalogSource and bundle image pulls"
 
   echo "=== Adding ${pull_secret_name} to ${ns}/default service account ==="
   oc get sa default -n "${ns}" -o json \
