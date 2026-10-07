@@ -4,11 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
+
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
-        typeset -a _fURL=()
-        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
-        "${_fURL[@]}" \
+        curl -fsSL \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
 fi
@@ -70,7 +70,6 @@ function on_exit() {
       ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-odf__quay-tests-deploy-quay-odf.xml || true
   fi
   write_quay_install_junit "${ec}"
-  [[ -n "${YQ_TMPDIR:-}" ]] && rm -rf "${YQ_TMPDIR}" || true
   exit "${ec}"
 }
 trap on_exit EXIT
@@ -335,6 +334,8 @@ if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
   exit 1
 fi
 
+mkdir -p /tmp/QUAY_ODF && cd /tmp/QUAY_ODF
+
 #Deploy Quay, here disable monitoring component
 cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
@@ -381,32 +382,17 @@ FEATURE_MAILING: false
 FEATURE_OTEL_TRACING: false
 EOF
 
-# Fetch yq once into a private temp dir: used below to merge config
-# fragments and to strip operator-managed keys, which now run
-# unconditionally.
-YQ_TMPDIR="$(mktemp -d)"
-YQ="${YQ_TMPDIR}/yq"
-yq_version="v4.47.2"
-case "$(uname -m)" in
-	x86_64) yq_arch="amd64"; yq_sha256="1bb99e1019e23de33c7e6afc23e93dad72aad6cf2cb03c797f068ea79814ddb0" ;;
-	aarch64) yq_arch="arm64"; yq_sha256="05df1f6aed334f223bb3e6a967db259f7185e33650c3b6447625e16fea0ed31f" ;;
-	*) echo "Unsupported architecture for yq: $(uname -m)" >&2; exit 1 ;;
-esac
-curl -fsSL "https://github.com/mikefarah/yq/releases/download/${yq_version}/yq_linux_${yq_arch}" -o "${YQ}"
-printf '%s  %s\n' "${yq_sha256}" "${YQ}" | sha256sum --check --status
-chmod +x "${YQ}"
-
 # Merge a config fragment into config.yaml with list-append semantics ('*+',
 # not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
 # Validate first so a present-but-malformed fragment fails the step clearly
 # instead of corrupting config.yaml.
 function merge_config_fragment() {
 	local fragment="$1"
-	if ! "${YQ}" e 'true' "${fragment}" >/dev/null 2>&1; then
+	if ! yq e 'true' "${fragment}" >/dev/null 2>&1; then
 		echo "ERROR: ${fragment} is not valid YAML" >&2
 		exit 1
 	fi
-	"${YQ}" eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
 # Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
@@ -434,7 +420,7 @@ fi
 # above added any of these keys. The DISTRIBUTED_STORAGE_* / FEATURE_PROXY_STORAGE
 # keys are additionally stripped here because objectstorage is managed: true
 # below -- the operator owns distributed storage configuration entirely.
-"${YQ}" -i '
+yq -i '
 	del(
 		.FEATURE_SECURITY_SCANNER,
 		.FEATURE_SECURITY_NOTIFICATIONS,
@@ -465,7 +451,7 @@ fi
 # pkg/kustomize/secrets.go, ComponentObjectStorage case). QUAY_EXTRA_CONFIG sets
 # USERFILES_LOCATION / LOG_ARCHIVE_LOCATION / ACTION_LOG_ARCHIVE_LOCATION to
 # "default", which would otherwise name a location the operator never creates.
-"${YQ}" -i '
+yq -i '
 	with(select(has("USERFILES_LOCATION")); .USERFILES_LOCATION = "local_us") |
 	with(select(has("LOG_ARCHIVE_LOCATION")); .LOG_ARCHIVE_LOCATION = "local_us") |
 	with(select(has("ACTION_LOG_ARCHIVE_LOCATION")); .ACTION_LOG_ARCHIVE_LOCATION = "local_us")
