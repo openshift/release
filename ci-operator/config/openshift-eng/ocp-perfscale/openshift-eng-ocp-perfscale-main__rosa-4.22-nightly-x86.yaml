@@ -132,9 +132,11 @@ tests:
   steps:
     cluster_profile: aws-perfscale
     env:
+      BUILD_FARM_EXTRA_FLAGS: --alerting=false --job-iterations=80 --set=jobs.2.jobPause=10m
       CHANNEL_GROUP: nightly
       CLUSTER_TAGS: TicketId:731
       COMPUTE_MACHINE_TYPE: m6i.xlarge
+      CUSTOM_KB_BUILD: "true"
       ENABLE_AUTOSCALING: "true"
       INDEX_ENABLED: "true"
       MIN_REPLICAS: "18"
@@ -142,98 +144,7 @@ tests:
       OPENSHIFT_VERSION: "4.22"
       REPLICAS: "114"
     test:
-    - as: build-farm-pprof
-      cli: latest
-      commands: |
-        #!/bin/bash
-        set -o errexit
-        set -o nounset
-        set -o pipefail
-        set -x
-
-        # === Create SA and get bearer token for kube-apiserver pprof ===
-        oc create namespace benchmark-operator || true
-        oc create serviceaccount kube-burner -n benchmark-operator || true
-        oc adm policy add-cluster-role-to-user cluster-admin -z kube-burner -n benchmark-operator
-        BEARER_TOKEN=$(oc create token kube-burner -n benchmark-operator --duration=24h)
-        export BEARER_TOKEN
-
-        # === Install Go 1.25.9 ===
-        curl -sL https://go.dev/dl/go1.25.9.linux-amd64.tar.gz | tar -C /tmp -xzf -
-        export PATH="/tmp/go/bin:${PATH}"
-        export GOPATH="/tmp/gopath"
-        mkdir -p "${GOPATH}"
-        go version
-
-        # === Build kube-burner-ocp from fork with pprof targets ===
-        cd /tmp
-        git clone --branch add-kube-apiserver-pprof-targets --depth 1 https://github.com/redhat-chai-bot/kube-burner_kube-burner-ocp.git kube-burner-ocp-src
-        cd kube-burner-ocp-src
-        make build
-        tar czf /tmp/kube-burner-ocp-custom.tar.gz -C bin/amd64 kube-burner-ocp
-        export KUBE_BURNER_URL="file:///tmp/kube-burner-ocp-custom.tar.gz"
-
-        # === Run build-farm workload (replicated from build-farm-commands.sh) ===
-        cat /etc/os-release
-        oc config view
-        oc projects
-        oc version
-        python --version
-        pushd /tmp
-        python -m virtualenv ./venv_qe
-        source ./venv_qe/bin/activate
-
-        ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
-        ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
-        ES_PASSWORD=$(cat "${ES_SECRETS_PATH}/password")
-        ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
-        if [ -e "${ES_SECRETS_PATH}/host" ]; then
-            ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
-        fi
-
-        REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-        LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
-        TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-        git clone $REPO_URL $TAG_OPTION --depth 1
-        pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
-        export WORKLOAD=build-farm
-
-        export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
-
-        ENABLE_LOCAL_INDEX=${ENABLE_LOCAL_INDEX:-false}
-        if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
-            EXTRA_FLAGS+=" --local-indexing"
-        fi
-        PROFILE_TYPE=${PROFILE_TYPE:-both}
-        BUILD_FARM_EXTRA_FLAGS="--alerting=false --job-iterations=80 --set=jobs.2.jobPause=10m"
-        EXTRA_FLAGS+="${BUILD_FARM_EXTRA_FLAGS} --gc-metrics=false --profile-type=${PROFILE_TYPE}"
-        EXTRA_FLAGS+=" --pprof-interval=1m"
-
-        USER_METADATA=${USER_METADATA:-""}
-        if [[ -n "${USER_METADATA}" ]]; then
-          echo "${USER_METADATA}" > user-metadata.yaml
-          EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
-        fi
-        export EXTRA_FLAGS
-        ADDITIONAL_PARAMS=${ADDITIONAL_PARAMS:-'{}'}
-        export ADDITIONAL_PARAMS
-
-        E2E_VERSION=${E2E_VERSION:-default}
-        ./run.sh
-
-        if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
-            metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
-            cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
-        fi
-      credentials:
-      - collection: ocp-perfscale-cpt
-        group: ocp-qe-perfscale-es-creds
-        mount_path: /secret
-      from: ocp-qe-perfscale-ci
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - chain: openshift-qe-build-farm
     - as: capture-prometheus-dump
       cli: latest
       commands: |
