@@ -1071,6 +1071,52 @@ tests:
     - chain: openshift-qe-ingress-perf
     workflow: rosa-aws-sts
 - always_run: false
+  as: data-path-9nodes-no-place-lag
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "6"
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+    test:
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - as: disable-place-lag
+      cli: latest
+      commands: |-
+        echo "Disabling PLACE_LAG scheduler feature on infra/router nodes..."
+        INFRA_NODES=$(oc get nodes -l node-role.kubernetes.io/infra= -o jsonpath='{.items[*].metadata.name}')
+        if [[ -z "${INFRA_NODES}" ]]; then
+          echo "ERROR: No infra nodes found."
+          exit 1
+        fi
+        for node in ${INFRA_NODES}; do
+          echo "Processing node ${node}..."
+          echo "Current sched features:"
+          oc debug "node/${node}" --quiet -- chroot /host bash -c 'grep PLACE_LAG /sys/kernel/debug/sched/features' || true
+          echo "Disabling PLACE_LAG..."
+          oc debug "node/${node}" --quiet -- chroot /host bash -c 'echo NO_PLACE_LAG > /sys/kernel/debug/sched/features'
+          echo "Verifying..."
+          RESULT=$(oc debug "node/${node}" --quiet -- chroot /host bash -c 'grep -c NO_PLACE_LAG /sys/kernel/debug/sched/features' | tr -d '[:space:]')
+          echo "Node ${node}: NO_PLACE_LAG count=${RESULT}"
+          if [[ "${RESULT}" != "1" ]]; then
+            echo "ERROR: Failed to disable PLACE_LAG on ${node}"
+            exit 1
+          fi
+        done
+        echo "SUCCESS: PLACE_LAG disabled on all infra nodes."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+    - chain: openshift-qe-ingress-perf
+    workflow: rosa-aws-sts
+- always_run: false
   as: default
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
