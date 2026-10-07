@@ -35,14 +35,21 @@ _opp_cleanup() {
 # --- Atomic JUnit Writer (INTEROP-9527) ---
 _junit_emit_safe() {
   local kind="$1" message="$2" rc="${3:-0}"
+  # XML-escape kind and message to prevent malformed JUnit output
+  # when error strings contain XML special characters (& < > " ').
+  # _xml_escape is defined later in this file but that is fine —
+  # bash resolves function names at call time, not definition time.
+  local safe_kind safe_message
+  safe_kind="$(_xml_escape "${kind}")"
+  safe_message="$(_xml_escape "${message}")"
   local tmpf
   tmpf="${ARTIFACT_DIR}/.junit_acm_upgrade.tmp.$$"
   {
     cat <<XMLEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="interop-opp-product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
-  <testcase name="${kind}">
-    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
+  <testcase name="${safe_kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${safe_message}" "${rc}" )
   </testcase>
 </testsuite>
 XMLEOF
@@ -688,6 +695,15 @@ function Main () {
     newCsv="$(GetCurrentCsv)"
     newVersion="$(GetInstalledVersion)"
     echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
+
+    # --- Version transition check (INTEROP-9527) ---
+    if [[ -n "${currentVersion}" && "${newVersion}" == "${currentVersion}" ]]; then
+        echo >&2 "WARNING: ACM version did not change after upgrade (${currentVersion})"
+        _JUNIT_KIND="version-unchanged"
+        _JUNIT_MESSAGE="ACM version did not change after channel switch: still ${currentVersion}"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
 
     typeset _acm_upgrade_output=""
     if ! _acm_upgrade_output="$(ValidateMceUpgrade 2>&1)"; then
