@@ -641,36 +641,58 @@ function copyArtifacts {
   done
   scrub_playwright_archives "${archives[@]}" || true
   # Prow's html lens renders any artifact matching custom-link-*.html inline near
-  # the top of the Spyglass job page. The Playwright HTML report copied above only
-  # shows up buried in the artifact tree, so surface a direct link to it. Compose
-  # the GCS URL the same way hypershift-analyze-e2e-failure does. Only write the
-  # link when index.html actually landed so it is never dead; default every CI var
-  # with :- so a missing var in a local run cannot abort this EXIT trap.
-  if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
-    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
-    local gcs_path
-    if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
-      gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"
-    else
-      gcs_path="logs/${JOB_NAME:-}/${BUILD_ID:-}"
-    fi
-    local report_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}/quay-test-e2e/artifacts"
-    cat > "${ARTIFACT_DIR}/custom-link-playwright-report.html" << EOF || true
+  # the top of the Spyglass job page, so put the links a failure triage starts from
+  # there: the Playwright report, must-gather, the Quay revision under test, and the
+  # quay-gather logs. Compose the GCS URLs the same way
+  # hypershift-analyze-e2e-failure does. The gather links point at post steps that
+  # run after this one, so they are directory listings. Default every CI var with :-
+  # so a missing var in a local run cannot abort this EXIT trap.
+  local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
+  local gcs_path
+  if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
+    gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"
+  else
+    gcs_path="logs/${JOB_NAME:-}/${BUILD_ID:-}"
+  fi
+  local steps_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}"
+  # A quay/quay presubmit tests the PR head. Anything else (periodics, rehearsals)
+  # deploys a product image whose revision label is a midstream commit that does not
+  # exist upstream, so link the upstream ref the deploy step derived from it instead.
+  local quay_rev=""
+  if [[ "${REPO_OWNER:-}/${REPO_NAME:-}" == "quay/quay" ]]; then
+    quay_rev="${PULL_PULL_SHA:-${PULL_BASE_SHA:-}}"
+  elif [[ -s "${SHARED_DIR:-}/playwright_git_ref" ]]; then
+    quay_rev="$(cat "${SHARED_DIR}/playwright_git_ref")"
+  fi
+  local quay_image
+  quay_image=$(timeout 30 oc -n "${QUAYNAMESPACE:-quay-enterprise}" get pods -l quay-component=quay-app \
+    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+  {
+    cat << EOF
 <html>
 <head>
-<title>Playwright report</title>
 <style>
-a { display:inline-block; padding:5px 20px; margin:10px; border:2px solid #4E9AF1; border-radius:1em; text-decoration:none; color:#FFFFFF !important; background-color:#4E9AF1; }
+body { font-family: sans-serif; margin: 0; }
+a { display:inline-block; padding:5px 20px; margin:10px 10px 4px 0; border:2px solid #4E9AF1; border-radius:1em; text-decoration:none; color:#FFFFFF !important; background-color:#4E9AF1; }
+small { display:block; color:#666; font-family:monospace; }
 </style>
 </head>
 <body>
-<a target="_blank" href="${report_base}/index.html">Playwright HTML report</a>
-</body>
-</html>
 EOF
-  else
-    echo "No index.html in ${ARTIFACT_DIR}; skipping custom-link-playwright-report.html"
-  fi
+    if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
+      echo "<a target=\"_blank\" href=\"${steps_base}/quay-test-e2e/artifacts/index.html\">Playwright report</a>"
+    fi
+    echo "<a target=\"_blank\" href=\"${steps_base}/gather-must-gather/artifacts/\">must-gather</a>"
+    if [[ -n "${quay_rev}" ]]; then
+      echo "<a target=\"_blank\" href=\"https://github.com/quay/quay/tree/${quay_rev}\">quay ${quay_rev:0:12}</a>"
+    fi
+    echo "<a target=\"_blank\" href=\"${steps_base}/quay-gather/artifacts/\">Quay logs</a>"
+    if [[ -n "${quay_image}" ]]; then
+      echo "<small>quay-app image: ${quay_image}</small>"
+    fi
+    echo "</body>"
+    echo "</html>"
+  } > "${ARTIFACT_DIR}/custom-link-quay-results.html" || true
   gatherBuilderDiagnostics || true
 }
 trap 'copyArtifacts; stopJaegerPortForward' EXIT
