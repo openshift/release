@@ -4,11 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
+
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
-        typeset -a _fURL=()
-        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
-        "${_fURL[@]}" \
+        curl -fsSL \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
 fi
@@ -70,7 +70,6 @@ function on_exit() {
       ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-gcp__quay-tests-deploy-quay-gcp.xml || true
   fi
   write_quay_install_junit "${ec}"
-  [[ -n "${YQ_TMPDIR:-}" ]] && rm -rf "${YQ_TMPDIR}" || true
   exit "${ec}"
 }
 trap on_exit EXIT
@@ -344,25 +343,17 @@ FEATURE_MAILING: false
 FEATURE_OTEL_TRACING: false
 EOF
 
-# Fetch yq once into a private temp dir: used below to merge config
-# fragments and to strip operator-managed keys, which now run
-# unconditionally.
-YQ_TMPDIR="$(mktemp -d)"
-YQ="${YQ_TMPDIR}/yq"
-curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-	-o "${YQ}" && chmod +x "${YQ}"
-
 # Merge a config fragment into config.yaml with list-append semantics ('*+',
 # not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
 # Validate first so a present-but-malformed fragment fails the step clearly
 # instead of corrupting config.yaml.
 function merge_config_fragment() {
 	local fragment="$1"
-	if ! "${YQ}" e 'true' "${fragment}" >/dev/null 2>&1; then
+	if ! yq e 'true' "${fragment}" >/dev/null 2>&1; then
 		echo "ERROR: ${fragment} is not valid YAML" >&2
 		exit 1
 	fi
-	"${YQ}" eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
 # Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
@@ -388,7 +379,7 @@ fi
 # injects those values; leaving them in configBundleSecret blocks rollout.
 # Runs unconditionally now: a no-op on the defaults block when no overlay
 # above added any of these keys.
-"${YQ}" -i '
+yq -i '
 	del(
 		.FEATURE_SECURITY_SCANNER,
 		.FEATURE_SECURITY_NOTIFICATIONS,

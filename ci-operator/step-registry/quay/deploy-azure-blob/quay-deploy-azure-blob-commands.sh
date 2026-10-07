@@ -4,16 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
+
 if [ "${MAP_TESTS}" = "true" ]; then
     exit_trap_ref="6263d6941034bf16cfc10b2bca7433ccf22fde60"
     exit_trap_sha256="bfc394cc4586576e2c0473d8a276ecb2fa456792fdd9114c23c1be54d9982305"
     exit_trap_script="$(mktemp)"
     exit_trap_url="https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/${exit_trap_ref}/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh"
-    if command -v wget >/dev/null 2>&1; then
-        wget -qO "${exit_trap_script}" "${exit_trap_url}"
-    else
-        curl -fsSL -o "${exit_trap_script}" "${exit_trap_url}"
-    fi
+    curl -fsSL -o "${exit_trap_script}" "${exit_trap_url}"
     printf '%s  %s\n' "${exit_trap_sha256}" "${exit_trap_script}" | sha256sum --check --status
     eval "$(cat "${exit_trap_script}")"
     rm -f "${exit_trap_script}"
@@ -406,19 +404,10 @@ EOF
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	echo "Merging extra Quay config into defaults..."
 	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
-	yq_version="v4.47.2"
-	case "$(uname -m)" in
-		x86_64) yq_arch="amd64"; yq_sha256="1bb99e1019e23de33c7e6afc23e93dad72aad6cf2cb03c797f068ea79814ddb0" ;;
-		aarch64) yq_arch="arm64"; yq_sha256="05df1f6aed334f223bb3e6a967db259f7185e33650c3b6447625e16fea0ed31f" ;;
-		*) echo "Unsupported architecture for yq: $(uname -m)" >&2; exit 1 ;;
-	esac
-	curl -fsSL "https://github.com/mikefarah/yq/releases/download/${yq_version}/yq_linux_${yq_arch}" -o /tmp/yq
-	printf '%s  %s\n' "${yq_sha256}" /tmp/yq | sha256sum --check --status
-	chmod +x /tmp/yq
-	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
+	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
 	# Strip field-group keys for components this CR keeps managed. The operator
 	# injects those values; leaving them in configBundleSecret blocks rollout.
-	/tmp/yq -i '
+	yq -i '
 		del(
 			.FEATURE_SECURITY_SCANNER,
 			.FEATURE_SECURITY_NOTIFICATIONS,
