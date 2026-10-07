@@ -278,6 +278,14 @@ tests:
              done
              echo "===GODEBUG==="
              tr "\0" "\n" < /proc/${pid}/environ | grep -i "^GODEBUG" || echo "(none set)"
+             echo "===KHUGEPAGED==="
+             for f in max_ptes_none max_ptes_swap max_ptes_shared pages_to_scan scan_sleep_millisecs alloc_sleep_millisecs; do
+               val=$(cat /sys/kernel/mm/transparent_hugepage/khugepaged/$f 2>/dev/null) && echo "$f=$val"
+             done
+             echo "===VMSTAT==="
+             grep -E "^thp_(fault_alloc|collapse_alloc|collapse_alloc_failed|split_page|split_pmd|zero_page_alloc)" /proc/vmstat
+             echo "===MEMINFO==="
+             grep -E "^(AnonHugePages|AnonPages|MemFree|MemAvailable|Cached)" /proc/meminfo
              echo "===GOMETRICS==="
              (curl -s http://localhost:9637/metrics 2>/dev/null \
                || curl -sk https://localhost:9637/metrics 2>/dev/null) \
@@ -311,6 +319,8 @@ tests:
             echo "=== ${node} ==="
             grep -E '^(VmRSS|crio_pid|crio:|Version)' "${OUT}/raw-${node}.txt" | head -3
             grep -A3 '^===THP===' "${OUT}/raw-${node}.txt" | head -6
+            grep -A10 '^===KHUGEPAGED===' "${OUT}/raw-${node}.txt" | grep -v '^===' | head -6
+            grep -A10 '^===VMSTAT===' "${OUT}/raw-${node}.txt" | grep -v '^===' | head -8
             awk -F'\t' '
               { if ($1 ~ /^\[anon/) { an += $3; ant += $5; n++ } else { fb += $3 } th += $5 }
               END { printf "file_backed_rss=%.1f MB\nanon_rss=%.1f MB (%d mappings)\nAnonHugePages=%.1f MB (in anon: %.1f MB)\n", fb/1024, an/1024, n, th/1024, ant/1024 }
@@ -376,6 +386,14 @@ tests:
              done
              echo "===GODEBUG==="
              tr "\0" "\n" < /proc/${pid}/environ | grep -i "^GODEBUG" || echo "(none set)"
+             echo "===KHUGEPAGED==="
+             for f in max_ptes_none max_ptes_swap max_ptes_shared pages_to_scan scan_sleep_millisecs alloc_sleep_millisecs; do
+               val=$(cat /sys/kernel/mm/transparent_hugepage/khugepaged/$f 2>/dev/null) && echo "$f=$val"
+             done
+             echo "===VMSTAT==="
+             grep -E "^thp_(fault_alloc|collapse_alloc|collapse_alloc_failed|split_page|split_pmd|zero_page_alloc)" /proc/vmstat
+             echo "===MEMINFO==="
+             grep -E "^(AnonHugePages|AnonPages|MemFree|MemAvailable|Cached)" /proc/meminfo
              echo "===GOMETRICS==="
              (curl -s http://localhost:9637/metrics 2>/dev/null \
                || curl -sk https://localhost:9637/metrics 2>/dev/null) \
@@ -409,6 +427,8 @@ tests:
             echo "=== ${node} ==="
             grep -E '^(VmRSS|crio_pid|crio:|Version)' "${OUT}/raw-${node}.txt" | head -3
             grep -A3 '^===THP===' "${OUT}/raw-${node}.txt" | head -6
+            grep -A10 '^===KHUGEPAGED===' "${OUT}/raw-${node}.txt" | grep -v '^===' | head -6
+            grep -A10 '^===VMSTAT===' "${OUT}/raw-${node}.txt" | grep -v '^===' | head -8
             awk -F'\t' '
               { if ($1 ~ /^\[anon/) { an += $3; ant += $5; n++ } else { fb += $3 } th += $5 }
               END { printf "file_backed_rss=%.1f MB\nanon_rss=%.1f MB (%d mappings)\nAnonHugePages=%.1f MB (in anon: %.1f MB)\n", fb/1024, an/1024, n, th/1024, ant/1024 }
