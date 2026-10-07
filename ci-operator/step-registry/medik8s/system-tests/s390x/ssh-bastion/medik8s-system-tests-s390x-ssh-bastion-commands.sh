@@ -6,6 +6,9 @@
 # InternalIPs on the libvirt machine network (pod network cannot). sshd listens
 # on 2222 to avoid clashing with the node's host sshd on :22. run-tests
 # port-forwards the Service (libvirt has no cloud LB).
+#
+# Important: dnf install of openssh on s390x can take several minutes. The
+# container must not be treated as Ready until sshd is listening on :2222.
 
 set -euo pipefail
 
@@ -87,6 +90,10 @@ ssh-keygen -q -t ecdsa -f "${workdir}/ssh_host_ecdsa_key" -C '' -N ''
 ssh-keygen -q -t ed25519 -f "${workdir}/ssh_host_ed25519_key" -C '' -N ''
 cat > "${workdir}/sshd_config" <<'EOF'
 Port 2222
+# Listen on both families so oc port-forward (often dials [::1]) works.
+AddressFamily any
+ListenAddress 0.0.0.0
+ListenAddress ::
 HostKey /etc/ssh/ssh_host_rsa_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
@@ -147,6 +154,9 @@ metadata:
   name: ssh-bastion
 spec:
   replicas: 1
+  # dnf install openssh on s390x is slow; default 600s is usually enough but
+  # leave headroom so rollout does not time out mid-install.
+  progressDeadlineSeconds: 900
   selector:
     matchLabels:
       run: ssh-bastion
@@ -169,6 +179,19 @@ spec:
           protocol: TCP
         securityContext:
           privileged: true
+        # Do not mark Ready until sshd is listening. Without this, rollout
+        # succeeds while dnf is still installing and port-forward gets
+        # connection refused on :2222.
+        startupProbe:
+          tcpSocket:
+            port: 2222
+          periodSeconds: 5
+          failureThreshold: 120
+        readinessProbe:
+          tcpSocket:
+            port: 2222
+          periodSeconds: 2
+          failureThreshold: 3
         volumeMounts:
         - name: ssh-host-keys
           mountPath: /ssh-host-keys
@@ -181,7 +204,8 @@ spec:
         - -ec
         - |
           echo "Installing openssh-server on $(uname -m)..."
-          dnf install -y openssh-server openssh-clients
+          dnf install -y --setopt=install_weak_deps=False openssh-server openssh-clients
+          mkdir -p /var/run/sshd /var/empty/sshd
           cp /ssh-host-keys/ssh_host_rsa_key /ssh-host-keys/ssh_host_ecdsa_key \
             /ssh-host-keys/ssh_host_ed25519_key /ssh-host-keys/sshd_config /etc/ssh/
           chmod 600 /etc/ssh/ssh_host_*_key
@@ -192,6 +216,7 @@ spec:
           chown -R core:core /home/core
           chmod 700 /home/core/.ssh
           chmod 600 /home/core/.ssh/authorized_keys
+          /usr/sbin/sshd -t -f /etc/ssh/sshd_config
           echo "Starting sshd on :2222 (hostNetwork)..."
           exec /usr/sbin/sshd -D -e -f /etc/ssh/sshd_config
       volumes:
@@ -217,14 +242,39 @@ dump_bastion_debug() {
       done
 }
 
-echo "Waiting for ssh-bastion deployment to become Available..."
-if ! oc -n "${SSH_BASTION_NAMESPACE}" rollout status deployment/ssh-bastion --timeout=5m; then
+wait_for_sshd() {
+  local bastion_pod="$1"
+  local i
+  echo "Waiting for sshd to listen on 127.0.0.1:2222 inside bastion (dnf install may take several minutes)..."
+  for i in $(seq 1 120); do
+    if oc -n "${SSH_BASTION_NAMESPACE}" exec "${bastion_pod}" -- \
+        bash -c 'echo >/dev/tcp/127.0.0.1/2222' >/dev/null 2>&1; then
+      echo "sshd is listening on :2222 (attempt ${i})"
+      return 0
+    fi
+    if (( i % 6 == 0 )); then
+      echo "still waiting for sshd... (${i}/120) last log lines:"
+      oc -n "${SSH_BASTION_NAMESPACE}" logs "${bastion_pod}" --tail=5 2>/dev/null || true
+    fi
+    sleep 5
+  done
+  return 1
+}
+
+echo "Waiting for ssh-bastion deployment to become Available (sshd readiness)..."
+if ! oc -n "${SSH_BASTION_NAMESPACE}" rollout status deployment/ssh-bastion --timeout=12m; then
   dump_bastion_debug
   exit 1
 fi
 oc -n "${SSH_BASTION_NAMESPACE}" get pods,svc -o wide
 
 bastion_pod="$(oc -n "${SSH_BASTION_NAMESPACE}" get pods -l run=ssh-bastion -o jsonpath='{.items[0].metadata.name}')"
+if ! wait_for_sshd "${bastion_pod}"; then
+  echo "ERROR: sshd never became ready on :2222" >&2
+  dump_bastion_debug
+  exit 1
+fi
+
 echo "Installed authorized_keys fingerprints in bastion:"
 oc -n "${SSH_BASTION_NAMESPACE}" exec "${bastion_pod}" -- \
   ssh-keygen -lf /home/core/.ssh/authorized_keys || true
@@ -249,15 +299,24 @@ oc -n "${SSH_BASTION_NAMESPACE}" port-forward svc/ssh-bastion 12222:22 >"${pf_lo
 pf_pid=$!
 cleanup_pf() { kill "${pf_pid}" 2>/dev/null || true; }
 trap 'cleanup_pf; rm -rf "${workdir}" "${bastion_key_dir}"' EXIT
-for _ in $(seq 1 30); do
+for _ in $(seq 1 60); do
   if (echo >/dev/tcp/127.0.0.1/12222) >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
-if ! ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    -o ConnectTimeout=10 -p 12222 -i "${SHARED_DIR}/medik8s_bastion_ssh_key" \
-    core@127.0.0.1 'echo bastion-login-ok; hostname'; then
+# Retry SSH a few times; first connection after port-forward can race briefly.
+login_ok=false
+for _ in $(seq 1 5); do
+  if ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o ConnectTimeout=10 -p 12222 -i "${SHARED_DIR}/medik8s_bastion_ssh_key" \
+      core@127.0.0.1 'echo bastion-login-ok; hostname'; then
+    login_ok=true
+    break
+  fi
+  sleep 2
+done
+if [[ "${login_ok}" != "true" ]]; then
   echo "ERROR: bastion SSH login failed with dedicated key" >&2
   echo "--- port-forward log ---" >&2
   cat "${pf_log}" >&2 || true
