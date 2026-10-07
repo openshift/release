@@ -3,6 +3,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
+  descheduler:
+    name: "5.1"
+    namespace: ocp-priv
+    tag: descheduler
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-kube-descheduler-operator
@@ -62,6 +66,11 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: cluster-kube-descheduler-operator
+      - env: OPERAND_IMAGE
+        name: pipeline:descheduler
       from: src
       resources:
         requests:
@@ -89,6 +98,19 @@ tests:
     - ref: fips-check
     - ref: optional-operators-operator-sdk
     - ref: openshift-tests-extension-setup-out-of-payload
+    - as: resolve-images
+      commands: |
+        echo "$OPERATOR_IMAGE" > "${SHARED_DIR}/operator-image"
+        echo "$OPERAND_IMAGE" > "${SHARED_DIR}/operand-image"
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: cluster-kube-descheduler-operator
+      - env: OPERAND_IMAGE
+        name: pipeline:descheduler
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - ref: openshift-e2e-test
     workflow: ipi-aws
 zz_generated_metadata:
