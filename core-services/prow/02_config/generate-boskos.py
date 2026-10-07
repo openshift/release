@@ -674,6 +674,12 @@ CONFIG = {
         'us-west-1': 5,
         'us-west-2': 5,
     },
+    'aws-edge-hw-accel-quota-slice': {
+        'us-east-1': 15,
+        'us-east-2': 15,
+        'us-west-1': 15,
+        'us-west-2': 15,
+    },
     'rh-openshift-ecosystem-quota-slice': {
         'us-east-1': 10,
         'us-east-2': 10,
