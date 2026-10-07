@@ -1,0 +1,21 @@
+---
+# Imports the external Go 1.27 builder image into the medik8s namespace so it can
+# be referenced as `build_root` by medik8s/system-tests until an official
+# golang-1.27 builder is available in the ocp/openshift namespaces.
+# Consumed as: namespace: medik8s, name: builder, tag: go1.27
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  name: builder
+  namespace: medik8s
+spec:
+  tags:
+    - name: go1.27
+      from:
+        kind: DockerImage
+        name: quay.io/konveyor/builder:ubi9-v1.27
+      importPolicy:
+        importMode: Legacy
+        scheduled: true
+      referencePolicy:
+        type: Local

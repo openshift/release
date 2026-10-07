@@ -1,0 +1,20 @@
+workflow:
+  as: openshift-e2e-vsphere-multi-vcenter-csi
+  steps:
+    pre:
+    - chain: ipi-vsphere-pre-multi-vcenter
+    - ref: storage-conf-csi-vsphere-topology
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-obj-check
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post
+    env:
+      # for storage-conf-csi-vsphere and openshift-e2e-test
+      TEST_CSI_DRIVER_MANIFEST: manifest-vsphere.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-vsphere.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The workflow deploys vsphere cluster with multi vcenter and executes the `openshift/csi` end-to-end test suite on vSphere CSI driver that was installed during cluster setup.

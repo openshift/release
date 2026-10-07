@@ -1,0 +1,21 @@
+workflow:
+  as: ovn-subnet-configs
+  steps:
+    pre:
+      - chain: ipi-conf-aws
+      - ref: ovn-conf-internal-masquerade-subnet
+      - chain: ipi-install
+      - ref: ovn-utils
+    test:
+      - ref: ovn-defaultnetwork-internal-masquerade-subnet
+      - ref: ovn-defaultnetwork-internal-join-subnet
+      - ref: ovn-defaultnetwork-internal-transit-switch-subnet
+      - ref: openshift-e2e-test
+    post:
+      - chain: gather-core-dump
+      - chain: ipi-aws-post
+  documentation: |-
+    This workflow uses a clusternetwork manifest to configure the internalMasqueradeSubnet at
+    install. Following install, day-2 configs are made to both internalJoinSubnet and
+    internalTransitSwitchSubnet. Finally, the normal e2e workflow test is executed.
+

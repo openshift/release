@@ -1,0 +1,37 @@
+ref:
+  as: load-balancer
+  timeout: 120m
+  from: openstack-installer
+  grace_period: 10m
+  commands: load-balancer-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: CONFIG_TYPE
+      documentation: |
+        The type of config for the environment to deploy.
+
+        * 'minimal' - Configure the install-config with the minimal options to make it work on
+                      our tests, which requires the usage of floating IPs. This config type doesn't
+                      require a proxy server to be deployed.
+        * 'proxy' - Configure the install-config to use a pre-created restricted network (BYON) and
+                   a Cluster Proxy.
+  documentation: |-
+    Deploy a load-balancer that can be used as a user-managed LB for the
+    OpenShift control-plane.
+    To use this step, a few things are required.
+
+    * A bastion node has to be deployed beforehand. Its IP address has to be
+      in $SHARED_DIR/LB_HOST and the name of the user used to SSH into it
+      has to be in $SHARED_DIR/LB_USER.
+    * SSH server has to be enabled on the bastion and the user has to have sudo access. Also, the SSH port
+      has to be reachable from OpenShift CI systems.
+    * If your bastion does not have the VIPs created for API and ingress, they can be created by Ansible.
+      For that you'll need to put them (respectively) in $SHARED_DIR/API_IP and $SHARED_DIR/INGRESS_IP.
+      Otherwise, if you deal with them yourself (e.g. by running Keepalived), then you can ignore these
+      two files.
+    * Master and worker nodes IPs (if they're known, otherwise the whole subnet can be used) have to be respectively in the
+      multi-line $SHARED_DIR/MASTER_IPS and $SHARED_DIR/WORKER_IPS files.
+

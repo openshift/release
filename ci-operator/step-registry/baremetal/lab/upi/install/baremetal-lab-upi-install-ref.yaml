@@ -1,0 +1,61 @@
+ref:
+  as: baremetal-lab-upi-install
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: baremetal-lab-upi-install-commands.sh
+  resources:
+    requests:
+      cpu: '1'
+      memory: 128Mi
+  timeout: 3h00m0s
+  grace_period: 600
+  env:
+  - name: INTERNAL_NET_IP
+    default: "192.168.80.1"
+    documentation: ""
+  - name: INTERNAL_NET_CIDR
+    default: "192.168.80.0/22"
+  - name: architecture
+    default: ""
+    documentation: ""
+  - name: masters
+    default: "3"
+    documentation: ""
+  - name: workers
+    default: "2"
+    documentation: ""
+  - name: AUX_HOST
+    default: ""
+    documentation: ""
+  - name: FIPS_ENABLED
+    default: "false"
+  - name: ADDITIONAL_WORKERS
+    default: "0"
+    documentation: |
+      Number of additional workers. When testing multi-arch compute nodes clusters, this should be set to the desired
+      number of additional workers for the non-default architecture to add to the cluster. This can only work with
+      payload images that support multi-arch.
+  - name: ADDITIONAL_WORKERS_DAY2
+    default: "true"
+    documentation: |
+      Whether to add (power on) the additional workers after the cluster is installed.
+      This is useful for testing multi-arch compute node clusters as a real day2 operation and is especially important
+      for testing single-architectures clusters based on single-architecture payloads migrating to a multi-arch payload.
+  - name: DISCONNECTED
+    default: "false"
+  - name: BOOTSTRAP_IN_PLACE
+    default: "false"
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    The baremetal-lab-upi-install will provision a UPI baremetal cluster, given the configuration assets
+    prepared in the earlier steps. 
+    The minimum requirement for this step to work is to run it after the chain baremetal-lab-upi-conf-base.
+    Users that want implement their specific installation configuration should implement workflows that execute 
+    (1) the baremetal-lab-upi-conf-base chain, 
+    (2) a set of custom chains/steps to either patch the install-config.yaml or define custom manifest_*.yaml files that will be included in install-dir/manifests, to be consumed by the installer,
+    (3) the baremetal-lab-upi-install step.
+    

@@ -1,0 +1,38 @@
+ref:
+  as: operator-pipelines-preflight-prod-check
+  from_image:
+    name: openshift-preflight
+    namespace: ci
+    tag: latest
+  commands: operator-pipelines-preflight-prod-check-commands.sh
+  env:
+    - name: TEST_ASSET
+      documentation: The asset under test by the preflight utility.
+    - name: ASSET_TYPE
+      documentation: The type of asset under test. One of "container" or "operator".
+    - name: PFLT_INDEXIMAGE
+      documentation:
+        The index image containing an operator bundle under test.
+        Used for the "operator" asset type.
+    - name: PFLT_LOGLEVEL
+      documentation: The log verbosity. One of "info", "error", "debug", "trace".
+      default: trace
+    - name: PFLT_ARTIFACTS
+      documentation: Where Preflight will write artifacts locally.
+    - name: PUBLISH_ARTIFACTS
+      documentation:
+        Whether preflight will publish its artifacts, preflight.log, and results.json
+        to ARTIFACT_DIR.
+      default: 'false'
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 400Mi
+  documentation: |-
+      This step will execute the Preflight utility against a target certification test asset.
+      Preflight STDOUT is suppressed, and log file always pushed to the SHARED_DIR as a tarball
+      called preflight.tar.gz. This is to encourage the secure transmission of those assets in a
+      follow up step for this task.
+
+      Optionally, setting PUBLISH_ARTIFACTS=true when calling this task will immediately push preflight
+      artifacts and logfiles to the ARTIFACT_DIR which is searchable on prow.ci.openshift.org.

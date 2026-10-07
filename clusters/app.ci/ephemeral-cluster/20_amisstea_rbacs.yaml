@@ -1,0 +1,35 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: amisstea-pod-log-reader
+  namespace: ci
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  - apps
+  resources:
+  - deployments
+  - pods
+  verbs:
+  - list
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: amisstea-pod-log-reader
+  namespace: ci
+subjects:
+- kind: Group
+  name: "amisstea-group"
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: amisstea-pod-log-reader
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,44 @@
+{% import "tests/_e2e-install.defaults.j2" as d %}
+tests:
+- steps:
+    env:
+      ENABLE_BUILD_SUPPORT: "true"
+{%- if fips %}
+      FIPS_ENABLED: "true"
+      # FEATURE_FIPS requires MAIL_USE_TLS, which Mailpit does not serve, so
+      # Mailpit stays off and the @feature:MAILING specs self-skip.
+      QUAY_DEPLOY_MAILPIT: "false"
+{%- endif %}
+      PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}'
+      QUAY_EXTRA_CONFIG: |
+        FEATURE_PROGRAMMATIC_BOOTSTRAP: false
+        FEATURE_USER_METADATA: true
+        FEATURE_IMMUTABLE_TAGS: true
+        FEATURE_SPARSE_INDEX: true
+        FEATURE_QUOTA_NOTIFICATIONS: true
+        FEATURE_EDIT_QUOTA: true
+        FEATURE_CHANGE_TAG_EXPIRATION: true
+        FEATURE_IMAGE_PULL_STATS: false
+        LOG_ARCHIVE_LOCATION: default
+        ACTION_LOG_ARCHIVE_LOCATION: default
+        SESSION_TIMEOUT: 2h
+        DEFAULT_UI: react
+        SUPER_USERS:
+          - admin
+        GLOBAL_READONLY_SUPER_USERS:
+          - readonly
+{%- if fips %}
+        FEATURE_FIPS: true
+{%- endif %}
+    test:
+{%- if fips %}
+    - ref: fips-check-fips-or-die
+{%- endif %}
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-provisioning-tls
+    - ref: quay-provisioning-builder
+    - ref: quay-deploy-mailpit
+    - ref: quay-deploy-jaeger
+    - ref: "{{ deploy_ref }}"
+    - ref: quay-test-e2e
