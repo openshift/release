@@ -847,6 +847,320 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-qe-installer-aws
+- as: control-plane-24nodes-cdv2-promdump-el9kernel
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_KB_BUILD: "true"
+      KB_FLAGS: --local-indexing
+      ZONES_COUNT: "3"
+    test:
+    - as: apply-rhel9-kernel
+      cli: latest
+      commands: |
+        set -o errexit
+        set -o pipefail
+
+        OS_IMAGE_URL="quay.io/mcornea/rhel-coreos-10:5.14.0-687.55.1"
+
+        echo "=== Applying MachineConfigs to overlay RHCOS10 with kernel 5.14 image via osImageURL ==="
+        for ROLE in worker master; do
+          echo "Creating MachineConfig os-layer-custom-${ROLE} for role ${ROLE}..."
+          oc apply -f - <<MCEOF
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          name: os-layer-custom-${ROLE}
+          labels:
+            machineconfiguration.openshift.io/role: ${ROLE}
+        spec:
+          osImageURL: ${OS_IMAGE_URL}
+        MCEOF
+        done
+
+        echo "=== MachineConfigs applied, waiting for MCPs to start updating ==="
+        oc wait mcp worker master --for condition=Updating=True --timeout=5m || true
+
+        echo "=== Waiting for MachineConfigPools to finish rolling out ==="
+        oc wait mcp worker master --for condition=Updated=True --timeout=30m
+        echo "=== MachineConfigPools are Updated after RHCOS10 with 5.14 kernel image overlay ==="
+      from: cli
+      grace_period: 10s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - ref: openshift-qe-workers-scale
+    - as: crio-residual-idle
+      cli: latest
+      commands: |
+        echo "CRI-O residual memory capture..."
+        OUT="${ARTIFACT_DIR}/crio-residual"
+        mkdir -p "${OUT}"
+
+        # FIX 1: the build-cluster namespace leaks into the target kubeconfig context;
+        # oc debug would try to create its pod there and fail.
+        oc config set-context --current --namespace=default 2>/dev/null || true
+
+        # One Prometheus query returning every crio go_memstats series (cross-check only —
+        # freshly-scaled workers may not be scraped yet; the node-local fetch is authoritative).
+        oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- curl -sG \
+          http://localhost:9090/api/v1/query \
+          --data-urlencode 'query={__name__=~"go_memstats_(heap_inuse|heap_idle|heap_released|heap_sys|stack_inuse|mspan_inuse|buck_hash_sys|gc_sys|other_sys)_bytes",job="crio"}' \
+          > "${OUT}/go-memstats-prometheus.json" || true
+
+        # Per worker node: crio smaps (per-mapping), rollup, THP/mTHP state, GODEBUG,
+        # and crio's own /metrics straight from the node (authoritative go_memstats).
+        NODES=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+        while read -r node; do
+          [[ -z "${node}" ]] && continue
+          echo "  capturing ${node}..."
+          oc debug node/"${node}" -- chroot /host bash -c \
+            'pid=$(pgrep -x crio | head -1)
+             echo "===META==="
+             echo "crio_pid: ${pid}"
+             crio version 2>/dev/null | grep -i version || true
+             grep -E "^(VmRSS|VmHWM|VmData|VmSwap):" /proc/${pid}/status
+             echo "===THP==="
+             cat /sys/kernel/mm/transparent_hugepage/enabled
+             for d in /sys/kernel/mm/transparent_hugepage/hugepages-*kB; do
+               [ -d "$d" ] && echo "$(basename $d): $(cat $d/enabled 2>/dev/null)"
+             done
+             echo "===GODEBUG==="
+             tr "\0" "\n" < /proc/${pid}/environ | grep -i "^GODEBUG" || echo "(none set)"
+             echo "===KHUGEPAGED==="
+             for f in max_ptes_none max_ptes_swap max_ptes_shared pages_to_scan scan_sleep_millisecs alloc_sleep_millisecs; do
+               val=$(cat /sys/kernel/mm/transparent_hugepage/khugepaged/$f 2>/dev/null) && echo "$f=$val"
+             done
+             echo "===VMSTAT==="
+             grep -E "^thp_(fault_alloc|collapse_alloc|collapse_alloc_failed|split_page|split_pmd|zero_page_alloc)" /proc/vmstat
+             echo "===MEMINFO==="
+             grep -E "^(AnonHugePages|AnonPages|MemFree|MemAvailable|Cached)" /proc/meminfo
+             echo "===GOMETRICS==="
+             (curl -s http://localhost:9637/metrics 2>/dev/null \
+               || curl -sk https://localhost:9637/metrics 2>/dev/null) \
+               | grep -E "^(go_memstats_(heap_inuse|heap_idle|heap_released|heap_sys|stack_inuse|mspan_inuse|buck_hash_sys|gc_sys|other_sys)_bytes|go_info)" || true
+             echo "===ROLLUP==="
+             grep -E "^(Rss|Pss|Private_Clean|Private_Dirty|Anonymous|AnonHugePages|Swap):" /proc/${pid}/smaps_rollup
+             echo "===SMAPS==="
+             cat /proc/${pid}/smaps' \
+            > "${OUT}/raw-${node}.txt" || true
+
+          # Per-node summary: file-backed vs anonymous RSS and THP totals, top mappings.
+          MAPFILE="/tmp/mappings-${node}.txt"
+          awk '
+            function flushrec() {
+              if (name != "") { printf "%s\t%d\t%d\t%d\t%d\n", name, size, rss, pd, ahp }
+            }
+            /^[0-9a-f]+-[0-9a-f]+/ {
+              flushrec()
+              name = ($6 == "" ? "[anon:" $1 "]" : $6)
+              size = 0; rss = 0; pd = 0; ahp = 0
+              next
+            }
+            /^Size:/           { size = $2 }
+            /^Rss:/            { rss  = $2 }
+            /^Private_Dirty:/  { pd   = $2 }
+            /^AnonHugePages:/  { ahp  = $2 }
+            END { flushrec() }
+          ' <(sed -n '/===SMAPS===/,$p' "${OUT}/raw-${node}.txt" | tail -n +2) > "${MAPFILE}"
+
+          {
+            echo "=== ${node} ==="
+            grep -E '^(VmRSS|crio_pid|crio:|Version)' "${OUT}/raw-${node}.txt" | head -3
+            grep -A3 '^===THP===' "${OUT}/raw-${node}.txt" | head -6
+            grep -A10 '^===KHUGEPAGED===' "${OUT}/raw-${node}.txt" | grep -v '^===' | head -6
+            grep -A10 '^===VMSTAT===' "${OUT}/raw-${node}.txt" | grep -v '^===' | head -8
+            awk -F'\t' '
+              { if ($1 ~ /^\[anon/) { an += $3; ant += $5; n++ } else { fb += $3 } th += $5 }
+              END { printf "file_backed_rss=%.1f MB\nanon_rss=%.1f MB (%d mappings)\nAnonHugePages=%.1f MB (in anon: %.1f MB)\n", fb/1024, an/1024, n, th/1024, ant/1024 }
+            ' "${MAPFILE}"
+            echo "-- go_memstats (node-local):"
+            sed -n '/===GOMETRICS===/,/===ROLLUP===/p' "${OUT}/raw-${node}.txt" | grep -E '^go_memstats' | head -10
+            echo "-- top-5 file-backed:"
+            grep -v '^\[anon' "${MAPFILE}" | sort -t"$(printf '\t')" -k3,3rn | head -5 | \
+              awk -F'\t' '{printf "  %8.1f MB rss  %s\n", $3/1024, $1}'
+            echo "-- top-5 anonymous:"
+            grep '^\[anon' "${MAPFILE}" | sort -t"$(printf '\t')" -k3,3rn | head -5 | \
+              awk -F'\t' '{printf "  %8.1f MB rss  %8.1f MB thp  %s\n", $3/1024, $5/1024, $1}'
+          } >> "${OUT}/summary.txt"
+
+          rm -f "${MAPFILE}"
+        done <<NODES
+        ${NODES}
+        NODES
+
+        echo "=== SUMMARY ==="
+        cat "${OUT}/summary.txt"
+        echo "CRI-O residual capture complete: ${OUT}"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-qe-cluster-density-v2
+    - as: crio-residual-post
+      cli: latest
+      commands: |
+        echo "CRI-O residual memory capture..."
+        OUT="${ARTIFACT_DIR}/crio-residual"
+        mkdir -p "${OUT}"
+
+        # FIX 1: the build-cluster namespace leaks into the target kubeconfig context;
+        # oc debug would try to create its pod there and fail.
+        oc config set-context --current --namespace=default 2>/dev/null || true
+
+        # One Prometheus query returning every crio go_memstats series (cross-check only —
+        # freshly-scaled workers may not be scraped yet; the node-local fetch is authoritative).
+        oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- curl -sG \
+          http://localhost:9090/api/v1/query \
+          --data-urlencode 'query={__name__=~"go_memstats_(heap_inuse|heap_idle|heap_released|heap_sys|stack_inuse|mspan_inuse|buck_hash_sys|gc_sys|other_sys)_bytes",job="crio"}' \
+          > "${OUT}/go-memstats-prometheus.json" || true
+
+        # Per worker node: crio smaps (per-mapping), rollup, THP/mTHP state, GODEBUG,
+        # and crio's own /metrics straight from the node (authoritative go_memstats).
+        NODES=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+        while read -r node; do
+          [[ -z "${node}" ]] && continue
+          echo "  capturing ${node}..."
+          oc debug node/"${node}" -- chroot /host bash -c \
+            'pid=$(pgrep -x crio | head -1)
+             echo "===META==="
+             echo "crio_pid: ${pid}"
+             crio version 2>/dev/null | grep -i version || true
+             grep -E "^(VmRSS|VmHWM|VmData|VmSwap):" /proc/${pid}/status
+             echo "===THP==="
+             cat /sys/kernel/mm/transparent_hugepage/enabled
+             for d in /sys/kernel/mm/transparent_hugepage/hugepages-*kB; do
+               [ -d "$d" ] && echo "$(basename $d): $(cat $d/enabled 2>/dev/null)"
+             done
+             echo "===GODEBUG==="
+             tr "\0" "\n" < /proc/${pid}/environ | grep -i "^GODEBUG" || echo "(none set)"
+             echo "===KHUGEPAGED==="
+             for f in max_ptes_none max_ptes_swap max_ptes_shared pages_to_scan scan_sleep_millisecs alloc_sleep_millisecs; do
+               val=$(cat /sys/kernel/mm/transparent_hugepage/khugepaged/$f 2>/dev/null) && echo "$f=$val"
+             done
+             echo "===VMSTAT==="
+             grep -E "^thp_(fault_alloc|collapse_alloc|collapse_alloc_failed|split_page|split_pmd|zero_page_alloc)" /proc/vmstat
+             echo "===MEMINFO==="
+             grep -E "^(AnonHugePages|AnonPages|MemFree|MemAvailable|Cached)" /proc/meminfo
+             echo "===GOMETRICS==="
+             (curl -s http://localhost:9637/metrics 2>/dev/null \
+               || curl -sk https://localhost:9637/metrics 2>/dev/null) \
+               | grep -E "^(go_memstats_(heap_inuse|heap_idle|heap_released|heap_sys|stack_inuse|mspan_inuse|buck_hash_sys|gc_sys|other_sys)_bytes|go_info)" || true
+             echo "===ROLLUP==="
+             grep -E "^(Rss|Pss|Private_Clean|Private_Dirty|Anonymous|AnonHugePages|Swap):" /proc/${pid}/smaps_rollup
+             echo "===SMAPS==="
+             cat /proc/${pid}/smaps' \
+            > "${OUT}/raw-${node}.txt" || true
+
+          # Per-node summary: file-backed vs anonymous RSS and THP totals, top mappings.
+          MAPFILE="/tmp/mappings-${node}.txt"
+          awk '
+            function flushrec() {
+              if (name != "") { printf "%s\t%d\t%d\t%d\t%d\n", name, size, rss, pd, ahp }
+            }
+            /^[0-9a-f]+-[0-9a-f]+/ {
+              flushrec()
+              name = ($6 == "" ? "[anon:" $1 "]" : $6)
+              size = 0; rss = 0; pd = 0; ahp = 0
+              next
+            }
+            /^Size:/           { size = $2 }
+            /^Rss:/            { rss  = $2 }
+            /^Private_Dirty:/  { pd   = $2 }
+            /^AnonHugePages:/  { ahp  = $2 }
+            END { flushrec() }
+          ' <(sed -n '/===SMAPS===/,$p' "${OUT}/raw-${node}.txt" | tail -n +2) > "${MAPFILE}"
+
+          {
+            echo "=== ${node} ==="
+            grep -E '^(VmRSS|crio_pid|crio:|Version)' "${OUT}/raw-${node}.txt" | head -3
+            grep -A3 '^===THP===' "${OUT}/raw-${node}.txt" | head -6
+            grep -A10 '^===KHUGEPAGED===' "${OUT}/raw-${node}.txt" | grep -v '^===' | head -6
+            grep -A10 '^===VMSTAT===' "${OUT}/raw-${node}.txt" | grep -v '^===' | head -8
+            awk -F'\t' '
+              { if ($1 ~ /^\[anon/) { an += $3; ant += $5; n++ } else { fb += $3 } th += $5 }
+              END { printf "file_backed_rss=%.1f MB\nanon_rss=%.1f MB (%d mappings)\nAnonHugePages=%.1f MB (in anon: %.1f MB)\n", fb/1024, an/1024, n, th/1024, ant/1024 }
+            ' "${MAPFILE}"
+            echo "-- go_memstats (node-local):"
+            sed -n '/===GOMETRICS===/,/===ROLLUP===/p' "${OUT}/raw-${node}.txt" | grep -E '^go_memstats' | head -10
+            echo "-- top-5 file-backed:"
+            grep -v '^\[anon' "${MAPFILE}" | sort -t"$(printf '\t')" -k3,3rn | head -5 | \
+              awk -F'\t' '{printf "  %8.1f MB rss  %s\n", $3/1024, $1}'
+            echo "-- top-5 anonymous:"
+            grep '^\[anon' "${MAPFILE}" | sort -t"$(printf '\t')" -k3,3rn | head -5 | \
+              awk -F'\t' '{printf "  %8.1f MB rss  %8.1f MB thp  %s\n", $3/1024, $5/1024, $1}'
+          } >> "${OUT}/summary.txt"
+
+          rm -f "${MAPFILE}"
+        done <<NODES
+        ${NODES}
+        NODES
+
+        echo "=== SUMMARY ==="
+        cat "${OUT}/summary.txt"
+        echo "CRI-O residual capture complete: ${OUT}"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: capture-prometheus-dump
+      cli: latest
+      commands: |
+        echo "Capturing Prometheus dump..."
+        PROMDIR="${ARTIFACT_DIR}/metrics"
+        mkdir -p "${PROMDIR}"
+        prometheus="$(oc get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name)" || true
+        if [[ -n "${prometheus}" ]]; then
+          echo "${prometheus}" | while read prompod; do
+            prompod=${prompod#"pod/"}
+            FILE_NAME="${prompod}"
+            if [[ "$prompod" == *-0 ]]; then
+              FILE_NAME="prometheus"
+            fi
+            echo "Snapshotting prometheus from ${prompod} as ${FILE_NAME} (may take 15s)..."
+            oc exec -n openshift-monitoring "${prompod}" -- tar cvzf - -C /prometheus . > "${PROMDIR}/${FILE_NAME}.tar.gz" || true
+            echo "Collecting prometheus metadata from ${prompod}..."
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'" | gzip > "${PROMDIR}/${FILE_NAME}-target-metadata.json.gz" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config" | gzip > "${PROMDIR}/${FILE_NAME}-config.json.gz" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb" > "${PROMDIR}/${FILE_NAME}-tsdb-status.json" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo" > "${PROMDIR}/${FILE_NAME}-runtimeinfo.json" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets" > "${PROMDIR}/${FILE_NAME}-targets.json" || true
+          done
+          cat >> "${SHARED_DIR}/custom-links.txt" <<'PROM_LINK'
+        <script>
+        let prom = document.createElement('a');
+        prom.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
+        prom.title="Creates a new prometheus deployment with data from this job run.";
+        prom.innerHTML="PromeCIeus";
+        prom.target="_blank";
+        document.getElementById("wrapper").append(prom);
+        </script>
+        PROM_LINK
+        else
+          echo "Unable to find a Prometheus pod to snapshot."
+        fi
+        echo "Adding Sippy intervals link..."
+        if [[ "${JOB_TYPE:-}" == "presubmit" ]]; then
+          extra_args="${JOB_NAME}/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+        else
+          extra_args="${JOB_NAME:-}"
+        fi
+        cat >> "${SHARED_DIR}/custom-links.txt" << INTERVALS_LINK
+        <a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/${extra_args}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
+        INTERVALS_LINK
+        echo "Prometheus dump complete"
+        ls -lh "${PROMDIR}" || true
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-qe-installer-aws
 - always_run: false
   as: control-plane-fips-24nodes
   reporter_config:
