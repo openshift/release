@@ -13,6 +13,13 @@ images:
       RUN curl -fsSL https://claude.ai/install.sh | bash \
           && install -m 0755 "$HOME/.local/bin/claude" /usr/local/bin/claude \
           && claude --version
+      RUN OC_MIRROR=https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable \
+          && curl -fsSL "${OC_MIRROR}/openshift-client-linux.tar.gz" -o /tmp/openshift-client-linux.tar.gz \
+          && (cd /tmp && curl -fsSL "${OC_MIRROR}/sha256sum.txt" | grep ' openshift-client-linux.tar.gz$' | sha256sum -c -) \
+          && tar -xzf /tmp/openshift-client-linux.tar.gz -C /usr/local/bin oc kubectl \
+          && rm -f /tmp/openshift-client-linux.tar.gz \
+          && oc version --client \
+          && kubectl version --client
     from: src
     to: obs-tests-runner
 promotion:
