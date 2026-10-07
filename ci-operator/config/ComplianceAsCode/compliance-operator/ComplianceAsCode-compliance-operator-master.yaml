@@ -143,10 +143,8 @@ tests:
   optional: true
   steps:
     cluster_profile: aws-stackrox
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
     env:
-      BASE_DOMAIN: perfscale.rox.systems
+      HYPERSHIFT_NODE_COUNT: "2"
     test:
     - as: test
       cli: latest
@@ -162,7 +160,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-aws-tls-scanner-5-0
   optional: true
@@ -601,7 +599,7 @@ tests:
   steps:
     cluster_profile: quay-aws
     env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
+      HYPERSHIFT_NODE_COUNT: "2"
     test:
     - as: test
       cli: latest
@@ -617,13 +615,13 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - as: e2e-aws-cel
   run_if_changed: ^(tests/e2e/(cel_tests|framework)/|pkg/controller/(customrule|tailoredprofile|scansettingbinding|compliancescan|compliancesuite)/|pkg/apis/compliance/|pkg/celcontent/|cmd/cel-bundler/|cmd/celctl/|go\.(mod|sum)$|Makefile|Dockerfile\.ci$|cmd/manager/|main\.go$)
   steps:
     cluster_profile: quay-aws
     env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
+      HYPERSHIFT_NODE_COUNT: "2"
     test:
     - as: test
       cli: latest
@@ -639,7 +637,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-rosa
   optional: true
