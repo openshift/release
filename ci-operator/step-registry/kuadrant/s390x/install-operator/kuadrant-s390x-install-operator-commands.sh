@@ -6,7 +6,7 @@ wait_for_csv() {
   # $1 = namespace, $2 = subscription name, $3 = optional expected CSV name
   local ns="$1" sub="$2" expected_csv="${3:-}" csv phase
   echo "Waiting for CSV of subscription ${sub} in ${ns} ..."
-  for _ in $(seq 1 90); do
+  for _ in $(seq 1 180); do
     csv="$(oc get subscription "${sub}" -n "${ns}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
     if [[ -n "${csv}" ]]; then
       phase="$(oc get csv "${csv}" -n "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
@@ -23,6 +23,10 @@ wait_for_csv() {
   done
   echo "ERROR: CSV for ${sub} did not reach Succeeded" >&2
   oc get subscription "${sub}" -n "${ns}" -o yaml >&2 || true
+  oc get installplan -n "${ns}" -o yaml >&2 || true
+  oc get jobs,pods -n "${ns}" -o wide >&2 || true
+  oc get events -n "${ns}" --sort-by='.lastTimestamp' >&2 || true
+  oc logs -n "${ns}" -l job-name --all-containers --tail=200 >&2 || true
   return 1
 }
 
@@ -93,6 +97,17 @@ apply_kuadrant_quay_pull_secret() {
   unset user pass auth
   $WAS_TRACING && set -x
   echo "Created ${ns}/${pull_secret_name} for CatalogSource image pulls"
+
+  echo "=== Adding ${pull_secret_name} to ${ns}/default service account ==="
+  oc get sa default -n "${ns}" -o json \
+    | jq --arg name "${pull_secret_name}" \
+      '.imagePullSecrets = ((.imagePullSecrets // []) + [{"name":$name}] | unique_by(.name))' \
+    | oc apply -f -
+
+  echo "=== Waiting for MachineConfigPools to roll out the new pull-secret ==="
+  sleep 15
+  oc get mcp
+  oc wait mcp master worker --for=condition=updated --timeout=20m
 }
 
 echo "=== Installing cert-manager operator ==="
@@ -200,9 +215,14 @@ kind: OperatorGroup
 metadata:
   name: kuadrant
   namespace: ${KUADRANT_NAMESPACE}
+  annotations:
+    operatorframework.io/bundle-unpack-timeout: "20m"
+    operatorframework.io/bundle-unpack-min-retry-interval: "2m"
 spec:
   upgradeStrategy: Default
----
+EOF
+
+cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
