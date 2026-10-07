@@ -133,7 +133,7 @@ function new_azure_storage_name() {
   printf 'quayci%s\n' "${suffix}" | cut -c1-24
 }
 
-mkdir -p QUAY_AZURE && cd QUAY_AZURE
+mkdir -p /tmp/QUAY_AZURE && cd /tmp/QUAY_AZURE
 
 cat >>variables.tf <<EOF
 variable "resource_group" {

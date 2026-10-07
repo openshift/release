@@ -147,7 +147,7 @@ QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
 export AWS_ACCESS_KEY_ID="${QUAY_AWS_ACCESS_KEY}"
 export AWS_SECRET_ACCESS_KEY="${QUAY_AWS_SECRET_KEY}"
 
-mkdir -p QUAY_AWS && cd QUAY_AWS
+mkdir -p /tmp/QUAY_AWS && cd /tmp/QUAY_AWS
 cat >>variables.tf <<EOF
 variable "region" {
   default = "us-east-2"

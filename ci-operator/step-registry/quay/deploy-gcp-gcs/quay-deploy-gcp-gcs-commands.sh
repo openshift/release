@@ -148,7 +148,7 @@ function new_gcs_bucket_name() {
 }
 
 #Copy GCP auth.json from mounted secret to the terraform working directory
-mkdir -p QUAY_GCP && cd QUAY_GCP
+mkdir -p /tmp/QUAY_GCP && cd /tmp/QUAY_GCP
 cp /var/run/quay-qe-gcp-secret/auth.json .
 
 cat >>variables.tf <<EOF
