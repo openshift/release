@@ -1,3 +1,12 @@
+base_images:
+  opentelemetry-collector:
+    name: redhat-opentelemetry-collector
+    namespace: ci
+    tag: redhat-otel-collector
+  operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
 build_root:
   image_stream_tag:
     name: builder
@@ -12,6 +21,18 @@ images:
   - context_dir: .
     dockerfile_path: Dockerfile.ta.art
     to: opentelemetry-target-allocator-art
+  - context_dir: .
+    dockerfile_path: ./tests/e2e-openshift/Dockerfile
+    to: obs-tests-runner
+operator:
+  bundles:
+  - as: opentelemetry-bundle
+    context_dir: ./bundle/openshift
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:[0-9][0-9.]*
+    with: pipeline:opentelemetry-operator-art
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -25,6 +46,41 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: e2e-pre-merge
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  steps:
+    env:
+      AGENT_SKILL: otel
+      JIRA_PROJECT: TRACING
+    post:
+    - ref: openshift-observability-qe-agent
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace opentelemetry-operator-system
+        oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
+        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
+        oc wait --for condition=Available -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: opentelemetry-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: distributed-tracing-tests-opentelemetry-premerge
+    workflow: generic-claim
 zz_generated_metadata:
   branch: rhosdt-3.11
   org: openshift
