@@ -137,6 +137,7 @@ tests:
     cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
+      HYPERSHIFT_AZURE_LOCATION: westus3
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
@@ -166,6 +167,7 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       AZURE_MULTI_ARCH: "true"
+      HYPERSHIFT_AZURE_LOCATION: westus3
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
@@ -351,7 +353,7 @@ tests:
       ODF_USE_PRERELEASE: "true"
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-azure-aks-ovn-conformance
-  cron: 0 */2 * * *
+  cron: 0 10,22 * * *
   steps:
     cluster_profile: hypershift-aks
     env:
@@ -387,6 +389,21 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-e2e-v2-self-managed
+- as: e2e-aks-managed-hsm
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: ^TestCreateClusterCustomConfig$
+      HYPERSHIFT_AZURE_LOCATION: westus3
+      HYPERSHIFT_AZURE_MANAGED_HSM: "true"
+      HYPERSHIFT_AZURE_MANAGED_HSM_LOCATION: eastus
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    workflow: hypershift-azure-aks-e2e
 - as: e2e-azure-kubevirt-ovn
   cron: 0 4 * * *
   steps:

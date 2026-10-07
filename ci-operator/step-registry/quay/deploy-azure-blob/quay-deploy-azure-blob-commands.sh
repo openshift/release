@@ -51,37 +51,6 @@ function print_quayregistry_conditions() {
   fi
 }
 
-# Derive the Playwright test ref from the deployed Quay app image so the e2e suite
-# is version-matched to the product with no manual pin. The app image is pinned by
-# digest; its source-commit label (org.opencontainers.image.revision / vcs-ref)
-# points at the quay/quay commit it was built from. Written to
-# ${SHARED_DIR}/playwright_git_ref for the test-e2e step; best-effort (the test step
-# falls back to a branch if it is absent). This script runs without `set -x`, so the
-# pull-secret authfile below is never traced; it is also removed immediately.
-function derive_playwright_ref() {
-  local ns="${QUAY_NS}"
-  local app_img authfile commit
-  app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
-    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
-  if [[ -z "${app_img}" ]]; then
-    echo "WARNING: could not determine quay-app imageID; Playwright ref will fall back" >&2
-    return 0
-  fi
-  echo "Deployed Quay app image: ${app_img}" >&2
-  authfile=$(mktemp)
-  oc get secret/pull-secret -n openshift-config \
-    --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
-  commit=$(oc image info "${app_img}" --registry-config="${authfile}" -o json 2>/dev/null \
-    | jq -r '.config.config.Labels["org.opencontainers.image.revision"] // .config.config.Labels["vcs-ref"] // ""' || true)
-  rm -f "${authfile}"
-  if [[ "${commit}" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "Derived Playwright git ref from deployed image: ${commit}" >&2
-    echo "${commit}" > "${SHARED_DIR}/playwright_git_ref"
-  else
-    echo "WARNING: no 40-char source-commit label on deployed image (got '${commit}'); Playwright ref will fall back" >&2
-  fi
-}
-
 function print_failing_pod_logs() {
   local ns="${QUAY_NS}"
   local name status restarts
@@ -493,6 +462,24 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   TLS_MANAGED="false"
   cat "${SHARED_DIR}/config_builder.yaml" >> config.yaml
 
+  # The builder image is always the RELATED_IMAGE_COMPONENT_BUILDER the
+  # Subscription's installed CSV ships, so the builder matches the installed
+  # operator. quay-provisioning-builder leaves "from-csv" for it. No fallback.
+  if ! grep -qE '^ *BUILDER_CONTAINER_IMAGE: from-csv$' config.yaml; then
+    echo "ERROR: config_builder.yaml has no 'BUILDER_CONTAINER_IMAGE: from-csv' line to fill" >&2
+    exit 1
+  fi
+  csv_json=$(oc -n quay-enterprise get csv "$CSV" -o json)
+  mapfile -t builder_images < <(jq -r '[.spec.install.spec.deployments[]?.spec.template.spec.containers[]?.env[]?
+      | select(.name == "RELATED_IMAGE_COMPONENT_BUILDER") | .value // empty | select(. != "")]
+      | unique | .[]' <<<"$csv_json")
+  if [[ ${#builder_images[@]} -ne 1 ]]; then
+    echo "ERROR: CSV ${CSV} must set exactly one non-empty RELATED_IMAGE_COMPONENT_BUILDER value; got: ${builder_images[*]:-none}" >&2
+    exit 1
+  fi
+  echo "Builder image from CSV ${CSV}: ${builder_images[0]}" >&2
+  sed -i -E "s|^( *BUILDER_CONTAINER_IMAGE:) from-csv$|\1 ${builder_images[0]}|" config.yaml
+
   oc create secret generic -n quay-enterprise config-bundle-secret \
     --from-file config.yaml=./config.yaml \
     --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
@@ -567,7 +554,6 @@ for i in $(seq 1 90); do
     fi
     chmod 600 "${SHARED_DIR}/quay_oauth2_token"
     rm -f "${initialize_payload}" "${quay_ca_bundle}"
-    derive_playwright_ref || true
     archive_pod_info
     exit 0
   fi

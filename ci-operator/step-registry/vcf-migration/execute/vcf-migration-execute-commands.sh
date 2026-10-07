@@ -14,9 +14,11 @@ function log() {
 }
 
 function dump_operator_logs() {
-  log "dumping VCF migration operator logs"
+  local suffix="${1:-}"
+  local file="${ARTIFACT_DIR}/vcf-migration-operator${suffix:+-${suffix}}.log"
+  log "dumping VCF migration operator logs to ${file}"
   oc -n "${MIGRATION_NAMESPACE}" logs "deployment/${OPERATOR_DEPLOYMENT}" --all-containers 2>&1 \
-    | tee "${ARTIFACT_DIR}/vcf-migration-operator.log" || true
+    | tee "${file}" || true
 }
 
 function debug_dump() {
@@ -216,6 +218,9 @@ jq -n \
 timeout_seconds="${VCF_MIGRATION_TIMEOUT}"
 migration_deadline=$(( $(date +%s) + timeout_seconds ))
 wait_for_condition "InfrastructurePrepared" "${migration_deadline}"
+# Capture preflight logs immediately: a later pod restart (e.g. during the
+# control plane rollout) would lose this container instance's log history.
+dump_operator_logs preflight
 wait_for_condition "DestinationInitialized" "${migration_deadline}"
 wait_for_condition "MultiSiteConfigured" "${migration_deadline}"
 wait_for_condition "WorkloadMigrated" "${migration_deadline}"

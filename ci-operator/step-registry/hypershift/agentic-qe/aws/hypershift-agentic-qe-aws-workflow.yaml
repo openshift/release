@@ -14,12 +14,12 @@ workflow:
     - chain: hypershift-aws-destroy
     - chain: hypershift-destroy-nested-management-cluster
   documentation: |-
-    HyperShift Agent QE workflow for AI-driven test plan execution.
+    HyperShift Agent QE workflow: a live environment built from the PR under test.
 
-    This workflow provisions a management cluster with HyperShift operator
-    installed from the PR under test, creates a HostedCluster, then uses
-    Claude to execute test plans from the test-plan/ directory against
-    the live environment.
+    This workflow provisions a management cluster with the HyperShift operator
+    installed from the PR under test, creates a HostedCluster from the PR's
+    release payload, then holds the environment so that a person or an agent
+    (Chai Bot, triggering the job through Gangway) can work with it.
 
     Pre phase:
     1. Provisions a nested management cluster via IPI
@@ -27,8 +27,9 @@ workflow:
     3. Creates a HostedCluster with the PR payload via hypershift CLI
 
     Test phase:
-    1. Discovers test plan files changed/added by the PR
-    2. Runs Claude to execute each test plan against the HostedCluster
+    1. Holds the environment for HOLD_DURATION (default 30m); with
+       CHAI_SHARED_DIR_ACCESS=true, first grants Chai Bot read access to the
+       test's SHARED_DIR secret, which holds both kubeconfigs
 
     Post phase:
     1. Dumps cluster artifacts for debugging

@@ -103,6 +103,9 @@ fi
 if [[ "${RESERVE_UPGRADE_PATH:-}" == "true" ]]; then
   EXTRA_VARS+=("-e" "reserve_upgrade_path=true")
 fi
+if [[ -n "${CLUSTER_API_INSTALLER_REF:-}" ]]; then
+  EXTRA_VARS+=("-e" "cluster_api_installer_ref=${CLUSTER_API_INSTALLER_REF}")
+fi
 
 echo "Running rosa-hcp-e2e tests (name_prefix=${NAME_PREFIX})..."
 "${PYTHON}" run-test-suite.py ${TEST_SUITE} --ai-agent "${EXTRA_VARS[@]}" 2>&1 | tee "${ARTIFACT_DIR}/rosa-hcp-e2e-test.log"

@@ -28,6 +28,14 @@ ref:
         Gangway API override for OCP_RELEASE_IMAGE. When set via Gangway API,
         this value takes precedence over the ocp_release_image in INFRA_SETTINGS.
         Accepts tag or digest format (e.g., quay.io/openshift-release-dev/ocp-release:4.18.0-x86_64).
+    - name: MULTISTAGE_PARAM_OVERRIDE_ARCHITECTURE
+      default: ""
+      documentation: |-
+        Gangway API override for ARCHITECTURE. When set via Gangway API,
+        this value takes precedence over the architecture in INFRA_SETTINGS.
+        Supported values: x86_64, arm64, aarch64, ppc64le, s390x.
+        Note: Both arm64 (Kubernetes naming) and aarch64 (Linux naming) are accepted
+        for ARM64 architecture. The playbook translates between naming conventions as needed.
     - name: INFRA_SETTINGS
       default: '{}'
       documentation: >-
@@ -43,6 +51,7 @@ ref:
             "version": "",
             "ocp_release_image": "",
             "lockdown_uri": "",
+            "architecture": "x86_64",
             "debug": false
           }
         }
@@ -54,6 +63,10 @@ ref:
         no lockdown_uri, mirrors the hub cluster's own release image;
         lockdown_uri (str) - lockdown JSON URL to extract OCP release image from. Supports
         both hub and spoke lockdown formats;
+        architecture (str) - CPU architecture. Accepts both Kubernetes naming (arm64) and
+        Linux naming (aarch64) for ARM64. Supported values: x86_64, arm64, aarch64, ppc64le, s390x.
+        Defaults to x86_64. Used when lockdown_uri is missing architecture field or when using
+        ocp_release_image without lockdown. Auto-detected from lockdown JSON when available;
         debug (bool) - when true, enables Ansible -vvv verbose output.
         Values are exported as uppercase env vars.
   credentials:
