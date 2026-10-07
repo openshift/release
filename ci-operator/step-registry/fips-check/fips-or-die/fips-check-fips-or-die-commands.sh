@@ -149,7 +149,7 @@ if [[ -z "$node_name" ]]; then
   echo "ERROR: No Ready master node found"
   exit 1
 fi
-echo "checking FIPS status on node $node_name"
+echo "checking FIPS status on a master node"
 fips_flag=$(oc debug node/$node_name -- chroot /host cat /proc/sys/crypto/fips_enabled 2>&1)
 fips_value=$(echo "$fips_flag" | grep -oE '^[01]$')
 if [[ $fips_value == "1" ]]; then
