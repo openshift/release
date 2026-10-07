@@ -495,6 +495,12 @@ function Main () {
     newVersion="$(GetInstalledVersion)"
     echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
 
+    # --- Version transition check (INTEROP-9527) ---
+    if [[ -n "${currentVersion}" && "${newVersion}" == "${currentVersion}" ]]; then
+        echo >&2 "WARNING: ACS version did not change after upgrade (${currentVersion})"
+        exit 1
+    fi
+
     typeset _acs_upgrade_output=""
     if ! _acs_upgrade_output="$(ValidateAcsHealth 2>&1)"; then
         echo "${_acs_upgrade_output}"

@@ -149,7 +149,7 @@ _propagate_junit () {
     done
 }
 
-trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
+trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit ${_jrc}' EXIT
 
 # ---------------------------------------------------------------------------
 # Test 1: cluster-health
