@@ -105,7 +105,9 @@ AuthorizedKeysFile /home/core/.ssh/authorized_keys
 StrictModes no
 PasswordAuthentication no
 KbdInteractiveAuthentication no
-UsePAM no
+# RHEL/CentOS 9 openssh ignores UsePAM=no and still consults PAM; locked
+# accounts are then rejected even for pubkey auth ("account is locked").
+UsePAM yes
 X11Forwarding no
 PrintMotd no
 AllowTcpForwarding yes
@@ -210,7 +212,11 @@ spec:
             /ssh-host-keys/ssh_host_ed25519_key /ssh-host-keys/sshd_config /etc/ssh/
           chmod 600 /etc/ssh/ssh_host_*_key
           chmod 644 /etc/ssh/sshd_config
-          id -u core >/dev/null 2>&1 || useradd -m -u 1000 core
+          # useradd locks the account (!! in shadow). With PAM enforced, pubkey
+          # auth then fails with "User core not allowed because account is locked".
+          id -u core >/dev/null 2>&1 || useradd -m -u 1000 -s /bin/bash core
+          passwd -d core
+          usermod -U core
           mkdir -p /home/core/.ssh
           cp /ssh-authorized-keys/authorized_keys /home/core/.ssh/authorized_keys
           chown -R core:core /home/core
