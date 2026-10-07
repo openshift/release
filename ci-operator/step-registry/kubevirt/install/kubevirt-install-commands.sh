@@ -152,6 +152,8 @@ kind: HyperConverged
 metadata:
   name: kubevirt-hyperconverged
   namespace: openshift-cnv
+  annotations:
+    platform.kubevirt.io/autopilot: "false"
 spec:
   featureGates:
     deployKubevirtIpamController: true
