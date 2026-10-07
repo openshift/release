@@ -14,15 +14,18 @@ eval "$(
 
 typeset -i startTime=$SECONDS
 
-trap 'DebugOnExit' EXIT
-
 # shellcheck disable=SC2329
 # DebugOnExit — only triggers on infrastructure failures (non-zero exit before pytest runs).
 # pytest test failures (captured in JUnit XML) do NOT enter this path because the main
 # script body always exits 0 after RunCnvUpgradePytest. The debug hold is only for cases
 # where the step itself dies early (e.g. missing kubeconfig, virtctl install failure).
+#
+# Accepts an optional explicit exit code as $1. When omitted (i.e. invoked directly as
+# the EXIT trap handler with no args), it falls back to the live $?. An explicit arg is
+# required when DebugOnExit is called from inside another trap command (see the
+# MAP_TESTS branch below), since by then $? no longer reflects the script's real exit code.
 DebugOnExit() {
-    typeset -i exitCode=$?
+    typeset -i exitCode="${1:-$?}"
     typeset -i endTime=$SECONDS
     typeset -i executionTime=$((endTime - startTime))
     typeset hcoNamespace="openshift-cnv"
@@ -45,6 +48,28 @@ DebugOnExit() {
 
     exit "${exitCode}"
 }
+
+# This trap will be executed when the script exits for any reason (successful, error, or signal).
+if [[ "${MAP_TESTS}" == "true" ]]; then
+    # Map results by setting an identifier prefix in the test suite name for reporting tools.
+    # Merge the original jUnit results into a single file and archive the originals.
+    # Send the merged file to the shared dir for the Data Router Reporter step
+    # (run here so EXIT stays DebugOnExit).
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    # shellcheck disable=SC2154
+    trap '
+        typeset -i ec=$?
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--cnv__interop-tests__openshift-virtualization-upgrade-tests.xml || true
+        DebugOnExit "${ec}"
+    ' EXIT
+else
+    trap 'DebugOnExit' EXIT
+fi
 
 # shellcheck disable=SC2329
 GetMustGatherImage() {
@@ -72,20 +97,6 @@ RunMustGather() {
     mkdir -p "${mustGatherCnvDir}"
     oc adm must-gather --dest-dir="${mustGatherCnvDir}" --image="${image}" \
         -- /usr/bin/gather --vms_details | tee "${mustGatherCnvDir}"/must-gather-cnv.log || true
-    true
-}
-
-MapTestsForComponentReadiness() {
-    [[ "${MAP_TESTS}" != "true" ]] && return
-
-    typeset resultsFile="${1:-}"
-    : "Patching Tests Result File: ${resultsFile}"
-    if [[ -f "${resultsFile}" ]]; then
-        eval "$(
-            curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
-        )"; EnsureReqs yq
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' "${resultsFile}"
-    fi
     true
 }
 
@@ -214,12 +225,6 @@ InstallAndVerifyVirtctl
 typeset -i exitCode=0
 
 RunCnvUpgradePytest "${hcoSubscription}" || exitCode=$?
-
-MapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
-
-if [[ -f "${JUNIT_RESULTS_FILE}" ]]; then
-    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
-fi
 
 if (( exitCode != 0 )); then
     : "pytest exited ${exitCode} — test failures recorded in JUnit XML; step exits 0 to allow subsequent steps to run"
