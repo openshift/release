@@ -97,6 +97,8 @@ ADDITIONAL_LIBVIRT_URI="qemu+tcp://${HOSTNAME_ADDITIONAL}:${ADDITIONAL_PORT}/sys
 VIRSH_PRIMARY="mock-nss.sh virsh --connect ${PRIMARY_LIBVIRT_URI}"
 VIRSH_ADDITIONAL="mock-nss.sh virsh --connect ${ADDITIONAL_LIBVIRT_URI}"
 
+# Must match POOL_NAME used by the primary upi-install-libvirt step.
+POOL_NAME="${POOL_NAME:-multiarch-ci-pool}"
 ADDITIONAL_POOL="${ADDITIONAL_POOL_NAME:-multiarch-ci-pool}"
 HTTPD_POOL="${HTTPD_POOL_NAME:-httpd}"
 HTTPD_BASE_URL="http://${HTTPD_IP}:${HTTPD_PORT}"
