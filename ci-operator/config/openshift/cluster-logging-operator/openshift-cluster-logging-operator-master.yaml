@@ -15,10 +15,10 @@ base_images:
     name: vector
     namespace: logging
     tag: v0.54.0
-  loki-operator:
+  loki-operator-bundle:
     name: 5.y
     namespace: logging
-    tag: loki-operator
+    tag: loki-operator-bundle
   loki-operator-src:
     name: 5.y
     namespace: logging
@@ -127,8 +127,6 @@ tests:
         name: pipeline:logging-eventrouter
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER
         name: pipeline:log-file-metric-exporter
-      - env: IMAGE_LOKI_OPERATOR
-        name: pipeline:loki-operator
       from: pipeline:cluster-logging-operator-e2e
       resources:
         requests:
@@ -154,6 +152,22 @@ tests:
     env:
       OO_INSTALL_NAMESPACE: openshift-logging
     test:
+    - as: deploy-loki-operator
+      cli: latest
+      commands: |
+        oc create namespace openshift-operators-redhat || true
+        oc annotate namespace openshift-operators-redhat openshift.io/node-selector=""
+        oc label namespace openshift-operators-redhat openshift.io/cluster-monitoring="true"
+        cd /tmp && operator-sdk run bundle --timeout=10m --install-mode AllNamespaces --security-context-config restricted -n openshift-operators-redhat "$OO_BUNDLE_LOKI"
+        oc wait --for condition=Available --timeout=5m -n openshift-operators-redhat deployment loki-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE_LOKI
+        name: pipeline:loki-operator-bundle
+      from: cli-operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
     - as: test
       cli: latest
       commands: make test-e2e-from-ci-bundle IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
@@ -164,8 +178,6 @@ tests:
         name: pipeline:logging-eventrouter
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER
         name: pipeline:log-file-metric-exporter
-      - env: IMAGE_LOKI_OPERATOR
-        name: pipeline:loki-operator
       from: pipeline:cluster-logging-operator-e2e
       resources:
         requests:
