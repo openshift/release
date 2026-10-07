@@ -8,6 +8,7 @@ set -o pipefail
 NS="openshift-operators"
 DEPLOY="quay-operator-tng"
 CONTAINER="quay-operator"
+SHARED_DIR="${SHARED_DIR:-/tmp/shared}"
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 mkdir -p "${ARTIFACT_DIR}"
 
@@ -38,13 +39,22 @@ metrics_snapshot() {
 }
 
 # OLM-revert check: the env set by quay-operator-otel-setup must survive the tests.
+ENV_AFTER="${ARTIFACT_DIR}/env-after.txt"
 oc get deployment "${DEPLOY}" -n "${NS}" -o json 2>/dev/null |
   jq --arg c "${CONTAINER}" '.spec.template.spec.containers[] | select(.name == $c) | .env' \
-  > "${ARTIFACT_DIR}/env-after.txt" || true
-if jq -e 'any(.[]?; .name == "OTEL_EXPORTER_OTLP_ENDPOINT")' "${ARTIFACT_DIR}/env-after.txt" >/dev/null 2>&1; then
-  echo "PASS: OTEL_EXPORTER_OTLP_ENDPOINT still set on ${DEPLOY}/${CONTAINER}"
+  > "${ENV_AFTER}" || true
+if [[ ! -f "${SHARED_DIR}/jaeger_otlp_endpoint" ]]; then
+  echo "SKIP: tracing not configured (jaeger_otlp_endpoint absent)"
 else
-  echo "FAIL: OTEL_EXPORTER_OTLP_ENDPOINT missing from ${DEPLOY}/${CONTAINER}"
+  EXPECTED=$(cat "${SHARED_DIR}/jaeger_otlp_endpoint")
+  if ! jq -e 'any(.[]?; .name == "OTEL_EXPORTER_OTLP_ENDPOINT")' "${ENV_AFTER}" >/dev/null 2>&1; then
+    echo "FAIL: OTEL_EXPORTER_OTLP_ENDPOINT missing from ${DEPLOY}/${CONTAINER} (expected '${EXPECTED}')"
+  elif jq -e --arg ep "${EXPECTED}" 'any(.[]?; .name == "OTEL_EXPORTER_OTLP_ENDPOINT" and .value == $ep)' "${ENV_AFTER}" >/dev/null 2>&1; then
+    echo "PASS: OTEL_EXPORTER_OTLP_ENDPOINT=${EXPECTED} still set on ${DEPLOY}/${CONTAINER}"
+  else
+    FOUND=$(jq -r 'first(.[] | select(.name == "OTEL_EXPORTER_OTLP_ENDPOINT")) | .value // ""' "${ENV_AFTER}" 2>/dev/null || true)
+    echo "FAIL: OTEL_EXPORTER_OTLP_ENDPOINT on ${DEPLOY}/${CONTAINER} is '${FOUND}', expected '${EXPECTED}'"
+  fi
 fi
 
 metrics_snapshot after

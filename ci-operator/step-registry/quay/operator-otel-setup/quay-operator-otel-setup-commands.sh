@@ -39,6 +39,7 @@ metrics_snapshot() {
 if [[ ! -f "${SHARED_DIR}/jaeger_otlp_endpoint" ]]; then
   echo "Jaeger was not deployed; quay-operator tracing not configured"
   echo "tracing not configured: ${SHARED_DIR}/jaeger_otlp_endpoint absent" > "${ARTIFACT_DIR}/tracing-not-configured.txt"
+  metrics_snapshot before
   exit 0
 fi
 ENDPOINT=$(cat "${SHARED_DIR}/jaeger_otlp_endpoint")
