@@ -61,7 +61,7 @@ if [[ ${FLP_CONSUMER_REPLICAS:-} ]]; then
 fi
 
 createFlowCollector ${PARAMETERS}
-oc patch flowcollector/cluster --type=merge -p='{"spec":{"loki":{"advanced":{"excludeLabels":["K8S_FlowLayer", "FlowDirection"]}}}}'
+oc patch flowcollector/cluster --type=merge -p='{"spec":{"loki":{"advanced":{"excludeLabels":["SrcK8S_Namespace", "DstK8S_Namespace", "SrcK8S_OwnerName", "DstK8S_OwnerName"]}}}}'
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
     patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
