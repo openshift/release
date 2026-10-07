@@ -568,14 +568,14 @@ echo "PASS: workflow does not set TIMEOUT or PR_ONLY (zero added overhead for or
 debug_main_section=$(grep -A25 'debug-winc-aws-upi' "${MAIN_CONFIG}")
 echo "${debug_main_section}" | grep -Fq 'cucushift-installer-rehearse-aws-upi-ovn-winc-debug-provision' || \
     fail "main debug caller does not use debug provision chain in pre override"
-echo "${debug_main_section}" | grep -Eq 'TIMEOUT:.*\+1 hour' || fail "main debug caller does not set TIMEOUT: +1 hour"
+echo "${debug_main_section}" | grep -Eq 'TIMEOUT:.*\+3 hours' || fail "main debug caller does not set TIMEOUT: +3 hours"
 echo "${debug_main_section}" | grep -Fq 'PR_ONLY: "true"' || fail "main debug caller does not set PR_ONLY: true"
 debug_r50_section=$(grep -A25 'debug-winc-aws-upi' "${R50_CONFIG}")
 echo "${debug_r50_section}" | grep -Fq 'cucushift-installer-rehearse-aws-upi-ovn-winc-debug-provision' || \
     fail "release-5.0 debug caller does not use debug provision chain in pre override"
 echo "${debug_r50_section}" | grep -Eq 'TIMEOUT:.*\+1 hour' || fail "release-5.0 debug caller does not set TIMEOUT: +1 hour"
 echo "${debug_r50_section}" | grep -Fq 'PR_ONLY: "true"' || fail "release-5.0 debug caller does not set PR_ONLY: true"
-echo "PASS: debug callers use debug provision chain with TIMEOUT +1 hour and PR_ONLY true"
+echo "PASS: debug callers use debug provision chain with main TIMEOUT +3 hours, release-5.0 TIMEOUT +1 hour, and PR_ONLY true"
 
 # Verify non-debug callers do NOT include debug chain, wait, or TIMEOUT
 FBC_CONFIG="${REPO_ROOT}/ci-operator/config/openshift/windows-machine-config-operator-fbc/openshift-windows-machine-config-operator-fbc-main.yaml"
@@ -930,7 +930,7 @@ echo "PASS: release-5.0 debug caller uses debug provision chain, sets BYOH_DEBUG
 
 # Verify TIMEOUT and PR_ONLY are still set (for the ref:wait in the debug chain)
 echo "${debug_main_section}" | grep -Fq 'PR_ONLY: "true"' || fail "main debug caller missing PR_ONLY"
-echo "${debug_main_section}" | grep -Eq 'TIMEOUT:.*\+1 hour' || fail "main debug caller missing TIMEOUT"
+echo "${debug_main_section}" | grep -Eq 'TIMEOUT:.*\+3 hours' || fail "main debug caller missing TIMEOUT +3 hours"
 echo "${debug_r50_section}" | grep -Fq 'PR_ONLY: "true"' || fail "release-5.0 debug caller missing PR_ONLY"
 echo "${debug_r50_section}" | grep -Eq 'TIMEOUT:.*\+1 hour' || fail "release-5.0 debug caller missing TIMEOUT"
 echo "PASS: debug callers set TIMEOUT and PR_ONLY for bounded wait"
@@ -963,11 +963,11 @@ fi
 echo "PASS: shared provision chain is unchanged (no debug additions)"
 
 # --- Wait budget verification ---
-# Verify the stock wait ref has a timeout that accommodates the 1-hour debug window
+# Verify the stock wait ref has a timeout that accommodates the 3-hour debug window
 WAIT_REF="${REPO_ROOT}/ci-operator/step-registry/wait/wait-ref.yaml"
 wait_timeout=$(grep 'timeout:' "${WAIT_REF}" | head -1 | awk '{print $2}')
-# Stock wait timeout is 72h which easily accommodates the +1 hour TIMEOUT
-echo "PASS: stock wait ref timeout (${wait_timeout}) accommodates 1-hour debug window"
+# Stock wait timeout is 72h which easily accommodates the +3 hours TIMEOUT
+echo "PASS: stock wait ref timeout (${wait_timeout}) accommodates 3-hour debug window"
 
 echo ""
 echo "All tests passed"
