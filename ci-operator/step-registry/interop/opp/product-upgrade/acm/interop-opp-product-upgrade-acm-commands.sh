@@ -475,6 +475,9 @@ _xml_escape() {
     text="${text//>/\&gt;}"
     text="${text//\"/\&quot;}"
     text="${text//\'/\&apos;}"
+    text="${text//$'\n'/\&#10;}"
+    text="${text//$'\t'/\&#9;}"
+    text="${text//$'\r'/\&#13;}"
     printf '%s' "${text}"
 }
 
@@ -695,6 +698,22 @@ function Main () {
     newCsv="$(GetCurrentCsv)"
     newVersion="$(GetInstalledVersion)"
     echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
+
+    # --- Missing version guard (INTEROP-9527) ---
+    if [[ -z "${currentVersion}" ]]; then
+        echo >&2 "ERROR: Pre-upgrade ACM version is empty; cannot verify transition"
+        _JUNIT_KIND="version-missing"
+        _JUNIT_MESSAGE="Pre-upgrade ACM version is empty; cannot verify transition"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
+    if [[ -z "${newVersion}" ]]; then
+        echo >&2 "ERROR: Post-upgrade ACM version is empty; cannot verify transition"
+        _JUNIT_KIND="version-missing"
+        _JUNIT_MESSAGE="Post-upgrade ACM version is empty; cannot verify transition"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
 
     # --- Version transition check (INTEROP-9527) ---
     if [[ -n "${currentVersion}" && "${newVersion}" == "${currentVersion}" ]]; then
