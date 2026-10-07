@@ -1,10 +1,14 @@
 #!/bin/bash
 #
 # Upgrade ODF on the ACM hub cluster through one or more channels after an EUS OCP upgrade.
-# Iterates ODF_UPGRADE_CHANNEL_HOPS (comma-separated, e.g. "stable-4.21,stable-4.22"),
-# patching the Subscription channel at each hop, waiting for OLM to install the new CSV
-# (Succeeded), then waiting for StorageCluster operand images to converge (actualImage ==
-# desiredImage, version matching the hop) and NooBaa to return to Ready.
+# Iterates ODF_UPGRADE_CHANNEL_HOPS (comma-separated, e.g. "stable-4.21,stable-4.22").
+# Each hop retargets the odf-operator pkgs ConfigMap (PKGS_CONFIG_MAP_NAME) from the
+# pre-hop channel to the hop channel, then patches Subscriptions still on that pre-hop
+# channel (odf-operator and dependencies such as odf-csi-addons-operator). The running
+# ODF operator copies ConfigMap channels back onto dependency Subscriptions, so the
+# ConfigMap has to move first or it writes the old channel back. Then waits for OLM to
+# install the new CSV (Succeeded) and for StorageCluster operand images to converge
+# (actualImage == desiredImage, version matching the hop) and NooBaa to return to Ready.
 # ODF's OLM upgrade graph requires sequential hops — skipping directly from stable-4.20
 # to stable-4.22 leaves OLM without an install-plan edge and the CSV never changes.
 # Intended for EUS scenarios (e.g. stable-4.20 → stable-4.21 → stable-4.22).
@@ -34,7 +38,7 @@ DumpHubOdfUpgradeDiagnostics() {
     oc --kubeconfig="${KUBECONFIG}" get storagecluster,cephcluster,noobaa,csv \
         -n "${ODF_INSTALL_NAMESPACE}" -o wide \
         > "${artifactDir}/odf-resources.txt" 2>&1 || true
-    oc --kubeconfig="${KUBECONFIG}" get subscription.operators.coreos.com "${ODF_SUBSCRIPTION_NAME}" \
+    oc --kubeconfig="${KUBECONFIG}" get subscription.operators.coreos.com \
         -n "${ODF_INSTALL_NAMESPACE}" -o yaml \
         > "${artifactDir}/subscription.yaml" 2>&1 || true
     oc --kubeconfig="${KUBECONFIG}" get storagecluster "${ODF_STORAGE_CLUSTER_NAME}" \
@@ -56,6 +60,9 @@ DumpHubOdfUpgradeDiagnostics() {
         oc --kubeconfig="${KUBECONFIG}" get noobaa/noobaa \
             -n "${ODF_INSTALL_NAMESPACE}" \
             -o jsonpath='noobaaPhase={.status.phase}{"\n"}' || true
+        oc --kubeconfig="${KUBECONFIG}" get subscription.operators.coreos.com \
+            -n "${ODF_INSTALL_NAMESPACE}" \
+            -o jsonpath='{range .items[*]}subscription={.metadata.name} channel={.spec.channel}{"\n"}{end}' || true
     } > "${artifactDir}/odf-upgrade-summary.txt" 2>&1 || true
     true
 }
@@ -81,12 +88,16 @@ trap HubOdfUpgradeCleanup EXIT
 # and the new CSV name is unknown until OLM resolves the install plan.
 WaitCsvUpgraded() {
     # previousCsv may be empty (OLM has not yet reported installedCSV); the arg must still be passed.
-    (( $# >= 1 )) || { printf 'FATAL: WaitCsvUpgraded requires previousCsv (may be empty)\n' >&2; return 1; }
+    (( $# >= 2 )) || { printf 'FATAL: WaitCsvUpgraded requires previousCsv and fromChannel\n' >&2; return 1; }
     typeset previousCsv="${1}"; shift
+    typeset fromChannel="${1:?}"; (($#)) && shift
     typeset newCsvName=''
     (
         SECONDS=0
         while (( SECONDS < odfCsvPollMax )); do
+            # Re-apply while polling. The 4.20 operator reconciles Subscription generation
+            # changes from its pkgs ConfigMap and can write the pre-hop channel back.
+            AlignOdfChannelsForHop "${KUBECONFIG}" "${fromChannel}" "${currentChannel}"
             newCsvName="$(oc --kubeconfig="${KUBECONFIG}" \
                 get subscription.operators.coreos.com "${ODF_SUBSCRIPTION_NAME}" \
                 -n "${ODF_INSTALL_NAMESPACE}" \
@@ -176,6 +187,90 @@ WaitStorageClusterAndNoobaaReady() {
     true
 }
 
+# OdfPkgsConfigMapName — name of the ConfigMap the running odf-operator reconciles
+# Subscription channels from (deployment env PKGS_CONFIG_MAP_NAME).
+OdfPkgsConfigMapName() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset cmName=''
+    cmName="$(oc --kubeconfig="${kubeconfig}" get deployment \
+        -n "${ODF_INSTALL_NAMESPACE}" -o json \
+        | jq -r '[.items[]?.spec.template.spec.containers[]?.env[]?
+            | select(.name=="PKGS_CONFIG_MAP_NAME") | .value]
+            | map(select(length > 0)) | unique | .[0] // empty')"
+    [[ -n "${cmName}" ]] \
+        || { printf 'FATAL: PKGS_CONFIG_MAP_NAME is not set on any deployment in %s\n' "${ODF_INSTALL_NAMESPACE}" >&2; return 1; }
+    printf '%s' "${cmName}"
+}
+
+# RetargetOdfPkgsConfigMap — rewrite pkgs ConfigMap records whose channel line is
+# exactly "channel: <fromChannel>" to the hop channel. Other channels (alpha, IBM
+# stable-1.x, and so on) stay as they are. The odf-operator SubscriptionReconciler
+# copies these records onto dependency Subscriptions.
+RetargetOdfPkgsConfigMap() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset fromChannel="${1:?}"; (($#)) && shift
+    typeset hopChannel="${1:?}"; (($#)) && shift
+    typeset cmName='' cmJson='' patchJson=''
+    [[ "${fromChannel}" == "${hopChannel}" ]] && return 0
+    cmName="$(OdfPkgsConfigMapName "${kubeconfig}")"
+    cmJson="$(oc --kubeconfig="${kubeconfig}" get configmap "${cmName}" \
+        -n "${ODF_INSTALL_NAMESPACE}" -o json)"
+    patchJson="$(jq -c --arg from "${fromChannel}" --arg to "${hopChannel}" '
+        def retarget:
+            split("\n")
+            | map(if . == ("channel: " + $from) then "channel: " + $to else . end)
+            | join("\n");
+        (.data // {})
+        | with_entries(select(.value | split("\n") | index("channel: " + $from)))
+        | with_entries(.value |= retarget)
+        | if . == {} then empty else {data: .} end
+    ' <<<"${cmJson}")"
+    if [[ -z "${patchJson}" ]]; then
+        printf 'INFO: ConfigMap %s has no channel %s records\n' "${cmName}" "${fromChannel}" >&2
+        return 0
+    fi
+    printf 'INFO: Retargeting ConfigMap %s channel %s → %s\n' "${cmName}" "${fromChannel}" "${hopChannel}" >&2
+    oc --kubeconfig="${kubeconfig}" patch configmap "${cmName}" \
+        -n "${ODF_INSTALL_NAMESPACE}" \
+        --type merge \
+        -p "${patchJson}"
+    true
+}
+
+# PatchOdfNamespaceChannels — move Subscriptions still on fromChannel to hopChannel.
+# Only the pre-hop channel is changed, so unrelated Subscriptions in the namespace stay put.
+PatchOdfNamespaceChannels() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset fromChannel="${1:?}"; (($#)) && shift
+    typeset hopChannel="${1:?}"; (($#)) && shift
+    typeset subsJson='' subName='' subChannel=''
+    [[ "${fromChannel}" == "${hopChannel}" ]] && return 0
+    subsJson="$(oc --kubeconfig="${kubeconfig}" get subscription.operators.coreos.com \
+        -n "${ODF_INSTALL_NAMESPACE}" -o json)"
+    while IFS=$'\t' read -r subName subChannel; do
+        [[ -n "${subName}" ]] || continue
+        [[ "${subChannel}" == "${fromChannel}" ]] || continue
+        printf 'INFO: Patching subscription %s channel %s → %s\n' \
+            "${subName}" "${subChannel}" "${hopChannel}" >&2
+        oc --kubeconfig="${kubeconfig}" patch subscription.operators.coreos.com "${subName}" \
+            -n "${ODF_INSTALL_NAMESPACE}" \
+            --type merge \
+            -p "$(jq -cn --arg ch "${hopChannel}" '{"spec":{"channel":$ch}}')"
+    done < <(jq -r '.items[] | [.metadata.name, (.spec.channel // "")] | @tsv' <<<"${subsJson}")
+    true
+}
+
+# AlignOdfChannelsForHop — ConfigMap first, then Subscriptions, so the operator
+# write-back and this step agree on the hop channel.
+AlignOdfChannelsForHop() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset fromChannel="${1:?}"; (($#)) && shift
+    typeset hopChannel="${1:?}"; (($#)) && shift
+    RetargetOdfPkgsConfigMap "${kubeconfig}" "${fromChannel}" "${hopChannel}"
+    PatchOdfNamespaceChannels "${kubeconfig}" "${fromChannel}" "${hopChannel}"
+    true
+}
+
 # ValidateUpgradeChannelHops — require a non-empty, comma-separated list of
 # <prefix>-<major>.<minor> channels in strictly ascending version order.
 ValidateUpgradeChannelHops() {
@@ -220,6 +315,7 @@ printf 'INFO: ODF hub channel upgrade via %d hop(s): %s\n' "${#hopChannelsArr[@]
 
 typeset previousCsv=''
 typeset hopChannel=''
+typeset fromChannel=''
 typeset preDesiredCeph=''
 
 previousCsv="$(oc --kubeconfig="${KUBECONFIG}" \
@@ -236,12 +332,16 @@ for hopChannel in "${hopChannelsArr[@]}"; do
     preDesiredCeph="$(oc --kubeconfig="${KUBECONFIG}" get storagecluster "${ODF_STORAGE_CLUSTER_NAME}" \
         -n "${ODF_INSTALL_NAMESPACE}" \
         -o jsonpath='{.status.images.ceph.desiredImage}' || true)"
-    printf 'INFO: Hub ODF hop → %s (from installedCSV=%s preDesiredCeph=%s)\n' "${hopChannel}" "${previousCsv:-<none>}" "${preDesiredCeph:-<none>}" >&2
-    oc --kubeconfig="${KUBECONFIG}" patch subscription.operators.coreos.com "${ODF_SUBSCRIPTION_NAME}" \
+    fromChannel="$(oc --kubeconfig="${KUBECONFIG}" \
+        get subscription.operators.coreos.com "${ODF_SUBSCRIPTION_NAME}" \
         -n "${ODF_INSTALL_NAMESPACE}" \
-        --type merge \
-        -p "$(jq -cn --arg ch "${hopChannel}" '{"spec":{"channel":$ch}}')"
-    WaitCsvUpgraded "${previousCsv}"
+        -o jsonpath='{.spec.channel}')"
+    [[ -n "${fromChannel}" ]] \
+        || { printf 'FATAL: odf-operator subscription has no spec.channel\n' >&2; false; }
+    printf 'INFO: Hub ODF hop → %s (from channel=%s installedCSV=%s preDesiredCeph=%s)\n' \
+        "${hopChannel}" "${fromChannel}" "${previousCsv:-<none>}" "${preDesiredCeph:-<none>}" >&2
+    AlignOdfChannelsForHop "${KUBECONFIG}" "${fromChannel}" "${hopChannel}"
+    WaitCsvUpgraded "${previousCsv}" "${fromChannel}"
     # Record the new CSV as baseline for the next hop before checking StorageCluster.
     previousCsv="$(oc --kubeconfig="${KUBECONFIG}" \
         get subscription.operators.coreos.com "${ODF_SUBSCRIPTION_NAME}" \

@@ -18,11 +18,17 @@ ref:
     succeeds. Two EUS hops are 7h worst-case, plus must-gather/diagnostics. 8h is the
     ceiling that covers that budget.
 
-    Iterates ODF_UPGRADE_CHANNEL_HOPS (comma-separated, e.g. "stable-4.21,stable-4.22"),
-    patching the odf-operator Subscription channel at each hop, waiting for OLM to detect
-    the channel change and install the new CSV (Succeeded), then waiting for StorageCluster
-    status.images actualImage to equal desiredImage (and status.version to match the hop)
-    and NooBaa to return to Ready before moving to the next hop.
+    Iterates ODF_UPGRADE_CHANNEL_HOPS (comma-separated, e.g. "stable-4.21,stable-4.22").
+    Each hop first rewrites the odf-operator pkgs ConfigMap (deployment env
+    PKGS_CONFIG_MAP_NAME) so records still on the pre-hop channel point at the hop
+    channel, then patches Subscriptions still on that pre-hop channel (odf-operator and
+    dependencies such as odf-csi-addons-operator). The running operator copies ConfigMap
+    channels back onto dependency Subscriptions; leaving the ConfigMap on the old channel
+    makes that write-back restore stable-4.20 and OLM reports ConstraintsNotSatisfiable
+    once the refreshed catalog no longer contains it. The step then waits for OLM to
+    install the new CSV (Succeeded), then for StorageCluster status.images actualImage
+    to equal desiredImage (and status.version to match the hop) and NooBaa to return to
+    Ready before the next hop.
 
     ODF's OLM upgrade graph requires sequential hops. Jumping directly from stable-4.20 to
     stable-4.22 leaves OLM without an install-plan edge and the installedCSV never changes.
@@ -39,8 +45,9 @@ ref:
     default: ""
     documentation: |-
       Comma-separated ordered list of ODF Subscription channels to upgrade through
-      (e.g. "stable-4.21,stable-4.22"). Each hop patches the Subscription, waits for the
-      new CSV to reach Succeeded, then waits for StorageCluster operand images to converge
+      (e.g. "stable-4.21,stable-4.22"). Each hop retargets the pkgs ConfigMap and every
+      Subscription still on the pre-hop channel, waits for the new CSV to reach Succeeded,
+      then waits for StorageCluster operand images to converge
       (actualImage == desiredImage, version matching the hop) and NooBaa Ready before the
       next hop. Required — step fails if empty.
   - name: ODF_INSTALL_NAMESPACE
