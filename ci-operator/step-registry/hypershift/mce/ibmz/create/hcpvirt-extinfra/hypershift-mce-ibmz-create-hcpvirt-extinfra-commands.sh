@@ -76,6 +76,12 @@ else
 fi
 echo "$(date) Fixed NodePort for lease ${MGMT_CLUSTER_LEASE}: ${FIXED_NODEPORT}"
 
+# Render the HCP manifests so we can patch the kube-apiserver Service before
+# applying. Pinning type=NodePort + nodePort=FIXED_NODEPORT at manifest time
+# ensures the service is correct from the first apply — haproxy on the LPAR
+# forwards FIXED_NODEPORT to the kube-apiserver pod, and infra VMIs reach the
+# kube-apiserver via MGMT_HOST_IP:FIXED_NODEPORT through the LPAR NAT gateway.
+HC_MANIFEST="/tmp/hcp-kubevirt-manifests.yaml"
 hcp create cluster kubevirt \
   --name ${HC_NAME} \
   --node-pool-replicas 2 \
@@ -92,16 +98,53 @@ hcp create cluster kubevirt \
   --release-image ${OCP_IMAGE_MULTI} \
   --annotations "resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m" \
   --annotations "resource-request-override.hypershift.openshift.io/kube-scheduler.kube-scheduler=memory=512Mi,cpu=500m" \
-  --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m"
+  --annotations "resource-request-override.hypershift.openshift.io/kube-controller-manager.kube-controller-manager=memory=1Gi,cpu=1000m" \
+  --render-sensitive --render > "${HC_MANIFEST}"
 
+echo "$(date) Rendered HCP manifests to ${HC_MANIFEST}"
+
+echo "$(date) Patching kube-apiserver Service in manifest: type=NodePort, nodePort=${FIXED_NODEPORT}"
+python3 - "${HC_MANIFEST}" "${FIXED_NODEPORT}" <<'PYEOF'
+import sys, re
+manifest_path = sys.argv[1]
+fixed_nodeport = int(sys.argv[2])
+with open(manifest_path) as f:
+    raw = f.read()
+docs = re.split(r'^---\s*$', raw, flags=re.MULTILINE)
+patched = []
+for doc in docs:
+    is_svc = bool(re.search(r'^\s*kind:\s*Service\s*$', doc, re.MULTILINE))
+    is_kas = bool(re.search(r'^\s*name:\s*(kube-apiserver|APIServer)\s*$', doc, re.MULTILINE))
+    if is_svc and is_kas:
+        doc = re.sub(r'(\btype:\s*)LoadBalancer', r'\1NodePort', doc)
+        doc = re.sub(r'(\btype:\s*)ClusterIP',   r'\1NodePort', doc)
+        if re.search(r'^\s*nodePort:\s*\d+', doc, re.MULTILINE):
+            doc = re.sub(r'(\s*nodePort:\s*)\d+',
+                         lambda m: m.group(1) + str(fixed_nodeport), doc)
+        else:
+            doc = re.sub(r'((\s*)port:\s*6443)',
+                         lambda m: m.group(1) + '\n' + m.group(2) + 'nodePort: ' + str(fixed_nodeport),
+                         doc)
+        print(f"  [patch] kube-apiserver Service: type=NodePort, nodePort={fixed_nodeport}", file=sys.stderr)
+    patched.append(doc)
+with open(manifest_path, 'w') as f:
+    f.write('---'.join(patched))
+PYEOF
+
+echo "$(date) kube-apiserver Service after manifest patch:"
+python3 -c "
+import re, sys
+raw = open(sys.argv[1]).read()
+for doc in re.split(r'^---[ \t]*$', raw, flags=re.MULTILINE):
+    if re.search(r'kind:[ \t]*Service', doc) and re.search(r'name:[ \t]*(kube-apiserver|APIServer)', doc):
+        print(doc)
+" "${HC_MANIFEST}" || true
+
+echo "$(date) Applying HCP manifests"
+oc apply -f "${HC_MANIFEST}"
 echo "$(date) HCP cluster created"
 
-# --- Pin the kube-apiserver Service NodePort to FIXED_NODEPORT ---
-# HyperShift creates a LoadBalancer Service named "kube-apiserver" in the
-# control-plane namespace (HC_NS-HC_NAME) shortly after the HostedCluster is
-# applied. We wait for it to appear, then patch its port entry to the fixed
-# NodePort that haproxy on the LPAR has pre-configured. MetalLB continues to
-# manage the VIP; only the nodePort field is pinned.
+# --- Wait for kube-apiserver Service and print full YAML for debugging ---
 KAPI_SVC_NS="${HC_NS}-${HC_NAME}"
 KAPI_SVC_NAME="kube-apiserver"
 
@@ -120,13 +163,11 @@ if ! oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" &>/dev/null; then
   exit 1
 fi
 
-echo "$(date) Patching ${KAPI_SVC_NAME} port[0].nodePort → ${FIXED_NODEPORT}"
-oc patch svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" --type=json \
-  -p "[{\"op\":\"replace\",\"path\":\"/spec/ports/0/nodePort\",\"value\":${FIXED_NODEPORT}}]"
-echo "$(date) NodePort pinned to ${FIXED_NODEPORT} on Service ${KAPI_SVC_NAME}"
+echo "$(date) DEBUG: kube-apiserver Service (full YAML) in ${KAPI_SVC_NS}:"
+oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" -o yaml || true
 
-echo "$(date) DEBUG: Sleeping 40 minutes after hcp create to let HC and NodePool settle"
-sleep 2400
+echo "$(date) DEBUG: Sleeping 2 hours after hcp create to let HC, NodePool, and infra VMIs settle"
+sleep 7200
 
 echo "$(date) DEBUG: Management cluster state after 40m sleep"
 oc get no || true
