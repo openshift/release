@@ -23,20 +23,6 @@ if [[ -n "${ALLOWED_LOCATIONS:-}" ]]; then
     slot_manager_args+=(--allowed-locations "${ALLOWED_LOCATIONS}")
 fi
 
-if [[ -n "${LOCATION_WEIGHTS:-}" ]]; then
-    slot_manager_args+=(--location-weights "${LOCATION_WEIGHTS}")
-fi
-
-if [[ -n "${BUILD_ID:-}" ]]; then
-    slot_manager_args+=(--build-id "${BUILD_ID}")
-fi
-
-# Highest-precedence region pin for runtime-selected pools; slot-manager acquire
-# reads MULTISTAGE_PARAM_OVERRIDE_LOCATION from the environment.
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
-    export MULTISTAGE_PARAM_OVERRIDE_LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
-fi
-
 if [[ -n "${ARO_HCP_SLOT_MANAGER_MAX_WAIT_FOR_LEASE:-}" ]]; then
     slot_manager_args+=(--max-wait-for-lease "${ARO_HCP_SLOT_MANAGER_MAX_WAIT_FOR_LEASE}")
 fi

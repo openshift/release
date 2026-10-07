@@ -17,10 +17,6 @@ if [[ -n "${SELECTED_LOCATION:-}" ]]; then
     export LOCATION="${SELECTED_LOCATION}"
 fi
 
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
-    export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
-fi
-
 : "${LOCATION:?LOCATION must be set directly, via Gangway override, or by SELECTED_LOCATION in the runtime slot export file}"
 
 export AZURE_TOKEN_CREDENTIALS=prod

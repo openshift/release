@@ -15,10 +15,6 @@ source "${env_file}"
 export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
 : "${LOCATION:?LOCATION must be provided by SELECTED_LOCATION or the legacy runtime slot export file}"
 
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
-    export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
-fi
-
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
