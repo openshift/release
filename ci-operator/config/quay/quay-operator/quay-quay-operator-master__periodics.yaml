@@ -104,6 +104,22 @@ tests:
     test:
     - ref: quay-test-chainsaw
     workflow: ipi-aws
+- as: e2e-sts
+  cron: 0 18 * * 0
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    post:
+    - ref: quay-gather
+    - chain: ipi-aws-post-manual-oidc-sts
+    - ref: quay-sts-cleanup
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
+    - ref: quay-sts-provision
+    - ref: quay-sts-install
+    test:
+    - ref: quay-sts-test
 zz_generated_metadata:
   branch: master
   org: quay
