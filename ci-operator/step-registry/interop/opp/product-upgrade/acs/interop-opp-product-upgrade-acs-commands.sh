@@ -276,10 +276,14 @@ function ValidateAcsHealth () {
     echo "Validating ACS health post-upgrade..."
 
     typeset centralNs
-    centralNs="$(oc get central -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)"
+    if ! centralNs="$(oc get central -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)"; then
+        echo >&2 "ERROR: Unable to query required Central CR"
+        return 1
+    fi
 
     if [[ -z "${centralNs}" ]]; then
-        echo "WARNING: No Central CR found; skipping Central validation"
+        echo >&2 "ERROR: No required Central CR found; cannot validate ACS application health"
+        return 1
     else
         typeset centralStatus
         centralStatus="$(oc get central -n "${centralNs}" \
@@ -307,10 +311,14 @@ function ValidateAcsHealth () {
     fi
 
     typeset scNs
-    scNs="$(oc get securedcluster -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)"
+    if ! scNs="$(oc get securedcluster -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)"; then
+        echo >&2 "ERROR: Unable to query required SecuredCluster CR"
+        return 1
+    fi
 
     if [[ -z "${scNs}" ]]; then
-        echo "WARNING: No SecuredCluster CR found; skipping SecuredCluster validation"
+        echo >&2 "ERROR: No required SecuredCluster CR found; cannot validate ACS application health"
+        return 1
     else
         typeset scStatus
         scStatus="$(oc get securedcluster -n "${scNs}" \
