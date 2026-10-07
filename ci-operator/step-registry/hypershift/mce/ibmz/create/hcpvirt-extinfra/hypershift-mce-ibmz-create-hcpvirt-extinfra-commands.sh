@@ -197,6 +197,30 @@ fi
 echo "$(date) DEBUG: kube-apiserver Service (full YAML) in ${KAPI_SVC_NS}:"
 oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" -o yaml || true
 
+# Verify the three things we need:
+#   1. type == NodePort
+#   2. nodePort == FIXED_NODEPORT
+#   3. an external-IP or loadBalancerIP is NOT set (confirming it's not LoadBalancer)
+SVC_TYPE=$(oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" \
+  -o jsonpath='{.spec.type}' 2>/dev/null || true)
+SVC_NODEPORT=$(oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" \
+  -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || true)
+SVC_EXTIP=$(oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+
+echo "$(date) kube-apiserver Service checks:"
+echo "  spec.type      = ${SVC_TYPE}     (want: NodePort)"
+echo "  spec.nodePort  = ${SVC_NODEPORT} (want: ${FIXED_NODEPORT})"
+echo "  LB ingress IP  = ${SVC_EXTIP:-<none>}  (want: <none>)"
+
+if [[ "${SVC_TYPE}" == "NodePort" && "${SVC_NODEPORT}" == "${FIXED_NODEPORT}" ]]; then
+  echo "$(date) ✓ kube-apiserver Service is NodePort:${FIXED_NODEPORT} — haproxy on ${MGMT_HOST_IP} will forward correctly"
+else
+  echo "$(date) WARNING: kube-apiserver Service is NOT the expected NodePort:${FIXED_NODEPORT}"
+  echo "$(date)   Got type=${SVC_TYPE}, nodePort=${SVC_NODEPORT}"
+  echo "$(date)   Check that HostedCluster spec.services[APIServer] was patched correctly in the manifest"
+fi
+
 echo "$(date) DEBUG: Sleeping 2 hours after hcp create to let HC, NodePool, and infra VMIs settle"
 sleep 7200
 
