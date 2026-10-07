@@ -41,7 +41,7 @@ function show_multiclusterhub_related_objects {
   echo "### $(date) ###"
   echo
   set -x
-  oc get clusterversions,node,mcp,co,operators || echo
+  oc get clusterversions,mcp,co,operators || echo
   oc get subscriptions.operators.coreos.com -A || echo
   oc get ClusterManagementAddOn || echo
   oc get operator advanced-cluster-management.open-cluster-management -oyaml || echo
