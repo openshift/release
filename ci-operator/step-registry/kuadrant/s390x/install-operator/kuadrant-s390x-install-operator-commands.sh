@@ -45,6 +45,56 @@ approve_installplan_for_csv() {
   [[ "${approved}" == "true" ]] || { echo "ERROR: no install plan found for ${csv_name} in ${ns}" >&2; return 1; }
 }
 
+# Merge Vault Quay robot creds into the cluster pull-secret and create a
+# dockerconfig Secret for CatalogSource.spec.secrets. Do not echo username or
+# password; disable tracing while they are in memory.
+apply_kuadrant_quay_pull_secret() {
+  local ns="$1"
+  local user_file="${QUAY_CREDS_DIR}/username"
+  local pass_file="${QUAY_CREDS_DIR}/password"
+  local pull_secret_name="kuadrant-qe-rhcl-prerelease-pull"
+  if [[ ! -f "${user_file}" || ! -f "${pass_file}" ]]; then
+    echo "ERROR: Quay pull credentials missing under ${QUAY_CREDS_DIR} (need username and password)." >&2
+    echo "Vault secret kuadrant-qe-rhcl-prerelease-pull may not have synced to test-credentials." >&2
+    return 1
+  fi
+
+  echo "=== Merging Kuadrant QE Quay credentials into cluster pull-secret ==="
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x # Disable tracing due to password handling
+
+  local user pass auth
+  user="$(tr -d '\n' < "${user_file}")"
+  pass="$(tr -d '\n' < "${pass_file}")"
+  auth="$(printf '%s:%s' "${user}" "${pass}" | base64 -w 0)"
+
+  oc get secret pull-secret -n openshift-config -o json \
+    | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
+  jq --arg auth "${auth}" '
+    .auths["quay.io"] = {"auth":$auth,"email":""}
+    | .auths["quay.io/kuadrant/qe-rhcl-prerelease-images"] = {"auth":$auth,"email":""}
+  ' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
+  mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
+  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
+
+  jq -n --arg auth "${auth}" '{
+    auths: {
+      "quay.io": {"auth":$auth,"email":""},
+      "quay.io/kuadrant/qe-rhcl-prerelease-images": {"auth":$auth,"email":""}
+    }
+  }' > /tmp/kuadrant-quay-auth.json
+  oc create secret generic "${pull_secret_name}" \
+    -n "${ns}" \
+    --type=kubernetes.io/dockerconfigjson \
+    --from-file=.dockerconfigjson=/tmp/kuadrant-quay-auth.json \
+    --dry-run=client -o yaml | oc apply -f -
+
+  rm -f /tmp/global-pull-secret.json /tmp/global-pull-secret.json.tmp /tmp/kuadrant-quay-auth.json
+  unset user pass auth
+  $WAS_TRACING && set -x
+  echo "Created ${ns}/${pull_secret_name} for CatalogSource image pulls"
+}
+
 echo "=== Installing cert-manager operator ==="
 cat <<EOF | oc apply -f -
 apiVersion: v1
@@ -84,6 +134,7 @@ if [[ -n "${KUADRANT_CATALOG_SOURCE_IMAGE}" ]]; then
   echo "=== Creating upstream Kuadrant grpc CatalogSource ==="
   KUADRANT_SOURCE="kuadrant-operator-catalog"
   KUADRANT_SOURCE_NS="${KUADRANT_NAMESPACE}"
+  apply_kuadrant_quay_pull_secret "${KUADRANT_SOURCE_NS}"
   cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -95,17 +146,30 @@ spec:
   image: ${KUADRANT_CATALOG_SOURCE_IMAGE}
   displayName: Kuadrant Operators
   publisher: grpc
+  secrets:
+  - kuadrant-qe-rhcl-prerelease-pull
   updateStrategy:
     registryPoll:
       interval: 45m
 EOF
   echo "Waiting for CatalogSource ${KUADRANT_SOURCE} to be READY ..."
+  catalog_ready=false
   for _ in $(seq 1 60); do
     state="$(oc get catalogsource "${KUADRANT_SOURCE}" -n "${KUADRANT_SOURCE_NS}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)"
     echo "  state: ${state:-<none>}"
-    [[ "${state}" == "READY" ]] && break
+    if [[ "${state}" == "READY" ]]; then
+      catalog_ready=true
+      break
+    fi
     sleep 10
   done
+  if [[ "${catalog_ready}" != "true" ]]; then
+    echo "ERROR: CatalogSource ${KUADRANT_SOURCE} did not become READY" >&2
+    oc get catalogsource "${KUADRANT_SOURCE}" -n "${KUADRANT_SOURCE_NS}" -o yaml >&2 || true
+    oc get pods -n "${KUADRANT_SOURCE_NS}" -o wide >&2 || true
+    oc get events -n "${KUADRANT_SOURCE_NS}" --sort-by='.lastTimestamp' >&2 || true
+    exit 1
+  fi
 else
   echo "=== Using downstream operator catalog ${KUADRANT_SOURCE} (${KUADRANT_SOURCE_NS}) ==="
 fi

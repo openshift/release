@@ -11,6 +11,10 @@ ref:
       cpu: 100m
       memory: 200Mi
   timeout: 40m0s
+  credentials:
+  - namespace: test-credentials
+    name: kuadrant-qe-rhcl-prerelease-pull
+    mount_path: /var/run/secrets/kuadrant-quay
   env:
   - name: KUADRANT_NAMESPACE
     default: "kuadrant-system"
@@ -29,13 +33,21 @@ ref:
     default: "stable-v1"
     documentation: |-
       Subscription channel for the cert-manager operator.
+  - name: QUAY_CREDS_DIR
+    default: "/var/run/secrets/kuadrant-quay"
+    documentation: |-
+      Mount of Vault secret kuadrant-qe-rhcl-prerelease-pull (keys: username,
+      password). Used to pull the private qe-rhcl-prerelease-images catalog
+      and to merge those creds into openshift-config/pull-secret.
   - name: KUADRANT_CATALOG_SOURCE_IMAGE
     default: ""
     documentation: |-
       Optional grpc CatalogSource image for upstream Kuadrant (quay.io/kuadrant/…).
       When set, a CatalogSource named "kuadrant-operator-catalog" is created in
-      KUADRANT_NAMESPACE. Leave empty for downstream RHCL from redhat-operators
-      (recommended; matches rhcl-mc1 after migration).
+      KUADRANT_NAMESPACE. Private indexes (qe-rhcl-prerelease-images) require
+      the Vault pull secret mounted at QUAY_CREDS_DIR. Leave empty for
+      downstream RHCL from redhat-operators (recommended; matches rhcl-mc1
+      after migration).
   - name: KUADRANT_CATALOG_SOURCE
     default: "redhat-operators"
     documentation: |-
@@ -102,7 +114,9 @@ ref:
   documentation: |-
     Installs cert-manager and the RHCL operator (rhcl-operator from a custom grpc
     catalog image, or from redhat-operators when KUADRANT_CATALOG_SOURCE_IMAGE is
-    empty) on a provisioned s390x OCP cluster. With RHCL_STARTING_CSV empty, OLM
+    empty) on a provisioned s390x OCP cluster. Private catalog images are pulled
+    with Vault secret kuadrant-qe-rhcl-prerelease-pull (merged into the cluster
+    pull-secret and CatalogSource.spec.secrets). With RHCL_STARTING_CSV empty, OLM
     installs the channel head from that catalog. Optionally sets
     RELATED_IMAGE_WASMSHIM via Subscription config.env and/or overrides the manager
     image when those env vars are non-empty. Ensures DNS is Available before any
