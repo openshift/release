@@ -55,7 +55,7 @@ echo "Emptying the compute pool..."
 python -c '
 import yaml;
 path = "install-config.yaml";
-data = yaml.load(open(path));
+data = yaml.load(open(path), Loader=yaml.SafeLoader);
 data["compute"][0]["replicas"] = 0;
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
@@ -69,7 +69,7 @@ if [[ -v IS_XPN ]]; then
   python -c '
 import yaml;
 path = "install-config.yaml";
-data = yaml.load(open(path));
+data = yaml.load(open(path), Loader=yaml.SafeLoader);
 data["publish"] = "Internal";
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 fi
@@ -110,7 +110,7 @@ echo "Making control-plane nodes unschedulable..."
 python -c '
 import yaml;
 path = "manifests/cluster-scheduler-02-config.yml";
-data = yaml.load(open(path));
+data = yaml.load(open(path), Loader=yaml.SafeLoader);
 data["spec"]["mastersSchedulable"] = False;
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
@@ -120,7 +120,7 @@ if [[ -v IS_XPN ]]; then
   python -c '
 import yaml;
 path = "manifests/cluster-dns-02-config.yml";
-data = yaml.load(open(path));
+data = yaml.load(open(path), Loader=yaml.SafeLoader);
 del data["spec"]["privateZone"];
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 fi
@@ -137,7 +137,7 @@ if [[ -v IS_XPN ]] && [[ ${origin_publish} = "External" ]]; then
   python -c '
 import yaml;
 path = "manifests/cluster-ingress-default-ingresscontroller.yaml";
-data = yaml.load(open(path));
+data = yaml.load(open(path), Loader=yaml.SafeLoader);
 data["spec"]["endpointPublishingStrategy"]["loadBalancer"]["scope"] = "External";
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 fi
