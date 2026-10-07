@@ -155,7 +155,7 @@ def test_jinja_renders_ocp_version() -> None:
     assert rendered["releases"]["latest"]["candidate"]["architecture"] == "amd64"
     assert rendered["releases"]["latest"]["candidate"]["version"] == "4.22"
     assert rendered["zz_generated_metadata"]["variant"] == "aws-ocp422-e2e-install"
-    assert rendered["prowgen"]["enable_secrets_store_csi_driver"] is True
+    assert "prowgen" not in rendered
 
 
 def test_e2e_install_template_inverts_full_default_filter() -> None:
