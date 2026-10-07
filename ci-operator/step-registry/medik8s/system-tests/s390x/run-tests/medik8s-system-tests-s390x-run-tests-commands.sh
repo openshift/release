@@ -140,7 +140,7 @@ EOF
       echo "--- direct bastion login test ---" >&2
       /usr/bin/ssh -vvv -p "${port}" -i "${bastion_key_dst}" \
         -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        -o ConnectTimeout=10 "core@${host}" 'echo bastion-ok; hostname' >&2 || true
+        -o ConnectTimeout=10 "core@${host}" 'echo bastion-ok; id -un' >&2 || true
       return 1
     fi
     echo "Bastion SSH verification succeeded"

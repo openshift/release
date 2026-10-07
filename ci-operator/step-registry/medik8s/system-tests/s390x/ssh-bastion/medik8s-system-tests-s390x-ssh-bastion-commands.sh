@@ -317,7 +317,7 @@ login_ok=false
 for _ in $(seq 1 5); do
   if ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -p 12222 -i "${SHARED_DIR}/medik8s_bastion_ssh_key" \
-      core@127.0.0.1 'echo bastion-login-ok; hostname'; then
+      core@127.0.0.1 'echo bastion-login-ok; id -un'; then
     login_ok=true
     break
   fi
