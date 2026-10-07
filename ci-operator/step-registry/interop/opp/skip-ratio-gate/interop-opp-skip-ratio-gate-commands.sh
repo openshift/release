@@ -30,12 +30,31 @@ def parse_junit(path):
     Handles both <testsuites> (wrapper) and bare <testsuite> roots.
     Returns a list of dicts with keys: name, tests, passed, failed,
     skipped, errored.
+
+    Robust parsing (INTEROP-9527):
+    - Empty files are reported as parse failures
+    - Testcase child elements are counted and used to cross-validate
+      the ``tests`` attribute; when the attribute is absent or zero
+      but testcases exist, the count is derived from the children.
+      Suites that declare more tests than they contain are rejected
+      as incomplete evidence
+    - Failure/skipped child elements are counted directly for accuracy
     """
     suites = []
+
+    # Guard: empty or effectively-empty files
+    try:
+        if path.stat().st_size == 0:
+            global _parse_failures
+            _parse_failures += 1
+            print(f"WARNING: skipping {path} — file is empty", file=sys.stderr)
+            return suites
+    except OSError:
+        pass
+
     try:
         tree = ET.parse(path)
     except ET.ParseError as exc:
-        global _parse_failures
         _parse_failures += 1
         print(f"WARNING: skipping {path} — XML parse error: {exc}", file=sys.stderr)
         return suites
@@ -52,18 +71,40 @@ def parse_junit(path):
         return suites
 
     for ts in suite_elements:
-        tests = int(ts.get("tests", 0))
+        testcases = ts.findall("testcase")
+        tc_count = len(testcases)
+
+        # Cross-validate: derive a missing count from testcase children,
+        # but reject suites whose declared count includes missing cases.
+        tests_attr = int(ts.get("tests", 0))
+        if tests_attr > tc_count:
+            _parse_failures += 1
+            suite_name = ts.get("name", path.name)
+            print(
+                f"WARNING: skipping suite {suite_name!r} in {path} — "
+                f"declares tests={tests_attr} but contains only "
+                f"{tc_count} <testcase> child element(s)",
+                file=sys.stderr,
+            )
+            continue
+        tests = max(tests_attr, tc_count)
+
         failures = int(ts.get("failures", 0))
         errors = int(ts.get("errors", 0))
         skipped_attr = int(ts.get("skipped", ts.get("skip", 0)))
 
         # Some generators omit the skipped attribute but include
         # <skipped/> child elements inside <testcase>.
-        if skipped_attr == 0:
-            skipped_attr = sum(
-                1 for tc in ts.findall("testcase")
-                if tc.find("skipped") is not None
-            )
+        skipped_from_children = sum(
+            1 for tc in testcases if tc.find("skipped") is not None
+        )
+        skipped_attr = max(skipped_attr, skipped_from_children)
+
+        # Cross-validate failure count from children too
+        failures_from_children = sum(
+            1 for tc in testcases if tc.find("failure") is not None
+        )
+        failures = max(failures, failures_from_children)
 
         passed = max(0, tests - failures - errors - skipped_attr)
 
@@ -144,7 +185,10 @@ def main():
         or (shared_dir if shared_dir and any(Path(shared_dir).rglob("*.xml")) else "")
         or os.environ.get("ARTIFACT_DIR", "")
     )
-    fail_on_breach = os.environ.get("FAIL_ON_BREACH", "true").lower() != "false"
+    # Default matches the ref.yaml default ("false" = advisory-only mode).
+    # ci-operator sets the env var from the YAML default, but aligning the
+    # Python fallback avoids surprises when running the script standalone.
+    fail_on_breach = os.environ.get("FAIL_ON_BREACH", "false").lower() != "false"
     artifact_dir = os.environ.get("ARTIFACT_DIR", junit_dir)
 
     if not junit_dir:
@@ -175,7 +219,7 @@ def main():
         all_suites.extend(parse_junit(xf))
 
     if _parse_failures:
-        reason = f"{_parse_failures} JUnit XML file(s) could not be parsed"
+        reason = f"{_parse_failures} JUnit parse/validation failure(s)"
         print(f"EVIDENCE-INCOMPLETE: {reason}", file=sys.stderr)
         write_evidence_incomplete_junit(artifact_dir, threshold, reason)
         sys.exit(0)
