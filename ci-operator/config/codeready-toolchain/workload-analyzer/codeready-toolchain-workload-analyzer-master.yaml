@@ -3,6 +3,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: base
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
@@ -11,6 +15,9 @@ images:
   - dockerfile_path: test/e2e/alertmanager-mock/build/Dockerfile
     from: base
     to: alertmanager-mock
+  - dockerfile_path: openshift-ci/build/Dockerfile.openshift-ci-vm
+    from: nested-podman
+    to: e2e-vm-test
   - dockerfile_path: openshift-ci/build/Dockerfile.openshift-ci
     from: base
     to: workload-analyzer
@@ -39,6 +46,10 @@ resources:
     requests:
       cpu: "2"
       memory: 8Gi
+  e2e-vm-test:
+    requests:
+      cpu: "1"
+      memory: 2Gi
 tests:
 - as: e2e
   skip_if_only_changed: .*pkg/rules/rulesets/.*|^\.github/|\.[mM][dD]$|^\.gitignore$|^\.govulncheck\.yaml$|^OWNERS$|^LICENSE$
@@ -69,10 +80,6 @@ tests:
   - nested-podman
   commands: |
     set -euo pipefail
-    yum install -y openssl openssh-clients podman
-    curl -L -s https://hyperconverged-cluster-cli-download-openshift-cnv.apps.rm1.0a51.p1.openshiftapps.com/amd64/linux/virtctl.tar.gz -o /tmp/virtctl.tar.gz
-    tar xzf /tmp/virtctl.tar.gz -C /tmp
-    install -m 0755 /tmp/virtctl /usr/local/bin/virtctl
     virtctl version --client
     secret_dir=/usr/local/vm-e2e-secrets
     for key in ssh-privatekey test-kubeconfig controller-kubeconfig; do
@@ -83,10 +90,6 @@ tests:
     cp -L "${secret_dir}/test-kubeconfig" /tmp/vm-test-kubeconfig
     cp -L "${secret_dir}/controller-kubeconfig" /tmp/vm-controller-kubeconfig
     chmod 600 /tmp/vm-test-ssh-key /tmp/vm-test-kubeconfig /tmp/vm-controller-kubeconfig
-    export HOME=/tmp
-    export XDG_CONFIG_HOME="${HOME}/.config"
-    mkdir -p "${XDG_CONFIG_HOME}/containers"
-    printf '%s\n' 'unqualified-search-registries = ["registry.access.redhat.com", "registry.redhat.io", "docker.io"]' 'short-name-mode = "permissive"' > "${XDG_CONFIG_HOME}/containers/registries.conf"
     export VM_TEST_VIRTCTL_PATH=/usr/local/bin/virtctl
     export VM_TEST_SSH_KEY_PATH=/tmp/vm-test-ssh-key
     export VM_TEST_KUBECONFIG_PATH=/tmp/vm-test-kubeconfig
@@ -94,7 +97,7 @@ tests:
     export VM_TEST_NAMESPACE=devsandbox-wa-test-u-dev
     make test-e2e-vm
   container:
-    from: src
+    from: e2e-vm-test
   max_concurrency: 1
   nested_podman: true
   secrets:
