@@ -206,17 +206,18 @@ spec:
         - -ec
         - |
           echo "Installing openssh-server on $(uname -m)..."
-          dnf install -y --setopt=install_weak_deps=False openssh-server openssh-clients
+          # shadow-utils provides useradd/usermod; passwd is not in the minimal image.
+          dnf install -y --setopt=install_weak_deps=False \
+            openssh-server openssh-clients shadow-utils
           mkdir -p /var/run/sshd /var/empty/sshd
           cp /ssh-host-keys/ssh_host_rsa_key /ssh-host-keys/ssh_host_ecdsa_key \
             /ssh-host-keys/ssh_host_ed25519_key /ssh-host-keys/sshd_config /etc/ssh/
           chmod 600 /etc/ssh/ssh_host_*_key
           chmod 644 /etc/ssh/sshd_config
-          # useradd locks the account (!! in shadow). With PAM enforced, pubkey
-          # auth then fails with "User core not allowed because account is locked".
+          # useradd locks the account (!! in shadow). PAM then rejects pubkey
+          # with "account is locked". '*' = no password, account not locked.
           id -u core >/dev/null 2>&1 || useradd -m -u 1000 -s /bin/bash core
-          passwd -d core
-          usermod -U core
+          usermod -p '*' core
           mkdir -p /home/core/.ssh
           cp /ssh-authorized-keys/authorized_keys /home/core/.ssh/authorized_keys
           chown -R core:core /home/core
