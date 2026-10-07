@@ -13,7 +13,7 @@ set -euo pipefail
 NS="${ODF__INSTALL_NAMESPACE}"
 
 # DumpCephFSDiag — on failure, capture why CephFS CSI is absent/unusable to ARTIFACT_DIR.
-# The CephFS CSI plugin daemonset is only created once a CephFilesystem (MDS) exists, so the
+# The CephFS CSI plugin daemonset is only Ready once a CephFilesystem (MDS) is serving, so the
 # filesystem/MDS state and rook-ceph-operator log are the primary root-cause signals; the
 # StorageCluster status shows why Available was met without CephFS. Without this, the gate
 # fails before any cluster-state collection runs, leaving the failure cause uncaptured.
@@ -35,12 +35,16 @@ DumpCephFSDiag() {
     true
 }
 
+# The CephFS CSI node plugin daemonset is named after the driver (<namespace>.cephfs.csi.ceph.com-nodeplugin)
+# by the Ceph CSI operator; it matches the StorageClass provisioner discovered below.
+CEPHFS_NODEPLUGIN_DS="${NS}.cephfs.csi.ceph.com-nodeplugin"
+
 echo "INFO: Verifying CephFS CSI plugin pods are Ready in ${NS}"
-if ! oc rollout status daemonset/csi-cephfsplugin -n "${NS}" \
+if ! oc rollout status "daemonset/${CEPHFS_NODEPLUGIN_DS}" -n "${NS}" \
     --timeout="${ODF__CEPHFS_CSI_WAIT_TIMEOUT}"; then
-    echo "ERROR: CephFS CSI node plugin (daemonset/csi-cephfsplugin) is not Ready in ${NS}." >&2
+    echo "ERROR: CephFS CSI node plugin (daemonset/${CEPHFS_NODEPLUGIN_DS}) is not Ready in ${NS}." >&2
     echo "ODF reports the StorageCluster up but CephFS CSI is unavailable; failing before tests run." >&2
-    oc get pods -n "${NS}" -l app=csi-cephfsplugin -o wide >&2 || true
+    oc get pods -n "${NS}" -l "app=${CEPHFS_NODEPLUGIN_DS}" -o wide >&2 || true
     DumpCephFSDiag
     exit 1
 fi
