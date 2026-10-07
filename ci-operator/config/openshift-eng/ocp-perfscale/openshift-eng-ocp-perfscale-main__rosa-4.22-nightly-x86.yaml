@@ -3,6 +3,10 @@ base_images:
     name: ocm-cli
     namespace: ci
     tag: latest
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -58,6 +62,178 @@ tests:
     test:
     - chain: openshift-qe-build-farm
     - ref: openshift-qe-orion
+    - as: capture-prometheus-dump
+      cli: latest
+      commands: |
+        echo "Capturing Prometheus dump..."
+        PROMDIR="${ARTIFACT_DIR}/metrics"
+        mkdir -p "${PROMDIR}"
+        prometheus="$(oc get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name)" || true
+        if [[ -n "${prometheus}" ]]; then
+          echo "${prometheus}" | while read prompod; do
+            prompod=${prompod#"pod/"}
+            FILE_NAME="${prompod}"
+            if [[ "$prompod" == *-0 ]]; then
+              FILE_NAME="prometheus"
+            fi
+            echo "Snapshotting prometheus from ${prompod} as ${FILE_NAME} (may take 15s)..."
+            oc exec -n openshift-monitoring "${prompod}" -- tar cvzf - -C /prometheus . > "${PROMDIR}/${FILE_NAME}.tar.gz" || true
+            echo "Collecting prometheus metadata from ${prompod}..."
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'" | gzip > "${PROMDIR}/${FILE_NAME}-target-metadata.json.gz" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config" | gzip > "${PROMDIR}/${FILE_NAME}-config.json.gz" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb" > "${PROMDIR}/${FILE_NAME}-tsdb-status.json" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo" > "${PROMDIR}/${FILE_NAME}-runtimeinfo.json" || true
+            oc exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets" > "${PROMDIR}/${FILE_NAME}-targets.json" || true
+          done
+          cat >> "${SHARED_DIR}/custom-links.txt" <<'PROM_LINK'
+        <script>
+        let prom = document.createElement('a');
+        prom.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
+        prom.title="Creates a new prometheus deployment with data from this job run.";
+        prom.innerHTML="PromeCIeus";
+        prom.target="_blank";
+        document.getElementById("wrapper").append(prom);
+        </script>
+        PROM_LINK
+        else
+          echo "Unable to find a Prometheus pod to snapshot."
+        fi
+        echo "Adding Sippy intervals link..."
+        if [[ "${JOB_TYPE:-}" == "presubmit" ]]; then
+          extra_args="${JOB_NAME}/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+        else
+          extra_args="${JOB_NAME:-}"
+        fi
+        cat >> "${SHARED_DIR}/custom-links.txt" << INTERVALS_LINK
+        <a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/${extra_args}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
+        INTERVALS_LINK
+        echo "Prometheus dump complete"
+        ls -lh "${PROMDIR}" || true
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+- always_run: false
+  as: build-farm-114nodes-pprof
+  cron: 0 8 8,22 * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "true"
+      INDEX_ENABLED: "true"
+      MIN_REPLICAS: "18"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.22"
+      REPLICAS: "114"
+    test:
+    - as: build-farm-pprof
+      cli: latest
+      commands: |
+        #!/bin/bash
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        set -x
+
+        # === Create SA and get bearer token for kube-apiserver pprof ===
+        oc create namespace benchmark-operator || true
+        oc create serviceaccount kube-burner -n benchmark-operator || true
+        oc adm policy add-cluster-role-to-user cluster-admin -z kube-burner -n benchmark-operator
+        BEARER_TOKEN=$(oc create token kube-burner -n benchmark-operator --duration=24h)
+        export BEARER_TOKEN
+
+        # === Install Go 1.25.9 ===
+        curl -sL https://go.dev/dl/go1.25.9.linux-amd64.tar.gz | tar -C /tmp -xzf -
+        export PATH="/tmp/go/bin:${PATH}"
+        export GOPATH="/tmp/gopath"
+        mkdir -p "${GOPATH}"
+        go version
+
+        # === Build kube-burner-ocp from fork with pprof targets ===
+        cd /tmp
+        git clone --branch add-kube-apiserver-pprof-targets --depth 1 https://github.com/redhat-chai-bot/kube-burner_kube-burner-ocp.git kube-burner-ocp-src
+        cd kube-burner-ocp-src
+        make build
+        tar czf /tmp/kube-burner-ocp-custom.tar.gz -C bin/amd64 kube-burner-ocp
+        export KUBE_BURNER_URL="file:///tmp/kube-burner-ocp-custom.tar.gz"
+
+        # === Run build-farm workload (replicated from build-farm-commands.sh) ===
+        cat /etc/os-release
+        oc config view
+        oc projects
+        oc version
+        python --version
+        pushd /tmp
+        python -m virtualenv ./venv_qe
+        source ./venv_qe/bin/activate
+
+        ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
+        ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
+        ES_PASSWORD=$(cat "${ES_SECRETS_PATH}/password")
+        ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
+        if [ -e "${ES_SECRETS_PATH}/host" ]; then
+            ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
+        fi
+
+        REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
+        LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
+        TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
+        git clone $REPO_URL $TAG_OPTION --depth 1
+        pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+        export WORKLOAD=build-farm
+
+        export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+
+        ENABLE_LOCAL_INDEX=${ENABLE_LOCAL_INDEX:-false}
+        if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
+            EXTRA_FLAGS+=" --local-indexing"
+        fi
+        PROFILE_TYPE=${PROFILE_TYPE:-both}
+        BUILD_FARM_EXTRA_FLAGS="--alerting=false --job-iterations=80 --set=jobs.2.jobPause=10m"
+        EXTRA_FLAGS+="${BUILD_FARM_EXTRA_FLAGS} --gc-metrics=false --profile-type=${PROFILE_TYPE}"
+        EXTRA_FLAGS+=" --pprof-interval=1m"
+
+        USER_METADATA=${USER_METADATA:-""}
+        if [[ -n "${USER_METADATA}" ]]; then
+          echo "${USER_METADATA}" > user-metadata.yaml
+          EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
+        fi
+        export EXTRA_FLAGS
+        ADDITIONAL_PARAMS=${ADDITIONAL_PARAMS:-'{}'}
+        export ADDITIONAL_PARAMS
+
+        E2E_VERSION=${E2E_VERSION:-default}
+        ./run.sh
+
+        if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
+            metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
+            cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
+        fi
+      credentials:
+      - collection: ocp-perfscale-cpt
+        group: ocp-qe-perfscale-es-creds
+        mount_path: /secret
+      from: ocp-qe-perfscale-ci
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - as: capture-prometheus-dump
       cli: latest
       commands: |
