@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 junit_path, summary_path = sys.argv[1:]
 root = ET.parse(junit_path).getroot()
 cases = [element for element in root.iter()
-         if element.tag in {"testcase", "testcases"} and element.get("name")]
+         if element.tag == "testcase" and element.get("name")]
 
 skips = []
 failures = []
