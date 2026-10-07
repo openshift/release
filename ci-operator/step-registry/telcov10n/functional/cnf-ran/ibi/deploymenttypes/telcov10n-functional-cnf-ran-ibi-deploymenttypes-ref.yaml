@@ -1,0 +1,32 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibi-deploymenttypes
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibi-deploymenttypes-commands.sh
+  timeout: 4h
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: TARGET_CLUSTER_NAME
+    default: ""
+    documentation: Target hub name used to locate its kubeconfig on the target bastion.
+  - name: TARGET_SPOKE_CLUSTER
+    default: "['ibi-target']"
+    documentation: Single target spoke name in the existing list format.
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-all
+    mount_path: /var/group_variables/common/all
+  documentation: |-
+    Restore target inventory, retrieve the target spoke kubeconfig, and prepare
+    deploymenttypes with the existing deploy-run-eco-gotests.yaml playbook.
+    Run the generated launcher without a TTY and collect console logs and reports.
+    Record setup, execution, or collection failure in
+    SHARED_DIR/ibi-deploymenttypes-exit-code and allow later stages to continue.
+    Requires the ibi-deploymenttypes-result post step to fail the final job
+    when this step records a failure.
