@@ -76,11 +76,19 @@ else
 fi
 echo "$(date) Fixed NodePort for lease ${MGMT_CLUSTER_LEASE}: ${FIXED_NODEPORT}"
 
-# Render the HCP manifests so we can patch the kube-apiserver Service before
-# applying. Pinning type=NodePort + nodePort=FIXED_NODEPORT at manifest time
-# ensures the service is correct from the first apply — haproxy on the LPAR
-# forwards FIXED_NODEPORT to the kube-apiserver pod, and infra VMIs reach the
-# kube-apiserver via MGMT_HOST_IP:FIXED_NODEPORT through the LPAR NAT gateway.
+# Render the HCP manifests and patch the HostedCluster spec.services to tell
+# CPO to create the kube-apiserver Service as NodePort with our fixed port.
+# This is the only correct approach — the kube-apiserver Service type is
+# immutable (LoadBalancer → NodePort is rejected by Kubernetes), and CPO
+# reconciles the Service from HostedCluster.spec.services, not from the
+# Service object directly.
+#
+# spec.services[APIServer].servicePublishingStrategy:
+#   type: NodePort
+#   nodePort.address: MGMT_HOST_IP  (LPAR NAT gateway reachable from both bridges)
+#   nodePort.port:    FIXED_NODEPORT (pre-configured in haproxy on the LPAR)
+#
+# CPO will create and maintain the kube-apiserver Service as NodePort:FIXED_NODEPORT.
 HC_MANIFEST="/tmp/hcp-kubevirt-manifests.yaml"
 hcp create cluster kubevirt \
   --name ${HC_NAME} \
@@ -103,57 +111,71 @@ hcp create cluster kubevirt \
 
 echo "$(date) Rendered HCP manifests to ${HC_MANIFEST}"
 
-echo "$(date) Patching kube-apiserver Service in manifest: type=NodePort, nodePort=${FIXED_NODEPORT}"
-python3 - "${HC_MANIFEST}" "${FIXED_NODEPORT}" <<'PYEOF'
+# Patch the HostedCluster document: set APIServer servicePublishingStrategy to
+# NodePort with MGMT_HOST_IP and FIXED_NODEPORT. CPO reads this and creates/
+# maintains the kube-apiserver Service accordingly.
+echo "$(date) Patching HostedCluster spec.services[APIServer] → NodePort ${MGMT_HOST_IP}:${FIXED_NODEPORT}"
+python3 - "${HC_MANIFEST}" "${MGMT_HOST_IP}" "${FIXED_NODEPORT}" <<'PYEOF'
 import sys, re
 manifest_path = sys.argv[1]
-fixed_nodeport = int(sys.argv[2])
+mgmt_host_ip  = sys.argv[2]
+fixed_nodeport = int(sys.argv[3])
+
 with open(manifest_path) as f:
     raw = f.read()
 
-# Split on YAML document separators.  hcp --render outputs '---\n' between
-# every document, sometimes with a bare 'null' document in between.
-# We drop any document that is empty or contains only 'null' after stripping.
+# Split on YAML document separators, skip empty/null docs.
 docs = re.split(r'\n---[ \t]*\n', '\n' + raw)
 patched = []
 for doc in docs:
     if not doc.strip() or doc.strip() == 'null':
         continue
-    is_svc = bool(re.search(r'^\s*kind:\s*Service\s*$', doc, re.MULTILINE))
-    is_kas = bool(re.search(r'^\s*name:\s*(kube-apiserver|APIServer)\s*$', doc, re.MULTILINE))
-    if is_svc and is_kas:
-        doc = re.sub(r'(\btype:\s*)LoadBalancer', r'\1NodePort', doc)
-        doc = re.sub(r'(\btype:\s*)ClusterIP',   r'\1NodePort', doc)
-        if re.search(r'^\s*nodePort:\s*\d+', doc, re.MULTILINE):
-            doc = re.sub(r'(\s*nodePort:\s*)\d+',
-                         lambda m: m.group(1) + str(fixed_nodeport), doc)
-        else:
-            doc = re.sub(r'((\s*)port:\s*6443)',
-                         lambda m: m.group(1) + '\n' + m.group(2) + 'nodePort: ' + str(fixed_nodeport),
-                         doc)
-        print(f"  [patch] kube-apiserver Service: type=NodePort, nodePort={fixed_nodeport}", file=sys.stderr)
+    is_hc = (bool(re.search(r'^\s*kind:\s*HostedCluster\s*$', doc, re.MULTILINE)) and
+             bool(re.search(r'^\s*name:\s*\S+', doc, re.MULTILINE)))
+    if is_hc:
+        # Replace the APIServer servicePublishingStrategy block.
+        # Match:
+        #   - service: APIServer
+        #     servicePublishingStrategy:
+        #       type: <anything>
+        # and replace with NodePort + address + port.
+        replacement = (
+            f'- service: APIServer\n'
+            f'    servicePublishingStrategy:\n'
+            f'      type: NodePort\n'
+            f'      nodePort:\n'
+            f'        address: {mgmt_host_ip}\n'
+            f'        port: {fixed_nodeport}'
+        )
+        doc = re.sub(
+            r'-\s*service:\s*APIServer\s*\n\s*servicePublishingStrategy:\s*\n\s*type:\s*\S+',
+            replacement,
+            doc,
+        )
+        print(f"  [patch] HostedCluster spec.services[APIServer] → NodePort {mgmt_host_ip}:{fixed_nodeport}",
+              file=sys.stderr)
     patched.append(doc.strip('\n'))
 
 with open(manifest_path, 'w') as f:
     f.write('\n---\n'.join(patched) + '\n')
 PYEOF
 
-echo "$(date) kube-apiserver Service after manifest patch:"
+echo "$(date) HostedCluster spec.services after patch:"
 python3 -c "
 import re, sys
 raw = open(sys.argv[1]).read()
 for doc in re.split(r'\n---[ \t]*\n', '\n' + raw):
-    if doc.strip() and doc.strip() != 'null' \
-       and re.search(r'kind:[ \t]*Service', doc) \
-       and re.search(r'name:[ \t]*(kube-apiserver|APIServer)', doc):
-        print(doc)
+    if doc.strip() and re.search(r'kind:[ \t]*HostedCluster', doc):
+        m = re.search(r'services:.*', doc, re.DOTALL)
+        if m:
+            print(doc[m.start():m.start()+400])
 " "${HC_MANIFEST}" || true
 
 echo "$(date) Applying HCP manifests"
 oc apply -f "${HC_MANIFEST}"
 echo "$(date) HCP cluster created"
 
-# --- Wait for kube-apiserver Service and print full YAML for debugging ---
+# Wait for kube-apiserver Service and print it — CPO should create it as NodePort.
 KAPI_SVC_NS="${HC_NS}-${HC_NAME}"
 KAPI_SVC_NAME="kube-apiserver"
 
@@ -389,8 +411,9 @@ APPS_DOMAIN="apps.${HC_NAME}.phc-cicd.cis.ibm.net"
 CANARY_URL="https://canary-openshift-ingress-canary.${APPS_DOMAIN}"
 CP_NS="${HC_NS}-${HC_NAME}"
 
-echo "$(date) Setting ingress-operator NO_PROXY so canary bypasses konnectivity for ${APPS_DOMAIN}"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+echo "$(date) Setting ingress-operator NO_PROXY so canary bypasses konnectivity for ${APPS_DOMAIN}"
 oc set env deploy/ingress-operator -n "${CP_NS}" -c ingress-operator \
   "NO_PROXY=kube-apiserver,${LB_IP},.${APPS_DOMAIN},phc-cicd.cis.ibm.net,127.0.0.1,localhost"
 
