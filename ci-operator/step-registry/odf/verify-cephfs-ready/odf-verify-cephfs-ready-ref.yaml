@@ -1,0 +1,28 @@
+ref:
+  as: odf-verify-cephfs-ready
+  from: cli
+  commands: odf-verify-cephfs-ready-commands.sh
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: ODF__INSTALL_NAMESPACE
+      default: openshift-storage
+      documentation: Namespace where ODF and the CephFS CSI driver are installed.
+    - name: ODF__CEPHFS_CSI_WAIT_TIMEOUT
+      default: "5m"
+      documentation: Timeout for the csi-cephfsplugin DaemonSet to finish rolling out Ready.
+    - name: ODF__CEPHFS_PVC_BIND_TIMEOUT
+      default: "3m"
+      documentation: Timeout for a probe ReadWriteMany PVC to reach Bound, confirming CephFS provisioning works.
+  documentation: |-
+    Fail the job before any storage-dependent test runs when ODF CephFS RWX storage
+    is not actually usable. odf-apply-storage-cluster only waits for the StorageCluster
+    Available condition (or OSD readiness), which can be met while the CephFS CSI driver
+    is still down — a failure that otherwise surfaces only as per-test MountDevice
+    timeouts and unbound PVCs minutes later, producing a confusing cluster-wide red run.
+    This step verifies the specific capability storage-based-remediation needs: the
+    CephFS CSI node plugin (csi-cephfsplugin) is Ready and a ReadWriteMany PVC binds.
+    Place it after odf-apply-storage-cluster and before the storage-dependent test step.
