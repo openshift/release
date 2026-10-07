@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -11,6 +13,14 @@ echo "************ openperouter deploy-verify test ************"
 # it defines the leased host's IP and SSHOPTS and verifies root SSH access.
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
+
+ls -al
+git status
+git remote add andreaskaris https://github.com/andreaskaris/openperouter.git
+git fetch --all
+git checkout andreaskaris/downstream/enable-missing-e2es
+find . -name run_tests.sh
+find . -name run_tests.sh | xargs grep ''
 
 echo "### Copying OpenPERouter E2E source to remote host"
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" \
