@@ -495,6 +495,16 @@ function Main () {
     newVersion="$(GetInstalledVersion)"
     echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
 
+    # --- Missing version guard (INTEROP-9527) ---
+    if [[ -z "${currentVersion}" ]]; then
+        echo >&2 "ERROR: Pre-upgrade ACS version is empty; cannot verify transition"
+        exit 1
+    fi
+    if [[ -z "${newVersion}" ]]; then
+        echo >&2 "ERROR: Post-upgrade ACS version is empty; cannot verify transition"
+        exit 1
+    fi
+
     # --- Version transition check (INTEROP-9527) ---
     if [[ -n "${currentVersion}" && "${newVersion}" == "${currentVersion}" ]]; then
         echo >&2 "WARNING: ACS version did not change after upgrade (${currentVersion})"
