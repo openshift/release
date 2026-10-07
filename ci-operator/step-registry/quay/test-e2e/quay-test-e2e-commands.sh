@@ -656,13 +656,15 @@ function copyArtifacts {
   fi
   local steps_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}"
   # A quay/quay presubmit tests the PR head. Anything else (periodics, rehearsals)
-  # deploys a product image whose revision label is a midstream commit that does not
-  # exist upstream, so link the upstream ref the deploy step derived from it instead.
+  # deploys an image whose revision label may be a midstream commit that does not
+  # exist upstream, so link the upstream commit the Playwright suite was cloned at
+  # (PW_TEST_SHA, see playwright-source.txt): the image's own revision when its
+  # label resolved upstream, else the head of the derived tag or branch.
   local quay_rev=""
   if [[ "${REPO_OWNER:-}/${REPO_NAME:-}" == "quay/quay" ]]; then
     quay_rev="${PULL_PULL_SHA:-${PULL_BASE_SHA:-}}"
-  elif [[ -s "${SHARED_DIR:-}/playwright_git_ref" ]]; then
-    quay_rev="$(cat "${SHARED_DIR}/playwright_git_ref")"
+  elif [[ "${PW_TEST_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+    quay_rev="${PW_TEST_SHA}"
   fi
   local quay_image
   quay_image=$(timeout 30 oc -n "${QUAYNAMESPACE:-quay-enterprise}" get pods -l quay-component=quay-app \
