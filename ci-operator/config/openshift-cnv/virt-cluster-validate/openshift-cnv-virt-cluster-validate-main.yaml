@@ -12,6 +12,8 @@ images:
   items:
   - dockerfile_path: Containerfile
     to: virt-cluster-validate
+  - dockerfile_path: build/validation-controller/Containerfile
+    to: virt-validation-controller
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -203,6 +205,170 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-azure
+- as: e2e-controller-azure
+  optional: true
+  steps:
+    cluster_profile: azure-virtualization
+    env:
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+      OPERATORS: |
+        [
+          {"name": "kubernetes-nmstate-operator", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-nmstate", "target_namespaces": "openshift-nmstate", "operator_group": "nmstate-og"},
+          {"name": "redhat-oadp-operator", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group": "oadp-og"},
+          {"name": "node-healthcheck-operator", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-operators"},
+          {"name": "self-node-remediation", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-operators"}
+        ]
+    test:
+    - as: install-cnv
+      cli: latest
+      commands: |
+        set -euo pipefail
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/master -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make update_pull_secret set_imagedigestmirrorset deploy_cnv
+        oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=merge -p '{"spec":{"virtualization":{"virtualMachineOptions":{"defaultCPUModel":"Broadwell"}}}}'
+      credentials:
+      - collection: cnv-ci-secrets
+        group: cnv-ci-brew-pull-secret
+        mount_path: /var/run/cnv-ci-brew-pull-secret
+      - collection: virtualization-secrets
+        group: konflux-pull-secret
+        mount_path: /var/run/cnv-ci-konflux-pull-secret
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: openshift-virtualization+konflux_ro_bot
+        name: KONFLUX_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-konflux-pull-secret/token
+        name: KONFLUX_REGISTRY_TOKEN_PATH
+      - default: "5.0"
+        name: OCP_VERSION
+      - default: "5.0"
+        name: CNV_VERSION
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      - default: "false"
+        name: PRODUCTION_RELEASE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 1h0m0s
+    - as: setup-catalog
+      cli: latest
+      commands: |
+        set -euo pipefail
+        oc create -f - <<'EOF'
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          name: redhat-operators-v4-22
+          namespace: openshift-marketplace
+        spec:
+          sourceType: grpc
+          image: registry.redhat.io/redhat/redhat-operator-index:v4.22
+          displayName: Red Hat Operators v4.22
+        EOF
+        oc wait -n openshift-marketplace catalogsource/redhat-operators-v4-22 --for=jsonpath='{.status.connectionState.lastObservedState}'=READY --timeout=5m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: install-operators
+    - as: setup-rwx-storage
+      cli: latest
+      commands: |
+        set -euo pipefail
+        oc get storageclass -o name | xargs -I{} oc patch {} -p '{"metadata":{"annotations":{"storageclass.kubevirt.io/is-default-virt-class":"false"}}}' --type=merge 2>/dev/null || true
+        oc create -f - <<'EOF'
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata:
+          name: azurefile-csi-smb
+          annotations:
+            storageclass.kubevirt.io/is-default-virt-class: "true"
+        provisioner: file.csi.azure.com
+        parameters:
+          skuName: Standard_LRS
+        reclaimPolicy: Delete
+        volumeBindingMode: Immediate
+        allowVolumeExpansion: true
+        mountOptions:
+        - dir_mode=0777
+        - file_mode=0660
+        - uid=107
+        - gid=107
+        - noperm
+        - mfsymlinks
+        - cache=strict
+        - nosharesock
+        - actimeo=30
+        - nobrl
+        EOF
+        oc wait storageprofile azurefile-csi-smb --for=jsonpath='{.status.provisioner}'=file.csi.azure.com --timeout=2m
+        oc patch storageprofile azurefile-csi-smb --type=merge -p '{"spec":{"claimPropertySets":[{"accessModes":["ReadWriteMany"],"volumeMode":"Filesystem"}]}}'
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: wait-for-golden-images
+      cli: latest
+      commands: |
+        set -euo pipefail
+        for i in $(seq 1 30); do
+          if oc get dataimportcron -n openshift-virtualization-os-images --no-headers 2>/dev/null | grep -q .; then break; fi
+          sleep 10
+        done
+        oc wait dataimportcron --all -n openshift-virtualization-os-images --for=condition=UpToDate=true --timeout=15m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: validate-controller-e2e
+      cli: latest
+      commands: |
+        set -euo pipefail
+        mkdir -p "${ARTIFACT_DIR}"
+        oc create namespace openshift-mtv --dry-run=client -o yaml | oc apply -f -
+        make deploy-controller CONTROLLER_IMAGE="${CONTROLLER_IMAGE}" VALIDATOR_IMAGE="${VCV_IMAGE}"
+
+        workload_data_source=""
+        for candidate in rhel10 rhel9; do
+          if oc get datasource "${candidate}" -n openshift-virtualization-os-images >/dev/null 2>&1; then
+            workload_data_source="openshift-virtualization-os-images/${candidate}"
+            break
+          fi
+        done
+        test -n "${workload_data_source}"
+
+        TARGET_NAMESPACE=vcv-controller-e2e make bootstrap-target
+        set +e
+        TARGET_NAMESPACE=vcv-controller-e2e \
+          VALIDATION_NAME=target-canary-e2e \
+          DATA_SOURCE="${workload_data_source}" \
+          make run-controller-e2e 2>&1 | tee "${ARTIFACT_DIR}/controller-e2e.log"
+        status=${PIPESTATUS[0]}
+        set -e
+        exit "${status}"
+      dependencies:
+      - env: VCV_IMAGE
+        name: virt-cluster-validate
+      - env: CONTROLLER_IMAGE
+        name: virt-validation-controller
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+      timeout: 30m0s
     workflow: ipi-azure
 - as: e2e-gcp
   optional: true
