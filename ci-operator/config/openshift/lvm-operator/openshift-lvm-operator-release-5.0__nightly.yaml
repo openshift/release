@@ -1,4 +1,8 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -22,6 +26,12 @@ build_root:
     tag: rhel-9-golang-1.26-openshift-5.0
 images:
   items:
+  - dockerfile_path: Dockerfile
+    inputs:
+      ocp_5.0_base-rhel9:
+        as:
+        - fedora:latest
+    to: lvm-operator
   - context_dir: .
     dockerfile_path: test/integration/Dockerfile
     inputs:
@@ -29,6 +39,13 @@ images:
         as:
         - registry.access.redhat.com/ubi9/ubi-minimal:latest
     to: lvm-operator-integration-test
+operator:
+  bundles:
+  - as: lvm-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/lvms_dev/lvms-operator:latest
+    with: pipeline:lvm-operator
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -56,6 +73,80 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-baremetalds-tnf-lvms-mno-qe-integration-tests
+  cron: 0 8 * * 5
+  steps:
+    cluster_profile: equinix-edge-enablement
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+    env:
+      LVM_CLUSTER_DEVICE_PATH: /dev/vda
+      LVM_CLUSTER_TOLERATE_MASTER: "true"
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-lvm-storage
+      OO_INSTALL_TIMEOUT_MINUTES: "20"
+    test:
+    - as: lvms-tnf-prepare-and-record
+      cli: latest
+      commands: |
+        set -eu
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        test "$(oc get nodes -l node-role.kubernetes.io/master -o name | wc -l | tr -d ' ')" = 2
+        # LVMS MNO disk tests select worker-labelled nodes. In TNF the two
+        # control-plane nodes also host workloads; there are no separate workers.
+        oc label nodes -l node-role.kubernetes.io/master node-role.kubernetes.io/worker= --overwrite
+        test "$(oc get nodes -l node-role.kubernetes.io/worker -o name | wc -l | tr -d ' ')" = 2
+        printf '%s\n' "${RELEASE_IMAGE_LATEST}" > "${ARTIFACT_DIR}/release-image.txt"
+        printf '%s\n' "${OO_BUNDLE}" > "${ARTIFACT_DIR}/bundle-image.txt"
+        printf '%s\n' "${OPERATOR_IMAGE}" > "${ARTIFACT_DIR}/operator-image.txt"
+        oc get clusterversion version -o json > "${ARTIFACT_DIR}/clusterversion.json"
+        oc get nodes -o wide > "${ARTIFACT_DIR}/nodes.txt"
+        oc -n openshift-lvm-storage get csv -o json > "${ARTIFACT_DIR}/csv.json"
+        oc -n openshift-lvm-storage get lvmcluster -o json > "${ARTIFACT_DIR}/lvmcluster.json"
+        oc -n openshift-lvm-storage get pods -o wide > "${ARTIFACT_DIR}/pods.txt"
+        oc -n openshift-lvm-storage get deployments,daemonsets -o json > "${ARTIFACT_DIR}/csi-workloads.json"
+        oc get csidriver topolvm.io -o json > "${ARTIFACT_DIR}/topolvm-csidriver.json"
+        cp "${SHARED_DIR}/lvm-cluster.yaml" "${ARTIFACT_DIR}/lvm-cluster.yaml"
+        test "$(oc -n openshift-lvm-storage get lvmcluster my-lvmcluster -o jsonpath='{.status.state}')" = Ready
+      dependencies:
+      - env: OO_BUNDLE
+        name: lvm-operator-bundle
+      - env: OPERATOR_IMAGE
+        name: lvm-operator
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: lvms-tnf-mno-integration-test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        if ./integration-test run-suite -c 1 --junit-path "${ARTIFACT_DIR}/junit_results.xml" openshift/lvm-operator/test/integration/qe_tests/mno > "${ARTIFACT_DIR}/ote-results.log" 2>&1; then
+          result=0
+        else
+          result=$?
+        fi
+        if [ -f "${ARTIFACT_DIR}/junit_results.xml" ]; then
+          cp "${ARTIFACT_DIR}/junit_results.xml" "${SHARED_DIR}/lvms-tnf-junit.xml"
+        fi
+        exit "${result}"
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    - ref: baremetalds-two-node-fencing-lvms-mno-validate-results
+    workflow: baremetalds-two-node-fencing-lvms-mno
 - as: e2e-aws-sno-qe-integration-tests
   cron: 0 8 * * 5
   steps:

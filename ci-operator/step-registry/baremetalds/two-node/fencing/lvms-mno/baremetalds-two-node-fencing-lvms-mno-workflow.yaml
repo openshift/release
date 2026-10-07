@@ -1,0 +1,34 @@
+workflow:
+  as: baremetalds-two-node-fencing-lvms-mno
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: equinix-edge-enablement
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - chain: baremetalds-two-node-fencing-post-install
+    - ref: openshift-cluster-bot-rbac
+    - ref: optional-operators-operator-sdk
+    - ref: storage-create-lvm-cluster
+    - ref: storage-conf-storageclass-set-default-storageclass
+    post:
+    - ref: baremetalds-two-node-fencing-lvms-mno-gather
+    - chain: baremetalds-ofcir-post
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        MASTER_DISK=100
+        NUM_WORKERS=0
+        BMC_DRIVER=redfish
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb vdc"
+        VM_EXTRADISKS_SIZE=100G
+      ENABLE_HYPERVISOR_SSH_CONFIG: "true"
+      REQUIRED_DEFAULT_STORAGECLASS: lvms-vg1
+  documentation: |-
+    Install a TNF cluster with three extra disks on each node, install the CI-built
+    LVMS bundle, and create a Ready LVMCluster using one disk per node. The other
+    disks remain available for the MNO suite's multi-disk and RAID cases. The
+    test step also labels both control-plane nodes as workers so the MNO test
+    helpers can discover their disks without adding separate nodes.
