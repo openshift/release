@@ -110,9 +110,15 @@ manifest_path = sys.argv[1]
 fixed_nodeport = int(sys.argv[2])
 with open(manifest_path) as f:
     raw = f.read()
-docs = re.split(r'^---\s*$', raw, flags=re.MULTILINE)
+
+# Split on YAML document separators.  hcp --render outputs '---\n' between
+# every document, sometimes with a bare 'null' document in between.
+# We drop any document that is empty or contains only 'null' after stripping.
+docs = re.split(r'\n---[ \t]*\n', '\n' + raw)
 patched = []
 for doc in docs:
+    if not doc.strip() or doc.strip() == 'null':
+        continue
     is_svc = bool(re.search(r'^\s*kind:\s*Service\s*$', doc, re.MULTILINE))
     is_kas = bool(re.search(r'^\s*name:\s*(kube-apiserver|APIServer)\s*$', doc, re.MULTILINE))
     if is_svc and is_kas:
@@ -126,17 +132,20 @@ for doc in docs:
                          lambda m: m.group(1) + '\n' + m.group(2) + 'nodePort: ' + str(fixed_nodeport),
                          doc)
         print(f"  [patch] kube-apiserver Service: type=NodePort, nodePort={fixed_nodeport}", file=sys.stderr)
-    patched.append(doc)
+    patched.append(doc.strip('\n'))
+
 with open(manifest_path, 'w') as f:
-    f.write('---'.join(patched))
+    f.write('\n---\n'.join(patched) + '\n')
 PYEOF
 
 echo "$(date) kube-apiserver Service after manifest patch:"
 python3 -c "
 import re, sys
 raw = open(sys.argv[1]).read()
-for doc in re.split(r'^---[ \t]*$', raw, flags=re.MULTILINE):
-    if re.search(r'kind:[ \t]*Service', doc) and re.search(r'name:[ \t]*(kube-apiserver|APIServer)', doc):
+for doc in re.split(r'\n---[ \t]*\n', '\n' + raw):
+    if doc.strip() and doc.strip() != 'null' \
+       and re.search(r'kind:[ \t]*Service', doc) \
+       and re.search(r'name:[ \t]*(kube-apiserver|APIServer)', doc):
         print(doc)
 " "${HC_MANIFEST}" || true
 
