@@ -1,0 +1,32 @@
+chain:
+  as: cucushift-installer-rehearse-aws-upi-ovn-winc-debug-provision
+  steps:
+  - ref: ipi-install-rbac
+  - chain: ipi-conf-aws
+  - ref: ovn-conf
+  - ref: ovn-conf-hybrid-manifest
+  - chain: upi-install-aws
+  - ref: ssh-bastion
+  - ref: openshift-windows-setup-wmco-konflux
+  - ref: operatorhub-subscribe
+  - ref: windows-conf-operator
+  - ref: aws-windows-ami-discover
+  - ref: windows-byoh-provision
+  - ref: wait
+  - ref: cucushift-winc-prepare-byoh
+  - chain: cucushift-installer-check
+  documentation: |-
+    Debug variant of the UPI Windows BYOH provision chain. Identical to
+    cucushift-installer-rehearse-aws-upi-ovn-winc-provision except a bounded
+    stock ref:wait is inserted between windows-byoh-provision and
+    cucushift-winc-prepare-byoh. This gives a human operator time to inspect the
+    cluster (via pod terminal) before dependent Windows readiness checks run.
+
+    The ref:wait parameters (TIMEOUT, PR_ONLY) and the BYOH_DEBUG_CONTINUE flag
+    must be set by the debug callers in their ci-operator config env section.
+    The wait honours /tmp/debug.done for early release and PR_ONLY=true to skip
+    the pause in periodic/postsubmit jobs.
+
+    This chain is used ONLY by debug-winc-aws-upi callers on main and
+    release-5.0. Ordinary callers use the standard provision chain and are
+    unaffected.
