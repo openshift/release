@@ -73,7 +73,7 @@ else:
                        ACS_TARGET_CHANNEL='rhacs-4.11', ARTIFACT_DIR=str(artifact),
                        SHARED_DIR=str(shared))
             result = subprocess.run(['bash', str(script)], env=env, capture_output=True,
-                                    text=True, timeout=10)
+                                    text=True, timeout=10, check=False)
             junit = ET.parse(artifact / 'junit_lp-interop--OPP--acs-upgrade.xml').getroot()
             shared_junit = ET.parse(shared / 'junit/junit_lp-interop--OPP--acs-upgrade.xml').getroot()
             return (result, junit, shared_junit,
@@ -144,7 +144,7 @@ else:
             function.write_text('set -euo pipefail\nfunction ValidateAcsHealth () {' + body +
                                 '\nif ValidateAcsHealth; then exit 0; else exit $?; fi\n')
             env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'], ACS_FIXTURE=scenario)
-            return subprocess.run(['bash', str(function)], env=env, capture_output=True, text=True, timeout=10)
+            return subprocess.run(['bash', str(function)], env=env, capture_output=True, text=True, timeout=10, check=False)
 
     def test_healthy_required_resources(self):
         result = self.validate('healthy')
