@@ -244,6 +244,11 @@ provision_sts_cluster() {
         return 1
     fi
 
+    if ! rosa delete operator-roles --prefix "${name}" -y --mode auto; then
+        log "ERROR: Failed to delete stale operator roles for ${name}. Skipping cluster creation."
+        return 1
+    fi
+
     rosa create cluster -y \
         --cluster-name "${name}" \
         --sts \

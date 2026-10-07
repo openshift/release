@@ -28,7 +28,7 @@ main() {
         DEBUG_FLAG="-vvv"
     fi
 
-    echo "Running RFC2544 test (duration: ${DURATION}, frame_size: ${FRAME_SIZE}, lat_rate: ${LAT_RATE})"
+    echo "Running RFC2544 test (duration: ${DURATION}, frame_size: ${FRAME_SIZE}, lat_rate: ${LAT_RATE}, test_options: ${TEST_OPTIONS})"
     local rc=0
     ansible-playbook ./playbooks/telco-kpis/run-test.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
@@ -39,6 +39,7 @@ main() {
         -e duration="${DURATION}" \
         -e frame_size="${FRAME_SIZE}" \
         -e lat_rate="${LAT_RATE}" \
+        -e test_options="${TEST_OPTIONS}" \
         -e ran_integration_repo="${RAN_INTEGRATION_REPO}" \
         -e ran_integration_branch="${RAN_INTEGRATION_BRANCH}" \
         -e spirent_config_file="${SPIRENT_CONFIG_FILE}" \
