@@ -1,0 +1,20 @@
+ref:
+  as: quay-operator-otel-gather
+  cli: latest
+  from_image:
+    name: quay-test-omr
+    namespace: ci
+    tag: latest
+  commands: quay-operator-otel-gather-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  grace_period: 10m0s
+  documentation: |-
+    Post-test companion to quay-operator-otel-setup. Records whether
+    OTEL_EXPORTER_OTLP_ENDPOINT is still set on deployment/quay-operator-tng
+    (env-after.txt plus a PASS/FAIL log line, to catch OLM reverting it), then
+    snapshots the operator's controller-runtime metrics (pod port 8080) to
+    ${ARTIFACT_DIR}/operator-metrics/metrics-after.txt. Best-effort: always
+    exits 0.

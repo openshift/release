@@ -75,14 +75,20 @@ tests:
     env:
       CHAINSAW_SUITE: e2e
       COMPUTE_NODE_TYPE: m5.4xlarge
+      JAEGER_NAMESPACE: openshift-operators
+      JAEGER_SERVICE: quay-operator
       SETUP_NOOBAA: "true"
     post:
+    - ref: quay-operator-otel-gather
+    - ref: quay-gather-jaeger-traces
     - ref: quay-gather
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     - ref: quay-install-odf-operator
+    - ref: quay-deploy-jaeger
     - ref: quay-install-operator-bundle
+    - ref: quay-operator-otel-setup
     test:
     - ref: quay-test-chainsaw
     workflow: ipi-aws
