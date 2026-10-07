@@ -716,7 +716,7 @@ function Main () {
     fi
 
     # --- Version transition check (INTEROP-9527) ---
-    if [[ -n "${currentVersion}" && "${newVersion}" == "${currentVersion}" ]]; then
+    if [[ "${newVersion}" == "${currentVersion}" ]]; then
         echo >&2 "WARNING: ACM version did not change after upgrade (${currentVersion})"
         _JUNIT_KIND="version-unchanged"
         _JUNIT_MESSAGE="ACM version did not change after channel switch: still ${currentVersion}"
