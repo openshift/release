@@ -24,5 +24,5 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${CLUSTER_NA
   sed -i "/; BEGIN ${CLUSTER_NAME}/,/; END ${CLUSTER_NAME}$/d" /opt/bind9_zones/{zone,internal_zone.rev}
   podman start bind9
   podman exec bind9 rndc reload
-  podman exec bind9 rndc flush
+  nslookup
 EOF
