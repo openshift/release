@@ -63,34 +63,22 @@ else
 # the pre-image-tests script.
 # The Playwright suite is cloned from PLAYWRIGHT_GIT_REPO at a ref resolved in this
 # order (first match wins):
-#   1. PLAYWRIGHT_GIT_BRANCH        - explicit override from the ci-operator config.
-#   2. ${SHARED_DIR}/playwright_git_ref - ref auto-derived by the deploy step from the
-#      deployed Quay app image's version/release labels (the upstream vX.Y.Z tag when
-#      one matches, otherwise the redhat-X.Y branch), so the suite is version-matched
-#      to the product with no manual upkeep.
-#   3. PLAYWRIGHT_GIT_FALLBACK_BRANCH - last-resort branch so the run still executes
-#      (with a warning) instead of hard-failing when nothing else is available.
-# PLAYWRIGHT_GIT_REPO stays required. The resolved ref may be a branch, tag, or commit
-# SHA; clone_playwright_sources handles each.
+#   1. PLAYWRIGHT_GIT_BRANCH - explicit override from the ci-operator config; the
+#      step fails if it cannot be cloned.
+#   2. The upstream commit recorded in the deployed quay-app image's labels, so the
+#      suite runs from the revision the image under test was built from.
+#   3. PLAYWRIGHT_REF_MODE=derived only: the upstream vX.Y.Z tag matching the image's
+#      version label, else branch redhat-X.Y, else PLAYWRIGHT_GIT_FALLBACK_BRANCH.
+#      PLAYWRIGHT_REF_MODE=strict (product nightlies) fails the step instead: a moving
+#      branch is not the revision under test, and a spec/image skew reads as a
+#      product failure.
 PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_GIT_REPO:-}"
 PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_GIT_BRANCH:-}"
 PLAYWRIGHT_GIT_FALLBACK_BRANCH="${PLAYWRIGHT_GIT_FALLBACK_BRANCH:-redhat-3.18}"
+PLAYWRIGHT_REF_MODE="${PLAYWRIGHT_REF_MODE:-derived}"
 if [[ -z "${PLAYWRIGHT_GIT_REPO}" ]]; then
   echo "ERROR: PLAYWRIGHT_GIT_REPO must be set" >&2
   exit 1
-fi
-PLAYWRIGHT_REF_IS_DERIVED=false
-if [[ -n "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
-  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_BRANCH}"
-  echo "Using explicitly configured Playwright ref: ${PLAYWRIGHT_GIT_REF}"
-elif [[ -s "${SHARED_DIR}/playwright_git_ref" ]]; then
-  PLAYWRIGHT_GIT_REF="$(cat "${SHARED_DIR}/playwright_git_ref")"
-  PLAYWRIGHT_REF_IS_DERIVED=true
-  echo "Using Playwright ref auto-derived from the deployed image: ${PLAYWRIGHT_GIT_REF}"
-else
-  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
-  echo "WARNING: no explicit PLAYWRIGHT_GIT_BRANCH and no derived ref in SHARED_DIR;" >&2
-  echo "         falling back to branch ${PLAYWRIGHT_GIT_REF}" >&2
 fi
 
 clone_playwright_sources() {
@@ -141,17 +129,147 @@ clone_playwright_sources() {
   rm -f "${archive}"
 }
 
-echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (ref ${PLAYWRIGHT_GIT_REF})"
-if ! clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"; then
-  if [[ "${PLAYWRIGHT_REF_IS_DERIVED}" != true ]]; then
+# Resolve a digest pullspec through the cluster's IDMS/ICSP mirrors, with the
+# original pullspec last. The kubelet reports the quay-app image under its SOURCE
+# pullspec (registry.redhat.io/quay/quay-rhel9@<digest>), but a nightly digest is
+# only published in the mirror; CRI-O rewrites the pull, `oc image info` does not.
+# A source matches its own repo and every repo under it: the nightly IDMS source is
+# registry.redhat.io/quay, not the full app repo. node, not jq: the runner image
+# has no jq.
+function mirror_pullspecs() {
+  local pullspec="$1"
+  if [[ "${pullspec}" == *@* ]]; then
+    # One get per kind: a combined get fails whole when either kind is not served.
+    local kind
+    for kind in imagecontentsourcepolicies imagedigestmirrorsets; do
+      oc get "${kind}" -o json 2>/dev/null \
+        | node -e '
+            const [repo, digest] = process.argv.slice(1);
+            for (const item of JSON.parse(require("fs").readFileSync(0, "utf8")).items || []) {
+              const spec = item.spec || {};
+              for (const m of spec.repositoryDigestMirrors || spec.imageDigestMirrors || []) {
+                if (repo !== m.source && !repo.startsWith(`${m.source}/`)) continue;
+                for (const mirror of m.mirrors || []) {
+                  console.log(`${mirror}${repo.slice(m.source.length)}@${digest}`);
+                }
+              }
+            }' "${pullspec%@*}" "${pullspec#*@}" 2>/dev/null || true
+    done
+  fi
+  printf '%s\n' "${pullspec}"
+}
+
+PW_SHA_LABELS=(io.openshift.build.commit.id vcs-ref org.opencontainers.image.revision)
+PW_IMAGE=none
+PW_LABEL=none
+declare -A PW_LABELS=()
+
+# Clone the upstream commit recorded in the deployed quay-app image's labels. ART
+# builds from the openshift-priv mirror of quay/quay, so its commit label is an
+# upstream sha; a midstream sha (older Konflux builds) fails the fetch and the next
+# label is tried. Returns non-zero when no label sha is fetchable.
+function resolve_playwright_ref() {
+  local ns="${QUAYNAMESPACE:-quay-enterprise}"
+  local app_img authfile errfile candidate info="" key value sha tried=" " was_tracing
+  app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
+    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+  if [[ -z "${app_img}" ]]; then
+    echo "WARNING: could not determine the deployed quay-app imageID" >&2
+    return 1
+  fi
+  PW_IMAGE="${app_img#*@}"
+  echo "Deployed Quay app image: ${app_img}"
+  # Disable tracing due to pull-secret handling
+  [[ $- == *x* ]] && was_tracing=true || was_tracing=false
+  set +x
+  authfile=$(mktemp)
+  errfile=$(mktemp)
+  oc get secret/pull-secret -n openshift-config \
+    --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
+  # stderr stays out of ${info}: a warning on the success path would corrupt the JSON.
+  for candidate in $(mirror_pullspecs "${app_img}"); do
+    if info=$(oc image info "${candidate}" --filter-by-os linux/amd64 \
+                --registry-config="${authfile}" -o json 2>"${errfile}"); then
+      echo "Read deployed image metadata from ${candidate}"
+      break
+    fi
+    echo "Could not read ${candidate}: $(tr '\n' ' ' < "${errfile}")"
+    info=""
+  done
+  rm -f "${authfile}" "${errfile}"
+  $was_tracing && set -x
+  if [[ -z "${info}" ]]; then
+    echo "WARNING: deployed image ${PW_IMAGE} is not readable from any configured mirror" >&2
+    return 1
+  fi
+  while IFS='=' read -r key value; do
+    PW_LABELS["${key}"]="${value}"
+    echo "Deployed image label ${key}='${value}'"
+  done < <(node -e '
+      const labels = JSON.parse(require("fs").readFileSync(0, "utf8")).config?.config?.Labels || {};
+      for (const k of process.argv.slice(1)) console.log(`${k}=${labels[k] ?? ""}`);' \
+    io.openshift.build.commit.id io.openshift.build.commit.url io.openshift.build.source-location \
+    vcs-ref org.opencontainers.image.revision version release <<<"${info}")
+  for key in "${PW_SHA_LABELS[@]}"; do
+    sha="${PW_LABELS[${key}]:-}"
+    [[ "${sha}" =~ ^[0-9a-f]{40}$ && "${tried}" != *" ${sha} "* ]] || continue
+    tried+="${sha} "
+    if clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${sha}" "${CLONE_DIR}"; then
+      PLAYWRIGHT_GIT_REF="${sha}"
+      PW_LABEL="${key}"
+      echo "Playwright source: ${sha} from label ${key} of ${PW_IMAGE}"
+      return 0
+    fi
+    echo "WARNING: ${sha} from label ${key} is not fetchable from ${PLAYWRIGHT_GIT_REPO}" >&2
+  done
+  return 1
+}
+
+if [[ -n "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
+  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_BRANCH}"
+  echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (explicitly configured ref ${PLAYWRIGHT_GIT_REF})"
+  if ! clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"; then
     echo "ERROR: failed to clone ${PLAYWRIGHT_GIT_REPO} at ${PLAYWRIGHT_GIT_REF}" >&2
     exit 1
   fi
-  echo "WARNING: derived ref ${PLAYWRIGHT_GIT_REF} is not present in ${PLAYWRIGHT_GIT_REPO};" >&2
-  echo "         falling back to branch ${PLAYWRIGHT_GIT_FALLBACK_BRANCH}" >&2
-  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
-  clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
+elif ! resolve_playwright_ref; then
+  if [[ "${PLAYWRIGHT_REF_MODE}" == "strict" ]]; then
+    labels=""
+    for key in "${PW_SHA_LABELS[@]}"; do labels+=" ${key}='${PW_LABELS[${key}]:-}'"; done
+    echo "ERROR: no label sha of deployed image ${PW_IMAGE} is fetchable from ${PLAYWRIGHT_GIT_REPO} (${labels# }); PLAYWRIGHT_REF_MODE=strict never falls back to a branch" >&2
+    exit 1
+  fi
+  version="${PW_LABELS[version]:-}"
+  release="${PW_LABELS[release]:-}"
+  if [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+     && git ls-remote --exit-code "${PLAYWRIGHT_GIT_REPO}" "refs/tags/v${version}" >/dev/null 2>&1; then
+    PLAYWRIGHT_GIT_REF="v${version}"
+  # The version label's X.Y prefix is the product series even when the version
+  # carries a suffix no tag matches. Release is only X.Y on product builds (a
+  # build-id release also has an X.Y shape), so it is consulted only after version.
+  elif [[ "${version}" =~ ^([0-9]+\.[0-9]+) ]]; then
+    PLAYWRIGHT_GIT_REF="redhat-${BASH_REMATCH[1]}"
+  elif [[ "${release}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    PLAYWRIGHT_GIT_REF="redhat-${release}"
+  else
+    PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
+  fi
+  echo "WARNING: no image label sha is fetchable; cloning ref ${PLAYWRIGHT_GIT_REF} derived from version='${version}' release='${release}'" >&2
+  if ! clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"; then
+    echo "WARNING: ${PLAYWRIGHT_GIT_REF} is not present in ${PLAYWRIGHT_GIT_REPO};" >&2
+    echo "         falling back to branch ${PLAYWRIGHT_GIT_FALLBACK_BRANCH}" >&2
+    PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
+    clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
+  fi
 fi
+if command -v git >/dev/null 2>&1; then
+  PW_TEST_SHA="$(git -C "${CLONE_DIR}" rev-parse HEAD)"
+else
+  PW_TEST_SHA="archive ${PLAYWRIGHT_GIT_REF}"
+fi
+echo "Playwright suite checked out at ${PW_TEST_SHA} (ref ${PLAYWRIGHT_GIT_REF}, mode ${PLAYWRIGHT_REF_MODE})"
+printf 'image=%s\nlabel=%s\nmode=%s\nref=%s\ntest_sha=%s\n' "${PW_IMAGE}" "${PW_LABEL}" \
+  "${PLAYWRIGHT_REF_MODE}" "${PLAYWRIGHT_GIT_REF}" "${PW_TEST_SHA}" > "${ARTIFACT_DIR}/playwright-source.txt"
 PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
 if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
   echo "ERROR: cloned sources have no web/ directory at ${PLAYWRIGHT_WORKDIR}" >&2
