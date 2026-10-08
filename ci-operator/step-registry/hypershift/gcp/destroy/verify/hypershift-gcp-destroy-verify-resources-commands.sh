@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Verify HostedCluster and GCP resources are gone before project cleanup.
 
 set -euo pipefail
 
