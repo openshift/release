@@ -100,6 +100,8 @@ else:
         self.assertFalse(version)
         self.assertFalse(skipped)
         self.assertNotIn('=== ACS Operator Upgrade: SUCCESS ===', result.stdout)
+        if scenario.startswith("denied-"):
+            self.assertIn("Forbidden", result.stdout + result.stderr)
 
     def test_full_script_absent_central(self):
         self.assert_full_failure('absent-central')
@@ -166,12 +168,14 @@ else:
     def test_central_discovery_error(self):
         result = self.validate('denied-central')
         self.assertEqual(result.returncode, 1)
+        self.assertIn("Forbidden", result.stderr)
         self.assertIn('Unable to query required Central CR', result.stderr)
         self.assertNotIn('No required Central CR found', result.stderr)
 
     def test_securedcluster_discovery_error(self):
         result = self.validate('denied-securedcluster')
         self.assertEqual(result.returncode, 1)
+        self.assertIn("Forbidden", result.stderr)
         self.assertIn('Unable to query required SecuredCluster CR', result.stderr)
         self.assertNotIn('No required SecuredCluster CR found', result.stderr)
 

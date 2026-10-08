@@ -276,7 +276,7 @@ function ValidateAcsHealth () {
     echo "Validating ACS health post-upgrade..."
 
     typeset centralNs
-    if ! centralNs="$(oc get central -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)"; then
+    if ! centralNs="$(oc get central -A -o jsonpath='{.items[0].metadata.namespace}')"; then
         echo >&2 "ERROR: Unable to query required Central CR"
         return 1
     fi
@@ -311,7 +311,7 @@ function ValidateAcsHealth () {
     fi
 
     typeset scNs
-    if ! scNs="$(oc get securedcluster -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)"; then
+    if ! scNs="$(oc get securedcluster -A -o jsonpath='{.items[0].metadata.namespace}')"; then
         echo >&2 "ERROR: Unable to query required SecuredCluster CR"
         return 1
     fi
