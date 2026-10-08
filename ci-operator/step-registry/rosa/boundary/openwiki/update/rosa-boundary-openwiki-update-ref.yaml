@@ -24,35 +24,18 @@ ref:
     default: /var/run/rosa-boundary-vertex/gcp-vertex-sa-key
     documentation: Existing rosa-boundary/ci/gcp-vertex-sa-key JSON key for the rosa-boundary service account in rosa-general.
   credentials:
-  # Mount only the four fields this job needs from rosa-boundary/ci, not the
-  # full group (which also contains credentials for unrelated tests).
+  # No GitHub App credentials in the agent container. Only the Vertex key is
+  # mounted for generating documentation; publishing happens in another step.
   - collection: rosa-boundary
     group: ci
     field: gcp-vertex-sa-key
     mount_path: /var/run/rosa-boundary-vertex
-  - collection: rosa-boundary
-    group: ci
-    field: github-app-app-id
-    mount_path: /var/run/rosa-boundary-github-app-id
-  - collection: rosa-boundary
-    group: ci
-    field: github-app-installation-id
-    mount_path: /var/run/rosa-boundary-github-app-installation
-  - collection: rosa-boundary
-    group: ci
-    field: github-app-pem
-    mount_path: /var/run/rosa-boundary-github-app-key
   resources:
     requests:
       cpu: 500m
       memory: 4Gi
   documentation: |-
-    Install pinned Node/OpenWiki into the periodic's temporary directory and
-    run OpenWiki with a ROSA Vertex credential on a full-history clone of
-    openshift-online/rosa-boundary, then open or update a docs-only PR using a
-    GitHub App. Mounts only gcp-vertex-sa-key, github-app-app-id,
-    github-app-installation-id and github-app-pem from rosa-boundary/ci.
-    github-app-client-id is not required for installation-token auth.
-    The app must be installed on the repo with Contents and Pull requests
-    read/write permissions. The Google key must belong to
-    rosa-boundary@rosa-general.iam.gserviceaccount.com.
+    Install pinned Node/OpenWiki into a temporary directory and run OpenWiki
+    on the full-history clone from the prepare step. Mounts only the Vertex
+    key from rosa-boundary/ci. Passes a docs-only patch and the update exit
+    code to the publish step, even if OpenWiki only completes some pages.
