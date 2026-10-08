@@ -131,7 +131,7 @@ else
   IS_M6A_REGION="no"
   m6a_offerings=$(aws ec2 describe-instance-type-offerings --region "${REGION}" \
     --filters "Name=instance-type,Values=m6a.*" \
-    --query 'length(InstanceTypeOfferings)' --output text || echo 0)
+    --query 'length(InstanceTypeOfferings)' --output json || echo 0)
   if [[ "${m6a_offerings}" -gt 0 ]]; then
     IS_M6A_REGION="yes"
   fi
