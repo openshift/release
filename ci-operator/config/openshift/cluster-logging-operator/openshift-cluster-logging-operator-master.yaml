@@ -31,6 +31,10 @@ base_images:
     name: "4.21"
     namespace: origin
     tag: operator-sdk
+  ubi9:
+    name: ubi
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
     name: builder
@@ -57,6 +61,36 @@ images:
         as:
         - loki-operator-src
     to: cluster-logging-operator-e2e
+  - dockerfile_literal: |
+      FROM loki-operator-bundle AS loki-operator-bundle
+      FROM ubi9
+      COPY --from=loki-operator-bundle /manifests /manifests
+      COPY --from=loki-operator-bundle /metadata /metadata
+      COPY --from=loki-operator-bundle /tests /tests
+      RUN sed -i \
+        -e 's#quay.io/openshift-logging/loki-operator:0.1.0#registry.ci.openshift.org/logging/5.y:loki-operator#g' \
+        -e 's#quay.io/openshift-logging/loki:v3.7.8#registry.ci.openshift.org/logging/loki:v3.7.8#g' \
+        -e 's#quay.io/observatorium/api:latest#registry.ci.openshift.org/logging/lokistack-gateway:main#g' \
+        -e 's#quay.io/observatorium/opa-openshift:latest#registry.ci.openshift.org/logging/opa-openshift:main#g' \
+        -e 's#quay.io/openshift-logging/passthrough-gateway:latest#registry.ci.openshift.org/logging/5.y:passthrough-gateway#g' \
+        /manifests/loki-operator.clusterserviceversion.yaml
+      LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1 \
+            operators.operatorframework.io.bundle.manifests.v1=manifests/ \
+            operators.operatorframework.io.bundle.metadata.v1=metadata/ \
+            operators.operatorframework.io.bundle.package.v1=loki-operator \
+            operators.operatorframework.io.bundle.channels.v1=stable \
+            operators.operatorframework.io.bundle.channel.default.v1=stable \
+            operators.operatorframework.io.metrics.builder=operator-sdk-unknown \
+            operators.operatorframework.io.metrics.mediatype.v1=metrics+v1 \
+            operators.operatorframework.io.metrics.project_layout=go.kubebuilder.io/v4 \
+            operators.operatorframework.io.test.mediatype.v1=scorecard+v1 \
+            operators.operatorframework.io.test.config.v1=tests/scorecard/
+    from: ubi9
+    inputs:
+      loki-operator-bundle:
+        as:
+        - loki-operator-bundle
+    to: loki-operator-bundle-ci
 operator:
   bundles:
   - as: cluster-logging-operator-bundle
@@ -153,16 +187,15 @@ tests:
       OO_INSTALL_NAMESPACE: openshift-logging
     test:
     - as: deploy-loki-operator
-      cli: latest
       commands: |
         oc create namespace openshift-operators-redhat || true
-        oc annotate namespace openshift-operators-redhat openshift.io/node-selector=""
-        oc label namespace openshift-operators-redhat openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=10m --install-mode AllNamespaces --security-context-config restricted -n openshift-operators-redhat "$OO_BUNDLE_LOKI"
-        oc wait --for condition=Available --timeout=5m -n openshift-operators-redhat deployment loki-operator-controller-manager
+        oc annotate --overwrite namespace openshift-operators-redhat openshift.io/node-selector=""
+        oc label --overwrite namespace openshift-operators-redhat openshift.io/cluster-monitoring="true"
+        operator-sdk run bundle --timeout=10m --install-mode AllNamespaces --security-context-config restricted -n openshift-operators-redhat "$OO_BUNDLE_LOKI"
+        oc wait --for=condition=Available --timeout=5m -n openshift-operators-redhat deployment loki-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE_LOKI
-        name: pipeline:loki-operator-bundle
+        name: pipeline:loki-operator-bundle-ci
       from: cli-operator-sdk
       resources:
         requests:
