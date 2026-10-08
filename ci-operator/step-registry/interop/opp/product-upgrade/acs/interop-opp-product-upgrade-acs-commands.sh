@@ -73,6 +73,11 @@ ACS_SUBSCRIPTION_NAMESPACE="${ACS_SUBSCRIPTION_NAMESPACE:-rhacs-operator}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
 
+# Persist step output for build log validation
+if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+    exec > >(tee "${ARTIFACT_DIR}/acs-upgrade.log") 2>&1
+fi
+
 function CollectDiagnostics () {
     # Dump ACS subscription, CSV, Central, and SecuredCluster state to artifacts for debugging.
     typeset artifactFile="${ARTIFACT_DIR}/acs-upgrade-diagnostics.txt"
