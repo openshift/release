@@ -22,6 +22,12 @@ run_tls_scan() {
       OWNS_NAMESPACE=false
   fi
   local SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
+  # tls-scanner-mirror publishes a mirrored pull spec for clusters that cannot
+  # reach the build farm registry (e.g. baremetalds ipv6).
+  if [[ -f "${SHARED_DIR}/tls-scanner-image" ]]; then
+      SCANNER_IMAGE="$(<"${SHARED_DIR}/tls-scanner-image")"
+      echo "Using mirrored scanner image from ${SHARED_DIR}/tls-scanner-image: ${SCANNER_IMAGE}"
+  fi
   local ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 
   if [[ -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then
