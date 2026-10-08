@@ -1,0 +1,63 @@
+base_images:
+  ocp_5-0_cli:
+    name: "5.0"
+    namespace: ocp
+    tag: cli
+  openshift-tests:
+    name: "5.0"
+    namespace: ocp
+    tag: tests
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.0
+images:
+  items:
+  - dockerfile_literal: |
+      # Stage 1: Build stolostron-policy-collection extension binary
+      FROM src AS extension-builder
+      WORKDIR /go/src/github.com/openshift-eng/openshift-tests-extension/stolostron-policy-collection
+      RUN GO_COMPLIANCE_POLICY="exempt_all" go build -o stolostron-policy-collection ./cmd/stolostron-policy-collection/... && \
+          gzip -c stolostron-policy-collection > stolostron-policy-collection-ext.gz
+
+      # Stage 2: Create composite container
+      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+      # Copy openshift-tests from base image
+      COPY --from=openshift-tests /usr/bin/openshift-tests /usr/bin/openshift-tests
+      RUN chmod +x /usr/bin/openshift-tests
+
+      # Copy stolostron-policy-collection extension binary (compressed)
+      COPY --from=extension-builder /go/src/github.com/openshift-eng/openshift-tests-extension/stolostron-policy-collection/stolostron-policy-collection-ext.gz /usr/bin/stolostron-policy-collection-ext.gz
+
+      # Copy test scripts
+      COPY --from=extension-builder /go/src/github.com/openshift-eng/openshift-tests-extension/stolostron-policy-collection/scripts /usr/share/policy-collection-tests/scripts
+
+      # Set working directory
+      WORKDIR /usr/share/policy-collection-tests
+
+      # Default entrypoint
+      ENTRYPOINT ["/usr/bin/openshift-tests"]
+      CMD ["--help"]
+    from: ocp_5-0_cli
+    inputs:
+      openshift-tests:
+        as:
+        - openshift-tests
+      src:
+        as:
+        - src
+    to: acm-policy-tests-composite
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: openshift-tests-extension
+  variant: acm-policy-composite
