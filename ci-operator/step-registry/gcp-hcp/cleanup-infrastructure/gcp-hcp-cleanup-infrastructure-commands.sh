@@ -698,15 +698,25 @@ if [[ -n "${CUSTOMER_PROJECT}" ]]; then
   delete_project "${CUSTOMER_PROJECT}" "Customer" || CLEANUP_FAILED=1
 fi
 
+folder_cleanup_succeeded=false
 if [[ -n "${REGION_FOLDER_ID}" ]]; then
-  delete_folder "${REGION_FOLDER_ID}" "E2E Region" || CLEANUP_FAILED=1
+  if delete_folder "${REGION_FOLDER_ID}" "E2E Region"; then
+    folder_cleanup_succeeded=true
+  else
+    CLEANUP_FAILED=1
+  fi
 else
-  log "No E2E region folder ID available; skipping folder deletion"
+  log "ERROR: No E2E region folder ID available; retaining TFC workspace and state for auto-destroy"
+  CLEANUP_FAILED=1
 fi
 
 # Phase 6: Clear TFC workspace state
 log ""
-clear_tfc_workspace || CLEANUP_FAILED=1
+if [[ "${folder_cleanup_succeeded}" == "true" ]]; then
+  clear_tfc_workspace || CLEANUP_FAILED=1
+else
+  log "Skipping TFC workspace cleanup because folder cleanup did not complete"
+fi
 
 log ""
 if [[ "${CLEANUP_FAILED}" -ne 0 ]]; then

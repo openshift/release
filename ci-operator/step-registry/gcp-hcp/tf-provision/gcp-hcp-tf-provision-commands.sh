@@ -291,6 +291,34 @@ import_orphaned_firestore() {
   return 1
 }
 
+# A failed apply can leave resources in the remote state before Terraform has
+# produced its normal outputs. Preserve the folder ID when that happens so the
+# cleanup step can delete the per-run folder before it clears the workspace.
+recover_partial_folder_id() {
+  local folder_id=""
+
+  log "Attempting to recover E2E folder ID from partial Terraform state..."
+
+  # Prefer the root output when Terraform recorded it despite the failed apply.
+  folder_id=$(terraform output -json 2>>"${LOG}" | \
+    jq -er '.region.value.folder_id | strings | select(length > 0)' 2>>"${LOG}" || true)
+
+  # Root outputs are not guaranteed after a partial apply, but the folder
+  # resource itself is already present in remote state if it was created.
+  if [[ -z "${folder_id}" ]]; then
+    folder_id=$(terraform state show -no-color module.region.google_folder.region 2>>"${LOG}" | \
+      awk -F' = ' '$1 == "folder_id" { gsub(/"/, "", $2); print $2; exit }' || true)
+  fi
+
+  if [[ -z "${folder_id}" ]]; then
+    log "WARNING: Could not recover E2E folder ID from partial Terraform state"
+    return 1
+  fi
+
+  printf '%s\n' "${folder_id}" > "${SHARED_DIR}/region-folder-id"
+  log "Recovered E2E folder ID: ${folder_id}"
+}
+
 MAX_APPLY_ATTEMPTS=5
 apply_attempt=1
 apply_wait=30
@@ -318,6 +346,7 @@ while (( apply_attempt <= MAX_APPLY_ATTEMPTS )); do
     log "Error details:"
     log "${non_transient}"
     log "Check TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
+    recover_partial_folder_id || true
     exit 1
   fi
 
@@ -336,6 +365,7 @@ while (( apply_attempt <= MAX_APPLY_ATTEMPTS )); do
   else
     log "ERROR: Terraform apply failed after ${MAX_APPLY_ATTEMPTS} attempts"
     log "Check TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
+    recover_partial_folder_id || true
     exit 1
   fi
 done
