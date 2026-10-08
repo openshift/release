@@ -155,7 +155,7 @@ function set_test_provider() {
     # Currently all v6 deployments are disconnected, so we have to tell
     # openshift-tests to exclude those tests that require internet
     # access.
-    if [[ "${DS_IP_STACK}" != "v6" ]];
+    if [[ "${DS_IP_STACK}" != "v6" && "${DS_IP_STACK}" != "v6v4" ]];
     then
         export TEST_PROVIDER='{"type":"baremetal"}'
     else
@@ -224,7 +224,7 @@ EOF
 function mirror_release_image_for_disconnected_upgrade() {
     # All IPv6 clusters are disconnected and
     # release image should be mirrored for upgrades.
-    if [[ "${DS_IP_STACK}" == "v6" ]]; then
+    if [[ "${DS_IP_STACK}" == "v6" || "${DS_IP_STACK}" == "v6v4" ]]; then
       echo "### Mirroring release images for disconnected upgrade ###"
 
       JUNIT_IMAGE_FILE="$ARTIFACT_DIR/junit_image-mirroring-disconnected-upgrade.xml"
@@ -394,7 +394,7 @@ packet|equinix*)
         # digest are transparently redirected to the local mirror registry.
         # IDMS is GA from OCP 4.13; skip on older clusters.
         echo "### IDMS check: DS_IP_STACK=${DS_IP_STACK} DS_OPENSHIFT_VERSION=${DS_OPENSHIFT_VERSION}"
-        if [[ "${DS_IP_STACK}" == "v6" ]] && is_openshift_version_gte "4.13"; then
+        if [[ "${DS_IP_STACK}" == "v6" || "${DS_IP_STACK}" == "v6v4" ]] && is_openshift_version_gte "4.13"; then
             if [[ "${DEGRADED_NODE:-false}" == "true" ]]; then
                 # The master pool cannot finish a rollout once a master is offline.
                 # Require the degradation step to have applied this configuration
