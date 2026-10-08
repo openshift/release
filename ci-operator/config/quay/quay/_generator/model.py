@@ -34,6 +34,23 @@ DEPLOY_REF_BY_CLOUD = {
 DEPLOY_REF_BY_STORAGE = {
     "odf": "quay-deploy-odf",
 }
+# Cloud-managed databases for database: true jobs. libvirt has no entry:
+# expand rejects database: true for clouds missing from this map.
+DATABASE_BY_CLOUD = {
+    "aws": "rds",
+    "gcp": "sql",
+    "azure": "postgres",
+}
+DATABASE_PROVISION_REF_BY_CLOUD = {
+    "aws": "quay-database-intg-aws-rds",
+    "gcp": "quay-database-intg-gcp-sql",
+    "azure": "quay-database-intg-azure-postgres",
+}
+DATABASE_DEPROVISION_REF_BY_CLOUD = {
+    "aws": "quay-database-intg-aws-rds-deprovision",
+    "gcp": "quay-database-intg-gcp-sql-deprovision",
+    "azure": "quay-database-intg-azure-postgres-deprovision",
+}
 # No rhel-9-release-golang-1.25-openshift-<ocp> build root tag exists for older OCP (e.g. 4.14).
 # The build root only builds the Playwright runner image, so older clusters reuse it.
 BUILD_ROOT_OCP_FLOOR = "4.22"
@@ -62,6 +79,7 @@ class Cell:
     skip_if_only_changed: str | None = None
     fips: bool = False
     storage_override: str | None = None
+    database: bool = False
 
     @property
     def quay_version_dashed(self) -> str:
@@ -103,6 +121,33 @@ class Cell:
             raise ValueError(f"unsupported cloud {self.cloud!r}") from exc
 
     @property
+    def database_kind(self) -> str | None:
+        if not self.database:
+            return None
+        try:
+            return DATABASE_BY_CLOUD[self.cloud]
+        except KeyError as exc:
+            raise ValueError(f"database not supported for cloud {self.cloud!r}") from exc
+
+    @property
+    def database_provision_ref(self) -> str | None:
+        if not self.database:
+            return None
+        try:
+            return DATABASE_PROVISION_REF_BY_CLOUD[self.cloud]
+        except KeyError as exc:
+            raise ValueError(f"database not supported for cloud {self.cloud!r}") from exc
+
+    @property
+    def database_deprovision_ref(self) -> str | None:
+        if not self.database:
+            return None
+        try:
+            return DATABASE_DEPROVISION_REF_BY_CLOUD[self.cloud]
+        except KeyError as exc:
+            raise ValueError(f"database not supported for cloud {self.cloud!r}") from exc
+
+    @property
     def operator_channel(self) -> str:
         return f"stable-{self.quay_version}"
 
@@ -129,12 +174,18 @@ class Cell:
     @property
     def test_as(self) -> str:
         # No arch suffix: a non-amd64 arch is already in the variant, which
-        # Prow puts ahead of `as` in the job name.
-        base = (
-            f"{self.cloud}-{self.storage}-{self.source}"
-            if self.kind == "periodic"
-            else f"{self.cloud}-{self.storage}"
-        )
+        # Prow puts ahead of `as` in the job name. database: true inserts the
+        # cloud DB kind (rds/sql/postgres) before source; fips still suffixes.
+        # Filename/variant are unchanged, so sibling rows share one file.
+        parts = [self.cloud, self.storage]
+        if self.database:
+            kind = self.database_kind
+            if kind is None:
+                raise ValueError(f"database not supported for cloud {self.cloud!r}")
+            parts.append(kind)
+        if self.kind == "periodic":
+            parts.append(str(self.source))
+        base = "-".join(parts)
         return f"{base}-fips" if self.fips else base
 
     @property
@@ -164,6 +215,10 @@ class Cell:
             "variant": self.variant,
             "test_as": self.test_as,
             "deploy_ref": self.deploy_ref,
+            "database": self.database,
+            "database_kind": self.database_kind,
+            "database_provision_ref": self.database_provision_ref,
+            "database_deprovision_ref": self.database_deprovision_ref,
             "kind": self.kind,
             "layout": self.layout,
             "fips": self.fips,
