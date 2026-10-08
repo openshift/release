@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 SCRIPT = None
 
 
-class RequiredResources(unittest.TestCase):  # pylint: disable=too-many-public-methods
+class RequiredResources(unittest.TestCase):
     def run_full_script(self, scenario, target_channel='rhacs-4.11'):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -217,7 +217,7 @@ else:
         self.assertNotIn('Approving manual InstallPlan', result.stdout)
         self.assertIn('Cannot determine pre-upgrade operator version', result.stderr)
 
-    def validate(self, scenario):
+    def _validate(self, scenario):
         source = SCRIPT.read_text()
         body = source.split("function ValidateAcsHealth () {", 1)[1].split("# _xml_escape:", 1)[0]
         with tempfile.TemporaryDirectory() as tmp:
@@ -251,31 +251,31 @@ else:
             return subprocess.run(['bash', str(function)], env=env, capture_output=True, text=True, timeout=10, check=False)
 
     def test_healthy_required_resources(self):
-        result = self.validate('healthy')
+        result = self._validate('healthy')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('ACS health validation complete', result.stdout)
 
     def test_absent_central(self):
-        result = self.validate('absent-central')
+        result = self._validate('absent-central')
         self.assertEqual(result.returncode, 1)
         self.assertIn('No required Central CR found', result.stderr)
         self.assertNotIn('ACS health validation complete', result.stdout)
 
     def test_absent_securedcluster(self):
-        result = self.validate('absent-securedcluster')
+        result = self._validate('absent-securedcluster')
         self.assertEqual(result.returncode, 1)
         self.assertIn('No required SecuredCluster CR found', result.stderr)
         self.assertNotIn('ACS health validation complete', result.stdout)
 
     def test_central_discovery_error(self):
-        result = self.validate('denied-central')
+        result = self._validate('denied-central')
         self.assertEqual(result.returncode, 1)
         self.assertIn("Forbidden", result.stderr)
         self.assertIn('Unable to query required Central CR', result.stderr)
         self.assertNotIn('No required Central CR found', result.stderr)
 
     def test_securedcluster_discovery_error(self):
-        result = self.validate('denied-securedcluster')
+        result = self._validate('denied-securedcluster')
         self.assertEqual(result.returncode, 1)
         self.assertIn("Forbidden", result.stderr)
         self.assertIn('Unable to query required SecuredCluster CR', result.stderr)
