@@ -14,11 +14,13 @@ when the ratio exceeds SKIP_RATIO_THRESHOLD (unless FAIL_ON_BREACH
 is "false").
 """
 
+import hashlib
 import math
 import os
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 # Global counter for XML parse failures
 _parse_failures = 0
@@ -40,12 +42,12 @@ def parse_junit(path):
       as incomplete evidence
     - Failure/skipped child elements are counted directly for accuracy
     """
+    global _parse_failures
     suites = []
 
     # Guard: empty or effectively-empty files
     try:
         if path.stat().st_size == 0:
-            global _parse_failures
             _parse_failures += 1
             print(f"WARNING: skipping {path} — file is empty", file=sys.stderr)
             return suites
@@ -54,7 +56,7 @@ def parse_junit(path):
 
     try:
         tree = ET.parse(path)
-    except ET.ParseError as exc:
+    except (ET.ParseError, OSError) as exc:
         _parse_failures += 1
         print(f"WARNING: skipping {path} — XML parse error: {exc}", file=sys.stderr)
         return suites
@@ -63,10 +65,11 @@ def parse_junit(path):
 
     # Collect <testsuite> elements regardless of root tag
     if root.tag == "testsuite":
-        suite_elements = [root]
+        suite_elements = list(root.iter("testsuite"))
     elif root.tag == "testsuites":
-        suite_elements = root.findall("testsuite")
+        suite_elements = list(root.iter("testsuite"))
     else:
+        _parse_failures += 1
         print(f"WARNING: skipping {path} — unexpected root <{root.tag}>", file=sys.stderr)
         return suites
 
@@ -76,23 +79,43 @@ def parse_junit(path):
 
         # Cross-validate: derive a missing count from testcase children,
         # but reject suites whose declared count includes missing cases.
-        tests_attr = int(ts.get("tests", 0))
-        if tests_attr > tc_count:
+        try:
+            tests_attr = int(ts.get("tests", 0))
+            failures = int(ts.get("failures", 0))
+            errors = int(ts.get("errors", 0))
+            skipped_attr = int(ts.get("skipped", ts.get("skip", 0)))
+            if any(value < 0 for value in (tests_attr, failures, errors, skipped_attr)):
+                raise ValueError("negative JUnit count")
+        except (ValueError, TypeError) as exc:
+            _parse_failures += 1
+            print(f"WARNING: invalid counts in {path}: {exc}", file=sys.stderr)
+            continue
+        # Parent suite counts aggregate descendants. Validate the aggregate,
+        # but count each direct testcase only in its owning suite.
+        descendants = list(ts.iter("testcase"))
+        if tests_attr > len(descendants):
             _parse_failures += 1
             suite_name = ts.get("name", path.name)
             print(
                 f"WARNING: skipping suite {suite_name!r} in {path} — "
                 f"declares tests={tests_attr} but contains only "
-                f"{tc_count} <testcase> child element(s)",
+                f"{len(descendants)} <testcase> descendant element(s)",
                 file=sys.stderr,
             )
             continue
-        tests = max(tests_attr, tc_count)
-
-        failures = int(ts.get("failures", 0))
-        errors = int(ts.get("errors", 0))
-        skipped_attr = int(ts.get("skipped", ts.get("skip", 0)))
-
+        if ts.findall("testsuite"):
+            child_outcomes = (
+                sum(tc.find("failure") is not None for tc in descendants),
+                sum(tc.find("error") is not None for tc in descendants),
+                sum(tc.find("skipped") is not None for tc in descendants),
+            )
+            if (failures > child_outcomes[0] or errors > child_outcomes[1]
+                    or skipped_attr > child_outcomes[2]):
+                _parse_failures += 1
+                print(f"WARNING: parent outcome counts lack testcase evidence in {path}", file=sys.stderr)
+                continue
+            failures = errors = skipped_attr = 0
+        tests = tc_count
         # Some generators omit the skipped attribute but include
         # <skipped/> child elements inside <testcase>.
         skipped_from_children = sum(
@@ -106,7 +129,19 @@ def parse_junit(path):
         )
         failures = max(failures, failures_from_children)
 
-        passed = max(0, tests - failures - errors - skipped_attr)
+        errors_from_children = sum(
+            1 for tc in testcases if tc.find("error") is not None
+        )
+        errors = max(errors, errors_from_children)
+        if failures + errors + skipped_attr > tests:
+            _parse_failures += 1
+            print(f"WARNING: contradictory outcome counts in {path}", file=sys.stderr)
+            continue
+
+        if not testcases:
+            continue
+
+        passed = tests - failures - errors - skipped_attr
 
         suites.append({
             "name": ts.get("name", path.name),
@@ -126,11 +161,11 @@ def write_evidence_incomplete_junit(artifact_dir, threshold, reason):
     out = Path(artifact_dir) / "skip-ratio-gate.xml"
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        f'<testsuite name="lp-interop--OPP--skip-gate" tests="1" failures="0">',
+        f'<testsuite name="lp-interop--OPP--skip-gate" tests="1" failures="0" skipped="1">',
         f'  <testcase name="skip-ratio-gate (evidence-incomplete)" classname="interop.opp.skip-ratio-gate">',
-        f'    <system-out>EVIDENCE-INCOMPLETE: {reason}. '
+        f'    <skipped message="EVIDENCE-INCOMPLETE">{escape(reason)}. '
         f'Skip-ratio gate requires valid test results to measure. '
-        f'Threshold={threshold:.4f}</system-out>',
+        f'Threshold={threshold:.4f}</skipped>',
         '  </testcase>',
         '</testsuite>',
     ]
@@ -215,7 +250,18 @@ def main():
         sys.exit(0)
 
     all_suites = []
+    seen_artifacts = set()
     for xf in xml_files:
+        try:
+            fingerprint = hashlib.sha256(xf.read_bytes()).digest()
+        except OSError:
+            # parse_junit owns the incomplete-evidence reporting.
+            all_suites.extend(parse_junit(xf))
+            continue
+        if fingerprint in seen_artifacts:
+            print(f"WARNING: duplicate identical JUnit artifact ignored: {xf}", file=sys.stderr)
+            continue
+        seen_artifacts.add(fingerprint)
         all_suites.extend(parse_junit(xf))
 
     if _parse_failures:
