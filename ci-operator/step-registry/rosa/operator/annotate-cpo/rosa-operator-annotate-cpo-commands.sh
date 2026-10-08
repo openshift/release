@@ -34,7 +34,10 @@ if [[ -z "${CPO_OPERATOR_IMAGE:-}" ]]; then
 fi
 log "PR-built control plane operator image: ${CPO_OPERATOR_IMAGE}"
 
-# Log into OCM
+# Log into OCM. Disable tracing due to credential handling (secrets must not be
+# exposed through expanded xtrace output of the reads or the ocm login arguments).
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 OCM_TOKEN=$(read_profile_file "ocm-token")
@@ -46,8 +49,10 @@ elif [[ -n "${OCM_TOKEN}" ]]; then
   ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 else
   log "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
+  $WAS_TRACING && set -x
   exit 1
 fi
+$WAS_TRACING && set -x
 
 # Resolve the hosted cluster and the management cluster that actually runs it.
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
