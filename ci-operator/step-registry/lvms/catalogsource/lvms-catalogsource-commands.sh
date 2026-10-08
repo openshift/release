@@ -593,28 +593,26 @@ function main {
 	# Extract source commit from catalog image for z-stream integration test builds.
 	# Only needed when ZSTREAM_VERSION is set — non-z-stream tests use pre-built images.
 	if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
-		local commit image_info_flags="" oc_stderr=""
+		local commit
+		local -a image_info_flags=()
 		if [[ "$DISCONNECTED" == "true" ]]; then
-			image_info_flags="--insecure -a /tmp/new-dockerconfigjson"
+			image_info_flags=(--insecure -a /tmp/new-dockerconfigjson)
 		fi
-		oc_stderr=$(mktemp)
-		commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
-			2>"${oc_stderr}" | jq -r '.config.config.Labels["vcs-ref"]') || true
+		commit=$(oc image info "${image_info_flags[@]}" --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+			2>/dev/null | jq -r '.config.config.Labels["vcs-ref"]') || true
 		# Retry with pull-secret auth if unauthenticated attempt failed
 		if [[ -z "${commit}" || "${commit}" == "null" ]] && [[ "$DISCONNECTED" != "true" ]]; then
 			echo "oc image info failed, retrying with pull-secret authentication..."
 			commit=$(oc image info -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
-				2>>"${oc_stderr}" | jq -r '.config.config.Labels["vcs-ref"]') || true
+				2>/dev/null | jq -r '.config.config.Labels["vcs-ref"]') || true
 		fi
 		# Fall back to skopeo whenever oc image info cannot obtain the source commit
 		if [[ -z "${commit}" || "${commit}" == "null" ]] && command -v skopeo &>/dev/null; then
 			echo "oc image info did not return vcs-ref, falling back to skopeo inspect..."
-			cat "${oc_stderr}"
 			commit=$(skopeo inspect --authfile "${CLUSTER_PROFILE_DIR}/pull-secret" --override-os=linux --override-arch=amd64 \
 				"docker://${LVM_INDEX_IMAGE}" 2>/dev/null \
 				| jq -r '.Labels["vcs-ref"]') || true
 		fi
-		rm -f "${oc_stderr}"
 		if [[ -z "${commit}" || "${commit}" == "null" ]]; then
 			echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
 			return 1
