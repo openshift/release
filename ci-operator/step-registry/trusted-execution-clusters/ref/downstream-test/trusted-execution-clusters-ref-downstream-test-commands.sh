@@ -94,6 +94,7 @@ STORAGE_KEY=$(az storage account keys list --resource-group "${RESOURCE_GROUP}" 
 echo "Creating container and uploading test blob"
 az storage container create --name test --account-name "${STORAGE_ACCOUNT}" --account-key "${STORAGE_KEY}" --output none
 
+# TODO if this works at all, also do it in the rg the cluster is in after cluster install
 echo "azure access check $(date -u --rfc-3339=seconds)" > /tmp/test-blob.txt
 az storage blob upload \
   --account-name "${STORAGE_ACCOUNT}" \
