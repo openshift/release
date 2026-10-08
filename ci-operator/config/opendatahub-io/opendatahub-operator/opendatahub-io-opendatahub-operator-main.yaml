@@ -159,6 +159,38 @@ tests:
           cpu: 2000m
           memory: 3Gi
       timeout: 3h0m0s
+    - as: enable-aipipelines-for-tls-scan
+      cli: latest
+      commands: |
+        oc patch datasciencecluster.v2.datasciencecluster.opendatahub.io default-dsc \
+          --type=merge \
+          -p '{"spec":{"components":{"aipipelines":{"managementState":"Managed"}}}}'
+        oc wait --for=condition=Ready \
+          aipipelines.components.platform.opendatahub.io/default-aipipelines \
+          --timeout=20m
+        oc apply -f - <<'EOF'
+        apiVersion: datasciencepipelinesapplications.opendatahub.io/v1
+        kind: DataSciencePipelinesApplication
+        metadata:
+          name: aipipelines-tls-scan
+          namespace: redhat-ods-applications
+        spec:
+          dspVersion: v2
+          podToPodTLS: true
+          objectStorage:
+            minio:
+              image: quay.io/opendatahub/minio:RELEASE.2019-08-14T20-37-41Z-license-compliance
+        EOF
+        oc wait --for=condition=Ready \
+          datasciencepipelinesapplications.opendatahub.io/aipipelines-tls-scan \
+          -n redhat-ods-applications \
+          --timeout=20m
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 45m0s
     - ref: tls-scanner-run
     workflow: generic-claim
 - as: opendatahub-operator-image-mirror
