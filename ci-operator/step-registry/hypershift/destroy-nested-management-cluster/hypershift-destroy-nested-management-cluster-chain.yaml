@@ -56,12 +56,15 @@ chain:
       \) -delete
       # 3. Redact known credential formats while preserving opaque identifiers
       #    such as Kubernetes UIDs, which are useful for correlating resources.
+      # Redact long base64-like values even when logs omit a credential-key label;
+      # the base64 alphabet excludes hyphens, so Kubernetes UUIDs remain intact.
       find "${DUMP_WORK_DIR}/output" -type f -exec sed -i.bak -E \
         -e 's/-----BEGIN [A-Z0-9 ]+-----.*-----END [A-Z0-9 ]+-----/REDACTED_PEM/g' \
         -e '/-----BEGIN [A-Z0-9 ]+-----/,/-----END [A-Z0-9 ]+-----/d' \
         -e 's/^([[:space:]]*(-[[:space:]]+)?"?authorization"?[[:space:]]*:[[:space:]]*)[^[:space:]#|>].*/\1"REDACTED"/I' \
         -e 's|[Bb][Ee][Aa][Rr][Ee][Rr][[:space:]]+[A-Za-z0-9._~+/=-]+|Bearer REDACTED|g' \
         -e 's|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_.-]*|REDACTED_JWT|g' \
+        -e 's|[A-Za-z0-9+/]{32,}={0,2}|REDACTED_BASE64|g' \
         -e 's#(AKIA|ASIA)[0-9A-Z]{16}#REDACTED_AWS_ACCESS_KEY#g' \
         -e "s/(\"?[[:alnum:]_.-]*(password|passwd|passphrase|token|credential|client[_-]?secret|secret[_-]?key|secret|private[_-]?key|client[_-]?key|api[_-]?key|access[_-]?key|shared[_-]?key|authorization|bearer[_-]?token|kubeconfig)\"?[[:space:]]*[:=][[:space:]]*)(\"[^\"]*\"|'[^']*'|[^[:space:],;&#|>]+)/\\1\"REDACTED\"/Ig" \
         -e "s/(--?[[:alnum:]_-]*(password|passwd|passphrase|token|secret|credential|private[_-]?key|client[_-]?key|api[_-]?key|access[_-]?key|shared[_-]?key|authorization|bearer[_-]?token)[[:alnum:]_-]*[[:space:]]+)(\"[^\"]*\"|'[^']*'|[^[:space:],;&]+)/\\1REDACTED/Ig" \
