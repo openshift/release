@@ -1,0 +1,28 @@
+ref:
+  as: medik8s-source-upgrade
+  from: source-upgrade-test-runner
+  cli: latest
+  commands: medik8s-source-upgrade-commands.sh
+  nested_podman: true
+  env:
+  - name: SOURCE_OPERATOR
+    default: ""
+    documentation: Operator to build and upgrade (nhc, sbr, snr, far, mdr, or nmo).
+  - name: CONSOLE_PLUGIN_IMAGE
+    default: quay.io/medik8s/node-remediation-console@sha256:80d9e74d0374b72d71988d6da96ff9adeefeb1ab90f4893df65b1b3ab3ecbdd3
+    documentation: Pinned NHC console plugin image; ignored by the other operators.
+  - name: MUST_GATHER_IMAGE
+    default: quay.io/medik8s/must-gather@sha256:a3ba0753e60517c2a7cff68eca778c23198787af36e8214e8838d2c7fc676b97
+    documentation: Pinned NHC must-gather image; ignored by the other operators.
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  documentation: |-
+    Builds the operator checkout selected by Prow, its bundle, and an FBC using
+    make dev-olm-catalog-push with Podman. Publishes temporary images to ttl.sh,
+    verifies the bundle/version, and runs rhwa-system-tests main's
+    tier:upgrade-operator tests. SBR also builds its agent; NHC supplies pinned
+    related images. Version/image and configuration-preservation checks remain
+    enabled. Source images need no release IDMS. SBR needs no ODF, FAR does not
+    fence machines, NHC and SNR remediate workers, and NMO drains a worker.
