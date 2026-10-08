@@ -1,18 +1,14 @@
 base_images:
   aws-efs-csi-operator-create-efs:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: aws-efs-csi-operator-create-efs
   claude-ai-helpers:
     name: claude-ai-helpers
     namespace: ci
     tag: latest
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   upi-installer:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -24,9 +20,10 @@ prowgen:
   enable_secrets_store_csi_driver: true
 releases:
   latest:
-    release:
-      channel: stable
-      version: "4.22"
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -46,7 +43,7 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation
       TEST_NAME: e2e-far-aws
@@ -84,7 +81,7 @@ tests:
       ECO_TEST_FEATURES: far-operator
       ECO_TEST_LABELS: operator:far && operator:nhc && tier:interop
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation,node-healthcheck-operator
       TEST_NAME: e2e-far-nhc-interop-aws
@@ -124,7 +121,7 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: machine-deletion-remediation,node-healthcheck-operator
       TEST_NAME: e2e-mdr-aws
@@ -162,7 +159,7 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: node-healthcheck-operator,self-node-remediation
       TEST_NAME: e2e-nhc-aws
@@ -201,7 +198,7 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: node-maintenance-operator
       TEST_NAME: e2e-nmo-aws
@@ -240,8 +237,9 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      OCP_VERSION: "500"
+      ODF_OPERATOR_CHANNEL: stable-5.0
+      ODF_VERSION_MAJOR_MINOR: "5.0"
       OO_CHANNEL: stable
       OPERATORS: storage-based-remediation,node-healthcheck-operator
       TEST_NAME: e2e-sbr-aws-odf
@@ -251,9 +249,7 @@ tests:
     - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
-    - ref: odf-prepare-cluster
-    - ref: operatorhub-subscribe-odf-operator
-    - ref: odf-apply-storage-cluster
+    - ref: medik8s-deploy-odf-dev-catalog
     - ref: medik8s-sbr-nfs-dynamic-provisioner
     - as: e2e-test
       cli: latest
@@ -284,7 +280,7 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: storage-based-remediation,node-healthcheck-operator
       TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
@@ -318,105 +314,6 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 - always_run: false
-  as: e2e-sbr-hypershift-aws-odf
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      ECO_TEST_FEATURES: sbr-operator
-      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
-        && !tier:upgrade-cluster && !tier:interop'
-      HYPERSHIFT_INSTANCE_TYPE: m5.4xlarge
-      HYPERSHIFT_NODE_COUNT: "3"
-      OCP_VERSION: "422"
-      ODF__STORAGE_CLUSTER_WAIT_TIMEOUT: 15m
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
-      ODF_SC_AVAILABLE_FALLBACK: "true"
-      OO_CHANNEL: stable
-      OPERATORS: storage-based-remediation,node-healthcheck-operator
-      SKIP_IDMS: "true"
-      TEST_NAME: e2e-sbr-hypershift-aws-odf
-      TEST_STEPS: e2e-test
-    post:
-    - ref: medik8s-analyze-e2e-failure
-    - ref: medik8s-sbr-hypershift-restore-kubeconfig
-    - chain: hypershift-dump
-    - chain: hypershift-aws-destroy
-    - chain: hypershift-destroy-nested-management-cluster
-    test:
-    - ref: medik8s-sbr-hypershift-switch-kubeconfig
-    - ref: medik8s-sbr-hypershift-wait-nodes
-    - chain: medik8s-setup
-    - ref: odf-prepare-cluster
-    - ref: operatorhub-subscribe-odf-operator
-    - ref: odf-apply-storage-cluster
-    - ref: medik8s-sbr-nfs-dynamic-provisioner
-    - as: e2e-test
-      cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
-        make run-tests
-      env:
-      - name: ECO_TEST_FEATURES
-      - name: ECO_TEST_LABELS
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: medik8s-sbr-hypershift
-- always_run: false
-  as: e2e-sbr-hypershift-persistent-aws-odf
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      ECO_TEST_FEATURES: sbr-operator
-      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
-        && !tier:upgrade-cluster && !tier:interop'
-      HYPERSHIFT_INSTANCE_TYPE: m5.4xlarge
-      HYPERSHIFT_NODE_COUNT: "3"
-      OCP_VERSION: "422"
-      ODF__STORAGE_CLUSTER_WAIT_TIMEOUT: 15m
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
-      ODF_SC_AVAILABLE_FALLBACK: "true"
-      OO_CHANNEL: stable
-      OPERATORS: storage-based-remediation,node-healthcheck-operator
-      SKIP_IDMS: "true"
-      TEST_NAME: e2e-sbr-hypershift-persistent-aws-odf
-      TEST_STEPS: e2e-test
-    post:
-    - ref: medik8s-analyze-e2e-failure
-    - ref: medik8s-sbr-hypershift-restore-kubeconfig
-    - chain: hypershift-dump
-    - chain: hypershift-aws-destroy
-    test:
-    - ref: medik8s-sbr-hypershift-switch-kubeconfig
-    - ref: medik8s-sbr-hypershift-wait-nodes
-    - chain: medik8s-setup
-    - ref: odf-prepare-cluster
-    - ref: operatorhub-subscribe-odf-operator
-    - ref: odf-apply-storage-cluster
-    - ref: medik8s-sbr-nfs-dynamic-provisioner
-    - as: e2e-test
-      cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
-        make run-tests
-      env:
-      - name: ECO_TEST_FEATURES
-      - name: ECO_TEST_LABELS
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: medik8s-sbr-hypershift-persistent
-- always_run: false
   as: e2e-snr-aws
   capabilities:
   - intranet
@@ -429,7 +326,7 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: self-node-remediation,node-healthcheck-operator
       TEST_NAME: e2e-snr-aws
@@ -457,7 +354,7 @@ tests:
 - as: e2e-far-weekly-aws
   capabilities:
   - intranet
-  cron: 0 4 * * 2
+  cron: 0 16 * * 2
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -468,10 +365,10 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation
-      POLARION_TESTRUN_ID: RHWA-FAR-4.22-weekly
+      POLARION_TESTRUN_ID: RHWA-FAR-5.0-weekly
       REPORT_CASE_TAG: polarion-testcase-id
       TEST_NAME: e2e-far-weekly-aws
       TEST_STEPS: e2e-test
@@ -503,7 +400,7 @@ tests:
 - as: e2e-sbr-weekly-aws-odf
   capabilities:
   - intranet
-  cron: 0 8 * * 2
+  cron: 0 20 * * 2
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -514,11 +411,12 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      OCP_VERSION: "500"
+      ODF_OPERATOR_CHANNEL: stable-5.0
+      ODF_VERSION_MAJOR_MINOR: "5.0"
       OO_CHANNEL: stable
       OPERATORS: storage-based-remediation,node-healthcheck-operator
-      POLARION_TESTRUN_ID: RHWA-SBR-4.22-weekly
+      POLARION_TESTRUN_ID: RHWA-SBR-5.0-weekly
       REPORT_CASE_TAG: polarion-testcase-id
       TEST_NAME: e2e-sbr-weekly-aws-odf
       TEST_STEPS: e2e-test
@@ -528,9 +426,7 @@ tests:
     - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
-    - ref: odf-prepare-cluster
-    - ref: operatorhub-subscribe-odf-operator
-    - ref: odf-apply-storage-cluster
+    - ref: medik8s-deploy-odf-dev-catalog
     - ref: medik8s-sbr-nfs-dynamic-provisioner
     - as: e2e-test
       cli: latest
@@ -552,7 +448,7 @@ tests:
 - as: e2e-snr-weekly-aws
   capabilities:
   - intranet
-  cron: 0 4 * * 3
+  cron: 0 16 * * 3
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -561,7 +457,7 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: self-node-remediation,node-healthcheck-operator
       TEST_NAME: e2e-snr-weekly-aws
@@ -589,7 +485,7 @@ tests:
 - as: e2e-mdr-weekly-aws
   capabilities:
   - intranet
-  cron: 0 4 * * 4
+  cron: 0 16 * * 4
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -598,7 +494,7 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: machine-deletion-remediation,node-healthcheck-operator
       TEST_NAME: e2e-mdr-weekly-aws
@@ -626,7 +522,7 @@ tests:
 - as: e2e-sbr-weekly-aws-efs
   capabilities:
   - intranet
-  cron: 0 8 * * 3
+  cron: 0 20 * * 3
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -637,10 +533,10 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: storage-based-remediation,node-healthcheck-operator
-      POLARION_TESTRUN_ID: RHWA-SBR-4.22-weekly-efs
+      POLARION_TESTRUN_ID: RHWA-SBR-5.0-weekly-efs
       REPORT_CASE_TAG: polarion-testcase-id
       TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
       TEST_NAME: e2e-sbr-weekly-aws-efs
@@ -678,7 +574,7 @@ tests:
 - as: e2e-nhc-weekly-aws
   capabilities:
   - intranet
-  cron: 0 4 * * 5
+  cron: 0 16 * * 5
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -687,7 +583,7 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: node-healthcheck-operator,self-node-remediation
       TEST_NAME: e2e-nhc-weekly-aws
@@ -716,7 +612,7 @@ tests:
 - as: e2e-far-nhc-interop-weekly-aws
   capabilities:
   - intranet
-  cron: 0 12 * * 5
+  cron: 0 0 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -726,10 +622,10 @@ tests:
       ECO_TEST_FEATURES: far-operator
       ECO_TEST_LABELS: operator:far && operator:nhc && tier:interop
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation,node-healthcheck-operator
-      POLARION_TESTRUN_ID: RHWA-FAR-NHC-4.22-interop-weekly
+      POLARION_TESTRUN_ID: RHWA-FAR-NHC-5.0-interop-weekly
       REPORT_CASE_TAG: polarion-testcase-id
       TEST_NAME: e2e-far-nhc-interop-weekly-aws
       TEST_STEPS: e2e-test
@@ -762,7 +658,7 @@ tests:
 - as: e2e-nmo-weekly-aws
   capabilities:
   - intranet
-  cron: 0 8 * * 4
+  cron: 0 20 * * 4
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -771,7 +667,7 @@ tests:
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
-      OCP_VERSION: "422"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: node-maintenance-operator
       TEST_NAME: e2e-nmo-weekly-aws
@@ -800,4 +696,4 @@ zz_generated_metadata:
   branch: main
   org: openshift
   repo: rhwa-system-tests
-  variant: 4.22-konflux
+  variant: 5.0-konflux
