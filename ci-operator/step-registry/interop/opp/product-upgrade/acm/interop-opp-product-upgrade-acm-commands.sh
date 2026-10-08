@@ -531,7 +531,7 @@ _finalize_exit() {
   # Product no-op results should not emit trace or cluster diagnostics.
   if [[ "${_EXIT_CLASS}" == "product" ]]; then
     (exit 0); _opp_cleanup
-    exit 0
+    exit "${rc}"
   fi
   (exit "${rc}"); _opp_cleanup
   if (( rc != 0 )); then
@@ -605,7 +605,7 @@ function Main () {
       _JUNIT_KIND="acm-upgrade-not-needed"
       _JUNIT_MESSAGE="Channel ${currentChannel} head (${head}) already installed -- nothing to upgrade"
       _EXIT_CLASS="product"
-      return 1   # _finalize_exit will see product -> exit 0, but emit a JUnit failure
+      return 1   # _finalize_exit preserves this status and emits a JUnit failure
     elif (( resolve_rc != 0 )); then
       _JUNIT_KIND="resolve-target-channel"
       _JUNIT_MESSAGE="ResolveTargetChannel failed"
