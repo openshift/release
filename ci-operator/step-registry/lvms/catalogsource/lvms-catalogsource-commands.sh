@@ -610,12 +610,24 @@ function main {
 		commit=""
 		for attempt in 1 2 3; do
 			echo "Reading vcs-ref from catalog image on node ${node_name} (attempt ${attempt}/3)"
-			# podman pull output -> stderr so it stays visible in the log while only
-			# the label lands on stdout. "|| commit=''" stops set -e from exiting at
-			# this assignment on a failed oc debug, so the retry/error path still runs.
-			commit=$(oc -n debug-qe debug "node/${node_name}" -- chroot /host bash -c \
-				"podman pull -q --authfile /var/lib/kubelet/config.json '${LVM_INDEX_IMAGE}' >&2 && \
-				 podman image inspect '${LVM_INDEX_IMAGE}' --format '{{ index .Labels \"vcs-ref\" }}'" \
+
+			# Pull and inspect run in separate oc debug sessions on purpose. oc debug
+			# merges the pod's stdout and stderr onto one stream, so a single session
+			# that both pulls and inspects would leak "podman pull"'s image-ID line
+			# into the captured label and produce a bogus ref. Pulling on its own lets
+			# its output (including any failure) flow to the step log for debugging,
+			# while the inspect session captures only the label.
+			if ! oc -n debug-qe debug "node/${node_name}" -- chroot /host \
+				podman pull -q --authfile /var/lib/kubelet/config.json "${LVM_INDEX_IMAGE}"; then
+				echo "podman pull of catalog image failed (see output above), retrying in 15s..."
+				[[ ${attempt} -lt 3 ]] && sleep 15
+				continue
+			fi
+
+			# "|| commit=''" stops set -e from exiting on a failed oc debug so the
+			# retry/error path still runs.
+			commit=$(oc -n debug-qe debug "node/${node_name}" -- chroot /host \
+				podman image inspect "${LVM_INDEX_IMAGE}" --format '{{ index .Labels "vcs-ref" }}' \
 				| tr -d '[:space:]') || commit=""
 			[[ -n "${commit}" && "${commit}" != "<novalue>" ]] && break
 			if [[ ${attempt} -lt 3 ]]; then
