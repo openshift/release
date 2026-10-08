@@ -11,7 +11,7 @@ SCRIPT = None
 
 
 class RequiredResources(unittest.TestCase):
-    def run_full_script(self, scenario):
+    def run_full_script(self, scenario, target_channel='rhacs-4.11'):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             mock = root / "oc"
@@ -23,7 +23,7 @@ kind = args[1]
 state = Path(os.environ['ACS_STATE'])
 scenario = os.environ['ACS_FIXTURE']
 if args[0] == 'patch':
-    if kind == 'subscription':
+    if kind in ('subscription', 'installplan'):
         state.write_text('upgraded')
     print('patched')
 elif kind == 'subscription':
@@ -37,10 +37,20 @@ elif kind == 'subscription':
     else:
         sys.exit(2)
 elif kind == 'installplan':
-    print('Automatic' if 'approval' in args[-1] else 'Complete')
+    if 'approval' in args[-1]:
+        print('Manual' if scenario.startswith('same-channel-') else 'Automatic')
+    else:
+        print('RequiresApproval' if scenario.startswith('same-channel-') else 'Complete')
 elif kind == 'csv':
     if 'spec.version' in args[-1]:
-        print('4.11.4' if args[2] == 'rhacs-new' else '4.10.9')
+        if scenario in ('no-initial-version', 'same-channel-no-initial-version') and args[2] == 'rhacs-old':
+            pass
+        elif scenario == 'post-version-empty' and args[2] == 'rhacs-new':
+            pass
+        elif scenario in ('post-version-unchanged', 'same-channel-post-version-unchanged') and args[2] == 'rhacs-new':
+            print('4.10.9')
+        else:
+            print('4.11.4' if args[2] == 'rhacs-new' else '4.10.9')
     else:
         print('Succeeded')
 elif kind in ('central', 'securedcluster'):
@@ -70,7 +80,7 @@ else:
             script.write_text(SCRIPT.read_text())
             env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
                        ACS_FIXTURE=scenario, ACS_STATE=str(root / 'upgraded'),
-                       ACS_TARGET_CHANNEL='rhacs-4.11', ARTIFACT_DIR=str(artifact),
+                       ACS_TARGET_CHANNEL=target_channel, ARTIFACT_DIR=str(artifact),
                        SHARED_DIR=str(shared))
             result = subprocess.run(['bash', str(script)], env=env, capture_output=True,
                                     text=True, timeout=10, check=False)
@@ -90,8 +100,8 @@ else:
         self.assertTrue(version)
         self.assertFalse(skipped)
 
-    def assert_full_failure(self, scenario):
-        result, junit, shared, summary, version, skipped = self.run_full_script(scenario)
+    def assert_full_failure(self, scenario, target_channel='rhacs-4.11'):
+        result, junit, shared, summary, version, skipped = self.run_full_script(scenario, target_channel)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(junit.get('failures'), '1')
         self.assertIsNotNone(junit.find('.//failure'))
@@ -114,6 +124,62 @@ else:
 
     def test_full_script_securedcluster_discovery_error(self):
         self.assert_full_failure('denied-securedcluster')
+
+    def test_full_script_no_initial_version(self):
+        result, junit, shared, summary, version, skipped = self.run_full_script('no-initial-version')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(junit.get('failures'), '1')
+        self.assertFalse(summary)
+        self.assertFalse(version)
+        self.assertIn('Cannot determine pre-upgrade operator version', result.stderr)
+        self.assertNotIn('Patching subscription channel', result.stdout)
+
+    def test_full_script_post_version_empty(self):
+        result, junit, shared, summary, version, skipped = self.run_full_script('post-version-empty')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(junit.get('failures'), '1')
+        self.assertFalse(summary)
+        self.assertFalse(version)
+        self.assertIn('Post-upgrade version is empty', result.stderr)
+
+    def test_full_script_post_version_unchanged(self):
+        result, junit, shared, summary, version, skipped = self.run_full_script('post-version-unchanged')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(junit.get('failures'), '1')
+        self.assertFalse(summary)
+        self.assertFalse(version)
+        self.assertIn('Operator version unchanged after upgrade', result.stderr)
+
+    def test_full_script_same_channel_healthy(self):
+        result, junit, shared, summary, version, skipped = self.run_full_script(
+            'same-channel-healthy', target_channel='rhacs-4.10')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(junit.get('failures'), '0')
+        self.assertEqual(shared.get('failures'), '0')
+        self.assertTrue(summary)
+        self.assertTrue(version)
+        self.assertFalse(skipped)
+        self.assertNotIn('Patching subscription channel', result.stdout)
+        self.assertIn('Approving manual InstallPlan', result.stdout)
+
+    def test_full_script_same_channel_no_initial_version(self):
+        result, junit, shared, summary, version, skipped = self.run_full_script(
+            'same-channel-no-initial-version', target_channel='rhacs-4.10')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(junit.get('failures'), '1')
+        self.assertFalse(summary)
+        self.assertFalse(version)
+        self.assertIn('Cannot determine pre-upgrade operator version', result.stderr)
+        self.assertNotIn('Approving manual InstallPlan', result.stdout)
+
+    def test_full_script_same_channel_post_version_unchanged(self):
+        result, junit, shared, summary, version, skipped = self.run_full_script(
+            'same-channel-post-version-unchanged', target_channel='rhacs-4.10')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(junit.get('failures'), '1')
+        self.assertFalse(summary)
+        self.assertFalse(version)
+        self.assertIn('Operator version unchanged after upgrade', result.stderr)
 
     def validate(self, scenario):
         source = SCRIPT.read_text()

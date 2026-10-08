@@ -123,6 +123,17 @@ function GetInstalledVersion () {
         -o jsonpath='{.spec.version}' || true
 }
 
+function RequireInitialVersion () {
+    # Verify the pre-upgrade operator version can be determined before any mutation.
+    typeset version
+    version="$(GetInstalledVersion)"
+    if [[ -z "${version}" ]]; then
+        echo >&2 "ERROR: Cannot determine pre-upgrade operator version; aborting before mutation"
+        return 1
+    fi
+    echo "${version}"
+}
+
 function GetCurrentChannel () {
     # Return the current subscription channel for the operator.
     oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
@@ -457,8 +468,10 @@ function Main () {
             echo "InstallPlan ${prePatchPlan} already complete; no pending upgrade"
             exit 0
         fi
+        RequireInitialVersion >/dev/null
         installPlan="${prePatchPlan}"
     else
+        RequireInitialVersion >/dev/null
         echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
         oc patch subscription "${ACS_SUBSCRIPTION_NAME}" \
             -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
@@ -502,6 +515,16 @@ function Main () {
     WaitForCsvSucceeded "${currentCsv}"
     newCsv="$(GetCurrentCsv)"
     newVersion="$(GetInstalledVersion)"
+
+    if [[ -z "${newVersion}" ]]; then
+        echo >&2 "ERROR: Post-upgrade version is empty; cannot confirm upgrade succeeded"
+        exit 1
+    fi
+    if [[ "${newVersion}" == "${currentVersion}" ]]; then
+        echo >&2 "ERROR: Operator version unchanged after upgrade (${newVersion}); upgrade may have failed"
+        exit 1
+    fi
+
     echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
 
     typeset _acs_upgrade_output=""
