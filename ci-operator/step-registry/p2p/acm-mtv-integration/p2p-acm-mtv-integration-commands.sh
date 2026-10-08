@@ -204,7 +204,6 @@ if [[ -n "${ARTIFACT_DIR}" ]]; then
 fi
 
 if (( stepRc != 0 )); then
-    DumpDiagnostics
     exit "${stepRc}"
 fi
 true
