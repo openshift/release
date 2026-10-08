@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deck
+  namespace: ci-staging
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: deck
+  namespace: ci-staging
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/log
+    verbs:
+      - get
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: deck
+  namespace: ci-staging
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: deck
+subjects:
+- kind: ServiceAccount
+  name: deck
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: deck-token
+  namespace: ci-staging
+  annotations:
+    kubernetes.io/service-account.name: deck
+type: kubernetes.io/service-account-token

@@ -1,0 +1,37 @@
+ref:
+  as: storage-create-csi-aws-efs
+  from: aws-efs-csi-operator-create-efs
+  # inject oc binary
+  cli: latest
+  commands: storage-create-csi-aws-efs-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: TEST_CSI_DRIVER_MANIFEST
+    documentation: |-
+      The CSI driver manifest to create.  Used by the `openshift-tests` as a
+      manifest for openshift/csi tests. The file must be in ${SHARED_DIR}.
+  - name: TEST_OCP_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      The OCP specific CSI driver manifest to create.  Used by the `openshift-tests` as a
+      manifest for openshift/csi tests. The file must be in ${SHARED_DIR}.
+  - name: ENABLE_LONG_CSI_CERTIFICATION_TESTS
+    documentation: |-
+      Enable CSI certification test for SCSI LUN overflow that creates 260 volumes + pods.
+    default: "false"
+  - name: ENABLE_CROSS_ACCOUNT
+    documentation: |-
+      Enable cross account test configuration support.
+    default: "false"
+  - name: EFS_ENABLE_SINGLE_ZONE
+    documentation: |-
+      Enable single zone volume configuration support.
+    default: "false"
+  documentation: |-
+    The csi-aws-efs step creates ClusterCSDriver and StorageClass for the EFS CSI driver.
+    It also creates ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} and
+    ${TEST_OCP_CSI_DRIVER_MANIFEST}, which is consumed by openshift-e2e-test step to
+    run CSI driver certification suite.

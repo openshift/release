@@ -1,0 +1,45 @@
+ref:
+  as: hypershift-agentic-qe-process
+  from: cli
+  commands: hypershift-agentic-qe-process-commands.sh
+  timeout: 2h0m0s
+  env:
+  - name: HOLD_DURATION
+    default: "30m"
+    documentation: |-
+      How long to hold the environment before the post phase tears it down,
+      in sleep(1) syntax (for example 30m or 1h). The step timeout (2h) bounds it.
+  - name: MULTISTAGE_PARAM_OVERRIDE_HOLD_DURATION
+    default: ""
+    documentation: |-
+      Gangway transport variable. Gangway cannot set step parameters directly,
+      so this prefixed variable is used as a transport mechanism. When set, the
+      script uses its value as HOLD_DURATION.
+  - name: CHAI_SHARED_DIR_ACCESS
+    default: "false"
+    documentation: |-
+      If "true", grant Chai Bot's read-only build-farm service account
+      (ci/chai-bot-cluster-reader) get access to this test's SHARED_DIR secret,
+      and nothing else, so that it can fetch the management and hosted cluster
+      kubeconfigs while the environment is held.
+  - name: MULTISTAGE_PARAM_OVERRIDE_CHAI_SHARED_DIR_ACCESS
+    default: ""
+    documentation: |-
+      Gangway transport variable. Gangway cannot set step parameters directly,
+      so this prefixed variable is used as a transport mechanism. When set, the
+      script uses its value as CHAI_SHARED_DIR_ACCESS.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Test step for the HyperShift Agentic QE job. Holds the environment created
+    in the pre phase -- a management cluster running the HyperShift operator
+    built from the PR, and a HostedCluster created from the PR's release
+    payload -- for HOLD_DURATION, so that a person or an agent can work with
+    it before the post phase tears it down. The management and hosted cluster
+    kubeconfigs are in SHARED_DIR (kubeconfig and nested_kubeconfig).
+
+    Chai Bot triggers this job through Gangway with CHAI_SHARED_DIR_ACCESS set,
+    reads the kubeconfigs from the test's SHARED_DIR secret on the build
+    cluster, and hands them to the remote workspace solving the PR's issue.

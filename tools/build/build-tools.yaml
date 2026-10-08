@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: build-tools
+metadata:
+  name: build-tools
+parameters:
+- name: RELEASE_REF
+  displayName: Source Ref
+  description: Git reference to use for setup
+  value: master
+  required: false
+- name: RELEASE_URL
+  displayName: Source URL
+  description: Git source URL to use for setup
+  value: https://github.com/openshift/release.git
+  required: true
+- description: The URL to the pipeline release library. Must be specified without a protocol (https://)
+  displayName: Release Library URL
+  name: RELEASE_LIBRARY_URL
+  value: github.com/openshift/release-library
+  required: true
+- description: The Branch of the pipeline release library.
+  displayName: Release Library REF
+  name: RELEASE_LIBRARY_REF
+  value: master
+  required: true
+objects:
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: build-tools
+    labels:
+      name: build-tools
+  spec:
+    triggers:
+      - type: ConfigChange
+    runPolicy: Serial
+    source:
+      type: Git
+      git:
+        uri: "${RELEASE_URL}"
+        ref: "${RELEASE_REF}"
+      contextDir: tools/build/pipeline
+    strategy:
+      type: JenkinsPipeline
+      jenkinsPipelineStrategy:
+        env:
+        - name: RELEASE_URL
+          value: "${RELEASE_URL}"
+        - name: RELEASE_REF
+          value: "${RELEASE_REF}"
+        - name: RELEASE_LIBRARY_URL
+          value: "${RELEASE_LIBRARY_URL}"
+        - name: RELEASE_LIBRARY_REF
+          value: "${RELEASE_LIBRARY_REF}"

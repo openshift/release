@@ -1,0 +1,1 @@
+../../rhdh-aks-lifecycle/scripts/print-configured-versions.sh

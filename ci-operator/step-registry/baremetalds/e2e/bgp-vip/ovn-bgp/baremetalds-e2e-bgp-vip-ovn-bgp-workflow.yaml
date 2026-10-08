@@ -1,0 +1,56 @@
+workflow:
+  as: baremetalds-e2e-bgp-vip-ovn-bgp
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+        NUM_WORKERS=2
+        ENABLE_BGP_TOR=true
+        BGP_VIP_MANAGEMENT=true
+      FEATURE_SET: DevPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local\| CPU Partitioning
+        cluster platform workloads should be annotated correctly for Deployments
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - chain: baremetalds-ofcir-pre
+      - ref: baremetalds-e2e-ovn-bgp-pre
+    test:
+      - ref: baremetalds-e2e-bgp-vip-verify
+      - ref: baremetalds-e2e-bgp-vip-ovn-bgp-verify
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    Coexistence lane for BGP-based VIP management (enhancement 1982) and
+    OVN-Kubernetes BGP route advertisements. Installs a baremetal IPI cluster
+    via dev-scripts with BGP_VIP_MANAGEMENT=true (API/ingress VIPs advertised
+    to a top-of-rack FRR speaker by kube-vip + frr-k8s static pods instead of
+    keepalived), then runs the OVN BGP pre step: an external FRR route
+    reflector on the baremetal bridge, routeAdvertisements enabled on the
+    cluster network operator, and FRRConfiguration/RouteAdvertisements CRs for
+    the default pod network. The verification steps assert that both BGP
+    consumers work simultaneously: the VIP acceptance criteria still hold, the
+    RouteAdvertisements-generated FRRConfiguration is merged by the frr-k8s
+    static pods on the control plane (where the frr-k8s DaemonSet does not
+    run), every node establishes a session to the route reflector, and pod
+    network prefixes arrive at the reflector; the conformance suite then runs
+    against the combined configuration. The cluster is dual-stack
+    (IP_STACK=v4v6): the verify steps assert both address families end to
+    end (per-family VIP advertisement, per-family route-reflector sessions
+    and pod subnets, and datapath over both families).
+
+    Security notes (mirroring the existing baremetalds-e2e-ovn-bgp-* lanes
+    this workflow composes): EXTRA_MG_ARGS=--host-network only makes the
+    post-run "oc adm must-gather" pod use host networking, so diagnostics
+    can be collected even when the BGP-advertised pod-network path under
+    test is broken — it does not change the security posture of any tested
+    workload. The privileged FRR/agnhost containers belong to the shared
+    baremetalds-e2e-ovn-bgp-pre step and run on the ephemeral CI hypervisor
+    (the equinix packet host, discarded after the job), not on the cluster;
+    FRR needs to create VRFs, veth/macvlan attachments and set sysctls
+    there to emulate the external router.

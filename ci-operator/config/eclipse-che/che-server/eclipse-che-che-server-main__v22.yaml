@@ -1,0 +1,170 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: azure-all-tests
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export AZURE_PAT=$(cat /usr/local/ci-secrets/azure/azure-pat)
+        export AZURE_PRIVATE_KEY=$(cat /usr/local/ci-secrets/azure/azure-private-key)
+        export AZURE_PUBLIC_KEY=$(cat /usr/local/ci-secrets/azure/azure-public-key)
+        /bin/bash .ci/openshift-ci/test-azure-all-tests.sh
+      credentials:
+      - collection: dev-azure
+        group: usr/local/ci-secrets/azure
+        mount_path: /usr/local/ci-secrets/azure
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: bitbucket-gitea-all-tests
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export BITBUCKET_PRIVATE_KEY=$(cat /usr/local/ci-secrets/bitbucket/bitbucket-private-key)
+        export BITBUCKET_PUBLIC_KEY=$(cat /usr/local/ci-secrets/bitbucket/bitbucket-public-key)
+        export GITEA_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gitea/gitea-private-key)
+        export GITEA_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gitea/gitea-public-key)
+        export GITEA_PAT=$(cat /usr/local/ci-secrets/gitea/gitea-pat)
+        /bin/bash .ci/openshift-ci/test-bitbucket-gitea-all-tests.sh
+      credentials:
+      - collection: bitbucket
+        group: usr/local/ci-secrets/bitbucket
+        mount_path: /usr/local/ci-secrets/bitbucket
+      - collection: gitea
+        group: usr/local/ci-secrets/gitea
+        mount_path: /usr/local/ci-secrets/gitea
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: github-all-tests
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITHUB_PAT=$(cat /usr/local/ci-secrets/github/gh-pat)
+        export GITHUB_PRIVATE_KEY=$(cat /usr/local/ci-secrets/github/github-private-key)
+        export GITHUB_PUBLIC_KEY=$(cat /usr/local/ci-secrets/github/github-public-key)
+        /bin/bash .ci/openshift-ci/test-github-all-tests.sh
+      credentials:
+      - bundle: github
+        mount_path: /usr/local/ci-secrets/github
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: gitlab-all-tests
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITLAB_PAT=$(cat /usr/local/ci-secrets/gitlab/gl-pat)
+        export GITLAB_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-private-key)
+        export GITLAB_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-public-key)
+        /bin/bash .ci/openshift-ci/test-gitlab-all-tests.sh
+      credentials:
+      - collection: gitlab
+        group: usr/local/ci-secrets/gitlab
+        mount_path: /usr/local/ci-secrets/gitlab
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: gitlab-with-oauth-setup-flow
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_NODE_COUNT: "2"
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export ADMIN_ACCESS_TOKEN=$(cat /usr/local/ci-secrets/gitlab/admin-access-token)
+        export GIT_PROVIDER_PASSWORD=$(cat /usr/local/ci-secrets/gitlab/git-provider-password)
+        /bin/bash .ci/openshift-ci/test-gitlab-with-oauth-setup-flow.sh
+      credentials:
+      - collection: gitlab
+        group: usr/local/ci-secrets/gitlab
+        mount_path: /usr/local/ci-secrets/gitlab
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: che-smoke-test
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_NODE_COUNT: "2"
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-che-smoke-test.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+zz_generated_metadata:
+  branch: main
+  org: eclipse-che
+  repo: che-server
+  variant: v22
