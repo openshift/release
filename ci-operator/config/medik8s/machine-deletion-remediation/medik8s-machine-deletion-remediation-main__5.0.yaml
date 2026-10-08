@@ -44,6 +44,20 @@ images:
         as:
         - system-tests-builder
     to: mdr-upgrade-test-runner
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+    from: nested-podman
+    inputs:
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: fbc-upgrade-test-runner
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -131,12 +145,6 @@ tests:
           test -f /opt/mdr-ci-src/Makefile
           cp -R /opt/mdr-ci-src /tmp/mdr-source
 
-          # TODO: Revert this rehearsal-only checkout after machine-deletion-remediation#191 merges.
-          echo '==> Check out machine-deletion-remediation PR 191'
-          git -C /tmp/mdr-source fetch --depth=1 \
-            https://github.com/medik8s/machine-deletion-remediation.git refs/pull/191/head
-          git -C /tmp/mdr-source checkout --detach FETCH_HEAD
-
           local revision prefix operator_tag bundle_tag catalog_tag
           revision="$(git -C /tmp/mdr-source rev-parse HEAD)"
           git -C /tmp/mdr-source show --no-patch --format=fuller HEAD
@@ -177,8 +185,7 @@ tests:
             DEV_OLM_BUNDLE_IMAGE="$bundle_tag" \
             DEV_OLM_CATALOG_IMAGE="$catalog_tag" \
             VERSION="$MDR_VERSION" \
-            PREVIOUS_VERSION="$MDR_PREVIOUS_VERSION" \
-            SKIP_RANGE_LOWER=0.0.1
+            PREVIOUS_VERSION="$MDR_PREVIOUS_VERSION"
 
           echo '==> Resolve pushed candidate images to immutable digests'
           skopeo inspect --format '{{.Digest}}' "docker://$operator_tag" > "$ARTIFACT_DIR/operator.digest"
@@ -222,13 +229,9 @@ tests:
         }
 
         checkout_system_tests() {
-          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#28 merges.
-          echo '==> Check out openshift/rhwa-system-tests PR 28'
+          echo '==> Check out openshift/rhwa-system-tests main'
           git clone --depth=1 --branch main \
             https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
-          git -C /tmp/system-tests fetch --depth=1 \
-            https://github.com/openshift/rhwa-system-tests.git refs/pull/28/head
-          git -C /tmp/system-tests checkout --detach FETCH_HEAD
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
           git -C /tmp/system-tests rev-parse HEAD > "$ARTIFACT_DIR/system-tests-commit.txt"
         }
@@ -269,6 +272,24 @@ tests:
         requests:
           cpu: "2"
           memory: 4Gi
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-system-tests-mdr-fbc-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      FBC_CANDIDATE_IMAGE: registry.redhat.io/workload-availability/machine-deletion-remediation-rhel9-operator@sha256:7031d8f90610169b114e9efaa93244afed1ead0bbd596a927eb549046b4baf77
+      FBC_CANDIDATE_MIRROR: quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-operator-5-8
+      FBC_OPERATOR: mdr
+      TEST_NAME: e2e-system-tests-mdr-fbc-upgrade
+      TEST_STEPS: medik8s-fbc-upgrade
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-fbc-upgrade
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

@@ -44,6 +44,20 @@ images:
         as:
         - system-tests-builder
     to: nmo-upgrade-test-runner
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+    from: nested-podman
+    inputs:
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: fbc-upgrade-test-runner
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -131,12 +145,6 @@ tests:
           test -f /opt/nmo-ci-src/Makefile
           cp -R /opt/nmo-ci-src /tmp/nmo-source
 
-          # TODO: Revert this rehearsal-only checkout after node-maintenance-operator#183 merges.
-          echo '==> Check out node-maintenance-operator PR 183'
-          git -C /tmp/nmo-source fetch --depth=1 \
-            https://github.com/medik8s/node-maintenance-operator.git refs/pull/183/head
-          git -C /tmp/nmo-source checkout --detach FETCH_HEAD
-
           local revision prefix operator_tag bundle_tag catalog_tag
           revision="$(git -C /tmp/nmo-source rev-parse HEAD)"
           git -C /tmp/nmo-source show --no-patch --format=fuller HEAD
@@ -177,8 +185,7 @@ tests:
             DEV_OLM_BUNDLE_IMAGE="$bundle_tag" \
             DEV_OLM_CATALOG_IMAGE="$catalog_tag" \
             VERSION="$NMO_VERSION" \
-            PREVIOUS_VERSION="$NMO_PREVIOUS_VERSION" \
-            SKIP_RANGE_LOWER=0.12.0
+            PREVIOUS_VERSION="$NMO_PREVIOUS_VERSION"
 
           echo '==> Resolve pushed candidate images to immutable digests'
           skopeo inspect --format '{{.Digest}}' "docker://$operator_tag" > "$ARTIFACT_DIR/operator.digest"
@@ -222,13 +229,9 @@ tests:
         }
 
         checkout_system_tests() {
-          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#28 merges.
-          echo '==> Check out openshift/rhwa-system-tests PR 28'
+          echo '==> Check out openshift/rhwa-system-tests main'
           git clone --depth=1 --branch main \
             https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
-          git -C /tmp/system-tests fetch --depth=1 \
-            https://github.com/openshift/rhwa-system-tests.git refs/pull/28/head
-          git -C /tmp/system-tests checkout --detach FETCH_HEAD
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
           git -C /tmp/system-tests rev-parse HEAD > "$ARTIFACT_DIR/system-tests-commit.txt"
         }
@@ -269,6 +272,24 @@ tests:
         requests:
           cpu: "2"
           memory: 4Gi
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-system-tests-nmo-fbc-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      FBC_CANDIDATE_IMAGE: registry.redhat.io/workload-availability/node-maintenance-rhel9-operator@sha256:7c8573814341363c2dc201ea47169f774b73d135ce76791c15da31922bb684b9
+      FBC_CANDIDATE_MIRROR: quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-operator-5-8
+      FBC_OPERATOR: nmo
+      TEST_NAME: e2e-system-tests-nmo-fbc-upgrade
+      TEST_STEPS: medik8s-fbc-upgrade
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-fbc-upgrade
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
