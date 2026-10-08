@@ -9,7 +9,7 @@
 set -euxo pipefail; shopt -s inherit_errexit
 
 eval "$(
-    curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
 typeset -i startTime=$SECONDS
@@ -58,7 +58,9 @@ if [[ "${MAP_TESTS}" == "true" ]]; then
     eval "$(
         typeset -a _fURL=()
         type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-        "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        # Pinned to a reviewed commit SHA (rather than refs/heads/main) to avoid
+        # executing unreviewed upstream changes with this job's credentials.
+        "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
     # shellcheck disable=SC2154
     trap '
@@ -71,6 +73,9 @@ else
     trap 'DebugOnExit' EXIT
 fi
 
+# Resolves the CNV must-gather image reference from the HCO CSV's relatedImages list
+# (looked up by name containing "must-gather"). Prints the image pull spec, or nothing
+# if the CSV/image entry can't be found — callers fall back to a version-pinned default.
 # shellcheck disable=SC2329
 GetMustGatherImage() {
     oc get csv --namespace='openshift-cnv' --selector='!olm.copiedFrom' --output='json' \
@@ -83,6 +88,11 @@ GetMustGatherImage() {
     true
 }
 
+# Runs `oc adm must-gather` with the CNV-specific gather script (--vms_details), using the
+# image resolved by GetMustGatherImage, or a version-pinned fallback image when that lookup
+# comes up empty (e.g. HCO CSV already gone). Output is collected under
+# ${ARTIFACT_DIR}/must-gather-cnv for post-mortem debugging; failures are swallowed (|| true)
+# so a must-gather issue never masks the original infrastructure failure being debugged.
 # shellcheck disable=SC2329
 RunMustGather() {
     typeset image
@@ -100,6 +110,10 @@ RunMustGather() {
     true
 }
 
+# Downloads virtctl from the cluster's HyperConverged CLI-download route (derived from the
+# ingress domain), extracts it into ${binFolder} (already on PATH), and verifies it runs via
+# `virtctl version --client`. Exits the whole step non-zero on any failure, since a working
+# virtctl is required for the upgrade test suite that runs afterward.
 function InstallAndVerifyVirtctl () {
     typeset baseURL
     if ! baseURL="$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}' | tr -d '\n\r')"; then
@@ -125,6 +139,10 @@ function InstallAndVerifyVirtctl () {
     true
 }
 
+# Builds the pytest CLI argument list for the CNV upgrade run from CNV_* environment
+# variables (target version/source/channel/storage-class-matrix) plus fixed data-collector
+# and traceback options. Prints one argument per line so callers can safely load it into a
+# bash array with `mapfile -t`. Appends --cnv-image only when CNV_TARGET_IMAGE is set.
 BuildCnvUpgradePytestArgs() {
     typeset -a args=(
         --upgrade=cnv
@@ -142,6 +160,11 @@ BuildCnvUpgradePytestArgs() {
     printf '%s\n' "${args[@]}"
 }
 
+# Runs the single, full CNV upgrade pytest suite (pre/post upgrade validation included) via
+# `uv run pytest`, writing JUnit XML to JUNIT_RESULTS_FILE. Takes the HCO subscription name
+# as $1. Captures pytest's exit code and returns it to the caller instead of letting a test
+# failure abort the script, since failures are recorded in JUnit XML and handled by Firewatch
+# rather than by the step's own exit status.
 RunCnvUpgradePytest() {
     typeset hcoSubscription="${1:?}"; (($#)) && shift
     typeset -i exitCode=0

@@ -53,6 +53,11 @@ images:
     to: cli-with-git
   - dockerfile_literal: |
       FROM this-is-ignored
+      # The upstream openshift-virtualization-tests image (quay.io/openshift-cnv/openshift-virtualization-tests,
+      # built from github.com/RedHatQE/openshift-virtualization-tests) sets no USER in its Dockerfile, so it
+      # already defaults to root. This USER root is therefore a no-op restating that default (not an
+      # escalation) and is only needed so dnf can install packages during this derived build step; it does
+      # not change the non-root securityContext/SCC applied to the test pod at runtime.
       USER root
       RUN <<run-EOF
       set -exo pipefail; shopt -s inherit_errexit
