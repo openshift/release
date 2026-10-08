@@ -15,9 +15,11 @@ set -o pipefail
 # installing. That is what lets the job catch install/bootstrap regressions, which is most of what
 # CPO PRs change.
 #
-# The CPO image lives on the CI registry, so its credentials are merged into the HostedCluster
-# pull secret first; the operator resolves and the control plane pulls the CPO using that secret
-# (HyperShift syncs it into the control plane namespace), and OCM's pull secret has no CI creds.
+# The PR-built CPO is first mirrored to a public quay.io/rrp-dev-ci repository by the preceding
+# rosa-operator-push-cpo step (which records the pushed pullspec in ${SHARED_DIR}/cpo-image). The
+# control plane can pull that public image with the cluster's own pull secret, so this step does not
+# touch the HostedCluster pull secret. That avoids the CI-registry entry being reverted mid-run when
+# the ACM work agent resyncs the cluster pull secret (ROSAENG-74212 review feedback).
 # After annotating, the step waits for the operator to actually roll the control-plane-operator
 # deployment to the PR image and become healthy, so a CPO that never runs cannot pass silently.
 
@@ -48,12 +50,16 @@ if (( PULLS == 0 )); then
   exit 0
 fi
 
-# Validate inputs
-if [[ -z "${CPO_OPERATOR_IMAGE:-}" ]]; then
-  log "CPO_OPERATOR_IMAGE is required (the PR-built control plane operator image, injected via dependencies)"
+# The PR-built CPO image was mirrored to public quay by rosa-operator-push-cpo, which records the
+# pushed pullspec here. Use that public image as the annotation value so the control plane pulls it
+# without any CI-registry credentials.
+CPO_IMAGE_FILE="${SHARED_DIR}/cpo-image"
+if [[ ! -s "${CPO_IMAGE_FILE}" ]]; then
+  log "ERROR: ${CPO_IMAGE_FILE} is missing or empty; rosa-operator-push-cpo must run first and mirror the CPO image"
   exit 1
 fi
-log "PR-built control plane operator image: ${CPO_OPERATOR_IMAGE}"
+CPO_IMAGE_REF=$(cat "${CPO_IMAGE_FILE}")
+log "PR-built control plane operator image (mirrored to quay): ${CPO_IMAGE_REF}"
 
 # Log into OCM. Disable tracing due to credential handling (secrets must not be
 # exposed through expanded xtrace output of the reads or the ocm login arguments).
@@ -129,42 +135,11 @@ while true; do
   sleep 30
 done
 
-# Merge CI registry credentials into the HostedCluster pull secret so the control plane can pull
-# the PR-built CPO image. HyperShift reads spec.pullSecret from the HC namespace and syncs it into
-# the control plane namespace, where the CPO deployment uses it to pull.
-PS_NAME=$(KUBECONFIG="${MC_KUBECONFIG}" oc get hostedcluster "${CLUSTER_NAME}" -n "${HC_NAMESPACE}" \
-  -o jsonpath='{.spec.pullSecret.name}')
-if [[ -z "${PS_NAME}" ]]; then
-  log "ERROR: HostedCluster '${CLUSTER_NAME}' has no spec.pullSecret.name"
-  exit 1
-fi
-CI_REGISTRY=$(echo "${CPO_OPERATOR_IMAGE}" | cut -d'/' -f1)
-log "Merging CI registry '${CI_REGISTRY}' credentials into pull secret '${PS_NAME}'"
-
-# Disable tracing due to pull-secret and token handling.
-[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
-set +x
-SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-CI_AUTH=$(printf 'serviceaccount:%s' "${SA_TOKEN}" | base64 -w0)
-CURRENT_DOCKERCFG=$(KUBECONFIG="${MC_KUBECONFIG}" oc get secret "${PS_NAME}" -n "${HC_NAMESPACE}" \
-  -o json | jq -r '.data[".dockerconfigjson"] // empty' | base64 -d)
-if [[ -z "${CURRENT_DOCKERCFG}" ]]; then
-  log "ERROR: pull secret '${PS_NAME}' has no .dockerconfigjson"
-  $WAS_TRACING && set -x
-  exit 1
-fi
-MERGED_DOCKERCFG=$(echo "${CURRENT_DOCKERCFG}" \
-  | jq -c --arg reg "${CI_REGISTRY}" --arg auth "${CI_AUTH}" '.auths[$reg] = {auth: $auth}')
-MERGED_B64=$(echo -n "${MERGED_DOCKERCFG}" | base64 -w0)
-KUBECONFIG="${MC_KUBECONFIG}" oc patch secret "${PS_NAME}" -n "${HC_NAMESPACE}" --type=merge \
-  -p "{\"data\":{\".dockerconfigjson\":\"${MERGED_B64}\"}}"
-$WAS_TRACING && set -x
-log "Merged CI registry credentials into pull secret '${PS_NAME}'"
-
-# Stamp the annotation so the HyperShift operator deploys the PR-built CPO for this cluster.
+# Stamp the annotation so the HyperShift operator deploys the PR-built CPO for this cluster. The
+# image lives in a public quay repository, so no change to the HostedCluster pull secret is needed.
 KUBECONFIG="${MC_KUBECONFIG}" oc annotate hostedcluster "${CLUSTER_NAME}" -n "${HC_NAMESPACE}" \
-  "hypershift.openshift.io/control-plane-operator-image=${CPO_OPERATOR_IMAGE}" --overwrite
-log "Annotated HostedCluster '${CLUSTER_NAME}' with control-plane-operator-image=${CPO_OPERATOR_IMAGE}"
+  "hypershift.openshift.io/control-plane-operator-image=${CPO_IMAGE_REF}" --overwrite
+log "Annotated HostedCluster '${CLUSTER_NAME}' with control-plane-operator-image=${CPO_IMAGE_REF}"
 
 # Verify the HyperShift operator actually rolls the control plane operator onto the PR image.
 # The downstream HC/HCP readiness checks can pass on conditions left True by the install, and a
@@ -176,13 +151,13 @@ ROLLOUT_START=$(date +%s)
 while true; do
   CPO_IMAGE=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment control-plane-operator -n "${HCP_NAMESPACE}" \
     -o jsonpath='{.spec.template.spec.containers[?(@.name=="control-plane-operator")].image}' 2>/dev/null || true)
-  if [[ "${CPO_IMAGE}" == "${CPO_OPERATOR_IMAGE}" ]]; then
+  if [[ "${CPO_IMAGE}" == "${CPO_IMAGE_REF}" ]]; then
     log "control-plane-operator deployment now references the PR image"
     break
   fi
   elapsed=$(( $(date +%s) - ROLLOUT_START ))
   if (( elapsed >= CPO_ROLLOUT_TIMEOUT )); then
-    log "ERROR: Timed out after ${CPO_ROLLOUT_TIMEOUT}s waiting for control-plane-operator to use ${CPO_OPERATOR_IMAGE} (current: ${CPO_IMAGE:-<none>})"
+    log "ERROR: Timed out after ${CPO_ROLLOUT_TIMEOUT}s waiting for control-plane-operator to use ${CPO_IMAGE_REF} (current: ${CPO_IMAGE:-<none>})"
     exit 1
   fi
   log "WAITING: control-plane-operator image is '${CPO_IMAGE:-<none>}' (elapsed: ${elapsed}s), retrying in 10s..."
@@ -199,6 +174,6 @@ log "control-plane-operator rollout complete on the PR image"
 
 # Record the applied override only after confirming the PR-built CPO actually runs, so the artifact
 # reflects what was really tested.
-echo "${CPO_OPERATOR_IMAGE}" > "${SHARED_DIR}/cpo-annotation-image"
+echo "${CPO_IMAGE_REF}" > "${SHARED_DIR}/cpo-annotation-image"
 
 log "PR-built control plane operator override applied and verified on ${CLUSTER_NAME}"

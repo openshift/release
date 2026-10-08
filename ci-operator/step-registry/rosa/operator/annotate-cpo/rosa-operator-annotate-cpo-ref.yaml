@@ -7,9 +7,6 @@ ref:
     requests:
       cpu: 100m
       memory: 100Mi
-  dependencies:
-  - name: hypershift
-    env: CPO_OPERATOR_IMAGE
   env:
   - name: OCM_LOGIN_ENV
     default: "staging"
@@ -36,8 +33,12 @@ ref:
     checks, the consuming config must inline the provision chain to place this step correctly.
 
     It resolves the management cluster from the hosted cluster's provision shard, waits for the
-    HostedCluster CR, merges CI registry credentials into the HostedCluster pull secret so the
-    control plane can pull the CPO image from the CI registry, sets the annotation, and then waits
-    for the control-plane-operator deployment to switch to the PR image and become healthy so a CPO
-    that never runs cannot pass silently. CPO_OPERATOR_IMAGE is the PR-built control plane image
-    injected via dependencies (same build as the operator image used by rosa-operator-deploy-pr).
+    HostedCluster CR, sets the annotation, and then waits for the control-plane-operator deployment
+    to switch to the PR image and become healthy so a CPO that never runs cannot pass silently.
+
+    The annotated image is the PR-built control plane image mirrored to a public quay.io/rrp-dev-ci
+    repository by the preceding rosa-operator-push-cpo step, which records the pushed pullspec in
+    ${SHARED_DIR}/cpo-image. Using a public image means the control plane pulls it with the cluster's
+    own pull secret, so this step does not modify the HostedCluster pull secret; that avoids the
+    CI-registry entry being reverted mid-run when the ACM work agent resyncs the cluster pull secret
+    (ROSAENG-74212 review feedback). The consuming config must run rosa-operator-push-cpo first.
