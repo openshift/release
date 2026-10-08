@@ -1,0 +1,58 @@
+ref:
+  as: rosa-boundary-openwiki-update
+  from: claude-ai-helpers
+  commands: rosa-boundary-openwiki-update-commands.sh
+  timeout: 4h
+  grace_period: 5m
+  env:
+  - name: OPENWIKI_PROVIDER
+    default: gemini-enterprise
+    documentation: Use Google ADC/Vertex AI instead of an OpenAI API key.
+  - name: ROSA_BOUNDARY_VERTEX_PROJECT_ID
+    default: rosa-general
+    documentation: ROSA-owned Vertex inference project; keys for other GCP projects are rejected.
+  - name: ROSA_BOUNDARY_VERTEX_SERVICE_ACCOUNT_EMAIL
+    default: rosa-boundary@rosa-general.iam.gserviceaccount.com
+    documentation: Existing rosa-boundary service account; keys for other ROSA initiatives are rejected.
+  - name: GOOGLE_CLOUD_LOCATION
+    default: global
+    documentation: Vertex AI endpoint location.
+  - name: OPENWIKI_MODEL_ID
+    default: claude-sonnet-5
+    documentation: Claude model enabled in the Vertex Model Garden for the ROSA project.
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: /var/run/rosa-boundary-vertex/gcp-vertex-sa-key
+    documentation: Existing rosa-boundary/ci/gcp-vertex-sa-key JSON key for the rosa-boundary service account in rosa-general.
+  credentials:
+  # Mount only the four fields this job needs from rosa-boundary/ci, not the
+  # full group (which also contains credentials for unrelated tests).
+  - collection: rosa-boundary
+    group: ci
+    field: gcp-vertex-sa-key
+    mount_path: /var/run/rosa-boundary-vertex
+  - collection: rosa-boundary
+    group: ci
+    field: github-app-app-id
+    mount_path: /var/run/rosa-boundary-github-app-id
+  - collection: rosa-boundary
+    group: ci
+    field: github-app-installation-id
+    mount_path: /var/run/rosa-boundary-github-app-installation
+  - collection: rosa-boundary
+    group: ci
+    field: github-app-pem
+    mount_path: /var/run/rosa-boundary-github-app-key
+  resources:
+    requests:
+      cpu: 500m
+      memory: 4Gi
+  documentation: |-
+    Install pinned Node/OpenWiki into the periodic's temporary directory and
+    run OpenWiki with a ROSA Vertex credential on a full-history clone of
+    openshift-online/rosa-boundary, then open or update a docs-only PR using a
+    GitHub App. Mounts only gcp-vertex-sa-key, github-app-app-id,
+    github-app-installation-id and github-app-pem from rosa-boundary/ci.
+    github-app-client-id is not required for installation-token auth.
+    The app must be installed on the repo with Contents and Pull requests
+    read/write permissions. The Google key must belong to
+    rosa-boundary@rosa-general.iam.gserviceaccount.com.
