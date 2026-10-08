@@ -89,9 +89,27 @@ echo "Run eco-gotests via ssh tunnel"
 ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key "cd /tmp/eco_gotests;./eco-gotests-run.sh || true"
 
 echo "Gather artifacts from bastion"
+mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests"
 # shellcheck disable=SC2154
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/eco_gotests/report/*.xml "${ARTIFACT_DIR}/junit_eco_gotests/"
 rm -rf "${PROJECT_DIR}/temp_ssh_key"
 
-echo "Store polarion report for reporter step"
-mv "${ARTIFACT_DIR}/junit_eco_gotests/report_testrun.xml" "${SHARED_DIR}/report_testrun.xml"
+echo "Combine per-suite ginkgo JUnit into polarion_eco_gotests.xml for reporter step"
+python3 - "${ARTIFACT_DIR}/junit_eco_gotests" "${SHARED_DIR}/polarion_eco_gotests.xml" << 'PYEOF'
+import re, sys, xml.etree.ElementTree as ET, glob, os
+src_dir, out_file = sys.argv[1], sys.argv[2]
+def strip(s):
+    s = re.sub(r'<system-err>.*?</system-err>', '', s, flags=re.DOTALL)
+    return re.sub(r'<system-out>.*?</system-out>', '', s, flags=re.DOTALL)
+root = ET.Element('testsuite', {'name': 'eco-gotests'})
+for f in sorted(glob.glob(os.path.join(src_dir, '*_junit.xml'))):
+    try:
+        tree = ET.fromstring(strip(open(f).read()))
+        for suite in ([tree] if tree.tag == 'testsuite' else list(tree)):
+            if suite.tag == 'testsuite':
+                for tc in suite.findall('testcase'):
+                    root.append(tc)
+    except ET.ParseError:
+        pass
+ET.ElementTree(root).write(out_file, encoding='unicode', xml_declaration=True)
+PYEOF
