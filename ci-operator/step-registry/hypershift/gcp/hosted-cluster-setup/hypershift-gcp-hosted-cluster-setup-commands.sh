@@ -184,8 +184,11 @@ cat "${INFRA_OUTPUT}"
 # Using awk instead of jq (jq not available in hypershift-operator image)
 HC_VPC_NAME=$(awk -F'"' '/"networkName"/{print $4}' "${INFRA_OUTPUT}")
 HC_SUBNET_NAME=$(awk -F'"' '/"subnetName"/{print $4}' "${INFRA_OUTPUT}")
+HC_ROUTER_NAME=$(awk -F'"' '/"routerName"/{print $4}' "${INFRA_OUTPUT}")
+HC_NAT_NAME=$(awk -F'"' '/"natName"/{print $4}' "${INFRA_OUTPUT}")
+HC_FIREWALL_RULE_NAME=$(awk -F'"' '/"firewallRuleName"/{print $4}' "${INFRA_OUTPUT}")
 
-if [[ -z "${HC_VPC_NAME}" || -z "${HC_SUBNET_NAME}" ]]; then
+if [[ -z "${HC_VPC_NAME}" || -z "${HC_SUBNET_NAME}" || -z "${HC_ROUTER_NAME}" || -z "${HC_NAT_NAME}" || -z "${HC_FIREWALL_RULE_NAME}" ]]; then
     echo "ERROR: Failed to parse network configuration from infra output"
     cat "${INFRA_OUTPUT}"
     exit 1
@@ -194,6 +197,9 @@ fi
 # Save HC-specific network info to SHARED_DIR
 echo "${HC_VPC_NAME}" > "${SHARED_DIR}/hc-vpc-name"
 echo "${HC_SUBNET_NAME}" > "${SHARED_DIR}/hc-subnet-name"
+echo "${HC_ROUTER_NAME}" > "${SHARED_DIR}/hc-router-name"
+echo "${HC_NAT_NAME}" > "${SHARED_DIR}/hc-nat-name"
+echo "${HC_FIREWALL_RULE_NAME}" > "${SHARED_DIR}/hc-firewall-rule-name"
 
 # =============================================================================
 # Summary
@@ -216,3 +222,6 @@ echo ""
 echo "Network Configuration:"
 echo "  VPC: ${HC_VPC_NAME}"
 echo "  Subnet: ${HC_SUBNET_NAME}"
+echo "  Router: ${HC_ROUTER_NAME}"
+echo "  NAT: ${HC_NAT_NAME}"
+echo "  Firewall rule: ${HC_FIREWALL_RULE_NAME}"

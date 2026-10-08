@@ -28,6 +28,9 @@ chain:
       # Network config (from hypershift-gcp-hosted-cluster-setup)
       VPC_NAME="$(<"${SHARED_DIR}/hc-vpc-name")"
       PSC_SUBNET="$(<"${SHARED_DIR}/hc-subnet-name")"
+      ROUTER_NAME="$(<"${SHARED_DIR}/hc-router-name")"
+      NAT_NAME="$(<"${SHARED_DIR}/hc-nat-name")"
+      FIREWALL_RULE_NAME="$(<"${SHARED_DIR}/hc-firewall-rule-name")"
 
       # WIF config (from hypershift-gcp-hosted-cluster-setup)
       WIF_PROJECT_NUMBER="$(<"${SHARED_DIR}/wif-project-number")"
@@ -53,6 +56,34 @@ chain:
       HC_NAME="gcp-hc-${CLUSTER_NAME:0-8}"
       echo "$(date) Creating GCP HyperShift cluster ${HC_NAME}"
 
+      # The GCP CLI flags are required by newer HyperShift versions. Keep this
+      # release branch usable with older operator images while exercising the
+      # resource-reference flow as soon as those flags are available.
+      CREATE_GCP_HELP="$(bin/hypershift create cluster gcp --help 2>&1 || true)"
+      GCP_NETWORK_REFERENCE_ARGS=()
+      HAS_ROUTER_FLAG=false
+      HAS_NAT_FLAG=false
+      HAS_FIREWALL_RULE_FLAG=false
+      grep -q -- '--router-name' <<< "${CREATE_GCP_HELP}" && HAS_ROUTER_FLAG=true
+      grep -q -- '--nat-name' <<< "${CREATE_GCP_HELP}" && HAS_NAT_FLAG=true
+      grep -q -- '--firewall-rule-name' <<< "${CREATE_GCP_HELP}" && HAS_FIREWALL_RULE_FLAG=true
+
+      if [[ "${HAS_ROUTER_FLAG}" == true && "${HAS_NAT_FLAG}" == true && "${HAS_FIREWALL_RULE_FLAG}" == true ]]; then
+        GCP_NETWORK_REFERENCE_ARGS=(
+          --router-name "${ROUTER_NAME}"
+          --nat-name "${NAT_NAME}"
+          --firewall-rule-name "${FIREWALL_RULE_NAME}"
+        )
+        echo true > "${SHARED_DIR}/gcp-resource-reference-flow"
+      elif [[ "${HAS_ROUTER_FLAG}" == false && "${HAS_NAT_FLAG}" == false && "${HAS_FIREWALL_RULE_FLAG}" == false ]]; then
+        echo false > "${SHARED_DIR}/gcp-resource-reference-flow"
+        echo "HyperShift CLI does not support GCP network resource reference flags; using the legacy create path"
+      else
+        echo "ERROR: HyperShift CLI exposes only some GCP network resource reference flags"
+        echo "${CREATE_GCP_HELP}"
+        exit 1
+      fi
+
       bin/hypershift create cluster gcp \
         --name "${HC_NAME}" \
         --namespace clusters \
@@ -66,6 +97,7 @@ chain:
         --zone "${GCP_ZONE}" \
         --network "${VPC_NAME}" \
         --private-service-connect-subnet "${PSC_SUBNET}" \
+        "${GCP_NETWORK_REFERENCE_ARGS[@]}" \
         --endpoint-access PublicAndPrivate \
         --workload-identity-project-number "${WIF_PROJECT_NUMBER}" \
         --workload-identity-pool-id "${WIF_POOL_ID}" \
@@ -89,6 +121,18 @@ chain:
 
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters "hostedcluster/${HC_NAME}"
+      if [[ "$(<"${SHARED_DIR}/gcp-resource-reference-flow")" == true ]]; then
+        ACTUAL_ROUTER_NAME="$(oc get hostedcluster "${HC_NAME}" -n clusters -o jsonpath='{.spec.platform.gcp.networkConfig.router.name}')"
+        ACTUAL_NAT_NAME="$(oc get hostedcluster "${HC_NAME}" -n clusters -o jsonpath='{.spec.platform.gcp.networkConfig.nat.name}')"
+        ACTUAL_FIREWALL_RULE_NAME="$(oc get hostedcluster "${HC_NAME}" -n clusters -o jsonpath='{.spec.platform.gcp.networkConfig.firewallRule.name}')"
+        if [[ "${ACTUAL_ROUTER_NAME}" != "${ROUTER_NAME}" || "${ACTUAL_NAT_NAME}" != "${NAT_NAME}" || "${ACTUAL_FIREWALL_RULE_NAME}" != "${FIREWALL_RULE_NAME}" ]]; then
+          echo "ERROR: HostedCluster does not contain the expected GCP network resource references"
+          echo "Expected router=${ROUTER_NAME}, NAT=${NAT_NAME}, firewall rule=${FIREWALL_RULE_NAME}"
+          echo "Actual router=${ACTUAL_ROUTER_NAME}, NAT=${ACTUAL_NAT_NAME}, firewall rule=${ACTUAL_FIREWALL_RULE_NAME}"
+          exit 1
+        fi
+        echo "HostedCluster contains the expected GCP network resource references"
+      fi
       echo "Cluster became available, creating kubeconfig"
       bin/hypershift create kubeconfig --namespace=clusters --name="${HC_NAME}" > "${SHARED_DIR}/nested_kubeconfig"
 

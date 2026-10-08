@@ -6,8 +6,10 @@ chain:
     commands: |-
       set -exuo pipefail
 
+      DESTROY_RESULT="${SHARED_DIR}/hypershift-gcp-destroy-result"
       if [[ ! -f "${SHARED_DIR}/cluster-name" ]]; then
           echo "WARNING: cluster-name not found — create step may not have completed. Skipping destroy."
+          echo skipped > "${DESTROY_RESULT}"
           exit 0
       fi
 
@@ -20,14 +22,21 @@ chain:
       if ! oc get hostedcluster "${CLUSTER_NAME}" -n clusters --request-timeout=10s &>/dev/null; then
           echo "WARNING: Cannot access API server (HostedCluster/${CLUSTER_NAME} in clusters). Skipping destroy."
           echo "The deprovision step will clean up via GCP project deletion."
+          echo unavailable > "${DESTROY_RESULT}"
           exit 0
       fi
 
       echo "$(date) Deleting GCP HyperShift cluster ${CLUSTER_NAME}"
-      bin/hypershift destroy cluster gcp \
+      if bin/hypershift destroy cluster gcp \
         --name "${CLUSTER_NAME}" \
         --namespace clusters \
-        --cluster-grace-period 40m
+        --cluster-grace-period 40m; then
+          echo 0 > "${DESTROY_RESULT}"
+      else
+          DESTROY_EXIT_CODE=$?
+          echo "${DESTROY_EXIT_CODE}" > "${DESTROY_RESULT}"
+          exit "${DESTROY_EXIT_CODE}"
+      fi
       echo "$(date) Finished deleting cluster"
     from: hypershift-operator
     grace_period: 5m0s
@@ -41,7 +50,13 @@ chain:
     Destroys a GCP HostedCluster by deleting the HostedCluster CR and
     waiting for finalizers to complete.
 
-    The underlying GCP infrastructure (VPC, WIF, projects) is cleaned up
-    separately by hypershift-gcp-gke-deprovision via project deletion.
+    When the installed HyperShift CLI supports GCP network resource references,
+    cluster creation records the VPC, subnet, router, NAT, and firewall rule on
+    the HostedCluster. The destroy command then waits for HostedCluster
+    finalizers to clean up the referenced network and IAM resources. The later
+    hypershift-gcp-gke-deprovision step still deletes the temporary GKE cluster
+    and GCP projects.
 
     Reads cluster-name from SHARED_DIR (saved by hypershift-gcp-create).
+    Writes hypershift-gcp-destroy-result so the verification step can detect
+    destroy failures hidden by this best-effort cleanup step.
