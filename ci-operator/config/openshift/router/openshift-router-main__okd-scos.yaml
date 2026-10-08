@@ -22,7 +22,7 @@ images:
     - name: TAGS
       value: scos
     dockerfile_path: images/router/base/Dockerfile.ocp
-    from: origin_scos-5.1_base-stream10
+    from: router-haproxy32-compat
     inputs:
       ocp_builder_rhel-9-golang-1.26-openshift-5.0:
         as:
@@ -45,7 +45,7 @@ images:
     - name: TAGS
       value: scos
     dockerfile_path: images/router/haproxy32/Dockerfile.ocp
-    from: origin_scos-5.1_base-stream10
+    from: router-haproxy32-compat
     to: haproxy-router-haproxy32
 promotion:
   to:
@@ -53,6 +53,22 @@ promotion:
     namespace: origin
 prowgen:
   enable_secrets_store_csi_driver: true
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      cat << EOF > /etc/yum.repos.d/haproxy32-el9-compat.repo
+      [rhel-9-server-ose-haproxy32-compat]
+      id = rhel-9-server-ose-haproxy32-compat
+      name = rhel-9-server-ose-haproxy32-compat
+      baseurl = http://base-5-1-rhel9.ocp.svc/rhel-9-server-ose
+      enabled = 1
+      gpgcheck = 0
+      skip_if_unavailable = true
+      includepkgs = haproxy32
+
+      EOF
+    from: origin_scos-5.1_base-stream10
+    to: router-haproxy32-compat
 releases:
   latest:
     integration:
