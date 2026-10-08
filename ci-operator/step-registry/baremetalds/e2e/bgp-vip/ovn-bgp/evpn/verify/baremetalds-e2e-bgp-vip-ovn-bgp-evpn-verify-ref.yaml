@@ -1,0 +1,37 @@
+ref:
+  as: baremetalds-e2e-bgp-vip-ovn-bgp-evpn-verify
+  from: dev-scripts
+  commands: baremetalds-e2e-bgp-vip-ovn-bgp-evpn-verify-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  grace_period: 10m
+  env:
+  - name: EVPN_L3VNI
+    default: "4100"
+    documentation: |-
+      VNI of the IP-VRF used for the control-plane check. Chosen outside the
+      ranges the ovn-kubernetes EVPN e2e suite allocates, since that suite
+      runs afterwards against the same route reflector.
+  - name: EVPN_CUDN_SUBNET_V4
+    default: "10.241.0.0/16"
+    documentation: IPv4 subnet of the throw-away Layer3 EVPN CUDN used for the check.
+  - name: EVPN_CUDN_SUBNET_V6
+    default: "fd00:10:241::/60"
+    documentation: IPv6 subnet of the CUDN on dual-stack clusters (the VXLAN underlay stays IPv4).
+  documentation: |-
+    Control-plane coexistence check for OVN-Kubernetes EVPN on a cluster
+    deployed with BGP-based VIP management (enhancement 1982). The functional
+    EVPN coverage comes from the ovn-kubernetes OTE suite that runs after this
+    step; this step asserts only what that suite cannot: that the per-node EVPN
+    FRRConfiguration is merged by the frr-k8s *static pod* on a control plane
+    node (the DaemonSet does not run there), that the static pod's l2vpn-evpn
+    session to the route reflector is Established, and - with EVPN live - that
+    every control plane eBGP session to the top-of-rack speaker still is, and
+    the VIPs are still advertised and answering. To do so it enables the
+    l2vpn-evpn address family on the external route reflector (idempotent;
+    the OTE suite does the same), creates a throw-away Layer3 EVPN CUDN with a
+    VTEP CR over the IPv4 node CIDR, and pins one agnhost pod to a control
+    plane node. All test resources are removed on exit so the OTE suite finds
+    the cluster as the route reflector pre step left it. IPv4 underlay only.
