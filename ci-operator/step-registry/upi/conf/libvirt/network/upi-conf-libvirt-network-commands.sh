@@ -36,7 +36,10 @@ function leaseLookup () {
 
 if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
   BASE_DOMAIN="phc-cicd.cis.ibm.net"
-  CLUSTER_NAME="${LEASED_RESOURCE}"
+  # openshift-install enforces a 21-char cluster name limit; truncate here so
+  # the libvirt network XML <name> matches what install-config.yaml and VM
+  # networking use.
+  CLUSTER_NAME="${LEASED_RESOURCE:0:21}"
 else
   BASE_DOMAIN="${LEASED_RESOURCE}.ci"
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"

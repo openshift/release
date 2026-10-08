@@ -69,7 +69,10 @@ oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INST
   --command=openshift-install --to="${INSTALL_DIR}"
 
 if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
-  CLUSTER_NAME="${LEASED_RESOURCE}"
+  # openshift-install enforces a 21-char cluster name limit; truncate here so
+  # VM networking uses the same name as install-config.yaml and the libvirt
+  # network XML created in the conf step.
+  CLUSTER_NAME="${LEASED_RESOURCE:0:21}"
 else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi

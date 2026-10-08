@@ -40,7 +40,9 @@ cat "${SHARED_DIR}/network.xml"
 # Create the libvirt network
 echo "Creating the libvirt network..."
 if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
-  CLUSTER_NAME="${LEASED_RESOURCE}"
+  # openshift-install enforces a 21-char cluster name limit; truncate here so
+  # the net-autostart/net-start name matches the network XML <name>.
+  CLUSTER_NAME="${LEASED_RESOURCE:0:21}"
 else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi
