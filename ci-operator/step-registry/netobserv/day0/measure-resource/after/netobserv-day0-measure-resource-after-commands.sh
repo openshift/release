@@ -54,7 +54,7 @@ END_TIME=$(date +%s)
 echo "Measurement window end: $(date -u -d "@${END_TIME}" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -r "${END_TIME}" '+%Y-%m-%dT%H:%M:%SZ')"
 
 # Download queries config
-QUERIES_FILE="${ARTIFACT_DIR}/day0_prometheus_queries.yaml"
+QUERIES_FILE="${ARTIFACT_DIR}/netobserv_prometheus_queries.yaml"
 echo "Downloading queries config from ${QUERIES_CONFIG_URL}..."
 curl -fsSL "${QUERIES_CONFIG_URL}" -o "${QUERIES_FILE}"
 
