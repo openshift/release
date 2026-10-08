@@ -642,8 +642,8 @@ function copyArtifacts {
   scrub_playwright_archives "${archives[@]}" || true
   # Prow's html lens renders any artifact matching custom-link-*.html inline near
   # the top of the Spyglass job page, so put the links a failure triage starts from
-  # there: the Playwright report, must-gather, the Quay revision under test, and the
-  # quay-gather logs. Compose the GCS URLs the same way
+  # there: the Playwright report, the quay-gather logs, must-gather, and the Quay
+  # revision under test. Compose the GCS URLs the same way
   # hypershift-analyze-e2e-failure does. The gather links point at post steps that
   # run after this one, so they are directory listings. Default every CI var with :-
   # so a missing var in a local run cannot abort this EXIT trap.
@@ -671,27 +671,41 @@ function copyArtifacts {
     -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
   {
     cat << EOF
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
+<meta charset="utf-8">
+<title>Quay e2e results</title>
+<meta name="description" content="Links for triaging the Quay e2e run">
 <style>
-body { font-family: sans-serif; margin: 0; }
-a { display:inline-block; padding:5px 20px; margin:10px 10px 4px 0; border:2px solid #4E9AF1; border-radius:1em; text-decoration:none; color:#FFFFFF !important; background-color:#4E9AF1; }
-small { display:block; color:#666; font-family:monospace; }
+body { margin: 0; font: 14px/1.4 Roboto, "Helvetica Neue", Arial, sans-serif; color: #151515; }
+main { padding: 12px 18px 16px; }
+ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+li { flex: 1 1 180px; max-width: 260px; }
+a { display: block; height: 100%; box-sizing: border-box; padding: 8px 12px; border: 1px solid #d2d2d2; border-left: 3px solid #0066cc; border-radius: 4px; color: #0066cc; font-weight: 500; text-decoration: none; }
+a:hover, a:focus { background: #f0f7ff; border-color: #0066cc; }
+a span { display: block; color: #6a6e73; font-size: 12px; font-weight: 400; }
+p { margin: 12px 0 0; color: #6a6e73; font-size: 12px; }
+code { color: #151515; font: 12px/1.4 "Roboto Mono", Menlo, Consolas, monospace; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
+<main>
+<ul>
 EOF
     if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
-      echo "<a target=\"_blank\" href=\"${steps_base}/quay-test-e2e/artifacts/index.html\">Playwright report</a>"
+      echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-test-e2e/artifacts/index.html\">Playwright report<span>Failures, traces and screenshots</span></a></li>"
     fi
-    echo "<a target=\"_blank\" href=\"${steps_base}/gather-must-gather/artifacts/\">must-gather</a>"
+    echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-gather/artifacts/\">Quay logs<span>Pods, events and container logs</span></a></li>"
+    echo "<li><a target=\"_blank\" href=\"${steps_base}/gather-must-gather/artifacts/\">must-gather<span>Cluster state after the run</span></a></li>"
     if [[ -n "${quay_rev}" ]]; then
-      echo "<a target=\"_blank\" href=\"https://github.com/quay/quay/tree/${quay_rev}\">quay ${quay_rev:0:12}</a>"
+      echo "<li><a target=\"_blank\" href=\"https://github.com/quay/quay/tree/${quay_rev}\">quay ${quay_rev:0:12}<span>Source under test on GitHub</span></a></li>"
     fi
-    echo "<a target=\"_blank\" href=\"${steps_base}/quay-gather/artifacts/\">Quay logs</a>"
+    echo "</ul>"
     if [[ -n "${quay_image}" ]]; then
-      echo "<small>quay-app image: ${quay_image}</small>"
+      echo "<p>quay-app image <code>${quay_image}</code></p>"
     fi
+    echo "</main>"
     echo "</body>"
     echo "</html>"
   } > "${ARTIFACT_DIR}/custom-link-quay-results.html" || true
