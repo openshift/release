@@ -35,11 +35,9 @@ function leaseLookup () {
 }
 
 # Must match upi-conf-libvirt install-config naming when USE_EXTERNAL_DNS is true (VPN / phc-cicd).
-# openshift-install enforces a 21-char cluster name limit; truncate here so
-# agent-config.yaml and all downstream steps use a consistent name.
 if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
   BASE_DOMAIN="phc-cicd.cis.ibm.net"
-  CLUSTER_NAME="${LEASED_RESOURCE:0:21}"
+  CLUSTER_NAME="${LEASED_RESOURCE}"
 else
   BASE_DOMAIN="${LEASED_RESOURCE}.ci"
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"

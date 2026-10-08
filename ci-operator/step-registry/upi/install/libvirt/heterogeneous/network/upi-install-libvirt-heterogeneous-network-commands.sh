@@ -33,9 +33,7 @@ REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
 
 if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
-  # openshift-install enforces a 21-char cluster name limit; truncate here so
-  # VM networking matches install-config.yaml and the libvirt network XML.
-  CLUSTER_NAME="${LEASED_RESOURCE:0:21}"
+  CLUSTER_NAME="${LEASED_RESOURCE}"
 else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi

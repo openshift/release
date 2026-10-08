@@ -163,10 +163,7 @@ done
 
 if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
   BASE_DOMAIN="phc-cicd.cis.ibm.net"
-  # openshift-install enforces a 21-char cluster name limit; truncate here so
-  # the heterogeneous libvirt network XML <name> matches install-config.yaml
-  # and VM networking.
-  CLUSTER_NAME="${LEASED_RESOURCE:0:21}"
+  CLUSTER_NAME="${LEASED_RESOURCE}"
 else
   BASE_DOMAIN="${LEASED_RESOURCE}.ci"
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
