@@ -83,6 +83,7 @@ def test_expand_matrix_cells() -> None:
         ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", True, "s3"),
         ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x", False, "s3"),
         ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "odf"),
+        ("3.14", "redhat-3.14", "aws", "4.18", "e2e-legacy", "@weekly", "periodic", "amd64", False, "s3"),
         (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64", False, "s3"),
         (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64", False, "gcs"),
         (None, "master", "azure", "4.22", "e2e-install", None, "presubmit", "amd64", False, "blob"),
@@ -385,6 +386,29 @@ def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     assert config["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.14__quay-rhel9-operator"
     ocp50 = by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]
     assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
+
+
+def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
+    results, _retired = generate_all()
+    config = {name: cfg for _group, name, cfg in results}["quay-quay-redhat-3.14__aws-ocp418-e2e-legacy.yaml"]
+    # Containerfile.playwright does not exist on redhat-3.14.
+    assert "images" not in config
+    (test,) = config["tests"]
+    assert test["as"] == "aws-s3"
+    assert test["cron"] == "@weekly"
+    steps = test["steps"]
+    assert steps["cluster_profile"] == "aws-quay-qe"
+    assert not [key for key in steps["env"] if key.startswith("PLAYWRIGHT_")]
+    assert steps["env"]["QUAY_VERSION"] == "3.14"
+    assert steps["env"]["QUAY_OPERATOR_CHANNEL"] == "stable-3.14"
+    assert steps["env"]["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
+    assert [step["ref"] for step in steps["test"]] == [
+        "quay-enable-catalogsource-art",
+        "quay-deploy-aws-s3",
+        "quay-test-e2e-legacy",
+    ]
+    post = [step.get("ref") or step.get("chain") for step in steps["post"]]
+    assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post"]
 
 
 def test_master_presubmit_expands_all_clouds() -> None:

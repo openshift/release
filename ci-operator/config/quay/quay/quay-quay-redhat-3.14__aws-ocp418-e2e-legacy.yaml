@@ -1,0 +1,47 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-s3
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      QUAY_OPERATOR_CHANNEL: stable-3.14
+      QUAY_OPERATOR_SOURCE: redhat-operators
+      QUAY_VERSION: "3.14"
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+    - chain: ipi-aws-post
+    test:
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-deploy-aws-s3
+    - ref: quay-test-e2e-legacy
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: redhat-3.14
+  org: quay
+  repo: quay
+  variant: aws-ocp418-e2e-legacy

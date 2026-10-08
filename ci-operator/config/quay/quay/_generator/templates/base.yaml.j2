@@ -3,10 +3,12 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-{{ build_root_ocp_version }}
+{% if test != "e2e-legacy" %}
 images:
   items:
   - dockerfile_path: web/Containerfile.playwright
     to: quay-playwright-runner
+{% endif %}
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -27,7 +29,9 @@ tests:
 - as: "{{ test_as }}"
   steps:
     env:
+{%- if test != "e2e-legacy" %}
       PLAYWRIGHT_GIT_REPO: https://github.com/quay/quay.git
+{%- endif %}
       QUAY_OPERATOR_CHANNEL: "{{ operator_channel }}"
 zz_generated_metadata:
   branch: "{{ branch }}"
