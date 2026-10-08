@@ -126,7 +126,7 @@ else:
         self.assert_full_failure('denied-securedcluster')
 
     def test_full_script_no_initial_version(self):
-        result, junit, shared, summary, version, skipped = self.run_full_script('no-initial-version')
+        result, junit, _, summary, version, _ = self.run_full_script('no-initial-version')
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(junit.get('failures'), '1')
         self.assertFalse(summary)
@@ -135,7 +135,7 @@ else:
         self.assertNotIn('Patching subscription channel', result.stdout)
 
     def test_full_script_post_version_empty(self):
-        result, junit, shared, summary, version, skipped = self.run_full_script('post-version-empty')
+        result, junit, _, summary, version, _ = self.run_full_script('post-version-empty')
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(junit.get('failures'), '1')
         self.assertFalse(summary)
@@ -143,7 +143,7 @@ else:
         self.assertIn('Post-upgrade version is empty', result.stderr)
 
     def test_full_script_post_version_unchanged(self):
-        result, junit, shared, summary, version, skipped = self.run_full_script('post-version-unchanged')
+        result, junit, _, summary, version, _ = self.run_full_script('post-version-unchanged')
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(junit.get('failures'), '1')
         self.assertFalse(summary)
@@ -163,7 +163,7 @@ else:
         self.assertIn('Approving manual InstallPlan', result.stdout)
 
     def test_full_script_same_channel_no_initial_version(self):
-        result, junit, shared, summary, version, skipped = self.run_full_script(
+        result, junit, _, summary, version, _ = self.run_full_script(
             'same-channel-no-initial-version', target_channel='rhacs-4.10')
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(junit.get('failures'), '1')
@@ -173,7 +173,7 @@ else:
         self.assertNotIn('Approving manual InstallPlan', result.stdout)
 
     def test_full_script_same_channel_post_version_unchanged(self):
-        result, junit, shared, summary, version, skipped = self.run_full_script(
+        result, junit, _, summary, version, _ = self.run_full_script(
             'same-channel-post-version-unchanged', target_channel='rhacs-4.10')
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(junit.get('failures'), '1')
