@@ -43,7 +43,13 @@ elif kind == 'installplan':
         print('RequiresApproval' if scenario.startswith('same-channel-') else 'Complete')
 elif kind == 'csv':
     if 'spec.version' in args[-1]:
-        if scenario in ('no-initial-version', 'same-channel-no-initial-version') and args[2] == 'rhacs-old':
+        if scenario.endswith('empty-baseline') and args[2] == 'rhacs-old':
+            count_file = state.parent / 'version-reads'
+            count = int(count_file.read_text()) if count_file.exists() else 0
+            count_file.write_text(str(count + 1))
+            if count > 0:
+                print('4.10.9')
+        elif scenario in ('no-initial-version', 'same-channel-no-initial-version') and args[2] == 'rhacs-old':
             pass
         elif scenario == 'post-version-empty' and args[2] == 'rhacs-new':
             pass
@@ -180,6 +186,36 @@ else:
         self.assertFalse(summary)
         self.assertFalse(version)
         self.assertIn('Operator version unchanged after upgrade', result.stderr)
+
+    def test_full_script_empty_baseline(self):
+        """Cross-channel: empty captured baseline must fail before mutation."""
+        result, junit, shared, summary, version, skipped = self.run_full_script(
+            'empty-baseline')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(junit.get('failures'), '1')
+        self.assertIsNotNone(junit.find('.//failure'))
+        self.assertEqual(shared.get('failures'), '1')
+        self.assertFalse(summary)
+        self.assertFalse(version)
+        self.assertFalse(skipped)
+        self.assertNotIn('=== ACS Operator Upgrade: SUCCESS ===', result.stdout)
+        self.assertNotIn('Patching subscription channel', result.stdout)
+        self.assertIn('Cannot determine pre-upgrade operator version', result.stderr)
+
+    def test_full_script_same_channel_empty_baseline(self):
+        """Same-channel: empty captured baseline must fail before approval."""
+        result, junit, shared, summary, version, skipped = self.run_full_script(
+            'same-channel-empty-baseline', target_channel='rhacs-4.10')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(junit.get('failures'), '1')
+        self.assertIsNotNone(junit.find('.//failure'))
+        self.assertEqual(shared.get('failures'), '1')
+        self.assertFalse(summary)
+        self.assertFalse(version)
+        self.assertFalse(skipped)
+        self.assertNotIn('=== ACS Operator Upgrade: SUCCESS ===', result.stdout)
+        self.assertNotIn('Approving manual InstallPlan', result.stdout)
+        self.assertIn('Cannot determine pre-upgrade operator version', result.stderr)
 
     def validate(self, scenario):
         source = SCRIPT.read_text()

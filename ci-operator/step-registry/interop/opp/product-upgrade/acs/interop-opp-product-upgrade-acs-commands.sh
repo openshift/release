@@ -112,9 +112,11 @@ function GetCsvPhase () {
 }
 
 function GetInstalledVersion () {
-    # Return the installed operator version from the current CSV spec.
-    typeset csvName
-    csvName="$(GetCurrentCsv)"
+    # Return the installed operator version from the current or given CSV spec.
+    typeset csvName="${1:-}"
+    if [[ -z "${csvName}" ]]; then
+        csvName="$(GetCurrentCsv)"
+    fi
     if [[ -z "${csvName}" ]]; then
         return 1
     fi
@@ -124,14 +126,14 @@ function GetInstalledVersion () {
 }
 
 function RequireInitialVersion () {
-    # Verify the pre-upgrade operator version can be determined before any mutation.
-    typeset version
-    version="$(GetInstalledVersion)"
+    # Verify the captured pre-upgrade operator version is nonempty before any mutation.
+    typeset version="${1:-}"
     if [[ -z "${version}" ]]; then
         echo >&2 "ERROR: Cannot determine pre-upgrade operator version; aborting before mutation"
         return 1
     fi
     echo "${version}"
+    return 0
 }
 
 function GetCurrentChannel () {
@@ -439,7 +441,7 @@ function Main () {
         exit 3
     fi
 
-    currentVersion="$(GetInstalledVersion)"
+    currentVersion="$(GetInstalledVersion "${currentCsv}")"
     currentChannel="$(GetCurrentChannel)"
     echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
 
@@ -468,10 +470,10 @@ function Main () {
             echo "InstallPlan ${prePatchPlan} already complete; no pending upgrade"
             exit 0
         fi
-        RequireInitialVersion >/dev/null
+        RequireInitialVersion "${currentVersion}" >/dev/null
         installPlan="${prePatchPlan}"
     else
-        RequireInitialVersion >/dev/null
+        RequireInitialVersion "${currentVersion}" >/dev/null
         echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
         oc patch subscription "${ACS_SUBSCRIPTION_NAME}" \
             -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
