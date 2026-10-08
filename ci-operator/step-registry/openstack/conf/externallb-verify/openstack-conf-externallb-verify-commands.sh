@@ -27,3 +27,32 @@ if [[ "${load_balancer_type}" != "UserManaged" ]]; then
     exit 1
 fi
 echo "loadBalancer.type is UserManaged"
+
+# When multiple LB endpoints were provisioned, api/api-int DNS must list them all.
+if [[ -f "${SHARED_DIR}/LB_HOSTS" && -f "${SHARED_DIR}/dns_up.json" ]]; then
+    expected=0
+    while IFS= read -r ip || [[ -n "${ip}" ]]; do
+        [[ -z "${ip}" ]] && continue
+        expected=$((expected + 1))
+    done < "${SHARED_DIR}/LB_HOSTS"
+
+    if [[ "${expected}" -lt 1 ]]; then
+        echo "ERROR: LB_HOSTS is empty"
+        exit 1
+    fi
+
+    for name_prefix in api api-int; do
+        count="$(jq --arg p "${name_prefix}." \
+            '[.Changes[].ResourceRecordSet | select(.Name | startswith($p)) | .ResourceRecords | length] | first // 0' \
+            "${SHARED_DIR}/dns_up.json")"
+        values="$(jq -r --arg p "${name_prefix}." \
+            '.Changes[].ResourceRecordSet | select(.Name | startswith($p)) | .ResourceRecords[].Value' \
+            "${SHARED_DIR}/dns_up.json" | tr '\n' ' ')"
+        echo "${name_prefix} DNS has ${count} address(es): ${values}"
+        if [[ "${count}" -lt "${expected}" ]]; then
+            echo "ERROR: expected at least ${expected} addresses for ${name_prefix}, got ${count}"
+            exit 1
+        fi
+    done
+    echo "api/api-int DNS records include ${expected} LB endpoint(s)"
+fi
