@@ -1,0 +1,77 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM quay.io/kuadrant/testsuite:latest
+    to: kuadrant-testsuite
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  ppc64le-latest:
+    candidate:
+      architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-ppc64le
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: powervs-multi-1
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      BASE_DOMAIN: multi-arch-cicd.cis.ibm.net
+      COREDNS_LB_HOST: "241"
+      COREDNS_ZONE: k.example.com
+      IBMCLOUD_CIS_CRN: 'crn:v1:bluemix:public:internet-svcs:global:a/3c24cb272ca44aa1ac9f6e9490ac5ecd:8a93b3a8-b109-4c74-952c-7578dca2c4ee::'
+      ISTIO_CONTROL_NAMESPACE: openshift-operators
+      ISTIO_VERSION: v1.30-latest
+      KUADRANT_CATALOG_SOURCE: redhat-operators
+      KUADRANT_CHANNEL: stable
+      KUADRANT_SUBSCRIPTION_NAME: rhcl-operator
+      METALLB_ADDRESS_POOL: ""
+      OCP_VERSION: "4.22"
+      OSSM_STARTING_CSV: servicemeshoperator3.v3.4.1
+      PYTEST_FLAGS: -n4
+      RESOURCE_GROUP: multi-arch-cicd-resource-group
+      RHCL_STARTING_CSV: rhcl-operator.v1.4.2
+      RUN_AUTHORINO: "false"
+      RUN_DNSTLS: "false"
+      RUN_KUADRANT: "true"
+      RUN_LIMITADOR: "false"
+      RUN_OBSERVABILITY: "false"
+      RUN_SMOKE: "true"
+      TERRAFORM_VERSION: "1.5.5"
+    workflow: kuadrant-ppc64le
+zz_generated_metadata:
+  branch: main
+  org: Kuadrant
+  repo: testsuite

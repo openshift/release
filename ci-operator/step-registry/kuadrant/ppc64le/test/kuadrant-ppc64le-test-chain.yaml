@@ -1,0 +1,22 @@
+chain:
+  as: kuadrant-ppc64le-test
+  steps:
+  - ref: kuadrant-ppc64le-install-ossm
+  - ref: kuadrant-ppc64le-install-metallb
+  - ref: kuadrant-ppc64le-install-coredns
+  - ref: kuadrant-ppc64le-verify-gateway
+  - ref: kuadrant-ppc64le-install-operator
+  - ref: kuadrant-ppc64le-deploy-tools
+  - ref: kuadrant-ppc64le-run-testsuite
+  documentation: |-
+    Installs the full Kuadrant (RHCL) stack on a provisioned ppc64le OCP cluster and
+    runs the Kuadrant end-to-end testsuite. Order:
+      1. kuadrant-ppc64le-install-ossm     - Gateway API CRDs + OpenShift Service Mesh 3.x (Sail/Istio)
+      2. kuadrant-ppc64le-install-metallb  - Red Hat MetalLB operator + lease-derived L2 IP pool
+      3. kuadrant-ppc64le-install-coredns  - kuadrant-coredns + dedicated MetalLB pool
+      4. kuadrant-ppc64le-verify-gateway   - fail-fast Gateway Programmed probe + diagnostics
+      5. kuadrant-ppc64le-install-operator - cert-manager, Kuadrant operator (+ Authorino, Limitador, DNS operators) and the Kuadrant CR
+      6. kuadrant-ppc64le-deploy-tools     - testing tools (Keycloak, Mockserver, Jaeger) using ppc64le images
+      7. kuadrant-ppc64le-run-testsuite    - generate config; default make smoke + kuadrant (optional RUN_AUTHORINO/LIMITADOR/DNSTLS/OBSERVABILITY); collect JUnit
+    Component and cluster cleanup are handled by the post phase of the
+    kuadrant-ppc64le workflow.
