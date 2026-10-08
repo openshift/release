@@ -55,6 +55,31 @@ tests:
     - ref: quay-tests-quay-deploy-registry-builder
     - ref: quay-tests-test-quay-newui
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay318-ocp50-fips-virtual-builder
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.8xlarge
+      FIPS_ENABLED: "true"
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v5-0@sha256:7407f44c12d4e08c03b9009f84eb8a5119ae366b097c1a0ef449f0693aca9c56
+      NEW_UI_TESTING_COVERAGE: builder
+      ODF_OPERATOR_CHANNEL: stable-4.22
+      QUAY_BUILDER_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-18@sha256:6f3e53c231e1d611fa715148751d057b857fca8d6c7dec45be39e3b19e00e76a
+      QUAY_OLD_UI_DISABLED: "true"
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.18"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-tls
+    - ref: quay-tests-resource-provisioning-builder
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-builder
+    - ref: quay-tests-test-quay-newui
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-quay318-ocp50-baremetal-builder
   cron: '@yearly'
   steps:
