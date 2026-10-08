@@ -30,8 +30,28 @@ for file in "${PROJECT_DIR}"/artifacts/*; do
 done
 
 echo "Copy reports for reporter step"
-cp "${PROJECT_DIR}"/artifacts/report_*.xml "${SHARED_DIR}"/
-cp "${PROJECT_DIR}"/artifacts/junit_*.xml "${SHARED_DIR}"/
+cp "${PROJECT_DIR}"/artifacts/junit_*.xml "${SHARED_DIR}"/ 2>/dev/null || true
+cp "${PROJECT_DIR}"/artifacts/report_polarion.xml "${SHARED_DIR}/polarion_report_polarion.xml" 2>/dev/null || true
+
+echo "Combine per-suite cnf-gotests JUnit into polarion_cnfgotests.xml for reporter step"
+python3 - "${PROJECT_DIR}/artifacts" "${SHARED_DIR}/polarion_cnfgotests.xml" << 'PYEOF'
+import re, sys, xml.etree.ElementTree as ET, glob, os
+src_dir, out_file = sys.argv[1], sys.argv[2]
+def strip(s):
+    s = re.sub(r'<system-err>.*?</system-err>', '', s, flags=re.DOTALL)
+    return re.sub(r'<system-out>.*?</system-out>', '', s, flags=re.DOTALL)
+root = ET.Element('testsuite', {'name': 'cnf-gotests'})
+for f in sorted(glob.glob(os.path.join(src_dir, '*_suite_test.xml'))):
+    try:
+        tree = ET.fromstring(strip(open(f).read()))
+        for suite in ([tree] if tree.tag == 'testsuite' else list(tree)):
+            if suite.tag == 'testsuite':
+                for tc in suite.findall('testcase'):
+                    root.append(tc)
+    except ET.ParseError:
+        pass
+ET.ElementTree(root).write(out_file, encoding='unicode', xml_declaration=True)
+PYEOF
 
 mkdir "${ARTIFACT_DIR}/junit"
 for file in "${PROJECT_DIR}"/artifacts/*.xml; do

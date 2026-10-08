@@ -77,6 +77,19 @@ if [ ! -f "${ARTIFACT_DIR}/junit_test-result.xml" ]; then
 fi
 
 echo "Store report for reporter step"
-cp "${ARTIFACT_DIR}/junit_test-result.xml" "${SHARED_DIR}/junit_test-result.xml"
+python3 - "${ARTIFACT_DIR}/junit_test-result.xml" "${SHARED_DIR}/polarion_cnf_test_result.xml" << 'PYEOF'
+import re, sys, xml.etree.ElementTree as ET
+src, out = sys.argv[1], sys.argv[2]
+def strip(s):
+    s = re.sub(r'<system-err>.*?</system-err>', '', s, flags=re.DOTALL)
+    return re.sub(r'<system-out>.*?</system-out>', '', s, flags=re.DOTALL)
+tree = ET.fromstring(strip(open(src).read()))
+root = ET.Element('testsuite', {'name': 'cnf-tests'})
+for suite in ([tree] if tree.tag == 'testsuite' else list(tree)):
+    if suite.tag == 'testsuite':
+        for tc in suite.findall('testcase'):
+            root.append(tc)
+ET.ElementTree(root).write(out, encoding='unicode', xml_declaration=True)
+PYEOF
 
 rm -rf $PROJECT_DIR/temp_ssh_key
