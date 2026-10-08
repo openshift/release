@@ -34,5 +34,44 @@ pushd e2e-benchmarking/workloads/ingress-perf
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 export ES_INDEX="ingress-performance"
 
+# For environments where the Prometheus route is not reachable from the Prow runner
+# (e.g. Bare Metal / Equinix where cluster ingress IPs are on private subnets),
+# port-forward the prometheus-k8s service and set PROMETHEUS_URL / PROMETHEUS_TOKEN
+# so ingress-perf uses the tunnel instead of the route.
+PROM_HOST=$(oc get route prometheus-k8s -n openshift-monitoring -o jsonpath='{.spec.host}' 2>/dev/null || true)
+if [[ -n "${PROM_HOST}" ]]; then
+  if ! curl -ks --connect-timeout 5 "https://${PROM_HOST}/api/v1/status/runtimeinfo" > /dev/null 2>&1; then
+    echo "Prometheus route ${PROM_HOST} unreachable — using port-forward tunnel"
+    oc port-forward svc/prometheus-k8s 9090:9091 -n openshift-monitoring &
+    PF_PID=$!
+    # Wait for the tunnel to be ready
+    for i in $(seq 1 10); do
+      if curl -kso /dev/null "https://localhost:9090/-/ready" 2>/dev/null; then
+        echo "Port-forward ready after ${i}s"
+        break
+      fi
+      sleep 2
+    done
+    export PROMETHEUS_URL="https://localhost:9090"
+    # Disable xtrace to avoid leaking the bearer token in build logs
+    set +x
+    PROMETHEUS_TOKEN=$(oc create token prometheus-k8s -n openshift-monitoring --duration=2h)
+    export PROMETHEUS_TOKEN
+    set -x
+    # shellcheck disable=SC2064
+    trap "kill ${PF_PID} 2>/dev/null || true" EXIT
+
+    # Use v0.6.1 which includes PROMETHEUS_URL/PROMETHEUS_TOKEN env var support
+    # (cloud-bulldozer/ingress-perf#89)
+    export INGRESS_PERF_VERSION="0.6.1"
+
+    # BM clusters have no infra nodes — remove infra nodePlacement from tuningPatch
+    # and reduce replicas to 1 so the ingress controller scales successfully.
+    CONFIG_FILE="${CONFIG:-config/standard.yml}"
+    sed -i 's|tuningPatch:.*|tuningPatch: '"'"'{"spec":{"replicas": 1}}'"'"'|g' "${CONFIG_FILE}"
+    echo "BM: patched ${CONFIG_FILE} — removed infra nodePlacement, set replicas=1"
+  fi
+fi
+
 # Start the Workload
 ./run.sh
