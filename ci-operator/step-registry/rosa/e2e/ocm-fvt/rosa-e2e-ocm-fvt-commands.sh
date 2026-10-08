@@ -3,6 +3,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Apply Gangway override before any use of OCM_FVT_EXTRA_ENVS.
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OCM_FVT_EXTRA_ENVS:-}" ]]; then
+  echo "Applying Gangway override: OCM_FVT_EXTRA_ENVS (from MULTISTAGE_PARAM_OVERRIDE_OCM_FVT_EXTRA_ENVS)"
+  export OCM_FVT_EXTRA_ENVS="${MULTISTAGE_PARAM_OVERRIDE_OCM_FVT_EXTRA_ENVS}"
+fi
+
 if [[ -z "${OCM_FVT_JOB_NAME:-}" ]]; then
   echo "ERROR: OCM_FVT_JOB_NAME is required but not set" >&2
   exit 1

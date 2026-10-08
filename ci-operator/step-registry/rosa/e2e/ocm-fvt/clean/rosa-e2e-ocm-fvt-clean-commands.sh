@@ -3,6 +3,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Apply Gangway override before any use of OCM_FVT_EXTRA_ENVS.
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OCM_FVT_EXTRA_ENVS:-}" ]]; then
+  echo "Applying Gangway override: OCM_FVT_EXTRA_ENVS (from MULTISTAGE_PARAM_OVERRIDE_OCM_FVT_EXTRA_ENVS)"
+  export OCM_FVT_EXTRA_ENVS="${MULTISTAGE_PARAM_OVERRIDE_OCM_FVT_EXTRA_ENVS}"
+fi
+
 # Runs ocmtest --justClean using cluster.ini / .datainfo persisted by rosa-e2e-ocm-fvt
 # when OCM_FVT_DEFER_CLEAN=true (so gather posts can run against a live guest first).
 # See ROSAENG-67965.
