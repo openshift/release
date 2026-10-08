@@ -16,7 +16,10 @@ ref:
     documentation: The OCM environment to log into. Supported values are [production, staging, integration].
   - name: HC_APPEAR_TIMEOUT
     default: "900"
-    documentation: Seconds to wait for the HostedCluster CR to appear on the management cluster after provisioning.
+    documentation: Seconds to wait for the HostedCluster CR to appear on the management cluster after the cluster-create ref.
+  - name: CPO_ROLLOUT_TIMEOUT
+    default: "900"
+    documentation: Seconds to wait for the control-plane-operator deployment to switch to the PR image and roll out successfully.
   documentation: |-
     Forces the HostedCluster under test to run the PR-built control-plane-operator (CPO) image.
 
@@ -26,9 +29,15 @@ ref:
     undetected (ROSAENG-74212). This step stamps the highest-precedence source instead, the
     hypershift.openshift.io/control-plane-operator-image annotation, directly on the HostedCluster.
 
-    It must run after the cluster is provisioned (the HostedCluster must exist) and before the
-    control plane readiness checks. It resolves the management cluster from the hosted cluster's
-    provision shard, waits for the HostedCluster CR, merges CI registry credentials into the
-    HostedCluster pull secret so the control plane can pull the CPO image from the CI registry,
-    then sets the annotation. CPO_OPERATOR_IMAGE is the PR-built control plane image injected via
-    dependencies (same build as the operator image used by rosa-operator-deploy-pr).
+    It must run immediately after the cluster-create ref (rosa-cluster-provision) and before the
+    cluster readiness checks (rosa-cluster-wait-ready-cluster), so the HyperShift operator rolls
+    the PR CPO onto the control plane while the cluster is still installing; this is what lets the
+    job catch install/bootstrap regressions. Because the provision chain embeds its own readiness
+    checks, the consuming config must inline the provision chain to place this step correctly.
+
+    It resolves the management cluster from the hosted cluster's provision shard, waits for the
+    HostedCluster CR, merges CI registry credentials into the HostedCluster pull secret so the
+    control plane can pull the CPO image from the CI registry, sets the annotation, and then waits
+    for the control-plane-operator deployment to switch to the PR image and become healthy so a CPO
+    that never runs cannot pass silently. CPO_OPERATOR_IMAGE is the PR-built control plane image
+    injected via dependencies (same build as the operator image used by rosa-operator-deploy-pr).

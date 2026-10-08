@@ -47,6 +47,7 @@ tests:
       CHANNEL_GROUP: stable
       CLUSTER_SECTOR: hypershift-ci
       ENABLE_BILLING_ACCOUNT: "yes"
+      ENABLE_BYOVPC: "true"
       HOSTED_CP: "true"
       LABEL_FILTER: Platform:HCP
       OCM_LOGIN_ENV: staging
@@ -65,8 +66,16 @@ tests:
     - ref: rosa-operator-restore
     pre:
     - ref: rosa-operator-deploy-pr
-    - chain: rosa-aws-sts-hcp-provision
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    - chain: rosa-sts-oidc-config-create
+    - ref: rosa-cluster-provision
     - ref: rosa-operator-annotate-cpo
+    - ref: rosa-cluster-wait-ready-cluster
+    - ref: rosa-cluster-notify-error
+    - ref: rosa-conf-idp-htpasswd
+    - ref: rosa-cluster-wait-ready-operators
+    - ref: aws-provision-tags-for-byo-vpc
     - ref: rosa-cluster-wait-ready-hosted-cp
     - ref: rosa-cluster-wait-ready-nodes
     - ref: rosa-cluster-credentials-hypershift-mgmt

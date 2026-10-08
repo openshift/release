@@ -10,9 +10,16 @@ set -o pipefail
 # operator's --control-plane-operator-image flag (as rosa-operator-deploy-pr does) never takes
 # effect, because the CPO baked into the release image outranks that flag. See ROSAENG-74212.
 #
+# This step runs immediately after the cluster-create ref and before the cluster readiness checks,
+# so the HyperShift operator rolls the PR CPO onto the control plane while the cluster is still
+# installing. That is what lets the job catch install/bootstrap regressions, which is most of what
+# CPO PRs change.
+#
 # The CPO image lives on the CI registry, so its credentials are merged into the HostedCluster
 # pull secret first; the operator resolves and the control plane pulls the CPO using that secret
 # (HyperShift syncs it into the control plane namespace), and OCM's pull secret has no CI creds.
+# After annotating, the step waits for the operator to actually roll the control-plane-operator
+# deployment to the PR image and become healthy, so a CPO that never runs cannot pass silently.
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -26,6 +33,20 @@ read_profile_file() {
     cat "${CLUSTER_PROFILE_DIR}/${file}"
   fi
 }
+
+# Only override the CPO when a PR is under test. Without one (periodic, gangway, or manual runs),
+# ci-operator builds the hypershift image from the branch HEAD, and replacing the payload CPO with
+# it would mean no longer testing the release payload. /payload-job runs are periodics, so JOB_TYPE
+# does not distinguish them; inspect JOB_SPEC for pull refs instead.
+if [[ -z "${JOB_SPEC:-}" ]]; then
+  log "JOB_SPEC is unset; assuming no PR under test, keeping the CPO from the release payload"
+  exit 0
+fi
+PULLS=$(echo "${JOB_SPEC}" | jq -r '[.refs] + (.extra_refs // []) | map(select(. != null) | (.pulls // []) | length) | add // 0')
+if (( PULLS == 0 )); then
+  log "No PR under test; keeping the CPO from the release payload"
+  exit 0
+fi
 
 # Validate inputs
 if [[ -z "${CPO_OPERATOR_IMAGE:-}" ]]; then
@@ -145,7 +166,39 @@ KUBECONFIG="${MC_KUBECONFIG}" oc annotate hostedcluster "${CLUSTER_NAME}" -n "${
   "hypershift.openshift.io/control-plane-operator-image=${CPO_OPERATOR_IMAGE}" --overwrite
 log "Annotated HostedCluster '${CLUSTER_NAME}' with control-plane-operator-image=${CPO_OPERATOR_IMAGE}"
 
-# Record the applied override so follow-up steps / debugging can confirm what was tested.
+# Verify the HyperShift operator actually rolls the control plane operator onto the PR image.
+# The downstream HC/HCP readiness checks can pass on conditions left True by the install, and a
+# crash-looping new CPO pod leaves the old replica serving the deployment, so without this check a
+# broken CPO could still produce a green job.
+HCP_NAMESPACE="${HC_NAMESPACE}-${CLUSTER_NAME}"
+log "Waiting for the control-plane-operator deployment in ${HCP_NAMESPACE} to switch to the PR image..."
+ROLLOUT_START=$(date +%s)
+while true; do
+  CPO_IMAGE=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment control-plane-operator -n "${HCP_NAMESPACE}" \
+    -o jsonpath='{.spec.template.spec.containers[?(@.name=="control-plane-operator")].image}' 2>/dev/null || true)
+  if [[ "${CPO_IMAGE}" == "${CPO_OPERATOR_IMAGE}" ]]; then
+    log "control-plane-operator deployment now references the PR image"
+    break
+  fi
+  elapsed=$(( $(date +%s) - ROLLOUT_START ))
+  if (( elapsed >= CPO_ROLLOUT_TIMEOUT )); then
+    log "ERROR: Timed out after ${CPO_ROLLOUT_TIMEOUT}s waiting for control-plane-operator to use ${CPO_OPERATOR_IMAGE} (current: ${CPO_IMAGE:-<none>})"
+    exit 1
+  fi
+  log "WAITING: control-plane-operator image is '${CPO_IMAGE:-<none>}' (elapsed: ${elapsed}s), retrying in 10s..."
+  sleep 10
+done
+
+# Confirm the rolled deployment becomes healthy on the PR image (catches a crash-looping CPO).
+if ! KUBECONFIG="${MC_KUBECONFIG}" oc rollout status deployment/control-plane-operator -n "${HCP_NAMESPACE}" \
+  --timeout="${CPO_ROLLOUT_TIMEOUT}s"; then
+  log "ERROR: control-plane-operator rollout did not complete on the PR image"
+  exit 1
+fi
+log "control-plane-operator rollout complete on the PR image"
+
+# Record the applied override only after confirming the PR-built CPO actually runs, so the artifact
+# reflects what was really tested.
 echo "${CPO_OPERATOR_IMAGE}" > "${SHARED_DIR}/cpo-annotation-image"
 
-log "PR-built control plane operator override applied to ${CLUSTER_NAME}"
+log "PR-built control plane operator override applied and verified on ${CLUSTER_NAME}"
