@@ -367,7 +367,7 @@ function merge_config_fragment() {
 	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
-# Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
+# Merge order: Mailpit -> OTel -> unmanaged database -> QUAY_EXTRA_CONFIG,
 # so an explicit override still wins over the service-owned fragments. A
 # missing fragment is a silent no-op, leaving the disabled default above.
 if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
@@ -380,6 +380,26 @@ if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
 	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
 fi
 
+# Unmanaged DB fragments from quay-database-intg-* steps. At most one should
+# exist; the first match wins.
+DATABASE_CONFIG_FRAGMENT=""
+for candidate in \
+	"${SHARED_DIR}/quay-database-aws-rds-config.yaml" \
+	"${SHARED_DIR}/quay-database-gcp-sql-config.yaml" \
+	"${SHARED_DIR}/quay-database-azure-postgres-config.yaml"
+do
+	if [[ -s "${candidate}" ]]; then
+		DATABASE_CONFIG_FRAGMENT="${candidate}"
+		break
+	fi
+done
+POSTGRES_MANAGED="true"
+if [[ -n "${DATABASE_CONFIG_FRAGMENT}" ]]; then
+	echo "Merging unmanaged database config fragment ${DATABASE_CONFIG_FRAGMENT} into defaults..."
+	merge_config_fragment "${DATABASE_CONFIG_FRAGMENT}"
+	POSTGRES_MANAGED="false"
+fi
+
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	echo "Merging extra Quay config into defaults..."
 	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
@@ -388,30 +408,53 @@ fi
 
 # Strip field-group keys for components this CR keeps managed. The operator
 # injects those values; leaving them in configBundleSecret blocks rollout.
-# Runs unconditionally now: a no-op on the defaults block when no overlay
-# above added any of these keys.
-yq -i '
-	del(
-		.FEATURE_SECURITY_SCANNER,
-		.FEATURE_SECURITY_NOTIFICATIONS,
-		.SECURITY_SCANNER_ENDPOINT,
-		.SECURITY_SCANNER_INDEXING_INTERVAL,
-		.SECURITY_SCANNER_V4_ENDPOINT,
-		.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
-		.SECURITY_SCANNER_V4_PSK,
-		.FEATURE_REPO_MIRROR,
-		.REPO_MIRROR_INTERVAL,
-		.REPO_MIRROR_SERVER_HOSTNAME,
-		.REPO_MIRROR_TLS_VERIFY,
-		.BUILDLOGS_REDIS,
-		.USER_EVENTS_REDIS,
-		.DB_URI,
-		.DB_CONNECTION_ARGS,
-		.SERVER_HOSTNAME,
-		.PREFERRED_URL_SCHEME,
-		.EXTERNAL_TLS_TERMINATION
-	)
-' config.yaml
+# Keep DB_URI / DB_CONNECTION_ARGS when an unmanaged database fragment was
+# merged above; otherwise strip them so the operator manages postgres.
+if [[ "${POSTGRES_MANAGED}" == "true" ]]; then
+	yq -i '
+		del(
+			.FEATURE_SECURITY_SCANNER,
+			.FEATURE_SECURITY_NOTIFICATIONS,
+			.SECURITY_SCANNER_ENDPOINT,
+			.SECURITY_SCANNER_INDEXING_INTERVAL,
+			.SECURITY_SCANNER_V4_ENDPOINT,
+			.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
+			.SECURITY_SCANNER_V4_PSK,
+			.FEATURE_REPO_MIRROR,
+			.REPO_MIRROR_INTERVAL,
+			.REPO_MIRROR_SERVER_HOSTNAME,
+			.REPO_MIRROR_TLS_VERIFY,
+			.BUILDLOGS_REDIS,
+			.USER_EVENTS_REDIS,
+			.DB_URI,
+			.DB_CONNECTION_ARGS,
+			.SERVER_HOSTNAME,
+			.PREFERRED_URL_SCHEME,
+			.EXTERNAL_TLS_TERMINATION
+		)
+	' config.yaml
+else
+	yq -i '
+		del(
+			.FEATURE_SECURITY_SCANNER,
+			.FEATURE_SECURITY_NOTIFICATIONS,
+			.SECURITY_SCANNER_ENDPOINT,
+			.SECURITY_SCANNER_INDEXING_INTERVAL,
+			.SECURITY_SCANNER_V4_ENDPOINT,
+			.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
+			.SECURITY_SCANNER_V4_PSK,
+			.FEATURE_REPO_MIRROR,
+			.REPO_MIRROR_INTERVAL,
+			.REPO_MIRROR_SERVER_HOSTNAME,
+			.REPO_MIRROR_TLS_VERIFY,
+			.BUILDLOGS_REDIS,
+			.USER_EVENTS_REDIS,
+			.SERVER_HOSTNAME,
+			.PREFERRED_URL_SCHEME,
+			.EXTERNAL_TLS_TERMINATION
+		)
+	' config.yaml
+fi
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
 # quay-provisioning-{tls,builder} steps have already written the
@@ -455,14 +498,34 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   echo "Builder image from CSV ${CSV}: ${builder_images[0]}" >&2
   sed -i -E "s|^( *BUILDER_CONTAINER_IMAGE:) from-csv$|\1 ${builder_images[0]}|" config.yaml
 
-  oc create secret generic -n quay-enterprise config-bundle-secret \
-    --from-file config.yaml=./config.yaml \
-    --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
-    --from-file ssl.key="${SHARED_DIR}/ssl.key" \
+  secret_args=(
+    --from-file config.yaml=./config.yaml
+    --from-file ssl.cert="${SHARED_DIR}/ssl.cert"
+    --from-file ssl.key="${SHARED_DIR}/ssl.key"
     --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt"
+  )
 else
-  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
+  secret_args=(--from-file config.yaml=./config.yaml)
 fi
+
+# On redhat-3.18 the operator projects only a secret named
+# postgresql-client-certs into /run/secrets/postgresql (see gsql deploy).
+# When GCP SQL client certs are present, use that secret name as configBundleSecret.
+CONFIG_BUNDLE_SECRET_NAME="config-bundle-secret"
+if [[ -s "${SHARED_DIR}/client-cert.pem" && -s "${SHARED_DIR}/client-key.pem" && -s "${SHARED_DIR}/server-ca.pem" ]]; then
+  echo "Including GCP SQL client certificates in postgresql-client-certs..." >&2
+  secret_args+=(
+    --from-file tls.crt="${SHARED_DIR}/client-cert.pem"
+    --from-file tls.key="${SHARED_DIR}/client-key.pem"
+    --from-file ca.crt="${SHARED_DIR}/server-ca.pem"
+  )
+  CONFIG_BUNDLE_SECRET_NAME="postgresql-client-certs"
+elif [[ "${DATABASE_CONFIG_FRAGMENT}" == *gcp-sql* ]]; then
+  echo "ERROR: GCP SQL config fragment present but client certificates missing in SHARED_DIR" >&2
+  exit 1
+fi
+
+oc create secret generic -n quay-enterprise "${CONFIG_BUNDLE_SECRET_NAME}" "${secret_args[@]}"
 
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
@@ -472,12 +535,14 @@ metadata:
   name: quay
   namespace: quay-enterprise
 spec:
-  configBundleSecret: config-bundle-secret
+  configBundleSecret: ${CONFIG_BUNDLE_SECRET_NAME}
   components:
   - kind: objectstorage
     managed: false
   - kind: monitoring
     managed: false
+  - kind: postgres
+    managed: ${POSTGRES_MANAGED}
   - kind: horizontalpodautoscaler
     managed: false
   - kind: quay

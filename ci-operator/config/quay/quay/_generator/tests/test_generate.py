@@ -1154,6 +1154,70 @@ def test_robot_api_tokens_only_on_quay_5() -> None:
             assert ("FEATURE_ROBOT_API_TOKENS: true" in extra) == enabled, (filename, test["as"])
 
 
+def test_redhat_318_database_shares_cloud_files() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+
+    aws = {test["as"]: test for test in by_name[PHASE0_NAME]["tests"]}
+    assert "aws-s3-rds-nightly" in aws
+    rds = aws["aws-s3-rds-nightly"]
+    assert rds["cron"] == "@weekly"
+    assert {"ref": "quay-database-intg-aws-rds"} in rds["steps"]["test"]
+    assert rds["steps"]["test"].index({"ref": "quay-database-intg-aws-rds"}) < rds[
+        "steps"
+    ]["test"].index({"ref": "quay-deploy-aws-s3"})
+    assert {"ref": "quay-database-intg-aws-rds-deprovision"} in rds["steps"]["post"]
+    assert {"ref": "quay-database-intg-aws-rds"} not in aws["aws-s3-nightly"]["steps"]["test"]
+
+    gcp_name = "quay-quay-redhat-3.18__gcp-ocp422-e2e-install.yaml"
+    gcp = {test["as"]: test for test in by_name[gcp_name]["tests"]}
+    assert set(gcp) == {"gcp-gcs-nightly", "gcp-gcs-sql-nightly"}
+    assert {"ref": "quay-database-intg-gcp-sql"} in gcp["gcp-gcs-sql-nightly"]["steps"]["test"]
+    assert {"ref": "quay-database-intg-gcp-sql-deprovision"} in gcp["gcp-gcs-sql-nightly"][
+        "steps"
+    ]["post"]
+
+    azure_name = "quay-quay-redhat-3.18__azure-ocp422-e2e-install.yaml"
+    azure = {test["as"]: test for test in by_name[azure_name]["tests"]}
+    assert set(azure) == {"azure-blob-nightly", "azure-blob-postgres-nightly"}
+    assert {"ref": "quay-database-intg-azure-postgres"} in azure[
+        "azure-blob-postgres-nightly"
+    ]["steps"]["test"]
+    assert {"ref": "quay-database-intg-azure-postgres-deprovision"} in azure[
+        "azure-blob-postgres-nightly"
+    ]["steps"]["post"]
+
+
+def test_database_rejects_unsupported_cloud() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["libvirt"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "database": True,
+        }
+    )
+    with pytest.raises(ValueError, match="database: true is not supported for cloud"):
+        expand_cells(matrix)
+
+
+def test_database_rejects_non_bool() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "database": "yes",
+        }
+    )
+    with pytest.raises(ValueError, match="database must be a boolean"):
+        expand_cells(matrix)
+
+
 def test_fips_rejects_non_bool() -> None:
     matrix = _matrix_with_job(
         {
