@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 SCRIPT = None
 
 
-class RequiredResources(unittest.TestCase):
+class RequiredResources(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def run_full_script(self, scenario, target_channel='rhacs-4.11'):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
