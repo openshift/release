@@ -60,6 +60,96 @@ tests:
     - ref: openshift-qe-orion
     workflow: rosa-aws-sts
   timeout: 8h0m0s
+- always_run: false
+  as: build-farm-114nodes-khugepaged-256
+  cron: 0 8 8,22 * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BUILD_FARM_EXTRA_FLAGS: --alerting=false --job-iterations=80 --set=jobs.2.jobPause=10m
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "true"
+      INDEX_ENABLED: "true"
+      KUBE_BURNER_VERSION: 1.11.18
+      MIN_REPLICAS: "18"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+      ORION_CONFIG: examples/build-farm.yaml
+      REPLICAS: "114"
+      RUN_ORION: "true"
+    test:
+    - as: tune-khugepaged
+      cli: latest
+      commands: |
+        set -o errexit
+        set -o pipefail
+
+        echo "=== Applying MachineConfig to set khugepaged max_ptes_none=256 ==="
+        for ROLE in worker master; do
+          echo "Creating MachineConfig 99-tune-khugepaged-${ROLE} for role ${ROLE}..."
+          oc apply -f - <<MCEOF
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          name: 99-tune-khugepaged-${ROLE}
+          labels:
+            machineconfiguration.openshift.io/role: ${ROLE}
+        spec:
+          config:
+            ignition:
+              version: 3.2.0
+            systemd:
+              units:
+              - name: tune-khugepaged.service
+                enabled: true
+                contents: |
+                  [Unit]
+                  Description=Set khugepaged max_ptes_none=256 for perf testing
+                  Before=crio.service kubelet.service
+                  DefaultDependencies=no
+                  After=systemd-sysctl.service
+                  [Service]
+                  Type=oneshot
+                  ExecStart=/bin/bash -c 'echo 256 > /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_none'
+                  RemainAfterExit=yes
+                  [Install]
+                  WantedBy=multi-user.target
+        MCEOF
+        done
+
+        echo "=== MachineConfigs applied, waiting for MCPs to start updating ==="
+        oc wait mcp worker master --for condition=Updating=True --timeout=5m || true
+
+        echo "=== Waiting for MachineConfigPools to finish rolling out ==="
+        oc wait mcp worker master --for condition=Updated=True --timeout=30m
+        oc wait mcp worker master --for condition=Degraded=False --timeout=5m
+        echo "=== MachineConfigPools are Updated with max_ptes_none=256 ==="
+
+        echo "=== Verifying max_ptes_none on a sample worker node ==="
+        SAMPLE_NODE=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
+        oc debug node/${SAMPLE_NODE} -- chroot /host cat /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_none
+      from: cli
+      grace_period: 10s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - chain: openshift-qe-build-farm
+    - ref: openshift-qe-orion
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
