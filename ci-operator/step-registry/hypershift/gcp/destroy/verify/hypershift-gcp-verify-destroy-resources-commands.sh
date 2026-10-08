@@ -24,8 +24,7 @@ if GET_OUTPUT="$(oc get hostedcluster "${CLUSTER_NAME}" -n clusters --request-ti
   echo "ERROR: HostedCluster/${CLUSTER_NAME} still exists after destroy completed"
   exit 1
 elif [[ "${GET_OUTPUT}" != *"(NotFound)"* && "${GET_OUTPUT}" != *"not found"* ]]; then
-  echo "ERROR: Could not verify HostedCluster/${CLUSTER_NAME} deletion:"
-  echo "${GET_OUTPUT}"
+  echo "ERROR: Could not verify HostedCluster deletion"
   exit 1
 fi
 
@@ -46,6 +45,9 @@ NETWORK_SA="$(<"${SHARED_DIR}/network-sa")"
 
 gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"
 
+# assert_resource_absent checks whether a GCP list command returns the named
+# resource. Arguments: description, resource name, then the gcloud command
+# and its options. It returns nonzero if listing fails or the resource remains.
 assert_resource_absent() {
   local description="$1"
   local resource_name="$2"
