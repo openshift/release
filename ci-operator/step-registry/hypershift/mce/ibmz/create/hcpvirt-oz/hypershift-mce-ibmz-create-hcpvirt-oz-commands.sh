@@ -34,16 +34,24 @@ set -x
 POOL_RANGE=$(oc get ipaddresspool -n metallb-system -o jsonpath='{.items[0].spec.addresses[0]}' 2>/dev/null || true)
 echo "$(date) MetalLB IPAddressPool range: ${POOL_RANGE}"
 
-if [[ "${POOL_RANGE}" == 192.168.2.* ]]; then
-  HC_NAME=hcpvirt-oz-ci
-  HC_NS=hcpvirt-oz-ci-ns
+if [[ "${POOL_RANGE}" == 192.168.126.* ]]; then
+  HC_NAME=hcpvirt-oz-ci-0
+  HC_NS=hcpvirt-oz-ci-0-ns
+  MGMT_CLUSTER_LEASE=3-0
+elif [[ "${POOL_RANGE}" == 192.168.1.* ]]; then
+  HC_NAME=hcpvirt-oz-ci-1
+  HC_NS=hcpvirt-oz-ci-1-ns
+  MGMT_CLUSTER_LEASE=3-1
+elif [[ "${POOL_RANGE}" == 192.168.2.* ]]; then
+  HC_NAME=hcpvirt-oz-ci-2
+  HC_NS=hcpvirt-oz-ci-2-ns
   MGMT_CLUSTER_LEASE=3-2
 elif [[ "${POOL_RANGE}" == 192.168.3.* ]]; then
-  HC_NAME=hcpvirtnew-oz-ci
-  HC_NS=hcpvirtnew-oz-ci-ns
+  HC_NAME=hcpvirt-oz-ci-3
+  HC_NS=hcpvirt-oz-ci-3-ns
   MGMT_CLUSTER_LEASE=3-3
 else
-  echo "$(date) ERROR: Unrecognised IPAddressPool range '${POOL_RANGE}', expected 192.168.2.x or 192.168.3.x"
+  echo "$(date) ERROR: Unrecognised IPAddressPool range '${POOL_RANGE}', expected 192.168.126.x or 192.169.1.x or 192.168.2.x or 192.168.3.x"
   exit 1
 fi
 
@@ -57,7 +65,11 @@ echo "$(date) LPAR host IP: ${MGMT_HOST_IP}"
 #   lease 3-3 → binds 10.0.1.15:31133
 # We render the HCP manifests, patch the kube-apiserver Service to use the
 # matching fixed NodePort, then apply — so haproxy always finds the port it expects.
-if [[ "${MGMT_CLUSTER_LEASE}" == "3-2" ]]; then
+if [[ "${MGMT_CLUSTER_LEASE}" == "3-0" ]]; then
+  FIXED_NODEPORT=31130
+elif [[ "${MGMT_CLUSTER_LEASE}" == "3-1" ]]; then
+  FIXED_NODEPORT=31131
+elif [[ "${MGMT_CLUSTER_LEASE}" == "3-2" ]]; then
   FIXED_NODEPORT=31132
 elif [[ "${MGMT_CLUSTER_LEASE}" == "3-3" ]]; then
   FIXED_NODEPORT=31133

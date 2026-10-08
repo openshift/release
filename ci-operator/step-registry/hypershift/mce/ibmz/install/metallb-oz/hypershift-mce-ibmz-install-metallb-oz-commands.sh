@@ -214,10 +214,14 @@ else
   NODE_IP=$(oc get nodes -o wide --no-headers 2>/dev/null \
     | awk '{print $6}' | grep -v '^$' | head -1)
   echo "  Detected node IP: ${NODE_IP}"
-  if [[ "${NODE_IP}" == 192.168.2.* ]]; then
-    IP_POOL="192.168.2.53-192.168.2.54"
+  if [[ "${NODE_IP}" == 192.168.126.* ]]; then 
+    IP_POOL="192.168.126.53-192.168.126.54" # lease 3-0
+  elif [[ "${NODE_IP}" == 192.168.1.* ]]; then 
+    IP_POOL="192.168.1.53-192.168.1.54" # lease 3-1
+  elif [[ "${NODE_IP}" == 192.168.2.* ]]; then 
+    IP_POOL="192.168.2.53-192.168.2.54" # lease 3-2
   else
-    IP_POOL="192.168.3.53-192.168.3.54"
+    IP_POOL="192.168.3.53-192.168.3.54" # lease 3-3
   fi
 fi
 echo "  IPAddressPool range: ${IP_POOL}"
