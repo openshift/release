@@ -1,3 +1,8 @@
+base_images:
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   project_image:
     dockerfile_literal: |
@@ -35,6 +40,8 @@ tests:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "1"
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: feast-operator-system,test-ns-feast,test-ns-remote-registry
     test:
     - as: run-tests
       cli: latest
@@ -60,6 +67,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - ref: tls-scanner-run
     workflow: hypershift-hostedcluster-workflow
 - as: e2e-in-cluster-postsubmit
   postsubmit: true
