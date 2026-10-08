@@ -53,6 +53,14 @@ chain:
         -o -name '*.kubeconfig' \
         -o -name '*.tar' \
         -o -name '*.tar.gz' \
+        -o -name '*.tgz' \
+        -o -name '*.zip' \
+        -o -name '*.gz' \
+        -o -name '*.bz2' \
+        -o -name '*.xz' \
+        -o -name '*.zst' \
+        -o -name '*.7z' \
+        -o -name '*.rar' \
       \) -delete
       # 3. Redact known credential formats while preserving opaque identifiers
       #    such as Kubernetes UIDs, which are useful for correlating resources.
@@ -77,9 +85,54 @@ chain:
       find "${DUMP_WORK_DIR}/output" -type f -name '*.bak' -delete
       # Redact the contents of block-style credential values without leaving
       # orphaned YAML indentation or changing the surrounding resource shape.
+      # Also redact unlabeled high-entropy tokens in diagnostics. Preserve
+      # Kubernetes UUIDs and image/content digests so resource correlation stays useful.
       while IFS= read -r -d '' file; do
         awk '
           BEGIN { block_indent = -1; env_indent = -1; env_item_indent = -1; redact_env_value = 0 }
+          function is_uuid(value) {
+            return length(value) == 36 && \
+              substr(value, 9, 1) == "-" && substr(value, 14, 1) == "-" && \
+              substr(value, 19, 1) == "-" && substr(value, 24, 1) == "-" && \
+              substr(value, 1, 8) ~ /^[[:xdigit:]]+$/ && \
+              substr(value, 10, 4) ~ /^[[:xdigit:]]+$/ && \
+              substr(value, 15, 4) ~ /^[[:xdigit:]]+$/ && \
+              substr(value, 20, 4) ~ /^[[:xdigit:]]+$/ && \
+              substr(value, 25, 12) ~ /^[[:xdigit:]]+$/
+          }
+          function is_resource_identifier(value) {
+            # Kubernetes object names are DNS labels and remain useful in diagnostics.
+            return value ~ /^[a-z0-9]+(-[a-z0-9]+)+$/
+          }
+          function entropy(value, counts, i, character, probability, total, result) {
+            for (character in counts) delete counts[character]
+            total = length(value)
+            for (i = 1; i <= total; i++) counts[substr(value, i, 1)]++
+            result = 0
+            for (character in counts) {
+              probability = counts[character] / total
+              result -= probability * log(probability) / log(2)
+            }
+            return result
+          }
+          function redact_opaque_tokens(line, original, output, token, start, size) {
+            original = line
+            output = ""
+            while (match(line, /[A-Za-z0-9_~+.\/=\-]+/)) {
+              start = RSTART
+              size = RLENGTH
+              token = substr(line, start, size)
+              output = output substr(line, 1, start - 1)
+              if (length(token) >= 24 && !is_uuid(token) && !is_resource_identifier(token) && \
+                  tolower(original) !~ /(sha1|sha256|digest)/ && entropy(token) >= 3.5) {
+                output = output "REDACTED_HIGH_ENTROPY"
+              } else {
+                output = output token
+              }
+              line = substr(line, start + size)
+            }
+            return output line
+          }
           function indentation(line, position) {
             position = match(line, /[^[:space:]]/)
             return position == 0 ? 0 : position - 1
@@ -159,7 +212,7 @@ chain:
               } else if (current_key == "value" && redact_env_value && current_indent > env_item_indent) {
                 if (is_block_scalar($0)) block_indent = current_indent
                 sub(/:[[:space:]]*.*/, ": \"REDACTED\"")
-                print
+                print redact_opaque_tokens($0)
                 redact_env_value = 0
                 next
               } else if (env_item_indent >= 0 && current_indent <= env_item_indent && $0 ~ /^[[:space:]]*-/) {
@@ -170,14 +223,18 @@ chain:
             if (is_credential_key($0) && is_block_scalar($0)) {
               block_indent = key_indentation($0)
               sub(/:[[:space:]]*[|>].*$/, ": \"REDACTED\"")
-              print
+              print redact_opaque_tokens($0)
               next
             }
-            print
+            print redact_opaque_tokens($0)
           }
         ' "$file" > "${file}.redacted"
         mv "${file}.redacted" "$file"
-      done < <(find "${DUMP_WORK_DIR}/output" -type f \( -name '*.yaml' -o -name '*.yml' \) -print0)
+      done < <(find "${DUMP_WORK_DIR}/output" -type f \( \
+        -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name '*.jsonl' \
+        -o -name '*.log' -o -name '*.txt' -o -name '*.xml' -o -name '*.csv' \
+        -o -name '*.out' -o -name '*.conf' -o -name '*.ini' -o -name '*.properties' \
+      \) -print0)
       find "${DUMP_WORK_DIR}/output" -mindepth 1 -type d -empty -delete
 
       # oc adm inspect failures are logged but may not fail the dump command.
