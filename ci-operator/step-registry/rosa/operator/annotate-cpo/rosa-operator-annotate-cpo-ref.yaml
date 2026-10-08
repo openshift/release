@@ -1,0 +1,34 @@
+ref:
+  as: rosa-operator-annotate-cpo
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-operator-annotate-cpo-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  dependencies:
+  - name: hypershift
+    env: CPO_OPERATOR_IMAGE
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The OCM environment to log into. Supported values are [production, staging, integration].
+  - name: HC_APPEAR_TIMEOUT
+    default: "900"
+    documentation: Seconds to wait for the HostedCluster CR to appear on the management cluster after provisioning.
+  documentation: |-
+    Forces the HostedCluster under test to run the PR-built control-plane-operator (CPO) image.
+
+    rosa-operator-deploy-pr sets the HyperShift operator's --control-plane-operator-image flag,
+    but that flag is the lowest-precedence CPO source: the CPO bundled in the cluster's release
+    image always outranks it, so the PR-built CPO never runs and CPO regressions can merge
+    undetected (ROSAENG-74212). This step stamps the highest-precedence source instead, the
+    hypershift.openshift.io/control-plane-operator-image annotation, directly on the HostedCluster.
+
+    It must run after the cluster is provisioned (the HostedCluster must exist) and before the
+    control plane readiness checks. It resolves the management cluster from the hosted cluster's
+    provision shard, waits for the HostedCluster CR, merges CI registry credentials into the
+    HostedCluster pull secret so the control plane can pull the CPO image from the CI registry,
+    then sets the annotation. CPO_OPERATOR_IMAGE is the PR-built control plane image injected via
+    dependencies (same build as the operator image used by rosa-operator-deploy-pr).
