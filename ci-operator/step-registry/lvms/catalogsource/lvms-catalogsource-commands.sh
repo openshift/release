@@ -606,9 +606,9 @@ function main {
 			commit=$(oc image info -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
 				2>>"${oc_stderr}" | jq -r '.config.config.Labels["vcs-ref"]') || true
 		fi
-		# Fall back to skopeo only when oc image info hits S3 Forbidden from quay.io
-		if [[ -z "${commit}" || "${commit}" == "null" ]] && grep -qi "Forbidden" "${oc_stderr}" && command -v skopeo &>/dev/null; then
-			echo "oc image info hit Forbidden error, falling back to skopeo inspect..."
+		# Fall back to skopeo whenever oc image info cannot obtain the source commit
+		if [[ -z "${commit}" || "${commit}" == "null" ]] && command -v skopeo &>/dev/null; then
+			echo "oc image info did not return vcs-ref, falling back to skopeo inspect..."
 			cat "${oc_stderr}"
 			commit=$(skopeo inspect --authfile "${CLUSTER_PROFILE_DIR}/pull-secret" --override-os=linux --override-arch=amd64 \
 				"docker://${LVM_INDEX_IMAGE}" 2>/dev/null \
