@@ -66,6 +66,8 @@ github_token() {
   jwt="${header}.${payload}.${signature}"
   curl -fsS -X POST -H "Authorization: Bearer ${jwt}" \
     -H 'Accept: application/vnd.github+json' \
+    -H 'Content-Type: application/json' \
+    --data '{"repositories":["rosa-boundary"],"permissions":{"contents":"write","pull_requests":"write"}}' \
     "https://api.github.com/app/installations/$(cat "$installation_id_file")/access_tokens" \
     | jq -er '.token'
 }
