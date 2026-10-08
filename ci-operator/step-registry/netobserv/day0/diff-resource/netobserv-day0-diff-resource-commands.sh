@@ -9,11 +9,12 @@ SNAPSHOT_WITH="${SHARED_DIR}/day0-snapshot-with-netobserv.json"
 REPORT="${ARTIFACT_DIR}/day0-resource-diff.txt"
 HTML_REPORT="${ARTIFACT_DIR}/day0-resource-diff.html"
 SPYGLASS_LINK="${ARTIFACT_DIR}/custom-link-day0-report.html"
+DAY0_ARTIFACTS_BASE=""
 ORION_ARTIFACTS_BASE=""
+ORION_WORKERS="${COMPUTE_NODE_REPLICAS:-}"
 
-# The Orion step runs after this step. Build links to its eventual artifacts so
-# Spyglass can surface them without modifying the shared Orion step. The URL
-# path mirrors ci-operator's public artifact layout.
+# Build absolute links to this step and the later Orion step. The URL path
+# mirrors ci-operator's public artifact layout.
 if [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" && -n "${JOB_NAME_SAFE:-}" ]]; then
     if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" && -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" ]]; then
         GCS_JOB_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
@@ -21,8 +22,10 @@ if [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" && -n "${JOB_NAME_SAFE:-}" ]]; th
         GCS_JOB_PATH="logs/${JOB_NAME}/${BUILD_ID}"
     fi
     GCS_BUCKET="${GCS_PUBLIC_BUCKET:-test-platform-results-public}"
-    GCSWEB_BASE="${GCS_PUBLIC_BASE:-https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/${GCS_BUCKET}}"
-    ORION_ARTIFACTS_BASE="${GCSWEB_BASE}/${GCS_JOB_PATH}/artifacts/${JOB_NAME_SAFE}/openshift-qe-orion/artifacts"
+    GCS_ARTIFACT_BASE="${GCS_ARTIFACT_BASE:-https://gcs.ci.openshift.org/gcs/${GCS_BUCKET}}"
+    JOB_ARTIFACTS_BASE="${GCS_ARTIFACT_BASE}/${GCS_JOB_PATH}/artifacts/${JOB_NAME_SAFE}"
+    DAY0_ARTIFACTS_BASE="${JOB_ARTIFACTS_BASE}/netobserv-day0-diff-resource/artifacts"
+    ORION_ARTIFACTS_BASE="${JOB_ARTIFACTS_BASE}/openshift-qe-orion/artifacts"
 fi
 
 if [[ ! -f "${SNAPSHOT_WITHOUT}" ]]; then
@@ -161,30 +164,86 @@ print(f"\nReport written to {report_path}")
 print(f"HTML report written to {html_report_path}")
 PYEOF
 
-# Spyglass recognizes this artifact name and renders its links in the Prow UI.
-{
-cat <<'HTMLEOF'
-<!doctype html>
+# Spyglass renders custom-link-*.html files directly in the expanded HTML lens.
+# Include the report body for a quick view and use absolute public GCS URLs for
+# links because relative URLs resolve under /spyglass/static/html/.
+export REPORT SPYGLASS_LINK DAY0_ARTIFACTS_BASE ORION_ARTIFACTS_BASE ORION_WORKERS
+python - <<'PYEOF'
+from html import escape
+import os
+
+report_path = os.environ["REPORT"]
+spyglass_path = os.environ["SPYGLASS_LINK"]
+day0_base = os.environ.get("DAY0_ARTIFACTS_BASE", "")
+orion_base = os.environ.get("ORION_ARTIFACTS_BASE", "")
+orion_workers = os.environ.get("ORION_WORKERS", "")
+
+with open(report_path) as f:
+    report = f.read()
+
+def artifact_link(label, url, title):
+    return (
+        f'<a class="artifact-link" target="_blank" '
+        f'href="{escape(url, quote=True)}" title="{escape(title, quote=True)}">'
+        f'{escape(label)}</a>'
+    )
+
+parts = ["""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <title>NetObserv Day0 reports</title>
   <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
+  <style>
+    body { font-family: sans-serif; margin: 1em; }
+    .artifact-link { display: inline-block; margin: 0 0.75em 0.75em 0; }
+    pre { background: #f5f5f5; border: 1px solid #ddd; padding: 1em; overflow-x: auto; }
+  </style>
 </head>
 <body>
-  <a target="_blank" href="day0-resource-diff.html" title="Open the NetObserv day0 resource impact report">NetObserv day0 resource diff</a>
-HTMLEOF
-if [[ -n "${ORION_ARTIFACTS_BASE}" ]]; then
-  cat <<HTMLEOF
-  <h2>Orion artifacts</h2>
-  <a target="_blank" href="${ORION_ARTIFACTS_BASE}/output.txt" title="Open Orion command output">Orion output</a>
-  <a target="_blank" href="${ORION_ARTIFACTS_BASE}/orion-output.txt" title="Open Orion command output">Orion command output</a>
-  <a target="_blank" href="${ORION_ARTIFACTS_BASE}/viz.html" title="Open Orion visualization">Orion visualization</a>
-HTMLEOF
-fi
-cat <<'HTMLEOF'
-</body>
-</html>
-HTMLEOF
-} > "${SPYGLASS_LINK}"
+  <h1>NetObserv Day0 reports</h1>
+"""]
+
+if day0_base:
+    parts.append(artifact_link(
+        "NetObserv day0 resource diff",
+        f"{day0_base}/day0-resource-diff.html",
+        "Open the complete NetObserv day0 resource impact report",
+    ))
+
+parts.extend([
+    "<h2>Resource diff</h2>",
+    f"<pre>{escape(report)}</pre>",
+])
+
+if orion_base:
+    parts.extend([
+        "<h2>Orion artifacts</h2>",
+        artifact_link("Orion output", f"{orion_base}/output.txt", "Open Orion command output"),
+    ])
+    if orion_workers:
+        baseline_viz = f"output_netobserv-day0-baseline-AWS-{orion_workers}w_viz.html"
+        enabled_viz = f"output_netobserv-day0-with-noo-AWS-{orion_workers}w_viz.html"
+        parts.extend([
+            artifact_link(
+                "Orion baseline visualization",
+                f"{orion_base}/{baseline_viz}",
+                "Open the Orion visualization for the baseline measurement",
+            ),
+            artifact_link(
+                "Orion with NetObserv visualization",
+                f"{orion_base}/{enabled_viz}",
+                "Open the Orion visualization for the enabled measurement",
+            ),
+        ])
+    parts.append(artifact_link(
+        "All Orion artifacts",
+        f"{orion_base}/",
+        "Browse all Orion artifacts, including any additional visualizations",
+    ))
+
+parts.append("</body>\n</html>\n")
+with open(spyglass_path, "w") as f:
+    f.write("\n".join(parts))
+PYEOF
 echo "Spyglass link written to ${SPYGLASS_LINK}"
