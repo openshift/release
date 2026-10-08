@@ -1,3 +1,8 @@
+base_images:
+  base_rhel10:
+    name: "5.1"
+    namespace: ocp
+    tag: base-rhel10
 build_root:
   from_repository: true
 images:
@@ -6,6 +11,10 @@ images:
     from: src
     optional: true
     to: ironic-tester
+  - dockerfile_path: openstack-ironic-tester-rhel10-py314.Dockerfile
+    from: base_rhel10
+    optional: true
+    to: ironic-tester-rhel10-py314
 promotion:
   to:
   - name: "5.1"
@@ -38,6 +47,16 @@ tests:
   commands: HOME=`dirname .` tox -vv -e pep8
   container:
     from: ironic-tester
+- as: unit-rhel10-py314
+  commands: HOME=`dirname .` tox -vv -e py3
+  container:
+    clone: true
+    from: ironic-tester-rhel10-py314
+- as: pep8-rhel10-py314
+  commands: HOME=`dirname .` tox -vv -e pep8
+  container:
+    clone: true
+    from: ironic-tester-rhel10-py314
 zz_generated_metadata:
   branch: main
   org: openshift
