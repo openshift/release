@@ -1,0 +1,270 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v2.10.1
+  insights-operator-tests:
+    name: insights-operator-tests
+    namespace: ci
+    tag: "4.20"
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/insights-operator
+images:
+  items:
+  - to: insights-operator
+promotion:
+  to:
+  - name: "4.20"
+    namespace: ocp-priv
+prowgen:
+  enable_secrets_store_csi_driver: true
+  private: true
+releases:
+  initial:
+    integration:
+      name: "4.20"
+      namespace: ocp-priv
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp-priv
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  lint:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=10m
+  container:
+    clone: true
+    from: golangci-lint
+  timeout: 15m0s
+- as: unit
+  commands: |
+    export COVER_PROFILE=./unit_coverage.out
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make unit
+  container:
+    from: src
+  secret:
+    collection: insights-operator
+    group: insights-operator-codecov-token
+    mount_path: /tmp/secret
+- always_run: false
+  as: e2e
+  pipeline_skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp
+- always_run: false
+  as: e2e-agnostic-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+  steps:
+    cluster_profile: openshift-org-azure
+    workflow: openshift-upgrade-azure
+- always_run: false
+  as: insights-operator-e2e-tests
+  pipeline_skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+  steps:
+    cluster_profile: openshift-org-gcp
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        pytest.sh -k "not tp_only and not UI and not slow and not periodic_only" --junitxml=$(pwd)/test-report.xml
+      credentials:
+      - collection: insights-qa
+        group: pull-secret
+        mount_path: /secrets
+      - collection: insights-operator-secrets
+        group: aws-bucket
+        mount_path: /secret/aws/aws-bucket
+      - collection: insights-operator-secrets
+        group: aws-access-key-id
+        mount_path: /secret/aws/aws-access-key-id
+      - collection: insights-operator-secrets
+        group: aws-region
+        mount_path: /secret/aws/aws-region
+      - collection: insights-operator-secrets
+        group: aws-secret-access-key
+        mount_path: /secret/aws/aws-secret-access-key
+      - collection: insights-operator-secrets
+        group: slack-bot-token
+        mount_path: /secret/slack-bot-token
+      - collection: insights-operator-secrets
+        group: slack-webhook-url
+        mount_path: /secret/slack-webhook-url
+      - collection: insights-operator-secrets
+        group: insights-ocm-token
+        mount_path: /secret/ocm-access/
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      - default: /secret/slack-bot-token/slack-bot-token
+        name: SLACK_BOT_TOKEN
+      - default: /secret/slack-webhook-url/slack-webhook-url
+        name: SLACK_WEBHOOK_URL
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-ovn-techpreview
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: pytest.sh -m "not UI and techpreview" --junitxml=$(pwd)/test-report.xml
+      credentials:
+      - collection: insights-qa
+        group: pull-secret
+        mount_path: /secrets
+      - collection: insights-operator-secrets
+        group: aws-bucket
+        mount_path: /secret/aws/aws-bucket
+      - collection: insights-operator-secrets
+        group: aws-access-key-id
+        mount_path: /secret/aws/aws-access-key-id
+      - collection: insights-operator-secrets
+        group: aws-region
+        mount_path: /secret/aws/aws-region
+      - collection: insights-operator-secrets
+        group: aws-secret-access-key
+        mount_path: /secret/aws/aws-secret-access-key
+      - collection: insights-operator-secrets
+        group: slack-bot-token
+        mount_path: /secret/slack-bot-token
+      - collection: insights-operator-secrets
+        group: slack-webhook-url
+        mount_path: /secret/slack-webhook-url
+      - collection: insights-operator-secrets
+        group: insights-ocm-token
+        mount_path: /secret/ocm-access/
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      - default: /secret/slack-bot-token/slack-bot-token
+        name: SLACK_BOT_TOKEN
+      - default: /secret/slack-webhook-url/slack-webhook-url
+        name: SLACK_WEBHOOK_URL
+      from: insights-operator-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: insights-runtime-extractor-tests
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+  steps:
+    cluster_profile: openshift-org-gcp
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml
+      credentials:
+      - collection: insights-qa
+        group: pull-secret
+        mount_path: /secrets
+      - collection: insights-operator-secrets
+        group: aws-bucket
+        mount_path: /secret/aws/aws-bucket
+      - collection: insights-operator-secrets
+        group: aws-access-key-id
+        mount_path: /secret/aws/aws-access-key-id
+      - collection: insights-operator-secrets
+        group: aws-region
+        mount_path: /secret/aws/aws-region
+      - collection: insights-operator-secrets
+        group: aws-secret-access-key
+        mount_path: /secret/aws/aws-secret-access-key
+      - collection: insights-operator-secrets
+        group: slack-bot-token
+        mount_path: /secret/slack-bot-token
+      - collection: insights-operator-secrets
+        group: slack-webhook-url
+        mount_path: /secret/slack-webhook-url
+      - collection: insights-operator-secrets
+        group: insights-ocm-token
+        mount_path: /secret/ocm-access/
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      - default: /secret/slack-bot-token/slack-bot-token
+        name: SLACK_BOT_TOKEN
+      - default: /secret/slack-webhook-url/slack-webhook-url
+        name: SLACK_WEBHOOK_URL
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.20
+  org: openshift-priv
+  repo: insights-operator

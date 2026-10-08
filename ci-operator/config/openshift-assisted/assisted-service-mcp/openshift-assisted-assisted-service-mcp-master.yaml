@@ -1,0 +1,48 @@
+base_images:
+  rh-ecosystem-edge-assisted-chat-install:
+    name: assisted-chat-img
+    namespace: edge-infrastructure
+    tag: rh-ecosystem-edge-assisted-chat-install
+  rh-ecosystem-edge-assisted-chat-test:
+    name: assisted-chat-img
+    namespace: edge-infrastructure
+    tag: rh-ecosystem-edge-assisted-chat-test
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/python-311:latest
+      USER 0:0
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: assisted-service-mcp
+promotion:
+  to:
+  - name: assisted-chat-img
+    namespace: edge-infrastructure
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    pip install uv
+    make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift-assisted
+  repo: assisted-service-mcp

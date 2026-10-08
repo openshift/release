@@ -1,0 +1,83 @@
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile
+prowgen:
+  disable_sparse_checkout: true
+  enable_secrets_store_csi_driver: true
+  expose: true
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: argocd-lint
+  commands: make argocd-lint
+  container:
+    from: src
+  run_if_changed: ^argocd/
+- as: validate
+  run_if_changed: ^(terraform|hcp-terraform)/
+  steps:
+    test:
+    - as: validate
+      commands: |
+        # This step runs with an HCP Terraform token and a GitHub App token
+        # mounted, so the tooling is restored from the trusted base revision
+        # before anything executes. Without it a pull request could edit
+        # hack/ci/ or the Makefile to read those tokens. The Terraform
+        # configuration under test stays exactly as the pull request wrote it.
+        # Keep this ordering; hack/ci/lib.sh documents why.
+        git checkout "${PULL_BASE_SHA}" -- Makefile hack/
+        hack/ci/validate.sh
+      credentials:
+      - as: oauth
+        collection: test-platform-infra
+        field: private-git-cloner
+        group: openshift-ci-robot
+        mount_path: /etc/github-private
+      - collection: app-sre-infra-terraform-cloud
+        group: tfcloud-token
+        mount_path: /etc/terraform-cloud
+      from: src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+- as: terraform-plan
+  run_if_changed: ^(terraform|hcp-terraform)/
+  steps:
+    test:
+    - as: plan
+      commands: |
+        # This step runs with an HCP Terraform token and a GitHub App token
+        # mounted, so the tooling is restored from the trusted base revision
+        # before anything executes. Without it a pull request could edit
+        # hack/ci/ or the Makefile to read those tokens. The Terraform
+        # configuration under test stays exactly as the pull request wrote it.
+        # Keep this ordering; hack/ci/lib.sh documents why.
+        git checkout "${PULL_BASE_SHA}" -- Makefile hack/
+        hack/ci/plan.sh
+      credentials:
+      - as: oauth
+        collection: test-platform-infra
+        field: private-git-cloner
+        group: openshift-ci-robot
+        mount_path: /etc/github-private
+      - collection: app-sre-infra-terraform-cloud
+        group: tfcloud-token
+        mount_path: /etc/terraform-cloud
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: app-sre
+  repo: infra

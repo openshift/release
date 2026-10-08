@@ -1,0 +1,34 @@
+ref:
+  as: rosa-mcvw-install
+  from: rosa-aws-cli
+  grace_period: 5m
+  commands: rosa-mcvw-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 15m0s
+  dependencies:
+  - name: OPERATOR_IMAGE
+    env: OPERATOR_IMAGE
+  - name: OPERATOR_PKO_IMAGE
+    env: OPERATOR_PKO_IMAGE
+  env:
+  - name: OPERATOR_NAME
+    default: ""
+    documentation: Short name of the operator (e.g. managed-cluster-validating-webhooks).
+  - name: OPERATOR_NAMESPACE
+    default: openshift-validation-webhook
+    documentation: Namespace where MCVW deploys. Defaults to openshift-validation-webhook.
+  - name: OPERATOR_DEPLOYMENT_NAME
+    default: validation-webhook
+    documentation: Name of the deployment to wait on. Defaults to validation-webhook.
+  - name: CLUSTER_PACKAGE_NAME
+    default: ""
+    documentation: Name for the PKO ClusterPackage CR. Defaults to OPERATOR_NAME-e2e-test.
+  documentation: |-
+    Installs managed-cluster-validating-webhooks via PKO ClusterPackage on the target cluster.
+    Unlike the generic rosa-operator-install step, this ref fetches the cluster service CA
+    and passes it as serviceca in the ClusterPackage config, which MCVW's PKO manifest requires
+    to populate the caBundle field in ValidatingWebhookConfigurations.
+    Safe on ephemeral clusters only.
