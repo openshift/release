@@ -44,6 +44,20 @@ images:
         as:
         - system-tests-builder
     to: nhc-upgrade-test-runner
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+    from: nested-podman
+    inputs:
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: fbc-upgrade-test-runner
 operator:
   bundles:
   - as: my-bundle
@@ -190,7 +204,6 @@ tests:
             DEV_OLM_CATALOG_IMAGE="$catalog_tag" \
             VERSION="$NHC_VERSION" \
             PREVIOUS_VERSION="$NHC_PREVIOUS_VERSION" \
-            SKIP_RANGE_LOWER=0.1.0 \
             DOCS_RHWA_VERSION=5.0 \
             CONSOLE_PLUGIN_IMAGE="$CONSOLE_PLUGIN_IMAGE" \
             MUST_GATHER_IMAGE="$MUST_GATHER_IMAGE"
@@ -238,14 +251,11 @@ tests:
         }
 
         checkout_system_tests() {
-          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#18 merges.
-          echo '==> Check out openshift/rhwa-system-tests PR 18'
+          echo '==> Check out openshift/rhwa-system-tests main'
           git clone --depth=1 --branch main \
             https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
-          git -C /tmp/system-tests fetch --depth=1 \
-            https://github.com/openshift/rhwa-system-tests.git refs/pull/18/head
-          git -C /tmp/system-tests checkout --detach FETCH_HEAD
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
+          git -C /tmp/system-tests rev-parse HEAD > "$ARTIFACT_DIR/system-tests-commit.txt"
         }
 
         print_run_config() {
@@ -294,182 +304,15 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      FBC_CANDIDATE_IMAGE: registry.redhat.io/workload-availability/node-healthcheck-rhel9-operator@sha256:1467d202417527668cc1945acfcbc01f5bed2d6b67704d77b52df62e78036336
+      FBC_CANDIDATE_MIRROR: quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-operator-5-8
+      FBC_OPERATOR: nhc
       TEST_NAME: e2e-system-tests-nhc-fbc-upgrade
-      TEST_STEPS: run-nhc-fbc-upgrade-tests
+      TEST_STEPS: medik8s-fbc-upgrade
     post:
     - ref: medik8s-analyze-e2e-failure
     test:
-    - as: run-nhc-fbc-upgrade-tests
-      cli: latest
-      commands: |
-        set -o errexit -o nounset -o pipefail
-
-        : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
-        exec > >(tee "$ARTIFACT_DIR/nhc-fbc-upgrade-tests.log") 2>&1
-
-        prepare_runtime() {
-          # Give skopeo/tools the cluster's Red Hat registry credentials.
-          echo '==> Read cluster pull secret for Red Hat registry access'
-          local auth_dir=/tmp/nhc-registry-auth
-          mkdir -p "$auth_dir"
-          oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' |
-            base64 --decode > "$auth_dir/auth.json"
-          chmod 0600 "$auth_dir/auth.json"
-          export REGISTRY_AUTH_FILE="$auth_dir/auth.json"
-
-          # The test container runs as an arbitrary UID.
-          export GOPATH=/tmp/nhc-go
-          export GOMODCACHE="$GOPATH/pkg/mod"
-          export GOCACHE=/tmp/nhc-go-build-cache
-          mkdir -p "$GOMODCACHE" "$GOCACHE"
-
-          go version
-        }
-
-        write_idms() {
-          echo '==> Write reviewed IDMS for rhwa-fbc'
-          cat <<'EOF' > /tmp/nhc-fbc-idms.yaml
-        apiVersion: config.openshift.io/v1
-        kind: ImageDigestMirrorSet
-        metadata:
-          name: rhwa-fbc-fips-image-mirror-set
-        spec:
-          imageDigestMirrors:
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-operator-0-10
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-operator-0-11
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-operator-0-12
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-operator-5-8
-              source: registry.redhat.io/workload-availability/node-healthcheck-rhel9-operator
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-bundle-0-10
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-bundle-0-11
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-bundle-0-12
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-bundle-5-8
-              source: registry.redhat.io/workload-availability/node-healthcheck-operator-bundle
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-console-0-10
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-console-0-11
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-console-0-12
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-console-5-8
-              source: registry.redhat.io/workload-availability/node-remediation-console-rhel9
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-must-gather-0-10
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-must-gather-0-11
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-must-gather-0-12
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-must-gather-5-8
-              source: registry.redhat.io/workload-availability/node-healthcheck-must-gather-rhel9
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-operator-0-11
-                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-operator-0-12
-                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-operator-0-13
-              source: registry.redhat.io/workload-availability/self-node-remediation-rhel9-operator
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-bundle-0-11
-                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-bundle-0-12
-                - quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-bundle-0-13
-              source: registry.redhat.io/workload-availability/self-node-remediation-operator-bundle
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-operator-0-6
-                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-operator-0-7
-                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-operator-0-8
-              source: registry.redhat.io/workload-availability/fence-agents-remediation-rhel9-operator
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-bundle-0-6
-                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-bundle-0-7
-                - quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-bundle-0-8
-              source: registry.redhat.io/workload-availability/fence-agents-remediation-operator-bundle
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-operator-0-5
-                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-operator-0-6
-                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-operator-0-7
-              source: registry.redhat.io/workload-availability/machine-deletion-remediation-rhel9-operator
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-bundle-0-5
-                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-bundle-0-6
-                - quay.io/redhat-user-workloads/rhwa-tenant/machine-deletion-remediation/mdr-bundle-0-7
-              source: registry.redhat.io/workload-availability/machine-deletion-remediation-operator-bundle
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-operator-5-5
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-operator-5-6
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-operator-5-7
-              source: registry.redhat.io/workload-availability/node-maintenance-rhel9-operator
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-bundle-5-5
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-bundle-5-6
-                - quay.io/redhat-user-workloads/rhwa-tenant/node-maintenance-operator/nmo-bundle-5-7
-              source: registry.redhat.io/workload-availability/node-maintenance-operator-bundle
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/storage-based-remediation/sbr-agent-0-3
-              source: registry.redhat.io/workload-availability/storage-based-remediation-agent-rhel9
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/storage-based-remediation/sbr-operator-0-3
-              source: registry.redhat.io/workload-availability/storage-based-remediation-rhel9-operator
-            - mirrors:
-                - quay.io/redhat-user-workloads/rhwa-tenant/storage-based-remediation/sbr-bundle-0-3
-              source: registry.redhat.io/workload-availability/storage-based-remediation-operator-bundle
-        EOF
-          export NHC_FBC_IDMS_PATH=/tmp/nhc-fbc-idms.yaml
-        }
-
-        prepare_candidate() {
-          write_idms
-
-          # Post-MR-617 artifacts that passed the local tier:upgrade-operator run.
-          export NHC_FBC_CATALOG_IMAGE='quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500@sha256:5865bf9dda1a2b2a554a496ada5a9f4f6d0a0ad7efb74578cfc02d47300e1c3a'
-          export NHC_FBC_CANDIDATE_VERSION=5.8.0
-          export NHC_FBC_CANDIDATE_IMAGE='registry.redhat.io/workload-availability/node-healthcheck-rhel9-operator@sha256:6d18d257929d6f7cee3add33bbcd9342fb0c0f3ffd0e754b8b2db4473bd4b43d'
-          export NHC_FBC_CHANNEL=stable
-          export NHC_FBC_IDMS_PATH=/tmp/nhc-fbc-idms.yaml
-        }
-
-        checkout_system_tests() {
-          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#18 merges.
-          echo '==> Check out openshift/rhwa-system-tests PR 18'
-          git clone --depth=1 --branch main \
-            https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
-          git -C /tmp/system-tests fetch --depth=1 \
-            https://github.com/openshift/rhwa-system-tests.git refs/pull/18/head
-          git -C /tmp/system-tests checkout --detach FETCH_HEAD
-          git -C /tmp/system-tests show --no-patch --format=fuller HEAD
-        }
-
-        print_run_config() {
-          echo "Candidate catalog: $NHC_FBC_CATALOG_IMAGE"
-          echo "Candidate version: $NHC_FBC_CANDIDATE_VERSION"
-          echo "Candidate controller: $NHC_FBC_CANDIDATE_IMAGE"
-          echo "Channel: $NHC_FBC_CHANNEL"
-          echo "IDMS: ${NHC_FBC_IDMS_PATH:-none}"
-        }
-
-        run_upgrade_test() {
-          export ECO_TEST_FEATURES=nhc-operator
-          export ECO_TEST_LABELS=tier:upgrade-operator
-          export ECO_TEST_VERBOSE=true
-          export WORKLOAD_IMAGE=unused-by-nhc-upgrade-tests
-          # Prow test pods cannot reach worker private IPs over SSH.
-          export MEDIK8S_KUBELET_STOP_OCDEBUG=true
-
-          echo '==> Start system-tests tier: upgrade-operator'
-          export ECO_REPORTS_DUMP_DIR="$ARTIFACT_DIR/upgrade-operator"
-          mkdir -p "$ECO_REPORTS_DUMP_DIR"
-          make -C /tmp/system-tests run-tests 2>&1 | tee "$ECO_REPORTS_DUMP_DIR/run.log"
-        }
-
-        main() {
-          prepare_runtime
-          prepare_candidate
-          checkout_system_tests
-          print_run_config
-          run_upgrade_test
-        }
-
-        main
-      from: nhc-upgrade-test-runner
-      resources:
-        requests:
-          cpu: "2"
-          memory: 4Gi
+    - ref: medik8s-fbc-upgrade
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

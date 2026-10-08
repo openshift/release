@@ -44,6 +44,20 @@ images:
         as:
         - system-tests-builder
     to: far-upgrade-test-runner
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+    from: nested-podman
+    inputs:
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: fbc-upgrade-test-runner
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -131,12 +145,6 @@ tests:
           test -f /opt/far-ci-src/Makefile
           cp -R /opt/far-ci-src /tmp/far-source
 
-          # TODO: Revert this rehearsal-only checkout after fence-agents-remediation#220 merges.
-          echo '==> Check out fence-agents-remediation PR 220'
-          git -C /tmp/far-source fetch --depth=1 \
-            https://github.com/medik8s/fence-agents-remediation.git refs/pull/220/head
-          git -C /tmp/far-source checkout --detach FETCH_HEAD
-
           local revision prefix operator_tag bundle_tag catalog_tag
           revision="$(git -C /tmp/far-source rev-parse HEAD)"
           git -C /tmp/far-source show --no-patch --format=fuller HEAD
@@ -177,8 +185,7 @@ tests:
             DEV_OLM_BUNDLE_IMAGE="$bundle_tag" \
             DEV_OLM_CATALOG_IMAGE="$catalog_tag" \
             VERSION="$FAR_VERSION" \
-            PREVIOUS_VERSION="$FAR_PREVIOUS_VERSION" \
-            SKIP_RANGE_LOWER=0.0.1
+            PREVIOUS_VERSION="$FAR_PREVIOUS_VERSION"
 
           echo '==> Resolve pushed candidate images to immutable digests'
           skopeo inspect --format '{{.Digest}}' "docker://$operator_tag" > "$ARTIFACT_DIR/operator.digest"
@@ -224,13 +231,9 @@ tests:
         }
 
         checkout_system_tests() {
-          # TODO: Revert this rehearsal-only checkout after openshift/rhwa-system-tests#28 merges.
-          echo '==> Check out openshift/rhwa-system-tests PR 28'
+          echo '==> Check out openshift/rhwa-system-tests main'
           git clone --depth=1 --branch main \
             https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
-          git -C /tmp/system-tests fetch --depth=1 \
-            https://github.com/openshift/rhwa-system-tests.git refs/pull/28/head
-          git -C /tmp/system-tests checkout --detach FETCH_HEAD
           git -C /tmp/system-tests show --no-patch --format=fuller HEAD
           git -C /tmp/system-tests rev-parse HEAD > "$ARTIFACT_DIR/system-tests-commit.txt"
         }
@@ -271,6 +274,24 @@ tests:
         requests:
           cpu: "2"
           memory: 4Gi
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-system-tests-far-fbc-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      FBC_CANDIDATE_IMAGE: registry.redhat.io/workload-availability/fence-agents-remediation-rhel9-operator@sha256:f707b866dbbef82352070f9fe5612ad718ee7c92dcaa3af2c108fd1044993ead
+      FBC_CANDIDATE_MIRROR: quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-operator-5-8
+      FBC_OPERATOR: far
+      TEST_NAME: e2e-system-tests-far-fbc-upgrade
+      TEST_STEPS: medik8s-fbc-upgrade
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-fbc-upgrade
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
