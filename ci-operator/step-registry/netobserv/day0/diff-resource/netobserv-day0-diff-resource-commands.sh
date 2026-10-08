@@ -49,24 +49,29 @@ report_path      = "${REPORT}"
 html_report_path = "${HTML_REPORT}"
 metrics_filter   = set("${DIFF_METRICS}".split(","))
 
-# These metrics are reported by Prometheus in bytes. Render them using IEC
-# units (KiB, MiB, GiB, ...) so the report is readable in Spyglass.
+# Memory metrics are reported in bytes, while the network recording rules are
+# byte-counter rates normalized per second. Render both using IEC units.
 MEMORY_METRIC_PARTS = ("memory", "rss", "workingset", "storageusage")
+NETWORK_RATE_METRICS = {"TotalNetworkBytesIn", "TotalNetworkBytesOut"}
 
 def is_memory_metric(metric):
     name = metric.lower()
     return any(part in name for part in MEMORY_METRIC_PARTS)
 
-def format_metric_value(metric, value):
-    if not is_memory_metric(metric):
-        return f"{value:.4f}"
-    units = ("B", "KiB", "MiB", "GiB", "TiB", "PiB")
+def format_iec_value(value, units):
     scaled = value
     unit_index = 0
     while abs(scaled) >= 1024 and unit_index < len(units) - 1:
         scaled /= 1024
         unit_index += 1
     return f"{scaled:.2f} {units[unit_index]}"
+
+def format_metric_value(metric, value):
+    if is_memory_metric(metric):
+        return format_iec_value(value, ("B", "KiB", "MiB", "GiB", "TiB", "PiB"))
+    if metric in NETWORK_RATE_METRICS:
+        return format_iec_value(value, ("B/s", "KiB/s", "MiB/s", "GiB/s", "TiB/s", "PiB/s"))
+    return f"{value:.4f}"
 
 def load_averages(path):
     with open(path) as f:
