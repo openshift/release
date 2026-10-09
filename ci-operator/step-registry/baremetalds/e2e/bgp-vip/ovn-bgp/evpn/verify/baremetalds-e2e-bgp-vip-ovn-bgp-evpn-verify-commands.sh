@@ -285,9 +285,9 @@ echo "[4/5] the master's VTEP IP is its node IP, not a VIP, and the RR learns th
 # Under BGP VIP management kube-vip holds the API/ingress VIPs as plain /32s
 # on br-ex of every node. ovn-k's unmanaged VTEP discovery filters only
 # keepalived-labelled and IFA_F_SECONDARY addresses, so a VIP inside the
-# VTEP CIDR can be chosen as the VTEP IP - every master would then source
-# VXLAN from the API VIP and every worker from the ingress VIP, and the
-# cross-node EVPN datapath is dead. This is the coexistence contract.
+# VTEP CIDR is chosen as the VTEP IP - every master then sources VXLAN from
+# the API VIP and every worker from the ingress VIP, and the cross-node
+# EVPN datapath is dead (OCPBUGS-130338). This is the coexistence contract.
 check_vtep_annotation() {
     local v4
     v4="$(oc get node "${master_node}" -o json | jq -r --arg n "${VTEP}" '.metadata.annotations["k8s.ovn.org/node-vteps"] // "{}" | fromjson | .[$n].ips // [] | map(select(contains(":")|not)) | .[0] // empty')"
@@ -300,7 +300,7 @@ if ! poll 300 check_vtep_annotation; then
     for vip in ${api_vips} ${ingress_vips}; do
         echo "  (VIP on this cluster: ${vip})"
     done
-    fail "VTEP IP selected on ${master_node} is not its node IP ${master_ip} - a BGP-managed VIP was picked as the VXLAN source"
+    fail "VTEP IP selected on ${master_node} is not its node IP ${master_ip} - a BGP-managed VIP was picked as the VXLAN source (OCPBUGS-130338)"
 fi
 check_rr_type5_from_master() {
     # the master's per-node CUDN host subnet must be a type-5 route whose next hop is the master's node IP
