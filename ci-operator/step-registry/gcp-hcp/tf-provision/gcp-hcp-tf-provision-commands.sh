@@ -294,6 +294,10 @@ import_orphaned_firestore() {
 # A failed apply can leave resources in the remote state before Terraform has
 # produced its normal outputs. Preserve the folder ID when that happens so the
 # cleanup step can delete the per-run folder before it clears the workspace.
+parse_folder_id() {
+  awk -F= '$1 ~ /^[[:space:]]*folder_id[[:space:]]*$/ { value=$2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); gsub(/^"|"$/, "", value); print value; exit }'
+}
+
 recover_partial_folder_id() {
   local folder_id=""
 
@@ -307,7 +311,7 @@ recover_partial_folder_id() {
   # resource itself is already present in remote state if it was created.
   if [[ -z "${folder_id}" ]]; then
     folder_id=$(terraform state show -no-color module.region.google_folder.region 2>>"${LOG}" | \
-      awk -F' = ' '$1 == "folder_id" { gsub(/"/, "", $2); print $2; exit }' || true)
+      parse_folder_id || true)
   fi
 
   if [[ -z "${folder_id}" ]]; then
