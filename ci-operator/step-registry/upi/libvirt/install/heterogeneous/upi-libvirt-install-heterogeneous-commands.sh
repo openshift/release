@@ -4,13 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [ "${ADDITIONAL_WORKER_ARCHITECTURE}" != "x86_64" ]; then
-  echo "upi-libvirt-install-heterogeneous currently only supports x86_64 as additional multi-architecture compute node architecture"
+if [[ -z "${ADDITIONAL_WORKER_ARCHITECTURE}" ]]; then
+  echo "ERROR: ADDITIONAL_WORKER_ARCHITECTURE is not set"
   exit 1
 fi
 
-CLUSTER_DOMAIN="libvirt-s390x-amd64-0-0.ci"
-LIBVIRT_DOMAIN_NAME_SUFFIX="libvirt-s390x-amd64-0-0-ci"
+if [[ -z "${ADDITIONAL_LIBVIRT_HOST}" ]]; then
+  echo "ERROR: ADDITIONAL_LIBVIRT_HOST is not set — required for connecting to the additional hypervisor"
+  exit 1
+fi
+
+CLUSTER_DOMAIN="${CLUSTER_DOMAIN}"
+LIBVIRT_DOMAIN_NAME_SUFFIX="${LIBVIRT_DOMAIN_NAME_SUFFIX}"
 
 mkdir /tmp/bin
 
@@ -194,7 +199,7 @@ DOMAIN_TEMPLATE_XML=$(cat <<EOF
 EOF
 )
 
-HTTPD_BASE_URL="http://172.16.41.20:8080/"
+HTTPD_BASE_URL="http://${HTTPD_LIBVIRT_HOST}:${HTTPD_PORT}/"
 
 
 # Prepare boot artifacts:
@@ -223,7 +228,7 @@ if [[ $(dirname "$KERNEL_URL") != $(dirname "$INITRAMFS_URL") ]]; then
   exit 1
 fi
 
-export LIBVIRT_DEFAULT_URI="qemu+tcp://lnxocp10:16509/system"
+export LIBVIRT_DEFAULT_URI="qemu+tcp://${HTTPD_LIBVIRT_HOST}:${HTTPD_LIBVIRT_PORT}/system"
 # only download and transfer rootfs if it doesn't already exist on httpd
 if check_exists_in_pool httpd "$ROOTFS_FILENAME"; then
   echo "rootfs ($ROOTFS_FILENAME) already exists on httpd, skipping transfer"
@@ -234,7 +239,7 @@ else
 fi
 
 
-export LIBVIRT_DEFAULT_URI="qemu+tcp://xkvmocp04:16510/system"
+export LIBVIRT_DEFAULT_URI="qemu+tcp://${ADDITIONAL_LIBVIRT_HOST}:${ADDITIONAL_LIBVIRT_PORT}/system"
 HOST_BOOT_ARTIFACT_BASE=/var/lib/libvirt/boot/
 HOST_PATH_KERNEL=${HOST_BOOT_ARTIFACT_BASE}${KERNEL_FILENAME}
 HOST_PATH_INITRAMFS=${HOST_BOOT_ARTIFACT_BASE}${INITRAMFS_FILENAME}
