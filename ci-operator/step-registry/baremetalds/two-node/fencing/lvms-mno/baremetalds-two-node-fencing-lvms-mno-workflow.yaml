@@ -7,9 +7,7 @@ workflow:
     - chain: baremetalds-ofcir-pre
     - chain: baremetalds-two-node-fencing-post-install
     - ref: openshift-cluster-bot-rbac
-    - ref: optional-operators-operator-sdk
-    - ref: storage-create-lvm-cluster
-    - ref: storage-conf-storageclass-set-default-storageclass
+    - chain: storage-conf-csi-optional-topolvm
     post:
     - chain: baremetalds-ofcir-post
     env:
@@ -23,10 +21,9 @@ workflow:
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST="vda vdb vdc"
         VM_EXTRADISKS_SIZE=100G
-      REQUIRED_DEFAULT_STORAGECLASS: lvms-vg1
   documentation: |-
-    Install a TNF cluster with three extra disks on each node, install the CI-built
-    LVMS bundle, and create a Ready LVMCluster using one disk per node. The other
+    Install a TNF cluster with three extra disks on each node, install LVMS from
+    the configured catalog, and create a Ready LVMCluster using one disk per node. The other
     disks remain available for the MNO suite's multi-disk and RAID cases. The
     test step also labels both control-plane nodes as workers so the MNO test
     helpers can discover their disks without adding separate nodes.
