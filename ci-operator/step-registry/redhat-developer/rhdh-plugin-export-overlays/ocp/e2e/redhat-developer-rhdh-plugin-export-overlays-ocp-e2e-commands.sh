@@ -194,12 +194,9 @@ export RHDH_VERSION INSTALLATION_METHOD
 INSTALLATION_METHOD="${INSTALLATION_METHOD:-helm}"
 if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
     RHDH_VERSION="$(echo "$RELEASE_BRANCH_NAME" | cut -d'-' -f2)"
-elif [ "${INSTALLATION_METHOD}" == "operator" ]; then
-    # The operator catalog-source install resolves RHDH_VERSION to a release-X.Y
-    # branch that doesn't exist for pinned builds and 404s; "next" is the working ref.
-    RHDH_VERSION="next"
 else
-    RHDH_VERSION="1.11" # TODO: Change to "next" when RHIDP-12071 & RHDHBUGS-3052 is fixed
+    # Main uses next for both Helm and operator installations.
+    RHDH_VERSION="next"
 fi
 echo "RHDH_VERSION: ${RHDH_VERSION}, INSTALLATION_METHOD: ${INSTALLATION_METHOD}"
 
