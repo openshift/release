@@ -1,0 +1,54 @@
+ref:
+  as: upi-install-libvirt-heterogeneous
+  from: libvirt-installer
+  grace_period: 30m
+  commands: upi-install-libvirt-heterogeneous-commands.sh
+  env:
+  - name: ARCH
+    default: "s390x"
+  - name: BRANCH
+    default: ""
+  - name: ADDITIONAL_WORKER_ARCHITECTURE
+    default: "arm64"
+    documentation: "Heterogeneous worker architecture (arm64)"
+  - name: DOMAIN_MEMORY
+    documentation: The memory to allocate for each guest, in KiB
+    default: '25156824'
+  - name: DOMAIN_DISK_SIZE
+    documentation: The disk size to allocate for each guest, in B
+    default: '107374182400'
+  - name: DOMAIN_VCPUS
+    documentation: Number of VCPUs to allocate for each guest
+    default: '6'
+  - name: POOL_NAME
+    default: 'default'
+    documentation: "Primary hypervisor pool name used as fallback for worker ignition volume retrieval"
+  - name: HTTPD_POOL_NAME
+    default: 'httpd'
+    documentation: "HTTPD pool name on primary hypervisor"
+  - name: ADDITIONAL_POOL_NAME
+    default: 'multiarch-ci-pool'
+    documentation: "Pool name on additional hypervisor"
+  - name: ADDITIONAL_LIBVIRT_PORT
+    default: '16509'
+    documentation: "Libvirt port on additional hypervisor/bastion route"
+  - name: OPENSHIFT_CLIENT_VERSION_OVERRIDE
+    default: ''
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST
+  dnsConfig:
+    nameservers:
+    - 172.30.38.188
+    searches:
+    - "bastion-z.svc.cluster.local"
+    - "bastion-ppc64le-libvirt.svc.cluster.local"
+  documentation: >-
+    Provisions additional heterogeneous compute nodes (arm64) on a secondary libvirt hypervisor using
+    the lease-aware VPN profile and arm64 domain templates.
