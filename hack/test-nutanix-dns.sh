@@ -174,6 +174,11 @@ case "${operation}" in
             echo "synthetic-invalid-zone"
             exit 0
         fi
+        if [[ "${AWS_MOCK_SCENARIO:-}" == lookup-multiple ]]
+        then
+            printf '%s\t%s\n' "${EXPECTED_HOSTED_ZONE_ID:?}" /hostedzone/ZSECOND456
+            exit 0
+        fi
         echo "${EXPECTED_HOSTED_ZONE_ID:?}"
         ;;
     "route53 change-resource-record-sets")
@@ -185,7 +190,7 @@ case "${operation}" in
             change_id="${EXPECTED_CREATE_CHANGE_ID:?}"
         else
             batch_file="${EXPECTED_SHARED_DIR:?}/dns-delete.json"
-            batch_uri="file:///${batch_file}"
+            batch_uri="file://${batch_file}"
             batch_action=DELETE
             change_id="${EXPECTED_DELETE_CHANGE_ID:?}"
         fi
@@ -425,6 +430,19 @@ do
     [[ ! -e "${shared_dir}/hosted-zone.txt" ]] || fail "invalid lookup output wrote hosted-zone state"
     pass "setup rejects successful ${lookup_scenario#lookup-} hosted-zone lookup output"
 done
+
+new_case lookup-multiple
+write_credentials
+write_nutanix_context
+run_setup lookup-multiple
+assert_status 1
+assert_contains "Route53 hosted-zone lookup returned multiple matching public hosted zones"
+assert_not_contains "/hostedzone/ZTEST123"
+assert_not_contains "/hostedzone/ZSECOND456"
+assert_not_contains "Install AWS cli"
+assert_aws_operations "route53 list-hosted-zones-by-name"
+[[ ! -e "${shared_dir}/hosted-zone.txt" ]] || fail "multiple lookup output wrote hosted-zone state"
+pass "setup rejects multiple tab-separated hosted-zone lookup results without echoing them"
 
 new_case create-failure-cleanup
 write_credentials

@@ -85,6 +85,12 @@ then
     exit 1
 fi
 
+if [[ "${hosted_zone_id}" == *$'\t'* ]]
+then
+    echo "ERROR: Route53 hosted-zone lookup returned multiple matching public hosted zones" >&2
+    exit 1
+fi
+
 if [[ ! "${hosted_zone_id}" =~ ^(/hostedzone/)?Z[A-Z0-9]+$ ]]
 then
     echo "ERROR: Route53 hosted-zone lookup returned no valid public hosted zone" >&2

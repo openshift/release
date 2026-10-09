@@ -62,7 +62,7 @@ then
     fi
 fi
 
-if ! id=$(aws route53 change-resource-record-sets --hosted-zone-id "${HOSTED_ZONE_ID}" --change-batch "file:///${SHARED_DIR}/dns-delete.json" --query '"ChangeInfo"."Id"' --output text 2>/dev/null)
+if ! id=$(aws route53 change-resource-record-sets --hosted-zone-id "${HOSTED_ZONE_ID}" --change-batch "file://${delete_batch_file}" --query '"ChangeInfo"."Id"' --output text 2>/dev/null)
 then
     echo "ERROR: Route53 DNS record deletion failed" >&2
     exit 1
