@@ -3,6 +3,16 @@ set -o errexit # Nonzero exit code of any of the commands below will fail the te
 set -o nounset
 set -o pipefail
 
+# Test Platform pods often run as non-root and cannot write to the image-default caches.
+if [[ -z "${GOMODCACHE:-}" ]] || [[ ! -w "${GOMODCACHE}" ]]; then
+  export GOMODCACHE=/tmp/go-modcache
+fi
+mkdir -p "${GOMODCACHE}"
+if [[ -z "${GOCACHE:-}" ]] || [[ ! -w "${GOCACHE}" ]]; then
+  export GOCACHE=/tmp/go-build
+fi
+mkdir -p "${GOCACHE}"
+
 die_general() {
     echo "ERROR: An discrepancy was found in go dependency metadata or it could not"
     echo "be checked successfully. Common failures:"
