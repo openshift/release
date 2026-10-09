@@ -143,6 +143,18 @@ Update this section whenever a new job type is activated or disabled, a window
 shifts, or a new provider is added. Include the reason for any window change so
 the next editor can see why the current layout exists.
 
+## Updating `KATA_RPM_VERSION`
+
+Whenever you change `KATA_RPM_VERSION` (bumping to a new GA/tagged build, or
+pointing at a scratch build), **verify the RPM actually resolves before
+committing** — a typo'd NVR or build task only surfaces hours later when a
+job fails on a real cluster. Emulate the download logic from
+[`sandboxed-containers-operator-update-kata-rpm-commands.sh`](../../../step-registry/sandboxed-containers-operator/update-kata-rpm/sandboxed-containers-operator-update-kata-rpm-commands.sh)
+locally.
+
+Only after the test passes should you run `make ci-operator-config`
+and `make jobs` and commit.
+
 ## Verify Changes
 
 Always regenerate and validate after editing configs:
