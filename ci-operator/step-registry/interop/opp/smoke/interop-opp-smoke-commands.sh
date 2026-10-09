@@ -9,7 +9,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  _exit_code=$?
+  _exit_code=${1:-$?}
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -24,7 +24,8 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
-trap '_opp_cleanup' EXIT
+_jrc=0
+trap '_jrc=$?; set +e; _opp_cleanup "${_jrc}"' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -150,7 +151,7 @@ _propagate_junit () {
     done
 }
 
-trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
+trap '_jrc=$?; set +e; _opp_cleanup "${_jrc}"; CollectExitArtifacts; _propagate_junit; exit "${_jrc}"' EXIT
 
 # ---------------------------------------------------------------------------
 # Test 1: cluster-health

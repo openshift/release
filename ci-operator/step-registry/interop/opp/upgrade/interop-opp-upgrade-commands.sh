@@ -346,15 +346,15 @@ function ValidatePlatformHealth () {
     echo ">>> PHASE: Validating platform health"
     : "Validating platform health"
 
-    typeset avail="" progressing="" degraded=""
+    typeset avail="" progressing="" failing=""
     avail="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')"
     progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')"
-    degraded="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}')"
-    if [[ "${avail}" != "True" || "${progressing}" != "False" || "${degraded}" != "False" ]]; then
-        : "CVO health check failed: Available=${avail} Progressing=${progressing} Degraded=${degraded}"
+    failing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Failing")].status}')"
+    if [[ "${avail}" != "True" || "${progressing}" != "False" || "${failing}" != "False" ]]; then
+        : "CVO health check failed: Available=${avail} Progressing=${progressing} Failing=${failing}"
         return 1
     fi
-    : "CVO: Available=True, Progressing=False, Degraded=False"
+    : "CVO: Available=True, Progressing=False, Failing=False"
 
     typeset unhealthyCo=""
     unhealthyCo="$(oc get co -o go-template='{{range .items}}{{$avail := ""}}{{$prog := ""}}{{$deg := ""}}{{range .status.conditions}}{{if eq .type "Available"}}{{$avail = .status}}{{end}}{{if eq .type "Progressing"}}{{$prog = .status}}{{end}}{{if eq .type "Degraded"}}{{$deg = .status}}{{end}}{{end}}{{if or (ne $avail "True") (ne $prog "False") (ne $deg "False")}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}')"
@@ -515,5 +515,5 @@ JEOF
   fi
 }
 
-trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; exitCode=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit 0' EXIT
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; exitCode=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit ${_jrc}' EXIT
 Main "$@"
