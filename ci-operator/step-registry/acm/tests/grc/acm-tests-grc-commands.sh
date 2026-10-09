@@ -33,6 +33,7 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+set +x  # Disable tracing to prevent credential leakage in CI logs
 # Set the dynamic vars based on provisioned hub cluster.
 OC_CLUSTER_URL=$(oc whoami --show-server)
 export OC_CLUSTER_URL
@@ -46,6 +47,7 @@ export RBAC_PASS
 # run the test execution script
 typeset -i _test_rc=0
 ./execute_grc_interop_commands.sh || _test_rc=$?
+set -x  # Re-enable tracing
 
 # Copy the test cases results to an external directory
 cp -r test-output/cypress "$ARTIFACT_DIR/" || true

@@ -50,12 +50,14 @@ export CYPRESS_OPTIONS_HUB_PASSWORD=
 CYPRESS_OPTIONS_HUB_PASSWORD="$(cat "${SHARED_DIR}/kubeadmin-password")"
 set -x
 
+set +x
 typeset -i _test_rc=0
 CYPRESS_BASE_URL="$(oc whoami --show-console)" \
 CYPRESS_HUB_API_URL="$(oc whoami --show-server)" \
 CYPRESS_CLC_OCP_IMAGE_VERSION="$(cat "${secretsDir}/clc/ocp_image_version")" \
 CLOUD_PROVIDERS="$(cat "${secretsDir}/clc/ocp_cloud_providers")" \
 bash +x ./execute_clc_interop_commands.sh || _test_rc=$?
+set -x
 
 unset CYPRESS_OPTIONS_HUB_PASSWORD
 
