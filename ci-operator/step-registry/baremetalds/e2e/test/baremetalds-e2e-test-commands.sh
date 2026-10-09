@@ -155,7 +155,7 @@ function set_test_provider() {
     # Currently all v6 deployments are disconnected, so we have to tell
     # openshift-tests to exclude those tests that require internet
     # access.
-    if [[ "${DS_IP_STACK}" != "v6" ]];
+    if [[ "${DS_IP_STACK}" != "v6" && "${DS_IP_STACK}" != "v6v4" ]];
     then
         export TEST_PROVIDER='{"type":"baremetal"}'
     else
