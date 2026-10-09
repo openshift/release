@@ -26,6 +26,9 @@ chain:
           exit 0
       fi
 
+      # Reuse the existing WIF configuration for the CLI's GCP API calls.
+      export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
+
       echo "$(date) Deleting GCP HyperShift cluster ${CLUSTER_NAME}"
       if bin/hypershift destroy cluster gcp \
         --name "${CLUSTER_NAME}" \
@@ -51,9 +54,10 @@ chain:
     waiting for finalizers to complete.
 
     When the installed HyperShift CLI supports GCP network resource references,
-    cluster creation records the VPC, subnet, router, NAT, and firewall rule on
-    the HostedCluster. The destroy command then waits for HostedCluster
-    finalizers to clean up the referenced network and IAM resources. The later
+    cluster creation records router, NAT, and firewall-rule names in the
+    HostedCluster's gcp-infra-resources annotation; other references stay in the
+    spec. After finalizers complete, the CLI deletes referenced IAM and network
+    resources using the existing WIF credential configuration. The later
     hypershift-gcp-gke-deprovision step still deletes the temporary GKE cluster
     and GCP projects.
 

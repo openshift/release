@@ -188,7 +188,9 @@ HC_ROUTER_NAME=$(awk -F'"' '/"routerName"/{print $4}' "${INFRA_OUTPUT}")
 HC_NAT_NAME=$(awk -F'"' '/"natName"/{print $4}' "${INFRA_OUTPUT}")
 HC_FIREWALL_RULE_NAME=$(awk -F'"' '/"firewallRuleName"/{print $4}' "${INFRA_OUTPUT}")
 
-if [[ -z "${HC_VPC_NAME}" || -z "${HC_SUBNET_NAME}" || -z "${HC_ROUTER_NAME}" || -z "${HC_NAT_NAME}" || -z "${HC_FIREWALL_RULE_NAME}" ]]; then
+# The create step requires cleanup names only when the CLI supports the new
+# flags, so older infrastructure output remains usable with the legacy flow.
+if [[ -z "${HC_VPC_NAME}" || -z "${HC_SUBNET_NAME}" ]]; then
     echo "ERROR: Failed to parse network configuration from infra output"
     cat "${INFRA_OUTPUT}"
     exit 1
