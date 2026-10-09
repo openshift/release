@@ -58,12 +58,28 @@ PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Get Pull request info - Pull request
 PR_NUMBER=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].number')
-PR_BODY=$(curl -s -X GET \
+PR_API_URL="https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER}"
+# -L: follow a redirect (e.g. a renamed repo) so %{http_code} below reflects the
+# final response, not just the redirect's own 3xx.
+PR_HTTP_RESPONSE=$(curl -sL -w $'\n%{http_code}' -X GET \
   -H "Accept: application/vnd.github+json" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
-  https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} |
-  jq -r '.body')
-DEPENDS_ON_INSTALL_YAMLS=$(echo "$PR_BODY" | grep -iE "(depends-on).*(install_yamls)" || true)
+  "${PR_API_URL}")
+PR_HTTP_CODE=$(echo "$PR_HTTP_RESPONSE" | tail -n1)
+PR_JSON=$(echo "$PR_HTTP_RESPONSE" | sed '$d')
+# Fail with the actual response instead of a bare jq parse error further down:
+# this API call is unauthenticated (60 req/hour, shared across every job on
+# this CI cluster's egress IP), so a non-200 here usually means rate-limited.
+if [[ "$PR_HTTP_CODE" != "200" ]]; then
+  echo "GitHub API GET ${PR_API_URL} returned HTTP ${PR_HTTP_CODE} (expected 200), response body:" >&2
+  echo "$PR_JSON" >&2
+  exit 1
+fi
+PR_BODY=$(echo "$PR_JSON" | jq -r '.body')
+# Anchored to a real "Depends-On:" trailer, not any line mentioning both words,
+# so PR prose discussing the syntax is not picked up (see the build step).
+DEPENDS_ON_INSTALL_YAMLS=$(echo "$PR_BODY" | grep -iE "^depends-on:.*install_yamls" | head -1 || true)
+DEPENDS_ON=$(echo "$PR_BODY" | grep -iE "^depends-on:.*openstack-operator" | head -1 || true)
 # Build tag
 BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
 
@@ -83,6 +99,19 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
 fi
 # sets default branch for install_yamls
 export OPENSTACK_K8S_BRANCH=${REF_BRANCH}
+
+# In a rehearsal prow clones the meta operator as an extra_ref at its base branch,
+# so a "Depends-On: .../openstack-operator#<pr>" on the release PR is not reflected
+# in this step's /go/src checkout. The build step rebuilds the operator image from
+# that PR, but this step also reads .prow_ci.env, the chainsaw config and tests from
+# /go/src, so check the PR out here too to keep config/tests in sync with the image.
+if [[ "$REF_ORG" != "$ORG" && "$BASE_OP" == "$META_OPERATOR" && -n "$DEPENDS_ON" ]]; then
+  pr_num=$(echo "$DEPENDS_ON" | rev | cut -d"/" -f1 | rev | tr -d '[:space:]')
+  if [[ "$pr_num" == ?(-)+([0-9]) ]]; then
+    git -C /go/src/github.com/${ORG}/${BASE_OP} fetch "https://github.com/${ORG}/${BASE_OP}.git" "pull/${pr_num}/head:PR${pr_num}"
+    git -C /go/src/github.com/${ORG}/${BASE_OP} checkout "PR${pr_num}"
+  fi
+fi
 
 # custom per project ENV variables
 # shellcheck source=/dev/null
@@ -144,49 +173,77 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/test/chainsaw/config.yaml" ]; then
 
   storage_create
 
-  # perform a minor update if it is the openstack-operator
+  # perform an OLM based minor update if it is the openstack-operator
+  # set SKIP_OLM_UPDATE=true in .prow_ci.env to skip the base->PR upgrade dance
+  # and just install the PR CSV directly before running chainsaw
   if [ ${SERVICE_NAME} == "openstack" ]; then
-    OPENSTACK_IMG_BKP=${OPENSTACK_IMG}
-
-    # deploy operators and ctlplane, to be updated
-    export OPENSTACK_IMG=${OPENSTACK_IMG_BASE_RELEASE:="quay.io/openstack-k8s-operators/openstack-operator-index:18.0-fr2-latest"}
+    # Upgrade edge CSV names baked into the PR index by the build step.
+    PR_CSV=$(cat "${SHARED_DIR}/olm-pr-csv")
     export TIMEOUT=${TIMEOUT:="600s"}
-    make openstack_wait || exit 1
+    export INSTALLPLAN_APPROVAL=Manual
 
-    # if the new initialization resource exists install it
-    # this will also wait for operators to deploy
-    if oc get crd openstacks.operator.openstack.org &> /dev/null; then
-      make openstack_init
+    if [ "${SKIP_OLM_UPDATE}" == "true" ]; then
+      # install the PR version directly, skipping the base install and upgrade
+      export STARTING_CSV=${PR_CSV}
+      # create catalogsource/subscription pinned to the PR CSV (pending approval)
+      make openstack || exit 1
+      # approve the PR version and wait for it to install
+      APPROVE_CSV=${PR_CSV} make openstack_approve_installplan || exit 1
+      # if the new initialization resource exists install it
+      # this will also wait for operators to deploy
+      if oc get crd openstacks.operator.openstack.org &> /dev/null; then
+        make openstack_init
+      fi
+    else
+      BASE_CSV=$(cat "${SHARED_DIR}/olm-base-csv")
+
+      # Install the base release first and gate upgrades behind manual approval so
+      # OLM walks ${BASE_CSV} -> ${PR_CSV} within the PR index (${OPENSTACK_IMG}).
+      export STARTING_CSV=${BASE_CSV}
+      # defaults to the fr1 oscp yaml sample with deprecated rabbitMqInstanceBus
+      # parameters (see OPENSTACK_CTLPLANE_BASE_RELEASE default in the ref.yaml);
+      # override it in .prow_ci.env if OPENSTACK_IMG_BASE_RELEASE needs a different sample CR
+      export OPENSTACK_CTLPLANE=${OPENSTACK_CTLPLANE_BASE_RELEASE}
+
+      # create catalogsource/subscription pinned to the base CSV (pending approval)
+      make openstack || exit 1
+      # approve the base version and wait for it to install
+      APPROVE_CSV=${BASE_CSV} make openstack_approve_installplan || exit 1
+
+      # if the new initialization resource exists install it
+      # this will also wait for operators to deploy
+      if oc get crd openstacks.operator.openstack.org &> /dev/null; then
+        make openstack_init
+      fi
+
+      # deploy ctlplane and dataplane CRs on the base version, to be updated
+      make openstack_wait_deploy || exit 1
+      make edpm_deploy_baremetal || exit 1
+
+      # trigger the OLM upgrade to the PR version and wait for it to install
+      APPROVE_CSV=${PR_CSV} make openstack_approve_installplan || exit 1
+      # revert to default oscp sample for subsequent steps
+      unset OPENSTACK_CTLPLANE
+      # if the new initialization resource exists install it
+      # this will also wait for operators to deploy
+      if oc get crd openstacks.operator.openstack.org &> /dev/null; then
+        make openstack_init
+      fi
+      # wait until all the service operators got really up and validate that the ctlplane
+      # is ready before patching the osversion. This is to make sure to check that the
+      # new set of operator and the deployments they create to work correct with the
+      # old vesion of service containers.
+      sleep 60
+      oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
+      make openstack_patch_version || exit 1
+      sleep 10
+      oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
+
+      # cleanup to run chainsaw
+      make edpm_deploy_cleanup openstack_deploy_cleanup && \
+      oc wait -n openstack --for=delete pod/swift-storage-0 --timeout=${TIMEOUT}
+      storage_cleanup && storage_create
     fi
-
-    make openstack_wait_deploy || exit 1
-    # Create the dataplane CRs to check their update
-    make edpm_deploy_baremetal || exit 1
-    make openstack_cleanup || exit 1
-
-    # update operators and ctlplane to the PR
-    export OPENSTACK_IMG=${OPENSTACK_IMG_BKP}
-    make openstack_wait || exit 1
-    sleep 10
-    # if the new initialization resource exists install it
-    # this will also wait for operators to deploy
-    if oc get crd openstacks.operator.openstack.org &> /dev/null; then
-      make openstack_init
-    fi
-    # wait until all the service operators got really up and validate that the ctlplane
-    # is ready before patching the osversion. This is to make sure to check that the
-    # new set of operator and the deployments they create to work correct with the
-    # old vesion of service containers.
-    sleep 60
-    oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
-    make openstack_patch_version || exit 1
-    sleep 10
-    oc wait openstackcontrolplane -n openstack --for=condition=Ready --timeout=${TIMEOUT} -l core.openstack.org/openstackcontrolplane || exit 1
-
-    # cleanup to run chainsaw
-    make edpm_deploy_cleanup openstack_deploy_cleanup && \
-    oc wait -n openstack --for=delete pod/swift-storage-0 --timeout=${TIMEOUT}
-    storage_cleanup && storage_create
   fi
 
   # run chainsaw

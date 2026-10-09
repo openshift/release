@@ -52,7 +52,7 @@ MC_PROJECT=$(<"${SHARED_DIR}/mc-project-id")
 MC_CLUSTER=$(<"${SHARED_DIR}/mc-cluster-name")
 SERVICE_PROJECT=$(cat "${SHARED_DIR}/service-project-id" 2>/dev/null || echo "")
 CUSTOMER_PROJECT=$(cat "${SHARED_DIR}/customer-project-id" 2>/dev/null || echo "")
-REGION=${GCP_REGION:-us-central1}
+REGION=${GCP_REGION:-northamerica-northeast2}
 
 # Get project numbers
 REGION_PROJECT_NUMBER=$(gcloud projects describe "${REGION_PROJECT}" --format='value(projectNumber)' 2>/dev/null || echo "")

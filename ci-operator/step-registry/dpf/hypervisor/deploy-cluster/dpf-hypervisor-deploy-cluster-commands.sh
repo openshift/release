@@ -3,6 +3,28 @@ set -euo pipefail
 
 export PATH="/cli:${PATH}"
 
+# A workflow can require an exact version handoff. Validate it before touching
+# the hypervisor, independently of the workflow that supplied the request.
+REQUESTED_DPF_OPENSHIFT_VERSION=""
+if [[ -f "${SHARED_DIR}/dpf-openshift-version" ]]; then
+  DPF_OPENSHIFT_VERSION="$(tr -d '[:space:]' < "${SHARED_DIR}/dpf-openshift-version")"
+  if [[ -z "${DPF_OPENSHIFT_VERSION}" ]]; then
+    echo "ERROR: ${SHARED_DIR}/dpf-openshift-version is empty"
+    exit 1
+  fi
+  if [[ ! "${DPF_OPENSHIFT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9][A-Za-z0-9._-]*)?$ ]]; then
+    echo "ERROR: invalid OpenShift version '${DPF_OPENSHIFT_VERSION}'"
+    exit 1
+  fi
+  export DPF_OPENSHIFT_VERSION
+  REQUESTED_DPF_OPENSHIFT_VERSION="${DPF_OPENSHIFT_VERSION}"
+  DPF_SKIP_CI_PAYLOAD=true
+  echo "Using OpenShift version ${DPF_OPENSHIFT_VERSION} from shared dir"
+elif [[ "${DPF_REQUIRE_SHARED_OPENSHIFT_VERSION:-false}" == "true" ]]; then
+  echo "ERROR: workflow requires ${SHARED_DIR}/dpf-openshift-version"
+  exit 1
+fi
+
 echo "Checking access to SHARED_DIR ..."
 echo "Testing SHARED_DIR" > ${SHARED_DIR}/testing.txt
 ls -ltra ${SHARED_DIR}
@@ -72,8 +94,9 @@ datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 CLEAN_ALL_LOG="${REMOTE_LOGS_DIR}/make_clean-all_${datetime_string}.log"
 echo "Remote make clean-all logs directory on hypervisor: ${CLEAN_ALL_LOG}"
 
-DEPLOYMENT_LOG="${REMOTE_LOGS_DIR}/make_all_${datetime_string}.log"
+DEPLOYMENT_LOG="${REMOTE_LOGS_DIR}/make_${DPF_DEPLOY_MAKE_TARGET}_${datetime_string}.log"
 echo "Remote deployment logs directory on hypervisor: ${DEPLOYMENT_LOG}"
+echo "Deploy make target: ${DPF_DEPLOY_MAKE_TARGET}"
 
 
 # Git clone the dpf-openshift repo on hypervisor
@@ -196,17 +219,24 @@ if [[ -n "${PAYLOAD_URL}" ]]; then
 fi
 
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
+  export DPF_OPENSHIFT_VERSION='${DPF_OPENSHIFT_VERSION:-}'; \
   cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
   pwd; \
   env; \
   set -a; \
   source env.user_${CLUSTER_NAME}; \
+  if [[ -n '${REQUESTED_DPF_OPENSHIFT_VERSION}' ]]; then \
+    export DPF_OPENSHIFT_VERSION='${REQUESTED_DPF_OPENSHIFT_VERSION}'; \
+    export PAYLOAD_URL=''; \
+  fi; \
+  if [[ -n \"\${DPF_OPENSHIFT_VERSION:-}\" ]]; then \
+    export OPENSHIFT_VERSION=\"\${DPF_OPENSHIFT_VERSION}\"; \
+  fi; \
   env; \
   set +a; \
   make generate-env; \
-  ls -ltra .env; \
-  cat .env"; then
+  ls -ltra .env"; then
   echo ".env file from sourced env.user_${CLUSTER_NAME} was generated successfully"
 else
   echo "ERROR: Failed to generate .env file from sourced env.user_${CLUSTER_NAME} file"
@@ -249,11 +279,16 @@ if [[ -f "${SHARED_DIR}/dpf-hcp-provisioner-operator-override" ]]; then
 fi
 
 echo "Copying .env from hypervisor to artifacts..."
-scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env ${ARTIFACT_DIR}/.env || echo "WARNING: Failed to copy .env to artifacts"
+if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env /tmp/.env.full 2>/dev/null; then
+  sed -E '/^WORKER_[0-9]+_NAME=/!{ /^WORKER_[0-9]+_/d }' /tmp/.env.full > "${ARTIFACT_DIR}/.env"
+  rm -f /tmp/.env.full
+else
+  echo "WARNING: Failed to copy .env to artifacts"
+fi
 
 
 # SSH session to hypervisor
-echo "Starting DPF deployment with 'make all'..."
+echo "Starting DPF deployment with 'make ${DPF_DEPLOY_MAKE_TARGET}'..."
 echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
 
 
@@ -271,17 +306,17 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   echo "Sleeping for 300 seconds ...."
   sleep 300
 
-  # Execute make all on hypervisor with comprehensive logging
-  echo "Execute make all on hypervisor with comprehensive logging"
+  # Execute the configured make target on hypervisor with comprehensive logging
+  echo "Execute make ${DPF_DEPLOY_MAKE_TARGET} on hypervisor with comprehensive logging"
 
   if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
     cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
     mkdir -p ${REMOTE_LOGS_DIR} ; \
-    make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
+    make ${DPF_DEPLOY_MAKE_TARGET} 2>&1 | tee ${DEPLOYMENT_LOG}"; then
 
     DEPLOYMENT_SUCCESS=true
 
-    # Note:  here we often get here but make all failed, so we need to ssh again
+    # Note:  here we often get here but make failed, so we need to ssh again
     # and run oc commands to confirm the deployment is success and we got the DPU workers ready
 
     echo "DPF deployment completed successfully, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
@@ -299,5 +334,5 @@ else
   exit 1
 fi
 
-# To Do: add basic oc commands to verify make all step passed
+# To Do: add basic oc commands to verify the deploy make target passed
 

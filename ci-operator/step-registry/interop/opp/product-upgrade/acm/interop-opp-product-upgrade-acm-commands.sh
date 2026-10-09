@@ -2,6 +2,11 @@
 set -euo pipefail
 shopt -s inherit_errexit
 
+# --- Typed exit globals (INTEROP-9527) ---
+_JUNIT_KIND=""
+_JUNIT_MESSAGE=""
+_EXIT_CLASS=""    # "product" or "infra"
+
 # === Known-Issue Skip Framework ===
 # This script uses _detect_known_issue() to emit JUnit SKIPPED results
 # for tracked bugs instead of failing the job. Unknown failures still FAIL.
@@ -17,7 +22,7 @@ set -x
 # shellcheck disable=SC2154
 _opp_cleanup() {
   # Save xtrace log with credentials scrubbed when the step exits non-zero.
-  _exit_code=${1:-$?}
+  _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
@@ -27,42 +32,27 @@ _opp_cleanup() {
   fi
 }
 
-# --- JUnit XML wrapper: emit result for skip-ratio-gate ---
-_junit_start=$(date +%s)
-_junit_emitted=0
-_jrc=0  # initialized here, assigned inside trap string
-_junit_emit() {
-  # Emit a JUnit XML result for the ACM upgrade step and propagate
-  # it to SHARED_DIR so downstream steps can aggregate results.
-  (( _junit_emitted )) && return 0
-  _junit_emitted=1
-  local _jr=${1:-0}
-  local _je
-  _je=$(date +%s) || _je=${_junit_start}
-  local _jd=$((_je - _junit_start))
-  local _jn="acm-upgrade"
-  local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
-  local _fc=0 _fx=""
-  if (( _jr != 0 )); then
-    _fc=1
-    _fx="<failure message=\"${_jn} exited with code ${_jr}\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
-  fi
-  cat > "${_jf}" <<JUNITEOF || true
+# --- Atomic JUnit Writer (INTEROP-9527) ---
+_junit_emit_safe() {
+  local kind="$1" message="$2" rc="${3:-0}"
+  local tmpf
+  tmpf="${ARTIFACT_DIR}/.junit_acm_upgrade.tmp.$$"
+  {
+    cat <<XMLEOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="${_fc}" errors="0" skipped="0" time="${_jd}">
-  <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
-    ${_fx}
+<testsuite name="interop-opp-product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+  <testcase name="${kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
   </testcase>
 </testsuite>
-JUNITEOF
+XMLEOF
+  } > "${tmpf}"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_acm_upgrade.xml"
   if [[ -n "${SHARED_DIR:-}" ]]; then
-    local _step_prefix
-    _step_prefix="$(basename "${BASH_SOURCE[0]:-$0}" .sh | sed 's/-commands$//')"
-    cp "${_jf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_jf}")" 2>/dev/null || true
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_acm_upgrade.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
   fi
 }
-
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit 0' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -84,7 +74,11 @@ function CollectDiagnostics () {
     {
         printf '=== ACM Operator Upgrade Diagnostics ===\n\n'
         printf '=== Subscription ===\n'
-        oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" -n "${ACM_SUBSCRIPTION_NAMESPACE}" -o yaml 2>&1 || true
+        # Allow-list operational fields; omit annotations, labels, and spec.config.
+        oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            -o jsonpath='Name: {.metadata.name}{"\n"}Namespace: {.metadata.namespace}{"\n"}Generation: {.metadata.generation}{"\n"}Package: {.spec.name}{"\n"}Channel: {.spec.channel}{"\n"}Source: {.spec.source}{"\n"}Source namespace: {.spec.sourceNamespace}{"\n"}InstallPlan approval: {.spec.installPlanApproval}{"\n"}Current CSV: {.status.currentCSV}{"\n"}Installed CSV: {.status.installedCSV}{"\n"}InstallPlan: {.status.installPlanRef.name}{"\n"}State: {.status.state}{"\n"}Conditions:{"\n"}{range .status.conditions[*]}- type={.type} status={.status} reason={.reason}{"\n"}{end}' \
+            2>&1 || true
         printf '\n=== CSVs in %s ===\n' "${ACM_SUBSCRIPTION_NAMESPACE}"
         oc get csv -n "${ACM_SUBSCRIPTION_NAMESPACE}" 2>&1 || true
         printf '\n=== InstallPlan ===\n'
@@ -97,8 +91,6 @@ function CollectDiagnostics () {
     } > "${artifactFile}"
     true
 }
-
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; if (( _jrc != 0 )); then CollectDiagnostics; fi; exit 0' EXIT
 
 function GetCurrentCsv () {
     # Return the currentCSV name from the operator subscription status.
@@ -142,46 +134,105 @@ function ResolveTargetChannel () {
     fi
 
     typeset currentChannel
-    currentChannel="$(GetCurrentChannel)"
+    if ! currentChannel="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.channel}')"; then
+        echo >&2 "ERROR: Failed to query current subscription channel"
+        return 1
+    fi
     if [[ -z "${currentChannel}" ]]; then
         echo >&2 "ERROR: Cannot determine current subscription channel"
-        return 3
+        return 1
     fi
 
     typeset catalogNamespace
-    catalogNamespace="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+    if ! catalogNamespace="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.sourceNamespace}' || true)"
+        -o jsonpath='{.spec.sourceNamespace}')"; then
+        echo >&2 "ERROR: Failed to query subscription source namespace"
+        return 1
+    fi
+    if [[ -z "${catalogNamespace}" ]]; then
+        echo >&2 "ERROR: Subscription source namespace is empty"
+        return 1
+    fi
+
+    typeset catalogSource
+    if ! catalogSource="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.source}')"; then
+        echo >&2 "ERROR: Failed to query subscription catalog source"
+        return 1
+    fi
+    if [[ -z "${catalogSource}" ]]; then
+        echo >&2 "ERROR: Subscription catalog source is empty"
+        return 1
+    fi
 
     typeset packageName
-    packageName="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+    if ! packageName="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.name}' || true)"
+        -o jsonpath='{.spec.name}')"; then
+        echo >&2 "ERROR: Failed to query subscription package name"
+        return 1
+    fi
+    if [[ -z "${packageName}" ]]; then
+        echo >&2 "ERROR: Subscription package name is empty"
+        return 1
+    fi
 
     typeset channels
-    channels="$(oc get packagemanifest "${packageName}" \
+    if ! channels="$(oc get packagemanifest "${packageName}" \
         -n "${catalogNamespace}" \
-        -o jsonpath='{.status.channels[*].name}' || true)"
+        -o jsonpath='{.status.channels[*].name}')"; then
+        echo >&2 "ERROR: Failed to query packagemanifest for ${packageName}"
+        return 1
+    fi
 
     if [[ -z "${channels}" ]]; then
         echo >&2 "ERROR: No channels found in packagemanifest for ${packageName}"
-        return 3
+        return 1
+    fi
+
+    typeset manifestSource manifestSourceNamespace
+    if ! manifestSource="$(oc get packagemanifest "${packageName}" \
+        -n "${catalogNamespace}" \
+        -o jsonpath='{.status.catalogSource}')" || [[ -z "${manifestSource}" ]]; then
+        echo >&2 "ERROR: Packagemanifest for ${packageName} has no valid catalog source"
+        return 1
+    fi
+    if ! manifestSourceNamespace="$(oc get packagemanifest "${packageName}" \
+        -n "${catalogNamespace}" \
+        -o jsonpath='{.status.catalogSourceNamespace}')" || [[ -z "${manifestSourceNamespace}" ]]; then
+        echo >&2 "ERROR: Packagemanifest for ${packageName} has no valid catalog source namespace"
+        return 1
+    fi
+    if [[ "${manifestSource}" != "${catalogSource}" ||
+          "${manifestSourceNamespace}" != "${catalogNamespace}" ]]; then
+        echo >&2 "ERROR: Packagemanifest catalog source does not match the subscription"
+        return 1
     fi
 
     typeset currentVersion nextChannel=""
     currentVersion="$(echo "${currentChannel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
+    if [[ -z "${currentVersion}" ]]; then
+        echo >&2 "ERROR: Current channel ${currentChannel} does not contain a valid version"
+        return 1
+    fi
 
     typeset -a channelList
     read -ra channelList <<< "${channels}"
+    typeset -i validChannelCount=0
+    typeset currentChannelFound=false
     for ch in "${channelList[@]}"; do
         typeset chVersion
         chVersion="$(echo "${ch}" | grep -oE '[0-9]+\.[0-9]+' || true)"
         if [[ -z "${chVersion}" ]]; then
             continue
         fi
-        if [[ -z "${currentVersion}" ]]; then
-            nextChannel="${ch}"
-            break
+        (( validChannelCount += 1 ))
+        if [[ "${ch}" == "${currentChannel}" ]]; then
+            currentChannelFound=true
         fi
         typeset currentMajor currentMinor chMajor chMinor
         currentMajor="${currentVersion%%.*}"
@@ -205,6 +256,15 @@ function ResolveTargetChannel () {
             fi
         fi
     done
+
+    if (( validChannelCount == 0 )); then
+        echo >&2 "ERROR: Packagemanifest for ${packageName} has no versioned channels"
+        return 1
+    fi
+    if [[ "${currentChannelFound}" != true ]]; then
+        echo >&2 "ERROR: Current channel ${currentChannel} is absent from the packagemanifest"
+        return 1
+    fi
 
     if [[ -z "${nextChannel}" ]]; then
         echo >&2 "ERROR: No upgrade channel found newer than ${currentChannel}"
@@ -438,6 +498,39 @@ _detect_known_issue() {
 JUNIT_EOF
 }
 
+# --- Channel head helper (INTEROP-9527) ---
+get_channel_head() {
+  local pkg="$1" ch="$2"
+  oc get packagemanifest "${pkg}" -n openshift-marketplace \
+     -o jsonpath="{.status.channels[?(@.name==\"${ch}\")].currentCSV}" 2>/dev/null || echo "unknown"
+}
+
+# --- Single typed finalizer (INTEROP-9527) ---
+_finalize_exit() {
+  local rc=$?
+  set +e
+  # Fallback for unclassified exits
+  if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+    _JUNIT_KIND="unclassified-failure"
+    _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+    _EXIT_CLASS="infra"
+  fi
+  if [[ -n "${_JUNIT_KIND}" ]]; then
+    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+  fi
+  # Product no-op results should not emit trace or cluster diagnostics.
+  if [[ "${_EXIT_CLASS}" == "product" ]]; then
+    (exit 0); _opp_cleanup
+    exit 0
+  fi
+  (exit "${rc}"); _opp_cleanup
+  if (( rc != 0 )); then
+    CollectDiagnostics
+  fi
+  exit "${rc}"
+}
+trap '_finalize_exit' EXIT
+
 # === Main ===
 
 function Main () {
@@ -454,14 +547,68 @@ function Main () {
     currentCsv="$(GetCurrentCsv)"
     if [[ -z "${currentCsv}" ]]; then
         echo >&2 "ERROR: No ACM subscription found or no currentCSV set"
-        exit 3
+        _JUNIT_KIND="no-subscription"
+        _JUNIT_MESSAGE="No ACM subscription found or no currentCSV set"
+        _EXIT_CLASS="infra"
+        return 3
     fi
 
     currentVersion="$(GetInstalledVersion)"
-    currentChannel="$(GetCurrentChannel)"
+    if ! currentChannel="$(GetCurrentChannel)"; then
+        echo >&2 "ERROR: Failed to query current subscription channel"
+        _JUNIT_KIND="current-channel"
+        _JUNIT_MESSAGE="Failed to query current subscription channel"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
+    if [[ -z "${currentChannel}" ]] ||
+       ! grep -qE '[0-9]+\.[0-9]+' <<< "${currentChannel}"; then
+        echo >&2 "ERROR: Current subscription channel is empty or invalid: ${currentChannel:-<empty>}"
+        _JUNIT_KIND="current-channel"
+        _JUNIT_MESSAGE="Current subscription channel is empty or invalid"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
     echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
 
-    targetChannel="$(ResolveTargetChannel)"
+    if [[ -z "${ACM_TARGET_CHANNEL}" ]]; then
+      # --- CatalogSource readiness check (INTEROP-9527) ---
+      local cs_timeout="${ACM_CATALOGSOURCE_TIMEOUT:-300}"
+      echo "Waiting up to ${cs_timeout}s for CatalogSource 'redhat-operators' to be READY ..."
+      if ! oc wait catalogsource/redhat-operators -n openshift-marketplace \
+             --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
+             --timeout="${cs_timeout}s"; then
+        echo "ERROR: CatalogSource redhat-operators not READY after ${cs_timeout}s"
+        _JUNIT_KIND="catalogsource-readiness"
+        _JUNIT_MESSAGE="CatalogSource redhat-operators not READY after ${cs_timeout}s"
+        _EXIT_CLASS="infra"
+        return 1
+      fi
+    fi
+
+    # --- Safe ResolveTargetChannel call (INTEROP-9527) ---
+    local resolve_rc=0
+    targetChannel="$(ResolveTargetChannel)" || resolve_rc=$?
+    if (( resolve_rc == 3 )); then
+      local head
+      head=$(get_channel_head "${ACM_SUBSCRIPTION_NAME}" "${currentChannel}")
+      _JUNIT_KIND="acm-upgrade-not-needed"
+      _JUNIT_MESSAGE="Channel ${currentChannel} head (${head}) already installed -- nothing to upgrade"
+      _EXIT_CLASS="product"
+      return 1   # _finalize_exit will see product -> exit 0, but emit a JUnit failure
+    elif (( resolve_rc != 0 )); then
+      _JUNIT_KIND="resolve-target-channel"
+      _JUNIT_MESSAGE="ResolveTargetChannel failed"
+      _EXIT_CLASS="infra"
+      return "${resolve_rc}"
+    fi
+    if ! grep -qE '[0-9]+\.[0-9]+' <<< "${targetChannel}"; then
+      echo >&2 "ERROR: Target channel does not contain a valid version: ${targetChannel:-<empty>}"
+      _JUNIT_KIND="target-channel"
+      _JUNIT_MESSAGE="Target channel is empty or invalid"
+      _EXIT_CLASS="infra"
+      return 1
+    fi
     echo "Target channel: ${targetChannel}"
 
     prePatchPlan=""
@@ -477,14 +624,20 @@ function Main () {
         echo "Already on target channel ${targetChannel}; checking if upgrade is available..."
         if [[ -z "${prePatchPlan}" ]]; then
             echo "No pending upgrade on current channel; nothing to do"
-            exit 0
+            _JUNIT_KIND="acm-upgrade-not-needed"
+            _JUNIT_MESSAGE="Already on target channel ${targetChannel} with no pending upgrade"
+            _EXIT_CLASS="product"
+            return 1
         fi
         planPhase="$(oc get installplan "${prePatchPlan}" \
             -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
             -o jsonpath='{.status.phase}' || true)"
         if [[ "${planPhase}" == "Complete" ]]; then
             echo "InstallPlan ${prePatchPlan} already complete; no pending upgrade"
-            exit 0
+            _JUNIT_KIND="acm-upgrade-not-needed"
+            _JUNIT_MESSAGE="InstallPlan ${prePatchPlan} already complete -- no pending upgrade"
+            _EXIT_CLASS="product"
+            return 1
         fi
         installPlan="${prePatchPlan}"
     else
@@ -511,7 +664,10 @@ function Main () {
 
         if [[ -z "${installPlan}" ]]; then
             echo >&2 "ERROR: No new InstallPlan appeared after channel change (waited 3m)"
-            exit 2
+            _JUNIT_KIND="installplan-timeout"
+            _JUNIT_MESSAGE="No new InstallPlan appeared after channel change (waited 3m)"
+            _EXIT_CLASS="infra"
+            return 2
         fi
     fi
 
@@ -544,7 +700,10 @@ function Main () {
             _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
                 "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
         else
-            exit 1
+            _JUNIT_KIND="mce-upgrade-failure"
+            _JUNIT_MESSAGE="MCE upgrade validation failed"
+            _EXIT_CLASS="infra"
+            return 1
         fi
     else
         echo "${_acm_upgrade_output}"
@@ -560,7 +719,10 @@ function Main () {
             _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
                 "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
         else
-            exit 1
+            _JUNIT_KIND="hub-health-failure"
+            _JUNIT_MESSAGE="ACM hub health validation failed"
+            _EXIT_CLASS="infra"
+            return 1
         fi
     else
         echo "${_acm_upgrade_output}"
@@ -584,6 +746,3 @@ function Main () {
 }
 
 Main "$@"
-
-# Rename JUnit suite for dashboard visibility
-find "${ARTIFACT_DIR}" -name "*.xml" -exec sed -i 's/name="product-upgrade-acm"/name="lp-interop--OPP--acm-upgrade"/g; s/classname="product-upgrade-acm"/classname="lp-interop--OPP--acm-upgrade"/g' {} + 2>/dev/null || true

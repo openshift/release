@@ -4,16 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
+
 if [ "${MAP_TESTS}" = "true" ]; then
     exit_trap_ref="6263d6941034bf16cfc10b2bca7433ccf22fde60"
     exit_trap_sha256="bfc394cc4586576e2c0473d8a276ecb2fa456792fdd9114c23c1be54d9982305"
     exit_trap_script="$(mktemp)"
     exit_trap_url="https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/${exit_trap_ref}/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh"
-    if command -v wget >/dev/null 2>&1; then
-        wget -qO "${exit_trap_script}" "${exit_trap_url}"
-    else
-        curl -fsSL -o "${exit_trap_script}" "${exit_trap_url}"
-    fi
+    curl -fsSL -o "${exit_trap_script}" "${exit_trap_url}"
     printf '%s  %s\n' "${exit_trap_sha256}" "${exit_trap_script}" | sha256sum --check --status
     eval "$(cat "${exit_trap_script}")"
     rm -f "${exit_trap_script}"
@@ -48,37 +46,6 @@ function print_quayregistry_conditions() {
       | jq -r '.status.conditions[]? | "\(.type)=\(.status) reason=\(.reason // "") msg=\(.message // "")"' >&2 || true
   else
     oc -n "${ns}" get quayregistry quay -o yaml 2>/dev/null >&2 || true
-  fi
-}
-
-# Derive the Playwright test ref from the deployed Quay app image so the e2e suite
-# is version-matched to the product with no manual pin. The app image is pinned by
-# digest; its source-commit label (org.opencontainers.image.revision / vcs-ref)
-# points at the quay/quay commit it was built from. Written to
-# ${SHARED_DIR}/playwright_git_ref for the test-e2e step; best-effort (the test step
-# falls back to a branch if it is absent). This script runs without `set -x`, so the
-# pull-secret authfile below is never traced; it is also removed immediately.
-function derive_playwright_ref() {
-  local ns="${QUAY_NS}"
-  local app_img authfile commit
-  app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
-    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
-  if [[ -z "${app_img}" ]]; then
-    echo "WARNING: could not determine quay-app imageID; Playwright ref will fall back" >&2
-    return 0
-  fi
-  echo "Deployed Quay app image: ${app_img}" >&2
-  authfile=$(mktemp)
-  oc get secret/pull-secret -n openshift-config \
-    --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
-  commit=$(oc image info "${app_img}" --registry-config="${authfile}" -o json 2>/dev/null \
-    | jq -r '.config.config.Labels["org.opencontainers.image.revision"] // .config.config.Labels["vcs-ref"] // ""' || true)
-  rm -f "${authfile}"
-  if [[ "${commit}" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "Derived Playwright git ref from deployed image: ${commit}" >&2
-    echo "${commit}" > "${SHARED_DIR}/playwright_git_ref"
-  else
-    echo "WARNING: no 40-char source-commit label on deployed image (got '${commit}'); Playwright ref will fall back" >&2
   fi
 }
 
@@ -166,7 +133,7 @@ function new_azure_storage_name() {
   printf 'quayci%s\n' "${suffix}" | cut -c1-24
 }
 
-mkdir -p QUAY_AZURE && cd QUAY_AZURE
+mkdir -p /tmp/QUAY_AZURE && cd /tmp/QUAY_AZURE
 
 cat >>variables.tf <<EOF
 variable "resource_group" {
@@ -437,19 +404,10 @@ EOF
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	echo "Merging extra Quay config into defaults..."
 	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
-	yq_version="v4.47.2"
-	case "$(uname -m)" in
-		x86_64) yq_arch="amd64"; yq_sha256="1bb99e1019e23de33c7e6afc23e93dad72aad6cf2cb03c797f068ea79814ddb0" ;;
-		aarch64) yq_arch="arm64"; yq_sha256="05df1f6aed334f223bb3e6a967db259f7185e33650c3b6447625e16fea0ed31f" ;;
-		*) echo "Unsupported architecture for yq: $(uname -m)" >&2; exit 1 ;;
-	esac
-	curl -fsSL "https://github.com/mikefarah/yq/releases/download/${yq_version}/yq_linux_${yq_arch}" -o /tmp/yq
-	printf '%s  %s\n' "${yq_sha256}" /tmp/yq | sha256sum --check --status
-	chmod +x /tmp/yq
-	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
+	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
 	# Strip field-group keys for components this CR keeps managed. The operator
 	# injects those values; leaving them in configBundleSecret blocks rollout.
-	/tmp/yq -i '
+	yq -i '
 		del(
 			.FEATURE_SECURITY_SCANNER,
 			.FEATURE_SECURITY_NOTIFICATIONS,
@@ -492,6 +450,24 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   done
   TLS_MANAGED="false"
   cat "${SHARED_DIR}/config_builder.yaml" >> config.yaml
+
+  # The builder image is always the RELATED_IMAGE_COMPONENT_BUILDER the
+  # Subscription's installed CSV ships, so the builder matches the installed
+  # operator. quay-provisioning-builder leaves "from-csv" for it. No fallback.
+  if ! grep -qE '^ *BUILDER_CONTAINER_IMAGE: from-csv$' config.yaml; then
+    echo "ERROR: config_builder.yaml has no 'BUILDER_CONTAINER_IMAGE: from-csv' line to fill" >&2
+    exit 1
+  fi
+  csv_json=$(oc -n quay-enterprise get csv "$CSV" -o json)
+  mapfile -t builder_images < <(jq -r '[.spec.install.spec.deployments[]?.spec.template.spec.containers[]?.env[]?
+      | select(.name == "RELATED_IMAGE_COMPONENT_BUILDER") | .value // empty | select(. != "")]
+      | unique | .[]' <<<"$csv_json")
+  if [[ ${#builder_images[@]} -ne 1 ]]; then
+    echo "ERROR: CSV ${CSV} must set exactly one non-empty RELATED_IMAGE_COMPONENT_BUILDER value; got: ${builder_images[*]:-none}" >&2
+    exit 1
+  fi
+  echo "Builder image from CSV ${CSV}: ${builder_images[0]}" >&2
+  sed -i -E "s|^( *BUILDER_CONTAINER_IMAGE:) from-csv$|\1 ${builder_images[0]}|" config.yaml
 
   oc create secret generic -n quay-enterprise config-bundle-secret \
     --from-file config.yaml=./config.yaml \
@@ -567,7 +543,6 @@ for i in $(seq 1 90); do
     fi
     chmod 600 "${SHARED_DIR}/quay_oauth2_token"
     rm -f "${initialize_payload}" "${quay_ca_bundle}"
-    derive_playwright_ref || true
     archive_pod_info
     exit 0
   fi

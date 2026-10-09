@@ -43,3 +43,14 @@ echo "${TESTS}" | openshift-tests run \
     -f - \
     -o "${ARTIFACT_DIR}/e2e.log" \
     --junit-dir "${ARTIFACT_DIR}/junit"
+
+# IRI tests must not be skipped on this platform.
+junit=$(ls "${ARTIFACT_DIR}"/junit/junit_e2e_*.xml 2>/dev/null) || {
+    echo "ERROR: no junit_e2e_*.xml file found"
+    exit 1
+}
+skipped=$(sed -n 's/.*skipped="\([0-9]*\)".*/\1/p' ${junit} | head -1)
+if [[ "${skipped}" -gt 0 ]]; then
+    echo "ERROR: ${skipped} IRI test(s) were skipped"
+    exit 1
+fi

@@ -9,7 +9,6 @@ base_images:
     tag: latest
 build_root:
   from_repository: true
-  use_build_cache: true
 images:
   items:
   - dockerfile_path: Dockerfile
@@ -55,9 +54,6 @@ tests:
   pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|\.mdc$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
-    env:
-      FEATURE_GATES: '["KarpenterOperator=true"]'
-      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-operator
@@ -65,7 +61,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_GATES: '["KarpenterOperator=true"]'
+      FEATURE_GATES: '["KarpenterOperator=true","ManagedBootImagesAWSCAPI=true"]'
       FEATURE_SET: CustomNoUpgrade
     test:
     - as: test
@@ -78,7 +74,7 @@ tests:
     workflow: ipi-aws
 - always_run: false
   as: e2e-aws-hypershift
-  optional: true
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|\.mdc$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     env:

@@ -33,7 +33,6 @@ base_images:
     tag: openstack-cinder-csi-driver-operator-test
 build_root:
   from_repository: true
-  use_build_cache: true
 images:
   items:
   - additional_architectures:
@@ -165,7 +164,7 @@ tests:
   as: e2e-aks
   capabilities:
   - arm64
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)|(^Makefile$)
   steps:
     cluster_profile: hypershift-aks
     env:
@@ -194,6 +193,7 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       CI_TESTS_RUN: ^TestCreateClusterCustomConfig$
+      HYPERSHIFT_AZURE_LOCATION: westus3
       HYPERSHIFT_AZURE_MANAGED_HSM: "true"
       HYPERSHIFT_AZURE_MANAGED_HSM_LOCATION: eastus
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
@@ -249,7 +249,7 @@ tests:
   as: e2e-aws
   capabilities:
   - arm64
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)|(^Makefile$)
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -267,24 +267,13 @@ tests:
   as: e2e-v2-aws
   capabilities:
   - arm64
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)|(^Makefile$)
   steps:
     cluster_profile: hypershift-aws
     env:
       NODEPOOL_N1_VERSION: "5.0"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-v2
-- always_run: false
-  as: e2e-v2-aws-techpreview-osimagestream
-  capabilities:
-  - arm64
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      GUEST_FEATURE_SET: TechPreviewNoUpgrade
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-v2-osimagestream
 - always_run: false
   as: e2e-v2-aws-backuprestore
   capabilities:
@@ -344,7 +333,7 @@ tests:
   as: e2e-v2-azure-self-managed
   capabilities:
   - arm64
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)|(^Makefile$)
   steps:
     cluster_profile: hypershift-azure
     env:
@@ -388,7 +377,7 @@ tests:
   as: e2e-aws-upgrade-hypershift-operator
   capabilities:
   - arm64
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)|(^Makefile$)
   steps:
     cluster_profile: hypershift-aws
     dependencies:
@@ -445,7 +434,8 @@ tests:
   as: e2e-kubevirt-aws-ovn-reduced
   capabilities:
   - arm64
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  optional: true
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)|(^Makefile$)
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -587,7 +577,7 @@ tests:
 - as: security
   capabilities:
   - arm64
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
+  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^Makefile$)
   steps:
     env:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
@@ -731,7 +721,7 @@ tests:
   as: e2e-v2-gke
   capabilities:
   - arm64
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)|(^Makefile$)
   steps:
     cluster_profile: hypershift-gcp
     env:
@@ -763,6 +753,31 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-azure-aks-external-oidc
+- always_run: false
+  as: e2e-rosa-hyperfleet
+  optional: true
+  steps:
+    dependencies:
+      CI_IMAGE_1: hypershift-operator
+      CI_IMAGE_2: hypershift
+    env:
+      OCP_RELEASE_STREAM: ocp-branch-candidate
+      ROSA_REGIONAL_EXTRA_COMPONENTS: |
+        - image: CI_IMAGE_1
+          repo: quay.io/rrp-dev-ci/hypershift-operator
+          target: argocd/config/management-cluster/hypershift/values.yaml
+          override:
+            hypershift:
+              hypershift:
+                image: IMAGE_REPO:IMAGE_TAG
+        - image: CI_IMAGE_2
+          repo: quay.io/rrp-dev-ci/control-plane-operator
+          target: argocd/config/regional-cluster/hyperfleet/values.yaml
+          override:
+            hyperfleet:
+              helmValues:
+                controlPlaneOperatorImage: IMAGE_REPO:IMAGE_TAG
+    workflow: rosa-hyperfleet-ephemeral-e2e
 zz_generated_metadata:
   branch: release-5.2
   org: openshift

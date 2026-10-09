@@ -77,7 +77,7 @@ function monitor_progress() {
 }
 
 function run_must_gather_and_abort_on_fail() {
-  local odf_must_gather_image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}"
+  local odf_must_gather_image="registry.redhat.io/odf4/ocs-must-gather-rhel9:v${ODF_VERSION_MAJOR_MINOR}"
   # Wait for StorageCluster to be deployed, and on fail run must gather
   oc wait "storagecluster.ocs.openshift.io/${ODF_STORAGE_CLUSTER_NAME}"  \
     -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='30m' || \

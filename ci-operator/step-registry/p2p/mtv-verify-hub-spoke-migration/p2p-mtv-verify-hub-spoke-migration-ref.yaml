@@ -118,3 +118,29 @@ ref:
     documentation: |-
       SHARED_DIR file name of the SSH private key authorized on the test VMs.
       Must match P2P_HS_VM_SSH_KEY_NAME in p2p-create-cclm-test-vms.
+  - name: MTV_PVC_CHECK
+    default: "true"
+    documentation: |-
+      When true, run VerifyPvcAttachment (VM spec references rootdisk PVC as a volume)
+      and VerifyPvcIntegrity (PVC is Bound; requested size, accessModes, and volumeMode
+      match the env defaults below). Set false to skip both checks for cirros guests or
+      cold-migration plans where PVC names differ from the rootdisk convention.
+  - name: MTV_VM_ROOTDISK_SIZE
+    default: "32Gi"
+    documentation: |-
+      Expected spec.resources.requests.storage on the destination rootdisk PVC.
+      Must match P2P_HS_VM_DISK_SIZE in p2p-create-cclm-test-vms (default 32Gi).
+      Compared as Kubernetes quantities (32Gi equals 34359738368), not as strings.
+      Unset uses this default. An explicit empty value skips the size comparison.
+  - name: MTV_VM_ROOTDISK_ACCESS_MODE
+    default: "ReadWriteMany"
+    documentation: |-
+      Access mode that must be present on the destination rootdisk PVC.
+      Live migration requires ReadWriteMany. Unset uses this default.
+      An explicit empty value skips the accessModes check.
+  - name: MTV_VM_ROOTDISK_VOLUME_MODE
+    default: "Block"
+    documentation: |-
+      Expected spec.volumeMode on the destination rootdisk PVC. Must match the
+      DataVolume created by p2p-create-cclm-test-vms (Block). Unset uses this
+      default. An explicit empty value skips the volumeMode check.

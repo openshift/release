@@ -41,7 +41,6 @@ base_images:
     tag: openstack-cinder-csi-driver-operator-test
 build_root:
   from_repository: true
-  use_build_cache: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
   items:
@@ -226,6 +225,7 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       CI_TESTS_RUN: ^TestCreateClusterCustomConfig$
+      HYPERSHIFT_AZURE_LOCATION: westus3
       HYPERSHIFT_AZURE_MANAGED_HSM: "true"
       HYPERSHIFT_AZURE_MANAGED_HSM_LOCATION: eastus
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
@@ -306,15 +306,6 @@ tests:
     env:
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-v2
-- always_run: false
-  as: e2e-v2-aws-techpreview-osimagestream
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      GUEST_FEATURE_SET: TechPreviewNoUpgrade
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-v2-osimagestream
 - always_run: false
   as: e2e-v2-aws-backuprestore
   optional: true
@@ -476,6 +467,7 @@ tests:
     workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-kubevirt-aws-ovn-reduced
+  optional: true
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
   steps:
     cluster_profile: openshift-org-aws

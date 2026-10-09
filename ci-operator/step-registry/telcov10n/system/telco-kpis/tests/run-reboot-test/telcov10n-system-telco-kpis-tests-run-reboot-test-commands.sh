@@ -9,6 +9,14 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 # fi
 
 export_env_vars_from_json 'reboot' "${TEST_SETTINGS:-}" "${TEST_SETTINGS_DEFAULTS:-}"
+apply_gangway_overrides
+
+# Validate REBOOT_COUNT is a non-negative integer
+if ! [[ "${REBOOT_COUNT}" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: REBOOT_COUNT must be a non-negative integer, got: '${REBOOT_COUNT}'"
+    exit 1
+fi
+
 setup_continue_on_fail
 setup_debug_on_fail
 
@@ -27,7 +35,7 @@ main() {
         DEBUG_FLAG="-vvv"
     fi
 
-    echo "Running reboot test (reboot_count: ${REBOOT_COUNT})"
+    echo "Running reboot test (reboot_count: ${REBOOT_COUNT}, test_options: ${TEST_OPTIONS})"
     local rc=0
     ansible-playbook ./playbooks/telco-kpis/run-test.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
@@ -36,6 +44,7 @@ main() {
         -e hub_kubeconfig="${HUB_KUBECONFIG}" \
         -e spoke_kubeconfig="${SPOKE_KUBECONFIG}" \
         -e reboot_count="${REBOOT_COUNT}" \
+        -e test_options="${TEST_OPTIONS}" \
         -e ran_integration_repo="${RAN_INTEGRATION_REPO}" \
         -e cnf_gotests_repo="${CNF_GOTESTS_REPO}" \
         -e force_pull_test_runner_image="${FORCE_PULL_TEST_RUNNER_IMAGE}" \

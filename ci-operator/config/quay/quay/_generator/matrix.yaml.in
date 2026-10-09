@@ -10,10 +10,12 @@ managed_files:
     - quay-quay-master.yaml
     - quay-quay-redhat-3.18__aws-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml
+    - quay-quay-redhat-3.18__aws-ocp414-e2e-install.yaml
     - quay-quay-redhat-3.18__gcp-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__azure-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__libvirt-s390x-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.17__aws-ocp422-e2e-install.yaml
   retired: []
 
 quay:
@@ -29,18 +31,43 @@ quay:
         clouds: [aws]
         ocp: ["5.0"]
         test: e2e-install
+      # oldest OCP Quay 3.18 supports with an ART nightly FBC (v4.12/v4.13 have none)
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.14"]
+        test: e2e-install
       - cron: weekly
         source: nightly
         clouds: [aws]
         ocp: ["4.22"]
         test: e2e-install
         arches: [arm64]
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        fips: true
       - cron: 0 8 * * 2
         source: nightly
         clouds: [libvirt]
         ocp: ["4.22"]
         test: e2e-install
         arches: [s390x]
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        storage: odf
+  - branch: redhat-3.17
+    jobs:
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
   - branch: master
     layout: base
     env:
@@ -54,8 +81,15 @@ quay:
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
     jobs:
       - kind: presubmit
-        clouds: [aws, gcp]
+        clouds: [aws, gcp, azure]
         ocp: ["4.22"]
         test: e2e-install
+        always_run: false
+        optional: true
+      - kind: presubmit
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        storage: odf
         always_run: false
         optional: true

@@ -1,0 +1,77 @@
+ref:
+  as: p2p-mtv-wait-acm-providers
+  from: cli
+  commands: p2p-mtv-wait-acm-providers-commands.sh
+  timeout: 45m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Discover and wait for the MTV OpenShift Providers that ACM's mtv-integrations controller
+    creates automatically for every ManagedCluster labeled acm/cnv-operator-install=true
+    (see p2p-acm-cnv-addon-install): one Provider named "<managed-cluster>-<suffix>" (suffix
+    defaults to "-mtv", e.g. acm-spoke-abc12-1-mtv) per spoke, backed by a ManagedServiceAccount
+    and synced into the mtv-integrations namespace.
+
+    This step performs discovery/readiness checks only — it never creates Provider, Secret, or
+    ManifestWork objects itself. Replaces p2p-mtv-register-providers (manual Hive-kubeconfig-based
+    registration) wherever ACM already owns the MTV lifecycle via p2p-acm-mtv-integration +
+    p2p-acm-cnv-addon-install.
+
+    Using the ACM-created "<cluster>-mtv" providers (instead of hand-picked names like spoke-1/
+    spoke-2) matters beyond naming: the mtv-integrations Plan admission webhook only enforces its
+    target-namespace access check when the destination provider name ends in "-mtv" — plans built
+    on manually registered providers silently skip that validation. Migrating through the ACM
+    providers in both directions keeps that webhook path under test.
+
+    For each spoke (SHARED_DIR/managed-cluster-name-<N> from acm-interop-p2p-cluster-install, or
+    MTV_SPOKE_CLUSTER_NAMES when set): waits for the ManagedCluster to be Available, waits for the
+    derived Provider name to exist in MTV_PROVIDER_NAMESPACE, waits for it to reach
+    condition=Ready, and writes the resolved name to
+    ${SHARED_DIR}/mtv-acm-provider-name-<N> (1-based, same index space as managed-cluster-name-<N>
+    and managed-cluster-kubeconfig-<N>) for downstream steps (p2p-mtv-create-migration-maps,
+    p2p-mtv-create-return-migration-maps, p2p-mtv-execute-live-migration(-return)) to consume.
+
+    Requires p2p-acm-mtv-integration and p2p-acm-cnv-addon-install to have already run so ACM has
+    had a chance to reconcile the providers. Hub kubeconfig is KUBECONFIG from ci-operator.
+
+    Publishes ${ARTIFACT_DIR}/mtv-acm-providers-status.txt (oc get providers, no secrets).
+  env:
+  - name: MTV_PROVIDER_NAMESPACE
+    default: "mtv-integrations"
+    documentation: |-
+      Namespace where ACM's mtv-integrations controller creates and manages Provider (and
+      Secret) objects for managed clusters. Distinct from MTV_NAMESPACE/MTV_INSTALL_NAMESPACE,
+      which is where the MTV operator and ForkliftController are installed (openshift-mtv) —
+      keep the two separate; do not point this at the operator namespace.
+  - name: MTV_SPOKE_CLUSTER_COUNT
+    default: "2"
+    documentation: |-
+      Number of spokes to resolve via SHARED_DIR/managed-cluster-name-1..N.
+      Ignored when MTV_SPOKE_CLUSTER_NAMES is set.
+  - name: MTV_SPOKE_CLUSTER_NAMES
+    default: ""
+    documentation: |-
+      Comma-separated ACM ManagedCluster names (hub namespaces), e.g.
+      acm-spoke-abc12-1,acm-spoke-abc12-2. When set, overrides SHARED_DIR discovery and
+      MTV_SPOKE_CLUSTER_COUNT; index N in this list maps to mtv-acm-provider-name-<N+1>.
+  - name: MTV_ACM_PROVIDER_SUFFIX
+    default: "-mtv"
+    documentation: |-
+      Suffix ACM's mtv-integrations controller appends to the managed cluster name to form
+      the Provider CR name (e.g. cluster "acm-spoke-abc12-1" -> provider
+      "acm-spoke-abc12-1-mtv"). The Plan webhook target-access check requires this suffix.
+  - name: MTV_PROVIDER_DISCOVERY_TIMEOUT
+    default: "10m"
+    documentation: |-
+      Per-spoke timeout waiting for the derived Provider object to be created by ACM.
+      Reconciliation can lag behind the ManagedCluster label (set by
+      p2p-acm-cnv-addon-install) and the ManagedServiceAccount token projection.
+  - name: MTV_PROVIDER_READY_TIMEOUT
+    default: "15m"
+    documentation: Per-spoke timeout for oc wait provider/<name> --for=condition=Ready.
+  - name: MTV_MANAGED_CLUSTER_WAIT_TIMEOUT
+    default: "10m"
+    documentation: Timeout for the ManagedCluster Available wait per spoke.

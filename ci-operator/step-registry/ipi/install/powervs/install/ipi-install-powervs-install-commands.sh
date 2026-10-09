@@ -271,7 +271,7 @@ function install_required_tools() {
 
   echo "Installing PowerVS-DHCP-report"
   DHCP_TAR="PowerVS-DHCP-report-v1.3-linux-amd64.tar.gz"
-  curl --location --output /tmp/${DHCP_TAR} https://github.com/hamzy/PowerVS-DHCP-report/releases/download/v1.3/${DHCP_TAR}
+  for _ in {1..3}; do curl --location --fail --output /tmp/${DHCP_TAR} https://github.com/hamzy/PowerVS-DHCP-report/releases/download/v1.3/${DHCP_TAR} && break || sleep 2; done
   (cd /tmp/; tar xzvf ${DHCP_TAR}; mv PowerVS-DHCP-report /tmp/bin/)
 
   hash jq || exit 1
@@ -921,6 +921,14 @@ if [ -f "${CHRONY_MASTER_YAML}" ]; then
   echo "Saving ${CHRONY_MASTER_YAML} to the install directory..."
   cp ${CHRONY_MASTER_YAML} "${dir}/manifests"
 fi
+
+# Sets up the powervm-rmc manifests
+for POWERVM_RMC_YAML in powervm-rmc-namespace.yaml powervm-rmc-serviceaccount.yaml powervm-rmc-scc-rolebinding.yaml powervm-rmc-daemonset.yaml; do
+  if [ -f "${SHARED_DIR}/${POWERVM_RMC_YAML}" ]; then
+    echo "Saving ${SHARED_DIR}/${POWERVM_RMC_YAML} to the install directory..."
+    cp "${SHARED_DIR}/${POWERVM_RMC_YAML}" "${dir}/manifests"
+  fi
+done
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 

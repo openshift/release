@@ -792,7 +792,14 @@ tests:
   cron: 5 13 * * *
   steps:
     cluster_profile: equinix-edge-enablement
-    workflow: agent-e2e-two-node-fencing-ipv4
+    workflow: agent-e2e-two-node-fencing-ipv4-hostname
+- as: e2e-agent-ovn-two-node-fencing-mac
+  capabilities:
+  - intranet
+  cron: 5 14 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: agent-e2e-two-node-fencing-ipv4-mac
 - as: e2e-metal-ovn-two-node-fencing-techpreview
   capabilities:
   - intranet
@@ -1331,6 +1338,9 @@ tests:
   cron: 0 0 1 1 *
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      FEATURE_GATES: '["VSpherePerComponentScopedCreds=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere-manual-credentials-mode
 - as: e2e-vsphere-ovn-csi-vcf9
   cron: 2,32 8,23 * * *
@@ -1481,6 +1491,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_MACHINE_MANAGEMENT: MachineAPI
       DEDICATED_HOST: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
     leases:
@@ -2208,13 +2219,15 @@ tests:
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node-one-core
-- as: e2e-aws-ovn-shared-vpc-phz-techpreview
+- as: e2e-aws-ovn-shared-vpc-phz
   interval: 168h
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-      FEATURE_SET: TechPreviewNoUpgrade
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-qe-quota-slice
     workflow: openshift-e2e-aws-shared-vpc-phz
 - as: e2e-agent-compact-fips
   capabilities:
@@ -3087,7 +3100,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn-rt
 - as: e2e-aws-disruptive-longrunning
-  cron: 0 12 * * *
+  cron: 0 0,12 * * *
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -3098,6 +3111,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: openshift-e2e-test-8h
     workflow: openshift-e2e-aws-disruption
 - as: e2e-aws-disruptive-longrunning-techpreview
   interval: 168h

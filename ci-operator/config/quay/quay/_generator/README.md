@@ -2,7 +2,7 @@
 
 Python generator that reads a compact `matrix.yaml.in` and writes [ci-operator](https://docs.ci.openshift.org/) config files for each test cell.
 
-Templating is Jinja `{{ variable }}` placeholders only. Conditionals and loops stay in `generate.py`, not in the YAML templates.
+Templating is Jinja `{{ variable }}` placeholders plus `{% if %}` on cell flags (`arch`, `layout`, `fips`). Expansion and merging stay in `generate.py`, not in the YAML templates.
 
 Each generated file starts with a `# DO NOT EDIT` header pointing back at `matrix.yaml.in`, `templates/`, and `generate.py`.
 
@@ -74,13 +74,17 @@ quay:
 | `quay[].jobs[]` | One job spec, expanded across `clouds` × `ocp` |
 | `quay[].jobs[].kind` | `periodic` (default, renders `templates/`) or `presubmit` (renders `templates/presubmit/`) |
 | `quay[].jobs[].cron` | Required for `periodic`; must be unset for `presubmit`. Either an alias (`daily` / `nightly` / `weekly`) or a raw 5-field cron expression, passed through verbatim |
-| `quay[].jobs[].source` | Required for periodic: `nightly` (`fbc-operator-catalog` + `QUAY_INDEX_IMAGE_REPO`) or `stable` (`redhat-operators`, no index image); must be unset for presubmit |
+| `quay[].jobs[].source` | Required for periodic: `nightly` (`fbc-operator-catalog` + `QUAY_INDEX_IMAGE_REPO` + `PLAYWRIGHT_REF_MODE: strict`, which fails closed with no branch fallback) or `stable` (`redhat-operators`, no index image); must be unset for presubmit |
 | `quay[].jobs[].always_run` / `.optional` / `.run_if_changed` / `.skip_if_only_changed` | Presubmit trigger fields, copied onto the test when set. `run_if_changed` and `skip_if_only_changed` are mutually exclusive; `always_run: true` cannot combine with either. Only valid when `kind: presubmit`. |
 | `quay[].jobs[].env` | Optional per-job env; keys replace branch env of the same name |
 | `quay[].jobs[].as` | Optional ci-operator test name. Defaults to `{cloud}-{storage}-{source}` for `periodic` (for example `aws-s3-nightly`) and `{cloud}-{storage}` for `presubmit` (for example `aws-s3`) -- cron changes only timing, never the name. Split the job into its own row when only some clouds need a different name. |
+| `quay[].jobs[].fips` | Optional boolean, periodic only. `true` installs a FIPS cluster (`FIPS_ENABLED`), runs `fips-check-fips-or-die` first, sets `FEATURE_FIPS: true` in `QUAY_EXTRA_CONFIG`, and turns Mailpit off (`QUAY_DEPLOY_MAILPIT: "false"`; `FEATURE_FIPS` requires `MAIL_USE_TLS`, so the `@feature:MAILING` specs self-skip). The derived `as` gets a `-fips` suffix; the filename does not change, so a FIPS row shares its non-FIPS sibling's file. |
 | `quay[].jobs[].arches` | Optional non-empty list of `amd64` / `arm64` / `s390x`, no duplicates. Defaults to `[global_defaults.arch]`. Expands into the cartesian product alongside `ocp` and `clouds`. |
+| `quay[].jobs[].storage` | Optional override of the cloud's default storage backend (`STORAGE_BY_CLOUD` in `model.py`). Absent uses the cloud's default; the only other allowed value today is `odf`, and only on `aws`. Any other value, or `odf` on a different cloud, fails generation. |
 
 The `libvirt` cloud maps to S3 storage (`STORAGE_BY_CLOUD` in `model.py`); its `s390x` arch cell provisions through the IBM Z libvirt workflow (`quay-tests-libvirt-s390x`) instead of an `ipi-*` cloud installer.
+
+`storage: odf` deploys Quay with NooBaa-managed object storage instead of a per-job bucket: the `quay-install-odf-operator` ref (with `SETUP_NOOBAA: "true"`) is inserted right before the deploy ref, which becomes `quay-deploy-odf` instead of the cloud's usual deploy step, and the QuayRegistry's `objectstorage` component is left `managed: true` for the operator to own.
 
 Each job is cartesian-expanded to one ci-operator file named `{org}-{repo}-{branch}__{cloud}-ocp{ocp_nodot}-{test}.yaml` (`layout: base` rows instead write `{org}-{repo}-{branch}.yaml`). A non-`amd64` arch folds into that same naming: `variant` becomes `{cloud}-{arch}-ocp{ocp_nodot}-{test}` (the derived `as` does not repeat the arch), and a `layout: base` row writes `{org}-{repo}-{branch}__{arch}.yaml` instead (with `zz_generated_metadata.variant` set to `{arch}`) since `arch` isn't otherwise part of its filename. Cells that share a filename (for example a periodic and a presubmit row for the same branch/cloud/OCP/test) merge into one file: their tests concatenate in matrix order, and everything but `tests` must be identical across the group or generation fails with `incompatible file-level inputs`. Two rows in one file that derive or set the same `as` collide: the generator fails with `duplicate as`. Periodic derives `{cloud}-{storage}-{source}` and presubmit derives `{cloud}-{storage}`, so a periodic/presubmit pair does not collide on its own. Two rows of the same kind can still collide; set an explicit `as` on one row to resolve it, and the name must not encode the kind.
 

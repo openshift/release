@@ -792,7 +792,14 @@ tests:
   cron: 5 13 * * *
   steps:
     cluster_profile: equinix-edge-enablement
-    workflow: agent-e2e-two-node-fencing-ipv4
+    workflow: agent-e2e-two-node-fencing-ipv4-hostname
+- as: e2e-agent-ovn-two-node-fencing-mac
+  capabilities:
+  - intranet
+  cron: 5 14 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: agent-e2e-two-node-fencing-ipv4-mac
 - as: e2e-metal-ovn-two-node-fencing-techpreview
   capabilities:
   - intranet
@@ -1476,6 +1483,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_MACHINE_MANAGEMENT: MachineAPI
       DEDICATED_HOST: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
     leases:
@@ -2204,13 +2212,15 @@ tests:
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node-one-core
-- as: e2e-aws-ovn-shared-vpc-phz-techpreview
+- as: e2e-aws-ovn-shared-vpc-phz
   interval: 168h
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-      FEATURE_SET: TechPreviewNoUpgrade
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-qe-quota-slice
     workflow: openshift-e2e-aws-shared-vpc-phz
 - as: e2e-agent-compact-fips
   capabilities:
@@ -3085,7 +3095,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn-rt
 - as: e2e-aws-disruptive-longrunning
-  cron: 0 12 * * *
+  cron: 0 0,12 * * *
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -3096,6 +3106,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: openshift-e2e-test-8h
     workflow: openshift-e2e-aws-disruption
 - as: e2e-aws-disruptive-longrunning-techpreview
   interval: 168h
@@ -3106,6 +3118,32 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
       TEST_SUITE: openshift/disruptive-longrunning
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-nodes-isolated
+  cron: 0 14 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_REQUIRES_SSH: "yes"
+      TEST_SUITE: openshift/nodes/isolated
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-nodes-isolated-techpreview
+  interval: 168h
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
+      TEST_SUITE: openshift/nodes/isolated
     observers:
       enable:
       - observers-resource-watch

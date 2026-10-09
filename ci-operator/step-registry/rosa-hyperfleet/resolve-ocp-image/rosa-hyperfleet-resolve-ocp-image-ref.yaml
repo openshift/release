@@ -1,0 +1,64 @@
+ref:
+  as: rosa-hyperfleet-resolve-ocp-image
+  from_image:
+    namespace: ci
+    name: rosa-regional-platform-ci
+    tag: latest
+  commands: rosa-hyperfleet-resolve-ocp-image-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: OCP_RELEASE_STREAM
+    default: ""
+    documentation: |-
+      Release controller stream whose latest accepted payload is used as the
+      OCP release image of the e2e HCP cluster. Empty (the default) skips
+      this step and the e2e step uses its default image.
+
+      - "ocp-branch-nightly": the newest accepted multi-arch nightly
+        (X.Y.0-0.nightly-multi) of the release-X.Y branch's OCP version.
+        Suited to periodics that should catch OCP regressions early.
+      - "ocp-branch-candidate": the newest accepted GA, z-stream or RC
+        payload of the release-X.Y branch's OCP version, from the
+        N-stable-multi streams (no nightlies or ECs). The OCP "candidate"
+        update channel carries the same releases. Suited to presubmits,
+        where a failure should point at the change under test.
+
+      Both ocp-branch-* values fall back to the highest older X.Y with an
+      accepted payload, with a warning, when the branch's own version has
+      none yet (e.g. right after a branch cut, or before the first RC), so a
+      branch never tests a newer OCP than its own. On any other branch (e.g.
+      main) they use the highest X.Y available. They require a repo whose
+      release-X.Y branches track OCP X.Y, such as an OCP component like
+      openshift/hypershift; do not use them in repos with their own
+      versioning. Unlike a fixed stream name, the value stays correct when
+      config-brancher copies the config to release branches.
+
+      - Any other value is used as the stream name, e.g. 5.1.0-0.nightly-multi
+        or 5-dev-preview-multi. Multi-arch streams (ending in -multi) resolve
+        to quay.io/openshift-release-dev images. amd64 nightly and CI streams
+        resolve to CI registry images that the ephemeral environment cannot
+        pull, so use multi-arch streams.
+  documentation: |-
+    Resolves OCP_RELEASE_STREAM to the latest accepted payload from the OCP
+    release controller, for rosa-hyperfleet-e2e to use as OCP_IMAGE. Does
+    nothing when OCP_RELEASE_STREAM is empty.
+
+    How it resolves:
+    1. "ocp-branch-nightly" and "ocp-branch-candidate" are turned into a
+       stream name (and, for candidates, an X.Y version prefix) using the
+       accepted payloads listed by the multi-arch release controller. The
+       branch comes from JOB_SPEC: the ref marked workdir:true, else
+       refs.base_ref for presubmits, else extra_refs[0].base_ref for
+       periodics.
+    2. The latest accepted payload of that stream (matching the prefix, if
+       any) is fetched from multi.ocp.releases.ci.openshift.org for -multi
+       streams, or from amd64.ocp.releases.ci.openshift.org otherwise.
+    3. Its pullspec is written to ${SHARED_DIR}/ocp-image, which
+       rosa-hyperfleet-e2e uses unless OCP_IMAGE is set explicitly. The full
+       release is saved as ocp-release.json in the step artifacts.
+
+    Runs before provisioning, so an unknown stream or a stream without
+    accepted payloads fails the job in seconds instead of after provisioning.

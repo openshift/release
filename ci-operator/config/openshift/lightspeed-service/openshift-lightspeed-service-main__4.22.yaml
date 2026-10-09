@@ -106,6 +106,58 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: ols-eval-periodic-daily
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+      variant: fips
+    owner: obs
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.22"
+  cron: 15 7 * * *
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
+        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
+        export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
+        export VERTEX_PROVIDER_KEY_PATH=/var/run/vertex/token
+        export BEDROCK_AWS_ACCESS_KEY_ID=$(cat /var/run/bedrock-iam/aws_access_key_id)
+        export BEDROCK_AWS_SECRET_ACCESS_KEY=$(cat /var/run/bedrock-iam/aws_secret_access_key)
+
+        tests/scripts/test-lseval-daily.sh
+      credentials:
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: bedrock-apitoken
+        mount_path: /var/run/bedrock-iam
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: watsonx-apitoken
+        mount_path: /var/run/watsonx
+      - collection: openshift-lightspeed-service-creds
+        group: vertex-apitoken
+        mount_path: /var/run/vertex
+      dependencies:
+      - env: OLS_IMAGE
+        name: lightspeed-service-api
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
