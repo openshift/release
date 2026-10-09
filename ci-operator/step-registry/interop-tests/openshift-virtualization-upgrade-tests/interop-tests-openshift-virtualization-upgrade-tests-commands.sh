@@ -59,7 +59,7 @@ if [[ "${MAP_TESTS}" == "true" ]]; then
         typeset -a _fURL=()
         type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
         # Pinned to a reviewed commit SHA (rather than refs/heads/main) to avoid
-        # executing unreviewed upstream changes with this job's credentials.
+        # executing unreviewed upstream changes with the credentials of this job.
         "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
     # shellcheck disable=SC2154
@@ -154,6 +154,20 @@ BuildCnvUpgradePytestArgs() {
         --ignore=tests/network/
         --tb=native
     )
+    # VirtualMachineTemplate (template.kubevirt.io) is part of CNV 4.22.
+    # On older targets the vm_template upgrade tests error in setup
+    # (Couldn't find VirtualMachineTemplate in template.kubevirt.io api group):
+    #   TestVMTemplatePreUpgrade::test_template_creation_before_upgrade
+    #   TestVMTemplatePreUpgrade::test_vm_creation_from_template_before_upgrade
+    typeset cnvVer="${CNV_TARGET_VERSION#v}"
+    typeset cnvMajor="${cnvVer%%.*}"
+    typeset cnvRest="${cnvVer#*.}"
+    typeset cnvMajorMinor="${cnvMajor}.${cnvRest%%.*}"
+    if [[ "${cnvMajorMinor}" != "4.22" ]] \
+        && [[ "$(printf '%s\n%s\n' "${cnvMajorMinor}" "4.22" | sort -V | head -n1)" == "${cnvMajorMinor}" ]]; then
+        : "CNV ${CNV_TARGET_VERSION} is below 4.22; ignoring tests/infrastructure/vm_template/"
+        args+=(--ignore=tests/infrastructure/vm_template/)
+    fi
     if [[ -n "${CNV_TARGET_IMAGE}" ]]; then
         args+=(--cnv-image "${CNV_TARGET_IMAGE}")
     fi
