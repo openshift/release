@@ -1,0 +1,28 @@
+ref:
+  as: quay-database-intg-azure-postgres
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-database-intg-azure-postgres-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: aws_rds_postgresql
+    mount_path: /var/run/quay-qe-aws-rds-postgresql-secret
+  documentation: |-
+    Provision Azure Database for PostgreSQL Flexible Server for Quay. Creates the
+    database instance and outputs database connection details and configuration
+    fragment to SHARED_DIR for use by Quay deployment steps. Uses Azure credentials
+    from the cluster profile (azure-quay-qe), so resources are created in the same
+    account as cluster infrastructure.
+  env:
+  - name: POSTGRESQL_VERSION
+    documentation: Support PostgreSQL Version 17/16/15/14/13/12
+    default: "17"

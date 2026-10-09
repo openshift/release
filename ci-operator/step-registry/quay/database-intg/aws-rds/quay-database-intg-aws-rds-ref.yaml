@@ -1,0 +1,31 @@
+ref:
+  as: quay-database-intg-aws-rds
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-database-intg-aws-rds-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: aws
+    mount_path: /var/run/quay-qe-aws-secret
+  - collection: quay-tests
+    group: aws_rds_postgresql
+    mount_path: /var/run/quay-qe-aws-rds-postgresql-secret
+  documentation: |-
+    Provision AWS RDS PostgreSQL database for Quay. Creates a per-job SCRAM
+    parameter group (named from JOB_NAME_SAFE/JOB_NAME when set), a dedicated VPC,
+    and a publicly reachable Postgres instance. Outputs connection details and a
+    Quay config fragment to SHARED_DIR for deploy steps. The parameter group is
+    destroyed with the Terraform stack by quay-database-intg-aws-rds-deprovision.
+  env:
+  - name: POSTGRESQL_VERSION
+    documentation: Support PostgreSQL Version 17/16/15/14/13
+    default: "17"
