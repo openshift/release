@@ -40,6 +40,48 @@ Because these variants are near-identical, a change to a shared test step
 usually has to be applied to **all** of them at once — see graph-build coupling
 below.
 
+## OWNERS File — Synced from Upstream, Single Source of Truth
+
+`ci-operator/config/openshift/sandboxed-containers-operator/OWNERS` is
+**auto-generated and synced** from the upstream
+`openshift/sandboxed-containers-operator` repo's root `OWNERS` file via
+`https://github.com/openshift/ci-tools` tooling (OWNERS_ALIASES are expanded
+and non-`openshift`-org logins are filtered out — see the header comment in the
+file itself). It reflects the actual approvers/reviewers of the product repo.
+
+- **Do not hand-edit this file.** Changes are overwritten on the next sync; to
+  change approvers/reviewers, edit the upstream repo's `OWNERS` file instead.
+- This file is the **source of truth** that every `OWNERS` file under
+  `../../../step-registry/sandboxed-containers-operator/` (the top-level one and
+  one per ref/chain/workflow subdirectory) is kept in sync with, via
+  [`sync-owners.sh`](sync-owners.sh) (a real-file copy, **not** a symlink — see
+  below for why). Run it after this file changes:
+  ```bash
+  ./ci-operator/config/openshift/sandboxed-containers-operator/sync-owners.sh
+  ```
+  then commit the resulting step-registry `OWNERS` changes alongside it.
+
+### Why a sync script instead of a symlink
+
+A step-registry `OWNERS` symlinked across to this file (e.g.
+`../../config/openshift/sandboxed-containers-operator/OWNERS`) looks tempting —
+one editable file, everything else just points at it — but it **breaks CI for
+the entire `openshift/release` repo**, not just OSC:
+`generate-registry-metadata` (run by `make registry-metadata`, part of
+`make update`, and by the repo-wide `hack/validate-registry-metadata.sh` Prow
+check) operates on a **copy of `ci-operator/step-registry` alone** —
+`ci-operator/config` is never present in that context — so any symlink
+pointing out of `step-registry/` resolves to nothing there and the tool aborts
+hard for the whole registry, not just this component. (Confirmed locally: a
+`step-registry/.../OWNERS` symlink to `../../config/.../OWNERS` makes
+`make registry-metadata` fail with "missing OWNERS file" for every affected
+path.) The 2,800+ existing OWNERS symlinks elsewhere in `step-registry/` only
+ever point to a parent directory **within `step-registry/` itself**
+(`../OWNERS`) for exactly this reason. Real-file copies plus an explicit sync
+script are the only approach compatible with that tooling boundary. See the
+[Step-registry AGENTS.md "OWNERS Files" section](../../../step-registry/sandboxed-containers-operator/AGENTS.md#owners-files--kept-in-sync-with-config-owners-via-sync-ownerssh)
+for the step-registry side of this convention.
+
 ## Pipeline Images Primer
 
 `ci-operator` builds a pipeline image graph per config:
@@ -186,6 +228,8 @@ AGENTS.md update:
 - Test names or workflow references added to/removed from the config variants.
 - A nightly job type is enabled, disabled, or rescheduled (update the Nightly
   Periodic Jobs section — table, schedule block, and window rationale).
+- The OWNERS sync source or mechanism changes (e.g., upstream repo renamed, sync
+  tooling changed), or the symlink convention in the step-registry changes.
 
 The linked AGENTS.md files
 ([Step-registry AGENTS.md](../../../step-registry/sandboxed-containers-operator/AGENTS.md),
