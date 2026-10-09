@@ -314,6 +314,10 @@ sysctl -w net.ipv6.conf.\$(ip -o route get 1.1.1.1 | cut -f 5 -d ' ').accept_ra=
 
 cd dev-scripts
 
+# Use the custom dev-scripts branch from pmtk's fork.
+git fetch https://github.com/pmtk/openshift-dev-scripts.git sno-bip-skip-dnsmasq
+git checkout -B sno-bip-skip-dnsmasq FETCH_HEAD
+
 cp /root/pull-secret /root/dev-scripts/pull_secret.json
 
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
