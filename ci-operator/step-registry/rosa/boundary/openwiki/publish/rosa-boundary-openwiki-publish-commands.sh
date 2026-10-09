@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo=openshift-online/rosa-boundary
-base=main
-branch=openwiki/update
-production_job=periodic-ci-openshift-online-rosa-boundary-main-openwiki-openwiki-update
+repo=${TARGET_REPO:?}
+base=${TARGET_BASE_BRANCH:?}
+branch=${TARGET_UPDATE_BRANCH:?}
+production_job=${TARGET_PERIODIC_JOB:?}
+[[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'Invalid OpenWiki repository.' >&2; exit 1; }
+[[ "$production_job" =~ ^periodic-ci-[a-z0-9-]+$ ]] || { echo 'Invalid scheduled periodic job name.' >&2; exit 1; }
+git check-ref-format --branch "$base" >/dev/null
+git check-ref-format --branch "$branch" >/dev/null
 case "${JOB_NAME:-}" in
   "$production_job") dry_run=false ;;
   rehearse-*-"$production_job") dry_run=true ;;
@@ -42,7 +46,7 @@ if [[ "$dry_run" == false ]]; then
   export GITHUB_TOKEN
   GITHUB_TOKEN=$(curl -fsS -X POST -H "Authorization: Bearer ${jwt}" \
     -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' \
-    --data '{"repositories":["rosa-boundary"],"permissions":{"contents":"write","pull_requests":"write"}}' \
+    --data "$(jq -nc --arg repository "${repo#*/}" '{repositories:[$repository],permissions:{contents:"write",pull_requests:"write"}}')" \
     "https://api.github.com/app/installations/$(cat "$installation_id_file")/access_tokens" \
     | jq -er '.token')
 fi
@@ -98,7 +102,7 @@ while IFS= read -r -d '' path; do
     openwiki/*) ;;
     *) echo "Refusing unexpected OpenWiki patch path: ${path}" >&2; exit 1 ;;
   esac
-done < <(git diff --cached --name-only -z)
+done < <(git diff --cached --no-renames --name-only -z)
 if git diff --cached --quiet; then
   echo 'No OpenWiki documentation changes to publish.'
   exit "$update_status"
@@ -128,7 +132,7 @@ fi
 pr_body=$(cat <<EOF
 ## OpenWiki documentation refresh
 
-This PR updates the generated ROSA Boundary wiki under \`openwiki/\`. It comes from [OpenShift CI's scheduled Prow periodic](https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/${JOB_NAME}), **not GitHub Actions**. Please review the generated documentation and source-backed claims before merging; application code and root agent guidance are outside this job's publishing scope.
+This PR updates the generated wiki for \`${repo}\` under \`openwiki/\`. It comes from [OpenShift CI's scheduled Prow periodic](https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/${JOB_NAME}), **not GitHub Actions**. Please review the generated documentation and source-backed claims before merging; application code and root agent guidance are outside this job's publishing scope.
 
 ### Run details
 

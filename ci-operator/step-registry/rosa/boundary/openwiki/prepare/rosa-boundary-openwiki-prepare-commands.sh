@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo=openshift-online/rosa-boundary
-base=main
-branch=openwiki/update
+repo=${TARGET_REPO:?}
+base=${TARGET_BASE_BRANCH:?}
+branch=${TARGET_UPDATE_BRANCH:?}
+[[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'Invalid OpenWiki repository.' >&2; exit 1; }
+git check-ref-format --branch "$base" >/dev/null
+git check-ref-format --branch "$branch" >/dev/null
 app_id_file=/var/run/rosa-boundary-github-app-id/github-app-app-id
 installation_id_file=/var/run/rosa-boundary-github-app-installation/github-app-installation-id
 private_key_file=/var/run/rosa-boundary-github-app-key/github-app-pem
@@ -27,7 +30,7 @@ jwt="${header}.${payload}.${signature}"
 export GITHUB_TOKEN
 GITHUB_TOKEN=$(curl -fsS -X POST -H "Authorization: Bearer ${jwt}" \
   -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' \
-  --data '{"repositories":["rosa-boundary"],"permissions":{"contents":"write","pull_requests":"write"}}' \
+  --data "$(jq -nc --arg repository "${repo#*/}" '{repositories:[$repository],permissions:{contents:"write",pull_requests:"write"}}')" \
   "https://api.github.com/app/installations/$(cat "$installation_id_file")/access_tokens" \
   | jq -er '.token')
 
