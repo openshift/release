@@ -163,6 +163,134 @@ echo "Gathering from namespaces:" >&2
 echo "${NAMESPACES}" >&2
 echo "${NAMESPACES}" >"${ARTIFACT_DIR}/gathered-namespaces.txt"
 
+# --- tested-images.json -----------------------------------------------------
+# Machine-readable record of the images this run tested, parsed by
+# release-readiness (contract v1: change it additively only). It joins on the
+# requested digests (pod spec.image, CSV related images, the catalog's bundle
+# image); image_id is diagnostic only. Written before the bulk collection so the
+# deadline cannot skip it. Anything that could not be read is null and named in
+# "missing", with "complete": false; never a failure.
+write_tested_images() {
+  local out="${ARTIFACT_DIR}/tested-images.json"
+  local missing=() json
+  if ! command -v jq >/dev/null 2>&1; then
+    echo '{"schema_version":1,"complete":false,"missing":["jq"]}' >"${out}"
+    return
+  fi
+  oc_json() { ! past_deadline && timeout "${CALL_TIMEOUT}" oc "$@" -o json 2>/dev/null; }
+
+  local requested="" resolved=""
+  [[ -s "${SHARED_DIR:-}/quay_index_image_requested" ]] && requested="$(<"${SHARED_DIR}/quay_index_image_requested")"
+  [[ -s "${SHARED_DIR:-}/quay_index_image" ]] && resolved="$(<"${SHARED_DIR}/quay_index_image")"
+  # A tag-form override is recorded there verbatim; resolved_ref is digests only.
+  [[ "${resolved}" == *@sha256:* ]] || resolved=""
+
+  local sub="null" sub_ns="" csv=""
+  if json="$(oc_json get subscription --all-namespaces)"; then
+    sub="$(jq -c '[.items[] | select(.spec.name == "quay-operator")][0]' <<<"${json}")"
+    sub_ns="$(jq -r '.metadata.namespace // empty' <<<"${sub}")"
+    csv="$(jq -r '.status.installedCSV // .status.currentCSV // empty' <<<"${sub}")"
+  fi
+  [[ -n "${sub_ns}" ]] || missing+=("subscription")
+  [[ -n "${csv}" ]] || missing+=("operator.csv")
+
+  # Without the resolve step's record, a digest-pinned CatalogSource is just as exact.
+  if [[ -z "${resolved}" && -n "${sub_ns}" ]] && json="$(oc_json get catalogsource -n \
+      "$(jq -r '.spec.sourceNamespace' <<<"${sub}")" "$(jq -r '.spec.source' <<<"${sub}")")"; then
+    resolved="$(jq -r '.spec.image // empty | select(contains("@sha256:"))' <<<"${json}")"
+  fi
+  [[ -n "${requested}" ]] || missing+=("catalog.requested_ref")
+  [[ -n "${resolved}" ]] || missing+=("catalog.resolved_ref")
+
+  local quay_version=""
+  json="$(oc_json get quayregistry --all-namespaces)" \
+    && quay_version="$(jq -r '[.items[].status.currentVersion // empty][0] // empty' <<<"${json}")"
+  [[ -n "${quay_version}" ]] || missing+=("quay_version")
+
+  # The bundle is the installed CSV's olm.bundle image in the pinned catalog. The
+  # catalog repo is public, so this needs no credentials; FBC is YAML or JSON.
+  local bundle="" fbc
+  if [[ -n "${csv}" && -n "${resolved}" ]] && ! past_deadline && fbc="$(mktemp -d)"; then
+    if timeout "${CALL_TIMEOUT}" oc image extract "${resolved}" --path "/configs/:${fbc}" \
+        --confirm --filter-by-os=linux/amd64 >/dev/null 2>&1; then
+      bundle="$(find "${fbc}" -type f \( -name '*.yaml' -o -name '*.yml' \) -exec awk -v csv="${csv}" '
+        function done_doc() { if (schema == "olm.bundle" && name == csv) print image; schema = name = image = "" }
+        FNR == 1 { done_doc() }
+        /^---/ { done_doc(); next }
+        /^schema:/ { schema = $2 } /^name:/ { name = $2 } /^image:/ { image = $2 }
+        END { done_doc() }' {} + 2>/dev/null | head -n1)"
+      [[ -n "${bundle}" ]] || bundle="$(find "${fbc}" -type f -name '*.json' -exec cat {} + 2>/dev/null \
+        | jq -r --arg csv "${csv}" 'select(.schema == "olm.bundle" and .name == $csv) | .image' 2>/dev/null | head -n1)"
+    fi
+    rm -rf -- "${fbc}"
+  fi
+  [[ -n "${bundle}" ]] || missing+=("operator.bundle_ref")
+
+  # Images, two sources. "pod": each operator or Quay component pod, by a fixed
+  # quay-component label -> role map. "csv-related": the operand images the
+  # installed CSV hands the operator, which covers images no pod runs (builder,
+  # builder-qemu); the *_PREVIOUS images only serve upgrades and are left out.
+  local images="[]" ns more
+  while IFS= read -r ns; do
+    [[ -n "${ns}" ]] || continue
+    json="$(oc_json get pods -n "${ns}")" || { missing+=("pods/${ns}"); continue; }
+    more="$(jq -c '{"quay-app": "quay", "quay-app-upgrade": "quay", "quay-mirror": "quay",
+        "clair-app": "clair", "clair-postgres": "clair-postgres", "postgres": "postgres",
+        "redis": "redis"} as $roles
+      | [.items[] | . as $p | $p.spec.containers[] as $c
+      | (if $c.name == "quay-operator" then "quay-operator"
+         else ($p.metadata.labels["quay-component"] // "" | $roles[.] // empty) end) as $role
+      | {role: $role, source: "pod", pod: $p.metadata.name, container: $c.name,
+         requested_ref: $c.image,
+         image_id: ([$p.status.containerStatuses[]? | select(.name == $c.name) | .imageID
+                     | select(. != "")][0] // null)}]' <<<"${json}")" \
+      && images="$(jq -c --argjson more "${more}" '. + $more' <<<"${images}")" \
+      || missing+=("pods/${ns}")
+  done <<<"${NAMESPACES}"
+  if [[ -n "${csv}" ]] && json="$(oc_json get csv -n "${sub_ns}" "${csv}")"; then
+    more="$(jq -c '{"QUAY": "quay", "CLAIR": "clair", "BUILDER": "builder",
+        "BUILDER_QEMU": "builder-qemu", "POSTGRES": "postgres",
+        "CLAIRPOSTGRES": "clair-postgres", "REDIS": "redis"} as $roles
+      | [.spec.install.spec.deployments[]?.spec.template.spec.containers[]?
+      | select(.name == "quay-operator") as $c
+      | ({role: "quay-operator", ref: $c.image},
+         ($c.env[]? | select(.name | startswith("RELATED_IMAGE_COMPONENT_"))
+          | {role: $roles[.name | ltrimstr("RELATED_IMAGE_COMPONENT_")], ref: .value}))
+      | select(.role != null)
+      | {role, source: "csv-related", pod: null, container: null,
+         requested_ref: (if (.ref // "") == "" then null else .ref end),
+         image_id: null}] | unique' <<<"${json}")" \
+      && images="$(jq -c --argjson more "${more}" '. + $more' <<<"${images}")" \
+      || missing+=("csv-related")
+  else
+    missing+=("csv-related")
+  fi
+  [[ "$(jq 'length' <<<"${images}")" -gt 0 ]] || missing+=("images")
+  # requested_ref is the join key, so a tag-only ref leaves the record incomplete.
+  jq -e 'all(.[]; (.requested_ref // "") | test("@sha256:[0-9a-f]{64}$"))' <<<"${images}" >/dev/null \
+    || missing+=("images.requested_ref")
+  jq -e 'any(.[]; .role == "builder")' <<<"${images}" >/dev/null || missing+=("builder")
+
+  local missing_json="[]"
+  [[ ${#missing[@]} -eq 0 ]] || missing_json="$(printf '%s\n' "${missing[@]}" | jq -R . | jq -sc .)"
+  jq -n \
+    --arg job "${JOB_NAME:-}" --arg build "${BUILD_ID:-}" --arg quay_version "${quay_version}" \
+    --arg requested "${requested}" --arg resolved "${resolved}" \
+    --arg channel "$(jq -r '.spec.channel // empty' <<<"${sub}")" \
+    --arg csv "${csv}" --arg bundle "${bundle}" \
+    --argjson missing "${missing_json}" --argjson images "${images}" \
+    'def opt: if . == "" then null else . end;
+    {schema_version: 1, job_name: ($job | opt), build_id: ($build | opt),
+     captured_at: (now | todate), complete: ($missing | length == 0), missing: $missing,
+     quay_version: ($quay_version | opt),
+     catalog: {requested_ref: ($requested | opt), resolved_ref: ($resolved | opt), channel: ($channel | opt)},
+     operator: {csv: ($csv | opt), bundle_ref: ($bundle | opt)},
+     images: $images, provenance: []}' >"${out}" \
+    || echo '{"schema_version":1,"complete":false,"missing":["write"]}' >"${out}"
+  echo "[quay-gather] tested-images.json: $(jq -c '{complete, missing}' "${out}" 2>/dev/null)" >&2
+}
+write_tested_images
+
 # --- cluster-scoped ---------------------------------------------------------
 run "${ARTIFACT_DIR}/quayregistries.json" get quayregistry --all-namespaces -o json
 run "${ARTIFACT_DIR}/quayregistry-describe.txt" describe quayregistry --all-namespaces
