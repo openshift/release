@@ -60,6 +60,28 @@ tests:
     - ref: openshift-qe-orion
     workflow: rosa-aws-sts
   timeout: 8h0m0s
+- always_run: false
+  as: control-plane-24nodes-cdv2
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      CUSTOM_KB_BUILD: "true"
+      ENABLE_AUTOSCALING: "false"
+      GC_METRICS: "false"
+      INDEX_ENABLED: "true"
+      KB_FLAGS: --local-indexing
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+      READY_WAIT_TIMEOUT: 30m
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    workflow: rosa-aws-sts
 zz_generated_metadata:
   branch: main
   org: openshift-eng
