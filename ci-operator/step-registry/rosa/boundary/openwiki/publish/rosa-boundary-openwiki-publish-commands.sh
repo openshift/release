@@ -144,15 +144,16 @@ EOF
 if [[ "$update_status" != 0 ]]; then
   pr_body+=$'\n\n**Partial update:** OpenWiki exited unsuccessfully. This PR includes only pages completed before the failure; review them before merging.'
 fi
+pr_title="docs: Scheduled OpenWiki update ($(date -u +%F))"
 
 git commit -m 'docs: update OpenWiki'
 git push origin "HEAD:refs/heads/${branch}"
 if [[ -n "$existing_pr" ]]; then
   pr_url="https://github.com/${repo}/pull/${existing_pr}"
-  gh api -X PATCH "repos/${repo}/pulls/${existing_pr}" -f body="$pr_body" --silent
+  gh api -X PATCH "repos/${repo}/pulls/${existing_pr}" -f title="$pr_title" -f body="$pr_body" --silent
 else
   pr_url=$(gh pr create --repo "$repo" --base "$base" --head "$branch" \
-    --title 'docs: update OpenWiki' --body "$pr_body")
+    --title "$pr_title" --body "$pr_body")
 fi
 echo "OpenWiki PR: ${pr_url}"
 exit "$update_status"
