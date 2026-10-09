@@ -152,7 +152,13 @@ tests:
       cli: latest
       commands: |
         unset GOFLAGS
-        E2E_TEST_DSC_MONITORING_NAMESPACE=redhat-ods-monitoring make e2e-test -e ODH_PLATFORM_TYPE=rhoai -e E2E_TEST_FLAGS="-timeout 120m" -e OPERATOR_NAMESPACE=redhat-ods-operator -e E2E_AUTO_RESOLVE=true
+        E2E_TEST_BACKUP_AND_RESTORE_DSCI_AND_DSC=true \
+          E2E_TEST_DSC_MONITORING_NAMESPACE=redhat-ods-monitoring \
+          make e2e-test \
+          -e ODH_PLATFORM_TYPE=rhoai \
+          -e E2E_TEST_FLAGS="-timeout 120m" \
+          -e OPERATOR_NAMESPACE=redhat-ods-operator \
+          -e E2E_AUTO_RESOLVE=true
       from: src
       resources:
         requests:
@@ -162,19 +168,6 @@ tests:
     - as: enable-aipipelines-for-tls-scan
       cli: latest
       commands: |
-        oc apply -f - <<'EOF'
-        apiVersion: datasciencecluster.opendatahub.io/v3
-        kind: DataScienceCluster
-        metadata:
-          name: default-dsc
-        spec:
-          components:
-            aipipelines:
-              managementState: Managed
-        EOF
-        oc wait --for=condition=Ready \
-          datasciencecluster.v3.datasciencecluster.opendatahub.io/default-dsc \
-          --timeout=20m
         oc wait --for=condition=Ready \
           aipipelines.components.platform.opendatahub.io/default-aipipelines \
           --timeout=20m
@@ -200,7 +193,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-      timeout: 1h0m0s
+      timeout: 45m0m0s
     - ref: tls-scanner-run
     workflow: generic-claim
 - as: opendatahub-operator-image-mirror
