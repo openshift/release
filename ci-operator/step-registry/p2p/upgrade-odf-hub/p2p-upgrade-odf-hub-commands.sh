@@ -6,9 +6,12 @@
 # pre-hop channel to the hop channel, then patches Subscriptions still on that pre-hop
 # channel (odf-operator and dependencies such as odf-csi-addons-operator). The running
 # ODF operator copies ConfigMap channels back onto dependency Subscriptions, so the
-# ConfigMap has to move first or it writes the old channel back. Then waits for OLM to
-# install the new CSV (Succeeded) and for StorageCluster operand images to converge
-# (actualImage == desiredImage, version matching the hop) and NooBaa to return to Ready.
+# ConfigMap has to move first or it writes the old channel back. ocs-client-operator is
+# skipped until StorageCluster hop completion: webhook subscription.ocs.openshift.io
+# denies a client channel that does not match StorageClient desired-subscription-channel.
+# Then waits for OLM to install the new CSV (Succeeded) and for StorageCluster operand
+# images to converge (actualImage == desiredImage, version matching the hop) and NooBaa
+# to return to Ready, then aligns ocs-client-operator.
 # ODF's OLM upgrade graph requires sequential hops — skipping directly from stable-4.20
 # to stable-4.22 leaves OLM without an install-plan edge and the CSV never changes.
 # Intended for EUS scenarios (e.g. stable-4.20 → stable-4.21 → stable-4.22).
@@ -35,9 +38,11 @@ typeset currentChannel=''
 DumpHubOdfUpgradeDiagnostics() {
     typeset artifactDir="${ARTIFACT_DIR}/odf-hub-upgrade"
     mkdir -p "${artifactDir}"
-    oc --kubeconfig="${KUBECONFIG}" get storagecluster,cephcluster,noobaa,csv \
+    oc --kubeconfig="${KUBECONFIG}" get storagecluster,cephcluster,noobaa,csv,storageclient \
         -n "${ODF_INSTALL_NAMESPACE}" -o wide \
         > "${artifactDir}/odf-resources.txt" 2>&1 || true
+    oc --kubeconfig="${KUBECONFIG}" get storageclient -A -o yaml \
+        > "${artifactDir}/storageclient.yaml" 2>&1 || true
     oc --kubeconfig="${KUBECONFIG}" get subscription.operators.coreos.com \
         -n "${ODF_INSTALL_NAMESPACE}" -o yaml \
         > "${artifactDir}/subscription.yaml" 2>&1 || true
@@ -222,6 +227,10 @@ RetargetOdfPkgsConfigMap() {
             | join("\n");
         (.data // {})
         | with_entries(select(.value | split("\n") | index("channel: " + $from)))
+        | with_entries(select(
+            (.key != "OCS_CLIENT")
+            and ((.value | split("\n") | index("pkg: ocs-client-operator")) | not)
+          ))
         | with_entries(.value |= retarget)
         | if . == {} then empty else {data: .} end
     ' <<<"${cmJson}")"
@@ -250,6 +259,14 @@ PatchOdfNamespaceChannels() {
     while IFS=$'\t' read -r subName subChannel; do
         [[ -n "${subName}" ]] || continue
         [[ "${subChannel}" == "${fromChannel}" ]] || continue
+        # ocs-client-operator is gated by webhook subscription.ocs.openshift.io.
+        # It rejects a channel that does not match StorageClient
+        # desired-subscription-channel until the StorageCluster hop finishes.
+        if [[ "${subName}" == *ocs-client-operator* ]]; then
+            printf 'INFO: Skipping %s until StorageCluster hop %s completes (ocs-client webhook)\n' \
+                "${subName}" "${hopChannel}" >&2
+            continue
+        fi
         printf 'INFO: Patching subscription %s channel %s → %s\n' \
             "${subName}" "${subChannel}" "${hopChannel}" >&2
         oc --kubeconfig="${kubeconfig}" patch subscription.operators.coreos.com "${subName}" \
@@ -261,7 +278,8 @@ PatchOdfNamespaceChannels() {
 }
 
 # AlignOdfChannelsForHop — ConfigMap first, then Subscriptions, so the operator
-# write-back and this step agree on the hop channel.
+# write-back and this step agree on the hop channel. Skips ocs-client-operator;
+# AlignOcsClientAfterHop runs that after StorageCluster hop completion.
 AlignOdfChannelsForHop() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset fromChannel="${1:?}"; (($#)) && shift
@@ -269,6 +287,106 @@ AlignOdfChannelsForHop() {
     RetargetOdfPkgsConfigMap "${kubeconfig}" "${fromChannel}" "${hopChannel}"
     PatchOdfNamespaceChannels "${kubeconfig}" "${fromChannel}" "${hopChannel}"
     true
+}
+
+# RetargetOcsClientPkgsConfigMap — move only the ocs-client-operator pkgs record.
+# Called after StorageCluster hop completion, when the client webhook will accept
+# the hop channel.
+RetargetOcsClientPkgsConfigMap() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset fromChannel="${1:?}"; (($#)) && shift
+    typeset hopChannel="${1:?}"; (($#)) && shift
+    typeset cmName='' cmJson='' patchJson=''
+    [[ "${fromChannel}" == "${hopChannel}" ]] && return 0
+    cmName="$(OdfPkgsConfigMapName "${kubeconfig}")"
+    cmJson="$(oc --kubeconfig="${kubeconfig}" get configmap "${cmName}" \
+        -n "${ODF_INSTALL_NAMESPACE}" -o json)"
+    patchJson="$(jq -c --arg from "${fromChannel}" --arg to "${hopChannel}" '
+        def retarget:
+            split("\n")
+            | map(if . == ("channel: " + $from) then "channel: " + $to else . end)
+            | join("\n");
+        (.data // {})
+        | with_entries(select(
+            (.key == "OCS_CLIENT")
+            or ((.value | split("\n") | index("pkg: ocs-client-operator")) != null)
+          ))
+        | with_entries(select(.value | split("\n") | index("channel: " + $from)))
+        | with_entries(.value |= retarget)
+        | if . == {} then empty else {data: .} end
+    ' <<<"${cmJson}")"
+    if [[ -z "${patchJson}" ]]; then
+        printf 'INFO: ConfigMap %s has no ocs-client-operator channel %s record\n' \
+            "${cmName}" "${fromChannel}" >&2
+        return 0
+    fi
+    printf 'INFO: Retargeting ConfigMap %s ocs-client-operator channel %s → %s\n' \
+        "${cmName}" "${fromChannel}" "${hopChannel}" >&2
+    oc --kubeconfig="${kubeconfig}" patch configmap "${cmName}" \
+        -n "${ODF_INSTALL_NAMESPACE}" \
+        --type merge \
+        -p "${patchJson}"
+    true
+}
+
+# TryAlignOcsClientForHop — one attempt to move ocs-client-operator to hopChannel.
+# Returns 0 when every client subscription is already on hopChannel or was patched.
+# A webhook Forbidden means StorageClient still pins the previous channel.
+TryAlignOcsClientForHop() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset fromChannel="${1:?}"; (($#)) && shift
+    typeset hopChannel="${1:?}"; (($#)) && shift
+    typeset subsJson='' subName='' subChannel=''
+    typeset -i fnRc=0 patchRc=0
+    [[ "${fromChannel}" == "${hopChannel}" ]] && return 0
+    # Capture status explicitly: this function is called from `if` / `||`, where
+    # bash ignores errexit for the whole body.
+    {
+        RetargetOcsClientPkgsConfigMap "${kubeconfig}" "${fromChannel}" "${hopChannel}"
+        subsJson="$(oc --kubeconfig="${kubeconfig}" get subscription.operators.coreos.com \
+            -n "${ODF_INSTALL_NAMESPACE}" -o json)"
+        while IFS=$'\t' read -r subName subChannel; do
+            [[ -n "${subName}" ]] || continue
+            [[ "${subName}" == *ocs-client-operator* ]] || continue
+            [[ "${subChannel}" == "${hopChannel}" ]] && continue
+            printf 'INFO: Patching ocs-client-operator subscription %s channel %s → %s\n' \
+                "${subName}" "${subChannel}" "${hopChannel}" >&2
+            patchRc=0
+            oc --kubeconfig="${kubeconfig}" patch subscription.operators.coreos.com "${subName}" \
+                -n "${ODF_INSTALL_NAMESPACE}" \
+                --type merge \
+                -p "$(jq -cn --arg ch "${hopChannel}" '{"spec":{"channel":$ch}}')" \
+                || patchRc=$?
+            (( patchRc == 0 )) || return "${patchRc}"
+        done < <(jq -r '.items[] | [.metadata.name, (.spec.channel // "")] | @tsv' <<<"${subsJson}")
+        true
+    } || fnRc=$?
+    return "${fnRc}"
+}
+
+# AlignOcsClientAfterHop — wait until StorageClient annotations allow the hop
+# channel, then patch ocs-client-operator. Official ODF upgrades only change
+# odf-operator; the provider updates StorageClient desired-subscription-channel
+# after the StorageCluster hop, and webhook subscription.ocs.openshift.io
+# forbids moving the client earlier.
+# https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.22/html/updating_openshift_data_foundation/updating-ocs-to-odf_rhodf
+AlignOcsClientAfterHop() {
+    typeset fromChannel="${1:?}"; (($#)) && shift
+    typeset hopChannel="${1:?}"; (($#)) && shift
+    printf 'INFO: Aligning ocs-client-operator to %s after StorageCluster hop\n' "${hopChannel}" >&2
+    (
+        SECONDS=0
+        while (( SECONDS < odfCsvPollMax )); do
+            if TryAlignOcsClientForHop "${KUBECONFIG}" "${fromChannel}" "${hopChannel}"; then
+                break
+            fi
+            : "Waiting for StorageClient to allow ocs-client-operator channel ${hopChannel} (${SECONDS}/${odfCsvPollMax}s)"
+            sleep "${odfCsvPollInt}"
+        done
+        TryAlignOcsClientForHop "${KUBECONFIG}" "${fromChannel}" "${hopChannel}" \
+            || { printf 'FATAL: ocs-client-operator channel could not move to %s within %ss (webhook still pinning StorageClient)\n' "${hopChannel}" "${odfCsvPollMax}" >&2; false; }
+        true
+    )
 }
 
 # ValidateUpgradeChannelHops — require a non-empty, comma-separated list of
@@ -349,6 +467,7 @@ for hopChannel in "${hopChannelsArr[@]}"; do
         -o jsonpath='{.status.installedCSV}' || true)"
     : "Hub ODF hop to ${hopChannel} CSV installed: ${previousCsv}"
     WaitStorageClusterAndNoobaaReady "${preDesiredCeph}"
+    AlignOcsClientAfterHop "${fromChannel}" "${hopChannel}"
     oc --kubeconfig="${KUBECONFIG}" get storagecluster,storageclass \
         -n "${ODF_INSTALL_NAMESPACE}" \
         > "${ARTIFACT_DIR}/odf-hub-after-${hopChannel}.txt"

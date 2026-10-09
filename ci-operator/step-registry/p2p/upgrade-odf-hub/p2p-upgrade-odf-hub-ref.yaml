@@ -22,13 +22,16 @@ ref:
     Each hop first rewrites the odf-operator pkgs ConfigMap (deployment env
     PKGS_CONFIG_MAP_NAME) so records still on the pre-hop channel point at the hop
     channel, then patches Subscriptions still on that pre-hop channel (odf-operator and
-    dependencies such as odf-csi-addons-operator). The running operator copies ConfigMap
-    channels back onto dependency Subscriptions; leaving the ConfigMap on the old channel
-    makes that write-back restore stable-4.20 and OLM reports ConstraintsNotSatisfiable
-    once the refreshed catalog no longer contains it. The step then waits for OLM to
-    install the new CSV (Succeeded), then for StorageCluster status.images actualImage
-    to equal desiredImage (and status.version to match the hop) and NooBaa to return to
-    Ready before the next hop.
+    dependencies such as odf-csi-addons-operator). ocs-client-operator is not patched
+    until StorageCluster hop completion: webhook subscription.ocs.openshift.io denies a
+    client channel that does not match StorageClient desired-subscription-channel.
+    The running operator copies ConfigMap channels back onto dependency Subscriptions;
+    leaving the ConfigMap on the old channel makes that write-back restore stable-4.20
+    and OLM reports ConstraintsNotSatisfiable once the refreshed catalog no longer
+    contains it. The step then waits for OLM to install the new CSV (Succeeded), then
+    for StorageCluster status.images actualImage to equal desiredImage (and
+    status.version to match the hop) and NooBaa to return to Ready, then aligns
+    ocs-client-operator before the next hop.
 
     ODF's OLM upgrade graph requires sequential hops. Jumping directly from stable-4.20 to
     stable-4.22 leaves OLM without an install-plan edge and the installedCSV never changes.
