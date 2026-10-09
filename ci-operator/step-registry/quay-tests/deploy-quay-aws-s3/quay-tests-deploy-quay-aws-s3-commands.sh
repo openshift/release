@@ -260,6 +260,21 @@ spec:
     managed: true
   - kind: quay
     managed: true
+    overrides:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "4"
+          memory: 8Gi
+      env:
+      - name: WORKER_COUNT_REGISTRY
+        value: "4"
+      - name: WORKER_COUNT_WEB
+        value: "2"
+      - name: WORKER_COUNT_SECSCAN
+        value: "2"
   - kind: mirror
     managed: true
   - kind: clair
@@ -270,14 +285,72 @@ spec:
     managed: true
 EOF
 
+# After QuayRegistry CR is created, before the readiness wait
+if [[ "${PATCH_STARTUP_PROBE:-false}" == "true" ]]; then
+    echo "Wait for quay-database and clair-postgres pods to be up."
+    sleep 5m
+    for i in $(seq 1 60); do
+        if oc get deployment quay-quay-app -n ${QUAY_NAMESPACE:-quay-enterprise} &>/dev/null; then
+            echo "Scale down quay-quay-app deployment..."
+            oc scale deployment quay-quay-app -n ${QUAY_NAMESPACE:-quay-enterprise} --replicas=0
+            echo "Patching quay-quay-app with startupProbe for slow-starting architectures..."
+            oc patch deployment quay-quay-app -n ${QUAY_NAMESPACE:-quay-enterprise} --type=json -p='[
+              {"op": "add", "path": "/spec/template/spec/containers/0/startupProbe", "value": {
+                "httpGet": {"path": "/health/instance", "port": 8080, "scheme": "HTTP"},
+                "failureThreshold": 30,
+                "periodSeconds": 10,
+                "timeoutSeconds": 10
+              }}
+            ]'
+            echo "startupProbe patched successfully"
+            oc scale deployment quay-quay-app -n ${QUAY_NAMESPACE:-quay-enterprise} --replicas=1
+            echo "Delete older quay-quay-app replicasets."
+            oc get rs -n ${QUAY_NAMESPACE:-quay-enterprise} -l quay-component=quay-app --sort-by=.metadata.creationTimestamp -o name | head -n -1 | xargs -r oc delete -n ${QUAY_NAMESPACE:-quay-enterprise}
+            break
+        fi
+        echo "Waiting for deployment... ($i/60)"
+        sleep 60
+    done
+fi
+
+echo "Sleeping 15m for debugging — connect now!"
+sleep 15m
+
 for _ in {1..60}; do
   if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Quay is in ready status" >&2
     oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
-    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+
+    # PowerVS boot writes this file when the existing bastion proxy is available.
+    # Other Quay jobs continue to use direct access when the file is absent.
+    proxy_args=()
+    if [[ -s "${SHARED_DIR}/proxy_public_url" ]]; then
+      proxy_url="$(<"${SHARED_DIR}/proxy_public_url")"
+      proxy_args=(--proxy "${proxy_url}")
+      echo "Testing Quay through proxy ${proxy_url}" >&2
+    fi
+
+    quay_application_url="${quay_route%/}/"
+    if ! curl -k -fsSL \
+      "${proxy_args[@]}" \
+      --connect-timeout 30 \
+      --max-time 120 \
+      "${quay_application_url}" \
+      --output /dev/null; then
+      echo "ERROR: Quay application URL is not reachable" >&2
+      archive_pod_info
+      #exit 1
+    fi
+
+    curl -k -fsSL \
+      "${proxy_args[@]}" \
+      -X POST "${quay_route%/}/api/v1/user/initialize" \
+      --header 'Content-Type: application/json' \
+      --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' \
+      | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     archive_pod_info
     exit 0
   fi
