@@ -1,0 +1,122 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  system-tests-builder:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.27
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: self-node-remediation
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM quay.io/operator-framework/operator-sdk@sha256:1b37b208f424e5abec0dc2045b54d3942e2eb03e085f48baf19aff7e5a333d84 AS operator-sdk
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip gettext && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      COPY --from=operator-sdk /usr/local/bin/operator-sdk /usr/local/bin/operator-sdk
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+      COPY snr-src/ /opt/snr-ci-src/
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: snr-src/
+          source_path: /go/src/github.com/medik8s/self-node-remediation/.
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: source-upgrade-test-runner
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+    from: nested-podman
+    inputs:
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: fbc-upgrade-test-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 500Mi
+tests:
+- always_run: false
+  as: e2e-system-tests-snr-upgrade
+  capabilities:
+  - nested-podman
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      SOURCE_OPERATOR: snr
+      TEST_NAME: e2e-system-tests-snr-upgrade
+      TEST_STEPS: medik8s-source-upgrade
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    test:
+    - ref: medik8s-source-upgrade
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-system-tests-snr-fbc-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      FBC_CANDIDATE_IMAGE: registry.redhat.io/workload-availability/self-node-remediation-rhel9-operator@sha256:8fdaaf6557a5d4509a0c1f63003e7e920b95f101af8cb18ea185e63220077b72
+      FBC_CANDIDATE_MIRROR: quay.io/redhat-user-workloads/rhwa-tenant/self-node-remediation/snr-operator-5-8
+      FBC_OPERATOR: snr
+      TEST_NAME: e2e-system-tests-snr-fbc-upgrade
+      TEST_STEPS: medik8s-fbc-upgrade
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    test:
+    - ref: medik8s-fbc-upgrade
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: self-node-remediation
+  variant: "5.0"
