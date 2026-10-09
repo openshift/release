@@ -16,6 +16,7 @@
 #   ENABLEPEERPODS                - "true" to enable peer-pods (default: false)
 #   WORKLOAD_TO_TEST              - "kata", "peer-pods", or "coco" (default: kata)
 #   RUST_RUNTIME                  - "true" to use the Rust runtime (default: false)
+#   KATACONFIG_WAIT_TIMEOUT       - Seconds to wait for KataConfig readiness (default: 7200)
 #
 # Outputs:
 #   Patches osc-config ConfigMap in default namespace to indicate installation complete.
@@ -43,6 +44,11 @@ ENABLEPEERPODS=${ENABLEPEERPODS:-false}
 WORKLOAD_TO_TEST=${WORKLOAD_TO_TEST:-kata}
 USE_OLMV1=${USE_OLMV1:-false}
 OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
+
+# Timeout (seconds) for KataConfig to become ready (InProgress=False). Node
+# reboots make this the longest wait in the step. Lower it when debugging a
+# known failure so the step fails fast instead of waiting the full duration.
+KATACONFIG_WAIT_TIMEOUT=${KATACONFIG_WAIT_TIMEOUT:-7200}
 
 OC_RETRY_COUNT=${OC_RETRY_COUNT:-3}
 OC_RETRY_INTERVAL=${OC_RETRY_INTERVAL:-20}
@@ -713,7 +719,7 @@ function create_peer_pods_secret() {
 }
 
 function wait_for_kataconfig() {
-  echo ">>> Waiting for KataConfig to be ready (this may take up to 2 hours for node reboots)"
+  echo ">>> Waiting for KataConfig to be ready (timeout: ${KATACONFIG_WAIT_TIMEOUT}s for node reboots)"
 
   # Wait for KataConfig CR to exist
   if ! wait_until "KataConfig CR to exist" 60 5 \
@@ -726,10 +732,10 @@ function wait_for_kataconfig() {
   kataconfig_name=$(oc get kataconfig -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
   echo ">>> KataConfig name: ${kataconfig_name}"
 
-  # Wait for KataConfig InProgress condition to be False (7200s / 2h)
-  if ! wait_until "KataConfig ready (InProgress=False)" 7200 30 \
+  # Wait for KataConfig InProgress condition to be False (KATACONFIG_WAIT_TIMEOUT, default 7200s / 2h)
+  if ! wait_until "KataConfig ready (InProgress=False)" "${KATACONFIG_WAIT_TIMEOUT}" 30 \
     "[[ \"\$(oc get kataconfig '${kataconfig_name}' -o jsonpath='{.status.conditions[?(@.type==\"InProgress\")].status}' 2>/dev/null)\" == \"False\" ]]"; then
-    echo ">>> ERROR: KataConfig not ready after 2 hours"
+    echo ">>> ERROR: KataConfig not ready after ${KATACONFIG_WAIT_TIMEOUT}s"
     oc get kataconfig "${kataconfig_name}" -o yaml || true
     oc get nodes || true
     oc get mcp || true
