@@ -17,12 +17,9 @@ log() {
 # Only mirror when a PR is under test. Without one (periodic, gangway, or manual runs) the CPO shipped
 # in the release payload is the one we want to test, so there is nothing to push. /payload-job runs are
 # periodics, so JOB_TYPE does not distinguish them; inspect JOB_SPEC for pull refs instead.
-if [[ -z "${JOB_SPEC:-}" ]]; then
-  log "JOB_SPEC is unset; assuming no PR under test, skipping CPO image mirror"
-  exit 0
-fi
-PULLS=$(echo "${JOB_SPEC}" | jq -r '[.refs] + (.extra_refs // []) | map(select(. != null) | (.pulls // []) | length) | add // 0')
-if (( PULLS == 0 )); then
+# The cli image this step runs on has no jq, so detect a non-empty pulls array (on refs or extra_refs,
+# which both serialize as "pulls":[{) with a compact substring check instead.
+if [[ -z "${JOB_SPEC:-}" ]] || [[ "$(echo "${JOB_SPEC}" | tr -d '[:space:]')" != *'"pulls":[{'* ]]; then
   log "No PR under test; skipping CPO image mirror"
   exit 0
 fi
