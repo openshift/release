@@ -32,7 +32,21 @@ rm "$workdir/node.tar.xz"
 export PATH="$workdir/node/bin:$workdir/tools/bin:$PATH"
 npm install --global --prefix "$workdir/tools" openwiki@0.7.1 mermaid@11.16.0 jsdom@29.1.1
 
-cd "${SHARED_DIR}/rosa-boundary-openwiki-checkout"
+# Only flat files survive between steps in SHARED_DIR. Clone the public repo
+# locally so the model container never receives GitHub App credentials.
+base_branch=$(cat "${SHARED_DIR}/openwiki-base-branch")
+case "$base_branch" in
+  main|openwiki/update) ;;
+  *) echo 'Unexpected OpenWiki base branch.' >&2; exit 1 ;;
+esac
+git clone https://github.com/openshift-online/rosa-boundary.git "$workdir/repo"
+cd "$workdir/repo"
+git config user.name 'OpenShift CI Bot'
+git config user.email 'ci-bot@redhat.com'
+git switch -c openwiki/update "origin/${base_branch}"
+if [[ "$base_branch" != main ]]; then
+  git merge --no-edit origin/main
+fi
 export LANGCHAIN_TRACING_V2=false
 set +e
 openwiki code --update --print

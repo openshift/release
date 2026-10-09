@@ -31,34 +31,17 @@ GITHUB_TOKEN=$(curl -fsS -X POST -H "Authorization: Bearer ${jwt}" \
   "https://api.github.com/app/installations/$(cat "$installation_id_file")/access_tokens" \
   | jq -er '.token')
 
-askpass_dir=$(mktemp -d)
-trap 'rm -rf "$askpass_dir"' EXIT
-cat > "$askpass_dir/askpass" <<'EOF'
-#!/usr/bin/env bash
-case "$1" in
-  *Username*) printf '%s\n' x-access-token ;;
-  *Password*) printf '%s\n' "$GITHUB_TOKEN" ;;
-esac
-EOF
-chmod 700 "$askpass_dir/askpass"
-export GIT_ASKPASS="$askpass_dir/askpass" GIT_TERMINAL_PROMPT=0
-
-# Never save GitHub tokens in git remotes or SHARED_DIR; this step's mounts
-# disappear before the model step starts.
-git clone "https://github.com/${repo}.git" "${SHARED_DIR}/rosa-boundary-openwiki-checkout"
-cd "${SHARED_DIR}/rosa-boundary-openwiki-checkout"
-git config user.name 'OpenShift CI Bot'
-git config user.email 'ci-bot@redhat.com'
+# SHARED_DIR can carry flat files only. Pass the branch choice, not a checkout
+# or credentials; the model step clones the public repository independently.
 existing_pr=$(gh pr list --repo "$repo" --base "$base" --head "$branch" \
   --state open --json number --jq '.[0].number // empty')
 if [[ -n "$existing_pr" ]]; then
-  git fetch origin "$branch"
-  git switch -c "$branch" "origin/${branch}"
-  git merge --no-edit "origin/${base}"
+  git ls-remote --exit-code "https://github.com/${repo}.git" "refs/heads/${branch}" >/dev/null
+  printf '%s\n' "$branch" > "${SHARED_DIR}/openwiki-base-branch"
 else
-  if git ls-remote --exit-code origin "refs/heads/${branch}" >/dev/null; then
+  if git ls-remote --exit-code "https://github.com/${repo}.git" "refs/heads/${branch}" >/dev/null; then
     echo "${branch} exists without an open PR; inspect/remove the stale bot branch before rerunning." >&2
     exit 1
   fi
-  git switch -c "$branch" "origin/${base}"
+  printf '%s\n' "$base" > "${SHARED_DIR}/openwiki-base-branch"
 fi
