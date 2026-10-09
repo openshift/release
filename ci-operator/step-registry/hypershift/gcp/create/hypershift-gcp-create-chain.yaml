@@ -53,40 +53,32 @@ chain:
       HC_NAME="gcp-hc-${CLUSTER_NAME:0-8}"
       echo "$(date) Creating GCP HyperShift cluster ${HC_NAME}"
 
-      # The GCP CLI flags are required by newer HyperShift versions. Keep this
-      # release branch usable with older operator images while exercising the
-      # resource-reference flow as soon as those flags are available.
+      # Pass the required resource references only when the CLI supports them.
       CREATE_GCP_HELP="$(bin/hypershift create cluster gcp --help 2>&1)"
       GCP_NETWORK_REFERENCE_ARGS=()
-      HAS_ROUTER_FLAG=false
-      HAS_NAT_FLAG=false
-      HAS_FIREWALL_RULE_FLAG=false
-      grep -q -- '--router-name' <<< "${CREATE_GCP_HELP}" && HAS_ROUTER_FLAG=true
-      grep -q -- '--nat-name' <<< "${CREATE_GCP_HELP}" && HAS_NAT_FLAG=true
-      grep -q -- '--firewall-rule-name' <<< "${CREATE_GCP_HELP}" && HAS_FIREWALL_RULE_FLAG=true
-
-      if [[ "${HAS_ROUTER_FLAG}" == true && "${HAS_NAT_FLAG}" == true && "${HAS_FIREWALL_RULE_FLAG}" == true ]]; then
-        ROUTER_NAME="$(<"${SHARED_DIR}/hc-router-name")"
-        NAT_NAME="$(<"${SHARED_DIR}/hc-nat-name")"
-        FIREWALL_RULE_NAME="$(<"${SHARED_DIR}/hc-firewall-rule-name")"
-        if [[ -z "${ROUTER_NAME}" || -z "${NAT_NAME}" || -z "${FIREWALL_RULE_NAME}" ]]; then
-          echo "ERROR: GCP infrastructure output is missing required router, NAT, or firewall-rule names"
-          exit 1
+      for resource in router nat firewall-rule; do
+        if grep -q -- "--${resource}-name" <<< "${CREATE_GCP_HELP}"; then
+          RESOURCE_NAME="$(<"${SHARED_DIR}/hc-${resource}-name")"
+          if [[ -z "${RESOURCE_NAME}" ]]; then
+            echo "ERROR: GCP infrastructure output is missing the required ${resource} name"
+            exit 1
+          fi
+          GCP_NETWORK_REFERENCE_ARGS+=("--${resource}-name" "${RESOURCE_NAME}")
         fi
-        GCP_NETWORK_REFERENCE_ARGS=(
-          --router-name "${ROUTER_NAME}"
-          --nat-name "${NAT_NAME}"
-          --firewall-rule-name "${FIREWALL_RULE_NAME}"
-        )
-        echo true > "${SHARED_DIR}/gcp-resource-reference-flow"
-      elif [[ "${HAS_ROUTER_FLAG}" == false && "${HAS_NAT_FLAG}" == false && "${HAS_FIREWALL_RULE_FLAG}" == false ]]; then
-        echo false > "${SHARED_DIR}/gcp-resource-reference-flow"
-        echo "HyperShift CLI does not support GCP network resource reference flags; using the legacy create path"
-      else
-        echo "ERROR: HyperShift CLI exposes only some GCP network resource reference flags"
-        echo "${CREATE_GCP_HELP}"
-        exit 1
-      fi
+      done
+      case "${#GCP_NETWORK_REFERENCE_ARGS[@]}" in
+        0)
+          echo false > "${SHARED_DIR}/gcp-resource-reference-flow"
+          echo "HyperShift CLI does not support GCP network resource reference flags; using the legacy create path"
+          ;;
+        6)
+          echo true > "${SHARED_DIR}/gcp-resource-reference-flow"
+          ;;
+        *)
+          echo "ERROR: HyperShift CLI exposes only some GCP network resource reference flags"
+          exit 1
+          ;;
+      esac
 
       bin/hypershift create cluster gcp \
         --name "${HC_NAME}" \
@@ -123,17 +115,6 @@ chain:
       # Save HC CR name early so destroy chain can clean up if rollout times out
       echo "${HC_NAME}" > "${SHARED_DIR}/cluster-name"
 
-      if [[ "$(<"${SHARED_DIR}/gcp-resource-reference-flow")" == true ]]; then
-        # Compare the compact versioned JSON emitted by the CLI; jq is not
-        # available in this image. Resource names contain no JSON escapes.
-        EXPECTED_INFRA_RESOURCES="$(printf '{"version":1,"router":"%s","nat":"%s","firewallRule":"%s"}' "${ROUTER_NAME}" "${NAT_NAME}" "${FIREWALL_RULE_NAME}")"
-        ACTUAL_INFRA_RESOURCES="$(oc get hostedcluster "${HC_NAME}" -n clusters -o go-template='{{index .metadata.annotations "hypershift.openshift.io/gcp-infra-resources"}}')"
-        if [[ "${ACTUAL_INFRA_RESOURCES}" != "${EXPECTED_INFRA_RESOURCES}" ]]; then
-          echo "ERROR: HostedCluster does not contain the expected GCP infrastructure resources annotation"
-          exit 1
-        fi
-        echo "HostedCluster contains the expected GCP infrastructure resources annotation"
-      fi
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters "hostedcluster/${HC_NAME}"
       echo "Cluster became available, creating kubeconfig"

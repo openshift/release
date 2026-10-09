@@ -6,10 +6,9 @@ chain:
     commands: |-
       set -exuo pipefail
 
-      DESTROY_RESULT="${SHARED_DIR}/hypershift-gcp-destroy-result"
+      rm -f "${SHARED_DIR}/gcp-destroy-complete"
       if [[ ! -f "${SHARED_DIR}/cluster-name" ]]; then
           echo "WARNING: cluster-name not found — create step may not have completed. Skipping destroy."
-          echo skipped > "${DESTROY_RESULT}"
           exit 0
       fi
 
@@ -22,7 +21,6 @@ chain:
       if ! oc get hostedcluster "${CLUSTER_NAME}" -n clusters --request-timeout=10s &>/dev/null; then
           echo "WARNING: Cannot access API server (HostedCluster/${CLUSTER_NAME} in clusters). Skipping destroy."
           echo "The deprovision step will clean up via GCP project deletion."
-          echo unavailable > "${DESTROY_RESULT}"
           exit 0
       fi
 
@@ -30,16 +28,11 @@ chain:
       export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 
       echo "$(date) Deleting GCP HyperShift cluster ${CLUSTER_NAME}"
-      if bin/hypershift destroy cluster gcp \
+      bin/hypershift destroy cluster gcp \
         --name "${CLUSTER_NAME}" \
         --namespace clusters \
-        --cluster-grace-period 40m; then
-          echo 0 > "${DESTROY_RESULT}"
-      else
-          DESTROY_EXIT_CODE=$?
-          echo "${DESTROY_EXIT_CODE}" > "${DESTROY_RESULT}"
-          exit "${DESTROY_EXIT_CODE}"
-      fi
+        --cluster-grace-period 40m
+      touch "${SHARED_DIR}/gcp-destroy-complete"
       echo "$(date) Finished deleting cluster"
     from: hypershift-operator
     grace_period: 5m0s
@@ -62,5 +55,5 @@ chain:
     and GCP projects.
 
     Reads cluster-name from SHARED_DIR (saved by hypershift-gcp-create).
-    Writes hypershift-gcp-destroy-result so the verification step can detect
-    destroy failures hidden by this best-effort cleanup step.
+    Writes gcp-destroy-complete only after a successful CLI exit. The verification
+    step requires this marker when testing the resource-reference flow.
