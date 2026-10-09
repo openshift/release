@@ -75,7 +75,7 @@ cleanup() {
     oc delete namespace "${NS}" --ignore-not-found --timeout=180s || true
     oc delete vtep "${VTEP}" --ignore-not-found --timeout=120s || true
 }
-trap cleanup EXIT
+if [[ "${EVPN_KEEP:-false}" == "true" ]]; then trap collect EXIT; else trap cleanup EXIT; fi
 
 masters="$(oc get nodes -l node-role.kubernetes.io/control-plane -o name | wc -l)"
 api_vips="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.baremetal.apiServerInternalIPs[*]}')"
@@ -89,7 +89,7 @@ dualstack=false
 [[ "$(oc get network.config cluster -o jsonpath='{.status.clusterNetwork[*].cidr}')" == *:* ]] && dualstack=true
 
 # ----------------------------------------------------------------------------
-echo "[0/4] preconditions: route reflector up, local gateway mode (EVPN requirement)"
+echo "[0/5] preconditions: route reflector up, local gateway mode (EVPN requirement)"
 ${CLI} inspect "${RR_CONTAINER}" --format '{{.State.Running}}' | grep -q true \
     || { echo "route reflector '${RR_CONTAINER}' not running; baremetalds-e2e-ovn-bgp-pre must precede this step"; exit 1; }
 if [[ "$(oc get network.operator cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}')" != "true" ]]; then
@@ -123,7 +123,7 @@ if oc get frrconfiguration -n openshift-frr-k8s receive-filtered -o json | jq -e
 fi
 
 # ----------------------------------------------------------------------------
-echo "[1/4] throw-away Layer3 EVPN CUDN + VTEP + RouteAdvertisements accepted"
+echo "[1/5] throw-away Layer3 EVPN CUDN + VTEP + RouteAdvertisements accepted"
 oc apply -f - <<YAML
 apiVersion: k8s.ovn.org/v1
 kind: VTEP
@@ -140,8 +140,22 @@ if ! poll 300 check_vtep; then
     fail "VTEP ${VTEP} not Accepted"
 fi
 
-oc create namespace "${NS}" --dry-run=client -o yaml | oc apply -f -
-oc label namespace "${NS}" "bgp-vip-evpn-check=" pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged security.openshift.io/scc.podSecurityLabelSync=false --overwrite
+# a Primary-role CUDN only attaches to namespaces carrying the
+# k8s.ovn.org/primary-user-defined-network label, and an admission policy
+# forbids adding it after creation - so the labels go on the namespace object
+oc apply -f - <<YAML
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${NS}
+  labels:
+    bgp-vip-evpn-check: ""
+    k8s.ovn.org/primary-user-defined-network: ""
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+YAML
 subnets="        - cidr: ${EVPN_CUDN_SUBNET_V4}
           hostSubnet: 24"
 ${dualstack} && subnets+="
@@ -176,14 +190,20 @@ metadata:
   name: ${CUDN}
 spec:
   nodeSelector: {}
-  frrConfigurationSelector: {}
+  # select only the ovn-bgp route reflector FRRConfiguration: an empty
+  # selector would also match the BGP VIP one and ovn-k would template the
+  # EVPN session onto the VIP ToR peer
+  frrConfigurationSelector:
+    matchLabels:
+      network: default
   networkSelectors:
   - networkSelectionType: ClusterUserDefinedNetworks
     clusterUserDefinedNetworkSelector:
       networkSelector:
         matchLabels:
           bgp-vip-evpn-check: ""
-  targetVRF: ${CUDN}
+  # EVPN networks live in an ovn-k managed VRF; 'auto' selects it
+  targetVRF: auto
   advertisements:
   - PodNetwork
 YAML
@@ -198,7 +218,7 @@ if ! poll 300 check_cudn; then
 fi
 
 # ----------------------------------------------------------------------------
-echo "[2/4] pod pinned to control plane node ${master_node} is Ready on the EVPN network"
+echo "[2/5] pod pinned to control plane node ${master_node} is Ready on the EVPN network"
 oc apply -n "${NS}" -f - <<YAML
 apiVersion: v1
 kind: Pod
@@ -224,16 +244,18 @@ if ! oc wait -n "${NS}" --for=condition=Ready pod/evpn-master --timeout=300s; th
 fi
 
 # ----------------------------------------------------------------------------
-echo "[3/4] the master's EVPN FRRConfiguration is merged by the frr-k8s STATIC POD and its l2vpn-evpn session is Established"
+echo "[3/5] the master's EVPN FRRConfiguration is merged by the frr-k8s STATIC POD and its l2vpn-evpn session is Established"
 # On the control plane the frr-k8s instance is the MCO-rendered static pod
 # 'frr-k8s-<node>'; the DaemonSet is excluded there. This is the point of
 # the lane: the ovn-k generated per-node EVPN configuration must be
 # reconciled by that static pod, next to the eBGP VIP session.
 static_pod="frr-k8s-${master_node}"
+# ovn-k emits the EVPN part (vrf <x> / vni N, l2vpn evpn address family) as
+# spec.raw.rawConfig on the per-node generated FRRConfiguration
 check_frrconf_vni() {
     oc get frrconfiguration -n openshift-frr-k8s -o json \
-        | jq -e --arg n "${master_node}" --argjson v "${EVPN_L3VNI}" \
-            '[.items[] | select(.spec.nodeSelector.matchLabels["kubernetes.io/hostname"]==$n) | .. | objects | select(has("vni")) | .vni] | index($v) != null' >/dev/null
+        | jq -e --arg n "${master_node}" --arg v " vni ${EVPN_L3VNI}" \
+            '[.items[] | select(.spec.nodeSelector.matchLabels["kubernetes.io/hostname"]==$n) | .spec.raw.rawConfig // ""] | any(contains($v))' >/dev/null
 }
 if ! poll 300 check_frrconf_vni; then
     oc get frrconfiguration -n openshift-frr-k8s -o yaml | grep -nE "name:|hostname|vni" || true
@@ -248,16 +270,50 @@ if ! poll 300 check_static_pod_evpn; then
     oc exec -n openshift-frr-k8s "${static_pod}" -c frr -- vtysh -c 'show running-config' || true
     fail "frr-k8s static pod ${static_pod} has no Established l2vpn-evpn session"
 fi
-check_rr_sees_master() {
-    ${CLI} exec "${RR_CONTAINER}" vtysh -c 'show bgp l2vpn evpn json' 2>/dev/null | grep -q "\[3\]:\[0\]:\[32\]:\[${master_ip}\]"
+# the VNI must be programmed on the master (SVD vxlan device with vnifilter)
+check_master_vni() {
+    oc exec -n openshift-frr-k8s "${static_pod}" -c frr -- vtysh -c 'show evpn vni json' 2>/dev/null \
+        | jq -e --arg v "${EVPN_L3VNI}" 'has($v)' >/dev/null
 }
-if ! poll 300 check_rr_sees_master; then
-    ${CLI} exec "${RR_CONTAINER}" vtysh -c 'show bgp l2vpn evpn' || true
-    fail "route reflector has no EVPN type-3 route from the master VTEP ${master_ip}"
+if ! poll 300 check_master_vni; then
+    oc exec -n openshift-frr-k8s "${static_pod}" -c frr -- vtysh -c 'show evpn vni' || true
+    fail "VNI ${EVPN_L3VNI} is not programmed on ${master_node}"
 fi
 
 # ----------------------------------------------------------------------------
-echo "[4/4] BGP VIP regression guard: VIPs unaffected with EVPN live on the control plane"
+echo "[4/5] the master's VTEP IP is its node IP, not a VIP, and the RR learns the master's CUDN subnet via that IP"
+# Under BGP VIP management kube-vip holds the API/ingress VIPs as plain /32s
+# on br-ex of every node. ovn-k's unmanaged VTEP discovery filters only
+# keepalived-labelled and IFA_F_SECONDARY addresses, so a VIP inside the
+# VTEP CIDR can be chosen as the VTEP IP - every master would then source
+# VXLAN from the API VIP and every worker from the ingress VIP, and the
+# cross-node EVPN datapath is dead. This is the coexistence contract.
+check_vtep_annotation() {
+    local v4
+    v4="$(oc get node "${master_node}" -o json | jq -r --arg n "${VTEP}" '.metadata.annotations["k8s.ovn.org/node-vteps"] // "{}" | fromjson | .[$n].ips // [] | map(select(contains(":")|not)) | .[0] // empty')"
+    [[ -n "${v4}" ]] || return 1
+    echo "master ${master_node} VTEP annotation (v4): ${v4}; node IP: ${master_ip}"
+    [[ "${v4}" == "${master_ip}" ]]
+}
+if ! poll 300 check_vtep_annotation; then
+    oc get node "${master_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/node-vteps}{"\n"}' || true
+    for vip in ${api_vips} ${ingress_vips}; do
+        echo "  (VIP on this cluster: ${vip})"
+    done
+    fail "VTEP IP selected on ${master_node} is not its node IP ${master_ip} - a BGP-managed VIP was picked as the VXLAN source"
+fi
+check_rr_type5_from_master() {
+    # the master's per-node CUDN host subnet must be a type-5 route whose next hop is the master's node IP
+    ${CLI} exec "${RR_CONTAINER}" vtysh -c 'show bgp l2vpn evpn route type prefix json' 2>/dev/null \
+        | jq -e --arg nh "${master_ip}" '[.. | objects | select(has("nexthops")) | .nexthops[]?.ip] | index($nh) != null' >/dev/null
+}
+if ! poll 300 check_rr_type5_from_master; then
+    ${CLI} exec "${RR_CONTAINER}" vtysh -c 'show bgp l2vpn evpn route type prefix' || true
+    fail "route reflector has no EVPN type-5 route with next hop ${master_ip} (master's VTEP)"
+fi
+
+# ----------------------------------------------------------------------------
+echo "[5/5] BGP VIP regression guard: VIPs unaffected with EVPN live on the control plane"
 check_tor_sessions() {
     local established
     established="$(${CLI} exec "${TOR_CONTAINER}" vtysh -c 'show bgp ipv4 unicast summary json' 2>/dev/null \
