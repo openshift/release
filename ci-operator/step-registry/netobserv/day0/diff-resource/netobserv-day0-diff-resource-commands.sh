@@ -154,8 +154,29 @@ with open(html_report_path, "w") as f:
   <title>NetObserv Day0 Resource Impact Report</title>
   <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
   <style>
-    body { font-family: sans-serif; margin: 2em; }
-    pre { background: #f5f5f5; border: 1px solid #ddd; padding: 1em; overflow-x: auto; }
+    html { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      background-color: #303030;
+      color: #eee;
+      font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+      font-size: 14px;
+      margin: 0;
+      padding: 16px;
+    }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    p { color: #ccc; margin: 0 0 16px; }
+    pre {
+      background: #212121;
+      border: 1px solid #555;
+      border-radius: 4px;
+      color: #eee;
+      line-height: 1.4;
+      margin: 0;
+      max-width: 100%;
+      overflow-x: auto;
+      padding: 16px;
+    }
   </style>
 </head>
 <body>
@@ -200,9 +221,51 @@ parts = ["""<!doctype html>
   <title>NetObserv Day0 reports</title>
   <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
   <style>
-    body { font-family: sans-serif; margin: 1em; }
-    .artifact-link { display: inline-block; margin: 0 0.75em 0.75em 0; }
-    pre { background: #f5f5f5; border: 1px solid #ddd; padding: 1em; overflow-x: auto; }
+    html { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      background-color: #303030;
+      color: #eee;
+      font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+      font-size: 14px;
+      margin: 0;
+      padding: 16px;
+    }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    h2 { color: #90caf9; font-size: 15px; margin: 18px 0 8px; }
+    .artifact-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-width: 100%;
+    }
+    .artifact-link {
+      align-items: center;
+      background-color: #4e9af1;
+      border: 2px solid #4e9af1;
+      border-radius: 1em;
+      color: #fff !important;
+      display: inline-flex;
+      line-height: 1.3;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      padding: 6px 14px;
+      text-decoration: none;
+      white-space: normal;
+    }
+    .artifact-link:hover { border-color: #fff; }
+    pre {
+      background: #212121;
+      border: 1px solid #555;
+      border-radius: 4px;
+      color: #eee;
+      font-size: 13px;
+      line-height: 1.4;
+      margin: 0;
+      max-width: 100%;
+      overflow-x: auto;
+      padding: 16px;
+    }
   </style>
 </head>
 <body>
@@ -210,11 +273,15 @@ parts = ["""<!doctype html>
 """]
 
 if day0_base:
-    parts.append(artifact_link(
-        "NetObserv day0 resource diff",
-        f"{day0_base}/day0-resource-diff.html",
-        "Open the complete NetObserv day0 resource impact report",
-    ))
+    parts.extend([
+        '<nav class="artifact-links" aria-label="NetObserv reports">',
+        artifact_link(
+            "NetObserv day0 resource diff",
+            f"{day0_base}/day0-resource-diff.html",
+            "Open the complete NetObserv day0 resource impact report",
+        ),
+        "</nav>",
+    ])
 
 parts.extend([
     "<h2>Resource diff</h2>",
@@ -224,7 +291,8 @@ parts.extend([
 if orion_base:
     parts.extend([
         "<h2>Orion artifacts</h2>",
-        artifact_link("Orion output", f"{orion_base}/output.txt", "Open Orion command output"),
+        '<nav class="artifact-links" aria-label="Orion artifacts">',
+        artifact_link("Orion output", f"{orion_base}/orion-output.txt", "Open Orion command output"),
     ])
     if orion_workers:
         baseline_viz = f"output_netobserv-day0-baseline-AWS-{orion_workers}w_viz.html"
@@ -246,6 +314,7 @@ if orion_base:
         f"{orion_base}/",
         "Browse all Orion artifacts, including any additional visualizations",
     ))
+    parts.append("</nav>")
 
 parts.append("</body>\n</html>\n")
 with open(spyglass_path, "w") as f:
