@@ -54,13 +54,12 @@ update_status=$?
 set -e
 printf '%s\n' "$update_status" > "${SHARED_DIR}/openwiki-exit-status"
 
-# Transfer only the generated documentation, never the agent's git directory
-# or worktree, to a separate publisher without Vertex/model credentials.
+# Transfer only the generated wiki, never the agent's git directory, worktree,
+# or OpenWiki's hard-coded AGENTS.md / CLAUDE.md setup changes. Those root
+# guidance files are owned by the repository, not this scheduled update.
 rm -f openwiki/.run.json
-for path in openwiki AGENTS.md CLAUDE.md; do
-  if [[ -e "$path" || -n "$(git ls-files -- "$path")" ]]; then
-    git add -A -- "$path"
-  fi
-done
-git diff --cached --binary > "${SHARED_DIR}/openwiki-docs.patch"
+if [[ -e openwiki || -n "$(git ls-files -- openwiki)" ]]; then
+  git add -A -- openwiki
+fi
+git diff --cached --binary -- openwiki/ > "${SHARED_DIR}/openwiki-docs.patch"
 echo "OpenWiki exited with status ${update_status}; publish step will handle any completed pages."

@@ -95,7 +95,7 @@ fi
 git apply --index --binary "$patch_file"
 while IFS= read -r -d '' path; do
   case "$path" in
-    openwiki/*|AGENTS.md|CLAUDE.md) ;;
+    openwiki/*) ;;
     *) echo "Refusing unexpected OpenWiki patch path: ${path}" >&2; exit 1 ;;
   esac
 done < <(git diff --cached --name-only -z)
