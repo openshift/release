@@ -165,8 +165,11 @@ Implement the same discovery/guest proxy pattern with the Nutanix VM network and
   Derive `noProxy` from the actual topology; do not put destinations in `noProxy` if the design
   requires those requests to traverse Squid.
 - Configure the HostedCluster's `spec.configuration.proxy` before or during creation so the installed
-  NodePool workers retain the intended proxy settings. Verify the rendered worker configuration and
-  rollout behavior; discovery-time proxy configuration alone is not enough.
+  NodePool workers retain the intended proxy settings. Since the Squid listener is plain HTTP on
+  port 8213, configure the HTTPS proxy field with an HTTP URL and the proxy's literal IP, for example:
+  `httpsProxy: http://<BARE_METAL_PROXY_IP>:8213`. This tells workers to send HTTPS requests through
+  Squid; it does not mean workers resolve the destination hostname themselves. Verify the rendered
+  worker configuration and rollout behavior; discovery-time proxy configuration alone is not enough.
 - Reuse the Squid instance established by the existing baremetal/dev-scripts proxy setup if the
   Nutanix worker network can reach it. The existing `hypershift-agent-create-proxy` step adjusts
   Squid's rules and the CI-side `nested_kubeconfig`; it does not configure the worker InfraEnv. Keep
@@ -175,9 +178,14 @@ Implement the same discovery/guest proxy pattern with the Nutanix VM network and
   OAuth/OIDC, registry, and test dependency hostnames and ports from the generated resources and
   worker configuration. Extend Squid's domain ACL and TLS CONNECT port allowlist only for those
   observed destinations/ports; account for any NodePorts used by the HostedCluster.
-- Confirm DNS resolution for the proxy host from the Nutanix worker network. Ensure Squid can resolve
-  and reach the proxied service endpoints. Add only DNS records/forwarders that are actually missing
-  for this network; do not invent service names or duplicate existing records.
+- The proxy endpoint is configured as a literal baremetal-host IP, so Nutanix workers do not need a
+  DNS record to locate Squid. For HTTPS requests sent through `httpsProxy`, the client sends the
+  destination hostname in the HTTP CONNECT request and Squid performs DNS resolution and connects to
+  that destination. Verify DNS resolution and routing from the Squid host to each observed endpoint.
+- Worker-side DNS is still required for destinations bypassed by `noProxy`, and for any component
+  that does not honor the configured proxy. Determine those cases from the actual worker configuration
+  and topology. Add DNS records or forwarders only when a concrete missing lookup is demonstrated; do
+  not invent service names or duplicate existing records.
 - If any endpoint uses a private CA, provide its correct trust bundle to both the discovery
   environment and installed guest configuration. A proxy tunnel does not replace certificate trust;
   do not disable TLS verification or introduce TLS interception.
@@ -186,14 +194,15 @@ Implement the same discovery/guest proxy pattern with the Nutanix VM network and
 
 Before full conformance, boot at least one VM on the actual leased Nutanix subnet and verify:
 
-1. The VM can resolve/reach the configured Squid listener (normally TCP 8213, unless configured
-   otherwise).
+1. The VM can connect to the configured Squid IP and listener port (normally TCP 8213); no DNS lookup
+   is needed for the proxy address when it is configured as a literal IP.
 2. Squid accepts CONNECT to each required endpoint and exact port, including the InfraEnv/Assisted
    Service endpoints and hosted API/ignition/Konnectivity endpoints.
 3. The discovery Agent registers with the intended InfraEnv/namespace and the installed worker
    retains the intended proxy configuration.
-4. Worker DNS, certificates, routes, firewall policy, and access to required registries work through
-   the chosen proxy path.
+4. Squid resolves and reaches proxied destinations; worker DNS works for any `noProxy`/direct
+   destinations. Certificates, routes, firewall policy, and required registry access work through the
+   selected paths.
 
 Testing from the CI pod alone is insufficient: the discovery ISO boots in a Nutanix VM with a
 different network path. Treat worker-to-proxy reachability as a gate; do not assume it from the
@@ -239,8 +248,9 @@ existence of Squid or the success of the ISO download.
   120-GB baseline, captures their UUIDs, and attaches/boots the ISO as intended.
 - [ ] Verify run-scoped Agent selection, approval of only the expected three Agents, NodePool scale
   from zero to three, and three Ready guest Nodes.
-- [ ] Verify discovery and installed workers use the intended Squid proxy, DNS path, ACL destinations
-  and ports, and trust bundle from the actual Nutanix network.
+- [ ] Verify discovery and installed workers use the intended Squid proxy, Squid-side DNS for tunneled
+  destinations, worker-side DNS for any `noProxy`/direct destinations, ACL destinations and ports,
+  and trust bundle from the actual Nutanix network.
 - [ ] Verify hosted API, ignition/Konnectivity as used by the HostedCluster, guest ingress, registries,
   and conformance dependencies are reachable.
 - [ ] Run the existing guest conformance and diagnostics chains without changing the standalone
