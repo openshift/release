@@ -21,11 +21,12 @@ export AZURE_TOKEN_CREDENTIALS=prod
 
 # Resolve CUSTOMER_SUBSCRIPTION from the slot env file or vault profile
 env_file="${SHARED_DIR:-}/aro-hcp-slot.env"
-if [[ -z "${CUSTOMER_SUBSCRIPTION:-}" ]] && [[ -f "${env_file}" ]]; then
+if [[ -f "${env_file}" ]]; then
   # shellcheck disable=SC1090
   source "${env_file}"
 fi
 export CUSTOMER_SUBSCRIPTION="${CUSTOMER_SUBSCRIPTION:-$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")}"
+export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 set -o xtrace
