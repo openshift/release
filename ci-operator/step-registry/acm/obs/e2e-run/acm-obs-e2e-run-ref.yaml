@@ -2,19 +2,19 @@ ref:
   as: acm-obs-e2e-run
   from: observability-e2e-test
   commands: acm-obs-e2e-run-commands.sh
-  timeout: 2h0m0s
+  timeout: 2h10m0s
   grace_period: 10m0s
   resources:
     requests:
       cpu: '2'
-      memory: 4Gi
+      memory: 6Gi
   env:
   - name: DR__RP__CR_COMP_NAME
     default: "lp-interop--ACM-Virt"
-    documentation: Component Readiness component name for junit remapping
+    documentation: Component Readiness component name for deterministic JUnit suite mapping
   - name: MAP_TESTS
     default: "false"
-    documentation: When true, remap junit test suite names for Component Readiness routing
+    documentation: When true, prefix JUnit suite names for Component Readiness routing
   - name: GINKGO_FOCUS
     default: "@ocpInterop"
     documentation: Ginkgo --focus regex to select test specs (e.g. @ocpInterop)
@@ -23,31 +23,54 @@ ref:
     documentation: Ginkgo --skip regex to exclude test specs
   documentation: |-
     Runs the maintained ACM observability Ginkgo test suite from the
-    stolostron/multicluster-observability-operator test image.
+    stolostron/multicluster-observability-operator OPP source image.
 
-    Exit policy: if Ginkgo exits nonzero but JUnit contains recorded
-    <failure> elements, the suite ran and its failures are observability-
-    specific — exit 0 so downstream LP test steps continue. Firewatch
-    classifies failures from JUnit. If Ginkgo fails without producing
-    JUnit failures (runner crash, image pull, timeout), exit nonzero.
+    The step copies the complete /tmp/obs checkout and uses writable source,
+    HOME, GOPATH, module, and build-cache paths for OpenShift arbitrary-UID
+    execution. It derives Go and Ginkgo versions from the embedded go.mod,
+    verifies the selected versions, builds the module-matched Ginkgo CLI in
+    that module, and compiles the suite from tests/pkg/tests. The build,
+    dependency, and toolchain-download phase has one 15-minute budget. Cold
+    caches therefore require runtime network access; warm-cache compilation is
+    not a disconnected-runtime guarantee.
+
+    The suite runs from tests/pkg/tests so ../../../examples fixtures resolve.
+    Its Ginkgo timeout remains 105 minutes. Worst-case process guards allow
+    15 minutes plus 30 seconds of build termination and 107 minutes plus two
+    minutes of suite termination. That totals 124m30s and leaves 5m30s of the
+    2h10m step timeout for source copying and report handling. The 10-minute
+    step grace period remains separate.
+
+    Exit policy uses Ginkgo's private native JSON structure to distinguish It
+    body assertions from setup, cleanup, timeout, interruption, abort, and
+    panic failures. Missing, malformed, or inconsistent JSON/JUnit, zero
+    executed specs, additional failures, compile failures, and abnormal runner
+    exits are fatal. Only executed It body assertions with Ginkgo's failed/
+    exit-1 result remain non-gating so downstream P2P steps run; their
+    canonical JUnit is still published for reporting and classification.
+
+    JUnit suite-name mapping is performed directly with Python ElementTree.
+    No remote post-processing helper is downloaded or evaluated. Only the
+    Ginkgo CLI report is canonical; the suite's hard-coded cwd results.xml is
+    removed to prevent duplicate ingestion. The canonical report is written to
+    ARTIFACT_DIR and copied to SHARED_DIR/junit for the data-router consumer.
+    The native JSON report stays in a private temporary directory and is never
+    published because it can contain test diagnostics. EXIT cleanup always
+    attempts private-tree deletion; inability to delete is reported and makes
+    an otherwise successful step fail without hiding an existing failure.
+
+    Repository maintainers changing this wrapper must run the focused,
+    cluster-free check: hack/acm-obs-e2e-run-unit-tests.sh
 
     Requires acm-obs-odf-setup (or equivalent) to have already:
       - Deployed MCO with ODF storage and created mco-e2e-testing-sa RBAC
       - Written ${SHARED_DIR}/acm-obs-options.json (suite options)
 
-    When MAP_TESTS=true, the script downloads ExitTrap--PostProcessPrep.sh
-    from raw.githubusercontent.com at runtime (peer ACM interop pattern);
-    this requires network access from the test pod.
+    The hub kubeconfig, optional managed-cluster kubeconfig, options contract,
+    SKIP_INSTALL_STEP=true, SKIP_UNINSTALL_STEP=true, canary mode, focus/skip,
+    and serial execution are preserved. This step does not call the image's
+    execute_obs_interop_commands.sh because that helper logs in and mutates
+    options outside this P2P lifecycle contract.
 
-    Runs with SKIP_INSTALL_STEP=true and SKIP_UNINSTALL_STEP=true so the
-    suite uses the pre-existing MCO installation and does not tear it down.
-
-    Produces JUnit XML for Prow / Sippy / TestGrid / Component Readiness.
-
-    The consuming CI config must define the 'observability-e2e-test' image
-    alias in base_images, e.g.:
-      base_images:
-        observability-e2e-test:
-          name: "2.17"
-          namespace: stolostron
-          tag: observability-e2e-test
+    The consuming CI config must keep the 'observability-e2e-test' alias and
+    point it at acm-qe/2.17:multicluster-observability-operator-opp.
