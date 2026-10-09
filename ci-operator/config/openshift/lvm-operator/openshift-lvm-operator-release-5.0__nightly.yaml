@@ -1,8 +1,4 @@
 base_images:
-  cli-operator-sdk:
-    name: cli-operator-sdk
-    namespace: ocp
-    tag: v1.31.0
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -26,12 +22,6 @@ build_root:
     tag: rhel-9-golang-1.26-openshift-5.0
 images:
   items:
-  - dockerfile_path: Dockerfile
-    inputs:
-      ocp_5.0_base-rhel9:
-        as:
-        - fedora:latest
-    to: lvm-operator
   - context_dir: .
     dockerfile_path: test/integration/Dockerfile
     inputs:
@@ -39,13 +29,6 @@ images:
         as:
         - registry.access.redhat.com/ubi9/ubi-minimal:latest
     to: lvm-operator-integration-test
-operator:
-  bundles:
-  - as: lvm-operator-bundle
-    dockerfile_path: bundle.Dockerfile
-  substitutions:
-  - pullspec: quay.io/lvms_dev/lvms-operator:latest
-    with: pipeline:lvm-operator
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -77,15 +60,14 @@ tests:
   cron: 0 8 * * 5
   steps:
     cluster_profile: equinix-edge-enablement
-    dependencies:
-      OO_BUNDLE: lvm-operator-bundle
     env:
+      LVM_CATALOG_SOURCE: lvm-catalogsource
       LVM_CLUSTER_DEVICE_PATH: /dev/vda
       LVM_CLUSTER_TOLERATE_MASTER: "true"
+      LVM_OPERATOR_SUB_CHANNEL: stable-5.0
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
-      OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: openshift-lvm-storage
-      OO_INSTALL_TIMEOUT_MINUTES: "20"
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v5.0
     test:
     - as: lvms-tnf-prepare-and-record
       cli: latest
@@ -100,19 +82,23 @@ tests:
         oc label nodes -l node-role.kubernetes.io/master node-role.kubernetes.io/worker= --overwrite
         test "$(oc get nodes -l node-role.kubernetes.io/worker -o name | wc -l | tr -d ' ')" = 2
         printf '%s\n' "${RELEASE_IMAGE_LATEST}" > "${ARTIFACT_DIR}/release-image.txt"
-        printf '%s\n' "${OO_BUNDLE}" > "${ARTIFACT_DIR}/bundle-image.txt"
-        printf '%s\n' "${OPERATOR_IMAGE}" > "${ARTIFACT_DIR}/operator-image.txt"
         printf '%s\n' "${DEVSCRIPTS_CONFIG}" > "${ARTIFACT_DIR}/tnf-devscripts-config.txt"
         oc get clusterversion version -o json > "${ARTIFACT_DIR}/clusterversion.json"
+        # Record what OLM actually installed; the nightly catalog tag can advance.
+        oc -n openshift-marketplace get catalogsource lvm-catalogsource -o json > "${ARTIFACT_DIR}/catalogsource.json"
+        oc -n openshift-marketplace get pods -l olm.catalogSource=lvm-catalogsource -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[*].imageID}{"\n"}{end}' > "${ARTIFACT_DIR}/catalog-image-ids.txt"
+        installed_csv=$(oc -n openshift-lvm-storage get subscription lvms-operator -o jsonpath='{.status.installedCSV}')
+        test -n "${installed_csv}"
+        oc -n openshift-lvm-storage get csv "${installed_csv}" -o json > "${ARTIFACT_DIR}/installed-csv.json"
+        oc -n openshift-lvm-storage get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[*].imageID}{"\n"}{end}' > "${ARTIFACT_DIR}/lvms-image-ids.txt"
         oc get csidriver topolvm.io -o json > "${ARTIFACT_DIR}/topolvm-csidriver.json"
         cp "${SHARED_DIR}/lvm-cluster.yaml" "${ARTIFACT_DIR}/lvm-cluster.yaml"
       dependencies:
-      - env: OO_BUNDLE
-        name: lvm-operator-bundle
-      - env: OPERATOR_IMAGE
-        name: lvm-operator
       - env: RELEASE_IMAGE_LATEST
         name: release:latest
+      env:
+      - name: DEVSCRIPTS_CONFIG
+        documentation: TNF provisioning configuration to record with the test results.
       from: cli
       resources:
         requests:
