@@ -84,6 +84,7 @@ def test_expand_matrix_cells() -> None:
         ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x", False, "s3"),
         ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "odf"),
         ("3.17", "redhat-3.17", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", False, "s3"),
+        ("5.0", "redhat-5.0", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64", False, "s3"),
         (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64", False, "s3"),
         (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64", False, "gcs"),
         (None, "master", "azure", "4.22", "e2e-install", None, "presubmit", "amd64", False, "blob"),
