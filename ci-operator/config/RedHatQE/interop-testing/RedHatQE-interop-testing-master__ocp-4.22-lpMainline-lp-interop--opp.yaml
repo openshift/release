@@ -155,6 +155,79 @@ tests:
     - ref: interop-tests-ocs-tests
     - ref: interop-tests-opp-quay-smoke
     - ref: interop-opp-skip-ratio-gate
+- always_run: false
+  as: cr--debug--aws
+  capabilities:
+  - intranet
+  cluster: build05
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-cspi-qe
+    env:
+      AWS_COMPUTE_VOLUME_SIZE: "500"
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      DR__RP__CR_COMP_NAME: lp-interop--OPP
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-aws-lp","opp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "false"
+      MAP_TESTS: "true"
+      MCP_WAIT_TIMEOUT: "4200"
+      ODF_OPERATOR_CHANNEL: stable-4.22
+      ODF_VERSION_MAJOR_MINOR: "4.22"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      SKIP_POLICIES: policy-acs,policy-acs-central-ca-bundle,policy-acs-central-status,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
+      SLEEP_DURATION: 4h
+      ZONES_COUNT: "3"
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: mce-must-gather
+    - ref: interop-opp-must-gather-acs
+    - ref: interop-opp-must-gather-odf
+    - ref: acm-inspector
+    - ref: acm-tests-clc-destroy
+    - ref: gather-aws-console
+    - ref: cucushift-installer-wait
+    - chain: ipi-deprovision
+    - ref: mpiit-data-router-reporter
+    - ref: firewatch-report-issues
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-rootvolume
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    - ref: interop-opp-disk-diag
+    - ref: interop-opp-kubelet-config
+    - ref: interop-opp-wait-for-api
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-policies-openshift-plus-setup
+    test:
+    - ref: acm-policies-openshift-plus
+    - ref: interop-opp-wait-mcp
+    - ref: stackrox-opp-readiness
+    - ref: stackrox-opp-smoke
+    - ref: acm-tests-clc-smoke
+    - ref: acm-fetch-managed-clusters
+    - ref: acm-opp-app
+    - ref: interop-opp-odf-health
+    - ref: interop-tests-ocs-tests
+    - ref: interop-tests-opp-quay-smoke
+    - ref: interop-opp-skip-ratio-gate
 - as: cr--full-stack--vsphere
   capabilities:
   - intranet
