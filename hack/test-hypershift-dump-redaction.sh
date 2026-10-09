@@ -75,6 +75,11 @@ metadata:
     "digest": sha256:${digest}
     notcommit: ${commit}
   quotedHashFlow: {"commit": ${commit}, "sha256": ${digest}, "digest": sha256:${digest}, "notcommit": ${commit}}
+  quotedHashValues:
+    "commit": "${commit}"
+    "sha256": "${digest}"
+    "digest": "sha256:${digest}"
+    notcommit: "${commit}"
   sourceFile: kubernetes/kubernetes/pkg/controller/deployment/sync.go
   image: quay.io/openshift/hypershift-controller:v2.0
   diagnosticFlow: {password: fake-flow-root, keep: retained}
@@ -140,6 +145,32 @@ spec:
         - default
       - name: inline-argument-container
         args: ["--password", "inline-args-fake", "--namespace", "default"]
+      - name: script-diagnostic-container
+        image: "quay.io/demo/controller@sha256:${digest}"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cat <<'SCRIPT'
+          env: [
+          args: [
+          password=block-script-secret
+          SCRIPT
+        env:
+        - name: API_TOKEN
+          value: after-scalar-env-secret
+        args:
+        - --password
+        - after-scalar-arg-secret
+      - name: args-script-diagnostic-container
+        args:
+        - |
+          cat <<'SCRIPT'
+          env: [
+          args: [
+          SCRIPT
+        - --token
+        - after-args-script-secret
   containers:
   - name: diagnostic-container
     env:
@@ -169,11 +200,31 @@ spec:
           {value: value-before-name-fake,
            name: API_TOKEN},
           {value: don't-break-flow,
-           name: APP_MODE}]
+           name: APP_MODE},
+          {name: QUOTE_DIAGNOSTIC,
+           value: keep " diagnostic}]
+EOF
+
+cat > "${fixture_dir}/cluster-scoped-resources/core/events.yaml" <<'EOF'
+apiVersion: events.k8s.io/v1
+kind: Event
+message: |
+  cannot load script fragment:
+  env: [
+  password: event-block-scalar-secret
+  unexpected end of input
+reason: Failed
 EOF
 
 cat > "${fixture_dir}/cluster-scoped-resources/core/root-flow.yaml" <<'EOF'
 {password: fake-flow-root-secret, keep: retained-root-flow-field}
+EOF
+
+cat > "${fixture_dir}/cluster-scoped-resources/core/quoted-hashes.yaml" <<EOF
+"commit": "${commit}"
+"sha256": "${digest}"
+"digest": "sha256:${digest}"
+notcommit: "${commit}"
 EOF
 
 cat > "${fixture_dir}/cluster-scoped-resources/core/status.json" <<EOF
@@ -196,7 +247,7 @@ cat > "${fixture_dir}/cluster-scoped-resources/core/status.json" <<EOF
   ],
   "token":null,
   "items":[{"spec":{"containers":[
-    {"name":"first","env":[{"name":"API_TOKEN","value":"pretty-json-env-secret"}]},
+    {"name":"first","image":"quay.io/demo/controller@sha256:${digest}","env":[{"name":"API_TOKEN","value":"pretty-json-env-secret"}]},
     {"name":"second","env":[{"value":"second-container-secret","name":"DB_PASSWORD"}]}
   ]}}],
   "compactContainers":[{"env":[{"name":"API_TOKEN","value":"compact-first-secret"}]},{"env":[{"value":"compact-second-secret","name":"DB_PASSWORD"}]}],
@@ -266,21 +317,29 @@ mkdir -p "${extract_dir}"
 tar -xzf "${archive}" -C "${extract_dir}" || fail "archive extraction failed"
 yaml_file="${extract_dir}/output/cluster-scoped-resources/core/nodes.yaml"
 root_flow_file="${extract_dir}/output/cluster-scoped-resources/core/root-flow.yaml"
+quoted_hash_file="${extract_dir}/output/cluster-scoped-resources/core/quoted-hashes.yaml"
 json_file="${extract_dir}/output/cluster-scoped-resources/core/status.json"
 html_file="${extract_dir}/output/cluster-scoped-resources/core/event-filter.html"
 log_file="${extract_dir}/output/cluster-scoped-resources/core/events.log"
+events_file="${extract_dir}/output/cluster-scoped-resources/core/events.yaml"
 timestamp_file="${extract_dir}/output/cluster-scoped-resources/core/timestamp"
 
 yq '.' "${yaml_file}" > /dev/null || fail "sanitized YAML is invalid"
+yq '.' "${events_file}" > /dev/null || fail "sanitized Event YAML is invalid"
 yq '.' "${root_flow_file}" > /dev/null || fail "sanitized root flow YAML is invalid"
+yq '.' "${quoted_hash_file}" > /dev/null || fail "sanitized quoted-hash YAML is invalid"
 jq '.' "${json_file}" > /dev/null || fail "sanitized JSON is invalid"
 
 yq -e ".metadata.hashes.\"commit\" == \"${commit}\" and .metadata.hashes.\"sha256\" == \"${digest}\" and .metadata.hashes.\"digest\" == \"sha256:${digest}\" and .metadata.hashes.notcommit == \"REDACTED_HIGH_ENTROPY\" and .metadata.quotedHashFlow.\"commit\" == \"${commit}\" and .metadata.quotedHashFlow.\"sha256\" == \"${digest}\" and .metadata.quotedHashFlow.\"digest\" == \"sha256:${digest}\" and .metadata.quotedHashFlow.notcommit == \"REDACTED_HIGH_ENTROPY\"" "${yaml_file}" > /dev/null || fail "quoted hash keys were redacted or unrelated tokens were preserved"
+yq -e ".metadata.quotedHashValues.\"commit\" == \"${commit}\" and .metadata.quotedHashValues.\"sha256\" == \"${digest}\" and .metadata.quotedHashValues.\"digest\" == \"sha256:${digest}\" and .metadata.quotedHashValues.notcommit == \"REDACTED_HIGH_ENTROPY\" and .spec.template.spec.containers[2].image == \"quay.io/demo/controller@sha256:${digest}\"" "${yaml_file}" > /dev/null || fail "quoted YAML hash values or image digest were not preserved exactly"
+yq -e '.spec.template.spec.containers[2].env[0].value == "REDACTED" and .spec.template.spec.containers[2].args[1] == "REDACTED" and (.spec.template.spec.containers[2].command[2] | (contains("env: [") and contains("args: ["))) and (.spec.template.spec.containers[3].args[0] | (contains("env: [") and contains("args: ["))) and .spec.template.spec.containers[3].args[2] == "REDACTED"' "${yaml_file}" > /dev/null || fail "block-scalar command content was misparsed or following credentials were not redacted"
+yq -e '.message | (contains("env: [") and contains("password: REDACTED") and contains("unexpected end of input"))' "${events_file}" > /dev/null || fail "Event block-scalar diagnostics were not preserved and sanitized"
 yq -e '.metadata.pemMessages | contains("between")' "${yaml_file}" > /dev/null || fail "repeated PEM redaction lost the intervening diagnostic"
 yq -e '.metadata.pemMessages | contains("after-repeated-pem")' "${yaml_file}" > /dev/null || fail "repeated PEM redaction lost trailing diagnostic content"
 yq -e '.spec.template.spec.automountServiceAccountToken == false and .spec.template.spec.volumes[0].projected.sources[0].serviceAccountToken.audience == "api" and .spec.template.spec.volumes[0].projected.sources[0].serviceAccountToken.expirationSeconds == 3607 and .spec.template.spec.volumes[0].projected.sources[0].serviceAccountToken.path == "token" and .spec.template.spec.volumes[0].projected.sources[1].secret.name == "projected-secret-reference" and .spec.template.spec.volumes[1].secret.secretName == "volume-secret-reference"' "${yaml_file}" > /dev/null || fail "sanitization damaged Pod configuration diagnostics"
 yq -e ".spec.template.spec.containers[1].args[0] == \"--password\" and .spec.template.spec.containers[1].args[1] == \"REDACTED\" and .spec.template.spec.containers[1].args[2] == \"--namespace\" and .spec.template.spec.containers[1].args[3] == \"default\" and .spec.containers[0].env[3].value == \"REDACTED\" and .spec.containers[0].env[5].value == \"REDACTED\" and .spec.containers[0].env[6].value == \"retained-after-forced-pem\" and .spec.containers[1].env[0].value == \"REDACTED\" and .spec.containers[1].env[1].value == \"REDACTED\" and .spec.containers[1].env[2].value == \"don't-break-flow\"" "${yaml_file}" > /dev/null || fail "flow-style arguments or environment values were not safely handled"
 yq -e '.password == "REDACTED" and .keep == "retained-root-flow-field"' "${root_flow_file}" > /dev/null || fail "root flow YAML redaction damaged sibling fields"
+yq -e ".commit == \"${commit}\" and .sha256 == \"${digest}\" and .digest == \"sha256:${digest}\" and .notcommit == \"REDACTED_HIGH_ENTROPY\"" "${quoted_hash_file}" > /dev/null || fail "quoted YAML hash keys were redacted or unrelated tokens were preserved"
 
 assert_contains "${yaml_file}" "commit: ${commit}"
 assert_contains "${yaml_file}" "notcommit: REDACTED_HIGH_ENTROPY"
@@ -301,6 +360,8 @@ assert_contains "${yaml_file}" 'args: ["--password", "REDACTED", "--namespace", 
 assert_contains "${yaml_file}" 'value: "REDACTED", name: "DB_PASSWORD"'
 assert_contains "${yaml_file}" 'value: retained-after-forced-pem'
 assert_contains "${yaml_file}" "value: don't-break-flow"
+assert_contains "${yaml_file}" 'value: keep " diagnostic'
+assert_contains "${yaml_file}" 'password=REDACTED'
 assert_not_contains "${yaml_file}" "diagnostic=${opaque}"
 assert_contains "${yaml_file}" "digestWithOtherDiagnostic: \"sha256:${digest} diagnostic=REDACTED_HIGH_ENTROPY\""
 assert_contains "${yaml_file}" "ordinaryPath: https://api.example.invalid/api/v1/namespaces/default/status"
@@ -326,7 +387,7 @@ assert_contains "${json_file}" "https://REDACTED@example.invalid/api"
 assert_contains "${json_file}" "\"commit\":\"${commit}\""
 assert_contains "${json_file}" '"notcommit":"REDACTED_HIGH_ENTROPY"'
 assert_contains "${json_file}" "sha256:${digest}"
-jq -e '.password == "REDACTED" and .client_secret == "REDACTED" and .serviceAccountToken == {"audience":"api","expirationSeconds":3607,"path":"token"} and .automountServiceAccountToken == false and .volumes[0].projected.sources[0].serviceAccountToken.audience == "api" and .volumes[0].projected.sources[1].secret.name == "retained-projected-secret" and .volumes[1].secret.secretName == "retained-volume-secret" and .token == "REDACTED" and .items[0].spec.containers[0].env[0].value == "REDACTED" and .items[0].spec.containers[1].env[0].value == "REDACTED" and .compactContainers[0].env[0].value == "REDACTED" and .compactContainers[1].env[0].value == "REDACTED" and .args == ["--password", "REDACTED", "--namespace", "default"] and .env[0].value == "REDACTED" and .env[1].valueFrom.secretKeyRef.name == "retained-json-reference" and .keep == "retained-json-field" and .keepBetweenPem == "retained-between-pem" and .pemBefore == "REDACTED_PEM" and .pemAfter == "REDACTED_PEM" and (.pem | contains("REDACTED_PEM") and contains("middle") and contains("post"))' "${json_file}" > /dev/null || fail "JSON credential, argument, PEM, or diagnostic preservation failed"
+jq --arg digest "${digest}" -e '.password == "REDACTED" and .client_secret == "REDACTED" and .serviceAccountToken == {"audience":"api","expirationSeconds":3607,"path":"token"} and .automountServiceAccountToken == false and .volumes[0].projected.sources[0].serviceAccountToken.audience == "api" and .volumes[0].projected.sources[1].secret.name == "retained-projected-secret" and .volumes[1].secret.secretName == "retained-volume-secret" and .token == "REDACTED" and .items[0].spec.containers[0].image == ("quay.io/demo/controller@sha256:" + $digest) and .items[0].spec.containers[0].env[0].value == "REDACTED" and .items[0].spec.containers[1].env[0].value == "REDACTED" and .compactContainers[0].env[0].value == "REDACTED" and .compactContainers[1].env[0].value == "REDACTED" and .args == ["--password", "REDACTED", "--namespace", "default"] and .env[0].value == "REDACTED" and .env[1].valueFrom.secretKeyRef.name == "retained-json-reference" and .keep == "retained-json-field" and .keepBetweenPem == "retained-between-pem" and .pemBefore == "REDACTED_PEM" and .pemAfter == "REDACTED_PEM" and (.pem | contains("REDACTED_PEM") and contains("middle") and contains("post"))' "${json_file}" > /dev/null || fail "JSON credential, argument, PEM, or diagnostic preservation failed"
 assert_contains "${html_file}" "https://REDACTED@example.invalid/events/REDACTED_HIGH_ENTROPY"
 assert_contains "${html_file}" "Authorization: REDACTED</a>"
 assert_contains "${html_file}" "</body></html>"
@@ -365,6 +426,11 @@ assert_not_contains "${extract_dir}" "unicode-escaped-json-secret"
 assert_not_contains "${extract_dir}" "inline-args-fake"
 assert_not_contains "${extract_dir}" "repeated-yaml-pem-one"
 assert_not_contains "${extract_dir}" "repeated-yaml-pem-two"
+assert_not_contains "${extract_dir}" "after-scalar-env-secret"
+assert_not_contains "${extract_dir}" "after-scalar-arg-secret"
+assert_not_contains "${extract_dir}" "block-script-secret"
+assert_not_contains "${extract_dir}" "event-block-scalar-secret"
+assert_not_contains "${extract_dir}" "after-args-script-secret"
 assert_not_contains "${extract_dir}" "inline-key-one"
 assert_not_contains "${extract_dir}" "inline-key-two"
 assert_not_contains "${extract_dir}" "sibling-key-one"
