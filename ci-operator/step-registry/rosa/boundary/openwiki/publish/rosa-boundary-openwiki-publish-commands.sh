@@ -89,9 +89,17 @@ if [[ -n "$existing_pr" ]]; then
   git switch -c "$branch" "origin/${branch}"
   git merge --no-edit "origin/${base}"
 else
-  if git ls-remote --exit-code origin "refs/heads/${branch}" >/dev/null; then
-    echo "${branch} exists without an open PR; inspect/remove the stale bot branch before rerunning." >&2
-    exit 1
+  # Capture the current tip before starting from main. A closed PR can leave
+  # this branch behind; only replace the exact tip we saw, never a newer push.
+  remote_ref=$(git ls-remote origin "refs/heads/${branch}")
+  if [[ -n "$remote_ref" ]]; then
+    stale_branch_sha=${remote_ref%%$'\t'*}
+    if [[ ! "$stale_branch_sha" =~ ^[0-9a-f]{40}$ ]]; then
+      echo 'Unexpected stale bot branch revision.' >&2
+      exit 1
+    fi
+  else
+    stale_branch_sha=''
   fi
   git switch -c "$branch" "origin/${base}"
 fi
@@ -151,7 +159,19 @@ fi
 pr_title="docs: Scheduled OpenWiki update ($(date -u +%F))"
 
 git commit -m 'docs: update OpenWiki'
-git push origin "HEAD:refs/heads/${branch}"
+if [[ -n "$existing_pr" ]]; then
+  git push origin "HEAD:refs/heads/${branch}"
+else
+  # Do not take over a branch that gained a PR while OpenWiki was running.
+  new_pr=$(gh pr list --repo "$repo" --base "$base" --head "$branch" \
+    --state open --json number --jq '.[0].number // empty')
+  if [[ -n "$new_pr" ]]; then
+    echo "${branch} acquired an open PR during this run; refusing to replace it." >&2
+    exit 1
+  fi
+  git push --force-with-lease="refs/heads/${branch}:${stale_branch_sha}" \
+    origin "HEAD:refs/heads/${branch}"
+fi
 if [[ -n "$existing_pr" ]]; then
   pr_url="https://github.com/${repo}/pull/${existing_pr}"
   gh api -X PATCH "repos/${repo}/pulls/${existing_pr}" -f title="$pr_title" -f body="$pr_body" --silent

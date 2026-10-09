@@ -42,9 +42,7 @@ if [[ -n "$existing_pr" ]]; then
   git ls-remote --exit-code "https://github.com/${repo}.git" "refs/heads/${branch}" >/dev/null
   printf '%s\n' "$branch" > "${SHARED_DIR}/openwiki-base-branch"
 else
-  if git ls-remote --exit-code "https://github.com/${repo}.git" "refs/heads/${branch}" >/dev/null; then
-    echo "${branch} exists without an open PR; inspect/remove the stale bot branch before rerunning." >&2
-    exit 1
-  fi
+  # A closed PR may leave the bot branch behind. Start a fresh update from the
+  # target base instead; publish replaces the stale branch only on a real run.
   printf '%s\n' "$base" > "${SHARED_DIR}/openwiki-base-branch"
 fi
