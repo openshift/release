@@ -162,9 +162,19 @@ tests:
     - as: enable-aipipelines-for-tls-scan
       cli: latest
       commands: |
-        oc patch datasciencecluster.v2.datasciencecluster.opendatahub.io default-dsc \
-          --type=merge \
-          -p '{"spec":{"components":{"aipipelines":{"managementState":"Managed"}}}}'
+        oc apply -f - <<'EOF'
+        apiVersion: datasciencecluster.opendatahub.io/v3
+        kind: DataScienceCluster
+        metadata:
+          name: default-dsc
+        spec:
+          components:
+            aipipelines:
+              managementState: Managed
+        EOF
+        oc wait --for=condition=Ready \
+          datasciencecluster.v3.datasciencecluster.opendatahub.io/default-dsc \
+          --timeout=20m
         oc wait --for=condition=Ready \
           aipipelines.components.platform.opendatahub.io/default-aipipelines \
           --timeout=20m
@@ -190,7 +200,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-      timeout: 45m0s
+      timeout: 1h0m0s
     - ref: tls-scanner-run
     workflow: generic-claim
 - as: opendatahub-operator-image-mirror
