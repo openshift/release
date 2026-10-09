@@ -73,6 +73,11 @@ releases:
       relative: 2
       stream: nightly
       version: "5.0"
+  multi-latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -144,9 +149,11 @@ tests:
   steps:
     cluster_profile: aws-stackrox
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
+      RELEASE_IMAGE_LATEST: release:multi-latest
     env:
       BASE_DOMAIN: perfscale.rox.systems
+      HYPERSHIFT_BASE_DOMAIN: perfscale.rox.systems
+      HYPERSHIFT_NODE_COUNT: "2"
     test:
     - as: test
       cli: latest
@@ -162,7 +169,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-aws-tls-scanner-5-0
   optional: true
@@ -597,8 +604,12 @@ tests:
   run_if_changed: ^(tests/e2e/(parsing_tests|framework)/|pkg/controller/(profilebundle|tailoredprofile|compliancescan)/|pkg/apis/compliance/|pkg/profileparser/)
   steps:
     cluster_profile: quay-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multi-latest
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
+      HYPERSHIFT_BASE_DOMAIN: quay.devcluster.openshift.com
+      HYPERSHIFT_NODE_COUNT: "2"
     test:
     - as: test
       cli: latest
@@ -614,13 +625,17 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - as: e2e-aws-cel
   run_if_changed: ^(tests/e2e/(cel_tests|framework)/|pkg/controller/(customrule|tailoredprofile|scansettingbinding|compliancescan|compliancesuite)/|pkg/apis/compliance/|pkg/celcontent/|cmd/cel-bundler/|cmd/celctl/)
   steps:
     cluster_profile: quay-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multi-latest
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
+      HYPERSHIFT_BASE_DOMAIN: quay.devcluster.openshift.com
+      HYPERSHIFT_NODE_COUNT: "2"
     test:
     - as: test
       cli: latest
@@ -636,7 +651,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-rosa
   optional: true
