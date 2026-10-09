@@ -31,6 +31,11 @@ tar -xJf "$workdir/node.tar.xz" --strip-components=1 -C "$workdir/node"
 rm "$workdir/node.tar.xz"
 export PATH="$workdir/node/bin:$workdir/tools/bin:$PATH"
 npm install --global --prefix "$workdir/tools" openwiki@0.7.1 mermaid@11.16.0 jsdom@29.1.1
+# Record the installed version and requested model for the publisher's PR
+# description. SHARED_DIR accepts only flat files; no credentials cross steps.
+jq -er '.version' "$workdir/tools/lib/node_modules/openwiki/package.json" > "${SHARED_DIR}/openwiki-version"
+printf '%s\n' "${OPENWIKI_MODEL_ID:?}" > "${SHARED_DIR}/openwiki-model-id"
+printf '%s\n' "${OPENWIKI_PROVIDER:?}" > "${SHARED_DIR}/openwiki-provider"
 
 # Only flat files survive between steps in SHARED_DIR. Clone the public repo
 # locally so the model container never receives GitHub App credentials.

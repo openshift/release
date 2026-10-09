@@ -111,12 +111,46 @@ if [[ "$dry_run" == true ]]; then
   exit "$update_status"
 fi
 
+openwiki_version=$(cat "${SHARED_DIR}/openwiki-version")
+model_id=$(cat "${SHARED_DIR}/openwiki-model-id")
+provider=$(cat "${SHARED_DIR}/openwiki-provider")
+for value in "$openwiki_version" "$model_id" "$provider"; do
+  if [[ ! "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._:/-]*$ ]]; then
+    echo 'Invalid OpenWiki provenance metadata.' >&2
+    exit 1
+  fi
+done
+if [[ ! "${BUILD_ID:-}" =~ ^[0-9]+$ ]]; then
+  echo 'Missing or invalid Prow build ID.' >&2
+  exit 1
+fi
+
+pr_body=$(cat <<EOF
+## OpenWiki documentation refresh
+
+This PR updates the generated ROSA Boundary wiki under \`openwiki/\`. It comes from [OpenShift CI's scheduled Prow periodic](https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/${JOB_NAME}), **not GitHub Actions**. Please review the generated documentation and source-backed claims before merging; application code and root agent guidance are outside this job's publishing scope.
+
+### Run details
+
+| | |
+| --- | --- |
+| Prow job | \`${JOB_NAME}\` |
+| Build | [\`${BUILD_ID}\`](https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}) |
+| OpenWiki | \`v${openwiki_version}\` (\`openwiki code --update --print\`) |
+| Configured model | \`${model_id}\` via \`${provider}\` |
+| OpenWiki exit status | \`${update_status}\` |
+EOF
+)
+if [[ "$update_status" != 0 ]]; then
+  pr_body+=$'\n\n**Partial update:** OpenWiki exited unsuccessfully. This PR includes only pages completed before the failure; review them before merging.'
+fi
+
 git commit -m 'docs: update OpenWiki'
 git push origin "HEAD:refs/heads/${branch}"
 if [[ -n "$existing_pr" ]]; then
   pr_url="https://github.com/${repo}/pull/${existing_pr}"
+  gh api -X PATCH "repos/${repo}/pulls/${existing_pr}" -f body="$pr_body" --silent
 else
-  pr_body=$(printf 'Automated OpenWiki documentation update from Prow.\n\nOpenWiki exit status: %s. Failed runs may include completed pages; review before merging.\n' "$update_status")
   pr_url=$(gh pr create --repo "$repo" --base "$base" --head "$branch" \
     --title 'docs: update OpenWiki' --body "$pr_body")
 fi
