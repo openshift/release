@@ -3,6 +3,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: base
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
@@ -11,6 +15,9 @@ images:
   - dockerfile_path: test/e2e/alertmanager-mock/build/Dockerfile
     from: base
     to: alertmanager-mock
+  - dockerfile_path: openshift-ci/build/Dockerfile.openshift-ci-vm
+    from: nested-podman
+    to: e2e-vm-test
   - dockerfile_path: openshift-ci/build/Dockerfile.openshift-ci
     from: base
     to: workload-analyzer
@@ -33,6 +40,16 @@ resources:
     requests:
       cpu: "3"
       memory: 250Mi
+  e2e-vm:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 8Gi
+  e2e-vm-test:
+    requests:
+      cpu: "1"
+      memory: 2Gi
 tests:
 - as: e2e
   skip_if_only_changed: .*pkg/rules/rulesets/.*|^\.github/|\.[mM][dD]$|^\.gitignore$|^\.govulncheck\.yaml$|^OWNERS$|^LICENSE$
@@ -58,6 +75,37 @@ tests:
           cpu: "3"
           memory: 250Mi
     workflow: codeready-toolchain-aws
+- as: e2e-vm
+  capabilities:
+  - nested-podman
+  commands: |
+    set -euo pipefail
+    virtctl version --client
+    secret_dir=/usr/local/vm-e2e-secrets
+    for key in vm-ssh-key test-kubeconfig controller-kubeconfig; do
+      test -f "${secret_dir}/${key}" || { echo "missing secret file ${secret_dir}/${key}"; exit 1; }
+    done
+    umask 077
+    cp -L "${secret_dir}/vm-ssh-key" /tmp/vm-test-ssh-key
+    cp -L "${secret_dir}/test-kubeconfig" /tmp/vm-test-kubeconfig
+    cp -L "${secret_dir}/controller-kubeconfig" /tmp/vm-controller-kubeconfig
+    chmod 600 /tmp/vm-test-ssh-key /tmp/vm-test-kubeconfig /tmp/vm-controller-kubeconfig
+    export VM_TEST_VIRTCTL_PATH=/usr/local/bin/virtctl
+    export VM_TEST_SSH_KEY_PATH=/tmp/vm-test-ssh-key
+    export VM_TEST_KUBECONFIG_PATH=/tmp/vm-test-kubeconfig
+    export VM_CONTROLLER_KUBECONFIG=/tmp/vm-controller-kubeconfig
+    export VM_TEST_NAMESPACE=devsandbox-wa-test-u-dev
+    make test-e2e-vm
+  container:
+    from: e2e-vm-test
+  max_concurrency: 1
+  nested_podman: true
+  secrets:
+  - collection: cluster-secrets-devsandboxci-aws
+    group: devsandboxci-aws
+    mount_path: /usr/local/vm-e2e-secrets
+  skip_if_only_changed: .*pkg/rules/rulesets/.*|^\.github/|\.[mM][dD]$|^\.gitignore$|^\.govulncheck\.yaml$|^OWNERS$|^LICENSE$
+  timeout: 3h0m0s
 zz_generated_metadata:
   branch: master
   org: codeready-toolchain

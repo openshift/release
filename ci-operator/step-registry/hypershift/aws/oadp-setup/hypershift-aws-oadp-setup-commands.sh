@@ -22,6 +22,17 @@ echo "${BUCKET_NAME}" > "${SHARED_DIR}/oadp-bucket-name"
 # Create the openshift-adp namespace if it doesn't exist
 oc get namespace openshift-adp 2>/dev/null || oc create namespace openshift-adp
 
+# Create image pull secret so Velero can pull CI-built plugin images
+if [[ -f /etc/ci-pull-credentials/.dockerconfigjson ]]; then
+  echo "Creating CI registry pull secret in openshift-adp namespace..."
+  oc create secret docker-registry ci-pull-secret \
+    --namespace openshift-adp \
+    --from-file=.dockerconfigjson=/etc/ci-pull-credentials/.dockerconfigjson \
+    --dry-run=client -o yaml | oc apply -f -
+  oc secrets link default ci-pull-secret --for=pull -n openshift-adp
+  oc secrets link velero ci-pull-secret --for=pull -n openshift-adp 2>/dev/null || true
+fi
+
 # Create secret with AWS credentials
 echo "Creating AWS credentials secret..."
 # Disable tracing due to credential handling

@@ -10,7 +10,10 @@ tests:
       QUAY_DEPLOY_MAILPIT: "false"
 {%- endif %}
       PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}'
-      QUAY_BUILDER_IMAGE: registry.redhat.io/quay/quay-builder-rhel9@sha256:9ced74943d3147fb6eac6df05c50a47553d550586be736068c47767c6f68c777
+{%- if storage == "odf" %}
+      SETUP_NOOBAA: "true"
+      QUAY_STORAGE_PROVIDER: odf
+{%- endif %}
       QUAY_EXTRA_CONFIG: |
         FEATURE_PROGRAMMATIC_BOOTSTRAP: false
         FEATURE_USER_METADATA: true
@@ -41,5 +44,8 @@ tests:
     - ref: quay-provisioning-builder
     - ref: quay-deploy-mailpit
     - ref: quay-deploy-jaeger
+{%- if storage == "odf" %}
+    - ref: quay-install-odf-operator
+{%- endif %}
     - ref: "{{ deploy_ref }}"
     - ref: quay-test-e2e

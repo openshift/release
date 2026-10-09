@@ -43,7 +43,8 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: far-operator
-      ECO_TEST_LABELS: '!tier:upgrade && !tier:interop'
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -52,6 +53,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - ref: medik8s-aws-credentials
@@ -89,6 +91,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - ref: medik8s-aws-credentials
@@ -118,6 +121,8 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: mdr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -126,6 +131,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - as: e2e-test
@@ -136,6 +142,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -152,6 +159,8 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -160,6 +169,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - ref: ssh-bastion
@@ -171,6 +181,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -187,6 +198,8 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: nmo-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -195,6 +208,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - as: e2e-test
@@ -205,6 +219,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -222,6 +237,8 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
       ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.21
@@ -231,6 +248,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - ref: odf-prepare-cluster
@@ -245,6 +263,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -262,6 +281,8 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       CLUSTERCSIDRIVER: efs.csi.aws.com
       ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -289,6 +310,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -304,6 +326,8 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       HYPERSHIFT_INSTANCE_TYPE: m5.4xlarge
       HYPERSHIFT_NODE_COUNT: "3"
       OCP_VERSION: "422"
@@ -317,6 +341,10 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - ref: medik8s-sbr-hypershift-restore-kubeconfig
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster
     test:
     - ref: medik8s-sbr-hypershift-switch-kubeconfig
     - ref: medik8s-sbr-hypershift-wait-nodes
@@ -332,6 +360,7 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -347,6 +376,8 @@ tests:
     cluster_profile: hypershift-aws
     env:
       ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       HYPERSHIFT_INSTANCE_TYPE: m5.4xlarge
       HYPERSHIFT_NODE_COUNT: "3"
       OCP_VERSION: "422"
@@ -360,6 +391,9 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - ref: medik8s-sbr-hypershift-restore-kubeconfig
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
     test:
     - ref: medik8s-sbr-hypershift-switch-kubeconfig
     - ref: medik8s-sbr-hypershift-wait-nodes
@@ -375,6 +409,7 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -391,6 +426,8 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -399,6 +436,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - as: e2e-test
@@ -409,6 +447,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -426,7 +465,8 @@ tests:
       ECO_ENABLE_REPORT: "true"
       ECO_TC_PREFIX: OCP-
       ECO_TEST_FEATURES: far-operator
-      ECO_TEST_LABELS: '!tier:upgrade && !tier:interop'
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -471,6 +511,8 @@ tests:
       COMPUTE_NODE_TYPE: m5.4xlarge
       ECO_TC_PREFIX: OCP-
       ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.21
@@ -499,6 +541,7 @@ tests:
       - name: ECO_TC_PREFIX
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       - name: REPORT_CASE_TAG
       from: src
       resources:
@@ -515,6 +558,8 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -523,6 +568,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - as: e2e-test
@@ -533,6 +579,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -548,6 +595,8 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: mdr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -556,6 +605,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - as: e2e-test
@@ -566,6 +616,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -583,6 +634,8 @@ tests:
       CLUSTERCSIDRIVER: efs.csi.aws.com
       ECO_TC_PREFIX: OCP-
       ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -614,6 +667,7 @@ tests:
       - name: ECO_TC_PREFIX
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       - name: REPORT_CASE_TAG
       from: src
       resources:
@@ -630,6 +684,8 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -638,6 +694,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - ref: ssh-bastion
@@ -649,6 +706,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -710,6 +768,8 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: nmo-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
@@ -718,6 +778,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - as: e2e-test
@@ -728,6 +789,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:

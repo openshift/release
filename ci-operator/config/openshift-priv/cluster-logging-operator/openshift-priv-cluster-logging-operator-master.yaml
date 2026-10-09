@@ -23,6 +23,10 @@ base_images:
     name: 5.y
     namespace: logging
     tag: loki-operator-src
+  obs-tests-runner:
+    name: obs-tests-runner
+    namespace: logging
+    tag: main
   operator-sdk:
     name: "4.21"
     namespace: origin
@@ -105,11 +109,48 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
+      region: us-east-2
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.21"
+    version: "4.22"
+  skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
+  steps:
+    dependencies:
+      OO_BUNDLE: cluster-logging-operator-bundle
+    env:
+      OO_INSTALL_NAMESPACE: openshift-logging
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-from-ci-bundle IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
+      dependencies:
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      - env: IMAGE_LOKI_OPERATOR
+        name: pipeline:loki-operator
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: optional-operators-ci-operator-sdk-generic-claim
+- always_run: true
+  as: e2e-ocp-5-0
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs-logging
+    product: ocp
+    timeout: 1h0m0s
+    version: "5.0"
+  optional: true
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     dependencies:
@@ -140,11 +181,11 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
+      region: us-east-2
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.21"
+    version: "4.22"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
@@ -165,6 +206,52 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: generic-claim
+- as: e2e-pre-merge
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs-logging
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  optional: true
+  skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
+  steps:
+    env:
+      AGENT_SKILL: cluster-logging
+      JIRA_PROJECT: LOG
+      OPERATORS: |
+        [
+            {"name": "loki-operator", "source": "redhat-operators", "install_namespace": "openshift-operators-redhat", "target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"}
+        ]
+      TEST_SUITE: openshift-logging-e2e-tests/cluster-logging-operator
+    post:
+    - ref: openshift-observability-qe-agent
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        for ns in openshift-logging openshift-operators-redhat; do
+          oc create namespace "$ns"
+          oc annotate namespace "$ns" openshift.io/node-selector=""
+          oc label namespace "$ns" openshift.io/cluster-monitoring="true"
+        done
+        cd /tmp && operator-sdk run bundle --timeout=10m --install-mode AllNamespaces --security-context-config restricted -n openshift-logging "$OO_BUNDLE"
+        oc wait --for condition=Available --timeout=5m -n openshift-logging deployment cluster-logging-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: cluster-logging-operator-bundle
+      from: cli-operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: install-operators
+    - ref: openshift-observability-logging-e2e-tests
     workflow: generic-claim
 zz_generated_metadata:
   branch: master

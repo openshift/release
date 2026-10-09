@@ -8,7 +8,6 @@ build_root:
     name: maistra-builder
     namespace: ci
     tag: upstream-master
-  use_build_cache: true
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -263,36 +262,9 @@ tests:
     - ref: servicemesh-istio-images-build
     - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
-- as: istio-integration-helm
-  postsubmit: true
-  reporter_config:
-    channel: '#team-ossm-quality'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
-  steps:
-    cluster_profile: ossm-aws
-    env:
-      BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      REPORT_TO_REPORT_PORTAL: "true"
-      TEST_FILE_NAME: junit.xml
-      TEST_HUB: quay.io/sail-dev
-      TEST_SUITE: helm
-      TEST_SUITE_DESC: Istio Integration helm
-    test:
-    - ref: servicemesh-sail-operator-copy-src
-    - ref: servicemesh-istio-images-build
-    - ref: servicemesh-istio-int-tests
-    workflow: servicemesh-istio-e2e-hypershift
 - always_run: false
-  as: istio-integration-helm-retest
-  optional: true
+  as: istio-integration-helm
+  pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
   steps:
     cluster_profile: ossm-aws
     env:

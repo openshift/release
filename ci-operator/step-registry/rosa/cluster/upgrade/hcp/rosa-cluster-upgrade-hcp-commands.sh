@@ -95,7 +95,7 @@ write_upgrade_metrics() {
   mkdir -p "${ARTIFACT_DIR}" || return 0
   jq -n \
     --arg start "${UPGRADE_START_ISO}" \
-    --arg end "${end_iso}" \
+    --arg end_time "${end_iso}" \
     --argjson start_epoch "${UPGRADE_START_EPOCH}" \
     --argjson end_epoch "${end_epoch}" \
     --argjson duration_seconds "${duration}" \
@@ -103,7 +103,7 @@ write_upgrade_metrics() {
     --arg to_version "${available_version:-${UPGRADED_TO_VERSION:-}}" \
     '{
       start: $start,
-      end: $end,
+      end: $end_time,
       start_epoch: $start_epoch,
       end_epoch: $end_epoch,
       duration_seconds: $duration_seconds,
@@ -219,6 +219,12 @@ function upgrade_cluster_to () {
       sleep 120
     else
       log -e "$upgrade_info"
+      if [[ "$upgrade_info" == *"ERR:"* ]] || [[ "$upgrade_info" == *"failed to schedule"* ]]; then
+        log "error: Upgrade scheduling failed. Aborting instead of waiting."
+        mkdir -p "${ARTIFACT_DIR}" || true
+        echo "$upgrade_info" > "${ARTIFACT_DIR}/upgrade-schedule-error.txt"
+        exit 1
+      fi
       break
     fi
   done

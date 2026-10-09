@@ -27,6 +27,7 @@ metadata:
     cloud: aws    # set according to the imageRef used
     owner: obs-myteamname  # create your team name and add it here, ex: obs-logging
     product: ocp    # set according to the imageRef used
+    variant: fips   # optinal setting: set according to a specific requirement (ex. fips, gpu, etc)
     region: us-east-1   # match install-config file
     version: "4.15"   # set according to the imageRef used
     version_lower: "4.15.0-0" # lower bound for automatically updated imageset

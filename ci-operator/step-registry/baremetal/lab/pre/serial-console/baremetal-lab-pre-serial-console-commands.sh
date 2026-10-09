@@ -28,5 +28,5 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   --user \"${bmc_user}\" \
   --password \"${bmc_pass}\" \
   --vendor \"${vendor}\" \
-  --iso \"true\""
+  --sol \"true\""
 done

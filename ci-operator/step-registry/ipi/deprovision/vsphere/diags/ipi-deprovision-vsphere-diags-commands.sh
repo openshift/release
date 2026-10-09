@@ -207,9 +207,126 @@ function collect_diagnostic_data {
   echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
   echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
 
+  collect_vcenter_metric_table "machine-api-operator" "mapi_vsphere_request_duration_seconds_count" "mapi_vsphere_request_duration_seconds_bucket" "operation" "${vcenter_state}/mapi-vsphere-metrics.json"
+  collect_vcenter_metric_table "vsphere-csi-driver" "vsphere_request_ops_seconds_count" "vsphere_request_ops_seconds_bucket" "request" "${vcenter_state}/csi-vsphere-metrics.json"
+
   write_html
 
   set -e
+}
+
+# Collects vCenter request latency/error metrics exposed by OpenShift
+# components that talk to vCenter directly: the machine-api-operator's
+# vSphere actuator (mapi_vsphere_request_duration_seconds, added in
+# https://github.com/openshift/machine-api-operator/pull/1552) and the
+# vSphere CSI driver (vsphere_request_ops_seconds, from upstream
+# kubernetes-sigs/vsphere-csi-driver). Both are scraped by the in-cluster
+# Prometheus, so they're queried through the thanos-querier pod rather than
+# via govc. Either metric may be absent on older releases; that's handled,
+# not treated as an error.
+#
+# $1: human-readable source name, used in log messages
+# $2: counter metric name (e.g. mapi_vsphere_request_duration_seconds_count)
+# $3: histogram bucket metric name (e.g. mapi_vsphere_request_duration_seconds_bucket)
+# $4: label shared by both metrics identifying the vCenter operation/request
+# $5: output JSON file path
+function collect_vcenter_metric_table() {
+  local label="$1" count_metric="$2" bucket_metric="$3" op_label="$4" out_file="$5"
+  echo "$(date -u --rfc-3339=seconds) - Collecting ${label} request metrics (${count_metric}) from in-cluster Prometheus"
+
+  local q_counts="sum by (client, ${op_label}, status) (${count_metric})"
+  local q_p50="histogram_quantile(0.50, sum by (le, client, ${op_label}) (${bucket_metric}))"
+  local q_p95="histogram_quantile(0.95, sum by (le, client, ${op_label}) (${bucket_metric}))"
+  local q_p99="histogram_quantile(0.99, sum by (le, client, ${op_label}) (${bucket_metric}))"
+
+  # Everything is fetched in a single oc rsh call, mirroring the
+  # gather-extra-commands.sh thanos-querier pattern (one bash -c script run
+  # remotely via curl against the pod's local Prometheus HTTP API), rather
+  # than invoking curl directly as the rsh command: that avoids depending on
+  # how oc rsh splits/forwards a bare multi-flag command line. stderr and the
+  # raw response are always saved so a bad query is debuggable from artifacts
+  # instead of silently producing an empty table.
+  local debug_log="${out_file%.json}-debug.log"
+  local remote_script
+  remote_script=$(cat <<REMOTE
+set -euo pipefail
+query() {
+  curl -f --silent http://localhost:9090/api/v1/query --data-urlencode "query=\$1" || echo '{"data":{"result":[]}}'
+}
+echo "{\"counts\":\$(query '${q_counts}')}"
+echo "{\"p50\":\$(query '${q_p50}')}"
+echo "{\"p95\":\$(query '${q_p95}')}"
+echo "{\"p99\":\$(query '${q_p99}')}"
+REMOTE
+)
+
+  local raw
+  raw=$(oc --insecure-skip-tls-verify rsh -T -n openshift-monitoring -c thanos-query deploy/thanos-querier /bin/bash -c "${remote_script}" 2>"${debug_log}")
+  echo "${raw}" >> "${debug_log}"
+
+  local merged
+  if [[ -z "${raw}" ]] || ! merged=$(jq -s 'reduce .[] as $o ({}; . + $o)' <<<"${raw}" 2>>"${debug_log}"); then
+    echo "$(date -u --rfc-3339=seconds) - unable to query ${count_metric}, see ${debug_log}"
+    echo '{"available": false}' > "${out_file}"
+    return
+  fi
+
+  if [[ "$(echo "${merged}" | jq -r '.counts.data.result | length // 0')" == "0" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ${count_metric} not found on this cluster, skipping"
+    echo '{"available": false}' > "${out_file}"
+    return
+  fi
+
+  echo "${merged}" | jq --arg oplabel "${op_label}" '
+    def quantiles(key): reduce (.[key].data.result[]?) as $r ({}; .[$r.metric.client + "|" + $r.metric[$oplabel]] = ($r.value[1] | tonumber));
+    . as $all |
+    (quantiles("p50")) as $p50 |
+    (quantiles("p95")) as $p95 |
+    (quantiles("p99")) as $p99 |
+    (reduce $all.counts.data.result[] as $r ({};
+      ($r.metric.client + "|" + $r.metric[$oplabel]) as $k |
+      ($r.value[1] | tonumber) as $v |
+      (if $r.metric.status == "success" then "success" else "error" end) as $bucket |
+      .[$k].client = $r.metric.client |
+      .[$k].operation = $r.metric[$oplabel] |
+      .[$k][$bucket] = ((.[$k][$bucket] // 0) + $v)
+    )) as $byOp |
+    {
+      available: true,
+      rows: ($byOp | to_entries | map(.value + {
+        key: .key,
+        success: (.value.success // 0),
+        error: (.value.error // 0),
+        total: ((.value.success // 0) + (.value.error // 0)),
+        p50: $p50[.key],
+        p95: $p95[.key],
+        p99: $p99[.key]
+      }) | sort_by(-.total))
+    }
+    ' > "${out_file}" || echo '{"available": false}' > "${out_file}"
+}
+
+function embed_vcenter_metrics_table() {
+  local file="$1" title="$2" no_data_note="$3"
+  cat >> "${RESULT_HTML}" << EOF
+        <h3>${title}</h3>
+EOF
+  if [[ ! -f "${file}" ]] || [[ "$(jq -r '.available' "${file}" 2>/dev/null)" != "true" ]]; then
+    cat >> "${RESULT_HTML}" << EOF
+        <p>${no_data_note}</p>
+EOF
+    return
+  fi
+  cat >> "${RESULT_HTML}" << 'EOF'
+        <table class="table table-striped table-sm">
+          <thead><tr><th>Client</th><th>Operation</th><th>Success</th><th>Errors</th><th>Total</th><th>p50 (s)</th><th>p95 (s)</th><th>p99 (s)</th></tr></thead>
+          <tbody>
+EOF
+  jq -r '.rows[] | "<tr><td>\(.client | @html)</td><td>\(.operation | @html)</td><td>\(.success // 0)</td><td>\(.error // 0)</td><td>\(.total)</td><td>\(.p50 // "n/a")</td><td>\(.p95 // "n/a")</td><td>\(.p99 // "n/a")</td></tr>"' "${file}" >> "${RESULT_HTML}"
+  cat >> "${RESULT_HTML}" << 'EOF'
+          </tbody>
+        </table>
+EOF
 }
 
 function write_html() {
@@ -363,6 +480,8 @@ function write_results_html() {
   Virtual Machines </button>
         <button class="list-group-item list-group-item-action" v-on:click="changeContent('host')">
   Hosts            </button>
+        <button class="list-group-item list-group-item-action" v-on:click="changeContent('vcenter')">
+  vCenter Metrics  </button>
          <a href="https://github.com/openshift/release/blob/master/ci-operator/step-registry/ipi/deprovision/vsphere/diags/ipi-deprovision-vsphere-diags-commands.sh" class="list-group-item list-group-item-action text-center" target="_blank">
          <img src="https://github.com/favicon.ico" alt="GitHub logo" title="Found a bug or issue? Visit this project's git repo.">
         </a>
@@ -435,6 +554,16 @@ EOF
             <canvas id="host-cpu-readiness"></canvas>
           </div>
         </div>
+      </div>
+    </data>
+    <data id="vcenter-data">
+      <div id="vcenter-data-content">
+        <h1>vCenter Metrics</h1>
+        <hr>
+EOF
+  embed_vcenter_metrics_table "${vcenter_state}/mapi-vsphere-metrics.json" "Machine API Operator (mapi_vsphere_request_duration_seconds)" 'No vSphere request metrics (<code>mapi_vsphere_request_duration_seconds</code>) were found on this cluster. This metric was introduced by <a href="https://github.com/openshift/machine-api-operator/pull/1552" target="_blank">machine-api-operator#1552</a> and may not be present on older releases.'
+  embed_vcenter_metrics_table "${vcenter_state}/csi-vsphere-metrics.json" "vSphere CSI Driver (vsphere_request_ops_seconds)" 'No vSphere request metrics (<code>vsphere_request_ops_seconds</code>) were found on this cluster.'
+  cat >> ${RESULT_HTML} << EOF
       </div>
     </data>
 

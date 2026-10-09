@@ -27,6 +27,36 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
+- as: biweekly-e2e-doca8
+  capabilities:
+  - intranet
+  cron: 30 0 * * 1,3
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: metal-dpf-doca8
+    env:
+      DPF_SKIP_CI_PAYLOAD: "true"
+      OPENSHIFT_DPF_BRANCH: release-4.22
+    post:
+    - ref: gather-extra
+    - ref: gather-must-gather
+    test:
+    - ref: dpf-hypervisor-deploy-cluster
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+    - ref: dpf-hypervisor-network-tests
+  timeout: 6h0m0s
 - always_run: false
   as: deploy-cluster-doca8
   capabilities:
