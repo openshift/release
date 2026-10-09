@@ -39,9 +39,20 @@ echo "Running setup script: ${SETUP_SCRIPT}..."
 # shellcheck source=/dev/null
 source "${WORKDIR}/${SETUP_SCRIPT}"
 
-echo "Installing Claude Code..."
+echo "Installing Claude Code (gate)..."
 curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
 export PATH="${HOME}/.local/bin:${PATH}"
+
+# --- Agent tooling (OpenCode harness for worker models) ---
+[[ -f "${SHARED_DIR}/trt-agent.sh" ]] || {
+    echo "ERROR: ${SHARED_DIR}/trt-agent.sh not found — eval init step must run first"
+    exit 1
+}
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/trt-agent.sh"
+trt_resolve_model
+echo "Agent model: ${TRT_MODEL} (requested: '${TRT_MODEL_REQUESTED:-}')"
+trt_opencode_setup
 
 # --- Artifact collection ---
 mkdir -p "${WORKDIR}/artifacts"
@@ -52,6 +63,10 @@ copy_artifacts() {
     if [[ -d "${HOME}/.claude/projects" ]]; then
         tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" \
             -C "${HOME}/.claude" projects/ 2>/dev/null || true
+    fi
+    if [[ -d "${HOME}/.local/share/opencode" ]]; then
+        tar -czf "${ARTIFACT_DIR}/opencode-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" \
+            -C "${HOME}/.local/share" opencode/ 2>/dev/null || true
     fi
 }
 trap copy_artifacts EXIT TERM INT
@@ -73,50 +88,17 @@ export EVAL_MODE=true
 export WORKDIR
 /opt/scripts/review-respond.sh
 
-# Convert OTEL with extract_metrics + jq into harness run_result.json.
-# Temp autodl stays out of ARTIFACT_DIR so nothing is pushed to BigQuery.
-OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
-if [[ -s "${OTEL_LOG}" ]]; then
-    cp "${OTEL_LOG}" "${ARTIFACT_DIR}/claude-otel.jsonl"
-    METRICS_TMP=$(mktemp)
-    python3 /opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py \
-        "${OTEL_LOG}" "${METRICS_TMP}" || true
-    if jq -e '.rows[0].model' "${METRICS_TMP}" >/dev/null 2>&1; then
-        jq '
-          .rows[0] as $r
-          | ($r.total_cost_usd | tonumber) as $cost
-          | {
-              model: $r.model,
-              agent: "claude-code",
-              agent_version: $r.claude_code_version,
-              duration_s: (($r.duration_ms | tonumber) / 1000),
-              cost_usd: $cost,
-              num_turns: ($r.num_turns | tonumber),
-              exit_code: ($r.is_error | tonumber),
-              token_usage: {
-                input: ($r.input_tokens | tonumber),
-                output: ($r.output_tokens | tonumber),
-                cache_read: ($r.cache_read_input_tokens | tonumber),
-                cache_create: ($r.cache_creation_input_tokens | tonumber)
-              },
-              per_model_usage: {
-                ($r.model): {
-                  input: ($r.input_tokens | tonumber),
-                  output: ($r.output_tokens | tonumber),
-                  cache_read: ($r.cache_read_input_tokens | tonumber),
-                  cache_create: ($r.cache_creation_input_tokens | tonumber),
-                  cost_usd: $cost
-                }
-              }
-            }
-        ' "${METRICS_TMP}" > "${SHARED_DIR}/eval-solve-run-result.json"
-        cp "${SHARED_DIR}/eval-solve-run-result.json" "${ARTIFACT_DIR}/eval-solve-run-result.json"
-    else
-        echo "WARNING: extract_metrics produced no usable row; Run Configuration will be omitted"
-    fi
-    rm -f "${METRICS_TMP}" "${SHARED_DIR}/claude-otel.jsonl"
-else
-    echo "WARNING: no OTEL JSONL collected; Run Configuration will be omitted"
+# Report which model actually ran (OpenCode does not export OTEL to the
+# agentic-ci collector, so run-result is model-only, from the resolver
+# metadata).
+if [[ -f "${ARTIFACT_DIR}/agent-model.json" ]]; then
+    jq -n \
+        --arg model "$(jq -r '.effective_model' "${ARTIFACT_DIR}/agent-model.json")" \
+        --arg agent "opencode" \
+        --arg agent_version "${TRT_OPENCODE_VERSION}" \
+        '{model: $model, agent: $agent, agent_version: $agent_version}' \
+        > "${SHARED_DIR}/eval-solve-run-result.json"
+    cp "${SHARED_DIR}/eval-solve-run-result.json" "${ARTIFACT_DIR}/eval-solve-run-result.json"
 fi
 
 echo "=== TRT Review Responder Eval Respond Complete ==="

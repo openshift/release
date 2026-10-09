@@ -6,6 +6,12 @@ ref:
   - collection: ci-claude-code
     group: claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
+  - collection: ci-claude-code
+    group: codex-openshift-ci
+    mount_path: /var/run/codex-openai-api-key
+  - collection: ci-claude-code
+    group: zai-openshift-ci
+    mount_path: /var/run/zai-api-key
   - collection: technical-release-team
     group: openshift-trt-agent-gh-app
     mount_path: /var/run/github-token
@@ -29,6 +35,23 @@ ref:
     default: "/var/run/claude-code-service-account/google-token"
   - name: CLAUDE_MODEL
     default: "claude-opus-4-6"
+    documentation: |-
+      Legacy model input; used only when AGENT_MODEL and its override are unset.
+  - name: AGENT_MODEL
+    default: ""
+    documentation: |-
+      Worker agent model for the OpenCode harness: alias (glm, sol, luna,
+      claude-*) or provider/model ID (google-vertex*, openai/*, zai/*).
+      Empty or unresolvable falls back to google-vertex-anthropic/claude-opus-4-6@default.
+  - name: MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL
+    default: ""
+    documentation: Gangway API override for AGENT_MODEL.
+  - name: OPENAI_API_KEY_PATH
+    default: "/var/run/codex-openai-api-key/token"
+    documentation: OpenAI API key file for openai/* models (luna, sol).
+  - name: ZAI_API_KEY_PATH
+    default: "/var/run/zai-api-key/token"
+    documentation: Z.ai API key file for glm; falls back until provisioned.
   - name: EVAL_PARALLELISM
     default: "5"
     documentation: |-
@@ -46,5 +69,6 @@ ref:
   documentation: |-
     Parallel eval dispatcher. Reads the case list from eval-init,
     runs the repo setup script once, then solves each case in parallel
-    (up to EVAL_PARALLELISM concurrently). Each case gets its own
-    working directory and Claude session. Creates a PR per case.
+    (up to EVAL_PARALLELISM concurrently) on the OpenCode harness. Each
+    case gets its own working directory and agent session. Creates a PR
+    per case.

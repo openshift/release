@@ -10,12 +10,12 @@ echo "=== TRT Jira Solver ==="
     echo "ERROR: ${SHARED_DIR}/github-app-auth.sh not found — github-app-auth step must run first"
     exit 1
 }
-[[ -f "${SHARED_DIR}/trt-telemetry.sh" ]] || {
-    echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — workflow init step must run first"
+[[ -f "${SHARED_DIR}/trt-agent.sh" ]] || {
+    echo "ERROR: ${SHARED_DIR}/trt-agent.sh not found — workflow init step must run first"
     exit 1
 }
 # shellcheck source=/dev/null
-source "${SHARED_DIR}/trt-telemetry.sh"
+source "${SHARED_DIR}/trt-agent.sh"
 load_github_tokens
 configure_github_git_credentials
 
@@ -26,6 +26,9 @@ ISSUE_SUMMARY=$(jq -r '.fields.summary // "No summary"' "${ISSUE_JSON}")
 export ISSUE_SUMMARY
 
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
+
+trt_resolve_model
+echo "Agent model: ${TRT_MODEL} (requested: '${TRT_MODEL_REQUESTED:-}')"
 
 PHASE_SETUP_START=$(date +%s)
 
@@ -47,10 +50,6 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     echo "Running setup script: ${SETUP_SCRIPT}..."
     # shellcheck source=/dev/null
     source "${WORKDIR}/${SETUP_SCRIPT}"
-
-    echo "Installing Claude Code..."
-    curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
-    export PATH="${HOME}/.local/bin:${PATH}"
 fi
 
 mkdir -p "${WORKDIR}/artifacts"
@@ -60,9 +59,9 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
         echo "Copying artifacts..."
         cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
         podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
-        if [[ -d "${HOME}/.claude/projects" ]]; then
-            echo "Archiving Claude session logs..."
-            tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
+        if [[ -d "${HOME}/.local/share/opencode" ]]; then
+            echo "Archiving OpenCode session logs..."
+            tar -czf "${ARTIFACT_DIR}/opencode-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.local/share" opencode/ 2>/dev/null || true
         fi
     }
     trap copy_artifacts EXIT TERM INT
@@ -114,131 +113,27 @@ if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     cat "${WORKDIR}/.agentic/solve-config.md" >> "${SYSTEM_PROMPT}"
 fi
 
-# Block gh inside the Claude session. jira-solve --ci only needs git; the
-# pipeline opens the PR after Claude exits. --settings lives under /tmp so we
-# do not write into a cloned repo that may ship its own .claude/settings.json.
-HOOKS_DIR="/tmp/ci-hooks"
-mkdir -p "${HOOKS_DIR}"
-cat > "${HOOKS_DIR}/block-gh.sh" <<'HOOK_EOF'
-#!/bin/bash
-set -euo pipefail
+# gh blocking inside the agent session is enforced by the solver profile
+# in trt-agent.sh.
 
-if ! command -v jq >/dev/null 2>&1; then
-    echo "block-gh hook requires jq" >&2
-    exit 2
-fi
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "block-gh hook requires python3" >&2
-    exit 2
-fi
-
-cmd=$(jq -r '.tool_input.command // ""') || exit 2
-
-result=$(HOOK_BASH_CMD="$cmd" python3 - <<'PY'
-import os, re, shlex, sys
-
-cmd = os.environ.get("HOOK_BASH_CMD", "")
-UNSAFE = re.compile(r"\$\(|`|<\(|>\(|\$\{|\$'")
-WRAPPERS = {"command", "exec", "env", "nice", "nohup", "time"}
-SHELLS = {"bash", "sh", "dash", "zsh", "ksh"}
-
-
-def argv(s):
-    return shlex.split(s, posix=True)
-
-
-def skip_env(tokens):
-    i = 0
-    while i < len(tokens) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", tokens[i]):
-        i += 1
-    return tokens[i:]
-
-
-def skip_wrappers(tokens):
-    tokens = skip_env(tokens)
-    while tokens and tokens[0].rsplit("/", 1)[-1] in WRAPPERS:
-        tokens = tokens[1:]
-        while tokens and tokens[0].startswith("-"):
-            tokens = tokens[1:]
-    return tokens
-
-
-def deny_command(text):
-    if UNSAFE.search(text):
-        return True
-    for part in re.split(r"(?:&&|\|\||[;|\n])", text):
-        part = part.strip()
-        if not part:
-            continue
-        try:
-            tokens = skip_wrappers(argv(part))
-        except ValueError:
-            return True
-        if not tokens:
-            continue
-        exe = tokens[0].rsplit("/", 1)[-1]
-        if exe == "gh":
-            return True
-        if exe == "eval":
-            return deny_command(" ".join(tokens[1:]))
-        if exe in SHELLS and "-c" in tokens:
-            i = tokens.index("-c")
-            if i + 1 < len(tokens) and deny_command(tokens[i + 1]):
-                return True
-    return False
-
-
-try:
-    sys.stdout.write("deny" if deny_command(cmd) else "allow")
-except Exception as exc:
-    print(exc, file=sys.stderr)
-    sys.exit(2)
-PY
-) || exit 2
-
-if [[ "${result}" == deny ]]; then
-    jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny",
-      permissionDecisionReason: "CI mode: do not use the gh CLI. Push the branch with git; the pipeline creates the PR after you exit."}}' || exit 2
-fi
-HOOK_EOF
-chmod +x "${HOOKS_DIR}/block-gh.sh"
-cat > "${HOOKS_DIR}/settings.json" <<'HOOK_SETTINGS_EOF'
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "/tmp/ci-hooks/block-gh.sh" }]
-      }
-    ]
-  }
-}
-HOOK_SETTINGS_EOF
-
-# --- Run Claude to solve the issue ---
+# --- Run the agent to solve the issue ---
 PHASE_SETUP_DURATION=$(( $(date +%s) - PHASE_SETUP_START ))
 PHASE_SOLVE_START=$(date +%s)
-echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
+echo "Invoking agent (${TRT_MODEL}) to solve ${JIRA_ISSUE_KEY}..."
 
 CLAUDE_EXIT=0
-agentic_ci --timeout 5400 \
+trt_agent_run --profile solver --timeout 5400 \
+    --system-prompt-file "${SYSTEM_PROMPT}" \
     "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
 
 Create a feature branch — do NOT commit on the current branch.
 Do not use the gh CLI — the pipeline creates the PR after you exit. Push the branch with git and write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
-    --settings "${HOOKS_DIR}/settings.json" \
-    --output-format stream-json \
-    --append-system-prompt-file "${SYSTEM_PROMPT}" \
     || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-    echo "Claude timed out. Nudging to wrap up..."
-    agentic_ci --timeout 600 \
+    echo "Agent timed out. Nudging to wrap up..."
+    trt_agent_run --profile solver --timeout 600 --continue \
         "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to ${WORKDIR}/artifacts/pr-description.md. Do not use the gh CLI — the pipeline creates the PR after you exit." \
-        --continue \
-        --settings "${HOOKS_DIR}/settings.json" \
-        --output-format stream-json \
-        --max-turns 10 \
         || true
 fi
 PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
@@ -246,7 +141,7 @@ PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
 refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
 
 if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
-    echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
+    echo "ERROR: Agent exited with code ${CLAUDE_EXIT}."
     # Write failure metadata before exiting so post-step can emit metrics
     PR_RESULT="failed"
     jq -n \
@@ -256,6 +151,8 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
         --arg result "${PR_RESULT}" \
         --arg pr_url "" \
         --arg upstream_repo "${UPSTREAM_REPO}" \
+        --arg agent_model "${TRT_MODEL:-unknown}" \
+        --arg agent_harness "opencode" \
         --argjson claude_exit "${CLAUDE_EXIT}" \
         --argjson phase_durations "$(jq -n \
             --argjson setup "${PHASE_SETUP_DURATION}" \
@@ -268,10 +165,11 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
           result: $result,
           pr_url: $pr_url,
           upstream_repo: $upstream_repo,
+          agent_model: $agent_model,
+          agent_harness: $agent_harness,
           claude_exit: $claude_exit,
           phase_durations: $phase_durations
         }' > "${SHARED_DIR}/metrics-metadata-solve.json"
-    finalize_session_metrics
     exit "${CLAUDE_EXIT}"
 fi
 
@@ -279,13 +177,13 @@ fi
 PHASE_PR_START=$(date +%s)
 BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "")
 if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" ]]; then
-    echo "ERROR: Claude did not create a feature branch."
+    echo "ERROR: Agent did not create a feature branch."
     exit 1
 fi
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
     BASE_BRANCH=$(cat "${SHARED_DIR}/eval-base-branch" 2>/dev/null || echo "")
     if [[ -n "${BASE_BRANCH}" && "${BRANCH_NAME}" == "${BASE_BRANCH}" ]]; then
-        echo "ERROR: Claude did not create a feature branch (still on base branch ${BASE_BRANCH})."
+        echo "ERROR: Agent did not create a feature branch (still on base branch ${BASE_BRANCH})."
         exit 1
     fi
     EVAL_BRANCH="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
@@ -308,7 +206,7 @@ if [[ ! -s "${PR_BODY_FILE}" ]]; then
 Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
 PR_DEFAULT
 fi
-printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
+printf '\n---\nGenerated with [OpenCode](https://opencode.ai)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
 
 BASE_ARGS=()
 if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
@@ -319,7 +217,7 @@ echo "Creating PR..."
 PR_URL=$(gh pr create \
     --repo "${UPSTREAM_REPO}" \
     --head "${FORK_REPO%%/*}:${BRANCH_NAME}" \
-    "${BASE_ARGS[@]}" \
+    "${BASE_ARGS[@]+"${BASE_ARGS[@]}"}" \
     --no-maintainer-edit \
     --title "$(echo "${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}" | head -c 250)" \
     --body-file "${PR_BODY_FILE}" \
@@ -350,6 +248,8 @@ jq -n \
     --arg result "${PR_RESULT}" \
     --arg pr_url "${PR_URL:-}" \
     --arg upstream_repo "${UPSTREAM_REPO}" \
+    --arg agent_model "${TRT_MODEL:-unknown}" \
+    --arg agent_harness "opencode" \
     --argjson claude_exit "${CLAUDE_EXIT}" \
     --argjson phase_durations "$(jq -n \
         --argjson setup "${PHASE_SETUP_DURATION}" \
@@ -363,12 +263,12 @@ jq -n \
       result: $result,
       pr_url: $pr_url,
       upstream_repo: $upstream_repo,
+      agent_model: $agent_model,
+      agent_harness: $agent_harness,
       claude_exit: $claude_exit,
       phase_durations: $phase_durations
     }' > "${SHARED_DIR}/metrics-metadata-solve.json"
 
 echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-solve.json"
-
-finalize_session_metrics
 
 echo "=== TRT Jira Solver Complete ==="
