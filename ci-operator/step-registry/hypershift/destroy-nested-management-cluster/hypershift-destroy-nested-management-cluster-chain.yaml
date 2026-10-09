@@ -62,27 +62,29 @@ chain:
         -o -name '*.7z' \
         -o -name '*.rar' \
       \) -delete
-      # 3. Replace PEM blocks without changing the quoting or markup around them.
-      # Keep working on the private dump directory; nothing is published if a
-      # sanitizer command or file discovery fails.
-      find "${DUMP_WORK_DIR}/output" -type f -exec sed -i.bak -E \
-        -e 's/-----BEGIN [A-Z0-9 ]+-----.*-----END [A-Z0-9 ]+-----/REDACTED_PEM/g' \
-        -e '/-----BEGIN [A-Z0-9 ]+-----/,/-----END [A-Z0-9 ]+-----/d' \
-        {} +
-      find "${DUMP_WORK_DIR}/output" -type f -name '*.bak' -delete
-
-      # Discover the complete text-file set synchronously. Process substitution
-      # hides find's exit status and could otherwise publish unsanitized files.
+      # Discover every regular file synchronously. Process substitution hides
+      # find's exit status and could otherwise publish unsanitized files.
+      ALL_FILE_LIST="${DUMP_WORK_DIR}/all-files.list"
       TEXT_FILE_LIST="${DUMP_WORK_DIR}/text-files.list"
-      if ! find "${DUMP_WORK_DIR}/output" -type f \( \
-        -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name '*.jsonl' \
-        -o -name '*.log' -o -name '*.txt' -o -name '*.xml' -o -name '*.csv' \
-        -o -name '*.out' -o -name '*.conf' -o -name '*.ini' -o -name '*.properties' \
-        -o -name '*.html' -o -name '*.htm' \
-      \) -print0 > "${TEXT_FILE_LIST}"; then
-        echo "Failed to enumerate diagnostic files for sanitization; refusing to publish dump archive" >&2
+      if ! find "${DUMP_WORK_DIR}/output" -type f -print0 > "${ALL_FILE_LIST}"; then
+        echo "Failed to enumerate dump files; refusing to publish dump archive" >&2
         exit 1
       fi
+      : > "${TEXT_FILE_LIST}"
+      while IFS= read -r -d '' file; do
+        if [[ ! -s "${file}" ]] || LC_ALL=C grep -Iq . "${file}"; then
+          printf '%s\0' "${file}" >> "${TEXT_FILE_LIST}"
+        else
+          grep_status=$?
+          if [[ "${grep_status}" -ne 1 ]]; then
+            echo "Failed to classify dump file: ${file}; refusing to publish dump archive" >&2
+            exit 1
+          fi
+          # Binary files are not useful sanitized diagnostics and may contain
+          # embedded credentials that text redaction cannot safely inspect.
+          rm -f -- "${file}"
+        fi
+      done < "${ALL_FILE_LIST}"
 
       while IFS= read -r -d '' file; do
         [[ -f "${file}" ]] || { echo "Diagnostic file disappeared during sanitization: ${file}" >&2; exit 1; }
@@ -104,6 +106,10 @@ chain:
           env_list_indent = -1
           env_item_key_indent = -1
           env_item_count = 0
+          args_indent = -1
+          args_pending_secret = 0
+          pem_active = 0
+          pem_end_marker = ""
         }
         function trim(value) {
           sub(/^[[:space:]]+/, "", value)
@@ -195,6 +201,12 @@ chain:
         function is_credential_name(value) {
           return tolower(value) ~ ("(" credential_stems ")$")
         }
+        function is_sensitive_flag(value, normalized) {
+          normalized = tolower(value)
+          if (normalized !~ /^--?[[:alnum:]_-]+$/) return 0
+          sub(/^-+/, "", normalized)
+          return normalized ~ ("(^|[-_])(" credential_stems ")$")
+        }
         function is_uuid(value) {
           return length(value) == 36 && \
             substr(value, 9, 1) == "-" && substr(value, 14, 1) == "-" && \
@@ -223,11 +235,32 @@ chain:
           }
           return result
         }
-        function is_hash_value(token, prefix) {
+        function is_hash_value(token, prefix, match_start, context) {
           if ((length(token) != 40 && length(token) != 64) || token !~ /^[[:xdigit:]]+$/) return 0
           prefix = tolower(substr(current_line, 1, current_token_start - 1))
-          if (prefix ~ /(sha1|sha256|digest)[[:space:]]*[:=][[:space:]]*[\"' ]*$/) return 1
-          return prefix ~ /(git[-_]?commit|commit|revision|rev|commit[-_]?sha)[\"' ]*[[:space:]]*:[[:space:]]*[\"' ]*$/
+          if (!match(prefix, /(^|[{,[:space:]])[\"']?(git[-_]?commit|commit|revision|rev|commit[-_]?sha|sha1|sha256|digest)[\"']?[[:space:]]*:[[:space:]]*[\"' ]*((sha1|sha256):)?$/)) return 0
+          match_start = RSTART + 1
+          if (format == "yaml" || format == "json") {
+            context = quote_context(current_line, match_start, format)
+            if (context != "") return 0
+          }
+          return 1
+        }
+        function is_image_value(line, start, prefix, value_start, candidate, context) {
+          prefix = tolower(substr(line, 1, start - 1))
+          if (match(prefix, /(^|[^[:alnum:]_])image[\"' ]*[[:space:]]*:[[:space:]]*[\"' ]*/)) value_start = RSTART + RLENGTH
+          else if (match(prefix, /(^|[^[:alnum:]_])image[\"' ]*[[:space:]]*=[[:space:]]*[\"' ]*/)) value_start = RSTART + RLENGTH
+          else return 0
+          context = quote_context(line, RSTART + 1, format)
+          if ((format == "yaml" || format == "json") && context != "") return 0
+          candidate = tolower(substr(line, value_start))
+          sub(/[\"'[:space:],;}].*$/, "", candidate)
+          return index(candidate, "/") > 0 && candidate ~ /^[a-z0-9][a-z0-9.-]*(\/[a-z0-9._-]+)*(:[a-z0-9._-]+)?(@sha256:[[:xdigit:]]+)?$/
+        }
+        function is_source_path(line, start, token, suffix) {
+          suffix = substr(line, start + length(token))
+          return index(token, "/") > 0 && token ~ /^[[:alnum:]_.+-]+(\/[[:alnum:]_.+-]+)+$/ && \
+            suffix ~ /^\.[[:alpha:]][[:alnum:]]*([:[:space:],;}\"']|$)/
         }
         function is_mapping_key_token(line, start, token, suffix) {
           suffix = substr(line, start + length(token))
@@ -256,7 +289,8 @@ chain:
               if (base64_shaped) {
                 current_token_start = start
                 if (length(token) >= 32 && entropy(token) >= 3.5 && \
-                    !is_uuid(token) && !is_resource_identifier(token, line, start) && !is_hash_value(token)) {
+                    !is_uuid(token) && !is_resource_identifier(token, line, start) && !is_hash_value(token) && \
+                    !is_image_value(line, start) && !is_source_path(line, start, token)) {
                   output = output "REDACTED_BASE64"
                 } else {
                   output = output token
@@ -267,7 +301,8 @@ chain:
                 token = substr(line, start, i - start)
                 current_token_start = start
                 output = output (length(token) >= 24 && !is_uuid(token) && !is_resource_identifier(token, line, start) && \
-                  !is_mapping_key_token(line, start, token) && !is_hash_value(token) && entropy(token) >= 3.5 ? "REDACTED_HIGH_ENTROPY" : token)
+                  !is_mapping_key_token(line, start, token) && !is_hash_value(token) && !is_image_value(line, start) && \
+                  !is_source_path(line, start, token) && entropy(token) >= 3.5 ? "REDACTED_HIGH_ENTROPY" : token)
               }
             } else if (character ~ /[[:alnum:]_~+-]/) {
               start = i
@@ -275,7 +310,8 @@ chain:
               token = substr(line, start, i - start)
               current_token_start = start
               output = output (length(token) >= 24 && !is_uuid(token) && !is_resource_identifier(token, line, start) && !is_mapping_key_token(line, start, token) && \
-                !is_hash_value(token) && entropy(token) >= 3.5 ? "REDACTED_HIGH_ENTROPY" : token)
+                !is_hash_value(token) && !is_image_value(line, start) && !is_source_path(line, start, token) && \
+                entropy(token) >= 3.5 ? "REDACTED_HIGH_ENTROPY" : token)
             } else {
               output = output character
               i++
@@ -339,7 +375,7 @@ chain:
           }
           return output
         }
-        function redact_scalar(line, value_start, format, direct, key_indent, output, value, quote, end, context, i, comment) {
+        function redact_scalar(line, value_start, format, direct, key_indent, output, value, quote, end, context, i, comment, anchor_prefix, anchor_length, depth, character, in_quote) {
           scalar_end = value_start - 1
           if (value_start > length(line)) {
             if (direct && format == "yaml") block_indent = key_indent
@@ -347,27 +383,34 @@ chain:
             return "\"REDACTED\""
           }
           value = substr(line, value_start)
+          anchor_prefix = ""
+          if (format == "yaml" && direct && match(value, /^&[[:alnum:]_-]+[[:space:]]+/)) {
+            anchor_length = RLENGTH
+            anchor_prefix = substr(value, 1, anchor_length)
+            value_start += anchor_length
+            value = substr(line, value_start)
+          }
           quote = substr(line, value_start, 1)
           if (format == "yaml" && direct && value ~ /^[|>][+-]?[0-9]?[+-]?[[:space:]]*(#.*)?$/) {
             block_indent = key_indent
             comment = index(value, "#")
             scalar_end = length(line)
-            return "\"REDACTED\"" (comment > 0 ? " " substr(value, comment) : "")
+            return anchor_prefix "\"REDACTED\"" (comment > 0 ? " " substr(value, comment) : "")
           }
           if (quote == "\"" || quote == single_quote) {
             end = find_quote_end(line, value_start, quote)
             if (end > 0) {
               scalar_end = end
-              return quote "REDACTED" quote
+              return anchor_prefix quote "REDACTED" quote
             }
             if (direct && format == "yaml") {
               quoted_indent = key_indent
               quoted_character = quote
               scalar_end = length(line)
-              return quote "REDACTED" quote
+              return anchor_prefix quote "REDACTED" quote
             }
             scalar_end = length(line)
-            return quote "REDACTED" quote
+            return anchor_prefix quote "REDACTED" quote
           }
           context = quote_context(line, value_start - 1, format)
           if (context != "") {
@@ -378,7 +421,7 @@ chain:
               }
               if (end > 0) {
                 scalar_end = end
-                return "\\" context "REDACTED\\" context
+                return anchor_prefix "\\" context "REDACTED\\" context
               }
             }
             for (i = value_start; i <= length(line); i++) {
@@ -387,7 +430,7 @@ chain:
             }
             if (end > 0) {
               scalar_end = end - 1
-              return "REDACTED"
+              return anchor_prefix "REDACTED"
             }
           }
           if (format == "yaml" && direct) {
@@ -397,21 +440,40 @@ chain:
               if (substr(line, i, 1) == "#" && (i == value_start || substr(line, i - 1, 1) ~ /[[:space:]]/)) { comment = i; break }
             }
             scalar_end = length(line)
-            if (comment > 0) return "\"REDACTED\" " substr(line, comment)
-            return "\"REDACTED\""
+            if (comment > 0) return anchor_prefix "\"REDACTED\" " substr(line, comment)
+            return anchor_prefix "\"REDACTED\""
           }
           if (format == "json") {
+            if (quote == "{" || quote == "[") {
+              depth = 0
+              in_quote = ""
+              for (i = value_start; i <= length(line); i++) {
+                character = substr(line, i, 1)
+                if (in_quote == "\"" && character == "\\") { i++; continue }
+                if (character == "\"") { in_quote = in_quote == "" ? "\"" : ""; continue }
+                if (in_quote != "") continue
+                if (character == "{" || character == "[") depth++
+                else if (character == "}" || character == "]") {
+                  depth--
+                  if (depth == 0) break
+                }
+              }
+              scalar_end = i
+              return "\"REDACTED\""
+            }
             for (i = value_start; i <= length(line); i++) if (substr(line, i, 1) == "," || substr(line, i, 1) == "}" || substr(line, i, 1) == "]") break
-          } else if (format == "text" && tolower(substr(line, 1, value_start - 1)) ~ /^[[:space:]]*authorization[[:space:]]*[:=][[:space:]]*$/) {
+            scalar_end = i - 1
+            return "\"REDACTED\""
+          } else if (format == "text" && tolower(substr(line, 1, value_start - 1)) ~ /(^|[^[:alnum:]_])authorization[[:space:]]*[:=][[:space:]]*$/) {
             i = length(line) + 1
-          } else if (format == "html" && tolower(substr(line, 1, value_start - 1)) ~ /(^|[>[:space:]])authorization[[:space:]]*[:=][[:space:]]*$/) {
+          } else if (format == "html" && tolower(substr(line, 1, value_start - 1)) ~ /(^|[^[:alnum:]_])authorization[[:space:]]*[:=][[:space:]]*$/) {
             for (i = value_start; i <= length(line); i++) if (substr(line, i, 1) == "<") break
           } else {
             for (i = value_start; i <= length(line); i++) if (substr(line, i, 1) ~ /[[:space:],;&|>]/) break
           }
           if (i <= value_start) i = value_start + 1
           scalar_end = i - 1
-          return "REDACTED"
+          return anchor_prefix "REDACTED"
         }
         function redact_fields(line, format, force, output, lower, offset, start, size, value_start, context, quote, end, direct, key_indent, local_key, local_value_start, value, position, value_prefix, relative, field_start, field_size, flag_start, flag_size, delimiter, character) {
           if (force && format == "yaml" && parse_mapping(line)) {
@@ -545,7 +607,7 @@ chain:
           value = substr(object, value_start, value_end - value_start + 1)
           quote = substr(value, 1, 1)
           if (quote == "\"" || quote == single_quote) value = quote "REDACTED" quote
-          else value = "REDACTED"
+          else value = "\"REDACTED\""
           return substr(object, 1, value_start - 1) value substr(object, value_end + 1)
         }
         function redact_env_objects(line, lower, output, offset, env_position, colon, start, end, i, quote, character, depth, object, replacement) {
@@ -588,11 +650,232 @@ chain:
           }
           return output substr(line, offset)
         }
+        function matching_delimiter(text, start, opening, closing, depth, quote, character, i) {
+          depth = 0
+          quote = ""
+          for (i = start; i <= length(text); i++) {
+            character = substr(text, i, 1)
+            if (quote == "\"" && character == "\\") { i++; continue }
+            if (character == "\"") { quote = quote == "" ? "\"" : ""; continue }
+            if (quote != "") continue
+            if (character == opening) depth++
+            else if (character == closing) {
+              depth--
+              if (depth == 0) return i
+            }
+          }
+          return 0
+        }
+        function redact_json_fields(text, output, cursor, quote_start, quote_end, key, colon, value_start, value_end, character, i) {
+          output = ""
+          cursor = 1
+          while (cursor <= length(text)) {
+            quote_start = cursor
+            while (quote_start <= length(text) && substr(text, quote_start, 1) != "\"") quote_start++
+            if (quote_start > length(text)) return output substr(text, cursor)
+            output = output substr(text, cursor, quote_start - cursor)
+            quote_end = find_quote_end(text, quote_start, "\"")
+            if (quote_end == 0) return output substr(text, quote_start)
+            key = substr(text, quote_start + 1, quote_end - quote_start - 1)
+            colon = quote_end + 1
+            while (substr(text, colon, 1) ~ /[[:space:]]/ && colon <= length(text)) colon++
+            if (substr(text, colon, 1) != ":" || !is_credential_name(key)) {
+              output = output substr(text, quote_start, quote_end - quote_start + 1)
+              cursor = quote_end + 1
+              continue
+            }
+            value_start = colon + 1
+            while (substr(text, value_start, 1) ~ /[[:space:]]/ && value_start <= length(text)) value_start++
+            character = substr(text, value_start, 1)
+            if (character == "\"") value_end = find_quote_end(text, value_start, "\"")
+            else if (character == "{" || character == "[") value_end = matching_delimiter(text, value_start, character, character == "{" ? "}" : "]")
+            else {
+              value_end = value_start
+              while (value_end <= length(text) && substr(text, value_end, 1) !~ /[,}\]]/) value_end++
+              value_end--
+              while (value_end >= value_start && substr(text, value_end, 1) ~ /[[:space:]]/) value_end--
+            }
+            if (value_end < value_start) {
+              output = output substr(text, quote_start, quote_end - quote_start + 1)
+              cursor = quote_end + 1
+              continue
+            }
+            output = output substr(text, quote_start, value_start - quote_start) "\"REDACTED\""
+            cursor = value_end + 1
+          }
+          return output
+        }
+        function redact_json_env_array(text, start, end, output, i, chunk_start, object_end, object) {
+          output = "["
+          i = start + 1
+          chunk_start = i
+          while (i < end) {
+            if (substr(text, i, 1) == "{") {
+              output = output substr(text, chunk_start, i - chunk_start)
+              object_end = matching_delimiter(text, i, "{", "}")
+              if (object_end == 0 || object_end > end) return output substr(text, i, end - i + 1)
+              object = substr(text, i, object_end - i + 1)
+              output = output redact_flow_object(object)
+              i = object_end + 1
+              chunk_start = i
+            } else {
+              i++
+            }
+          }
+          return output substr(text, chunk_start, end - chunk_start) "]"
+        }
+        function redact_json_env_arrays(text, output, cursor, quote_start, quote_end, key, colon, array_start, array_end) {
+          output = ""
+          cursor = 1
+          while (cursor <= length(text)) {
+            quote_start = cursor
+            while (quote_start <= length(text) && substr(text, quote_start, 1) != "\"") quote_start++
+            if (quote_start > length(text)) return output substr(text, cursor)
+            output = output substr(text, cursor, quote_start - cursor)
+            quote_end = find_quote_end(text, quote_start, "\"")
+            if (quote_end == 0) return output substr(text, quote_start)
+            key = substr(text, quote_start + 1, quote_end - quote_start - 1)
+            colon = quote_end + 1
+            while (substr(text, colon, 1) ~ /[[:space:]]/ && colon <= length(text)) colon++
+            array_start = colon + 1
+            while (substr(text, array_start, 1) ~ /[[:space:]]/ && array_start <= length(text)) array_start++
+            if (key != "env" || substr(text, colon, 1) != ":" || substr(text, array_start, 1) != "[") {
+              output = output substr(text, quote_start, quote_end - quote_start + 1)
+              cursor = quote_end + 1
+              continue
+            }
+            array_end = matching_delimiter(text, array_start, "[", "]")
+            if (array_end == 0) return output substr(text, quote_start)
+            output = output substr(text, quote_start, array_start - quote_start) redact_json_env_array(text, array_start, array_end)
+            cursor = array_end + 1
+          }
+          return output
+        }
+        function redact_json_args_array(text, start, end, output, i, member_start, member_end, j, depth, quote, character, raw, value, leading, trailing, trailing_start, pending, consumed, comma) {
+          output = "["
+          i = start + 1
+          pending = 0
+          while (i < end) {
+            member_start = i
+            depth = 0
+            quote = ""
+            for (j = i; j < end; j++) {
+              character = substr(text, j, 1)
+              if (quote == "\"" && character == "\\") { j++; continue }
+              if (character == "\"") { quote = quote == "" ? "\"" : ""; continue }
+              if (quote != "") continue
+              if (character == "{" || character == "[") depth++
+              else if (character == "}" || character == "]") depth--
+              else if (character == "," && depth == 0) break
+            }
+            member_end = j
+            comma = j < end
+            raw = substr(text, member_start, member_end - member_start)
+            trimmed_start = match(raw, /[^[:space:]]/)
+            if (trimmed_start == 0) {
+              output = output raw
+              i = member_end + (comma ? 1 : 0)
+              if (comma) output = output ","
+              continue
+            }
+            leading = trimmed_start - 1
+            value = trim(raw)
+            consumed = 0
+            if (pending) {
+              if (substr(value, 1, 1) == "\"" && unquote(value) !~ /^--/) {
+                trailing_start = match(raw, /[[:space:]]*$/)
+                trailing = length(raw) - trailing_start + 1
+                output = output substr(raw, 1, leading) "\"REDACTED\"" (trailing > 0 ? substr(raw, trailing_start) : "")
+                consumed = 1
+              }
+              pending = 0
+            }
+            if (!consumed) {
+              output = output raw
+              if (substr(value, 1, 1) == "\"" && is_sensitive_flag(unquote(value))) pending = 1
+            }
+            i = member_end + (comma ? 1 : 0)
+            if (comma) output = output ","
+          }
+          return output "]"
+        }
+        function redact_json_args_arrays(text, output, cursor, quote_start, quote_end, key, colon, array_start, array_end) {
+          output = ""
+          cursor = 1
+          while (cursor <= length(text)) {
+            quote_start = cursor
+            while (quote_start <= length(text) && substr(text, quote_start, 1) != "\"") quote_start++
+            if (quote_start > length(text)) return output substr(text, cursor)
+            output = output substr(text, cursor, quote_start - cursor)
+            quote_end = find_quote_end(text, quote_start, "\"")
+            if (quote_end == 0) return output substr(text, quote_start)
+            key = substr(text, quote_start + 1, quote_end - quote_start - 1)
+            colon = quote_end + 1
+            while (substr(text, colon, 1) ~ /[[:space:]]/ && colon <= length(text)) colon++
+            array_start = colon + 1
+            while (substr(text, array_start, 1) ~ /[[:space:]]/ && array_start <= length(text)) array_start++
+            if (key != "args" || substr(text, colon, 1) != ":" || substr(text, array_start, 1) != "[") {
+              output = output substr(text, quote_start, quote_end - quote_start + 1)
+              cursor = quote_end + 1
+              continue
+            }
+            array_end = matching_delimiter(text, array_start, "[", "]")
+            if (array_end == 0) return output substr(text, quote_start)
+            output = output substr(text, quote_start, array_start - quote_start) redact_json_args_array(text, array_start, array_end)
+            cursor = array_end + 1
+          }
+          return output
+        }
         function flow_list_item(line, indent) {
           indent = indentation(line)
           return substr(line, indent + 1, 1) == "-" && substr(line, indent + 2, 1) ~ /[[:space:]\{]/
         }
+        function redact_pem(line, output, offset, marker_start, marker_end, begin_marker, marker_type, end_position) {
+          output = ""
+          offset = 1
+          while (offset <= length(line)) {
+            if (pem_active) {
+              end_position = index(substr(line, offset), pem_end_marker)
+              if (end_position == 0) return output
+              marker_end = offset + end_position - 1
+              offset = marker_end + length(pem_end_marker)
+              pem_active = 0
+              pem_end_marker = ""
+              continue
+            }
+            if (!match(substr(line, offset), /-----BEGIN [A-Z0-9 ]+-----/)) {
+              output = output substr(line, offset)
+              return output
+            }
+            marker_start = offset + RSTART - 1
+            begin_marker = substr(line, marker_start, RLENGTH)
+            marker_type = begin_marker
+            sub(/^-----BEGIN /, "", marker_type)
+            sub(/-----$/, "", marker_type)
+            pem_end_marker = "-----END " marker_type "-----"
+            output = output substr(line, offset, marker_start - offset) "REDACTED_PEM"
+            offset = marker_start + RLENGTH
+            pem_active = 1
+          }
+          return output
+        }
+        function redact_yaml_arg(line, indent, start, value, quote, end, comment) {
+          start = indent + 2
+          while (substr(line, start, 1) ~ /[[:space:]]/ && start <= length(line)) start++
+          value = substr(line, start)
+          quote = substr(line, start, 1)
+          if (quote == "\"" || quote == single_quote) {
+            end = find_quote_end(line, start, quote)
+            if (end > 0) return substr(line, 1, start - 1) quote "REDACTED" quote substr(line, end + 1)
+          }
+          comment = 0
+          for (end = start; end <= length(line); end++) {
+            if (substr(line, end, 1) == "#" && (end == start || substr(line, end - 1, 1) ~ /[[:space:]]/)) { comment = end; break }
+          }
+          return substr(line, 1, start - 1) "\"REDACTED\"" (comment > 0 ? " " substr(line, comment) : "")
+        }
         function process_line(line, force, output) {
+          line = redact_pem(line)
           output = redact_url_userinfo(line)
           output = redact_bearer(output)
           output = redact_aws_keys(output)
@@ -628,6 +911,10 @@ chain:
           env_item_key_indent = -1
         }
         {
+          if (format == "json") {
+            json_content = json_content (NR > 1 ? "\n" : "") $0
+            next
+          }
           current_indent = indentation($0)
           if (block_indent >= 0) {
             if ($0 ~ /^[[:space:]]*$/ || current_indent > block_indent) next
@@ -674,10 +961,53 @@ chain:
             env_list_indent = -1
             next
           }
+          if (format == "yaml" && args_indent >= 0) {
+            if ($0 ~ /^[[:space:]]*$/ || $0 ~ /^[[:space:]]*#/) {
+              process_line($0, 0)
+              next
+            }
+            if (current_indent < args_indent || (current_indent == args_indent && !flow_list_item($0))) {
+              args_indent = -1
+              args_pending_secret = 0
+            } else if (flow_list_item($0) && current_indent >= args_indent) {
+              argument_start = current_indent + 2
+              while (substr($0, argument_start, 1) ~ /[[:space:]]/ && argument_start <= length($0)) argument_start++
+              argument = unquote(substr($0, argument_start))
+              if (args_pending_secret) {
+                if (is_sensitive_flag(argument)) {
+                  process_line($0, 0)
+                } else {
+                  process_line(redact_yaml_arg($0, current_indent), 0)
+                  args_pending_secret = 0
+                }
+              } else {
+                process_line($0, 0)
+                if (is_sensitive_flag(argument)) args_pending_secret = 1
+              }
+              next
+            }
+          }
+          if (format == "yaml" && parse_mapping($0) && mapping_key == "args" && \
+              (mapping_value_start > length($0) || substr($0, mapping_value_start, 1) == "#")) {
+            process_line($0, 0)
+            args_indent = mapping_key_indent
+            args_pending_secret = 0
+            next
+          }
           process_line($0, 0)
         }
         END {
-          if (env_item_count > 0) flush_env_item()
+          if (format == "json") {
+            json_content = redact_json_fields(json_content)
+            json_content = redact_json_env_arrays(json_content)
+            json_content = redact_json_args_arrays(json_content)
+            json_line_count = split(json_content, json_lines, "\n")
+            for (json_line_index = 1; json_line_index <= json_line_count; json_line_index++) process_line(json_lines[json_line_index], 0)
+          } else if (env_item_count > 0) flush_env_item()
+          if (pem_active) {
+            print "Unterminated PEM block; refusing to publish sanitized dump" > "/dev/stderr"
+            exit 1
+          }
         }
       AWK
         mv "${file}.redacted" "${file}"

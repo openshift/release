@@ -63,10 +63,17 @@ metadata:
   name: hypershift-operator-controller-manager-abcdef
   uid: 123e4567-e89b-12d3-a456-426614174000
   commit: ${commit}
+  notcommit: ${commit}
   git_commit: "${commit} diagnostic=${opaque}"
   unlabelledOpaqueBase64: "QWxwaGFCZXRhR2FtbWFEZWx0YUVwc2lsb25L/XlXb3JkLzEyMzQ1Njc4OUFCQ0RFRg=="
   digest: sha256:${digest}
+  quotedDigest: "sha256:${digest}"
   digestWithOtherDiagnostic: "sha256:${digest} diagnostic=${opaque}"
+  sourceFile: kubernetes/kubernetes/pkg/controller/deployment/sync.go
+  image: quay.io/openshift/hypershift-controller:v2.0
+  diagnosticFlow: {password: fake-flow-root, keep: retained}
+  anchoredPassword: &diagnosticSecret anchored-yaml-secret
+  anchorAlias: *diagnosticSecret
   ordinaryPath: https://api.example.invalid/api/v1/namespaces/default/status
   opaquePath: https://api.example.invalid/api/v1/${opaque}/status
   opaqueLowerPath: https://api.example.invalid/api/v1/${lower_path_secret}/status
@@ -83,7 +90,19 @@ metadata:
     folded-plain-secret
     continuation-plain-secret
   afterMultiline: retained-diagnostic
+  pemMessage: "before -----BEGIN PRIVATE KEY-----
+    multiline-private-key-material
+    -----END PRIVATE KEY----- after-field"
 spec:
+  template:
+    spec:
+      containers:
+      - name: argument-container
+        args:
+        - --password
+        - yaml-argument-secret
+        - --namespace
+        - default
   containers:
   - name: diagnostic-container
     env:
@@ -102,8 +121,33 @@ spec:
 EOF
 
 cat > "${fixture_dir}/cluster-scoped-resources/core/status.json" <<EOF
-{"message":"password=json-message-secret and keep-json-diagnostic","url":"https://fake-user:fake-short@example.invalid/api","commit":"${commit}","digest":"sha256:${digest}","password":"json-field-secret","env":[{"value":"json-env-secret","name":"API_TOKEN"},{"name":"TOKEN_FROM","valueFrom":{"secretKeyRef":{"name":"retained-json-reference"}}}]}
+{
+  "message":"password=json-message-secret and keep-json-diagnostic",
+  "url":"https://fake-user:fake-short@example.invalid/api",
+  "commit":"${commit}",
+  "notcommit":"${commit}",
+  "digest":"sha256:${digest}",
+  "password":"json-field-secret",
+  "serviceAccountToken":{"expirationSeconds":3607,"path":"token"},
+  "automountServiceAccountToken":false,
+  "token":null,
+  "items":[{"spec":{"containers":[
+    {"name":"first","env":[{"name":"API_TOKEN","value":"pretty-json-env-secret"}]},
+    {"name":"second","env":[{"value":"second-container-secret","name":"DB_PASSWORD"}]}
+  ]}}],
+  "compactContainers":[{"env":[{"name":"API_TOKEN","value":"compact-first-secret"}]},{"env":[{"value":"compact-second-secret","name":"DB_PASSWORD"}]}],
+  "args":["--password","json-argument-secret","--namespace","default"],
+  "env":[{"value":"json-env-secret","name":"API_TOKEN"},{"name":"TOKEN_FROM","valueFrom":{"secretKeyRef":{"name":"retained-json-reference"}}}],
+  "pem":"pre -----BEGIN PRIVATE KEY-----inline-key-one-----END PRIVATE KEY----- middle -----BEGIN CERTIFICATE-----inline-key-two-----END CERTIFICATE----- post",
+  "pemBefore":"-----BEGIN PRIVATE KEY-----sibling-key-one-----END PRIVATE KEY-----","keepBetweenPem":"retained-between-pem","pemAfter":"-----BEGIN CERTIFICATE-----sibling-key-two-----END CERTIFICATE-----",
+  "keep":"retained-json-field"
+}
 EOF
+
+cat > "${fixture_dir}/cluster-scoped-resources/core/timestamp" <<EOF
+password=fake-extensionless-secret
+EOF
+printf 'binary\000fake-binary-secret' > "${fixture_dir}/cluster-scoped-resources/core/binary-data"
 
 cat > "${fixture_dir}/cluster-scoped-resources/core/event-filter.html" <<EOF
 <html><body><a href="https://fake-user:fake-short@example.invalid/events/${opaque}">Authorization: bEaReR html-bearer-secret</a><p>${opaque}</p></body></html>
@@ -111,8 +155,11 @@ EOF
 
 cat > "${fixture_dir}/cluster-scoped-resources/core/events.log" <<EOF
 Authorization: short-auth-secret
+message Authorization: Basic ZmFrZTpmYWtl
 AWS key AKIA1234567890ABCDEF and ASIA1234567890ABCDEF
 Run --password flag-secret-value --client-secret 'quoted flag secret' keep-after-flag
+Run argv --token separate-log-argument --namespace default
+message image: ${opaque}
 diagnostic URL https://api.example.invalid/normal/path/${opaque}/events
 EOF
 
@@ -157,14 +204,24 @@ yaml_file="${extract_dir}/output/cluster-scoped-resources/core/nodes.yaml"
 json_file="${extract_dir}/output/cluster-scoped-resources/core/status.json"
 html_file="${extract_dir}/output/cluster-scoped-resources/core/event-filter.html"
 log_file="${extract_dir}/output/cluster-scoped-resources/core/events.log"
+timestamp_file="${extract_dir}/output/cluster-scoped-resources/core/timestamp"
 
 yq '.' "${yaml_file}" > /dev/null || fail "sanitized YAML is invalid"
 jq '.' "${json_file}" > /dev/null || fail "sanitized JSON is invalid"
 
 assert_contains "${yaml_file}" "commit: ${commit}"
+assert_contains "${yaml_file}" "notcommit: REDACTED_HIGH_ENTROPY"
 assert_contains "${yaml_file}" "git_commit: \"${commit} diagnostic=REDACTED_HIGH_ENTROPY\""
 assert_contains "${yaml_file}" 'unlabelledOpaqueBase64: "REDACTED_BASE64"'
 assert_contains "${yaml_file}" "digest: sha256:${digest}"
+assert_contains "${yaml_file}" "quotedDigest: \"sha256:${digest}\""
+assert_contains "${yaml_file}" "sourceFile: kubernetes/kubernetes/pkg/controller/deployment/sync.go"
+assert_contains "${yaml_file}" "image: quay.io/openshift/hypershift-controller:v2.0"
+assert_contains "${yaml_file}" 'diagnosticFlow: {password: REDACTED, keep: retained}'
+assert_contains "${yaml_file}" 'anchoredPassword: &diagnosticSecret "REDACTED"'
+assert_contains "${yaml_file}" 'anchorAlias: *diagnosticSecret'
+assert_contains "${yaml_file}" 'pemMessage: "before REDACTED_PEM'
+assert_contains "${yaml_file}" 'after-field"'
 assert_not_contains "${yaml_file}" "diagnostic=${opaque}"
 assert_contains "${yaml_file}" "digestWithOtherDiagnostic: \"sha256:${digest} diagnostic=REDACTED_HIGH_ENTROPY\""
 assert_contains "${yaml_file}" "ordinaryPath: https://api.example.invalid/api/v1/namespaces/default/status"
@@ -188,13 +245,16 @@ assert_contains "${yaml_file}" 'value: "REDACTED"'
 assert_contains "${json_file}" "password=REDACTED and keep-json-diagnostic"
 assert_contains "${json_file}" "https://REDACTED@example.invalid/api"
 assert_contains "${json_file}" "\"commit\":\"${commit}\""
+assert_contains "${json_file}" '"notcommit":"REDACTED_HIGH_ENTROPY"'
 assert_contains "${json_file}" "sha256:${digest}"
-jq -e '.password == "REDACTED" and .env[0].value == "REDACTED" and .env[1].valueFrom.secretKeyRef.name == "retained-json-reference"' "${json_file}" > /dev/null || fail "JSON credential or environment sanitization failed"
+jq -e '.password == "REDACTED" and .serviceAccountToken == "REDACTED" and .automountServiceAccountToken == "REDACTED" and .token == "REDACTED" and .items[0].spec.containers[0].env[0].value == "REDACTED" and .items[0].spec.containers[1].env[0].value == "REDACTED" and .compactContainers[0].env[0].value == "REDACTED" and .compactContainers[1].env[0].value == "REDACTED" and .args == ["--password", "REDACTED", "--namespace", "default"] and .env[0].value == "REDACTED" and .env[1].valueFrom.secretKeyRef.name == "retained-json-reference" and .keep == "retained-json-field" and .keepBetweenPem == "retained-between-pem" and .pemBefore == "REDACTED_PEM" and .pemAfter == "REDACTED_PEM" and (.pem | contains("REDACTED_PEM") and contains("middle") and contains("post"))' "${json_file}" > /dev/null || fail "JSON credential, argument, PEM, or environment sanitization failed"
 assert_contains "${html_file}" "https://REDACTED@example.invalid/events/REDACTED_HIGH_ENTROPY"
 assert_contains "${html_file}" "Authorization: REDACTED</a>"
 assert_contains "${html_file}" "</body></html>"
 assert_contains "${log_file}" "Authorization: REDACTED"
+assert_contains "${log_file}" "message Authorization: REDACTED"
 assert_contains "${log_file}" "Run --password REDACTED --client-secret 'REDACTED' keep-after-flag"
+assert_contains "${timestamp_file}" "password=REDACTED"
 assert_not_contains "${log_file}" "AKIA1234567890ABCDEF"
 assert_not_contains "${log_file}" "ASIA1234567890ABCDEF"
 assert_not_contains "${extract_dir}" "fake-short"
@@ -210,6 +270,18 @@ assert_not_contains "${extract_dir}" "folded-plain-secret"
 assert_not_contains "${extract_dir}" "continuation-plain-secret"
 assert_not_contains "${extract_dir}" "flag-secret-value"
 assert_not_contains "${extract_dir}" "quoted flag secret"
+assert_not_contains "${extract_dir}" "yaml-argument-secret"
+assert_not_contains "${extract_dir}" "json-argument-secret"
+assert_not_contains "${extract_dir}" "separate-log-argument"
+assert_not_contains "${extract_dir}" "ZmFrZTpmYWtl"
+assert_not_contains "${extract_dir}" "fake-extensionless-secret"
+assert_not_contains "${extract_dir}" "anchored-yaml-secret"
+assert_not_contains "${extract_dir}" "multiline-private-key-material"
+assert_not_contains "${extract_dir}" "inline-key-one"
+assert_not_contains "${extract_dir}" "inline-key-two"
+assert_not_contains "${extract_dir}" "sibling-key-one"
+assert_not_contains "${extract_dir}" "sibling-key-two"
+[[ ! -e "${extract_dir}/output/cluster-scoped-resources/core/binary-data" ]] || fail "binary diagnostic file was archived"
 
 # Exercise the Azure branch too; sanitization and archive publication are shared.
 azure_run_dir="${work_dir}/azure-run"
@@ -255,6 +327,25 @@ if (
   fail "step unexpectedly succeeded after file discovery failed"
 fi
 [[ ! -e "${failure_artifact_dir}/artifacts.tar.gz" ]] || fail "archive was published after find failed"
-assert_contains "${work_dir}/find-failure.log" "Failed to enumerate diagnostic files"
+assert_contains "${work_dir}/find-failure.log" "Failed to enumerate dump files"
+
+# A PEM begin marker without a matching end marker must fail closed rather than
+# archive a partially rewritten structured diagnostic.
+pem_failure_dir="${work_dir}/pem-failure-run"
+make_fake_runner "${pem_failure_dir}"
+cp -R "${fixture_dir}/." "${pem_failure_dir}/fixture-copy"
+mkdir -p "${pem_failure_dir}/fixture-copy/cluster-scoped-resources/core"
+printf '%s\n' '-----BEGIN PRIVATE KEY-----unclosed-private-key' > \
+  "${pem_failure_dir}/fixture-copy/cluster-scoped-resources/core/unclosed"
+pem_failure_artifact_dir="${pem_failure_dir}/artifacts"
+if (
+  cd "${pem_failure_dir}"
+  FIXTURE_DIR="${pem_failure_dir}/fixture-copy" ARTIFACT_DIR="${pem_failure_artifact_dir}" \
+    PROW_JOB_ID=redaction-test HYPERSHIFT_NAMESPACE=clusters CLOUD_PROVIDER=AWS bash "${command_file}"
+) > "${work_dir}/pem-failure.log" 2>&1; then
+  fail "step unexpectedly succeeded after an unterminated PEM block"
+fi
+[[ ! -e "${pem_failure_artifact_dir}/artifacts.tar.gz" ]] || fail "archive was published with an unterminated PEM block"
+assert_contains "${work_dir}/pem-failure.log" "Unterminated PEM block"
 
 echo "PASS: dump sanitization, archive round-trip, and fail-closed file discovery"
