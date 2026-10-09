@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 
 # Grant image pull access for openshift-tests to extract test binaries from the payload
 KUBECONFIG_BAK=$KUBECONFIG
