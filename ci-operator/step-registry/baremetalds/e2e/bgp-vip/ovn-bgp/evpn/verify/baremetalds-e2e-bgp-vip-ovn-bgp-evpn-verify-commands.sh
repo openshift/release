@@ -290,7 +290,7 @@ echo "[4/5] the master's VTEP IP is its node IP, not a VIP, and the RR learns th
 # EVPN datapath is dead (OCPBUGS-130338). This is the coexistence contract.
 check_vtep_annotation() {
     local v4
-    v4="$(oc get node "${master_node}" -o json | jq -r --arg n "${VTEP}" '.metadata.annotations["k8s.ovn.org/node-vteps"] // "{}" | fromjson | .[$n].ips // [] | map(select(contains(":")|not)) | .[0] // empty')"
+    v4="$(oc get node "${master_node}" -o json | jq -r --arg n "${VTEP}" '.metadata.annotations["k8s.ovn.org/vteps"] // "{}" | fromjson | .[$n].ips // [] | map(select(contains(":")|not)) | .[0] // empty')"
     [[ -n "${v4}" ]] || return 1
     echo "master ${master_node} VTEP annotation (v4): ${v4}; node IP: ${master_ip}"
     [[ "${v4}" == "${master_ip}" ]]
