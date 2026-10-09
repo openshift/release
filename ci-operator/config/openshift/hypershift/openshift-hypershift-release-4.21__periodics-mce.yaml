@@ -15,6 +15,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
+  libvirt-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: libvirt-installer
   test-bin:
     name: "4.21"
     namespace: ocp
@@ -29,6 +33,13 @@ releases:
   421-latest:
     candidate:
       product: ocp
+      stream: nightly
+      version: "4.21"
+  initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
       stream: nightly
       version: "4.21"
   latest:
@@ -413,9 +424,11 @@ tests:
       CLUSTER_VERSION: "4.21"
       MCE_VERSION: "2.11"
     workflow: hypershift-mce-ibmz-conformance-s390xmgmt
-- as: e2e-ibmz-s390x-mgmt-ovn-conformance-virt
-  cluster: build01
-  cron: 30 7 */2 * *
+- as: e2e-ibmz-s390x-mgmt-ovn-conformance-virt-oz
+  capabilities:
+  - intranet
+  cluster: build12
+  cron: 30 0 * * 2,4
   reporter_config:
     channel: '#ibmz-prowci-notifier'
     job_states_to_report:
@@ -427,10 +440,19 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   steps:
+    cluster_profile: libvirt-s390x-vpn-hcp
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:initial
     env:
-      CLUSTER_VERSION: "4.21"
+      ARCH: s390x
+      BRANCH: 5.0-hcpci
+      ETCD_DISK_SPEED: slow
       MCE_VERSION: "2.11"
-    workflow: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt
+      NODE_TUNING: "true"
+      USE_EXTERNAL_DNS: "true"
+      USE_RAMFS: "true"
+    workflow: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-oz
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: release-4.21
   org: openshift
