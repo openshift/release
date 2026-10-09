@@ -108,6 +108,9 @@ chain:
           env_item_count = 0
           args_indent = -1
           args_pending_secret = 0
+          flow_capture = 0
+          flow_depth = 0
+          flow_quote = ""
           pem_active = 0
           pem_end_marker = ""
         }
@@ -115,6 +118,12 @@ chain:
           sub(/^[[:space:]]+/, "", value)
           sub(/[[:space:]]+$/, "", value)
           return value
+        }
+        function single_quote_starts(text, position, previous) {
+          if (substr(text, position, 1) != single_quote) return 0
+          previous = position <= 1 ? "" : substr(text, position - 1, 1)
+          return previous == "" || previous ~ /[[:space:]]/ || previous == "," || \
+            previous == ":" || previous == "[" || previous == "{" || previous == "-"
         }
         function indentation(line, position) {
           position = match(line, /[^[:space:]]/)
@@ -150,9 +159,10 @@ chain:
               i++
               continue
             }
-            if (character == "\"" || character == single_quote) {
+            if ((character == "\"" && (quote == "" || quote == "\"")) || \
+                (character == single_quote && (quote == single_quote || (quote == "" && single_quote_starts(line, i))))) {
               if (quote == "") quote = character
-              else if (quote == character) quote = ""
+              else quote = ""
             }
           }
           return quote
@@ -167,6 +177,10 @@ chain:
             position++
             while (substr(line, position, 1) ~ /[[:space:]]/ && position <= length(line)) position++
           }
+          # A flow collection at the beginning of a line is not a block
+          # mapping. Treating its first member as a block key causes the
+          # scalar redactor to consume the rest of the collection.
+          if (substr(line, position, 1) == "{" || substr(line, position, 1) == "[") return 0
           mapping_key_indent = position - 1
           quote = substr(line, position, 1)
           if (quote == "\"" || quote == single_quote) {
@@ -198,8 +212,54 @@ chain:
           sub(/[[:space:]]+#.*$/, "", value)
           return trim(value)
         }
+        function hex_digit_value(character, position) {
+          position = index("0123456789abcdef", tolower(character))
+          return position == 0 ? -1 : position - 1
+        }
+        function normalize_json_key(value, output, i, j, code, digit, valid, escaped) {
+          output = ""
+          for (i = 1; i <= length(value); i++) {
+            if (substr(value, i, 1) == "\\" && substr(value, i + 1, 1) == "u") {
+              code = 0
+              valid = 1
+              for (j = i + 2; j <= i + 5; j++) {
+                digit = hex_digit_value(substr(value, j, 1))
+                if (digit < 0) { valid = 0; break }
+                code = code * 16 + digit
+              }
+              if (valid && code < 128) {
+                output = output sprintf("%c", code)
+                i += 5
+                continue
+              }
+            }
+            escaped = substr(value, i + 1, 1)
+            if (substr(value, i, 1) == "\\" && index("\"\\/", escaped) > 0) {
+              output = output escaped
+              i++
+              continue
+            }
+            output = output substr(value, i, 1)
+          }
+          return output
+        }
         function is_credential_name(value) {
           return tolower(value) ~ ("(" credential_stems ")$")
+        }
+        function credential_field_name(line, start, value_start, raw) {
+          raw = substr(line, start, value_start - start)
+          sub(/[[:space:]:=]+$/, "", raw)
+          gsub(/[\"']/, "", raw)
+          if (match(raw, /[[:alnum:]_.-]+$/)) return tolower(substr(raw, RSTART, RLENGTH))
+          return ""
+        }
+        function preserve_diagnostic_field(name, value_character) {
+          name = tolower(name)
+          if (name == "automountserviceaccounttoken" || name == "secretname") return 1
+          if (name == "serviceaccounttoken" || name == "secret") {
+            return value_character == "" || value_character == "{" || value_character == "["
+          }
+          return 0
         }
         function is_sensitive_flag(value, normalized) {
           normalized = tolower(value)
@@ -475,7 +535,7 @@ chain:
           scalar_end = i - 1
           return anchor_prefix "REDACTED"
         }
-        function redact_fields(line, format, force, output, lower, offset, start, size, value_start, context, quote, end, direct, key_indent, local_key, local_value_start, value, position, value_prefix, relative, field_start, field_size, flag_start, flag_size, delimiter, character) {
+        function redact_fields(line, format, force, output, lower, offset, start, size, value_start, context, quote, end, direct, key_indent, local_key, local_value_start, value, position, value_prefix, relative, field_start, field_size, flag_start, flag_size, delimiter, character, matched_key) {
           if (force && format == "yaml" && parse_mapping(line)) {
             value_prefix = substr(line, 1, mapping_value_start - 1)
             if (substr(line, mapping_value_start - 1, 1) == ":") value_prefix = value_prefix " "
@@ -487,7 +547,8 @@ chain:
           offset = 1
           direct = 0
           key_indent = -1
-          if (format == "yaml" && parse_mapping(line) && is_credential_name(mapping_key)) {
+          if (format == "yaml" && parse_mapping(line) && is_credential_name(mapping_key) && \
+              !preserve_diagnostic_field(mapping_key, substr(line, mapping_value_start, 1))) {
             local_key = mapping_key
             local_value_start = mapping_value_start
             key_indent = mapping_key_indent
@@ -515,6 +576,14 @@ chain:
               size = flag_size
             }
             value_start = start + size
+            if (field_start > 0) {
+              matched_key = credential_field_name(line, start, value_start)
+              if (preserve_diagnostic_field(matched_key, substr(line, value_start, 1))) {
+                output = output substr(line, offset, value_start - offset)
+                offset = value_start
+                continue
+              }
+            }
             direct = format == "yaml" && key_indent >= 0 && start <= local_value_start
             context = quote_context(line, start + ((substr(line, start, 1) == "\"" || substr(line, start, 1) == single_quote) ? 1 : 0), format)
             quote = substr(line, value_start, 1)
@@ -576,9 +645,11 @@ chain:
           for (i = 2; i <= length(object); i++) {
             character = substr(object, i, 1)
             if (quote == "\"" && character == "\\") { i++; continue }
-            if (character == "\"" || character == single_quote) {
+            if (quote == single_quote && character == single_quote && substr(object, i + 1, 1) == single_quote) { i++; continue }
+            if ((character == "\"" && (quote == "" || quote == "\"")) || \
+                (character == single_quote && (quote == single_quote || (quote == "" && single_quote_starts(object, i))))) {
               if (quote == "") quote = character
-              else if (quote == character) quote = ""
+              else quote = ""
               continue
             }
             if (quote != "") continue
@@ -630,9 +701,11 @@ chain:
             for (i = start; i <= length(line); i++) {
               character = substr(line, i, 1)
               if (quote == "\"" && character == "\\") { i++; continue }
-              if (character == "\"" || character == single_quote) {
+              if (quote == single_quote && character == single_quote && substr(line, i + 1, 1) == single_quote) { i++; continue }
+              if ((character == "\"" && (quote == "" || quote == "\"")) || \
+                  (character == single_quote && (quote == single_quote || (quote == "" && single_quote_starts(line, i))))) {
                 if (quote == "") quote = character
-                else if (quote == character) quote = ""
+                else quote = ""
                 continue
               }
               if (quote != "") continue
@@ -656,7 +729,13 @@ chain:
           for (i = start; i <= length(text); i++) {
             character = substr(text, i, 1)
             if (quote == "\"" && character == "\\") { i++; continue }
-            if (character == "\"") { quote = quote == "" ? "\"" : ""; continue }
+            if (quote == single_quote && character == single_quote && substr(text, i + 1, 1) == single_quote) { i++; continue }
+            if ((character == "\"" && (quote == "" || quote == "\"")) || \
+                (character == single_quote && (quote == single_quote || (quote == "" && single_quote_starts(text, i))))) {
+              if (quote == "") quote = character
+              else quote = ""
+              continue
+            }
             if (quote != "") continue
             if (character == opening) depth++
             else if (character == closing) {
@@ -677,6 +756,7 @@ chain:
             quote_end = find_quote_end(text, quote_start, "\"")
             if (quote_end == 0) return output substr(text, quote_start)
             key = substr(text, quote_start + 1, quote_end - quote_start - 1)
+            key = normalize_json_key(key)
             colon = quote_end + 1
             while (substr(text, colon, 1) ~ /[[:space:]]/ && colon <= length(text)) colon++
             if (substr(text, colon, 1) != ":" || !is_credential_name(key)) {
@@ -687,6 +767,11 @@ chain:
             value_start = colon + 1
             while (substr(text, value_start, 1) ~ /[[:space:]]/ && value_start <= length(text)) value_start++
             character = substr(text, value_start, 1)
+            if (preserve_diagnostic_field(key, character)) {
+              output = output substr(text, quote_start, quote_end - quote_start + 1)
+              cursor = quote_end + 1
+              continue
+            }
             if (character == "\"") value_end = find_quote_end(text, value_start, "\"")
             else if (character == "{" || character == "[") value_end = matching_delimiter(text, value_start, character, character == "{" ? "}" : "]")
             else {
@@ -751,7 +836,7 @@ chain:
           }
           return output
         }
-        function redact_json_args_array(text, start, end, output, i, member_start, member_end, j, depth, quote, character, raw, value, leading, trailing, trailing_start, pending, consumed, comma) {
+        function redact_json_args_array(text, start, end, output, i, member_start, member_end, j, depth, quote, character, raw, value, leading, trailing, trailing_start, pending, consumed, comma, value_quote, replacement) {
           output = "["
           i = start + 1
           pending = 0
@@ -762,7 +847,13 @@ chain:
             for (j = i; j < end; j++) {
               character = substr(text, j, 1)
               if (quote == "\"" && character == "\\") { j++; continue }
-              if (character == "\"") { quote = quote == "" ? "\"" : ""; continue }
+              if (quote == single_quote && character == single_quote && substr(text, j + 1, 1) == single_quote) { j++; continue }
+              if ((character == "\"" && (quote == "" || quote == "\"")) || \
+                  (character == single_quote && (quote == single_quote || (quote == "" && single_quote_starts(text, j))))) {
+                if (quote == "") quote = character
+                else quote = ""
+                continue
+              }
               if (quote != "") continue
               if (character == "{" || character == "[") depth++
               else if (character == "}" || character == "]") depth--
@@ -781,23 +872,42 @@ chain:
             leading = trimmed_start - 1
             value = trim(raw)
             consumed = 0
+            value_quote = substr(value, 1, 1)
             if (pending) {
-              if (substr(value, 1, 1) == "\"" && unquote(value) !~ /^--/) {
+              if ((value_quote == "\"" || value_quote == single_quote) && unquote(value) !~ /^--/) {
                 trailing_start = match(raw, /[[:space:]]*$/)
                 trailing = length(raw) - trailing_start + 1
-                output = output substr(raw, 1, leading) "\"REDACTED\"" (trailing > 0 ? substr(raw, trailing_start) : "")
+                replacement = value_quote "REDACTED" value_quote
+                output = output substr(raw, 1, leading) replacement (trailing > 0 ? substr(raw, trailing_start) : "")
+                consumed = 1
+              } else if (value_quote != "\"" && value_quote != single_quote && value !~ /^--/ && \
+                  substr(value, 1, 1) != "{" && substr(value, 1, 1) != "[") {
+                trailing_start = match(raw, /[[:space:]]*$/)
+                trailing = length(raw) - trailing_start + 1
+                output = output substr(raw, 1, leading) "REDACTED" (trailing > 0 ? substr(raw, trailing_start) : "")
                 consumed = 1
               }
               pending = 0
             }
             if (!consumed) {
               output = output raw
-              if (substr(value, 1, 1) == "\"" && is_sensitive_flag(unquote(value))) pending = 1
+              if ((value_quote == "\"" || value_quote == single_quote) && is_sensitive_flag(unquote(value))) pending = 1
+              else if (value_quote != "\"" && value_quote != single_quote && is_sensitive_flag(value)) pending = 1
             }
             i = member_end + (comma ? 1 : 0)
             if (comma) output = output ","
           }
           return output "]"
+        }
+        function redact_yaml_args_array(line, start, end, value_start, output) {
+          if (format != "yaml" || !parse_mapping(line) || mapping_key != "args") return line
+          value_start = mapping_value_start
+          while (substr(line, value_start, 1) ~ /[[:space:]]/ && value_start <= length(line)) value_start++
+          if (substr(line, value_start, 1) != "[") return line
+          end = matching_delimiter(line, value_start, "[", "]")
+          if (end == 0) return line
+          output = substr(line, 1, value_start - 1) redact_json_args_array(line, value_start, end)
+          return output substr(line, end + 1)
         }
         function redact_json_args_arrays(text, output, cursor, quote_start, quote_end, key, colon, array_start, array_end) {
           output = ""
@@ -829,6 +939,22 @@ chain:
         function flow_list_item(line, indent) {
           indent = indentation(line)
           return substr(line, indent + 1, 1) == "-" && substr(line, indent + 2, 1) ~ /[[:space:]\{]/
+        }
+        function update_flow_state(text, i, character) {
+          for (i = 1; i <= length(text); i++) {
+            character = substr(text, i, 1)
+            if (flow_quote == "\"" && character == "\\") { i++; continue }
+            if (flow_quote == single_quote && character == single_quote && substr(text, i + 1, 1) == single_quote) { i++; continue }
+            if ((character == "\"" && (flow_quote == "" || flow_quote == "\"")) || \
+                (character == single_quote && (flow_quote == single_quote || (flow_quote == "" && single_quote_starts(text, i))))) {
+              if (flow_quote == "") flow_quote = character
+              else flow_quote = ""
+              continue
+            }
+            if (flow_quote != "") continue
+            if (character == "{" || character == "[") flow_depth++
+            else if (character == "}" || character == "]") flow_depth--
+          }
         }
         function redact_pem(line, output, offset, marker_start, marker_end, begin_marker, marker_type, end_position) {
           output = ""
@@ -875,13 +1001,17 @@ chain:
           return substr(line, 1, start - 1) "\"REDACTED\"" (comment > 0 ? " " substr(line, comment) : "")
         }
         function process_line(line, force, output) {
-          line = redact_pem(line)
           output = redact_url_userinfo(line)
           output = redact_bearer(output)
           output = redact_aws_keys(output)
           if (force) output = redact_fields(output, format, 1)
           else output = redact_fields(output, format, 0)
+          output = redact_yaml_args_array(output)
           output = redact_env_objects(output)
+          # Redact structured credential values before PEM scanning. A whole
+          # sensitive scalar may be discarded (including its continuation), so
+          # scanning it first could leave PEM state waiting for an unseen END.
+          output = redact_pem(output)
           print redact_opaque_tokens(output)
         }
         function flush_env_item(i, name, value_line, key, value, value_indent) {
@@ -916,6 +1046,17 @@ chain:
             next
           }
           current_indent = indentation($0)
+          if (format == "yaml" && flow_capture) {
+            flow_buffer = flow_buffer "\n" $0
+            update_flow_state($0)
+            if (flow_depth <= 0) {
+              process_line(flow_buffer, 0)
+              flow_capture = 0
+              flow_depth = 0
+              flow_quote = ""
+            }
+            next
+          }
           if (block_indent >= 0) {
             if ($0 ~ /^[[:space:]]*$/ || current_indent > block_indent) next
             block_indent = -1
@@ -943,7 +1084,17 @@ chain:
                 env_list_indent = current_indent
                 if (parse_mapping($0)) env_item_key_indent = mapping_key_indent
               }
-              if (substr($0, current_indent + 2, 1) == "{") {
+              flow_item_start = current_indent + 2
+              while (substr($0, flow_item_start, 1) ~ /[[:space:]]/ && flow_item_start <= length($0)) flow_item_start++
+              if (substr($0, flow_item_start, 1) == "{") {
+                flow_buffer = $0
+                flow_depth = 0
+                flow_quote = ""
+                update_flow_state(flow_buffer)
+                if (flow_depth > 0) {
+                  flow_capture = 1
+                  next
+                }
                 process_line($0, 0)
                 next
               }
@@ -994,6 +1145,20 @@ chain:
             args_pending_secret = 0
             next
           }
+          if (format == "yaml" && parse_mapping($0) && (mapping_key == "env" || mapping_key == "args")) {
+            flow_opening = substr($0, mapping_value_start, 1)
+            if ((mapping_key == "env" && (flow_opening == "[" || flow_opening == "{")) || \
+                (mapping_key == "args" && flow_opening == "[")) {
+              flow_buffer = $0
+              flow_depth = 0
+              flow_quote = ""
+              update_flow_state(flow_buffer)
+              if (flow_depth > 0) {
+                flow_capture = 1
+                next
+              }
+            }
+          }
           process_line($0, 0)
         }
         END {
@@ -1004,6 +1169,10 @@ chain:
             json_line_count = split(json_content, json_lines, "\n")
             for (json_line_index = 1; json_line_index <= json_line_count; json_line_index++) process_line(json_lines[json_line_index], 0)
           } else if (env_item_count > 0) flush_env_item()
+          if (flow_capture) {
+            print "Unterminated YAML flow collection; refusing to publish sanitized dump" > "/dev/stderr"
+            exit 1
+          }
           if (pem_active) {
             print "Unterminated PEM block; refusing to publish sanitized dump" > "/dev/stderr"
             exit 1

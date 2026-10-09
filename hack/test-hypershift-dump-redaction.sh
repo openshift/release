@@ -69,6 +69,12 @@ metadata:
   digest: sha256:${digest}
   quotedDigest: "sha256:${digest}"
   digestWithOtherDiagnostic: "sha256:${digest} diagnostic=${opaque}"
+  hashes:
+    "commit": ${commit}
+    "sha256": ${digest}
+    "digest": sha256:${digest}
+    notcommit: ${commit}
+  quotedHashFlow: {"commit": ${commit}, "sha256": ${digest}, "digest": sha256:${digest}, "notcommit": ${commit}}
   sourceFile: kubernetes/kubernetes/pkg/controller/deployment/sync.go
   image: quay.io/openshift/hypershift-controller:v2.0
   diagnosticFlow: {password: fake-flow-root, keep: retained}
@@ -93,9 +99,38 @@ metadata:
   pemMessage: "before -----BEGIN PRIVATE KEY-----
     multiline-private-key-material
     -----END PRIVATE KEY----- after-field"
+  pemPassword: "before -----BEGIN PRIVATE KEY-----
+    quoted-password-pem-secret
+    -----END PRIVATE KEY----- after-password-pem"
+  pemMessages: "before -----BEGIN PRIVATE KEY-----
+    repeated-yaml-pem-one
+    -----END PRIVATE KEY----- between -----BEGIN CERTIFICATE-----
+    repeated-yaml-pem-two
+    -----END CERTIFICATE----- after-repeated-pem"
+  afterDiagnosticPem: retained-after-pem
 spec:
   template:
     spec:
+      automountServiceAccountToken: false
+      volumes:
+      - name: projected-diagnostics
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: api
+              expirationSeconds: 3607
+              path: token
+          - secret:
+              name: projected-secret-reference
+              items:
+              - key: username
+                path: username
+      - name: secret-diagnostics
+        secret:
+          secretName: volume-secret-reference
+          items:
+          - key: password
+            path: password
       containers:
       - name: argument-container
         args:
@@ -103,6 +138,8 @@ spec:
         - yaml-argument-secret
         - --namespace
         - default
+      - name: inline-argument-container
+        args: ["--password", "inline-args-fake", "--namespace", "default"]
   containers:
   - name: diagnostic-container
     env:
@@ -114,10 +151,29 @@ spec:
           name: retained-secret-reference
           key: api-token
     - {value: "flow-env-secret", name: "DB_PASSWORD"}
+    - {name: DB_PASSWORD,
+       value: wrapped-flow-env-secret}
     - value: |
         multiline-env-secret
         continuation-env-secret
       name: BLOCK_TOKEN
+    - name: API_TOKEN
+      value: "before -----BEGIN CERTIFICATE-----
+        forced-env-pem-secret
+        -----END CERTIFICATE-----"
+    - name: AFTER_DIAGNOSTIC
+      value: retained-after-forced-pem
+  - name: flow-environment-container
+    env: [{name: DB_PASSWORD,
+           value: inline-flow-env-fake},
+          {value: value-before-name-fake,
+           name: API_TOKEN},
+          {value: don't-break-flow,
+           name: APP_MODE}]
+EOF
+
+cat > "${fixture_dir}/cluster-scoped-resources/core/root-flow.yaml" <<'EOF'
+{password: fake-flow-root-secret, keep: retained-root-flow-field}
 EOF
 
 cat > "${fixture_dir}/cluster-scoped-resources/core/status.json" <<EOF
@@ -128,8 +184,16 @@ cat > "${fixture_dir}/cluster-scoped-resources/core/status.json" <<EOF
   "notcommit":"${commit}",
   "digest":"sha256:${digest}",
   "password":"json-field-secret",
-  "serviceAccountToken":{"expirationSeconds":3607,"path":"token"},
+  "serviceAccountToken":{"audience":"api","expirationSeconds":3607,"path":"token"},
   "automountServiceAccountToken":false,
+  "client\u005fsecret":"unicode-escaped-json-secret",
+  "volumes":[
+    {"projected":{"sources":[
+      {"serviceAccountToken":{"audience":"api","expirationSeconds":3607,"path":"token"}},
+      {"secret":{"name":"retained-projected-secret","items":[{"key":"username","path":"username"}]}}
+    ]}},
+    {"secret":{"secretName":"retained-volume-secret","items":[{"key":"password","path":"password"}]}}
+  ],
   "token":null,
   "items":[{"spec":{"containers":[
     {"name":"first","env":[{"name":"API_TOKEN","value":"pretty-json-env-secret"}]},
@@ -201,13 +265,22 @@ extract_dir="${work_dir}/extracted"
 mkdir -p "${extract_dir}"
 tar -xzf "${archive}" -C "${extract_dir}" || fail "archive extraction failed"
 yaml_file="${extract_dir}/output/cluster-scoped-resources/core/nodes.yaml"
+root_flow_file="${extract_dir}/output/cluster-scoped-resources/core/root-flow.yaml"
 json_file="${extract_dir}/output/cluster-scoped-resources/core/status.json"
 html_file="${extract_dir}/output/cluster-scoped-resources/core/event-filter.html"
 log_file="${extract_dir}/output/cluster-scoped-resources/core/events.log"
 timestamp_file="${extract_dir}/output/cluster-scoped-resources/core/timestamp"
 
 yq '.' "${yaml_file}" > /dev/null || fail "sanitized YAML is invalid"
+yq '.' "${root_flow_file}" > /dev/null || fail "sanitized root flow YAML is invalid"
 jq '.' "${json_file}" > /dev/null || fail "sanitized JSON is invalid"
+
+yq -e ".metadata.hashes.\"commit\" == \"${commit}\" and .metadata.hashes.\"sha256\" == \"${digest}\" and .metadata.hashes.\"digest\" == \"sha256:${digest}\" and .metadata.hashes.notcommit == \"REDACTED_HIGH_ENTROPY\" and .metadata.quotedHashFlow.\"commit\" == \"${commit}\" and .metadata.quotedHashFlow.\"sha256\" == \"${digest}\" and .metadata.quotedHashFlow.\"digest\" == \"sha256:${digest}\" and .metadata.quotedHashFlow.notcommit == \"REDACTED_HIGH_ENTROPY\"" "${yaml_file}" > /dev/null || fail "quoted hash keys were redacted or unrelated tokens were preserved"
+yq -e '.metadata.pemMessages | contains("between")' "${yaml_file}" > /dev/null || fail "repeated PEM redaction lost the intervening diagnostic"
+yq -e '.metadata.pemMessages | contains("after-repeated-pem")' "${yaml_file}" > /dev/null || fail "repeated PEM redaction lost trailing diagnostic content"
+yq -e '.spec.template.spec.automountServiceAccountToken == false and .spec.template.spec.volumes[0].projected.sources[0].serviceAccountToken.audience == "api" and .spec.template.spec.volumes[0].projected.sources[0].serviceAccountToken.expirationSeconds == 3607 and .spec.template.spec.volumes[0].projected.sources[0].serviceAccountToken.path == "token" and .spec.template.spec.volumes[0].projected.sources[1].secret.name == "projected-secret-reference" and .spec.template.spec.volumes[1].secret.secretName == "volume-secret-reference"' "${yaml_file}" > /dev/null || fail "sanitization damaged Pod configuration diagnostics"
+yq -e ".spec.template.spec.containers[1].args[0] == \"--password\" and .spec.template.spec.containers[1].args[1] == \"REDACTED\" and .spec.template.spec.containers[1].args[2] == \"--namespace\" and .spec.template.spec.containers[1].args[3] == \"default\" and .spec.containers[0].env[3].value == \"REDACTED\" and .spec.containers[0].env[5].value == \"REDACTED\" and .spec.containers[0].env[6].value == \"retained-after-forced-pem\" and .spec.containers[1].env[0].value == \"REDACTED\" and .spec.containers[1].env[1].value == \"REDACTED\" and .spec.containers[1].env[2].value == \"don't-break-flow\"" "${yaml_file}" > /dev/null || fail "flow-style arguments or environment values were not safely handled"
+yq -e '.password == "REDACTED" and .keep == "retained-root-flow-field"' "${root_flow_file}" > /dev/null || fail "root flow YAML redaction damaged sibling fields"
 
 assert_contains "${yaml_file}" "commit: ${commit}"
 assert_contains "${yaml_file}" "notcommit: REDACTED_HIGH_ENTROPY"
@@ -222,6 +295,12 @@ assert_contains "${yaml_file}" 'anchoredPassword: &diagnosticSecret "REDACTED"'
 assert_contains "${yaml_file}" 'anchorAlias: *diagnosticSecret'
 assert_contains "${yaml_file}" 'pemMessage: "before REDACTED_PEM'
 assert_contains "${yaml_file}" 'after-field"'
+assert_contains "${yaml_file}" 'pemPassword: "REDACTED"'
+assert_contains "${yaml_file}" 'afterDiagnosticPem: retained-after-pem'
+assert_contains "${yaml_file}" 'args: ["--password", "REDACTED", "--namespace", "default"]'
+assert_contains "${yaml_file}" 'value: "REDACTED", name: "DB_PASSWORD"'
+assert_contains "${yaml_file}" 'value: retained-after-forced-pem'
+assert_contains "${yaml_file}" "value: don't-break-flow"
 assert_not_contains "${yaml_file}" "diagnostic=${opaque}"
 assert_contains "${yaml_file}" "digestWithOtherDiagnostic: \"sha256:${digest} diagnostic=REDACTED_HIGH_ENTROPY\""
 assert_contains "${yaml_file}" "ordinaryPath: https://api.example.invalid/api/v1/namespaces/default/status"
@@ -247,7 +326,7 @@ assert_contains "${json_file}" "https://REDACTED@example.invalid/api"
 assert_contains "${json_file}" "\"commit\":\"${commit}\""
 assert_contains "${json_file}" '"notcommit":"REDACTED_HIGH_ENTROPY"'
 assert_contains "${json_file}" "sha256:${digest}"
-jq -e '.password == "REDACTED" and .serviceAccountToken == "REDACTED" and .automountServiceAccountToken == "REDACTED" and .token == "REDACTED" and .items[0].spec.containers[0].env[0].value == "REDACTED" and .items[0].spec.containers[1].env[0].value == "REDACTED" and .compactContainers[0].env[0].value == "REDACTED" and .compactContainers[1].env[0].value == "REDACTED" and .args == ["--password", "REDACTED", "--namespace", "default"] and .env[0].value == "REDACTED" and .env[1].valueFrom.secretKeyRef.name == "retained-json-reference" and .keep == "retained-json-field" and .keepBetweenPem == "retained-between-pem" and .pemBefore == "REDACTED_PEM" and .pemAfter == "REDACTED_PEM" and (.pem | contains("REDACTED_PEM") and contains("middle") and contains("post"))' "${json_file}" > /dev/null || fail "JSON credential, argument, PEM, or environment sanitization failed"
+jq -e '.password == "REDACTED" and .client_secret == "REDACTED" and .serviceAccountToken == {"audience":"api","expirationSeconds":3607,"path":"token"} and .automountServiceAccountToken == false and .volumes[0].projected.sources[0].serviceAccountToken.audience == "api" and .volumes[0].projected.sources[1].secret.name == "retained-projected-secret" and .volumes[1].secret.secretName == "retained-volume-secret" and .token == "REDACTED" and .items[0].spec.containers[0].env[0].value == "REDACTED" and .items[0].spec.containers[1].env[0].value == "REDACTED" and .compactContainers[0].env[0].value == "REDACTED" and .compactContainers[1].env[0].value == "REDACTED" and .args == ["--password", "REDACTED", "--namespace", "default"] and .env[0].value == "REDACTED" and .env[1].valueFrom.secretKeyRef.name == "retained-json-reference" and .keep == "retained-json-field" and .keepBetweenPem == "retained-between-pem" and .pemBefore == "REDACTED_PEM" and .pemAfter == "REDACTED_PEM" and (.pem | contains("REDACTED_PEM") and contains("middle") and contains("post"))' "${json_file}" > /dev/null || fail "JSON credential, argument, PEM, or diagnostic preservation failed"
 assert_contains "${html_file}" "https://REDACTED@example.invalid/events/REDACTED_HIGH_ENTROPY"
 assert_contains "${html_file}" "Authorization: REDACTED</a>"
 assert_contains "${html_file}" "</body></html>"
@@ -277,6 +356,15 @@ assert_not_contains "${extract_dir}" "ZmFrZTpmYWtl"
 assert_not_contains "${extract_dir}" "fake-extensionless-secret"
 assert_not_contains "${extract_dir}" "anchored-yaml-secret"
 assert_not_contains "${extract_dir}" "multiline-private-key-material"
+assert_not_contains "${extract_dir}" "quoted-password-pem-secret"
+assert_not_contains "${extract_dir}" "forced-env-pem-secret"
+assert_not_contains "${extract_dir}" "wrapped-flow-env-secret"
+assert_not_contains "${extract_dir}" "inline-flow-env-fake"
+assert_not_contains "${extract_dir}" "value-before-name-fake"
+assert_not_contains "${extract_dir}" "unicode-escaped-json-secret"
+assert_not_contains "${extract_dir}" "inline-args-fake"
+assert_not_contains "${extract_dir}" "repeated-yaml-pem-one"
+assert_not_contains "${extract_dir}" "repeated-yaml-pem-two"
 assert_not_contains "${extract_dir}" "inline-key-one"
 assert_not_contains "${extract_dir}" "inline-key-two"
 assert_not_contains "${extract_dir}" "sibling-key-one"
@@ -348,4 +436,22 @@ fi
 [[ ! -e "${pem_failure_artifact_dir}/artifacts.tar.gz" ]] || fail "archive was published with an unterminated PEM block"
 assert_contains "${work_dir}/pem-failure.log" "Unterminated PEM block"
 
-echo "PASS: dump sanitization, archive round-trip, and fail-closed file discovery"
+# An unterminated flow collection must also fail closed rather than publishing
+# a file that has not reached credential sanitization.
+flow_failure_dir="${work_dir}/flow-failure-run"
+make_fake_runner "${flow_failure_dir}"
+cp -R "${fixture_dir}/." "${flow_failure_dir}/fixture-copy"
+printf '%s\n' 'env: [{name: API_TOKEN,' '       value: unclosed-flow-secret' > \
+  "${flow_failure_dir}/fixture-copy/cluster-scoped-resources/core/unclosed-flow.yaml"
+flow_failure_artifact_dir="${flow_failure_dir}/artifacts"
+if (
+  cd "${flow_failure_dir}"
+  FIXTURE_DIR="${flow_failure_dir}/fixture-copy" ARTIFACT_DIR="${flow_failure_artifact_dir}" \
+    PROW_JOB_ID=redaction-test HYPERSHIFT_NAMESPACE=clusters CLOUD_PROVIDER=AWS bash "${command_file}"
+) > "${work_dir}/flow-failure.log" 2>&1; then
+  fail "step unexpectedly succeeded after an unterminated YAML flow collection"
+fi
+[[ ! -e "${flow_failure_artifact_dir}/artifacts.tar.gz" ]] || fail "archive was published with an unterminated YAML flow collection"
+assert_contains "${work_dir}/flow-failure.log" "Unterminated YAML flow collection"
+
+echo "PASS: dump sanitization, archive round-trip, diagnostic preservation, and fail-closed handling"
