@@ -298,9 +298,9 @@ RetargetOcsClientPkgsConfigMap() {
     typeset hopChannel="${1:?}"; (($#)) && shift
     typeset cmName='' cmJson='' patchJson=''
     [[ "${fromChannel}" == "${hopChannel}" ]] && return 0
-    cmName="$(OdfPkgsConfigMapName "${kubeconfig}")"
+    cmName="$(OdfPkgsConfigMapName "${kubeconfig}")" || return $?
     cmJson="$(oc --kubeconfig="${kubeconfig}" get configmap "${cmName}" \
-        -n "${ODF_INSTALL_NAMESPACE}" -o json)"
+        -n "${ODF_INSTALL_NAMESPACE}" -o json)" || return $?
     patchJson="$(jq -c --arg from "${fromChannel}" --arg to "${hopChannel}" '
         def retarget:
             split("\n")
@@ -314,7 +314,7 @@ RetargetOcsClientPkgsConfigMap() {
         | with_entries(select(.value | split("\n") | index("channel: " + $from)))
         | with_entries(.value |= retarget)
         | if . == {} then empty else {data: .} end
-    ' <<<"${cmJson}")"
+    ' <<<"${cmJson}")" || return $?
     if [[ -z "${patchJson}" ]]; then
         printf 'INFO: ConfigMap %s has no ocs-client-operator channel %s record\n' \
             "${cmName}" "${fromChannel}" >&2
@@ -325,7 +325,7 @@ RetargetOcsClientPkgsConfigMap() {
     oc --kubeconfig="${kubeconfig}" patch configmap "${cmName}" \
         -n "${ODF_INSTALL_NAMESPACE}" \
         --type merge \
-        -p "${patchJson}"
+        -p "${patchJson}" || return $?
     true
 }
 
@@ -342,9 +342,9 @@ TryAlignOcsClientForHop() {
     # Capture status explicitly: this function is called from `if` / `||`, where
     # bash ignores errexit for the whole body.
     {
-        RetargetOcsClientPkgsConfigMap "${kubeconfig}" "${fromChannel}" "${hopChannel}"
+        RetargetOcsClientPkgsConfigMap "${kubeconfig}" "${fromChannel}" "${hopChannel}" || return $?
         subsJson="$(oc --kubeconfig="${kubeconfig}" get subscription.operators.coreos.com \
-            -n "${ODF_INSTALL_NAMESPACE}" -o json)"
+            -n "${ODF_INSTALL_NAMESPACE}" -o json)" || return $?
         while IFS=$'\t' read -r subName subChannel; do
             [[ -n "${subName}" ]] || continue
             [[ "${subName}" == *ocs-client-operator* ]] || continue
