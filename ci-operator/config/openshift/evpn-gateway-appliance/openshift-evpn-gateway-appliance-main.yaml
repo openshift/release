@@ -1,4 +1,16 @@
 base_images:
+  centos-stream10:
+    name: centos
+    namespace: openshift
+    tag: stream10
+  frr:
+    name: "5.1"
+    namespace: ocp
+    tag: metallb-frr
+  node-exporter:
+    name: "5.1"
+    namespace: ocp
+    tag: prometheus-node-exporter
   ubi-python:
     name: ubi-python-312
     namespace: ocp
@@ -10,6 +22,32 @@ images:
   - dockerfile_path: Dockerfile.ci
     from: ubi-python
     to: ansible-test-runner
+  - dockerfile_literal: |
+      ARG FRR_IMAGE=registry.redhat.io/openshift4/frr-rhel9@sha256:82fd7cc0123f6286bad46231a9939799ae79c30b9369047d2ffd109dacefa76e
+      ARG NODE_EXPORTER_IMAGE=registry.redhat.io/openshift4/ose-prometheus-node-exporter-rhel9@sha256:7d2884dc16f902e31b897d475d3e0dc09bc735df16b22544d0fefc4396a0ca48
+      FROM ${FRR_IMAGE} AS frr
+      FROM ${NODE_EXPORTER_IMAGE} AS node-exporter
+      FROM registry.redhat.io/rhel10/rhel-bootc
+      RUN dnf install -y wireguard-tools libreswan tcpdump traceroute mtr bind-utils python3 iproute frr podman skopeo && dnf clean all
+      COPY --from=frr /frr-metrics /usr/bin/frr-metrics
+      COPY --from=node-exporter /bin/node_exporter /usr/bin/node_exporter
+      COPY node-exporter.service frr-metrics.service /etc/systemd/system/
+      RUN sed -i -e 's/^bgpd=no/bgpd=yes/' -e 's/^bfdd=no/bfdd=yes/' /etc/frr/daemons \
+          && mkdir -p /etc/systemd/system/frr.service.d \
+          && printf '[Unit]\nConditionPathExists=/etc/frr/frr.conf\n' > /etc/systemd/system/frr.service.d/wait-for-config.conf \
+          && printf 'net.ipv4.ip_forward = 1\nnet.ipv4.conf.all.forwarding = 1\n' > /etc/sysctl.d/99-ip-forward.conf \
+          && mkdir -p /etc/wireguard && chmod 700 /etc/wireguard \
+          && systemctl enable frr.service frr-metrics.service node-exporter.service
+      LABEL description="EVPN Migration Appliance" version="0.1.0"
+    from: centos-stream10
+    inputs:
+      frr:
+        as:
+        - ${FRR_IMAGE}
+      node-exporter:
+        as:
+        - ${NODE_EXPORTER_IMAGE}
+    to: evpn-gateway-appliance
 resources:
   '*':
     limits:
