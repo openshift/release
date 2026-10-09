@@ -1,0 +1,31 @@
+ref:
+  as: ovs-doca-validate-node-package
+  from: cli
+  grace_period: 10m
+  timeout: 30m0s
+  commands: ovs-doca-validate-node-package-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 500Mi
+  env:
+  - name: OVS_DOCA_MCP
+    default: "worker"
+    documentation: The MachineConfigPool expected to be running the layered image.
+  - name: OVS_DOCA_PACKAGES
+    default: "doca-networking-runtime openvswitch-selinux-extra-policy mft"
+    documentation: |-
+      Space-separated list of packages that must be present on every node in the pool.
+      Keep this in step with the same variable on ovs-doca-build-osimage. libunwind is
+      deliberately absent: no package of that name exists in RHEL 10.
+  - name: OVS_DOCA_ABSENT_PACKAGES
+    default: "openvswitch"
+    documentation: |-
+      Space-separated list of package name prefixes that must NOT be installed. Matching is done
+      against versioned stock package names such as openvswitch3.4, so DOCA-provided packages
+      like doca-openvswitch are not affected.
+  documentation: |-
+    Verifies that the nodes in the target MachineConfigPool actually booted the DOCA layered
+    CoreOS image: the pool reports Updated, every node's osImageURL matches the image published
+    by ovs-doca-build-osimage, the expected DOCA packages are installed, and the stock
+    openvswitch packages are gone.
