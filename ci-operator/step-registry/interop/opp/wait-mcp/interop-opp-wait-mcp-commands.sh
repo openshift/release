@@ -334,10 +334,10 @@ case "${classification}" in
     UPDATING)
         echo "Ready count trend: ${readyHistory[*]}"
         if IsReadyCountProgressing; then
-            echo "FAILURE CLASS: Infrastructure timeout (non-blocking)"
+            echo "FAILURE CLASS: Infrastructure timeout"
             echo "MCP rollout is healthy (Degraded=False, ready count increasing) but too slow for the ${effectiveTimeout}s timeout"
-            AssertClusterHealthy
-            exit $?
+            AssertClusterHealthy || true
+            exit 1
         else
             echo "FAILURE CLASS: Potential interop issue"
             echo "MCP is updating but ready count is not progressing — nodes may be cycling"
