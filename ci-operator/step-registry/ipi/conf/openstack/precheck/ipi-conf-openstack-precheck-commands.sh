@@ -3,44 +3,51 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-function check_ip_resolves() {
-    local ip=$1
-    local domain=$2
+function check_ips_resolve() {
+    local domain=$1
+    shift
+    local expected_ips=("$@")
 
     local lookup
-    lookup=$(nslookup "$domain" 2>/dev/null)
-    if [[ $? -eq 0 ]] && [[ ${lookup} =~ $ip ]]; then
-        echo "$domain resolves to $ip"
-        return 0
-    else
-        echo "$domain does not resolve to $ip"
+    lookup=$(nslookup "$domain" 2>/dev/null) || true
+    if [[ -z "${lookup}" ]]; then
+        echo "$domain did not resolve"
         return 1
     fi
+    for ip in "${expected_ips[@]}"; do
+        # Literal match (escape dots); avoid bash =~ treating '.' as regex.
+        local escaped=${ip//./\\.}
+        if [[ ! "${lookup}" =~ (^|[^0-9])${escaped}([^0-9]|$) ]]; then
+            echo "$domain does not resolve to $ip"
+            echo "nslookup output:"
+            echo "${lookup}"
+            return 1
+        fi
+    done
+    echo "$domain resolves to ${expected_ips[*]}"
+    return 0
 }
 
-function verify_resolution() {
+function verify_name() {
     local cluster_name=$1
-    declare -n ipmap=$2
-    local BASE_DOMAIN=$3
-    local WAIT_TIME=$4
-    local TRY_COUNT=$5
+    local name=$2
+    shift 2
+    local expected_ips=("$@")
+    local domain="${name}.${cluster_name}.${BASE_DOMAIN}"
 
-    for name in "${!ipmap[@]}"; do
-        local ip=${ipmap[$name]}
-        for try in $(seq 1 $TRY_COUNT); do
-            echo "Attempt $try to verify we can resolve $name.$cluster_name.$BASE_DOMAIN"
-            if check_ip_resolves "$ip" "$name.$cluster_name.$BASE_DOMAIN"; then
-                echo "$name.$cluster_name.$BASE_DOMAIN resolves correctly to $ip"
-                break
-            fi
+    for try in $(seq 1 "$TRY_COUNT"); do
+        echo "Attempt $try to verify we can resolve $domain (expect ${expected_ips[*]})"
+        if check_ips_resolve "$domain" "${expected_ips[@]}"; then
+            echo "$domain resolves correctly"
+            return 0
+        fi
 
-            if [[ $try -eq $TRY_COUNT ]]; then
-                echo "FAILED: After $TRY_COUNT tries, $name.$cluster_name.$BASE_DOMAIN did not resolve to $ip"
-                exit 1
-            fi
+        if [[ $try -eq $TRY_COUNT ]]; then
+            echo "FAILED: After $TRY_COUNT tries, $domain did not resolve to ${expected_ips[*]}"
+            exit 1
+        fi
 
-            sleep $WAIT_TIME
-        done
+        sleep "$WAIT_TIME"
     done
 }
 
@@ -48,27 +55,33 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 API_IP=$(<"${SHARED_DIR}/API_IP")
 INGRESS_IP=$(<"${SHARED_DIR}/INGRESS_IP")
 
-declare -A ipmap=(
-    ["api"]=$API_IP
-    ["ingress.apps"]=$INGRESS_IP
-)
-
-if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
-    ipmap["api-int"]=$API_IP
+# Prefer LB endpoint FIPs when present (externallb multi-LB); else API_IP.
+API_IPS=()
+if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
+    while IFS= read -r ip || [[ -n "${ip}" ]]; do
+        [[ -z "${ip}" ]] && continue
+        API_IPS+=("${ip}")
+    done < "${SHARED_DIR}/LB_HOSTS"
+elif [[ -f "${SHARED_DIR}/LB_HOST" ]]; then
+    API_IPS+=("$(<"${SHARED_DIR}/LB_HOST")")
+fi
+if [[ "${#API_IPS[@]}" -eq 0 ]]; then
+    API_IPS+=("${API_IP}")
 fi
 
-verify_resolution "$CLUSTER_NAME" ipmap "$BASE_DOMAIN" "$WAIT_TIME" "$TRY_COUNT"
+echo "CONFIG_TYPE=${CONFIG_TYPE:-} API_IPS=${API_IPS[*]}"
+
+verify_name "$CLUSTER_NAME" "api" "${API_IPS[@]}"
+verify_name "$CLUSTER_NAME" "ingress.apps" "$INGRESS_IP"
+if [[ "${CONFIG_TYPE:-}" == *"externallb"* || -f "${SHARED_DIR}/LB_HOSTS" ]]; then
+    verify_name "$CLUSTER_NAME" "api-int" "${API_IPS[@]}"
+fi
 
 if [[ -s "${SHARED_DIR}/HIVE_FIP_API" && -s "${SHARED_DIR}/HIVE_FIP_INGRESS" && -s "${SHARED_DIR}/HIVE_CLUSTER_NAME" ]]; then
     HIVE_FIP_API=$(<"${SHARED_DIR}/HIVE_FIP_API")
     HIVE_FIP_INGRESS=$(<"${SHARED_DIR}/HIVE_FIP_INGRESS")
     HIVE_CLUSTER_NAME=$(<"${SHARED_DIR}/HIVE_CLUSTER_NAME")
 
-    # shellcheck disable=SC2034
-    declare -A ipmap_hive=(
-        ["api"]=$HIVE_FIP_API
-        ["ingress.apps"]=$HIVE_FIP_INGRESS
-    )
-
-    verify_resolution "$HIVE_CLUSTER_NAME" ipmap_hive "$BASE_DOMAIN" "$WAIT_TIME" "$TRY_COUNT"
+    verify_name "$HIVE_CLUSTER_NAME" "api" "$HIVE_FIP_API"
+    verify_name "$HIVE_CLUSTER_NAME" "ingress.apps" "$HIVE_FIP_INGRESS"
 fi

@@ -53,6 +53,23 @@ fi
 
 openstack server delete --wait "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete server bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
 openstack port delete $PROXY_PORT_ID || >&2 echo "Failed to delete proxy port ${PROXY_PORT_ID}"
+
+# Additional LB endpoint created when EXTERNAL_LB_COUNT>=2 (see provision step).
+if [[ -f "${SHARED_DIR}/BASTION_SERVER_2" ]]; then
+  LB2_NAME=$(<"${SHARED_DIR}/BASTION_SERVER_2")
+  if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
+    LB2_FIP="$(sed -n '2p' "${SHARED_DIR}/LB_HOSTS")"
+    if [[ -n "${LB2_FIP}" ]]; then
+      openstack floating ip delete "${LB2_FIP}" || >&2 echo "Failed to delete floating IP ${LB2_FIP}"
+    fi
+  fi
+  openstack server delete --wait "${LB2_NAME}" || >&2 echo "Failed to delete server ${LB2_NAME}"
+  if [[ -f "${SHARED_DIR}/PROXY_PORT_ID_2" ]]; then
+    PROXY_PORT_ID_2=$(<"${SHARED_DIR}/PROXY_PORT_ID_2")
+    openstack port delete "${PROXY_PORT_ID_2}" || >&2 echo "Failed to delete proxy port ${PROXY_PORT_ID_2}"
+  fi
+fi
+
 openstack security group delete "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete security group bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
 openstack keypair delete "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete keypair bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
 >&2 echo 'Cleanup done.'

@@ -42,17 +42,46 @@ EOF
 
 if [ -f "${SHARED_DIR}/API_IP" ]; then
   API_IP=$(<"${SHARED_DIR}"/API_IP)
-  if [[ "${API_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+  # Values published for api / api-int. For externallb, prefer LB endpoint FIPs
+  # (LB_HOSTS, else LB_HOST) so DNS can round-robin across UserManaged LBs.
+  # Otherwise keep the existing single API_IP behavior.
+  API_RECORD_VALUES=()
+  if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
+    if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
+      while IFS= read -r ip || [[ -n "${ip}" ]]; do
+        [[ -z "${ip}" ]] && continue
+        API_RECORD_VALUES+=("${ip}")
+      done < "${SHARED_DIR}/LB_HOSTS"
+    elif [[ -f "${SHARED_DIR}/LB_HOST" ]]; then
+      API_RECORD_VALUES+=("$(<"${SHARED_DIR}/LB_HOST")")
+    fi
+  fi
+  if [[ "${#API_RECORD_VALUES[@]}" -eq 0 ]]; then
+    API_RECORD_VALUES+=("${API_IP}")
+  fi
+
+  if [[ "${API_RECORD_VALUES[0]}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     API_RECORD_TYPE="A"
   else
     API_RECORD_TYPE="AAAA"
   fi
-  echo "Creating API DNS $API_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN"
-  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "api.'${CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${API_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${API_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api.json"
+  API_RESOURCE_RECORDS="$(printf '%s\n' "${API_RECORD_VALUES[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0)) | map({"Value": .})')"
+
+  echo "Creating API DNS ${API_RECORD_TYPE} record for ${CLUSTER_NAME}.${BASE_DOMAIN} -> ${API_RECORD_VALUES[*]}"
+  jq --arg name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." \
+    --arg type "${API_RECORD_TYPE}" \
+    --argjson rr "${API_RESOURCE_RECORDS}" \
+    '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": $rr}}]' \
+    "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api.json"
   cp "${TMP_DIR}/dns_api.json" "${SHARED_DIR}/dns_up.json"
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
-    echo "Creating API-INT DNS $API_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN"
-    jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "api-int.'${CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${API_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${API_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api_int.json"
+    echo "Creating API-INT DNS ${API_RECORD_TYPE} record for ${CLUSTER_NAME}.${BASE_DOMAIN} -> ${API_RECORD_VALUES[*]}"
+    jq --arg name "api-int.${CLUSTER_NAME}.${BASE_DOMAIN}." \
+      --arg type "${API_RECORD_TYPE}" \
+      --argjson rr "${API_RESOURCE_RECORDS}" \
+      '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": $rr}}]' \
+      "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api_int.json"
     cp "${TMP_DIR}/dns_api_int.json" "${SHARED_DIR}/dns_up.json"
   fi
 fi

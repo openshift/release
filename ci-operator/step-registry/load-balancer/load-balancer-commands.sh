@@ -16,12 +16,28 @@ fi
 
 MASTER_IPS=$(<"${SHARED_DIR}/MASTER_IPS")
 WORKER_IPS=$(<"${SHARED_DIR}/WORKER_IPS")
-LB_HOST=$(<"${SHARED_DIR}/LB_HOST")
 LB_USER=$(<"${SHARED_DIR}/LB_USER")
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 SSH_ARGS="-o ConnectTimeout=10 -o StrictHostKeyChecking=no"
-SSH_CMD="ssh ${SSH_ARGS} -i ${SSH_PRIV_KEY_PATH} ${LB_USER}@${LB_HOST}"
 SCP_CMD="scp ${SSH_ARGS} -i ${SSH_PRIV_KEY_PATH}"
+
+# Prefer LB_HOSTS (newline-separated) when present; otherwise a single LB_HOST.
+LB_HOST_LIST=()
+if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
+    while IFS= read -r host || [[ -n "${host}" ]]; do
+        [[ -z "${host}" ]] && continue
+        LB_HOST_LIST+=("${host}")
+    done < "${SHARED_DIR}/LB_HOSTS"
+else
+    LB_HOST_LIST+=("$(<"${SHARED_DIR}/LB_HOST")")
+fi
+
+if [ "${#LB_HOST_LIST[@]}" -eq 0 ]; then
+    echo "No LB hosts found in LB_HOSTS/LB_HOST, exiting"
+    exit 1
+fi
+
+echo "Configuring load balancer on ${#LB_HOST_LIST[@]} endpoint(s): ${LB_HOST_LIST[*]}"
 
 if [ -f "${SHARED_DIR}/API_IP" ]; then
     API_IP=$(<"${SHARED_DIR}/API_IP")
@@ -47,20 +63,6 @@ if ! whoami &> /dev/null; then
 fi
 
 WORK_DIR=${WORK_DIR:-$(mktemp -d -t load-balancer-XXXXXXXXXX)}
-
-echo "Writing Ansible inventory file to ${WORK_DIR}/inventory.yaml"
-cat > "${WORK_DIR}/inventory.yaml" << EOF
----
-all:
-  hosts:
-    lb:
-      ansible_host: "${LB_HOST}"
-      ansible_user: "${LB_USER}"
-      ansible_become: true
-      ansible_ssh_common_args: "${SSH_ARGS}"
-      ansible_ssh_private_key_file: "${SSH_PRIV_KEY_PATH}"
-EOF
-cp "${WORK_DIR}/inventory.yaml" "${ARTIFACT_DIR}/inventory.yaml"
 
 echo "Writing Ansible playbook to ${WORK_DIR}/playbook.yaml"
 cat > "${WORK_DIR}/playbook.yaml" <<EOF
@@ -164,11 +166,30 @@ ansible-galaxy collection install \
   git+https://github.com/ansible-collections/ansible.posix.git \
   git+https://github.com/ansible-collections/ansible.utils.git
 
-echo "Running Ansible playbook"
-ansible-playbook -i "${WORK_DIR}/inventory.yaml" -e "@$WORK_DIR/vars.yaml" "${WORK_DIR}/playbook.yaml"
+lb_idx=0
+for LB_HOST in "${LB_HOST_LIST[@]}"; do
+    echo "Deploying load balancer on ${LB_HOST} (${lb_idx})"
+    SSH_CMD="ssh ${SSH_ARGS} -i ${SSH_PRIV_KEY_PATH} ${LB_USER}@${LB_HOST}"
 
-echo "Collecting load balancer artifacts"
-$SSH_CMD bash - << EOF
+    echo "Writing Ansible inventory file to ${WORK_DIR}/inventory-${lb_idx}.yaml"
+    cat > "${WORK_DIR}/inventory-${lb_idx}.yaml" << EOF
+---
+all:
+  hosts:
+    lb:
+      ansible_host: "${LB_HOST}"
+      ansible_user: "${LB_USER}"
+      ansible_become: true
+      ansible_ssh_common_args: "${SSH_ARGS}"
+      ansible_ssh_private_key_file: "${SSH_PRIV_KEY_PATH}"
+EOF
+    cp "${WORK_DIR}/inventory-${lb_idx}.yaml" "${ARTIFACT_DIR}/inventory-${lb_idx}.yaml"
+
+    echo "Running Ansible playbook against ${LB_HOST}"
+    ansible-playbook -i "${WORK_DIR}/inventory-${lb_idx}.yaml" -e "@$WORK_DIR/vars.yaml" "${WORK_DIR}/playbook.yaml"
+
+    echo "Collecting load balancer artifacts from ${LB_HOST}"
+    $SSH_CMD bash - << EOF
 mkdir -p /tmp/load-balancer
 sudo cp /etc/haproxy/haproxy.cfg /tmp/load-balancer/haproxy.cfg
 sudo systemctl status haproxy > /tmp/load-balancer/haproxy_status.txt
@@ -181,6 +202,13 @@ ip r > /tmp/load-balancer/ip_r.txt
 sudo chown -R ${LB_USER}: /tmp/load-balancer
 tar -czC "/tmp" -f "/tmp/load-balancer.tar.gz" load-balancer/
 EOF
-$SCP_CMD ${LB_USER}@${LB_HOST}:/tmp/load-balancer.tar.gz ${ARTIFACT_DIR}
+    $SCP_CMD "${LB_USER}@${LB_HOST}:/tmp/load-balancer.tar.gz" "${ARTIFACT_DIR}/load-balancer-${lb_idx}.tar.gz"
+    # Keep the legacy artifact name for the primary endpoint.
+    if [[ "${lb_idx}" -eq 0 ]]; then
+        cp "${ARTIFACT_DIR}/load-balancer-${lb_idx}.tar.gz" "${ARTIFACT_DIR}/load-balancer.tar.gz"
+    fi
 
-echo "Load balancer was deployed and artifacts are available in ${ARTIFACT_DIR}/load-balancer.tar.gz"
+    lb_idx=$((lb_idx + 1))
+done
+
+echo "Load balancer was deployed on ${#LB_HOST_LIST[@]} endpoint(s); artifacts are in ${ARTIFACT_DIR}/load-balancer-*.tar.gz"

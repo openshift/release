@@ -110,6 +110,7 @@ if [[ "${CONFIG_TYPE}" == *"externallb"* ]]; then
   openstack port set --no-allowed-address --allowed-address ip-address=$API_IP,mac-address=$PROXY_MAC_ADDRESS --allowed-address ip-address=$INGRESS_IP,mac-address=$PROXY_MAC_ADDRESS $PROXY_PORT_ID
   cp ${SHARED_DIR}/BASTION_FIP ${SHARED_DIR}/LB_HOST
   cp ${SHARED_DIR}/BASTION_USER ${SHARED_DIR}/LB_USER
+  cp ${SHARED_DIR}/BASTION_FIP ${SHARED_DIR}/LB_HOSTS
 fi
 
 
@@ -213,3 +214,65 @@ if [[ -f "${SHARED_DIR}/osp-ca.crt" ]]; then
 fi
 
 echo "Bastion proxy is ready!"
+
+# Additional UserManaged LB endpoints (separate FIP/VM). Primary stays in LB_HOST;
+# all endpoints are listed in LB_HOSTS for later multi-LB / DNS RR steps.
+# Squid/DNS stay on the primary only.
+if [[ "${CONFIG_TYPE}" == *"externallb"* && "${EXTERNAL_LB_COUNT:-1}" -ge 2 ]]; then
+  if [[ "${EXTERNAL_LB_COUNT}" -gt 2 ]]; then
+    echo "ERROR: EXTERNAL_LB_COUNT=${EXTERNAL_LB_COUNT} is not supported yet (max 2)"
+    exit 1
+  fi
+
+  ADDITIONAL_LB_INTERFACE="${ADDITIONAL_LB_INTERFACE:-172.16.0.6}"
+  LB2_NAME="bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}-2"
+  LB2_PORT_NAME="${CLUSTER_NAME}-proxy-2"
+
+  echo "Provisioning additional LB endpoint ${LB2_NAME} (EXTERNAL_LB_COUNT=${EXTERNAL_LB_COUNT})"
+
+  lb2_port_id="$(openstack port create --security-group $sg_id \
+    --fixed-ip subnet=$MACHINES_SUBNET_ID,ip-address=$ADDITIONAL_LB_INTERFACE \
+    --network $MACHINES_NET_ID $LB2_PORT_NAME -f value -c id)"
+  >&2 echo "Created port ${LB2_PORT_NAME}: ${lb2_port_id}"
+  echo "${lb2_port_id}" > "${SHARED_DIR}/PROXY_PORT_ID_2"
+
+  lb2_server_params=" --image $BASTION_IMAGE --flavor $BASTION_FLAVOR \
+    --security-group $sg_id --key-name bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
+  if [[ -f ${SHARED_DIR}"/BASTION_NET_ID" ]]; then
+    lb2_server_params+=" --network $BASTION_NET_ID"
+  fi
+  lb2_server_params+=" --port $lb2_port_id"
+
+  lb2_server_id="$(openstack server create -f value -c id $lb2_server_params "${LB2_NAME}")"
+  >&2 echo "Created nova server ${LB2_NAME}: ${lb2_server_id}"
+  echo "${LB2_NAME}" > "${SHARED_DIR}/BASTION_SERVER_2"
+
+  lb2_fip="$(openstack floating ip create -f value -c floating_ip_address \
+    --description "bastionproxy $CLUSTER_NAME LB2 FIP" \
+    --tag bastionproxy-$CLUSTER_NAME \
+    "$OPENSTACK_EXTERNAL_NETWORK")"
+  >&2 echo "Created floating IP ${lb2_fip} for ${LB2_NAME}"
+  >&2 openstack server add floating ip "$lb2_server_id" "$lb2_fip"
+  echo "${lb2_fip}" >> "${SHARED_DIR}/DELETE_FIPS"
+  echo "${lb2_fip}" >> "${SHARED_DIR}/LB_HOSTS"
+  cp "${SHARED_DIR}/DELETE_FIPS" "${ARTIFACT_DIR}"
+  cp "${SHARED_DIR}/LB_HOSTS" "${ARTIFACT_DIR}"
+
+  LB2_MAC_ADDRESS="$(openstack port show -f value -c mac_address $lb2_port_id)"
+  echo "Configuring port $lb2_port_id with allowed addresses $API_IP and $INGRESS_IP"
+  openstack port set --no-allowed-address \
+    --allowed-address ip-address=$API_IP,mac-address=$LB2_MAC_ADDRESS \
+    --allowed-address ip-address=$INGRESS_IP,mac-address=$LB2_MAC_ADDRESS \
+    $lb2_port_id
+
+  SSH_CMD_LB2="ssh $SSH_ARGS $BASTION_USER@$lb2_fip"
+  if ! retry 60 5 $SSH_CMD_LB2 uname -a; then
+    echo "ERROR: Additional LB is not reachable via $lb2_fip - check logs:"
+    openstack console log show "${lb2_server_id}"
+    exit 1
+  fi
+
+  echo "Additional LB endpoint is ready: ${lb2_fip}"
+  echo "LB_HOSTS:"
+  cat "${SHARED_DIR}/LB_HOSTS"
+fi
