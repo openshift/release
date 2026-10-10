@@ -9,20 +9,23 @@
 set -euxo pipefail; shopt -s inherit_errexit
 
 eval "$(
-    curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
 typeset -i startTime=$SECONDS
-
-trap 'DebugOnExit' EXIT
 
 # shellcheck disable=SC2329
 # DebugOnExit — only triggers on infrastructure failures (non-zero exit before pytest runs).
 # pytest test failures (captured in JUnit XML) do NOT enter this path because the main
 # script body always exits 0 after RunCnvUpgradePytest. The debug hold is only for cases
 # where the step itself dies early (e.g. missing kubeconfig, virtctl install failure).
+#
+# Accepts an optional explicit exit code as $1. When omitted (i.e. invoked directly as
+# the EXIT trap handler with no args), it falls back to the live $?. An explicit arg is
+# required when DebugOnExit is called from inside another trap command (see the
+# MAP_TESTS branch below), since by then $? no longer reflects the script's real exit code.
 DebugOnExit() {
-    typeset -i exitCode=$?
+    typeset -i exitCode="${1:-$?}"
     typeset -i endTime=$SECONDS
     typeset -i executionTime=$((endTime - startTime))
     typeset hcoNamespace="openshift-cnv"
@@ -46,6 +49,33 @@ DebugOnExit() {
     exit "${exitCode}"
 }
 
+# This trap will be executed when the script exits for any reason (successful, error, or signal).
+if [[ "${MAP_TESTS}" == "true" ]]; then
+    # Map results by setting an identifier prefix in the test suite name for reporting tools.
+    # Merge the original jUnit results into a single file and archive the originals.
+    # Send the merged file to the shared dir for the Data Router Reporter step
+    # (run here so EXIT stays DebugOnExit).
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+        # Pinned to a reviewed commit SHA (rather than refs/heads/main) to avoid
+        # executing unreviewed upstream changes with the credentials of this job.
+        "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    # shellcheck disable=SC2154
+    trap '
+        typeset -i ec=$?
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--cnv__interop-tests__openshift-virtualization-upgrade-tests.xml || true
+        DebugOnExit "${ec}"
+    ' EXIT
+else
+    trap 'DebugOnExit' EXIT
+fi
+
+# Resolves the CNV must-gather image reference from the HCO CSV's relatedImages list
+# (looked up by name containing "must-gather"). Prints the image pull spec, or nothing
+# if the CSV/image entry can't be found — callers fall back to a version-pinned default.
 # shellcheck disable=SC2329
 GetMustGatherImage() {
     oc get csv --namespace='openshift-cnv' --selector='!olm.copiedFrom' --output='json' \
@@ -58,6 +88,11 @@ GetMustGatherImage() {
     true
 }
 
+# Runs `oc adm must-gather` with the CNV-specific gather script (--vms_details), using the
+# image resolved by GetMustGatherImage, or a version-pinned fallback image when that lookup
+# comes up empty (e.g. HCO CSV already gone). Output is collected under
+# ${ARTIFACT_DIR}/must-gather-cnv for post-mortem debugging; failures are swallowed (|| true)
+# so a must-gather issue never masks the original infrastructure failure being debugged.
 # shellcheck disable=SC2329
 RunMustGather() {
     typeset image
@@ -75,20 +110,10 @@ RunMustGather() {
     true
 }
 
-MapTestsForComponentReadiness() {
-    [[ "${MAP_TESTS}" != "true" ]] && return
-
-    typeset resultsFile="${1:-}"
-    : "Patching Tests Result File: ${resultsFile}"
-    if [[ -f "${resultsFile}" ]]; then
-        eval "$(
-            curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
-        )"; EnsureReqs yq
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' "${resultsFile}"
-    fi
-    true
-}
-
+# Downloads virtctl from the cluster's HyperConverged CLI-download route (derived from the
+# ingress domain), extracts it into ${binFolder} (already on PATH), and verifies it runs via
+# `virtctl version --client`. Exits the whole step non-zero on any failure, since a working
+# virtctl is required for the upgrade test suite that runs afterward.
 function InstallAndVerifyVirtctl () {
     typeset baseURL
     if ! baseURL="$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}' | tr -d '\n\r')"; then
@@ -114,6 +139,10 @@ function InstallAndVerifyVirtctl () {
     true
 }
 
+# Builds the pytest CLI argument list for the CNV upgrade run from CNV_* environment
+# variables (target version/source/channel/storage-class-matrix) plus fixed data-collector
+# and traceback options. Prints one argument per line so callers can safely load it into a
+# bash array with `mapfile -t`. Appends --cnv-image only when CNV_TARGET_IMAGE is set.
 BuildCnvUpgradePytestArgs() {
     typeset -a args=(
         --upgrade=cnv
@@ -125,12 +154,31 @@ BuildCnvUpgradePytestArgs() {
         --ignore=tests/network/
         --tb=native
     )
+    # VirtualMachineTemplate (template.kubevirt.io) is part of CNV 4.22.
+    # On older targets the vm_template upgrade tests error in setup
+    # (Couldn't find VirtualMachineTemplate in template.kubevirt.io api group):
+    #   TestVMTemplatePreUpgrade::test_template_creation_before_upgrade
+    #   TestVMTemplatePreUpgrade::test_vm_creation_from_template_before_upgrade
+    typeset cnvVer="${CNV_TARGET_VERSION#v}"
+    typeset cnvMajor="${cnvVer%%.*}"
+    typeset cnvRest="${cnvVer#*.}"
+    typeset cnvMajorMinor="${cnvMajor}.${cnvRest%%.*}"
+    if [[ "${cnvMajorMinor}" != "4.22" ]] \
+        && [[ "$(printf '%s\n%s\n' "${cnvMajorMinor}" "4.22" | sort -V | head -n1)" == "${cnvMajorMinor}" ]]; then
+        : "CNV ${CNV_TARGET_VERSION} is below 4.22; ignoring tests/infrastructure/vm_template/"
+        args+=(--ignore=tests/infrastructure/vm_template/)
+    fi
     if [[ -n "${CNV_TARGET_IMAGE}" ]]; then
         args+=(--cnv-image "${CNV_TARGET_IMAGE}")
     fi
     printf '%s\n' "${args[@]}"
 }
 
+# Runs the single, full CNV upgrade pytest suite (pre/post upgrade validation included) via
+# `uv run pytest`, writing JUnit XML to JUNIT_RESULTS_FILE. Takes the HCO subscription name
+# as $1. Captures pytest's exit code and returns it to the caller instead of letting a test
+# failure abort the script, since failures are recorded in JUnit XML and handled by Firewatch
+# rather than by the step's own exit status.
 RunCnvUpgradePytest() {
     typeset hcoSubscription="${1:?}"; (($#)) && shift
     typeset -i exitCode=0
@@ -214,12 +262,6 @@ InstallAndVerifyVirtctl
 typeset -i exitCode=0
 
 RunCnvUpgradePytest "${hcoSubscription}" || exitCode=$?
-
-MapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
-
-if [[ -f "${JUNIT_RESULTS_FILE}" ]]; then
-    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
-fi
 
 if (( exitCode != 0 )); then
     : "pytest exited ${exitCode} — test failures recorded in JUnit XML; step exits 0 to allow subsequent steps to run"
