@@ -1,0 +1,32 @@
+workflow:
+  as: servicemesh-istio-e2e-libvirt-s390x
+  documentation: |-
+    Provisions an ephemeral s390x OpenShift cluster on remote IBM Z libvirt hypervisors
+    (same pre/post path as openshift-e2e-libvirt-vpn), then runs OSSM test steps from
+    the ci-operator job configuration.
+
+    Requires cluster_profile libvirt-s390x-vpn-oz, capability/intranet, and Prow cluster
+    build12. Hypervisor hostnames and network layout come from Boskos (LEASED_RESOURCE)
+    and the cluster profile leases secret — not from workflow env.
+
+    Operator install and e2e test steps remain on the job test: chain so that individual
+    jobs can inject their own logic (e.g. install-operators,
+    servicemesh-sail-operator-e2e-lpinterop).
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    - ref: servicemesh-istio-e2e-libvirt-s390x-write-console-url
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+    - ref: firewatch-report-issues
+    env:
+      ARCH: s390x
+      ETCD_DISK_SPEED: slow
+      USE_EXTERNAL_DNS: "true"
