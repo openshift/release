@@ -33,9 +33,16 @@ cd "${TEMPLATE_DIR}"
 # shellcheck source=/dev/null
 source "${TEMPLATE_DIR}/${SETUP_SCRIPT}"
 
-echo "Installing Claude Code..."
-curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
-export PATH="${HOME}/.local/bin:${PATH}"
+echo "Installing agent tooling (OpenCode harness)..."
+[[ -f "${SHARED_DIR}/trt-agent.sh" ]] || {
+    echo "ERROR: ${SHARED_DIR}/trt-agent.sh not found — eval init step must run first"
+    exit 1
+}
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/trt-agent.sh"
+trt_resolve_model
+echo "Agent model: ${TRT_MODEL} (requested: '${TRT_MODEL_REQUESTED:-}')"
+trt_opencode_setup
 
 # --- Artifact collection ---
 REAL_SHARED_DIR="${SHARED_DIR}"
@@ -46,14 +53,11 @@ copy_artifacts() {
         if [[ -d "/workspace/${case_name}/artifacts" ]]; then
             cp "/workspace/${case_name}/artifacts/"* "${ARTIFACT_DIR}/${case_name}/" 2>/dev/null || true
         fi
-        if [[ -f "/tmp/eval-otel/${case_name}.claude-otel.jsonl" ]]; then
-            cp "/tmp/eval-otel/${case_name}.claude-otel.jsonl" "${ARTIFACT_DIR}/${case_name}/claude-otel.jsonl"
-        fi
     done
     podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
-    if [[ -d "${HOME}/.claude/projects" ]]; then
-        tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" \
-            -C "${HOME}/.claude" projects/ 2>/dev/null || true
+    if [[ -d "${HOME}/.local/share/opencode" ]]; then
+        tar -czf "${ARTIFACT_DIR}/opencode-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" \
+            -C "${HOME}/.local/share" opencode/ 2>/dev/null || true
     fi
 }
 trap copy_artifacts EXIT TERM INT
@@ -61,10 +65,9 @@ trap copy_artifacts EXIT TERM INT
 # --- Per-case dispatch ---
 # Each subshell gets a temp SHARED_DIR with standard filenames the solver expects:
 #   reads:  gh-fork-token, gh-upstream-token, jira-issue-key, jira-issue.json, eval-base-branch, eval-case
-#   writes: claude-branch, pr-number, pr-description.md, claude-otel.jsonl
+#   writes: claude-branch, pr-number, pr-description.md
 RESULTS_DIR="/tmp/eval-results"
-OTEL_DIR="/tmp/eval-otel"
-mkdir -p "${RESULTS_DIR}" "${OTEL_DIR}"
+mkdir -p "${RESULTS_DIR}"
 RUNNING=0
 
 for case_name in "${CASE_LIST[@]}"; do
@@ -79,7 +82,7 @@ for case_name in "${CASE_LIST[@]}"; do
         done
         cp "${REAL_SHARED_DIR}/gh-fork-token" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/gh-upstream-token" "${CASE_SHARED}/"
-        cp "${REAL_SHARED_DIR}/trt-telemetry.sh" "${CASE_SHARED}/"
+        cp "${REAL_SHARED_DIR}/trt-agent.sh" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/github-app-auth.sh" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/github-app-token-outputs" "${CASE_SHARED}/"
 
@@ -90,19 +93,19 @@ for case_name in "${CASE_LIST[@]}"; do
 
         export SHARED_DIR="${CASE_SHARED}"
         export WORKDIR="${CASE_WORKDIR}"
+        # Per-case ARTIFACT_DIR so resolver metadata (agent-model.json)
+        # lands in the case artifacts instead of racing on the step dir.
+        export ARTIFACT_DIR="${CASE_WORKDIR}/artifacts"
         export EVAL_MODE=true
         /opt/scripts/solve.sh
 
-        # Copy small outputs to SHARED_DIR for judge/cleanup. OTEL stays on
-        # local disk / artifacts — SHARED_DIR is a 3MiB kube secret.
+        # Copy small outputs to SHARED_DIR for judge/cleanup. Artifacts
+        # stay on local disk — SHARED_DIR is a 3MiB kube secret.
         for f in claude-branch pr-number pr-description.md; do
             if [[ -f "${CASE_SHARED}/${f}" ]]; then
                 cp "${CASE_SHARED}/${f}" "${REAL_SHARED_DIR}/${case_name}.${f}"
             fi
         done
-        if [[ -f "${CASE_SHARED}/claude-otel.jsonl" ]]; then
-            cp "${CASE_SHARED}/claude-otel.jsonl" "${OTEL_DIR}/${case_name}.claude-otel.jsonl"
-        fi
 
         echo "pass" > "${RESULTS_DIR}/${case_name}"
     ) > "${ARTIFACT_DIR}/solve-${case_name}.log" 2>&1 &
@@ -132,57 +135,17 @@ done
 
 echo "Completed: ${#CASE_LIST[@]} cases, ${FAILURES} failures."
 
-# Combine per-case OTEL on local disk and reshape with extract_metrics + jq
-# into eval-solve-run-result.json for prow-agent-eval. Do not put JSONL in
-# SHARED_DIR (ci-operator persists it as a 3MiB secret).
-OTEL_COMBINED="${OTEL_DIR}/claude-otel.jsonl"
-: > "${OTEL_COMBINED}"
-for case_name in "${CASE_LIST[@]}"; do
-    if [[ -f "${OTEL_DIR}/${case_name}.claude-otel.jsonl" ]]; then
-        cat "${OTEL_DIR}/${case_name}.claude-otel.jsonl" >> "${OTEL_COMBINED}"
-    fi
-done
-if [[ -s "${OTEL_COMBINED}" ]]; then
-    cp "${OTEL_COMBINED}" "${ARTIFACT_DIR}/claude-otel.jsonl"
-    METRICS_TMP=$(mktemp)
-    python3 /opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py \
-        "${OTEL_COMBINED}" "${METRICS_TMP}" || true
-    if jq -e '.rows[0].model' "${METRICS_TMP}" >/dev/null 2>&1; then
-        jq '
-          .rows[0] as $r
-          | ($r.total_cost_usd | tonumber) as $cost
-          | {
-              model: $r.model,
-              agent: "claude-code",
-              agent_version: $r.claude_code_version,
-              duration_s: (($r.duration_ms | tonumber) / 1000),
-              cost_usd: $cost,
-              num_turns: ($r.num_turns | tonumber),
-              exit_code: ($r.is_error | tonumber),
-              token_usage: {
-                input: ($r.input_tokens | tonumber),
-                output: ($r.output_tokens | tonumber),
-                cache_read: ($r.cache_read_input_tokens | tonumber),
-                cache_create: ($r.cache_creation_input_tokens | tonumber)
-              },
-              per_model_usage: {
-                ($r.model): {
-                  input: ($r.input_tokens | tonumber),
-                  output: ($r.output_tokens | tonumber),
-                  cache_read: ($r.cache_read_input_tokens | tonumber),
-                  cache_create: ($r.cache_creation_input_tokens | tonumber),
-                  cost_usd: $cost
-                }
-              }
-            }
-        ' "${METRICS_TMP}" > "${REAL_SHARED_DIR}/eval-solve-run-result.json"
-        cp "${REAL_SHARED_DIR}/eval-solve-run-result.json" "${ARTIFACT_DIR}/eval-solve-run-result.json"
-    else
-        echo "WARNING: extract_metrics produced no usable row; Run Configuration will be omitted"
-    fi
-    rm -f "${METRICS_TMP}"
-else
-    echo "WARNING: no OTEL JSONL collected from any case; Run Configuration will be omitted"
+# Report which model actually ran (OpenCode does not export OTEL to the
+# agentic-ci collector, so run-result is model-only, from the first case's
+# resolver metadata).
+if [[ ${#CASE_LIST[@]} -gt 0 && -f "/workspace/${CASE_LIST[0]}/artifacts/agent-model.json" ]]; then
+    jq -n \
+        --arg model "$(jq -r '.effective_model' "/workspace/${CASE_LIST[0]}/artifacts/agent-model.json")" \
+        --arg agent "opencode" \
+        --arg agent_version "${TRT_OPENCODE_VERSION}" \
+        '{model: $model, agent: $agent, agent_version: $agent_version}' \
+        > "${REAL_SHARED_DIR}/eval-solve-run-result.json"
+    cp "${REAL_SHARED_DIR}/eval-solve-run-result.json" "${ARTIFACT_DIR}/eval-solve-run-result.json"
 fi
 
 # Always exit 0 so the judge step runs and produces the eval summary.
