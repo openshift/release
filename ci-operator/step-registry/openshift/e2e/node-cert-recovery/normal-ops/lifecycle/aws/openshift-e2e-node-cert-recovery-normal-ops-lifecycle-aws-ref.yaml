@@ -1,0 +1,45 @@
+ref:
+  as: openshift-e2e-node-cert-recovery-normal-ops-lifecycle-aws
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  timeout: 1h30m0s
+  commands: openshift-e2e-node-cert-recovery-normal-ops-lifecycle-aws-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: APPROVER_EVENT_TIMEOUT
+    default: "3m"
+    documentation: How long to wait for the approver's NodeCertRecoveryEnabled Event after enabling it.
+  - name: NODE_TIMEOUT
+    default: "25m"
+    documentation: How long a new, replacement, restarted or re-started node has to become Ready.
+  - name: STOP_DURATION
+    default: "10m"
+    documentation: |-
+      How long one worker stays stopped. Must exceed the approver's 5-minute heartbeat staleness, so the
+      approver sees a stale node whose certs are still valid.
+  - name: CLIENT_RESET
+    default: "true"
+    documentation: |-
+      After the normal-operation checks, move one worker's kubelet client cert aside and require the
+      recovery approver to re-admit it only after its heartbeat has been stale for 5 minutes.
+  - name: CLIENT_RESET_TIMEOUT
+    default: "15m"
+    documentation: How long the client-reset worker's new client CSR has to be approved.
+  documentation: |-
+    Node cert recovery with the toggle on during normal operation (OCPSTRAT-1346), on AWS IPI. Enables
+    the recovery approver (ConfigMap openshift-config/node-client-cert-recovery), then: submits a kubelet
+    client renewal CSR as an existing worker, with its current cert (a kubelet renews only at 70-90% of
+    its cert's lifetime, so the step makes the request itself); in parallel scales a worker MachineSet
+    up by one, rotates one master's serving cert, and stops one worker for STOP_DURATION; then deletes
+    the new worker's Machine and waits for its replacement. Every kubelet CSR since the toggle must be
+    approved by the routine approvers (machine-approver for bootstrap and serving CSRs, the
+    kube-controller-manager CSR approver for renewals) and none by the recovery approvers
+    (KCMRecoveryApprove). With CLIENT_RESET, one worker then loses its client cert and must be
+    re-admitted by the recovery approver no sooner than about 5 minutes after its CSR appears.
+    The gates for an absent or deleting Node are unit-tested only: no step leaves a bootstrap CSR
+    pending for a Node that is going away. Results: ${ARTIFACT_DIR}/normal-ops/verdict.json and
+    junit_node_cert_recovery_normal_ops.xml.
