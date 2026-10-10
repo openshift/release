@@ -191,6 +191,12 @@ runner_args=(-p "${PROVIDER}")
 [[ -n "${TIMEOUT}" ]]        && runner_args+=(--timeout "${TIMEOUT}")
 [[ -n "${TESTS_REPO}" ]]     && runner_args+=(--tests-repo "${TESTS_REPO}")
 [[ -n "${TESTS_REPO_REF}" ]] && runner_args+=(--tests-repo-ref "${TESTS_REPO_REF}")
+if [[ "${PROFILE}" = "coco" ]]; then
+    TRUSTEE_URL="$(cat "${SHARED_DIR}/TRUSTEE_URL")"
+    [[ -n "$TRUSTEE_URL" ]] || { echo "ERROR: trustee URL not found at ""${SHARED_DIR}/TRUSTEE_URL"""; exit 1; }
+    # TODO: add support for secure http
+    runner_args+=(--trustee-url "${TRUSTEE_URL/https/http}")
+fi
 
 # Log only non-sensitive metadata: a user-supplied tests-repo URL may embed
 # credentials, so never echo the raw runner arguments.
