@@ -53,6 +53,33 @@ chain:
       HC_NAME="gcp-hc-${CLUSTER_NAME:0-8}"
       echo "$(date) Creating GCP HyperShift cluster ${HC_NAME}"
 
+      # Pass the required resource references only when the CLI supports them.
+      CREATE_GCP_HELP="$(bin/hypershift create cluster gcp --help 2>&1)"
+      GCP_NETWORK_REFERENCE_ARGS=()
+      for resource in router nat firewall-rule; do
+        if grep -q -- "--${resource}-name" <<< "${CREATE_GCP_HELP}"; then
+          RESOURCE_NAME="$(<"${SHARED_DIR}/hc-${resource}-name")"
+          if [[ -z "${RESOURCE_NAME}" ]]; then
+            echo "ERROR: GCP infrastructure output is missing the required ${resource} name"
+            exit 1
+          fi
+          GCP_NETWORK_REFERENCE_ARGS+=("--${resource}-name" "${RESOURCE_NAME}")
+        fi
+      done
+      case "${#GCP_NETWORK_REFERENCE_ARGS[@]}" in
+        0)
+          echo false > "${SHARED_DIR}/gcp-resource-reference-flow"
+          echo "HyperShift CLI does not support GCP network resource reference flags; using the legacy create path"
+          ;;
+        6)
+          echo true > "${SHARED_DIR}/gcp-resource-reference-flow"
+          ;;
+        *)
+          echo "ERROR: HyperShift CLI exposes only some GCP network resource reference flags"
+          exit 1
+          ;;
+      esac
+
       bin/hypershift create cluster gcp \
         --name "${HC_NAME}" \
         --namespace clusters \
@@ -66,6 +93,7 @@ chain:
         --zone "${GCP_ZONE}" \
         --network "${VPC_NAME}" \
         --private-service-connect-subnet "${PSC_SUBNET}" \
+        "${GCP_NETWORK_REFERENCE_ARGS[@]}" \
         --endpoint-access PublicAndPrivate \
         --workload-identity-project-number "${WIF_PROJECT_NUMBER}" \
         --workload-identity-pool-id "${WIF_POOL_ID}" \
