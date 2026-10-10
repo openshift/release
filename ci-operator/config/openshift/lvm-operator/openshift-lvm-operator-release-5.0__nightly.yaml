@@ -56,6 +56,79 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-baremetalds-tnf-lvms-mno-qe-integration-tests
+  cron: 0 8 * * 5
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      LVM_CATALOG_SOURCE: lvm-catalogsource
+      LVM_CLUSTER_DEVICE_PATH: /dev/vda
+      LVM_CLUSTER_TOLERATE_MASTER: "true"
+      LVM_OPERATOR_SUB_CHANNEL: stable-5.0
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v5.0
+    test:
+    - as: lvms-tnf-prepare-and-record
+      cli: latest
+      commands: |
+        set -eu
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        test "$(oc get nodes -l node-role.kubernetes.io/master -o name | wc -l | tr -d ' ')" = 2
+        # LVMS MNO disk tests select worker-labelled nodes. In TNF the two
+        # control-plane nodes also host workloads; there are no separate workers.
+        oc label nodes -l node-role.kubernetes.io/master node-role.kubernetes.io/worker= --overwrite
+        test "$(oc get nodes -l node-role.kubernetes.io/worker -o name | wc -l | tr -d ' ')" = 2
+        printf '%s\n' "${RELEASE_IMAGE_LATEST}" > "${ARTIFACT_DIR}/release-image.txt"
+        printf '%s\n' "${DEVSCRIPTS_CONFIG}" > "${ARTIFACT_DIR}/tnf-devscripts-config.txt"
+        oc get clusterversion version -o json > "${ARTIFACT_DIR}/clusterversion.json"
+        # Record what OLM actually installed; the nightly catalog tag can advance.
+        oc -n openshift-marketplace get catalogsource lvm-catalogsource -o json > "${ARTIFACT_DIR}/catalogsource.json"
+        oc -n openshift-marketplace get pods -l olm.catalogSource=lvm-catalogsource -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[*].imageID}{"\n"}{end}' > "${ARTIFACT_DIR}/catalog-image-ids.txt"
+        installed_csv=$(oc -n openshift-lvm-storage get subscription lvms-operator -o jsonpath='{.status.installedCSV}')
+        test -n "${installed_csv}"
+        oc -n openshift-lvm-storage get csv "${installed_csv}" -o json > "${ARTIFACT_DIR}/installed-csv.json"
+        oc -n openshift-lvm-storage get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[*].imageID}{"\n"}{end}' > "${ARTIFACT_DIR}/lvms-image-ids.txt"
+        oc get csidriver topolvm.io -o json > "${ARTIFACT_DIR}/topolvm-csidriver.json"
+        cp "${SHARED_DIR}/lvm-cluster.yaml" "${ARTIFACT_DIR}/lvm-cluster.yaml"
+      dependencies:
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      env:
+      - default: ""
+        documentation: TNF provisioning configuration to record with the test results.
+        name: DEVSCRIPTS_CONFIG
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: lvms-tnf-mno-integration-test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        if ./integration-test run-suite -c 1 --output json --junit-path "${ARTIFACT_DIR}/junit_results.xml" openshift/lvm-operator/test/integration/qe_tests/mno > "${ARTIFACT_DIR}/ote-results.json" 2> "${ARTIFACT_DIR}/test.log"; then
+          result=0
+        else
+          result=$?
+        fi
+        if [ -f "${ARTIFACT_DIR}/junit_results.xml" ]; then
+          cp "${ARTIFACT_DIR}/junit_results.xml" "${SHARED_DIR}/lvms-tnf-junit.xml"
+        fi
+        exit "${result}"
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    - ref: baremetalds-two-node-fencing-lvms-mno-validate-results
+    workflow: baremetalds-two-node-fencing-lvms-mno
 - as: e2e-aws-sno-qe-integration-tests
   cron: 0 8 * * 5
   steps:
