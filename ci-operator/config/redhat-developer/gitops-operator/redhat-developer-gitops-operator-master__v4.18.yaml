@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.19"
+    name: "4.18"
     namespace: origin
     tag: operator-sdk
 build_root:
@@ -45,15 +45,15 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.18"
   initial:
     integration:
-      name: "4.19"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -64,6 +64,7 @@ tests:
 - as: kuttl-sequential
   capabilities:
   - arm64
+  optional: true
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     cluster_profile: gitops-aws
@@ -73,6 +74,7 @@ tests:
       BASE_DOMAIN: ocp-gitops-qe.com
       OCP_ARCH: arm64
     test:
+    - ref: gitops-operator-merge-quay-pull-secret
     - as: install
       cli: latest
       commands: |
@@ -115,6 +117,7 @@ tests:
 - as: kuttl-parallel
   capabilities:
   - arm64
+  optional: true
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     cluster_profile: gitops-aws
@@ -124,6 +127,7 @@ tests:
       BASE_DOMAIN: ocp-gitops-qe.com
       OCP_ARCH: arm64
     test:
+    - ref: gitops-operator-merge-quay-pull-secret
     - as: install
       cli: latest
       commands: |
@@ -165,6 +169,7 @@ tests:
 - as: e2e
   capabilities:
   - arm64
+  optional: true
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     cluster_profile: gitops-aws
@@ -174,6 +179,7 @@ tests:
       BASE_DOMAIN: ocp-gitops-qe.com
       OCP_ARCH: arm64
     test:
+    - ref: gitops-operator-merge-quay-pull-secret
     - as: e2e-steps
       commands: scripts/openshiftci-presubmit-all-tests.sh
       from: dependencies
@@ -186,4 +192,4 @@ zz_generated_metadata:
   branch: master
   org: redhat-developer
   repo: gitops-operator
-  variant: v4.19
+  variant: v4.18
