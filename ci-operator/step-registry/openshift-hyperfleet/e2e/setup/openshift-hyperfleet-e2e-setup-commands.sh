@@ -103,6 +103,7 @@ hyperfleet-credential-provider generate-kubeconfig \
 # Resolve Gangway-overridable params (prefix is required for ci-operator to
 # inject overrides; bare names are used by downstream scripts and deploy-clm.sh).
 NAMESPACE_PREFIX="${MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX:-e2e}"
+INFRA_REF="${MULTISTAGE_PARAM_OVERRIDE_INFRA_REF:-main}"
 
 # Generate namespace name with build_id suffix
 NAMESPACE_NAME=${NAMESPACE_PREFIX}-${BUILD_ID}
@@ -116,13 +117,13 @@ echo "${PROJECT_ID}" > "${SHARED_DIR}/gcp_project_id"
 
 # Export chart parameters for the deployment
 export API_CHART_REPO="${API_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-api.git}"
-export API_CHART_REF="${API_CHART_REF:-main}"
+export API_CHART_REF="${MULTISTAGE_PARAM_OVERRIDE_API_CHART_REF:-${API_CHART_REF:-main}}"
 export API_CHART_PATH="${API_CHART_PATH:-charts}"
 export ADAPTER_CHART_REPO="${ADAPTER_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-adapter.git}"
-export ADAPTER_CHART_REF="${ADAPTER_CHART_REF:-main}"
+export ADAPTER_CHART_REF="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_CHART_REF:-${ADAPTER_CHART_REF:-main}}"
 export ADAPTER_CHART_PATH="${ADAPTER_CHART_PATH:-charts}"
 export SENTINEL_CHART_REPO="${SENTINEL_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-sentinel.git}"
-export SENTINEL_CHART_REF="${SENTINEL_CHART_REF:-main}"
+export SENTINEL_CHART_REF="${MULTISTAGE_PARAM_OVERRIDE_SENTINEL_CHART_REF:-${SENTINEL_CHART_REF:-main}}"
 export SENTINEL_CHART_PATH="${SENTINEL_CHART_PATH:-charts}"
 
 # Export image parameters for the deployment
@@ -133,6 +134,7 @@ export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
 export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}"
 export SENTINEL_IMAGE_REPO="${SENTINEL_IMAGE_REPO:-ci/hyperfleet-sentinel}"
 export SENTINEL_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG:-latest}"
+export APPLIER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_APPLIER_IMAGE_TAG:-latest}"
 
 # Enable JWT authentication for the API
 export JWT_AUTH_ENABLED="${JWT_AUTH_ENABLED:-true}"
@@ -149,7 +151,8 @@ fi
 
 # Install hyperfleet components via infra repo
 # Will inherit all exported values here
-git clone --depth 1 "https://github.com/openshift-hyperfleet/hyperfleet-infra.git" /tmp/hyperfleet-infra
+log "Cloning hyperfleet-infra at ref: ${INFRA_REF}"
+git clone --depth 1 --branch "${INFRA_REF}" "https://github.com/openshift-hyperfleet/hyperfleet-infra.git" /tmp/hyperfleet-infra
 cd /tmp/hyperfleet-infra
 
 HELMFILE_ENV="e2e-gcp"
