@@ -1,7 +1,12 @@
+base_images:
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9/go-toolset:1.22.9
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.26
       USER 0
       RUN yum install -y --nodocs make git
       RUN ln -s /cli/oc /usr/bin/kubectl
@@ -17,9 +22,10 @@ prowgen:
   enable_secrets_store_csi_driver: true
 releases:
   latest:
-    integration:
-      name: "4.18"
-      namespace: ocp
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -35,6 +41,12 @@ tests:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "1"
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: feast-operator-system,test-ns-feast,test-ns-remote-registry
+      SCANNER_CPU_LIMIT: "2"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
     test:
     - as: run-tests
       cli: latest
@@ -60,6 +72,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - ref: tls-scanner-run
     workflow: hypershift-hostedcluster-workflow
 - as: e2e-in-cluster-postsubmit
   postsubmit: true
@@ -94,6 +107,85 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: tls-scan-pqc
+  cron: 0 6 1,15 * *
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "1"
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: opendatahub-feast-system,feast-tls-scan
+      SCANNER_CPU_LIMIT: "2"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
+    test:
+    - as: deploy-feast-module
+      cli: latest
+      commands: |
+        set -euo pipefail
+        MODULE_NS=opendatahub-feast-system
+        FS_NS=feast-tls-scan
+        MODULE_OPERATOR_IMAGE=quay.io/opendatahub/odh-feast-module-operator:odh-stable
+
+        # Deploy the Feast module operator with the same manifests its Helm chart is generated from.
+        git clone --depth 1 https://github.com/opendatahub-io/feast-module-operator.git /tmp/feast-module-operator
+        oc kustomize /tmp/feast-module-operator/config/default > /tmp/feast-module-operator.yaml
+        grep -q 'image: ttl.sh/opendatahub-feast-operator:latest' /tmp/feast-module-operator.yaml
+        sed -i "s#image: ttl.sh/opendatahub-feast-operator:latest#image: ${MODULE_OPERATOR_IMAGE}#" /tmp/feast-module-operator.yaml
+        oc apply -f /tmp/feast-module-operator.yaml
+
+        # Have the module operator deploy the Feast operator and feature server images built from this branch.
+        oc -n "${MODULE_NS}" set env deployment/opendatahub-feast-operator -c manager \
+          RELATED_IMAGE_ODH_FEAST_OPERATOR_IMAGE="${FEAST_OPERATOR_CONTROLLER_IMAGE}" \
+          RELATED_IMAGE_ODH_FEATURE_SERVER_IMAGE="${FEAST_FEATURE_SERVER_IMAGE}"
+        oc -n "${MODULE_NS}" rollout status deployment/opendatahub-feast-operator --timeout=5m
+
+        oc apply -f - <<EOF
+        apiVersion: components.platform.opendatahub.io/v1alpha1
+        kind: FeastOperator
+        metadata:
+          name: default-feastoperator
+        spec: {}
+        EOF
+        oc wait --for=condition=Ready feastoperators.components.platform.opendatahub.io/default-feastoperator --timeout=10m
+        oc -n "${MODULE_NS}" wait --for=condition=Available deployment/feast-operator-controller-manager --timeout=10m
+
+        # Leave a FeatureStore with all servers running (TLS on by default on OpenShift) for the scan.
+        oc create namespace "${FS_NS}"
+        oc apply -n "${FS_NS}" -f - <<EOF
+        apiVersion: feast.dev/v1
+        kind: FeatureStore
+        metadata:
+          name: tls-scan
+        spec:
+          feastProject: tls_scan
+          services:
+            offlineStore:
+              server: {}
+            onlineStore:
+              server: {}
+            registry:
+              local:
+                server: {}
+            ui: {}
+        EOF
+        oc -n "${FS_NS}" wait --for=condition=FeatureStore featurestore/tls-scan --timeout=10m
+        oc -n "${FS_NS}" wait --for=condition=Available deployment --all --timeout=10m
+      dependencies:
+      - env: FEAST_OPERATOR_CONTROLLER_IMAGE
+        name: feast-operator
+      - env: FEAST_FEATURE_SERVER_IMAGE
+        name: feast-feature-server
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
     workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: master
