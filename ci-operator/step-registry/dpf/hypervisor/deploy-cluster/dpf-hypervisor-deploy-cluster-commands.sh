@@ -103,10 +103,12 @@ REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-
 
 datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
+REMOTE_OPENSHIFT_DPF_DIR="${REMOTE_WORK_DIR}/openshift-dpf"
 
 echo "Deploying OpenShift cluster with DPF from Prow pod"
 echo "Local working directory: ${WORK_DIR}"
 echo "Remote host: ${REMOTE_HOST}"
+echo "Remote tracking directory: ${REMOTE_OPENSHIFT_DPF_DIR}"
 echo "Cluster name: ${CLUSTER_NAME}"
 echo "Deploy make target: ${DPF_DEPLOY_MAKE_TARGET}"
 
@@ -116,6 +118,17 @@ if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -d ${REMOTE_MAIN_WORK_DIR}"; then
   echo "ERROR: Remote work directory ${REMOTE_MAIN_WORK_DIR} does not exist on ${REMOTE_HOST}"
   exit 1
 fi
+
+# Create tracking directory on bastion and update pointer early so files
+# can be SCP'd back as soon as they become available (including on failure).
+echo "Creating tracking directory on bastion: ${REMOTE_OPENSHIFT_DPF_DIR}"
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "mkdir -p ${REMOTE_OPENSHIFT_DPF_DIR}"
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"; then
+  ssh ${SSH_OPTS} root@${REMOTE_HOST} "sed -i 's|LAST_OPENSHIFT_DPF=.*|LAST_OPENSHIFT_DPF=${REMOTE_OPENSHIFT_DPF_DIR}|' ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"
+else
+  ssh ${SSH_OPTS} root@${REMOTE_HOST} "echo 'LAST_OPENSHIFT_DPF=${REMOTE_OPENSHIFT_DPF_DIR}' > ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"
+fi
+echo "Bastion tracking directory ready"
 
 cd "${WORK_DIR}"
 
@@ -134,27 +147,35 @@ git fetch origin pull/269/head:pr-269
 git merge pr-269 --no-edit
 echo "PR #269 merged successfully"
 
-# Copy kubeconfig and .env to SHARED_DIR on exit so must-gather can reach
-# the cluster even when the deployment fails partway through.
-copy_kubeconfig() {
-  echo "Attempting to copy kubeconfig to SHARED_DIR..."
-  if [[ -f "${WORK_DIR}/kubeconfig.${CLUSTER_NAME}" ]]; then
-    cp "${WORK_DIR}/kubeconfig.${CLUSTER_NAME}" "${SHARED_DIR}/kubeconfig"
-    echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig"
+# Sync kubeconfigs and .env to SHARED_DIR and bastion. Called by the EXIT
+# trap (so files are saved even on failure) and can also be called mid-run
+# to push files as soon as they appear.
+sync_artifacts() {
+  local found_kubeconfig=false
+  for kc in "${WORK_DIR}"/kubeconfig*; do
+    [[ -f "$kc" ]] || continue
+    found_kubeconfig=true
+    local basename
+    basename=$(basename "$kc")
+    scp ${SSH_OPTS} "$kc" "root@${REMOTE_HOST}:${REMOTE_OPENSHIFT_DPF_DIR}/" 2>/dev/null \
+      && echo "${basename} copied to bastion" \
+      || echo "WARNING: Failed to copy ${basename} to bastion"
+  done
+  if $found_kubeconfig; then
+    cp "${WORK_DIR}/kubeconfig.${CLUSTER_NAME}" "${SHARED_DIR}/kubeconfig" 2>/dev/null || true
   else
-    echo "WARNING: Could not copy kubeconfig to SHARED_DIR (file may not exist yet)"
+    echo "WARNING: No kubeconfig files found yet"
   fi
 
-  echo "Attempting to copy .env to SHARED_DIR..."
   if [[ -f "${WORK_DIR}/.env" ]]; then
     cp "${WORK_DIR}/.env" "${SHARED_DIR}/.env"
     sed -i 's/^PAYLOAD_URL=.*$/PAYLOAD_URL=/' "${SHARED_DIR}/.env"
-    echo ".env copied to \${SHARED_DIR}/.env"
-  else
-    echo "WARNING: Could not copy .env to SHARED_DIR (file may not exist yet)"
+    scp ${SSH_OPTS} "${WORK_DIR}/.env" "root@${REMOTE_HOST}:${REMOTE_OPENSHIFT_DPF_DIR}/" 2>/dev/null \
+      && echo ".env copied to bastion" \
+      || echo "WARNING: Failed to copy .env to bastion"
   fi
 }
-trap copy_kubeconfig EXIT
+trap sync_artifacts EXIT
 
 echo "Git repository state:"
 git log --oneline -5
@@ -177,8 +198,11 @@ echo "aicli offline token configured"
 # Set up secrets from the Vault cluster profile
 echo "Setting up secrets from Vault cluster profile..."
 ssh-keygen -y -f /tmp/id_rsa > "${WORK_DIR}/ssh_key.pub"
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "cat /root/.ssh/id_rsa.pub" >> "${WORK_DIR}/ssh_key.pub" 2>/dev/null \
+  && echo "Bastion public key appended to ssh_key.pub" \
+  || echo "WARNING: Could not fetch bastion public key"
 export SSH_KEY="${WORK_DIR}/ssh_key.pub"
-echo "SSH public key derived from private key: ${SSH_KEY}"
+echo "SSH public key(s) for VM injection: ${SSH_KEY}"
 
 cp "${CLUSTER_PROFILE_DIR}/dpf-pull-secret" "${WORK_DIR}/dpf_pull_secret.json"
 export DPF_PULL_SECRET="${WORK_DIR}/dpf_pull_secret.json"
@@ -272,8 +296,9 @@ if [[ -n "${PAYLOAD_URL}" ]]; then
   echo "Added AI_URL=http://${REMOTE_HOST}:${AI_PORT}, AI_ONPREM_PORT=${AI_PORT}, AI_ONPREM_IMAGE_PORT=${IMAGE_PORT} to .env"
 fi
 
-echo "Copying .env to artifacts..."
+echo "Copying .env to artifacts and bastion..."
 sed -E '/^WORKER_[0-9]+_NAME=/!{ /^WORKER_[0-9]+_/d }' .env > "${ARTIFACT_DIR}/.env" || echo "WARNING: Failed to copy .env to artifacts"
+sync_artifacts
 
 if [[ -n "${PAYLOAD_URL}" ]]; then
   echo "Starting SSH reverse tunnel (AI API :${AI_PORT} -> :8090, image service :${IMAGE_PORT} -> :8888)..."
@@ -284,7 +309,7 @@ if [[ -n "${PAYLOAD_URL}" ]]; then
     root@${REMOTE_HOST} -N &
   SSH_TUNNEL_PID=$!
   cleanup() {
-    copy_kubeconfig
+    sync_artifacts
     kill "${SSH_TUNNEL_PID}" 2>/dev/null || true
   }
   trap cleanup EXIT
@@ -317,17 +342,5 @@ else
   exit 1
 fi
 
-# Post-deployment: copy files back to bastion for tracking
-echo "Copying deployment files back to bastion..."
-ssh ${SSH_OPTS} root@${REMOTE_HOST} "mkdir -p ${REMOTE_WORK_DIR}/openshift-dpf"
-scp ${SSH_OPTS} .env "root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/" || echo "WARNING: Failed to copy .env to bastion"
-scp ${SSH_OPTS} "kubeconfig.${CLUSTER_NAME}" "root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/" 2>/dev/null || echo "WARNING: Failed to copy kubeconfig to bastion"
-
-# Update last-openshift-dpf-dir.sh on bastion
-echo "Updating last-openshift-dpf-dir.sh on bastion..."
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"; then
-  ssh ${SSH_OPTS} root@${REMOTE_HOST} "sed -i 's|LAST_OPENSHIFT_DPF=.*|LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf|' ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"
-else
-  ssh ${SSH_OPTS} root@${REMOTE_HOST} "echo 'LAST_OPENSHIFT_DPF=${REMOTE_WORK_DIR}/openshift-dpf' > ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"
-fi
-echo "Bastion tracking updated"
+echo "Deployment completed. Syncing kubeconfigs and .env to bastion..."
+sync_artifacts
