@@ -47,6 +47,15 @@ OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
 OC_RETRY_COUNT=${OC_RETRY_COUNT:-3}
 OC_RETRY_INTERVAL=${OC_RETRY_INTERVAL:-20}
 
+# PodVM image build (peer-pods only). The operator builds the image with the
+# osc-podvm-image-creation Job and deletes that Job as soon as it completes or
+# fails, so the build logs are snapshotted in the background while KataConfig is
+# reconciling.
+PODVM_IMAGE_JOB="osc-podvm-image-creation"
+PODVM_LOG_FILE="${ARTIFACT_DIR:-${SHARED_DIR}}/podvm-image-creation.log"
+PODVM_CAPTURE_INTERVAL=${PODVM_CAPTURE_INTERVAL:-30}
+PODVM_CAPTURE_PID=""
+
 
 # Early exit if installation disabled
 if [[ "${OSC_INSTALL}" != "true" ]]; then
@@ -95,6 +104,7 @@ cd "${SCRATCH}"
 function exit_handler() {
   local exitcode=$?
   set +e
+  stop_podvm_log_capture
   rm -rf "${SCRATCH}"
 
   if [[ ${exitcode} -ne 0 ]]; then
@@ -712,6 +722,52 @@ function create_peer_pods_secret() {
   esac
 }
 
+#========================================
+# PodVM Image Build Logs (peer-pods)
+#========================================
+
+# Keep a copy of the image build logs: the operator deletes the Job (and with it
+# the pod and its logs) as soon as the build completes or fails.
+function capture_podvm_logs() {
+  oc get job "${PODVM_IMAGE_JOB}" -n "${OSC_NAMESPACE}" &>/dev/null || return 0
+
+  if oc logs "job/${PODVM_IMAGE_JOB}" -n "${OSC_NAMESPACE}" --all-containers --timestamps \
+      > "${PODVM_LOG_FILE}.tmp" 2>/dev/null; then
+    mv "${PODVM_LOG_FILE}.tmp" "${PODVM_LOG_FILE}"
+  else
+    rm -f "${PODVM_LOG_FILE}.tmp"
+  fi
+}
+
+# Snapshot the image build logs in the background while KataConfig reconciles.
+function start_podvm_log_capture() {
+  [[ "${ENABLEPEERPODS}" == "true" ]] || return 0
+
+  (
+    set +e
+    while true; do
+      capture_podvm_logs
+      sleep "${PODVM_CAPTURE_INTERVAL}"
+    done
+  ) &
+  PODVM_CAPTURE_PID=$!
+}
+
+function stop_podvm_log_capture() {
+  [[ -n "${PODVM_CAPTURE_PID}" ]] || return 0
+
+  kill "${PODVM_CAPTURE_PID}" 2>/dev/null || true
+  wait "${PODVM_CAPTURE_PID}" 2>/dev/null || true
+  PODVM_CAPTURE_PID=""
+
+  capture_podvm_logs
+  if [[ -s "${PODVM_LOG_FILE}" ]]; then
+    echo ">>> PodVM image build logs: $(basename "${PODVM_LOG_FILE}") in the job artifacts"
+  else
+    echo ">>> No podvm image build logs captured (job ${PODVM_IMAGE_JOB} produced none)"
+  fi
+}
+
 function wait_for_kataconfig() {
   echo ">>> Waiting for KataConfig to be ready (this may take up to 2 hours for node reboots)"
 
@@ -840,7 +896,9 @@ if [[ "${RUST_RUNTIME}" == "true" ]]; then
 fi
 
 install_osc_operands "${CHARTS_DIR}"
+start_podvm_log_capture
 wait_for_kataconfig
+stop_podvm_log_capture
 
 if [[ "${RUST_RUNTIME}" == "true" ]]; then
   check_rust_runtime
