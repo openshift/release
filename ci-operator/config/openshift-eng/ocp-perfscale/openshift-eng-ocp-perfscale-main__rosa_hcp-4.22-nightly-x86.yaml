@@ -586,10 +586,10 @@ tests:
       {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
       logs> :warning: {{end}}'
   steps:
-    allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
       CHANNEL_GROUP: nightly
+      CLUSTER_SECTOR: perf2
       COMPUTE_MACHINE_TYPE: m6i.xlarge
       CONFIG: config/standard-classic-rosa.yml
       DISABLE_WORKLOAD_MONITORING: "false"
@@ -602,11 +602,21 @@ tests:
       MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
       MULTI_AZ: "false"
       OPENSHIFT_VERSION: "4.22"
+      REGION: us-east-2
       REPLICAS: "9"
+    post:
+    - ref: gather-must-gather
+    - ref: gather-extra
+    - ref: gather-audit-logs
+    - ref: rosa-cluster-deprovision
+    - ref: rosa-cluster-index
+    - chain: rosa-sts-oidc-config-delete
+    - ref: aws-deprovision-stacks
+    - ref: send-results-to-reportportal
     test:
     - chain: openshift-qe-hypershift-infra
     - ref: openshift-qe-perfscale-aws-data-path-sg
-    - chain: openshift-qe-data-path-tests
+    - chain: openshift-qe-ingress-perf
     workflow: rosa-aws-sts-hcp-mp
 - always_run: false
   as: control-plane-3nodes
