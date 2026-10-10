@@ -163,6 +163,77 @@ tests:
           memory: 200Mi
     - ref: tls-scanner-run
     workflow: optional-operators-ci-aws
+- always_run: false
+  as: tls-curve-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-ptp
+      OO_PACKAGE: ptp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-ptp
+      SCANNER_CPU: "2"
+      TLS_GROUPS: SecP384r1MLKEM1024
+    test:
+    - ref: tls-groups-configure
+    - as: wait-ptp-tls-curve-restart
+      cli: latest
+      commands: |
+        echo "Waiting for PTP operator to restart after TLS group change..."
+        oc rollout status deployment ptp-operator -n openshift-ptp --timeout=300s
+        oc rollout status daemonset linuxptp-daemon -n openshift-ptp --timeout=400s
+        echo "PTP operator and daemon restarted with the custom TLS group"
+        oc get pods -n openshift-ptp
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
+- as: tls-curve-scan-periodic
+  cron: 0 4 * * 5
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-ptp
+      OO_PACKAGE: ptp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-ptp
+      SCANNER_CPU: "2"
+      TLS_GROUPS: SecP384r1MLKEM1024
+    test:
+    - ref: tls-groups-configure
+    - as: wait-ptp-tls-curve-restart
+      cli: latest
+      commands: |
+        echo "Waiting for PTP operator to restart after TLS group change..."
+        oc rollout status deployment ptp-operator -n openshift-ptp --timeout=300s
+        oc rollout status daemonset linuxptp-daemon -n openshift-ptp --timeout=400s
+        echo "PTP operator and daemon restarted with the custom TLS group"
+        oc get pods -n openshift-ptp
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
 - as: security
   optional: true
   skip_if_only_changed: ^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
