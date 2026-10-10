@@ -4,7 +4,7 @@
 # See https://docs.google.com/presentation/d/1d3heMS5JAFmubJpW_8YuHa5r3AlCvj2tW0akQ6b8EQw/edit?usp=sharing
 
 CONTAINER_NAME="haproxy-$(<"${SHARED_DIR}"/cluster_name)"
-OVE_ISO_STORAGE_HOST=$(<"${CLUSTER_PROFILE_DIR}/ove_iso_storage_host")
+OVE_ISO_STORAGE_HOST="fd99:2222:3456::2"
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
