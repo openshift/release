@@ -1,0 +1,24 @@
+workflow:
+  as: hypershift-aws-ovn-conformance
+  documentation: |-
+    The HyperShift AWS OVN conformance workflow provisions a HyperShift cluster
+    on AWS along with an ipecho bastion instance for OVN-Kubernetes EgressIP
+    and network connectivity testing.
+
+    The ipecho server returns the caller's source IP address over HTTP.
+    After cluster and bastion setup, the workflow pauses (default 18h) for
+    manual debugging, then cleans up all resources on teardown.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-root-management-cluster
+    - chain: hypershift-aws-create
+    - ref: hypershift-aws-ovn-ipecho-provision
+    test:
+    - ref: wait
+    post:
+    - chain: hypershift-dump
+    - ref: hypershift-aws-ovn-ipecho-deprovision
+    - chain: hypershift-aws-destroy
+    env:
+      TIMEOUT: "+18 hours"

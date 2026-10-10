@@ -1,0 +1,34 @@
+ref:
+  as: hypershift-aws-ovn-ipecho-provision
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  commands: hypershift-aws-ovn-ipecho-provision-commands.sh
+  credentials:
+  - mount_path: /etc/hypershift-pool-aws-credentials
+    name: hypershift-pool-aws-credentials
+    namespace: test-credentials
+  env:
+  - name: HYPERSHIFT_AWS_REGION
+    default: "us-east-1"
+    documentation: "The AWS region to launch the ipecho bastion instance in."
+  - name: IPECHO_PORT
+    default: "9095"
+    documentation: "TCP port on which the ipecho HTTP server listens."
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  grace_period: 5m0s
+  documentation: |-
+    Provisions an EC2 bastion instance running a Python3 ipecho HTTP server.
+    The ipecho server returns the caller's source IP address, which is used
+    by OVN-Kubernetes EgressIP and network connectivity tests.
+
+    Outputs saved to ${SHARED_DIR}:
+    - ipecho_instance_id: EC2 instance ID
+    - ipecho_security_group_id: Security group ID
+    - ipecho_region: AWS region
+    - ipecho_public_ip: Public IPv4 address
+    - ipecho_url: Full URL (http://<ip>:<port>)
