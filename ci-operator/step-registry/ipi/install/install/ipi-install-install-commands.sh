@@ -742,6 +742,29 @@ function inject_spot_instance_config() {
       ;;
   esac
 
+  local on_demand_manifest=
+  local min_replicas=
+  local replicas
+  if [[ "${mtype}" == "workers" && "${SPOT_ON_DEMAND_FALLBACK:-false}" == "true" ]]; then
+    for manifest in $manifests; do
+      [[ -f "${manifest}" ]] || continue
+      [[ "$(/tmp/yq r "${manifest}" kind)" == "MachineSet" ]] || continue
+
+      replicas=$(/tmp/yq r "${manifest}" spec.replicas)
+      [[ "${replicas}" =~ ^[1-9][0-9]*$ ]] || continue
+
+      if [[ -z "${min_replicas}" ]] || (( replicas < min_replicas )); then
+        min_replicas=${replicas}
+        on_demand_manifest=${manifest}
+      fi
+    done
+
+    if [[ -z "${on_demand_manifest}" ]]; then
+      echo "ERROR: No worker MachineSet with positive replicas found for the on-demand fallback"
+      exit 1
+    fi
+  fi
+
   # Inject spotMarketOptions into the appropriate manifests
   local prefix=
   local found=false
@@ -775,12 +798,16 @@ function inject_spot_instance_config() {
           ;;
     esac
     found=true
+    if [[ "${manifest}" == "${on_demand_manifest}" ]]; then
+      echo "Keeping ${manifest} on-demand with ${min_replicas} replicas"
+      continue
+    fi
     echo "Using spot instances for ${kind} in ${manifest}"
     /tmp/yq w -i --tag '!!str' "${manifest}" "${prefix}.spotMarketOptions.maxPrice" ''
   done
 
   if $found; then
-    echo "Enabled AWS Spot instances for ${mtype}"
+    echo "Configured AWS Spot instances for ${mtype}"
   else
     echo "ERROR: Spot instances were requested for ${mtype}, but no such manifests were found!"
     exit 1
