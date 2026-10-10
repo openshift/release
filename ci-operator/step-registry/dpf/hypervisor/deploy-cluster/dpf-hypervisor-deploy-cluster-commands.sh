@@ -280,7 +280,15 @@ fi
 
 echo "Copying .env from hypervisor to artifacts..."
 if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env /tmp/.env.full 2>/dev/null; then
-  sed -E '/^WORKER_[0-9]+_NAME=/!{ /^WORKER_[0-9]+_/d }' /tmp/.env.full > "${ARTIFACT_DIR}/.env"
+  # Filter the artifact copy; keep SHARED_DIR/.env for downstream steps.
+  sed -E '
+    /^WORKER_[0-9]+_NAME=/! { /^WORKER_[0-9]+_/d; }
+    /^ZT_/d
+    /^DPU[0-9]+_SERIAL=/d
+    /(^|_)(IP|IPS|VIP|PASSWORDS?|PASSWDS?|PASS)(_|=)/d
+    /^VM_(GW|DNS)=/d
+    /=[^=]*([0-9]{1,3}\.){3}[0-9]{1,3}([^0-9]|$)/d
+  ' /tmp/.env.full > "${ARTIFACT_DIR}/.env"
   rm -f /tmp/.env.full
 else
   echo "WARNING: Failed to copy .env to artifacts"
