@@ -272,6 +272,12 @@ chain:
         function is_hash_context(value) {
           return tolower(value) ~ /^(git[-_]?commit|commit|revision|rev|commit[-_]?sha|sha1|sha256|digest)$/
         }
+        function is_direct_hash_prefix(value, allow_quote) {
+          value = trim(value)
+          if (allow_quote && (substr(value, 1, 1) == "\"" || substr(value, 1, 1) == single_quote)) value = substr(value, 2)
+          value = trim(value)
+          return value == "" || value == "sha1:" || value == "sha256:"
+        }
         function json_property_key_at(line, position, in_string, escaped, string_start, i, character, colon, key_end, key_open, key) {
           in_string = 0
           string_start = 0
@@ -299,6 +305,28 @@ chain:
           if (key_open == 0) return ""
           key = substr(line, key_open + 1, key_end - key_open - 1)
           return normalize_json_key(key)
+        }
+        function json_direct_hash_value(line, position, token, key, in_string, escaped, string_start, i, character, value_prefix, value_suffix) {
+          key = json_property_key_at(line, position)
+          if (!is_hash_context(key)) return 0
+          in_string = 0
+          escaped = 0
+          string_start = 0
+          for (i = 1; i < position; i++) {
+            character = substr(line, i, 1)
+            if (in_string) {
+              if (escaped) { escaped = 0; continue }
+              if (character == "\\") { escaped = 1; continue }
+              if (character == "\"") in_string = 0
+            } else if (character == "\"") {
+              in_string = 1
+              string_start = i
+            }
+          }
+          if (!in_string) return 0
+          value_prefix = substr(line, string_start + 1, position - string_start - 1)
+          value_suffix = substr(line, position + length(token))
+          return is_direct_hash_prefix(value_prefix, 0) && substr(value_suffix, 1, 1) == "\""
         }
         function credential_field_name(line, start, value_start, raw) {
           raw = substr(line, start, value_start - start)
@@ -349,11 +377,14 @@ chain:
           }
           return result
         }
-        function is_hash_value(token, prefix, match_start, context) {
+        function is_hash_value(token, prefix, match_start, context, hash_prefix) {
           if ((length(token) != 40 && length(token) != 64) || token !~ /^[[:xdigit:]]+$/) return 0
           if (format == "yaml" && parse_mapping(current_line) && is_hash_context(mapping_key) && \
-              current_token_start >= mapping_value_start) return 1
-          if (format == "json" && is_hash_context(json_property_key_at(current_line, current_token_start))) return 1
+              current_token_start >= mapping_value_start) {
+            hash_prefix = substr(current_line, mapping_value_start, current_token_start - mapping_value_start)
+            if (is_direct_hash_prefix(hash_prefix, 1)) return 1
+          }
+          if (format == "json" && json_direct_hash_value(current_line, current_token_start, token)) return 1
           prefix = tolower(substr(current_line, 1, current_token_start - 1))
           if (!match(prefix, /(^|[{,[:space:]])[\"']?(git[-_]?commit|commit|revision|rev|commit[-_]?sha|sha1|sha256|digest)[\"']?[[:space:]]*:[[:space:]]*[\"' ]*((sha1|sha256):)?$/)) return 0
           match_start = RSTART

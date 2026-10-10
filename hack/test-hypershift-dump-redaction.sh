@@ -19,7 +19,7 @@ assert_contains() {
   local file="$1"
   local expected="$2"
   if ! grep -Fq -- "${expected}" "${file}"; then
-    echo "Expected to find [${expected}] in ${file}" >&2
+    echo "Expected fixture output was not found in ${file}" >&2
     return 1
   fi
 }
@@ -28,7 +28,7 @@ assert_not_contains() {
   local file="$1"
   local unexpected="$2"
   if grep -RFq -- "${unexpected}" "${file}"; then
-    echo "Unexpectedly found [${unexpected}] in ${file}" >&2
+    echo "Unexpected sensitive fixture content found in ${file}" >&2
     return 1
   fi
 }
@@ -51,8 +51,37 @@ bash -n "${command_file}" || fail "extracted dump step has invalid shell syntax"
 
 fixture_dir="${work_dir}/fixture"
 mkdir -p "${fixture_dir}/cluster-scoped-resources/core"
-opaque="A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6"
-lower_path_secret="k9md2nqv-7rpx4twy-8zab3k6f-5jwh"
+new_fixture_token() {
+  od -An -N32 -tx1 /dev/urandom | tr -d '[:space:]'
+}
+new_high_entropy_fixture_token() {
+  local token attempt
+  for ((attempt = 0; attempt < 10; attempt++)); do
+    token="$(new_fixture_token)"
+    if printf '%s\n' "${token}" | awk '{
+      for (i = 1; i <= length($0); i++) counts[substr($0, i, 1)]++
+      for (character in counts) {
+        probability = counts[character] / length($0)
+        entropy -= probability * log(probability) / log(2)
+      }
+      exit !(entropy >= 3.5)
+    }'; then
+      printf '%s' "${token}"
+      return
+    fi
+  done
+  fail "could not generate a high-entropy test fixture"
+}
+opaque_fixture_token="$(new_high_entropy_fixture_token)"
+lower_path_fixture_seed="$(new_high_entropy_fixture_token)"
+opaque_base64_fixture="$(new_fixture_token | base64 | tr -d '[:space:]')"
+[[ "${#opaque_fixture_token}" -eq 64 && "${#lower_path_fixture_seed}" -eq 64 && "${#opaque_base64_fixture}" -ge 32 ]] || fail "could not generate redaction fixtures"
+lower_path_fixture_token=""
+for ((offset = 0; offset < ${#lower_path_fixture_seed}; offset += 8)); do
+  [[ -n "${lower_path_fixture_token}" ]] && lower_path_fixture_token+="-"
+  lower_path_fixture_token+="${lower_path_fixture_seed:offset:8}"
+done
+unset lower_path_fixture_seed
 commit="0123456789abcdef0123456789abcdef01234567"
 digest="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
@@ -64,11 +93,11 @@ metadata:
   uid: 123e4567-e89b-12d3-a456-426614174000
   commit: ${commit}
   notcommit: ${commit}
-  git_commit: "${commit} diagnostic=${opaque}"
-  unlabelledOpaqueBase64: "QWxwaGFCZXRhR2FtbWFEZWx0YUVwc2lsb25L/XlXb3JkLzEyMzQ1Njc4OUFCQ0RFRg=="
+  git_commit: "${commit} diagnostic=${opaque_fixture_token}"
+  unlabelledOpaqueBase64: "${opaque_base64_fixture}"
   digest: sha256:${digest}
   quotedDigest: "sha256:${digest}"
-  digestWithOtherDiagnostic: "sha256:${digest} diagnostic=${opaque}"
+  digestWithOtherDiagnostic: "sha256:${digest} diagnostic=${opaque_fixture_token}"
   hashes:
     "commit": ${commit}
     "sha256": ${digest}
@@ -83,11 +112,15 @@ metadata:
   sourceFile: kubernetes/kubernetes/pkg/controller/deployment/sync.go
   image: quay.io/openshift/hypershift-controller:v2.0
   diagnosticFlow: {password: fake-flow-root, keep: retained}
+  shellDiagnostic: |
+    opaque="${opaque_fixture_token}"
+    lower_path_secret="${lower_path_fixture_token}"
+    echo keep-after-script-secrets
   anchoredPassword: &diagnosticSecret anchored-yaml-secret
   anchorAlias: *diagnosticSecret
   ordinaryPath: https://api.example.invalid/api/v1/namespaces/default/status
-  opaquePath: https://api.example.invalid/api/v1/${opaque}/status
-  opaqueLowerPath: https://api.example.invalid/api/v1/${lower_path_secret}/status
+  opaquePath: https://api.example.invalid/api/v1/${opaque_fixture_token}/status
+  opaqueLowerPath: https://api.example.invalid/api/v1/${lower_path_fixture_token}/status
   userInfoURL: https://fake-user:fake-short@example.invalid/api/v1/status
   databaseURL: postgres://fake-user:fake-short@db.example.invalid/hypershift
   message: "prefix password=fake-short and keep-diagnostic"
@@ -232,6 +265,7 @@ cat > "${fixture_dir}/cluster-scoped-resources/core/status.json" <<EOF
   "message":"password=json-message-secret and keep-json-diagnostic",
   "url":"https://fake-user:fake-short@example.invalid/api",
   "commit":"${commit}",
+  "hashDiagnostic":{"commit":"${commit} diagnostic=${opaque_fixture_token}"},
   "notcommit":"${commit}",
   "digest":"sha256:${digest}",
   "password":"json-field-secret",
@@ -265,7 +299,7 @@ EOF
 printf 'binary\000fake-binary-secret' > "${fixture_dir}/cluster-scoped-resources/core/binary-data"
 
 cat > "${fixture_dir}/cluster-scoped-resources/core/event-filter.html" <<EOF
-<html><body><a href="https://fake-user:fake-short@example.invalid/events/${opaque}">Authorization: bEaReR html-bearer-secret</a><p>${opaque}</p></body></html>
+<html><body><a href="https://fake-user:fake-short@example.invalid/events/${opaque_fixture_token}">Authorization: bEaReR html-bearer-secret</a><p>${opaque_fixture_token}</p></body></html>
 EOF
 
 cat > "${fixture_dir}/cluster-scoped-resources/core/events.log" <<EOF
@@ -274,8 +308,8 @@ message Authorization: Basic ZmFrZTpmYWtl
 AWS key AKIA1234567890ABCDEF and ASIA1234567890ABCDEF
 Run --password flag-secret-value --client-secret 'quoted flag secret' keep-after-flag
 Run argv --token separate-log-argument --namespace default
-message image: ${opaque}
-diagnostic URL https://api.example.invalid/normal/path/${opaque}/events
+message image: ${opaque_fixture_token}
+diagnostic URL https://api.example.invalid/normal/path/${opaque_fixture_token}/events
 EOF
 
 make_fake_runner() {
@@ -350,6 +384,10 @@ assert_contains "${yaml_file}" "quotedDigest: \"sha256:${digest}\""
 assert_contains "${yaml_file}" "sourceFile: kubernetes/kubernetes/pkg/controller/deployment/sync.go"
 assert_contains "${yaml_file}" "image: quay.io/openshift/hypershift-controller:v2.0"
 assert_contains "${yaml_file}" 'diagnosticFlow: {password: REDACTED, keep: retained}'
+assert_contains "${yaml_file}" "git_commit: \"${commit} diagnostic=REDACTED_HIGH_ENTROPY\""
+assert_contains "${yaml_file}" 'opaque="REDACTED_HIGH_ENTROPY"'
+assert_contains "${yaml_file}" 'lower_path_secret="REDACTED"'
+assert_contains "${yaml_file}" 'echo keep-after-script-secrets'
 assert_contains "${yaml_file}" 'anchoredPassword: &diagnosticSecret "REDACTED"'
 assert_contains "${yaml_file}" 'anchorAlias: *diagnosticSecret'
 assert_contains "${yaml_file}" 'pemMessage: "before REDACTED_PEM'
@@ -362,7 +400,7 @@ assert_contains "${yaml_file}" 'value: retained-after-forced-pem'
 assert_contains "${yaml_file}" "value: don't-break-flow"
 assert_contains "${yaml_file}" 'value: keep " diagnostic'
 assert_contains "${yaml_file}" 'password=REDACTED'
-assert_not_contains "${yaml_file}" "diagnostic=${opaque}"
+assert_not_contains "${yaml_file}" "diagnostic=${opaque_fixture_token}"
 assert_contains "${yaml_file}" "digestWithOtherDiagnostic: \"sha256:${digest} diagnostic=REDACTED_HIGH_ENTROPY\""
 assert_contains "${yaml_file}" "ordinaryPath: https://api.example.invalid/api/v1/namespaces/default/status"
 assert_contains "${yaml_file}" "opaquePath: https://api.example.invalid/api/v1/REDACTED_HIGH_ENTROPY/status"
@@ -387,7 +425,7 @@ assert_contains "${json_file}" "https://REDACTED@example.invalid/api"
 assert_contains "${json_file}" "\"commit\":\"${commit}\""
 assert_contains "${json_file}" '"notcommit":"REDACTED_HIGH_ENTROPY"'
 assert_contains "${json_file}" "sha256:${digest}"
-jq --arg digest "${digest}" -e '.password == "REDACTED" and .client_secret == "REDACTED" and .serviceAccountToken == {"audience":"api","expirationSeconds":3607,"path":"token"} and .automountServiceAccountToken == false and .volumes[0].projected.sources[0].serviceAccountToken.audience == "api" and .volumes[0].projected.sources[1].secret.name == "retained-projected-secret" and .volumes[1].secret.secretName == "retained-volume-secret" and .token == "REDACTED" and .items[0].spec.containers[0].image == ("quay.io/demo/controller@sha256:" + $digest) and .items[0].spec.containers[0].env[0].value == "REDACTED" and .items[0].spec.containers[1].env[0].value == "REDACTED" and .compactContainers[0].env[0].value == "REDACTED" and .compactContainers[1].env[0].value == "REDACTED" and .args == ["--password", "REDACTED", "--namespace", "default"] and .env[0].value == "REDACTED" and .env[1].valueFrom.secretKeyRef.name == "retained-json-reference" and .keep == "retained-json-field" and .keepBetweenPem == "retained-between-pem" and .pemBefore == "REDACTED_PEM" and .pemAfter == "REDACTED_PEM" and (.pem | contains("REDACTED_PEM") and contains("middle") and contains("post"))' "${json_file}" > /dev/null || fail "JSON credential, argument, PEM, or diagnostic preservation failed"
+jq --arg digest "${digest}" --arg commit "${commit}" -e '.password == "REDACTED" and .client_secret == "REDACTED" and .hashDiagnostic.commit == ($commit + " diagnostic=REDACTED_HIGH_ENTROPY") and .serviceAccountToken == {"audience":"api","expirationSeconds":3607,"path":"token"} and .automountServiceAccountToken == false and .volumes[0].projected.sources[0].serviceAccountToken.audience == "api" and .volumes[0].projected.sources[1].secret.name == "retained-projected-secret" and .volumes[1].secret.secretName == "retained-volume-secret" and .token == "REDACTED" and .items[0].spec.containers[0].image == ("quay.io/demo/controller@sha256:" + $digest) and .items[0].spec.containers[0].env[0].value == "REDACTED" and .items[0].spec.containers[1].env[0].value == "REDACTED" and .compactContainers[0].env[0].value == "REDACTED" and .compactContainers[1].env[0].value == "REDACTED" and .args == ["--password", "REDACTED", "--namespace", "default"] and .env[0].value == "REDACTED" and .env[1].valueFrom.secretKeyRef.name == "retained-json-reference" and .keep == "retained-json-field" and .keepBetweenPem == "retained-between-pem" and .pemBefore == "REDACTED_PEM" and .pemAfter == "REDACTED_PEM" and (.pem | contains("REDACTED_PEM") and contains("middle") and contains("post"))' "${json_file}" > /dev/null || fail "JSON credential, argument, PEM, or diagnostic preservation failed"
 assert_contains "${html_file}" "https://REDACTED@example.invalid/events/REDACTED_HIGH_ENTROPY"
 assert_contains "${html_file}" "Authorization: REDACTED</a>"
 assert_contains "${html_file}" "</body></html>"
@@ -398,7 +436,9 @@ assert_contains "${timestamp_file}" "password=REDACTED"
 assert_not_contains "${log_file}" "AKIA1234567890ABCDEF"
 assert_not_contains "${log_file}" "ASIA1234567890ABCDEF"
 assert_not_contains "${extract_dir}" "fake-short"
-assert_not_contains "${extract_dir}" "${opaque}"
+assert_not_contains "${extract_dir}" "${opaque_fixture_token}"
+assert_not_contains "${extract_dir}" "${lower_path_fixture_token}"
+assert_not_contains "${extract_dir}" "${opaque_base64_fixture}"
 assert_not_contains "${extract_dir}" "env-value-before-name-secret"
 assert_not_contains "${extract_dir}" "flow-env-secret"
 assert_not_contains "${extract_dir}" "multiline-env-secret"
