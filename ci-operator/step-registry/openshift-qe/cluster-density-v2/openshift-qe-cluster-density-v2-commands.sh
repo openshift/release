@@ -77,6 +77,7 @@ fi
 
 export EXTRA_FLAGS UUID
 export ADDITIONAL_PARAMS
+echo "${UUID}" > "${SHARED_DIR}/workload-uuid"
 
 set +o errexit
 ./run.sh
