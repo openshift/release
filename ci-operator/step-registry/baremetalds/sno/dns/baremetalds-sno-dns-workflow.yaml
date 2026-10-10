@@ -1,0 +1,30 @@
+workflow:
+  as: baremetalds-sno-dns
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BOOTSTRAP_IN_PLACE=true
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_MEMORY=32768
+        MASTER_DISK=120
+        MASTER_VCPU=16
+        FEATURE_SET=CustomNoUpgrade
+        FEATURE_GATES=UnifiedClusterManagedDNSAndLB=true
+        SNO_BIP_SKIP_DNSMASQ=true
+      DEVSCRIPTS_TARGET: sno_bip
+    pre:
+      - chain: baremetalds-ofcir-pre
+      - ref: baremetalds-sno-conf
+    test:
+      - ref: baremetalds-sno-dns
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    This workflow preserves the baremetalds-sno bootstrap-in-place installation
+    and cleanup while enabling UnifiedClusterManagedDNSAndLB at install time and
+    running the focused SNO DNS validation instead of the existing SNO test set.
