@@ -4,6 +4,14 @@ set -euo pipefail
 set -x
 
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
+PLAYWRIGHT_ARTIFACT_SUBDIR="${PLAYWRIGHT_ARTIFACT_SUBDIR:-}"
+if [[ -n "${PLAYWRIGHT_ARTIFACT_SUBDIR}" ]]; then
+  if [[ ! "${PLAYWRIGHT_ARTIFACT_SUBDIR}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "ERROR: PLAYWRIGHT_ARTIFACT_SUBDIR must be a single safe directory name" >&2
+    exit 1
+  fi
+  ARTIFACT_DIR="${ARTIFACT_DIR}/${PLAYWRIGHT_ARTIFACT_SUBDIR}"
+fi
 mkdir -p "${ARTIFACT_DIR}"
 
 # Read the Quay route written by the deploy step
@@ -14,12 +22,30 @@ if [[ -z "${QUAY_ROUTE}" ]]; then
 fi
 echo "Quay route: ${QUAY_ROUTE}"
 
-# Read credentials
+# Read credentials. The normal path preserves the existing mounted-secret
+# behavior; the shared-admin path supports the self-contained upgrade scaffold.
 # Disable tracing due to password handling
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+PLAYWRIGHT_CREDENTIALS_SOURCE="${PLAYWRIGHT_CREDENTIALS_SOURCE:-mounted-secret}"
+case "${PLAYWRIGHT_CREDENTIALS_SOURCE}" in
+  mounted-secret)
+    QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+    QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+    ;;
+  shared-admin)
+    if [[ ! -s "${SHARED_DIR}/quay-admin-username" || ! -s "${SHARED_DIR}/quay-admin-password" ]]; then
+      echo "ERROR: shared-admin credentials are not present in SHARED_DIR" >&2
+      exit 1
+    fi
+    QUAY_USERNAME=$(cat "${SHARED_DIR}/quay-admin-username")
+    QUAY_PASSWORD=$(cat "${SHARED_DIR}/quay-admin-password")
+    ;;
+  *)
+    echo "ERROR: PLAYWRIGHT_CREDENTIALS_SOURCE must be mounted-secret or shared-admin" >&2
+    exit 1
+    ;;
+esac
 $WAS_TRACING && set -x
 
 # Configure Playwright environment
@@ -47,6 +73,29 @@ else
   echo "No mailpit_api in SHARED_DIR; email-dependent specs may skip or fail"
 fi
 
+# Upgrade wrappers select different, independently configured suite controls
+# through PLAYWRIGHT_PHASE. Non-upgrade callers keep the original variables.
+PLAYWRIGHT_PHASE="${PLAYWRIGHT_PHASE:-}"
+case "${PLAYWRIGHT_PHASE}" in
+  "") ;;
+  n-minus-one)
+    PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_N_MINUS_ONE_USE_IMAGE_TESTS:-false}"
+    # The per-phase repo defaults to PLAYWRIGHT_GIT_REPO (both upgrade phases clone
+    # the same quay repo), so only the per-phase branch has to be set explicitly.
+    PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_N_MINUS_ONE_GIT_REPO:-${PLAYWRIGHT_GIT_REPO:-}}"
+    PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH:-}"
+    ;;
+  n)
+    PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_N_USE_IMAGE_TESTS:-false}"
+    # Per-phase repo defaults to PLAYWRIGHT_GIT_REPO (see n-minus-one above).
+    PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_N_GIT_REPO:-${PLAYWRIGHT_GIT_REPO:-}}"
+    PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_N_GIT_BRANCH:-}"
+    ;;
+  *)
+    echo "ERROR: PLAYWRIGHT_PHASE must be empty, n-minus-one, or n" >&2
+    exit 1
+    ;;
+esac
 PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_USE_IMAGE_TESTS:-false}"
 CLONE_DIR="/tmp/quay-playwright-src"
 if [[ "${PLAYWRIGHT_USE_IMAGE_TESTS}" == "true" ]]; then
@@ -76,9 +125,31 @@ PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_GIT_REPO:-}"
 PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_GIT_BRANCH:-}"
 PLAYWRIGHT_GIT_FALLBACK_BRANCH="${PLAYWRIGHT_GIT_FALLBACK_BRANCH:-redhat-3.18}"
 PLAYWRIGHT_REF_MODE="${PLAYWRIGHT_REF_MODE:-derived}"
+PLAYWRIGHT_REQUIRE_EXPLICIT_REF="${PLAYWRIGHT_REQUIRE_EXPLICIT_REF:-false}"
+if [[ "${PLAYWRIGHT_REQUIRE_EXPLICIT_REF}" != "true" && "${PLAYWRIGHT_REQUIRE_EXPLICIT_REF}" != "false" ]]; then
+  echo "ERROR: PLAYWRIGHT_REQUIRE_EXPLICIT_REF must be true or false" >&2
+  exit 1
+fi
 if [[ -z "${PLAYWRIGHT_GIT_REPO}" ]]; then
   echo "ERROR: PLAYWRIGHT_GIT_REPO must be set" >&2
   exit 1
+fi
+if [[ "${PLAYWRIGHT_REQUIRE_EXPLICIT_REF}" == "true" && -z "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
+  echo "ERROR: PLAYWRIGHT_GIT_BRANCH must be explicitly set when PLAYWRIGHT_REQUIRE_EXPLICIT_REF=true" >&2
+  exit 1
+fi
+export PLAYWRIGHT_REF_IS_DERIVED=false
+if [[ -n "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
+  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_BRANCH}"
+  echo "Using explicitly configured Playwright ref: ${PLAYWRIGHT_GIT_REF}"
+elif [[ -s "${SHARED_DIR}/playwright_git_ref" ]]; then
+  PLAYWRIGHT_GIT_REF="$(cat "${SHARED_DIR}/playwright_git_ref")"
+  export PLAYWRIGHT_REF_IS_DERIVED=true
+  echo "Using Playwright ref auto-derived from the deployed image: ${PLAYWRIGHT_GIT_REF}"
+else
+  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
+  echo "WARNING: no explicit PLAYWRIGHT_GIT_BRANCH and no derived ref in SHARED_DIR;" >&2
+  echo "         falling back to branch ${PLAYWRIGHT_GIT_REF}" >&2
 fi
 
 clone_playwright_sources() {
@@ -647,30 +718,46 @@ function copyArtifacts {
   # hypershift-analyze-e2e-failure does. The gather links point at post steps that
   # run after this one, so they are directory listings. Default every CI var with :-
   # so a missing var in a local run cannot abort this EXIT trap.
-  local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
-  local gcs_path
-  if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
-    gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"
+  if [[ "${PLAYWRIGHT_EXPORT_BLOB:-false}" == "true" ]]; then
+    # This phase's report is merged into the combined upgrade report by
+    # quay-operator-upgrade-report, so skip its standalone Spyglass link to avoid
+    # a redundant per-phase report button.
+    echo "PLAYWRIGHT_EXPORT_BLOB=true: skipping standalone report link (merged into the combined report)"
   else
-    gcs_path="logs/${JOB_NAME:-}/${BUILD_ID:-}"
-  fi
-  local steps_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}"
-  # A quay/quay presubmit tests the PR head. Anything else (periodics, rehearsals)
-  # deploys an image whose revision label may be a midstream commit that does not
-  # exist upstream, so link the upstream commit the Playwright suite was cloned at
-  # (PW_TEST_SHA, see playwright-source.txt): the image's own revision when its
-  # label resolved upstream, else the head of the derived tag or branch.
-  local quay_rev=""
-  if [[ "${REPO_OWNER:-}/${REPO_NAME:-}" == "quay/quay" ]]; then
-    quay_rev="${PULL_PULL_SHA:-${PULL_BASE_SHA:-}}"
-  elif [[ "${PW_TEST_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
-    quay_rev="${PW_TEST_SHA}"
-  fi
-  local quay_image
-  quay_image=$(timeout 30 oc -n "${QUAYNAMESPACE:-quay-enterprise}" get pods -l quay-component=quay-app \
-    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
-  {
-    cat << EOF
+    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
+    local gcs_path
+    if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
+      gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"
+    else
+      gcs_path="logs/${JOB_NAME:-}/${BUILD_ID:-}"
+    fi
+    local steps_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}"
+    # ci-operator uploads a step's ARTIFACT_DIR to artifacts/<test>/<step>/artifacts/.
+    # The step name is quay-test-e2e by default, but composed workflows run this
+    # runner under uniquely named adapter steps (e.g. the operator-upgrade
+    # seed/verify/functional phases), so derive it from PLAYWRIGHT_STEP_NAME. When
+    # a phase nests its reports under PLAYWRIGHT_ARTIFACT_SUBDIR, append that too so
+    # the link resolves to that phase's own report instead of a sibling's.
+    local report_path="${PLAYWRIGHT_STEP_NAME:-quay-test-e2e}/artifacts"
+    if [[ -n "${PLAYWRIGHT_ARTIFACT_SUBDIR}" ]]; then
+      report_path="${report_path}/${PLAYWRIGHT_ARTIFACT_SUBDIR}"
+    fi
+    # A quay/quay presubmit tests the PR head. Anything else (periodics, rehearsals)
+    # deploys an image whose revision label may be a midstream commit that does not
+    # exist upstream, so link the upstream commit the Playwright suite was cloned at
+    # (PW_TEST_SHA, see playwright-source.txt): the image's own revision when its
+    # label resolved upstream, else the head of the derived tag or branch.
+    local quay_rev=""
+    if [[ "${REPO_OWNER:-}/${REPO_NAME:-}" == "quay/quay" ]]; then
+      quay_rev="${PULL_PULL_SHA:-${PULL_BASE_SHA:-}}"
+    elif [[ "${PW_TEST_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+      quay_rev="${PW_TEST_SHA}"
+    fi
+    local quay_image
+    quay_image=$(timeout 30 oc -n "${QUAYNAMESPACE:-quay-enterprise}" get pods -l quay-component=quay-app \
+      -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+    {
+      cat << EOF
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -693,22 +780,23 @@ code { color: #151515; font: 12px/1.4 "Roboto Mono", Menlo, Consolas, monospace;
 <main>
 <ul>
 EOF
-    if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
-      echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-test-e2e/artifacts/index.html\">Playwright report<span>Failures, traces and screenshots</span></a></li>"
-    fi
-    echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-gather/artifacts/\">Quay logs<span>Pods, events and container logs</span></a></li>"
-    echo "<li><a target=\"_blank\" href=\"${steps_base}/gather-must-gather/artifacts/\">must-gather<span>Cluster state after the run</span></a></li>"
-    if [[ -n "${quay_rev}" ]]; then
-      echo "<li><a target=\"_blank\" href=\"https://github.com/quay/quay/tree/${quay_rev}\">quay ${quay_rev:0:12}<span>Source under test on GitHub</span></a></li>"
-    fi
-    echo "</ul>"
-    if [[ -n "${quay_image}" ]]; then
-      echo "<p>quay-app image <code>${quay_image}</code></p>"
-    fi
-    echo "</main>"
-    echo "</body>"
-    echo "</html>"
-  } > "${ARTIFACT_DIR}/custom-link-quay-results.html" || true
+      if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
+        echo "<li><a target=\"_blank\" href=\"${steps_base}/${report_path}/index.html\">Playwright report<span>Failures, traces and screenshots</span></a></li>"
+      fi
+      echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-gather/artifacts/\">Quay logs<span>Pods, events and container logs</span></a></li>"
+      echo "<li><a target=\"_blank\" href=\"${steps_base}/gather-must-gather/artifacts/\">must-gather<span>Cluster state after the run</span></a></li>"
+      if [[ -n "${quay_rev}" ]]; then
+        echo "<li><a target=\"_blank\" href=\"https://github.com/quay/quay/tree/${quay_rev}\">quay ${quay_rev:0:12}<span>Source under test on GitHub</span></a></li>"
+      fi
+      echo "</ul>"
+      if [[ -n "${quay_image}" ]]; then
+        echo "<p>quay-app image <code>${quay_image}</code></p>"
+      fi
+      echo "</main>"
+      echo "</body>"
+      echo "</html>"
+    } > "${ARTIFACT_DIR}/custom-link-quay-results.html" || true
+  fi
   gatherBuilderDiagnostics || true
 }
 trap 'copyArtifacts; stopJaegerPortForward' EXIT
@@ -889,6 +977,148 @@ else
   exit 1
 fi
 
+# --- authenticated API warmup ------------------------------------------------
+# The discovery preflight above proves the route answers an unauthenticated
+# GET, but the suite's global setup begins with POST /api/v1/signin: the first
+# DB-backed request of the run (session creation plus password verify). On
+# freshly (re)started Quay pods -- most notably the pods the operator channel
+# upgrade rolls out -- that first request can outlast the suite's short
+# apiRequestContext timeout, aborting global setup before a single test runs
+# and failing the whole phase (see the from-317 rehearsal failures). Sign in
+# once here, retrying only transient-looking failures, so global setup always
+# hits a warm endpoint.
+#
+# Best effort by construction, so it cannot change the outcome of a lane that
+# would pass: every failure path only warns and returns 0. A 2xx/3xx/4xx answer
+# counts as warm (a 4xx is a credentials question, which is global setup's
+# business, and is never retried, so a wrong password cannot become a burst of
+# signin attempts); only timeouts, transport errors and 5xx retry, within
+# QUAY_API_WARMUP_BUDGET_SECONDS (default 120, 0 disables the warmup entirely).
+# On a healthy lane the whole warmup is one csrf GET plus one signin POST, well
+# under a second. Per-attempt status codes and timings land in
+# api-warmup.jsonl; no credential, cookie or response body is ever logged.
+function api_warmup() {
+  local budget="${QUAY_API_WARMUP_BUDGET_SECONDS:-120}"
+  [[ "${budget}" =~ ^[0-9]+$ ]] || budget=120
+  if [[ "${budget}" -eq 0 ]]; then
+    echo "API warmup disabled (QUAY_API_WARMUP_BUDGET_SECONDS=0)."
+    return 0
+  fi
+  # Bash xtrace prints expanded values, so every command that expands the
+  # password or the parsed csrf token must run untraced (the same reason the
+  # credentials are read under set +x at the top of this script). warm_tracing
+  # remembers whether to restore tracing afterwards; when the step itself runs
+  # untraced it stays off throughout.
+  local warm_tracing=false
+  [[ $- == *x* ]] && warm_tracing=true || warm_tracing=false
+  # No signin credentials at hand (a lane that provisions its own users): the
+  # discovery probe above is all the warming that can be done. The guard
+  # expands the password, so it runs untraced.
+  local have_credentials=true
+  if [[ "${warm_tracing}" == true ]]; then set +x; fi
+  if [[ -z "${QUAY_USERNAME:-}" || -z "${QUAY_PASSWORD:-}" ]]; then
+    have_credentials=false
+  fi
+  if [[ "${warm_tracing}" == true ]]; then set -x; fi
+  if [[ "${have_credentials}" == false ]]; then
+    echo "API warmup skipped: no signin credentials available."
+    return 0
+  fi
+
+  local log="${ARTIFACT_DIR}/api-warmup.jsonl"
+  local deadline=$(( $(date +%s) + budget ))
+  local attempt=0 outcome="no-answer"
+  local csrf_metrics="" csrf_exit=0 csrf_code="" csrf_token="" csrf_ok=false
+  local signin_metrics="" signin_exit=0 signin_code="" signin_ttfb=""
+  # The cookie jar, the csrf body and the signin body (it carries the password)
+  # are temp files, never artifacts: only status codes and timings are logged.
+  local cookie_jar csrf_body signin_body
+  cookie_jar="$(mktemp)"
+  csrf_body="$(mktemp)"
+  signin_body="$(mktemp)"
+
+  while [[ "$(date +%s)" -lt "${deadline}" ]]; do
+    attempt=$(( attempt + 1 ))
+
+    # 1) CSRF token: the unauthenticated GET that also sets the _csrf_token
+    #    cookie the signin POST must send back. Nothing here is secret, so it
+    #    stays traced like the preflight probes it mirrors.
+    csrf_exit=0
+    csrf_metrics="$(LC_ALL=C curl -sk -m 15 -c "${cookie_jar}" -o "${csrf_body}" \
+      -w '%{http_code} %{time_starttransfer}' "${QUAY_ROUTE}/csrf_token" 2>/dev/null)" || csrf_exit=$?
+    read -r csrf_code _ <<<"${csrf_metrics:-000 0}"
+    # The parsed csrf token is a session credential, and bash prints expanded
+    # values under xtrace, so parse, assign and emptiness-check it untraced;
+    # only the boolean decision is visible to the trace.
+    if [[ "${warm_tracing}" == true ]]; then set +x; fi
+    csrf_ok=false
+    if [[ "${csrf_exit}" -eq 0 && "${csrf_code}" == "200" ]]; then
+      csrf_token="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String(d.csrf_token||""))' "${csrf_body}" 2>/dev/null || true)"
+      [[ -n "${csrf_token}" ]] && csrf_ok=true || csrf_ok=false
+    fi
+    if [[ "${warm_tracing}" == true ]]; then set -x; fi
+    if [[ "${csrf_ok}" != true ]]; then
+      printf '{"timestamp":"%s","attempt":%s,"endpoint":"csrf_token","curl_exit":%s,"http_status":"%s"}\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${attempt}" "${csrf_exit}" "${csrf_code:-000}" >>"${log}"
+      sleep 5
+      continue
+    fi
+
+    # 2) Signin: the request this warmup exists for. The whole exchange runs in
+    #    a subshell with tracing off: the body file holds the password, the
+    #    header a session-scoped CSRF token, and neither may reach the build
+    #    log even if a later command errors. The credentials were exported at
+    #    the top of this script, so node reads them from the inherited
+    #    environment -- no secret is ever part of a command line. The signin
+    #    response (a session token) goes to /dev/null; only curl's -w status
+    #    and timing escape the subshell, into a variable.
+    signin_exit=0
+    signin_metrics="$(
+      set +x
+      node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({username: process.env.QUAY_USERNAME, password: process.env.QUAY_PASSWORD}))' "${signin_body}" || exit 90
+      LC_ALL=C curl -sk -m 30 -b "${cookie_jar}" \
+        -H "X-CSRF-Token: ${csrf_token}" -H 'content-type: application/json' \
+        --data @"${signin_body}" -o /dev/null \
+        -w '%{http_code} %{time_starttransfer}' "${QUAY_ROUTE}/api/v1/signin" 2>/dev/null
+    )" || signin_exit=$?
+    read -r signin_code signin_ttfb <<<"${signin_metrics:-000 0}"
+
+    if [[ "${signin_exit}" -eq 0 && "${signin_code}" =~ ^[23] ]]; then
+      outcome="warm"
+    elif [[ "${signin_exit}" -eq 0 && "${signin_code}" =~ ^[4] ]]; then
+      # The endpoint answered, so it is warm; whether these credentials are
+      # the right ones is global setup's question, not this warmup's.
+      outcome="warm-auth-rejected"
+    else
+      outcome="no-answer"
+    fi
+    printf '{"timestamp":"%s","attempt":%s,"endpoint":"signin","curl_exit":%s,"http_status":"%s","time_starttransfer":%s,"outcome":"%s"}\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${attempt}" "${signin_exit}" "${signin_code:-000}" "${signin_ttfb:-0}" "${outcome}" >>"${log}"
+    if [[ "${outcome}" != "no-answer" ]]; then
+      break
+    fi
+    sleep 5
+  done
+
+  rm -f "${cookie_jar}" "${csrf_body}" "${signin_body}"
+  case "${outcome}" in
+    warm)
+      echo "API warmup: signin answered HTTP ${signin_code} on attempt ${attempt}; global setup starts on a warm endpoint."
+      ;;
+    warm-auth-rejected)
+      echo "API warmup: signin endpoint answered HTTP ${signin_code} (auth rejected); treating as warm, global setup will authenticate."
+      ;;
+    *)
+      echo "WARNING: API warmup got no signin answer within ${budget}s; continuing anyway (global setup may still succeed). Per-attempt evidence in api-warmup.jsonl." >&2
+      ;;
+  esac
+  return 0
+}
+# The || guard makes the warmup unable to take a lane down even if the function
+# itself errors (mktemp, node, ...): the Playwright suite stays the authority on
+# every failure that matters.
+api_warmup || echo "WARNING: API warmup errored; continuing." >&2
+
 # Tests excluded from the run come entirely from PLAYWRIGHT_GREP_INVERT, set in the
 # ci-operator config (steps.env) for this test. Keeping the exclusion list in the
 # config rather than hardcoding it here lets each variant tune what it quarantines
@@ -896,7 +1126,15 @@ fi
 # Playwright test title; see E2E_FAILURE_REPORT.md in the repo root for the rationale
 # behind the current exclusions. When unset, the full suite runs.
 PLAYWRIGHT_GREP_INVERT="${PLAYWRIGHT_GREP_INVERT:-}"
+PLAYWRIGHT_GREP="${PLAYWRIGHT_GREP:-}"
+GREP_ARGS=()
 GREP_INVERT_ARGS=()
+if [[ -n "${PLAYWRIGHT_GREP}" ]]; then
+  GREP_ARGS=(--grep "${PLAYWRIGHT_GREP}")
+  echo "Selecting tests matching: ${PLAYWRIGHT_GREP}"
+else
+  echo "No PLAYWRIGHT_GREP set; running all tests not excluded by PLAYWRIGHT_GREP_INVERT."
+fi
 if [[ -n "${PLAYWRIGHT_GREP_INVERT}" ]]; then
   GREP_INVERT_ARGS=(--grep-invert "${PLAYWRIGHT_GREP_INVERT}")
   echo "Excluding tests matching: ${PLAYWRIGHT_GREP_INVERT}"
@@ -914,13 +1152,97 @@ fi
 # --workers flag overrides the config value; override via PLAYWRIGHT_WORKERS if needed.
 PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-2}"
 
+# Optional override for Playwright's maxFailures. The suite's playwright.config.ts
+# stops the whole run early after a small number of failures in CI, which leaves
+# later tests reported as "did not run" and hides the full picture. Set
+# PLAYWRIGHT_MAX_FAILURES=0 to run every selected test to completion (0 = no
+# limit); leave empty to honor the suite's own config default.
+MAX_FAILURES_ARGS=()
+if [[ -n "${PLAYWRIGHT_MAX_FAILURES:-}" ]]; then
+  MAX_FAILURES_ARGS=(--max-failures "${PLAYWRIGHT_MAX_FAILURES}")
+  echo "Overriding Playwright maxFailures: ${PLAYWRIGHT_MAX_FAILURES}"
+fi
+
 startJaegerPortForward
 
 echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
+if [[ -n "${PLAYWRIGHT_GREP}" ]]; then
+  # A positive selector is useful only when it actually selects something.  Playwright
+  # can otherwise exit successfully after running zero tests, which would make the
+  # n-1 smoke stage a false-positive gate.
+  if ! selected_tests_output="$(npx playwright test "${GREP_ARGS[@]}" "${GREP_INVERT_ARGS[@]}" --list 2>&1)"; then
+    printf '%s\n' "${selected_tests_output}" | tee "${ARTIFACT_DIR}/playwright-selected-tests.log" >&2
+    echo "ERROR: unable to list tests selected by PLAYWRIGHT_GREP" >&2
+    exit 1
+  fi
+  printf '%s\n' "${selected_tests_output}" | tee "${ARTIFACT_DIR}/playwright-selected-tests.log"
+  if [[ "${selected_tests_output}" =~ Total:[[:space:]]+([0-9]+)[[:space:]]+tests? ]]; then
+    selected_tests="${BASH_REMATCH[1]}"
+  else
+    echo "ERROR: Playwright --list output did not report a selected-test total" >&2
+    exit 1
+  fi
+  if (( selected_tests == 0 )); then
+    echo "ERROR: PLAYWRIGHT_GREP selected zero tests" >&2
+    exit 1
+  fi
+  echo "PLAYWRIGHT_GREP selected ${selected_tests} test(s)."
+fi
+# Base reporters. When PLAYWRIGHT_EXPORT_BLOB=true (the upgrade phases set it), also
+# emit a Playwright "blob" report and copy it into SHARED_DIR so the final report
+# step can merge seed + verify into one combined HTML report via
+# `playwright merge-reports`.
+PLAYWRIGHT_REPORTERS="list,junit,html,json"
+PLAYWRIGHT_EXPORT_BLOB="${PLAYWRIGHT_EXPORT_BLOB:-false}"
+if [[ "${PLAYWRIGHT_EXPORT_BLOB}" == "true" && -n "${SHARED_DIR:-}" ]]; then
+  PLAYWRIGHT_REPORTERS="${PLAYWRIGHT_REPORTERS},blob"
+fi
+playwright_rc=0
 npx playwright test \
+  "${GREP_ARGS[@]}" \
   "${GREP_INVERT_ARGS[@]}" \
+  "${MAX_FAILURES_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
-  --reporter=list,junit,html,json \
-  2>&1 | scrub_playwright_secrets | tee "${ARTIFACT_DIR}/playwright-output.log"
+  --reporter="${PLAYWRIGHT_REPORTERS}" \
+  2>&1 | scrub_playwright_secrets | tee "${ARTIFACT_DIR}/playwright-output.log" || playwright_rc=$?
 popd
+
+# Export this phase's blob report (if produced) to SHARED_DIR under a phase-unique
+# name, so the final report step can merge the phases into one Playwright HTML
+# report. ci-operator only persists FLAT files in SHARED_DIR between steps
+# (subdirectories are not copied), so write a single flat file, not a subdir.
+# Best-effort: report plumbing must never fail the phase.
+if [[ "${PLAYWRIGHT_EXPORT_BLOB}" == "true" && -n "${SHARED_DIR:-}" ]]; then
+  blob_tag="${PLAYWRIGHT_ARTIFACT_SUBDIR:-${PLAYWRIGHT_STEP_NAME:-phase}}"
+  for z in "${PLAYWRIGHT_WORKDIR}"/blob-report/*.zip; do
+    [[ -e "${z}" ]] || continue
+    cp "${z}" "${SHARED_DIR}/quay-upgrade-blob-${blob_tag}.zip" || true
+    break
+  done
+fi
+
+# The EXIT trap (copyArtifacts) always publishes this phase's JUnit + HTML report,
+# so per-test results are visible in the Prow UI regardless of outcome. In
+# best-effort mode a test failure must NOT fail this ci-operator step: the upgrade
+# phases run as a sequential multi-stage chain (seed -> upgrade -> verify ->
+# functional), and a non-zero step aborts the chain so the later phases never run
+# and never publish their JUnit. Swallow the failure so every phase executes and
+# reports; the aggregated JUnit (not the job color) carries the pass/fail detail.
+# Non-best-effort callers (e.g. the e2e-install gate) still fail on a non-zero rc.
+if [[ "${PLAYWRIGHT_BEST_EFFORT:-false}" == "true" ]]; then
+  # Record this phase's result so the final report/gate step can fail the JOB when
+  # any best-effort phase had test failures, even though this step exits 0 (so the
+  # chain keeps running and every phase publishes its report). ci-operator only
+  # persists FLAT files in SHARED_DIR between steps (subdirectories are not copied),
+  # so write a single flat, phase-unique marker file.
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    result_tag="${PLAYWRIGHT_ARTIFACT_SUBDIR:-${PLAYWRIGHT_STEP_NAME:-phase}}"
+    echo "${playwright_rc}" > "${SHARED_DIR}/quay-upgrade-result-${result_tag}.rc" || true
+  fi
+  if (( playwright_rc != 0 )); then
+    echo "PLAYWRIGHT_BEST_EFFORT=true: Playwright exited ${playwright_rc}; not failing the step so subsequent phases still run. The final report/gate step will fail the job; see the JUnit report for per-test results."
+  fi
+  exit 0
+fi
+exit "${playwright_rc}"
