@@ -188,13 +188,16 @@ fi
 
 # ── RHDH version ─────────────────────────────────────────────────────────────
 
+# INSTALLATION_METHOD is provided by the ref (default "helm"); the operator jobs
+# override it to "operator" via the config's steps.env.
 export RHDH_VERSION INSTALLATION_METHOD
+INSTALLATION_METHOD="${INSTALLATION_METHOD:-helm}"
 if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
     RHDH_VERSION="$(echo "$RELEASE_BRANCH_NAME" | cut -d'-' -f2)"
 else
-    RHDH_VERSION="1.11" # TODO: Change to "next" when RHIDP-12071 & RHDHBUGS-3052 is fixed
+    # Main uses next for both Helm and operator installations.
+    RHDH_VERSION="next"
 fi
-INSTALLATION_METHOD="helm"
 echo "RHDH_VERSION: ${RHDH_VERSION}, INSTALLATION_METHOD: ${INSTALLATION_METHOD}"
 
 # Save RHDH version to SHARED_DIR for data-router step
@@ -235,7 +238,7 @@ post_github_comment() {
 
     local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public/pr-logs/pull"
     local test_name="${JOB_NAME##*-"${RELEASE_BRANCH_NAME}"-}"
-    local step_path="${gcs_base}/${GITHUB_ORG_NAME}_${GITHUB_REPOSITORY_NAME}/${GIT_PR_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${test_name}/redhat-developer-rhdh-plugin-export-overlays-ocp-helm"
+    local step_path="${gcs_base}/${GITHUB_ORG_NAME}_${GITHUB_REPOSITORY_NAME}/${GIT_PR_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${test_name}/redhat-developer-rhdh-plugin-export-overlays-ocp-e2e"
 
     local stats counts status comment
     stats=$(jq -r '(.stats.duration // 0) / 1000 | floor | "\(. / 60 | floor)m \(. % 60)s"' playwright-report/results.json 2>/dev/null || echo "N/A")
