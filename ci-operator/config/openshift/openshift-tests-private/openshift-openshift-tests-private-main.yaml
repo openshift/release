@@ -241,10 +241,37 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      BYOH_DEBUG_CONTINUE: "true"
       FORCE_SUCCESS_EXIT: "no"
+      PR_ONLY: "true"
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
+      TIMEOUT: +3 hours
+    pre:
+    - chain: cucushift-installer-rehearse-aws-upi-ovn-winc-debug-provision
+    - ref: cucushift-installer-reportportal-marker
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-upi-ovn-winc
+- as: debug-winc-aws-upi-server-2025
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BYOH_DEBUG_CONTINUE: "true"
+      BYOH_WINDOWS_VERSION: "2025"
+      FORCE_SUCCESS_EXIT: "no"
+      PR_ONLY: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+      TIMEOUT: +3 hours
+    pre:
+    - chain: cucushift-installer-rehearse-aws-upi-ovn-winc-debug-provision
+    - ref: cucushift-installer-reportportal-marker
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-upi-ovn-winc

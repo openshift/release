@@ -5,6 +5,7 @@ ref:
     name: terraform-windows-provisioner
     tag: latest
   commands: windows-byoh-provision-commands.sh
+  grace_period: 5m
   resources:
     requests:
       cpu: 100m
@@ -31,25 +32,37 @@ ref:
     - name: BYOH_READY_TIMEOUT
       default: "45m"
       documentation: "Timeout waiting for BYOH nodes to become Ready (use 45m-60m for vSphere, 30m for cloud platforms)"
+    - name: BYOH_DEBUG_CONTINUE
+      default: "false"
+      documentation: |-
+        Debug-only flag. When "true" and provisioning or readiness fails, the step
+        records the original failure exit status in SHARED_DIR/byoh_debug_original_failure_status,
+        logs a visible warning, and returns exit 0 so the workflow continues to the next step
+        (typically a bounded ref:wait for cluster inspection). This is NOT a provisioning success.
+        Must only be enabled by debug callers (debug-winc-aws-upi on main and release-5.0).
+        Default: "false" (normal behaviour — failures return the original nonzero exit status).
   documentation: |-
     Provisions Windows BYOH (Bring Your Own Host) nodes using terraform-windows-provisioner container image.
 
     This step:
     1. Uses pre-built terraform-windows-provisioner image (ci/terraform-windows-provisioner:latest)
-    2. Provisions Windows worker nodes on the detected cloud platform (AWS, Azure, GCP, vSphere, Nutanix, None)
-    3. Waits for nodes to become Ready
-    4. Exports instance information to SHARED_DIR for WMCO BYOH e2e tests
+    2. Starts background watchers to capture Windows Node metadata and cloud-controller-manager
+       (CCM) logs BEFORE BYOH registration triggers WMCO (captures fleeting node creates/deletes)
+    3. Provisions Windows worker nodes on the detected cloud platform (AWS, Azure, GCP, vSphere, Nutanix, None)
+    4. Saves Terraform cleanup state to protected SHARED_DIR before readiness polling
+    5. Waits for nodes to become Ready
+    6. Stops background watchers and exports instance information to SHARED_DIR for WMCO BYOH e2e tests
 
-    The container image includes:
-    - Terraform 1.9.5 (pre-installed, no download needed)
-    - All provisioner scripts and platform configs
-    - Cloud CLIs (aws, gcloud, az) for fallback operations
+    Background watchers are read-only, bounded, and stopped/reaped on all exit paths
+    (success, failure, signal). They never modify cluster resources or read Secrets.
+
+    On failure, the step preserves the original nonzero exit status and collects bounded,
+    best-effort WMCO diagnostics. Public artifacts contain only sanitized technical
+    summaries (no raw IPs, hostnames, ARNs, or credentials). Raw operator logs are
+    stored in protected SHARED_DIR only.
 
     Cloud credentials are automatically provided via the cluster profile (CLUSTER_PROFILE_DIR).
 
-    Instance information is exported in the format expected by WMCO BYOH tests:
-    ${SHARED_DIR}/<ip>_windows_instance.txt
-
-    Terraform state is stored in ${ARTIFACT_DIR}/terraform_byoh/ for access by destroy step.
-    Note: ARTIFACT_DIR is used instead of SHARED_DIR because SHARED_DIR points to the cluster-profile
-    secret mount which is not shared between steps.
+    Terraform state can contain sensitive values. It is kept only in protected SHARED_DIR,
+    archived there immediately after the provisioner returns (including after partial failures
+    when state exists), and is never copied to ARTIFACT_DIR.

@@ -16,4 +16,15 @@ workflow:
       - chain: cucushift-installer-rehearse-aws-upi-ovn-winc-deprovision
       - ref: send-results-to-reportportal
   documentation: |-
-    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow which require Windows workers as part of the cluster for AWS UPI (platform "none").
+    This is the workflow to trigger Prow's rehearsal test when submitting installer
+    steps/chain/workflow which require Windows workers as part of the cluster for AWS
+    UPI (platform "none").
+
+    The deprovision chain does not include any wait step. Callers that need a
+    post-phase debugging window (e.g. debug-winc-aws-upi) add the stock ref:wait
+    step before the deprovision chain in their own post override, with appropriate
+    TIMEOUT and PR_ONLY env settings. This keeps ordinary presubmit, postsubmit,
+    and periodic callers free of any added pause.
+
+    Provision and test failures remain failures; the gather and deprovision steps
+    always run.
