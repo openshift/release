@@ -4,11 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
+
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
-        typeset -a _fURL=()
-        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
-        "${_fURL[@]}" \
+        curl -fsSL \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
 fi
@@ -70,7 +70,6 @@ function on_exit() {
       ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-aws-s3__quay-tests-deploy-quay-aws-s3.xml || true
   fi
   write_quay_install_junit "${ec}"
-  [[ -n "${YQ_TMPDIR:-}" ]] && rm -rf "${YQ_TMPDIR}" || true
   exit "${ec}"
 }
 trap on_exit EXIT
@@ -101,114 +100,6 @@ function print_quayregistry_conditions() {
   else
     oc -n "${ns}" get quayregistry quay -o yaml 2>/dev/null >&2 || true
   fi
-}
-
-# Resolve a digest pullspec through the cluster's configured mirrors, most specific
-# first, with the original pullspec last. The kubelet reports the quay-app image
-# under its SOURCE pullspec (registry.redhat.io/quay/quay-rhel9@<digest>), but on
-# the nightly jobs that digest is only ever published in the Konflux repo the
-# ImageContentSourcePolicy created by quay-enable-catalogsource points at. CRI-O
-# rewrites the pull; `oc image info` is a plain client-side registry call and does
-# not, so asking registry.redhat.io for it returns "manifest unknown".
-function mirror_pullspecs() {
-  local pullspec="$1" repo digest
-  if [[ "${pullspec}" == *@* ]]; then
-    repo="${pullspec%@*}"
-    digest="${pullspec#*@}"
-    oc get imagecontentsourcepolicies,imagedigestmirrorsets -o json 2>/dev/null \
-      | jq -r --arg repo "${repo}" --arg digest "${digest}" '
-          .items[]?.spec
-          | (.repositoryDigestMirrors // .imageDigestMirrors // [])[]?
-          | select(.source == $repo)
-          | .mirrors[]?
-          | "\(.)@\($digest)"' 2>/dev/null || true
-  fi
-  printf '%s\n' "${pullspec}"
-}
-
-# Derive the Playwright test ref from the deployed Quay app image so the e2e suite
-# is version-matched to the product with no manual pin. Written to
-# ${SHARED_DIR}/playwright_git_ref for the test-e2e step; best-effort (the test step
-# keeps its own fallback for a ref that turns out not to be fetchable). This script
-# runs without `set -x`, so the pull-secret authfile below is never traced; it is
-# also removed immediately.
-#
-# The source-commit labels (org.opencontainers.image.revision / vcs-ref) are NOT
-# usable here. The deployed image is built midstream, so that commit is a midstream
-# commit and is never present in the upstream PLAYWRIGHT_GIT_REPO: eleven product
-# digests spanning 3.16-3.18 were checked and none of them resolved upstream. That
-# is how the label is built, not a bad digest, so there is nothing to recover.
-#
-# The version label does resolve. Upstream carries a vX.Y.Z tag for 12 of the 13
-# released versions those images report (v3.16.6 is the lone exception), so:
-#   a. version X.Y.Z with an upstream tag vX.Y.Z  -> pin that tag.
-#   b. anything else -> deliberately pin branch redhat-X.Y for the image's series.
-#      This is the expected path for a nightly, which has no upstream commit or tag
-#      equivalent at all, so it is logged as a deliberate pin rather than a warning:
-#      a warning that fires on correct behaviour teaches people to ignore warnings.
-# The labels actually read are logged verbatim every run, so a build whose labels
-# do not match these expectations says so in its own log.
-function derive_playwright_ref() {
-  local ns="${QUAY_NS}"
-  local app_img authfile errfile candidate info="" version release series ref
-  local repo="${PLAYWRIGHT_GIT_REPO:-https://github.com/quay/quay.git}"
-  app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
-    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
-  if [[ -z "${app_img}" ]]; then
-    echo "WARNING: could not determine quay-app imageID; Playwright ref will fall back" >&2
-    return 0
-  fi
-  echo "Deployed Quay app image: ${app_img}" >&2
-  authfile=$(mktemp)
-  errfile=$(mktemp)
-  oc get secret/pull-secret -n openshift-config \
-    --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
-  # stderr is captured separately, never merged into ${info}: a stray warning on the
-  # success path would be prepended to the JSON, jq would return an empty label, and
-  # the step would report a missing label for what is really a readable image.
-  for candidate in $(mirror_pullspecs "${app_img}"); do
-    if info=$(oc image info "${candidate}" --filter-by-os linux/amd64 \
-                --registry-config="${authfile}" -o json 2>"${errfile}"); then
-      echo "Read deployed image metadata from ${candidate}" >&2
-      break
-    fi
-    echo "Could not read ${candidate}: $(tr '\n' ' ' < "${errfile}")" >&2
-    info=""
-  done
-  rm -f "${authfile}" "${errfile}"
-  if [[ -z "${info}" ]]; then
-    echo "WARNING: deployed image not readable from any configured mirror; Playwright ref will fall back" >&2
-    return 0
-  fi
-  version=$(jq -r '.config.config.Labels["version"] // ""' <<<"${info}" 2>/dev/null || true)
-  release=$(jq -r '.config.config.Labels["release"] // ""' <<<"${info}" 2>/dev/null || true)
-  echo "Deployed image labels: version='${version}' release='${release}' revision='$(
-    jq -r '.config.config.Labels["org.opencontainers.image.revision"] // ""' <<<"${info}" 2>/dev/null || true)'" >&2
-  if [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
-     && git ls-remote --exit-code "${repo}" "refs/tags/v${version}" >/dev/null 2>&1; then
-    ref="v${version}"
-    echo "Pinning Playwright ref to upstream tag ${ref}, matching the deployed version label" >&2
-    echo "${ref}" > "${SHARED_DIR}/playwright_git_ref"
-    return 0
-  fi
-  # The version label's X.Y prefix is the product series, so it is the first choice
-  # even when the version itself carries a suffix a tag would never match. Release is
-  # only X.Y on product builds - a build-id release such as 6.1759012345 also matches
-  # an X.Y shape - so it is consulted only when version yields nothing.
-  series=""
-  if [[ "${version}" =~ ^([0-9]+\.[0-9]+) ]]; then
-    series="${BASH_REMATCH[1]}"
-  elif [[ "${release}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-    series="${release}"
-  fi
-  if [[ -z "${series}" ]]; then
-    echo "WARNING: deployed image has no usable version or release label (version='${version}' release='${release}'); Playwright ref will fall back" >&2
-    return 0
-  fi
-  ref="redhat-${series}"
-  echo "No upstream tag matches the deployed image; deliberately pinning Playwright ref to branch ${ref}." >&2
-  echo "This is the expected outcome for a build with no released upstream tag, not a degraded one." >&2
-  echo "${ref}" > "${SHARED_DIR}/playwright_git_ref"
 }
 
 function print_failing_pod_logs() {
@@ -256,7 +147,7 @@ QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
 export AWS_ACCESS_KEY_ID="${QUAY_AWS_ACCESS_KEY}"
 export AWS_SECRET_ACCESS_KEY="${QUAY_AWS_SECRET_KEY}"
 
-mkdir -p QUAY_AWS && cd QUAY_AWS
+mkdir -p /tmp/QUAY_AWS && cd /tmp/QUAY_AWS
 cat >>variables.tf <<EOF
 variable "region" {
   default = "us-east-2"
@@ -463,25 +354,17 @@ FEATURE_MAILING: false
 FEATURE_OTEL_TRACING: false
 EOF
 
-# Fetch yq once into a private temp dir: used below to merge config
-# fragments and to strip operator-managed keys, which now run
-# unconditionally.
-YQ_TMPDIR="$(mktemp -d)"
-YQ="${YQ_TMPDIR}/yq"
-curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-	-o "${YQ}" && chmod +x "${YQ}"
-
 # Merge a config fragment into config.yaml with list-append semantics ('*+',
 # not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
 # Validate first so a present-but-malformed fragment fails the step clearly
 # instead of corrupting config.yaml.
 function merge_config_fragment() {
 	local fragment="$1"
-	if ! "${YQ}" e 'true' "${fragment}" >/dev/null 2>&1; then
+	if ! yq e 'true' "${fragment}" >/dev/null 2>&1; then
 		echo "ERROR: ${fragment} is not valid YAML" >&2
 		exit 1
 	fi
-	"${YQ}" eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
 # Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
@@ -507,7 +390,7 @@ fi
 # injects those values; leaving them in configBundleSecret blocks rollout.
 # Runs unconditionally now: a no-op on the defaults block when no overlay
 # above added any of these keys.
-"${YQ}" -i '
+yq -i '
 	del(
 		.FEATURE_SECURITY_SCANNER,
 		.FEATURE_SECURITY_NOTIFICATIONS,
@@ -620,7 +503,6 @@ for i in $(seq 1 90); do
     quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
-    derive_playwright_ref || true
     archive_pod_info
     exit 0
   fi

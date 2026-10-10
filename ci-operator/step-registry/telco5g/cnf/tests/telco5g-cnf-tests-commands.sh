@@ -381,7 +381,7 @@ fi
 
 
 function create_tests_temp_skip_list_5 {
-# List of temporarly skipped tests for 5.0
+# List of temporarly skipped tests for 5.x and master
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
@@ -648,9 +648,11 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.0" ]]; then
+if [[ "$T5CI_VERSION" == "5.1" ]]; then
     export CNF_BRANCH="master"
-    export CNF_TESTS_IMAGE="cnf-tests:4.21"
+    # Let operator test submodules use their default main branches.
+    unset TARGET_RELEASE
+    export CNF_TESTS_IMAGE="cnf-tests:4.22"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
@@ -694,11 +696,11 @@ create_tests_skip_list_file
 if [[ "$CNF_BRANCH" == *"4."* ]]; then
     function_version="${CNF_BRANCH//release-4./}"
     skip_function_name="create_tests_temp_skip_list_${function_version}"
-elif [[ "$CNF_BRANCH" == *"5."* ]]; then
+elif [[ "$CNF_BRANCH" == *"5."* ]] || [[ "$CNF_BRANCH" == "master" ]]; then
     function_version=5
     skip_function_name="create_tests_temp_skip_list_5"
 else
-    # In case of master branch
+    # Fallback for other branch names
     skip_function_name=create_tests_temp_skip_list_22
 fi
 if declare -f "$skip_function_name" > /dev/null; then

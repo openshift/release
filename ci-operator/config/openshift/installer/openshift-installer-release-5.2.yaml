@@ -69,7 +69,6 @@ base_images:
     tag: latest
 build_root:
   from_repository: true
-  use_build_cache: true
 images:
   items:
   - capabilities:
@@ -1109,8 +1108,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
-        In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-ovn-devpreview
@@ -1120,8 +1118,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: DevPreviewNoUpgrade
-      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
-        In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-host-groups-ovn-techpreview
@@ -1393,7 +1390,17 @@ tests:
   pipeline_run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-two-node-fencing-ipv4
+    workflow: agent-e2e-two-node-fencing-ipv4-hostname
+- always_run: false
+  as: e2e-agent-two-node-fencing-ipv4-mac
+  capabilities:
+  - intranet
+  - nested-podman
+  optional: true
+  pipeline_run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-two-node-fencing-ipv4-mac
 - always_run: false
   as: e2e-agent-compact-ipv4-appliance-diskimage
   capabilities:

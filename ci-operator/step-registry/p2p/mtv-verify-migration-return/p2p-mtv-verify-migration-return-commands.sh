@@ -159,9 +159,9 @@ function DumpDiagnostics () {
     failed: .status.migrationState.failed,
     failureReason: .status.migrationState.failureReason}]'
 
-  HubOc get plan,migration -n "${MTV_NAMESPACE}" 2>&1 \
+  HubOc get plan,migration -n "${MTV_PROVIDER_NAMESPACE}" 2>&1 \
     | RedactOutput > "${diagDir}/hub-mtv-resources.txt" || true
-  HubOc get events -n "${MTV_NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 \
+  HubOc get events -n "${MTV_PROVIDER_NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 \
     | RedactOutput > "${diagDir}/hub-mtv-events.txt" || true
 
   typeset -i k

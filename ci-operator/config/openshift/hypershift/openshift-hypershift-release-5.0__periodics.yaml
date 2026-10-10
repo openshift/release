@@ -507,14 +507,21 @@ tests:
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
-- as: e2e-v2-aws-techpreview-osimagestream
-  cron: 0 0,6,12,18 * * *
+- as: e2e-rosa-hyperfleet
+  cron: 0 8 * * *
   steps:
-    cluster_profile: hypershift-aws
     env:
-      GUEST_FEATURE_SET: TechPreviewNoUpgrade
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-v2-osimagestream
+      OCP_RELEASE_STREAM: ocp-branch-nightly
+      ROSA_REGIONAL_HELM_OVERRIDE_YAML: |
+        hypershift:
+          hypershift:
+            image: quay.io/hypershift/hypershift-operator:latest
+      ROSA_REGIONAL_HELM_VALUES_FILE: argocd/config/management-cluster/hypershift/values.yaml
+      ROSA_REGIONAL_TEARDOWN_FIRE_AND_FORGET: "false"
+    pre:
+    - ref: rosa-hyperfleet-resolve-ocp-image
+    - ref: rosa-hyperfleet-provision
+    workflow: rosa-hyperfleet-ephemeral-e2e
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

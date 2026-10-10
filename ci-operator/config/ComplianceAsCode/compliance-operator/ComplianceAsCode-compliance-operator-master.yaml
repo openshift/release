@@ -174,7 +174,6 @@ tests:
     env:
       BASE_DOMAIN: perfscale.rox.systems
       COMPUTE_NODE_TYPE: m5.2xlarge
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.ci.openshift.org/ocp/release-5:5.0.0-0.nightly-2026-09-09-111616
     post:
     - chain: ipi-deprovision
     pre:
@@ -550,9 +549,8 @@ tests:
       resources:
         requests:
           cpu: 100m
-- always_run: false
-  as: e2e-aws-scan-config
-  optional: true
+- as: e2e-aws-scan-config
+  run_if_changed: ^(tests/e2e/(scan-config|framework)/|pkg/controller/(compliancescan|compliancesuite|scansettingbinding)/|pkg/apis/compliance/|go\.(mod|sum)$|Makefile|Dockerfile\.ci$|cmd/manager/|main\.go$)
   steps:
     cluster_profile: aws-stackrox
     env:
@@ -574,7 +572,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-tailoring
-  run_if_changed: ^(tests/e2e/(tailoring_tests|framework)/|pkg/controller/(tailoredprofile|scansettingbinding|profilebundle|compliancescan|compliancesuite|complianceremediation)/|pkg/apis/compliance/|pkg/profileparser/|go\.(mod|sum)$|Makefile|Dockerfile\.ci$|cmd/manager/|main\.go$)
+  run_if_changed: ^(tests/e2e/(tailoring_tests|framework)/|pkg/controller/(tailoredprofile|scansettingbinding|profilebundle|compliancescan|compliancesuite|complianceremediation)/|pkg/apis/compliance/|pkg/profileparser/)
   steps:
     cluster_profile: quay-aws
     env:
@@ -595,9 +593,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- always_run: false
-  as: e2e-aws-parsing
-  optional: true
+- as: e2e-aws-parsing
+  run_if_changed: ^(tests/e2e/(parsing_tests|framework)/|pkg/controller/(profilebundle|tailoredprofile|compliancescan)/|pkg/apis/compliance/|pkg/profileparser/)
   steps:
     cluster_profile: quay-aws
     env:
@@ -619,7 +616,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-cel
-  run_if_changed: ^(tests/e2e/(cel_tests|framework)/|pkg/controller/(customrule|tailoredprofile|scansettingbinding|compliancescan|compliancesuite)/|pkg/apis/compliance/|pkg/celcontent/|cmd/cel-bundler/|cmd/celctl/|go\.(mod|sum)$|Makefile|Dockerfile\.ci$|cmd/manager/|main\.go$)
+  run_if_changed: ^(tests/e2e/(cel_tests|framework)/|pkg/controller/(customrule|tailoredprofile|scansettingbinding|compliancescan|compliancesuite)/|pkg/apis/compliance/|pkg/celcontent/|cmd/cel-bundler/|cmd/celctl/)
   steps:
     cluster_profile: quay-aws
     env:

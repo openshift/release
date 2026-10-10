@@ -33,7 +33,6 @@ base_images:
     tag: openstack-cinder-csi-driver-operator-test
 build_root:
   from_repository: true
-  use_build_cache: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
   items:
@@ -292,17 +291,6 @@ tests:
       NODEPOOL_N1_VERSION: "5.0"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-v2
-- always_run: false
-  as: e2e-v2-aws-techpreview-osimagestream
-  capabilities:
-  - arm64
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      GUEST_FEATURE_SET: TechPreviewNoUpgrade
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-v2-osimagestream
 - always_run: false
   as: e2e-v2-aws-backuprestore
   capabilities:
@@ -790,6 +778,7 @@ tests:
       CI_IMAGE_1: hypershift-operator
       CI_IMAGE_2: hypershift
     env:
+      OCP_RELEASE_STREAM: ocp-branch-candidate
       ROSA_REGIONAL_EXTRA_COMPONENTS: |
         - image: CI_IMAGE_1
           repo: quay.io/rrp-dev-ci/hypershift-operator
@@ -800,10 +789,10 @@ tests:
                 image: IMAGE_REPO:IMAGE_TAG
         - image: CI_IMAGE_2
           repo: quay.io/rrp-dev-ci/control-plane-operator
-          target: argocd/config/management-cluster/hypershift/values.yaml
+          target: argocd/config/regional-cluster/hyperfleet/values.yaml
           override:
-            hypershift:
-              hypershift:
+            hyperfleet:
+              helmValues:
                 controlPlaneOperatorImage: IMAGE_REPO:IMAGE_TAG
     workflow: rosa-hyperfleet-ephemeral-e2e
 zz_generated_metadata:
