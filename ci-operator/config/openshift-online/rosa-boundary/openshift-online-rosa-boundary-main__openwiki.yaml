@@ -1,0 +1,32 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
+  expose: true
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 4Gi
+tests:
+- as: openwiki-update
+  cron: 0 16 * * 2,4
+  steps:
+    env:
+      TARGET_BASE_BRANCH: main
+      TARGET_PERIODIC_JOB: periodic-ci-openshift-online-rosa-boundary-main-openwiki-openwiki-update
+      TARGET_REPO: openshift-online/rosa-boundary
+      TARGET_UPDATE_BRANCH: openwiki/update
+    test:
+    - ref: rosa-boundary-openwiki-prepare
+    - ref: rosa-boundary-openwiki-update
+    - ref: rosa-boundary-openwiki-publish
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-boundary
+  variant: openwiki
