@@ -79,6 +79,12 @@ chain:
         [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       else
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        # Tests that call the AWS API directly (e.g. cloud-provider-aws BYO
+        # security group cases) need the cluster profile credentials; without
+        # them the SDK falls back to EC2 IMDS, which is unreachable here.
+        if [[ -f "${CLUSTER_PROFILE_DIR:-}/.awscred" ]]; then
+          export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+        fi
         # When HOSTED_CP is set, the management cluster kubeconfig is not derived
         # automatically. Set HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG and
         # HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE from SHARED_DIR artifacts
