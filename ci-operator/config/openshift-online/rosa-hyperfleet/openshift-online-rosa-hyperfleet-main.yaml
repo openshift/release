@@ -93,54 +93,7 @@ tests:
 - always_run: false
   as: on-demand-e2e
   steps:
-    post:
-    - as: teardown-ephemeral
-      commands: |-
-        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
-        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
-        uv run --no-cache ci/ephemeral-provider/main.py --teardown-fire-and-forget
-      credentials:
-      - collection: cluster-secrets-rosa-regional-platform-int
-        group: ephemeral-creds
-        mount_path: /var/run/rosa-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    pre:
-    - as: provision-ephemeral
-      commands: |-
-        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
-        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
-        uv run --no-cache ci/ephemeral-provider/main.py \
-          --save-regional-state "${SHARED_DIR}/regional-terraform-outputs.json" \
-          --save-management-state "${SHARED_DIR}/management-terraform-outputs.json"
-      credentials:
-      - collection: cluster-secrets-rosa-regional-platform-int
-        group: ephemeral-creds
-        mount_path: /var/run/rosa-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    test:
-    - as: e2e
-      commands: |-
-        export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
-        ./ci/e2e-tests.sh
-      credentials:
-      - collection: cluster-secrets-rosa-regional-platform-int
-        group: ephemeral-creds
-        mount_path: /var/run/rosa-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    workflow: rosa-hyperfleet-ephemeral-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-online
