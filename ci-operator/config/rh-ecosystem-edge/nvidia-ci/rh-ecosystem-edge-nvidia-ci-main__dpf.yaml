@@ -1,0 +1,76 @@
+base_images:
+  dpf-ci:
+    name: openshift-dpf
+    namespace: ci
+    tag: dpf-ci
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+  run_if_changed: x^
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.22.0-0
+        stream: 4-stable
+        upper: 4.23.0-0
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: nvidia-gpu-operator-e2e-26-7
+  capabilities:
+  - intranet
+  optional: true
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca8
+    env:
+      NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: ""
+      NVIDIAGPU_CLEANUP: "false"
+      NVIDIAGPU_DEPLOY_FROM_BUNDLE: "false"
+      NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH: ""
+      NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: ""
+      NVIDIAGPU_PRECOMPILED_DRIVER_BRANCH: all
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: ""
+      NVIDIAGPU_USE_PRECOMPILED_DRIVER: "false"
+      TEST_FEATURES: nvidiagpu
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - as: gpu-operator-e2e
+      commands: make run-tests
+      env:
+      - name: NVIDIAGPU_CLEANUP
+      - name: NVIDIAGPU_DEPLOY_FROM_BUNDLE
+      - name: TEST_FEATURES
+      - name: NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+      - name: NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+      - name: NVIDIAGPU_PRECOMPILED_DRIVER_BRANCH
+      - name: NVIDIAGPU_SUBSCRIPTION_CHANNEL
+      - name: NVIDIAGPU_USE_PRECOMPILED_DRIVER
+      - name: NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+  timeout: 2h0m0s
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: dpf
