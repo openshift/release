@@ -197,6 +197,80 @@ tests:
     - ref: openshift-qe-orion
     workflow: openshift-qe-installer-aws
   timeout: 8h0m0s
+- as: netobserv-day0-resource-measurements-25nodes
+  cron: '@monthly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ACK_FILE: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/orion/ack.yaml
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "25"
+      ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
+      ES_METADATA_INDEX: prod-netobserv-operator-metadata*
+      EXTRA_MG_ARGS: --image=quay.io/netobserv/must-gather
+      FEATURE_GATES: '["NetworkObservabilityInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      LOOKBACK: "60"
+      NETOBSERV_INSTALLATION_POLICY: NoAction
+      ORION_CONFIG: https://raw.githubusercontent.com/memodi/netobserv-perf-tests/refs/heads/day0-queries2/scripts/queries/netobserv-day0-orion.yaml
+      ORION_ENVS: WORKERS=25
+      QUERIES_CONFIG_URL: https://raw.githubusercontent.com/memodi/netobserv-perf-tests/refs/heads/day0-queries2/scripts/queries/netobserv_prometheus_queries.yaml
+      RUN_ORION: "true"
+      VERSION: "5.0"
+      ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    post:
+    - ref: netobserv-cerberus-report
+    - chain: netobserv-perf-test-post
+    test:
+    - ref: redhat-chaos-observer-start
+    - ref: netobserv-day0-measure-resource-before
+    - ref: netobserv-day0-patch-cno
+    - ref: netobserv-day0-measure-resource-after
+    - ref: openshift-qe-orion
+    - ref: netobserv-day0-diff-resource
+    workflow: netobserv-installer-aws-day0
+  timeout: 8h0m0s
+- as: netobserv-day0-resource-measurements-120nodes
+  cron: '@monthly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ACK_FILE: https://raw.githubusercontent.com/netobserv/netobserv-perf-tests/refs/heads/main/scripts/orion/ack.yaml
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
+      ES_METADATA_INDEX: prod-netobserv-operator-metadata*
+      EXTRA_MG_ARGS: --image=quay.io/netobserv/must-gather
+      FEATURE_GATES: '["NetworkObservabilityInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      LOOKBACK: "60"
+      NETOBSERV_INSTALLATION_POLICY: NoAction
+      ORION_CONFIG: https://raw.githubusercontent.com/memodi/netobserv-perf-tests/refs/heads/day0-queries2/scripts/queries/netobserv-day0-orion.yaml
+      ORION_ENVS: WORKERS=120
+      QUERIES_CONFIG_URL: https://raw.githubusercontent.com/memodi/netobserv-perf-tests/refs/heads/day0-queries2/scripts/queries/netobserv_prometheus_queries.yaml
+      RUN_ORION: "true"
+      VERSION: "5.0"
+      ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    post:
+    - ref: netobserv-cerberus-report
+    - chain: netobserv-perf-test-post
+    test:
+    - ref: redhat-chaos-observer-start
+    - ref: netobserv-day0-measure-resource-before
+    - ref: netobserv-day0-patch-cno
+    - ref: netobserv-day0-measure-resource-after
+    - ref: openshift-qe-orion
+    - ref: netobserv-day0-diff-resource
+    workflow: netobserv-installer-aws-day0
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: netobserv
