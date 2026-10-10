@@ -1,0 +1,59 @@
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.23
+      ENV GOFLAGS="-mod=readonly"
+      USER 0
+      RUN dnf install -y jq python3 gettext util-linux && dnf clean all
+      USER 1001
+images:
+  items:
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+      COPY bin/manager /manager
+      USER 65532:65532
+      ENTRYPOINT ["/manager"]
+    from: bin
+    to: agentic-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 4Gi
+tests:
+- as: e2e-disconnected-gemma
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+      variant: gpu
+    owner: obs
+    product: ocp
+    timeout: 3h0m0s
+    version: "5.0"
+  cron: 10 8 * * 0
+  steps:
+    env:
+      E2E_SCENARIO_TAGS: core
+      LIGHTSPEED_SERVICE_REF: 2e13067ad5fce3e2b648af56b4f6e29cdb2efd91
+    test:
+    - ref: openshift-lightspeed-agentic-operator-e2e-disconnected
+    workflow: generic-claim
+  timeout: 18h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: lightspeed-agentic-operator
+  variant: "5.0"

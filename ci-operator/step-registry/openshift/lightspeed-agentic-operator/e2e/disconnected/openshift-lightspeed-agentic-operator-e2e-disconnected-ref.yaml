@@ -1,0 +1,41 @@
+ref:
+  as: openshift-lightspeed-agentic-operator-e2e-disconnected
+  from: src
+  cli: latest
+  commands: openshift-lightspeed-agentic-operator-e2e-disconnected-commands.sh
+  timeout: 16h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+    limits:
+      memory: 8Gi
+  dependencies:
+  - env: IMG
+    name: agentic-operator
+  credentials:
+  - collection: openshift-lightspeed-service-creds
+    group: huggingface
+    mount_path: /var/run/huggingface
+  - collection: openshift-lightspeed-service-creds
+    group: vllm-apikey
+    mount_path: /var/run/vllm
+  env:
+  - name: LIGHTSPEED_SERVICE_REF
+    documentation: Full commit SHA of lightspeed-service providing the Gemma 4 RHOAI assets.
+  - name: E2E_SCENARIO_TAGS
+    default: core
+    documentation: Disconnected product E2E must run core scenarios without exclusions.
+  - name: SANDBOX_SOURCE_IMAGE
+    default: quay.io/openshift-lightspeed/lightspeed-agentic-sandbox:latest
+    documentation: Real sandbox image to mirror into the claimed cluster before runtime restriction.
+  - name: SKILL_SOURCE_IMAGE
+    default: quay.io/openshiftanalytics/agentic-skills:latest
+    documentation: Skill image referenced by the core troubleshooting scenarios; unknown images fail closed.
+  documentation: |-
+    Run Agentic OLS core product E2E on a claimed GPU cluster. Mirror operator,
+    sandbox and skill images to the cluster-local registry, provision Gemma 4
+    using the pinned service assets, then invoke product-e2e-disconnected once.
+    The operator harness owns runtime NetworkPolicies, preflight and cleanup.
+    No LSEval, external-provider fallback, or retry after restoring egress.
