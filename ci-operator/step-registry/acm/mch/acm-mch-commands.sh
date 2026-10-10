@@ -20,18 +20,17 @@ function get_failed_pods_by_name {
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
 }
 
-function dump_multiclusterhub_pod_logs {
+function dump_multiclusterhub_pod_status {
   echo
-  echo "Dumping logs for failing PODs..."
+  echo "Gathering allowlisted status fields for failing PODs..."
   echo
   for ns in "${namespaces_to_check[@]}"; do
    for failed_pod_name in $(get_failed_pods_by_name ${ns}); do
-     echo "Gathering '${failed_pod_name}' POD logs in the '${ns}' namespace..."
+     echo "Gathering '${failed_pod_name}' POD status in the '${ns}' namespace..."
      echo
-     set -x
-     oc -n ${ns} describe pod/${failed_pod_name} > ${ARTIFACT_DIR}/${ns}_${failed_pod_name}.describe.txt
-     oc -n ${ns} logs pods/$failed_pod_name > ${ARTIFACT_DIR}/${ns}_${failed_pod_name}.logs
-     set +x
+     oc -n "${ns}" get pod "${failed_pod_name}" \
+       -o jsonpath='pod={.metadata.name}{"\n"}phase={.status.phase}{"\n"}reason={.status.reason}{"\n"}{range .status.initContainerStatuses[*]}init-container={.name} ready={.ready} restarts={.restartCount} waiting-reason={.state.waiting.reason} terminated-reason={.state.terminated.reason} exit-code={.state.terminated.exitCode}{"\n"}{end}{range .status.containerStatuses[*]}container={.name} ready={.ready} restarts={.restartCount} waiting-reason={.state.waiting.reason} terminated-reason={.state.terminated.reason} exit-code={.state.terminated.exitCode}{"\n"}{end}' \
+       > "${ARTIFACT_DIR}/${ns}_${failed_pod_name}.status.txt"
      echo
    done
   done
@@ -42,7 +41,7 @@ function show_multiclusterhub_related_objects {
   echo "### $(date) ###"
   echo
   set -x
-  oc get clusterversions,node,mcp,co,operators || echo
+  oc get clusterversions,mcp,co,operators || echo
   oc get subscriptions.operators.coreos.com -A || echo
   oc get ClusterManagementAddOn || echo
   oc get operator advanced-cluster-management.open-cluster-management -oyaml || echo
@@ -130,7 +129,7 @@ EOF
 
   set +x ;
   show_multiclusterhub_related_objects ;
-  dump_multiclusterhub_pod_logs ;
+  dump_multiclusterhub_pod_status ;
   echo "Error MCH failed to reach Running status in alloted time." ;
   exit 1 ;
 }
