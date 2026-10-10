@@ -1,0 +1,44 @@
+ref:
+  as: rosa-operator-annotate-cpo
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-operator-annotate-cpo-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The OCM environment to log into. Supported values are [production, staging, integration].
+  - name: HC_APPEAR_TIMEOUT
+    default: "900"
+    documentation: Seconds to wait for the HostedCluster CR to appear on the management cluster after the cluster-create ref.
+  - name: CPO_ROLLOUT_TIMEOUT
+    default: "900"
+    documentation: Seconds to wait for the control-plane-operator deployment to switch to the PR image and roll out successfully.
+  documentation: |-
+    Forces the HostedCluster under test to run the PR-built control-plane-operator (CPO) image.
+
+    rosa-operator-deploy-pr sets the HyperShift operator's --control-plane-operator-image flag,
+    but that flag is the lowest-precedence CPO source: the CPO bundled in the cluster's release
+    image always outranks it, so the PR-built CPO never runs and CPO regressions can merge
+    undetected (ROSAENG-74212). This step stamps the highest-precedence source instead, the
+    hypershift.openshift.io/control-plane-operator-image annotation, directly on the HostedCluster.
+
+    It must run immediately after the cluster-create ref (rosa-cluster-provision) and before the
+    cluster readiness checks (rosa-cluster-wait-ready-cluster), so the HyperShift operator rolls
+    the PR CPO onto the control plane while the cluster is still installing; this is what lets the
+    job catch install/bootstrap regressions. Because the provision chain embeds its own readiness
+    checks, the consuming config must inline the provision chain to place this step correctly.
+
+    It resolves the management cluster from the hosted cluster's provision shard, waits for the
+    HostedCluster CR, sets the annotation, and then waits for the control-plane-operator deployment
+    to switch to the PR image and become healthy so a CPO that never runs cannot pass silently.
+
+    The annotated image is the PR-built control plane image mirrored to a public quay.io/rrp-dev-ci
+    repository by the preceding rosa-operator-push-cpo step, which records the pushed pullspec in
+    ${SHARED_DIR}/cpo-image. Using a public image means the control plane pulls it with the cluster's
+    own pull secret, so this step does not modify the HostedCluster pull secret; that avoids the
+    CI-registry entry being reverted mid-run when the ACM work agent resyncs the cluster pull secret
+    (ROSAENG-74212 review feedback). The consuming config must run rosa-operator-push-cpo first.

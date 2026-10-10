@@ -47,6 +47,20 @@ read_profile_file() {
   fi
 }
 
+# Only override the operator when a PR is under test. Without one (periodic, gangway, or manual
+# runs), ci-operator builds the hypershift-operator image from the branch HEAD, and patching it onto
+# the shared management cluster would replace the running operator with an unreviewed build.
+# /payload-job runs are periodics, so JOB_TYPE does not distinguish them; inspect JOB_SPEC instead.
+if [[ -z "${JOB_SPEC:-}" ]]; then
+  echo "JOB_SPEC is unset; assuming no PR under test, leaving the management cluster operator unchanged"
+  exit 0
+fi
+PULLS=$(echo "${JOB_SPEC}" | jq -r '[.refs] + (.extra_refs // []) | map(select(. != null) | (.pulls // []) | length) | add // 0')
+if (( PULLS == 0 )); then
+  echo "No PR under test; leaving the management cluster operator unchanged"
+  exit 0
+fi
+
 # Validate inputs
 if [[ -z "${OPERATOR_IMAGE:-}" ]]; then
   echo "OPERATOR_IMAGE is required (the PR-built HyperShift operator image, injected via dependencies)"

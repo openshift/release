@@ -1,0 +1,33 @@
+ref:
+  as: rosa-operator-push-cpo
+  from_image:
+    namespace: ocp
+    name: "4.21"
+    tag: cli
+  commands: rosa-operator-push-cpo-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - collection: cluster-secrets-rosa-regional-platform-int
+    group: rrp-dev-ci-quay
+    mount_path: /var/run/quay-push-credentials
+  dependencies:
+  - name: hypershift
+    env: CPO_SRC_IMAGE
+  env:
+  - name: CPO_QUAY_REPO
+    default: "quay.io/rrp-dev-ci/control-plane-operator"
+    documentation: Public quay.io destination repository for the mirrored PR control-plane-operator image.
+  documentation: |-
+    Mirrors the PR-built control-plane-operator (CPO) image to a public quay.io repository so the
+    hosted control plane can pull it with the cluster's own pull secret, without injecting CI-registry
+    credentials into the HostedCluster pull secret (which the ACM work agent can revert mid-run; see
+    ROSAENG-74212 review feedback).
+
+    Runs only when a PR is under test (inspects JOB_SPEC for pull refs); otherwise the CPO shipped in
+    the release payload is the one under test and nothing is pushed. Writes the pushed pullspec to
+    ${SHARED_DIR}/cpo-image for rosa-operator-annotate-cpo to stamp on the HostedCluster. CPO_SRC_IMAGE
+    is the PR-built control plane image injected via dependencies (the same build rosa-operator-deploy-pr
+    uses). Pushing to quay.io/rrp-dev-ci requires the rrp-dev-ci-quay push credentials.
