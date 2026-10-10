@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: ubi
-    namespace: ocp
-    tag: "9"
   ocm-cli:
     name: ocm-cli
     namespace: ci
@@ -24,28 +20,6 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.25-openshift-4.22
-images:
-  items:
-  - additional_architectures:
-    - arm64
-    dockerfile_path: Dockerfile.ci
-    from: base
-    to: compliance-operator
-  - additional_architectures:
-    - arm64
-    dockerfile_path: images/testcontent/Dockerfile.ci
-    to: testcontent
-  - additional_architectures:
-    - arm64
-    dockerfile_path: images/openscap/Dockerfile
-    to: testopenscap
-promotion:
-  to:
-  - excluded_images:
-    - testcontent
-    - testopenscap
-    name: "4.17"
-    namespace: ComplianceAsCode
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -103,14 +77,40 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-parallel
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
+        make e2e-parallel
       from: src
       resources:
         requests:
@@ -125,14 +125,40 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-serial
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
+        make e2e-serial
       from: src
       resources:
         requests:
@@ -150,14 +176,40 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-deployment
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
+        make e2e-deployment
       from: src
       resources:
         requests:
@@ -185,6 +237,36 @@ tests:
       commands: |
         #!/bin/bash
         set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
 
         # cli:latest ships `oc`, not `kubectl` — shim it for make deploy/install.
         ln -sf "$(command -v oc)" /tmp/kubectl && export PATH="/tmp:${PATH}"
@@ -369,8 +451,6 @@ tests:
           exit "${pod_exit_code}"
         fi
       dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
       - env: PULL_SPEC_TLS_SCANNER_TOOL
         name: tls-scanner-tool-5-0
       from: src
@@ -399,6 +479,36 @@ tests:
       commands: |
         #!/bin/bash
         set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
 
         # cli:latest ships `oc`, not `kubectl` — shim it for make deploy/install.
         ln -sf "$(command -v oc)" /tmp/kubectl && export PATH="/tmp:${PATH}"
@@ -541,8 +651,6 @@ tests:
           exit "${pod_exit_code}"
         fi
       dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
       - env: PULL_SPEC_TLS_SCANNER_TOOL
         name: tls-scanner-tool
       from: src
@@ -558,14 +666,40 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-scan-config
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
+        make e2e-scan-config
       from: src
       resources:
         requests:
@@ -580,14 +714,40 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-tailoring
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
+        make e2e-tailoring
       from: src
       resources:
         requests:
@@ -602,14 +762,40 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-parsing
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
+        make e2e-parsing
       from: src
       resources:
         requests:
@@ -624,14 +810,40 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-cel
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
+        make e2e-cel
       from: src
       resources:
         requests:
@@ -653,10 +865,40 @@ tests:
     - ref: ipi-install-rbac
     - as: test-ocp4-pci-dss-node
       cli: latest
-      commands: make e2e-rosa
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
+        make e2e-rosa
       from: src
       resources:
         requests:
@@ -677,14 +919,40 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-parallel
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
+        make e2e-parallel
       from: src
       resources:
         requests:
@@ -705,14 +973,40 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-serial
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # Konflux builds this PR's images while the cluster installs, so test with
+        # them instead of having Prow build them before the install starts. Konflux
+        # builds an image only for PRs that change its sources; other PRs test with
+        # the master image, which has the same sources.
+        q=redhat-user-workloads/ocp-isc-tenant
+        has() { # <image> <tag> [active]: whether quay has the tag (or ever had it)
+          local out
+          out=$(curl -fsS --max-time 30 --retry 5 --retry-all-errors "https://quay.io/api/v1/repository/$q/$1/tag/?specificTag=$2${3:+&onlyActiveTags=true}") || exit 1
+          [[ $out == *'"name"'* ]]
+        }
+        konflux() { # <image>: the build of it to test with
+          local tag=on-pr-${PULL_PULL_SHA:-} delay
+          # A Konflux build stores its source at <tag>.git when it starts.
+          if [[ -n ${PULL_PULL_SHA:-} ]] && has "$1" "$tag.git"; then
+            # Retry with backoff for up to 5 minutes while the build finishes.
+            for delay in 10 20 40 80 150 0; do
+              has "$1" "$tag" active && { echo "quay.io/$q/$1:$tag"; return; }
+              has "$1" "$tag.git" active || { echo "quay.io/$q/$1:$tag has expired: /test $1-on-pull-request rebuilds it" >&2; exit 1; }
+              sleep $delay
+            done
+            echo "Konflux has not built quay.io/$q/$1:$tag after 5 minutes" >&2
+            exit 1
+          fi
+          echo "quay.io/$q/$1:master"
+        }
+        IMAGE_FROM_CI=$(konflux compliance-operator-dev)
+        OPENSCAP_IMAGE=$(konflux compliance-operator-openscap-dev)
+        MUST_GATHER_IMAGE=$(konflux compliance-operator-must-gather-dev)
+        export IMAGE_FROM_CI OPENSCAP_IMAGE MUST_GATHER_IMAGE
+        echo "Testing with $IMAGE_FROM_CI $OPENSCAP_IMAGE $MUST_GATHER_IMAGE"
+        make e2e-serial
       from: src
       resources:
         requests:
