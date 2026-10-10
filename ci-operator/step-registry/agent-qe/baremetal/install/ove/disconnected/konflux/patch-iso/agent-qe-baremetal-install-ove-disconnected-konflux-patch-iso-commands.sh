@@ -8,7 +8,7 @@ set -o nounset
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 
-OVE_ISO_STORAGE_HOST=$(<"${CLUSTER_PROFILE_DIR}/ove_iso_storage_host")
+OVE_ISO_STORAGE_HOST="fd99:2222:3456::2"
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -74,7 +74,7 @@ compute:
 
   INSTALL_CONFIG=$(base64 -w 0 "${SHARED_DIR}/install-config.yaml")
   AGENT_CONFIG=$(base64 -w 0 "${SHARED_DIR}/agent-config.yaml")
-  AGENT_ISO="${CLUSTER_NAME}.agent-ove.x86_64.iso"
+  AGENT_ISO="agent-ove.x86_64.iso"
   timeout -s 9 10m ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" \
     "nsenter -n -t \"\$(podman inspect -f '{{ .State.Pid }}' \"${CONTAINER_NAME}\")\" \
      ssh -o StrictHostKeyChecking=no root@\"${OVE_ISO_STORAGE_HOST}\" patch_ove_static_network_ignition_file.sh \

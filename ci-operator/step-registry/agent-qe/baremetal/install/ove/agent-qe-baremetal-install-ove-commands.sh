@@ -73,6 +73,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
      boot_selection="vcd"
    fi
    echo "Power on #${host} (${name})..."
+   OVE_ISO_STORAGE_HOST="fd99:2222:3456::2"
    CONTAINER_NAME="haproxy-$(<"${SHARED_DIR}"/cluster_name)"
    if ! timeout -s 9 15m ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" \
         "nsenter -n -t \"\$(podman inspect -f '{{ .State.Pid }}' \"${CONTAINER_NAME}\")\" \

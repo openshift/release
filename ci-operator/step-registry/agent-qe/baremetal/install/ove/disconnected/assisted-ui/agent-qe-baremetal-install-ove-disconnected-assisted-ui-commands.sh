@@ -17,7 +17,7 @@ export HTTPS_PROXY=${proxy}
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET=$(jq -c -n '{"auths":{"test":{"auth":"dXNlcjpwYXNzCg=="}}}')
-RENDEZVOUS_IP=$(<"${SHARED_DIR}/node-zero-ip.txt")
+RENDEZVOUS_IP=$([[ ${ipv4_enabled:-false} == true ]] && echo "$(<"${SHARED_DIR}/node-zero-ip.txt")" || echo "[$(<"${SHARED_DIR}/node-zero-ip.txt")]")
 PROXY_URL=$(<"${CLUSTER_PROFILE_DIR}/proxy")
 
 export CLUSTER_NAME BASE_DOMAIN PULL_SECRET RENDEZVOUS_IP PROXY_URL \

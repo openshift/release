@@ -133,9 +133,9 @@ if [ "${ipv4_enabled}" == "true" ]; then
   else
     # Required for internal communication, uses a separate IP to avoid conflicts with VIPs or node IPs.
     LAST_OCTET="${INTERNAL_API_IPV4##*.}"
-    if [ "$LAST_OCTET" -lt 155 ]; then
-      # Nodes 1 to 154 -> Containers get 80.101 to 80.254
-      HAPROXY_IPv4="${INTERNAL_API_IPV4%.*.*}.80.$((LAST_OCTET+100))"/22
+    if [ "$LAST_OCTET" -lt 150 ]; then
+      # Nodes 1 to 154 -> Containers get 81.101 to 81.254
+      HAPROXY_IPv4="${INTERNAL_API_IPV4%.*.*}.81.$((LAST_OCTET+105))"/22
     else
       # Fallback for Nodes 155 to 248 -> Containers get 83.161 to 83.254
       HAPROXY_IPv4="${INTERNAL_API_IPV4%.*.*}.83.$((LAST_OCTET+6))"/22
