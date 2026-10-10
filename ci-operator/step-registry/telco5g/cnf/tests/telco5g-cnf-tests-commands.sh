@@ -863,3 +863,4 @@ set -e
 
 [[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-cnf-tests"
 exit ${status}
+# test
