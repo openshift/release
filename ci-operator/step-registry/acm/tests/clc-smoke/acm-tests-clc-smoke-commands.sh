@@ -82,6 +82,10 @@ unset CYPRESS_OPTIONS_HUB_PASSWORD
 
 typeset reportStatus=0
 cp -r reports "${ARTIFACT_DIR}/" || reportStatus=$?
+
+# Rename JUnit suite for dashboard visibility
+find "${ARTIFACT_DIR}" -name "*.xml" -exec sed -i 's/name="acm-tests-clc-smoke"/name="lp-interop--OPP--acm-clc"/g; s/classname="acm-tests-clc-smoke"/classname="lp-interop--OPP--acm-clc"/g' {} + 2>/dev/null || true
+
 if (( clcStatus != 0 )); then
     exit "${clcStatus}"
 fi
