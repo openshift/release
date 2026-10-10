@@ -55,6 +55,15 @@ cat > /tmp/ssh-wrap/ssh <<'SSHWRAP'
 exec /usr/bin/ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$@"
 SSHWRAP
 chmod +x /tmp/ssh-wrap/ssh
+
+# ipmitool is not in the dpf-ci image and the BMC management network is
+# only reachable from the bastion. Proxy calls through SSH.
+cat > /tmp/ssh-wrap/ipmitool <<IPMIWRAP
+#!/bin/bash
+exec /usr/bin/ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR root@${REMOTE_HOST} ipmitool "\$@"
+IPMIWRAP
+chmod +x /tmp/ssh-wrap/ipmitool
+
 export PATH="/tmp/ssh-wrap:${PATH}"
 
 # Set up SSH key and config for libvirt qemu+ssh:// connections.
