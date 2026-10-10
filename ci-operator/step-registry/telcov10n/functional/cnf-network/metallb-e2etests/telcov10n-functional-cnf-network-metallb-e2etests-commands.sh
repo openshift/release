@@ -11,6 +11,11 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
+if [[ "${RUN_METALLB_E2E_TESTS}" != "true" ]]; then
+  echo "RUN_METALLB_E2E_TESTS is not set to 'true' — skipping metallb e2e tests"
+  exit 0
+fi
+
 echo "Create group_vars directory"
 mkdir ${ECO_CI_CD_INVENTORY_PATH}/group_vars
 
@@ -65,6 +70,19 @@ if [ ! -f "${ARTIFACT_DIR}/junit_metallb/junit-report.xml" ]; then
 fi
 
 echo "Store report for reporter step"
-cp "${ARTIFACT_DIR}/junit_metallb/junit-report.xml" "${SHARED_DIR}/junit_metallb_report.xml"
+python3 - "${ARTIFACT_DIR}/junit_metallb/junit-report.xml" "${SHARED_DIR}/polarion_metallb_report.xml" << 'PYEOF'
+import re, sys, xml.etree.ElementTree as ET
+src, out = sys.argv[1], sys.argv[2]
+def strip(s):
+    s = re.sub(r'<system-err>.*?</system-err>', '', s, flags=re.DOTALL)
+    return re.sub(r'<system-out>.*?</system-out>', '', s, flags=re.DOTALL)
+tree = ET.fromstring(strip(open(src).read()))
+root = ET.Element('testsuite', {'name': 'metallb'})
+for suite in ([tree] if tree.tag == 'testsuite' else list(tree)):
+    if suite.tag == 'testsuite':
+        for tc in suite.findall('testcase'):
+            root.append(tc)
+ET.ElementTree(root).write(out, encoding='unicode', xml_declaration=True)
+PYEOF
 
 rm -f "${PROJECT_DIR}/temp_ssh_key"
