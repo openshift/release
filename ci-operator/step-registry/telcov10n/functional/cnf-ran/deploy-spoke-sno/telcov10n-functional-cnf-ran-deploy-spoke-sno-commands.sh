@@ -29,7 +29,7 @@ cp ${SHARED_DIR}/hypervisor ${INVENTORY_PATH}/host_vars/hypervisor
 cp ${SHARED_DIR}/master0 ${INVENTORY_PATH}/host_vars/master0
 
 # Set kubeconfig path
-KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
+KUBECONFIG_PATH="/home/telcov10n/project/generated/${SPOKE_CLUSTER}/auth/kubeconfig"
 
 echo "Running ZTP deployment for sno spoke cluster: ${SPOKE_CLUSTER}"
 ansible-playbook ./playbooks/ran/deploy-spoke-sno.yaml \
