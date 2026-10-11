@@ -76,8 +76,15 @@ export GITHUB_USER
 GITHUB_TOKEN=$(cat $SECRETS_DIR/alc/git-token)
 export GITHUB_TOKEN
 
-COLLECTIVE_OCP_TOKEN=$(cat $SECRETS_DIR/alc/collective-ocp-token)
-export COLLECTIVE_OCP_TOKEN
+# collective-ocp-token is optional; the key may not yet be provisioned in the
+# acm-qe/alc-credentials vault collection.  Export it when available so the
+# test runner can use it, but do not fail the step when it is absent.
+if [[ -f "$SECRETS_DIR/alc/collective-ocp-token" ]]; then
+    COLLECTIVE_OCP_TOKEN=$(cat "$SECRETS_DIR/alc/collective-ocp-token")
+    export COLLECTIVE_OCP_TOKEN
+else
+    echo "WARNING: collective-ocp-token not found in acm-qe/alc-credentials vault; tests requiring this credential may be skipped" >&2
+fi
 
 # run the test execution script
 typeset -i _test_rc=0
