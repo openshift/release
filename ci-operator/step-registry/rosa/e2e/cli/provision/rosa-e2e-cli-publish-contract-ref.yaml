@@ -1,0 +1,70 @@
+ref:
+  as: rosa-e2e-cli-publish-contract
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-e2e-cli-publish-contract-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The OCM environment the cluster lives in. Supported values are [production, staging, integration].
+  - name: HOSTED_CP
+    default: "true"
+    documentation: Whether the cluster is a Hosted Control Plane (HCP) cluster. Recorded as topology=hcp when true, classic otherwise.
+  - name: STS
+    default: "true"
+    documentation: Whether the cluster uses AWS Security Token Service (STS). Recorded as feature_flags.sts.
+  - name: REGION
+    default: ""
+    documentation: AWS region fallback for cluster-metadata.json when OCM does not report one.
+  - name: OPENSHIFT_VERSION
+    default: ""
+    documentation: OpenShift version fallback for cluster-metadata.json when OCM does not report one.
+  - name: CHANNEL_GROUP
+    default: "stable"
+    documentation: Release channel group fallback for cluster-metadata.json when OCM does not report one.
+  - name: ENABLE_BYOVPC
+    default: "true"
+    documentation: Whether the cluster was installed into a pre-provisioned (BYO) VPC. Recorded as feature_flags.byovpc.
+  - name: PRIVATE
+    default: "false"
+    documentation: Whether the API endpoint and application routes are private. Recorded as feature_flags.private.
+  - name: PRIVATE_LINK
+    default: "false"
+    documentation: Whether the cluster uses AWS PrivateLink. Recorded as feature_flags.privatelink.
+  - name: ETCD_ENCRYPTION
+    default: "false"
+    documentation: Whether etcd encryption is enabled. Recorded as feature_flags.etcd_encryption.
+  - name: STORAGE_ENCRYPTION
+    default: "false"
+    documentation: Whether EBS volumes are encrypted with a KMS key. Recorded as feature_flags.kms.
+  - name: FIPS
+    default: "false"
+    documentation: Whether the cluster is FIPS-enabled. Recorded as feature_flags.fips.
+  - name: ENABLE_SHARED_VPC
+    default: "false"
+    documentation: Whether the cluster uses a Shared VPC (cross-account). Recorded as feature_flags.sharedvpc.
+  - name: ZERO_EGRESS
+    default: "false"
+    documentation: Whether the cluster is zero-egress. Recorded as feature_flags.zero_egress.
+  - name: MULTI_AZ
+    default: "false"
+    documentation: Whether the cluster is deployed across multiple availability zones. Recorded as feature_flags.multi_az.
+  documentation: |-
+    Publishes the frozen provisioner-to-validator SHARED_DIR contract (ROSAENG-67580) for a cluster
+    provisioned by the rosa CLI steps, making it the rosa-CLI head of the provision x validate matrix
+    (ROSAENG-308 / ROSAENG-67583).
+
+    The rosa CLI flow (rosa-cluster-provision) already writes ${SHARED_DIR}/cluster-id, and
+    rosa-conf-idp-htpasswd already writes ${SHARED_DIR}/kubeconfig. This step adds the remaining
+    contract artifact, ${SHARED_DIR}/cluster-metadata.json (cluster type, region, channel, feature
+    flags), using the same schema and schema_version as rosa-e2e-ocm-provision so the
+    provisioner-agnostic validation refs (rosa-e2e-validate-customer / rosa-e2e-validate-platform)
+    cannot tell which head produced the cluster. It also back-fills ${SHARED_DIR}/kubeconfig from OCM
+    if the CLI flow did not produce one (non-fatal: backplane-login provides it for private clusters).
+
+    Run this immediately after the rosa CLI cluster-create flow. Requires ocm and jq (provided by the
+    rosa-aws-cli image) and OCM credentials in the cluster profile.
