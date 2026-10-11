@@ -64,15 +64,18 @@ $WAS_TRACING && set -x
 # (e.g. a private cluster not reachable here), fall back to OCM credentials; a miss is non-fatal,
 # backplane-login provides the kubeconfig later and the customer-plane validation fails loudly if
 # it is still absent.
-if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
-  if ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" \
+if [[ -s "${SHARED_DIR}/kubeconfig" ]]; then
+  # Written by rosa-conf-idp-htpasswd. Lock down the token-bearing file to match the OCM head
+  # (rosa-conf-idp-htpasswd does not set restrictive perms).
+  chmod 0600 "${SHARED_DIR}/kubeconfig"
+  log "Using customer-plane kubeconfig from rosa-conf-idp-htpasswd"
+elif ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" \
        | jq -re '.kubeconfig' > "${SHARED_DIR}/kubeconfig" 2>/dev/null; then
-    chmod 0600 "${SHARED_DIR}/kubeconfig"
-    log "Wrote customer-plane kubeconfig to \${SHARED_DIR}/kubeconfig"
-  else
-    rm -f "${SHARED_DIR}/kubeconfig"
-    log "Guest kubeconfig not available from OCM (private cluster?); backplane-login will provide it"
-  fi
+  chmod 0600 "${SHARED_DIR}/kubeconfig"
+  log "Wrote customer-plane kubeconfig to \${SHARED_DIR}/kubeconfig from OCM"
+else
+  rm -f "${SHARED_DIR}/kubeconfig"
+  log "Guest kubeconfig not available from OCM (private cluster?); backplane-login will provide it"
 fi
 
 # ---- Contract artifact: ${SHARED_DIR}/cluster-metadata.json (ROSAENG-67580) ----
