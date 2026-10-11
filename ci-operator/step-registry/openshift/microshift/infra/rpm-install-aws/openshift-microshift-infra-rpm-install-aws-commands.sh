@@ -71,13 +71,26 @@ if [[ -n "${PROWJOB_ID}" && "${PROWJOB_ID}" =~ .*nightly.* ]]; then
   REBASE_TO="${RELEASE_IMAGE_LATEST}"
 fi
 
-if [ -n "${REBASE_TO}" ]; then
-  # Under this condition we need to force traps at the last moment to not override the one above.
   echo "REBASE_TO is set to ${REBASE_TO}"
   export PATH="${HOME}/.local/bin:${PATH}"
+
+  # Install the exact Go version required by microshift's go.mod
+  required_go=$(grep '^go ' /go/src/github.com/openshift/microshift/go.mod | awk '{print $2}')
+  current_go=$(go version 2>/dev/null | awk '{print $3}' | sed 's/^go//')
+  if [[ "${current_go}" != "${required_go}" ]]; then
+    echo "Go version mismatch: have ${current_go:-none}, need ${required_go}. Installing..."
+    curl -sSfL "https://go.dev/dl/go${required_go}.linux-amd64.tar.gz" -o /tmp/go.tar.gz
+    mkdir -p /tmp/goroot
+    tar -C /tmp/goroot -xzf /tmp/go.tar.gz
+    rm /tmp/go.tar.gz
+    export GOROOT=/tmp/goroot/go
+    export PATH="${GOROOT}/bin:${PATH}"
+    echo "Installed Go $(go version)"
+  fi
+
   python3 -m ensurepip --upgrade
   pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
-
+if [ -n "${REBASE_TO}" ]; then
   cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/.pull-secret.json
 
   cd /go/src/github.com/openshift/microshift/
