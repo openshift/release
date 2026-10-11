@@ -60,3 +60,6 @@ cp -r "${SHARED_DIR}"/hypervisors /eco-ci-cd/inventories/ocp-deployment/group_va
 cd /eco-ci-cd
 ansible-playbook -vv playbooks/ran/create-spoke-masters.yml \
   -i inventories/ocp-deployment/build-inventory.py
+
+# Save inventory to SHARED_DIR
+tar -czvf "${SHARED_DIR}/inventory.tar.gz" -C "/eco-ci-cd/inventories/ocp-deployment/" .
