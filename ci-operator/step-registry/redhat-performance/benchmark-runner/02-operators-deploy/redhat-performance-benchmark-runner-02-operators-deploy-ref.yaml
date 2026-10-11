@@ -1,0 +1,45 @@
+ref:
+  as: redhat-performance-benchmark-runner-02-operators-deploy
+  from_image:
+    namespace: ci
+    name: benchmark-runner
+    tag: latest
+  commands: redhat-performance-benchmark-runner-02-operators-deploy-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: benchmark-runner-perfci-config
+      mount_path: /secret
+  env:
+    - name: CNV_VERSION
+      default: "4.22"
+      documentation: CNV operator version to install
+    - name: LSO_VERSION
+      default: "4.21"
+      documentation: LSO operator version to install
+    - name: ODF_VERSION
+      default: "4.21"
+      documentation: ODF operator version to install
+    - name: NUM_ODF_DISK
+      default: "6"
+      documentation: Number of disks to allocate to ODF per worker
+    - name: WORKER_DISK_PREFIX
+      default: "wwn-0x"
+      documentation: Prefix for worker disk IDs
+    - name: PROVISION_TIMEOUT
+      default: "3600"
+      documentation: Timeout in seconds per operator installation
+    - name: QUAY_REPOSITORY
+      default: "quay.io/benchmark-runner/benchmark-runner:latest"
+      documentation: Benchmark-runner container image used on the provisioner
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Install OpenShift operators (CNV, LSO, ODF, Infra, Custom)
+    on a bare-metal cluster. SSHes to the provisioner and runs
+    the benchmark-runner container with INSTALL_OCP_RESOURCES=True
+    for each operator sequentially.
+    Requires kubeconfig on the provisioner from a prior OCP deploy step.
+  timeout: 7200s
+  grace_period: 60s

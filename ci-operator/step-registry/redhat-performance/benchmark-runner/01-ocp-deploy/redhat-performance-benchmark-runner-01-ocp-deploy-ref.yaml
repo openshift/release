@@ -1,0 +1,36 @@
+ref:
+  as: redhat-performance-benchmark-runner-01-ocp-deploy
+  from_image:
+    namespace: ci
+    name: benchmark-runner
+    tag: latest
+  commands: redhat-performance-benchmark-runner-01-ocp-deploy-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: benchmark-runner-perfci-config
+      mount_path: /secret
+  env:
+    - name: INSTALL_OCP_VERSION
+      default: "latest-4.22"
+      documentation: OpenShift version to install (e.g., latest-4.22, latest-4.22.0-ec)
+    - name: OCP_BUILD
+      default: "dev"
+      documentation: OCP build type (dev or ga)
+    - name: PROVISION_TIMEOUT
+      default: "7200"
+      documentation: Timeout in seconds for the JetLag provisioning step
+    - name: QUAY_REPOSITORY
+      default: "quay.io/benchmark-runner/benchmark-runner:latest"
+      documentation: Benchmark-runner container image used on the provisioner
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Deploy OpenShift on bare-metal via JetLag (Assisted Installer).
+    SSHes to the provisioner host, cleans up previous deployments,
+    and runs the benchmark-runner container to execute JetLag.
+    Outputs kubeconfig and kubeadmin-password to SHARED_DIR
+    for consumption by subsequent workflow steps.
+  timeout: 9000s
+  grace_period: 60s
