@@ -6,8 +6,15 @@ workflow:
     Run target preinstall with the full version detected from the seed cluster,
     then deploy the target spoke using the existing deployment playbook.
     Run Deployment Types tests on the target and collect their reports.
-    Defer their result until the final post step so later stages can run.
+    When enabled, preinstall the former seed server as replacement hardware
+    before IBBF; a replacement preinstall failure blocks subsequent tests.
+    Check their exit code and reports with the shared final JUnit verifier
+    so later stages can run before the job is marked failed.
   steps:
+    env:
+      JUNIT_INVENTORY_PREFIX: target-
+      JUNIT_REPORT_DIR_FILE: ibi-deploymenttypes-report-dir
+      JUNIT_REQUIRED_RESULT_FILES: ibi-deploymenttypes-exit-code
     pre:
     # Seed hub setup — kni-qe-127 deployed at VERSION
     - ref: telcov10n-functional-cnf-ran-hub-deploy
@@ -43,5 +50,6 @@ workflow:
     - ref: telcov10n-functional-cnf-ran-ibu-target-deploy-spoke-sno
     test:
     - ref: telcov10n-functional-cnf-ran-ibi-deploymenttypes
+    - ref: telcov10n-functional-cnf-ran-ibi-replacement-preinstall
     post:
-    - ref: telcov10n-functional-cnf-ran-ibi-deploymenttypes-result
+    - ref: telcov10n-verify-junit-reports-bastion

@@ -30,6 +30,7 @@ host-record=api-int.kni-qe-127.telcov10n.eng.rdu2.dc.redhat.com,10.6.184.111,262
 address=/apps.kni-qe-127.telcov10n.eng.rdu2.dc.redhat.com/10.6.184.111
 address=/apps.kni-qe-127.telcov10n.eng.rdu2.dc.redhat.com/2620:52:9:16b8:6e00::111
 
+host-record=helix42.lab.eng.tlv2.redhat.com,10.46.55.168
 host-record=api.ibi-seed.lab.eng.tlv2.redhat.com,10.46.55.168
 host-record=api-int.ibi-seed.lab.eng.tlv2.redhat.com,10.46.55.168
 address=/apps.ibi-seed.lab.eng.tlv2.redhat.com/10.46.55.168
@@ -64,6 +65,19 @@ main() {
     --extra-vars '{"ansible_become": true}' \
     -m ansible.builtin.script \
     -a "${WORK_DIR}/apply-dns.sh"
+
+  # Rootless test containers inherit this mapping from the bastion at creation.
+  ansible bastion \
+    -i "${INVENTORY_PATH}/build-inventory.py" \
+    --extra-vars "ansible_private_key_file=${WORK_DIR}/ssh-key ansible_ssh_private_key_file=${WORK_DIR}/ssh-key" \
+    --extra-vars '{"ansible_become": true}' \
+    -m ansible.builtin.lineinfile \
+    -a '{
+      "path": "/etc/hosts",
+      "regexp": "^[^#]*\\shelix42\\.lab\\.eng\\.tlv2\\.redhat\\.com(\\s.*)?$",
+      "line": "10.46.55.168 helix42.lab.eng.tlv2.redhat.com",
+      "state": "present"
+    }'
 }
 
 main "$@"
