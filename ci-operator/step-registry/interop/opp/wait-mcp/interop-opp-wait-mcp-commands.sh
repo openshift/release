@@ -72,7 +72,7 @@ typeset -ri maxTimeout="${MCP_WAIT_MAX_TIMEOUT:-5400}"
 typeset -ri consecutiveRequired="${MCP_CONSECUTIVE_CHECKS:-3}"
 typeset -ri settleDelay="${MCP_SETTLE_DELAY:-90}"
 typeset -ri maxUnavailable="${MCP_MAX_UNAVAILABLE:-3}"
-typeset -ri pollInterval=30
+typeset -ri pollInterval="${MCP_POLL_INTERVAL:-30}"
 typeset -a readyHistory=()
 typeset -i extensionsApplied=0
 typeset -i pollsSinceLastExtension=0
@@ -214,6 +214,8 @@ if (( effectiveTimeout > maxTimeout )); then
 fi
 typeset -i deadline=$(( startSeconds + effectiveTimeout ))
 typeset -i consecutivePasses=0
+typeset -i consecutiveFailures=0
+typeset -i currentPollInterval=${pollInterval}
 
 echo "Polling MCPs for up to ${effectiveTimeout}s (need ${consecutiveRequired} consecutive clean polls)..."
 echo "Progress-based extension: +${progressExtension}s per detection, max total ${maxTimeout}s"
@@ -222,12 +224,20 @@ while (( SECONDS < deadline )); do
     typeset -i remaining=$(( deadline - SECONDS ))
     (( remaining < 5 )) && remaining=5
     typeset mcpJson=""
-    mcpJson="$(oc get mcp -o json --request-timeout="${remaining}s" 2>/dev/null)" || {
-        echo "WARNING: oc get mcp failed, retrying in ${pollInterval}s"
+    if mcpJson="$(oc get mcp -o json --request-timeout="${remaining}s" 2>/dev/null)"; then
+        consecutiveFailures=0
+        currentPollInterval=${pollInterval}
+    else
+        (( consecutiveFailures++ )) || true
+        # Exponential backoff: base → 2x → 4x, capped at 120s
+        typeset -i backoffExponent=$(( consecutiveFailures > 3 ? 3 : consecutiveFailures - 1 ))
+        currentPollInterval=$(( pollInterval * (2 ** backoffExponent) ))
+        (( currentPollInterval > 120 )) && currentPollInterval=120
+        echo "WARNING: oc get mcp failed (attempt ${consecutiveFailures}), backing off to ${currentPollInterval}s"
         consecutivePasses=0
-        sleep "${pollInterval}"
+        sleep "${currentPollInterval}"
         continue
-    }
+    fi
 
     typeset statusLine=""
     statusLine="$(echo "${mcpJson}" | python3 -c "
@@ -304,7 +314,7 @@ else:
         fi
     fi
 
-    sleep "${pollInterval}"
+    sleep "${currentPollInterval}"
 done
 
 typeset -i elapsed=$(( SECONDS - startSeconds ))
