@@ -922,6 +922,14 @@ if [ -f "${CHRONY_MASTER_YAML}" ]; then
   cp ${CHRONY_MASTER_YAML} "${dir}/manifests"
 fi
 
+# Sets up the powervm-rmc manifests
+for POWERVM_RMC_YAML in powervm-rmc-namespace.yaml powervm-rmc-serviceaccount.yaml powervm-rmc-scc-rolebinding.yaml powervm-rmc-daemonset.yaml; do
+  if [ -f "${SHARED_DIR}/${POWERVM_RMC_YAML}" ]; then
+    echo "Saving ${SHARED_DIR}/${POWERVM_RMC_YAML} to the install directory..."
+    cp "${SHARED_DIR}/${POWERVM_RMC_YAML}" "${dir}/manifests"
+  fi
+done
+
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"

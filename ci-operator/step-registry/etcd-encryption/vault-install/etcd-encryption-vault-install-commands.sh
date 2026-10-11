@@ -60,6 +60,15 @@ record_vault_images() {
     echo "  local mirror: push by digest to localimages/vault-kube-kms"
   fi
   echo "${VAULT_KMS_PLUGIN_IMAGE}" > "${SHARED_DIR}/vault-kms-plugin-image"
+
+  if [[ -n "${VAULT_KMS_PLUGIN_IMAGE_UPDATE:-}" ]]; then
+    echo "Vault KMS plugin update image: ${VAULT_KMS_PLUGIN_IMAGE_UPDATE}"
+    echo "  ICSP source: $(resolve_image_repo "${VAULT_KMS_PLUGIN_IMAGE_UPDATE}")"
+    if [[ "${VAULT_KMS_PLUGIN_IMAGE_UPDATE}" == *@* ]]; then
+      echo "  local mirror: push by digest to localimages/$(basename "$(resolve_image_repo "${VAULT_KMS_PLUGIN_IMAGE_UPDATE}")")"
+    fi
+    echo "${VAULT_KMS_PLUGIN_IMAGE_UPDATE}" > "${SHARED_DIR}/vault-kms-plugin-image-update"
+  fi
 }
 
 mirror_vault_images() {
@@ -67,13 +76,24 @@ mirror_vault_images() {
   local vault_enterprise_dst
   local vault_kms_src="${VAULT_KMS_PLUGIN_IMAGE}"
   local vault_kms_dst
+  local vault_kms_update_src="${VAULT_KMS_PLUGIN_IMAGE_UPDATE:-}"
+  local vault_kms_update_dst=""
   local registry_port="${DS_REGISTRY##*:}"
+  local vault_kms_update_local_repo=""
   vault_enterprise_dst="$(resolve_image_mirror_destination "${DS_REGISTRY}/localimages/vault-enterprise" "${VAULT_ENTERPRISE_IMAGE}")"
   vault_kms_dst="$(resolve_image_mirror_destination "${DS_REGISTRY}/localimages/vault-kube-kms" "${VAULT_KMS_PLUGIN_IMAGE}")"
+  if [[ -n "${vault_kms_update_src}" && "${vault_kms_update_src}" != "${VAULT_KMS_PLUGIN_IMAGE}" ]]; then
+    # Mirror the update image into its own local repository (e.g. localimages/vault-kube-kms-to-upgrade).
+    vault_kms_update_local_repo="${DS_REGISTRY}/localimages/$(basename "$(resolve_image_repo "${vault_kms_update_src}")")"
+    vault_kms_update_dst="$(resolve_image_mirror_destination "${vault_kms_update_local_repo}" "${vault_kms_update_src}")"
+  fi
 
   echo "Mirroring vault images to local registry (multi-arch manifest list)..."
   echo "  ${vault_enterprise_src} -> ${vault_enterprise_dst}"
   echo "  ${vault_kms_src} -> ${vault_kms_dst}"
+  if [[ -n "${vault_kms_update_dst}" ]]; then
+    echo "  ${vault_kms_update_src} -> ${vault_kms_update_dst}"
+  fi
   echo "  verification: skopeo inspect / podman pull --platform (detected arch) after mirror"
 
   # shellcheck disable=SC2087
@@ -299,6 +319,9 @@ mirror_vault_image() {
 
 mirror_vault_image "${vault_enterprise_src}" "${vault_enterprise_dst}" "vault-enterprise"
 mirror_vault_image "${vault_kms_src}" "${vault_kms_dst}" "vault-kube-kms"
+if [[ -n "${vault_kms_update_dst}" ]]; then
+mirror_vault_image "${vault_kms_update_src}" "${vault_kms_update_dst}" "vault-kube-kms-to-upgrade"
+fi
 EOF
 
   VAULT_IMAGE_REPOSITORY="${DS_REGISTRY}/localimages/vault-enterprise"
@@ -309,8 +332,14 @@ EOF
 apply_vault_icsp() {
   local vault_enterprise_icsp_source
   local vault_kms_icsp_source
+  local vault_kms_update_icsp_source
+  local vault_kms_update_mirror
   vault_enterprise_icsp_source="$(resolve_image_repo "${VAULT_ENTERPRISE_IMAGE}")"
   vault_kms_icsp_source="$(resolve_image_repo "${VAULT_KMS_PLUGIN_IMAGE}")"
+  vault_kms_update_icsp_source=""
+  if [[ -n "${VAULT_KMS_PLUGIN_IMAGE_UPDATE:-}" ]]; then
+    vault_kms_update_icsp_source="$(resolve_image_repo "${VAULT_KMS_PLUGIN_IMAGE_UPDATE}")"
+  fi
 
   echo "Applying ImageContentSourcePolicy for vault images..."
   oc apply -f - <<EOF
@@ -327,6 +356,12 @@ spec:
     - ${DS_REGISTRY}/localimages/vault-kube-kms
     source: ${vault_kms_icsp_source}
 EOF
+
+  if [[ -n "${vault_kms_update_icsp_source}" && "${vault_kms_update_icsp_source}" != "${vault_kms_icsp_source}" ]]; then
+    vault_kms_update_mirror="${DS_REGISTRY}/localimages/$(basename "${vault_kms_update_icsp_source}")"
+    echo "Adding ICSP mirror for KMS plugin update image ${vault_kms_update_icsp_source} -> ${vault_kms_update_mirror}"
+    oc patch imagecontentsourcepolicy/vault-mirror --type=json -p="[{\"op\":\"add\",\"path\":\"/spec/repositoryDigestMirrors/-\",\"value\":{\"mirrors\":[\"${vault_kms_update_mirror}\"],\"source\":\"${vault_kms_update_icsp_source}\"}}]"
+  fi
 
   echo "Waiting for ICSP to propagate to nodes..."
   oc wait machineconfigpool/master --for=condition=Updated=True --timeout=10m

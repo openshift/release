@@ -1,6 +1,6 @@
 build_root:
   project_image:
-    dockerfile_path: ci/build-root/Dockerfile
+    dockerfile_path: Dockerfile
 prowgen:
   disable_sparse_checkout: true
   enable_secrets_store_csi_driver: true
@@ -27,46 +27,14 @@ tests:
     test:
     - as: validate
       commands: |
-        git config --global url."https://github.com/".insteadOf "git@github.com:"
-        git config --global credential.helper '!f() {
-          if [ "$1" = "get" ]; then
-            host="" proto=""
-            while IFS= read -r line; do
-              [ -z "$line" ] && break
-              case "$line" in
-                host=*) host="${line#host=}" ;;
-                protocol=*) proto="${line#protocol=}" ;;
-              esac
-            done
-            if [ "$proto" = "https" ] && [ "$host" = "github.com" ]; then
-              echo "username=x-access-token"
-              echo "password=$(cat /etc/github-private/oauth)"
-            else
-              exit 1
-            fi
-          fi
-        }; f'
-        umask 077
-        cat > "$HOME/.terraformrc" <<TFRC
-        credentials "app.terraform.io" {
-          token = "$(cat /etc/terraform-cloud/token)"
-        }
-        TFRC
-        export TF_PLUGIN_CACHE_DIR="${TMPDIR:-/tmp}/terraform-plugin-cache"
-        mkdir -p "${TF_PLUGIN_CACHE_DIR}"
-        if [ "${REPO_OWNER}/${REPO_NAME}" != "app-sre/infra" ]; then
-          echo "Skipping validate: job context is not app-sre/infra"
-          exit 0
-        fi
-        # Credentials are mounted here, so the tooling that drives Terraform is
-        # restored from the trusted base revision. Without this a pull request
-        # could simply edit hack/lint.sh or the Makefile to read the token. The
-        # Terraform configuration under test stays as the PR wrote it.
+        # This step runs with an HCP Terraform token and a GitHub App token
+        # mounted, so the tooling is restored from the trusted base revision
+        # before anything executes. Without it a pull request could edit
+        # hack/ci/ or the Makefile to read those tokens. The Terraform
+        # configuration under test stays exactly as the pull request wrote it.
+        # Keep this ordering; hack/ci/lib.sh documents why.
         git checkout "${PULL_BASE_SHA}" -- Makefile hack/
-        # Only the workspaces this pull request touches: initializing all ~200
-        # of them takes around twenty minutes and repeats work the change does
-        # not affect.
-        make validate-changed BASE="${PULL_BASE_SHA}"
+        hack/ci/validate.sh
       credentials:
       - as: oauth
         collection: test-platform-infra
@@ -87,48 +55,14 @@ tests:
     test:
     - as: plan
       commands: |
-        git config --global url."https://github.com/".insteadOf "git@github.com:"
-        git config --global credential.helper '!f() {
-          if [ "$1" = "get" ]; then
-            host="" proto=""
-            while IFS= read -r line; do
-              [ -z "$line" ] && break
-              case "$line" in
-                host=*) host="${line#host=}" ;;
-                protocol=*) proto="${line#protocol=}" ;;
-              esac
-            done
-            if [ "$proto" = "https" ] && [ "$host" = "github.com" ]; then
-              echo "username=x-access-token"
-              echo "password=$(cat /etc/github-private/oauth)"
-            else
-              exit 1
-            fi
-          fi
-        }; f'
-        umask 077
-        cat > "$HOME/.terraformrc" <<TFRC
-        credentials "app.terraform.io" {
-          token = "$(cat /etc/terraform-cloud/token)"
-        }
-        TFRC
-        export TF_PLUGIN_CACHE_DIR="${TMPDIR:-/tmp}/terraform-plugin-cache"
-        mkdir -p "${TF_PLUGIN_CACHE_DIR}"
-        # Never execute fork-controlled Makefile or planner code with
-        # credentials: the base revision is trusted, and the planner itself
-        # refuses pull requests whose author is not an organization member or
-        # repository collaborator before Terraform is invoked.
-        if [ "${REPO_OWNER}/${REPO_NAME}" != "app-sre/infra" ]; then
-          echo "Skipping plan: job context is not app-sre/infra"
-          exit 0
-        fi
-        set -o pipefail
-        # -I (isolated) is required, not cosmetic: for `python3 -`, CPython sets
-        # sys.path[0] to the working directory, which is the PR checkout. A
-        # PR-added json.py (or any other stdlib name) at the repository root
-        # would then be imported by the trusted planner and execute before any
-        # of its checks ran.
-        git show "${PULL_BASE_SHA}:hack/tfc-speculative-plan.py" | python3 -I -
+        # This step runs with an HCP Terraform token and a GitHub App token
+        # mounted, so the tooling is restored from the trusted base revision
+        # before anything executes. Without it a pull request could edit
+        # hack/ci/ or the Makefile to read those tokens. The Terraform
+        # configuration under test stays exactly as the pull request wrote it.
+        # Keep this ordering; hack/ci/lib.sh documents why.
+        git checkout "${PULL_BASE_SHA}" -- Makefile hack/
+        hack/ci/plan.sh
       credentials:
       - as: oauth
         collection: test-platform-infra

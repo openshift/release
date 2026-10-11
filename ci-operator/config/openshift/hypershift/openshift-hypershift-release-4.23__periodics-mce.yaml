@@ -1,0 +1,68 @@
+base_images:
+  assisted-service-scripts:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  test-bin:
+    name: "4.23"
+    namespace: ocp
+    tag: hypershift-tests
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.23"
+  upi-installer:
+    name: "4.23"
+    namespace: ocp
+    tag: upi-installer
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  423-latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.23"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.23"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-critical
+  cron: 0 0 29 2 *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:423-latest
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:423-latest
+    env:
+      AWS_REGION_OVERWRITE: us-east-1
+      MCE_VERSION: "5.0"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-mce-multi-version-test-info
+    - chain: hypershift-conformance
+    workflow: hypershift-mce-aws-conformance
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: hypershift
+  variant: periodics-mce

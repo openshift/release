@@ -1,3 +1,12 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
 binary_build_commands: CGO_ENABLED=0 go build -o /go/bin/hypershift-oadp-plugin .
 build_root:
   image_stream_tag:
@@ -20,12 +29,12 @@ prowgen:
 releases:
   initial:
     integration:
-      name: "4.21"
+      name: "5.0"
       namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: "4.21"
+      name: "5.0"
       namespace: ocp-priv
 resources:
   '*':
@@ -63,6 +72,19 @@ tests:
     make verify
   container:
     from: src
+- always_run: false
+  as: e2e-aws-backuprestore
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    dependency_overrides:
+      OADP_HYPERSHIFT_PLUGIN_IMAGE: pipeline:hypershift-oadp-plugin-oadp-1.6
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-aws-e2e-backuprestore
 zz_generated_metadata:
   branch: oadp-1.6
   org: openshift-priv

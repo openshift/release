@@ -1,0 +1,89 @@
+base_images:
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.0
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp-priv
+    tag: rhel-9-golang-1.26-openshift-5.0
+canonical_go_repository: github.com/openshift/redhat-opentelemetry-collector
+images:
+  items:
+  - dockerfile_literal: |
+      # Mirrors Dockerfile.art of this repository (rhosdt-3.11). Keep in sync.
+      # bpf-generator runs on the CI builder image: the Red Hat golang-builder image has no RHEL repositories in CI, so dnf cannot install clang there.
+      # The CI builder image wraps go in a way that breaks "go build -C", so the builder stage keeps the Red Hat golang-builder image.
+      FROM ci-builder AS bpf-generator
+
+      WORKDIR /opt/app-root/src
+      USER root
+
+      RUN dnf -y install clang llvm && \
+          dnf clean all && \
+          rm -rf /var/cache/yum
+
+      COPY .obi-src .obi-src
+      RUN GOFLAGS=-mod=mod make -C .obi-src generate
+
+      FROM registry.redhat.io/openshift/golang-builder:golang-builder-v1.26-rhel9 AS builder
+
+      WORKDIR /opt/app-root/src
+      USER root
+
+      COPY . .
+      COPY --from=bpf-generator /opt/app-root/src/.obi-src .obi-src
+
+      RUN CGO_ENABLED=0 GOFIPS140=certified go build -C ./_build -mod=mod -o opentelemetry-collector -trimpath -ldflags "-w"
+
+      FROM registry.redhat.io/ubi9/ubi-micro AS target-base
+
+      FROM registry.redhat.io/ubi9/ubi as install-additional-packages
+      COPY --from=target-base / /mnt/rootfs
+      RUN rpm --root /mnt/rootfs --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      # Install the systemd package which provides journalctl required by journald receiver and add user to systemd-journal group.
+      # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/journaldreceiver
+      RUN dnf install --installroot=/mnt/rootfs --releasever=9 --setopt=install_weak_deps=false --setopt=reposdir=/etc/yum.repos.d --nodocs -y systemd && \
+          dnf clean all && \
+          rm -rf /mnt/rootfs/var/cache/*
+
+      FROM registry.redhat.io/ubi9/ubi-micro
+      WORKDIR /
+      COPY --from=install-additional-packages /mnt/rootfs/ /
+
+      COPY --from=builder /opt/app-root/src/_build/opentelemetry-collector /usr/bin/opentelemetry-collector
+      COPY configs/otelcol.yaml /etc/otelcol/config.yaml
+
+      ENV GODEBUG=fips140=auto
+      ARG USER_UID=1001
+      RUN useradd -u ${USER_UID} otelcol && usermod -a -G systemd-journal otelcol
+      USER ${USER_UID}
+      ENTRYPOINT ["/usr/bin/opentelemetry-collector"]
+      CMD ["--config", "/etc/otelcol/config.yaml"]
+      EXPOSE 4317 55678 55679
+    inputs:
+      builder:
+        as:
+        - ci-builder
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/redhat-opentelemetry-collector/.
+    to: redhat-opentelemetry-collector
+promotion:
+  to:
+  - disabled: true
+    namespace: ci
+    tag: redhat-otel-collector
+prowgen:
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: rhosdt-3.11
+  org: openshift-priv
+  repo: redhat-opentelemetry-collector
