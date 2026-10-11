@@ -32,7 +32,7 @@ finish() {
   fi
 
   echo "Deployment Types step status: ${result}; report-copy status: ${copy_rc}."
-  echo "Subsequent stages may continue; the final result step will check this status."
+  echo "Subsequent stages may continue; the shared JUnit verifier will check this status and the reports."
   exit 0
 }
 
@@ -62,6 +62,7 @@ create_work_directories() {
   SPOKE_KUBECONFIG="/tmp/${TEMP_DIR##*/}-kubeconfig"
   REPORT_DIR="${ARTIFACT_DIR}/ibi-deploymenttypes"
   mkdir -p "${REPORT_DIR}"
+  printf '%s\n' "${WORK_DIR}/junit" > "${SHARED_DIR}/ibi-deploymenttypes-report-dir"
 }
 
 configure_ssh() {
@@ -145,9 +146,22 @@ run_tests() {
 }
 
 collect_reports() {
+  local copy_rc=0 junit_rc=0
   scp -q -r "${SSH_OPTS[@]}" \
     "${BASTION_USER}@${BASTION_IP}:${WORK_DIR}/report" "${REPORT_DIR}/" \
-    2>&1 | redact_bastion
+    2>&1 | redact_bastion || copy_rc=$?
+
+  # Keep all artifacts, but give the verifier only the Ginkgo JUnit report.
+  ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
+    "set -e
+     test -s '${WORK_DIR}/report/deployment_suite_test_junit.xml'
+     mkdir -p '${WORK_DIR}/junit'
+     cp '${WORK_DIR}/report/deployment_suite_test_junit.xml' \
+        '${WORK_DIR}/junit/deploymenttypes.xml'" \
+    2>&1 | redact_bastion || junit_rc=$?
+
+  (( copy_rc == 0 )) || return "${copy_rc}"
+  return "${junit_rc}"
 }
 
 main() {
