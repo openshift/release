@@ -69,3 +69,9 @@ if unguarded_proxy_conf=$(find "${registry_dir}" -name '*-commands.sh' -print0 \
 fi
 
 find "${registry_dir}" -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
+
+# The downstream-sync behavioral tests intentionally live outside the step
+# registry because registry validation only accepts registered step files.
+downstream_sync_test="${base_dir}/hack/tests/github-downstream-sync-commands_test.sh"
+shellcheck -S warning "${downstream_sync_test}"
+"${downstream_sync_test}"
