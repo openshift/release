@@ -65,3 +65,27 @@ if [[ -f "${SHARED_DIR}/dns_up.json" ]]; then
         echo "api-int DNS includes API VIP ${api_ip}"
     fi
 fi
+
+# Probe each UserManaged LB from the CI network (outside). In-cluster hairpin to these
+# FIPs is not available on this cloud; e2e skips lb-ext/api-ext/OIDC for that reason.
+lb_hosts=()
+if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
+    while IFS= read -r ip || [[ -n "${ip}" ]]; do
+        [[ -z "${ip}" ]] && continue
+        lb_hosts+=("${ip}")
+    done < "${SHARED_DIR}/LB_HOSTS"
+elif [[ -f "${SHARED_DIR}/LB_HOST" ]]; then
+    lb_hosts+=("$(<"${SHARED_DIR}/LB_HOST")")
+fi
+if [[ "${#lb_hosts[@]}" -eq 0 ]]; then
+    echo "ERROR: no LB_HOSTS/LB_HOST to probe"
+    exit 1
+fi
+for ip in "${lb_hosts[@]}"; do
+    echo "Checking https://${ip}:6443/readyz"
+    if ! curl -kfsS --connect-timeout 10 --max-time 30 "https://${ip}:6443/readyz" -o /dev/null; then
+        echo "ERROR: UserManaged LB ${ip}:6443 is not reachable from CI"
+        exit 1
+    fi
+    echo "LB endpoint ${ip}:6443 is reachable"
+done
