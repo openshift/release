@@ -215,9 +215,7 @@ fi
 
 echo "Bastion proxy is ready!"
 
-# Additional UserManaged LB endpoints (separate FIP/VM). Primary stays in LB_HOST;
-# all endpoints are listed in LB_HOSTS for later multi-LB / DNS RR steps.
-# Squid/DNS stay on the primary only.
+# Extra UserManaged LB VM/FIP when EXTERNAL_LB_COUNT>=2. Squid stays on primary only.
 if [[ "${CONFIG_TYPE}" == *"externallb"* && "${EXTERNAL_LB_COUNT:-1}" -ge 2 ]]; then
   if [[ "${EXTERNAL_LB_COUNT}" -gt 2 ]]; then
     echo "ERROR: EXTERNAL_LB_COUNT=${EXTERNAL_LB_COUNT} is not supported yet (max 2)"

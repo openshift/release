@@ -28,7 +28,6 @@ if [[ "${load_balancer_type}" != "UserManaged" ]]; then
 fi
 echo "loadBalancer.type is UserManaged"
 
-# api → multi LB FIPs; api-int → machines-net API VIP (see dnsrecords step).
 if [[ -f "${SHARED_DIR}/dns_up.json" ]]; then
     if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
         expected=0

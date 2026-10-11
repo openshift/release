@@ -55,8 +55,7 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 API_IP=$(<"${SHARED_DIR}/API_IP")
 INGRESS_IP=$(<"${SHARED_DIR}/INGRESS_IP")
 
-# api: LB FIPs when present (externallb multi-LB); else API_IP.
-# api-int (externallb): machines-net API VIP - must stay reachable from nodes.
+# Prefer LB_HOSTS/LB_HOST for api when present. api-int uses API VIP for externallb.
 API_IPS=()
 if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     while IFS= read -r ip || [[ -n "${ip}" ]]; do
@@ -69,8 +68,6 @@ fi
 if [[ "${#API_IPS[@]}" -eq 0 ]]; then
     API_IPS+=("${API_IP}")
 fi
-
-echo "CONFIG_TYPE=${CONFIG_TYPE:-} api=${API_IPS[*]} api-int=${API_IP}"
 
 verify_name "$CLUSTER_NAME" "api" "${API_IPS[@]}"
 verify_name "$CLUSTER_NAME" "ingress.apps" "$INGRESS_IP"

@@ -54,7 +54,6 @@ fi
 openstack server delete --wait "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete server bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
 openstack port delete $PROXY_PORT_ID || >&2 echo "Failed to delete proxy port ${PROXY_PORT_ID}"
 
-# Additional LB endpoint created when EXTERNAL_LB_COUNT>=2 (see provision step).
 if [[ -f "${SHARED_DIR}/BASTION_SERVER_2" ]]; then
   LB2_NAME=$(<"${SHARED_DIR}/BASTION_SERVER_2")
   if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then

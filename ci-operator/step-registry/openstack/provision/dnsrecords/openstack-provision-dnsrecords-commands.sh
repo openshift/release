@@ -43,9 +43,7 @@ EOF
 if [ -f "${SHARED_DIR}/API_IP" ]; then
   API_IP=$(<"${SHARED_DIR}"/API_IP)
 
-  # api: for externallb, publish UserManaged LB FIPs (LB_HOSTS) for external RR.
-  # api-int: keep the machines-net API VIP so cluster nodes/MCS stay on-L2
-  # (public FIPs from the BYON subnet break bootstrap).
+  # externallb: api → LB FIPs (multi-value); api-int → machines-net API VIP.
   API_RECORD_VALUES=()
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
     if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
