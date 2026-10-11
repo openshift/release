@@ -181,4 +181,94 @@ for fip in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"); do
 done
 
 
+# Temporary debug for Keystone reachability from in-cluster CAPO on proxy/BYON
+# topologies (e.g. proxy-externallb after UserManaged is accepted). Best-effort
+# only: never fail gather if the API is down or resources are missing.
+# Runs before collect_bootstrap_logs so bastion SSH failures cannot skip it.
+collect_capi_proxy_debug() {
+	local kubeconfig="${SHARED_DIR}/kubeconfig"
+	local out="${ARTIFACT_DIR}/capi-proxy-keystone-debug.log"
+
+	if [[ ! -f "${kubeconfig}" ]]; then
+		echo "Skipping CAPO/proxy debug: no kubeconfig in SHARED_DIR"
+		return 0
+	fi
+
+	export KUBECONFIG="${kubeconfig}"
+
+	# Resolve pod name outside the piped brace group (local is invalid in a subshell).
+	local pod
+	pod="$(oc -n openshift-cluster-api-operator get pods -l k8s-app=capi-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+
+	{
+		echo "===== CAPO / proxy / Keystone debug ($(date -u +%Y-%m-%dT%H:%M:%SZ)) ====="
+		echo "CONFIG_TYPE=${CONFIG_TYPE:-}"
+		echo
+
+		echo "----- Proxy CR (cluster) -----"
+		oc get proxy cluster -o yaml 2>&1 || true
+		echo
+
+		echo "----- Proxy env injected into capi-operator Deployment -----"
+		oc -n openshift-cluster-api-operator get deploy capi-operator \
+			-o jsonpath='{range .spec.template.spec.containers[?(@.name=="capi-operator")].env[*]}{.name}={.value}{"\n"}{end}' 2>&1 || true
+		echo
+		echo "(full env list including valueFrom):"
+		oc -n openshift-cluster-api-operator get deploy capi-operator \
+			-o jsonpath='{.spec.template.spec.containers[?(@.name=="capi-operator")].env}' 2>&1 | python3 -m json.tool 2>&1 || true
+		echo
+
+		echo "----- Running capi-operator pod env (HTTP(S)_PROXY / NO_PROXY) -----"
+		if [[ -n "${pod}" ]]; then
+			echo "pod=${pod}"
+			oc -n openshift-cluster-api-operator exec "${pod}" -c capi-operator -- \
+				/bin/sh -c 'env | grep -E "^(HTTP|HTTPS|NO|http|https|no)_?PROXY=" | sort' 2>&1 || true
+		else
+			echo "No capi-operator pod found"
+		fi
+		echo
+
+		echo "----- openstack-cloud-credentials secret keys (sizes only) -----"
+		oc -n openshift-cluster-api get secret openstack-cloud-credentials -o json 2>&1 \
+			| python3 -c '
+import sys, json, base64
+try:
+    d = json.load(sys.stdin)
+    data = d.get("data") or {}
+    for k, v in sorted(data.items()):
+        raw = base64.b64decode(v)
+        print(f"{k}: {len(raw)} bytes")
+        if k == "clouds.yaml":
+            # redact secrets; show auth_url only
+            text = raw.decode("utf-8", errors="replace")
+            for line in text.splitlines():
+                if "auth_url" in line or "cloud:" in line or line.strip().startswith("clouds:"):
+                    print(f"  {line}")
+        if k == "cacert":
+            # show PEM markers only, not full cert bodies
+            for line in raw.decode("utf-8", errors="replace").splitlines():
+                if "BEGIN" in line or "END" in line:
+                    print(f"  {line}")
+except Exception as e:
+    print(f"failed to parse secret: {e}")
+' 2>&1 || true
+		echo
+
+		echo "----- clusteroperator cluster-api -----"
+		oc get co cluster-api -o yaml 2>&1 || true
+		echo
+
+		echo "----- capi-operator recent logs (Keystone / OpenStack client) -----"
+		oc -n openshift-cluster-api-operator logs deploy/capi-operator --tail=200 2>&1 \
+			| grep -E 'OpenStack|Keystone|proxy|ProviderClient|dial tcp|authentication|InfraCluster|UserManaged|creating OpenStack' \
+			|| oc -n openshift-cluster-api-operator logs deploy/capi-operator --tail=80 2>&1 \
+			|| true
+		echo
+
+		echo "===== end CAPO / proxy / Keystone debug ====="
+	} | tee "${out}"
+}
+
+collect_capi_proxy_debug
+
 collect_bootstrap_logs
