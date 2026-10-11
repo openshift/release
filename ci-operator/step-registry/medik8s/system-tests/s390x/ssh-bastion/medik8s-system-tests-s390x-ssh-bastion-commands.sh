@@ -170,6 +170,17 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: ssh-bastion
+      # Keep bastion off workers. NHC/SNR remediation reboots workers and
+      # kills hostNetwork pods + the CI pod's oc port-forward to :12222.
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
       containers:
       - name: ssh-bastion
         image: quay.io/centos/centos:stream9
@@ -274,6 +285,18 @@ if ! oc -n "${SSH_BASTION_NAMESPACE}" rollout status deployment/ssh-bastion --ti
   exit 1
 fi
 oc -n "${SSH_BASTION_NAMESPACE}" get pods,svc -o wide
+bastion_node="$(oc -n "${SSH_BASTION_NAMESPACE}" get pods -l run=ssh-bastion \
+  -o jsonpath='{.items[0].spec.nodeName}' 2>/dev/null || true)"
+echo "ssh-bastion scheduled on node: ${bastion_node:-unknown}"
+if [[ -n "${bastion_node}" ]] && oc get node "${bastion_node}" -o jsonpath='{.metadata.labels}' \
+    | grep -q 'node-role.kubernetes.io/worker'; then
+  if ! oc get node "${bastion_node}" -o jsonpath='{.metadata.labels}' \
+      | grep -qE 'node-role.kubernetes.io/(master|control-plane)'; then
+    echo "ERROR: ssh-bastion landed on worker-only node ${bastion_node}; remediation will kill SSH" >&2
+    dump_bastion_debug
+    exit 1
+  fi
+fi
 
 bastion_pod="$(oc -n "${SSH_BASTION_NAMESPACE}" get pods -l run=ssh-bastion -o jsonpath='{.items[0].metadata.name}')"
 if ! wait_for_sshd "${bastion_pod}"; then

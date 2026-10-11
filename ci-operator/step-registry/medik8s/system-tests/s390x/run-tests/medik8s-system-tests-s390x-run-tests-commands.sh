@@ -71,11 +71,26 @@ setup_ssh_bastion_proxy() {
     port-forward)
       host="127.0.0.1"
       port=12222
-      echo "Starting oc port-forward for ssh-bastion on localhost:${port}"
-      oc -n test-ssh-bastion port-forward svc/ssh-bastion "${port}:22" \
-        >"${ARTIFACT_DIR}/ssh-bastion-port-forward.log" 2>&1 &
-      echo $! > /tmp/ssh-bastion-port-forward.pid
-      for _ in $(seq 1 60); do
+      # Supervisor: restart port-forward if it dies (API blip, bastion
+      # reschedule). Destructive NHC tests need SSH across many remediations.
+      (
+        attempt=0
+        while true; do
+          attempt=$((attempt + 1))
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) starting oc port-forward attempt=${attempt}" \
+            >>"${ARTIFACT_DIR}/ssh-bastion-port-forward.log"
+          oc -n test-ssh-bastion port-forward svc/ssh-bastion "${port}:22" \
+            >>"${ARTIFACT_DIR}/ssh-bastion-port-forward.log" 2>&1 &
+          pf_pid=$!
+          echo "${pf_pid}" > /tmp/ssh-bastion-port-forward.pid
+          wait "${pf_pid}" || true
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) port-forward exited; restarting in 2s" \
+            >>"${ARTIFACT_DIR}/ssh-bastion-port-forward.log"
+          sleep 2
+        done
+      ) &
+      echo $! > /tmp/ssh-bastion-port-forward-supervisor.pid
+      for _ in $(seq 1 90); do
         if (echo >/dev/tcp/127.0.0.1/"${port}") >/dev/null 2>&1; then
           break
         fi
@@ -86,6 +101,7 @@ setup_ssh_bastion_proxy() {
         cat "${ARTIFACT_DIR}/ssh-bastion-port-forward.log" >&2 || true
         return 1
       fi
+      echo "SSH bastion port-forward ready on localhost:${port} (supervised restart enabled)"
       ;;
     *)
       echo "WARNING: unknown medik8s_ssh_bastion_mode=${mode}; skipping SSH proxy" >&2
