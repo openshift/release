@@ -8,8 +8,10 @@ ref:
   documentation: |-
     Verify JUnit reports on the bastion host instead of the CI pod to avoid the
     1 MB Kubernetes secret size limit of SHARED_DIR.
-    Runs fail_if_any_test_failed.py on the bastion against the directory in
-    SHARED_DIR/bastion_junit_report_dir when present, otherwise JUNIT_REPORT_DIR.
+    Runs fail_if_any_test_failed.py on the bastion against the directory selected
+    by JUNIT_REPORT_DIR_FILE, otherwise SHARED_DIR/bastion_junit_report_dir when
+    present, otherwise JUNIT_REPORT_DIR. Optionally use prefixed shared inventory.
+    Required execution results also fail the job, even when XML reports pass.
   grace_period: 10s
   timeout: 30m0s
   resources:
@@ -23,6 +25,25 @@ ref:
   - name: JUNIT_REPORT_DIR
     default: "/tmp/test_reports/junit"
     documentation: Directory on the bastion containing JUnit XML reports to verify
+  - name: JUNIT_INVENTORY_PREFIX
+    default: ""
+    documentation: |-
+      Optional shared inventory prefix, for example target-. Reads <prefix>bastion
+      and <prefix>all from SHARED_DIR. Empty uses the mounted CLUSTER_NAME inventory
+      with SHARED_DIR/bastion as a fallback for the host address.
+  - name: JUNIT_REPORT_DIR_FILE
+    default: ""
+    documentation: |-
+      Optional filename under SHARED_DIR containing the current run's absolute
+      report directory on the bastion. Takes precedence over bastion_junit_report_dir
+      and JUNIT_REPORT_DIR; missing or invalid files fail verification instead of
+      falling back to another run.
+  - name: JUNIT_REQUIRED_RESULT_FILES
+    default: ""
+    documentation: |-
+      Optional space-separated filenames under SHARED_DIR containing step exit
+      codes. Missing, invalid, or nonzero results fail the final job. XML reports
+      are still verified when the bastion and report directory are available.
   - name: KNOWN_FAILURES
     default: "[]"
     documentation: |-
