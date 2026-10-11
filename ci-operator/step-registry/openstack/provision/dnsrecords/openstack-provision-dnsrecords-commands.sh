@@ -43,9 +43,9 @@ EOF
 if [ -f "${SHARED_DIR}/API_IP" ]; then
   API_IP=$(<"${SHARED_DIR}"/API_IP)
 
-  # Values published for api / api-int. For externallb, prefer LB endpoint FIPs
-  # (LB_HOSTS, else LB_HOST) so DNS can round-robin across UserManaged LBs.
-  # Otherwise keep the existing single API_IP behavior.
+  # api: for externallb, publish UserManaged LB FIPs (LB_HOSTS) for external RR.
+  # api-int: keep the machines-net API VIP so cluster nodes/MCS stay on-L2
+  # (public FIPs from the BYON subnet break bootstrap).
   API_RECORD_VALUES=()
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
     if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
@@ -76,11 +76,16 @@ if [ -f "${SHARED_DIR}/API_IP" ]; then
     "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api.json"
   cp "${TMP_DIR}/dns_api.json" "${SHARED_DIR}/dns_up.json"
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
-    echo "Creating API-INT DNS ${API_RECORD_TYPE} record for ${CLUSTER_NAME}.${BASE_DOMAIN} -> ${API_RECORD_VALUES[*]}"
+    if [[ "${API_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      API_INT_RECORD_TYPE="A"
+    else
+      API_INT_RECORD_TYPE="AAAA"
+    fi
+    echo "Creating API-INT DNS ${API_INT_RECORD_TYPE} record for ${CLUSTER_NAME}.${BASE_DOMAIN} -> ${API_IP}"
     jq --arg name "api-int.${CLUSTER_NAME}.${BASE_DOMAIN}." \
-      --arg type "${API_RECORD_TYPE}" \
-      --argjson rr "${API_RESOURCE_RECORDS}" \
-      '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": $rr}}]' \
+      --arg type "${API_INT_RECORD_TYPE}" \
+      --arg ip "${API_IP}" \
+      '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": [{"Value": $ip}]}}]' \
       "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api_int.json"
     cp "${TMP_DIR}/dns_api_int.json" "${SHARED_DIR}/dns_up.json"
   fi

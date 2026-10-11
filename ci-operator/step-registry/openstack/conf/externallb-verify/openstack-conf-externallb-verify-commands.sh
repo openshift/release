@@ -28,31 +28,41 @@ if [[ "${load_balancer_type}" != "UserManaged" ]]; then
 fi
 echo "loadBalancer.type is UserManaged"
 
-# When multiple LB endpoints were provisioned, api/api-int DNS must list them all.
-if [[ -f "${SHARED_DIR}/LB_HOSTS" && -f "${SHARED_DIR}/dns_up.json" ]]; then
-    expected=0
-    while IFS= read -r ip || [[ -n "${ip}" ]]; do
-        [[ -z "${ip}" ]] && continue
-        expected=$((expected + 1))
-    done < "${SHARED_DIR}/LB_HOSTS"
+# api → multi LB FIPs; api-int → machines-net API VIP (see dnsrecords step).
+if [[ -f "${SHARED_DIR}/dns_up.json" ]]; then
+    if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
+        expected=0
+        while IFS= read -r ip || [[ -n "${ip}" ]]; do
+            [[ -z "${ip}" ]] && continue
+            expected=$((expected + 1))
+        done < "${SHARED_DIR}/LB_HOSTS"
 
-    if [[ "${expected}" -lt 1 ]]; then
-        echo "ERROR: LB_HOSTS is empty"
-        exit 1
-    fi
-
-    for name_prefix in api api-int; do
-        count="$(jq --arg p "${name_prefix}." \
-            '[.Changes[].ResourceRecordSet | select(.Name | startswith($p)) | .ResourceRecords | length] | first // 0' \
-            "${SHARED_DIR}/dns_up.json")"
-        values="$(jq -r --arg p "${name_prefix}." \
-            '.Changes[].ResourceRecordSet | select(.Name | startswith($p)) | .ResourceRecords[].Value' \
-            "${SHARED_DIR}/dns_up.json" | tr '\n' ' ')"
-        echo "${name_prefix} DNS has ${count} address(es): ${values}"
-        if [[ "${count}" -lt "${expected}" ]]; then
-            echo "ERROR: expected at least ${expected} addresses for ${name_prefix}, got ${count}"
+        if [[ "${expected}" -lt 1 ]]; then
+            echo "ERROR: LB_HOSTS is empty"
             exit 1
         fi
-    done
-    echo "api/api-int DNS records include ${expected} LB endpoint(s)"
+
+        api_count="$(jq '[.Changes[].ResourceRecordSet | select(.Name | startswith("api.")) | .ResourceRecords | length] | first // 0' \
+            "${SHARED_DIR}/dns_up.json")"
+        api_values="$(jq -r '.Changes[].ResourceRecordSet | select(.Name | startswith("api.")) | .ResourceRecords[].Value' \
+            "${SHARED_DIR}/dns_up.json" | tr '\n' ' ')"
+        echo "api DNS has ${api_count} address(es): ${api_values}"
+        if [[ "${api_count}" -lt "${expected}" ]]; then
+            echo "ERROR: expected at least ${expected} addresses for api, got ${api_count}"
+            exit 1
+        fi
+        echo "api DNS records include ${expected} LB endpoint(s)"
+    fi
+
+    if [[ -f "${SHARED_DIR}/API_IP" ]]; then
+        api_ip="$(<"${SHARED_DIR}/API_IP")"
+        api_int_values="$(jq -r '.Changes[].ResourceRecordSet | select(.Name | startswith("api-int.")) | .ResourceRecords[].Value' \
+            "${SHARED_DIR}/dns_up.json")"
+        echo "api-int DNS address(es): ${api_int_values}"
+        if ! grep -Fxq "${api_ip}" <<<"${api_int_values}"; then
+            echo "ERROR: expected api-int to include API VIP ${api_ip}"
+            exit 1
+        fi
+        echo "api-int DNS includes API VIP ${api_ip}"
+    fi
 fi

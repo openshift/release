@@ -55,7 +55,8 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 API_IP=$(<"${SHARED_DIR}/API_IP")
 INGRESS_IP=$(<"${SHARED_DIR}/INGRESS_IP")
 
-# Prefer LB endpoint FIPs when present (externallb multi-LB); else API_IP.
+# api: LB FIPs when present (externallb multi-LB); else API_IP.
+# api-int (externallb): machines-net API VIP - must stay reachable from nodes.
 API_IPS=()
 if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     while IFS= read -r ip || [[ -n "${ip}" ]]; do
@@ -69,12 +70,12 @@ if [[ "${#API_IPS[@]}" -eq 0 ]]; then
     API_IPS+=("${API_IP}")
 fi
 
-echo "CONFIG_TYPE=${CONFIG_TYPE:-} API_IPS=${API_IPS[*]}"
+echo "CONFIG_TYPE=${CONFIG_TYPE:-} api=${API_IPS[*]} api-int=${API_IP}"
 
 verify_name "$CLUSTER_NAME" "api" "${API_IPS[@]}"
 verify_name "$CLUSTER_NAME" "ingress.apps" "$INGRESS_IP"
 if [[ "${CONFIG_TYPE:-}" == *"externallb"* || -f "${SHARED_DIR}/LB_HOSTS" ]]; then
-    verify_name "$CLUSTER_NAME" "api-int" "${API_IPS[@]}"
+    verify_name "$CLUSTER_NAME" "api-int" "${API_IP}"
 fi
 
 if [[ -s "${SHARED_DIR}/HIVE_FIP_API" && -s "${SHARED_DIR}/HIVE_FIP_INGRESS" && -s "${SHARED_DIR}/HIVE_CLUSTER_NAME" ]]; then
