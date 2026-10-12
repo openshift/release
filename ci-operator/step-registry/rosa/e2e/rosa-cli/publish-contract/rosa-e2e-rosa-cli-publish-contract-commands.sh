@@ -70,8 +70,6 @@ if [[ -s "${SHARED_DIR}/kubeconfig" ]]; then
   # Lock down the token-bearing file to match the OCM head (rosa-conf-idp-htpasswd does not chmod it).
   chmod 0600 "${SHARED_DIR}/kubeconfig"
   log "Using customer-plane kubeconfig from rosa-conf-idp-htpasswd"
-else
-  log "No customer-plane kubeconfig from rosa-conf-idp-htpasswd; backplane-login will provide bp-kubeconfig"
 fi
 
 # ---- Contract artifact: ${SHARED_DIR}/cluster-metadata.json (ROSAENG-67580) ----
