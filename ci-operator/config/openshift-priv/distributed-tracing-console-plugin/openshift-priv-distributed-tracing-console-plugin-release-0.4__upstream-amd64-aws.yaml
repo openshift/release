@@ -1,0 +1,54 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp-priv
+    tag: rhel-9-golang-1.23-openshift-4.19
+canonical_go_repository: github.com/openshift/distributed-tracing-console-plugin
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: distributed-tracing-console-plugin
+  - dockerfile_path: Dockerfile.test
+    to: distributed-tracing-console-plugin-test
+  - context_dir: .
+    dockerfile_path: tests/Dockerfile
+    to: obs-tests-runner
+prowgen:
+  private: true
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+tests:
+- as: lint
+  commands: make lint-frontend
+  container:
+    from: distributed-tracing-console-plugin-test
+- as: fips-image-scan
+  steps:
+    dependencies:
+      SCAN_IMAGE: distributed-tracing-console-plugin
+    test:
+    - ref: fips-check-image-scan
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  steps:
+    test:
+    - ref: distributed-tracing-tests-tracing-ui-upstream
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-0.4
+  org: openshift-priv
+  repo: distributed-tracing-console-plugin
+  variant: upstream-amd64-aws

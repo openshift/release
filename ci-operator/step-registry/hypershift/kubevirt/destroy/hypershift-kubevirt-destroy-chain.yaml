@@ -1,0 +1,37 @@
+chain:
+  as: hypershift-kubevirt-destroy
+  steps:
+  - as: destroy
+    cli: latest
+    commands: |-
+      set -exuo pipefail
+
+      HCP_CLI="/usr/bin/hcp"
+      if [[ ! -f $HCP_CLI ]]; then
+          # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
+          HCP_CLI="/usr/bin/hypershift"
+      fi
+      echo "Using $HCP_CLI for cli"
+
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+
+      # If the cluster was never created (e.g. RUN_EXTERNAL_INFRA_TEST=false),
+      # skip destruction instead of failing on a non-existent resource.
+      if ! oc get hostedcluster -A --field-selector metadata.name="${CLUSTER_NAME}" -o name 2>/dev/null | grep -q .; then
+        echo "$(date) No HostedCluster named ${CLUSTER_NAME} found, skipping destroy"
+        exit 0
+      fi
+
+      echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+      $HCP_CLI destroy cluster kubevirt \
+        --name ${CLUSTER_NAME} \
+        --cluster-grace-period 15m
+
+      echo "$(date) Finished deleting cluster"
+    from: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 15m0s

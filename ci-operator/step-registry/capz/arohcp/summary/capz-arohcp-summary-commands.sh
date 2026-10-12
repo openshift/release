@@ -1,0 +1,1 @@
+../../test/summary/capz-test-summary-commands.sh

@@ -1,0 +1,27 @@
+workflow:
+  as: baremetalds-e2e-bgp-vip
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=2
+        ENABLE_BGP_TOR=true
+        BGP_VIP_MANAGEMENT=true
+      FEATURE_SET: DevPreviewNoUpgrade
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - chain: baremetalds-ofcir-pre
+    test:
+      - ref: baremetalds-e2e-bgp-vip-verify
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    This workflow installs a baremetal IPI cluster via dev-scripts with BGP-based
+    VIP management (enhancement 1982, DevPreviewNoUpgrade): the API and ingress
+    VIPs are advertised over BGP to a top-of-rack FRR speaker on the hypervisor
+    instead of being managed by keepalived. Instead of the conformance suite, the
+    test step asserts the feature's acceptance criteria: vipManagement=BGP on the
+    Infrastructure CR, frr-k8s static pods (and no keepalived) on the control
+    plane, the API VIP advertised from every master and the ingress VIP from the
+    workers on the ToR, and the console answering over the BGP-routed path.

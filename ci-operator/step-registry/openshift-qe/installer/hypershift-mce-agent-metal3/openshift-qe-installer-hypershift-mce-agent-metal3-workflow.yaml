@@ -1,0 +1,37 @@
+workflow:
+  as: openshift-qe-installer-hypershift-mce-agent-metal3
+  documentation: |-
+    The HyperShift mce agent conformance (connected) workflow executes tests against a new ephemeral
+    The installation method for nodepool is metal3.
+    The current workflow supports both IPv4 and dual-stack
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - chain: hypershift-mce-agent-destroy
+    - chain: baremetalds-ipi-post
+    test:
+    - ref: hypershift-mce-agent-info
+    - chain: hypershift-conformance
+    pre:
+    - chain: baremetalds-ipi-pre
+    - ref: enable-qe-catalogsource
+    - chain: hypershift-mce-agent-lvm
+    - ref: hypershift-mce-install
+    - chain: hypershift-mce-agent-metal3-create
+    env:
+      TEST_SKIPS: >-
+        etcd leader changes are not excessive\|
+        check registry.redhat.io is available and samples operator can import sample imagestreams
+      AGENT_NAMESPACE: hypershift-agents
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      IP_STACK: v4
+      PACKET_OS: rocky_9
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3  

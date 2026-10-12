@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alert-proxy
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: alert-proxy-state
+  namespace: ci
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  resourceNames:
+  - alert-proxy-state
+  verbs:
+  - get
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: alert-proxy-state
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: alert-proxy-state
+subjects:
+- kind: ServiceAccount
+  name: alert-proxy
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alert-proxy-group-reader
+rules:
+- apiGroups:
+  - user.openshift.io
+  resourceNames:
+  - test-platform-ci-admins
+  resources:
+  - groups
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alert-proxy-group-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alert-proxy-group-reader
+subjects:
+- kind: ServiceAccount
+  name: alert-proxy
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: alert-proxy-alertmanager-edit
+  namespace: openshift-user-workload-monitoring
+# The proxy runs with `--enable-silences=true` from stage 5 of ROLLOUT.md. `get` and `list` back
+# silence inventory and read-back, and `delete` backs silence expiry and the drain and rollback
+# path; that flag never gates any of them, so they are granted from stage 2 onward. `create` is the
+# one verb stage 5 adds: the Alertmanager v2 API expresses creating, extending, replacing, and
+# broadening suppression alike as a POST to /api/v2/silences carrying an optional existing id, and
+# the proxy issues no PUT or PATCH, so `update` is never exercised and must not be granted.
+rules:
+- apiGroups:
+  - monitoring.coreos.com
+  resourceNames:
+  - user-workload
+  resources:
+  - alertmanagers/api
+  verbs:
+  - get
+  - list
+  - create
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: alert-proxy-alertmanager-edit
+  namespace: openshift-user-workload-monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: alert-proxy-alertmanager-edit
+subjects:
+- kind: ServiceAccount
+  name: alert-proxy
+  namespace: ci

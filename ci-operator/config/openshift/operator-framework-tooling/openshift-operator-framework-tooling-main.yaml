@@ -1,0 +1,55 @@
+binary_build_commands: GO111MODULE=on GOPROXY=https://proxy.golang.org make build
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: v0.Dockerfile
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/operator-framework-tooling/v0
+    to: olm-v0-bumper
+  - dockerfile_path: v1.Dockerfile
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/operator-framework-tooling/v1
+    to: olm-v1-bumper
+promotion:
+  to:
+  - namespace: operator-lifecycle-manager
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  steps:
+    test:
+    - as: test
+      commands: GO111MODULE=on GOPROXY=https://proxy.golang.org make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: lint
+  steps:
+    test:
+    - as: lint
+      commands: GO111MODULE=on GOPROXY=https://proxy.golang.org make lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: operator-framework-tooling

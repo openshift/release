@@ -1,0 +1,48 @@
+ref:
+  as: interop-opp-product-upgrade-acs
+  commands: interop-opp-product-upgrade-acs-commands.sh
+  documentation: |-
+    Upgrades the ACS (Advanced Cluster Security) operator via OLM subscription
+    channel change and validates the upgrade completes successfully.
+
+    The step performs:
+    1. Identifies the currently installed ACS version via CSV
+    2. Patches the Subscription to the target channel (or next available)
+    3. Waits for the new CSV to reach Succeeded phase
+    4. Validates Central and SecuredCluster CRs reach ready state
+    5. Confirms key deployments (central, scanner, scanner-db) are healthy
+
+    This step is part of the OPP coordinated product upgrade workflow.
+
+    Exit codes:
+      0 - upgrade successful, all health checks passed
+      1 - upgrade failed (CSV did not reach Succeeded)
+      2 - timeout waiting for upgrade
+      3 - precondition failure (no subscription found, no upgrade path)
+  env:
+    - default: "rhacs-operator"
+      documentation: |-
+        Name of the ACS Subscription resource in the target namespace.
+      name: ACS_SUBSCRIPTION_NAME
+    - default: "rhacs-operator"
+      documentation: |-
+        Namespace containing the ACS Subscription and CSV resources.
+      name: ACS_SUBSCRIPTION_NAMESPACE
+    - default: ""
+      documentation: |-
+        Target subscription channel for ACS operator upgrade (e.g. stable-4.7).
+        When empty, the step determines the next available channel automatically
+        by querying the catalog for channels newer than the currently installed version.
+      name: ACS_TARGET_CHANNEL
+    - default: "30m"
+      documentation: |-
+        Maximum time to wait for the ACS operator upgrade to complete.
+        Covers CSV transition from Replacing to Succeeded phase.
+      name: ACS_UPGRADE_TIMEOUT
+  from: cli
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 45m

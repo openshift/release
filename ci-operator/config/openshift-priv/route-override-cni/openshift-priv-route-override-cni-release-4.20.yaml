@@ -1,0 +1,51 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/route-override-cni
+images:
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: multus-route-override-cni
+promotion:
+  to:
+  - name: "4.20"
+    namespace: ocp-priv
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: "4.20"
+      namespace: ocp-priv
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp-priv
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: route-override-cni
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.20
+  org: openshift-priv
+  repo: route-override-cni

@@ -1,0 +1,38 @@
+ref:
+  as: openshift-e2e-cert-rotation-build-and-ship-prep
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  timeout: 30m0s
+  commands: openshift-e2e-cert-rotation-build-and-ship-prep-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: NODE_CLIENT_CERT_RECOVERY_TOGGLE
+    default: "on"
+    documentation: |-
+      "on" enables the kubelet client CSR recovery approver (ConfigMap openshift-config/node-client-cert-recovery)
+      and expects every node to recover unattended. "off" leaves it disabled and expects the gap to reproduce.
+  - name: SKEW
+    default: "2d"
+    documentation: |-
+      How far each node's clock jumps forward at the next boot (s, m, h or d suffix). Must pass the
+      install-time kubelet signer expiry by at least 1h.
+  - name: MIN_WINDOW_REMAINING
+    default: "6h"
+    documentation: |-
+      Refuse to continue if less than this is left before the install-time signer expires.
+  - name: APPROVER_EVENT_TIMEOUT
+    default: "3m"
+    documentation: How long to wait for the approver's NodeCertRecoveryEnabled Event after enabling it.
+  - name: APPROVER_IDLE_CHECK
+    default: "2m"
+    documentation: How long to check that the approver approves nothing on the healthy cluster.
+  documentation: |-
+    Prepares a freshly installed cluster for the build-and-ship test (OCPSTRAT-1346): the cluster must
+    still be on its 24h install-time kubelet signer. Optionally enables the kubelet client CSR recovery
+    approver, then installs a one-shot systemd unit on every node that jumps the clock forward by SKEW at
+    the next boot, before crio and the kubelet start, and masks chronyd so nothing pulls it back.
+    The next step powers the nodes off and on; the node clocks then read past the kubelet cert expiry.

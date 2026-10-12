@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Generate a mirror file that imports from another cluster
+
+set -euo pipefail
+
+v="${VERSION:-4.0}"
+to="${TO:-registry.ci.openshift.org/ocp/${v}}"
+from="${FROM:-registry.reg-aws.openshift.com/openshift/ose-}"
+
+out="$( oc get is -n openshift origin-v${v} --template '{{ range .spec.tags }}{{ .name }}{{ "\n" }}{{ end }}' )"
+for i in $out; do
+  a="${from}${i}:v${v} ${to}:${i}"
+  echo $a
+done

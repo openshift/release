@@ -1,0 +1,36 @@
+workflow:
+  as: rosa-e2e-hcp-fips
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      REPLICAS: "2"
+      FIPS: "true"
+      ETCD_ENCRYPTION: "true"
+    pre:
+      - ref: aws-provision-vpc-shared
+      - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+      - chain: rosa-sts-oidc-config-create
+      - ref: rosa-sts-kms-key-create
+      - chain: rosa-cluster-provision
+      - ref: aws-provision-tags-for-byo-vpc
+      - ref: rosa-cluster-wait-ready-hosted-cp
+      - ref: rosa-cluster-wait-ready-nodes
+    test:
+      - ref: rosa-e2e-test
+    post:
+      - chain: rosa-cluster-deprovision
+        best_effort: true
+      - ref: rosa-sts-kms-key-delete
+        best_effort: true
+      - chain: rosa-sts-oidc-config-delete
+        best_effort: true
+      - ref: rosa-e2e-cleanup-vpc
+        best_effort: true
+      - ref: aws-deprovision-stacks
+        best_effort: true
+  documentation: |-
+    This workflow provisions a FIPS-enabled ROSA HCP cluster with etcd
+    encryption (required by the ROSA CLI for FIPS HCP clusters) and runs
+    the rosa-e2e managed service validation suite, then tears down the
+    cluster and deletes the KMS key.

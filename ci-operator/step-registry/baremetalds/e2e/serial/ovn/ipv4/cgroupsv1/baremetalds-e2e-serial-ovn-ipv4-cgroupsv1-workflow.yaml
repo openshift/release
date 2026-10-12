@@ -1,0 +1,20 @@
+workflow:
+  as: baremetalds-e2e-serial-ovn-ipv4-cgroupsv1
+  steps:
+    pre:
+      - ref: openshift-manifests-cgroupsv1
+      - chain: baremetalds-ofcir-pre
+    test:
+      - ref: baremetalds-e2e-test
+    post:
+      - chain: baremetalds-ofcir-post
+    env:
+      TEST_SUITE: "openshift/conformance/serial"
+      TEST_SKIPS: ""
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_EXTRA_WORKERS=1
+        APPLY_EXTRA_WORKERS=true
+  documentation: |-
+    This workflow executes the ipv4 end-to-end serial test suite on a cluster provisioned by running dev-scripts on a packet server using cgroups v1.

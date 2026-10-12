@@ -1,0 +1,24 @@
+chain:
+  as: cucushift-installer-rehearse-gcp-ipi-byo-fw-provision
+  steps: 
+    - ref: gcp-provision-minimal-permission
+    - ref: gcp-provision-vpc
+    - ref: gcp-provision-firewalls
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-firewall-rules-management
+    - chain: ipi-install
+    - ref: enable-qe-catalogsource
+    - chain: cucushift-installer-check
+  env:
+  - name: MINIMAL_PERMISSIONS_WITHOUT_FIREWALL_PROVISION
+    default: "yes"
+  - name: FILEWALL_RULES_MANAGEMENT
+    default: "Unmanaged"
+  - name: NETWORK_TAGS_FOR_COMPUTE_NODES
+    default: "preserved-ipi-compute"
+    documentation: Additional network tags applied to compute nodes, comma separated strings, e.g. "ocp-tag01,ocp-tag02".
+  - name: NETWORK_TAGS_FOR_CONTROL_PLANE_NODES
+    default: "preserved-ipi-control-plane"
+    documentation: Additional network tags applied to control-plane nodes, comma separated strings, e.g. "ocp-tag01,ocp-tag02".
+  documentation: |-
+    Create an IPI cluster on GCP for QE e2e tests.

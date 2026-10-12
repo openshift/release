@@ -1,0 +1,748 @@
+#!/bin/bash
+set -euo pipefail
+shopt -s inherit_errexit
+
+# --- Typed exit globals (INTEROP-9527) ---
+_JUNIT_KIND=""
+_JUNIT_MESSAGE=""
+_EXIT_CLASS=""    # "product" or "infra"
+
+# === Known-Issue Skip Framework ===
+# This script uses _detect_known_issue() to emit JUnit SKIPPED results
+# for tracked bugs instead of failing the job. Unknown failures still FAIL.
+# Tracked issues: ACM-45920
+# See PR review Fix 3 for rationale.
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  # Save xtrace log with credentials scrubbed when the step exits non-zero.
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+
+# --- Atomic JUnit Writer (INTEROP-9527) ---
+_junit_emit_safe() {
+  local kind="$1" message="$2" rc="${3:-0}"
+  local tmpf
+  tmpf="${ARTIFACT_DIR}/.junit_acm_upgrade.tmp.$$"
+  {
+    cat <<XMLEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="interop-opp-product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+  <testcase name="${kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
+  </testcase>
+</testsuite>
+XMLEOF
+  } > "${tmpf}"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_acm_upgrade.xml"
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_acm_upgrade.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
+echo ">>> PHASE: initialization"
+
+ACM_TARGET_CHANNEL="${ACM_TARGET_CHANNEL:-}"
+ACM_UPGRADE_TIMEOUT="${ACM_UPGRADE_TIMEOUT:-30m}"
+ACM_SUBSCRIPTION_NAME="${ACM_SUBSCRIPTION_NAME:-advanced-cluster-management}"
+ACM_SUBSCRIPTION_NAMESPACE="${ACM_SUBSCRIPTION_NAMESPACE:-open-cluster-management}"
+# Use the fully-qualified OLM resource type to avoid ambiguity with ACM's own
+# subscriptions.apps.open-cluster-management.io CRD that is registered on the
+# hub once ACM is installed. Override via ACM_SUBSCRIPTION_RESOURCE if needed.
+ACM_SUBSCRIPTION_RESOURCE="${ACM_SUBSCRIPTION_RESOURCE:-subscriptions.operators.coreos.com}"
+
+ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
+mkdir -p "${ARTIFACT_DIR}"
+
+function CollectDiagnostics () {
+    # Dump ACM subscription, CSV, MCE, and pod state to artifacts for debugging.
+    typeset artifactFile="${ARTIFACT_DIR}/acm-upgrade-diagnostics.txt"
+    {
+        printf '=== ACM Operator Upgrade Diagnostics ===\n\n'
+        printf '=== Subscription ===\n'
+        # Allow-list operational fields; omit annotations, labels, and spec.config.
+        oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            -o jsonpath='Name: {.metadata.name}{"\n"}Namespace: {.metadata.namespace}{"\n"}Generation: {.metadata.generation}{"\n"}Package: {.spec.name}{"\n"}Channel: {.spec.channel}{"\n"}Source: {.spec.source}{"\n"}Source namespace: {.spec.sourceNamespace}{"\n"}InstallPlan approval: {.spec.installPlanApproval}{"\n"}Current CSV: {.status.currentCSV}{"\n"}Installed CSV: {.status.installedCSV}{"\n"}InstallPlan: {.status.installPlanRef.name}{"\n"}State: {.status.state}{"\n"}Conditions:{"\n"}{range .status.conditions[*]}- type={.type} status={.status} reason={.reason}{"\n"}{end}' \
+            2>&1 || true
+        printf '\n=== CSVs in %s ===\n' "${ACM_SUBSCRIPTION_NAMESPACE}"
+        oc get csv -n "${ACM_SUBSCRIPTION_NAMESPACE}" 2>&1 || true
+        printf '\n=== InstallPlan ===\n'
+        oc get installplan -n "${ACM_SUBSCRIPTION_NAMESPACE}" 2>&1 || true
+        printf '\n=== MCE CSVs ===\n'
+        oc get csv -n multicluster-engine 2>&1 || true
+        printf '\n=== Pods not Ready ===\n'
+        oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" --field-selector=status.phase!=Running,status.phase!=Succeeded 2>&1 || true
+        oc get pods -n multicluster-engine --field-selector=status.phase!=Running,status.phase!=Succeeded 2>&1 || true
+    } > "${artifactFile}"
+    true
+}
+
+function GetCurrentCsv () {
+    # Return the currentCSV name from the operator subscription status.
+    oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.status.currentCSV}' || true
+}
+
+function GetCsvPhase () {
+    # Return the status phase of the given CSV in the operator namespace.
+    typeset csvName="$1"
+    oc get csv "${csvName}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.status.phase}' || true
+}
+
+function GetInstalledVersion () {
+    # Return the installed operator version from the current CSV spec.
+    typeset csvName
+    csvName="$(GetCurrentCsv)"
+    if [[ -z "${csvName}" ]]; then
+        return 1
+    fi
+    oc get csv "${csvName}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.version}' || true
+}
+
+function GetCurrentChannel () {
+    # Return the current subscription channel for the operator.
+    oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.channel}' || true
+}
+
+function ResolveTargetChannel () {
+    # Determine the next higher channel to upgrade to from the packagemanifest.
+    if [[ -n "${ACM_TARGET_CHANNEL}" ]]; then
+        echo "${ACM_TARGET_CHANNEL}"
+        return 0
+    fi
+
+    typeset currentChannel
+    if ! currentChannel="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.channel}')"; then
+        echo >&2 "ERROR: Failed to query current subscription channel"
+        return 1
+    fi
+    if [[ -z "${currentChannel}" ]]; then
+        echo >&2 "ERROR: Cannot determine current subscription channel"
+        return 1
+    fi
+
+    typeset catalogNamespace
+    if ! catalogNamespace="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.sourceNamespace}')"; then
+        echo >&2 "ERROR: Failed to query subscription source namespace"
+        return 1
+    fi
+    if [[ -z "${catalogNamespace}" ]]; then
+        echo >&2 "ERROR: Subscription source namespace is empty"
+        return 1
+    fi
+
+    typeset catalogSource
+    if ! catalogSource="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.source}')"; then
+        echo >&2 "ERROR: Failed to query subscription catalog source"
+        return 1
+    fi
+    if [[ -z "${catalogSource}" ]]; then
+        echo >&2 "ERROR: Subscription catalog source is empty"
+        return 1
+    fi
+
+    typeset packageName
+    if ! packageName="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.name}')"; then
+        echo >&2 "ERROR: Failed to query subscription package name"
+        return 1
+    fi
+    if [[ -z "${packageName}" ]]; then
+        echo >&2 "ERROR: Subscription package name is empty"
+        return 1
+    fi
+
+    typeset channels
+    if ! channels="$(oc get packagemanifest "${packageName}" \
+        -n "${catalogNamespace}" \
+        -o jsonpath='{.status.channels[*].name}')"; then
+        echo >&2 "ERROR: Failed to query packagemanifest for ${packageName}"
+        return 1
+    fi
+
+    if [[ -z "${channels}" ]]; then
+        echo >&2 "ERROR: No channels found in packagemanifest for ${packageName}"
+        return 1
+    fi
+
+    typeset manifestSource manifestSourceNamespace
+    if ! manifestSource="$(oc get packagemanifest "${packageName}" \
+        -n "${catalogNamespace}" \
+        -o jsonpath='{.status.catalogSource}')" || [[ -z "${manifestSource}" ]]; then
+        echo >&2 "ERROR: Packagemanifest for ${packageName} has no valid catalog source"
+        return 1
+    fi
+    if ! manifestSourceNamespace="$(oc get packagemanifest "${packageName}" \
+        -n "${catalogNamespace}" \
+        -o jsonpath='{.status.catalogSourceNamespace}')" || [[ -z "${manifestSourceNamespace}" ]]; then
+        echo >&2 "ERROR: Packagemanifest for ${packageName} has no valid catalog source namespace"
+        return 1
+    fi
+    if [[ "${manifestSource}" != "${catalogSource}" ||
+          "${manifestSourceNamespace}" != "${catalogNamespace}" ]]; then
+        echo >&2 "ERROR: Packagemanifest catalog source does not match the subscription"
+        return 1
+    fi
+
+    typeset currentVersion nextChannel=""
+    currentVersion="$(echo "${currentChannel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
+    if [[ -z "${currentVersion}" ]]; then
+        echo >&2 "ERROR: Current channel ${currentChannel} does not contain a valid version"
+        return 1
+    fi
+
+    typeset -a channelList
+    read -ra channelList <<< "${channels}"
+    typeset -i validChannelCount=0
+    typeset currentChannelFound=false
+    for ch in "${channelList[@]}"; do
+        typeset chVersion
+        chVersion="$(echo "${ch}" | grep -oE '[0-9]+\.[0-9]+' || true)"
+        if [[ -z "${chVersion}" ]]; then
+            continue
+        fi
+        (( validChannelCount += 1 ))
+        if [[ "${ch}" == "${currentChannel}" ]]; then
+            currentChannelFound=true
+        fi
+        typeset currentMajor currentMinor chMajor chMinor
+        currentMajor="${currentVersion%%.*}"
+        currentMinor="${currentVersion##*.}"
+        chMajor="${chVersion%%.*}"
+        chMinor="${chVersion##*.}"
+
+        if (( chMajor > currentMajor )) || \
+           (( chMajor == currentMajor && chMinor > currentMinor )); then
+            if [[ -z "${nextChannel}" ]]; then
+                nextChannel="${ch}"
+            else
+                typeset nextVersion nextMajor nextMinor
+                nextVersion="$(echo "${nextChannel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
+                nextMajor="${nextVersion%%.*}"
+                nextMinor="${nextVersion##*.}"
+                if (( chMajor < nextMajor )) || \
+                   (( chMajor == nextMajor && chMinor < nextMinor )); then
+                    nextChannel="${ch}"
+                fi
+            fi
+        fi
+    done
+
+    if (( validChannelCount == 0 )); then
+        echo >&2 "ERROR: Packagemanifest for ${packageName} has no versioned channels"
+        return 1
+    fi
+    if [[ "${currentChannelFound}" != true ]]; then
+        echo >&2 "ERROR: Current channel ${currentChannel} is absent from the packagemanifest"
+        return 1
+    fi
+
+    if [[ -z "${nextChannel}" ]]; then
+        echo >&2 "ERROR: No upgrade channel found newer than ${currentChannel}"
+        return 3
+    fi
+
+    echo "${nextChannel}"
+    true
+}
+
+function WaitForCsvSucceeded () {
+    # Poll until a new CSV (different from previousCsv) reaches Succeeded phase or timeout.
+    typeset previousCsv="$1"
+    typeset timeoutSeconds
+    timeoutSeconds="$(ParseTimeout "${ACM_UPGRADE_TIMEOUT}")"
+    typeset startTime elapsed newCsv phase
+    startTime="$(date +%s)"
+
+    while true; do
+        elapsed="$(( $(date +%s) - startTime ))"
+        if (( elapsed > timeoutSeconds )); then
+            echo >&2 "ERROR: Timeout (${ACM_UPGRADE_TIMEOUT}) waiting for CSV upgrade"
+            return 2
+        fi
+
+        newCsv="$(GetCurrentCsv)"
+        if [[ -z "${newCsv}" || "${newCsv}" == "${previousCsv}" ]]; then
+            sleep 10
+            continue
+        fi
+
+        phase="$(GetCsvPhase "${newCsv}")"
+        echo "  CSV: ${newCsv}  Phase: ${phase}  (${elapsed}s elapsed)"
+
+        case "${phase}" in
+            Succeeded)
+                return 0
+                ;;
+            Failed)
+                echo >&2 "ERROR: CSV ${newCsv} entered Failed phase"
+                return 1
+                ;;
+            *)
+                sleep 15
+                ;;
+        esac
+    done
+}
+
+function ParseTimeout () {
+    # Convert a human-readable timeout string (e.g. 30m, 300s) to seconds.
+    typeset input="$1"
+    typeset minutes=0 seconds=0
+    if [[ "${input}" =~ ^([0-9]+)m$ ]]; then
+        minutes="${BASH_REMATCH[1]}"
+    elif [[ "${input}" =~ ^([0-9]+)s$ ]]; then
+        seconds="${BASH_REMATCH[1]}"
+    elif [[ "${input}" =~ ^([0-9]+)h$ ]]; then
+        minutes="$(( BASH_REMATCH[1] * 60 ))"
+    elif [[ "${input}" =~ ^([0-9]+)$ ]]; then
+        minutes="${input}"
+    else
+        echo >&2 "WARNING: Unrecognized timeout format '${input}'; defaulting to 30m"
+        minutes=30
+    fi
+    echo "$(( minutes * 60 + seconds ))"
+    true
+}
+
+function ValidateMceUpgrade () {
+    # Verify the MCE (MultiCluster Engine) CSV reached Succeeded phase.
+    echo "Validating MCE (MultiCluster Engine) upgrade..."
+    typeset mceCsv
+    mceCsv="$(oc get csv -n multicluster-engine \
+        -o jsonpath='{.items[?(@.spec.displayName=="multicluster engine for Kubernetes")].metadata.name}' \
+        || true)"
+
+    if [[ -z "${mceCsv}" ]]; then
+        mceCsv="$(oc get csv -n multicluster-engine \
+            -l operators.coreos.com/multicluster-engine.multicluster-engine= \
+            -o jsonpath='{.items[0].metadata.name}' || true)"
+    fi
+
+    if [[ -z "${mceCsv}" ]]; then
+        echo "WARNING: MCE CSV not found; skipping MCE validation"
+        return 0
+    fi
+
+    typeset mcePhase
+    mcePhase="$(oc get csv "${mceCsv}" -n multicluster-engine \
+        -o jsonpath='{.status.phase}' || true)"
+
+    echo "  MCE CSV: ${mceCsv}  Phase: ${mcePhase}"
+    if [[ "${mcePhase}" != "Succeeded" ]]; then
+        echo "WARNING: MCE CSV phase is ${mcePhase}, not Succeeded"
+        typeset timeoutEnd
+        timeoutEnd="$(( $(date +%s) + 300 ))"
+        while (( $(date +%s) < timeoutEnd )); do
+            mcePhase="$(oc get csv "${mceCsv}" -n multicluster-engine \
+                -o jsonpath='{.status.phase}' || true)"
+            if [[ "${mcePhase}" == "Succeeded" ]]; then
+                echo "  MCE CSV reached Succeeded phase"
+                return 0
+            fi
+            sleep 15
+        done
+        echo >&2 "ERROR: MCE CSV did not reach Succeeded within 5 minutes"
+        return 1
+    fi
+    return 0
+}
+
+function ValidateHubHealth () {
+    # Check MultiClusterHub phase, policy propagator readiness, and managed cluster availability.
+    echo "Validating ACM hub health post-upgrade..."
+
+    typeset mchStatus
+    mchStatus="$(oc get multiclusterhub -A \
+        -o jsonpath='{.items[0].status.phase}' || true)"
+    echo "  MultiClusterHub phase: ${mchStatus}"
+
+    if [[ "${mchStatus}" != "Running" ]]; then
+        echo "  Waiting for MCH to reach Running phase (timeout: 5m)..."
+        typeset timeoutEnd
+        timeoutEnd="$(( $(date +%s) + 300 ))"
+        while (( $(date +%s) < timeoutEnd )); do
+            mchStatus="$(oc get multiclusterhub -A \
+                -o jsonpath='{.items[0].status.phase}' || true)"
+            if [[ "${mchStatus}" == "Running" ]]; then
+                break
+            fi
+            sleep 15
+        done
+        if [[ "${mchStatus}" != "Running" ]]; then
+            echo >&2 "ERROR: MultiClusterHub did not reach Running phase"
+            return 1
+        fi
+    fi
+
+    echo "  Checking policy propagator..."
+    typeset propagatorReady=""
+    typeset -i propTimeout=300
+    typeset -i propStart
+    propStart="$(date +%s)"
+    while (( $(date +%s) - propStart < propTimeout )); do
+        propagatorReady="$(oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            -l name=governance-policy-propagator \
+            -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' \
+            || true)"
+        if [[ "${propagatorReady}" == "True" ]]; then
+            break
+        fi
+        sleep 15
+    done
+    echo "  Policy propagator ready: ${propagatorReady}"
+    if [[ "${propagatorReady}" != "True" ]]; then
+        echo >&2 "ERROR: Policy propagator not ready after ${propTimeout}s"
+        return 1
+    fi
+
+    echo "  Checking managed clusters..."
+    # Use per-cluster condition queries instead of a nested jsonpath filter;
+    # kubectl jsonpath does not support nested [?(...)] predicates and silently
+    # returns an unterminated-filter error that is masked by || true, causing
+    # all clusters to appear unavailable even when they are healthy.
+    typeset -a clusterNames=()
+    typeset clusterNamesRaw=""
+    clusterNamesRaw="$(oc get managedclusters -o jsonpath='{.items[*].metadata.name}' || true)"
+    read -ra clusterNames <<< "${clusterNamesRaw}"
+    typeset -i clusterCount=${#clusterNames[@]}
+    typeset -i availableCount=0
+    for clusterName in "${clusterNames[@]}"; do
+        typeset condStatus=""
+        condStatus="$(oc get managedcluster "${clusterName}" \
+            -o jsonpath='{.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status}' \
+            || true)"
+        if [[ "${condStatus}" == "True" ]]; then
+            (( availableCount += 1 ))
+        fi
+    done
+    echo "  Managed clusters: ${availableCount}/${clusterCount} available"
+
+    if (( clusterCount > 0 && availableCount == 0 )); then
+        echo >&2 "WARNING: All ${clusterCount} managed cluster(s) are unavailable after upgrade"
+    elif (( clusterCount > 0 && availableCount < clusterCount )); then
+        echo >&2 "WARNING: ${availableCount}/${clusterCount} managed cluster(s) available (some may be reconciling post-upgrade)"
+    fi
+
+    echo "ACM hub health validation complete"
+    return 0
+}
+
+# _xml_escape: Required for bash 5.x where patsub_replacement is enabled
+# by default, changing how ${var//pattern/replacement} handles & and \ in
+# the replacement string. Without escaping, JUnit XML output is malformed.
+_xml_escape() {
+    # Replace XML special characters with their entity equivalents.
+    local text="$1"
+    text="${text//&/\&amp;}"
+    text="${text//</\&lt;}"
+    text="${text//>/\&gt;}"
+    text="${text//\"/\&quot;}"
+    text="${text//\'/\&apos;}"
+    printf '%s' "${text}"
+}
+
+# JUnit fragment contract: ci-operator's junit_report.go accepts both
+# standalone <testcase> fragments and full <testsuite>-wrapped documents.
+# Fragments are appended to junit_known_issues.xml and consumed correctly.
+_detect_known_issue() {
+    # Emit a JUnit SKIPPED testcase fragment for a tracked known issue.
+    local error_output="$1"
+    local bug_id="$2"
+    local bug_description="$3"
+    local safe_bug_id safe_desc safe_error
+
+    safe_bug_id="$(_xml_escape "${bug_id}")"
+    safe_desc="$(_xml_escape "${bug_description}")"
+    safe_error="$(_xml_escape "${error_output:0:500}")"
+
+    echo ">>> KNOWN ISSUE: ${bug_id} — ${bug_description}"
+    echo ">>> Marking as SKIPPED (tracked: https://issues.redhat.com/browse/${bug_id})"
+
+    cat <<JUNIT_EOF >> "${ARTIFACT_DIR}/junit_known_issues.xml"
+<testcase name="${safe_bug_id}: ${safe_desc}" classname="opp.interop.known_issues">
+  <skipped message="Known issue: ${safe_bug_id}">
+    Tracked at https://issues.redhat.com/browse/${safe_bug_id}
+    Error: ${safe_error}
+  </skipped>
+</testcase>
+JUNIT_EOF
+}
+
+# --- Channel head helper (INTEROP-9527) ---
+get_channel_head() {
+  local pkg="$1" ch="$2"
+  oc get packagemanifest "${pkg}" -n openshift-marketplace \
+     -o jsonpath="{.status.channels[?(@.name==\"${ch}\")].currentCSV}" 2>/dev/null || echo "unknown"
+}
+
+# --- Single typed finalizer (INTEROP-9527) ---
+_finalize_exit() {
+  local rc=$?
+  set +e
+  # Fallback for unclassified exits
+  if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+    _JUNIT_KIND="unclassified-failure"
+    _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+    _EXIT_CLASS="infra"
+  fi
+  if [[ -n "${_JUNIT_KIND}" ]]; then
+    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+  fi
+  # Product no-op results should not emit trace or cluster diagnostics.
+  if [[ "${_EXIT_CLASS}" == "product" ]]; then
+    (exit 0); _opp_cleanup
+    exit 0
+  fi
+  (exit "${rc}"); _opp_cleanup
+  if (( rc != 0 )); then
+    CollectDiagnostics
+  fi
+  exit "${rc}"
+}
+trap '_finalize_exit' EXIT
+
+# === Main ===
+
+function Main () {
+    # Orchestrate the ACM operator upgrade: resolve channel, patch subscription, wait, validate.
+    typeset currentCsv currentVersion currentChannel targetChannel
+    typeset prePatchPlan planPhase installPlan localApproval
+    typeset newCsv newVersion
+
+    echo "=== ACM Operator Upgrade Step ==="
+    echo "Namespace: ${ACM_SUBSCRIPTION_NAMESPACE}"
+    echo "Subscription: ${ACM_SUBSCRIPTION_NAME}"
+    echo "Timeout: ${ACM_UPGRADE_TIMEOUT}"
+
+    currentCsv="$(GetCurrentCsv)"
+    if [[ -z "${currentCsv}" ]]; then
+        echo >&2 "ERROR: No ACM subscription found or no currentCSV set"
+        _JUNIT_KIND="no-subscription"
+        _JUNIT_MESSAGE="No ACM subscription found or no currentCSV set"
+        _EXIT_CLASS="infra"
+        return 3
+    fi
+
+    currentVersion="$(GetInstalledVersion)"
+    if ! currentChannel="$(GetCurrentChannel)"; then
+        echo >&2 "ERROR: Failed to query current subscription channel"
+        _JUNIT_KIND="current-channel"
+        _JUNIT_MESSAGE="Failed to query current subscription channel"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
+    if [[ -z "${currentChannel}" ]] ||
+       ! grep -qE '[0-9]+\.[0-9]+' <<< "${currentChannel}"; then
+        echo >&2 "ERROR: Current subscription channel is empty or invalid: ${currentChannel:-<empty>}"
+        _JUNIT_KIND="current-channel"
+        _JUNIT_MESSAGE="Current subscription channel is empty or invalid"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
+    echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
+
+    if [[ -z "${ACM_TARGET_CHANNEL}" ]]; then
+      # --- CatalogSource readiness check (INTEROP-9527) ---
+      local cs_timeout="${ACM_CATALOGSOURCE_TIMEOUT:-300}"
+      echo "Waiting up to ${cs_timeout}s for CatalogSource 'redhat-operators' to be READY ..."
+      if ! oc wait catalogsource/redhat-operators -n openshift-marketplace \
+             --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
+             --timeout="${cs_timeout}s"; then
+        echo "ERROR: CatalogSource redhat-operators not READY after ${cs_timeout}s"
+        _JUNIT_KIND="catalogsource-readiness"
+        _JUNIT_MESSAGE="CatalogSource redhat-operators not READY after ${cs_timeout}s"
+        _EXIT_CLASS="infra"
+        return 1
+      fi
+    fi
+
+    # --- Safe ResolveTargetChannel call (INTEROP-9527) ---
+    local resolve_rc=0
+    targetChannel="$(ResolveTargetChannel)" || resolve_rc=$?
+    if (( resolve_rc == 3 )); then
+      local head
+      head=$(get_channel_head "${ACM_SUBSCRIPTION_NAME}" "${currentChannel}")
+      _JUNIT_KIND="acm-upgrade-not-needed"
+      _JUNIT_MESSAGE="Channel ${currentChannel} head (${head}) already installed -- nothing to upgrade"
+      _EXIT_CLASS="product"
+      return 1   # _finalize_exit will see product -> exit 0, but emit a JUnit failure
+    elif (( resolve_rc != 0 )); then
+      _JUNIT_KIND="resolve-target-channel"
+      _JUNIT_MESSAGE="ResolveTargetChannel failed"
+      _EXIT_CLASS="infra"
+      return "${resolve_rc}"
+    fi
+    if ! grep -qE '[0-9]+\.[0-9]+' <<< "${targetChannel}"; then
+      echo >&2 "ERROR: Target channel does not contain a valid version: ${targetChannel:-<empty>}"
+      _JUNIT_KIND="target-channel"
+      _JUNIT_MESSAGE="Target channel is empty or invalid"
+      _EXIT_CLASS="infra"
+      return 1
+    fi
+    echo "Target channel: ${targetChannel}"
+
+    prePatchPlan=""
+    if ! prePatchPlan="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null)"; then
+        echo "WARNING: Could not query current installPlanRef; treating as empty"
+        prePatchPlan=""
+    fi
+    echo "Pre-patch InstallPlan: ${prePatchPlan:-none}"
+
+    if [[ "${targetChannel}" == "${currentChannel}" ]]; then
+        echo "Already on target channel ${targetChannel}; checking if upgrade is available..."
+        if [[ -z "${prePatchPlan}" ]]; then
+            echo "No pending upgrade on current channel; nothing to do"
+            _JUNIT_KIND="acm-upgrade-not-needed"
+            _JUNIT_MESSAGE="Already on target channel ${targetChannel} with no pending upgrade"
+            _EXIT_CLASS="product"
+            return 1
+        fi
+        planPhase="$(oc get installplan "${prePatchPlan}" \
+            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            -o jsonpath='{.status.phase}' || true)"
+        if [[ "${planPhase}" == "Complete" ]]; then
+            echo "InstallPlan ${prePatchPlan} already complete; no pending upgrade"
+            _JUNIT_KIND="acm-upgrade-not-needed"
+            _JUNIT_MESSAGE="InstallPlan ${prePatchPlan} already complete -- no pending upgrade"
+            _EXIT_CLASS="product"
+            return 1
+        fi
+        installPlan="${prePatchPlan}"
+    else
+        echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
+        oc patch "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            --type merge \
+            -p "{\"spec\":{\"channel\":\"${targetChannel}\"}}"
+
+        echo "Waiting for new InstallPlan (pre-patch ref: ${prePatchPlan:-none})..."
+        sleep 10
+
+        installPlan=""
+        for _ in {1..18}; do
+            installPlan="$(oc get "${ACM_SUBSCRIPTION_RESOURCE}" "${ACM_SUBSCRIPTION_NAME}" \
+                -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+                -o jsonpath='{.status.installPlanRef.name}' || true)"
+            if [[ -n "${installPlan}" && "${installPlan}" != "${prePatchPlan}" ]]; then
+                break
+            fi
+            installPlan=""
+            sleep 10
+        done
+
+        if [[ -z "${installPlan}" ]]; then
+            echo >&2 "ERROR: No new InstallPlan appeared after channel change (waited 3m)"
+            _JUNIT_KIND="installplan-timeout"
+            _JUNIT_MESSAGE="No new InstallPlan appeared after channel change (waited 3m)"
+            _EXIT_CLASS="infra"
+            return 2
+        fi
+    fi
+
+    echo "InstallPlan: ${installPlan}"
+    localApproval="$(oc get installplan "${installPlan}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.approval}' || true)"
+    if [[ "${localApproval}" == "Manual" ]]; then
+        echo "Approving manual InstallPlan..."
+        oc patch installplan "${installPlan}" \
+            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            --type merge \
+            -p '{"spec":{"approved":true}}'
+    fi
+
+    echo "Waiting for ACM CSV to reach Succeeded phase..."
+    WaitForCsvSucceeded "${currentCsv}"
+    newCsv="$(GetCurrentCsv)"
+    newVersion="$(GetInstalledVersion)"
+    echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
+
+    typeset _acm_upgrade_output=""
+    if ! _acm_upgrade_output="$(ValidateMceUpgrade 2>&1)"; then
+        echo "${_acm_upgrade_output}"
+        if echo "${_acm_upgrade_output}" | grep -q "cannot unmarshal string into Go struct"; then
+            # Known-issue skip: ACM-45920
+            # Added: 2026-09-21
+            # Review-by: 2026-12-21 (or when ACM-45920 is resolved)
+            # Owner: OPP-interop team
+            _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
+                "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
+        else
+            _JUNIT_KIND="mce-upgrade-failure"
+            _JUNIT_MESSAGE="MCE upgrade validation failed"
+            _EXIT_CLASS="infra"
+            return 1
+        fi
+    else
+        echo "${_acm_upgrade_output}"
+    fi
+
+    if ! _acm_upgrade_output="$(ValidateHubHealth 2>&1)"; then
+        echo "${_acm_upgrade_output}"
+        if echo "${_acm_upgrade_output}" | grep -q "cannot unmarshal string into Go struct"; then
+            # Known-issue skip: ACM-45920
+            # Added: 2026-09-21
+            # Review-by: 2026-12-21 (or when ACM-45920 is resolved)
+            # Owner: OPP-interop team
+            _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
+                "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
+        else
+            _JUNIT_KIND="hub-health-failure"
+            _JUNIT_MESSAGE="ACM hub health validation failed"
+            _EXIT_CLASS="infra"
+            return 1
+        fi
+    else
+        echo "${_acm_upgrade_output}"
+    fi
+
+    {
+        printf '=== ACM Operator Upgrade Summary ===\n'
+        printf 'Previous: %s (%s)\n' "${currentVersion}" "${currentChannel}"
+        printf 'Current:  %s (%s)\n' "${newVersion}" "${targetChannel}"
+        printf 'CSV:      %s\n' "${newCsv}"
+        printf 'Status:   SUCCESS\n'
+    } > "${ARTIFACT_DIR}/acm-upgrade-summary.txt"
+
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+        echo "${newVersion}" > "${SHARED_DIR}/acm-upgraded-version"
+        echo "${targetChannel}" > "${SHARED_DIR}/acm-upgraded-channel"
+    fi
+
+    echo "=== ACM Operator Upgrade: SUCCESS ==="
+    true
+}
+
+Main "$@"

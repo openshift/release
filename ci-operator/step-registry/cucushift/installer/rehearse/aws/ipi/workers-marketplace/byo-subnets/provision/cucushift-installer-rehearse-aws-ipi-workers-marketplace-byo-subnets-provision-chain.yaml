@@ -1,0 +1,24 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-workers-marketplace-byo-subnets-provision
+  steps:
+  - ref: aws-provision-vpc-shared
+  - chain: ipi-conf-aws
+  - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-aws-marketplace
+  - ref: ipi-conf-aws-usage-info
+  - chain: aws-provision-iam-user-minimal-permission
+  - chain: ipi-install
+  - ref: cucushift-installer-check-aws-custom-ami
+  - ref: aws-provision-tags-for-byo-vpc
+  - ref: cucushift-installer-check-aws-custom-vpc
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  env:
+  - name: USE_MARKETPLACE_CONTRACT_NODE_TYPE_ONLY
+    default: "yes"
+    documentation: |-
+      Use instance types which present in the contract only.
+  documentation: |-
+    Create an IPI cluster on AWS for QE e2e tests.
+    The worker node is configured by using AWS Marketplace images
+

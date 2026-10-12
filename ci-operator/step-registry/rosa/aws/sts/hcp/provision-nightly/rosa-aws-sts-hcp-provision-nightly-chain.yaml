@@ -1,0 +1,17 @@
+chain:
+  as: rosa-aws-sts-hcp-provision-nightly
+  env:
+  - name: HOSTED_CP
+    default: "true"
+  - name: ENABLE_BYOVPC
+    default: "true"
+  steps:
+  - ref: aws-provision-vpc-shared
+  - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+  - chain: rosa-sts-oidc-config-create
+  - chain: rosa-cluster-provision-nightly-hcp
+  - ref: aws-provision-tags-for-byo-vpc
+  documentation: >-
+    Same as rosa-aws-sts-hcp-provision but allows unsigned nightly images
+    on the management cluster. Use for HCP conformance jobs that test
+    nightly OCP payloads on 4.22+ MCs.

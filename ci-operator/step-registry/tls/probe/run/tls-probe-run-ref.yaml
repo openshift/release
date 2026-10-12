@@ -1,0 +1,37 @@
+ref:
+  as: tls-probe-run
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: tls-probe-run-commands.sh
+  env:
+    - name: PROBE_NAMESPACE
+      default: "tls-probe"
+      documentation: |-
+        Namespace to create for the probe DaemonSet. Must be 'tls-probe' or
+        start with 'tls-probe-'; the step deletes this namespace on every run
+        so overrides are restricted to avoid deleting an unrelated namespace.
+    - name: PROBE_CAPTURE_DURATION
+      default: "180"
+      documentation: "Seconds to capture TLS traffic before collecting results."
+  dependencies:
+    - env: PROBE_IMAGE
+      name: tls-probe
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 30m0s
+  grace_period: 5m0s
+  documentation: |-
+    Deploys the tls-probe eBPF DaemonSet for a bounded capture and generates
+    client TLS traffic. Retains public artifacts under ARTIFACT_DIR/tls-probe/captures:
+    capture-*.jsonl contains the probe's unchanged JSON event lines, and
+    capture-*.log contains the original container output, including diagnostics.
+    No event-type, port, or TLS-version filtering; no compliance verdict or JUnit.
+    Deployment, capture, retrieval failures, or no events across all pods fail
+    this smoke test. Collection is attempted before cleanup even on failure.
+
+    PROBE_IMAGE is supplied by ci-operator from the Containerfile.ci source
+    build in stolostron/tls-probe. Downstream consumers interpret the events.

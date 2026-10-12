@@ -1,0 +1,315 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  krkn.prow:
+    name: krkn
+    namespace: chaos
+    tag: latest
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: krkn.prow
+    to: prow-scripts-416
+  - dockerfile_path: cerberus/Dockerfile_prow
+    from: cerberus.prow
+    to: cerberus-main-prow-416
+  - dockerfile_literal: |-
+      FROM ocp-qe-perfscale-ci
+      RUN ls
+      RUN cp oc /bin
+    from: ocp-qe-perfscale-ci
+    to: perfscale-observer
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: krkn-hub-tests-416
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
+      GC: "false"
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "true"
+      TELEMETRY_GROUP: prow-ocp-4.16
+      USER_TAGS: |
+        TicketId 419
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: redhat-chaos-installer-aws
+- always_run: false
+  as: krkn-hub-node-tests
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CDV2_ITERATION_MULTIPLIER: "11"
+      GC: "false"
+      PROFILE_TYPE: reporting
+      SPOT_INSTANCES: "false"
+      USER_TAGS: |
+        TicketId 419
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: redhat-chaos-krkn-hub-node-tests
+    workflow: redhat-chaos-installer-aws
+- always_run: false
+  as: krkn-hub-zone-tests
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "11"
+      GC: "false"
+      SPOT_INSTANCES: "false"
+      USER_TAGS: |
+        TicketId 419
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
+    - ref: redhat-chaos-zone-outage
+    workflow: redhat-chaos-installer-aws
+- always_run: false
+  as: krkn-hub-cloud-gcp-node-tests
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: gcp-chaos
+    env:
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "11"
+      GC: "false"
+      PROFILE_TYPE: reporting
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
+    workflow: redhat-chaos-installer-gcp
+- always_run: false
+  as: krkn-hub-tests-416-azure-node
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CDV2_ITERATION_MULTIPLIER: "11"
+      GC: "false"
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-azure-4.16
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
+    - chain: redhat-chaos-krkn-hub-control-plane-tests
+    - chain: redhat-chaos-krkn-hub-worker-node-tests
+    - ref: redhat-chaos-power-outage
+    workflow: redhat-chaos-installer-azure
+- always_run: false
+  as: krkn-hub-tests-gcp
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: gcp-chaos
+    env:
+      TELEMETRY_GROUP: prow-ocp-gcp-4.16
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: redhat-chaos-installer-gcp
+- always_run: false
+  as: krkn-hub-tests-azure
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CDV2_ITERATION_MULTIPLIER: "11"
+      GC: "false"
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-azure-4.16
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: redhat-chaos-installer-azure
+- always_run: false
+  as: krkn-hub-tests-aro
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      ARO_CLUSTER_VERSION: 4.16.30
+      ARO_MASTER_VM_SIZE: Standard_D16s_v3
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "11"
+      GC: "false"
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-aro-4.16
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
+    - chain: redhat-chaos-krkn-hub-etcd-tests
+    - chain: redhat-chaos-krkn-hub-console-tests
+    - ref: redhat-chaos-pod-scenarios-prometheus-disruption
+    workflow: redhat-chaos-installer-azure-aro-upi
+- always_run: false
+  as: krkn-hub-tests-aro-node
+  reporter_config:
+    channel: '#chaos-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      ARO_CLUSTER_VERSION: "4.16"
+      ARO_MASTER_VM_SIZE: Standard_D16s_v3
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      CD_V2_EXTRA_FLAGS: ""
+      CDV2_ITERATION_MULTIPLIER: "10"
+      GC: "false"
+      PROFILE_TYPE: reporting
+      TELEMETRY_GROUP: prow-ocp-aro-4.16
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-observer-start
+    - ref: redhat-chaos-network-chaos
+    - ref: redhat-chaos-pod-network-chaos
+    - chain: redhat-chaos-hog-scenarios
+    workflow: redhat-chaos-installer-azure-aro-upi
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: prow-scripts
+  variant: 4.16-nightly

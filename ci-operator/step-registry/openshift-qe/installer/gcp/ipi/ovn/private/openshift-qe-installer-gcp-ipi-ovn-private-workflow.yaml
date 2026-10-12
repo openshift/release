@@ -1,0 +1,18 @@
+workflow:
+  as: openshift-qe-installer-gcp-ipi-ovn-private
+  steps:
+    pre:
+    - ref: gcp-provision-vpc
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-gcp
+    - ref: ovn-conf
+    - chain: ipi-install
+    - chain: create-infra-move-ingress-monitoring-registry
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - ref: gcp-deprovision-bastionhost
+    - ref: gcp-deprovision-vpc
+  documentation: |-
+    Provision and deprovision GCP-IPI-OVN-Private cluster workflow, including creating infra nodes and moving ingress monitoring and registry to infra nodes.

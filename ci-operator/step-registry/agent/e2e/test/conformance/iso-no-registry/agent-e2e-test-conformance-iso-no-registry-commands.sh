@@ -1,0 +1,56 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+date +%s > "${SHARED_DIR}/TEST_TIME_TEST_START"
+trap 'date +%s > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
+
+# Get all tests filtered for NoRegistryClusterInstall
+ALL_TESTS="$(openshift-tests run all --provider '{"type":"baremetal"}' --dry-run)"
+TESTS="$(printf '%s\n' "${ALL_TESTS}" | grep -E 'NoRegistryClusterInstall' || true)"
+if [[ -z "${TESTS}" ]]; then
+    echo "No tests matched NoRegistryClusterInstall"
+    exit 1
+fi
+
+# Apply TEST_SKIPS filter if set
+if [[ -n "${TEST_SKIPS:-}" ]]; then
+    echo "Skipping tests matching: ${TEST_SKIPS}"
+    echo "${TESTS}" | grep -E -- "${TEST_SKIPS}" || true
+    set +e
+    FILTERED_TESTS="$(printf '%s\n' "${TESTS}" | grep -Ev -- "${TEST_SKIPS}")"
+    grep_status=$?
+    set -e
+    if [[ ${grep_status} -eq 2 ]]; then
+        echo "Invalid TEST_SKIPS regex: ${TEST_SKIPS}" >&2
+	exit 1
+    fi
+    if [[ -z "${FILTERED_TESTS}" ]]; then
+        echo "All candidate tests were filtered by TEST_SKIPS=${TEST_SKIPS}"
+        exit 1
+    fi
+    TESTS="${FILTERED_TESTS}"
+fi
+
+# Run the filtered tests
+echo "${TESTS}" | openshift-tests run \
+    --monitor "watch-namespaces" \
+    --max-parallel-tests 1 \
+    -f - \
+    -o "${ARTIFACT_DIR}/e2e.log" \
+    --junit-dir "${ARTIFACT_DIR}/junit"
+
+# IRI tests must not be skipped on this platform.
+junit=$(ls "${ARTIFACT_DIR}"/junit/junit_e2e_*.xml 2>/dev/null) || {
+    echo "ERROR: no junit_e2e_*.xml file found"
+    exit 1
+}
+skipped=$(sed -n 's/.*skipped="\([0-9]*\)".*/\1/p' ${junit} | head -1)
+if [[ "${skipped}" -gt 0 ]]; then
+    echo "ERROR: ${skipped} IRI test(s) were skipped"
+    exit 1
+fi

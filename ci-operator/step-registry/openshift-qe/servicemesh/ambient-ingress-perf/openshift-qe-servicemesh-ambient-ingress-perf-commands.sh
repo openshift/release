@@ -1,0 +1,1 @@
+../../ingress-perf/openshift-qe-ingress-perf-commands.sh

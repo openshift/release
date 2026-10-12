@@ -1,0 +1,39 @@
+ref:
+  as: ipi-conf-aws-sharednetwork
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  commands: ipi-conf-aws-sharednetwork-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: ZONES_COUNT
+    default: "2"
+    documentation: |-
+      The number of Availability Zones to present in the cluster. Accepted values are 1, 2, and 3.
+  - name: AWS_EDGE_POOL_ENABLED
+    default: ""
+    documentation: |-
+      The value "yes" enables the provisioning the VPC network resouces (subnets) in Local or Wavelength zones.
+      When wavelength-zone is set, in additional gateway, Carrier Gateway, is created and
+      associated to the VPC.
+  - name: EDGE_ZONE_TYPES
+    default: ""
+    documentation: |-
+      EDGE_ZONE_TYPES is a comma sepparated AWS Zone types to create the network infrastructure resources required by edge compute
+      pool (worker nodes in Local or Wavelength zones), creating a file SHARED_DIR/edge-zone-names.txt with
+      AWS Zone names with new line as delimitator.
+      Example of valid values:
+      - local-zone
+      - wavelength-zone
+      - local-zone,wavelength-zone
+  - name: EDGE_PUBLIC_SUBNET
+    default: "no"
+    documentation: |-
+      EDGE_PUBLIC_SUBNET use the public subnet to create worker nodes, instead of Private (default).
+  documentation: |-
+    The IPI AWS configure step generates the AWS-specific install-config.yaml contents based
+    on the cluster profile and optional input files.
