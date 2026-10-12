@@ -26,27 +26,24 @@ fi
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 
-# Derive the cluster name the same way upi-install-libvirt does.
-if [[ "${USE_EXTERNAL_DNS:-false}" == "true" ]]; then
-  CLUSTER_NAME="${LEASED_RESOURCE}"
-else
-  CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
-fi
-
-echo "Attaching secondary libvirt disk volumes to VMs for cluster: ${CLUSTER_NAME}"
+# upi-install-libvirt always names domains ${LEASED_RESOURCE}-control-${i}
+# and ${LEASED_RESOURCE}-compute-${i}, regardless of USE_EXTERNAL_DNS or
+# UNIQUE_HASH.  CLUSTER_NAME (which appends UNIQUE_HASH) is only the
+# OpenShift cluster/network name, not the libvirt domain name.
+echo "Attaching secondary libvirt disk volumes to VMs for lease: ${LEASED_RESOURCE}"
 echo "  Pool: ${POOL_NAME}"
 echo "  Volume capacity: ${SECONDARY_DISK_CAPACITY}"
 
 # Collect the names of all control-plane and compute VMs that belong to this
-# cluster.  Bootstrap is excluded — it is destroyed before this step runs.
+# lease.  Bootstrap is excluded — it is destroyed before this step runs.
 declare -a vm_names=()
 
 for (( i=0; i<=${CONTROL_COUNT}-1; i++ )); do
-  vm_names+=("${CLUSTER_NAME}-control-${i}")
+  vm_names+=("${LEASED_RESOURCE}-control-${i}")
 done
 
 for (( i=0; i<=${COMPUTE_COUNT}-1; i++ )); do
-  vm_names+=("${CLUSTER_NAME}-compute-${i}")
+  vm_names+=("${LEASED_RESOURCE}-compute-${i}")
 done
 
 echo "VMs targeted for secondary disk attachment: ${vm_names[*]}"
@@ -96,6 +93,13 @@ echo "All secondary libvirt disks attached. Saving volume list..."
 
 # Write the volume list to SHARED_DIR for potential cleanup / audit use.
 printf '%s\n' "${vm_names[@]/%/-lvm-disk}" > "${SHARED_DIR}/libvirt-secondary-disk-volumes.txt"
-
 echo "Volume list saved to \${SHARED_DIR}/libvirt-secondary-disk-volumes.txt"
+
+# Tell the LVM step which block device to use as the physical volume.
+# hypershift-mce-agent-lvm-commands.sh reads ${SHARED_DIR}/lvmdevice and
+# falls back to /dev/vda when the file is absent — which would make LVM
+# consume the root disk instead of the secondary disk attached above.
+echo "/dev/${SECONDARY_DISK_DEV}" > "${SHARED_DIR}/lvmdevice"
+echo "LVM device path written to \${SHARED_DIR}/lvmdevice: /dev/${SECONDARY_DISK_DEV}"
+
 echo "Secondary disk provisioning complete."
