@@ -18,9 +18,7 @@ ref:
     - "bastion-z.svc.cluster.local"
     - "bastion-ppc64le-libvirt.svc.cluster.local"
   documentation: |-
-    Defines and starts the primary libvirt NAT network, then extends it over VXLAN to the ARM
-    infrastructure bridge.  VXLAN topology (local-ip, remote-ip, VNI, dstport, interface,
-    additional-bridge) is read from the lease's vxlan object in the private profile; host-specific
-    addresses are never placed in public job YAML.  Requires ssh-hypervisor-key and
-    ssh-hypervisor-known-hosts to be provisioned in the cluster profile by infra.
-    Writes arm-bridge-name to SHARED_DIR for use by downstream steps.
+    Defines and starts the primary libvirt NAT network and publishes the ARM bridge name.
+    Reads vxlan.additional-bridge from the private lease record and writes it to SHARED_DIR/arm-bridge-name
+    for use by the heterogeneous installer step.
+    Infra owns both VXLAN endpoints and their attachment lifecycle; this step performs no hypervisor SSH operations.

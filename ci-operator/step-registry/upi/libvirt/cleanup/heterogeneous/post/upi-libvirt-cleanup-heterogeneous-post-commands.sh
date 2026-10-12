@@ -17,7 +17,7 @@ require_commands() {
   fi
 }
 
-require_commands yq-v4 mock-nss.sh virsh grep awk sleep ssh
+require_commands yq-v4 mock-nss.sh virsh grep awk sleep
 
 # Ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE:-}" ]]; then
@@ -58,40 +58,6 @@ ADDITIONAL_LIBVIRT_URI="qemu+tcp://${HOSTNAME_ADDITIONAL}:${ADDITIONAL_PORT}/sys
 VIRSH_PRIMARY="mock-nss.sh virsh --connect ${PRIMARY_LIBVIRT_URI}"
 VIRSH_ADDITIONAL="mock-nss.sh virsh --connect ${ADDITIONAL_LIBVIRT_URI}"
 
-# ---------------------------------------------------------------------------
-# SSH helper for primary hypervisor host operations (ip link, alias check).
-# Credentials are provisioned by infra in the cluster profile.
-# ---------------------------------------------------------------------------
-SSH_KEY="${CLUSTER_PROFILE_DIR}/ssh-hypervisor-key"
-SSH_KNOWN_HOSTS="${CLUSTER_PROFILE_DIR}/ssh-hypervisor-known-hosts"
-
-if [[ ! -f "${SSH_KEY}" ]]; then
-  echo "ERROR: Hypervisor SSH key not found at ${SSH_KEY}; infra must provision this in the cluster profile"
-  exit 1
-fi
-if [[ ! -f "${SSH_KNOWN_HOSTS}" ]]; then
-  echo "ERROR: Hypervisor known_hosts not found at ${SSH_KNOWN_HOSTS}; infra must provision this in the cluster profile"
-  exit 1
-fi
-
-run_primary() {
-  ssh \
-    -i "${SSH_KEY}" \
-    -o BatchMode=yes \
-    -o ConnectTimeout=30 \
-    -o UserKnownHostsFile="${SSH_KNOWN_HOSTS}" \
-    -o StrictHostKeyChecking=yes \
-    "root@${HOSTNAME_PRIMARY}" \
-    "$@"
-}
-
-# Read VXLAN config for ownership checks
-VXLAN_INTERFACE="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.interface" "${LEASE_CONF}")"
-VXLAN_ID="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.id" "${LEASE_CONF}")"
-VXLAN_REMOTE_IP="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.remote-ip" "${LEASE_CONF}")"
-VXLAN_PORT="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.dstport" "${LEASE_CONF}")"
-EXPECTED_VXLAN_OWNER="ci:${LEASED_RESOURCE}"
-
 echo "Verifying libvirt connectivity to primary and additional hypervisors..."
 if ! ${VIRSH_PRIMARY} list >/dev/null; then
   echo "ERROR: Failed to connect or list domains on primary hypervisor"
@@ -104,7 +70,6 @@ if ! ${VIRSH_ADDITIONAL} list >/dev/null; then
 fi
 
 CLEANUP_FAILED=0
-VXLAN_CLEANUP_FAILED=0
 
 set +e
 
@@ -235,64 +200,7 @@ if ${VIRSH_ADDITIONAL} pool-list 2>/dev/null | grep -qw "${ADDITIONAL_POOL}"; th
   done
 fi
 
-# ---------------------------------------------------------------------------
-# Clean primary VXLAN endpoint — must happen after ARM network is gone.
-# Before deleting, verify the endpoint is job-owned and matches expected config.
-# Preserve infra-owned ocp2-arm bridge, persistent vxlan2, and NetworkManager
-# connections — only remove the job-owned endpoint.
-# ---------------------------------------------------------------------------
-if [[ -n "${VXLAN_INTERFACE}" && "${VXLAN_INTERFACE}" != "null" ]]; then
-  echo "Checking for job-owned primary VXLAN endpoint '${VXLAN_INTERFACE}'..."
-  VXLAN_PRESENT=$(run_primary test -e "/sys/class/net/${VXLAN_INTERFACE}" && echo yes || echo no)
-  if [[ "${VXLAN_PRESENT}" == "yes" ]]; then
-    # Check ownership alias
-    ACTUAL_ALIAS=$(run_primary ip link show "${VXLAN_INTERFACE}" 2>/dev/null |
-      grep -oP '(?<=alias )\S+' | head -1 || true)
-    if [[ "${ACTUAL_ALIAS}" != "${EXPECTED_VXLAN_OWNER}" ]]; then
-      echo "ERROR: VXLAN endpoint '${VXLAN_INTERFACE}' alias is '${ACTUAL_ALIAS}'," \
-           " expected '${EXPECTED_VXLAN_OWNER}'; refusing to delete (report for reconciliation)" >&2
-      VXLAN_CLEANUP_FAILED=1
-    else
-      # Verify VNI, remote, and dstport match lease before destroying
-      ACTUAL_VNI=$(run_primary ip -d link show "${VXLAN_INTERFACE}" 2>/dev/null |
-        grep -oP 'id \K[0-9]+' | head -1 || true)
-      ACTUAL_REMOTE=$(run_primary ip -d link show "${VXLAN_INTERFACE}" 2>/dev/null |
-        grep -oP 'remote \K[0-9.]+' | head -1 || true)
-      ACTUAL_PORT=$(run_primary ip -d link show "${VXLAN_INTERFACE}" 2>/dev/null |
-        grep -oP 'dstport \K[0-9]+' | head -1 || true)
-
-      if [[ "${ACTUAL_VNI}" != "${VXLAN_ID}" || \
-            "${ACTUAL_REMOTE}" != "${VXLAN_REMOTE_IP}" || \
-            "${ACTUAL_PORT}" != "${VXLAN_PORT}" ]]; then
-        echo "ERROR: VXLAN endpoint '${VXLAN_INTERFACE}' config mismatch" \
-             "(vni=${ACTUAL_VNI}/${VXLAN_ID}, remote=${ACTUAL_REMOTE}/${VXLAN_REMOTE_IP}," \
-             " port=${ACTUAL_PORT}/${VXLAN_PORT}); refusing to delete (report for reconciliation)" >&2
-        VXLAN_CLEANUP_FAILED=1
-      else
-        echo "Removing job-owned VXLAN endpoint '${VXLAN_INTERFACE}' from primary hypervisor..."
-        run_primary bash -s -- "${VXLAN_INTERFACE}" <<'DEL_VXLAN'
-set -euo pipefail
-iface=$1
-ip link set dev "${iface}" down 2>/dev/null || true
-ip link delete "${iface}"
-DEL_VXLAN
-        # Verify absence
-        if run_primary test -e "/sys/class/net/${VXLAN_INTERFACE}" 2>/dev/null; then
-          echo "ERROR: VXLAN endpoint '${VXLAN_INTERFACE}' still exists after delete" >&2
-          VXLAN_CLEANUP_FAILED=1
-        else
-          echo "INFO: VXLAN endpoint '${VXLAN_INTERFACE}' successfully removed"
-        fi
-      fi
-    fi
-  else
-    echo "INFO: VXLAN endpoint '${VXLAN_INTERFACE}' not present; nothing to remove"
-  fi
-else
-  echo "INFO: No VXLAN interface configured in lease; skipping VXLAN cleanup"
-fi
-
-# --- Now remove primary libvirt network (after ARM and VXLAN cleanup) ---
+# --- Remove primary libvirt network after ARM resource cleanup ---
 echo "Removing stale networks on primary host..."
 PRIMARY_INIT_NETS=$(${VIRSH_PRIMARY} net-list --all --name 2>&1) || {
   echo "ERROR: Failed to list initial networks on primary hypervisor: ${PRIMARY_INIT_NETS}"
@@ -390,7 +298,7 @@ if [ -n "${CONFLICTING_DOMAINS_P}" ] || [ -n "${CONFLICTING_VOLUMES_P}" ] || \
    [ -n "${CONFLICTING_HTTPD_VOLUMES_P}" ] || [ -n "${CONFLICTING_POOLS_P}" ] || \
    [ -n "${CONFLICTING_NETWORKS_P}" ] || [ -n "${CONFLICTING_DOMAINS_A}" ] || \
    [ -n "${CONFLICTING_VOLUMES_A}" ] || [ -n "${CONFLICTING_ARM_NETS_A}" ] || \
-   [ "${CLEANUP_FAILED}" -ne 0 ] || [ "${VXLAN_CLEANUP_FAILED}" -ne 0 ]; then
+   [ "${CLEANUP_FAILED}" -ne 0 ]; then
   echo "ERROR: Could not ensure clean state for lease ${LEASED_RESOURCE}"
   [[ -n "${CONFLICTING_DOMAINS_P}" ]]      && echo "Conflicting primary domains found"
   [[ -n "${CONFLICTING_VOLUMES_P}" ]]      && echo "Conflicting primary pool volumes found"
@@ -400,7 +308,6 @@ if [ -n "${CONFLICTING_DOMAINS_P}" ] || [ -n "${CONFLICTING_VOLUMES_P}" ] || \
   [[ -n "${CONFLICTING_DOMAINS_A}" ]]      && echo "Conflicting additional domains found"
   [[ -n "${CONFLICTING_VOLUMES_A}" ]]      && echo "Conflicting additional pool volumes found"
   [[ -n "${CONFLICTING_ARM_NETS_A}" ]]     && echo "Conflicting ARM networks found on additional hypervisor"
-  [[ "${VXLAN_CLEANUP_FAILED}" -ne 0 ]]   && echo "Primary VXLAN endpoint cleanup failed (ownership or config mismatch)"
   exit 1
 fi
 

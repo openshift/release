@@ -121,30 +121,11 @@ fi
 ARM_NETWORK_NAME="${LEASED_RESOURCE}"
 ARM_NETWORK_XML="${SHARED_DIR}/network-arm64.xml"
 
-# Verify infrastructure-owned ARM bridge and persistent VXLAN endpoint exist
-# with the expected configuration on the additional hypervisor.
-# Do NOT recreate NetworkManager connections — infra owns those.
-echo "Verifying ARM infrastructure bridge '${ARM_BRIDGE_NAME}' on additional hypervisor..."
-VXLAN_INTERFACE="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.interface" "${LEASE_CONF}")"
-VXLAN_ID="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.id" "${LEASE_CONF}")"
-VXLAN_REMOTE_IP="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.remote-ip" "${LEASE_CONF}")"
-VXLAN_PORT="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.dstport" "${LEASE_CONF}")"
-
-if [[ -z "${VXLAN_INTERFACE}" || "${VXLAN_INTERFACE}" == "null" || \
-      -z "${VXLAN_ID}" || "${VXLAN_ID}" == "null" || \
-      -z "${VXLAN_REMOTE_IP}" || "${VXLAN_REMOTE_IP}" == "null" || \
-      -z "${VXLAN_PORT}" || "${VXLAN_PORT}" == "null" ]]; then
-  echo "ERROR: One or more VXLAN lease fields (interface/id/remote-ip/dstport) are missing"
-  exit 1
-fi
-
-# Check bridge, VXLAN membership, VNI, peer, and port on additional host via virsh domcapabilities
-# (libvirt TCP does not expose host net commands; use a best-effort check via /sys over virsh nodeinfo).
-# Confirmed by infra's persistent vxlan2/ocp2-arm setup — we verify the expected interface exists and
-# is enslaved to the right bridge, without SSH access to the additional host from the CI container.
-ADDITIONAL_BRIDGE_CHECK=$(${VIRSH_ADDITIONAL} net-list --all --name 2>/dev/null || true)
+# Infra owns the host bridge and VXLAN transport.
+# This lists libvirt network definitions only; it does not verify VXLAN.
+ADD_DEFINED_NETWORKS=$(${VIRSH_ADDITIONAL} net-list --all --name)
 # Guard: refuse an unexpected pre-existing ARM network of this name on the additional host
-if echo "${ADDITIONAL_BRIDGE_CHECK}" | grep -Fxq "${ARM_NETWORK_NAME}"; then
+if echo "${ADD_DEFINED_NETWORKS}" | grep -Fxq "${ARM_NETWORK_NAME}"; then
   echo "ERROR: Libvirt network '${ARM_NETWORK_NAME}' already exists on additional hypervisor;" \
        " pre-cleanup is required before redefining it"
   exit 1
@@ -162,7 +143,8 @@ EOF
 echo "Defining ARM libvirt network '${ARM_NETWORK_NAME}' on additional hypervisor..."
 ${VIRSH_ADDITIONAL} net-define "${ARM_NETWORK_XML}" --validate
 ${VIRSH_ADDITIONAL} net-start "${ARM_NETWORK_NAME}"
-# Do NOT autostart: the VXLAN endpoint is job-owned and must not outlive the lease.
+# No autostart for this lease-owned libvirt wrapper.
+# The underlying bridge and VXLAN transport are infra-owned.
 export NETWORK_NAME="${ARM_NETWORK_NAME}"
 
 # Verify the network is active and references the approved bridge
