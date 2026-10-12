@@ -26,6 +26,16 @@ metadata:
   name: openshift-cluster-csi-drivers
 EOF
 
+cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-pc-secret.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ntnx-pc-secret
+  namespace: openshift-cluster-csi-drivers
+stringData:
+  key: ${NUTANIX_HOST}:${NUTANIX_PORT}:${NUTANIX_USERNAME}:${NUTANIX_PASSWORD}
+EOF
+
 cat > "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml" << EOF
 apiVersion: v1
 kind: Secret
@@ -68,12 +78,8 @@ metadata:
   name: nutanixcsistorage
   namespace: openshift-cluster-csi-drivers
 spec:
-  namespace: openshift-cluster-csi-drivers
-  tolerations:
-    - key: "node-role.kubernetes.io/infra"
-      operator: "Exists"
-      value: ""
-      effect: "NoSchedule"
+  ntnxInitConfigMap:
+    usePC: true
 EOF
 
 cat > "${SHARED_DIR}/manifest_0006-nutanix-csi-storage-class.yaml" << EOF
@@ -91,6 +97,8 @@ parameters:
   csi.storage.k8s.io/node-publish-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/controller-expand-secret-name: ntnx-secret
   csi.storage.k8s.io/controller-expand-secret-namespace: openshift-cluster-csi-drivers
+  csi.storage.k8s.io/controller-publish-secret-name: ntnx-secret
+  csi.storage.k8s.io/controller-publish-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/fstype: ext4
   storageContainer: ${PE_STORAGE_CONTAINER}
   storageType: NutanixVolumes
@@ -99,6 +107,7 @@ reclaimPolicy: Delete
 EOF
 
 oc apply -f "${SHARED_DIR}/manifest_0000-nutanix-csi-openshift-cluster-csi-drivers-namespace.yaml"
+oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-pc-secret.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0003-nutanix-csi-operator-group.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0004-nutanix-csi-subscription.yaml"
