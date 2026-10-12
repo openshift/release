@@ -33,6 +33,7 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+set +x  # Disable tracing to prevent credential leakage in CI logs
 # Set the dynamic vars based on provisioned hub cluster.
 CYPRESS_OC_CLUSTER_URL=$(oc whoami --show-server)
 export CYPRESS_OC_CLUSTER_URL
@@ -75,11 +76,20 @@ export GITHUB_USER
 GITHUB_TOKEN=$(cat $SECRETS_DIR/alc/git-token)
 export GITHUB_TOKEN
 
-COLLECTIVE_OCP_TOKEN=$(cat $SECRETS_DIR/alc/collective-ocp-token)
-export COLLECTIVE_OCP_TOKEN
+# collective-ocp-token is optional; the key may not yet be provisioned in the
+# acm-qe/alc-credentials vault collection.  Export it when available so the
+# test runner can use it, but do not fail the step when it is absent.
+if [[ -f "$SECRETS_DIR/alc/collective-ocp-token" ]]; then
+    COLLECTIVE_OCP_TOKEN=$(cat "$SECRETS_DIR/alc/collective-ocp-token")
+    export COLLECTIVE_OCP_TOKEN
+else
+    echo "WARNING: collective-ocp-token not found in acm-qe/alc-credentials vault; tests requiring this credential may be skipped" >&2
+fi
 
 # run the test execution script
-./start.sh alc || :
+typeset -i _test_rc=0
+./start.sh alc || _test_rc=$?
+set -x  # Re-enable tracing
 
 # Copy test results (Playwright or legacy Cypress)
 for dir in test-results playwright-report ../tests/cypress/results; do
@@ -87,3 +97,5 @@ for dir in test-results playwright-report ../tests/cypress/results; do
     cp -r "$dir" "$ARTIFACT_DIR/" || true
   fi
 done
+
+exit "${_test_rc}"
