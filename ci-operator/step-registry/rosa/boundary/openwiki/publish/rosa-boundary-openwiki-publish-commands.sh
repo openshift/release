@@ -116,7 +116,12 @@ if git diff --cached --quiet; then
   exit "$update_status"
 fi
 
-git diff --cached --check
+# Markdown uses two trailing spaces for hard line breaks. Keep the other
+# whitespace checks, and still reject trailing spaces in non-Markdown files.
+git -c core.whitespace=-blank-at-eol diff --cached --check -- \
+  ':(glob)openwiki/*.md' ':(glob)openwiki/**/*.md'
+git diff --cached --check -- \
+  ':(exclude,glob)openwiki/*.md' ':(exclude,glob)openwiki/**/*.md'
 if [[ "$dry_run" == true ]]; then
   echo 'Rehearsal dry run: patch applies cleanly; skipping commit, push, and PR creation.'
   git diff --cached --stat
