@@ -11,10 +11,14 @@ images:
   items:
   - dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-      COPY bin/manager /manager
+      COPY manager /manager
       USER 65532:65532
       ENTRYPOINT ["/manager"]
-    from: bin
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/lightspeed-agentic-operator/bin/manager
     to: agentic-operator
 prowgen:
   enable_secrets_store_csi_driver: true
@@ -48,10 +52,12 @@ tests:
     env:
       E2E_SCENARIO_TAGS: core
       LIGHTSPEED_SERVICE_REF: 2e13067ad5fce3e2b648af56b4f6e29cdb2efd91
+      TIMEOUT: +8 hours
     test:
+    - ref: wait
     - ref: openshift-lightspeed-agentic-operator-e2e-disconnected
     workflow: generic-claim
-  timeout: 18h0m0s
+  timeout: 26h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift
