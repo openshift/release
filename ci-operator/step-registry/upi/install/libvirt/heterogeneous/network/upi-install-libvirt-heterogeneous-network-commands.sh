@@ -45,12 +45,31 @@ fi
 
 echo "Defining and starting libvirt network ${CLUSTER_NAME} on primary hypervisor..."
 
-# Clean up any stale network left from a previous run (same lease, failed teardown).
-# net-destroy is a no-op if the network is inactive; net-undefine removes the definition.
+# Both lease slots on this host share the same subnet/bridge (e.g. ocp3).
+# A stale network from a prior run on a *different* slot leaves the bridge occupied
+# under a different network name, so checking by CLUSTER_NAME alone is not enough.
+# Extract the bridge name from the XML we are about to define and tear down ANY
+# existing libvirt network that holds that bridge, regardless of its name.
+BRIDGE_NAME=$(grep -oP "(?<=<bridge name=')[^']+" "${SHARED_DIR}/network.xml" || true)
+
+if [[ -n "${BRIDGE_NAME}" ]]; then
+  echo "Target bridge: ${BRIDGE_NAME} — scanning for any network already holding it..."
+  for NET in $(${VIRSH} net-list --all --name 2>/dev/null); do
+    [[ -z "${NET}" ]] && continue
+    NET_BRIDGE=$(${VIRSH} net-info "${NET}" 2>/dev/null | awk '/^Bridge:/{print $2}' || true)
+    if [[ "${NET_BRIDGE}" == "${BRIDGE_NAME}" ]]; then
+      echo "Removing stale network '${NET}' (bridge ${BRIDGE_NAME})..."
+      ${VIRSH} net-destroy "${NET}" 2>/dev/null || true
+      ${VIRSH} net-undefine "${NET}" 2>/dev/null || true
+    fi
+  done
+fi
+
+# Also remove by exact CLUSTER_NAME in case it exists under a different bridge.
 if ${VIRSH} net-info "${CLUSTER_NAME}" >/dev/null 2>&1; then
-  echo "Stale network ${CLUSTER_NAME} found, removing it before redefine..."
+  echo "Removing stale network '${CLUSTER_NAME}' by name..."
   ${VIRSH} net-destroy "${CLUSTER_NAME}" 2>/dev/null || true
-  ${VIRSH} net-undefine "${CLUSTER_NAME}"
+  ${VIRSH} net-undefine "${CLUSTER_NAME}" 2>/dev/null || true
 fi
 
 ${VIRSH} net-define "${SHARED_DIR}/network.xml"
