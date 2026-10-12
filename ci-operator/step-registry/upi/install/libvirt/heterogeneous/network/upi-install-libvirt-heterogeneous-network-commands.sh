@@ -70,9 +70,21 @@ if [[ ! -f "${SHARED_DIR}/network.xml" ]]; then
 fi
 
 # Host bridges and VXLAN lifecycle are managed by infra.
-ARM_BRIDGE_NAME="$(leaseLookup 'vxlan."additional-bridge"')"
+# Prefer lease vxlan.additional-bridge; fall back to VXLAN_ADDITIONAL_BRIDGE so
+# rehearsals can proceed while the lease secret is still being updated.
+ARM_BRIDGE_NAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.\"additional-bridge\"" "${LEASE_CONF}" 2>/dev/null || true)"
+if [[ -z "${ARM_BRIDGE_NAME}" || "${ARM_BRIDGE_NAME}" == "null" ]]; then
+  if [[ -n "${VXLAN_ADDITIONAL_BRIDGE:-}" ]]; then
+    echo "WARN: lease '${LEASED_RESOURCE}' missing vxlan.additional-bridge; using VXLAN_ADDITIONAL_BRIDGE=${VXLAN_ADDITIONAL_BRIDGE}"
+    ARM_BRIDGE_NAME="${VXLAN_ADDITIONAL_BRIDGE}"
+  else
+    echo "ERROR: Couldn't find 'vxlan.additional-bridge' in lease config for '${LEASED_RESOURCE}'" >&2
+    echo "ERROR: Set vxlan.additional-bridge in the cluster-profile lease secret, or set VXLAN_ADDITIONAL_BRIDGE on the job." >&2
+    exit 1
+  fi
+fi
 if [[ -z "${ARM_BRIDGE_NAME}" || "${ARM_BRIDGE_NAME}" =~ [^a-zA-Z0-9_-] ]]; then
-  echo "ERROR: Invalid infrastructure ARM bridge name" >&2
+  echo "ERROR: Invalid infrastructure additional bridge name '${ARM_BRIDGE_NAME}'" >&2
   exit 1
 fi
 printf '%s\n' "${ARM_BRIDGE_NAME}" > "${SHARED_DIR}/arm-bridge-name"
