@@ -27,9 +27,12 @@ if [ -n "$E2E_REF" ]; then
     https://github.com/openshift-hyperfleet/hyperfleet-e2e.git "${SRC_DIR}"
   cd "${SRC_DIR}"
   make build
-  # Build ginkgo CLI and test binary for parallel execution
-  (cd .bingo && GOWORK=off go build -mod=mod -modfile=ginkgo.mod \
-    -o "${SRC_DIR}/bin/ginkgo" "github.com/onsi/ginkgo/v2/ginkgo")
+  # Build ginkgo CLI and test binary for parallel execution. Build the CLI
+  # from the cloned module's own go.mod: every supported ref pins ginkgo/v2
+  # as a direct dependency, so the CLI always matches the branch's library
+  # version. The old .bingo/ginkgo.mod pin existed only briefly on main and
+  # is absent from every ref this step can run against.
+  GOWORK=off go build -o "${SRC_DIR}/bin/ginkgo" "github.com/onsi/ginkgo/v2/ginkgo"
   CGO_ENABLED=0 go test -c -o "${SRC_DIR}/bin/e2e.test" ./e2e
   GINKGO_BIN="${SRC_DIR}/bin/ginkgo"
   E2E_TEST_BIN="${SRC_DIR}/bin/e2e.test"
