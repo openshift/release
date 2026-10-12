@@ -74,6 +74,7 @@ ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 # Choose for hypershift hosts for "sno" or "1b1v" - 1 baremetal host
+# shellcheck disable=SC2034  # unused while the cluster is pinned below
 ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
