@@ -78,6 +78,25 @@ tests:
     - chain: openshift-e2e-test-netobserv-pf5
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 10h0m0s
+- as: netobserv-metal-ds-ipi-ovn-ipv4-f60-virt
+  capabilities:
+  - intranet
+  cron: 51 3 4 1,3,5,7,9,11 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      GINKGO_FOCUS_FILTER: with VMs
+      SKIP_FRONTEND_TESTS: "true"
+      SKIP_QE_APP_REGISTRY: "true"
+    test:
+    - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - chain: openshift-e2e-test-netobserv-pf5
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 zz_generated_metadata:
   branch: release-2.0
   org: openshift
