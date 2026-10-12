@@ -8,6 +8,8 @@ ref:
     mount_path: /var/run/vault/mirror-registry
   - collection: rhdh-plugin-export-overlays
     group: osl-rc
+    field: release-json
+    as: release.json
     mount_path: /var/run/vault/osl-rc
   from_image:
     name: rhdh-e2e-runner
@@ -25,15 +27,38 @@ ref:
   documentation: |-
     Runs the OSL RC smoke test on an OCP cluster.
 
-    The release.json manifest at /var/run/vault/osl-rc must provide:
+    The release.json manifest, stored as field osl-rc/release-json in the
+    rhdh-plugin-export-overlays Secret Manager collection, is mounted at
+    /var/run/vault/osl-rc and must provide:
     - rhdhVersion and ocpVersion.
     - A digest-pinned Logic IIB image in logic.iib.
     - Exact Logic subscription and CSV expectations: logic.package,
       logic.channel, logic.startingCSV, and logic.expectedVersion.
-    - Exact Serverless subscription and CSV expectations: serverless.package,
-      serverless.channel, serverless.source, serverless.sourceNamespace,
-      serverless.expectedVersion, and serverless.expectedCSV.
-    - The test grep in tests.grep.
+
+    Serverless defaults to the latest serverless-operator in the stable channel
+    of redhat-operators in openshift-marketplace, installed in openshift-operators
+    as expected by the upstream Orchestrator test installer.
+    Omit the serverless object to use these defaults. The installed CSV and version
+    are logged once installation succeeds.
+
+    To pin an available operator version, set serverless.expectedVersion, for
+    example {"serverless": {"expectedVersion": "1.37.1"}}. An optional leading v
+    is accepted. The starting CSV defaults to serverless-operator.v1.37.1;
+    serverless.expectedCSV can override its name and requires expectedVersion.
+    A pin uses Manual approval for both Serverless and Logic because OLM can
+    combine their changes in one install plan. The job approves only initial
+    plans containing the requested CSVs and leaves subsequent upgrades unapproved.
+    The requested version must exist in the selected catalog and channel.
+    Container image tags are not supported as operator version overrides.
+
+    Optional serverless.package, serverless.channel, serverless.source, and
+    serverless.sourceNamespace override the standard catalog settings.
+
+    Always runs these three upstream Orchestrator tests with one worker:
+    - Run Greeting workflow and verify Workflows tab
+    - Run Failswitch workflow and verify statuses
+    - Rerun Failswitch from failure point
+    Requires all three to pass, with no failures, skips, or flakes.
 
     Credentials are mounted from openshift-qe/mirror-registry at
     /var/run/vault/mirror-registry and must provide registry_brew.json and
