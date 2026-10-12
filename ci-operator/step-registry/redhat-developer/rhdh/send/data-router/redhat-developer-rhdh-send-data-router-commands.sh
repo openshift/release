@@ -62,16 +62,19 @@ get_artifacts_url() {
   local artifacts_base_url="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
   local artifacts_complete_url
   if [ -n "${PULL_NUMBER:-}" ]; then
-    local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-}"         # e.g. "e2e-ocp-operator-nightly"
-    local suite_name="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-e2e-}" # e.g. "ocp-operator-nightly"
+    local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}"         # e.g. "e2e-ocp-operator-nightly"
+    local suite_name="${JOB_NAME##pull-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-}" # e.g. "ocp-operator-nightly"
     local part_2="redhat-developer-rhdh-${suite_name}"                      # e.g. "redhat-developer-rhdh-ocp-operator-nightly"
     # Override part_2 for specific cases that do not follow the standard naming convention.
     case "$JOB_NAME" in
       *osd-gcp*)
         part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
         ;;
-      *ocp-v*helm*-nightly*)
+      *ocp-v*helm*-nightly*|*ocp-helm-runtime-nightly*)
         part_2="redhat-developer-rhdh-ocp-helm-nightly"
+        ;;
+      *ocp-operator-runtime-nightly*)
+        part_2="redhat-developer-rhdh-ocp-operator-nightly"
         ;;
     esac
     artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
@@ -84,8 +87,11 @@ get_artifacts_url() {
       *osd-gcp*)
         part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
         ;;
-      *ocp-v*helm*-nightly*)
+      *ocp-v*helm*-nightly*|*ocp-helm-runtime-nightly*)
         part_2="redhat-developer-rhdh-ocp-helm-nightly"
+        ;;
+      *ocp-operator-runtime-nightly*)
+        part_2="redhat-developer-rhdh-ocp-operator-nightly"
         ;;
     esac
     artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
