@@ -35,6 +35,13 @@ releases:
       product: ocp
       stream: nightly
       version: "4.22"
+  initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.22"
   latest:
     candidate:
       product: ocp
@@ -475,7 +482,18 @@ tests:
 - as: e2e-ibmz-s390x-mgmt-ovn-conformance-agent-oz
   capabilities:
   - intranet
-  cron: 0 8 * * 1-4
+  cluster: build12
+  cron: 30 0 * * 1,3,5
+  reporter_config:
+    channel: '#ibmz-prowci-notifier'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: libvirt-s390x-vpn-hcp
     dependencies:
@@ -489,7 +507,7 @@ tests:
       USE_EXTERNAL_DNS: "true"
       USE_RAMFS: "true"
     workflow: hypershift-mce-ibmz-conformance-s390xmgmt-phase2-oz
-  timeout: 10h0m0s
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: release-4.22
   org: openshift
