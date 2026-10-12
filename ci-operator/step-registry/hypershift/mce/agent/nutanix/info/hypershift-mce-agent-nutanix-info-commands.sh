@@ -44,7 +44,7 @@ fi
 
 if [[ -f "$SHARED_DIR/packet-conf.sh" ]]; then
   source "$SHARED_DIR/packet-conf.sh"
-  ssh "\${SSHOPTS[@]}" "root@$IP" 'sudo podman logs --tail=500 external-squid 2>&1' > "$ARTIFACT_DIR/nutanix-squid.log" 2>&1 || true
+  ssh "${SSHOPTS[@]}" "root@$IP" 'sudo podman logs --tail=500 external-squid 2>&1' > "$ARTIFACT_DIR/nutanix-squid.log" 2>&1 || true
 fi
 
 if [[ -s "$SHARED_DIR/nutanix_squid_allowed_hosts" ]]; then
