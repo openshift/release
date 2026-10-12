@@ -167,7 +167,15 @@ if echo "${ADD_CURRENT_NETS}" | grep -Fxq "${ARM_NETWORK_NAME}"; then
   ARM_NET_BRIDGE=$(${VIRSH_ADDITIONAL} net-dumpxml "${ARM_NETWORK_NAME}" 2>/dev/null |
     yq-v4 -p=xml --xml-attribute-prefix='@' -oy '.network.bridge."@name"' 2>/dev/null || true)
   EXPECTED_ARM_BRIDGE="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.\"additional-bridge\"" "${LEASE_CONF}" 2>/dev/null || true)"
+  if [[ -z "${EXPECTED_ARM_BRIDGE}" || "${EXPECTED_ARM_BRIDGE}" == "null" ]]; then
+    if [[ -f "${SHARED_DIR}/arm-bridge-name" ]]; then
+      EXPECTED_ARM_BRIDGE="$(< "${SHARED_DIR}/arm-bridge-name")"
+    else
+      EXPECTED_ARM_BRIDGE="${VXLAN_ADDITIONAL_BRIDGE:-}"
+    fi
+  fi
   if [[ -z "${ARM_NET_BRIDGE}" || "${ARM_NET_BRIDGE}" == "null" || \
+        -z "${EXPECTED_ARM_BRIDGE}" || \
         "${ARM_NET_BRIDGE}" != "${EXPECTED_ARM_BRIDGE}" ]]; then
     echo "ERROR: ARM network '${ARM_NETWORK_NAME}' references bridge '${ARM_NET_BRIDGE}'," \
          " expected '${EXPECTED_ARM_BRIDGE}'; refusing to remove" >&2
