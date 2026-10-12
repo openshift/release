@@ -3,6 +3,10 @@
 set -x
 set -e
 
+# Target the management cluster before any oc call
+echo "$(date) Targeting management cluster kubeconfig"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
 # --- Step 0: Download and install the hcp CLI ---
 echo "$(date) Installing hcp CLI"
 mkdir -p /tmp/hcp_cli
@@ -20,8 +24,6 @@ curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64
 export PATH=$PATH:/tmp/bin
 
 # --- Step 1: Prepare management cluster and create the HCP Agent hosted cluster ---
-echo "$(date) Targeting management cluster kubeconfig"
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 # Enable wildcard DNS routes so guest *.apps routes resolve through the management ingress
 oc patch ingresscontroller -n openshift-ingress-operator default \
