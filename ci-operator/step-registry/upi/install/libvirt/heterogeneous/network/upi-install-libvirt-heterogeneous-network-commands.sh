@@ -44,6 +44,15 @@ if [[ ! -f "${SHARED_DIR}/network.xml" ]]; then
 fi
 
 echo "Defining and starting libvirt network ${CLUSTER_NAME} on primary hypervisor..."
+
+# Clean up any stale network left from a previous run (same lease, failed teardown).
+# net-destroy is a no-op if the network is inactive; net-undefine removes the definition.
+if ${VIRSH} net-info "${CLUSTER_NAME}" >/dev/null 2>&1; then
+  echo "Stale network ${CLUSTER_NAME} found, removing it before redefine..."
+  ${VIRSH} net-destroy "${CLUSTER_NAME}" 2>/dev/null || true
+  ${VIRSH} net-undefine "${CLUSTER_NAME}"
+fi
+
 ${VIRSH} net-define "${SHARED_DIR}/network.xml"
 ${VIRSH} net-autostart "${CLUSTER_NAME}"
 ${VIRSH} net-start "${CLUSTER_NAME}"
