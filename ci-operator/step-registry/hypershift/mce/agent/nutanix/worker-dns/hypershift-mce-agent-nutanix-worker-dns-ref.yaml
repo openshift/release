@@ -1,0 +1,22 @@
+ref:
+  as: hypershift-mce-agent-nutanix-worker-dns
+  from: dev-scripts
+  cli: latest
+  commands: hypershift-mce-agent-nutanix-worker-dns-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 35m0s
+  grace_period: 5m0s
+  env:
+  - name: NUTANIX_DNS_UPSTREAM
+    default: "127.0.0.1"
+    documentation: Baremetal management-side DNS server used for non-HostedCluster queries.
+  documentation: >-
+    Starts a run-scoped dnsmasq bound only to the baremetal host's WireGuard IP. Nutanix workers
+    query the gateway VM's subnet IP, which forwards UDP and TCP 53 through the lease-owned tunnel.
+    The host firewall admits DNS only from the gateway's tunnel IP. Shared subnet DHCP is unchanged.
+    Request path: Worker → gateway subnet IP → gateway DNAT to host tunnel IP + SNAT to gateway tunnelIP
+    → WireGuard → baremetal dnsmasq
+    This is to prevent exposing DNS servers to the public internet.
