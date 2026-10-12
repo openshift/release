@@ -42,6 +42,87 @@ ref:
     documentation: |-
       Gangway API override for TRIAGE_EXISTING_ONLY. When triggering via
       Gangway, pass as pod_spec_options.envs.
+  - name: TRIAGE_VIEWS
+    default: ""
+    documentation: |-
+      Space-separated list of Component Readiness views to triage in one
+      run (e.g. "4.20-main 4.21-main 4.22-main"). When set, it takes
+      precedence over TRIAGE_VIEW; the pre-pass clusters regressions
+      across all listed views. Used by the post-GA policy.
+  - name: MULTISTAGE_PARAM_OVERRIDE_TRIAGE_VIEWS
+    default: ""
+    documentation: |-
+      Gangway API override for TRIAGE_VIEWS. When triggering via Gangway,
+      pass as pod_spec_options.envs.
+  - name: TRIAGE_POLICY
+    default: "duty"
+    documentation: |-
+      "duty" (default) runs the skill exactly as before. "post-ga" runs
+      the post-GA policy for released versions: implies
+      TRIAGE_EXISTING_ONLY=true, runs the deterministic pre-pass
+      (scripts/prepass.py) before the agent, follows
+      references/post-ga-policy.md, limits JIRA writes to triage links and
+      the backport-candidate comment, publishes triage-manifest.json, and
+      runs the post-run audit (Sippy triage-catalogue diff, account-wide
+      JIRA creations) plus runner-receipt.json.
+  - name: MULTISTAGE_PARAM_OVERRIDE_TRIAGE_POLICY
+    default: ""
+    documentation: |-
+      Gangway API override for TRIAGE_POLICY. When triggering via Gangway,
+      pass as pod_spec_options.envs.
+  - name: TRIAGE_WRITE_MODE
+    default: "auto"
+    documentation: |-
+      "auto" lets the skill write triage records (and, under post-ga, the
+      allowed JIRA writes) when the policy's evidence bar is met. "report"
+      performs no Sippy or JIRA write at all and records every intended
+      action with status skipped-report-mode (shadow mode). Only honoured
+      by TRIAGE_POLICY=post-ga; the previous run's receipt can force
+      "report" regardless of this setting.
+  - name: MULTISTAGE_PARAM_OVERRIDE_TRIAGE_WRITE_MODE
+    default: ""
+    documentation: |-
+      Gangway API override for TRIAGE_WRITE_MODE. When triggering via
+      Gangway, pass as pod_spec_options.envs.
+  - name: TRIAGE_MODE
+    default: "weekly"
+    documentation: |-
+      "weekly" runs the full analysis. "tripwire" runs only the
+      deterministic pre-pass over the last 24 hours of newly opened
+      regressions, writes burst-status.json to the artifacts directory and
+      exits without any LLM call or write.
+  - name: MULTISTAGE_PARAM_OVERRIDE_TRIAGE_MODE
+    default: ""
+    documentation: |-
+      Gangway API override for TRIAGE_MODE. When triggering via Gangway,
+      pass as pod_spec_options.envs.
+  - name: TRIAGE_BASELINE
+    default: "auto"
+    documentation: |-
+      "auto" fetches triage-manifest.json (weekly) or burst-status.json
+      (tripwire) from the latest preceding attempt of the same job in
+      GCS and uses it as the baseline for growth/lineage/dedup. "none"
+      runs without a baseline (first run, or when job history is not
+      readable).
+  - name: MULTISTAGE_PARAM_OVERRIDE_TRIAGE_BASELINE
+    default: ""
+    documentation: |-
+      Gangway API override for TRIAGE_BASELINE. When triggering via
+      Gangway, pass as pod_spec_options.envs.
+  - name: POSTGA_ACK_RECEIPT
+    default: ""
+    documentation: |-
+      Run id whose runner-receipt.json a bulk_triage_managers member
+      acknowledges. When it names the latest preceding attempt, a receipt
+      that would otherwise force TRIAGE_WRITE_MODE=report (a JIRA creation
+      or an undeclared Sippy write recorded by the audit) is accepted and
+      the configured write mode applies again. Normally passed once via
+      Gangway after review.
+  - name: MULTISTAGE_PARAM_OVERRIDE_POSTGA_ACK_RECEIPT
+    default: ""
+    documentation: |-
+      Gangway API override for POSTGA_ACK_RECEIPT. When triggering via
+      Gangway, pass as pod_spec_options.envs.
   - name: AI_HELPERS_REPO
     default: ""
     documentation: |-
@@ -118,5 +199,15 @@ ref:
     appends Component Readiness triage links as the service account.
     With TRIAGE_EXISTING_ONLY=true, no new JIRA bugs are filed; those
     become report proposals.
+    With TRIAGE_POLICY=post-ga (released versions), the run is
+    existing-only, starts with the deterministic pre-pass over
+    TRIAGE_VIEWS, follows references/post-ga-policy.md, writes
+    triage-manifest.json next to the report, audits itself afterwards
+    (Sippy triage-catalogue diff against the declared actions, account-wide
+    JIRA creations in the run window) and writes runner-receipt.json; a
+    receipt recording a creation or an undeclared write forces the next
+    run into TRIAGE_WRITE_MODE=report until a manager acknowledges it via
+    POSTGA_ACK_RECEIPT. TRIAGE_MODE=tripwire runs only the pre-pass over
+    the last 24 hours and publishes burst-status.json without any LLM call.
     Release blockers and new Sippy labels/symptoms remain report
     recommendations rather than being created.
