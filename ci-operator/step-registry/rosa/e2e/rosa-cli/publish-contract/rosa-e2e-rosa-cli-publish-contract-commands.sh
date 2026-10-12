@@ -60,35 +60,42 @@ fi
 $WAS_TRACING && set -x
 
 # ---- Contract artifact: ${SHARED_DIR}/kubeconfig (customer plane) ----
-# The rosa CLI flow writes the admin kubeconfig via rosa-conf-idp-htpasswd. If it is missing
-# (e.g. a private cluster not reachable here), fall back to OCM credentials; a miss is non-fatal,
-# backplane-login provides the kubeconfig later and the customer-plane validation fails loudly if
-# it is still absent.
+# The rosa CLI flow writes the customer-plane admin kubeconfig via rosa-conf-idp-htpasswd (oc login).
+# If it is absent, leave it unset: rosa-backplane-login provides bp-kubeconfig for the customer plane,
+# and the customer-plane validation fails loudly if neither is present. We deliberately do not fetch
+# the kubeconfig from the OCM credentials API as a fallback: for a private cluster that call still
+# returns a kubeconfig, but one pointing at an internal API endpoint that is unreachable from CI, so
+# writing it would mask the need for backplane and make the downstream steps unstable.
 if [[ -s "${SHARED_DIR}/kubeconfig" ]]; then
-  # Written by rosa-conf-idp-htpasswd. Lock down the token-bearing file to match the OCM head
-  # (rosa-conf-idp-htpasswd does not set restrictive perms).
+  # Lock down the token-bearing file to match the OCM head (rosa-conf-idp-htpasswd does not chmod it).
   chmod 0600 "${SHARED_DIR}/kubeconfig"
   log "Using customer-plane kubeconfig from rosa-conf-idp-htpasswd"
-elif ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" \
-       | jq -re '.kubeconfig' > "${SHARED_DIR}/kubeconfig" 2>/dev/null; then
-  chmod 0600 "${SHARED_DIR}/kubeconfig"
-  log "Wrote customer-plane kubeconfig to \${SHARED_DIR}/kubeconfig from OCM"
 else
-  rm -f "${SHARED_DIR}/kubeconfig"
-  log "Guest kubeconfig not available from OCM (private cluster?); backplane-login will provide it"
+  log "No customer-plane kubeconfig from rosa-conf-idp-htpasswd; backplane-login will provide bp-kubeconfig"
 fi
 
 # ---- Contract artifact: ${SHARED_DIR}/cluster-metadata.json (ROSAENG-67580) ----
 # Same schema as rosa-e2e-ocm-provision so validation refs self-select assertions without per-job
 # config and cannot tell the heads apart. schema_version lets the contract evolve; bump it when the
 # shape changes.
-cluster_json=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}" 2>/dev/null || echo '{}')
+# Fail rather than publish an incomplete contract: if the cluster lookup fails we would otherwise
+# write empty name/region/version and let every downstream step run against bad metadata.
+if ! cluster_json=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}"); then
+  log "ERROR: failed to fetch cluster ${CLUSTER_ID} from OCM; cannot publish the contract"
+  exit 1
+fi
 resolved_region=$(jq -r '.region.id // empty' <<<"${cluster_json}")
 resolved_version=$(jq -r '.version.raw_id // .openshift_version // empty' <<<"${cluster_json}")
 resolved_channel=$(jq -r '.version.channel_group // empty' <<<"${cluster_json}")
 resolved_name=$(jq -r '.name // empty' <<<"${cluster_json}")
 if [[ -z "${resolved_name}" && -s "${SHARED_DIR}/cluster-name" ]]; then
   resolved_name=$(head -n 1 "${SHARED_DIR}/cluster-name")
+fi
+# The cluster name and region identify the cluster under test; refuse to publish a contract without
+# them rather than emitting empty strings the validation refs would silently accept.
+if [[ -z "${resolved_name}" || -z "${resolved_region:-${REGION}}" ]]; then
+  log "ERROR: incomplete cluster metadata (name='${resolved_name}', region='${resolved_region:-${REGION}}'); cannot publish the contract"
+  exit 1
 fi
 if [[ "${HOSTED_CP}" == "true" ]]; then topology="hcp"; else topology="classic"; fi
 

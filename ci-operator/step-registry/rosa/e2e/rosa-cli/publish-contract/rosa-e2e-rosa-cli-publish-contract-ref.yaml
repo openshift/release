@@ -63,8 +63,10 @@ ref:
     contract artifact, ${SHARED_DIR}/cluster-metadata.json (cluster type, region, channel, feature
     flags), using the same schema and schema_version as rosa-e2e-ocm-provision so the
     provisioner-agnostic validation refs (rosa-e2e-validate-customer / rosa-e2e-validate-platform)
-    cannot tell which head produced the cluster. It also back-fills ${SHARED_DIR}/kubeconfig from OCM
-    if the CLI flow did not produce one (non-fatal: backplane-login provides it for private clusters).
+    cannot tell which head produced the cluster. If rosa-conf-idp-htpasswd did not produce a
+    customer-plane kubeconfig (e.g. a private cluster whose API is unreachable from CI), it is left
+    unset for rosa-backplane-login to provide via bp-kubeconfig. The step fails rather than publish an
+    incomplete contract if the OCM cluster lookup fails or the cluster name/region cannot be resolved.
 
     Run this immediately after the rosa CLI cluster-create flow. Requires ocm and jq (provided by the
     rosa-aws-cli image) and OCM credentials in the cluster profile.
