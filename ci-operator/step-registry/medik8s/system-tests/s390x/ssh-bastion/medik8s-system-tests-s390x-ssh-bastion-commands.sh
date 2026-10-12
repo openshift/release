@@ -170,10 +170,19 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: ssh-bastion
-      # Keep bastion off workers. NHC/SNR remediation reboots workers and
-      # kills hostNetwork pods + the CI pod's oc port-forward to :12222.
+      # Keep bastion off workers (NHC remediates workers). Prefer control-2/1
+      # so SNR's typical control-0 master remediation does not kill bastion.
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values: ["control-2", "control-1"]
       tolerations:
       - key: node-role.kubernetes.io/master
         operator: Exists

@@ -23,6 +23,32 @@ fi
 # hostNetwork ssh-bastion and force every ssh(1) through it with a PATH wrapper
 # (previous ~/.ssh/config Host wildcards were not applied — ssh dialed nodes
 # directly and timed out).
+cleanup_ssh_bastion_proxy() {
+  local sup_pid pf_pid
+  # The supervised port-forward loop must die when tests finish; otherwise
+  # entrypoint sees an open log pipe and waits until the 3h step timeout
+  # (SNR green suites have already failed this way).
+  touch /tmp/ssh-bastion-port-forward.stop
+  if [[ -f /tmp/ssh-bastion-port-forward.pid ]]; then
+    pf_pid="$(cat /tmp/ssh-bastion-port-forward.pid 2>/dev/null || true)"
+    if [[ -n "${pf_pid}" ]]; then
+      kill "${pf_pid}" 2>/dev/null || true
+    fi
+  fi
+  if [[ -f /tmp/ssh-bastion-port-forward-supervisor.pid ]]; then
+    sup_pid="$(cat /tmp/ssh-bastion-port-forward-supervisor.pid 2>/dev/null || true)"
+    if [[ -n "${sup_pid}" ]]; then
+      kill "${sup_pid}" 2>/dev/null || true
+      wait "${sup_pid}" 2>/dev/null || true
+    fi
+  fi
+  pkill -f 'port-forward svc/ssh-bastion' 2>/dev/null || true
+  rm -f /tmp/ssh-bastion-port-forward.pid \
+    /tmp/ssh-bastion-port-forward-supervisor.pid \
+    /tmp/ssh-bastion-port-forward.stop
+}
+trap cleanup_ssh_bastion_proxy EXIT
+
 setup_ssh_bastion_proxy() {
   local mode host port bastion_key_src bastion_key_dst worker_key_src worker_key_dst wrapper_dir
 
@@ -72,23 +98,24 @@ setup_ssh_bastion_proxy() {
       host="127.0.0.1"
       port=12222
       # Supervisor: restart port-forward if it dies (API blip, bastion
-      # reschedule). Destructive NHC tests need SSH across many remediations.
+      # reschedule). Fully detach stdio so entrypoint does not wait on us.
+      # Stop via /tmp/ssh-bastion-port-forward.stop from EXIT trap.
+      rm -f /tmp/ssh-bastion-port-forward.stop
       (
         attempt=0
-        while true; do
+        while [[ ! -f /tmp/ssh-bastion-port-forward.stop ]]; do
           attempt=$((attempt + 1))
-          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) starting oc port-forward attempt=${attempt}" \
-            >>"${ARTIFACT_DIR}/ssh-bastion-port-forward.log"
-          oc -n test-ssh-bastion port-forward svc/ssh-bastion "${port}:22" \
-            >>"${ARTIFACT_DIR}/ssh-bastion-port-forward.log" 2>&1 &
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) starting oc port-forward attempt=${attempt}"
+          oc -n test-ssh-bastion port-forward svc/ssh-bastion "${port}:22" &
           pf_pid=$!
           echo "${pf_pid}" > /tmp/ssh-bastion-port-forward.pid
           wait "${pf_pid}" || true
-          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) port-forward exited; restarting in 2s" \
-            >>"${ARTIFACT_DIR}/ssh-bastion-port-forward.log"
+          [[ -f /tmp/ssh-bastion-port-forward.stop ]] && break
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) port-forward exited; restarting in 2s"
           sleep 2
         done
-      ) &
+        echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) port-forward supervisor stopped"
+      ) >>"${ARTIFACT_DIR}/ssh-bastion-port-forward.log" 2>&1 </dev/null &
       echo $! > /tmp/ssh-bastion-port-forward-supervisor.pid
       for _ in $(seq 1 90); do
         if (echo >/dev/tcp/127.0.0.1/"${port}") >/dev/null 2>&1; then
