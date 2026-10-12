@@ -1,0 +1,34 @@
+chain:
+  as: cucushift-installer-rehearse-azure-il6-ipi-disconnected-deprovision
+  steps:
+  - ref: gather-installer-boostrap-logs-in-bastion
+  - ref: gather-mirror-registry
+  - chain: gather-network
+  - chain: gather-core-dump
+  - chain: gather
+  # Destroys the cluster on the emulated IL6 plane. Must run on the bastion for the same reason
+  # the install does: *.microsoft.scloud has no route from a CI pod, and a destroy that cannot
+  # reach ARM silently leaks every resource it was meant to remove.
+  - ref: ipi-deprovision-deprovision-in-bastion
+  # Removes only what CI created on the commercial plane, matched on this run's name prefix.
+  - ref: azure-il6-deprovision-resources
+  env:
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+  - name: AZURE_IL6_VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+  documentation: |-
+    Tears down the Azure IL6 cluster and the commercial-plane resources this job created.
+
+    Deliberately does NOT use the usual Azure teardown chains. Three separate paths in this
+    registry delete a whole resource group:
+
+      openshift-install destroy             deletes platform.azure.resourceGroupName
+      azure-deprovision-resourcegroup       deletes every group named in ${SHARED_DIR}/resourcegroup*
+      ipi-deprovision-azure-resourcegroup   deletes platform.azure.resourceGroupName
+
+    In every other Azure job that is correct, because the group was created for the run. Here the
+    group is permanent and holds a VPN gateway plus two IPsec tunnels to the emulator that CI
+    cannot rebuild. The first path is made safe by an assertion in ipi-conf-azureil6; the other
+    two are simply not in this chain, and azure-il6-provision-subnets never writes the
+    ${SHARED_DIR}/resourcegroup* files that would arm them.

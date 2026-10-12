@@ -1,0 +1,47 @@
+ref:
+  as: azure-il6-check-prereqs
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-check-prereqs-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+    documentation: |-
+      The pre-provisioned, permanent resource group holding the emulator's VNet, VPN gateway and
+      tunnels. This group is a shared fixture and is NEVER created or deleted by CI.
+  - name: AZURE_IL6_VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+    documentation: |-
+      The pre-provisioned VNet inside AZURE_IL6_RESOURCE_GROUP that the cluster is installed into.
+  - name: AZURE_IL6_REGION
+    default: "westus2"
+    documentation: |-
+      The commercial-plane Azure region that AZURE_IL6_RESOURCE_GROUP lives in. This is NOT the
+      emulated IL6 region (see AZURE_IL6_CLUSTER_REGION in ipi-conf-azureil6).
+  - name: AZURE_IL6_REQUIRED_FREE_SUBNETS
+    default: "2"
+    documentation: |-
+      How many free /24s the job needs inside the VNet. Used only to produce a clear error message
+      before anything is provisioned.
+  documentation: |-
+    Fail-fast preflight for the Azure IL6 emulated-environment job.
+
+    Verifies, against the commercial Azure plane, that the shared fixture this job depends on is
+    actually present and healthy BEFORE any resource is created or any 40-minute install is
+    attempted:
+
+      * the resource group exists, and is in the expected region
+      * the VNet exists and has address space
+      * every IPsec connection in the group reports connectionStatus == Connected
+      * the VNet's DNS servers are set (these resolve the emulated IL6 ARM endpoint across the
+        tunnels; if they are empty, nothing downstream can work)
+      * there is enough free subnet space for this run
+
+    This step is read-only. It creates, modifies and deletes nothing.
