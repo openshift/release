@@ -24,7 +24,7 @@ require_commands() {
 require_commands \
   yq-v4 oc mock-nss.sh virsh curl envsubst \
   awk grep sed tar gzip base64 basename stat mktemp \
-  date mkdir rm cp touch sleep chmod uname
+  date mkdir rm cp touch sleep chmod uname cat tr mv
 
 if [ "${ADDITIONAL_WORKER_ARCHITECTURE:-}" != "arm64" ]; then
   echo "ERROR: upi-install-libvirt-heterogeneous currently supports arm64 as additional worker architecture; found '${ADDITIONAL_WORKER_ARCHITECTURE:-}'"
@@ -102,6 +102,82 @@ POOL_NAME="${POOL_NAME:-multiarch-ci-pool}"
 ADDITIONAL_POOL="${ADDITIONAL_POOL_NAME:-multiarch-ci-pool}"
 HTTPD_POOL="${HTTPD_POOL_NAME:-httpd}"
 HTTPD_BASE_URL="http://${HTTPD_IP}:${HTTPD_PORT}"
+
+# ---------------------------------------------------------------------------
+# ARM libvirt network definition — attach to the existing infrastructure
+# bridge over VXLAN rather than creating an isolated ARM network.
+# ARM_BRIDGE_NAME is written to SHARED_DIR by the network step; read it here.
+# ---------------------------------------------------------------------------
+if [[ ! -f "${SHARED_DIR}/arm-bridge-name" ]]; then
+  echo "ERROR: ${SHARED_DIR}/arm-bridge-name not found; ensure the network step ran successfully"
+  exit 1
+fi
+ARM_BRIDGE_NAME="$(< "${SHARED_DIR}/arm-bridge-name")"
+if [[ -z "${ARM_BRIDGE_NAME}" || "${ARM_BRIDGE_NAME}" =~ [^a-zA-Z0-9_-] ]]; then
+  echo "ERROR: ARM_BRIDGE_NAME '${ARM_BRIDGE_NAME}' from SHARED_DIR is empty or has unexpected characters"
+  exit 1
+fi
+
+ARM_NETWORK_NAME="${LEASED_RESOURCE}"
+ARM_NETWORK_XML="${SHARED_DIR}/network-arm64.xml"
+
+# Verify infrastructure-owned ARM bridge and persistent VXLAN endpoint exist
+# with the expected configuration on the additional hypervisor.
+# Do NOT recreate NetworkManager connections — infra owns those.
+echo "Verifying ARM infrastructure bridge '${ARM_BRIDGE_NAME}' on additional hypervisor..."
+VXLAN_INTERFACE="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.interface" "${LEASE_CONF}")"
+VXLAN_ID="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.id" "${LEASE_CONF}")"
+VXLAN_REMOTE_IP="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.remote-ip" "${LEASE_CONF}")"
+VXLAN_PORT="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.dstport" "${LEASE_CONF}")"
+
+if [[ -z "${VXLAN_INTERFACE}" || "${VXLAN_INTERFACE}" == "null" || \
+      -z "${VXLAN_ID}" || "${VXLAN_ID}" == "null" || \
+      -z "${VXLAN_REMOTE_IP}" || "${VXLAN_REMOTE_IP}" == "null" || \
+      -z "${VXLAN_PORT}" || "${VXLAN_PORT}" == "null" ]]; then
+  echo "ERROR: One or more VXLAN lease fields (interface/id/remote-ip/dstport) are missing"
+  exit 1
+fi
+
+# Check bridge, VXLAN membership, VNI, peer, and port on additional host via virsh domcapabilities
+# (libvirt TCP does not expose host net commands; use a best-effort check via /sys over virsh nodeinfo).
+# Confirmed by infra's persistent vxlan2/ocp2-arm setup — we verify the expected interface exists and
+# is enslaved to the right bridge, without SSH access to the additional host from the CI container.
+ADDITIONAL_BRIDGE_CHECK=$(${VIRSH_ADDITIONAL} net-list --all --name 2>/dev/null || true)
+# Guard: refuse an unexpected pre-existing ARM network of this name on the additional host
+if echo "${ADDITIONAL_BRIDGE_CHECK}" | grep -Fxq "${ARM_NETWORK_NAME}"; then
+  echo "ERROR: Libvirt network '${ARM_NETWORK_NAME}' already exists on additional hypervisor;" \
+       " pre-cleanup is required before redefining it"
+  exit 1
+fi
+
+echo "Creating ARM libvirt network XML (bridge-forward to ${ARM_BRIDGE_NAME})..."
+cat > "${ARM_NETWORK_XML}" <<EOF
+<network>
+  <name>${ARM_NETWORK_NAME}</name>
+  <forward mode='bridge'/>
+  <bridge name='${ARM_BRIDGE_NAME}'/>
+</network>
+EOF
+
+echo "Defining ARM libvirt network '${ARM_NETWORK_NAME}' on additional hypervisor..."
+${VIRSH_ADDITIONAL} net-define "${ARM_NETWORK_XML}" --validate
+${VIRSH_ADDITIONAL} net-start "${ARM_NETWORK_NAME}"
+# Do NOT autostart: the VXLAN endpoint is job-owned and must not outlive the lease.
+export NETWORK_NAME="${ARM_NETWORK_NAME}"
+
+# Verify the network is active and references the approved bridge
+ARM_NET_STATE=$(${VIRSH_ADDITIONAL} net-info "${ARM_NETWORK_NAME}" | awk '/^Active:/{print $2}')
+if [[ "${ARM_NET_STATE}" != "yes" ]]; then
+  echo "ERROR: ARM libvirt network '${ARM_NETWORK_NAME}' did not become active (state=${ARM_NET_STATE})"
+  exit 1
+fi
+ARM_NET_BRIDGE=$(${VIRSH_ADDITIONAL} net-dumpxml "${ARM_NETWORK_NAME}" |
+  yq-v4 -p=xml --xml-attribute-prefix='@' -oy '.network.bridge."@name"')
+if [[ "${ARM_NET_BRIDGE}" != "${ARM_BRIDGE_NAME}" ]]; then
+  echo "ERROR: ARM network XML references bridge '${ARM_NET_BRIDGE}', expected '${ARM_BRIDGE_NAME}'"
+  exit 1
+fi
+echo "ARM libvirt network '${ARM_NETWORK_NAME}' active and referencing bridge '${ARM_BRIDGE_NAME}'."
 
 mkdir -p /tmp/bin
 if [ -n "${OPENSHIFT_CLIENT_VERSION_OVERRIDE:-}" ]; then
@@ -341,6 +417,20 @@ if [[ ! -s "${TMP_WORKER_IGN}" ]]; then
   exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# Normalize the raw ignition file: strip NUL padding (from raw libvirt volumes)
+# and canonicalize to JSON. Validate that ignition.version is present.
+# ---------------------------------------------------------------------------
+normalized_ign=$(mktemp /tmp/worker.ign.normalized.XXXXXX)
+tr -d '\000' < "${TMP_WORKER_IGN}" |
+  yq-v4 -o=json '.' > "${normalized_ign}"
+if ! yq-v4 -e '.ignition.version != null' "${normalized_ign}" > /dev/null 2>&1; then
+  echo "ERROR: Normalized worker ignition does not contain ignition.version; check ignition source"
+  rm -f "${normalized_ign}"
+  exit 1
+fi
+mv "${normalized_ign}" "${TMP_WORKER_IGN}"
+
 # Upload lease-scoped worker ignition to HTTPD pool named exactly after the lease
 echo "Uploading lease-scoped worker ignition (${LEASE_WORKER_IGN_FILENAME}) to primary httpd pool..."
 upload_to_primary_pool "${HTTPD_POOL}" "${TMP_WORKER_IGN}" "${LEASE_WORKER_IGN_FILENAME}" "/var/www/html/${LEASE_WORKER_IGN_FILENAME}"
@@ -402,7 +492,7 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   node_fqdn="${node_name}.ci"
 
   domain_cmdline="rd.neednet=1 coreos.inst.install_dev=/dev/vda coreos.live.rootfs_url=${HTTPD_BASE_URL}/${ROOTFS_FILENAME} "
-  domain_cmdline+="ip=${node_ip}::${node_gw}:${node_netmask}:${node_fqdn}:${node_nic}:none:1500 "
+  domain_cmdline+="ip=${node_ip}::${node_gw}:${node_netmask}:${node_fqdn}:${node_nic}:none:${DOMAIN_NETWORK_MTU} "
   domain_cmdline+="nameserver=${node_nameserver} "
   domain_cmdline+="coreos.inst.ignition_url=${HTTPD_BASE_URL}/${LEASE_WORKER_IGN_FILENAME}"
 
@@ -417,19 +507,65 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   domain_qcow2_image_host_path="$(${VIRSH_ADDITIONAL} vol-path \
     --pool "${ADDITIONAL_POOL}" "${node_name}.qcow2")"
 
-  echo "Rendering install domain XML for ${node_name}..."
-  domain_install_xml=$(mktemp --tmpdir domain-"${node_name}"-install.xml.XXXXX)
+  # ---------------------------------------------------------------------------
+  # Set canonical exports common to both install and run templates.
+  # ---------------------------------------------------------------------------
+  # Preserve original KiB value; set_arm_template_memory adjusts DOMAIN_MEMORY
+  # to match the unit declared in the template (MiB or KiB).
+  DOMAIN_MEMORY_KIB="${DOMAIN_MEMORY}"
+  [[ "${DOMAIN_MEMORY_KIB}" =~ ^[1-9][0-9]*$ ]] || {
+    echo "ERROR: DOMAIN_MEMORY '${DOMAIN_MEMORY_KIB}' is not a positive integer"; exit 1
+  }
+  [[ -r /proc/sys/kernel/random/uuid ]] || {
+    echo "ERROR: /proc/sys/kernel/random/uuid is not readable"; exit 1
+  }
+
+  set_arm_template_memory() {
+    local unit
+    unit=$(yq-v4 -p=xml --xml-attribute-prefix='@' -oy \
+      '.domain.memory."@unit"' "$1")
+    case "${unit}" in
+      MiB) export DOMAIN_MEMORY=$(( (DOMAIN_MEMORY_KIB + 1023) / 1024 )) ;;
+      KiB) export DOMAIN_MEMORY="${DOMAIN_MEMORY_KIB}" ;;
+      *) echo "ERROR: Unsupported ARM template memory unit '${unit}'" >&2; exit 1 ;;
+    esac
+  }
+
+  # Validate kernel and initramfs share the same parent directory
+  if [[ "${HOST_PATH_KERNEL%/*}" != "${HOST_PATH_INITRAMFS%/*}" ]]; then
+    echo "ERROR: kernel and initramfs do not share the same parent directory" \
+         "(kernel=${HOST_PATH_KERNEL}, initramfs=${HOST_PATH_INITRAMFS})"
+    exit 1
+  fi
+
+  # Generate a UUID once per node, not once per template
+  DOMAIN_UUID=$(cat /proc/sys/kernel/random/uuid)
+
   export DOMAIN_NAME="${node_name}"
-  export DOMAIN_MEMORY="${DOMAIN_MEMORY}"
   export DOMAIN_VCPUS="${DOMAIN_VCPUS}"
   export HOST_PATH_KERNEL="${HOST_PATH_KERNEL}"
   export HOST_PATH_INITRAMFS="${HOST_PATH_INITRAMFS}"
   export DOMAIN_CMDLINE="${domain_cmdline}"
   export DISK_SOURCE_PATH="${domain_qcow2_image_host_path}"
   export MAC_ADDRESS="${node_mac}"
+  export DOMAIN_UUID="${DOMAIN_UUID}"
+  export NETWORK_NAME="${ARM_NETWORK_NAME}"
+  export DOMAIN_MAC="${node_mac}"
+  export BOOT_ARTIFACTS_PATH="${HOST_PATH_KERNEL%/*}"
+  export KERNEL_NAME="${HOST_PATH_KERNEL##*/}"
+  export INITRD_NAME="${HOST_PATH_INITRAMFS##*/}"
+  export EXTRA_ARGS="${domain_cmdline}"
+  export QCOW_PATH="${domain_qcow2_image_host_path%/*}"
+  export QCOW_NAME="${domain_qcow2_image_host_path##*/}"
 
-  # Template evaluation using envsubst and yq-v4 validation
-  envsubst < "${ARM64_INSTALL_TEMPLATE}" > "${domain_install_xml}"
+  # Whitelist of variables substituted into templates — both naming conventions.
+  TEMPLATE_VARS='$DOMAIN_NAME $DOMAIN_UUID $DOMAIN_MEMORY $DOMAIN_VCPUS $HOST_PATH_KERNEL $HOST_PATH_INITRAMFS $DOMAIN_CMDLINE $DISK_SOURCE_PATH $MAC_ADDRESS $NETWORK_NAME $LEASED_RESOURCE $DOMAIN_MAC $BOOT_ARTIFACTS_PATH $KERNEL_NAME $INITRD_NAME $EXTRA_ARGS $QCOW_PATH $QCOW_NAME'
+
+  echo "Rendering install domain XML for ${node_name}..."
+  domain_install_xml=$(mktemp --tmpdir domain-"${node_name}"-install.xml.XXXXX)
+  set_arm_template_memory "${ARM64_INSTALL_TEMPLATE}"
+  envsubst "${TEMPLATE_VARS}" \
+    < "${ARM64_INSTALL_TEMPLATE}" > "${domain_install_xml}"
 
   echo "Defining and starting install domain for ${node_name}..."
   CURRENT_INSTALL_DOMAIN="${node_name}"
@@ -441,7 +577,21 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
 
   echo "Install domain deleted. Defining persistent run domain for ${node_name} that boots from disk..."
   domain_run_xml=$(mktemp --tmpdir domain-"${node_name}"-run.xml.XXXXX)
-  envsubst < "${ARM64_RUN_TEMPLATE}" > "${domain_run_xml}"
+  raw_run_xml=$(mktemp --tmpdir domain-"${node_name}"-run-raw.xml.XXXXX)
+  set_arm_template_memory "${ARM64_RUN_TEMPLATE}"
+  envsubst "${TEMPLATE_VARS}" \
+    < "${ARM64_RUN_TEMPLATE}" > "${raw_run_xml}"
+
+  # Strip live-boot kernel/initrd/cmdline from the persistent run domain XML
+  # and set on_reboot=restart.  This modifies only the rendered copy; the
+  # stored secret template is unchanged.
+  yq-v4 -p=xml -o=xml --xml-attribute-prefix='@' \
+    'del(.domain.os.kernel) |
+     del(.domain.os.initrd) |
+     del(.domain.os.cmdline) |
+     .domain.on_reboot = "restart"' \
+    "${raw_run_xml}" > "${domain_run_xml}"
+  rm -f "${raw_run_xml}"
 
   ${VIRSH_ADDITIONAL} define "${domain_run_xml}" --validate
   ${VIRSH_ADDITIONAL} start "${node_name}"
