@@ -1,0 +1,32 @@
+ref:
+  as: nno-discover-signed-target
+  from: nvidia-ci
+  cli: latest
+  no_kubeconfig: true
+  commands: nno-discover-signed-target-commands.sh
+  timeout: 30m0s
+  grace_period: 2m0s
+  credentials:
+  - namespace: test-credentials
+    name: ci-pull-credentials
+    mount_path: /var/run/secrets/ci-pull-credentials
+  env:
+  - name: REGISTRY_AUTH_FILE
+    default: /var/run/secrets/ci-pull-credentials/.dockerconfigjson
+    documentation: Existing CI Docker auth for staging inventory and release reads.
+  - name: NNO_DISCOVERY_ARCHITECTURE
+    default: amd64
+    documentation: Architecture supported by the automatic signed lab job.
+  - name: NNO_SIGNED_HISTORY_JOBS
+    default: pull-ci-rh-ecosystem-edge-nvidia-ci-main-doca2-nno-signed periodic-ci-rh-ecosystem-edge-nvidia-ci-main-doca2-nno-signed-auto
+    documentation: Space-separated manual and automatic signed jobs included in history.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  documentation: |-
+    Select one recent unattempted staging driver and an exact compatible Assisted
+    OCP release. nvidia-ci prepares metadata access using existing CI auth and
+    the server's aicli account. Selected writes the signed handoffs; no-work
+    creates SHARED_DIR/skip-work-steps and succeeds without a target. Preparation
+    or scan errors fail this pre step without publishing the skip marker.
