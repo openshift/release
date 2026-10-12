@@ -159,6 +159,62 @@ tests:
           cpu: 2000m
           memory: 3Gi
       timeout: 3h0m0s
+    - as: prepare-trainer-for-tls-scan
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # The E2E suite deletes the DSC and its managed components before this
+        # step. Recreate a minimal platform configuration so the TLS scanner
+        # evaluates the Trainer module and Kubeflow Trainer controller.
+        oc apply -f - <<'EOF'
+        apiVersion: dscinitialization.opendatahub.io/v2
+        kind: DSCInitialization
+        metadata:
+          name: default-dsci
+        spec:
+          applicationsNamespace: redhat-ods-applications
+          monitoring:
+            managementState: Removed
+            namespace: redhat-ods-monitoring
+          trustedCABundle:
+            managementState: Managed
+            customCABundle: ""
+        EOF
+
+        oc wait \
+          --for=jsonpath='{.status.phase}'=Ready \
+          dscinitialization/default-dsci \
+          --timeout=10m
+
+        oc apply -f - <<'EOF'
+        apiVersion: datasciencecluster.opendatahub.io/v3
+        kind: DataScienceCluster
+        metadata:
+          name: default-dsc
+        spec:
+          components:
+            trainer:
+              managementState: Managed
+        EOF
+
+        oc wait \
+          --for=condition=Ready \
+          trainer.components.platform.opendatahub.io/default-trainer \
+          --timeout=15m
+
+        oc -n redhat-ods-applications rollout status \
+          deployment/trainer-operator-controller-manager \
+          --timeout=10m
+        oc -n redhat-ods-applications rollout status \
+          deployment/kubeflow-trainer-controller-manager \
+          --timeout=10m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
     - ref: tls-scanner-run
     workflow: generic-claim
 - as: opendatahub-operator-image-mirror
