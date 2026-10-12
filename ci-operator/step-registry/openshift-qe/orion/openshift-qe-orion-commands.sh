@@ -1,11 +1,68 @@
 #!/bin/bash
 set -x
 
+MAX_RETRIES=5
+
+discover_latest_orion_tag() {
+  local attempt remote_tags latest_tag
+
+  for attempt in $(seq 1 "$MAX_RETRIES"); do
+    remote_tags=""
+    latest_tag=""
+    if ! remote_tags=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git); then
+      echo "Orion tag discovery failed (attempt $attempt/$MAX_RETRIES)." >&2
+    elif ! latest_tag=$(
+      set -o pipefail
+      printf '%s\n' "$remote_tags" |
+        awk -F'refs/tags/' '{print $2}' |
+        grep -v '\^{}' |
+        sort -V |
+        tail -n1
+    ); then
+      echo "Orion tag discovery pipeline failed (attempt $attempt/$MAX_RETRIES)." >&2
+    elif [[ -z "$latest_tag" ]] || ! git check-ref-format "refs/tags/$latest_tag" >/dev/null 2>&1; then
+      echo "Orion tag discovery returned no valid tag (attempt $attempt/$MAX_RETRIES)." >&2
+    else
+      printf '%s\n' "$latest_tag"
+      return 0
+    fi
+
+    if [[ "$attempt" -lt "$MAX_RETRIES" ]]; then
+      echo "Retrying Orion tag discovery in 10s..." >&2
+      sleep 10
+    fi
+  done
+
+  echo "ERROR: failed to discover a valid Orion tag after $MAX_RETRIES attempts." >&2
+  return 1
+}
+
+clone_orion() {
+  local tag=$1 attempt
+
+  if [[ -z "$tag" ]]; then
+    echo "ERROR: refusing to clone Orion with an empty branch/tag." >&2
+    return 1
+  fi
+
+  for attempt in $(seq 1 "$MAX_RETRIES"); do
+    rm -rf orion
+    if git clone -q --branch "$tag" "$ORION_REPO" --depth 1; then
+      return 0
+    fi
+    if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
+      echo "git clone failed after $MAX_RETRIES attempts, exiting..." >&2
+      return 1
+    fi
+    echo "git clone failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
+    sleep 10
+  done
+}
+
+# Main execution
 if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
-
-MAX_RETRIES=5
 
 python --version
 pushd /tmp
@@ -14,23 +71,16 @@ python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
+    if ! LATEST_TAG=$(discover_latest_orion_tag); then
+      exit 1
+    fi
 else
     LATEST_TAG=$TAG
 fi
 
-for attempt in $(seq 1 "$MAX_RETRIES"); do
-  rm -rf orion
-  if git clone -q --branch "$LATEST_TAG" "$ORION_REPO" --depth 1; then
-    break
-  fi
-  if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
-    echo "git clone failed after $MAX_RETRIES attempts, exiting..." >&2
-    exit 1
-  fi
-  echo "git clone failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
-  sleep 10
-done
+if ! clone_orion "$LATEST_TAG"; then
+  exit 1
+fi
 
 pushd orion
 pip install -q --retries "$MAX_RETRIES" -r requirements.txt
