@@ -1,0 +1,227 @@
+#!/bin/bash
+
+set -euo pipefail
+
+export KUBECONFIG="$SHARED_DIR/kubeconfig"
+set +x
+source "$SHARED_DIR/nutanix_context.sh"
+CLUSTER_NAME=$(cat "$SHARED_DIR/cluster-name")
+INFRAENV_NAME=$(cat "$SHARED_DIR/nutanix_infraenv_name")
+AGENT_NAMESPACE=$(cat "$SHARED_DIR/nutanix_agent_namespace")
+RUN_LABEL_KEY=ci.openshift.io/hcp-agent-nutanix-run
+IMAGE_NAME="$INFRAENV_NAME.iso"
+WORK_DIR=/tmp/hcp-agent-nutanix
+if [[ -n "${AGENT_QE_INFRA_ANSIBLE_DIR:-}" ]]; then
+  ANSIBLE_FILES_DIR=${AGENT_QE_INFRA_ANSIBLE_DIR}
+else
+  ANSIBLE_FILES_DIR=/go/src/github.com/openshift-eng/agent-qe-infra/ansible-files
+fi
+
+if [[ ! -f "$ANSIBLE_FILES_DIR/vars/ci_nutanix.yml" || ! -d "$ANSIBLE_FILES_DIR/roles/nutanix/upload_image" || ! -d "$ANSIBLE_FILES_DIR/roles/nutanix/provision_vm" ]]; then
+  echo "agent-qe-infra/ansible-files was not found at $ANSIBLE_FILES_DIR; configure it as a Prow extra ref."
+  exit 1
+fi
+
+function gather_failure_diagnostics() {
+  local status=$?
+  if (( status != 0 )); then
+    set +e
+    mkdir -p "$ARTIFACT_DIR"
+    oc --kubeconfig="$SHARED_DIR/kubeconfig" get infraenv "$INFRAENV_NAME" -n "$AGENT_NAMESPACE" -o json | jq '{metadata:{name:.metadata.name,namespace:.metadata.namespace,labels:.metadata.labels},spec:{cpuArchitecture:.spec.cpuArchitecture,pullSecretRef:.spec.pullSecretRef,proxy:.spec.proxy},status:{conditions:.status.conditions}}' > "$ARTIFACT_DIR/nutanix-infraenv.json" 2>&1
+    oc --kubeconfig="$SHARED_DIR/kubeconfig" get agents -n "$AGENT_NAMESPACE" -o yaml > "$ARTIFACT_DIR/nutanix-agents.yaml" 2>&1
+    oc --kubeconfig="$SHARED_DIR/kubeconfig" get nodepool "$CLUSTER_NAME" -n local-cluster -o yaml > "$ARTIFACT_DIR/nutanix-nodepool.yaml" 2>&1
+    oc --kubeconfig="$SHARED_DIR/kubeconfig" get hostedcluster "$CLUSTER_NAME" -n local-cluster -o yaml > "$ARTIFACT_DIR/nutanix-hostedcluster.yaml" 2>&1
+  fi
+  return "$status"
+}
+trap gather_failure_diagnostics EXIT
+
+mkdir -p "$WORK_DIR"
+printf '%s\n' "$CLUSTER_NAME-worker-0" "$CLUSTER_NAME-worker-1" "$CLUSTER_NAME-worker-2" > "$SHARED_DIR/hostnames.txt"
+cp "$SHARED_DIR/hostnames.txt" "$SHARED_DIR/nutanix_worker_names"
+printf '%s\n' "$IMAGE_NAME" > "$SHARED_DIR/nutanix_image_name"
+: > "$SHARED_DIR/vm_uuids.txt"
+: > "$SHARED_DIR/image_uuid.txt"
+cp "$SHARED_DIR/hcp-agent-nutanix.iso" "$WORK_DIR/$IMAGE_NAME"
+
+export WORK_DIR AGENT_IMAGE="$IMAGE_NAME" SHARED_DIR
+export NUTANIX_HOST NUTANIX_PORT NUTANIX_USERNAME NUTANIX_PASSWORD NUTANIX_PC_URL
+export PE_HOST PE_PORT PE_USERNAME PE_PASSWORD PE_UUID PE_NAME PE_STORAGE_CONTAINER SUBNET_UUID
+unset RENDEZVOUS_IP
+
+playbook="$WORK_DIR/provision.yml"
+cat > "$playbook" <<EOF
+- name: Provision only the HostedCluster Agent workers
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars_files:
+    - "$ANSIBLE_FILES_DIR/vars/ci_nutanix.yml"
+  vars:
+    vm_memory_gb: 16
+    vm_disk_size_gb: 120
+  module_defaults:
+    group/nutanix.ncp.ntnx:
+      nutanix_username: "{{ lookup('env', 'NUTANIX_USERNAME') }}"
+      nutanix_password: "{{ lookup('env', 'NUTANIX_PASSWORD') }}"
+      nutanix_host: "{{ lookup('env', 'NUTANIX_HOST') }}"
+      validate_certs: false
+  roles:
+    - "$ANSIBLE_FILES_DIR/roles/nutanix/upload_image"
+    - "$ANSIBLE_FILES_DIR/roles/nutanix/provision_vm"
+EOF
+
+ansible_status=0
+ANSIBLE_ROLES_PATH="$ANSIBLE_FILES_DIR/roles" ansible-playbook -i localhost, "$playbook" || ansible_status=$?
+
+function recover_recorded_ids() {
+  local response name uuid
+  response=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
+    -H 'Content-Type: application/json' -X POST "$NUTANIX_PC_URL/api/nutanix/v3/vms/list" \
+    --data '{"kind":"vm","length":500}')
+  while IFS= read -r name; do
+    [[ -n "$name" ]] || continue
+    uuid=$(jq -r --arg name "$name" '[.entities[] | select(.spec.name == $name) | .metadata.uuid] | unique | if length == 1 then .[0] else empty end' <<<"$response")
+    if [[ -n "$uuid" ]] && ! grep -Fxq "$uuid" "$SHARED_DIR/vm_uuids.txt"; then
+      printf '%s\n' "$uuid" >> "$SHARED_DIR/vm_uuids.txt"
+    fi
+  done < "$SHARED_DIR/nutanix_worker_names"
+  if [[ ! -s "$SHARED_DIR/image_uuid.txt" ]]; then
+    response=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
+      -H 'Content-Type: application/json' -X POST "$NUTANIX_PC_URL/api/nutanix/v3/images/list" \
+      --data '{"kind":"image","length":500}')
+    uuid=$(jq -r --arg name "$IMAGE_NAME" '[.entities[] | select(.spec.name == $name) | .metadata.uuid] | unique | if length == 1 then .[0] else empty end' <<<"$response")
+    [[ -z "$uuid" ]] || printf '%s\n' "$uuid" > "$SHARED_DIR/image_uuid.txt"
+  fi
+}
+
+if (( ansible_status != 0 )); then
+  recover_recorded_ids || true
+  exit "$ansible_status"
+fi
+
+recover_recorded_ids
+if [[ $(wc -l < "$SHARED_DIR/vm_uuids.txt") -ne 3 || ! -s "$SHARED_DIR/image_uuid.txt" ]]; then
+  echo "Nutanix provisioning did not record exactly three worker UUIDs and one image UUID."
+  exit 1
+fi
+
+map_file="$SHARED_DIR/nutanix_worker_vms.tsv"
+: > "$map_file"
+while IFS= read -r name && IFS= read -r uuid <&3; do
+  vm_json=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
+    "$NUTANIX_PC_URL/api/nutanix/v3/vms/$uuid")
+  mac=$(jq -er '[.spec.resources.nic_list[]?.mac_address // empty] | map(ascii_downcase) | unique | if length == 1 then .[0] else error("VM NIC MAC is missing or ambiguous") end' <<<"$vm_json")
+  printf '%s\t%s\t%s\n' "$name" "$uuid" "$mac" >> "$map_file"
+done 3< "$SHARED_DIR/vm_uuids.txt" < "$SHARED_DIR/nutanix_worker_names"
+
+function matching_agents() {
+  oc get agents -n "$AGENT_NAMESPACE" -o json | jq -r --arg infraenv "$INFRAENV_NAME" \
+    '.items[] | select(.metadata.labels["infraenvs.agent-install.openshift.io"] == $infraenv) | .metadata.name'
+}
+
+agent_deadline=$((SECONDS + 3600))
+agents=""
+while (( SECONDS < agent_deadline )); do
+  agents=$(matching_agents)
+  agent_count=$(awk 'NF { count++ } END { print count + 0 }' <<<"$agents")
+  if (( agent_count > 3 )); then
+    echo "InfraEnv $INFRAENV_NAME selected $agent_count Agents; expected exactly three."
+    exit 1
+  fi
+  if (( agent_count == 3 )); then
+    break
+  fi
+  echo "Waiting for three Agents associated with InfraEnv $INFRAENV_NAME; found $agent_count."
+  sleep 30
+done
+if [[ $(awk 'NF { count++ } END { print count + 0 }' <<<"$agents") -ne 3 ]]; then
+  echo "Timed out waiting for the three InfraEnv Agents."
+  exit 1
+fi
+
+for agent in $agents; do oc wait agent "$agent" -n "$AGENT_NAMESPACE" --for=condition=RequirementsMet --timeout=20m; done
+
+map_file="$SHARED_DIR/nutanix_agent_vm_mapping.tsv"
+: > "$map_file"
+mapped_agent_names=""
+mapped_count=0
+while IFS=$'\t' read -r vm_name vm_uuid vm_mac; do
+  vm_mac_normalized=$(tr -d ':' <<<"$vm_mac" | tr '[:upper:]' '[:lower:]')
+  matched_agent=""
+  for agent in $agents; do
+    inventory_macs=$(oc get agent "$agent" -n "$AGENT_NAMESPACE" -o json | jq -r '.status.inventory.interfaces[]?.macAddress // empty' | tr '[:upper:]' '[:lower:]' | tr -d ':')
+    if grep -Fxq "$vm_mac_normalized" <<<"$inventory_macs"; then
+      if [[ -n "$matched_agent" ]]; then
+        echo "More than one Agent reports the MAC address $vm_mac."
+        exit 1
+      fi
+      matched_agent=$agent
+    fi
+  done
+  if [[ -z "$matched_agent" ]] || grep -Fxq "$matched_agent" <<<"$mapped_agent_names"; then
+    echo "Nutanix VM $vm_name ($vm_mac) did not map to exactly one distinct InfraEnv Agent."
+    exit 1
+  fi
+  mapped_agent_names=$(printf '%s\n%s' "$mapped_agent_names" "$matched_agent")
+  mapped_count=$((mapped_count + 1))
+  oc label agent "$matched_agent" -n "$AGENT_NAMESPACE" "$RUN_LABEL_KEY=$CLUSTER_NAME" --overwrite
+  agent_hostname=$(oc get agent "$matched_agent" -n "$AGENT_NAMESPACE" -o jsonpath='{.status.inventory.hostname}')
+  printf '%s\t%s\t%s\t%s\n' "$matched_agent" "$agent_hostname" "$vm_name" "$vm_mac" >> "$map_file"
+done < "$SHARED_DIR/nutanix_worker_vms.tsv"
+
+if [[ "$mapped_count" -ne 3 ]]; then
+  echo "The run's three VM NICs did not map to three distinct Agents."
+  exit 1
+fi
+
+selected_count=$(oc get agents -n "$AGENT_NAMESPACE" -l "$RUN_LABEL_KEY=$CLUSTER_NAME" --no-headers | wc -l)
+if [[ "$selected_count" -ne 3 ]]; then
+  echo "The run label matched $selected_count Agents; expected exactly three."
+  exit 1
+fi
+
+nodepool_selector=$(jq -n --arg key "$RUN_LABEL_KEY" --arg value "$CLUSTER_NAME" \
+  '{spec:{replicas:0,platform:{agent:{agentLabelSelector:{matchLabels:{($key):$value}}}}}}')
+oc patch nodepool "$CLUSTER_NAME" -n local-cluster --type=merge -p "$nodepool_selector"
+for agent in $agents; do
+  oc patch agent "$agent" -n "$AGENT_NAMESPACE" --type=merge -p '{"spec":{"approved":true}}'
+done
+
+oc scale nodepool "$CLUSTER_NAME" -n local-cluster --replicas=3
+oc wait agents -n "$AGENT_NAMESPACE" -l "$RUN_LABEL_KEY=$CLUSTER_NAME" \
+  --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=60m
+
+export KUBECONFIG="$SHARED_DIR/nested_kubeconfig"
+node_deadline=$((SECONDS + 3600))
+while (( SECONDS < node_deadline )); do
+  nodes_json=$(oc get nodes -o json)
+  node_count=$(jq '.items | length' <<<"$nodes_json")
+  ready_count=$(jq '[.items[] | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))] | length' <<<"$nodes_json")
+  if (( node_count > 3 )); then
+    echo "The HostedCluster has $node_count Nodes; expected exactly three."
+    exit 1
+  fi
+  if (( node_count == 3 && ready_count == 3 )); then
+    break
+  fi
+  echo "Waiting for three Ready HostedCluster Nodes; found $ready_count/$node_count."
+  sleep 30
+done
+if [[ "$node_count" -ne 3 || "$ready_count" -ne 3 ]]; then
+  echo "Timed out waiting for all three HostedCluster worker Nodes to become Ready."
+  exit 1
+fi
+
+proxy_json=$(oc get proxy cluster -o json)
+expected_proxy=$(cat "$SHARED_DIR/nutanix_proxy_url")
+jq -e --arg proxy "$expected_proxy" '.spec.httpProxy == $proxy and .spec.httpsProxy == $proxy' <<<"$proxy_json" >/dev/null
+proxy_host=$(sed 's|^http://||' <<<"$expected_proxy" | sed 's|:[^:]*$||')
+proxy_port=$(cut -d: -f3 <<<"$expected_proxy")
+for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+  oc debug "node/$node" --quiet -- chroot /host /usr/bin/bash -c \
+    "timeout 10 /usr/bin/bash -c '</dev/tcp/$proxy_host/$proxy_port'" >/dev/null
+done
+
+rm -f "$SHARED_DIR/hcp-agent-nutanix.iso"
+printf 'Provisioned three run-owned Nutanix workers; Agents joined and guest Nodes are Ready.\n'

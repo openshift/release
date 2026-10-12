@@ -90,6 +90,7 @@ metadata:
 EOF
 
 echo "Configure IPAddressPool in different network environments separately."
+METALLB_INGRESS_VIP="${NUTANIX_INGRESS_VIP:-192.168.111.30}"
 if [[ $IP_STACK == "v4" ]]; then
   oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
@@ -100,7 +101,7 @@ metadata:
 spec:
   autoAssign: false
   addresses:
-  - 192.168.111.30-192.168.111.30
+  - ${METALLB_INGRESS_VIP}-${METALLB_INGRESS_VIP}
 EOF
 elif [[ $IP_STACK == "v4v6" ]]; then
   oc create -f - <<EOF
@@ -112,7 +113,7 @@ metadata:
 spec:
   autoAssign: false
   addresses:
-  - 192.168.111.30-192.168.111.30
+  - ${METALLB_INGRESS_VIP}-${METALLB_INGRESS_VIP}
   - fd2e:6f44:5dd8:c956::1e-fd2e:6f44:5dd8:c956::1e
 EOF
 elif [[ $IP_STACK == "v6" ]]; then

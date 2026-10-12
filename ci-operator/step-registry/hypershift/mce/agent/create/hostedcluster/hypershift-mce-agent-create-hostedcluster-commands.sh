@@ -104,6 +104,14 @@ if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
   EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 fi
 
+if [[ -n "${HYPERSHIFT_NODE_COUNT:-}" ]]; then
+  if [[ ! "${HYPERSHIFT_NODE_COUNT}" =~ ^[0-9]+$ ]]; then
+    echo "HYPERSHIFT_NODE_COUNT must be a non-negative integer"
+    exit 1
+  fi
+  EXTRA_ARGS+=" --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} "
+fi
+
 if [[ "${HYPERSHIFT_NP_AUTOREPAIR}" == "true" ]]; then
   EXTRA_ARGS+=" --auto-repair"
 fi
