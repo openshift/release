@@ -55,15 +55,14 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 API_IP=$(<"${SHARED_DIR}/API_IP")
 INGRESS_IP=$(<"${SHARED_DIR}/INGRESS_IP")
 
-# Prefer LB_HOSTS/LB_HOST for api when present. api-int uses API VIP for externallb.
+# Multi-LB (LB_HOSTS) verifies api against the LB FIPs. Single-LB externallb
+# (LB_HOST only) keeps checking API_IP, same as before this was introduced.
 API_IPS=()
 if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     while IFS= read -r ip || [[ -n "${ip}" ]]; do
         [[ -z "${ip}" ]] && continue
         API_IPS+=("${ip}")
     done < "${SHARED_DIR}/LB_HOSTS"
-elif [[ -f "${SHARED_DIR}/LB_HOST" ]]; then
-    API_IPS+=("$(<"${SHARED_DIR}/LB_HOST")")
 fi
 if [[ "${#API_IPS[@]}" -eq 0 ]]; then
     API_IPS+=("${API_IP}")
