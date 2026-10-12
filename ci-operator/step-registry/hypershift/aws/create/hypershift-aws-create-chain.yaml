@@ -1,9 +1,19 @@
 chain:
   as: hypershift-aws-create
+  env:
+  - name: HYPERSHIFT_CLUSTER_ROLE
+    default: ''
+  - name: KUBECONFIG
+    default: ${SHARED_DIR}/kubeconfig
   steps:
   - as: create-hostedcluster
     cli: latest
     env:
+    - name: HYPERSHIFT_CLUSTER_ROLE
+      default: ''
+      documentation: Optional management cluster role used to select a role-specific kubeconfig.
+    - name: KUBECONFIG
+      default: ${SHARED_DIR}/kubeconfig
     - name: GUEST_FEATURE_SET
       default: ""
       documentation: |
@@ -91,6 +101,18 @@ chain:
       documentation: "The CNI provider to use for the cluster. Supported values: cilium, calico"
     commands: |-
       set -exuo pipefail
+      if [[ -n "${HYPERSHIFT_CLUSTER_ROLE:-}" ]]; then
+        if [[ ! "${HYPERSHIFT_CLUSTER_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
+          echo "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens" >&2
+          exit 1
+        fi
+        export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig_${HYPERSHIFT_CLUSTER_ROLE}"
+        if [[ ! -s "${KUBECONFIG}" ]]; then
+          echo "Management cluster kubeconfig ${KUBECONFIG} is missing or empty" >&2
+          exit 1
+        fi
+      fi
+
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
 
@@ -236,9 +258,8 @@ chain:
           num_zones=$(echo "${HC_ZONES}" | tr ',' '\n' | wc -l)
           num_nodes_expected=$((replicas_per_np * num_zones))
           export num_nodes_expected
-          export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
           set +e
-          timeout 25m bash -c '
+          KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" timeout 25m bash -c '
             while true; do
               num_nodes=$(oc get nodes --no-headers | wc -l)
               if (( num_nodes == num_nodes_expected )); then

@@ -1,0 +1,1 @@
+../hypershift-aws-oadp-setup-commands.sh

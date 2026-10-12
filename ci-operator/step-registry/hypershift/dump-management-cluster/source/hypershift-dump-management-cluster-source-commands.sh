@@ -1,0 +1,1 @@
+../hypershift-dump-management-cluster-commands.sh

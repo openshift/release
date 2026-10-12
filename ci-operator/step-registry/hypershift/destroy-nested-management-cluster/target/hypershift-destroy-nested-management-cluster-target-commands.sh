@@ -1,0 +1,1 @@
+../hypershift-destroy-nested-management-cluster-commands.sh
