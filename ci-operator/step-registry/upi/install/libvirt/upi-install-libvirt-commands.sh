@@ -471,6 +471,9 @@ clone_volume () {
     exit 1
   fi
 
+  # Delete stale clone volume left from a previous run before recreating.
+  ${VIRSH} vol-delete --pool ${POOL_NAME} ${1} 2>/dev/null || true
+
   echo "Cloning ${VOLUME_NAME} volume as ${1} volume..."
   ${VIRSH} vol-clone \
     --pool ${POOL_NAME} \
