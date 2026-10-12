@@ -1,22 +1,28 @@
 presubmits:
-  openshift-priv/redhat-opentelemetry-collector:
+  openshift-priv/quay-quay:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^rhosdt-3\.11$
-    - ^rhosdt-3\.11-
+    - ^redhat-5\.0$
+    - ^redhat-5\.0-
     cluster: build01
-    context: ci/prow/images
+    context: ci/prow/aws-ocp50-e2e-install-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - web/Containerfile.playwright
     hidden: true
     labels:
+      ci-operator.openshift.io/variant: aws-ocp50-e2e-install
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-redhat-opentelemetry-collector-rhosdt-3.11-images
-    path_alias: github.com/openshift/redhat-opentelemetry-collector
-    rerun_command: /test images
+    name: pull-ci-openshift-priv-quay-quay-redhat-5.0-aws-ocp50-e2e-install-images
+    path_alias: github.com/quay/quay
+    rerun_command: /test aws-ocp50-e2e-install-images
     spec:
       containers:
       - args:
@@ -25,6 +31,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=aws-ocp50-e2e-install
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -51,9 +58,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -63,4 +67,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )aws-ocp50-e2e-install-images,?($|\s.*)

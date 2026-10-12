@@ -1,12 +1,10 @@
-presubmits:
-  openshift-priv/open-telemetry-opentelemetry-operator:
+postsubmits:
+  openshift-priv/redhat-opentelemetry-collector:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^rhosdt-3\.11$
-    - ^rhosdt-3\.11-
+    - ^rhosdt-0\.158$
     cluster: build01
-    context: ci/prow/art-build-ocp-4.23-images
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -14,25 +12,23 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - Dockerfile.art
-      - Dockerfile.ta.art
     hidden: true
     labels:
-      ci-operator.openshift.io/variant: art-build-ocp-4.23
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      job-release: "4.23"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-3.11-art-build-ocp-4.23-images
-    path_alias: github.com/open-telemetry/opentelemetry-operator
-    rerun_command: /test art-build-ocp-4.23-images
+    max_concurrency: 1
+    name: branch-ci-openshift-priv-redhat-opentelemetry-collector-rhosdt-0.158-images
+    path_alias: github.com/openshift/redhat-opentelemetry-collector
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=art-build-ocp-4.23
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -54,6 +50,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -65,7 +64,9 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )art-build-ocp-4.23-images,?($|\s.*)
