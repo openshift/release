@@ -48,6 +48,11 @@ done
 
 echo "VMs targeted for secondary disk attachment: ${vm_names[*]}"
 
+if [[ ${#vm_names[@]} -eq 0 ]]; then
+  echo "ERROR: No VMs targeted — CONTROL_COUNT=${CONTROL_COUNT} and COMPUTE_COUNT=${COMPUTE_COUNT} both resolve to zero VMs." >&2
+  exit 1
+fi
+
 for VM in "${vm_names[@]}"; do
   VOL_NAME="${VM}-lvm-disk"
 
