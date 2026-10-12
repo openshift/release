@@ -24,7 +24,7 @@ Read `${SHARED_DIR}/qe-agent-context.json`. The test step writes it at exit time
   "step_script_ref": "distributed-tracing/tests/opentelemetry/downstream/distributed-tracing-tests-opentelemetry-downstream-commands.sh",
   "has_test_failures": true,
   "env": {
-    "MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH": "rhosdt-3.9"
+    "MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH": "rhosdt-0.158"
   }
 }
 ```

@@ -39,6 +39,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: base
+  console-plugin-demo:
+    name: "5.0"
+    namespace: ocp
+    tag: console-plugin-demo
   console-tests:
     name: "5.0"
     namespace: ocp
@@ -107,8 +111,6 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -1372,6 +1374,8 @@ tests:
       :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "3"
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-upi-zones
   cron: 39 3 * * 4
@@ -1384,6 +1388,8 @@ tests:
       :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "3"
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-host-groups-ovn-techpreview
   cron: 29 6 * * *
@@ -1404,8 +1410,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
-      FEATURE_SET: CustomNoUpgrade
       POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
@@ -1652,6 +1656,9 @@ tests:
     - as: e2e-test
       cli: latest
       commands: ./test-prow-e2e.sh release
+      dependencies:
+      - env: PLUGIN_PULL_SPEC
+        name: console-plugin-demo
       from: console-tests
       resources:
         limits:
@@ -1838,22 +1845,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-cnf
-- as: e2e-telco5g-sno-cnftests
-  capabilities:
-  - intranet
-  cron: 00 18 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "5.0"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
@@ -1886,7 +1877,7 @@ tests:
 - as: e2e-telco5g-hcp-cnftests
   capabilities:
   - intranet
-  cron: 00 22 */1 * 1-5
+  cron: 00 22 */1 * 5,6,0
   restrict_network_access: false
   steps:
     env:

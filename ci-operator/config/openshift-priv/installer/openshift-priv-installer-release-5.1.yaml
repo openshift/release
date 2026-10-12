@@ -144,7 +144,6 @@ promotion:
     name: "5.1"
     namespace: ocp-priv
 prowgen:
-  enable_secrets_store_csi_driver: true
   private: true
 raw_steps:
 - pipeline_image_cache_step:
@@ -1111,8 +1110,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
-        In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-ovn-devpreview
@@ -1122,8 +1120,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: DevPreviewNoUpgrade
-      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
-        In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-host-groups-ovn-techpreview
@@ -1328,6 +1325,9 @@ tests:
   restrict_network_access: false
   steps:
     cluster_profile: powervc-1
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
     env:
       ARCH: ppc64le
       BRANCH: "5.0"
@@ -1396,6 +1396,16 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-two-node-fencing-ipv4-hostname
+- always_run: false
+  as: e2e-agent-two-node-fencing-ipv4-mac
+  capabilities:
+  - intranet
+  - nested-podman
+  optional: true
+  pipeline_run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-two-node-fencing-ipv4-mac
 - always_run: false
   as: e2e-agent-compact-ipv4-appliance-diskimage
   capabilities:
