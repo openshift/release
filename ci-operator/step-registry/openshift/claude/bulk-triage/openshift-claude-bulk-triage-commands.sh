@@ -178,32 +178,79 @@ if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
     REPORT_FILE="triage-duty-report-post-ga.md"
 fi
 
-# --- Post-GA helpers: job history, pre-pass, audit, receipt, junit ---
+# Ensure the report and session logs are copied to artifacts even if the script exits early
+copy_reports() {
+    if [[ -d "${WORKDIR:-}" ]]; then
+        echo "Copying reports to artifact directory..."
+        find "${WORKDIR}" -maxdepth 1 -name "*.md" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+    fi
+    if [[ "${TRIAGE_POLICY:-duty}" == "post-ga" ]]; then
+        postga_finalize_on_exit
+    fi
+
+    # Archive the full Claude session directory (including subagent logs) for session continuation.
+    CLAUDE_HOME="/home/claude/.claude"
+    if [[ -d "${CLAUDE_HOME}/projects" ]]; then
+        echo "Archiving Claude session logs..."
+        if tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${CLAUDE_HOME}" projects/ 2>/dev/null; then
+            touch "${SHARED_DIR}/claude-session-available"
+        fi
+    fi
+}
+trap copy_reports EXIT TERM INT
+
+# --- Post-GA helpers: junit, job history, finalizer ---
 JUNIT_EXTRA_CASES=""
 JUNIT_EXTRA_COUNT=0
 JUNIT_EXTRA_FAILURES=0
+JUNIT_WRITTEN=false
+RECEIPT_WRITTEN=false
+POSTGA_EXIT_CODE=0
+xml_escape() {
+    local v="$1"
+    v="${v//&/&amp;}"; v="${v//</&lt;}"; v="${v//>/&gt;}"; v="${v//\"/&quot;}"
+    printf '%s' "${v}"
+}
 junit_case() {
     # junit_case <name> <ok:true|false> <message>
+    local name msg
+    name="$(xml_escape "[sig-claude] $1")"
+    msg="$(xml_escape "${3:-}")"
     JUNIT_EXTRA_COUNT=$(( JUNIT_EXTRA_COUNT + 1 ))
     if [[ "$2" == "true" ]]; then
-        JUNIT_EXTRA_CASES+="  <testcase name=\"[sig-claude] $1\" time=\"0\"/>
+        JUNIT_EXTRA_CASES+="  <testcase name=\"${name}\" time=\"0\"/>
 "
     else
         JUNIT_EXTRA_FAILURES=$(( JUNIT_EXTRA_FAILURES + 1 ))
-        JUNIT_EXTRA_CASES+="  <testcase name=\"[sig-claude] $1\" time=\"0\">
-    <failure message=\"$3\">$3</failure>
+        JUNIT_EXTRA_CASES+="  <testcase name=\"${name}\" time=\"0\">
+    <failure message=\"${msg}\">${msg}</failure>
   </testcase>
 "
     fi
 }
 
+write_extra_junit() {
+    # Standalone junit for paths that never reach the duty junit section (tripwire, early failures).
+    cat > "${ARTIFACT_DIR}/junit_claude-ci.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="claude-ci" tests="${JUNIT_EXTRA_COUNT}" failures="${JUNIT_EXTRA_FAILURES}" time="0">
+${JUNIT_EXTRA_CASES}</testsuite>
+EOF
+    JUNIT_WRITTEN=true
+    echo "JUnit XML written to ${ARTIFACT_DIR}/junit_claude-ci.xml"
+}
+
 latest_preceding_attempt() {
-    # Prints the greatest run id of this job in GCS that is not the current build, or nothing.
-    local prefix="gs://${GCS_BUCKET}/logs/${JOB_NAME:-}/"
-    gcloud storage ls "${prefix}" 2>/dev/null \
+    # Prints the greatest run id of this job in GCS that is strictly below the current build, or nothing.
+    # A listing that fails is discarded entirely (partial output must never select a run).
+    local prefix="gs://${GCS_BUCKET}/logs/${JOB_NAME:-}/" listing
+    if ! listing="$(gcloud storage ls "${prefix}" 2>/dev/null)"; then
+        return 0
+    fi
+    printf '%s\n' "${listing}" \
         | sed -E 's#/+$##; s#.*/##' \
         | grep -E '^[0-9]+$' \
-        | grep -vx "${BUILD_ID:-0}" \
+        | awk -v b="${BUILD_ID:-0}" 'length($0) < length(b) || (length($0) == length(b) && $0 < b)' \
         | sort -n | tail -1 || true
 }
 
@@ -215,39 +262,73 @@ fetch_prev_artifact() {
         "${dest}" >/dev/null 2>&1
 }
 
-write_extra_junit_and_exit() {
-    # Used by tripwire mode, which never reaches the agent/junit section below.
-    local failures="${JUNIT_EXTRA_FAILURES}"
-    cat > "${ARTIFACT_DIR}/junit_claude-ci.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="claude-ci" tests="${JUNIT_EXTRA_COUNT}" failures="${failures}" time="0">
-${JUNIT_EXTRA_CASES}</testsuite>
-EOF
-    echo "JUnit XML written to ${ARTIFACT_DIR}/junit_claude-ci.xml"
-    if [[ "${failures}" -gt 0 ]]; then exit 1; fi
-    exit 0
-}
-
+PROW_RUN_URL="https://prow.ci.openshift.org/view/gs/${GCS_BUCKET}/logs/${JOB_NAME:-unknown-job}/${BUILD_ID:-0}"
+PREV_RUN=""
+MODE_EFFECTIVE="${TRIAGE_WRITE_MODE}"
+MODE_REASON=""
+DECISION_LINE=""
+DECISION="configured"
+DECISION_ORIGIN=""
+BASELINE_ARG="none"
+read -r -a TRIAGE_VIEWS_ARR <<< "${TRIAGE_VIEWS}"
 PREPASS_INVENTORY_ARGS=()
 if [[ -n "${TRIAGE_INVENTORY_FILE}" ]]; then
     PREPASS_INVENTORY_ARGS=(--inventory "${TRIAGE_INVENTORY_FILE}" --no-oracle)
 fi
-
-if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
-    PREV_RUN=""
-    if [[ "${TRIAGE_BASELINE}" == "auto" ]]; then
-        PREV_RUN="$(latest_preceding_attempt)"
-        if [[ -z "${PREV_RUN}" ]]; then
-            echo "No preceding attempt found in gs://${GCS_BUCKET}/logs/${JOB_NAME:-} (or job history unreadable); baseline none."
-        else
-            echo "Latest preceding attempt: ${PREV_RUN}"
-        fi
-    fi
-    # shellcheck disable=SC2086
-    read -r -a TRIAGE_VIEWS_ARR <<< "${TRIAGE_VIEWS}"
+# gcloud CLI does not read GOOGLE_APPLICATION_CREDENTIALS by itself; point it at the mounted SA key.
+if [[ -f "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+    export CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE="${GOOGLE_APPLICATION_CREDENTIALS}"
 fi
 
-if [[ "${TRIAGE_POLICY}" == "post-ga" && "${TRIAGE_MODE}" == "tripwire" ]]; then
+write_receipt_now() {
+    # write_receipt_now <mode_effective> — uses whatever audit files exist (unknown placeholders otherwise).
+    local mode="$1" jira="${ARTIFACT_DIR}/jira-creations.json" sippy="${ARTIFACT_DIR}/sippy-catalog-diff.json"
+    [[ -s "${jira}" ]] || printf '{"status": "unknown", "count": null, "error": "run ended before the Jira audit"}\n' > "${jira}"
+    [[ -s "${sippy}" ]] || printf '{"status": "unknown", "error": "run ended before the Sippy catalogue diff"}\n' > "${sippy}"
+    local extra=()
+    [[ -n "${PREV_RUN}" ]] && extra+=(--previous-run "${PREV_RUN}")
+    if [[ "${DECISION}" == "report" && -n "${DECISION_ORIGIN}" ]]; then
+        extra+=(--downgrade-origin "${DECISION_ORIGIN}" --downgrade-reason "${MODE_REASON}")
+    fi
+    if python3 "${AIH_SCRIPTS_DIR}/audit.py" receipt-write --out "${ARTIFACT_DIR}/runner-receipt.json" \
+        --run-id "${BUILD_ID:-local}" --mode-requested "${TRIAGE_WRITE_MODE}" --mode-effective "${mode}" \
+        --jira-creations "${jira}" --sippy-diff "${sippy}" ${extra[@]+"${extra[@]}"}; then
+        RECEIPT_WRITTEN=true
+        return 0
+    fi
+    return 1
+}
+
+postga_finalize_on_exit() {
+    # Runs from the EXIT trap: guarantees a receipt and a junit exist, and that JSON artifacts reach $ARTIFACT_DIR.
+    for f in prepass.json triage-manifest.json; do
+        if [[ -d "${WORKDIR:-}" && -s "${WORKDIR}/${f}" && ! -s "${ARTIFACT_DIR}/${f}" ]]; then
+            cp "${WORKDIR}/${f}" "${ARTIFACT_DIR}/${f}" || true
+        fi
+    done
+    if [[ "${TRIAGE_MODE:-weekly}" != "tripwire" && "${RECEIPT_WRITTEN:-false}" != "true" ]]; then
+        echo "Run ended early: writing a failure receipt (next run stays in report mode)."
+        write_receipt_now report || true
+    fi
+    if [[ "${JUNIT_WRITTEN:-false}" != "true" ]]; then
+        if [[ "${JUNIT_EXTRA_COUNT}" -eq 0 ]]; then
+            junit_case "post-GA: run completed" false "the runner exited before producing its results"
+        fi
+        write_extra_junit || true
+    fi
+}
+
+if [[ "${TRIAGE_POLICY}" == "post-ga" || "${TRIAGE_MODE}" == "tripwire" ]]; then
+    PREV_RUN="$(latest_preceding_attempt)"
+    if [[ -z "${PREV_RUN}" ]]; then
+        echo "No preceding attempt found in gs://${GCS_BUCKET}/logs/${JOB_NAME:-} (or job history unreadable); baseline none."
+    else
+        echo "Latest preceding attempt: ${PREV_RUN}"
+    fi
+fi
+
+if [[ "${TRIAGE_MODE}" == "tripwire" ]]; then
+    # Tripwire never invokes the agent and never writes, whatever the policy.
     echo "Tripwire mode: deterministic pre-pass over the last 24h, no LLM call, no writes."
     PREV_STATUS_ARG="none"
     if [[ -n "${PREV_RUN}" ]] && fetch_prev_artifact "${PREV_RUN}" burst-status.json "${WORKDIR}/previous-burst-status.json"; then
@@ -264,35 +345,37 @@ if [[ "${TRIAGE_POLICY}" == "post-ga" && "${TRIAGE_MODE}" == "tripwire" ]]; then
     else
         junit_case "tripwire: burst-status.json produced" false "prepass.py --tripwire failed or produced no output"
     fi
-    write_extra_junit_and_exit
+    write_extra_junit
+    trap - EXIT TERM INT
+    if [[ "${JUNIT_EXTRA_FAILURES}" -gt 0 ]]; then exit 1; fi
+    exit 0
 fi
 
-MODE_EFFECTIVE="${TRIAGE_WRITE_MODE}"
-MODE_REASON=""
-BASELINE_ARG="none"
 if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
-    # Receipt check: the latest preceding attempt's audit can force report mode.
-    RECEIPT_PATH=""
+    # Receipt check (independent of TRIAGE_BASELINE): the latest preceding attempt's audit can force report mode.
+    RECEIPT_PATH="/nonexistent/runner-receipt.json"
     if [[ -n "${PREV_RUN}" ]] && fetch_prev_artifact "${PREV_RUN}" runner-receipt.json "${WORKDIR}/previous-receipt.json"; then
         RECEIPT_PATH="${WORKDIR}/previous-receipt.json"
     fi
-    DECIDE_ARGS=(receipt-decide)
-    if [[ -n "${RECEIPT_PATH}" ]]; then DECIDE_ARGS+=(--receipt "${RECEIPT_PATH}"); else DECIDE_ARGS+=(--receipt /nonexistent/runner-receipt.json); fi
+    DECIDE_ARGS=(receipt-decide --receipt "${RECEIPT_PATH}")
     if [[ -n "${POSTGA_ACK_RECEIPT}" ]]; then DECIDE_ARGS+=(--ack "${POSTGA_ACK_RECEIPT}"); fi
-    DECISION_LINE="$(python3 "${AIH_SCRIPTS_DIR}/audit.py" "${DECIDE_ARGS[@]}" 2>/dev/null || printf 'report\treceipt-decide failed')"
+    DECISION_LINE="$(python3 "${AIH_SCRIPTS_DIR}/audit.py" "${DECIDE_ARGS[@]}" 2>/dev/null || printf 'report\t\treceipt-decide failed')"
+    # Exact three-field parse (IFS-based read would collapse an empty origin field).
     DECISION="${DECISION_LINE%%$'\t'*}"
-    MODE_REASON="${DECISION_LINE#*$'\t'}"
+    DECISION_REST="${DECISION_LINE#*$'\t'}"
+    DECISION_ORIGIN="${DECISION_REST%%$'\t'*}"
+    MODE_REASON="${DECISION_REST#*$'\t'}"
+    [[ "${DECISION_LINE}" == *$'\t'* ]] || { DECISION_ORIGIN=""; MODE_REASON=""; }
+    DECISION="${DECISION:-report}"
     if [[ "${DECISION}" == "report" ]]; then
         MODE_EFFECTIVE="report"
         echo "Write mode forced to report by the previous receipt: ${MODE_REASON}"
     elif [[ -n "${MODE_REASON}" ]]; then
         echo "Receipt decision: ${MODE_REASON}"
-    elif [[ "${TRIAGE_WRITE_MODE}" == "report" ]]; then
-        MODE_REASON="configured"
     fi
     echo "Effective write mode: ${MODE_EFFECTIVE} (requested ${TRIAGE_WRITE_MODE})"
 
-    if [[ -n "${PREV_RUN}" ]] && fetch_prev_artifact "${PREV_RUN}" triage-manifest.json "${WORKDIR}/baseline-manifest.json"; then
+    if [[ "${TRIAGE_BASELINE}" == "auto" && -n "${PREV_RUN}" ]] && fetch_prev_artifact "${PREV_RUN}" triage-manifest.json "${WORKDIR}/baseline-manifest.json"; then
         BASELINE_ARG="${WORKDIR}/baseline-manifest.json"
     fi
     echo "Baseline: ${BASELINE_ARG}"
@@ -311,27 +394,9 @@ if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
         echo "Pre-pass clusters: $(jq -r '.clusters | length' "${WORKDIR}/prepass.json" 2>/dev/null || echo unknown)"
     else
         junit_case "post-GA: pre-pass produced prepass.json" false "prepass.py failed; the agent cannot run without an inventory"
-        write_extra_junit_and_exit
+        exit 1   # the EXIT trap writes the failure receipt and the junit
     fi
 fi
-
-# Ensure the report and session logs are copied to artifacts even if the script exits early
-copy_reports() {
-    if [[ -d "${WORKDIR:-}" ]]; then
-        echo "Copying reports to artifact directory..."
-        find "${WORKDIR}" -maxdepth 1 -name "*.md" -exec cp {} "${ARTIFACT_DIR}/" \; || true
-    fi
-
-    # Archive the full Claude session directory (including subagent logs) for session continuation.
-    CLAUDE_HOME="/home/claude/.claude"
-    if [[ -d "${CLAUDE_HOME}/projects" ]]; then
-        echo "Archiving Claude session logs..."
-        if tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${CLAUDE_HOME}" projects/ 2>/dev/null; then
-            touch "${SHARED_DIR}/claude-session-available"
-        fi
-    fi
-}
-trap copy_reports EXIT TERM INT
 
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 
@@ -425,23 +490,18 @@ PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
 
 if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
-    RUN_END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    # Manifest: copy and validate.
-    if [[ -s "${WORKDIR}/triage-manifest.json" ]]; then
-        cp "${WORKDIR}/triage-manifest.json" "${ARTIFACT_DIR}/triage-manifest.json"
-        if python3 "${AIH_SCRIPTS_DIR}/manifest.py" validate "${WORKDIR}/triage-manifest.json" 2> "${WORKDIR}/manifest-validate.err"; then
-            junit_case "post-GA: manifest validates" true ""
-        else
-            junit_case "post-GA: manifest validates" false "manifest.py validate failed: $(head -c 400 "${WORKDIR}/manifest-validate.err" | tr '"<>&' "'   ")"
-        fi
+    RUN_END="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+    # Agent outcome (a timeout is handled by the duty junit cases; any other failure is a post-GA failure).
+    if [[ "${CLAUDE_EXIT}" -eq 0 || "${CLAUDE_EXIT}" -eq 124 ]]; then
+        junit_case "post-GA: agent completed" true ""
     else
-        junit_case "post-GA: manifest validates" false "triage-manifest.json was not produced"
+        junit_case "post-GA: agent completed" false "agentic-ci exited with code ${CLAUDE_EXIT}"
     fi
     # Sippy triage catalogue after the agent; diff against the declared actions.
     python3 "${AIH_SCRIPTS_DIR}/audit.py" snapshot --out "${ARTIFACT_DIR}/sippy-triages-after.json" || true
     SIPPY_DIFF_STATUS="unknown"
     if [[ -s "${ARTIFACT_DIR}/sippy-triages-before.json" && -s "${ARTIFACT_DIR}/sippy-triages-after.json" ]]; then
-        MANIFEST_FOR_DIFF="${ARTIFACT_DIR}/triage-manifest.json"
+        MANIFEST_FOR_DIFF="${WORKDIR}/triage-manifest.json"
         [[ -s "${MANIFEST_FOR_DIFF}" ]] || MANIFEST_FOR_DIFF="/dev/null"
         SIPPY_DIFF_STATUS="$(python3 "${AIH_SCRIPTS_DIR}/audit.py" diff --before "${ARTIFACT_DIR}/sippy-triages-before.json" \
             --after "${ARTIFACT_DIR}/sippy-triages-after.json" --manifest "${MANIFEST_FOR_DIFF}" \
@@ -460,21 +520,42 @@ if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
         --reporter "${JIRA_USERNAME:-unknown}" --out "${ARTIFACT_DIR}/jira-creations.json" || true
     JIRA_CREATED="$(jq -r '.count // "unknown"' "${ARTIFACT_DIR}/jira-creations.json" 2>/dev/null || echo unknown)"
     JIRA_STATUS="$(jq -r '.status // "unknown"' "${ARTIFACT_DIR}/jira-creations.json" 2>/dev/null || echo unknown)"
-    if [[ "${JIRA_STATUS}" == "ok" && "${JIRA_CREATED}" == "0" ]]; then
+    JIRA_TRUNCATED="$(jq -r '.truncated // false' "${ARTIFACT_DIR}/jira-creations.json" 2>/dev/null || echo true)"
+    if [[ "${JIRA_STATUS}" == "ok" && "${JIRA_CREATED}" == "0" && "${JIRA_TRUNCATED}" == "false" ]]; then
         junit_case "post-GA: no Jira issues created by the job" true ""
     else
-        junit_case "post-GA: no Jira issues created by the job" false "account-wide creations in window: ${JIRA_CREATED} (status ${JIRA_STATUS}; shared account — see jira-creations.json)"
+        junit_case "post-GA: no Jira issues created by the job" false "account-wide creations in window: ${JIRA_CREATED} (status ${JIRA_STATUS}, truncated ${JIRA_TRUNCATED}; shared account — see jira-creations.json)"
     fi
-    echo "Jira creations in window (account-wide): ${JIRA_CREATED} (status ${JIRA_STATUS}); Sippy diff: ${SIPPY_DIFF_STATUS}"
+    echo "Jira creations in window (account-wide): ${JIRA_CREATED} (status ${JIRA_STATUS}, truncated ${JIRA_TRUNCATED}); Sippy diff: ${SIPPY_DIFF_STATUS}"
+    # Permissions observation (transparency only, never a gate).
+    python3 "${AIH_SCRIPTS_DIR}/audit.py" permissions --out "${ARTIFACT_DIR}/jira-permissions.json" || true
+    [[ -s "${ARTIFACT_DIR}/jira-permissions.json" ]] || printf '{"status": "unknown"}\n' > "${ARTIFACT_DIR}/jira-permissions.json"
+    # Manifest: inject the runner-owned audit and run metadata, then validate and publish.
+    if [[ -s "${WORKDIR}/triage-manifest.json" ]]; then
+        if python3 "${AIH_SCRIPTS_DIR}/manifest.py" finalize --manifest "${WORKDIR}/triage-manifest.json" \
+            --out "${ARTIFACT_DIR}/triage-manifest.json" \
+            --jira-creations "${ARTIFACT_DIR}/jira-creations.json" --sippy-diff "${ARTIFACT_DIR}/sippy-catalog-diff.json" \
+            --permissions "${ARTIFACT_DIR}/jira-permissions.json" \
+            --mode-requested "${TRIAGE_WRITE_MODE}" --mode-effective "${MODE_EFFECTIVE}" \
+            --decision "${DECISION_LINE}" --job "${JOB_NAME:-unknown-job}" --run-id "${BUILD_ID:-local}" \
+            --url "${PROW_RUN_URL}" --started "${RUN_START}" ${PREV_RUN:+--previous-run "${PREV_RUN}"} \
+            --existing-only true 2> "${WORKDIR}/manifest-validate.err"; then
+            junit_case "post-GA: manifest validates" true ""
+        else
+            [[ -s "${ARTIFACT_DIR}/triage-manifest.json" ]] || cp "${WORKDIR}/triage-manifest.json" "${ARTIFACT_DIR}/triage-manifest.json" || true
+            junit_case "post-GA: manifest validates" false "manifest.py finalize/validate failed: $(head -c 400 "${WORKDIR}/manifest-validate.err")"
+        fi
+    else
+        junit_case "post-GA: manifest validates" false "triage-manifest.json was not produced"
+    fi
     # Receipt for the next run.
-    if python3 "${AIH_SCRIPTS_DIR}/audit.py" receipt-write --out "${ARTIFACT_DIR}/runner-receipt.json" \
-        --run-id "${BUILD_ID:-local}" --mode-requested "${TRIAGE_WRITE_MODE}" --mode-effective "${MODE_EFFECTIVE}" \
-        --jira-creations "${ARTIFACT_DIR}/jira-creations.json" \
-        --sippy-diff "${ARTIFACT_DIR}/sippy-catalog-diff.json" \
-        ${PREV_RUN:+--previous-run "${PREV_RUN}"}; then
+    if write_receipt_now "${MODE_EFFECTIVE}"; then
         junit_case "post-GA: receipt written" true ""
     else
         junit_case "post-GA: receipt written" false "audit.py receipt-write failed"
+    fi
+    if [[ "${JUNIT_EXTRA_FAILURES}" -gt 0 ]]; then
+        POSTGA_EXIT_CODE=1
     fi
 fi
 
@@ -574,10 +655,15 @@ ${JUNIT_EXTRA_CASES}</testsuite>
 EOF
 
 echo "JUnit XML written to ${JUNIT_FILE}"
+JUNIT_WRITTEN=true
 
 if [[ -s "${WORKDIR}/${REPORT_FILE}" ]]; then
     echo "Triage analysis complete. Report: ${REPORT_FILE}"
 else
     echo "ERROR: No markdown report was generated."
     exit 1
+fi
+if [[ "${TRIAGE_POLICY}" == "post-ga" && "${POSTGA_EXIT_CODE}" -ne 0 ]]; then
+    echo "ERROR: post-GA checks failed (see junit); exiting non-zero."
+    exit "${POSTGA_EXIT_CODE}"
 fi
