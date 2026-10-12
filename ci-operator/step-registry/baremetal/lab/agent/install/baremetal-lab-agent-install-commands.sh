@@ -87,7 +87,17 @@ compute:
 - architecture: ${architecture}
   hyperthreading: Enabled
   name: worker
-  diskSetup: test
+  platform:
+    azure:
+      dataDisks:
+        - nameSuffix: etcddisk
+          cachingType: None
+          diskSizeGB: 20
+          lun: 0
+  diskSetup:
+    - type: etcd
+      etcd:
+        platformDiskID: etcddisk
   replicas: ${workers}
 networking:
   ovnKubernetesConfig:
