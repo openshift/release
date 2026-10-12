@@ -1,0 +1,36 @@
+ref:
+  as: hypershift-mce-ibmz-install-libvirt-secondarydisk
+  from: libvirt-installer
+  grace_period: 15m0s
+  commands: hypershift-mce-ibmz-install-libvirt-secondarydisk-commands.sh
+  env:
+  - name: CONTROL_COUNT
+    default: "3"
+    documentation: "Number of control-plane VMs to attach secondary disks to."
+  - name: COMPUTE_COUNT
+    default: "2"
+    documentation: "Number of compute VMs to attach secondary disks to."
+  - name: POOL_NAME
+    default: "multiarch-ci-pool"
+    documentation: "Name of the libvirt storage pool where secondary volumes will be created."
+  - name: SECONDARY_DISK_CAPACITY
+    default: "100G"
+    documentation: "Size of the secondary disk volume to create and attach to each VM (used as the LVM physical volume)."
+  - name: SECONDARY_DISK_DEV
+    default: "vdc"
+    documentation: "Target device name to use when attaching the secondary disk inside each guest VM. Must not conflict with existing devices (vda = root, vdb = ignition)."
+  - name: USE_EXTERNAL_DNS
+    default: "false"
+    documentation: "When true the cluster name equals LEASED_RESOURCE; otherwise it is LEASED_RESOURCE-UNIQUE_HASH. Must match the value used by upi-install-libvirt."
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 30m0s
+  documentation: >-
+    Attaches a secondary raw libvirt storage volume to each management-cluster VM
+    (control-plane and compute nodes) deployed by the upi-install-libvirt chain.
+    The secondary disk is intended as a physical volume for LVM-based storage-class
+    provisioning (e.g. LVMS / LVM operator) inside the OpenShift management cluster.
+    Volumes are created in the shared libvirt pool and hot-attached as persistent
+    virtio disks so they survive VM reboots.
