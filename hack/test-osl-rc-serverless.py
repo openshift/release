@@ -17,12 +17,12 @@ SCRIPT = ROOT / (
 SOURCE = SCRIPT.read_text()
 
 
-def run(body, manifest=None):
+def run(body, release_data=None):
     """Run the real shell functions with fake oc responses, never a cluster."""
     functions = "\n".join(re.findall(r"^\w+\(\) \{\n.*?^\}", SOURCE, re.M | re.S))
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "release.json"
-        path.write_text(json.dumps(manifest or {}))
+        path.write_text(json.dumps(release_data or {}))
         return subprocess.run(
             ["bash", "-euo", "pipefail", "-c", functions + "\n" + body],
             env={"PATH": "/usr/local/bin:/usr/bin:/bin", "MANIFEST": str(path)},
@@ -30,8 +30,8 @@ def run(body, manifest=None):
         )
 
 
-def check(condition, result):
-    assert condition, result.stdout + result.stderr
+def check(condition, process_result):
+    assert condition, process_result.stdout + process_result.stderr
 
 
 # No Serverless stanza must select standard latest; a version must select Manual.
