@@ -25,9 +25,19 @@ ref:
     default: "true"
     documentation: |-
       When true, run ginkgo with verbose output (recommended in CI).
+  - name: MEDIK8S_NHC_PHASED_RUN
+    default: "false"
+    documentation: |-
+      When true and ECO_TEST_FEATURES=nhc-operator, run tests in phases with
+      cluster settle between: base suite, then tier:resiliency, then
+      test_id:69711 last. Mitigates API rate-limiter cascades on small
+      libvirt OZ after control-plane remediation. ECO_TEST_LABELS is ignored
+      for filtering in this mode (upgrade/fresh-install remain excluded).
   documentation: |-
     Runs medik8s/system-tests via make run-tests against operators installed on the
     s390x cluster. WORKLOAD_IMAGE is taken from medik8s-lib when present.
     When medik8s-system-tests-s390x-ssh-bastion left a SHARED_DIR marker, this
     step configures SSH ProxyCommand (LB or localhost port-forward) so
     kubelet-stop/start can reach worker InternalIPs on libvirt OZ.
+    Optional MEDIK8S_NHC_PHASED_RUN phases NHC so resiliency and control-plane
+    remediation (69711) can share the job without cascading later specs.

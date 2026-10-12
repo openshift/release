@@ -197,6 +197,66 @@ setup_ssh_bastion_proxy
 echo "=== Operator status before tests ==="
 oc get csv,subscription,pods -n openshift-workload-availability -o wide || true
 
-make run-tests
+# After control-plane remediation / heavy SNR work, the test client often hits
+# client-go rate-limiter deadlines and later specs cascade-fail even when pods
+# look healthy. For NHC on small libvirt OZ, run the suite in phases with an
+# API/node settle between them so resiliency + test_id:69711 can stay in-job.
+wait_cluster_settle() {
+  local reason="${1:-post-phase}"
+  local i not_ready
+  echo "=== Cluster settle (${reason}) ==="
+  for i in $(seq 1 90); do
+    if ! oc get --raw=/readyz >/dev/null 2>&1; then
+      echo "API not ready (attempt ${i}/90); sleeping 10s"
+      sleep 10
+      continue
+    fi
+    not_ready="$(oc get nodes --no-headers 2>/dev/null | awk '$2 != "Ready" {print $1}' || true)"
+    if [[ -n "${not_ready}" ]]; then
+      echo "Nodes not Ready yet: ${not_ready} (attempt ${i}/90)"
+      sleep 10
+      continue
+    fi
+    if ! oc -n openshift-workload-availability get deploy node-healthcheck-controller-manager &>/dev/null; then
+      break
+    fi
+    if oc -n openshift-workload-availability wait --for=condition=Available \
+      deploy/node-healthcheck-controller-manager --timeout=30s &>/dev/null; then
+      echo "API, nodes, and NHC deployment are healthy; cooling down 90s for client rate limiter"
+      sleep 90
+      return 0
+    fi
+    sleep 10
+  done
+  echo "WARNING: settle timed out (${reason}); continuing after 90s cooldown" >&2
+  sleep 90
+}
+
+run_tests_with_labels() {
+  local phase_name="$1"
+  local labels="$2"
+  echo "=== Phase: ${phase_name} ==="
+  echo "ECO_TEST_LABELS: ${labels}"
+  ECO_TEST_LABELS="${labels}" make run-tests
+}
+
+# Base excludes for this GA-subscribe job (never run upgrade/fresh-install here).
+nhc_base_exclude='!tier:upgrade && !tier:upgrade-cluster && !tier:upgrade-operator && !tier:fresh-install'
+
+if [[ "${MEDIK8S_NHC_PHASED_RUN:-}" == "true" && "${ECO_TEST_FEATURES}" == "nhc-operator" ]]; then
+  echo "MEDIK8S_NHC_PHASED_RUN=true: running NHC in phases (base → resiliency → 69711)"
+  run_tests_with_labels "nhc-base (exclude resiliency + 69711)" \
+    "${nhc_base_exclude} && !tier:resiliency && !test_id:69711"
+  wait_cluster_settle "after nhc-base"
+  run_tests_with_labels "nhc-resiliency" \
+    "${nhc_base_exclude} && tier:resiliency"
+  wait_cluster_settle "after nhc-resiliency"
+  # 69711 remediates a control-plane node; keep it last so cascade cannot
+  # poison earlier phases.
+  run_tests_with_labels "nhc-69711 (control-plane remediation)" \
+    "${nhc_base_exclude} && test_id:69711"
+else
+  make run-tests
+fi
 
 echo "=== system-tests complete ==="
