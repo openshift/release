@@ -30,30 +30,6 @@ $WAS_TRACING && set -x
 echo "Using LOCALNET_PORT=${LOCALNET_PORT} LOCALNET_BRIDGE=${LOCALNET_BRIDGE} LOCALNET=${LOCALNET}"
 
 NNCP_NAME="${LOCALNET_PORT}-ovs-underlay"
-oc apply -f - <<EOF
-apiVersion: nmstate.io/v1
-kind: NodeNetworkConfigurationPolicy
-metadata:
-  name: ${NNCP_NAME}
-spec:
-  nodeSelector:
-    node-role.kubernetes.io/worker: ""
-  desiredState:
-    interfaces:
-      - name: ${LOCALNET_BRIDGE}
-        description: "OVS Bridge dedicated to ${LOCALNET_PORT} for CUDN Localnets"
-        type: ovs-bridge
-        state: up
-        bridge:
-          allow-extra-patch-ports: true
-          port:
-            - name: ${LOCALNET_PORT}
-    ovn:
-      bridge-mappings:
-        - localnet: ${LOCALNET}
-          bridge: ${LOCALNET_BRIDGE}
-          state: present
-EOF
 
 dump_nncp() {
   echo "=== NNCP ${NNCP_NAME} ==="
@@ -63,13 +39,9 @@ dump_nncp() {
   oc get nnce -o yaml || true
 }
 
-echo "Waiting for NNCP ${NNCP_NAME} to become Available..."
-if ! oc wait nncp/"${NNCP_NAME}" --for=condition=Available --timeout=10m; then
-  dump_nncp
-  exit 1
-fi
-oc get nncp "${NNCP_NAME}" -o yaml
-
+# Register before the first apply. The Available wait below exits on failure,
+# and the policy may already have changed some workers. Deleting the NNCP
+# does not roll that node configuration back.
 cleanup_nncp() {
   if [ "${CLEAN_UP}" != "true" ]; then
     return 0
@@ -101,6 +73,38 @@ EOF
   oc delete nncp/"${NNCP_NAME}" --ignore-not-found=true --wait=true
 }
 trap cleanup_nncp EXIT
+
+oc apply -f - <<EOF
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: ${NNCP_NAME}
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+  desiredState:
+    interfaces:
+      - name: ${LOCALNET_BRIDGE}
+        description: "OVS Bridge dedicated to ${LOCALNET_PORT} for CUDN Localnets"
+        type: ovs-bridge
+        state: up
+        bridge:
+          allow-extra-patch-ports: true
+          port:
+            - name: ${LOCALNET_PORT}
+    ovn:
+      bridge-mappings:
+        - localnet: ${LOCALNET}
+          bridge: ${LOCALNET_BRIDGE}
+          state: present
+EOF
+
+echo "Waiting for NNCP ${NNCP_NAME} to become Available..."
+if ! oc wait nncp/"${NNCP_NAME}" --for=condition=Available --timeout=10m; then
+  dump_nncp
+  exit 1
+fi
+oc get nncp "${NNCP_NAME}" -o yaml
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)

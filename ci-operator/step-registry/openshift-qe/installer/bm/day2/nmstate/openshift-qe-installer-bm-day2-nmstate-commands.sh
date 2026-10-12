@@ -23,51 +23,7 @@ oc projects
 
 NMSTATE_NS="openshift-nmstate"
 NMSTATE_PACKAGE="kubernetes-nmstate-operator"
-
-if oc get nmstate nmstate -n "${NMSTATE_NS}" >/dev/null 2>&1; then
-  echo "NMState is already installed"
-  oc get csv -n "${NMSTATE_NS}"
-  oc get pods -n "${NMSTATE_NS}"
-  exit 0
-fi
-
-echo "Installing ${NMSTATE_PACKAGE} from source ${OPERATOR_SOURCE_INDEX} channel ${NMSTATE_CHANNEL}"
-
-# Install the kubernetes-nmstate operator
-cat << EOF | oc apply -f -
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ${NMSTATE_NS}
-  labels:
-    name: ${NMSTATE_NS}
-    openshift.io/cluster-monitoring: "true"
-EOF
-
-cat << EOF | oc apply -f -
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: ${NMSTATE_NS}
-  namespace: ${NMSTATE_NS}
-spec:
-  targetNamespaces:
-  - ${NMSTATE_NS}
-EOF
-
-cat << EOF | oc apply -f -
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: ${NMSTATE_PACKAGE}
-  namespace: ${NMSTATE_NS}
-spec:
-  channel: ${NMSTATE_CHANNEL}
-  installPlanApproval: Automatic
-  name: ${NMSTATE_PACKAGE}
-  source: ${OPERATOR_SOURCE_INDEX}
-  sourceNamespace: openshift-marketplace
-EOF
+WAIT_TIMEOUT_SEC=600
 
 dump_nmstate_olm() {
   echo "=== NMState OLM diagnostics ==="
@@ -87,37 +43,82 @@ dump_nmstate_runtime() {
   oc get pods -n "${NMSTATE_NS}" --field-selector=status.phase!=Running -o yaml || true
 }
 
-# Wait for the operator CSV (fail fast if the catalog has no matching package)
-WAIT_TIMEOUT_SEC=600
-elapsed=0
-until kubectl get csv -n "${NMSTATE_NS}" 2>/dev/null | grep -q "${NMSTATE_PACKAGE}"; do
-  if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SEC}" ]; then
-    echo "Timed out waiting for ${NMSTATE_PACKAGE} CSV from source ${OPERATOR_SOURCE_INDEX}"
-    dump_nmstate_olm
-    exit 1
-  fi
-  echo "Waiting for NMState operator (${elapsed}s/${WAIT_TIMEOUT_SEC}s)"
-  sleep 10
-  elapsed=$((elapsed + 10))
-done
-kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n "${NMSTATE_NS}" "$(kubectl get csv -n "${NMSTATE_NS}" -oname | grep "${NMSTATE_PACKAGE}")"
+# An existing NMState object means the operator resources are already present.
+# Still wait for nmstate-handler below: the object can exist before the
+# DaemonSet has rolled out, and later steps depend on that readiness.
+if oc get nmstate nmstate -n "${NMSTATE_NS}" >/dev/null 2>&1; then
+  echo "NMState is already installed; skipping resource creation"
+  oc get csv -n "${NMSTATE_NS}"
+  oc get pods -n "${NMSTATE_NS}"
+else
+  echo "Installing ${NMSTATE_PACKAGE} from source ${OPERATOR_SOURCE_INDEX} channel ${NMSTATE_CHANNEL}"
 
-elapsed=0
-until oc get crd nmstates.nmstate.io >/dev/null 2>&1; do
-  if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SEC}" ]; then
-    echo "Timed out waiting for NMState CRD"
-    dump_nmstate_olm
-    exit 1
-  fi
-  echo "Waiting for NMState CRD (${elapsed}s/${WAIT_TIMEOUT_SEC}s)"
-  sleep 10
-  elapsed=$((elapsed + 10))
-done
+  # Install the kubernetes-nmstate operator
+  cat << EOF | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${NMSTATE_NS}
+  labels:
+    name: ${NMSTATE_NS}
+    openshift.io/cluster-monitoring: "true"
+EOF
 
-# Handlers are only required on workers. Virt jobs set INFRA=true, which
-# relabels two workers as infra-only; waiting on those nodes (plus masters)
-# previously timed out at 7/9 ready. NNCPs also select workers.
-cat << EOF | oc apply -f -
+  cat << EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: ${NMSTATE_NS}
+  namespace: ${NMSTATE_NS}
+spec:
+  targetNamespaces:
+  - ${NMSTATE_NS}
+EOF
+
+  cat << EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: ${NMSTATE_PACKAGE}
+  namespace: ${NMSTATE_NS}
+spec:
+  channel: ${NMSTATE_CHANNEL}
+  installPlanApproval: Automatic
+  name: ${NMSTATE_PACKAGE}
+  source: ${OPERATOR_SOURCE_INDEX}
+  sourceNamespace: openshift-marketplace
+EOF
+
+  # Wait for the operator CSV (fail fast if the catalog has no matching package)
+  elapsed=0
+  until kubectl get csv -n "${NMSTATE_NS}" 2>/dev/null | grep -q "${NMSTATE_PACKAGE}"; do
+    if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SEC}" ]; then
+      echo "Timed out waiting for ${NMSTATE_PACKAGE} CSV from source ${OPERATOR_SOURCE_INDEX}"
+      dump_nmstate_olm
+      exit 1
+    fi
+    echo "Waiting for NMState operator (${elapsed}s/${WAIT_TIMEOUT_SEC}s)"
+    sleep 10
+    elapsed=$((elapsed + 10))
+  done
+  kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n "${NMSTATE_NS}" "$(kubectl get csv -n "${NMSTATE_NS}" -oname | grep "${NMSTATE_PACKAGE}")"
+
+  elapsed=0
+  until oc get crd nmstates.nmstate.io >/dev/null 2>&1; do
+    if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SEC}" ]; then
+      echo "Timed out waiting for NMState CRD"
+      dump_nmstate_olm
+      exit 1
+    fi
+    echo "Waiting for NMState CRD (${elapsed}s/${WAIT_TIMEOUT_SEC}s)"
+    sleep 10
+    elapsed=$((elapsed + 10))
+  done
+
+  # Handlers are only required on workers. Virt jobs set INFRA=true, which
+  # relabels two workers as infra-only; waiting on those nodes (plus masters)
+  # previously timed out at 7/9 ready. NNCPs also select workers.
+  cat << EOF | oc apply -f -
 apiVersion: nmstate.io/v1
 kind: NMState
 metadata:
@@ -127,6 +128,7 @@ spec:
   nodeSelector:
     node-role.kubernetes.io/worker: ""
 EOF
+fi
 
 elapsed=0
 until oc get ds -n "${NMSTATE_NS}" nmstate-handler >/dev/null 2>&1; do
