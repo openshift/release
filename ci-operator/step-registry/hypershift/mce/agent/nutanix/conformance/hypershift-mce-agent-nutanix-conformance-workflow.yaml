@@ -1,0 +1,68 @@
+workflow:
+  as: hypershift-mce-agent-nutanix-conformance
+  documentation: |-
+    Runs HyperShift conformance against an Agent HostedCluster whose three NodePool workers are
+    Nutanix VMs booted from the MCE InfraEnv discovery ISO. The existing baremetal-backed management
+    cluster and MCE setup remain unchanged; Nutanix VMs host only guest workers.
+
+    A scheduling job must retain the management cluster profile used by the Metal3 conformance
+    baseline, provide openshift-eng/agent-qe-infra as an extra ref, set NUTANIX_INGRESS_VIP to a
+    reserved address reachable by the leased Nutanix subnet, and set NUTANIX_DHCP_CONFIRMED=true
+    only after validating DHCP on that subnet. This workflow intentionally has no Prow job entry.
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    pre:
+    - ref: hypershift-mce-agent-nutanix-preflight
+    - chain: baremetalds-ofcir-pre
+    - ref: enable-qe-catalogsource
+    - ref: deploy-konflux-operator
+    - chain: hypershift-mce-agent-lvm
+    - ref: hypershift-mce-install
+    - chain: hypershift-mce-agent-nutanix-create
+    test:
+    - chain: hypershift-conformance
+    post:
+    - ref: hypershift-mce-agent-info
+    - ref: hypershift-mce-agent-nutanix-info
+      best_effort: true
+    - ref: mce-must-gather
+    - ref: gather-extra
+    - ref: gather-audit-logs
+    - chain: hypershift-mce-agent-destroy
+    - ref: hypershift-mce-agent-nutanix-proxy-restore
+      best_effort: true
+    - ref: hypershift-mce-agent-nutanix-destroy
+      best_effort: true
+    - ref: baremetalds-devscripts-gather
+    - ref: ofcir-release
+    - ref: hypershift-mce-agent-nutanix-cleanup-verify
+    env:
+      TEST_SKIPS: >-
+        etcd leader changes are not excessive\|
+        check registry.redhat.io is available and samples operator can import sample imagestreams
+      AGENT_NAMESPACE: hypershift-agents
+      HYPERSHIFT_NODE_COUNT: "0"
+      KONFLUX_DEPLOY_OPERATORS: "false"
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "false"
+      KONFLUX_DEPLOY_SUBSCRIPTION: "false"
+      KONFLUX_TARGET_OPERATORS: metallb
+      CLUSTERTYPE: host_384gb_el9
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      IP_STACK: v4
+      NUTANIX_INGRESS_VIP: ""
+      NUTANIX_DHCP_CONFIRMED: "false"
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=4
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_MEMORY=32768
+        WORKER_MEMORY=32768
+        WORKER_VCPU=16
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
