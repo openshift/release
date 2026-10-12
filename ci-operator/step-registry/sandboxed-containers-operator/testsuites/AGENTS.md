@@ -42,8 +42,9 @@ The post suites run in `post`, which ci-operator executes **even when `pre` (set
 failed** — so without a guard they run against a broken cluster and emit a flood of
 meaningless failures. The guard is the `testsuites-gate` step (at the component
 root, `testsuites-gate/`): it runs in the **`test` phase** (via the shared
-`sandboxed-containers-operator-test` chain, before `openshift-extended-test`) and
-creates the file `${SHARED_DIR}/testsuites_gate`. Each post suite skips when that
+`sandboxed-containers-operator-test` chain, which runs only this gate step —
+`openshift-extended-test`/OTP is intentionally not invoked there) and creates
+the file `${SHARED_DIR}/testsuites_gate`. Each post suite skips when that
 file is absent.
 
 This leans on a ci-operator behaviour: **a failed `pre` step skips the entire `test`
