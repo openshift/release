@@ -1,0 +1,1 @@
+../hypershift-k8sgpt-commands.sh

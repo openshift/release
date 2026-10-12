@@ -1,0 +1,1 @@
+../hypershift-install-commands.sh
