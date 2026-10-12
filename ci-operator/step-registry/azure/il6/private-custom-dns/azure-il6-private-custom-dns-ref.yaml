@@ -1,0 +1,49 @@
+ref:
+  as: azure-il6-private-custom-dns
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-private-custom-dns-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: installer-ci-azureil6
+    group: service-principal
+    mount_path: /var/run/azureil6-secrets
+  env:
+  - name: BASE_DOMAIN
+    default: ""
+    documentation: |-
+      The cluster's base domain, used to build the api.<cluster>.<basedomain> and
+      *.apps.<cluster>.<basedomain> records. Must match baseDomain in install-config.
+  - name: AZURE_IL6_CLOUD_NAME
+    default: "AzureUSSecCloud"
+    documentation: |-
+      Cloud name registered with 'az cloud register' inside the container. Kept identical to the
+      value ipi-conf-azureil6 uses so both planes of tooling agree.
+  - name: AZURE_IL6_AZ_IMAGE
+    default: "mcr.microsoft.com/azure-cli:latest"
+    documentation: |-
+      Container image used to run the az CLI on the bastion. The bastion runs RHCOS, which has no
+      az CLI and no package manager, so az is run under podman. The bastion has internet egress
+      through its own public IP, which is how this image is pulled.
+  documentation: |-
+    Resolves the cluster's API and ingress addresses and writes them to ${SHARED_DIR}/custom_dns
+    in the format bastion-dnsmasq expects:
+
+      api.<cluster>.<basedomain>     <ip>
+      *.apps.<cluster>.<basedomain>  <ip>
+
+    This replaces azure-provision-private-custom-dns, which cannot be reused here. That step runs
+    'az network lb show' from the CI pod, but the cluster's internal load balancer is a resource on
+    the EMULATED IL6 plane: *.microsoft.scloud does not resolve from a build-farm pod and is not
+    routable from one. The query has to originate inside the VNet.
+
+    So the az calls are run on the bastion over SSH, inside a container, using the IL6 service
+    principal and the SHIFT CA that azure-il6-bastion-ca installed.
+
+    Runs after the cluster is installed. bastion-dnsmasq consumes the output.

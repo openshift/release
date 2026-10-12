@@ -1,0 +1,57 @@
+ref:
+  as: azure-il6-bastion-ca
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-bastion-ca-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: installer-ci-azureil6
+    group: shift-ca
+    mount_path: /var/run/azureil6-ca
+  env:
+  - name: AZURE_IL6_CA_FILE
+    default: "ca-chain.cert.pem"
+    documentation: |-
+      Filename of the SHIFT CA chain inside the mounted credential collection. The emulator team
+      distributes this as 'ca-chain.cert.pem'.
+  - name: AZURE_IL6_ARM_ENDPOINT
+    default: "https://management.azure.microsoft.scloud"
+    documentation: |-
+      The emulated IL6 Azure Resource Manager endpoint. Used here only to verify that the CA was
+      installed correctly -- the step curls this endpoint from the bastion and fails if TLS cannot
+      be validated. For Azure National Security this is https://management.azure.eaglex.ic.gov.
+  - name: AZURE_IL6_VERIFY_ARM_REACHABILITY
+    default: "true"
+    documentation: |-
+      Whether to fail the step if the ARM endpoint cannot be reached from the bastion after the CA
+      is installed. Set to "false" to install the CA without asserting tunnel health, which is
+      useful when bringing a new emulator environment up.
+  documentation: |-
+    Installs the SHIFT emulator's private CA chain on the bastion host so that everything running
+    there can validate TLS against the emulated IL6 ARM endpoint.
+
+    Four consumers need this CA and they read four different trust stores. Missing one produces a
+    confusing partial failure, so this step populates all of them:
+
+      az CLI             REQUESTS_CA_BUNDLE pointing at certifi's bundle with the CA appended
+      openshift-install  the OS trust store (and SSL_CERT_FILE for belt and braces)
+      podman             the OS trust store
+      the cluster        additionalTrustBundle -- handled separately by
+                         ipi-conf-additional-ca-azureil6
+
+    The bastion runs RHCOS, so the emulator team's Debian instructions
+    (/usr/local/share/ca-certificates + update-ca-certificates) do not apply. The RHCOS equivalent
+    is /etc/pki/ca-trust/source/anchors + 'update-ca-trust extract'.
+
+    The CA is delivered through a dedicated Vault credential collection rather than being added to
+    the shared azure-qe cluster profile, which is consumed by many unrelated jobs.
+
+    Outputs:
+      ${SHARED_DIR}/azure_il6_ca_bundle        the CA chain, for later in-cluster use
+      ${SHARED_DIR}/azure_il6_remote_ca_path   where the CA lives on the bastion
