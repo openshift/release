@@ -430,6 +430,7 @@ if [ "${INSTALLER_TYPE}" == "default" ]; then
     NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
 
     echo "Creating ${IGNITION_TYPE} ignition volume..."
+    ${VIRSH} vol-delete --pool ${POOL_NAME} ${NAME} || true
     ${VIRSH} vol-create-as \
       --name ${NAME} \
       --pool ${POOL_NAME} \
