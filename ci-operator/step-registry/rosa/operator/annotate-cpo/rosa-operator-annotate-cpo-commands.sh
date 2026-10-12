@@ -36,17 +36,18 @@ read_profile_file() {
   fi
 }
 
-# Only override the CPO when a PR is under test. Without one (periodic, gangway, or manual runs),
-# ci-operator builds the hypershift image from the branch HEAD, and replacing the payload CPO with
-# it would mean no longer testing the release payload. /payload-job runs are periodics, so JOB_TYPE
-# does not distinguish them; inspect JOB_SPEC for pull refs instead.
+# Only override the CPO when an openshift/hypershift PR is under test. Without one (periodic, gangway,
+# manual runs, or a rehearsal that only carries the openshift/release PR), ci-operator builds the
+# hypershift image from the branch HEAD, and replacing the payload CPO with it would mean no longer
+# testing the release payload. /payload-job runs are periodics, so JOB_TYPE does not distinguish them;
+# count pulls on the openshift/hypershift ref in JOB_SPEC instead.
 if [[ -z "${JOB_SPEC:-}" ]]; then
   log "JOB_SPEC is unset; assuming no PR under test, keeping the CPO from the release payload"
   exit 0
 fi
-PULLS=$(echo "${JOB_SPEC}" | jq -r '[.refs] + (.extra_refs // []) | map(select(. != null) | (.pulls // []) | length) | add // 0')
+PULLS=$(echo "${JOB_SPEC}" | jq -r '[.refs] + (.extra_refs // []) | map(select(.org=="openshift" and .repo=="hypershift") | (.pulls // []) | length) | add // 0')
 if (( PULLS == 0 )); then
-  log "No PR under test; keeping the CPO from the release payload"
+  log "No openshift/hypershift PR under test; keeping the CPO from the release payload"
   exit 0
 fi
 

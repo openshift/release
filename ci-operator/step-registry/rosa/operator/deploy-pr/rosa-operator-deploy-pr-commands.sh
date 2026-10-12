@@ -47,17 +47,18 @@ read_profile_file() {
   fi
 }
 
-# Only override the operator when a PR is under test. Without one (periodic, gangway, or manual
-# runs), ci-operator builds the hypershift-operator image from the branch HEAD, and patching it onto
-# the shared management cluster would replace the running operator with an unreviewed build.
-# /payload-job runs are periodics, so JOB_TYPE does not distinguish them; inspect JOB_SPEC instead.
+# Only override the operator when an openshift/hypershift PR is under test. Without one (periodic,
+# gangway, manual runs, or a rehearsal that only carries the openshift/release PR), ci-operator builds
+# the hypershift-operator image from the branch HEAD, and patching it onto the shared management
+# cluster would replace the running operator with an unreviewed build. /payload-job runs are periodics,
+# so JOB_TYPE does not distinguish them; count pulls on the openshift/hypershift ref in JOB_SPEC.
 if [[ -z "${JOB_SPEC:-}" ]]; then
   echo "JOB_SPEC is unset; assuming no PR under test, leaving the management cluster operator unchanged"
   exit 0
 fi
-PULLS=$(echo "${JOB_SPEC}" | jq -r '[.refs] + (.extra_refs // []) | map(select(. != null) | (.pulls // []) | length) | add // 0')
+PULLS=$(echo "${JOB_SPEC}" | jq -r '[.refs] + (.extra_refs // []) | map(select(.org=="openshift" and .repo=="hypershift") | (.pulls // []) | length) | add // 0')
 if (( PULLS == 0 )); then
-  echo "No PR under test; leaving the management cluster operator unchanged"
+  echo "No openshift/hypershift PR under test; leaving the management cluster operator unchanged"
   exit 0
 fi
 
