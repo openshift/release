@@ -14,6 +14,6 @@ ansible-playbook ./playbooks/ran/deploy-spoke-ztp-mno.yaml \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} \
         spoke_clusters='${SPOKE_CLUSTER_NAME}' \
         ocp_version=${VERSION} \
-        arch=${ARCH} \
+        arch=${SPOKE_ARCH} \
         ztp_git_repo_url=${GITLAB_REPO_URL} \
         ztp_git_repo_branch=${ZTP_GIT_BRANCH}"
