@@ -593,32 +593,54 @@ function main {
 	# Extract source commit from catalog image for z-stream integration test builds.
 	# Only needed when ZSTREAM_VERSION is set — non-z-stream tests use pre-built images.
 	if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
-		local commit image_info_flags="" oc_stderr=""
-		if [[ "$DISCONNECTED" == "true" ]]; then
-			image_info_flags="--insecure -a /tmp/new-dockerconfigjson"
-		fi
-		oc_stderr=$(mktemp)
-		commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
-			2>"${oc_stderr}" | jq -r '.config.config.Labels["vcs-ref"]') || true
-		# Retry with pull-secret auth if unauthenticated attempt failed
-		if [[ -z "${commit}" || "${commit}" == "null" ]] && [[ "$DISCONNECTED" != "true" ]]; then
-			echo "oc image info failed, retrying with pull-secret authentication..."
-			commit=$(oc image info -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
-				2>>"${oc_stderr}" | jq -r '.config.config.Labels["vcs-ref"]') || true
-		fi
-		# Fall back to skopeo only when oc image info hits S3 Forbidden from quay.io
-		if [[ -z "${commit}" || "${commit}" == "null" ]] && grep -qi "Forbidden" "${oc_stderr}" && command -v skopeo &>/dev/null; then
-			echo "oc image info hit Forbidden error, falling back to skopeo inspect..."
-			cat "${oc_stderr}"
-			commit=$(skopeo inspect --authfile "${CLUSTER_PROFILE_DIR}/pull-secret" --override-os=linux --override-arch=amd64 \
-				"docker://${LVM_INDEX_IMAGE}" 2>/dev/null \
-				| jq -r '.Labels["vcs-ref"]') || true
-		fi
-		rm -f "${oc_stderr}"
-		if [[ -z "${commit}" || "${commit}" == "null" ]]; then
-			echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
+		local commit node_name attempt
+
+		# Read the vcs-ref label from the catalog image via the cluster node.
+		# Reading it from the step container with "oc image info" fails on some
+		# environments (e.g. baremetal dual-stack) with a 403 Forbidden when it
+		# fetches the image config blob from quay.io's S3 backend. The node already
+		# pulled this image (the CatalogSource is Ready), so inspect it there using
+		# the node's working egress and pull credentials.
+		node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE" \
+			-o=jsonpath='{.items[0].spec.nodeName}')
+		oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
+			pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged \
+			pod-security.kubernetes.io/warn=privileged --overwrite || true
+
+		commit=""
+		for attempt in 1 2 3; do
+			echo "Reading vcs-ref from catalog image on node ${node_name} (attempt ${attempt}/3)"
+
+			# Pull and inspect run in separate oc debug sessions on purpose. oc debug
+			# merges the pod's stdout and stderr onto one stream, so a single session
+			# that both pulls and inspects would leak "podman pull"'s image-ID line
+			# into the captured label and produce a bogus ref. Pulling on its own lets
+			# its output (including any failure) flow to the step log for debugging,
+			# while the inspect session captures only the label.
+			if ! oc -n debug-qe debug "node/${node_name}" -- chroot /host \
+				podman pull -q --authfile /var/lib/kubelet/config.json "${LVM_INDEX_IMAGE}"; then
+				echo "podman pull of catalog image failed (see output above), retrying in 15s..."
+				[[ ${attempt} -lt 3 ]] && sleep 15
+				continue
+			fi
+
+			# "|| commit=''" stops set -e from exiting on a failed oc debug so the
+			# retry/error path still runs.
+			commit=$(oc -n debug-qe debug "node/${node_name}" -- chroot /host \
+				podman image inspect "${LVM_INDEX_IMAGE}" --format '{{ index .Labels "vcs-ref" }}' \
+				| tr -d '[:space:]') || commit=""
+			[[ -n "${commit}" && "${commit}" != "<novalue>" ]] && break
+			if [[ ${attempt} -lt 3 ]]; then
+				echo "vcs-ref lookup failed, retrying in 15s..."
+				sleep 15
+			fi
+		done
+
+		if [[ -z "${commit}" || "${commit}" == "<novalue>" ]]; then
+			echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE} (node-side read via ${node_name})"
 			return 1
 		fi
+		echo "Resolved vcs-ref: ${commit}"
 		echo -n "${commit}" > "${SHARED_DIR}/lvm_source_commit"
 	fi
 

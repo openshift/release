@@ -29,6 +29,7 @@ main() {
     local extra_vars=(
         -e "kubeconfig=${kubeconfig}"
         -e "ocp_version=${VERSION}"
+        -e "ocp_architecture=${ARCHITECTURE}"
     )
 
     if [[ -n "${LOCKDOWN_URI:-}" ]]; then

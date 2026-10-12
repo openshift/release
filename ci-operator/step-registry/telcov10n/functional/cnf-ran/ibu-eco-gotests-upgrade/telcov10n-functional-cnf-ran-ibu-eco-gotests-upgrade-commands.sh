@@ -52,6 +52,12 @@ echo "TARGET_SPOKE_SNO=${TARGET_SPOKE_SNO}"
 echo "ECO_GOTESTS_FEATURES=${ECO_GOTESTS_FEATURES}"
 echo "MIRROR_REGISTRY=${MIRROR_REGISTRY}"
 echo "VERSION=${VERSION}"
+if [[ ! -s "${SHARED_DIR}/cluster_version" ]]; then
+  echo "Error: seed hub cluster version file not found: '${SHARED_DIR}/cluster_version'" >&2
+  exit 1
+fi
+SEED_IMAGE_VERSION="$(cat "${SHARED_DIR}/cluster_version")"
+echo "Seed image version=${SEED_IMAGE_VERSION}"
 echo ""
 
 # Copy target hub inventory from SHARED_DIR (target-* prefixed files saved by ibu-target-hub-deploy)
@@ -82,8 +88,9 @@ process_inventory "${MOUNTED_SPOKE_INVENTORY}" "${OCP_DEPLOYMENT_INVENTORY_PATH}
 
 echo "Target hub inventory copied from SHARED_DIR and spoke inventory processed"
 
-# Target hub kubeconfig at the standard telcov10n path on the target bastion
-TARGET_HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
+# Host directory mounted into the eco-gotests container at /clusterconfigs.
+TARGET_HUB_CLUSTERCONFIGS_PATH="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}"
+TARGET_HUB_KUBECONFIG="/clusterconfigs/auth/kubeconfig"
 
 echo ""
 echo "=== Step 1: Prepare IBU target SNO and retrieve kubeconfig ==="
@@ -101,17 +108,25 @@ TARGET_SPOKE_KUBECONFIG="/tmp/${TARGET_SPOKE_SNO}-kubeconfig"
 # Build eco-gotests environment variables
 ECO_GOTESTS_ENV_VARS="-e ECO_CNF_RAN_SKIP_TLS_VERIFY=true"
 ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_SEED_IMAGE=${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
-ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO=${TARGET_HUB_KUBECONFIG}"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_SEED_IMAGE_VERSION=${SEED_IMAGE_VERSION}"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_ODAP_CM_NAME=oadp-cm"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_ODAP_CM_NAMESPACE=ztp-group"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KCAT_BROKER=vran-qe-kafka.kni-qe-11.telcoqe.eng.rdu2.dc.redhat.com:9092"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_HUB=${TARGET_HUB_KUBECONFIG}"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO=/kubeconfig/kubeconfig"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_TEST_TRACE=true"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_VERBOSE_SCRIPT=true"
 
 ansible-playbook playbooks/deploy-run-eco-gotests.yaml \
   -i "${CNF_INVENTORY_PATH}/switch-config.yaml" \
   --extra-vars "kubeconfig=${TARGET_SPOKE_KUBECONFIG}" \
   --extra-vars "features=${ECO_GOTESTS_FEATURES}" \
-  --extra-vars 'labels=!no-container' \
+  --extra-vars "labels='!no-container&&(!ValidateSeedReferences)'" \
   --extra-vars 'eco_worker_label=""' \
   --extra-vars 'eco_cnf_core_net_switch_user=""' \
   --extra-vars 'eco_cnf_core_net_switch_pass=""' \
   --extra-vars 'eco_gotests_tag=latest' \
+  --extra-vars "hub_clusterconfigs_path=${TARGET_HUB_CLUSTERCONFIGS_PATH}" \
   --extra-vars "additional_test_env_variables=\"${ECO_GOTESTS_ENV_VARS}\""
 
 echo "Set bastion SSH configuration"
@@ -157,3 +172,4 @@ done
 echo ""
 echo "=== IBU Upgrade Eco-Gotests Complete ==="
 echo "Seed image: ${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
+echo "Seed image OCP version: ${SEED_IMAGE_VERSION}"

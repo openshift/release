@@ -24,6 +24,19 @@ resolve_vault_kms_plugin_image() {
   exit 1
 }
 
+# Same resolution order as resolve_vault_kms_plugin_image (env, then SHARED_DIR).
+# Optional: empty when unset (only encryption-kms-2 jobs set VAULT_KMS_PLUGIN_IMAGE_UPDATE).
+resolve_vault_kms_plugin_update_image() {
+  if [[ -n "${VAULT_KMS_PLUGIN_IMAGE_UPDATE:-}" ]]; then
+    echo "${VAULT_KMS_PLUGIN_IMAGE_UPDATE}"
+    return
+  fi
+  if [[ -f "${SHARED_DIR}/vault-kms-plugin-image-update" ]]; then
+    tr -d '[:space:]' < "${SHARED_DIR}/vault-kms-plugin-image-update"
+    return
+  fi
+}
+
 install_vault_kms_config_crd() {
   echo "Installing VaultKMSConfig CRD (mock operator API)..."
   curl -fsSL "${VAULT_KMS_CONFIG_CRD_URL}" | oc apply -f -
@@ -362,6 +375,14 @@ POLICY
 }
 
 install_vault_kms_config_crd
+
+# Persist update image the same way install records VAULT_KMS_PLUGIN_IMAGE into SHARED_DIR
+# (env wins; otherwise keep the file written by etcd-encryption-vault-install).
+plugin_update_image="$(resolve_vault_kms_plugin_update_image)"
+if [[ -n "${plugin_update_image}" ]]; then
+  echo "Vault KMS plugin update image: ${plugin_update_image}"
+  echo "${plugin_update_image}" > "${SHARED_DIR}/vault-kms-plugin-image-update"
+fi
 
 configure_vault "${VAULT_NAMESPACE}" "${VAULT_KMS_KEY_NAME}" "vault-0" "vault-ca-bundle" "vault-approle-secret"
 configure_vault "${VAULT_SECONDARY_NAMESPACE}" "${VAULT_SECONDARY_KMS_KEY_NAME}" "vault-secondary-0" "vault-ca-bundle-secondary" "vault-approle-secret-secondary"

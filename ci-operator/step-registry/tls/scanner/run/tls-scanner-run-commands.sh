@@ -69,6 +69,27 @@ run_tls_scan() {
       echo "PQC readiness mode enabled: checks TLS 1.3 support and mlkem or mlkem25519 support per target."
   fi
 
+  # Assert TLS named groups/curves independently of PQC readiness.
+  if [[ -n "${EXPECTED_GROUPS:-}" ]]; then
+      local groups_mode="${EXPECTED_GROUPS_MODE:-contains}"
+      case "${groups_mode}" in
+        contains|exact) ;;
+        *)
+          echo "Invalid EXPECTED_GROUPS_MODE='${groups_mode}' (expected contains or exact)"
+          exit 1
+          ;;
+      esac
+      # SCANNER_ARGS is expanded unquoted into the scanner pod script, so strip
+      # whitespace from the group list (e.g. "X25519, x25519" -> "X25519,x25519").
+      local expected_groups="${EXPECTED_GROUPS//[[:space:]]/}"
+      if [[ -z "${expected_groups}" ]]; then
+          echo "EXPECTED_GROUPS must list at least one group after removing whitespace"
+          exit 1
+      fi
+      SCANNER_ARGS="${SCANNER_ARGS} --expected-groups=${expected_groups} --expected-groups-mode=${groups_mode}"
+      echo "Expected groups check enabled: groups=${expected_groups} mode=${groups_mode}"
+  fi
+
   if [[ -n "${SCAN_LIMIT_IPS:-}" && "${SCAN_LIMIT_IPS}" != "0" ]]; then
       SCANNER_ARGS="${SCANNER_ARGS} --limit-ips ${SCAN_LIMIT_IPS}"
       echo "Limiting scan to ${SCAN_LIMIT_IPS} IPs (smoke testing)."
