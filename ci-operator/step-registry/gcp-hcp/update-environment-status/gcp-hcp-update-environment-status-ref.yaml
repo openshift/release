@@ -1,0 +1,25 @@
+ref:
+  as: gcp-hcp-update-environment-status
+  from: src
+  commands: gcp-hcp-update-environment-status-commands.sh
+  env:
+  - name: E2E_STATUS_CONTEXT
+    default: ""
+    documentation: "GitHub commit status context for the periodic environment test"
+  - name: E2E_STATUS_TARGETS
+    default: ""
+    documentation: "JSON array of active promotion branches and required deployment status contexts"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+  timeout: 3m0s
+  credentials:
+  - namespace: ci
+    bundle: github-credentials-openshift-ci-robot-private-git-cloner
+    mount_path: /etc/github-private
+  documentation: |-
+    For a periodic job, captures active hydrated promotion commit SHAs and posts
+    a pending GitHub status to each. Requires the configured Terraform and
+    ArgoCD deployment statuses to be successful before testing. Presubmits do
+    not alter statuses on deployed commits.

@@ -1,12 +1,15 @@
 workflow:
   as: gcp-hcp-e2e-on-demand
   steps:
+    allow_best_effort_post_steps: true
     pre:
+    - ref: gcp-hcp-update-environment-status
     - ref: hypershift-gcp-wif-auth
     - ref: gcp-hcp-on-demand-config
     test:
     - ref: gcp-hcp-verify-hc-lifecycle
-    post: []
+    post:
+    - ref: gcp-hcp-finalize-environment-status
   documentation: |-
     Runs the HC lifecycle test against an existing long-running GCP HCP
     environment. WIF authenticates the job; the config step supplies the
@@ -16,3 +19,6 @@ workflow:
     once through the regional activate-project workflow and grant the WIF
     identity cluster-admin through the public API. The INT job itself does
     not invoke the regional workflow.
+    Periodic runs publish a separate HC lifecycle status on the active global
+    and sector promotion commits captured before the test. Requested presubmits
+    run the lifecycle test without changing deployed-commit statuses.
