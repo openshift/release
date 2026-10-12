@@ -72,6 +72,38 @@ find "${registry_dir}" -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
 
 # The downstream-sync behavioral tests intentionally live outside the step
 # registry because registry validation only accepts registered step files.
-downstream_sync_test="${base_dir}/hack/tests/github-downstream-sync-commands_test.sh"
+downstream_sync_test_path="hack/tests/github-downstream-sync-commands_test.sh"
+downstream_sync_test="${base_dir}/${downstream_sync_test_path}"
+downstream_sync_test_dir="${base_dir}/hack/tests"
+created_downstream_sync_test=false
+created_downstream_sync_test_dir=false
+
+cleanup_downstream_sync_test() {
+  if [[ "${created_downstream_sync_test}" == true ]]; then
+    rm -f "${downstream_sync_test}"
+  fi
+  if [[ "${created_downstream_sync_test_dir}" == true ]]; then
+    rmdir "${downstream_sync_test_dir}" 2>/dev/null || true
+  fi
+}
+trap cleanup_downstream_sync_test EXIT
+
+if ! git -C "${base_dir}" cat-file -e "HEAD:${downstream_sync_test_path}"; then
+  echo "ERROR: ${downstream_sync_test_path} does not exist in HEAD" >&2
+  exit 1
+fi
+
+# Prow derives sparse-checkout paths from the base branch configuration, so a
+# test added by the PR can exist in HEAD while still being absent from disk.
+if [[ ! -e "${downstream_sync_test}" ]]; then
+  if [[ ! -d "${downstream_sync_test_dir}" ]]; then
+    mkdir -p "${downstream_sync_test_dir}"
+    created_downstream_sync_test_dir=true
+  fi
+  created_downstream_sync_test=true
+  git -C "${base_dir}" show "HEAD:${downstream_sync_test_path}" > "${downstream_sync_test}"
+  chmod 0755 "${downstream_sync_test}"
+fi
+
 shellcheck -S warning "${downstream_sync_test}"
 "${downstream_sync_test}"
