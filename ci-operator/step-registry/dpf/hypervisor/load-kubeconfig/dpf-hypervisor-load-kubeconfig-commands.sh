@@ -1,6 +1,11 @@
 #!/bin/bash
 
 set -euo pipefail
+
+if [[ -f "${SHARED_DIR}/skip-work-steps" ]]; then
+  echo "Skipping work step: skip-work-steps marker is present."
+  exit 0
+fi
 shopt -s inherit_errexit
 
 # Configuration
