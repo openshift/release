@@ -7,7 +7,7 @@ if [[ "${NUTANIX_DHCP_CONFIRMED:-false}" != "true" ]]; then
   exit 1
 fi
 
-if [[ ! "${NUTANIX_INGRESS_VIP:-}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || ! awk -F. '$1 < 256 && $2 < 256 && $3 < 256 && $4 < 256' <<<"${NUTANIX_INGRESS_VIP}"; then
+if [[ ! "${NUTANIX_INGRESS_VIP:-}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || ! awk -F. '{ exit !($1 < 256 && $2 < 256 && $3 < 256 && $4 < 256) }' <<<"${NUTANIX_INGRESS_VIP}"; then
   echo "NUTANIX_INGRESS_VIP must be a reserved IPv4 address reachable from Nutanix workers."
   exit 1
 fi
