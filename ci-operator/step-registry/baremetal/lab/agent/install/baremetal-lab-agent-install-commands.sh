@@ -87,7 +87,12 @@ compute:
 - architecture: ${architecture}
   hyperthreading: Enabled
   name: worker
+  diskSetup: test
   replicas: ${workers}
+networking:
+  ovnKubernetesConfig:
+    ipv4:
+      internalJoinSubnet: 100.89.0.0/16
 "
 
 echo "[INFO] Looking for patches to the install-config.yaml..."
