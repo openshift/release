@@ -1,0 +1,42 @@
+ref:
+  as: mirror-images-community-e2e-images
+  from: tests
+  commands: mirror-images-community-e2e-images-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: MIRROR_REGISTRY_PATH
+    default: "e2e/tests"
+    documentation: |-
+      Path on the mirror registry host that community/k8s e2e test images
+      (agnhost, busybox, CSI test images, etc.) are pushed to.
+  - name: EXTRA_MIRROR_IMAGES
+    default: ""
+    documentation: |-
+      Newline-separated "source dest" pairs (same format as the output of
+      `openshift-tests images`) of additional images to mirror that aren't
+      covered by `openshift-tests images` for the release under test.
+      Appended verbatim to the generated mirror-images-list.yaml.
+  documentation: |-
+    Generates the list of community/upstream Kubernetes e2e test images
+    (agnhost, busybox, CSI mock drivers, etc.) required by the
+    openshift-e2e-test suite via `openshift-tests images`, and applies an
+    ImageDigestMirrorSet/ImageTagMirrorSet so the disconnected cluster pulls
+    them from the bastion mirror registry (read from
+    SHARED_DIR/mirror_registry_url) instead of their public sources.
+
+    Also always mirrors the known registry.k8s.io/pause versions (3.9, 3.10,
+    3.10.1, 3.10.2), since `openshift-tests images` does not include them
+    (their layers aren't compressed) and pause is used as the pod
+    sandbox/infra container for virtually every pod, so missing it breaks
+    almost every test in a disconnected cluster.
+
+    Writes SHARED_DIR/mirror-images-list.yaml (consumed by
+    mirror-images-qe-test-images with QE_IMAGES=false to perform the actual
+    `oc image mirror` push) and SHARED_DIR/mirror-tests-image (consumed by
+    openshift-e2e-test to pass --from-repository to openshift-tests run).
+
+    A no-op if SHARED_DIR/mirror_registry_url is absent (i.e. the workflow
+    doesn't provision a bastion mirror registry).
