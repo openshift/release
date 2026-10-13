@@ -5,6 +5,7 @@ set -o errexit -o nounset -o pipefail
 #   SOURCE_OPERATOR       Required: nhc, sbr, snr, far, mdr, or nmo.
 #   ARTIFACT_DIR          Required: existing writable directory for logs/reports.
 #   KUBECONFIG            Required: cluster credentials for oc and the Go tests.
+#   SYSTEM_TESTS_REF      Optional: test branch, tag, or commit SHA (default main).
 #   CONSOLE_PLUGIN_IMAGE  NHC only: digest-pinned console image (default in ref).
 #   MUST_GATHER_IMAGE     NHC only: digest-pinned must-gather image (default in ref).
 #
@@ -59,6 +60,7 @@ prepare_runtime() {
   go version
   skopeo --version
   operator-sdk version
+  yq --version
   podman version
   podman info
 
@@ -170,7 +172,8 @@ build_candidate() {
   case "$SOURCE_OPERATOR" in
     nhc)
       extra_build_args=(
-        DOCS_RHWA_VERSION=5.0
+        # Only NHC's OCP CSV template has a docs-version placeholder.
+        DOCS_RHWA_VERSION=5.8
         "CONSOLE_PLUGIN_IMAGE=$CONSOLE_PLUGIN_IMAGE"
         "MUST_GATHER_IMAGE=$MUST_GATHER_IMAGE"
       )
@@ -235,10 +238,8 @@ verify_candidate() {
   candidate_csv="$(find "$bundle_dir" -name '*clusterserviceversion.yaml' -print -quit)"
   : "${candidate_csv:?candidate bundle must contain a ClusterServiceVersion}"
 
-  candidate_version="$(
-    sed -n 's/^  version: *//p' "$candidate_csv" |
-      tr -d '"'
-  )"
+  # Read all spec.version entries so duplicate keys also fail the exact-version check.
+  candidate_version="$(yq -er '.spec | to_entries[] | select(.key == "version") | .value' "$candidate_csv")"
   : "${candidate_version:?candidate bundle CSV must specify spec.version}"
   test "$candidate_version" = "$SOURCE_VERSION"
 
@@ -266,9 +267,14 @@ prepare_candidate() {
 }
 
 checkout_system_tests() {
-  echo '==> Check out openshift/rhwa-system-tests main'
-  git clone --depth=1 --branch main \
-    https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
+  local ref="${SYSTEM_TESTS_REF:-main}"
+  echo "==> Check out openshift/rhwa-system-tests $ref"
+  test ! -e /tmp/system-tests
+  # Fetch only the requested branch, tag, or SHA without requiring newer git clone --revision support.
+  git init /tmp/system-tests
+  git -C /tmp/system-tests remote add origin https://github.com/openshift/rhwa-system-tests.git
+  git -C /tmp/system-tests fetch --depth=1 origin "$ref"
+  git -C /tmp/system-tests checkout --detach FETCH_HEAD
   git -C /tmp/system-tests show --no-patch --format=fuller HEAD
   git -C /tmp/system-tests rev-parse HEAD > "$ARTIFACT_DIR/system-tests-commit.txt"
 }
@@ -308,10 +314,12 @@ run_upgrade_test() {
       export MEDIK8S_KUBELET_STOP_OCDEBUG=true
       ;;
     sbr)
+      # Keep upgrade/config checks; skip the optional RWX-backed reboot test.
       export SBR_FBC_REMEDIATION=false
       unset SBR_STORAGE_CLASS
       ;;
     far)
+      # Keep upgrade/config checks; skip optional real fencing and its credentials.
       export FAR_FBC_REMEDIATION=false
       ;;
   esac

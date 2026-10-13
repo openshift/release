@@ -4,6 +4,11 @@ All six OCP 5.0 FBC jobs use this step and the merged
 `tier:upgrade-operator` tests from `openshift/rhwa-system-tests` main.
 The source jobs build the operator checkout provided by Prow and run the same tests.
 
+`SYSTEM_TESTS_REF` defaults to `main` for continuous validation of the current
+tests. Set it to a branch, tag, or commit SHA to select a different test revision
+or pin a reproducible run. The actual SHA is saved in `system-tests-commit.txt`.
+An unavailable ref fails the checkout rather than falling back to `main`.
+
 The FBC is pinned to the public Konflux build
 `sha256:e999cbe4fb3604d66ee71c9927827c2a88852b1456cb274ff1d673f1db9ce8fd`,
 source commit `8c9972727d69b2abf9312ddc9e9b270aaf67597c`.

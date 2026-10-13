@@ -8,12 +8,15 @@ ref:
   - name: SOURCE_OPERATOR
     default: ""
     documentation: Operator to build and upgrade (nhc, sbr, snr, far, mdr, or nmo).
+  - name: SYSTEM_TESTS_REF
+    default: main
+    documentation: rhwa-system-tests branch, tag, or commit SHA; main continuously validates current tests.
   - name: CONSOLE_PLUGIN_IMAGE
-    default: quay.io/medik8s/node-remediation-console@sha256:80d9e74d0374b72d71988d6da96ff9adeefeb1ab90f4893df65b1b3ab3ecbdd3
-    documentation: Pinned NHC console plugin image; ignored by the other operators.
+    default: quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-console-5-8@sha256:44e630966d208fa22a32e7e0c0858c4b18cd63fc63a926417d4639027be92870
+    documentation: NHC 5.8 console from the supplied FBC, pinned at its public IDMS mirror; candidate bundle only, ignored by other operators.
   - name: MUST_GATHER_IMAGE
-    default: quay.io/medik8s/must-gather@sha256:a3ba0753e60517c2a7cff68eca778c23198787af36e8214e8838d2c7fc676b97
-    documentation: Pinned NHC must-gather image; ignored by the other operators.
+    default: quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-must-gather-5-8@sha256:e0f3962ac2a1033bce98d96cbe3e99273e9176b84b02c9bbab9a13d88e18bdb9
+    documentation: NHC 5.8 must-gather from the supplied FBC, pinned at its public IDMS mirror; candidate bundle only, ignored by other operators.
   resources:
     requests:
       cpu: "2"
@@ -21,8 +24,13 @@ ref:
   documentation: |-
     Builds the operator checkout selected by Prow, its bundle, and an FBC using
     make dev-olm-catalog-push with Podman. Publishes temporary images to ttl.sh,
-    verifies the bundle/version, and runs rhwa-system-tests main's
-    tier:upgrade-operator tests. SBR also builds its agent; NHC supplies pinned
-    related images. Version/image and configuration-preservation checks remain
-    enabled. Source images need no release IDMS. SBR needs no ODF, FAR does not
-    fence machines, NHC and SNR remediate workers, and NMO drains a worker.
+    verifies the bundle/version, and runs the selected rhwa-system-tests ref's
+    tier:upgrade-operator tests. The runner's SDK must match the operator Makefile's
+    pin. SBR also builds its agent; NHC supplies pinned related images.
+    Version/image and configuration-preservation checks remain enabled.
+    Candidate images are directly pullable, so no release IDMS is applied.
+    SBR does not require ODF and does not perform storage-based remediation;
+    FAR does not fence machines. The NHC test uses oc-debug to stop a worker's
+    kubelet; NHC detects the unhealthy worker and requests remediation through
+    SNR, whose agent reboots the worker. The SNR test also remediates a worker,
+    and NMO drains a worker.

@@ -149,9 +149,14 @@ prepare_candidate() {
 }
 
 checkout_system_tests() {
-  echo '==> Check out openshift/rhwa-system-tests main'
-  git clone --depth=1 --branch main \
-    https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
+  local ref="${SYSTEM_TESTS_REF:-main}"
+  echo "==> Check out openshift/rhwa-system-tests $ref"
+  test ! -e /tmp/system-tests
+  # Fetch only the requested branch, tag, or SHA without requiring newer git clone --revision support.
+  git init /tmp/system-tests
+  git -C /tmp/system-tests remote add origin https://github.com/openshift/rhwa-system-tests.git
+  git -C /tmp/system-tests fetch --depth=1 origin "$ref"
+  git -C /tmp/system-tests checkout --detach FETCH_HEAD
   git -C /tmp/system-tests show --no-patch --format=fuller HEAD
   git -C /tmp/system-tests rev-parse HEAD > "$ARTIFACT_DIR/system-tests-commit.txt"
 }
@@ -175,7 +180,9 @@ run_upgrade_test() {
   # Match the proven source jobs' operator-specific safety settings.
   case "$FBC_OPERATOR" in
     nhc) export MEDIK8S_KUBELET_STOP_OCDEBUG=true ;;
+    # Keep upgrade/config checks; skip the optional RWX-backed reboot test.
     sbr) export SBR_FBC_REMEDIATION=false; unset SBR_STORAGE_CLASS ;;
+    # Keep upgrade/config checks; skip optional real fencing and its credentials.
     far) export FAR_FBC_REMEDIATION=false ;;
   esac
 
