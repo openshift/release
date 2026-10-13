@@ -102,27 +102,20 @@ WriteJunit() {
 # shellcheck disable=SC2317  # invoked via trap
 CollectExitArtifacts() {
     # Dump cluster state to artifacts on exit for post-mortem analysis.
-    # Node YAML is deliberately excluded — it contains IPs and providerIDs
-    # that must not leak into public GCS artifacts.
     : "Collecting exit diagnostics..."
     oc get clusterversion version -o yaml > "${ARTIFACT_DIR}/restore-clusterversion.yaml" || true
     oc get clusteroperators -o yaml > "${ARTIFACT_DIR}/restore-clusteroperators.yaml" || true
-    # Node health: capture aggregate Ready condition counts without node identities.
-    oc get nodes -o json | jq -r \
-        '[.items[] | ([.status.conditions[]? | select(.type == "Ready")][0].status // "Unknown")] | group_by(.)[] | "\(.[0])\t\(length)"' \
-        > "${ARTIFACT_DIR}/restore-node-readiness.txt" 2>/dev/null || true
+    oc get nodes -o yaml > "${ARTIFACT_DIR}/restore-nodes.yaml" || true
 }
 
 # shellcheck disable=SC2317
 _propagate_junit () {
-    local _step_prefix
-    _step_prefix="$(basename "${BASH_SOURCE[1]:-$0}" .sh | sed 's/-commands$//')"
-    find "${ARTIFACT_DIR}" -name '*.xml' -print0 2>/dev/null | while IFS= read -r -d '' _xf; do
-        cp "${_xf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_xf}")" 2>/dev/null || true
-    done
+    # Copy all JUnit XML files from ARTIFACT_DIR into SHARED_DIR/junit for aggregation.
+    mkdir -p "${SHARED_DIR}/junit"
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_jrc=$?; set +e; WriteJunit || true; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
+trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -182,12 +175,8 @@ fi
 # --- Verify node health ---
 echo ">>> PHASE: Node Health Check"
 typeset notReadyNodes=""
-notReadyNodes=$(oc get nodes -o json | jq '[.items[] | select(([.status.conditions[]? | select(.type=="Ready")][0].status // "Unknown") != "True")] | length') || notReadyNodes=-1
-if (( notReadyNodes < 0 )); then
-    : "FAIL: Failed to query node readiness"
-    AddResult "node-health" "fail" "Failed to query node readiness"
-    notReadyNodes=0
-elif (( notReadyNodes > 0 )); then
+notReadyNodes=$(oc get nodes --no-headers | grep -v ' Ready' | wc -l) || true
+if (( notReadyNodes > 0 )); then
     : "FAIL: ${notReadyNodes} node(s) not in Ready state"
     AddResult "node-health" "fail" "${notReadyNodes} node(s) not in Ready state"
 else

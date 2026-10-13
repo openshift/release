@@ -17,9 +17,10 @@ ref:
 
     Runs on the ACM hub (KUBECONFIG). Creates Plan and Migration CRs, waits for Succeeded,
     and verifies the VM is Running on the destination spoke (spoke-1). Requires:
-      - p2p-mtv-bidir-mig-config (return NetworkMap/StorageMap Ready on hub)
+      - p2p-mtv-wait-acm-providers (ACM-created providers Ready)
+      - p2p-mtv-create-return-migration-maps (return NetworkMap/StorageMap Ready on hub)
       - p2p-mtv-execute-live-migration (VM currently on spoke-2 after forward migration)
-      - p2p-acm-cnv-install-policy (DecentralizedLiveMigration + sync controller on spokes)
+      - p2p-acm-cnv-addon-install (DecentralizedLiveMigration + sync controller on spokes)
       - acm-interop-p2p-submariner-install (no Globalnet)
 
     Live preflight: sync-controller ready, no submariner-globalnet. During migration wait,
@@ -33,13 +34,29 @@ ref:
   env:
   - name: MTV_NAMESPACE
     default: "openshift-mtv"
-    documentation: Namespace where MTV Plan and Migration CRs live.
+    documentation: |-
+      Namespace where the MTV operator/ForkliftController is installed. Only used for the
+      CCLM feature-gate preflight (forkliftcontroller + forklift-controller Deployment
+      lookup). Does NOT need to equal MTV_PROVIDER_NAMESPACE — do not repoint this at the
+      provider namespace; Provider/Map/Plan/Migration CRs use MTV_PROVIDER_NAMESPACE below.
+  - name: MTV_PROVIDER_NAMESPACE
+    default: "mtv-integrations"
+    documentation: |-
+      Namespace where Provider, NetworkMap, StorageMap, Plan, and Migration CRs live. This
+      is ACM's mtv-integrations namespace (where ACM creates "<cluster>-mtv" Provider
+      objects), kept separate from MTV_NAMESPACE (the operator install namespace).
   - name: MTV_SOURCE_PROVIDER
-    default: "spoke-2"
-    documentation: MTV source Provider CR name for the return leg (VM currently resides here after forward migration).
+    default: ""
+    documentation: |-
+      MTV source Provider CR name for the return leg (VM currently resides here after the
+      forward migration). Empty resolves to ${SHARED_DIR}/mtv-acm-provider-name-<MTV_SOURCE_SPOKE_INDEX>
+      (written by p2p-mtv-wait-acm-providers). Set explicitly to pin a provider name instead.
   - name: MTV_DESTINATION_PROVIDER
-    default: "spoke-1"
-    documentation: MTV destination Provider CR name for the return leg (original source cluster).
+    default: ""
+    documentation: |-
+      MTV destination Provider CR name for the return leg (original source cluster). Empty
+      resolves to ${SHARED_DIR}/mtv-acm-provider-name-<MTV_DEST_SPOKE_INDEX> (written by
+      p2p-mtv-wait-acm-providers). Set explicitly to pin a provider name instead.
   - name: MTV_TEST_VM_COUNT
     default: "1"
     documentation: |-

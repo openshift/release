@@ -1,6 +1,6 @@
 # Operator overlay OpenShift CI steps
 
-Optional job `appstudio-operator-overlay-e2e-tests` exercises the **development-operator**
+Job `konflux-ring-deployments-conformance-tests` exercises the **development-operator**
 overlay on infra-deployments (not legacy `appstudio-e2e-tests` / `development` preview).
 
 ## Layout
@@ -30,5 +30,5 @@ Both refs use `from: konflux-overlay-install` and `cli: latest` for `oc`.
 
 ## Testing
 
-- **Release PR:** `/pj-rehearse pull-ci-redhat-appstudio-infra-deployments-main-appstudio-operator-overlay-e2e-tests`
-- **Infra PR:** `/test appstudio-operator-overlay-e2e-tests` after openshift/release is merged.
+- **Release PR:** `/pj-rehearse pull-ci-redhat-appstudio-infra-deployments-main-konflux-ring-deployments-conformance-tests`
+- **Infra PR:** `/test konflux-ring-deployments-conformance-tests` after openshift/release is merged.

@@ -6,6 +6,10 @@ tests:
     env:
       PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}|image build context carries the baked classifier artifact path|Nginx 502 error page when backend is unreachable'
       PLAYWRIGHT_USE_IMAGE_TESTS: "true"
+{%- if storage == "odf" %}
+      SETUP_NOOBAA: "true"
+      QUAY_STORAGE_PROVIDER: odf
+{%- endif %}
     test:
     - ref: merge-stage-registry-credentials
     - ref: quay-enable-catalogsource-art
@@ -13,6 +17,9 @@ tests:
     - ref: quay-provisioning-builder
     - ref: quay-deploy-mailpit
     - ref: quay-deploy-jaeger
+{%- if storage == "odf" %}
+    - ref: quay-install-odf-operator
+{%- endif %}
     - ref: "{{ deploy_ref }}"
     - ref: quay-deploy-custom-image
     - ref: quay-test-e2e

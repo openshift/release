@@ -8,6 +8,11 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+if ! grep -qE '^[[:space:]]*test-e2e:' Makefile; then
+  echo "Skipping management API e2e tests: test-e2e is not available on this branch"
+  exit 0
+fi
+
 # Run the plugin backend directly in this step container (which has the Go
 # source and toolchain via from: src). The backend only needs kube API access
 # to manage PrometheusRule CRDs — it does not need the full console plugin

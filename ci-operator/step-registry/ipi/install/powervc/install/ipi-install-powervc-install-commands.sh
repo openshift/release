@@ -22,7 +22,7 @@ set -o errtrace
 #   DEBUG - Enable debug logging (default: false)
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.10"
+readonly POWERVC_TOOL_VERSION="v2.4.11"
 readonly YQ_VERSION="v4.53.6"
 readonly IBMCLOUD_VERSION="2.47.1"
 
@@ -119,6 +119,31 @@ trap 'error_handler ${LINENO} $?' ERR
 # ============================================================================
 # Utility Functions
 # ============================================================================
+
+#######################################
+# Read a required secret file from SECRETS_DIR, failing with a clear message
+# if it is missing.
+#
+# Arguments:
+#   $1 - Name of the secret file within SECRETS_DIR.
+# Globals:
+#   SECRETS_DIR – (in) directory the secret file is read from.
+# Outputs:
+#   Writes the file contents to stdout.
+# Returns:
+#   0 on success; exits non-zero if the file does not exist.
+#######################################
+function read_secret() {
+	local name="${1}"
+	local path="${SECRETS_DIR}/${name}"
+
+	if [[ ! -f "${path}" ]]; then
+		log_error "Required secret file is missing: ${path}"
+		exit 1
+	fi
+
+	cat "${path}"
+}
 
 #######################################
 # Retry a command a fixed number of times with a constant delay between
@@ -400,6 +425,16 @@ function install_required_tools() {
 		return 1
 	fi
 	mv "${tmp_bin_dir}/${tool_bin}" "${tmp_bin_dir}/PowerVC-Tool"
+
+	# Install GrabConsole
+	tool_bin="GrabConsole-linux-${machine}"
+	powervc_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/${tool_bin}"
+	if ! download_tool_w_sha "${powervc_url}" "${tmp_bin_dir}/${tool_bin}" "${tool_bin} ${POWERVC_TOOL_VERSION}"; then
+		log_error "Could not download ${powervc_url}"
+		popd > /dev/null || true
+		return 1
+	fi
+	mv "${tmp_bin_dir}/${tool_bin}" "${tmp_bin_dir}/GrabConsole"
 
 	# Install yq-v4 if not present
 	if ! command -v yq-v4 &> /dev/null; then
@@ -1010,6 +1045,28 @@ function dump_resources() {
 		--shouldDebug false; then
 		log_warning "PowerVC-Tool watch-create failed, but continuing"
 	fi
+
+	# Read each secret into a standalone assignment. A combined
+	# `local var=$(read_secret ...)` would mask a read_secret exit with the
+	# always-zero exit code of the local builtin, preventing errexit from firing.
+	# Declaring local separately keeps errexit able to see the failure.
+	local hmc_passwords
+	hmc_passwords="$(read_secret HMC_PASSWORDS)"
+	export SSH_PASSWORDS="${hmc_passwords}"
+
+	local nodes=( "bootstrap" "master-0" "master-1" "master-2" )
+
+	for node in "${nodes[@]}"
+	do
+		if ! GrabConsole \
+			--cloud "${CLOUD}" \
+			--cluster-dir "${DIR}" \
+			--nudge \
+			${node}
+		then
+			log_warning "GrabConsole failed, but continuing"
+		fi
+	done
 }
 
 # ============================================================================
@@ -1093,7 +1150,9 @@ if [[ ! -f "${SECRETS_DIR}/IBMCLOUD_API_KEY" ]]; then
 	exit 2
 fi
 
-IBMCLOUD_API_KEY=$(cat "${SECRETS_DIR}/IBMCLOUD_API_KEY")
+IBMCLOUD_API_KEY="$(read_secret IBMCLOUD_API_KEY)"
+export IBMCLOUD_API_KEY="${IBMCLOUD_API_KEY}"
+
 if [[ -z "${IBMCLOUD_API_KEY}" ]]; then
 	log_error "IBMCLOUD_API_KEY is empty"
 	exit 2

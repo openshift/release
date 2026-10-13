@@ -104,11 +104,13 @@ presubmits:
     trigger: (?m)^/test( | .* )istio-integration-ambient-retest,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
     branches:
     - ^master$
     - ^master-
     cluster: build10
-    context: ci/prow/istio-integration-helm-retest
+    context: ci/prow/istio-integration-helm
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -117,9 +119,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-istio-master-istio-integration-helm-retest
-    optional: true
-    rerun_command: /test istio-integration-helm-retest
+    name: pull-ci-openshift-service-mesh-istio-master-istio-integration-helm
+    rerun_command: /test istio-integration-helm
     spec:
       containers:
       - args:
@@ -132,7 +133,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=istio-integration-helm-retest
+        - --target=istio-integration-helm
         command:
         - ci-operator
         env:
@@ -203,7 +204,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )istio-integration-helm-retest,?($|\s.*)
+    trigger: (?m)^/test( | .* )istio-integration-helm,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

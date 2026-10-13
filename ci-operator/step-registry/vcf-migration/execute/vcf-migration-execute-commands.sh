@@ -13,12 +13,20 @@ function log() {
   echo "$(date -u --rfc-3339=seconds) - $*"
 }
 
+function dump_operator_logs() {
+  local suffix="${1:-}"
+  local file="${ARTIFACT_DIR}/vcf-migration-operator${suffix:+-${suffix}}.log"
+  log "dumping VCF migration operator logs to ${file}"
+  oc -n "${MIGRATION_NAMESPACE}" logs "deployment/${OPERATOR_DEPLOYMENT}" --all-containers 2>&1 \
+    | tee "${file}" || true
+}
+
 function debug_dump() {
   log "dumping migration debug information"
   oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" -o yaml || true
   oc -n "${MIGRATION_NAMESPACE}" describe "vmwarecloudfoundationmigration/${MIGRATION_NAME}" || true
   oc -n "${MIGRATION_NAMESPACE}" get events --sort-by='.lastTimestamp' || true
-  oc -n "${MIGRATION_NAMESPACE}" logs "deployment/${OPERATOR_DEPLOYMENT}" --all-containers --tail=500 || true
+  dump_operator_logs
 }
 
 function wait_for_condition() {
@@ -210,10 +218,14 @@ jq -n \
 timeout_seconds="${VCF_MIGRATION_TIMEOUT}"
 migration_deadline=$(( $(date +%s) + timeout_seconds ))
 wait_for_condition "InfrastructurePrepared" "${migration_deadline}"
+# Capture preflight logs immediately: a later pod restart (e.g. during the
+# control plane rollout) would lose this container instance's log history.
+dump_operator_logs preflight
 wait_for_condition "DestinationInitialized" "${migration_deadline}"
 wait_for_condition "MultiSiteConfigured" "${migration_deadline}"
 wait_for_condition "WorkloadMigrated" "${migration_deadline}"
 wait_for_condition "SourceCleaned" "${migration_deadline}"
 wait_for_condition "Ready" "${migration_deadline}"
 
+dump_operator_logs
 log "migration completed successfully"

@@ -66,7 +66,7 @@ export RUN_ID
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # Export adapter parameters for the test
 export ADAPTER_CHART_REPO="${ADAPTER_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-adapter.git}"
-export ADAPTER_CHART_REF="${ADAPTER_CHART_REF:-main}"
+export ADAPTER_CHART_REF="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_CHART_REF:-${ADAPTER_CHART_REF:-main}}"
 export ADAPTER_CHART_PATH="${ADAPTER_CHART_PATH:-charts}"
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
 export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
@@ -74,7 +74,7 @@ export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}
 
 # Export API chart parameters for tier2 tests
 export API_CHART_REPO="${API_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-api.git}"
-export API_CHART_REF="${API_CHART_REF:-main}"
+export API_CHART_REF="${MULTISTAGE_PARAM_OVERRIDE_API_CHART_REF:-${API_CHART_REF:-main}}"
 export API_CHART_PATH="${API_CHART_PATH:-charts}"
 
 # JWT authentication via K8s TokenRequest API

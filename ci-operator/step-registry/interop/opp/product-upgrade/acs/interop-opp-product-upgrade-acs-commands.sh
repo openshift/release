@@ -17,7 +17,7 @@ set -x
 # shellcheck disable=SC2154
 _opp_cleanup() {
   # Save xtrace log with credentials scrubbed when the step exits non-zero.
-  _exit_code=${1:-$?}
+  _exit_code=$?
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
@@ -33,7 +33,7 @@ _junit_emitted=0
 _jrc=0  # initialized here, assigned inside trap string
 _junit_emit() {
   # Emit a JUnit XML result for the ACS upgrade step and propagate
-  # it to SHARED_DIR so downstream steps can aggregate results.
+  # it to SHARED_DIR/junit so downstream steps can aggregate results.
   (( _junit_emitted )) && return 0
   _junit_emitted=1
   local _jr=${1:-0}
@@ -56,13 +56,12 @@ _junit_emit() {
 </testsuite>
 JUNITEOF
   if [[ -n "${SHARED_DIR:-}" ]]; then
-    local _step_prefix
-    _step_prefix="$(basename "${BASH_SOURCE[0]:-$0}" .sh | sed 's/-commands$//')"
-    cp "${_jf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_jf}")" 2>/dev/null || true
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
   fi
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; exit 0' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; exit ${_jrc}' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -95,7 +94,7 @@ function CollectDiagnostics () {
     true
 }
 
-trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup ${_jrc}; if (( _jrc != 0 )); then CollectDiagnostics; fi; exit 0' EXIT
+trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; if (( _exit_code != 0 )); then CollectDiagnostics; fi; exit ${_jrc}' EXIT
 
 function GetCurrentCsv () {
     # Return the currentCSV name from the operator subscription status.
@@ -531,6 +530,3 @@ function Main () {
 }
 
 Main "$@"
-
-# Rename JUnit suite for dashboard visibility
-find "${ARTIFACT_DIR}" -name "*.xml" -exec sed -i 's/name="product-upgrade-acs"/name="lp-interop--OPP--acs-upgrade"/g; s/classname="product-upgrade-acs"/classname="lp-interop--OPP--acs-upgrade"/g' {} + 2>/dev/null || true

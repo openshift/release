@@ -6,7 +6,7 @@ set -o errexit
 set -o pipefail
 
 # Tool versions.
-readonly POWERVC_TOOL_VERSION="v2.4.10"
+readonly POWERVC_TOOL_VERSION="v2.4.11"
 readonly YQ_VERSION="v4.53.6"
 
 # Path to the mounted secret volume containing all PowerVC credentials.

@@ -11,6 +11,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - openstack-ironic-tester-rhel10-py314.Dockerfile
       - openstack-ironic-tester.Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
@@ -65,24 +66,25 @@ presubmits:
     - ^release-5\.2$
     - ^release-5\.2-
     cluster: build08
-    context: ci/prow/pep8
+    context: ci/prow/pep8-rhel10-py314
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - openstack-ironic-tester-rhel10-py314.Dockerfile
       - openstack-ironic-tester.Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openstack-ironic-release-5.2-pep8
-    rerun_command: /test pep8
+    name: pull-ci-openshift-openstack-ironic-release-5.2-pep8-rhel10-py314
+    rerun_command: /test pep8-rhel10-py314
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=pep8
+        - --target=pep8-rhel10-py314
         command:
         - ci-operator
         env:
@@ -123,31 +125,32 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pep8,?($|\s.*)
+    trigger: (?m)^/test( | .* )pep8-rhel10-py314,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
     cluster: build08
-    context: ci/prow/unit
+    context: ci/prow/pep8-rhel9-py312
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - openstack-ironic-tester-rhel10-py314.Dockerfile
       - openstack-ironic-tester.Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openstack-ironic-release-5.2-unit
-    rerun_command: /test unit
+    name: pull-ci-openshift-openstack-ironic-release-5.2-pep8-rhel9-py312
+    rerun_command: /test pep8-rhel9-py312
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --target=pep8-rhel9-py312
         command:
         - ci-operator
         env:
@@ -188,4 +191,136 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )pep8-rhel9-py312,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-5\.2$
+    - ^release-5\.2-
+    cluster: build08
+    context: ci/prow/unit-rhel10-py314
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - openstack-ironic-tester-rhel10-py314.Dockerfile
+      - openstack-ironic-tester.Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-openstack-ironic-release-5.2-unit-rhel10-py314
+    rerun_command: /test unit-rhel10-py314
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=unit-rhel10-py314
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit-rhel10-py314,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-5\.2$
+    - ^release-5\.2-
+    cluster: build08
+    context: ci/prow/unit-rhel9-py312
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - openstack-ironic-tester-rhel10-py314.Dockerfile
+      - openstack-ironic-tester.Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-openstack-ironic-release-5.2-unit-rhel9-py312
+    rerun_command: /test unit-rhel9-py312
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=unit-rhel9-py312
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit-rhel9-py312,?($|\s.*)

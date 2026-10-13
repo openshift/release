@@ -5,6 +5,7 @@ set -euo pipefail
 source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'mirror_spoke_operators' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
+apply_gangway_overrides
 setup_debug_on_fail
 
 main() {
@@ -34,11 +35,13 @@ main() {
         # Variable renamed with telco_kpis_ prefix to avoid upstream clashing
         extra_vars+=(-e "telco_kpis_spoke_lockdown_uri=${SPOKE_LOCKDOWN_URI}")
         # version is intentionally omitted: wrapper extracts spoke_ocp_version from lockdown
+        # architecture is also extracted from lockdown by wrapper (spoke_architecture)
         echo "Wrapper will extract operators, version, architecture from lockdown JSON"
     else
         # Variable renamed with telco_kpis_ prefix for wrapper
         extra_vars+=(-e "telco_kpis_version=${VERSION}")
-        echo "Wrapper will use version from parameter"
+        extra_vars+=(-e "telco_kpis_architecture=${ARCHITECTURE:-x86_64}")
+        echo "Wrapper will use version and architecture from parameters"
     fi
 
     if [[ "${GENERATE_SPOKE_LOCKDOWN:-false}" == "true" ]]; then

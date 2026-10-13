@@ -42,10 +42,10 @@ EOF
 fi
 
 # --- Configuration -----------------------------------------------------------
-# The golang e2e tests live in the operator repo. We always run them from the
-# development branch.
-OPERATOR_REPO="https://github.com/openshift/sandboxed-containers-operator"
-OPERATOR_REF="devel"
+# Where the golang e2e tests come from. Defaults live in the ref so a job can
+# point the suite at a fork, a release branch or a pinned commit.
+TESTS_OSC_REPO="${TESTS_OSC_REPO:-https://github.com/openshift/sandboxed-containers-operator}"
+TESTS_OSC_REPO_REF="${TESTS_OSC_REPO_REF:-devel}"
 
 # User-facing parameters (see the ref for defaults/documentation). They follow
 # the TESTS_<SUITE_NAME>_<PARAMETER> convention shared by all OSC test suites:
@@ -75,11 +75,33 @@ export GOCACHE="/tmp/gocache"
 export GOMODCACHE="/tmp/gomod"
 export GOFLAGS="-mod=mod"
 
-# --- Fetch the operator repo (hosts the golang e2e tests) --------------------
-OPERATOR_DIR="$(mktemp -d /tmp/osc-XXXXXX)"
-echo "Cloning ${OPERATOR_REPO} (${OPERATOR_REF})"
-git clone --depth 1 -b "${OPERATOR_REF}" "${OPERATOR_REPO}" "${OPERATOR_DIR}"
-cd "${OPERATOR_DIR}/test/e2e"
+# --- Fetch the test repo (hosts the golang e2e tests) ------------------------
+# fetch+checkout instead of `clone -b` so TESTS_OSC_REPO_REF accepts a branch,
+# a tag or a full commit SHA. The shallow fetch covers all three on github.com;
+# the retry unshallows for servers that refuse fetch-by-SHA.
+# A user-supplied repo URL may embed credentials, so log the ref only.
+# Stderr is suppressed on fetch: git writes the full URL to stderr on failure,
+# which would leak internal hostnames or embedded credentials into CI logs.
+TESTS_DIR="$(mktemp -d /tmp/osc-XXXXXX)"
+echo "Fetching test repo (ref ${TESTS_OSC_REPO_REF})"
+git init -q "${TESTS_DIR}"
+git -C "${TESTS_DIR}" fetch -q --depth 1 "${TESTS_OSC_REPO}" "${TESTS_OSC_REPO_REF}" 2>/dev/null \
+    || git -C "${TESTS_DIR}" fetch -q "${TESTS_OSC_REPO}" "${TESTS_OSC_REPO_REF}" 2>/dev/null \
+    || { echo "ERROR: failed to fetch ref ${TESTS_OSC_REPO_REF}; verify TESTS_OSC_REPO and TESTS_OSC_REPO_REF"; exit 1; }
+git -C "${TESTS_DIR}" checkout -q FETCH_HEAD
+# Record the commit actually used: the default ref tracks a moving branch, so
+# this is what tells a later reader whether the tests changed between runs.
+echo "Tests commit: $(git -C "${TESTS_DIR}" rev-parse HEAD)"
+
+# test/e2e only exists on devel today, so a ref that predates it (or a fork
+# that never carried it) resolves to nothing. Say so instead of letting the
+# cd below fail with a bare "No such file or directory".
+if [[ ! -d "${TESTS_DIR}/test/e2e" ]]; then
+    echo "ERROR: test/e2e not found at ref ${TESTS_OSC_REPO_REF}"
+    echo "       Set TESTS_OSC_REPO_REF to a ref that carries the tests."
+    exit 1
+fi
+cd "${TESTS_DIR}/test/e2e"
 
 # --- Run the golang (Ginkgo v2) e2e tests ------------------------------------
 # The suite reads its configuration from the osc-config configmap that the

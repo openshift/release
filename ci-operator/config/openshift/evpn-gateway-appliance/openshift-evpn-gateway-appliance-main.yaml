@@ -1,0 +1,28 @@
+base_images:
+  ubi-python:
+    name: ubi-python-312
+    namespace: ocp
+    tag: "9"
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.ci
+    from: ubi-python
+    to: ansible-test-runner
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: make verify OFFLINE=1
+  container:
+    from: ansible-test-runner
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: evpn-gateway-appliance

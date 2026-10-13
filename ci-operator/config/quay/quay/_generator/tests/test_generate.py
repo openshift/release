@@ -8,6 +8,7 @@ import pytest
 import yaml
 from conftest import PHASE0_MATRIX
 from generate import (
+    ALLOWED_ARCHES,
     GENERATED_HEADER,
     GENERATOR_DIR,
     _check_configs,
@@ -68,17 +69,26 @@ def test_expand_matrix_cells() -> None:
             cell.cron,
             cell.kind,
             cell.arch,
+            cell.fips,
+            cell.storage,
         )
         for cell in cells
     } == {
-        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "azure", "4.22", "e2e-install", "@daily", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64"),
-        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64"),
-        ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x"),
-        (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64"),
-        (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64"),
+        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "s3"),
+        ("3.18", "redhat-3.18", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "gcs"),
+        ("3.18", "redhat-3.18", "azure", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "blob"),
+        ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64", False, "s3"),
+        ("3.18", "redhat-3.18", "aws", "4.14", "e2e-install", "@weekly", "periodic", "amd64", False, "s3"),
+        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64", False, "s3"),
+        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", True, "s3"),
+        ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x", False, "s3"),
+        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "odf"),
+        ("3.17", "redhat-3.17", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", False, "s3"),
+        ("5.0", "redhat-5.0", "aws", "5.0", "e2e-install", "@daily", "periodic", "amd64", False, "s3"),
+        (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64", False, "s3"),
+        (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64", False, "gcs"),
+        (None, "master", "azure", "4.22", "e2e-install", None, "presubmit", "amd64", False, "blob"),
+        (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64", False, "odf"),
     }
     cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "amd64")
     assert cell.filename == PHASE0_NAME
@@ -89,7 +99,7 @@ def test_expand_matrix_cells() -> None:
 
     arm_cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "arm64")
     assert arm_cell.filename == "quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml"
-    assert arm_cell.test_as == "aws-s3-nightly-arm64"
+    assert arm_cell.test_as == "aws-s3-nightly"
 
     master_cell = next(c for c in cells if c.branch == "master")
     assert master_cell.filename == MASTER_NAME
@@ -98,6 +108,18 @@ def test_expand_matrix_cells() -> None:
     assert master_cell.optional is True
     assert master_cell.quay_version is None
     assert "QUAY_EXTRA_CONFIG" not in cell.env
+
+
+def test_job_names_have_no_trailing_arch_suffix() -> None:
+    # Prow names a job ...-<variant>-<as>; an arch already in the variant
+    # must not be repeated at the end of `as`.
+    results, _retired = generate_all()
+    for _group, filename, config in results:
+        variant = config["zz_generated_metadata"].get("variant", "")
+        for test in config["tests"]:
+            for arch in ALLOWED_ARCHES - {"amd64"}:
+                if arch in variant.split("-"):
+                    assert not test["as"].endswith(f"-{arch}"), f"{filename}: {test['as']}"
 
 
 def test_adding_ocp_version_expands_cells() -> None:
@@ -141,7 +163,7 @@ def test_e2e_install_template_inverts_full_default_filter() -> None:
     env = jinja_env(GENERATOR_DIR / "templates")
     rendered = render_template(env, "tests/e2e-install.yaml.j2", _phase0_cell().context())
     assert rendered["tests"][0]["steps"]["env"]["PLAYWRIGHT_GREP_INVERT"] == (
-        "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@webhook|"
+        "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|"
         "saves and loads architecture filter with mirror configuration|"
         "loads existing architecture filter from saved mirror configuration"
     )
@@ -318,7 +340,7 @@ def test_golden_redhat_318_arm64_canary_bytes() -> None:
     assert dumped.startswith(GENERATED_HEADER)
 
     test = config["tests"][0]
-    assert test["as"] == "aws-s3-nightly-arm64"
+    assert test["as"] == "aws-s3-nightly"
     assert test["cron"] == "@weekly"
     assert test["steps"]["dependencies"] == {
         "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE": "release:arm64-latest"
@@ -337,7 +359,7 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     assert filename in by_name
     config = by_name[filename]
     test = config["tests"][0]
-    assert test["as"] == "libvirt-s3-nightly-s390x"
+    assert test["as"] == "libvirt-s3-nightly"
     assert test["cron"] == "0 8 * * 2"
     assert test["capabilities"] == ["intranet"]
     assert test["steps"]["cluster_profile"] == "libvirt-s390x-vpn"
@@ -355,16 +377,47 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     assert "ipi-aws-post" not in post_refs
 
 
-def test_master_presubmit_expands_both_clouds() -> None:
+def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    config = by_name["quay-quay-redhat-3.18__aws-ocp414-e2e-install.yaml"]
+    assert config["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-4.22"
+    assert config["releases"]["latest"]["candidate"]["version"] == "4.14"
+    assert config["tests"][0]["cron"] == "@weekly"
+    assert config["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.14__quay-rhel9-operator"
+    ocp50 = by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]
+    assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
+
+
+def test_master_presubmit_expands_all_clouds() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
     tests = by_name[MASTER_NAME]["tests"]
     by_as = {test["as"]: test for test in tests}
-    assert set(by_as) == {"aws-s3", "gcp-gcs"}
+    assert set(by_as) == {"aws-s3", "gcp-gcs", "azure-blob", "aws-odf"}
 
     gcp_test = by_as["gcp-gcs"]
     assert gcp_test["optional"] is True
     assert gcp_test["always_run"] is False
+
+    odf_test = by_as["aws-odf"]
+    assert odf_test["optional"] is True
+    assert odf_test["always_run"] is False
+    odf_refs = [step["ref"] for step in odf_test["steps"]["test"]]
+    assert odf_refs == [
+        "merge-stage-registry-credentials",
+        "quay-enable-catalogsource-art",
+        "quay-provisioning-tls",
+        "quay-provisioning-builder",
+        "quay-deploy-mailpit",
+        "quay-deploy-jaeger",
+        "quay-install-odf-operator",
+        "quay-deploy-odf",
+        "quay-deploy-custom-image",
+        "quay-test-e2e",
+    ]
+    assert odf_test["steps"]["env"]["SETUP_NOOBAA"] == "true"
+    assert odf_test["steps"]["env"]["QUAY_STORAGE_PROVIDER"] == "odf"
 
 
 def test_mixed_golden_groups_periodic_and_presubmit_into_one_file() -> None:
@@ -542,7 +595,7 @@ def test_check_fails_when_retired_present(tmp_path: Path) -> None:
 
 def test_check_ignores_unrelated_branch_neighbors(tmp_path: Path) -> None:
     assert main(["--output", str(tmp_path)]) == 0
-    (tmp_path / "quay-quay-redhat-3.17__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
+    (tmp_path / "quay-quay-redhat-3.16__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
     (tmp_path / "quay-quay-master__claim.yaml").write_text("foo: bar\n")
     (tmp_path / "quay-quay-master__omr-v3.yaml").write_text("foo: bar\n")
     assert main(["--check", "--output", str(tmp_path)]) == 0
@@ -1095,11 +1148,192 @@ def test_master_arm64_variant_without_promotion(tmp_path: Path) -> None:
 
     tests = config["tests"]
     by_as = {test["as"]: test for test in tests}
-    assert set(by_as) == {"aws-s3-arm64"}
+    assert set(by_as) == {"aws-s3"}
 
-    aws_test = by_as["aws-s3-arm64"]
+    aws_test = by_as["aws-s3"]
     assert aws_test["steps"]["env"]["COMPUTE_NODE_TYPE"] == "m6g.4xlarge"
     assert aws_test["steps"]["dependencies"] == {
         "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE": "release:arm64-latest",
         "QUAY_CI_IMAGE": "pipeline:quay-server",
     }
+
+
+def test_redhat_318_aws_fips_shares_aws_file() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    tests = {test["as"]: test for test in by_name[PHASE0_NAME]["tests"]}
+    assert set(tests) == {"aws-s3-nightly", "aws-s3-nightly-fips", "aws-odf-nightly"}
+
+    fips = tests["aws-s3-nightly-fips"]
+    assert fips["cron"] == "@weekly"
+    assert fips["steps"]["env"]["FIPS_ENABLED"] == "true"
+    assert fips["steps"]["env"]["QUAY_DEPLOY_MAILPIT"] == "false"
+    assert "FEATURE_FIPS: true" in fips["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()
+    assert fips["steps"]["test"][0] == {"ref": "fips-check-fips-or-die"}
+    assert fips["steps"]["test"][1:] == tests["aws-s3-nightly"]["steps"]["test"]
+
+    plain = tests["aws-s3-nightly"]["steps"]
+    assert "FIPS_ENABLED" not in plain["env"]
+    assert "QUAY_DEPLOY_MAILPIT" not in plain["env"]
+    assert "FEATURE_FIPS" not in plain["env"]["QUAY_EXTRA_CONFIG"]
+
+
+def test_fips_rejects_non_bool() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "fips": "yes",
+        }
+    )
+    with pytest.raises(ValueError, match="fips must be a boolean"):
+        expand_cells(matrix)
+
+
+def test_presubmit_rejects_fips() -> None:
+    matrix = _matrix_with_job(
+        {
+            "kind": "presubmit",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "fips": True,
+        },
+        release_overrides={"branch": "master", "layout": "base"},
+    )
+    with pytest.raises(ValueError, match="fips is only valid for kind: periodic"):
+        expand_cells(matrix)
+
+
+def test_storage_odf_allowed_only_on_aws() -> None:
+    for cloud in ("gcp", "azure", "libvirt"):
+        matrix = _matrix_with_job(
+            {
+                "cron": "daily",
+                "source": "nightly",
+                "clouds": [cloud],
+                "ocp": ["4.22"],
+                "test": "e2e-install",
+                "storage": "odf",
+            }
+        )
+        with pytest.raises(ValueError, match="storage 'odf' is not allowed for cloud"):
+            expand_cells(matrix)
+
+
+def test_storage_rejects_unknown_value() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "storage": "bogus",
+        }
+    )
+    with pytest.raises(ValueError, match="storage 'bogus' is not allowed for cloud 'aws'"):
+        expand_cells(matrix)
+
+
+def test_storage_odf_on_aws_is_allowed() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "storage": "odf",
+        }
+    )
+    cells = expand_cells(matrix)
+    assert cells[0].storage == "odf"
+    assert cells[0].deploy_ref == "quay-deploy-odf"
+    assert cells[0].test_as == "aws-odf-nightly"
+
+
+def test_storage_explicit_default_matches_absent() -> None:
+    absent = _matrix_with_job(
+        {"cron": "daily", "source": "nightly", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"}
+    )
+    explicit = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "storage": "s3",
+        }
+    )
+    absent_cell = expand_cells(absent)[0]
+    explicit_cell = expand_cells(explicit)[0]
+    assert absent_cell.storage == explicit_cell.storage == "s3"
+    assert absent_cell.deploy_ref == explicit_cell.deploy_ref == "quay-deploy-aws-s3"
+
+
+def test_odf_storage_renders_install_step_before_deploy_and_sets_env() -> None:
+    cell = _phase0_cell(storage_override="odf")
+    config = build_config(cell, GENERATOR_DIR / "templates")
+    test = config["tests"][0]
+    assert test["as"] == "aws-odf-nightly"
+    refs = [step["ref"] for step in test["steps"]["test"]]
+    assert refs == [
+        "merge-stage-registry-credentials",
+        "quay-enable-catalogsource-art",
+        "quay-provisioning-tls",
+        "quay-provisioning-builder",
+        "quay-deploy-mailpit",
+        "quay-deploy-jaeger",
+        "quay-install-odf-operator",
+        "quay-deploy-odf",
+        "quay-test-e2e",
+    ]
+    env = test["steps"]["env"]
+    assert env["SETUP_NOOBAA"] == "true"
+    assert env["QUAY_STORAGE_PROVIDER"] == "odf"
+
+
+def test_odf_storage_presubmit_renders_install_before_deploy() -> None:
+    cell = _phase0_cell(
+        branch="master",
+        quay_version=None,
+        kind="presubmit",
+        cron=None,
+        storage_override="odf",
+    )
+    assert cell.test_as == "aws-odf"
+    config = build_config(cell, GENERATOR_DIR / "templates")
+    test = config["tests"][0]
+    refs = [step["ref"] for step in test["steps"]["test"]]
+    assert refs == [
+        "merge-stage-registry-credentials",
+        "quay-enable-catalogsource-art",
+        "quay-provisioning-tls",
+        "quay-provisioning-builder",
+        "quay-deploy-mailpit",
+        "quay-deploy-jaeger",
+        "quay-install-odf-operator",
+        "quay-deploy-odf",
+        "quay-deploy-custom-image",
+        "quay-test-e2e",
+    ]
+    env = test["steps"]["env"]
+    assert env["SETUP_NOOBAA"] == "true"
+    assert env["QUAY_STORAGE_PROVIDER"] == "odf"
+
+
+def test_production_odf_row_shares_file_with_s3_sibling() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    tests = {test["as"]: test for test in by_name[PHASE0_NAME]["tests"]}
+    assert "aws-s3-nightly" in tests
+    assert "aws-odf-nightly" in tests
+
+    s3_refs = [step["ref"] for step in tests["aws-s3-nightly"]["steps"]["test"]]
+    assert "quay-install-odf-operator" not in s3_refs
+    assert "SETUP_NOOBAA" not in tests["aws-s3-nightly"]["steps"]["env"]

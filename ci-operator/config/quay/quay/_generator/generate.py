@@ -40,7 +40,7 @@ from typing import Any
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateError
-from model import Cell, YamlMap
+from model import STORAGE_BY_CLOUD, EXTRA_STORAGE_BY_CLOUD, Cell, YamlMap
 
 GENERATOR_DIR = Path(__file__).resolve().parent
 SOURCES = ("nightly", "stable")
@@ -66,6 +66,8 @@ JOB_KEYS = {
     "optional",
     "run_if_changed",
     "skip_if_only_changed",
+    "fips",
+    "storage",
 }
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
 TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
@@ -337,10 +339,20 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             arches = _job_arches_field(job, default_arch, where)
             if not test or not ocps or not clouds:
                 raise ValueError(f"{where} is missing test, ocp, or clouds")
+            storage = _job_str_field(job, "storage", where)
+            if storage is not None:
+                for cloud in clouds:
+                    allowed = {STORAGE_BY_CLOUD[cloud]} if cloud in STORAGE_BY_CLOUD else set()
+                    allowed |= EXTRA_STORAGE_BY_CLOUD.get(cloud, set())
+                    if storage not in allowed:
+                        raise ValueError(
+                            f"{where}.storage {storage!r} is not allowed for cloud {cloud!r}"
+                        )
             always_run = _job_bool_field(job, "always_run", where)
             optional = _job_bool_field(job, "optional", where)
             run_if_changed = _job_str_field(job, "run_if_changed", where)
             skip_if_only_changed = _job_str_field(job, "skip_if_only_changed", where)
+            fips = _job_bool_field(job, "fips", where) or False
             cron_raw = job.get("cron")
             source_raw = job.get("source")
             if kind == "periodic":
@@ -369,6 +381,8 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         f"branch {branch!r} has none"
                     )
             else:
+                if fips:
+                    raise ValueError(f"{where}.fips is only valid for kind: periodic")
                 if cron_raw is not None:
                     raise ValueError(f"{where} presubmit job must not set cron")
                 cron = None
@@ -411,6 +425,8 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         optional=optional,
                         run_if_changed=run_if_changed,
                         skip_if_only_changed=skip_if_only_changed,
+                        fips=fips,
+                        storage_override=storage,
                     )
                 )
     return cells

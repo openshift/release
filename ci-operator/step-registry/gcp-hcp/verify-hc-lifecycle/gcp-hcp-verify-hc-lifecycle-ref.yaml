@@ -35,7 +35,7 @@ ref:
     ready -> login -> deploy workload -> verify -> delete -> destroy infra.
 
     Depends on:
-    - gcp-hcp-tf-provision (must write api-endpoint, oidc-endpoint, customer-project-id)
+    - gcp-hcp-tf-provision (must write api-endpoint, oidc-endpoint, customer-project-id, region, and region-project-id)
     - hypershift-gcp-wif-auth (provides the WIF ADC credential used by gcphcpctl)
     - gcp-hcp-e2e-tests image (provides /usr/bin/test-e2e and /usr/bin/gcphcpctl)
 
@@ -46,6 +46,12 @@ ref:
     - HC_DELETE_TIMEOUT: Delete timeout (default: 20m)
     - GCPHCPCTL_API_MAX_ATTEMPTS: API readiness attempts (default: 40)
     - GCPHCPCTL_API_WAIT_SECONDS: Seconds between API readiness attempts (default: 30)
+
+    The WIF principal from wif-config.json is reused for the activation workflow,
+    public API bootstrap, and gcphcpctl lifecycle requests.
+
+    This step derives platform-api-subject-email from wif-config.json for the
+    Ginkgo bootstrap; no alternate service-account credential is created.
 
     Outputs:
     - ${ARTIFACT_DIR}/junit_hc_lifecycle.xml: JUnit test results for Prow
