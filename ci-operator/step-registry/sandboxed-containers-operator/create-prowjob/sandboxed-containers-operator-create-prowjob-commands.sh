@@ -141,36 +141,6 @@ validate_and_set_defaults() {
         exit 1
     fi
 
-    # exclude C00133 from test by default
-    TEST_FILTERS="${TEST_FILTERS:-~DisconnectedOnly&;~Disruptive&;~C00133&}"
-    local -a _test_filter_segments
-    local _test_filter_seg
-    local _test_filter_re='^~?[a-zA-Z0-9_]+&?$'
-    IFS=';' read -ra _test_filter_segments <<< "${TEST_FILTERS}"
-    for _test_filter_seg in "${_test_filter_segments[@]}"; do
-        [[ -z "${_test_filter_seg}" ]] && continue
-        if [[ ! "${_test_filter_seg}" =~ ${_test_filter_re} ]]; then
-            echo "ERROR: Invalid TEST_FILTERS segment '${_test_filter_seg}'."
-            echo "Each non-empty segment must match ${_test_filter_re} (openshift-extended-test)."
-            echo "Example skipping Polarion cases C00317 and C00133:"
-            echo ""
-            echo "export TEST_FILTERS='~DisconnectedOnly&;~Disruptive&;~C00317&;~C00133&'"
-            echo ""
-            echo '* leading "~" excludes any selected dry-run line matching that token (grep -v -E)'
-            echo '* ";" separates filters'
-            echo '* trailing "&" means AND-combined'
-            exit 1
-        fi
-    done
-
-    # Let the tests run for this many minutes before killing the cluster and interupting the test
-    TEST_TIMEOUT="${TEST_TIMEOUT:-90}"
-    # Validate TEST_TIMEOUT is numeric
-    if ! [[ "${TEST_TIMEOUT}" =~ ^[0-9]+$ ]]; then
-        echo "ERROR: TEST_TIMEOUT should be numeric, got: ${TEST_TIMEOUT}"
-        exit 1
-    fi
-
     # Must-gather Configuration
     ENABLE_MUST_GATHER="${ENABLE_MUST_GATHER:-true}"
     # Validate ENABLE_MUST_GATHER
@@ -235,10 +205,6 @@ show_usage() {
     echo "  INSTALL_KATA_RPM               - Install Kata RPM: true or false (default: true)"
     echo "  KATA_RPM_VERSION               - Kata RPM version (default: 3.17.0-3.rhaos4.19.el9)"
     echo "  SLEEP_DURATION                 - Sleep duration after tests (default: 0h)"
-    echo "  TEST_SCENARIOS                 - Test scenarios filter (default: \"sig-kata.*Kata Author\" or \"sig-kata.*run and verify cosigned pod\")"
-    echo "  TEST_FILTERS                   - openshift-extended-test filters (default: ~DisconnectedOnly&;~Disruptive&)"
-    echo "                                   Append ;~Cnnnnn& to skip a Polarion-style id appearing in case lines"
-    echo "  TEST_TIMEOUT                   - Test timeout in minutes (default: 90)"
     echo "  ENABLE_MUST_GATHER             - Enable must-gather: true or false (default: true)"
     echo "  MUST_GATHER_IMAGE              - Must-gather image (default: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest)"
     echo "  MUST_GATHER_ON_FAILURE_ONLY    - Must-gather on failure only: true or false (default: true)"
@@ -317,17 +283,6 @@ generate_workflow() {
     env_vars+=("AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}")
   fi
 
-  local test_scenarios
-  if [[ -n "${TEST_SCENARIOS:-}" ]]; then
-    test_scenarios="$TEST_SCENARIOS"
-  else
-    if [[ "$workload" = "coco" ]]; then
-      test_scenarios="sig-kata.*run and verify cosigned pod"
-    else
-      test_scenarios="sig-kata.*Kata Author"
-    fi
-  fi
-
   # Common
   env_vars+=(
     "CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE:-\"\"}"
@@ -339,10 +294,7 @@ generate_workflow() {
     "MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}"
     "MUST_GATHER_ON_FAILURE_ONLY: \"${MUST_GATHER_ON_FAILURE_ONLY}\""
     "SLEEP_DURATION: ${SLEEP_DURATION}"
-    "TEST_FILTERS: ${TEST_FILTERS}"
     "TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}"
-    "TEST_SCENARIOS: ${test_scenarios}"
-    "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     "TRUSTEE_URL: ${TRUSTEE_URL:-\"\"}"
   )
 
@@ -388,10 +340,6 @@ command_create() {
 
     cat > "${OUTPUT_FILE}" <<EOF
 base_images:
-  tests-private:
-    name: tests-private
-    namespace: ci
-    tag: "4.22"
   upi-installer:
     name: "${UPI_INSTALLER_VERSION}"
     namespace: ocp
@@ -463,8 +411,6 @@ EOF
     echo "  • Azure Region: ${CUSTOM_AZURE_REGION}"
     echo "  • Kata RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
     echo "  • Sleep Duration: ${SLEEP_DURATION}"
-    echo "  • Test Timeout: ${TEST_TIMEOUT}"
-    echo "  • TEST_FILTERS: ${TEST_FILTERS}"
 
     if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
         echo "  • Catalog Source: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
