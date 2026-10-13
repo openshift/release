@@ -1,9 +1,3 @@
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: deck
-  namespace: ci
----
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
@@ -27,23 +21,21 @@ spec:
   source:
     type: Dockerfile
     dockerfile: |
-      FROM docker.io/library/golang:1.26-bookworm AS golang
-      FROM docker.io/library/node:20-bookworm-slim AS build
-      COPY --from=golang /usr/local/go /usr/local/go
-      ENV PATH=/usr/local/go/bin:${PATH} \
-          CGO_ENABLED=0 \
+      FROM registry.ci.openshift.org/ci/deck:upstream AS upstream
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.26-openshift-4.22 AS build
+      USER 0
+      ENV CGO_ENABLED=0 \
           GOMAXPROCS=2 \
-          GOFLAGS=-p=2 \
-          GOTOOLCHAIN=auto \
-          FORCE_HOST_GO=true \
-          NO_DOCKER=true
-      RUN apt-get update \
-          && apt-get install -y --no-install-recommends ca-certificates git rsync \
-          && rm -rf /var/lib/apt/lists/*
+          GOFLAGS="-p=2 -trimpath" \
+          GOTOOLCHAIN=auto
+      COPY --from=upstream /ko-app/deck /tmp/upstream-deck
       WORKDIR /src/prow
       ARG PATCH_COMMIT=d1d5cbef5ed31a1b6ef80c9faf7bfbc1b7c155ef
-      RUN git clone --branch main --single-branch https://github.com/kubernetes-sigs/prow.git . \
-          && git fetch origin "${PATCH_COMMIT}" \
+      RUN upstream_commit="$(go version -m /tmp/upstream-deck | sed -n 's/^[[:space:]]*build[[:space:]]*vcs.revision=//p')" \
+          && printf '%s\n' "${upstream_commit}" | grep -Eq '^[0-9a-f]{40}$' \
+          && git clone --branch main --single-branch https://github.com/kubernetes-sigs/prow.git . \
+          && git fetch origin "${upstream_commit}" "${PATCH_COMMIT}" \
+          && git checkout --detach "${upstream_commit}" \
           && git rev-parse HEAD > /tmp/upstream-sha \
           && git show --format= --binary "${PATCH_COMMIT}" > /tmp/deck.patch \
           && if git merge-base --is-ancestor "${PATCH_COMMIT}" HEAD; then \
@@ -55,18 +47,15 @@ spec:
                   cherry-pick --no-gpg-sign "${PATCH_COMMIT}"; \
             fi
       RUN go test ./cmd/deck
-      RUN cmd/deck/gather-static.sh
       RUN version="$(date -u +v%Y%m%d)-$(cat /tmp/upstream-sha)-history-${PATCH_COMMIT}" \
-          && go build -trimpath \
+          && go build \
               -ldflags="-s -w -X sigs.k8s.io/prow/pkg/version.Name=deck -X sigs.k8s.io/prow/pkg/version.Version=${version}" \
               -o /out/deck ./cmd/deck
 
-      # Match the runtime base used for Deck in upstream .ko.yaml. It includes
-      # git and the Kubernetes authentication helpers used by Deck.
-      FROM gcr.io/k8s-staging-test-infra/git-custom-k8s-auth:v20260512-1f34ef0df3
+      # Reuse this same upstream image's frontend assets, templates, lenses,
+      # git and Kubernetes authentication helpers. The patch only changes Go.
+      FROM upstream
       COPY --from=build /out/deck /ko-app/deck
-      COPY --from=build /src/prow/cmd/deck/kodata /var/run/ko
-      ENV KO_DATA_PATH=/var/run/ko
       ENTRYPOINT ["/ko-app/deck"]
       CMD []
   strategy:
@@ -74,8 +63,7 @@ spec:
     dockerStrategy:
       forcePull: true
       noCache: true
-  triggers:
-  - type: ConfigChange
+  triggers: []
 ---
 apiVersion: batch/v1
 kind: CronJob
