@@ -21,8 +21,8 @@ ref:
     default: rosa-general
     documentation: ROSA-owned Vertex inference project; keys for other GCP projects are rejected.
   - name: TARGET_VERTEX_SERVICE_ACCOUNT_EMAIL
-    default: rosa-cora-agent@rosa-general.iam.gserviceaccount.com
-    documentation: OpenWiki service account in rosa-general; keys for other accounts are rejected.
+    default: rosa-boundary@rosa-general.iam.gserviceaccount.com
+    documentation: Existing ROSA Boundary Vertex service account; keys for other accounts are rejected.
   - name: GOOGLE_CLOUD_LOCATION
     default: global
     documentation: Vertex AI endpoint location.
@@ -30,15 +30,15 @@ ref:
     default: claude-sonnet-5
     documentation: Claude model enabled in the Vertex Model Garden for the ROSA project.
   - name: GOOGLE_APPLICATION_CREDENTIALS
-    default: /var/run/rosa-cora-agent-vertex/gcp-vertex-sa-key
-    documentation: rosa-cora-agent/ci/gcp-vertex-sa-key JSON key for the configured OpenWiki service account in rosa-general.
+    default: /var/run/rosa-boundary-vertex/gcp-vertex-sa-key
+    documentation: rosa-boundary/ci/gcp-vertex-sa-key JSON key for the existing ROSA Boundary service account in rosa-general.
   credentials:
   # No GitHub App credentials in the agent container. Only the Vertex key is
   # mounted for generating documentation; publishing happens in another step.
-  - collection: rosa-cora-agent
+  - collection: rosa-boundary
     group: ci
     field: gcp-vertex-sa-key
-    mount_path: /var/run/rosa-cora-agent-vertex
+    mount_path: /var/run/rosa-boundary-vertex
   resources:
     requests:
       cpu: 500m
@@ -46,5 +46,5 @@ ref:
   documentation: |-
     Install pinned Node/OpenWiki into a temporary directory and run OpenWiki
     on a full-history clone of the public repository. Mounts only the Vertex
-    key from rosa-cora-agent/ci. Passes only openwiki/ changes and the update
+    key from rosa-boundary/ci. Passes only openwiki/ changes and the update
     exit code to the publish step, even if OpenWiki only completes some pages.

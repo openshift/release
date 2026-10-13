@@ -9,7 +9,7 @@ git check-ref-format --branch "$base" >/dev/null
 git check-ref-format --branch "$branch" >/dev/null
 
 if [[ ! -s "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
-  echo 'Missing rosa-cora-agent/ci/gcp-vertex-sa-key credential.' >&2
+  echo 'Missing rosa-boundary/ci/gcp-vertex-sa-key credential.' >&2
   exit 1
 fi
 
@@ -17,7 +17,7 @@ fi
 GOOGLE_CLOUD_PROJECT=$(jq -er 'select(.type == "service_account") | .project_id' "$GOOGLE_APPLICATION_CREDENTIALS")
 client_email=$(jq -er '.client_email' "$GOOGLE_APPLICATION_CREDENTIALS")
 if [[ "$GOOGLE_CLOUD_PROJECT" != "$TARGET_VERTEX_PROJECT_ID" || "$client_email" != "$TARGET_VERTEX_SERVICE_ACCOUNT_EMAIL" ]]; then
-  echo 'Vertex key does not belong to the configured ROSA Cora Agent service account.' >&2
+  echo 'Vertex key does not belong to the configured ROSA Boundary service account.' >&2
   exit 1
 fi
 export GOOGLE_CLOUD_PROJECT
