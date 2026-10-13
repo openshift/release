@@ -39,6 +39,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: base
+  console-plugin-demo:
+    name: "5.0"
+    namespace: ocp
+    tag: console-plugin-demo
   console-tests:
     name: "5.0"
     namespace: ocp
@@ -107,8 +111,6 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -1654,6 +1656,9 @@ tests:
     - as: e2e-test
       cli: latest
       commands: ./test-prow-e2e.sh release
+      dependencies:
+      - env: PLUGIN_PULL_SPEC
+        name: console-plugin-demo
       from: console-tests
       resources:
         limits:
@@ -1840,22 +1845,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-cnf
-- as: e2e-telco5g-sno-cnftests
-  capabilities:
-  - intranet
-  cron: 00 18 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "5.0"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
@@ -1888,7 +1877,7 @@ tests:
 - as: e2e-telco5g-hcp-cnftests
   capabilities:
   - intranet
-  cron: 00 22 */1 * 1-5
+  cron: 00 22 */1 * 5,6,0
   restrict_network_access: false
   steps:
     env:
