@@ -150,14 +150,41 @@ tests:
       PQC_CHECK: "true"
       SCAN_NAMESPACE: openshift-ptp
       SCANNER_CPU: "2"
+      SCANNER_NAMESPACE: openshift-ptp
       TLS_GROUPS: SecP384r1MLKEM1024
     test:
+    - as: record-ptp-daemon-generation
+      cli: latest
+      commands: |
+        generation=$(oc get daemonset linuxptp-daemon -n openshift-ptp -o jsonpath='{.metadata.generation}')
+        echo "PTP daemon generation before TLS group change: ${generation}"
+        printf '%s\n' "${generation}" > "${SHARED_DIR}/linuxptp-daemon-generation"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - ref: tls-groups-configure
     - as: wait-ptp-tls-curve-restart
       cli: latest
       commands: |
         echo "Waiting for PTP operator to restart after TLS group change..."
         oc rollout status deployment ptp-operator -n openshift-ptp --timeout=300s
+        previous_generation=$(cat "${SHARED_DIR}/linuxptp-daemon-generation")
+        current_generation=${previous_generation}
+        for _ in $(seq 1 40); do
+          current_generation=$(oc get daemonset linuxptp-daemon -n openshift-ptp -o jsonpath='{.metadata.generation}')
+          if (( current_generation > previous_generation )); then
+            echo "PTP daemon generation advanced from ${previous_generation} to ${current_generation}"
+            break
+          fi
+          echo "Waiting for PTP daemon generation to advance beyond ${previous_generation}..."
+          sleep 10
+        done
+        if (( current_generation <= previous_generation )); then
+          echo "PTP daemon generation did not change after the TLS group update"
+          exit 1
+        fi
         oc rollout status daemonset linuxptp-daemon -n openshift-ptp --timeout=400s
         echo "PTP operator and daemon restarted with the custom TLS group"
         oc get pods -n openshift-ptp
