@@ -20,19 +20,16 @@ echo "${RESOURCE_GROUP}" > "${SHARED_DIR}/cocl-resourcegroup"
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
 
-echo "Logging in with the azure-qe service principal to fetch the test image"
-AZURE_QE_CLIENT_ID=$(jq -r .clientId /tmp/secrets/azure-qe/osServicePrincipal.json)
-AZURE_QE_CLIENT_SECRET=$(jq -r .clientSecret /tmp/secrets/azure-qe/osServicePrincipal.json)
-AZURE_QE_TENANT_ID=$(jq -r .tenantId /tmp/secrets/azure-qe/osServicePrincipal.json)
+echo "Logging in with the trusted-execution-clusters-azure service principal to fetch the test image"
 az login --service-principal \
-  -u "${AZURE_QE_CLIENT_ID}" \
-  -p "${AZURE_QE_CLIENT_SECRET}" \
-  --tenant "${AZURE_QE_TENANT_ID}" \
+  -u "$(cat /tmp/secrets/azure/client-id)" \
+  -p "$(cat /tmp/secrets/azure/client-secret)" \
+  --tenant "$(cat /tmp/secrets/azure/tenant-id)" \
   --output none
 
 ${WAS_TRACING} && set -x
 
-SRC_IMAGE=$(cat /tmp/secrets/azure-qe/cocl-test-image)
+SRC_IMAGE="downstreamci/cos/redhat-coreos-9.6.20260112-0-azure-ovf-accept35-v2.x86_64.vhd"
 SRC_ACCOUNT="${SRC_IMAGE%%/*}"
 SRC_REST="${SRC_IMAGE#*/}"
 SRC_CONTAINER="${SRC_REST%%/*}"

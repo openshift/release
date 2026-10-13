@@ -3,7 +3,7 @@ set -euo pipefail
 
 SUFFIX=$(cat "${SHARED_DIR}/cocl-suffix")
 AZURE_RESOURCE_ID=$(cat "${SHARED_DIR}/cocl-azure-resource-id")
-APPROVED_IMAGE=$(cat /tmp/secrets/azure-qe/cocl-approved-image)
+APPROVED_IMAGE="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:30644f13781dd766a4bb09c0c5cb38c704f75218117f1b67a1b95cdc74a310a0"
 
 # Reads one of bundle/update-bundle.sh's hardcoded "export VAR=..." image
 # pullspecs without sourcing the script itself (sourcing it would also run
