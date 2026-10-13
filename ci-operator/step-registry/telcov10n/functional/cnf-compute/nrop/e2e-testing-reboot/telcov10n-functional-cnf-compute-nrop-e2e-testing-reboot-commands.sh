@@ -47,7 +47,7 @@ EXTRA_VARS="${EXTRA_VARS} scope=${SCOPE}"
 if [[ $SCOPE == "Reboot" ]]; then
     EXTRA_VARS="${EXTRA_VARS} run_reboot_tests_only=true"
     EXTRA_VARS="${EXTRA_VARS} topology_manager_scope=container"
-    EXTRA_VARS="${EXTRA_VARS} scope=container"
+    EXTRA_VARS="${EXTRA_VARS} scope=reboot"
 else
     EXTRA_VARS="${EXTRA_VARS} topology_manager_scope=${SCOPE}"
 fi
