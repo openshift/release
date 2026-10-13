@@ -13,8 +13,9 @@ Spoke **OCP** upgrade is **not** performed here — use `acm-interop-p2p-spoke-u
 | CNV 4.20 (installed by p2p-acm-cnv-install-policy on stable) | CNV 4.21.0 GA | `CNV_SOURCE=production`, `CNV_CHANNEL=stable` |
 
 All pytest invocations pass `--ignore=tests/network/` (interop clusters are not multi-NIC).
-When `CNV_TARGET_VERSION` is below 4.22, pytest also passes `--ignore=tests/infrastructure/vm_template/`
-because `VirtualMachineTemplate` (`template.kubevirt.io`) is not available before CNV 4.22.
+When the installed (source) CNV is below 4.22, pytest also passes `--ignore=tests/infrastructure/vm_template/`.
+Those tests create VMs from `VirtualMachineTemplate` (`template.kubevirt.io`) before the upgrade,
+and that API is not available before CNV 4.22.
 
 ## Pytest invocation
 

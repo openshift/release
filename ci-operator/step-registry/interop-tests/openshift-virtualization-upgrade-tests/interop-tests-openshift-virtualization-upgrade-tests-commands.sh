@@ -155,17 +155,21 @@ BuildCnvUpgradePytestArgs() {
         --tb=native
     )
     # VirtualMachineTemplate (template.kubevirt.io) is part of CNV 4.22.
-    # On older targets the vm_template upgrade tests error in setup
-    # (Couldn't find VirtualMachineTemplate in template.kubevirt.io api group):
+    # Pre-upgrade tests create VMs from that template before pytest upgrades CNV, so the
+    # check uses the installed (source) CSV, not CNV_TARGET_VERSION:
     #   TestVMTemplatePreUpgrade::test_template_creation_before_upgrade
     #   TestVMTemplatePreUpgrade::test_vm_creation_from_template_before_upgrade
-    typeset cnvVer="${CNV_TARGET_VERSION#v}"
+    typeset installedCsv
+    installedCsv="$(oc get subscription.operators.coreos.com/hco-operatorhub -n openshift-cnv -o jsonpath='{.status.installedCSV}')"
+    [[ "${installedCsv}" == kubevirt-hyperconverged-operator.v* ]]
+    typeset cnvVer="${installedCsv#kubevirt-hyperconverged-operator.v}"
     typeset cnvMajor="${cnvVer%%.*}"
     typeset cnvRest="${cnvVer#*.}"
     typeset cnvMajorMinor="${cnvMajor}.${cnvRest%%.*}"
+    printf '%s\n' "${cnvVer}" > "${ARTIFACT_DIR}/cnv-source-version"
     if [[ "${cnvMajorMinor}" != "4.22" ]] \
         && [[ "$(printf '%s\n%s\n' "${cnvMajorMinor}" "4.22" | sort -V | head -n1)" == "${cnvMajorMinor}" ]]; then
-        : "CNV ${CNV_TARGET_VERSION} is below 4.22; ignoring tests/infrastructure/vm_template/"
+        : "Installed CNV ${cnvVer} is below 4.22; ignoring tests/infrastructure/vm_template/"
         args+=(--ignore=tests/infrastructure/vm_template/)
     fi
     if [[ -n "${CNV_TARGET_IMAGE}" ]]; then
