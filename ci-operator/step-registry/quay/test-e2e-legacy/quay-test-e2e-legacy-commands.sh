@@ -27,21 +27,24 @@ cd quay-frontend-tests
 npm install --no-audit --no-fund
 
 rc=0
+# run_cypress <name> <cypress args...>: JUnit goes to junit_e2e_legacy-<name>-*.xml.
 run_cypress() {
+  local name=$1 code=0 tests
+  shift
   NO_COLOR=1 node_modules/.bin/cypress run -b electron \
     --reporter mocha-junit-reporter \
-    --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_e2e_legacy-[hash].xml" \
-    --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots" \
-    "$@" || rc=$?
+    --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_e2e_legacy-${name}-[hash].xml" \
+    --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots,trashAssetsBeforeRuns=false" \
+    "$@" || code=$?
+  tests=$(cat "${ARTIFACT_DIR}"/junit_e2e_legacy-"${name}"-*.xml 2>/dev/null | grep -o '<testcase' | wc -l || true)
+  echo "Cypress ${name} run: exit code ${code}, JUnit test cases: ${tests}"
+  if [[ "${tests}" -eq 0 ]]; then
+    echo "ERROR: ${name} run JUnit output has 0 tests" >&2
+    code=1
+  fi
+  [[ "${code}" -eq 0 ]] || rc=${code}
 }
-run_cypress --spec "${E2E_LEGACY_SPECS}"
+run_cypress specs --spec "${E2E_LEGACY_SPECS}"
 # grepOmitFiltered drops filtered tests, so their suites' before() hooks never run.
-run_cypress --spec "${E2E_LEGACY_GREP_SPECS}" --env "grep=${E2E_LEGACY_GREP},grepOmitFiltered=true"
-
-tests=$(cat "${ARTIFACT_DIR}"/junit_e2e_legacy-*.xml 2>/dev/null | grep -o '<testcase' | wc -l || true)
-echo "Cypress exit code: ${rc}, JUnit test cases: ${tests}"
-if [[ "${tests}" -eq 0 ]]; then
-  echo "ERROR: JUnit output has 0 tests" >&2
-  exit 1
-fi
+run_cypress grep --spec "${E2E_LEGACY_GREP_SPECS}" --env "grep=${E2E_LEGACY_GREP},grepOmitFiltered=true"
 exit "${rc}"
