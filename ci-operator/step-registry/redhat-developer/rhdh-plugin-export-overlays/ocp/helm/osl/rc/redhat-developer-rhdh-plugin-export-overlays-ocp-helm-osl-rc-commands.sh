@@ -247,6 +247,47 @@ wait_for_worker_mcp_rollout() {
     return 1
 }
 
+apply_osl_candidate_mirrors() {
+    oc apply -f - <<'EOF'
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: osl-rc-brew-mirror
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry-proxy.engineering.redhat.com
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry.stage.redhat.io
+  - mirrors:
+    - brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-rhel9-operator
+    source: registry.redhat.io/openshift-serverless-1/logic-rhel9-operator
+  - mirrors:
+    - brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-jobs-service-postgresql-rhel9
+    source: registry.redhat.io/openshift-serverless-1/logic-jobs-service-postgresql-rhel9
+  - mirrors:
+    - brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-jobs-service-ephemeral-rhel9
+    source: registry.redhat.io/openshift-serverless-1/logic-jobs-service-ephemeral-rhel9
+  - mirrors:
+    - brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-data-index-postgresql-rhel9
+    source: registry.redhat.io/openshift-serverless-1/logic-data-index-postgresql-rhel9
+  - mirrors:
+    - brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-data-index-ephemeral-rhel9
+    source: registry.redhat.io/openshift-serverless-1/logic-data-index-ephemeral-rhel9
+  - mirrors:
+    - brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-db-migrator-tool-rhel9
+    source: registry.redhat.io/openshift-serverless-1/logic-db-migrator-tool-rhel9
+  - mirrors:
+    - brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-swf-builder-rhel9
+    source: registry.redhat.io/openshift-serverless-1/logic-swf-builder-rhel9
+  - mirrors:
+    - brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-swf-devmode-rhel9
+    source: registry.redhat.io/openshift-serverless-1/logic-swf-devmode-rhel9
+EOF
+}
+
 if [[ ! -s "${MANIFEST}" ]]; then
     echo "ERROR: expected OSL RC manifest at ${MANIFEST}" >&2
     exit 1
@@ -302,20 +343,7 @@ if [[ -z "${MCP_BASELINE}" ]]; then
 fi
 oc -n openshift-config set data secret/pull-secret --from-file=.dockerconfigjson="${AUTHFILE}"
 
-oc apply -f - <<'EOF'
-apiVersion: operator.openshift.io/v1alpha1
-kind: ImageContentSourcePolicy
-metadata:
-  name: osl-rc-brew-mirror
-spec:
-  repositoryDigestMirrors:
-  - mirrors:
-    - brew.registry.redhat.io
-    source: registry-proxy.engineering.redhat.com
-  - mirrors:
-    - brew.registry.redhat.io
-    source: registry.stage.redhat.io
-EOF
+apply_osl_candidate_mirrors
 wait_for_worker_mcp_rollout "${MCP_BASELINE}"
 
 create_catalogsource "${LOGIC_CATALOG}" "${LOGIC_IIB}"

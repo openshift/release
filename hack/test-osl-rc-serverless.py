@@ -34,6 +34,35 @@ def check(condition, process_result):
     assert condition, process_result.stdout + process_result.stderr
 
 
+OSL_IMAGE_MIRRORS = [
+    ("brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-rhel9-operator",
+     "registry.redhat.io/openshift-serverless-1/logic-rhel9-operator"),
+    ("brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-jobs-service-postgresql-rhel9",
+     "registry.redhat.io/openshift-serverless-1/logic-jobs-service-postgresql-rhel9"),
+    ("brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-jobs-service-ephemeral-rhel9",
+     "registry.redhat.io/openshift-serverless-1/logic-jobs-service-ephemeral-rhel9"),
+    ("brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-data-index-postgresql-rhel9",
+     "registry.redhat.io/openshift-serverless-1/logic-data-index-postgresql-rhel9"),
+    ("brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-data-index-ephemeral-rhel9",
+     "registry.redhat.io/openshift-serverless-1/logic-data-index-ephemeral-rhel9"),
+    ("brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-db-migrator-tool-rhel9",
+     "registry.redhat.io/openshift-serverless-1/logic-db-migrator-tool-rhel9"),
+    ("brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-swf-builder-rhel9",
+     "registry.redhat.io/openshift-serverless-1/logic-swf-builder-rhel9"),
+    ("brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-swf-devmode-rhel9",
+     "registry.redhat.io/openshift-serverless-1/logic-swf-devmode-rhel9"),
+]
+result = run("oc() { cat; }\napply_osl_candidate_mirrors")
+emitted_mirrors = set(re.findall(
+    r"(?m)^[ \t]*-[ \t]+(brew\.registry\.redhat\.io/\S+)[ \t]*\n"
+    r"[ \t]*source:[ \t]+(registry\.redhat\.io/\S+)[ \t]*$",
+    result.stdout,
+))
+check(result.returncode == 0 and set(OSL_IMAGE_MIRRORS) <= emitted_mirrors, result)
+check("source: registry-proxy.engineering.redhat.com" in result.stdout, result)
+check("source: registry.stage.redhat.io" in result.stdout, result)
+
+
 # No Serverless stanza must select standard latest; a version must select Manual.
 for manifest, expected in [
     ({}, ["serverless-operator", "stable", "redhat-operators", "openshift-marketplace", "", "", "Automatic"]),
