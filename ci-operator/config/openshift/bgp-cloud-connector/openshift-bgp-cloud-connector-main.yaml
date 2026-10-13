@@ -1,4 +1,8 @@
 base_images:
+  aro-hcp-e2e-tests:
+    name: aro-hcp-e2e-tests
+    namespace: aro-hcp
+    tag: latest
   ocm-cli:
     name: ocm-cli
     namespace: ci
@@ -1671,6 +1675,61 @@ tests:
         hack/ci-e2e-azure.sh
       from: e2e-runner
       grace_period: 1h0m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- always_run: false
+  as: e2e-aro-hcp-operator
+  optional: true
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      ALLOWED_LOCATIONS: westus3
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
+      LOCATION: westus3
+      VAULT_SECRET_PROFILE: int-rh
+    post:
+    - ref: aro-hcp-lease-release
+    pre:
+    - ref: aro-hcp-lease-acquire
+    - ref: aro-hcp-write-config
+    test:
+    - as: probe
+      commands: |
+        # Reach the leased ARO HCP environment and say what is there: the
+        # subscription the lease handed out, the resource provider's
+        # registration and regions, and the hosted clusters already in the
+        # subscription. Nothing is created.
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/aro-hcp-slot.env"
+        CLUSTER_PROFILE_DIR="${SELECTED_CLUSTER_PROFILE_DIR:-/var/run/aro-hcp-${VAULT_SECRET_PROFILE}}"
+
+        # --password=VALUE, not --password VALUE: a secret beginning with a
+        # hyphen is otherwise read as another flag.
+        az login --service-principal \
+          --username "$(<"${CLUSTER_PROFILE_DIR}/client-id")" \
+          --password="$(<"${CLUSTER_PROFILE_DIR}/client-secret")" \
+          --tenant "$(<"${CLUSTER_PROFILE_DIR}/tenant")" --output none
+        az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+
+        echo "subscription: $(az account show --query name -o tsv)"
+        echo "region: ${SELECTED_LOCATION}"
+        echo "resource provider: $(az provider show --namespace Microsoft.RedHatOpenShift --query registrationState -o tsv)"
+        az provider show --namespace Microsoft.RedHatOpenShift \
+          --query "resourceTypes[].[resourceType, join(',', locations)]" -o tsv
+        az resource list --resource-type Microsoft.RedHatOpenShift/hcpOpenShiftClusters \
+          --query '[].{name:name, resourceGroup:resourceGroup, location:location}' -o table
+      credentials:
+      - collection: hcm-aro
+        group: aro-hcp-int-rh
+        mount_path: /var/run/aro-hcp-int-rh
+      from: aro-hcp-e2e-tests
       resources:
         requests:
           cpu: 100m
