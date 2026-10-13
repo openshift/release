@@ -22,16 +22,24 @@ oc new-project ext-infra-vms-ns
 POOL_RANGE=$(oc get ipaddresspool -n metallb-system -o jsonpath='{.items[0].spec.addresses[0]}' 2>/dev/null || true)
 echo "$(date) MetalLB IPAddressPool range: ${POOL_RANGE}"
 
-if [[ "${POOL_RANGE}" == 192.168.2.* ]]; then
-  HC_NAME=hcpvirt-oz-ci
-  HC_NS=hcpvirt-oz-ci-ns
+if [[ "${POOL_RANGE}" == 192.168.126.* ]]; then
+  HC_NAME=hcpvirt-oz-ci-0
+  HC_NS=hcpvirt-oz-ci-0-ns
+  MGMT_CLUSTER_LEASE=3-0
+elif [[ "${POOL_RANGE}" == 192.168.1.* ]]; then
+  HC_NAME=hcpvirt-oz-ci-1
+  HC_NS=hcpvirt-oz-ci-1-ns
+  MGMT_CLUSTER_LEASE=3-1
+elif [[ "${POOL_RANGE}" == 192.168.2.* ]]; then
+  HC_NAME=hcpvirt-oz-ci-2
+  HC_NS=hcpvirt-oz-ci-2-ns
   MGMT_CLUSTER_LEASE=3-2
 elif [[ "${POOL_RANGE}" == 192.168.3.* ]]; then
-  HC_NAME=hcpvirtnew-oz-ci
-  HC_NS=hcpvirtnew-oz-ci-ns
+  HC_NAME=hcpvirt-oz-ci-3
+  HC_NS=hcpvirt-oz-ci-3-ns
   MGMT_CLUSTER_LEASE=3-3
 else
-  echo "$(date) ERROR: Unrecognised IPAddressPool range '${POOL_RANGE}', expected 192.168.2.x or 192.168.3.x"
+  echo "$(date) ERROR: Unrecognised IPAddressPool range '${POOL_RANGE}', expected 192.168.126.x or 192.169.1.x or 192.168.2.x or 192.168.3.x"
   exit 1
 fi
 
