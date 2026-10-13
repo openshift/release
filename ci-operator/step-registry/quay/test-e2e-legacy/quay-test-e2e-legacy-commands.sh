@@ -12,8 +12,22 @@ if [[ -z "${QUAY_ROUTE}" ]]; then
 fi
 export CYPRESS_QUAY_ENDPOINT=${QUAY_ROUTE#*://}
 export CYPRESS_QUAY_VERSION=${QUAY_VERSION}
-export KUBECONFIG_PATH=${KUBECONFIG}
 echo "Quay version under test: ${CYPRESS_QUAY_VERSION}"
+
+# Reconfiguring tests run `oc login`, which writes the kubeconfig it uses.
+cp -L "${KUBECONFIG}" /tmp/kubeconfig
+export KUBECONFIG=/tmp/kubeconfig KUBECONFIG_PATH=/tmp/kubeconfig
+CYPRESS_OCP_ENDPOINT=$(oc whoami --show-server)
+export CYPRESS_OCP_ENDPOINT CYPRESS_OCP_USER=kubeadmin
+
+# Disable tracing due to password handling
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+CYPRESS_OCP_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+CYPRESS_QUAY_USER=$(cat /var/run/quay-qe-quay-secret/username)
+CYPRESS_QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+export CYPRESS_OCP_PASSWORD CYPRESS_QUAY_USER CYPRESS_QUAY_PASSWORD
+$WAS_TRACING && set -x
 
 cd quay-frontend-tests
 # npm ci rejects quay-tests' package-lock.json (out of sync with package.json).
@@ -21,7 +35,8 @@ npm install --no-audit --no-fund
 
 rc=0
 NO_COLOR=1 node_modules/.bin/cypress run -b electron \
-  --spec cypress/integration/smoke/SmokeTesting.js \
+  --spec "${E2E_LEGACY_SPECS}" \
+  --env "grep=${E2E_LEGACY_GREP}" \
   --reporter mocha-junit-reporter \
   --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_e2e_legacy-[hash].xml" \
   --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots" \
