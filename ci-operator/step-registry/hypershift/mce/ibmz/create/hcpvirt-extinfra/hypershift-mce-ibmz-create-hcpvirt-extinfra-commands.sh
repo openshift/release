@@ -19,6 +19,7 @@ export KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
 oc new-project ext-infra-vms-ns
 
 # Hosted cluster identity and namespace — derived from the MetalLB IPAddressPool range
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 POOL_RANGE=$(oc get ipaddresspool -n metallb-system -o jsonpath='{.items[0].spec.addresses[0]}' 2>/dev/null || true)
 echo "$(date) MetalLB IPAddressPool range: ${POOL_RANGE}"
 
@@ -74,7 +75,11 @@ echo "$(date) Using HC_NAME=${HC_NAME}, HC_NS=${HC_NS}"
 MGMT_HOST_IP=10.0.1.15
 echo "$(date) LPAR host IP: ${MGMT_HOST_IP}"
 
-if [[ "${MGMT_CLUSTER_LEASE}" == "3-2" ]]; then
+if [[ "${MGMT_CLUSTER_LEASE}" == "3-0" ]]; then
+  FIXED_NODEPORT=31130
+elif [[ "${MGMT_CLUSTER_LEASE}" == "3-1" ]]; then
+  FIXED_NODEPORT=31131
+elif [[ "${MGMT_CLUSTER_LEASE}" == "3-2" ]]; then
   FIXED_NODEPORT=31132
 elif [[ "${MGMT_CLUSTER_LEASE}" == "3-3" ]]; then
   FIXED_NODEPORT=31133
@@ -229,8 +234,8 @@ else
   echo "$(date)   Check that HostedCluster spec.services[APIServer] was patched correctly in the manifest"
 fi
 
-echo "$(date) DEBUG: Sleeping 2 hours after hcp create to let HC, NodePool, and infra VMIs settle"
-sleep 7200
+#echo "$(date) DEBUG: Sleeping 2 hours after hcp create to let HC, NodePool, and infra VMIs settle"
+#sleep 7200
 
 echo "$(date) DEBUG: Management cluster state after 40m sleep"
 oc get no || true
