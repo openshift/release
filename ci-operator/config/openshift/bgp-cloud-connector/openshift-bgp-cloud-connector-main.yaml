@@ -1691,17 +1691,75 @@ tests:
       LOCATION: westus3
       VAULT_SECRET_PROFILE: int-rh
     post:
+    - as: delete-cluster
+      commands: |
+        # Delete the hosted cluster, then the group holding its estate. The
+        # names are derived here rather than read from SHARED_DIR, because
+        # a step that is interrupted does not pass on what it wrote there.
+        # The resource provider removes the managed group with the cluster;
+        # a group this step cannot remove carries a deleteAfter tag and the
+        # ARO HCP sweeper takes it.
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/aro-hcp-slot.env"
+        CLUSTER_PROFILE_DIR="${SELECTED_CLUSTER_PROFILE_DIR:-/var/run/aro-hcp-${VAULT_SECRET_PROFILE}}"
+        az login --service-principal \
+          --username "$(<"${CLUSTER_PROFILE_DIR}/client-id")" \
+          --password="$(<"${CLUSTER_PROFILE_DIR}/client-secret")" \
+          --tenant "$(<"${CLUSTER_PROFILE_DIR}/tenant")" --output none
+        az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+
+        cluster="${NAMESPACE}-${UNIQUE_HASH}"
+        rg="${cluster}"
+        api_version=2025-12-23-preview
+
+        if [[ "$(az group exists --name "${rg}")" != true ]]; then
+          echo "no group ${rg}, so nothing to delete"
+          exit 0
+        fi
+
+        cluster_id="$(az resource list --resource-group "${rg}" \
+          --resource-type Microsoft.RedHatOpenShift/hcpOpenShiftClusters --name "${cluster}" \
+          --query '[0].id' -o tsv)"
+        if [[ -n "${cluster_id}" ]]; then
+          echo "deleting cluster ${cluster}"
+          az resource delete --ids "${cluster_id}" --api-version "${api_version}" --output none
+          echo "deleted cluster ${cluster}"
+        else
+          echo "no cluster ${cluster} in ${rg}"
+        fi
+
+        echo "deleting group ${rg}"
+        az group delete --name "${rg}" --yes --output none
+        echo "deleted group ${rg}"
+        echo "managed group ${rg}-managed exists: $(az group exists --name "${rg}-managed")"
+      credentials:
+      - collection: hcm-aro
+        group: aro-hcp-int-rh
+        mount_path: /var/run/aro-hcp-int-rh
+      from: aro-hcp-e2e-tests
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h0m0s
     - ref: aro-hcp-lease-release
     pre:
     - ref: aro-hcp-lease-acquire
     - ref: aro-hcp-write-config
-    test:
-    - as: probe
+    - as: create-cluster
       commands: |
-        # Reach the leased ARO HCP environment and say what is there: the
-        # subscription the lease handed out, the resource provider's
-        # registration and regions, and the hosted clusters already in the
-        # subscription. Nothing is created.
+        # Create one hosted cluster with a node pool in the leased
+        # subscription and write its admin kubeconfig to SHARED_DIR. The
+        # estate comes from the ARO HCP e2e setup modules in the image:
+        # network, key vault, the operators' managed identities and their
+        # role assignments, the cluster, the node pool. Identities are
+        # created here rather than taken from the slot's pool, which only
+        # the test binary can lease.
         set -o nounset
         set -o errexit
         set -o pipefail
@@ -1717,14 +1775,214 @@ tests:
           --password="$(<"${CLUSTER_PROFILE_DIR}/client-secret")" \
           --tenant "$(<"${CLUSTER_PROFILE_DIR}/tenant")" --output none
         az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+        subscription="$(az account show --query id -o tsv)"
+        location="${SELECTED_LOCATION}"
+        api_version=2025-12-23-preview
 
         echo "subscription: $(az account show --query name -o tsv)"
-        echo "region: ${SELECTED_LOCATION}"
+        echo "region: ${location}"
         echo "resource provider: $(az provider show --namespace Microsoft.RedHatOpenShift --query registrationState -o tsv)"
-        az provider show --namespace Microsoft.RedHatOpenShift \
-          --query "resourceTypes[].[resourceType, join(',', locations)]" -o tsv
-        az resource list --resource-type Microsoft.RedHatOpenShift/hcpOpenShiftClusters \
-          --query '[].{name:name, resourceGroup:resourceGroup, location:location}' -o table
+
+        # Versions the resource provider offers here, as "name channelGroup".
+        versions="$(az rest --method GET \
+          --url "https://management.azure.com/subscriptions/${subscription}/providers/Microsoft.RedHatOpenShift/locations/${location}/hcpOpenShiftVersions?api-version=${api_version}" \
+          --query "value[?properties.enabled].[name, properties.channelGroup]" -o tsv)"
+        echo "enabled versions:"
+        sed 's/^/  /' <<<"${versions}"
+
+        # The control plane takes a bare minor, which the provider resolves
+        # to its latest patch; a node pool takes a full version only. Given
+        # no minor, the newest stable one is used.
+        stable="$(awk '$2 == "stable" {print $1}' <<<"${versions}" | sort -V)"
+        minor="${ARO_HCP_CLUSTER_VERSION}"
+        if [[ -z "${minor}" ]]; then
+          minor="$(tail -1 <<<"${stable}" | cut -d. -f1,2)"
+        fi
+        nodepool_version="$(grep "^${minor}\." <<<"${stable}" | tail -1 || true)"
+        if [[ -z "${nodepool_version}" ]]; then
+          echo "no enabled stable ${minor}.x in ${location}" >&2
+          exit 1
+        fi
+        echo "control plane ${minor}, node pool ${nodepool_version}, workers ${ARO_HCP_WORKER_VM_SIZE}"
+
+        cluster="${NAMESPACE}-${UNIQUE_HASH}"
+        rg="${cluster}"
+        echo "${cluster}" >"${SHARED_DIR}/cluster-name"
+        echo "${rg}" >"${SHARED_DIR}/resourcegroup"
+
+        # The ARO HCP sweeper deletes e2e groups past their deleteAfter tag,
+        # which covers a post step that never ran.
+        az group create --name "${rg}" --location "${location}" --output none \
+          --tags persist=false \
+            "e2e.aro-hcp-ci.redhat.com=true" \
+            "deleteAfter.aro-hcp-ci.redhat.com=$(date -u -d '+4 hours' +%Y-%m-%dT%H:%M:%SZ)" \
+            "jobID.aro-hcp-ci.redhat.com=${BUILD_ID}"
+        echo "created group ${rg}"
+
+        # The modules are read-only in the image, and a module path is
+        # relative to the file that names it, so the configuration is
+        # written beside a copy.
+        bicep="$(mktemp -d)/bicep"
+        cp -r test/e2e-setup/bicep "${bicep}"
+        cat >"${bicep}/bgp-cloud-connector.bicep" <<'EOF'
+        targetScope = 'resourceGroup'
+
+        param clusterName string
+        param openshiftControlPlaneVersionId string
+        param openshiftNodePoolVersionId string
+        param vmSize string
+
+        module customerInfra 'modules/customer-infra.bicep' = {
+          name: 'customerInfra'
+          params: {
+            persistTagValue: false
+            clusterName: clusterName
+          }
+        }
+
+        module managedIdentities 'modules/managed-identities.bicep' = {
+          name: 'mi-${resourceGroup().name}'
+          scope: subscription()
+          params: {
+            msiResourceGroupName: resourceGroup().name
+            clusterResourceGroupName: resourceGroup().name
+            useMsiPool: false
+            clusterName: clusterName
+            identities: {
+              clusterApiAzureMiName: '${clusterName}-cluster-api-azure'
+              controlPlaneMiName: '${clusterName}-control-plane'
+              cloudControllerManagerMiName: '${clusterName}-cloud-controller-manager'
+              ingressMiName: '${clusterName}-ingress'
+              diskCsiDriverMiName: '${clusterName}-disk-csi-driver'
+              fileCsiDriverMiName: '${clusterName}-file-csi-driver'
+              imageRegistryMiName: '${clusterName}-image-registry'
+              cloudNetworkConfigMiName: '${clusterName}-cloud-network-config'
+              kmsMiName: '${clusterName}-kms'
+              dpDiskCsiDriverMiName: '${clusterName}-dp-disk-csi-driver'
+              dpFileCsiDriverMiName: '${clusterName}-dp-file-csi-driver'
+              dpImageRegistryMiName: '${clusterName}-dp-image-registry'
+              serviceManagedIdentityName: '${clusterName}-service-managed-identity'
+            }
+            vnetName: customerInfra.outputs.vnetName
+            subnetName: customerInfra.outputs.vnetSubnetName
+            nsgName: customerInfra.outputs.nsgName
+            keyVaultName: customerInfra.outputs.keyVaultName
+          }
+        }
+
+        module cluster 'modules/cluster.bicep' = {
+          name: 'cluster'
+          params: {
+            openshiftVersionId: openshiftControlPlaneVersionId
+            clusterName: clusterName
+            vnetName: customerInfra.outputs.vnetName
+            subnetName: customerInfra.outputs.vnetSubnetName
+            nsgName: customerInfra.outputs.nsgName
+            userAssignedIdentitiesValue: managedIdentities.outputs.userAssignedIdentitiesValue
+            identityValue: managedIdentities.outputs.identityValue
+            keyVaultName: customerInfra.outputs.keyVaultName
+            etcdEncryptionKeyName: customerInfra.outputs.etcdEncryptionKeyName
+          }
+        }
+
+        module nodePool 'modules/nodepool.bicep' = {
+          name: 'nodepool-1'
+          params: {
+            openshiftVersionId: openshiftNodePoolVersionId
+            clusterName: cluster.outputs.name
+            nodePoolName: 'nodepool-1'
+            vmSize: vmSize
+          }
+        }
+        EOF
+
+        echo "deploying ${cluster}; this takes a while"
+        az deployment group create --name aro-hcp --resource-group "${rg}" \
+          --template-file "${bicep}/bgp-cloud-connector.bicep" \
+          --parameters clusterName="${cluster}" \
+            openshiftControlPlaneVersionId="${minor}" \
+            openshiftNodePoolVersionId="${nodepool_version}" \
+            vmSize="${ARO_HCP_WORKER_VM_SIZE}" \
+          --output none
+        echo "deployed ${cluster}"
+
+        cluster_id="/subscriptions/${subscription}/resourceGroups/${rg}/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/${cluster}"
+        credential="$(mktemp)"
+        az resource invoke-action --ids "${cluster_id}" --action requestAdminCredential \
+          --api-version "${api_version}" -o json >"${credential}"
+        python3 - "${credential}" "${SHARED_DIR}/kubeconfig" <<'EOF'
+        import json, sys
+        credential = json.load(open(sys.argv[1]))
+        open(sys.argv[2], "w").write(credential["kubeconfig"])
+        print("admin kubeconfig expires at " + credential["expirationTimestamp"])
+        EOF
+        rm -f "${credential}"
+
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        echo "waiting for the nodes..."
+        deadline=$((SECONDS + 1800))
+        until (( $(oc get nodes --no-headers 2>/dev/null | grep -c ' Ready ') >= 2 )); do
+          if (( SECONDS >= deadline )); then
+            oc get nodes || true
+            echo "the node pool never reached two Ready nodes" >&2
+            exit 1
+          fi
+          sleep 20
+        done
+        oc get nodes
+      credentials:
+      - collection: hcm-aro
+        group: aro-hcp-int-rh
+        mount_path: /var/run/aro-hcp-int-rh
+      env:
+      - default: ""
+        documentation: OpenShift minor version for the cluster, such as "4.21"; the
+          newest stable minor the resource provider offers in the leased region when
+          empty.
+        name: ARO_HCP_CLUSTER_VERSION
+      - default: Standard_D8s_v5
+        documentation: VM size of the two worker nodes; the integration slot allows
+          the Dsv6, Dsv5 and Dasv5 families.
+        name: ARO_HCP_WORKER_VM_SIZE
+      from: aro-hcp-e2e-tests
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h30m0s
+    test:
+    - as: nodes
+      commands: |
+        # What the cluster looks like from inside, and what the managed
+        # group's deny assignments refuse: the constraint the operator has
+        # to live within on this platform.
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        oc get clusterversion
+        oc get nodes -o wide
+        oc get clusteroperators
+        oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure}'; echo
+
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/aro-hcp-slot.env"
+        CLUSTER_PROFILE_DIR="${SELECTED_CLUSTER_PROFILE_DIR:-/var/run/aro-hcp-${VAULT_SECRET_PROFILE}}"
+        az login --service-principal \
+          --username "$(<"${CLUSTER_PROFILE_DIR}/client-id")" \
+          --password="$(<"${CLUSTER_PROFILE_DIR}/client-secret")" \
+          --tenant "$(<"${CLUSTER_PROFILE_DIR}/tenant")" --output none
+        az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+        subscription="$(az account show --query id -o tsv)"
+        managed_rg="$(<"${SHARED_DIR}/resourcegroup")-managed"
+
+        echo "deny assignments on ${managed_rg}:"
+        az rest --method GET \
+          --url "https://management.azure.com/subscriptions/${subscription}/resourceGroups/${managed_rg}/providers/Microsoft.Authorization/denyAssignments?api-version=2022-04-01" \
+          --query "value[].{name:properties.denyAssignmentName, scope:properties.scope, actions:properties.permissions[].actions, notActions:properties.permissions[].notActions, dataActions:properties.permissions[].dataActions, isSystemProtected:properties.isSystemProtected}" \
+          -o yaml
       credentials:
       - collection: hcm-aro
         group: aro-hcp-int-rh
