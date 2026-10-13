@@ -212,7 +212,7 @@ handle_azure() {
     # Select instance type based on workload: CoCo requires confidential VM sizes
     if [[ "${WORKLOAD_TO_TEST}" == "coco" ]]; then
         PP_INSTANCE_SIZE="${AZURE_CVM_INSTANCE_SIZE:-Standard_DC2as_v5}"
-        PP_INSTANCE_SIZES="${AZURE_CVM_INSTANCE_SIZES:-Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5}"
+        PP_INSTANCE_SIZES="${AZURE_CVM_INSTANCE_SIZES:-Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5,Standard_DC2es_v6}"
 
         local sku_json
         sku_json=$(az vm list-skus --location "${PP_REGION}" --size "${PP_INSTANCE_SIZE}" \
@@ -222,13 +222,13 @@ handle_azure() {
         sku_count=$(echo "${sku_json}" | jq 'length')
         if [[ "${sku_count}" == "0" ]]; then
             echo "ERROR: Confidential VM size ${PP_INSTANCE_SIZE} is not available in region ${PP_REGION}"
-            echo "CoCo workloads require a confidential VM size (DCas_v5 family). Either:"
+            echo "CoCo workloads require a confidential VM size (DCas_v5 family for SEV-SNP or DCesv6 for TDX). Either:"
             echo "  - Deploy the cluster in a region that supports ${PP_INSTANCE_SIZE}"
             echo "  - Set AZURE_CVM_INSTANCE_SIZE to a CVM type available in ${PP_REGION}"
             echo "Available confidential VM sizes in ${PP_REGION}:"
             local available_cvms
             available_cvms=$(az vm list-skus --location "${PP_REGION}" \
-                --query "[?starts_with(name, 'Standard_DC') && contains(name, 'as_v5')].name" \
+                --query "[?starts_with(name, 'Standard_DC') && (contains(name, 'as_v5') || contains(name, 'es_v6'))].name" \
                 --output tsv 2>/dev/null)
             if [[ -n "${available_cvms}" ]]; then
                 echo "${available_cvms}"
