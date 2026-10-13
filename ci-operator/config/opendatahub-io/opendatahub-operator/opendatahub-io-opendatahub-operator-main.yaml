@@ -127,6 +127,59 @@ tests:
       IMAGE_REPO: opendatahub-operator
       PQC_CHECK: "true"
       SCAN_NAMESPACE: redhat-ods-operator,redhat-ods-applications,redhat-ods-monitoring,rhoai-model-registries
+    post:
+    - as: gather-rhoai-failure-diagnostics
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        diagnostics="${ARTIFACT_DIR}/rhoai-failure-diagnostics"
+        mkdir -p "${diagnostics}"
+
+        # Bound each request so an unhealthy API cannot block the remaining diagnostics.
+        capture() {
+          local file="$1"
+          shift
+          if ! timeout 20s oc --request-timeout=15s "$@" > "${diagnostics}/${file}" 2>&1; then
+            echo "Warning: could not collect ${file}; see the artifact for details."
+          fi
+        }
+
+        capture clusteroperators.yaml get clusteroperators -o yaml
+        capture nodes.yaml get nodes -o yaml
+        capture namespaces.yaml get namespaces redhat-ods-operator redhat-ods-applications kuadrant-system openshift-kube-controller-manager -o yaml
+        capture controller-manager-lease.yaml get lease kube-controller-manager -n kube-system -o yaml
+        capture rhcl-olm.yaml get subscriptions,installplans,clusterserviceversions -n kuadrant-system -o yaml
+
+        for namespace in redhat-ods-operator redhat-ods-applications kuadrant-system openshift-kube-controller-manager; do
+          # Pod YAML preserves termination messages even when the kubelet log API fails.
+          capture "${namespace}-workloads.yaml" get pods,deployments,replicasets -n "${namespace}" -o yaml
+          capture "${namespace}-events.yaml" get events -n "${namespace}" -o yaml
+        done
+
+        for namespace in kuadrant-system openshift-kube-controller-manager; do
+          containers=(--all-containers=true)
+          if [[ "${namespace}" == openshift-kube-controller-manager ]]; then
+            containers=(-c kube-controller-manager)
+            capture "${namespace}-pods.txt" get pods -n "${namespace}" -l app=kube-controller-manager -o name
+          else
+            capture "${namespace}-pods.txt" get pods -n "${namespace}" -o name
+          fi
+          while IFS= read -r pod; do
+            [[ "${pod}" == pod/* ]] || continue
+            name="${pod#pod/}"
+            capture "${namespace}-${name}-current.log" logs -n "${namespace}" "${pod}" "${containers[@]}" --timestamps --tail=2000
+            capture "${namespace}-${name}-previous.log" logs -n "${namespace}" "${pod}" "${containers[@]}" --previous --timestamps --tail=2000
+          done < "${diagnostics}/${namespace}-pods.txt"
+        done
+      from: cli
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 10m0s
+    - chain: gather
     pre:
     - ref: ipi-install-rbac
     - ref: opendatahub-operator-e2e-cluster-preflight-health-check
