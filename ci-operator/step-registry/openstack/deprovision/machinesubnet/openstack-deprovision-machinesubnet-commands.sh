@@ -6,8 +6,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "$CONFIG_TYPE" != *"proxy"* ]]; then
-    echo "Skipping step due to CONFIG_TYPE not being proxy."
+# Mirrors the guard in openstack-provision-machinesubnet.
+if [[ "$CONFIG_TYPE" != *"proxy"* && "$CONFIG_TYPE" != *"externallb"* ]]; then
+    echo "Skipping step due to CONFIG_TYPE not being proxy or externallb."
     exit 0
 fi
 

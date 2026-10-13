@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "$CONFIG_TYPE" != *"proxy"* ]]; then
-    echo "Skipping step due to CONFIG_TYPE not matching proxy."
+if [[ "$CONFIG_TYPE" != *"proxy"* && "$CONFIG_TYPE" != *"externallb"* ]]; then
+    echo "Skipping step due to CONFIG_TYPE not being proxy or externallb."
     exit 0
 fi
 
@@ -130,6 +130,14 @@ if ! retry 60 5 $SSH_CMD uname -a; then
 		echo "ERROR: Bastion proxy is not reachable via $bastion_fip - check logs:"
     openstack console log show ${server_id}
 		exit 1
+fi
+
+# Everything below this point deploys and configures Squid. It is only
+# needed when CONFIG_TYPE actually requests a proxy.
+if [[ "${CONFIG_TYPE}" != *"proxy"* ]]; then
+  echo "CONFIG_TYPE '${CONFIG_TYPE}' does not request a proxy, skipping Squid deployment."
+  echo "Bastion/LB host is ready!"
+  exit 0
 fi
 
 PASSWORD="$(< /var/run/bastionproxy/secret)"

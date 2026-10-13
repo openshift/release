@@ -24,12 +24,12 @@ EOF
 }
 
 if [[ -f "${SHARED_DIR}/BASTION_FIP" ]]; then
-    if [[ ! -f "${SHARED_DIR}/SQUID_AUTH" ]]; then
-        echo "ERROR: SQUID_AUTH not found in shared dir"
-        exit 1
+    if [[ -f "${SHARED_DIR}/SQUID_AUTH" ]]; then
+        echo "Ephemeral proxy detected: $(<"${SHARED_DIR}/BASTION_FIP")"
+        write_proxy_config "$(<"${SHARED_DIR}/SQUID_AUTH")" "$(<"${SHARED_DIR}/BASTION_FIP")"
+    else
+        echo "DEBUG: BASTION_FIP found but no SQUID_AUTH, assuming externallb without a proxy. No proxy-conf.sh needed."
     fi
-    echo "Ephemeral proxy detected: $(<"${SHARED_DIR}/BASTION_FIP")"
-    write_proxy_config "$(<"${SHARED_DIR}/SQUID_AUTH")" "$(<"${SHARED_DIR}/BASTION_FIP")"
     exit 0
 fi
 
