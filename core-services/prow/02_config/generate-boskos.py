@@ -552,7 +552,7 @@ CONFIG = {
         'ca-tor': 3,
     },
     'ibmcloud-quay-quota-slice': {
-        'default': 4,
+        'us-east': 4,
     },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
