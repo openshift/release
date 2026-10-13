@@ -1,0 +1,63 @@
+ref:
+  as: openshift-qe-microshift-perf-cycle
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  resources:
+    requests:
+      cpu: 100m
+      memory: 500Mi
+  commands: openshift-qe-microshift-perf-cycle-commands.sh
+  env:
+  - name: ITERATIONS
+    default: '3'
+    documentation: Number of fresh-install iterations, 1 through 5. Default three; consistency analysis belongs
+      to perf-tools.
+  - name: COLD_WINDOW
+    default: '1800'
+    documentation: Cold idle window in seconds, before any workload.
+  - name: WARM_WINDOW
+    default: '1800'
+    documentation: Warm idle window in seconds, after workloads and cleanup.
+  - name: SETTLE_SECONDS
+    default: '600'
+    documentation: Idle seconds between density sweeps and pod-network tests.
+  - name: CYCLE_BUDGET_SECONDS
+    default: '115200'
+    documentation: Total job budget in seconds (32h), including initialization/provisioning.
+  - name: MIN_ITERATION_BUDGET_SECONDS
+    default: '21600'
+    documentation: Do not start another iteration with less than this remaining budget (6h).
+  - name: NETPERF_TIMEOUT_SECONDS
+    default: '7200'
+    documentation: Bound for network-perf-v2 full-run.yaml in seconds.
+  - name: KUBE_BURNER_VERSION
+    default: latest
+    documentation: Latest public release resolved once by init; a concrete version/tag is an explicit pin.
+  - name: KUBE_BURNER_ES_INDEX
+    default: ripsaw-kube-burner
+    documentation: Native kube-burner metrics index.
+  - name: SWEEP_SLEEP
+    default: '30'
+    documentation: Idle seconds between QPS points, passed to the upstream sweep.
+  - name: SWEEP_CLEANUP_TIMEOUT
+    default: '300'
+    documentation: Namespace cleanup bound in seconds, passed to the upstream sweep.
+  - name: MICROSHIFT_PROMETHEUS_URL
+    default: ''
+    documentation: Prometheus override; normally uses deploy handoff for the bastion.
+  - name: NETPERF_VERSION
+    default: latest
+    documentation: Latest public release resolved once by init; the concrete tag is passed to the wrapper. Explicit tags remain pins.
+  - name: PERF_ES_INDEX
+    default: microshift-perf-v1
+    documentation: Dedicated Ansible/report_cycle index; optional completion marker uses the same destination as measurements.
+  - name: MODEL
+    default: R640
+    documentation: Scale Lab model used by self-sched; recorded as hardware in the cycle manifest.
+  timeout: 33h0m0s
+  grace_period: 5m0s
+  documentation: Run all fresh-install, idle, density and network iterations in one QUADS reservation. Keep partial
+    artifacts and fail the job if any iteration is invalid.
