@@ -16,9 +16,41 @@ libvirt-ppc64le*|libvirt-s390x*|powervs*|powervc*|power-s2s*)
     ;;
 esac
 
+function setup_test_args() {
+	# Disabling monitors until platform gaps are fixed (see linked bugs / comments).
+	case "${CLUSTER_TYPE}" in
+	powervs*)
+	    # Disabling until https://issues.redhat.com/browse/OCPBUGS-55458 is fixed.
+	    TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,service-type-load-balancer-availability"
+		;;
+	powervc*)
+	    TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,service-type-load-balancer-availability"
+		;;
+	libvirt-ppc64le*|power-s2s*)
+        TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability"
+        ;;
+	esac
+
+	# Escape [Monitor:audit-log-analyzer] API LBs follow /readyz of kube-apiserver
+	# and stop sending requests before server shutdowns for external clients on IBM Z and Power.
+	# This disables the whole audit-log-analyzer monitor (no per-test monitor skip exists).
+	# Revert once https://issues.redhat.com/browse/OCPBUGS-95188 is resolved.
+	case "${CLUSTER_TYPE}" in
+	libvirt-s390x*|libvirt-ppc64le*|power-s2s*|powervs*|powervc*)
+		TEST_ARGS="${TEST_ARGS:-} --disable-monitor=audit-log-analyzer"
+		;;
+	esac
+
+	if [[ "${DISABLE_LOAD_BALANCER_MONITOR:-false}" == "true" ]]; then
+		TEST_ARGS="${TEST_ARGS:-} --disable-monitor=service-type-load-balancer-availability"
+	fi
+}
+
 function upgrade() {
+    setup_test_args
     set -x
     openshift-tests run-upgrade all \
+        ${TEST_ARGS:-} \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER:-}" \
@@ -331,22 +363,8 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
         TEST_ARGS="${TEST_ARGS:-} --from-repository=quay.io/multi-arch/community-e2e-images"
         ;;
     esac
-	# Disabling the test until https://issues.redhat.com/browse/OCPBUGS-55458 is fixed.
-	case "${CLUSTER_TYPE}" in
-	powervs*)
-	    TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,service-type-load-balancer-availability"
-		;;
-	powervc*)
-	    TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,service-type-load-balancer-availability"
-		;;
-	libvirt-ppc64le*|power-s2s*)
-        TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability"
-        ;;
-	esac
 
-	if [[ "${DISABLE_LOAD_BALANCER_MONITOR:-false}" == "true" ]]; then
-		TEST_ARGS="${TEST_ARGS:-} --disable-monitor=service-type-load-balancer-availability"
-	fi
+    setup_test_args
 
     VERBOSITY="" # "--v 9"
     set -x
