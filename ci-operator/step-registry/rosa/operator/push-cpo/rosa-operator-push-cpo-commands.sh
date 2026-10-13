@@ -9,6 +9,10 @@ set -o pipefail
 # registry credentials into the HostedCluster pull secret, which the ACM work agent can resync and
 # revert mid-run, breaking later CPO pod pulls (ROSAENG-74212 review feedback). The pushed pullspec is
 # written to ${SHARED_DIR}/cpo-image for rosa-operator-annotate-cpo to stamp on the HostedCluster.
+#
+# TODO(ROSAENG-74212 follow-up): quay.io/rrp-dev-ci (owned by rosa-regional-platform/hyperfleet) is
+# being retired and should not be a dependency of a standard rosa-e2e job. Move to a rosa-e2e-owned
+# quay repo + push credential (see CPO_QUAY_REPO and the credentials block in the ref).
 
 log() {
   echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") ${*}\033[0m"
