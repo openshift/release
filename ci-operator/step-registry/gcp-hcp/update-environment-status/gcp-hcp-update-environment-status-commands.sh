@@ -11,11 +11,20 @@ if [[ -z "${JOB_SPEC:-}" ]]; then
   exit 1
 fi
 
-# A presubmit tests its own source checkout against an already deployed INT
-# environment. It must not overwrite the periodic result on deployed commits.
-if [[ "$(jq -r '.type // empty' <<<"${JOB_SPEC}")" != "periodic" ]]; then
+# An ordinary presubmit tests its own source checkout against an already
+# deployed INT environment. A pj-rehearse run of this specific periodic job
+# also tests that environment, and must exercise the status publication path.
+if ! jq -e --arg periodic_job "periodic-ci-openshift-online-gcp-hcp-infra-main-e2e-hostedcluster-int" '
+  . as $job |
+  $job.type == "periodic" or
+  ($job.type == "presubmit" and
+   $job.refs.org == "openshift" and
+   $job.refs.repo == "release" and
+   ($job.refs.pulls | length) == 1 and
+   $job.job == ("rehearse-" + ($job.refs.pulls[0].number | tostring) + "-" + $periodic_job))
+' <<<"${JOB_SPEC}" >/dev/null; then
   touch "${skip_path}"
-  echo "Skipping deployed-commit status for a non-periodic job"
+  echo "Skipping deployed-commit status for an ordinary presubmit"
   exit 0
 fi
 
@@ -29,6 +38,16 @@ if [[ ! -s "${token_path}" ]]; then
 fi
 if [[ ! "${E2E_STATUS_CONTEXT:-}" =~ ^[A-Za-z0-9][A-Za-z0-9/_-]{0,99}$ ]]; then
   echo "ERROR: E2E_STATUS_CONTEXT is missing or invalid" >&2
+  exit 1
+fi
+readonly status_wait_seconds="${E2E_STATUS_WAIT_SECONDS:-1800}"
+readonly status_poll_seconds="${E2E_STATUS_POLL_SECONDS:-60}"
+if [[ ! "${status_wait_seconds}" =~ ^[1-9][0-9]{0,3}$ ]] || (( status_wait_seconds > 1800 )); then
+  echo "ERROR: E2E_STATUS_WAIT_SECONDS must be between 1 and 1800" >&2
+  exit 1
+fi
+if [[ ! "${status_poll_seconds}" =~ ^[1-9][0-9]{0,3}$ ]] || (( status_poll_seconds > status_wait_seconds )); then
+  echo "ERROR: E2E_STATUS_POLL_SECONDS must be between 1 and E2E_STATUS_WAIT_SECONDS" >&2
   exit 1
 fi
 if ! jq -e '
@@ -93,28 +112,44 @@ while IFS= read -r target; do
     --data "${payload}" "${api}/statuses/${sha}" >/dev/null
 done < <(jq -c '.targets[]' "${targets_path}")
 
-# These checks prove the captured branch revisions were deployed before the
-# lifecycle test started. The promoter also gates on the same checks.
+# Wait for deployment of the captured revision before starting the lifecycle
+# test. Keep checking the branch so a newer promotion cannot pass this run.
+readonly deadline=$((SECONDS + status_wait_seconds))
 while IFS= read -r target; do
   branch="$(jq -r '.branch' <<<"${target}")"
   sha="$(jq -r '.sha' <<<"${target}")"
   contexts="$(jq -c '.contexts' <<<"${target}")"
-  status_response="$(github_get "${api}/commits/${sha}/status?per_page=100")"
-  missing="$(jq -r --argjson contexts "${contexts}" '
-    (.statuses // []) as $statuses |
-    $contexts[] as $wanted |
-    ([$statuses[] | select(.context == $wanted)] | sort_by(.id) | last | .state) as $state |
-    select($state != "success") | $wanted
-  ' <<<"${status_response}")"
-  if [[ -n "${missing}" ]]; then
-    echo "ERROR: deployment checks are not successful on ${branch}@${sha}:" >&2
-    echo "${missing}" >&2
-    exit 1
-  fi
-  if [[ "$(branch_sha "${branch}")" != "${sha}" ]]; then
-    echo "ERROR: ${branch} advanced before the lifecycle test started" >&2
-    exit 1
-  fi
+  while true; do
+    if [[ "$(branch_sha "${branch}")" != "${sha}" ]]; then
+      echo "ERROR: ${branch} advanced before the lifecycle test started" >&2
+      exit 1
+    fi
+    status_response="$(github_get "${api}/commits/${sha}/status?per_page=100")"
+    missing="$(jq -r --argjson contexts "${contexts}" '
+      (.statuses // []) as $statuses |
+      $contexts[] as $wanted |
+      ([$statuses[] | select(.context == $wanted)] | sort_by(.id) | last | .state) as $state |
+      select($state != "success") | $wanted
+    ' <<<"${status_response}")"
+    if [[ -z "${missing}" ]]; then
+      if [[ "$(branch_sha "${branch}")" != "${sha}" ]]; then
+        echo "ERROR: ${branch} advanced before the lifecycle test started" >&2
+        exit 1
+      fi
+      echo "Deployment checks passed on ${branch}@${sha}"
+      break
+    fi
+    if (( SECONDS >= deadline )); then
+      echo "ERROR: timed out waiting for deployment checks on ${branch}@${sha}:" >&2
+      echo "${missing}" >&2
+      exit 1
+    fi
+    remaining=$((deadline - SECONDS))
+    pause=$((remaining < status_poll_seconds ? remaining : status_poll_seconds))
+    echo "Waiting ${pause}s for deployment checks on ${branch}@${sha}:"
+    echo "${missing}"
+    sleep "${pause}"
+  done
 done < <(jq -c '.targets[]' "${targets_path}")
 
 echo "Captured deployed promotion commits and verified their deployment checks"
