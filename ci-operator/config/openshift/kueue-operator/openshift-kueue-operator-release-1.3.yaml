@@ -61,6 +61,12 @@ operator:
 prowgen:
   disable_sparse_checkout: true
 releases:
+  amd64-4-20-latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.20"
   arm64-4-20-latest:
     candidate:
       architecture: arm64
@@ -555,8 +561,6 @@ tests:
     - chain: kueue-operator-test-perfscale
     workflow: openshift-qe-installer-aws
 - as: test-e2e-disconnected
-  capabilities:
-  - arm64
   cron: '@daily'
   reporter_config:
     channel: '#forum-node-jira'
@@ -566,12 +570,14 @@ tests:
     report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs>'
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:amd64-4-20-latest
     env:
       BUNDLE_COMPONENT: kueue-bundle-1-3
       CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.20
       CATSRC_NAME: redhat-operators
-      MIRROR_OPERATORS: "true"
+      ENABLE_IDMS: "yes"
       MUST_GATHER_COMPONENT: kueue-must-gather-1-3
       OPERAND_COMPONENT: kueue-operand-1-3
       OPERATOR_COMPONENT: kueue-operator-1-3
@@ -612,7 +618,7 @@ tests:
         requests:
           cpu: 300m
           memory: 500Mi
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
+    workflow: openshift-e2e-aws-disconnected
 zz_generated_metadata:
   branch: release-1.3
   org: openshift
