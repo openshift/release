@@ -353,3 +353,6 @@ for i in {1..10}; do
 done
 
 echo "$(date) Successfully completed the Hosted Cluster creation with type agent in OZ."
+
+echo "$(date) Pods in hcp namespace ${hcp_ns}"
+oc get pods -n "${hcp_ns}"
