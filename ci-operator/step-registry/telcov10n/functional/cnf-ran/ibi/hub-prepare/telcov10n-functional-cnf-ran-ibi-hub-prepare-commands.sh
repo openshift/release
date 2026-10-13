@@ -144,6 +144,27 @@ if hub_role == 'target':
            '--type=merge', '-p', json.dumps(patch))
     wait_for('IBI operator', lambda: deployment_ready('multicluster-engine', component))
 
+    # Keep importing after replacement even when the retained ManagedCluster
+    # already has ImportSucceeded=True. This setting applies to the target hub.
+    namespace = 'multicluster-engine'
+    name = 'import-controller-config'
+    raw = oc('get', 'configmap', name, '-n', namespace, '--ignore-not-found', '-o', 'json')
+    if raw:
+        config = json.loads(raw)
+        if config.get('data', {}).get('autoImportStrategy') != 'ImportAndSync':
+            patch = {'metadata': {'resourceVersion': config['metadata']['resourceVersion']},
+                     'data': {'autoImportStrategy': 'ImportAndSync'}}
+            oc('patch', 'configmap', name, '-n', namespace,
+               '--type=merge', '-p', json.dumps(patch))
+    else:
+        config = {'apiVersion': 'v1', 'kind': 'ConfigMap',
+                  'metadata': {'name': name, 'namespace': namespace},
+                  'data': {'autoImportStrategy': 'ImportAndSync'}}
+        oc('create', '-f', '-', input_text=json.dumps(config))
+    if read('configmap', name, '-n', namespace).get('data', {}).get('autoImportStrategy') != 'ImportAndSync':
+        raise RuntimeError('Target hub automatic import strategy was not configured')
+    print('Target hub automatic import: ImportAndSync', flush=True)
+
 csv = None
 
 

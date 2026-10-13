@@ -15,7 +15,7 @@ finish() {
     copy_rc=$?
     (( result != 0 )) || result=${copy_rc}
     ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
-      "rm -f -- '${BMC_ENV_FILE}' '${SPOKE_KUBECONFIG}'" \
+      "rm -f -- '${BMC_ENV_FILE}' '${SPOKE_KUBECONFIG}' '${POLICY_BASELINE}'" \
       2>&1 | redact_bastion
   fi
   [[ -z "${TEMP_DIR}" ]] || rm -rf -- "${TEMP_DIR}"
@@ -60,6 +60,7 @@ create_work_directories() {
   REPORT_DIR="${ARTIFACT_DIR}/ibi-ibbf"
   mkdir -p "${REPORT_DIR}"
   BMC_ENV_FILE="/tmp/${TEMP_DIR##*/}-bmc.env"
+  POLICY_BASELINE="/tmp/${TEMP_DIR##*/}-policies.json"
 }
 
 configure_ssh() {
@@ -110,7 +111,7 @@ prepare_launcher() {
     --extra-vars "additional_test_env_variables='--env-file ${BMC_ENV_FILE}'" \
     --extra-vars '{
       "features": "gitopsztp",
-      "labels": "ibbf-end-to-end",
+      "labels": "\"ibbf-end-to-end && test_id:78333\"",
       "eco_gotests_tag": "latest",
       "test_timeout": "3h",
       "eco_worker_label": "",
@@ -153,7 +154,7 @@ prepare_bmc_environment() {
   ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
     python3 - "${HUB_CONFIG_DIR}/auth/kubeconfig" "${TARGET_SPOKE_NAME}" \
     "${VERSION}" "${IBI_IBBF_ORIGINAL_BMC_HOST}" "${IBI_IBBF_REPLACEMENT_BMC_HOST}" \
-    "${IBI_IBBF_TARGET_IP}" "${BMC_ENV_FILE}" <<'PY' \
+    "${IBI_IBBF_TARGET_IP}" "${BMC_ENV_FILE}" "${SPOKE_KUBECONFIG}" "${POLICY_BASELINE}" <<'PY' \
     2>&1 | redact_bastion | tee "${REPORT_DIR}/preflight.log"
 import base64
 import ipaddress
@@ -165,19 +166,78 @@ import sys
 import urllib.parse
 import urllib.request
 
-kubeconfig, spoke, version, original, replacement, target_ip, env_file = sys.argv[1:]
+kubeconfig, spoke, version, original, replacement, target_ip, env_file, spoke_config, baseline_file = sys.argv[1:]
+os.umask(0o077)
 for address in (original, replacement, target_ip):
     ipaddress.IPv4Address(address)
 
 def get(resource, name, namespace):
     return json.loads(subprocess.check_output([
-        "oc", "--kubeconfig=" + kubeconfig, "-n", namespace,
+        "oc", "--kubeconfig=" + kubeconfig, "--request-timeout=30s", "-n", namespace,
         "get", resource, name, "-o", "json",
-    ]))
+    ], timeout=45))
+
+def listing(resource, config, *scope):
+    return json.loads(subprocess.check_output([
+        "oc", "--kubeconfig=" + config, "--request-timeout=30s",
+        "get", resource, *scope, "-o", "json",
+    ], timeout=45))["items"]
 
 def require(condition, message):
     if not condition:
         sys.exit(message)
+
+siteconfigs = listing("configmaps", kubeconfig, "-A", "--field-selector",
+                      "metadata.name=siteconfig-operator-configuration")
+require(len(siteconfigs) == 1 and not siteconfigs[0]["metadata"].get("deletionTimestamp"),
+        "Expected exactly one active SiteConfig configuration ConfigMap.")
+siteconfig_namespace = siteconfigs[0]["metadata"]["namespace"]
+controller = get("deployment", "siteconfig-controller-manager", siteconfig_namespace)
+status = controller.get("status", {})
+desired = controller.get("spec", {}).get("replicas", 1)
+require(not controller["metadata"].get("deletionTimestamp") and desired > 0 and
+        status.get("observedGeneration", 0) >= controller["metadata"]["generation"] and
+        status.get("updatedReplicas", 0) == desired and
+        status.get("availableReplicas", 0) == desired,
+        "SiteConfig controller is not ready in its configuration namespace.")
+require(get("configmap", "import-controller-config", "multicluster-engine")
+        .get("data", {}).get("autoImportStrategy") == "ImportAndSync",
+        "Target hub must use ImportAndSync before IBBF.")
+
+# Capture the complete expected policy set before replacing the node. A later
+# empty or partial list must not count as successful policy recovery.
+policies = listing("policies.policy.open-cluster-management.io", kubeconfig, "-n", spoke)
+require(bool(policies) and all(item.get("status", {}).get("compliant") == "Compliant"
+                              for item in policies), "Target policies must be Compliant before IBBF.")
+config_policies = listing("configurationpolicies.policy.open-cluster-management.io", spoke_config, "-A")
+baseline = {}
+for policy in policies:
+    name = policy["metadata"]["name"]
+    templates = policy["spec"].get("policy-templates", [])
+    require(bool(templates), "Expected policy templates in target policy.")
+    baseline[name] = []
+    for template in templates:
+        definition = template["objectDefinition"]
+        require(definition.get("kind") == "ConfigurationPolicy",
+                "IBBF policy gate requires ConfigurationPolicy templates.")
+        matches = [item for item in config_policies
+                   if item["metadata"]["name"] == definition["metadata"]["name"]]
+        require(len(matches) == 1, "Target ConfigurationPolicy is missing or ambiguous.")
+        baseline[name].append({key: matches[0]["metadata"][key] for key in ("name", "namespace")})
+for name in ("common-config-policy", "common-subscriptions-policy"):
+    replica = next((item for item in policies if item["metadata"]["name"] == "ztp-common." + name), {})
+    require(replica.get("metadata", {}).get("labels", {}).get("policy.open-cluster-management.io/root-policy")
+            == "ztp-common." + name, "Expected common policy is not assigned to the target.")
+    get("policies.policy.open-cluster-management.io", name, "ztp-common")
+original_cgu = get("clustergroupupgrades.ran.openshift.io", spoke, "ztp-install")
+require(any(condition.get("type") == "Succeeded" and condition.get("status") == "True"
+            for condition in original_cgu.get("status", {}).get("conditions", [])),
+        "Initial target policy remediation has not completed.")
+original_nodes = listing("nodes", spoke_config)
+require(len(original_nodes) == 1 and original_nodes[0]["metadata"].get("uid"),
+        "Expected one original target node with a UID.")
+with open(baseline_file, "w") as output:
+    json.dump({"node_uid": original_nodes[0]["metadata"]["uid"], "policies": baseline}, output)
 
 for name, suffix in (("clusters", "clusterinstance"), ("policies", "policygentemplate")):
     app = get("applications.argoproj.io", name, "openshift-gitops")
@@ -235,7 +295,7 @@ with open(env_file, "w") as output:
         "ECO_CNF_RAN_BMC_USERNAME": user,
         "ECO_CNF_RAN_BMC_PASSWORD": password,
         "ECO_CNF_RAN_SKIP_TLS_VERIFY": "true",
-        "ECO_CNF_RAN_ACM_OPERATOR_NAMESPACE": "open-cluster-management",
+        "ECO_CNF_RAN_ACM_OPERATOR_NAMESPACE": siteconfig_namespace,
         "ECO_TEST_TRACE": "true",
         "ECO_VERBOSE_SCRIPT": "true",
     }.items():
@@ -260,57 +320,174 @@ hardware = [case for case in cases if "tests HW replacement via IBBF" in case.ge
 if len(hardware) != 1 or any(hardware[0].find(tag) is not None for tag in ("skipped", "failure", "error")):
     sys.exit("IBBF hardware replacement did not execute and pass exactly once.")
 print("IBBF hardware replacement test executed and passed.")
-policy = [case for case in cases if "verifies policies are compliant after IBBF" in case.get("name", "")]
-if not policy or any(case.find("skipped") is not None for case in policy):
-    print("Image policy spec skipped/missing; the separate policy gate will provide this check.")
+print("Policy compliance is checked separately after TALM remediation; image policy spec 87996 is not selected.")
 PY
 }
 
-wait_for_policies() {
-  # Some original images skip the second spec after changing the Argo path.
-  # Keep that Ginkgo result intact and record this independent check separately.
+remediate_and_verify_policies() {
+  # Run remediation before this independent compliance assertion. The image
+  # runs only the hardware spec because its policy spec can skip on a changed path.
   ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
     python3 - "${HUB_CONFIG_DIR}/auth/kubeconfig" "${TARGET_SPOKE_NAME}" \
-    "${WORK_DIR}/report/junit_ibbf_policy_gate.xml" <<'PY' \
+    "${SPOKE_KUBECONFIG}" "${POLICY_BASELINE}" "${WORK_DIR}/report" <<'PY' \
     2>&1 | redact_bastion | tee "${REPORT_DIR}/policy-gate.log"
+from datetime import datetime, timezone
+from pathlib import Path
 import json
 import subprocess
 import sys
 import time
 import xml.etree.ElementTree as ET
 
-kubeconfig, spoke, report = sys.argv[1:]
+hub_config, spoke, spoke_config, baseline_file, report_dir = sys.argv[1:]
+report_dir = Path(report_dir)
 started = time.monotonic()
+deadline = started + 3000
+# Use the replacement node's creation time, not completion of the test: watch
+# policies may already have evaluated by then and need not evaluate again.
+cutoff = None
 passed = False
-try:
-    while time.monotonic() - started < 1800:
-        result = subprocess.run([
-            "oc", "--kubeconfig=" + kubeconfig, "--request-timeout=30s",
-            "-n", spoke, "get", "policies.policy.open-cluster-management.io", "-o", "json",
-        ], capture_output=True, text=True, timeout=45)
-        if result.returncode != 0:
-            sys.exit("Cannot read target policies.")
-        policies = json.loads(result.stdout)["items"]
-        pending = [item["metadata"]["name"] for item in policies
-                   if item.get("status", {}).get("compliant") != "Compliant"]
-        if policies and not pending:
-            passed = True
-            print(f"All {len(policies)} target policies are Compliant.", flush=True)
-            break
-        print(f"Waiting for target policies: {len(policies)} present, {len(pending)} not Compliant.",
-              flush=True)
+failure = "Post-replacement policy recovery did not complete."
+cgu_status = {}
+
+def oc(config, *args, manifest=None):
+    try:
+        result = subprocess.run(
+            ["oc", "--kubeconfig=" + config, "--request-timeout=30s", *args],
+            input=json.dumps(manifest) if manifest is not None else None,
+            capture_output=True, text=True, timeout=45)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Policy recovery API request timed out.") from None
+    if result.returncode:
+        raise RuntimeError("Policy recovery API request failed: " + " ".join(args[:2]))
+    return json.loads(result.stdout)
+
+def wait_for(description, check, limit=deadline):
+    while time.monotonic() < limit:
+        if check():
+            print(description + ": complete.", flush=True)
+            return
+        print("Waiting for " + description + ".", flush=True)
         time.sleep(30)
+    raise RuntimeError(description + ": timed out.")
+
+def timestamp(value):
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is not None:
+            return parsed
+        return datetime.min.replace(tzinfo=timezone.utc)
+    except (AttributeError, ValueError):
+        return datetime.min.replace(tzinfo=timezone.utc)
+
+def replacement_ready():
+    global cutoff
+    try:
+        nodes = oc(spoke_config, "get", "nodes", "-o", "json")["items"]
+    except RuntimeError as error:
+        print(str(error), flush=True)
+        return False
+    if len(nodes) != 1:
+        return False
+    node = nodes[0]
+    if (node["metadata"]["uid"] == original_node_uid or node["metadata"].get("deletionTimestamp") or
+            not any(item.get("type") == "Ready" and item.get("status") == "True"
+                    for item in node.get("status", {}).get("conditions", []))):
+        return False
+    cutoff = timestamp(node["metadata"].get("creationTimestamp"))
+    if cutoff == datetime.min.replace(tzinfo=timezone.utc):
+        raise RuntimeError("Replacement node has no valid creation timestamp.")
+    return True
+
+def policy_state():
+    try:
+        hub = oc(hub_config, "-n", spoke, "get", "policies.policy.open-cluster-management.io", "-o", "json")
+        leaf = oc(spoke_config, "get", "configurationpolicies.policy.open-cluster-management.io",
+                  "-A", "-o", "json")
+    except RuntimeError as error:
+        # ACM availability can precede the policy add-on and its CRDs.
+        print(str(error), flush=True)
+        return False, False
+    hub = {item["metadata"]["name"]: item for item in hub["items"]}
+    leaf = {(item["metadata"]["namespace"], item["metadata"]["name"]): item for item in leaf["items"]}
+    fresh = True
+    compliant = True
+    for name, templates in baseline.items():
+        policy = hub.get(name, {})
+        if not policy or policy["metadata"].get("deletionTimestamp"):
+            return False, False
+        states = []
+        for template in templates:
+            item = leaf.get((template["namespace"], template["name"]), {})
+            status = item.get("status", {})
+            state = status.get("compliant")
+            if (not item or item["metadata"].get("deletionTimestamp") or
+                    status.get("lastEvaluatedGeneration") != item["metadata"]["generation"] or
+                    timestamp(status.get("lastEvaluated")) < cutoff or
+                    state not in ("Compliant", "NonCompliant")):
+                return False, False
+            states.append(state)
+        expected = "Compliant" if all(state == "Compliant" for state in states) else "NonCompliant"
+        fresh = fresh and policy.get("status", {}).get("compliant") == expected
+        compliant = compliant and expected == "Compliant"
+    # Also reject newly assigned noncompliant policies, beyond the baseline set.
+    compliant = compliant and all(item.get("status", {}).get("compliant") == "Compliant"
+                                  for item in hub.values())
+    return fresh, fresh and compliant
+
+def cgu_completed():
+    global cgu_status
+    obj = oc(hub_config, "-n", "ztp-install", "get", "clustergroupupgrades.ran.openshift.io",
+             cgu_name, "-o", "json")
+    if obj["metadata"]["uid"] != cgu_uid:
+        raise RuntimeError("Post-IBBF remediation object was replaced.")
+    cgu_status = {"name": cgu_name, "uid": cgu_uid,
+                  "conditions": obj.get("status", {}).get("conditions", []),
+                  "clusters": obj.get("status", {}).get("clusters", [])}
+    return any(item.get("type") == "Succeeded" and item.get("status") == "True"
+               for item in cgu_status["conditions"])
+
+try:
+    saved = json.loads(Path(baseline_file).read_text())
+    baseline, original_node_uid = saved["policies"], saved["node_uid"]
+    if not original_node_uid or not baseline or any(not templates for templates in baseline.values()):
+        raise RuntimeError("Expected policy baseline is empty.")
+    (report_dir / "expected-policies.json").write_text(json.dumps(baseline, indent=2))
+    # Inform policies must be evaluated on the replacement before TALM reads
+    # their status; otherwise old Compliant values can skip needed remediation.
+    wait_for("replacement node readiness", replacement_ready, started + 900)
+    wait_for("fresh replacement policy evaluations", lambda: policy_state()[0], started + 900)
+    obj = oc(hub_config, "create", "-f", "-", "-o", "json", manifest={
+        "apiVersion": "ran.openshift.io/v1alpha1", "kind": "ClusterGroupUpgrade",
+        "metadata": {"generateName": spoke + "-post-ibbf-", "namespace": "ztp-install"},
+        "spec": {
+            "clusters": [spoke], "enable": True, "backup": False, "preCaching": False,
+            "managedPolicies": ["common-config-policy", "common-subscriptions-policy"],
+            "remediationStrategy": {"maxConcurrency": 1, "timeout": 30},
+        },
+    })
+    cgu_name, cgu_uid = obj["metadata"]["name"], obj["metadata"]["uid"]
+    print("Created target-only policy remediation: " + cgu_name, flush=True)
+    wait_for("post-IBBF TALM remediation", cgu_completed)
+    wait_for("target policy compliance", lambda: policy_state()[1])
+    passed = True
+    print(f"All {len(baseline)} expected target policies are present, freshly evaluated and Compliant.",
+          flush=True)
+except Exception as error:
+    failure = str(error)
 finally:
-    suite = ET.Element("testsuite", name="IBBF supplemental policy gate", tests="1",
+    (report_dir / "post-ibbf-cgu-status.json").write_text(json.dumps(cgu_status, indent=2))
+    suite = ET.Element("testsuite", name="IBBF policy recovery", tests="1",
                        failures="0" if passed else "1",
                        time=str(round(time.monotonic() - started, 3)))
-    case = ET.SubElement(suite, "testcase", name="target policies compliant after replacement",
+    case = ET.SubElement(suite, "testcase", name="target policies compliant after TALM remediation",
                          classname="ibi.ibbf.policy-gate")
     if not passed:
-        ET.SubElement(case, "failure", message="Target policy compliance was not confirmed.")
-    ET.ElementTree(suite).write(report, encoding="utf-8", xml_declaration=True)
+        ET.SubElement(case, "failure", message=failure)
+    ET.ElementTree(suite).write(report_dir / "junit_ibbf_policy_gate.xml",
+                               encoding="utf-8", xml_declaration=True)
 if not passed:
-    sys.exit("Target policies did not become Compliant within 30 minutes.")
+    sys.exit(failure)
 PY
 }
 
@@ -330,9 +507,7 @@ main() {
   prepare_launcher
   run_tests
   verify_hardware_test
-  wait_for_policies
+  remediate_and_verify_policies
 }
-
-
 
 main "$@"
