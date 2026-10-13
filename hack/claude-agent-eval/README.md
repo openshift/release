@@ -178,6 +178,7 @@ ARTIFACT_DIR/
     regression.log                  # if scoring ran
     metrics.log                     # if metrics extraction was attempted
     eval-run.tar
+    stray-runs.tar                  # only if the harness-named run was missing
 ```
 
 The static index links available artifacts and reports selected evals as passed,
@@ -237,8 +238,8 @@ After the orchestrator exits, the runner reads the run only from
 `score.py` and `report.py` use. A link there is followed if it stays inside the
 runs directory. Directories the orchestrator created under another guessed name
 (for example the config `name`), whether links or `cp -r` copies, never identify
-the run; when the expected directory is missing, the failure lists them for
-diagnosis. The regression check reads `summary.yaml` from that verified physical
+the run; when the expected directory is missing, the failure lists them and
+their contents are archived as `stray-runs.tar` for diagnosis only. The regression check reads `summary.yaml` from that verified physical
 run directory and uses the cloned harness's `detect_regressions()` threshold
 rules. Missing summaries or thresholded judges still fail the eval.
 Python emits AutoDL metrics for orchestrator and harness model usage;

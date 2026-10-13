@@ -128,8 +128,7 @@ with open(os.environ["CALLS"], "a") as out:
 run_id = flag("--run-id")
 root = pathlib.Path(os.environ.get("AGENT_EVAL_RUNS_DIR", "eval/runs"))
 behavior = json.loads(os.environ.get("BEHAVIORS", "{}" )).get(config, "pass")
-# The harness names runs after EvalConfig.eval_name(); a guessed config name is never scored.
-import yaml
+import yaml  # The harness names runs after EvalConfig.eval_name(); a guessed name is never scored.
 raw = yaml.safe_load(pathlib.Path(config).read_text()) or {}
 eval_name = ((raw.get("execution") or {}).get("skill") or raw.get("skill") or raw.get("name")
              or pathlib.Path(config).stem)
@@ -151,9 +150,8 @@ if behavior == "removed_alias":
     alias.unlink()
 if behavior != "missing_report":
     (run / "report.html").write_text(config)
-if behavior == "copied_run":
-    import shutil  # A physical duplicate under the guessed name, as seen in the PIXAA rehearsal.
-    shutil.copytree(run, root / "config-name" / run_id)
+if behavior == "copied_run":  # A physical duplicate under the guessed name (release#85928).
+    __import__("shutil").copytree(run, root / "config-name" / run_id)
 if behavior == "stale_result":
     for p in run.iterdir(): p.unlink()
     run.rmdir()
@@ -631,18 +629,21 @@ class RunDirectoryTests(Fixture):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("run=example:foo/", result.stdout)
         log = (self.eval_artifacts() / "regression.log").read_text()
-        self.assertIn("/example:foo/", log)
-        self.assertNotIn("/config-name/", log)
+        self.assertTrue("/example:foo/" in log and "/config-name/" not in log)
         self.assertEqual(self.junit().attrib["failures"], "0")
 
     def test_run_written_only_under_the_guessed_name_fails_with_a_hint(self):
         self.change_skill()
         result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "wrong_name_only"}))
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("example:foo/", result.stdout)
-        self.assertIn("other directories named", result.stdout)
-        self.assertIn("config-name/", result.stdout)
+        for text in ("example:foo/", "other directories named", "config-name/", "STRAY"):
+            self.assertIn(text, result.stdout)
         self.assertEqual(self.junit().attrib["failures"], "1")
+        with tarfile.open(self.eval_artifacts() / "stray-runs.tar") as archive:
+            self.assertTrue(any(n.startswith("config-name/") and n.endswith("/summary.yaml") for n in archive.getnames()))
+        self.assertFalse((self.eval_artifacts() / "eval-run.tar").exists() or (self.eval_artifacts() / "summary.yaml").exists())
+        summary = json.loads((self.artifacts / "evals-summary.json").read_text())["evals"][0]
+        self.assertEqual((summary["status"], "stray-runs.tar" in summary["artifacts"]), ("failed", True))
 
     def test_exact_directory_lookup(self):
         runs = self.repo / "eval/runs"

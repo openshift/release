@@ -330,6 +330,34 @@ def archive(directory, artifacts):
         temporary.unlink(missing_ok=True)
 
 
+def archive_strays(runs, run_id, eval_name, artifacts):
+    """Preserve runs left under other names for diagnosis; never read them as results.
+
+    Called only when the harness-named run is missing. Physical directories
+    named after the run ID elsewhere inside the runs directory are archived
+    under their parent name. They do not take part in verification.
+    """
+    runs = runs.resolve()
+    canonical = (runs / eval_name / run_id).resolve()
+    strays = {}
+    for path in sorted(runs.glob(f"*/{run_id}")):
+        resolved = path.resolve()
+        if path.is_dir() and resolved != canonical and resolved.is_relative_to(runs):
+            strays.setdefault(resolved, path.parent.name)
+    if not strays:
+        return []
+    destination = artifacts / "stray-runs.tar"
+    temporary = destination.with_suffix(".tmp")
+    try:
+        with tarfile.open(temporary, "w") as output:
+            for resolved, name in strays.items():
+                output.add(resolved, arcname=f"{name}/{run_id}")
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return sorted(strays.values())
+
+
 def summary_data(artifacts, entries, errors):
     """Build the versioned, model-independent summary shared by agents and HTML."""
     counts = {status: sum(entry["status"] == status for entry in entries)
@@ -338,7 +366,8 @@ def summary_data(artifacts, entries, errors):
               "not_run" if counts["not run"] else "passed" if entries else "no_evals")
     evaluations = []
     filenames = ("report-summary.html", "summary.yaml", "run_result.json", "claude-eval.log",
-                 "config-resolution.log", "setup.log", "regression.log", "metrics.log", "eval-run.tar")
+                 "config-resolution.log", "setup.log", "regression.log", "metrics.log", "eval-run.tar",
+                 "stray-runs.tar")
     for entry in entries:
         directory = Path("evals") / entry["name"]
         files = {name: (directory / name).as_posix() for name in filenames
@@ -631,6 +660,12 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                                 directory = run_directory(runs, run_id, plan.eval_name)
                             except Exception as error:  # pylint: disable=broad-exception-caught
                                 failures.append(f"locate run: {type(error).__name__}: {error}")
+                                try:  # Keep whatever the orchestrator produced for debugging.
+                                    strays = archive_strays(runs, run_id, plan.eval_name, eval_artifacts)
+                                    if strays:
+                                        print(f"STRAY {plan.config}: archived {strays} to stray-runs.tar", flush=True)
+                                except Exception as stray_error:  # pylint: disable=broad-exception-caught
+                                    failures.append(f"archive stray runs: {type(stray_error).__name__}: {stray_error}")
                             if directory is not None:
                                 for label, action in (("collect results", collect_result), ("archive run", archive)):
                                     try:
