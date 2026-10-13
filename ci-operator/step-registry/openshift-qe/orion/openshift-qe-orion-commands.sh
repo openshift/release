@@ -53,13 +53,23 @@ case "$ES_TYPE" in
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-    if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]] && [[ -z "${PULL_NUMBER:-}" ]]; then
+    # Verify JOB_SPEC too: rehearsals can carry pull refs without PULL_NUMBER.
+    if [[ -f "/secret/qe/jira-api-key" ]] &&
+       [[ "${JOB_TYPE:-}" == "periodic" ]] &&
+       [[ "${JOB_NAME:-}" == *"payload"* ]] &&
+       [[ -z "${PULL_NUMBER:-}" ]] &&
+       printf '%s' "${JOB_SPEC:-}" | jq -e '
+         .type == "periodic" and
+         ([.refs.pulls[]?, .extra_refs[]?.pulls[]?] | length == 0)
+       ' >/dev/null; then
         JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
         JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
         JIRA_URL=https://redhat.atlassian.net/
         export JIRA_TOKEN JIRA_EMAIL JIRA_URL
         # We use orion's default JIRA project and components
         ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+    else
+        echo "Skipping automatic Jira enablement: job is ineligible or PR metadata could not be verified."
     fi
     set -x
     ;;
