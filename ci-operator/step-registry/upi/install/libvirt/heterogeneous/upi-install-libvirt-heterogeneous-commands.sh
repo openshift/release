@@ -26,10 +26,22 @@ require_commands \
   awk grep sed tar gzip base64 basename stat mktemp \
   date mkdir rm cp touch sleep chmod uname
 
-if [ "${ADDITIONAL_WORKER_ARCHITECTURE:-}" != "arm64" ]; then
-  echo "ERROR: upi-install-libvirt-heterogeneous currently supports arm64 as additional worker architecture; found '${ADDITIONAL_WORKER_ARCHITECTURE:-}'"
-  exit 1
-fi
+case "${ADDITIONAL_WORKER_ARCHITECTURE:-}" in
+  arm64|aarch64)
+    STREAM_ARCH="aarch64"
+    EXPECTED_NODE_ARCH="arm64"
+    TEMPLATE_ARCH="arm64"
+    ;;
+  amd64|x86_64)
+    STREAM_ARCH="x86_64"
+    EXPECTED_NODE_ARCH="amd64"
+    TEMPLATE_ARCH="amd64"
+    ;;
+  *)
+    echo "ERROR: upi-install-libvirt-heterogeneous currently supports arm64 or amd64 as additional worker architecture; found '${ADDITIONAL_WORKER_ARCHITECTURE:-}'"
+    exit 1
+    ;;
+esac
 
 # Ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE:-}" ]]; then
@@ -55,27 +67,47 @@ function leaseLookup () {
 }
 
 # Ensure templates exist in cluster profile
-ARM64_INSTALL_TEMPLATE="${CLUSTER_PROFILE_DIR}/domain-install-template-arm64.xml"
-ARM64_RUN_TEMPLATE="${CLUSTER_PROFILE_DIR}/domain-template-arm64.xml"
+INSTALL_TEMPLATE=""
+RUN_TEMPLATE=""
 
-if [[ ! -f "${ARM64_INSTALL_TEMPLATE}" ]]; then
-  echo "ERROR: Missing required arm64 install domain template: ${ARM64_INSTALL_TEMPLATE}"
+for candidate in \
+  "${CLUSTER_PROFILE_DIR}/domain-install-template-${TEMPLATE_ARCH}.xml" \
+  "${CLUSTER_PROFILE_DIR}/domain-install-template-${STREAM_ARCH}.xml" \
+  "${CLUSTER_PROFILE_DIR}/domain-install-template.xml"; do
+  if [[ -f "${candidate}" ]]; then
+    INSTALL_TEMPLATE="${candidate}"
+    break
+  fi
+done
+
+for candidate in \
+  "${CLUSTER_PROFILE_DIR}/domain-template-${TEMPLATE_ARCH}.xml" \
+  "${CLUSTER_PROFILE_DIR}/domain-template-${STREAM_ARCH}.xml" \
+  "${CLUSTER_PROFILE_DIR}/domain-template.xml"; do
+  if [[ -f "${candidate}" ]]; then
+    RUN_TEMPLATE="${candidate}"
+    break
+  fi
+done
+
+if [[ -z "${INSTALL_TEMPLATE}" ]]; then
+  echo "ERROR: Missing required ${ADDITIONAL_WORKER_ARCHITECTURE} install domain template in ${CLUSTER_PROFILE_DIR}"
   exit 1
 fi
 
-if [[ ! -f "${ARM64_RUN_TEMPLATE}" ]]; then
-  echo "ERROR: Missing required arm64 run domain template: ${ARM64_RUN_TEMPLATE}"
+if [[ -z "${RUN_TEMPLATE}" ]]; then
+  echo "ERROR: Missing required ${ADDITIONAL_WORKER_ARCHITECTURE} run domain template in ${CLUSTER_PROFILE_DIR}"
   exit 1
 fi
 
-# Validate arm64 template contents
-if ! grep -q 'aarch64' "${ARM64_INSTALL_TEMPLATE}"; then
-  echo "ERROR: ${ARM64_INSTALL_TEMPLATE} does not contain arch='aarch64'"
+# Validate template contents match expected QEMU architecture
+if ! grep -q "${STREAM_ARCH}" "${INSTALL_TEMPLATE}"; then
+  echo "ERROR: ${INSTALL_TEMPLATE} does not contain arch='${STREAM_ARCH}'"
   exit 1
 fi
 
-if ! grep -q 'aarch64' "${ARM64_RUN_TEMPLATE}"; then
-  echo "ERROR: ${ARM64_RUN_TEMPLATE} does not contain arch='aarch64'"
+if ! grep -q "${STREAM_ARCH}" "${RUN_TEMPLATE}"; then
+  echo "ERROR: ${RUN_TEMPLATE} does not contain arch='${STREAM_ARCH}'"
   exit 1
 fi
 
@@ -279,20 +311,20 @@ function delete_from_additional_pool_if_exists {
   fi
 }
 
-# Fetch arm64 coreos boot images from the running cluster
+# Fetch coreos boot images from the running cluster
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 if [[ ! -f "${KUBECONFIG}" ]]; then
   echo "ERROR: kubeconfig not found at ${KUBECONFIG}"
   exit 1
 fi
 
-echo "Fetching coreos-bootimages for architecture ${ADDITIONAL_WORKER_ARCHITECTURE}..."
-KERNEL_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.artifacts.metal.formats.pxe.kernel.location")
-INITRAMFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.artifacts.metal.formats.pxe.initramfs.location")
-ROOTFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.artifacts.metal.formats.pxe.rootfs.location")
+echo "Fetching coreos-bootimages for architecture ${STREAM_ARCH}..."
+KERNEL_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${STREAM_ARCH}.artifacts.metal.formats.pxe.kernel.location")
+INITRAMFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${STREAM_ARCH}.artifacts.metal.formats.pxe.initramfs.location")
+ROOTFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${STREAM_ARCH}.artifacts.metal.formats.pxe.rootfs.location")
 
 if [[ -z "${KERNEL_URL}" || "${KERNEL_URL}" == "null" || -z "${INITRAMFS_URL}" || "${INITRAMFS_URL}" == "null" || -z "${ROOTFS_URL}" || "${ROOTFS_URL}" == "null" ]]; then
-  echo "ERROR: Failed to retrieve boot artifact URLs from coreos-bootimages configmap for ${ADDITIONAL_WORKER_ARCHITECTURE}"
+  echo "ERROR: Failed to retrieve boot artifact URLs from coreos-bootimages configmap for ${STREAM_ARCH}"
   exit 1
 fi
 
@@ -386,7 +418,7 @@ fi
 
 # Provision additional compute nodes
 ADD_COMPUTE_COUNT=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".\"additional-compute\" | length" "${LEASE_CONF}")
-echo "Provisioning ${ADD_COMPUTE_COUNT} additional arm64 compute nodes..."
+echo "Provisioning ${ADD_COMPUTE_COUNT} additional ${ADDITIONAL_WORKER_ARCHITECTURE} compute nodes..."
 
 for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   node_name="${LEASED_RESOURCE}-additional-compute-${idx}"
@@ -426,7 +458,7 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   export MAC_ADDRESS="${node_mac}"
 
   # Template evaluation using envsubst and yq-v4 validation
-  envsubst < "${ARM64_INSTALL_TEMPLATE}" > "${domain_install_xml}"
+  envsubst < "${INSTALL_TEMPLATE}" > "${domain_install_xml}"
 
   echo "Defining and starting install domain for ${node_name}..."
   CURRENT_INSTALL_DOMAIN="${node_name}"
@@ -438,7 +470,7 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
 
   echo "Install domain deleted. Defining persistent run domain for ${node_name} that boots from disk..."
   domain_run_xml=$(mktemp --tmpdir domain-"${node_name}"-run.xml.XXXXX)
-  envsubst < "${ARM64_RUN_TEMPLATE}" > "${domain_run_xml}"
+  envsubst < "${RUN_TEMPLATE}" > "${domain_run_xml}"
 
   ${VIRSH_ADDITIONAL} define "${domain_run_xml}" --validate
   ${VIRSH_ADDITIONAL} start "${node_name}"
@@ -452,18 +484,18 @@ echo "Approving pending CSRs for additional compute nodes..."
 approve_csrs &
 CSR_APPROVER_PID=$!
 
-echo "Waiting for newly provisioned arm64 node(s) to join and become Ready..."
+echo "Waiting for newly provisioned ${ADDITIONAL_WORKER_ARCHITECTURE} node(s) to join and become Ready..."
 for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   target_node_name="${LEASED_RESOURCE}-additional-compute-${idx}"
   echo "Checking node status for ${target_node_name}..."
   node_ready=false
   for (( i=1; i<=60; i++ )); do
-    # Verify the specific node exists, matches arm64 architecture, and is Ready
+    # Verify the specific node exists, matches expected architecture, and is Ready
     NODE_LINE=$(oc get nodes --no-headers 2>/dev/null | grep -E "^${target_node_name}(\.[a-zA-Z0-9.-]+)?\s+" || true)
     if [[ -n "${NODE_LINE}" ]] && echo "${NODE_LINE}" | grep -qw "Ready"; then
       NODE_ARCH=$(oc get node $(echo "${NODE_LINE}" | awk '{print $1}') -o jsonpath='{.status.nodeInfo.architecture}' 2>/dev/null || true)
-      if [[ "${NODE_ARCH}" == "arm64" ]]; then
-        echo "Node ${target_node_name} successfully joined and is Ready with architecture arm64."
+      if [[ "${NODE_ARCH}" == "${EXPECTED_NODE_ARCH}" ]]; then
+        echo "Node ${target_node_name} successfully joined and is Ready with architecture ${EXPECTED_NODE_ARCH}."
         node_ready=true
         break
       fi
@@ -471,12 +503,12 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
     sleep 10
   done
   if [[ "${node_ready}" != "true" ]]; then
-    echo "ERROR: Timed out waiting for node ${target_node_name} to reach Ready state with arm64 architecture."
+    echo "ERROR: Timed out waiting for node ${target_node_name} to reach Ready state with ${EXPECTED_NODE_ARCH} architecture."
     exit 1
   fi
 done
 
-echo "Waiting for cluster operators to stabilize after adding arm64 worker..."
+echo "Waiting for cluster operators to stabilize after adding ${ADDITIONAL_WORKER_ARCHITECTURE} worker..."
 oc adm wait-for-stable-cluster
 
 oc config refresh-ca-bundle || true
@@ -484,4 +516,4 @@ oc config refresh-ca-bundle || true
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_HETEROGENEOUS_INSTALL_END_TIME"
 touch /tmp/heterogeneous-install-complete
 
-echo "Heterogeneous arm64 worker provisioned and verified successfully."
+echo "Heterogeneous ${ADDITIONAL_WORKER_ARCHITECTURE} worker provisioned and verified successfully."
