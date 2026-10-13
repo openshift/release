@@ -10,7 +10,7 @@ ref:
     requests:
       cpu: "2"
       memory: 4Gi
-  timeout: 3h30m0s
+  timeout: 1h30m0s
   grace_period: 15m0s
   credentials:
   - collection: quay-tests
@@ -20,25 +20,21 @@ ref:
   - name: QUAY_VERSION
     documentation: Quay X.Y under test, passed to the suite as CYPRESS_QUAY_VERSION.
   - name: E2E_LEGACY_SPECS
-    default: "cypress/integration/smoke/SmokeTesting.js,cypress/integration/quayAPI/quayAPITesting.js,cypress/integration/quayConsole/quayConsoleTesting.js"
-    documentation: |-
-      Comma-separated Cypress specs under quay-frontend-tests to run. The
-      configEditor spec is left out: it needs the config tool and external
-      LDAP, OIDC, Keystone, Elasticsearch, Kinesis and database endpoints.
+    default: "cypress/integration/smoke/SmokeTesting.js"
+    documentation: Comma-separated Cypress specs under quay-frontend-tests to run in full.
+  - name: E2E_LEGACY_GREP_SPECS
+    default: "cypress/integration/quayConsole/quayConsoleTesting.js"
+    documentation: Comma-separated Cypress specs under quay-frontend-tests to run filtered by E2E_LEGACY_GREP.
   - name: E2E_LEGACY_GREP
-    default: "-OCP-42462;-OCP-22881;-OCP-22887;-OCP-22885;-OCP-42451;-OCP-24418;-OCP-42463;-OCP-24373;-OCP-29779;-OCP-29684;-OCP-29776;-OCP-24105;-OCP-23611;-OCP-29465;-OCP-22889;-OCP-24369;-OCP-49072;-OCP-53851;-OCP-32403;-OCP-45242;-OCP-42828;-OCP-42717;-OCP-42975;-OCP-25900;-OCP-29686;-OCP-25896;-OCP-24362;-OCP-24350;-OCP-40283;-OCP-53846;-OCP-53850;-Mirror external Image repository;-Quay security scanning with Clair v4 for all"
+    default: "OCP-22450;OCP-20936;OCP-22873;OCP-26188"
     documentation: |-
-      @cypress/grep title filter; each "-" term skips tests whose suite and
-      test title contain it. The default skips tests this job cannot run:
-      builders (no build workers, GitHub/Bitbucket credentials), the config
-      editor and mail tests, tests that need podman (not in the image),
-      external proxy/registry/AWS credentials, helm, and a 10GB layer push.
-      It also skips the repo-mirror and Clair tests that sleep 300-1000s each,
-      which together would exceed the step timeout.
+      @cypress/grep include list for E2E_LEGACY_GREP_SPECS; a test runs when
+      its suite and test title contain one of the terms. The default keeps
+      the quayConsole tests that pass against a stock deployment without
+      cluster credentials: they reconfigure nothing and use only Quay creds.
   documentation: |-
-    Run the quay-tests old-UI Cypress suite (quay-frontend-tests: smoke,
-    quayAPI and quayConsole specs, filtered by E2E_LEGACY_GREP) against the
-    Quay deployed by a quay-deploy-* step (${SHARED_DIR}/quayroute). Tests that
-    reconfigure Quay log in to the cluster as kubeadmin. JUnit, videos and
-    screenshots go to ${ARTIFACT_DIR}. The step fails when Cypress fails or
-    the JUnit output reports zero tests.
+    Run the quay-tests old-UI Cypress smoke spec plus selected quayConsole
+    tests (quay-frontend-tests, E2E_LEGACY_SPECS and E2E_LEGACY_GREP) against
+    the Quay deployed by a quay-deploy-* step (${SHARED_DIR}/quayroute). JUnit,
+    videos and screenshots go to ${ARTIFACT_DIR}. The step fails when Cypress
+    fails or the JUnit output reports zero tests.
