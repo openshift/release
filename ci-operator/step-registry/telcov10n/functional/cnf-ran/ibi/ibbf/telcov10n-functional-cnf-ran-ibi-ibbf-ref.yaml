@@ -41,14 +41,19 @@ ref:
     name: telcov10n-ansible-group-all
     mount_path: /var/group_variables/common/all
   documentation: |-
-    Restore target inventory and run the original eco-gotests image with the
-    gitopsztp feature and ibbf-end-to-end label using deploy-run-eco-gotests.yaml.
-    Read original BMC credentials privately from the target hub and verify they
-    also authenticate the replacement BMC before allowing original-node power-off.
-    Require the hardware replacement spec to execute and pass, then independently
-    wait up to 30 minutes for nonempty target policies to become Compliant.
-    This policy gate covers images whose second IBBF spec skips after the Argo
-    path changes; keep the original Ginkgo results without rewriting skipped tests.
-    Stream launcher output, collect reports even on failure, and return failure
-    immediately. The test leaves the original hardware off and Argo on the
-    replacement fixture. Deployment Types final-result handling is unchanged.
+    Restore target inventory and run hardware test 78333 from the original
+    eco-gotests image with gitopsztp using deploy-run-eco-gotests.yaml.
+    Discover the ready SiteConfig controller namespace and require the target
+    hub ImportAndSync strategy before allowing original-node power-off.
+    Read original BMC credentials privately and verify they authenticate both
+    the original and replacement BMC. Capture the expected target policies.
+    Require hardware replacement to execute and pass, then wait for fresh policy
+    evaluations on the replacement. Create a new target-only TALM remediation
+    for common-config-policy and common-subscriptions-policy in that order.
+    Require remediation success and all expected policies to be Compliant within
+    a shared 50-minute policy-recovery deadline. Record this independent check
+    in its own JUnit report; image policy spec 87996 is deliberately not selected
+    because some images repeat the changed Git path in that spec's BeforeEach.
+    Stream output, collect reports even on failure, and return failure immediately.
+    Leave the original hardware off and Argo on the replacement fixture.
+    Deployment Types final-result handling is unchanged.
