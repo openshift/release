@@ -1,6 +1,15 @@
+base_images:
+  ubi-python:
+    name: ubi-python-312
+    namespace: ocp
+    tag: "9"
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.root
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.ci
+    from: ubi-python
+    to: ansible-test-runner
 resources:
   '*':
     limits:
@@ -12,7 +21,7 @@ tests:
 - as: verify
   commands: make verify OFFLINE=1
   container:
-    from: src
+    from: ansible-test-runner
 zz_generated_metadata:
   branch: main
   org: openshift
