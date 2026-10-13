@@ -4,6 +4,10 @@ chain:
   - as: tests
     cli: latest
     commands: |-
+      git clone --branch restore_cross_cluster https://github.com/mgencur/hypershift.git /tmp/hypershift-src
+      cd /tmp/hypershift-src
+      GO111MODULE=on GOWORK=off GOFLAGS=-mod=vendor go test -gcflags=all='-N -l' -tags e2ev2,backuprestore -c -o bin/test-backuprestore ./test/e2e/v2/tests
+
       export PATH="/hypershift/bin:${PATH}"
       export E2E_HOSTED_CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
       export E2E_HOSTED_CLUSTER_NAMESPACE="${E2E_HOSTED_CLUSTER_NAMESPACE:-clusters}"
@@ -11,7 +15,7 @@ chain:
       export KUBECONFIG_TARGET="${SHARED_DIR}/management_cluster_kubeconfig_target"
       export AWS_GUEST_INFRA_CREDENTIALS_FILE=/etc/hypershift-ci-jobs-awscreds/credentials
       export AWS_REGION=us-east-1
-      test-backuprestore --ginkgo.v --ginkgo.junit-report=${ARTIFACT_DIR}/junit_cross_cluster_restore_report.xml --ginkgo.label-filter="cross-cluster-restore" --ginkgo.fail-fast=true --ginkgo.timeout=2h --ginkgo.no-color=true
+      bin/test-backuprestore --ginkgo.v --ginkgo.junit-report=${ARTIFACT_DIR}/junit_cross_cluster_restore_report.xml --ginkgo.label-filter="cross-cluster-restore" --ginkgo.fail-fast=true --ginkgo.timeout=2h --ginkgo.no-color=true
     timeout: 2h30m
     grace_period: 5m
     from: hypershift-tests
