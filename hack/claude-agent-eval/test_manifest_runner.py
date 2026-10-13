@@ -57,6 +57,10 @@ class EvalConfig:
         self.thresholds = raw.get('thresholds', {})
         self.dataset = type('Dataset', (), {'path': (raw.get('dataset') or {}).get('path', '')})()
         self.base = Path(path).resolve().parent
+        self.raw, self.stem = raw, Path(path).stem
+    def eval_name(self):  # Same priority as the harness: skill under test, then name, then stem.
+        return ((self.raw.get('execution') or {}).get('skill') or self.raw.get('skill')
+                or self.raw.get('name') or self.stem)
     def resolve_path(self, value):
         path = Path(value)
         return path if path.is_absolute() else self.base / path
@@ -123,9 +127,13 @@ with open(os.environ["CALLS"], "a") as out:
     out.write(json.dumps(row) + "\n")
 run_id = flag("--run-id")
 root = pathlib.Path(os.environ.get("AGENT_EVAL_RUNS_DIR", "eval/runs"))
-run = root / "skill-name-not-config-name" / run_id
-run.mkdir(parents=True)
 behavior = json.loads(os.environ.get("BEHAVIORS", "{}" )).get(config, "pass")
+import yaml  # The harness names runs after EvalConfig.eval_name(); a guessed name is never scored.
+raw = yaml.safe_load(pathlib.Path(config).read_text()) or {}
+eval_name = ((raw.get("execution") or {}).get("skill") or raw.get("skill") or raw.get("name")
+             or pathlib.Path(config).stem)
+run = root / ("config-name" if behavior == "wrong_name_only" else eval_name) / run_id
+run.mkdir(parents=True)
 if behavior == "run_alias":
     alias = root / "config-name" / run_id
     alias.parent.mkdir(parents=True)
@@ -137,11 +145,13 @@ if behavior != "missing_summary":
     rate = 0.0 if behavior == "threshold_failure" else 1.0
     (run / "summary.yaml").write_text('judges: {quality: {pass_rate: ' + str(rate) + '}}\n')
 if behavior == "removed_alias":
-    alias = root / "example:foo"
+    alias = root / "config-name"
     alias.symlink_to(run.parent, target_is_directory=True)
     alias.unlink()
 if behavior != "missing_report":
     (run / "report.html").write_text(config)
+if behavior == "copied_run":  # A physical duplicate under the guessed name (release#85928).
+    __import__("shutil").copytree(run, root / "config-name" / run_id)
 if behavior == "stale_result":
     for p in run.iterdir(): p.unlink()
     run.rmdir()
@@ -224,6 +234,8 @@ class EvalConfig:
         value.thresholds = raw.get('thresholds', {})
         value.dataset = SimpleNamespace(path=(raw.get('dataset') or {}).get('path', ''))
         value.resolve_path = lambda path: Path(path)
+        value.eval_name = lambda: ((raw.get('execution') or {}).get('skill') or raw.get('skill')
+                                   or raw.get('name') or Path(path).stem)
         return value
 """)
         return root
@@ -611,26 +623,43 @@ class RunDirectoryTests(Fixture):
             self.assertTrue(archive.getmember("run").isdir())
             self.assertTrue(archive.getmember("run/run_result.json").isfile())
 
-    def test_flat_run_alias_resolves_to_the_same_directory(self):
-        runs = self.repo / "eval/runs"
-        directory = runs / "skill-name" / "current-run"
-        directory.mkdir(parents=True)
-        (runs / "current-run").symlink_to(directory, target_is_directory=True)
-        self.assertEqual(runner.run_directory(runs, "current-run"), directory)
+    def test_physical_copy_under_the_guessed_name_is_ignored(self):
+        self.change_skill()  # release#85928: the orchestrator duplicated the run with cp -r.
+        result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "copied_run"}))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("run=example:foo/", result.stdout)
+        log = (self.eval_artifacts() / "regression.log").read_text()
+        self.assertTrue("/example:foo/" in log and "/config-name/" not in log)
+        self.assertEqual(self.junit().attrib["failures"], "0")
 
-    def test_distinct_run_directories_remain_ambiguous(self):
-        runs = self.repo / "eval/runs"
-        for name in ("first", "second"):
-            (runs / name / "current-run").mkdir(parents=True)
-        with self.assertRaisesRegex(runner.EvalError, "found 2"):
-            runner.run_directory(runs, "current-run")
+    def test_run_written_only_under_the_guessed_name_fails_with_a_hint(self):
+        self.change_skill()
+        result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "wrong_name_only"}))
+        self.assertNotEqual(result.returncode, 0)
+        for text in ("example:foo/", "other directories named", "config-name/", "STRAY"):
+            self.assertIn(text, result.stdout)
+        self.assertEqual(self.junit().attrib["failures"], "1")
+        with tarfile.open(self.eval_artifacts() / "stray-runs.tar") as archive:
+            self.assertTrue(any(n.startswith("config-name/") and n.endswith("/summary.yaml") for n in archive.getnames()))
+        self.assertFalse((self.eval_artifacts() / "eval-run.tar").exists() or (self.eval_artifacts() / "summary.yaml").exists())
+        summary = json.loads((self.artifacts / "evals-summary.json").read_text())["evals"][0]
+        self.assertEqual((summary["status"], "stray-runs.tar" in summary["artifacts"]), ("failed", True))
 
-    def test_run_alias_cannot_escape_runs_directory(self):
+    def test_exact_directory_lookup(self):
         runs = self.repo / "eval/runs"
-        runs.mkdir(parents=True)
-        (runs / "current-run").symlink_to(self.root, target_is_directory=True)
+        physical = runs / "physical" / "current-run"
+        physical.mkdir(parents=True)
+        (runs / "other" / "current-run").mkdir(parents=True)
+        with self.assertRaisesRegex(runner.EvalError, r"skill/current-run not found.*other/current-run"):
+            runner.run_directory(runs, "current-run", "skill")  # Strays are listed, never used.
+        (runs / "skill").mkdir()
+        link = runs / "skill" / "current-run"
+        link.symlink_to(physical, target_is_directory=True)
+        self.assertEqual(runner.run_directory(runs, "current-run", "skill"), physical.resolve())
+        link.unlink()
+        link.symlink_to(self.root, target_is_directory=True)
         with self.assertRaisesRegex(runner.EvalError, "escapes the runs directory"):
-            runner.run_directory(runs, "current-run")
+            runner.run_directory(runs, "current-run", "skill")
 
 
 class ExecutionTests(Fixture):
@@ -847,9 +876,9 @@ class ExecutionTests(Fixture):
         self.change_skill()
         result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "removed_alias"}))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertFalse((self.repo / "eval/runs/example:foo").exists())
+        self.assertFalse((self.repo / "eval/runs/config-name").exists())
         log = (self.eval_artifacts() / "regression.log").read_text()
-        self.assertIn("/skill-name-not-config-name/", log)
+        self.assertIn("/example:foo/", log)
         self.assertIn("REGRESSIONS: 0", log)
         self.assertEqual(self.junit().attrib["failures"], "0")
 

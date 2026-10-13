@@ -261,19 +261,24 @@ def write_junit(artifacts, results):
     temporary.replace(destination)
 
 
-def run_directory(runs, run_id):
-    # The harness owns the eval-name directory (it need not equal the filename).
-    matches = [p for p in runs.glob(f"*/{run_id}") if p.is_dir()]
-    if (runs / run_id).is_dir():  # Also support the older flat harness layout.
-        matches.append(runs / run_id)
-    # A harness invocation can expose the same run through an eval/skill alias.
-    # Count physical directories, and archive their contents rather than a link.
-    directories = {path.resolve() for path in matches}
-    if any(not path.is_relative_to(runs.resolve()) for path in directories):
+def run_directory(runs, run_id, eval_name):
+    """Locate the run exactly where the pinned harness scores and reports it.
+
+    The harness derives that directory from ``EvalConfig.eval_name()``, which
+    the config bridge resolved at preflight. While following the skill
+    instructions, the orchestrator may guess another name and later add links
+    or copies; those never identify the run and are only listed for diagnosis.
+    """
+    runs = runs.resolve()
+    expected = runs / eval_name / run_id
+    if not expected.is_dir():
+        strays = sorted(str(path.relative_to(runs)) for path in runs.glob(f"*/{run_id}") if path.is_dir())
+        hint = f"; other directories named {run_id}: {strays}" if strays else ""
+        raise EvalError(f"harness run directory {eval_name}/{run_id} not found under {runs}{hint}")
+    directory = expected.resolve()
+    if not directory.is_relative_to(runs):
         raise EvalError(f"harness run directory for {run_id} escapes the runs directory")
-    if len(directories) != 1:
-        raise EvalError(f"expected exactly one harness run directory for {run_id}, found {len(directories)}")
-    return directories.pop()
+    return directory
 
 
 def collect_result(directory, artifacts):
@@ -325,6 +330,34 @@ def archive(directory, artifacts):
         temporary.unlink(missing_ok=True)
 
 
+def archive_strays(runs, run_id, eval_name, artifacts):
+    """Preserve runs left under other names for diagnosis; never read them as results.
+
+    Called only when the harness-named run is missing. Physical directories
+    named after the run ID elsewhere inside the runs directory are archived
+    under their parent name. They do not take part in verification.
+    """
+    runs = runs.resolve()
+    canonical = (runs / eval_name / run_id).resolve()
+    strays = {}
+    for path in sorted(runs.glob(f"*/{run_id}")):
+        resolved = path.resolve()
+        if path.is_dir() and resolved != canonical and resolved.is_relative_to(runs):
+            strays.setdefault(resolved, path.parent.name)
+    if not strays:
+        return []
+    destination = artifacts / "stray-runs.tar"
+    temporary = destination.with_suffix(".tmp")
+    try:
+        with tarfile.open(temporary, "w") as output:
+            for resolved, name in strays.items():
+                output.add(resolved, arcname=f"{name}/{run_id}")
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return sorted(strays.values())
+
+
 def summary_data(artifacts, entries, errors):
     """Build the versioned, model-independent summary shared by agents and HTML."""
     counts = {status: sum(entry["status"] == status for entry in entries)
@@ -333,7 +366,8 @@ def summary_data(artifacts, entries, errors):
               "not_run" if counts["not run"] else "passed" if entries else "no_evals")
     evaluations = []
     filenames = ("report-summary.html", "summary.yaml", "run_result.json", "claude-eval.log",
-                 "config-resolution.log", "setup.log", "regression.log", "metrics.log", "eval-run.tar")
+                 "config-resolution.log", "setup.log", "regression.log", "metrics.log", "eval-run.tar",
+                 "stray-runs.tar")
     for entry in entries:
         directory = Path("evals") / entry["name"]
         files = {name: (directory / name).as_posix() for name in filenames
@@ -510,7 +544,7 @@ def preflight_evals(repo, entries, files, artifacts, harness, temporary, env,  #
             cases = select_cases(repo, entry, files, resolved["config_chain"]) or ()
             plans.append(EvalPlan(entry.config, resolved["settings"], resolved["model"],
                                   entry.parallelism, entry.max_turns, entry.setup_script,
-                                  tuple(cases), resolved["config_chain"]))
+                                  tuple(cases), resolved["config_chain"], resolved["eval_name"]))
         except Exception as error:  # pylint: disable=broad-exception-caught
             message = f"{entry.config}: {type(error).__name__}: {error}"
             record.update(status="failed", failure=message)
@@ -575,7 +609,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                     args.extend(["--cases", *plan.cases])
                 prompt = "/eval-run " + shlex.join(args)
                 print(f"RUN {plan.config}: model={plan.model}, parallelism={plan.parallelism}, "
-                      f"orchestrator max_turns={plan.max_turns}", flush=True)
+                      f"orchestrator max_turns={plan.max_turns}, run={plan.eval_name}/{run_id}", flush=True)
                 try:
                     if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached before this eval could start")
@@ -600,7 +634,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                                      min(EVAL_TIMEOUT, remaining(deadline)))
                     if status:
                         raise EvalError(f"Claude orchestrator failed (exit {status}); see {stream_log.name}")
-                    directory = run_directory(runs, run_id)
+                    directory = run_directory(runs, run_id, plan.eval_name)
                     verify_result(directory, plan.settings)
                     # Score the verified physical run through the same harness
                     # checkout that resolved this original overlay config.
@@ -623,9 +657,15 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                         if invoked:
                             directory = None
                             try:
-                                directory = run_directory(runs, run_id)
+                                directory = run_directory(runs, run_id, plan.eval_name)
                             except Exception as error:  # pylint: disable=broad-exception-caught
                                 failures.append(f"locate run: {type(error).__name__}: {error}")
+                                try:  # Keep whatever the orchestrator produced for debugging.
+                                    strays = archive_strays(runs, run_id, plan.eval_name, eval_artifacts)
+                                    if strays:
+                                        print(f"STRAY {plan.config}: archived {strays} to stray-runs.tar", flush=True)
+                                except Exception as stray_error:  # pylint: disable=broad-exception-caught
+                                    failures.append(f"archive stray runs: {type(stray_error).__name__}: {stray_error}")
                             if directory is not None:
                                 for label, action in (("collect results", collect_result), ("archive run", archive)):
                                     try:

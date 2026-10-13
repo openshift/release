@@ -105,7 +105,10 @@ resolution, the Claude plugin, and regression scoring. The runner resolves
 selected configs with the harness's `load_raw()` and `EvalConfig.from_yaml()`
 APIs, so `extends`, inherited values, list merging, and `!replace` follow the
 same rules at preflight and execution. The original overlay path remains the
-eval identity and the `/eval-run --config` argument.
+eval identity and the `/eval-run --config` argument. Preflight also records the
+harness's `EvalConfig.eval_name()` (the skill under test, else `name`, else the
+file stem), because the harness scores, reports, and preflights a run under
+`AGENT_EVAL_RUNS_DIR/<eval_name>/<run_id>`.
 
 The harness resolves relative `extends` references from each file and resolves
 `dataset.path` from the base config at the root of the chain. Every config in
@@ -175,6 +178,7 @@ ARTIFACT_DIR/
     regression.log                  # if scoring ran
     metrics.log                     # if metrics extraction was attempted
     eval-run.tar
+    stray-runs.tar                  # only if the harness-named run was missing
 ```
 
 The static index links available artifacts and reports selected evals as passed,
@@ -229,13 +233,20 @@ logs, and allow subsequent evals to run.
 Ordinary unexpected exceptions also fail the affected eval. Success requires
 completed execution and finalization; an empty error list alone is insufficient.
 Report writers are attempted independently, and reporting errors fail the step.
-The regression check reads `summary.yaml` from the verified physical run
-directory and uses the cloned harness's `detect_regressions()` threshold rules.
-It does not derive a second path from the eval or skill name, or depend on
-temporary directory aliases created by the orchestrator. Missing summaries or
-thresholded judges still fail the eval.
+After the orchestrator exits, the runner reads the run only from
+`AGENT_EVAL_RUNS_DIR/<eval_name>/<run_id>`, the directory the harness's own
+`score.py` and `report.py` use. A link there is followed if it stays inside the
+runs directory. Directories the orchestrator created under another guessed name
+(for example the config `name`), whether links or `cp -r` copies, never identify
+the run; when the expected directory is missing, the failure lists them and
+their contents are archived as `stray-runs.tar` for diagnosis only. The regression check reads `summary.yaml` from that verified physical
+run directory and uses the cloned harness's `detect_regressions()` threshold
+rules. Missing summaries or thresholded judges still fail the eval.
 Python emits AutoDL metrics for orchestrator and harness model usage;
 metrics failures remain warnings and do not replace the eval verdict.
+An unreadable, truncated, or non-mapping `run_result.json` and non-integer
+turn counts are logged as warnings; the orchestrator rows are still written and
+the affected harness counts are treated as unavailable.
 Harness model rows count only turns explicitly attributed to that model. Missing
 or null counts omit the row's `num_turns` field (unavailable); explicit zero counts
 remain `"0"`. The `int64` schema stays unchanged: AutoDL columns are optional,

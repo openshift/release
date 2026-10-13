@@ -90,6 +90,25 @@ class RealHarnessContractTests(unittest.TestCase):
         self.assertEqual(resolved.dataset_path, str((self.repo / "evals/cases").resolve()))
         self.assertEqual(resolved.config_chain, ("evals/plain.yaml",))
 
+    def test_eval_name_follows_the_harness_scorer_priority(self):
+        self.put_yaml("evals/named.yaml", {
+            "name": "explicit-name",
+            "models": {"skill": "m"},
+            "dataset": {"path": "cases"},
+        })
+        self.put_yaml("evals/skilled.yaml", {
+            "name": "explicit-name",
+            "execution": {"skill": "plugin:skill"},
+            "models": {"skill": "m"},
+            "dataset": {"path": "cases"},
+        })
+        # score.py/report.py/preflight.py look under runs/<eval_name>/, where the
+        # skill wins over name; the runner must agree with them, not with name.
+        self.assertEqual(resolve_config(self.harness, self.repo, "evals/named.yaml").eval_name,
+                         "explicit-name")
+        self.assertEqual(resolve_config(self.harness, self.repo, "evals/skilled.yaml").eval_name,
+                         "plugin:skill")
+
     def test_multi_level_overlay_merges_and_resolves_dataset_from_base(self):
         _, overlay = self.profile_chain()
         resolved = resolve_config(self.harness, self.repo, overlay)

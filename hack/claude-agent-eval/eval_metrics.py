@@ -151,12 +151,29 @@ def main(args):  # pylint: disable=too-many-statements
             rows.append(row)
 
 
-    def add_harness_rows():  # pylint: disable=too-many-statements
+    def count(value):
+        """Return a non-negative integer count, or None when it is unavailable."""
+        if value is None or isinstance(value, bool):
+            return None
+        if isinstance(value, float) and value.is_integer():
+            value = int(value)
+        return value if isinstance(value, int) and value >= 0 else None
+
+    def add_harness_rows():  # pylint: disable=too-many-statements,too-many-locals
         result_file = pathlib.Path(result_path) if result_path else None
         if result_file is None or not result_file.is_file():
             return
-        with result_file.open(encoding="utf-8") as stream:
-            result = json.load(stream)
+        # A run killed at the deadline can leave a truncated file. That must
+        # not discard the orchestrator rows collected above.
+        try:
+            with result_file.open(encoding="utf-8") as stream:
+                result = json.load(stream)
+        except (OSError, ValueError) as error:
+            print(f"WARNING: harness result unreadable; writing orchestrator rows only: {error}")
+            return
+        if not isinstance(result, dict):
+            print("WARNING: harness result is not a mapping; writing orchestrator rows only")
+            return
         usages = result.get("per_model_usage", {})
         if not isinstance(usages, dict) or not usages:
             model = result.get("model", "unknown")
@@ -164,20 +181,27 @@ def main(args):  # pylint: disable=too-many-statements
             if not isinstance(usage, dict):
                 usage = {}
             usages = {model: {**usage, "cost_usd": result.get("cost_usd", 0)}}
-        model_turns = result.get("per_model_turns", {})
-        if not isinstance(model_turns, dict):
-            model_turns = {}
+        raw_turns = result.get("per_model_turns", {})
+        if not isinstance(raw_turns, dict):
+            raw_turns = {}
         # Missing/null is unavailable, not a measured zero. Keep known counts
         # even for models without token usage; never assign run totals per model.
-        model_turns = {model: int(value) for model, value in model_turns.items() if value is not None}
+        # Non-integer values (strings, booleans, negatives) are unavailable too.
+        invalid_turns = sorted(model for model, value in raw_turns.items()
+                               if value is not None and count(value) is None)
+        if invalid_turns:
+            print(f"WARNING: ignoring non-integer per-model turn counts for {invalid_turns}")
+        model_turns = {model: count(value) for model, value in raw_turns.items() if count(value) is not None}
         usages = {**{model: {} for model in model_turns}, **usages}
         missing_turns = sorted(set(usages) - model_turns.keys())
         if missing_turns:
             print(f"Per-model turns unavailable for {missing_turns}; "
                   "omit their counts and record any known unattributed total separately")
         total_turns = sum(model_turns.values())
-        run_turns = result.get("num_turns")
-        unattributed_turns = max(0, int(run_turns) - total_turns) if run_turns is not None else None
+        run_turns = count(result.get("num_turns"))
+        if result.get("num_turns") is not None and run_turns is None:
+            print(f"WARNING: ignoring non-integer run turn count {result.get('num_turns')!r}")
+        unattributed_turns = max(0, run_turns - total_turns) if run_turns is not None else None
         total_cost = sum(float(usage.get("cost_usd", 0) or 0) for usage in usages.values())
         duration_s = float(result.get("duration_s", 0) or result.get("wall_clock_s", 0) or 0)
         if not duration_s:
@@ -263,7 +287,14 @@ def main(args):  # pylint: disable=too-many-statements
 
 
     add_orchestrator_rows()
-    add_harness_rows()
+    harness_rows_start = len(rows)
+    try:
+        add_harness_rows()
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        # Harness accounting is best effort and all-or-nothing: a partial set of
+        # model rows would misstate the run. Orchestrator spend is still reported.
+        del rows[harness_rows_start:]
+        print(f"WARNING: harness metrics skipped: {type(error).__name__}: {error}")
     if not rows:
         sys.exit(1)
 

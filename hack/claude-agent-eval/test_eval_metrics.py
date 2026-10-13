@@ -104,6 +104,46 @@ class MetricsTests(unittest.TestCase):
                     self.assertAlmostEqual(sum(int(row["duration_ms"]) for row in rows), 2000, delta=2)
                     self.assertIn("turns unavailable", process.stdout)
 
+    def test_malformed_harness_result_keeps_orchestrator_rows(self):
+        for text in ('{"exit_code": 0, "per_model', "[1, 2]", "null"):
+            with self.subTest(text=text):
+                self.output.unlink(missing_ok=True)
+                self.result.write_text(text)
+                result = self.run_metrics()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("WARNING", result.stdout)
+                rows = json.loads(self.output.read_text())["rows"]
+                self.assertEqual([row["model"] for row in rows], ["outer", "helper"])
+
+    def test_partial_harness_rows_are_discarded_when_accounting_fails(self):
+        original = json.loads(self.result.read_text())
+        original["per_model_usage"]["judge"]["input"] = "not-a-number"
+        self.result.write_text(json.dumps(original))
+        result = self.run_metrics()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("harness metrics skipped: ValueError", result.stdout)
+        rows = json.loads(self.output.read_text())["rows"]
+        self.assertEqual([row["model"] for row in rows], ["outer", "helper"])
+        self.stream.unlink()
+        self.output.unlink()
+        self.assertEqual(self.run_metrics().returncode, 1)
+        self.assertFalse(self.output.exists())
+
+    def test_non_integer_turn_counts_are_unavailable_not_fatal(self):
+        original = json.loads(self.result.read_text())
+        self.result.write_text(json.dumps({**original, "num_turns": "x",
+                                           "per_model_turns": {"skill": "abc", "judge": True}}))
+        result = self.run_metrics()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("non-integer per-model turn counts for ['judge', 'skill']", result.stdout)
+        self.assertIn("non-integer run turn count 'x'", result.stdout)
+        rows = json.loads(self.output.read_text())["rows"]
+        harness = {row["model"]: row for row in rows if row["session_id"].startswith("eval-harness")}
+        self.assertEqual(set(harness), {"skill", "judge"})
+        for row in harness.values():
+            self.assertNotIn("num_turns", row)
+        self.assertEqual([row["model"] for row in rows[:2]], ["outer", "helper"])
+
     def test_unknown_turns_without_run_total_are_not_invented(self):
         self.stream.unlink()
         original = json.loads(self.result.read_text())

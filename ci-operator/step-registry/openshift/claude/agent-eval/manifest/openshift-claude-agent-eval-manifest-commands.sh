@@ -38,11 +38,21 @@ class EvalPlan:  # pylint: disable=too-many-instance-attributes
     setup_script: str = ""
     cases: tuple = ()
     config_chain: tuple = ()
+    eval_name: str = ""
 
     @property
     def artifact_name(self):
         """Return the stable directory name for this config identity."""
         return artifact_name(self.config)
+
+
+def validate_eval_name(value, field):
+    """Require the single path segment the harness uses under the runs directory."""
+    if not isinstance(value, str) or value in ("", ".", ".."):
+        raise EvalError(f"{field} must be a nonempty single path segment: {value!r}")
+    if any(c in "/\\" or ord(c) < 32 for c in value):
+        raise EvalError(f"{field} must be a single path segment without separators: {value!r}")
+    return value
 
 
 def validate_thresholds(thresholds):
@@ -111,14 +121,14 @@ import sys
 from typing import Optional
 
 try:
-    from .eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_thresholds
+    from .eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_eval_name, validate_thresholds
 except ImportError:
-    from eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_thresholds
+    from eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_eval_name, validate_thresholds
 
 
 HARNESS_URL = "https://github.com/opendatahub-io/agent-eval-harness.git"
 HARNESS_REVISION = "e4b0f24bdbaa33bb07e0d723dfd834e90b655b5f"
-RESULT_SCHEMA_VERSION = 1
+RESULT_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -127,6 +137,7 @@ class ResolvedConfig:
 
     config: str
     model: str
+    eval_name: str
     settings: dict
     dataset_path: Optional[str]
     config_chain: tuple
@@ -138,6 +149,7 @@ class ResolvedConfig:
             "schema_version": RESULT_SCHEMA_VERSION,
             "config": self.config,
             "model": self.model,
+            "eval_name": self.eval_name,
             "settings": self.settings,
             "dataset_path": self.dataset_path,
             "config_chain": list(self.config_chain),
@@ -236,6 +248,17 @@ def resolve_config(harness, repo, config):
     if not isinstance(model, str) or not model.strip():
         raise EvalError(f"{identity}: models.skill is required; EVAL_MODEL is ignored")
     thresholds = validate_thresholds(getattr(harness_config, "thresholds", None))
+    # The harness scores, reports, and preflights a run under
+    # AGENT_EVAL_RUNS_DIR/<eval_name>/<run_id>; the runner must look there, not
+    # at a directory derived from the config name or the orchestrator's guess.
+    namer = getattr(harness_config, "eval_name", None)
+    if not callable(namer):
+        raise EvalError(f"{identity}: pinned harness EvalConfig is missing eval_name()")
+    try:
+        eval_name = namer()
+    except Exception as error:
+        raise EvalError(f"{identity}: harness eval_name() failed: {type(error).__name__}: {error}") from error
+    eval_name = validate_eval_name(eval_name, f"{identity}: harness eval_name()")
     config_chain = _normalize_chain(repo, config_path, chain)
 
     dataset = getattr(harness_config, "dataset", None)
@@ -253,8 +276,8 @@ def resolve_config(harness, repo, config):
         except Exception as error:
             raise EvalError(f"{identity}: harness could not resolve dataset.path: {error}") from error
 
-    resolved = ResolvedConfig(identity, model, {"thresholds": thresholds}, dataset_path,
-                              config_chain, harness_config)
+    resolved = ResolvedConfig(identity, model, eval_name, {"thresholds": thresholds},
+                              dataset_path, config_chain, harness_config)
     try:
         encoded = json.dumps(resolved.as_dict(), ensure_ascii=False, allow_nan=False)
         if json.loads(encoded) != resolved.as_dict():
@@ -267,7 +290,7 @@ def resolve_config(harness, repo, config):
 def validate_resolution_result(document, repo, config, eval_cases_dir=""):
     """Validate the child's result file before it enters an eval plan."""
     if not isinstance(document, dict) or set(document) != {
-            "schema_version", "config", "model", "settings", "dataset_path", "config_chain"}:
+            "schema_version", "config", "model", "eval_name", "settings", "dataset_path", "config_chain"}:
         raise EvalError("config resolver returned an incompatible result schema")
     version = document["schema_version"]
     if not isinstance(version, int) or isinstance(version, bool) or version != RESULT_SCHEMA_VERSION:
@@ -277,6 +300,7 @@ def validate_resolution_result(document, repo, config, eval_cases_dir=""):
     model = document["model"]
     if not isinstance(model, str) or not model.strip():
         raise EvalError("config resolver returned an empty or invalid model")
+    eval_name = validate_eval_name(document["eval_name"], "config resolver eval_name")
     settings = document["settings"]
     if not isinstance(settings, dict) or set(settings) != {"thresholds"}:
         raise EvalError("config resolver returned invalid settings")
@@ -305,7 +329,7 @@ def validate_resolution_result(document, repo, config, eval_cases_dir=""):
         if resolved_dataset != cases_path:
             raise EvalError(f"{config}: eval_cases_dir must point to the same directory "
                             "as the harness-resolved dataset.path")
-    return {"model": model, "settings": {"thresholds": thresholds},
+    return {"model": model, "eval_name": eval_name, "settings": {"thresholds": thresholds},
             "dataset_path": dataset_path, "config_chain": tuple(chain)}
 
 
@@ -603,19 +627,24 @@ def write_junit(artifacts, results):
     temporary.replace(destination)
 
 
-def run_directory(runs, run_id):
-    # The harness owns the eval-name directory (it need not equal the filename).
-    matches = [p for p in runs.glob(f"*/{run_id}") if p.is_dir()]
-    if (runs / run_id).is_dir():  # Also support the older flat harness layout.
-        matches.append(runs / run_id)
-    # A harness invocation can expose the same run through an eval/skill alias.
-    # Count physical directories, and archive their contents rather than a link.
-    directories = {path.resolve() for path in matches}
-    if any(not path.is_relative_to(runs.resolve()) for path in directories):
+def run_directory(runs, run_id, eval_name):
+    """Locate the run exactly where the pinned harness scores and reports it.
+
+    The harness derives that directory from ``EvalConfig.eval_name()``, which
+    the config bridge resolved at preflight. While following the skill
+    instructions, the orchestrator may guess another name and later add links
+    or copies; those never identify the run and are only listed for diagnosis.
+    """
+    runs = runs.resolve()
+    expected = runs / eval_name / run_id
+    if not expected.is_dir():
+        strays = sorted(str(path.relative_to(runs)) for path in runs.glob(f"*/{run_id}") if path.is_dir())
+        hint = f"; other directories named {run_id}: {strays}" if strays else ""
+        raise EvalError(f"harness run directory {eval_name}/{run_id} not found under {runs}{hint}")
+    directory = expected.resolve()
+    if not directory.is_relative_to(runs):
         raise EvalError(f"harness run directory for {run_id} escapes the runs directory")
-    if len(directories) != 1:
-        raise EvalError(f"expected exactly one harness run directory for {run_id}, found {len(directories)}")
-    return directories.pop()
+    return directory
 
 
 def collect_result(directory, artifacts):
@@ -667,6 +696,34 @@ def archive(directory, artifacts):
         temporary.unlink(missing_ok=True)
 
 
+def archive_strays(runs, run_id, eval_name, artifacts):
+    """Preserve runs left under other names for diagnosis; never read them as results.
+
+    Called only when the harness-named run is missing. Physical directories
+    named after the run ID elsewhere inside the runs directory are archived
+    under their parent name. They do not take part in verification.
+    """
+    runs = runs.resolve()
+    canonical = (runs / eval_name / run_id).resolve()
+    strays = {}
+    for path in sorted(runs.glob(f"*/{run_id}")):
+        resolved = path.resolve()
+        if path.is_dir() and resolved != canonical and resolved.is_relative_to(runs):
+            strays.setdefault(resolved, path.parent.name)
+    if not strays:
+        return []
+    destination = artifacts / "stray-runs.tar"
+    temporary = destination.with_suffix(".tmp")
+    try:
+        with tarfile.open(temporary, "w") as output:
+            for resolved, name in strays.items():
+                output.add(resolved, arcname=f"{name}/{run_id}")
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return sorted(strays.values())
+
+
 def summary_data(artifacts, entries, errors):
     """Build the versioned, model-independent summary shared by agents and HTML."""
     counts = {status: sum(entry["status"] == status for entry in entries)
@@ -675,7 +732,8 @@ def summary_data(artifacts, entries, errors):
               "not_run" if counts["not run"] else "passed" if entries else "no_evals")
     evaluations = []
     filenames = ("report-summary.html", "summary.yaml", "run_result.json", "claude-eval.log",
-                 "config-resolution.log", "setup.log", "regression.log", "metrics.log", "eval-run.tar")
+                 "config-resolution.log", "setup.log", "regression.log", "metrics.log", "eval-run.tar",
+                 "stray-runs.tar")
     for entry in entries:
         directory = Path("evals") / entry["name"]
         files = {name: (directory / name).as_posix() for name in filenames
@@ -852,7 +910,7 @@ def preflight_evals(repo, entries, files, artifacts, harness, temporary, env,  #
             cases = select_cases(repo, entry, files, resolved["config_chain"]) or ()
             plans.append(EvalPlan(entry.config, resolved["settings"], resolved["model"],
                                   entry.parallelism, entry.max_turns, entry.setup_script,
-                                  tuple(cases), resolved["config_chain"]))
+                                  tuple(cases), resolved["config_chain"], resolved["eval_name"]))
         except Exception as error:  # pylint: disable=broad-exception-caught
             message = f"{entry.config}: {type(error).__name__}: {error}"
             record.update(status="failed", failure=message)
@@ -917,7 +975,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                     args.extend(["--cases", *plan.cases])
                 prompt = "/eval-run " + shlex.join(args)
                 print(f"RUN {plan.config}: model={plan.model}, parallelism={plan.parallelism}, "
-                      f"orchestrator max_turns={plan.max_turns}", flush=True)
+                      f"orchestrator max_turns={plan.max_turns}, run={plan.eval_name}/{run_id}", flush=True)
                 try:
                     if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached before this eval could start")
@@ -942,7 +1000,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                                      min(EVAL_TIMEOUT, remaining(deadline)))
                     if status:
                         raise EvalError(f"Claude orchestrator failed (exit {status}); see {stream_log.name}")
-                    directory = run_directory(runs, run_id)
+                    directory = run_directory(runs, run_id, plan.eval_name)
                     verify_result(directory, plan.settings)
                     # Score the verified physical run through the same harness
                     # checkout that resolved this original overlay config.
@@ -965,9 +1023,15 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                         if invoked:
                             directory = None
                             try:
-                                directory = run_directory(runs, run_id)
+                                directory = run_directory(runs, run_id, plan.eval_name)
                             except Exception as error:  # pylint: disable=broad-exception-caught
                                 failures.append(f"locate run: {type(error).__name__}: {error}")
+                                try:  # Keep whatever the orchestrator produced for debugging.
+                                    strays = archive_strays(runs, run_id, plan.eval_name, eval_artifacts)
+                                    if strays:
+                                        print(f"STRAY {plan.config}: archived {strays} to stray-runs.tar", flush=True)
+                                except Exception as stray_error:  # pylint: disable=broad-exception-caught
+                                    failures.append(f"archive stray runs: {type(stray_error).__name__}: {stray_error}")
                             if directory is not None:
                                 for label, action in (("collect results", collect_result), ("archive run", archive)):
                                     try:
@@ -1196,12 +1260,29 @@ def main(args):  # pylint: disable=too-many-statements
             rows.append(row)
 
 
-    def add_harness_rows():  # pylint: disable=too-many-statements
+    def count(value):
+        """Return a non-negative integer count, or None when it is unavailable."""
+        if value is None or isinstance(value, bool):
+            return None
+        if isinstance(value, float) and value.is_integer():
+            value = int(value)
+        return value if isinstance(value, int) and value >= 0 else None
+
+    def add_harness_rows():  # pylint: disable=too-many-statements,too-many-locals
         result_file = pathlib.Path(result_path) if result_path else None
         if result_file is None or not result_file.is_file():
             return
-        with result_file.open(encoding="utf-8") as stream:
-            result = json.load(stream)
+        # A run killed at the deadline can leave a truncated file. That must
+        # not discard the orchestrator rows collected above.
+        try:
+            with result_file.open(encoding="utf-8") as stream:
+                result = json.load(stream)
+        except (OSError, ValueError) as error:
+            print(f"WARNING: harness result unreadable; writing orchestrator rows only: {error}")
+            return
+        if not isinstance(result, dict):
+            print("WARNING: harness result is not a mapping; writing orchestrator rows only")
+            return
         usages = result.get("per_model_usage", {})
         if not isinstance(usages, dict) or not usages:
             model = result.get("model", "unknown")
@@ -1209,20 +1290,27 @@ def main(args):  # pylint: disable=too-many-statements
             if not isinstance(usage, dict):
                 usage = {}
             usages = {model: {**usage, "cost_usd": result.get("cost_usd", 0)}}
-        model_turns = result.get("per_model_turns", {})
-        if not isinstance(model_turns, dict):
-            model_turns = {}
+        raw_turns = result.get("per_model_turns", {})
+        if not isinstance(raw_turns, dict):
+            raw_turns = {}
         # Missing/null is unavailable, not a measured zero. Keep known counts
         # even for models without token usage; never assign run totals per model.
-        model_turns = {model: int(value) for model, value in model_turns.items() if value is not None}
+        # Non-integer values (strings, booleans, negatives) are unavailable too.
+        invalid_turns = sorted(model for model, value in raw_turns.items()
+                               if value is not None and count(value) is None)
+        if invalid_turns:
+            print(f"WARNING: ignoring non-integer per-model turn counts for {invalid_turns}")
+        model_turns = {model: count(value) for model, value in raw_turns.items() if count(value) is not None}
         usages = {**{model: {} for model in model_turns}, **usages}
         missing_turns = sorted(set(usages) - model_turns.keys())
         if missing_turns:
             print(f"Per-model turns unavailable for {missing_turns}; "
                   "omit their counts and record any known unattributed total separately")
         total_turns = sum(model_turns.values())
-        run_turns = result.get("num_turns")
-        unattributed_turns = max(0, int(run_turns) - total_turns) if run_turns is not None else None
+        run_turns = count(result.get("num_turns"))
+        if result.get("num_turns") is not None and run_turns is None:
+            print(f"WARNING: ignoring non-integer run turn count {result.get('num_turns')!r}")
+        unattributed_turns = max(0, run_turns - total_turns) if run_turns is not None else None
         total_cost = sum(float(usage.get("cost_usd", 0) or 0) for usage in usages.values())
         duration_s = float(result.get("duration_s", 0) or result.get("wall_clock_s", 0) or 0)
         if not duration_s:
@@ -1308,7 +1396,14 @@ def main(args):  # pylint: disable=too-many-statements
 
 
     add_orchestrator_rows()
-    add_harness_rows()
+    harness_rows_start = len(rows)
+    try:
+        add_harness_rows()
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        # Harness accounting is best effort and all-or-nothing: a partial set of
+        # model rows would misstate the run. Orchestrator spend is still reported.
+        del rows[harness_rows_start:]
+        print(f"WARNING: harness metrics skipped: {type(error).__name__}: {error}")
     if not rows:
         sys.exit(1)
 

@@ -31,11 +31,21 @@ class EvalPlan:  # pylint: disable=too-many-instance-attributes
     setup_script: str = ""
     cases: tuple = ()
     config_chain: tuple = ()
+    eval_name: str = ""
 
     @property
     def artifact_name(self):
         """Return the stable directory name for this config identity."""
         return artifact_name(self.config)
+
+
+def validate_eval_name(value, field):
+    """Require the single path segment the harness uses under the runs directory."""
+    if not isinstance(value, str) or value in ("", ".", ".."):
+        raise EvalError(f"{field} must be a nonempty single path segment: {value!r}")
+    if any(c in "/\\" or ord(c) < 32 for c in value):
+        raise EvalError(f"{field} must be a single path segment without separators: {value!r}")
+    return value
 
 
 def validate_thresholds(thresholds):

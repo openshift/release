@@ -10,14 +10,14 @@ import sys
 from typing import Optional
 
 try:
-    from .eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_thresholds
+    from .eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_eval_name, validate_thresholds
 except ImportError:
-    from eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_thresholds
+    from eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_eval_name, validate_thresholds
 
 
 HARNESS_URL = "https://github.com/opendatahub-io/agent-eval-harness.git"
 HARNESS_REVISION = "e4b0f24bdbaa33bb07e0d723dfd834e90b655b5f"
-RESULT_SCHEMA_VERSION = 1
+RESULT_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,7 @@ class ResolvedConfig:
 
     config: str
     model: str
+    eval_name: str
     settings: dict
     dataset_path: Optional[str]
     config_chain: tuple
@@ -37,6 +38,7 @@ class ResolvedConfig:
             "schema_version": RESULT_SCHEMA_VERSION,
             "config": self.config,
             "model": self.model,
+            "eval_name": self.eval_name,
             "settings": self.settings,
             "dataset_path": self.dataset_path,
             "config_chain": list(self.config_chain),
@@ -135,6 +137,17 @@ def resolve_config(harness, repo, config):
     if not isinstance(model, str) or not model.strip():
         raise EvalError(f"{identity}: models.skill is required; EVAL_MODEL is ignored")
     thresholds = validate_thresholds(getattr(harness_config, "thresholds", None))
+    # The harness scores, reports, and preflights a run under
+    # AGENT_EVAL_RUNS_DIR/<eval_name>/<run_id>; the runner must look there, not
+    # at a directory derived from the config name or the orchestrator's guess.
+    namer = getattr(harness_config, "eval_name", None)
+    if not callable(namer):
+        raise EvalError(f"{identity}: pinned harness EvalConfig is missing eval_name()")
+    try:
+        eval_name = namer()
+    except Exception as error:
+        raise EvalError(f"{identity}: harness eval_name() failed: {type(error).__name__}: {error}") from error
+    eval_name = validate_eval_name(eval_name, f"{identity}: harness eval_name()")
     config_chain = _normalize_chain(repo, config_path, chain)
 
     dataset = getattr(harness_config, "dataset", None)
@@ -152,8 +165,8 @@ def resolve_config(harness, repo, config):
         except Exception as error:
             raise EvalError(f"{identity}: harness could not resolve dataset.path: {error}") from error
 
-    resolved = ResolvedConfig(identity, model, {"thresholds": thresholds}, dataset_path,
-                              config_chain, harness_config)
+    resolved = ResolvedConfig(identity, model, eval_name, {"thresholds": thresholds},
+                              dataset_path, config_chain, harness_config)
     try:
         encoded = json.dumps(resolved.as_dict(), ensure_ascii=False, allow_nan=False)
         if json.loads(encoded) != resolved.as_dict():
@@ -166,7 +179,7 @@ def resolve_config(harness, repo, config):
 def validate_resolution_result(document, repo, config, eval_cases_dir=""):
     """Validate the child's result file before it enters an eval plan."""
     if not isinstance(document, dict) or set(document) != {
-            "schema_version", "config", "model", "settings", "dataset_path", "config_chain"}:
+            "schema_version", "config", "model", "eval_name", "settings", "dataset_path", "config_chain"}:
         raise EvalError("config resolver returned an incompatible result schema")
     version = document["schema_version"]
     if not isinstance(version, int) or isinstance(version, bool) or version != RESULT_SCHEMA_VERSION:
@@ -176,6 +189,7 @@ def validate_resolution_result(document, repo, config, eval_cases_dir=""):
     model = document["model"]
     if not isinstance(model, str) or not model.strip():
         raise EvalError("config resolver returned an empty or invalid model")
+    eval_name = validate_eval_name(document["eval_name"], "config resolver eval_name")
     settings = document["settings"]
     if not isinstance(settings, dict) or set(settings) != {"thresholds"}:
         raise EvalError("config resolver returned invalid settings")
@@ -204,7 +218,7 @@ def validate_resolution_result(document, repo, config, eval_cases_dir=""):
         if resolved_dataset != cases_path:
             raise EvalError(f"{config}: eval_cases_dir must point to the same directory "
                             "as the harness-resolved dataset.path")
-    return {"model": model, "settings": {"thresholds": thresholds},
+    return {"model": model, "eval_name": eval_name, "settings": {"thresholds": thresholds},
             "dataset_path": dataset_path, "config_chain": tuple(chain)}
 
 
