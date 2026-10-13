@@ -307,6 +307,7 @@ tests:
     test:
     - ref: rosa-e2e-ocm-fvt
   timeout: 5h0m0s
+# Manual-only (cron never fires). Pass upgrade params via run-prow-job.sh --fvt-env.
 - as: ocm-fvt-periodic-cs-rosa-hcp-nx-y-upgrade-staging-main
   capabilities:
   - nested-podman
@@ -316,11 +317,6 @@ tests:
     allow_best_effort_post_steps: true
     env:
       OCM_FVT_DEFER_CLEAN: "true"
-      OCM_FVT_EXTRA_ENVS: |-
-        CLUSTER_PROFILE=rosa-hcp-y-upg
-        UPGRADE_DISTANCE=4
-        UPGRADE_TARGET_CHANNEL=candidate
-        UPGRADE_TARGET_VERSION=4.22.6
       OCM_FVT_JOB_NAME: cs-rosa-hcp-nx-y-upgrade-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
@@ -331,20 +327,16 @@ tests:
     test:
     - ref: rosa-e2e-ocm-fvt-longrunning
   timeout: 12h0m0s
+# Manual-only (cron never fires). Pass AWS creds + upgrade params via --fvt-env.
 - as: ocm-fvt-periodic-cs-rosa-hcp-nx-y-upg-ocp5-lt-rc-staging-main
   capabilities:
   - nested-podman
-  cron: 40 10 * * *
+  cron: 0 0 31 2 *
   nested_podman: true
   steps:
     allow_best_effort_post_steps: true
     env:
       OCM_FVT_DEFER_CLEAN: "true"
-      OCM_FVT_EXTRA_ENVS: |-
-        AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
-        UPGRADE_DISTANCE=4
-        UPGRADE_TARGET_CHANNEL=candidate
-        UPGRADE_TARGET_VERSION=5.0.0-rc.5
       OCM_FVT_JOB_NAME: cs-rosa-hcp-nx-y-upgrade-ocp5-latest-rc-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
@@ -353,8 +345,8 @@ tests:
     pre:
     - ref: rosa-e2e-record-start-time
     test:
-    - ref: rosa-e2e-ocm-fvt
-  timeout: 5h0m0s
+    - ref: rosa-e2e-ocm-fvt-longrunning
+  timeout: 12h0m0s
 - as: ocm-fvt-periodic-cs-rosa-hcp-arm-staging-main
   capabilities:
   - nested-podman
