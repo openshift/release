@@ -40,12 +40,24 @@ echo ${MACHINES_NET_ID}>${SHARED_DIR}/MACHINES_NET_ID
 subnet_params=" --network ${MACHINES_NET_ID} --subnet-range ${SUBNET_RANGE} \
   --allocation-pool start=${ALLOCATION_POOL_START},end=${ALLOCATION_POOL_END}"
 
+if [[ "$CONFIG_TYPE" == *"externallb"* ]]; then
+  subnet_params+=" --dns-nameserver ${DNS_IP}"
+fi
+
 MACHINES_SUBNET_ID="$(openstack subnet create "${CLUSTER_NAME}-${CONFIG_TYPE}-machines-subnet" $subnet_params \
   --description "Machines subnet for ${CLUSTER_NAME}-${CONFIG_TYPE}" \
   --format value --column id)"
 echo "Created subnet for OpenShift machines: ${MACHINES_SUBNET_ID}"
 echo ${MACHINES_SUBNET_ID}>${SHARED_DIR}/MACHINES_SUBNET_ID
 echo ${SUBNET_RANGE}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
+
+# If it's a proxy job, the machine subnet is isolated and all trafic
+# goes through the bastion proxy, so a router interface is not needed.
+# Otherwise, let's attach the machines subnet to the router.
+if [[ "$CONFIG_TYPE" != *"proxy"* ]]; then
+  openstack router add subnet ${BASTION_ROUTER_ID} ${MACHINES_SUBNET_ID} >/dev/null
+  echo "Added machines subnet ${MACHINES_SUBNET_ID} to router: ${BASTION_ROUTER_ID}"
+fi
 
 # This block only works if the subnet range is a /24
 if [[ ${SUBNET_RANGE} != *"/24" ]]; then
