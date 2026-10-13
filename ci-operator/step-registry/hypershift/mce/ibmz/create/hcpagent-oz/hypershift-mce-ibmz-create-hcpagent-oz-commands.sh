@@ -269,7 +269,6 @@ hcp create cluster agent \
   --control-plane-availability-policy SingleReplica \
   --infra-availability-policy SingleReplica \
   --namespace=${HC_NS} \
-  --arch=s390x \
   --release-image=${OCP_IMAGE_MULTI} \
   --render-sensitive --render > "${HC_MANIFEST}"
 
