@@ -4,6 +4,8 @@
 set +x
 set -euo pipefail
 unset BASH_ENV
+# Bare test assertions exit silently under set -e; say which one failed.
+trap 'echo "PIXAA rehearsal bootstrap failed at ${BASH_SOURCE[0]}:${LINENO}" >&2' ERR
 
 test "${REPO_OWNER}/${REPO_NAME}" = openshift/release
 test "${EVAL_WORKDIR}" = /workspace
