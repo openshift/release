@@ -270,4 +270,7 @@ if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 	oc apply -f /tmp/acm-policy-subscription-backup.yaml
 fi
 
+_JUNIT_KIND="pass"
+_JUNIT_MESSAGE="ocs-tests passed"
+_EXIT_CLASS="success"
 true

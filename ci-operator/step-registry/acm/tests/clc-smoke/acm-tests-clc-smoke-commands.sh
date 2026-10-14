@@ -131,4 +131,9 @@ cp -r reports "${ARTIFACT_DIR}/" || reportStatus=$?
 if (( clcStatus != 0 )); then
     exit "${clcStatus}"
 fi
+if (( reportStatus == 0 )); then
+    _JUNIT_KIND="pass"
+    _JUNIT_MESSAGE="acm-clc-smoke tests passed"
+    _EXIT_CLASS="success"
+fi
 exit "${reportStatus}"

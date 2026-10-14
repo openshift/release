@@ -156,4 +156,9 @@ if [[ -d build/reports/tests/testSMOKE ]]; then
 fi
 
 echo "[smoke] Test run finished with exit code: ${testExit}"
+if (( testExit == 0 )); then
+    _JUNIT_KIND="pass"
+    _JUNIT_MESSAGE="stackrox-smoke tests passed"
+    _EXIT_CLASS="success"
+fi
 exit "${testExit}"
