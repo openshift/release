@@ -83,7 +83,13 @@ echo -n "${NAMESPACE}" > "${SHARED_DIR}/ephemeral-namespace"
 cp "${EPH_KUBECONFIG}" "${SHARED_DIR}/ephemeral-kubeconfig"
 echo -n "${OC_LOGIN_SERVER}" > "${SHARED_DIR}/ephemeral-cluster-server"
 
+# Output credentials for ClusterBot to surface after namespace reservation
+cp "${EPH_KUBECONFIG}" "${SHARED_DIR}/kubeconfig"
+CONSOLE_URL="https://console-openshift-console.apps.crc-eph.r9lp.p1.openshiftapps.com/k8s/cluster/projects/${NAMESPACE}"
+echo -n "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"
+
 echo "Namespace reservation complete. Outputs written to SHARED_DIR."
 echo "  ephemeral-namespace:      ${NAMESPACE}"
 echo "  ephemeral-kubeconfig:     ${SHARED_DIR}/ephemeral-kubeconfig"
 echo "  ephemeral-cluster-server: ${OC_LOGIN_SERVER}"
+echo "  console.url:              ${CONSOLE_URL}"
