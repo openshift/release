@@ -150,7 +150,7 @@ _finalize_exit() {
   if [[ -n "${_JUNIT_KIND}" ]]; then
     _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
   fi
-  _opp_cleanup
+  (exit "${rc}"); _opp_cleanup
   GenerateJunit
   _propagate_junit
   exit "${rc}"

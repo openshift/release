@@ -410,9 +410,9 @@ if ((getRc != 0)); then
         testFailureMsg["${test}"]="oc get quayintegration failed (rc=${getRc}) - cluster API error"
     done
 
-    _JUNIT_KIND=pass
+    _JUNIT_KIND=quay-api-error
     _JUNIT_MESSAGE="QuayIntegration API error (tests marked failed in JUnit)"
-    _EXIT_CLASS=success
+    _EXIT_CLASS=infra
     exit 0
 elif [[ -z "${getOutput}" ]]; then
     : "ERROR: QuayIntegration CRD exists but CR 'quay' not found!"
@@ -424,9 +424,9 @@ elif [[ -z "${getOutput}" ]]; then
         testFailureMsg["${test}"]="QuayIntegration CR 'quay' not found - OPP bundle not configured"
     done
 
-    _JUNIT_KIND=pass
+    _JUNIT_KIND=quayintegration-cr-missing
     _JUNIT_MESSAGE="QuayIntegration CR not found (tests marked failed in JUnit)"
-    _EXIT_CLASS=success
+    _EXIT_CLASS=infra
     exit 0
 fi
 
