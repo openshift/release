@@ -212,6 +212,46 @@ localnet_multi_clear_lsp_dhcpv6() {
     ovn-nbctl clear Logical_Switch_Port "${lsp_name}" dhcpv6_options 2>/dev/null || true
 }
 
+# localnet_multi_block_ipv6_ingress adds an OVN ACL that drops all IPv6 traffic
+# destined to a VM's localnet LSP.  Clearing OVN DHCPv6 options and stripping IPv6
+# from the LSP addresses (restrict_localnet_lsp_to_ipv4) prevents OVN itself from
+# issuing IPv6 leases, but on a dual-stack management cluster the physical network's
+# DHCPv6 server (dnsmasq/radvd on the baremetal host) still reaches the VM through
+# the localnet bridge because localnet is L2-transparent.  Without an ACL the VM
+# acquires an IPv6 address, DNS resolves the ignition server to the IPv6 ingress VIP,
+# and every connection attempt times out — the VM never fetches ignition and never
+# becomes a node.
+localnet_multi_block_ipv6_ingress() {
+  local ovn_pod="$1"
+  local lsp_name="$2"
+
+  if ! localnet_multi_should_disable_ipv6_boot; then
+    return 0
+  fi
+
+  local lsp_uuid ls_name
+
+  lsp_uuid=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl --no-leader-only get Logical_Switch_Port "${lsp_name}" _uuid 2>/dev/null \
+    | tr -d '"' | tr -d "'") || return 0
+  if [[ -z "${lsp_uuid}" ]]; then
+    return 0
+  fi
+
+  ls_name=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl --no-leader-only --bare --columns=name find Logical_Switch \
+    "ports{>=${lsp_uuid}}" 2>/dev/null | head -1) || return 0
+  if [[ -z "${ls_name}" ]]; then
+    echo "  Warning: could not find logical switch for ${lsp_name}, skipping IPv6 ACL"
+    return 0
+  fi
+
+  oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl --no-leader-only acl-add "${ls_name}" to-lport 1000 \
+    "outport == \"${lsp_name}\" && ip6" drop 2>/dev/null || true
+  echo "  Blocked IPv6 ingress on ${ls_name} for ${lsp_name}"
+}
+
 # restrict_localnet_lsp_to_ipv4 removes IPv6 addresses from a localnet LSP so initrd
 # Ignition uses IPv4 DNS/route to the ingress VIP instead of timing out on IPv6 ::4.
 restrict_localnet_lsp_to_ipv4() {
@@ -454,10 +494,12 @@ configure_localnet_multi_dhcp_on_nodes() {
         [[ -z "${lsp_name}" ]] && continue
         if lsp_has_dhcp_configured "${ovn_pod}" "${lsp_name}"; then
           restrict_localnet_lsp_to_ipv4 "${ovn_pod}" "${lsp_name}"
+          localnet_multi_block_ipv6_ingress "${ovn_pod}" "${lsp_name}"
           continue
         fi
         if configure_localnet_multi_dhcp_on_lsp "${ovn_pod}" "${lsp_name}" "${subnet}" "${i}"; then
           restrict_localnet_lsp_to_ipv4 "${ovn_pod}" "${lsp_name}"
+          localnet_multi_block_ipv6_ingress "${ovn_pod}" "${lsp_name}"
           echo "  Configured DHCP for ${nad_name} (LSP=${lsp_name}, node=${node})"
         else
           echo "  WARNING: Failed to configure DHCP for ${nad_name} (LSP=${lsp_name}, node=${node})"
