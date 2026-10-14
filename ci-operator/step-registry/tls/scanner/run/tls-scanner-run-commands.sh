@@ -63,6 +63,19 @@ run_tls_scan() {
       SCANNER_ARGS="--all-pods"
   fi
 
+  if [[ -n "${COMPONENT_FILTER:-}" ]]; then
+      local component_name='[a-zA-Z0-9]([a-zA-Z0-9_.-]*[a-zA-Z0-9])?'
+      local component_list="^[[:blank:]]*${component_name}[[:blank:]]*(,[[:blank:]]*${component_name}[[:blank:]]*)*$"
+      if [[ ! "${COMPONENT_FILTER}" =~ ${component_list} ]]; then
+          echo "Invalid COMPONENT_FILTER: expected comma-separated component names" >&2
+          exit 1
+      fi
+      local component_filter_arg
+      printf -v component_filter_arg '%q' "--component-filter=${COMPONENT_FILTER}"
+      SCANNER_ARGS="${SCANNER_ARGS} ${component_filter_arg}"
+      echo "Component filter: ${COMPONENT_FILTER}"
+  fi
+
   # Enable post-quantum cryptography checks when requested by the step ref.
   if [[ "${PQC_CHECK:-false}" == "true" ]]; then
       SCANNER_ARGS="${SCANNER_ARGS} --pqc-check"
