@@ -16,13 +16,24 @@ export CYPRESS_QUAY_HOSTNAME=${QUAY_ROUTE#*://}
 export CYPRESS_QUAY_VERSION=${QUAY_VERSION}
 echo "Quay version under test: ${CYPRESS_QUAY_VERSION}"
 
+# Run as a per-run superuser: QUAY_API_SUPERUSER must be in SUPER_USERS.
 # Disable tracing due to password handling
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
-CYPRESS_QUAY_USER=$(cat /var/run/quay-qe-quay-secret/username)
-CYPRESS_QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-export CYPRESS_QUAY_USER CYPRESS_QUAY_PASSWORD
+export CYPRESS_QUAY_USER=${QUAY_API_SUPERUSER}
+CYPRESS_QUAY_PASSWORD=$(set +o pipefail; LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 24)
+export CYPRESS_QUAY_PASSWORD
+body=$(jq -n --arg u "${CYPRESS_QUAY_USER}" --arg p "${CYPRESS_QUAY_PASSWORD}" \
+  '{username: $u, password: $p, email: ($u + "@example.com")}')
+code=$(curl -sk -o /tmp/create-user.json -w '%{http_code}' -X POST "${QUAY_ROUTE}/api/v1/user/" \
+  -H 'Content-Type: application/json' --data "${body}" || true)
+unset body
 $WAS_TRACING && set -x
+if [[ "${code}" != "200" ]]; then
+  echo "ERROR: creating Quay user ${CYPRESS_QUAY_USER} returned HTTP ${code}: $(cat /tmp/create-user.json 2>/dev/null)" >&2
+  exit 1
+fi
+echo "Created Quay user ${CYPRESS_QUAY_USER}"
 
 cd quay-api-tests
 npm install --no-audit --no-fund
