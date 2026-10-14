@@ -36,6 +36,14 @@ CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE:-}
 if [[ -z "${CATALOG_SOURCE_IMAGE}" && -f "${SHARED_DIR}/catalog-source-image" ]]; then
   CATALOG_SOURCE_IMAGE=$(cat "${SHARED_DIR}/catalog-source-image")
 fi
+# Disconnected runs install from the CatalogSource created from the mirror by
+# sandboxed-containers-operator-post-install-isolation-common-mirror-operator,
+# which already mirrored the Pre-GA catalog when one was requested.
+MIRROR_CATALOG_SOURCE=""
+if [[ -f "${SHARED_DIR}/disconnected_catalog_source_name" ]]; then
+  MIRROR_CATALOG_SOURCE=$(<"${SHARED_DIR}/disconnected_catalog_source_name")
+  CATALOG_SOURCE_IMAGE=""
+fi
 OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
 PEERPODS_CREDENTIALS_MODE="${PEERPODS_CREDENTIALS_MODE:-cco}"
@@ -482,6 +490,11 @@ function install_osc_operator() {
     return 1
   fi
 
+  if [[ -n "${MIRROR_CATALOG_SOURCE}" ]]; then
+    echo ">>> Disconnected: subscribing from CatalogSource ${MIRROR_CATALOG_SOURCE}"
+    sed -i "s/^\(\s*source:\s*\)redhat-operators\s*$/\1${MIRROR_CATALOG_SOURCE}/" "${operator_yaml}"
+  fi
+
   echo ">>> Rendered operator objects:"
   oc apply -f "${operator_yaml}" --dry-run=client -o name || true
 
@@ -491,7 +504,7 @@ function install_osc_operator() {
   # (helm chart bug).  When using the GA redhat-operators catalog the dev catalog has no valid
   # image and will never become READY, blocking Stage 0 of wait_for_operator().  Delete it so
   # the wait only covers catalogs that are actually needed.
-  if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
+  if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" || -n "${MIRROR_CATALOG_SOURCE}" ]]; then
     echo ">>> redhat-operators catalog in use; deleting spurious ${OSC_DEV_CATALOG_NAME} CatalogSource (helm chart bug)"
     oc delete catalogsource "${OSC_DEV_CATALOG_NAME}" -n openshift-marketplace --ignore-not-found=true || true
   fi
