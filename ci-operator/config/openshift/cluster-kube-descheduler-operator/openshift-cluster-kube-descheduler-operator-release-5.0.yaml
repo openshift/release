@@ -88,6 +88,54 @@ tests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-operator-serial-stage-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+      INDEX_IMAGE: ""
+      INSTALL_NAMESPACE: openshift-kube-descheduler-operator
+      INSTALL_OPERATOR: "true"
+      OPERAND_CRD: kubedeschedulers.operator.openshift.io
+      OPERAND_MANIFEST: |
+        apiVersion: operator.openshift.io/v1
+        kind: KubeDescheduler
+        metadata:
+          name: cluster
+          namespace: openshift-kube-descheduler-operator
+        spec:
+          managementState: Managed
+          deschedulingIntervalSeconds: 30
+          mode: Predictive
+          evictionLimits:
+            total: 4
+          profiles:
+          - LifecycleAndUtilization
+          profileCustomizations:
+            podLifetime: 10s
+      OPERAND_WORKLOAD: deployment/descheduler
+      OPERATOR_GROUP_NAME: descheduler-og
+      OPERATOR_WORKLOAD: deployment/descheduler-operator
+      PACKAGE_NAME: cluster-kube-descheduler-operator
+    test:
+    - ref: fips-check
+    - ref: optional-operators-enable-index-catalog
+    - as: descheduler-serial-tests
+      cli: latest
+      commands: |
+        set -euo pipefail
+        cd /tmp
+        gzip -dc /usr/bin/cluster-kube-descheduler-operator-tests-ext.gz > cluster-kube-descheduler-operator-tests-ext
+        chmod +x cluster-kube-descheduler-operator-tests-ext
+        ./cluster-kube-descheduler-operator-tests-ext run-suite openshift/cluster-kube-descheduler-operator/operator/serial --max-concurrency=1 -j "${ARTIFACT_DIR}/junit_descheduler_serial.xml"
+      from: cluster-kube-descheduler-operator
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-5.0
   org: openshift
