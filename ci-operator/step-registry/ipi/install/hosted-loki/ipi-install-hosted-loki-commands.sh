@@ -12,6 +12,10 @@ fi
 
 PROXYCFGLINE=
 PROXYLINE=
+PROXY_CA_MANIFEST=
+PROMTAIL_CA_VOLUME_MOUNT=
+TOKEN_REFRESHER_CA_VOLUME_MOUNT=
+PROXY_CA_VOLUME=
 if [[ "$JOB_NAME" =~ .*ipv6.* ]]
 then
   echo "IPv6 clusters are disconnected and won't be able to reach Loki."
@@ -28,6 +32,29 @@ if test -f "${SHARED_DIR}/install-config.yaml"; then
             value: ${CLUSTER_PROXY_URL}
           - name: HTTP_PROXY
             value: ${CLUSTER_PROXY_URL}"
+
+    if grep -q '^additionalTrustBundle:' "${SHARED_DIR}/install-config.yaml"; then
+      echo "Additional trust bundle detected: configuring Loki containers to trust proxy CA"
+      PROXYCFGLINE="${PROXYCFGLINE}
+        tls_config:
+          ca_file: /etc/proxy-ca/ca-bundle.crt"
+      PROXYLINE="${PROXYLINE}
+          - name: SSL_CERT_FILE
+            value: /etc/proxy-ca/ca-bundle.crt"
+      PROMTAIL_CA_VOLUME_MOUNT="        - mountPath: /etc/proxy-ca
+          name: proxy-trusted-ca
+          readOnly: true"
+      TOKEN_REFRESHER_CA_VOLUME_MOUNT="        - mountPath: /etc/proxy-ca
+          name: proxy-trusted-ca
+          readOnly: true"
+      PROXY_CA_VOLUME="      - name: proxy-trusted-ca
+        configMap:
+          name: proxy-trusted-ca
+          items:
+          - key: ca-bundle.crt
+            path: ca-bundle.crt"
+      PROXY_CA_MANIFEST="true"
+    fi
   fi
 fi
 
@@ -52,6 +79,19 @@ metadata:
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/warn: privileged
 EOF
+if [[ -n "${PROXY_CA_MANIFEST}" ]]; then
+cat >> "${SHARED_DIR}/manifest_02_proxy_ca_cm.yml" << EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: proxy-trusted-ca
+  namespace: openshift-e2e-loki
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
+data:
+  ca-bundle.crt: ""
+EOF
+fi
 cat >> "${SHARED_DIR}/manifest_clusterrole.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -448,6 +488,7 @@ spec:
           readOnly: true
         - mountPath: "/tmp/shared"
           name: shared-data
+$PROMTAIL_CA_VOLUME_MOUNT
       - args:
         - --https-address=:9001
         - --provider=openshift
@@ -509,6 +550,7 @@ $PROXYLINE
         volumeMounts:
         - mountPath: "/tmp/shared"
           name: shared-data
+$TOKEN_REFRESHER_CA_VOLUME_MOUNT
         image: quay.io/observatorium/token-refresher
       serviceAccountName: loki-promtail
       terminationGracePeriodSeconds: 30
@@ -541,6 +583,7 @@ $PROXYLINE
           secretName: cookie-secret
       - name: shared-data
         emptyDir: {}
+$PROXY_CA_VOLUME
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
