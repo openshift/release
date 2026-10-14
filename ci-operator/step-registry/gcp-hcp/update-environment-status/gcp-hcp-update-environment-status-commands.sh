@@ -142,13 +142,17 @@ while IFS= read -r target; do
       ' <<<"${status_response}")"
     fi
     if [[ "${check_runs}" != "[]" ]]; then
-      checks_response="$(github_get "${api}/commits/${sha}/check-runs?per_page=100")"
-      missing_checks="$(jq -r --argjson checks "${check_runs}" '
-        (.check_runs // []) as $runs |
-        $checks[] as $wanted |
-        ([$runs[] | select(.name == $wanted)] | sort_by(.id) | last | .conclusion) as $conclusion |
-        select($conclusion != "success") | $wanted
-      ' <<<"${checks_response}")"
+      missing_checks=""
+      while IFS= read -r check_name; do
+        encoded_check_name="$(jq -nr --arg name "${check_name}" '$name | @uri')"
+        checks_response="$(github_get "${api}/commits/${sha}/check-runs?check_name=${encoded_check_name}&per_page=100")"
+        conclusion="$(jq -r --arg wanted "${check_name}" '
+          ([(.check_runs // [])[] | select(.name == $wanted)] | sort_by(.id) | last | .conclusion) // ""
+        ' <<<"${checks_response}")"
+        if [[ "${conclusion}" != "success" ]]; then
+          missing_checks="${missing_checks}${missing_checks:+$'\n'}${check_name}"
+        fi
+      done < <(jq -r '.[]' <<<"${check_runs}")
       if [[ -n "${missing_checks}" ]]; then
         missing="${missing}${missing:+$'\n'}${missing_checks}"
       fi
