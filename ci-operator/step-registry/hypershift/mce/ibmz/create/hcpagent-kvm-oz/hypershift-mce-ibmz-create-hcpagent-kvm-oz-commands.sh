@@ -116,7 +116,12 @@ ${VIRSH} vol-create --file /tmp/rootfs.xml --pool "${HTTPD_POOL_NAME}"
 ${VIRSH} -k 60 -K 5 vol-upload --vol "${ROOTFS_NAME}" --pool "${HTTPD_POOL_NAME}" --file /tmp/agent-rootfs.img
 
 if [[ -z "${HTTPD_PORT}" ]]; then
-  HTTPD_PORT="$(leaseLookup 'httpd-port')"
+  HTTPD_PORT="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".[\"httpd-port\"]" "${LEASE_CONF}" 2>/dev/null || true)"
+fi
+if [[ -z "${HTTPD_PORT}" || "${HTTPD_PORT}" == "null" ]]; then
+  echo "$(date) ERROR: HTTPD_PORT is not set and lease config has no httpd-port for ${LEASED_RESOURCE}." \
+       " Set HTTPD_PORT in the workflow env." >&2
+  exit 1
 fi
 ROOTFS_URL_HTTPD="http://${HOSTNAME}:${HTTPD_PORT}/${ROOTFS_NAME}"
 echo "$(date) Uploaded the boot artifacts, rootfs is served at ${ROOTFS_URL_HTTPD}"
@@ -200,14 +205,16 @@ for (( i=0; i<AGENT_NODE_COUNT; i++ )); do
     --capacity "${AGENT_GUEST_DISK_CAPACITY}"
 
   write_domain_xml "${NAME}" "${MAC}" "/tmp/${NAME}-install.xml" install
-  write_domain_xml "${NAME}" "${MAC}" "/tmp/${NAME}.xml" disk
+  write_domain_xml "${NAME}" "${MAC}" "/tmp/${NAME}-disk.xml" disk
   ${VIRSH} destroy "${NAME}" >/dev/null 2>&1 || true
   ${VIRSH} undefine "${NAME}" >/dev/null 2>&1 || true
   ${VIRSH} define "/tmp/${NAME}-install.xml"
   ${VIRSH} start "${NAME}"
   # Redefine the domain so that the next start boots from disk. The running
-  # guest is not affected, and it powers off on its first reboot.
-  ${VIRSH} define "/tmp/${NAME}.xml"
+  # domain keeps its current UUID, so strip the UUID from the disk XML to avoid
+  # a "domain already exists" collision.
+  grep -v '<uuid>' "/tmp/${NAME}-disk.xml" > "/tmp/${NAME}-disk-nouuid.xml"
+  ${VIRSH} define "/tmp/${NAME}-disk-nouuid.xml"
 done
 printf '%s\n' "${GUEST_NAMES[@]}" > "${SHARED_DIR}/hcpagent-kvm-guests.txt"
 printf '%s\n' "${GUEST_IPS[@]}" > "${SHARED_DIR}/hcpagent-kvm-guest-ips.txt"
