@@ -32,6 +32,8 @@ def load_state():
     name = 'quay-sts-' + run_id
     if any(state[key] != name for key in ('namespace', 'bucket', 'role')):
         raise RuntimeError('Unexpected resource names in state')
+    if state.get('second_role') != name + '-b':
+        raise RuntimeError('Unexpected secondary role name in state')
     actual_cluster_uid = read_object('namespace', 'kube-system')['metadata']['uid']
     if state['cluster_uid'] != actual_cluster_uid:
         raise RuntimeError('State belongs to another cluster')
@@ -50,7 +52,8 @@ state = load_state()
 verify_namespace(state)
 namespace = state['namespace']
 for key, expected in {'STS_TEST_NAMESPACE': namespace, 'STS_S3_BUCKET': state['bucket'],
-                      'STS_S3_REGION': state['region'], 'STS_ROLE_ARN': state['role_arn']}.items():
+                      'STS_S3_REGION': state['region'], 'STS_ROLE_ARN': state['role_arn'],
+                      'STS_SECOND_ROLE_ARN': state['second_role_arn']}.items():
     if (STATE_PATH.parent / key).read_text().strip() != expected:
         raise RuntimeError('Test input differs from provisioning state: ' + key)
 
@@ -78,7 +81,7 @@ oc('rollout', 'status', 'deployment/' + operator['metadata']['name'],
 print('Ephemeral cluster, resource ownership, and operator checks passed')
 PYTHON
 
-for variable in STS_TEST_NAMESPACE STS_S3_BUCKET STS_S3_REGION STS_ROLE_ARN; do
+for variable in STS_TEST_NAMESPACE STS_S3_BUCKET STS_S3_REGION STS_ROLE_ARN STS_SECOND_ROLE_ARN; do
   value=$(cat "${SHARED_DIR}/${variable}")
   [[ -n "$value" ]] || { echo "Missing ${variable}" >&2; exit 1; }
   export "${variable}=${value}"
