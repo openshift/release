@@ -18,5 +18,4 @@ spec:
     - namespaceSelector:
         matchLabels:
           policy-group.network.openshift.io/host-network: ""
-      podSelector: {}
 EOF
