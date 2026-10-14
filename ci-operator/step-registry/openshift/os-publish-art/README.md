@@ -13,6 +13,14 @@ each dependency to a digest-named QCI tag with `--keep-manifest-list`, retaining
 registry content independently of the temporary build namespace. The import
 source is the QCI repository **at that same digest**, never the mirror tag.
 
+The script has four phases: `validate_inputs`, `mirror_images`, `update_art_tags`,
+and `wait_for_imports`. The blocks after mirroring are not just checks:
+`update_art_tags` writes both ImageStream tag specs to enable controller imports.
+Its response checks establish the assigned generations; `wait_for_imports`
+then verifies those exact imports without accepting a superseding update.
+The jq helper defines the two tag names as a JSON array directly in jq, rather
+than requiring a shell variable containing JSON for `--argjson`.
+
 Both ART tags are updated together using `oc replace` on the ImageStream,
 preserving unrelated tags and supplying its resource version. `reference: false`,
 `importPolicy.importMode: PreserveOriginal`, and `generation: 0` request a new

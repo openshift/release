@@ -1,36 +1,72 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "${JOB_TYPE:?}" != postsubmit ]]; then
-  echo 'ART publication is only permitted in postsubmits' >&2
-  exit 1
-fi
-
 export KUBECONFIG=/etc/app-ci-kubeconfig/kubeconfig
 registry_config=/etc/push-secret/.dockerconfigjson
-for credential_file in "$KUBECONFIG" "$registry_config"; do
-  if [[ ! -f "$credential_file" || ! -r "$credential_file" || ! -s "$credential_file" ]]; then
-    echo "Required credential file is missing, unreadable or empty: ${credential_file}" >&2
+
+validate_inputs() {
+  if [[ "${JOB_TYPE:?}" != postsubmit ]]; then
+    echo 'ART publication is only permitted in postsubmits' >&2
     exit 1
   fi
-done
-workdir=$(mktemp -d)
-trap 'rm -rf "$workdir"' EXIT
-tags='["stream-coreos","stream-coreos-extensions"]'
+  local credential_file source
+  for credential_file in "$KUBECONFIG" "$registry_config"; do
+    if [[ ! -f "$credential_file" || ! -r "$credential_file" || ! -s "$credential_file" ]]; then
+      echo "Required credential file is missing, unreadable or empty: ${credential_file}" >&2
+      exit 1
+    fi
+  done
+  sources=("${STREAM_COREOS_IMAGE:?}" "${STREAM_COREOS_EXTENSIONS_IMAGE:?}")
+  for source in "${sources[@]}"; do
+    if [[ ! "$source" =~ ^[^[:space:]@]+@sha256:[a-f0-9]{64}$ ]]; then
+      echo 'Expected an immutable build dependency, refusing publication' >&2
+      exit 1
+    fi
+  done
+}
+
+jq_art() {
+  local filter=$1
+  shift
+  jq "
+    def art_names: [\"stream-coreos\", \"stream-coreos-extensions\"];
+    def is_art_tag: IN(art_names[]);
+    def art_specs:
+      [.spec.tags[]? | select(.name | is_art_tag)] | sort_by(.name);
+    def has_both_tags:
+      (map(.name) | sort) == (art_names | sort);
+    $filter
+  " "$@"
+}
 
 diagnose() {
   echo "$1" >&2
   if [[ -s "$workdir/current.json" ]]; then
-    jq --argjson tags "$tags" '
-      def digest: if type == "string" then split("@")[-1] | if test("^sha256:[a-f0-9]{64}$") then . else null end else null end;
+    jq_art '
+      def digest:
+        if type == "string" then
+          split("@")[-1] | if test("^sha256:[a-f0-9]{64}$") then . else null end
+        else null end;
       def generation: if type == "number" then . else null end;
-      {spec: [.spec.tags[]? | select(.name as $name | $tags | index($name)) |
-        {name, digest: (.from.name | digest), generation: (.generation | generation)}],
-       status: [.status.tags[]? | select(.tag as $name | $tags | index($name)) |
-        {tag, latest: [.items[:1][]? | {digest: (.image | digest), generation: (.generation | generation)}],
-         conditions: [.conditions[]? | select(.type == "ImportSuccess") |
-           {generation: (.generation | generation), success: (.status == "True"),
-            reason: (.reason | if IN("RegistryUnavailable", "Unauthorized", "NotFound", "InternalError", "ImportFailed") then . else "Other" end)}]}]}' "$workdir/current.json" >&2
+      def reason:
+        if IN("RegistryUnavailable", "Unauthorized", "NotFound", "InternalError", "ImportFailed")
+        then . else "Other" end;
+      {
+        spec: [art_specs[] | {
+          name, digest: (.from.name | digest), generation: (.generation | generation)
+        }],
+        status: [.status.tags[]? | select(.tag | is_art_tag) | {
+          tag,
+          latest: [.items[:1][]? | {
+            digest: (.image | digest), generation: (.generation | generation)
+          }],
+          conditions: [.conditions[]? | select(.type == "ImportSuccess") | {
+            generation: (.generation | generation),
+            success: (.status == "True"), reason: (.reason | reason)
+          }]
+        }]
+      }
+    ' "$workdir/current.json" >&2
   fi
 }
 
@@ -41,99 +77,134 @@ get_stream() {
   fi
 }
 
-target_spec() {
-  jq -S --argjson tags "$tags" '[.spec.tags[]? | select(.name as $name | $tags | index($name))] | sort_by(.name)' "$1"
+require_unchanged() {
+  local previous=$1 message=$2
+  if ! cmp -s <(jq_art 'art_specs' -S "$previous") <(jq_art 'art_specs' -S "$workdir/current.json") ||
+    [[ $(jq -r '.metadata.uid' "$previous") != $(jq -r '.metadata.uid' "$workdir/current.json") ]]; then
+    diagnose "$message"
+    exit 1
+  fi
 }
 
-sources=("${STREAM_COREOS_IMAGE:?}" "${STREAM_COREOS_EXTENSIONS_IMAGE:?}")
-for source in "${sources[@]}"; do
-  if [[ ! "$source" =~ ^[^[:space:]@]+@sha256:[a-f0-9]{64}$ ]]; then
-    echo 'Expected an immutable build dependency, refusing publication' >&2
-    exit 1
-  fi
-done
-
-get_stream
-cp "$workdir/current.json" "$workdir/baseline.json"
-target_spec "$workdir/baseline.json" > "$workdir/baseline-tags.json"
-printf '[]' > "$workdir/desired.json"
-for index in 0 1; do
-  tag=$(jq -r ".[${index}]" <<< "$tags")
-  source=${sources[$index]}
-  digest=${source##*@}
-  destination="quay.io/openshift/ci:origin_scos-5.1-art_${tag}_${digest#sha256:}"
-  if ! oc image mirror --keep-manifest-list=true --registry-config="$registry_config" "$source=$destination" > "$workdir/mirror.out" 2> "$workdir/mirror.err"; then
-    echo "ART mirror failed for ${tag} at ${digest}; client diagnostics withheld to avoid exposing credentials" >&2
-    exit 1
-  fi
-  jq --arg name "$tag" --arg source "quay-proxy.ci.openshift.org/openshift/ci@${digest}" \
-    '. + [{name: $name, from: {kind: "DockerImage", name: $source}, reference: false, generation: 0, importPolicy: {importMode: "PreserveOriginal"}, referencePolicy: {type: "Source"}}]' \
-    "$workdir/desired.json" > "$workdir/next.json"
-  mv "$workdir/next.json" "$workdir/desired.json"
-done
-
-updated=false
-for attempt in 1 2 3; do
-  if ! cmp -s "$workdir/baseline-tags.json" <(target_spec "$workdir/current.json") ||
-    [[ $(jq -r '.metadata.uid' "$workdir/current.json") != $(jq -r '.metadata.uid' "$workdir/baseline.json") ]]; then
-    diagnose 'Publication superseded before update; refusing to overwrite'
-    exit 1
-  fi
-  jq --slurpfile desired "$workdir/desired.json" --argjson tags "$tags" \
-    '.spec.tags = ([.spec.tags[]? | select(.name as $name | $tags | index($name) | not)] + $desired[0])' \
-    "$workdir/current.json" > "$workdir/update.json"
-  if oc --request-timeout=10s -n origin replace -f "$workdir/update.json" -o json > "$workdir/updated.json" 2> "$workdir/replace.err"; then
-    updated=true
-    break
-  else
-    update_exit=$?
-  fi
-  expected_conflict="Error from server (Conflict): error when replacing \"${workdir}/update.json\": Operation cannot be fulfilled on imagestreams.image.openshift.io \"scos-5.1-art\": the object has been modified; please apply your changes to the latest version and try again"
-  if [[ $(cat "$workdir/replace.err") != "$expected_conflict" ]]; then
-    reason=Unclassified
-    case "$(cat "$workdir/replace.err")" in
-      'Error from server (Forbidden): '*) reason=Forbidden ;;
-      'Error from server (Invalid): '*|'The ImageStream "scos-5.1-art" is invalid: '*) reason=Invalid ;;
-    esac
-    diagnose "ART update failed (${reason}; exit ${update_exit}); outcome unconfirmed, not retrying or attributing to another writer"
-    exit "$update_exit"
-  fi
-  if [[ "$attempt" == 3 ]]; then
-    break
-  fi
+mirror_images() {
   get_stream
-done
-if [[ "$updated" != true ]]; then
+  cp "$workdir/current.json" "$workdir/baseline.json"
+  printf '[]' > "$workdir/desired.json"
+  local index tag source digest destination
+  for index in 0 1; do
+    tag=$(jq_art "art_names[${index}]" -nr)
+    source=${sources[$index]}
+    digest=${source##*@}
+    destination="quay.io/openshift/ci:origin_scos-5.1-art_${tag}_${digest#sha256:}"
+    if ! oc image mirror --keep-manifest-list=true --registry-config="$registry_config" "$source=$destination" > "$workdir/mirror.out" 2> "$workdir/mirror.err"; then
+      echo "ART mirror failed for ${tag} at ${digest}; client diagnostics withheld to avoid exposing credentials" >&2
+      exit 1
+    fi
+    jq --arg name "$tag" --arg source "quay-proxy.ci.openshift.org/openshift/ci@${digest}" '
+      . + [{
+        name: $name,
+        from: {kind: "DockerImage", name: $source},
+        reference: false,
+        generation: 0,
+        importPolicy: {importMode: "PreserveOriginal"},
+        referencePolicy: {type: "Source"}
+      }]
+    ' "$workdir/desired.json" > "$workdir/next.json"
+    mv "$workdir/next.json" "$workdir/desired.json"
+  done
+}
+
+verify_update_response() {
+  if ! jq_art '
+    def matches_request($expected):
+      .name == $expected.name and .from == $expected.from and
+      (.reference // false) == false and
+      .importPolicy.importMode == "PreserveOriginal" and
+      .referencePolicy.type == "Source";
+    art_specs as $actual |
+    ($actual | has_both_tags) and
+    all($desired[0][]; . as $expected | any($actual[]; matches_request($expected)))
+  ' -e --slurpfile desired "$workdir/desired.json" "$workdir/updated.json" > /dev/null; then
+    cp "$workdir/updated.json" "$workdir/current.json"
+    diagnose 'ART update response does not match this build or its import policy'
+    exit 1
+  fi
+  if ! jq_art 'art_specs | has_both_tags and all(.[]; .generation > 0)' -e "$workdir/updated.json" > /dev/null; then
+    diagnose 'API did not assign import generations'
+    exit 1
+  fi
+}
+
+update_art_tags() {
+  local attempt update_exit error expected_conflict reason
+  for attempt in 1 2 3; do
+    require_unchanged "$workdir/baseline.json" 'Publication superseded before update; refusing to overwrite'
+    jq_art '
+      .spec.tags = ([.spec.tags[]? | select(.name | is_art_tag | not)] + $desired[0])
+    ' --slurpfile desired "$workdir/desired.json" "$workdir/current.json" > "$workdir/update.json"
+    if oc --request-timeout=10s -n origin replace -f "$workdir/update.json" -o json > "$workdir/updated.json" 2> "$workdir/replace.err"; then
+      verify_update_response
+      return
+    else
+      update_exit=$?
+    fi
+    error=$(cat "$workdir/replace.err")
+    expected_conflict="Error from server (Conflict): error when replacing \"${workdir}/update.json\": Operation cannot be fulfilled on imagestreams.image.openshift.io \"scos-5.1-art\": the object has been modified; please apply your changes to the latest version and try again"
+    if [[ "$error" != "$expected_conflict" ]]; then
+      reason=Unclassified
+      case "$error" in
+        'Error from server (Forbidden): '*) reason=Forbidden ;;
+        'Error from server (Invalid): '*|'The ImageStream "scos-5.1-art" is invalid: '*) reason=Invalid ;;
+      esac
+      diagnose "ART update failed (${reason}; exit ${update_exit}); outcome unconfirmed, not retrying or attributing to another writer"
+      exit "$update_exit"
+    fi
+    if [[ "$attempt" != 3 ]]; then
+      get_stream
+    fi
+  done
   diagnose 'Unable to update ART imports after three optimistic attempts'
   exit 1
-fi
-target_spec "$workdir/updated.json" > "$workdir/updated-tags.json"
-if ! jq -e --slurpfile desired "$workdir/desired.json" '. as $stream | all($desired[0][]; . as $expected | any($stream.spec.tags[]?; .name == $expected.name and .from == $expected.from and (.reference // false) == false and .importPolicy.importMode == "PreserveOriginal" and .referencePolicy.type == "Source"))' "$workdir/updated.json" > /dev/null; then
-  cp "$workdir/updated.json" "$workdir/current.json"
-  diagnose 'ART update response does not match this build or its import policy'
-  exit 1
-fi
-if ! jq -e --argjson tags "$tags" '[.spec.tags[]? | select(.name as $name | $tags | index($name))] | length == 2 and all(.[]; .generation > 0)' "$workdir/updated.json" > /dev/null; then
-  diagnose 'API did not assign import generations'
-  exit 1
-fi
+}
 
-for ((attempt = 0; attempt < 60; attempt++)); do
-  get_stream
-  if ! cmp -s "$workdir/updated-tags.json" <(target_spec "$workdir/current.json") ||
-    [[ $(jq -r '.metadata.uid' "$workdir/current.json") != $(jq -r '.metadata.uid' "$workdir/updated.json") ]]; then
-    diagnose 'Publication superseded while waiting for import'
-    exit 1
-  fi
-  if jq -e --argjson tags "$tags" '. as $stream | any(.spec.tags[]?; . as $spec | ($tags | index($spec.name)) != null and any($stream.status.tags[]?; .tag == $spec.name and any(.conditions[]?; .type == "ImportSuccess" and .status == "False" and .generation == $spec.generation)))' "$workdir/current.json" > /dev/null; then
-    diagnose 'ART image import failed'
-    exit 1
-  fi
-  if jq -e --argjson tags "$tags" '. as $stream | [.spec.tags[]? | select(.name as $name | $tags | index($name))] | all(.[]; . as $spec | any($stream.status.tags[]?; .tag == $spec.name and (.items[0].image // "") != "" and .items[0].image == ($spec.from.name | split("@")[1]) and .items[0].generation == $spec.generation))' "$workdir/current.json" > /dev/null; then
-    echo 'Both ART CoreOS imports match this build and their current generations'
-    exit 0
-  fi
-  sleep 5
-done
-diagnose 'Timed out waiting for ART CoreOS imports'
-exit 1
+wait_for_imports() {
+  local attempt
+  for ((attempt = 0; attempt < 60; attempt++)); do
+    get_stream
+    require_unchanged "$workdir/updated.json" 'Publication superseded while waiting for import'
+    if jq_art '
+      def import_failed($spec):
+        any(.status.tags[]?;
+          .tag == $spec.name and any(.conditions[]?;
+            .type == "ImportSuccess" and .status == "False" and
+            .generation == $spec.generation));
+      . as $stream | any(art_specs[]; . as $spec | $stream | import_failed($spec))
+    ' -e "$workdir/current.json" > /dev/null; then
+      diagnose 'ART image import failed'
+      exit 1
+    fi
+    if jq_art '
+      def import_complete($spec):
+        any(.status.tags[]?;
+          .tag == $spec.name and
+          (.items[0].image // "") != "" and
+          .items[0].image == ($spec.from.name | split("@")[1]) and
+          .items[0].generation == $spec.generation);
+      . as $stream | art_specs |
+      has_both_tags and all(.[]; . as $spec | $stream | import_complete($spec))
+    ' -e "$workdir/current.json" > /dev/null; then
+      echo 'Both ART CoreOS imports match this build and their current generations'
+      return
+    fi
+    sleep 5
+  done
+  diagnose 'Timed out waiting for ART CoreOS imports'
+  exit 1
+}
+
+validate_inputs
+workdir=$(mktemp -d)
+trap 'rm -rf "$workdir"' EXIT
+mirror_images
+update_art_tags
+wait_for_imports
