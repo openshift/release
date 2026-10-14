@@ -17,6 +17,26 @@ resources:
       cpu: 100m
       memory: 4Gi
 tests:
+- as: gpu-cluster-on-demand
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+      variant: gpu
+    owner: obs
+    product: ocp
+    timeout: 8h0m0s
+    version: "4.20"
+  cron: 0 10 * * 0
+  steps:
+    allow_skip_on_success: true
+    env:
+      TIMEOUT: +6 hours
+    post:
+    - ref: gather-must-gather
+    test:
+    - ref: wait
 - as: troubleshooting-rhoai-periodic
   cluster_claim:
     architecture: amd64
