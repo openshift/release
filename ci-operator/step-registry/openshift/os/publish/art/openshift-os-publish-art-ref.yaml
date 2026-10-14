@@ -1,0 +1,31 @@
+ref:
+  as: openshift-os-publish-art
+  from_image:
+    namespace: ocp
+    name: "4.23"
+    tag: cli
+  commands: openshift-os-publish-art-commands.sh
+  timeout: 20m
+  grace_period: 1m
+  credentials:
+  - bundle: promotion-quay-tagger-kubeconfig
+    namespace: ci
+    mount_path: /etc/app-ci-kubeconfig
+  - bundle: registry-push-credentials-ci-central
+    namespace: ci
+    mount_path: /etc/push-secret
+  dependencies:
+  - name: stream-coreos
+    env: STREAM_COREOS_IMAGE
+  - name: stream-coreos-extensions
+    env: STREAM_COREOS_EXTENSIONS_IMAGE
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Publish this postsubmit's two built CoreOS images to origin/scos-5.1-art.
+    Mirror immutable build dependencies with their original manifest lists,
+    request imports through an optimistic ImageStream update, and verify the
+    imported digest and generation. This is independent of CI reference-only
+    promotion; it never reads a floating CI or ART source tag.
