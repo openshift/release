@@ -15,12 +15,24 @@ tags='["stream-coreos","stream-coreos-extensions"]'
 diagnose() {
   echo "$1" >&2
   if [[ -s "$workdir/current.json" ]]; then
-    jq --argjson tags "$tags" '{spec: [.spec.tags[]? | select(.name as $name | $tags | index($name))], status: [.status.tags[]? | select(.tag as $name | $tags | index($name))]}' "$workdir/current.json" >&2
+    jq --argjson tags "$tags" '
+      def digest: if type == "string" then split("@")[-1] | if test("^sha256:[a-f0-9]{64}$") then . else null end else null end;
+      def generation: if type == "number" then . else null end;
+      {spec: [.spec.tags[]? | select(.name as $name | $tags | index($name)) |
+        {name, digest: (.from.name | digest), generation: (.generation | generation)}],
+       status: [.status.tags[]? | select(.tag as $name | $tags | index($name)) |
+        {tag, latest: [.items[:1][]? | {digest: (.image | digest), generation: (.generation | generation)}],
+         conditions: [.conditions[]? | select(.type == "ImportSuccess") |
+           {generation: (.generation | generation), success: (.status == "True"),
+            reason: (.reason | if IN("RegistryUnavailable", "Unauthorized", "NotFound", "InternalError", "ImportFailed") then . else "Other" end)}]}]}' "$workdir/current.json" >&2
   fi
 }
 
 get_stream() {
-  oc --request-timeout=10s -n origin get imagestream scos-5.1-art -o json > "$workdir/current.json"
+  if ! oc --request-timeout=10s -n origin get imagestream scos-5.1-art -o json > "$workdir/current.json" 2> "$workdir/get.err"; then
+    echo 'Unable to read ART ImageStream; client diagnostics withheld to avoid exposing credentials' >&2
+    exit 1
+  fi
 }
 
 target_spec() {
@@ -44,7 +56,10 @@ for index in 0 1; do
   source=${sources[$index]}
   digest=${source##*@}
   destination="quay.io/openshift/ci:origin_scos-5.1-art_${tag}_${digest#sha256:}"
-  oc image mirror --keep-manifest-list=true --registry-config="$registry_config" "$source=$destination"
+  if ! oc image mirror --keep-manifest-list=true --registry-config="$registry_config" "$source=$destination" > "$workdir/mirror.out" 2> "$workdir/mirror.err"; then
+    echo "ART mirror failed for ${tag} at ${digest}; client diagnostics withheld to avoid exposing credentials" >&2
+    exit 1
+  fi
   jq --arg name "$tag" --arg source "quay-proxy.ci.openshift.org/openshift/ci@${digest}" \
     '. + [{name: $name, from: {kind: "DockerImage", name: $source}, reference: false, generation: 0, importPolicy: {importMode: "PreserveOriginal"}, referencePolicy: {type: "Source"}}]' \
     "$workdir/desired.json" > "$workdir/next.json"
@@ -61,8 +76,23 @@ for attempt in 1 2 3; do
   jq --slurpfile desired "$workdir/desired.json" --argjson tags "$tags" \
     '.spec.tags = ([.spec.tags[]? | select(.name as $name | $tags | index($name) | not)] + $desired[0])' \
     "$workdir/current.json" > "$workdir/update.json"
-  if oc --request-timeout=10s -n origin replace -f "$workdir/update.json" -o json > "$workdir/updated.json"; then
+  if oc --request-timeout=10s -n origin replace -f "$workdir/update.json" -o json > "$workdir/updated.json" 2> "$workdir/replace.err"; then
     updated=true
+    break
+  else
+    update_exit=$?
+  fi
+  expected_conflict="Error from server (Conflict): error when replacing \"${workdir}/update.json\": Operation cannot be fulfilled on imagestreams.image.openshift.io \"scos-5.1-art\": the object has been modified; please apply your changes to the latest version and try again"
+  if [[ $(cat "$workdir/replace.err") != "$expected_conflict" ]]; then
+    reason=Unclassified
+    case "$(cat "$workdir/replace.err")" in
+      'Error from server (Forbidden): '*) reason=Forbidden ;;
+      'Error from server (Invalid): '*|'The ImageStream "scos-5.1-art" is invalid: '*) reason=Invalid ;;
+    esac
+    diagnose "ART update failed (${reason}; exit ${update_exit}); outcome unconfirmed, not retrying or attributing to another writer"
+    exit "$update_exit"
+  fi
+  if [[ "$attempt" == 3 ]]; then
     break
   fi
   get_stream

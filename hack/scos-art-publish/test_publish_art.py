@@ -17,6 +17,20 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "ci-operator/step-registry/openshift/os/publish/art/openshift-os-publish-art-commands.sh"
 TAGS = ["stream-coreos", "stream-coreos-extensions"]
 DIGESTS = ["sha256:" + "a" * 64, "sha256:" + "b" * 64]
+SECRET = "credential-marker-do-not-log"
+
+
+def mirror_image(state, args):
+    assert "--keep-manifest-list=true" in args
+    assert "--registry-config=/etc/push-secret/.dockerconfigjson" in args
+    assert "@sha256:" in args[-1].split("=")[0]
+    digest = DIGESTS[state["mirrors"]]
+    tag = TAGS[state["mirrors"]]
+    assert args[-1] == f"registry.build13.ci.openshift.org/job/pipeline@{digest}=quay.io/openshift/ci:origin_scos-5.1-art_{tag}_{digest.removeprefix('sha256:')}"
+    state["mirrors"] += 1
+    print(f"https://user:{SECRET}@registry.example/image", file=sys.stderr)
+    print(f"https://user:{SECRET}@registry.example/image")
+    return int(state["mode"] == "mirror-failure")
 
 
 def mock_oc():
@@ -27,24 +41,32 @@ def mock_oc():
     stream = state["stream"]
     exit_code = 0
     if "mirror" in args:
-        assert "--keep-manifest-list=true" in args
-        assert "--registry-config=/etc/push-secret/.dockerconfigjson" in args
-        assert "@sha256:" in args[-1].split("=")[0]
-        digest = DIGESTS[state["mirrors"]]
-        tag = TAGS[state["mirrors"]]
-        assert args[-1] == f"registry.build13.ci.openshift.org/job/pipeline@{digest}=quay.io/openshift/ci:origin_scos-5.1-art_{tag}_{digest.removeprefix('sha256:')}"
-        state["mirrors"] += 1
+        exit_code = mirror_image(state, args)
     elif "replace" in args:
         update = json.loads(Path(args[args.index("-f") + 1]).read_text(encoding="utf-8"))
         assert update["metadata"]["resourceVersion"] == stream["metadata"]["resourceVersion"]
         assert update["spec"]["tags"][-1]["name"] == TAGS[-1]
         assert update["spec"]["tags"][0] == stream["spec"]["tags"][0]
         state["replaces"] += 1
-        if state["mode"] in ("conflict", "conflict-superseded") and state["replaces"] == 1:
+        if state["mode"] == "conflict-exhausted" or (
+                state["mode"] in ("conflict", "conflict-superseded") and state["replaces"] == 1):
             stream["metadata"]["resourceVersion"] = "2"
             if state["mode"] == "conflict-superseded":
                 stream["spec"]["tags"][1]["generation"] += 1
             exit_code = 1
+            print(f'Error from server (Conflict): error when replacing "{args[args.index("-f") + 1]}": '
+                  'Operation cannot be fulfilled on imagestreams.image.openshift.io "scos-5.1-art": '
+                  'the object has been modified; please apply your changes to the latest version and try again', file=sys.stderr)
+        elif state["mode"] in ("forbidden", "invalid", "timeout-unapplied", "conflict-word", "other-conflict"):
+            messages = {
+                "forbidden": f"Error from server (Forbidden): {SECRET} conflict",
+                "invalid": f'The ImageStream "scos-5.1-art" is invalid: {SECRET}',
+                "timeout-unapplied": f"error: context deadline exceeded {SECRET}",
+                "conflict-word": f"error: proxy conflict {SECRET}",
+                "other-conflict": f"Error from server (Conflict): admission conflict {SECRET}",
+            }
+            print(messages[state["mode"]], file=sys.stderr)
+            exit_code = 7
         else:
             for tag in update["spec"]["tags"][1:]:
                 assert tag["reference"] is False
@@ -62,9 +84,15 @@ def mock_oc():
             state["stream"] = update
             stream = update
             state["updated"] = True
+            if state["mode"] == "timeout-applied":
+                print(f"error: context deadline exceeded {SECRET}", file=sys.stderr)
+                exit_code = 7
     elif "get" in args:
         if state["updated"]:
             observe_import(state)
+        if state["mode"] == "get-failure":
+            print(f"error: {SECRET}", file=sys.stderr)
+            exit_code = 1
     else:
         raise AssertionError(args)
     state_path.write_text(json.dumps(state), encoding="utf-8")
@@ -103,8 +131,13 @@ def observe_import(state):
         if tag_mode == "stale-generation":
             items[0]["generation"] -= 1
         conditions = []
-        if tag_mode in ("failure", "old-failure"):
-            conditions = [{"type": "ImportSuccess", "status": "False", "reason": "RegistryUnavailable", "generation": generation - (tag_mode == "old-failure")}]
+        if tag_mode in ("failure", "old-failure", "sensitive-failure"):
+            conditions = [{"type": "ImportSuccess", "status": "False", "reason": "RegistryUnavailable", "message": SECRET,
+                           "generation": generation - (tag_mode == "old-failure")}]
+        if tag_mode == "sensitive-failure":
+            tag["from"]["name"] = f"https://user:{SECRET}@registry.example/image@{digest}"
+            tag["annotations"] = {"sensitive": SECRET}
+            items[0]["dockerImageReference"] = f"https://user:{SECRET}@registry.example/image"
         stream["status"]["tags"].append({"tag": tag["name"], "items": items, "conditions": conditions})
 
 
@@ -205,6 +238,38 @@ class PublishArtTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("superseded before update", result.stderr)
         self.assertEqual(state["replaces"], 1)
+
+    def test_only_optimistic_conflicts_retried(self):
+        for mode in ("forbidden", "invalid", "timeout-unapplied", "timeout-applied", "conflict-word", "other-conflict"):
+            with self.subTest(mode=mode):
+                result, state = self.run_publisher(mode)
+                self.assertEqual(result.returncode, 7, result.stderr)
+                self.assertEqual(state["replaces"], 1)
+                self.assertEqual(state["polls"], 0)
+                self.assertEqual(state["updated"], mode == "timeout-applied")
+                self.assertIn("outcome unconfirmed", result.stderr)
+                self.assertNotIn("superseded", result.stderr)
+                self.assertNotIn(SECRET, result.stdout + result.stderr)
+                if mode in ("forbidden", "invalid"):
+                    self.assertIn(mode.title(), result.stderr)
+
+    def test_exhausted_conflicts(self):
+        result, state = self.run_publisher("conflict-exhausted")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(state["replaces"], 3)
+        self.assertIn("three optimistic attempts", result.stderr)
+        self.assertNotIn("superseded", result.stderr)
+
+    def test_safe_failure_diagnostics(self):
+        for mode in ("failure", "sensitive-failure", "mirror-failure", "get-failure"):
+            with self.subTest(mode=mode):
+                result, _ = self.run_publisher(mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn(SECRET, result.stdout + result.stderr)
+                if mode == "failure":
+                    self.assertIn("RegistryUnavailable", result.stderr)
+                    self.assertIn(DIGESTS[0], result.stderr)
+                    self.assertIn('"generation": 11', result.stderr)
 
     def test_floating_source_rejected_before_writes(self):
         result, state = self.run_publisher(source="registry.build13.ci.openshift.org/job/pipeline:stream-coreos")

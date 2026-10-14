@@ -26,8 +26,13 @@ stream UID and exact target specs, a nonempty imported image equal to the build
 digest, and matching status/spec generations for both tags in one snapshot.
 Current-generation import failure conditions fail immediately; pending imports
 time out after 60 polls with 5-second sleeps and 10-second API request timeouts.
-Failures report tag specs and status conditions. Conflicting writes are retried
-at most three times, and only while the original target specs remain unchanged.
+Failures report allowlisted digests, generations and import-condition reasons,
+not raw references, condition messages or client output. Only the explicit
+server optimistic-update conflict diagnostic is retried, at most three attempts
+and only while the original target specs remain unchanged. Other update errors
+fail closed with their exit status and a safe error category. Their outcome is
+unconfirmed: a client timeout may occur after the server commits the update, so
+it is neither retried nor attributed to a superseding writer.
 A superseding writer, even for the same digest with a newer generation, fails
 the job rather than being credited or overwritten by a retry.
 
