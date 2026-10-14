@@ -294,10 +294,6 @@ if [[ ! -s "${MANIFEST}" ]]; then
 fi
 require_manifest_string '.rhdhVersion'
 RHDH_VERSION=$(jq -r '.rhdhVersion' "${MANIFEST}")
-if [[ "${RHDH_VERSION}" != "2.0" ]]; then
-    echo "ERROR: OSL RC smoke requires RHDH 2.0; release.json specifies ${RHDH_VERSION}" >&2
-    exit 1
-fi
 require_registry_credentials "${BREW_REGISTRY}" registry_brew.json
 require_registry_credentials "${STAGE_REGISTRY}" registry_stage.json
 
@@ -367,7 +363,7 @@ wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" 
 export E2E_COLLECT_COVERAGE=false RHDH_VERSION
 OVERLAYS_REPO=https://github.com/rostalan/rhdh-plugin-export-overlays.git
 OVERLAYS_REF=fix/orchestrator-RHIDP-16721-retry-coverage-v2
-OVERLAYS_COMMIT=fe115042732ab1311f39b35365b0ebe523900c53
+OVERLAYS_COMMIT=ea9243d5e39394ebf02d46b4f65e24a31ddfb9cc
 git clone --depth 1 --branch "${OVERLAYS_REF}" "${OVERLAYS_REPO}" "${WORKDIR}/rhdh-plugin-export-overlays"
 if [[ "$(git -C "${WORKDIR}/rhdh-plugin-export-overlays" rev-parse HEAD)" != "${OVERLAYS_COMMIT}" ]]; then
     echo "ERROR: overlays test checkout did not resolve to pinned commit ${OVERLAYS_COMMIT}" >&2
