@@ -3,6 +3,11 @@
 set -euo pipefail
 shopt -s inherit_errexit
 
+# --- Typed exit globals (INTEROP-9527) ---
+_JUNIT_KIND=""
+_JUNIT_MESSAGE=""
+_EXIT_CLASS=""    # "product" or "infra"
+
 # --- Trace-to-file: always capture, dump on failure only ---
 _xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
 exec {_xtrace_fd}>"${_xtrace_log}"
@@ -26,7 +31,49 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
-trap '_opp_cleanup' EXIT
+
+# --- Atomic JUnit Writer (INTEROP-9527) ---
+# shellcheck disable=SC2317
+_junit_emit_safe() {
+  local kind="$1" message="$2" rc="${3:-0}"
+  local tmpf
+  tmpf="${ARTIFACT_DIR}/.junit_lp-interop--OPP--ocs-tests.tmp.$$"
+  {
+    cat <<XMLEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--ocs-tests" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+  <testcase name="${kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
+  </testcase>
+</testsuite>
+XMLEOF
+  } > "${tmpf}"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_lp-interop--OPP--ocs-tests.xml"
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_lp-interop--OPP--ocs-tests.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
+# shellcheck disable=SC2317
+_finalize_junit() {
+    local rc="$1"
+    if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+        _JUNIT_KIND="unclassified-failure"
+        _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+    fi
+    if [[ -n "${_JUNIT_KIND}" ]]; then
+        _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+    fi
+}
+
+# shellcheck disable=SC2154
+trap '
+    _exit_rc=$?; set +e
+    (exit "${_exit_rc}"); _opp_cleanup
+    _finalize_junit "${_exit_rc}"
+    exit "${_exit_rc}"
+' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -84,18 +131,30 @@ if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
         curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
+    # shellcheck disable=SC2154
     trap '
-        _opp_cleanup
+        _exit_rc=$?; set +e
+        (exit "${_exit_rc}"); _opp_cleanup
         cleanup
+        _finalize_junit "${_exit_rc}"
         _propagate_junit
         mkdir -p /tmp/bin
         printf "%s\n" "#!/bin/sh" "exit 1" > /tmp/bin/yq && chmod +x /tmp/bin/yq
         PATH="/tmp/bin:${PATH}"
         LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
             ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
+        exit "${_exit_rc}"
     ' EXIT
 else
-    trap '_opp_cleanup; cleanup; _propagate_junit' EXIT
+    # shellcheck disable=SC2154
+    trap '
+        _exit_rc=$?; set +e
+        (exit "${_exit_rc}"); _opp_cleanup
+        cleanup
+        _finalize_junit "${_exit_rc}"
+        _propagate_junit
+        exit "${_exit_rc}"
+    ' EXIT
 fi
 
 #

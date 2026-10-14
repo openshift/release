@@ -1,12 +1,58 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+# --- Typed exit globals (INTEROP-9527) ---
+_JUNIT_KIND=""
+_JUNIT_MESSAGE=""
+_EXIT_CLASS=""    # "product" or "infra"
+
 # shellcheck disable=SC2317
 _propagate_junit () {
     mkdir -p "${SHARED_DIR}/junit"
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
-trap _propagate_junit EXIT
+
+# --- Atomic JUnit Writer (INTEROP-9527) ---
+# shellcheck disable=SC2317
+_junit_emit_safe() {
+  local kind="$1" message="$2" rc="${3:-0}"
+  local tmpf
+  tmpf="${ARTIFACT_DIR}/.junit_lp-interop--OPP--acm-clc-smoke.tmp.$$"
+  {
+    cat <<XMLEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--acm-clc-smoke" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+  <testcase name="${kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
+  </testcase>
+</testsuite>
+XMLEOF
+  } > "${tmpf}"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_lp-interop--OPP--acm-clc-smoke.xml"
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_lp-interop--OPP--acm-clc-smoke.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
+# --- Single typed finalizer (INTEROP-9527) ---
+# shellcheck disable=SC2317
+_finalize_exit() {
+  local rc=$?
+  set +e
+  # Fallback for unclassified exits
+  if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+    _JUNIT_KIND="unclassified-failure"
+    _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+    _EXIT_CLASS="infra"
+  fi
+  if [[ -n "${_JUNIT_KIND}" ]]; then
+    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+  fi
+  _propagate_junit
+  exit "${rc}"
+}
+trap '_finalize_exit' EXIT
 
 typeset secretsDir="/tmp/secrets"
 typeset optionFile="./options.yaml"
