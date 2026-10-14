@@ -32,6 +32,7 @@ class TLSScannerTests(unittest.TestCase):
             "SCANNER_CPU": "4",
             "SCANNER_MEMORY": "4Gi",
             "SCANNER_NAMESPACE": "",
+            "SCANNER_POD_MODE": "false",
             "TLS_SCANNER_CLUSTER_LABEL": "",
             "SCAN_NAMESPACE": "openshift-ingress",
             "PQC_CHECK": "false",
@@ -40,11 +41,16 @@ class TLSScannerTests(unittest.TestCase):
             "TLS_PROFILE_TYPE": "",
             "TEST_MANIFEST": str(self.manifest),
             "TEST_ARGUMENTS": str(self.arguments),
+            "TEST_OC_CALLS": str(self.directory / "oc-calls"),
+            "TEST_POD_CREATE_EXIT": "42",
         }
         self.write_executable("oc", '''#!/bin/bash
+printf '%s\\n' "$*" >> "${TEST_OC_CALLS}"
 if [[ "$*" == "create -f -" ]]; then
     cat > "${TEST_MANIFEST}"
-    exit 42
+    exit "${TEST_POD_CREATE_EXIT}"
+elif [[ "$*" == "get pod/tls-scanner"* ]]; then
+    printf Succeeded
 fi
 ''')
         self.write_executable("sleep", "#!/bin/bash\nexit 0\n")
@@ -126,6 +132,67 @@ Path(os.environ["TEST_ARGUMENTS"]).write_text(json.dumps(sys.argv[1:]))
         self.assertTrue(commands.is_symlink())
         self.assertEqual(commands.resolve(), SCANNER / "run" / run["commands"])
 
+    def test_container_modes_and_owned_namespace_cleanup(self):
+        for step in ("run", "recheck"):
+            for mode in ("false", "true", "unset"):
+                for namespace in ("", "existing"):
+                    if mode == "true" and namespace:
+                        continue
+                    with self.subTest(step=step, mode=mode, namespace=namespace):
+                        self.environment.update({"SCANNER_POD_MODE": mode, "SCANNER_NAMESPACE": namespace})
+                        if mode == "unset":
+                            self.environment.pop("SCANNER_POD_MODE")
+                        calls_path = Path(self.environment["TEST_OC_CALLS"])
+                        calls_path.unlink(missing_ok=True)
+                        result = self.run_step("envoy", step)
+                        self.assertEqual(result.returncode, 42, result.stderr)
+                        pod = yaml.safe_load(self.manifest.read_text())
+                        calls = calls_path.read_text(encoding="utf-8").splitlines()
+                        target = namespace or "tls-scanner"
+                        self.assertEqual(pod["metadata"]["namespace"], target)
+                        self.assertEqual(pod["spec"]["serviceAccountName"], "default")
+                        self.assertIn(f"adm policy add-cluster-role-to-user cluster-admin -z default -n {target}", calls)
+                        security = pod["spec"]["containers"][0]["securityContext"]
+                        restricted = mode == "true" or bool(namespace)
+                        self.assertIs(pod["spec"]["hostNetwork"], not restricted)
+                        self.assertIs(pod["spec"]["hostPID"], not restricted)
+                        if restricted:
+                            self.assertFalse(security.get("privileged", False))
+                            self.assertIs(security["runAsNonRoot"], True)
+                            self.assertIs(security["allowPrivilegeEscalation"], False)
+                            self.assertEqual(security["capabilities"]["drop"], ["ALL"])
+                            self.assertEqual(security["seccompProfile"], {"type": "RuntimeDefault"})
+                            self.assertFalse(any("add-scc-to-user" in call for call in calls))
+                        else:
+                            self.assertEqual(security, {"privileged": True, "runAsUser": 0})
+                            self.assertIn("adm policy add-scc-to-user privileged -z default -n tls-scanner", calls)
+                        if mode == "true":
+                            self.assertEqual(pod["metadata"]["annotations"]["openshift.io/required-scc"], "restricted-v2")
+                            self.assertNotIn("runAsUser", security)
+                            self.assertNotIn("securityContext", pod["spec"])
+                            self.assertIn("delete namespace tls-scanner --ignore-not-found --wait=false", calls)
+                        elif namespace:
+                            self.assertEqual(security["runAsUser"], 65532)
+                            self.assertFalse(any(call.startswith("delete namespace") for call in calls))
+                        self.assertIn("--component-filter=envoy", self.scanner_arguments())
+        for step in ("run", "recheck"):
+            self.environment.update({"SCANNER_POD_MODE": "true", "SCANNER_NAMESPACE": "", "TEST_POD_CREATE_EXIT": "0"})
+            Path(self.environment["TEST_OC_CALLS"]).unlink(missing_ok=True)
+            result = self.run_step("envoy", step)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("delete namespace tls-scanner --ignore-not-found --wait=false", Path(self.environment["TEST_OC_CALLS"]).read_text(encoding="utf-8"))
+
+    def test_invalid_container_mode_rejected_without_cluster_calls(self):
+        for step in ("run", "recheck"):
+            for mode, namespace, label in (("yes", "", ""), ("TRUE", "", ""), ("true;id", "", ""), ("true", "openshift-ingress", ""), ("true", "tls-scanner", ""), ("true", "", "management"), ("true", "", "guest")):
+                with self.subTest(step=step, mode=mode, namespace=namespace, label=label):
+                    self.environment.update({"SCANNER_POD_MODE": mode, "SCANNER_NAMESPACE": namespace, "TLS_SCANNER_CLUSTER_LABEL": label})
+                    result = self.run_step("envoy", step)
+                    self.assertEqual(result.returncode, 1, result.stderr)
+                    self.assertIn("SCANNER_POD_MODE", result.stderr)
+                    self.assertFalse(Path(self.environment["TEST_OC_CALLS"]).exists())
+                    self.assertFalse(self.manifest.exists())
+
     def test_recheck_forwards_shared_parameters(self):
         self.environment.update({
             "SCANNER_NAMESPACE": "existing",
@@ -155,6 +222,8 @@ Path(os.environ["TEST_ARGUMENTS"]).write_text(json.dumps(sys.argv[1:]))
                 config = yaml.safe_load((ROOT / "ci-operator/config/openshift/cluster-ingress-operator" / f"{filename}.yaml").read_text())
                 test = next(test for test in config["tests"] if test["as"] == "tls-scanner-aws-gatewayapi")
                 self.assertFalse(test.get("optional", False))
+                self.assertEqual(test["steps"]["env"]["SCANNER_POD_MODE"], "true")
+                self.assertNotIn("SCANNER_NAMESPACE", test["steps"]["env"])
                 self.assertIs(test["always_run"], False)
                 conformance = next(test for test in config["tests"] if test["as"] == "e2e-aws-gatewayapi-conformance")
                 pattern = test["pipeline_run_if_changed"]

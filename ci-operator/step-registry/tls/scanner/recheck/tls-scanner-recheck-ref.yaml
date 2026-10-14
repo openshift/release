@@ -4,6 +4,17 @@ ref:
   cli: latest
   commands: tls-scanner-recheck-commands.sh
   env:
+    - name: SCANNER_POD_MODE
+      default: "false"
+      documentation: |-
+        Set to "true" to use an unprivileged pod in the scanner-owned temporary
+        namespace, with no host networking or host PID access. Requires OpenShift
+        restricted-v2 SCC admission to allocate a non-root UID and volume fsGroup;
+        no fixed UID or fsGroup is assumed. The image must support arbitrary UIDs
+        and writable /tmp and /results. Retains cluster-admin API access for the
+        temporary namespace's default service account; this is container isolation,
+        not API least privilege. Rejects SCANNER_NAMESPACE and cluster labels.
+        "false" preserves legacy container and existing-namespace behavior.
     - name: SCAN_NAMESPACE
       default: ""
       documentation: "Comma-separated list of namespaces to scan. Empty means scan all namespaces."
