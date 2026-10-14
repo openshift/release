@@ -53,9 +53,10 @@ declare -A ipmap=(
     ["ingress.apps"]=$INGRESS_IP
 )
 
-# For UserManaged LB, openstack-provision-dnsrecords publishes api as LB_HOST
-# (bastion/LB floating IP). api-int stays on the internal VIP (API_IP).
-if [[ "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
+# Match dnsrecords: only non-proxy externallb publishes api as LB_HOST.
+# proxy-externallb keeps api -> API_IP (VIP); do not key off LB_HOST alone
+# because bastionproxy always writes it for proxy jobs too.
+if [[ "${CONFIG_TYPE:-}" == *"externallb"* && "${CONFIG_TYPE:-}" != *"proxy"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
     ipmap["api"]=$(<"${SHARED_DIR}/LB_HOST")
 fi
 

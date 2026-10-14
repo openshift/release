@@ -44,7 +44,10 @@ if [ -f "${SHARED_DIR}/API_IP" ]; then
   API_IP=$(<"${SHARED_DIR}"/API_IP)
 
   API_EXTERNAL_RECORD_IP="${API_IP}"
-  if [[ "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
+  # Non-proxy externallb (e.g. vexxhost): publish the LB floating IP so the
+  # installer can reach api from outside. Leave proxy-externallb on API_IP
+  # (VIP) — LB_HOST always exists for those jobs and must not change them.
+  if [[ "${CONFIG_TYPE:-}" == *"externallb"* && "${CONFIG_TYPE:-}" != *"proxy"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
     API_EXTERNAL_RECORD_IP=$(<"${SHARED_DIR}"/LB_HOST)
   fi
 
