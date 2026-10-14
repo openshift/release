@@ -249,7 +249,7 @@ get_localnet_multi_launcher_nodes() {
   local multi_ns="$1"
   oc get pods -n "${multi_ns}" -l kubevirt.io=virt-launcher \
     -o jsonpath='{range .items[*]}{.spec.nodeName}{" "}{end}' 2>/dev/null \
-    | tr ' ' '\n' | sort -u | tr '\n' ' '
+    | tr ' ' '\n' | sort -u | tr '\n' ' ' || true
 }
 
 localnet_multi_launcher_nodes_have_ovn() {
