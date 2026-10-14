@@ -86,18 +86,11 @@ After merge, review the first generated docs PR rather than auto-merging it.
 The target's unit/lint skip patterns are unchanged; whether to exempt all
 OpenWiki JSON files is a separate owner decision.
 
-## Local regression checks
-
-Run the offline fixture tests without CI secrets, GitHub writes, or model calls:
+## Local checks
 
 ```bash
-python3 hack/test-rosa-openwiki.py -v
 bash -n ci-operator/step-registry/rosa/boundary/openwiki/prepare/rosa-boundary-openwiki-prepare-commands.sh
 bash -n ci-operator/step-registry/rosa/boundary/openwiki/update/rosa-boundary-openwiki-update-commands.sh
 bash -n ci-operator/step-registry/rosa/boundary/openwiki/publish/rosa-boundary-openwiki-publish-commands.sh
 shellcheck ci-operator/step-registry/rosa/boundary/openwiki/{prepare,update,publish}/*-commands.sh
 ```
-
-The fixture tests use real Git histories/bundles and mock only network access,
-tool installation, and model execution. They require Python 3, Git, Bash,
-OpenSSL, and jq.
