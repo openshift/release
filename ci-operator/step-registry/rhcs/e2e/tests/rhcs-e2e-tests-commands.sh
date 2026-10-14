@@ -84,15 +84,20 @@ echo ">>> CI run label filter is: $label_filter. Cases match label will be filte
 # Below step will skip gcc checking
 export CGO_ENABLED=0
 
+# The exit status of ginkgo is the source of truth for pass/fail. pipefail is set, so the
+# pipe to tee preserves it. Hold it until the end so the statefile tar, the junit upload
+# and the cleanup below all still run on failure.
+test_exit=0
 ginkgo run \
     --label-filter $label_filter \
     --timeout $timeout \
     --output-dir ${SHARED_DIR} \
     --junit-report $junitFileName \
     -r \
-    --focus-file tests/e2e/.* | tee ${SHARED_DIR}/rhcs_tests.log  || true
+    --focus-file tests/e2e/.* | tee ${SHARED_DIR}/rhcs_tests.log || test_exit=$?
 
-# tar the shared manifest dir to make it share between pods
+# tar the shared manifest dir to make it share between pods.
+# rhcs-e2e-teardown un-tars this to destroy the cluster, so it must run even when tests failed.
 cd ${SHARED_DIR}
 find ./tf-manifests -name 'terraform.[tfstate|tfvars]*' -print0|tar --null -T - -zcvf statefiles.tar.gz
 ls ${SHARED_DIR}
@@ -100,21 +105,20 @@ ls ${SHARED_DIR}
 cd ~/terraform-provider-rhcs
 
 # copy testing result to ARTIFACT_DIR to expose
-cp ${SHARED_DIR}/$junitFileName ${ARTIFACT_DIR}
+if [ -f ${SHARED_DIR}/$junitFileName ]; then
+    cp ${SHARED_DIR}/$junitFileName ${ARTIFACT_DIR}
+else
+    echo ">>> WARN: no junit at ${SHARED_DIR}/$junitFileName. The tests likely died before writing results."
+fi
 
 # Introduce force success exit
 if [ "W${FORCE_SUCCESS_EXIT}W" == "WyesW" ]; then
     echo "force success exit"
-    exit 0
+    test_exit=0
 fi
-
-testFailure=$(tail -n 100 ${SHARED_DIR}/rhcs_tests.log | { grep "\[FAIL\]" || true; })
 
 # clean files before leaving
 rm -rf ${SHARED_DIR}/tf-manifests
 rm -rf ${SHARED_DIR}/rhcs_tests.log
 
-if [ ! -z "$testFailure" ]; then
-    sleep 1800 #Sleep 1800 to debug why cluster dns not ready
-    exit 1
-fi
+exit ${test_exit}

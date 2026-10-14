@@ -92,8 +92,6 @@ operator:
   substitutions:
   - pullspec: controller:latest
     with: pipeline:bgp-cloud-connector
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -230,23 +228,6 @@ tests:
       SCAN_IMAGE: bgp-cloud-connector
     test:
     - ref: fips-check-image-scan
-- always_run: false
-  as: e2e-aws
-  optional: true
-  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: openshift-org-aws
-    test:
-    - as: test
-      cli: latest
-      commands: hack/ci-e2e-aws.sh
-      from: e2e-runner
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-aws
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -785,7 +766,9 @@ tests:
     cluster_profile: azure-qe
     env:
       ARO_CLUSTER_VERSION: "4.21"
+      MUST_GATHER_KEEP_UNPACKED: "true"
     post:
+    - chain: gather
     - as: estate-sweep
       best_effort: true
       cli: latest
@@ -1226,7 +1209,9 @@ tests:
     cluster_profile: azure-qe
     env:
       ARO_CLUSTER_VERSION: "4.21"
+      MUST_GATHER_KEEP_UNPACKED: "true"
     post:
+    - chain: gather
     - as: estate-sweep
       best_effort: true
       cli: latest

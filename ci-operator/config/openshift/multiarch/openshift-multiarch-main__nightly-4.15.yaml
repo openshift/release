@@ -59,8 +59,6 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: vsphere-csi-driver-operator-test
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   arm64-initial:
     candidate:
@@ -234,6 +232,17 @@ tests:
     env:
       OCP_ARCH: arm64
       TEST_SUITE: upgrade-conformance
+    workflow: openshift-upgrade-aws
+- as: ocp-e2e-upgrade-aws-ovn-multi-a-a
+  cron: '@yearly'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      OCP_ARCH: arm64
+      TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: ocp-installer-e2e-aws-ovn-arm64
   cron: 36 20 24 8 *

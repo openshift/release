@@ -8,8 +8,6 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -92,6 +90,31 @@ tests:
       CHANNEL_GROUP: stable
       CLUSTER_API_INSTALLER_REF: backplane-2.17
       OPENSHIFT_VERSION: "4.22"
+      REGION: us-east-1
+      RESERVE_UPGRADE_PATH: "true"
+      TEST_SUITE: --tag full
+    workflow: rosa-e2e-capa
+  timeout: 8h0m0s
+- as: capa-e2e-candidate-5-0
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_API_INSTALLER_REF: backplane-5.0
+      OPENSHIFT_VERSION: "5.0"
+      REGION: us-east-1
+      TEST_SUITE: --tag smoke
+    workflow: rosa-e2e-capa
+  timeout: 5h0m0s
+- as: capa-e2e-candidate-5-0-full
+  cron: 0 8 * * 4
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_API_INSTALLER_REF: backplane-5.0
+      OPENSHIFT_VERSION: "5.0"
       REGION: us-east-1
       RESERVE_UPGRADE_PATH: "true"
       TEST_SUITE: --tag full
