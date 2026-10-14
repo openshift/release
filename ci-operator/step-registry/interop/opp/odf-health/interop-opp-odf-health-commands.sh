@@ -182,6 +182,8 @@ function CollectExitArtifacts () {
     oc get cephcluster -n "${ODF_NAMESPACE}" --ignore-not-found -o yaml > "${ARTIFACT_DIR}/cephcluster.yaml" || true
     oc get noobaa -n "${ODF_NAMESPACE}" --ignore-not-found -o yaml > "${ARTIFACT_DIR}/noobaa.yaml" || true
     oc get sc --ignore-not-found -o yaml > "${ARTIFACT_DIR}/storageclasses.yaml" || true
+    oc get obc -n "${ODF_NAMESPACE}" --ignore-not-found -o yaml > "${ARTIFACT_DIR}/objectbucketclaims.yaml" || true
+    oc get backingstore -n "${ODF_NAMESPACE}" --ignore-not-found -o yaml > "${ARTIFACT_DIR}/backingstores.yaml" || true
     true
 }
 
@@ -428,6 +430,11 @@ EOF
     done
 
     if [[ "${obcPhase}" != "Bound" ]]; then
+        : "Collecting OBC bind-timeout diagnostics..."
+        oc get obc "${obcName}" -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/obc-timeout-claim.yaml" || true
+        oc get objectbucket -l "objectbucket.io/bucket-claim-namespace=${ODF_NAMESPACE},objectbucket.io/bucket-claim-name=${obcName}" -o yaml > "${ARTIFACT_DIR}/obc-timeout-objectbucket.yaml" || true
+        oc get events -n "${ODF_NAMESPACE}" --field-selector "involvedObject.name=${obcName},involvedObject.kind=ObjectBucketClaim" -o yaml > "${ARTIFACT_DIR}/obc-timeout-events.yaml" || true
+        oc get backingstore -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/obc-timeout-backingstores.yaml" || true
         oc delete obc "${obcName}" -n "${ODF_NAMESPACE}" --ignore-not-found=true --wait=false 2>/dev/null || true
         AddResult "noobaa-s3-functional" "fail" "OBC did not bind within ${maxWait}s (phase=${obcPhase:-unknown})"
         return
