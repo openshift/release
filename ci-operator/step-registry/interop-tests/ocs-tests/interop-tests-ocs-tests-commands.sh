@@ -253,7 +253,7 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --html         "${CLUSTER_PATH}/test-results.html" \
   --junit-xml    "${CLUSTER_PATH}/junit.xml"         \
   ${EXTRA_ARGS} \
-  || /bin/true
+  ; _run_ci_rc=$?
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
@@ -270,7 +270,9 @@ if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 	oc apply -f /tmp/acm-policy-subscription-backup.yaml
 fi
 
-_JUNIT_KIND="pass"
-_JUNIT_MESSAGE="ocs-tests passed"
-_EXIT_CLASS="success"
+if (( _run_ci_rc == 0 )); then
+  _JUNIT_KIND="pass"
+  _JUNIT_MESSAGE="ocs-tests passed"
+  _EXIT_CLASS="success"
+fi
 true
