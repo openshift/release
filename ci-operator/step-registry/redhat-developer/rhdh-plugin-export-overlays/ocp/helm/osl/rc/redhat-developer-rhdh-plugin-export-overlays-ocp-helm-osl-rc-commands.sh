@@ -365,10 +365,17 @@ fi
 wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" "${LOGIC_STARTING_CSV}"
 
 export E2E_COLLECT_COVERAGE=false RHDH_VERSION
-git clone --depth 1 --branch main https://github.com/redhat-developer/rhdh-plugin-export-overlays.git "${WORKDIR}/rhdh-plugin-export-overlays"
+OVERLAYS_REPO=https://github.com/rostalan/rhdh-plugin-export-overlays.git
+OVERLAYS_REF=fix/orchestrator-RHIDP-16721-retry-coverage-v2
+OVERLAYS_COMMIT=fe115042732ab1311f39b35365b0ebe523900c53
+git clone --depth 1 --branch "${OVERLAYS_REF}" "${OVERLAYS_REPO}" "${WORKDIR}/rhdh-plugin-export-overlays"
+if [[ "$(git -C "${WORKDIR}/rhdh-plugin-export-overlays" rev-parse HEAD)" != "${OVERLAYS_COMMIT}" ]]; then
+    echo "ERROR: overlays test checkout did not resolve to pinned commit ${OVERLAYS_COMMIT}" >&2
+    exit 1
+fi
 cd "${WORKDIR}/rhdh-plugin-export-overlays"
 TEST_EXIT=0
-bash ./run-e2e.sh -w orchestrator --workers=1 --grep "${TEST_GREP}" || TEST_EXIT=$?
+LOKI_ALLOW_PLACEHOLDER=true bash ./run-e2e.sh -w orchestrator --workers=1 --grep "${TEST_GREP}" || TEST_EXIT=$?
 
 if [[ -d playwright-report && -n "${ARTIFACT_DIR:-}" ]]; then
     cp -a playwright-report "${ARTIFACT_DIR}/"
