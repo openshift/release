@@ -153,12 +153,15 @@ tests:
       SCANNER_NAMESPACE: openshift-ptp
       TLS_GROUPS: SecP384r1MLKEM1024
     test:
-    - as: record-ptp-daemon-generation
+    - as: record-ptp-daemon-pods
       cli: latest
       commands: |
-        generation=$(oc get daemonset linuxptp-daemon -n openshift-ptp -o jsonpath='{.metadata.generation}')
-        echo "PTP daemon generation before TLS group change: ${generation}"
-        printf '%s\n' "${generation}" > "${SHARED_DIR}/linuxptp-daemon-generation"
+        oc get pods -n openshift-ptp -l app=linuxptp-daemon -o jsonpath='{range .items[*]}{.metadata.uid}{"\n"}{end}' | sort > "${SHARED_DIR}/linuxptp-daemon-pods"
+        if [[ ! -s "${SHARED_DIR}/linuxptp-daemon-pods" ]]; then
+          echo "No PTP daemon pods found before the TLS group update"
+          exit 1
+        fi
+        echo "Recorded PTP daemon pods before the TLS group update"
       from: cli
       resources:
         requests:
@@ -170,19 +173,19 @@ tests:
       commands: |
         echo "Waiting for PTP operator to restart after TLS group change..."
         oc rollout status deployment ptp-operator -n openshift-ptp --timeout=300s
-        previous_generation=$(cat "${SHARED_DIR}/linuxptp-daemon-generation")
-        current_generation=${previous_generation}
+        restarted=false
         for _ in $(seq 1 40); do
-          current_generation=$(oc get daemonset linuxptp-daemon -n openshift-ptp -o jsonpath='{.metadata.generation}')
-          if (( current_generation > previous_generation )); then
-            echo "PTP daemon generation advanced from ${previous_generation} to ${current_generation}"
+          oc get pods -n openshift-ptp -l app=linuxptp-daemon -o jsonpath='{range .items[*]}{.metadata.uid}{"\n"}{end}' | sort > "${SHARED_DIR}/linuxptp-daemon-pods-current"
+          if [[ -s "${SHARED_DIR}/linuxptp-daemon-pods-current" ]] && ! comm -12 "${SHARED_DIR}/linuxptp-daemon-pods" "${SHARED_DIR}/linuxptp-daemon-pods-current" | grep -q .; then
+            restarted=true
+            echo "All PTP daemon pods were replaced after the TLS group update"
             break
           fi
-          echo "Waiting for PTP daemon generation to advance beyond ${previous_generation}..."
+          echo "Waiting for all pre-update PTP daemon pods to be replaced..."
           sleep 10
         done
-        if (( current_generation <= previous_generation )); then
-          echo "PTP daemon generation did not change after the TLS group update"
+        if [[ "${restarted}" != "true" ]]; then
+          echo "PTP daemon pods were not replaced after the TLS group update"
           exit 1
         fi
         oc rollout status daemonset linuxptp-daemon -n openshift-ptp --timeout=400s
