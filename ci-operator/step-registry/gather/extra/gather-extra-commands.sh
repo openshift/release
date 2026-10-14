@@ -316,7 +316,11 @@ if [[ -n "${prometheus}" ]]; then
 		fi
 
 		echo "Snapshotting prometheus from ${prompod} as ${FILE_NAME} (may take 15s) ..."
-		queue "${ARTIFACT_DIR}/metrics/${FILE_NAME}.tar.gz" oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- tar cvzf - -C /prometheus .
+		# Run tar inside the pod via bash so we can bound it with timeout. Without a timeout this
+		# command can stream for the full 2h step deadline when the TSDB is large or Prometheus is
+		# actively compacting (DPTP-5412). 900s matches the Prometheus snapshot retention window
+		# and leaves ample time for the remaining collectors and artifact upload.
+		queue "${ARTIFACT_DIR}/metrics/${FILE_NAME}.tar.gz" oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c 'timeout 900 tar cvzf - -C /prometheus . || { rc=$?; echo "WARNING: prometheus tar exited with rc=${rc} (timeout=900s, tar-not-found=127)" >&2; exit ${rc}; }'
 
 		FILTER=gzip queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
 		FILTER=gzip queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
@@ -761,7 +765,26 @@ script="$(
 )"
 queue ${ARTIFACT_DIR}/metrics/job_metrics.json oc --insecure-skip-tls-verify rsh -T -n openshift-monitoring -c thanos-query deploy/thanos-querier /bin/bash -c "${script}"
 
-wait
+# Wait for background collectors with a bounded timeout so the step does not
+# block the entrypoint 2h deadline and prevent artifact upload (DPTP-5412).
+# Collectors that exceed the timeout are killed; partial artifacts are preserved.
+COLLECTOR_TIMEOUT=$(( 90 * 60 ))  # 90 minutes — leaves ~30 min before the 2h step deadline
+collect_start=$(date +%s)
+while true; do
+  mapfile -t _running < <(jobs -rp 2>/dev/null)
+  [[ ${#_running[@]} -eq 0 ]] && break
+  elapsed=$(( $(date +%s) - collect_start ))
+  if (( elapsed >= COLLECTOR_TIMEOUT )); then
+    echo "WARNING: ${#_running[@]} background collector(s) still running after ${COLLECTOR_TIMEOUT}s; terminating to allow artifact upload" >&2
+    kill "${_running[@]}" 2>/dev/null || true
+    sleep 5
+    mapfile -t _running < <(jobs -rp 2>/dev/null)
+    [[ ${#_running[@]} -gt 0 ]] && kill -9 "${_running[@]}" 2>/dev/null || true
+    break
+  fi
+  sleep 5
+done
+wait || true
 
 mkdir -p ${ARTIFACT_DIR}/junit/
 
