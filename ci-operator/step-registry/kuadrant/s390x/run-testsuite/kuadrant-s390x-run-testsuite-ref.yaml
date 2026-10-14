@@ -18,7 +18,23 @@ ref:
       s390x-native Kuadrant testsuite image run as an in-cluster Job on an s390x
       worker node. Running on the cluster network is what lets the test client
       resolve *.COREDNS_ZONE (CoreDNS ClusterIP) and reach the Gateway MetalLB
-      IPs directly, unlike the amd64 build-farm step pod.
+      IPs directly, unlike the amd64 build-farm step pod. Provides the Python /
+      Poetry / s390x wheels runtime. Source tree is replaced when
+      TESTSUITE_GIT_REF is set.
+  - name: TESTSUITE_GIT_REPO
+    default: "https://github.com/Kuadrant/testsuite.git"
+    documentation: |-
+      Git remote cloned into the in-cluster Job when TESTSUITE_GIT_REF is set.
+      Public HTTPS; the Job already curls GitHub for the cfssl fallback.
+  - name: TESTSUITE_GIT_REF
+    default: "main"
+    documentation: |-
+      Kuadrant/testsuite git ref overlaid onto TESTSUITE_S390X_IMAGE before
+      make. Default "main" always fetches current origin/main at Job start
+      (the s390x image bake is 5682b36 / Jul 2026). Pin a SHA to freeze a
+      rehearsal. Set to "none" to keep the baked image tree. When overlaying,
+      the 1.4.x kuadrant-filter→wasm-shim rewrite is skipped so the
+      checked-out tests keep their Jaeger service name.
   - name: TESTSUITE_RUN_AS_USER
     default: "65532"
     documentation: |-
@@ -152,8 +168,11 @@ ref:
     getaddrinfo resolver plugin, mounts them plus a ServiceAccount token kubeconfig
     (cluster-admin; rhcl-mc1-style bearer for thanos-querier HTTPS) into a Job
     that uses TESTSUITE_S390X_IMAGE on an s390x worker node, streams the Job logs
-    into ARTIFACT_DIR, and recovers JUnit reports from the log stream. The OpenShift
-    CLI is injected via cli: latest. A cert-only installer kubeconfig is not used
+    into ARTIFACT_DIR, and recovers JUnit reports from the log stream. When
+    TESTSUITE_GIT_REF is not "none", the Job git-fetches (or curls the GitHub
+    tarball) that Kuadrant/testsuite ref over the image workdir and
+    poetry-installs before make. Default is main (always current tip). The
+    OpenShift CLI is injected via cli: latest. A cert-only installer kubeconfig is not used
     because testsuite Prometheus auth requires cluster.token (Bearer).
 
     Default make targets: smoke + kuadrant. Optional segmented suites

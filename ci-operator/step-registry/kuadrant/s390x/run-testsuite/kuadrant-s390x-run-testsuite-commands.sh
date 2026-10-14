@@ -16,6 +16,9 @@ set -euo pipefail
 #   - CFSSL ensure (baked in Dockerfile.s390x; fallback download if missing)
 #   - CoreDNS getaddrinfo plugin + UI ignore
 #
+# TESTSUITE_GIT_REF: when set, the Job overlays that Kuadrant/testsuite git ref
+# onto the s390x image workdir (runtime stays the image; source is current).
+#
 # Why: the ci-operator step pod lives on the amd64 build farm, on a different
 # network than the leased s390x cluster. It cannot resolve the private CoreDNS
 # zone (*.k.example.com) nor reach the Gateway MetalLB IPs (192.168.x.240).
@@ -1165,6 +1168,13 @@ PY
 # newer lock entry. Re-pin pyproject+lock in the Job before make so sync stays
 # on 6.32.1.
 PROTOBUF_PIN="${PROTOBUF_PIN:-6.32.1}"
+TESTSUITE_GIT_REPO="${TESTSUITE_GIT_REPO:-https://github.com/Kuadrant/testsuite.git}"
+TESTSUITE_GIT_REF="${TESTSUITE_GIT_REF:-main}"
+# "none" keeps the baked image tree; anything else (main, SHA, tag) is overlaid.
+OVERLAY_TESTSUITE=true
+if [[ -z "${TESTSUITE_GIT_REF}" || "${TESTSUITE_GIT_REF}" == "none" ]]; then
+  OVERLAY_TESTSUITE=false
+fi
 # Ignore UI only: the s390x testsuite image omits Playwright; collecting
 # singlecluster/ui still imports conftest and fails make with ModuleNotFoundError.
 # Those UI tests are outside the 450-collected / 10-skip kuadrant suite.
@@ -1206,7 +1216,39 @@ flags='${flags}' make ${target} || rc=1
 }
 
 CONTAINER_SCRIPT="set -o pipefail
+"
+if [[ "${OVERLAY_TESTSUITE}" == "true" ]]; then
+  echo "=== TESTSUITE_GIT_REF=${TESTSUITE_GIT_REF} (overlay onto ${TESTSUITE_S390X_IMAGE}) ==="
+  CONTAINER_SCRIPT+="echo '=== Checking out ${TESTSUITE_GIT_REPO} @ ${TESTSUITE_GIT_REF} ==='
+src=/tmp/kuadrant-testsuite-src
+rm -rf \$src
+mkdir -p \$src
+fetched=
+if command -v git >/dev/null 2>&1; then
+  git init \$src
+  git -C \$src remote add origin ${TESTSUITE_GIT_REPO}
+  if git -C \$src fetch --depth 1 origin ${TESTSUITE_GIT_REF}; then
+    git -C \$src checkout --force FETCH_HEAD
+    fetched=1
+  else
+    echo 'git fetch of ref failed; will try GitHub tarball'
+  fi
+fi
+if [[ -z \$fetched ]]; then
+  url=https://github.com/Kuadrant/testsuite/archive/${TESTSUITE_GIT_REF}.tar.gz
+  echo fetching \$url
+  curl -fsSL \$url | tar -xz -C \$src --strip-components=1 || exit 1
+fi
+test -f \$src/pyproject.toml || { echo 'checkout missing pyproject.toml'; exit 1; }
+git -C \$src log -1 --format='%H %ci %s' || true
+rm -rf /opt/workdir/kuadrant-testsuite
+mv \$src /opt/workdir/kuadrant-testsuite
 cd /opt/workdir/kuadrant-testsuite
+echo '=== poetry install for checked-out testsuite ==='
+poetry install --no-interaction --sync || poetry install --no-interaction || exit 1
+"
+fi
+CONTAINER_SCRIPT+="cd /opt/workdir/kuadrant-testsuite
 rc=0
 echo '=== Pinning protobuf==${PROTOBUF_PIN} for s390x (avoid broken upb ≥6.33.0) ==='
 # testsuite deps live in Poetry group \"main\" (see Dockerfile.s390x).
@@ -1257,10 +1299,11 @@ if p.exists():
     else:
         print('egress-bk already present or no backend name')
 PY
-
-# RHCL 1.4.x publishes dataplane traces as Jaeger service wasm-shim.
+"
+if [[ "${OVERLAY_TESTSUITE}" != "true" ]]; then
+  CONTAINER_SCRIPT+="# RHCL 1.4.x publishes dataplane traces as Jaeger service wasm-shim.
 # Testsuite 80f962fc+ looks up kuadrant-filter. Match pre-80f962fc (17815b9).
-echo '=== Jaeger lookup kuadrant-filter -> wasm-shim (RHCL 1.4.x) ==='
+echo '=== Jaeger lookup kuadrant-filter -> wasm-shim (RHCL 1.4.x bake) ==='
 python3 - <<'PY' || true
 from pathlib import Path
 files = [
@@ -1279,7 +1322,12 @@ for p in files:
     p.write_text(t.replace(old, new))
     print('patched', p, '-> wasm-shim')
 PY
-
+"
+else
+  CONTAINER_SCRIPT+="echo '=== Skipping kuadrant-filter -> wasm-shim (overlaying ${TESTSUITE_GIT_REF}; keep checked-out Jaeger service name) ==='
+"
+fi
+CONTAINER_SCRIPT+="
 # CFSSL: Dockerfile.s390x installs /usr/bin/cfssl; re-install if the baked image is older.
 echo '=== Ensuring cfssl is on PATH ==='
 if ! command -v cfssl >/dev/null 2>&1; then
@@ -1299,6 +1347,8 @@ echo "  RUN_SMOKE=${RUN_SMOKE} RUN_AUTHORINO=${RUN_AUTHORINO} RUN_LIMITADOR=${RU
 echo "  RUN_DNSTLS=${RUN_DNSTLS} RUN_OBSERVABILITY=${RUN_OBSERVABILITY} RUN_KUADRANT=${RUN_KUADRANT}"
 echo "  RUN_DATAPLANE_TRACING_ONLY=${RUN_DATAPLANE_TRACING_ONLY}"
 echo "  PYTEST_FLAGS=${PYTEST_FLAGS}"
+echo "  TESTSUITE_S390X_IMAGE=${TESTSUITE_S390X_IMAGE}"
+echo "  TESTSUITE_GIT_REF=${TESTSUITE_GIT_REF} overlay=${OVERLAY_TESTSUITE}"
 
 # Independent targets: each records failure into rc but does not skip the next.
 # Non-smoke uses --reruns 0 (Makefile defaults to --reruns 3; last CLI flag wins).
