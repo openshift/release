@@ -6,6 +6,12 @@ ref:
   - collection: ci-claude-code
     group: claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
+  - collection: ci-claude-code
+    group: codex-openshift-ci
+    mount_path: /var/run/codex-openai-api-key
+  - collection: ci-claude-code
+    group: zai-openshift-ci
+    mount_path: /var/run/zai-api-key
   - collection: technical-release-team
     group: openshift-trt-agent-gh-app
     mount_path: /var/run/github-token
@@ -29,6 +35,23 @@ ref:
     default: "/var/run/claude-code-service-account/google-token"
   - name: CLAUDE_MODEL
     default: "claude-opus-4-6"
+    documentation: |-
+      Legacy model input; used only when AGENT_MODEL and its override are unset.
+  - name: AGENT_MODEL
+    default: ""
+    documentation: |-
+      Worker agent model for the OpenCode harness: alias (glm, sol, luna,
+      claude-*) or provider/model ID (google-vertex*, openai/*, zai/*).
+      Empty or unresolvable falls back to google-vertex-anthropic/claude-opus-4-6@default.
+  - name: MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL
+    default: ""
+    documentation: Gangway API override for AGENT_MODEL.
+  - name: OPENAI_API_KEY_PATH
+    default: "/var/run/codex-openai-api-key/token"
+    documentation: OpenAI API key file for openai/* models (luna, sol).
+  - name: ZAI_API_KEY_PATH
+    default: "/var/run/zai-api-key/token"
+    documentation: Z.ai API key file for glm; falls back until provisioned.
   - name: REGISTRY_AUTH_FILE
     default: /var/run/registry-pull-credentials/.dockerconfigjson
     documentation: Pull secret for nested-podman QCI/registry.ci image pulls.
@@ -40,7 +63,8 @@ ref:
   timeout: 2h0m0s
   grace_period: 1m0s
   documentation: |-
-    Solves a Jira issue using Claude. Reads issue data and common
-    functions from SHARED_DIR (written by openshift-agentic-trt-init).
-    Runs repo-specific setup, invokes Claude, creates PR, polls for
-    review comments.
+    Solves a Jira issue using an agentic worker on the OpenCode harness
+    (default google-vertex-anthropic/claude-opus-4-6@default; GLM and OpenAI models via
+    AGENT_MODEL). Reads issue data and common functions from SHARED_DIR
+    (written by openshift-agentic-trt-init). Runs repo-specific setup,
+    invokes the agent, creates PR, polls for review comments.

@@ -101,8 +101,8 @@ All steps live under [`ci-operator/step-registry/openshift/agentic/trt/`][regist
 | Step | Ref YAML | Script | Inputs | Outputs |
 |------|----------|--------|--------|---------|
 | **github-app-auth** | [`github-app-auth-ref.yaml`][auth-ref] | [`github-app-auth-commands.sh`][auth-sh] | `trt-agent-gh-app` credential (app-id, private-key, installation IDs) | `gh-fork-token`, `gh-upstream-token`, `gh-app-bot-login` |
-| **init** | [`init-ref.yaml`][init-ref] | [`init-commands.sh`][init-sh] | `JIRA_ISSUE_KEY`, tokens from SHARED_DIR | `jira-issue-key`, `jira-issue.json` |
-| **jira-solver** | [`jira-solver-ref.yaml`][solver-ref] | [`jira-solver-commands.sh`][solver-sh] | JIRA JSON, tokens, `SETUP_SCRIPT`, `ALLOWED_TOOLS` | `pr-number`, `claude-output.log`, PR on fork |
+| **init** | [`init-ref.yaml`][init-ref] | [`init-commands.sh`][init-sh] | `JIRA_ISSUE_KEY`, tokens from SHARED_DIR | `jira-issue-key`, `jira-issue.json`, `trt-agent.sh` |
+| **jira-solver** | [`jira-solver-ref.yaml`][solver-ref] | [`jira-solver-commands.sh`][solver-sh] | JIRA JSON, tokens, `SETUP_SCRIPT`, `AGENT_MODEL` | `pr-number`, `agent-output.log`, `agent-model.json`, PR on fork |
 | **pr-followup** | [`pr-followup-ref.yaml`][followup-ref] | [`pr-followup-commands.sh`][followup-sh] | JIRA key, tokens | `pr-number` |
 | **review-responder** | [`review-responder-ref.yaml`][responder-ref] | [`review-responder-commands.sh`][responder-sh] | `pr-number`, tokens, `gh-app-bot-login` | Comment replies, pushed fixes |
 
@@ -117,6 +117,29 @@ All steps live under [`ci-operator/step-registry/openshift/agentic/trt/`][regist
 [followup-sh]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/pr-followup/openshift-agentic-trt-pr-followup-commands.sh
 [responder-ref]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/review-responder/openshift-agentic-trt-review-responder-ref.yaml
 [responder-sh]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/review-responder/openshift-agentic-trt-review-responder-commands.sh
+
+### Agent Harness (worker agents)
+
+Worker agents (jira-solver, review-responder workers) run on the **OpenCode**
+harness (`agentic-ci --harness opencode`) for all models. Model selection:
+`MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL` (Gangway) > `AGENT_MODEL` > legacy
+`CLAUDE_MODEL` — aliases (`glm`, `sol`, `luna`, `claude-*`) or full
+provider/model IDs; unresolvable requests fall back to
+`google-vertex-anthropic/claude-opus-4-6@default` (recorded in
+`agent-model.json`).
+
+The init steps write a shared `trt-agent.sh` library to SHARED_DIR (embedded
+heredoc, identical in all three inits): model resolver, pinned sha256-verified
+OpenCode install with a CI shim (`--dangerously-skip-permissions` → `--auto`,
+forces `--standalone`), per-profile security configs, and the `trt_agent_run`
+runner. Security is enforced in two layers from a CI-owned
+`OPENCODE_CONFIG_DIR`: `permission` deny rules in the config (direct
+command forms) and a per-profile permission plugin (wrapped and compound
+forms). The plugin is the backbone — repo-shipped OpenCode config can
+override the permission rules but cannot unload the plugin. The
+review-responder gate stays on the `claude` CLI with `GATE_MODEL`,
+unaffected by the model override. OpenCode does not export OTEL, so eval
+run-results report the model only (from `agent-model.json`).
 
 ### CI Operator Configs (Prow job definitions)
 

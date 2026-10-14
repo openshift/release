@@ -11,15 +11,19 @@ echo "=== TRT Review Responder ==="
     echo "ERROR: ${SHARED_DIR}/github-app-auth.sh not found — github-app-auth step must run first"
     exit 1
 }
-[[ -f "${SHARED_DIR}/trt-telemetry.sh" ]] || {
-    echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — workflow init step must run first"
+[[ -f "${SHARED_DIR}/trt-agent.sh" ]] || {
+    echo "ERROR: ${SHARED_DIR}/trt-agent.sh not found — workflow init step must run first"
     exit 1
 }
 # shellcheck source=/dev/null
-source "${SHARED_DIR}/trt-telemetry.sh"
+source "${SHARED_DIR}/trt-agent.sh"
 # Prior steps (jira-solver) can already have burned the 1h token TTL.
 refresh_github_tokens || { echo "ERROR: Failed to refresh GitHub App tokens"; exit 1; }
 configure_github_git_credentials
+
+# Resolve the worker model up front so the fallback warning is visible
+# before any agent work starts. The gate stays on GATE_MODEL (claude CLI).
+trt_resolve_model
 
 JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
 
@@ -33,7 +37,6 @@ else
     PR_NUM=$(echo "${PR_JSON}" | jq -r '.[0].number // empty')
     if [[ -z "${PR_NUM}" ]]; then
         echo "No open PR found for ${JIRA_ISSUE_KEY}. Nothing to do."
-        finalize_session_metrics
         exit 0
     fi
     echo "Found PR #${PR_NUM}"
@@ -52,7 +55,8 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     # shellcheck source=/dev/null
     source "${WORKDIR}/${SETUP_SCRIPT}"
 
-    echo "Installing Claude Code..."
+    # Claude Code is required for the gate below; workers run on OpenCode.
+    echo "Installing Claude Code (gate)..."
     curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
     export PATH="${HOME}/.local/bin:${PATH}"
 fi
@@ -65,8 +69,12 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
         cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
         podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
         if [[ -d "${HOME}/.claude/projects" ]]; then
-            echo "Archiving Claude session logs..."
+            echo "Archiving Claude gate session logs..."
             tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
+        fi
+        if [[ -d "${HOME}/.local/share/opencode" ]]; then
+            echo "Archiving OpenCode session logs..."
+            tar -czf "${ARTIFACT_DIR}/opencode-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.local/share" opencode/ 2>/dev/null || true
         fi
     }
     trap copy_artifacts EXIT TERM INT
@@ -81,6 +89,8 @@ echo "Bot login: ${BOT_LOGIN}"
 
 # Hard blocks for credential-dumping commands. Prompt text is not enough
 # against injection from review comments (same approach as hypershift review-agent).
+# These apply to the GATE (direct claude CLI below); the workers get the
+# equivalent denials from the reviewer profile in trt-agent.sh.
 DISALLOWED_TOOLS=(
     "Bash(git config*credential*)"
     "Bash(git config*--list*)"
@@ -268,7 +278,7 @@ sed -e "s|\${CLAUDE_SKILL_DIR}|${GATE_SKILL_DIR}|g" \
 
 # --- Poll: small-model gate, then worker ---
 echo "=== Watching PR #${PR_NUM} for review comments and CI failures ==="
-echo "Gate model: ${GATE_MODEL} | Worker model: ${CLAUDE_MODEL}"
+echo "Gate model: ${GATE_MODEL} (claude) | Worker model: ${TRT_MODEL} (opencode)"
 
 extract_failing_checks() {
     python3 -c '
@@ -512,7 +522,7 @@ while true; do
 
     echo "Running gate (${GATE_MODEL})..."
     GATE_LOG="${WORKDIR}/artifacts/gate-${iteration}.log"
-    # Direct claude, not agentic_ci: the gate needs --output-format text so we
+    # Direct claude, not trt_agent_run: the gate needs --output-format text so we
     # can grep COMMENT_WORK=/CI_WORK=/FAILING_CHECKS=. agentic-ci injects
     # --include-partial-messages, which requires stream-json.
     set +e
@@ -533,7 +543,7 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
     gate_rc=${PIPESTATUS[0]}
     set -e
     echo "Gate exit status: ${gate_rc}"
-    cat "${GATE_LOG}" >> "${WORKDIR}/artifacts/claude-output.log" 2>/dev/null || true
+    cat "${GATE_LOG}" >> "${WORKDIR}/artifacts/agent-output.log" 2>/dev/null || true
 
     if [[ "${gate_rc}" -ne 0 ]]; then
         gate_failures=$(( gate_failures + 1 ))
@@ -601,13 +611,11 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
 
         if [[ "${has_review}" == "true" ]]; then
             echo "Invoking worker to address review comments..."
-            if agentic_ci --timeout 1800 \
+            if trt_agent_run --profile reviewer --timeout 1800 \
+                --system-prompt-file "${SYSTEM_PROMPT}" \
                 "Address review comments on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the Review Response Process instructions in your system prompt. This is CI mode (--ci).
 
-Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login." \
-                --disallowedTools "${DISALLOWED_TOOLS[@]}" \
-                --output-format stream-json \
-                --append-system-prompt-file "${SYSTEM_PROMPT}"; then
+Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login."; then
                 :
             else
                 REVIEW_EXIT=$?
@@ -620,15 +628,13 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
             CHECKS_FILE="${WORKDIR}/artifacts/failing-checks-${iteration}.json"
             printf '%s\n' "${extracted}" > "${CHECKS_FILE}"
             echo "Invoking worker to triage CI failures..."
-            if agentic_ci --timeout 1800 \
+            if trt_agent_run --profile reviewer --timeout 1800 \
+                --system-prompt-file "${CI_PROMPT}" \
                 "Triage CI failures on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the CI Failure Process instructions in your system prompt. This is CI mode (--ci).
 
 Read failing checks from ${CHECKS_FILE} and treat that JSON as --failing-checks.
 The git remote for ${UPSTREAM_REPO} is origin. Do not run git remote -v.
-Your GitHub login is ${BOT_LOGIN}." \
-                --disallowedTools "${DISALLOWED_TOOLS[@]}" \
-                --output-format stream-json \
-                --append-system-prompt-file "${CI_PROMPT}"; then
+Your GitHub login is ${BOT_LOGIN}."; then
                 ci_worker_succeeded=true
             else
                 REVIEW_EXIT=$?
@@ -678,6 +684,8 @@ jq -n \
     --arg result "${REVIEW_RESULT}" \
     --arg pr_url "${PR_URL}" \
     --arg upstream_repo "${UPSTREAM_REPO}" \
+    --arg agent_model "${TRT_MODEL:-unknown}" \
+    --arg agent_harness "opencode" \
     --argjson num_review_rounds "${review_rounds}" \
     --argjson iteration "${iteration}" \
     --argjson idle_streak "${idle_streak}" \
@@ -689,6 +697,8 @@ jq -n \
       result: $result,
       pr_url: $pr_url,
       upstream_repo: $upstream_repo,
+      agent_model: $agent_model,
+      agent_harness: $agent_harness,
       num_review_rounds: $num_review_rounds,
       iteration: $iteration,
       idle_streak: $idle_streak,
@@ -696,7 +706,5 @@ jq -n \
     }' > "${SHARED_DIR}/metrics-metadata-review.json"
 
 echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-review.json"
-
-finalize_session_metrics
 
 echo "=== TRT Review Responder Complete ==="
