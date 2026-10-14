@@ -221,7 +221,8 @@ function approve_csrs() {
       local raw_csrs
       raw_csrs=$(oc get csr -ojson 2>/dev/null || echo '{"items":[]}')
       local pending_csrs
-      pending_csrs=$(echo "${raw_csrs}" | yq-v4 -oy '.items[] | select(.status | length == 0 or .conditions == null) | .metadata.name' 2>/dev/null || true)
+      pending_csrs=$(echo "${raw_csrs}" | yq-v4 -oy \
+        '.items[] | select((.status.conditions // [] | length) == 0) | .metadata.name' 2>/dev/null || true)
 
       for csr_name in ${pending_csrs}; do
         [[ -z "${csr_name}" ]] && continue
@@ -244,8 +245,10 @@ function approve_csrs() {
         fi
 
         if [[ "${valid_signer}" == "true" && "${valid_subject}" == "true" ]]; then
-          echo "Approving valid CSR ${csr_name} for requester ${requester} (signer: ${signer_name})"
-          oc adm certificate approve "${csr_name}" >/dev/null 2>&1 || true
+          echo "Attempting approval of CSR ${csr_name}"
+          if ! oc adm certificate approve "${csr_name}"; then
+            echo "ERROR: Approval failed for CSR ${csr_name}" >&2
+          fi
         fi
       done
 
@@ -588,12 +591,18 @@ echo "Approving pending CSRs for additional compute nodes..."
 approve_csrs &
 CSR_APPROVER_PID=$!
 
+READY_ATTEMPTS="${ADDITIONAL_NODE_READY_ATTEMPTS:-180}"
+if [[ ! "${READY_ATTEMPTS}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ERROR: Invalid ADDITIONAL_NODE_READY_ATTEMPTS" >&2
+  exit 1
+fi
+
 echo "Waiting for newly provisioned arm64 node(s) to join and become Ready..."
 for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   target_node_name="${LEASED_RESOURCE}-additional-compute-${idx}"
   echo "Checking node status for ${target_node_name}..."
   node_ready=false
-  for (( i=1; i<=60; i++ )); do
+  for (( i=1; i<=READY_ATTEMPTS; i++ )); do
     # Verify the specific node exists, matches arm64 architecture, and is Ready
     NODE_LINE=$(oc get nodes --no-headers 2>/dev/null | grep -E "^${target_node_name}(\.[a-zA-Z0-9.-]+)?\s+" || true)
     if [[ -n "${NODE_LINE}" ]] && echo "${NODE_LINE}" | grep -qw "Ready"; then
