@@ -123,7 +123,7 @@ echo ""
 # access before --setup-infra can create customer-project IAM and networking.
 if [[ "${GCPHCPCTL_AUTHZ_BOOTSTRAP:-true}" == "false" ]]; then
   echo "Checking pre-provisioned customer API access..."
-  if ! /usr/bin/gcphcpctl cluster list -o json > /dev/null 2>&1; then
+  if ! /usr/bin/gcphcpctl cluster list -o json > /dev/null; then
     echo "ERROR: Cannot list clusters in the customer project through the Platform API"
     echo "Verify one-time customer namespace activation and a cluster-admin RoleBinding for the WIF identity outside this job"
     exit 1
