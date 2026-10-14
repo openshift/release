@@ -29,6 +29,8 @@ ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/
 --known-infra-file infra-image-mirroring.yaml \
 --known-infra-file infra-periodics-origin-release-images.yaml
 
+python3 "${base_dir}/hack/generators/scos-art-publication.py" --release-root "${base_dir}" --jobs-root "${workdir}/ci-operator/jobs"
+
 if ! diff -Naupr "${ci_operator_dir}/jobs/" "${workdir}/ci-operator/jobs/"> "${workdir}/diff"; then
 	cat << EOF
 ERROR: This check enforces that Prow Job configuration YAML files are generated

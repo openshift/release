@@ -18,11 +18,58 @@ validate_inputs() {
   done
   sources=("${STREAM_COREOS_IMAGE:?}" "${STREAM_COREOS_EXTENSIONS_IMAGE:?}")
   for source in "${sources[@]}"; do
-    if [[ ! "$source" =~ ^[^[:space:]@]+@sha256:[a-f0-9]{64}$ ]]; then
+    if [[ ! "$source" =~ ^quay-proxy\.ci\.openshift\.org/openshift/ci@sha256:[a-f0-9]{64}$ ]]; then
       echo 'Expected an immutable build dependency, refusing publication' >&2
       exit 1
     fi
   done
+}
+
+require_ci_promotion() {
+  if ! oc --request-timeout=10s -n origin get imagestream scos-5.1 -o json > "$workdir/ci-current.json" 2> "$workdir/get.err"; then
+    echo 'Unable to verify normal CI promotion; client diagnostics withheld' >&2
+    exit 1
+  fi
+  if ! jq_art '
+    .apiVersion == "image.openshift.io/v1" and .kind == "ImageStream" and
+    .metadata.name == "scos-5.1" and .metadata.namespace == "origin" and
+    (.metadata.uid | type == "string" and length > 0) and
+    (art_specs | has_both_tags) and
+    ([art_specs[].from.name] == [$coreos, $extensions]) and
+    all(art_specs[];
+      .from.kind == "DockerImage" and .reference == true and
+      .referencePolicy.type == "Source" and
+      (.generation | type == "number" and . > 0))
+  ' -e --arg coreos "${sources[0]}" --arg extensions "${sources[1]}" "$workdir/ci-current.json" > /dev/null; then
+    echo 'Normal CI promotion does not match both originating build digests; refusing ART publication' >&2
+    exit 1
+  fi
+  if [[ -f "$workdir/ci-baseline.json" ]]; then
+    if ! cmp -s <(jq_art '[.metadata.uid, art_specs]' -S "$workdir/ci-baseline.json") <(jq_art '[.metadata.uid, art_specs]' -S "$workdir/ci-current.json"); then
+      echo 'Normal CI promotion was superseded; refusing ART publication success' >&2
+      exit 1
+    fi
+  else
+    cp "$workdir/ci-current.json" "$workdir/ci-baseline.json"
+  fi
+}
+
+require_manifest_list() {
+  local source=$1 digest
+  digest=${source##*@}
+  if ! oc image info --registry-config="$registry_config" --show-multiarch --filter-by-os='linux/.*' -o json "$source" > "$workdir/image-info.out" 2> "$workdir/image-info.err"; then
+    echo 'Unable to verify promoted manifest list; client diagnostics withheld' >&2
+    exit 1
+  fi
+  if ! jq --arg digest "$digest" '
+    if type == "array" then . else [.] end |
+    length > 0 and all(.[]; .listDigest == $digest and
+      (.digest | type == "string" and test("^sha256:[a-f0-9]{64}$")) and
+      .digest == .contentDigest)
+  ' -e "$workdir/image-info.out" > /dev/null; then
+    echo "Promoted source is not the expected manifest list at ${digest}" >&2
+    exit 1
+  fi
 }
 
 jq_art() {
@@ -111,10 +158,15 @@ require_unchanged() {
 }
 
 mirror_images() {
+  require_ci_promotion
+  local source
+  for source in "${sources[@]}"; do
+    require_manifest_list "$source"
+  done
   get_stream
   cp "$workdir/current.json" "$workdir/baseline.json"
   printf '[]' > "$workdir/desired.json"
-  local index tag source digest destination
+  local index tag digest destination
   for index in 0 1; do
     tag=$(jq_art "art_names[${index}]" -nr)
     source=${sources[$index]}
@@ -171,6 +223,7 @@ update_art_tags() {
 update_art_tag() {
   local tag=$1 attempt update_exit error expected_conflict reason conflict_prefix version
   for attempt in 1 2 3; do
+    require_ci_promotion
     get_stream
     require_unchanged "$workdir/baseline.json" 'Publication superseded before update; refusing to overwrite'
     if ! oc --request-timeout=10s -n origin get imagestreamtag "scos-5.1-art:${tag}" -o json > "$workdir/tag.json" 2> "$workdir/get.err"; then
@@ -219,6 +272,7 @@ update_art_tag() {
 wait_for_imports() {
   local attempt
   for ((attempt = 0; attempt < 60; attempt++)); do
+    require_ci_promotion
     get_stream
     require_unchanged "$workdir/updated.json" 'Publication superseded while waiting for import'
     if jq_art '
@@ -242,6 +296,7 @@ wait_for_imports() {
       . as $stream | art_specs |
       has_both_tags and all(.[]; . as $spec | $stream | import_complete($spec))
     ' -e "$workdir/current.json" > /dev/null; then
+      require_ci_promotion
       echo 'Both ART CoreOS imports match this build and their current generations'
       return
     fi
