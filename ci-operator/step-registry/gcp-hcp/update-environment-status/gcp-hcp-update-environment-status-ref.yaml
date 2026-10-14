@@ -1,0 +1,31 @@
+ref:
+  as: gcp-hcp-update-environment-status
+  from: src
+  commands: gcp-hcp-update-environment-status-commands.sh
+  env:
+  - name: E2E_STATUS_CONTEXT
+    default: ""
+    documentation: "GitHub commit status context for the periodic environment test"
+  - name: E2E_STATUS_TARGETS
+    default: ""
+    documentation: "JSON array of active promotion branches and required deployment status contexts"
+  - name: E2E_STATUS_WAIT_SECONDS
+    default: "1800"
+    documentation: "Maximum time to wait for Terraform and ArgoCD deployment statuses"
+  - name: E2E_STATUS_POLL_SECONDS
+    default: "60"
+    documentation: "Interval between deployment status checks"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+  timeout: 35m0s
+  credentials:
+  - namespace: ci
+    bundle: github-credentials-openshift-ci-robot-private-git-cloner
+    mount_path: /etc/github-private
+  documentation: |-
+    For a periodic job, captures the active sector promotion commit SHA and
+    posts a pending GitHub status. Waits up to 30 minutes for the configured
+    Terraform and ArgoCD deployment statuses before testing. Rehearsals of
+    this periodic also publish statuses; ordinary presubmits do not.
