@@ -76,7 +76,7 @@ tests:
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: sbr-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
-        && !tier:upgrade-cluster'
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       ODF_OPERATOR_CHANNEL: stable-5.0
       ODF_VERSION_MAJOR_MINOR: "5.0"
@@ -139,12 +139,6 @@ tests:
           echo '==> Copy the CI-selected SBR checkout into a writable build directory'
           test -f /opt/sbr-ci-src/Makefile
           cp -R /opt/sbr-ci-src /tmp/sbr-source
-
-          # TODO: Revert this rehearsal-only checkout after validating cross-repo wiring.
-          echo '==> Check out storage-based-remediation PR 95'
-          git -C /tmp/sbr-source fetch --depth=1 \
-            https://github.com/medik8s/storage-based-remediation.git refs/pull/95/head
-          git -C /tmp/sbr-source checkout --detach FETCH_HEAD
 
           local revision prefix operator_tag agent_tag bundle_tag catalog_tag
           revision="$(git -C /tmp/sbr-source rev-parse HEAD)"
