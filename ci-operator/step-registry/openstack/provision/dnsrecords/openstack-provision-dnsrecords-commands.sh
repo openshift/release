@@ -43,13 +43,20 @@ EOF
 if [ -f "${SHARED_DIR}/API_IP" ]; then
   API_IP=$(<"${SHARED_DIR}"/API_IP)
 
-  # LB_HOSTS present => multi-value api RR; else API_IP. api-int always API_IP.
+  # Priority for api DNS:
+  # 1) LB_HOSTS (multi-LB) when present
+  # 2) LB_HOST for externallb
+  # 3) API_IP (VIP)
+  # api-int always stays on API_IP.
   API_RECORD_VALUES=()
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     while IFS= read -r ip || [[ -n "${ip}" ]]; do
       [[ -z "${ip}" ]] && continue
       API_RECORD_VALUES+=("${ip}")
     done < "${SHARED_DIR}/LB_HOSTS"
+  fi
+  if [[ "${#API_RECORD_VALUES[@]}" -eq 0 && "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
+    API_RECORD_VALUES+=("$(<"${SHARED_DIR}/LB_HOST")")
   fi
   if [[ "${#API_RECORD_VALUES[@]}" -eq 0 ]]; then
     API_RECORD_VALUES+=("${API_IP}")
