@@ -326,7 +326,7 @@ cat << EOF > ~/fetch-kubeconfig.yml
 
   - name: Save the original of the ZTP kubeconfig
     fetch:
-      src: /home/kni/.kube/hcp_config_${CLUSTER_NAME}
+      src: /home/kni/.kube/ztp_config_${CLUSTER_NAME}
       dest: $SHARED_DIR/kubeconfig.original
       flat: yes
 
