@@ -29,7 +29,21 @@ TF_GCP_SQL_DIR="$(pwd)"
 # Copy GCP auth.json from mounted secret to current directory
 cp /var/run/quay-qe-gcp-secret/auth.json .
 
-echo "Provisioning Google Cloud SQL PostgreSQL (${DB_VERSION})..."
+# Co-locate the database with the cluster. For the openshift-org-gcp cluster
+# profile LEASED_RESOURCE carries the GCP region of the quota slice the
+# cluster was installed in (the same mechanism ipi-conf-gcp uses for
+# install-config). A cross-region database adds ~35ms RTT to every query,
+# which made the e2e suite blow per-test timeouts (rehearsal build
+# 2110243574493745152: cluster in us-east1 vs SQL in us-central1, 318 failed
+# tests, 2h step timeout). Fall back to the historical default when the
+# variable is unset or does not look like a GCP region.
+GCP_SQL_REGION="${LEASED_RESOURCE:-}"
+if [[ ! "${GCP_SQL_REGION}" =~ ^[a-z]+-[a-z]+[0-9]$ ]]; then
+  echo "LEASED_RESOURCE '${GCP_SQL_REGION}' is not a GCP region; defaulting SQL region to us-central1"
+  GCP_SQL_REGION="us-central1"
+fi
+
+echo "Provisioning Google Cloud SQL PostgreSQL (${DB_VERSION}) in region ${GCP_SQL_REGION}..."
 
 archive_terraform_state() {
   # Best-effort: timeout/kill may interrupt mid-apply; still try to leave destroyable state.
@@ -47,7 +61,9 @@ trap archive_terraform_state EXIT
 
 cat >>variables.tf <<EOF
 variable "region" {
-  default  = "us-central1"
+  # Actual cluster region (see derivation above); baked into this file so the
+  # deprovision step, which restores this archive, targets the same region.
+  default  = "${GCP_SQL_REGION}"
 }
 
 variable "tier" {
