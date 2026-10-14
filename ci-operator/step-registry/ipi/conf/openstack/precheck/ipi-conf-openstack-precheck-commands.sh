@@ -53,6 +53,12 @@ declare -A ipmap=(
     ["ingress.apps"]=$INGRESS_IP
 )
 
+# For UserManaged LB, openstack-provision-dnsrecords publishes api as LB_HOST
+# (bastion/LB floating IP). api-int stays on the internal VIP (API_IP).
+if [[ "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
+    ipmap["api"]=$(<"${SHARED_DIR}/LB_HOST")
+fi
+
 if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
     ipmap["api-int"]=$API_IP
 fi
