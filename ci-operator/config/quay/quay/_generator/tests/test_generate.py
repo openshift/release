@@ -597,6 +597,7 @@ def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
         "quay-enable-catalogsource-art",
         "quay-deploy-aws-s3",
         "quay-test-e2e-legacy",
+        "quay-test-api-legacy",
     ]
     post = [step.get("ref") or step.get("chain") for step in steps["post"]]
     assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post-manual-oidc-sts"]
