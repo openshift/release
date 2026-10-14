@@ -43,9 +43,7 @@ EOF
 if [ -f "${SHARED_DIR}/API_IP" ]; then
   API_IP=$(<"${SHARED_DIR}"/API_IP)
 
-  # Multi-LB (LB_HOSTS, EXTERNAL_LB_COUNT>=2): api -> LB FIPs (multi-value);
-  # api-int -> machines-net API VIP. Single-LB externallb (LB_HOST only) keeps
-  # the pre-existing behavior: api/api-int both use API_IP, unchanged by this.
+  # LB_HOSTS present => multi-value api RR; else API_IP. api-int always API_IP.
   API_RECORD_VALUES=()
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     while IFS= read -r ip || [[ -n "${ip}" ]]; do

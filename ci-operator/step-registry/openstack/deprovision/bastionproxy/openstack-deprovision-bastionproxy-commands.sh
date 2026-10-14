@@ -63,10 +63,11 @@ if [[ -f "${SHARED_DIR}/BASTION_SERVER_2" ]]; then
     fi
   fi
   openstack server delete --wait "${LB2_NAME}" || >&2 echo "Failed to delete server ${LB2_NAME}"
-  if [[ -f "${SHARED_DIR}/PROXY_PORT_ID_2" ]]; then
-    PROXY_PORT_ID_2=$(<"${SHARED_DIR}/PROXY_PORT_ID_2")
-    openstack port delete "${PROXY_PORT_ID_2}" || >&2 echo "Failed to delete proxy port ${PROXY_PORT_ID_2}"
-  fi
+fi
+# Port can exist without BASTION_SERVER_2 if server create failed.
+if [[ -f "${SHARED_DIR}/PROXY_PORT_ID_2" ]]; then
+  PROXY_PORT_ID_2=$(<"${SHARED_DIR}/PROXY_PORT_ID_2")
+  openstack port delete "${PROXY_PORT_ID_2}" || >&2 echo "Failed to delete proxy port ${PROXY_PORT_ID_2}"
 fi
 
 openstack security group delete "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete security group bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"

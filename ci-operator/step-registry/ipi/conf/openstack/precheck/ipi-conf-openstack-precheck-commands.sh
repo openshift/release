@@ -14,10 +14,20 @@ function check_ips_resolve() {
         echo "$domain did not resolve"
         return 1
     fi
+    # Exact Address tokens after Name: (IPv6-safe; bind-utils / busybox).
+    local answers
+    answers="$(awk '
+        /^Name:/{ in_answer=1; next }
+        in_answer && /^Address/ {
+            line = $0
+            sub(/^Address(es)?[ \t]*[0-9]*:[ \t]*/, "", line)
+            gsub(/#.*/, "", line)
+            n = split(line, a, /[ \t]+/)
+            if (n >= 1 && a[1] != "") print a[1]
+        }
+    ' <<<"${lookup}")"
     for ip in "${expected_ips[@]}"; do
-        # Literal match (escape dots); avoid bash =~ treating '.' as regex.
-        local escaped=${ip//./\\.}
-        if [[ ! "${lookup}" =~ (^|[^0-9])${escaped}([^0-9]|$) ]]; then
+        if ! grep -Fxq "${ip}" <<<"${answers}"; then
             echo "$domain does not resolve to $ip"
             echo "nslookup output:"
             echo "${lookup}"
@@ -55,8 +65,7 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 API_IP=$(<"${SHARED_DIR}/API_IP")
 INGRESS_IP=$(<"${SHARED_DIR}/INGRESS_IP")
 
-# Multi-LB (LB_HOSTS) verifies api against the LB FIPs. Single-LB externallb
-# (LB_HOST only) keeps checking API_IP, same as before this was introduced.
+# LB_HOSTS (multi-LB FIPs) when present; otherwise API_IP.
 API_IPS=()
 if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     while IFS= read -r ip || [[ -n "${ip}" ]]; do

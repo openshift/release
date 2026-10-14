@@ -44,12 +44,19 @@ if [[ -f "${SHARED_DIR}/dns_up.json" ]]; then
         api_count="$(jq '[.Changes[].ResourceRecordSet | select(.Name | startswith("api.")) | .ResourceRecords | length] | first // 0' \
             "${SHARED_DIR}/dns_up.json")"
         api_values="$(jq -r '.Changes[].ResourceRecordSet | select(.Name | startswith("api.")) | .ResourceRecords[].Value' \
-            "${SHARED_DIR}/dns_up.json" | tr '\n' ' ')"
-        echo "api DNS has ${api_count} address(es): ${api_values}"
+            "${SHARED_DIR}/dns_up.json")"
+        echo "api DNS has ${api_count} address(es): ${api_values//$'\n'/ }"
         if [[ "${api_count}" -lt "${expected}" ]]; then
             echo "ERROR: expected at least ${expected} addresses for api, got ${api_count}"
             exit 1
         fi
+        while IFS= read -r ip || [[ -n "${ip}" ]]; do
+            [[ -z "${ip}" ]] && continue
+            if ! grep -Fxq "${ip}" <<<"${api_values}"; then
+                echo "ERROR: expected api DNS to include LB endpoint ${ip}"
+                exit 1
+            fi
+        done < "${SHARED_DIR}/LB_HOSTS"
         echo "api DNS records include ${expected} LB endpoint(s)"
     fi
 
@@ -66,8 +73,7 @@ if [[ -f "${SHARED_DIR}/dns_up.json" ]]; then
     fi
 fi
 
-# Probe each UserManaged LB from the CI network (outside). In-cluster hairpin to these
-# FIPs is not available on this cloud; e2e skips lb-ext/api-ext/OIDC for that reason.
+# Outside probe: in-cluster hairpin to these FIPs is unavailable on this cloud.
 lb_hosts=()
 if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     while IFS= read -r ip || [[ -n "${ip}" ]]; do
@@ -83,7 +89,8 @@ if [[ "${#lb_hosts[@]}" -eq 0 ]]; then
 fi
 for ip in "${lb_hosts[@]}"; do
     echo "Checking https://${ip}:6443/readyz"
-    if ! curl -kfsS --connect-timeout 10 --max-time 30 "https://${ip}:6443/readyz" -o /dev/null; then
+    # Ignore proxy-conf; require direct CI→FIP:6443.
+    if ! curl --noproxy '*' -kfsS --connect-timeout 10 --max-time 30 "https://${ip}:6443/readyz" -o /dev/null; then
         echo "ERROR: UserManaged LB ${ip}:6443 is not reachable from CI"
         exit 1
     fi

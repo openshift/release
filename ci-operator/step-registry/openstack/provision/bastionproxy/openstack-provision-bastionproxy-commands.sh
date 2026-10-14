@@ -110,7 +110,6 @@ if [[ "${CONFIG_TYPE}" == *"externallb"* ]]; then
   openstack port set --no-allowed-address --allowed-address ip-address=$API_IP,mac-address=$PROXY_MAC_ADDRESS --allowed-address ip-address=$INGRESS_IP,mac-address=$PROXY_MAC_ADDRESS $PROXY_PORT_ID
   cp ${SHARED_DIR}/BASTION_FIP ${SHARED_DIR}/LB_HOST
   cp ${SHARED_DIR}/BASTION_USER ${SHARED_DIR}/LB_USER
-  cp ${SHARED_DIR}/BASTION_FIP ${SHARED_DIR}/LB_HOSTS
 fi
 
 
@@ -250,11 +249,12 @@ if [[ "${CONFIG_TYPE}" == *"externallb"* && "${EXTERNAL_LB_COUNT:-1}" -ge 2 ]]; 
     --tag bastionproxy-$CLUSTER_NAME \
     "$OPENSTACK_EXTERNAL_NETWORK")"
   >&2 echo "Created floating IP ${lb2_fip} for ${LB2_NAME}"
-  >&2 openstack server add floating ip "$lb2_server_id" "$lb2_fip"
+  # Record before attach so cleanup works if attach fails.
   echo "${lb2_fip}" >> "${SHARED_DIR}/DELETE_FIPS"
-  echo "${lb2_fip}" >> "${SHARED_DIR}/LB_HOSTS"
+  printf '%s\n%s\n' "$(<"${SHARED_DIR}/BASTION_FIP")" "${lb2_fip}" > "${SHARED_DIR}/LB_HOSTS"
   cp "${SHARED_DIR}/DELETE_FIPS" "${ARTIFACT_DIR}"
   cp "${SHARED_DIR}/LB_HOSTS" "${ARTIFACT_DIR}"
+  >&2 openstack server add floating ip "$lb2_server_id" "$lb2_fip"
 
   LB2_MAC_ADDRESS="$(openstack port show -f value -c mac_address $lb2_port_id)"
   echo "Configuring port $lb2_port_id with allowed addresses $API_IP and $INGRESS_IP"
