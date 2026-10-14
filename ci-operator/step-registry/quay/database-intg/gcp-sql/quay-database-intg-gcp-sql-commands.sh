@@ -108,7 +108,11 @@ resource "google_sql_database_instance" "instance" {
     edition = "ENTERPRISE"
     availability_type = "ZONAL"
 
-    disk_size         = 10
+    # PD-SSD scales ~30 IOPS/GB: 10 GB gave ~300 IOPS and the full e2e suite
+    # timed out at 2h15m with DB connection timeouts and 3s /health/instance
+    # probes (build 2110398453279363072). 100 GB ≈ 3000 read/write IOPS, matching
+    # the AWS gp3 baseline (3000 IOPS) that passes. Marginal cost ≈ $0.10/run.
+    disk_size         = 100
     disk_type         = "PD_SSD"
 
     ip_configuration {
