@@ -56,6 +56,31 @@ tests:
   container:
     clone: true
     from: reqs-tester-rhel10-py314
+- always_run: false
+  as: sushy-unit
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-sushy.git sushy
+    cd sushy
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    from: reqs-tester
+  optional: true
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+- always_run: false
+  as: sushy-unit-rhel10-py314
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-sushy.git sushy
+    cd sushy
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    clone: true
+    from: reqs-tester-rhel10-py314
+  optional: true
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
 zz_generated_metadata:
   branch: release-5.1
   org: openshift
