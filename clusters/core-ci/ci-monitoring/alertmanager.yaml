@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: custom-prometheus-operator
+  name: alertmanager
+  namespace: ci-monitoring
+spec:
+  configSecret: alertmanager-ci-monitoring
+  alertmanagerConfigMatcherStrategy:
+    type: OnNamespace
+  alertmanagerConfigNamespaceSelector:
+    matchExpressions:
+    - key: openshift.io/cluster-monitoring
+      operator: NotIn
+      values:
+      - "true"
+    - key: openshift.io/user-monitoring
+      operator: NotIn
+      values:
+      - "false"
+  alertmanagerConfigSelector:
+    matchExpressions:
+    - key: openshift.io/user-monitoring
+      operator: NotIn
+      values:
+      - "false"
+  listenLocal: false
+  nodeSelector:
+    kubernetes.io/os: linux
+  portName: web
+  replicas: 2
+  resources:
+    requests:
+      cpu: 4m
+      memory: 40Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  retention: 120h
+  secrets:
+  - alert-proxy-alertmanager-webhook
+  serviceAccountName: alertmanager
+  storage:
+    volumeClaimTemplate:
+      metadata: {}
+      spec:
+        resources:
+          requests:
+            storage: 10Gi
+      status: {}
