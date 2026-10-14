@@ -2,6 +2,33 @@
 set -euxo pipefail
 shopt -s inherit_errexit
 
+# --- Typed exit globals (INTEROP-9527) ---
+_JUNIT_KIND=""
+_JUNIT_MESSAGE=""
+_EXIT_CLASS=""    # "product" or "infra"
+
+# --- Atomic JUnit Writer (INTEROP-9527) ---
+_junit_emit_safe() {
+  local kind="$1" message="$2" rc="${3:-0}"
+  local tmpf
+  tmpf="${ARTIFACT_DIR}/.junit_step_acm_app.tmp.$$"
+  {
+    cat <<XMLEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--acm-app" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+  <testcase name="${kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
+  </testcase>
+</testsuite>
+XMLEOF
+  } > "${tmpf}"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_step_acm_app.xml"
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_step_acm_app.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
 # shellcheck disable=SC2317
 _propagate_junit () {
     mkdir -p "${SHARED_DIR}/junit"
@@ -74,7 +101,7 @@ function RecordTestResult () {
 
 # Function to generate JUnit XML
 function GenerateJunitXml () {
-    typeset junitFile="${ARTIFACT_DIR}/junit_acm-opp-app.xml"
+    typeset junitFile="${ARTIFACT_DIR}/junit_lp-interop--OPP--acm-app.xml"
     typeset -i totalDuration=0
     totalDuration=$(( $(date +%s) - startTime ))
 
@@ -102,7 +129,7 @@ function GenerateJunitXml () {
     cat > "${junitFile}" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="acm-opp-app" tests="${totalTests}" failures="${failedTests}" errors="0" skipped="${skippedTests}" time="${totalDuration}">
+  <testsuite name="lp-interop--OPP--acm-app" tests="${totalTests}" failures="${failedTests}" errors="0" skipped="${skippedTests}" time="${totalDuration}">
 EOF
 
     # Generate XML for each test case
@@ -114,13 +141,13 @@ EOF
         if [ "${status}" = "failed" ]; then
             typeset escapedMsg=""
             escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
-            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"><failure message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${test}\" classname=\"lp-interop--OPP--acm-app\" time=\"${duration}\"><failure message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         elif [ "${status}" = "skipped" ]; then
             typeset escapedMsg=""
             escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
-            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${test}\" classname=\"lp-interop--OPP--acm-app\" time=\"${duration}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         else
-            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"/>" >> "${junitFile}"
+            echo "    <testcase name=\"${test}\" classname=\"lp-interop--OPP--acm-app\" time=\"${duration}\"/>" >> "${junitFile}"
         fi
     done
 
@@ -288,8 +315,25 @@ function RunTestCase2 () {
 ################################################################################
 # Test Execution Setup
 ################################################################################
+# --- Single typed finalizer (INTEROP-9527) ---
+# shellcheck disable=SC2317
+_finalize_exit() {
+  local rc=$?
+  set +e
+  if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+    _JUNIT_KIND="unclassified-failure"
+    _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+    _EXIT_CLASS="infra"
+  fi
+  if [[ -n "${_JUNIT_KIND}" ]]; then
+    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+  fi
+  GenerateJunitXml
+  _propagate_junit
+  exit "${rc}"
+}
 # Set trap to generate JUnit XML on exit (regardless of success or failure)
-trap '{( GenerateJunitXml; _propagate_junit; true )}' EXIT
+trap '_finalize_exit' EXIT
 
 if [ "${MAP_TESTS:-}" = "true" ]; then
     eval "$(
@@ -299,13 +343,25 @@ if [ "${MAP_TESTS:-}" = "true" ]; then
             https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
     if type -t ExitTrap--PostProcessPrep; then
-        trap '{(
-            GenerateJunitXml
-            _propagate_junit
-            LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-                ExitTrap--PostProcessPrep junit--acm-opp-app.xml
-            true
-        )}' EXIT
+        # shellcheck disable=SC2317
+        _finalize_exit() {
+          local rc=$?
+          set +e
+          if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+            _JUNIT_KIND="unclassified-failure"
+            _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+            _EXIT_CLASS="infra"
+          fi
+          if [[ -n "${_JUNIT_KIND}" ]]; then
+            _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+          fi
+          GenerateJunitXml
+          _propagate_junit
+          LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+              ExitTrap--PostProcessPrep junit--lp-interop--OPP--acm-app.xml
+          exit "${rc}"
+        }
+        trap '_finalize_exit' EXIT
     else
         : "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping"
     fi
@@ -335,6 +391,9 @@ elif ! grep -qi quayintegration <<< "${apiOutput}"; then
         testFailureMsg["${test}"]="QuayIntegration CRD not available - Quay Bridge Operator not installed"
     done
 
+    _JUNIT_KIND=pass
+    _JUNIT_MESSAGE="Skipped: QuayIntegration CRD not available"
+    _EXIT_CLASS=success
     exit 0
 fi
 
@@ -351,6 +410,9 @@ if ((getRc != 0)); then
         testFailureMsg["${test}"]="oc get quayintegration failed (rc=${getRc}) - cluster API error"
     done
 
+    _JUNIT_KIND=pass
+    _JUNIT_MESSAGE="QuayIntegration API error (tests marked failed in JUnit)"
+    _EXIT_CLASS=success
     exit 0
 elif [[ -z "${getOutput}" ]]; then
     : "ERROR: QuayIntegration CRD exists but CR 'quay' not found!"
@@ -362,6 +424,9 @@ elif [[ -z "${getOutput}" ]]; then
         testFailureMsg["${test}"]="QuayIntegration CR 'quay' not found - OPP bundle not configured"
     done
 
+    _JUNIT_KIND=pass
+    _JUNIT_MESSAGE="QuayIntegration CR not found (tests marked failed in JUnit)"
+    _EXIT_CLASS=success
     exit 0
 fi
 
@@ -416,7 +481,13 @@ for test in "${allTestCasesArr[@]}"; do
 done
 
 if [[ "${_overall_status}" == "PASS" ]]; then
+    _JUNIT_KIND=pass
+    _JUNIT_MESSAGE="ACM OPP app tests passed"
+    _EXIT_CLASS=success
     exit 0
 else
+    _JUNIT_KIND="test-failures"
+    _JUNIT_MESSAGE="One or more ACM OPP app tests failed"
+    _EXIT_CLASS="infra"
     exit 1
 fi

@@ -27,6 +27,11 @@ _opp_cleanup() {
   fi
 }
 
+# --- Typed exit globals (INTEROP-9527) ---
+_JUNIT_KIND=""
+_JUNIT_MESSAGE=""
+_EXIT_CLASS=""    # "product" or "infra"
+
 # --- JUnit from cluster-state checks ---
 # Accumulators for JUnit generation
 typeset -a tcNamesArr=()
@@ -78,11 +83,11 @@ WriteJunit() {
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"opp-restore\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        echo "<testsuite name=\"lp-interop--OPP--restore\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
-            echo "  <testcase classname=\"opp-restore\" name=\"${name}\">"
+            echo "  <testcase classname=\"lp-interop--OPP--restore\" name=\"${name}\">"
             if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
                 typeset msg=""
                 msg="$(XmlEscape "${tcMessagesArr[$i]}")"
@@ -115,7 +120,47 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
+# --- Atomic JUnit Writer (INTEROP-9527) ---
+_junit_emit_safe() {
+  local kind="$1" message="$2" rc="${3:-0}"
+  local tmpf
+  tmpf="${ARTIFACT_DIR}/.junit_step_restore.tmp.$$"
+  {
+    cat <<XMLEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--restore" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+  <testcase name="${kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
+  </testcase>
+</testsuite>
+XMLEOF
+  } > "${tmpf}"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_step_restore.xml"
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_step_restore.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
+# --- Single typed finalizer (INTEROP-9527) ---
+# shellcheck disable=SC2317
+_finalize_exit() {
+  local rc=$?
+  set +e
+  if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+    _JUNIT_KIND="unclassified-failure"
+    _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+    _EXIT_CLASS="infra"
+  fi
+  if [[ -n "${_JUNIT_KIND}" ]]; then
+    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+  fi
+  _opp_cleanup
+  CollectExitArtifacts
+  _propagate_junit
+  exit "${rc}"
+}
+trap '_finalize_exit' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -204,5 +249,9 @@ EOF
 WriteJunit
 
 : "End time: $(date '+%F %T')"
+_JUNIT_KIND=pass
+_JUNIT_MESSAGE="Post-upgrade restore validation complete"
+_EXIT_CLASS=success
+
 : "Post-upgrade restore validation complete"
 true

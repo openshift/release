@@ -25,6 +25,33 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
+# --- Typed exit globals (INTEROP-9527) ---
+_JUNIT_KIND=""
+_JUNIT_MESSAGE=""
+_EXIT_CLASS=""    # "product" or "infra"
+
+# --- Atomic JUnit Writer (INTEROP-9527) ---
+_junit_emit_safe() {
+  local kind="$1" message="$2" rc="${3:-0}"
+  local tmpf
+  tmpf="${ARTIFACT_DIR}/.junit_ocp_upgrade.tmp.$$"
+  {
+    cat <<XMLEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--ocp-upgrade" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+  <testcase name="${kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
+  </testcase>
+</testsuite>
+XMLEOF
+  } > "${tmpf}"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_ocp_upgrade.xml"
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_ocp_upgrade.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
 _jrc=0
 trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}' EXIT
 
@@ -481,39 +508,32 @@ function Main () {
     StabilizeCluster
     ValidatePlatformHealth
     ValidateOppOperators
+    _JUNIT_KIND=pass
+    _JUNIT_MESSAGE="OCP upgrade and OPP validation completed successfully"
+    _EXIT_CLASS=success
+
     : "OCP upgrade and OPP validation completed successfully"
     true
 }
 
-SUITE_NAME="${SUITE_NAME:-ocp-upgrade}"
-# --- JUnit wrapper ---
+# --- Single typed finalizer (INTEROP-9527) ---
 # shellcheck disable=SC2317  # invoked via trap
-WriteJunit() {
-  local rc=${1:-0}
-  TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  JUNIT_FILE="${ARTIFACT_DIR}/junit_${SUITE_NAME}.xml"
-  if [[ $rc -eq 0 ]]; then
-    cat > "${JUNIT_FILE}" <<JEOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${SUITE_NAME}" tests="1" failures="0" time="0">
-  <testcase name="${SUITE_NAME}" classname="interop.opp">
-    <system-out>Step completed successfully at ${TIMESTAMP}</system-out>
-  </testcase>
-</testsuite>
-JEOF
-  else
-    cat > "${JUNIT_FILE}" <<JEOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${SUITE_NAME}" tests="1" failures="1" time="0">
-  <testcase name="${SUITE_NAME}" classname="interop.opp">
-    <failure message="${SUITE_NAME} failed with exit code ${rc}">
-Step failed at ${TIMESTAMP} with exit code ${rc}
-    </failure>
-  </testcase>
-</testsuite>
-JEOF
+_finalize_exit() {
+  local rc=$?
+  set +e
+  # Fallback for unclassified exits
+  if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+    _JUNIT_KIND="unclassified-failure"
+    _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+    _EXIT_CLASS="infra"
   fi
+  if [[ -n "${_JUNIT_KIND}" ]]; then
+    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+  fi
+  (exit "${rc}"); _opp_cleanup "${rc}"
+  exitCode="${rc}"
+  DebugOnExit
+  exit 0
 }
-
-trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; exitCode=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit 0' EXIT
+trap '_finalize_exit' EXIT
 Main "$@"

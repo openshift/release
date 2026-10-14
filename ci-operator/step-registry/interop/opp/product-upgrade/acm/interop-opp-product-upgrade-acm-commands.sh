@@ -40,7 +40,7 @@ _junit_emit_safe() {
   {
     cat <<XMLEOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="interop-opp-product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+<testsuite name="lp-interop--OPP--acm-upgrade" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
   <testcase name="${kind}">
     $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
   </testcase>
@@ -740,6 +740,10 @@ function Main () {
         echo "${newVersion}" > "${SHARED_DIR}/acm-upgraded-version"
         echo "${targetChannel}" > "${SHARED_DIR}/acm-upgraded-channel"
     fi
+
+    _JUNIT_KIND=pass
+    _JUNIT_MESSAGE="ACM upgrade completed successfully"
+    _EXIT_CLASS=success
 
     echo "=== ACM Operator Upgrade: SUCCESS ==="
     true
