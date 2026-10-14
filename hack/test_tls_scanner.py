@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 import subprocess
@@ -147,23 +148,60 @@ Path(os.environ["TEST_ARGUMENTS"]).write_text(json.dumps(sys.argv[1:]))
             "limits": {"cpu": "2", "memory": "3Gi"},
         })
 
-    def test_gateway_jobs_remain_optional_and_ordered(self):
+    def test_gateway_jobs_are_required_path_selected_and_ordered(self):
         for branch in ("main", "release-5.1"):
             with self.subTest(branch=branch):
                 filename = f"openshift-cluster-ingress-operator-{branch}"
                 config = yaml.safe_load((ROOT / "ci-operator/config/openshift/cluster-ingress-operator" / f"{filename}.yaml").read_text())
                 test = next(test for test in config["tests"] if test["as"] == "tls-scanner-aws-gatewayapi")
-                self.assertIs(test["optional"], True)
+                self.assertFalse(test.get("optional", False))
                 self.assertIs(test["always_run"], False)
+                conformance = next(test for test in config["tests"] if test["as"] == "e2e-aws-gatewayapi-conformance")
+                pattern = test["pipeline_run_if_changed"]
+                self.assertEqual(pattern, conformance["pipeline_run_if_changed"])
+                self.assertNotIn("pipeline_skip_if_only_changed", test)
+                relevant = (
+                    "manifests/0000_50_ingress-operator.yaml",
+                    "pkg/manifests/assets/gateway-api/gateway.yaml",
+                    "cmd/ingress-operator/main.go",
+                    "hack/gatewayapi-tls-scanner-setup.sh",
+                    "pkg/operator/controller/gateway/controller.go",
+                    "pkg/operator/controller/gatewayclass/controller.go",
+                    "vendor/github.com/istio-ecosystem/sail-operator/api/types.go",
+                    "vendor/sigs.k8s.io/gateway-api/apis/v1/gateway_types.go",
+                    "test/e2e/gateway_test.go",
+                )
+                irrelevant = (
+                    "README.md", "docs/gateway-api.md", "OWNERS", "go.mod",
+                    "pkg/operator/controller/ingress/controller.go",
+                    "pkg/operator/controller/gateway.go",
+                    "vendor/example.com/gateway-api/types.go",
+                )
+                for path in relevant:
+                    with self.subTest(selected=path):
+                        self.assertIsNotNone(re.search(pattern, path))
+                for path in irrelevant:
+                    with self.subTest(skipped=path):
+                        self.assertIsNone(re.search(pattern, path))
+                self.assertTrue(any(re.search(pattern, path) for path in ("README.md", relevant[0])))
+                self.assertFalse(any(re.search(pattern, path) for path in irrelevant))
                 self.assertEqual([step["ref"] for step in test["steps"]["test"] if "ref" in step], ["tls-scanner-run", "tls-13", "tls-scanner-recheck"])
                 self.assertEqual(test["steps"]["env"]["TLS_13_TLS_ADHERENCE_POLICY"], "StrictAllComponents")
                 jobs = yaml.safe_load((ROOT / "ci-operator/jobs/openshift/cluster-ingress-operator" / f"{filename}-presubmits.yaml").read_text())
                 job = next(job for job in jobs["presubmits"]["openshift/cluster-ingress-operator"] if job["name"].endswith("-tls-scanner-aws-gatewayapi"))
-                self.assertIs(job["optional"], True)
+                self.assertFalse(job.get("optional", False))
                 self.assertIs(job["always_run"], False)
                 escaped_branch = branch.replace(".", r"\.")
                 self.assertEqual(job["branches"], [f"^{escaped_branch}$", f"^{escaped_branch}-"])
-                self.assertEqual(job["annotations"]["pipeline_skip_if_only_changed"], test["pipeline_skip_if_only_changed"])
+                self.assertEqual(job["annotations"]["pipeline_run_if_changed"], pattern)
+                self.assertNotIn("pipeline_skip_if_only_changed", job["annotations"])
+                self.assertEqual(test["steps"]["workflow"], "openshift-e2e-aws-ovn")
+        workflow_path = ROOT / "ci-operator/step-registry/openshift/e2e/aws/ovn/openshift-e2e-aws-ovn-workflow.yaml"
+        workflow = yaml.safe_load(workflow_path.read_text())["workflow"]["steps"]
+        self.assertEqual(workflow["post"], [
+            {"chain": "gather-network"}, {"chain": "gather-core-dump"}, {"chain": "ipi-deprovision"},
+        ])
+        self.assertNotIn({"ref": "tls-13"}, workflow["pre"])
 
 
 if __name__ == "__main__":
