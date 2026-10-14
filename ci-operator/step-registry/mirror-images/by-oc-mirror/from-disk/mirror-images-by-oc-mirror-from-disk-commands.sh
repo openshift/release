@@ -37,16 +37,19 @@ fi
 
 SSH_KEY="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
 BASTION_IP=$(head -n 1 "${SHARED_DIR}/bastion_public_address")
+BASTION_PRIVATE_IP=$(head -n 1 "${SHARED_DIR}/bastion_private_address")
 BASTION_SSH_USER=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${SSH_KEY}"
 
-echo "Bastion: ${BASTION_SSH_USER}@${BASTION_IP}"
+echo "Bastion public:  ${BASTION_SSH_USER}@${BASTION_IP}"
+echo "Bastion private: ${BASTION_PRIVATE_IP}"
 
 # private mirror registry host: <public_dns>:<port>
-# The TLS cert on the bastion registry is issued for this hostname, so the
-# push destination must use it — not 'localhost:5000'.
+# The TLS cert on the bastion registry is issued for this hostname.
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
+MIRROR_REGISTRY_HOSTNAME="${MIRROR_REGISTRY_HOST%%:*}"   # strip :port
+MIRROR_REGISTRY_PORT="${MIRROR_REGISTRY_HOST##*:}"       # just the port number
 
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 if [[ -z "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" ]]; then
@@ -61,16 +64,17 @@ if [[ -f "${SHARED_DIR}/oc-mirror-workspace-path" ]]; then
 fi
 echo "Bastion workspace path: ${BASTION_WORKSPACE_PATH}"
 
-# Verify the oc-mirror binary and workspace exist on the bastion before proceeding
+# Verify the oc-mirror binary and workspace exist on the bastion
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
     "test -x /tmp/oc-mirror || { echo 'ERROR: /tmp/oc-mirror not found on bastion'; exit 1; }; \
-     test -d '${BASTION_WORKSPACE_PATH}/working-dir' || { echo 'ERROR: workspace not found on bastion at ${BASTION_WORKSPACE_PATH}'; exit 1; }; \
-     echo 'oc-mirror binary and workspace verified on bastion.'; \
+     test -d '${BASTION_WORKSPACE_PATH}/working-dir' || { echo 'ERROR: workspace missing at ${BASTION_WORKSPACE_PATH}'; exit 1; }; \
+     echo 'oc-mirror binary and workspace verified.'; \
      /tmp/oc-mirror version --output=yaml"
 
-# Build pull secret with registry credentials (Option B: this step independently
-# manages its own credentials from the openshift-qe/mirror-registry vault mount).
-# Disable tracing for this block — registry_creds is sensitive.
+# ---------------------------------------------------------------------------
+# Registry credentials
+# Disable tracing — registry_creds is sensitive.
+# ---------------------------------------------------------------------------
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | tr -d '\n' | base64 -w 0)
@@ -78,17 +82,19 @@ pull_secret_local=$(mktemp)
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c \
     'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' \
     > "${pull_secret_local}"
-# Transfer pull secret to bastion
+# Transfer pull secret to bastion; install into oc-mirror's expected auth location.
+# oc-mirror (v2) reads credentials from $XDG_RUNTIME_DIR/containers/auth.json.
 scp ${SSH_OPTS} "${pull_secret_local}" "${BASTION_SSH_USER}@${BASTION_IP}:/tmp/oc-mirror-pull-secret.json"
 rm -f "${pull_secret_local}"
 $WAS_TRACING && set -x
-echo "Pull secret transferred to bastion."
+ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
+    'xdg="${XDG_RUNTIME_DIR:-${HOME}/run}"; mkdir -p "${xdg}/containers"; cp /tmp/oc-mirror-pull-secret.json "${xdg}/containers/auth.json"'
+echo "Pull secret installed to bastion auth location."
 
-# Write the ImageSetConfiguration on the bastion
-# (same ISC as to-disk; oc-mirror needs it in disk-to-mirror mode to generate
-# the correct IDMS/ITMS cluster-resources)
+# Write the ImageSetConfiguration on the bastion.
+# (same ISC as to-disk; oc-mirror needs it in disk-to-mirror mode)
 ISC_PATH="${BASTION_WORKSPACE_PATH}/image-set-config.yaml"
-# shellcheck disable=SC2087  # Intentionally unquoted: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} must expand client-side
+# shellcheck disable=SC2087  # Intentionally unquoted: variable must expand client-side before SSH
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > '${ISC_PATH}'" <<EOF
 kind: ImageSetConfiguration
 apiVersion: mirror.openshift.io/v2alpha1
@@ -99,105 +105,211 @@ EOF
 echo "ImageSetConfiguration written on bastion at ${ISC_PATH}"
 
 # ---------------------------------------------------------------------------
-# Isolation enforcement
-# Block all outbound internet traffic on the bastion before running disk-to-mirror.
-# This enforces the no-public-internet boundary: oc-mirror must be able to push
-# from the local archive to the local registry without any external network access.
-#
-# Exemptions:
-#   - lo (loopback)
-#   - ESTABLISHED/RELATED (responses to already-open connections, e.g. our SSH session)
-#   - 10.0.0.0/8 (VPC-internal: covers AWS private endpoints for EC2/ELB/STS/S3)
-#   - 169.254.169.254/32 (AWS instance metadata)
-#
-# The iptables rules are restored after the import so subsequent post-steps
-# (deprovision, artifact gathering) are not affected.
+# VPC CIDR — read from vpc_info.json (written by aws-provision-vpc-disconnected).
+# Scopes the firewall exemption to the actual provisioned VPC CIDR rather than
+# assuming all of 10.0.0.0/8.
 # ---------------------------------------------------------------------------
-echo "=== Enforcing network isolation on bastion ==="
-ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" bash <<'ENDSSH'
+VPC_IPV4_CIDR="10.0.0.0/8"   # safe fallback if vpc_info.json is absent
+VPC_IPV6_CIDR=""
+if [[ -f "${SHARED_DIR}/vpc_info.json" ]]; then
+    _cidr=$(jq -r '.vpc_ipv4_cidr // empty' "${SHARED_DIR}/vpc_info.json")
+    [[ -n "${_cidr}" ]] && VPC_IPV4_CIDR="${_cidr}"
+    _cidr6=$(jq -r '.vpc_ipv6_cidr // empty' "${SHARED_DIR}/vpc_info.json")
+    [[ -n "${_cidr6}" ]] && VPC_IPV6_CIDR="${_cidr6}"
+fi
+echo "VPC IPv4 CIDR: ${VPC_IPV4_CIDR}"
+echo "VPC IPv6 CIDR: ${VPC_IPV6_CIDR:-none}"
+
+# ---------------------------------------------------------------------------
+# Build and transfer the remote D2M script.
+#
+# All isolation, acceptance test, and disk-to-mirror logic runs as a single
+# script on the bastion so that the EXIT trap covers every failure path.
+#
+# Client-side variables are interpolated here (before the file is transferred);
+# bastion-local variables use escaped \${ } so they expand only on the bastion.
+#
+# Phases executed by the remote script:
+#   1. Save iptables state (IPv4 + IPv6)
+#   2. Register EXIT trap that restores firewall, cleans /etc/hosts, removes auth
+#   3. Add /etc/hosts entry to route registry hostname to private IP
+#   4. Apply IPv4 isolation via a dedicated OC_MIRROR_EGRESS chain (jumped from
+#      the start of OUTPUT so pre-existing ACCEPT rules can't bypass it)
+#   5. Apply IPv6 isolation via OC_MIRROR_EGRESS6 chain
+#   6. Isolation acceptance test:
+#      a. Direct (--noproxy) connection to quay.io must fail
+#      b. Direct connection to the registry hostname:port must succeed
+#      c. DROP rule must be present in both chains
+#   7. Run oc-mirror disk-to-mirror
+#   EXIT trap fires: restores firewall, removes /etc/hosts entry, auth file
+# ---------------------------------------------------------------------------
+REMOTE_D2M_SCRIPT="/tmp/oc-mirror-d2m.sh"
+
+# Write the remote script to a local temp file so we can use normal heredoc
+# quoting: double-quoted lines interpolate client-side vars; single-quoted
+# heredoc delimiters (<<'__REMOTE__') mean everything inside is literal bash
+# for the bastion.  We use a Python one-liner to assemble the two parts.
+local_script=$(mktemp)
+
+# Part 1: values that must be set from the client side
+cat >> "${local_script}" <<PART1
+#!/bin/bash
 set -euo pipefail
-echo "Saving current iptables rules..."
-sudo iptables-save > /tmp/iptables-before-import.rules
-echo "Current OUTPUT chain:"
-sudo iptables -L OUTPUT -n -v
 
-echo "Inserting isolation rules..."
-# Permit loopback
-sudo iptables -I OUTPUT 1 -o lo -j ACCEPT
-# Permit established/related (keeps our SSH session alive)
-sudo iptables -I OUTPUT 2 -m state --state ESTABLISHED,RELATED -j ACCEPT
-# Permit VPC-internal (AWS private endpoints: ec2, elb, sts, s3)
-sudo iptables -I OUTPUT 3 -d 10.0.0.0/8 -j ACCEPT
-# Permit instance metadata
-sudo iptables -I OUTPUT 4 -d 169.254.169.254/32 -j ACCEPT
-# Drop all other outbound
-sudo iptables -A OUTPUT -j DROP
+MIRROR_REGISTRY_HOSTNAME="${MIRROR_REGISTRY_HOSTNAME}"
+MIRROR_REGISTRY_PORT="${MIRROR_REGISTRY_PORT}"
+MIRROR_REGISTRY_HOST="${MIRROR_REGISTRY_HOST}"
+BASTION_PRIVATE_IP="${BASTION_PRIVATE_IP}"
+ISC_PATH="${ISC_PATH}"
+BASTION_WORKSPACE_PATH="${BASTION_WORKSPACE_PATH}"
+VPC_IPV4_CIDR="${VPC_IPV4_CIDR}"
+VPC_IPV6_CIDR="${VPC_IPV6_CIDR}"
 
-echo "Isolation rules applied. OUTPUT chain:"
-sudo iptables -L OUTPUT -n -v
-ENDSSH
-echo "Network isolation enforced on bastion."
+PART1
 
-# ---------------------------------------------------------------------------
+# Part 2: the bastion-local logic (no client-side expansion needed)
+cat >> "${local_script}" <<'PART2'
+# -------------------------------------------------------------------
+# EXIT trap — restores firewall, removes /etc/hosts entry and auth file.
+# Runs unconditionally on exit, whether the D2M succeeds or fails.
+# -------------------------------------------------------------------
+function d2m_cleanup() {
+    echo "=== [cleanup] Restoring iptables/ip6tables rules ==="
+    if [[ -f /tmp/iptables-before-import.rules ]]; then
+        sudo iptables-restore  < /tmp/iptables-before-import.rules  && echo "[cleanup] IPv4 rules restored." || echo "[cleanup] WARNING: IPv4 restore failed."
+    fi
+    if [[ -f /tmp/ip6tables-before-import.rules ]]; then
+        sudo ip6tables-restore < /tmp/ip6tables-before-import.rules && echo "[cleanup] IPv6 rules restored." || echo "[cleanup] WARNING: IPv6 restore failed."
+    fi
+    echo "=== [cleanup] Removing /etc/hosts registry entry ==="
+    sudo sed -i "/${MIRROR_REGISTRY_HOSTNAME}/d" /etc/hosts && echo "[cleanup] /etc/hosts entry removed." || echo "[cleanup] WARNING: /etc/hosts sed failed."
+    echo "=== [cleanup] Removing remote auth file ==="
+    xdg="${XDG_RUNTIME_DIR:-${HOME}/run}"
+    rm -f /tmp/oc-mirror-pull-secret.json "${xdg}/containers/auth.json"
+    echo "=== [cleanup] Done ==="
+}
+trap d2m_cleanup EXIT
+
+# -------------------------------------------------------------------
+# Save current firewall state before any modifications
+# -------------------------------------------------------------------
+echo "Saving current iptables/ip6tables rules..."
+sudo iptables-save  > /tmp/iptables-before-import.rules
+sudo ip6tables-save > /tmp/ip6tables-before-import.rules
+
+# -------------------------------------------------------------------
+# Registry routing: map public DNS name to bastion private IP.
+# After isolation the public DNS may resolve to a public IP that is
+# blocked.  This ensures oc-mirror reaches the registry over the
+# VPC-internal path while still using the correct hostname for TLS.
+# -------------------------------------------------------------------
+echo "=== Adding /etc/hosts entry for registry routing ==="
+echo "${BASTION_PRIVATE_IP} ${MIRROR_REGISTRY_HOSTNAME}" | sudo tee -a /etc/hosts
+echo "/etc/hosts updated."
+
+# -------------------------------------------------------------------
+# IPv4 isolation via a dedicated chain jumped from the start of OUTPUT.
+# Using a dedicated chain means pre-existing broad ACCEPT rules can't
+# bypass the DROP at the end.
+# -------------------------------------------------------------------
+echo "=== Applying IPv4 isolation ==="
+sudo iptables -N OC_MIRROR_EGRESS 2>/dev/null || sudo iptables -F OC_MIRROR_EGRESS
+sudo iptables -A OC_MIRROR_EGRESS -o lo                          -j ACCEPT
+sudo iptables -A OC_MIRROR_EGRESS -m state --state ESTABLISHED,RELATED -j ACCEPT
+sudo iptables -A OC_MIRROR_EGRESS -d "${VPC_IPV4_CIDR}"         -j ACCEPT
+sudo iptables -A OC_MIRROR_EGRESS -d 169.254.169.254/32          -j ACCEPT
+sudo iptables -A OC_MIRROR_EGRESS                                -j DROP
+# Insert at the start of OUTPUT — takes precedence over existing rules.
+sudo iptables -I OUTPUT 1 -j OC_MIRROR_EGRESS
+
+# -------------------------------------------------------------------
+# IPv6 isolation
+# -------------------------------------------------------------------
+echo "=== Applying IPv6 isolation ==="
+sudo ip6tables -N OC_MIRROR_EGRESS6 2>/dev/null || sudo ip6tables -F OC_MIRROR_EGRESS6
+sudo ip6tables -A OC_MIRROR_EGRESS6 -o lo                          -j ACCEPT
+sudo ip6tables -A OC_MIRROR_EGRESS6 -m state --state ESTABLISHED,RELATED -j ACCEPT
+# Link-local addresses required for neighbour discovery
+sudo ip6tables -A OC_MIRROR_EGRESS6 -d fe80::/10                   -j ACCEPT
+if [[ -n "${VPC_IPV6_CIDR}" ]]; then
+    sudo ip6tables -A OC_MIRROR_EGRESS6 -d "${VPC_IPV6_CIDR}"      -j ACCEPT
+fi
+sudo ip6tables -A OC_MIRROR_EGRESS6                                 -j DROP
+sudo ip6tables -I OUTPUT 1 -j OC_MIRROR_EGRESS6
+
+echo "Isolation rules applied."
+echo "IPv4 OC_MIRROR_EGRESS chain:"
+sudo iptables  -L OC_MIRROR_EGRESS  -n -v
+echo "IPv6 OC_MIRROR_EGRESS6 chain:"
+sudo ip6tables -L OC_MIRROR_EGRESS6 -n -v
+
+# -------------------------------------------------------------------
 # Isolation acceptance test
-# Verify that public internet is unreachable and the local registry is reachable
-# before proceeding with disk-to-mirror. Fail fast if either check is wrong.
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 echo "=== Isolation acceptance test ==="
-ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" bash <<'ENDSSH'
-set -euo pipefail
-echo "--- Test 1: public internet must be blocked ---"
-if curl -m 10 --silent --output /dev/null https://quay.io; then
+
+echo "--- Test 1: direct connection to public internet must be blocked ---"
+if curl --noproxy '*' -m 10 --silent --output /dev/null https://quay.io; then
     echo "FAIL: quay.io is reachable — isolation is broken"
     exit 1
 else
-    echo "PASS: quay.io is not reachable (internet blocked as expected)"
+    echo "PASS: quay.io not reachable (internet blocked)"
 fi
 
-echo "--- Test 2: local mirror registry must be reachable ---"
-if curl -m 10 --silent --output /dev/null --insecure https://localhost:5000; then
-    echo "PASS: local registry at localhost:5000 is reachable"
+echo "--- Test 2: registry must be reachable at the exact endpoint oc-mirror will use ---"
+if curl --noproxy '*' -m 10 --silent --output /dev/null --insecure \
+        "https://${MIRROR_REGISTRY_HOSTNAME}:${MIRROR_REGISTRY_PORT}"; then
+    echo "PASS: registry at ${MIRROR_REGISTRY_HOST} reachable via private IP"
 else
-    echo "FAIL: local registry at localhost:5000 is not reachable"
+    echo "FAIL: registry at ${MIRROR_REGISTRY_HOST} not reachable"
     exit 1
 fi
-ENDSSH
+
+echo "--- Test 3: DROP rules present in isolation chains ---"
+if ! sudo iptables  -L OC_MIRROR_EGRESS  -n | grep -q DROP; then
+    echo "FAIL: DROP rule missing from IPv4 OC_MIRROR_EGRESS chain"
+    exit 1
+fi
+if ! sudo ip6tables -L OC_MIRROR_EGRESS6 -n | grep -q DROP; then
+    echo "FAIL: DROP rule missing from IPv6 OC_MIRROR_EGRESS6 chain"
+    exit 1
+fi
+echo "PASS: DROP rules present in both isolation chains"
 echo "Isolation acceptance test passed."
 
-# Save the iptables state during isolation to ARTIFACT_DIR for audit/debugging
-ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
-    "sudo iptables -L -n -v" > "${ARTIFACT_DIR}/bastion-iptables-during-import.txt" 2>&1 || true
-
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 # Disk-to-mirror (Phase 2)
-# Run oc-mirror on the bastion in disk-to-mirror mode.
-# The destination is docker://<mirror-registry-host> with no repo suffix —
-# oc-mirror reconstructs per-image paths from the archive metadata.
-# ---------------------------------------------------------------------------
-echo "=== Running disk-to-mirror (Phase 2) on bastion ==="
-ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
-    "/tmp/oc-mirror -c '${ISC_PATH}' \
-        --from file://${BASTION_WORKSPACE_PATH} \
-        docker://${MIRROR_REGISTRY_HOST} \
-        --dest-tls-verify=false --v2"
-echo "Disk-to-mirror complete."
+# -------------------------------------------------------------------
+echo "=== Running oc-mirror disk-to-mirror ==="
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-${HOME}/run}"
+export REGISTRY_AUTH_PREFERENCE=podman
 
-# ---------------------------------------------------------------------------
-# Restore iptables rules
-# Restore before copying artifacts so that if scp/ssh fails we still restore.
-# ---------------------------------------------------------------------------
-echo "=== Restoring iptables rules on bastion ==="
-ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
-    "sudo iptables-restore < /tmp/iptables-before-import.rules"
-echo "iptables rules restored."
+/tmp/oc-mirror -c "${ISC_PATH}" \
+    --from "file://${BASTION_WORKSPACE_PATH}" \
+    "docker://${MIRROR_REGISTRY_HOST}" \
+    --dest-tls-verify=false --v2
 
-# Save the restored iptables state for comparison
+echo "=== oc-mirror disk-to-mirror complete ==="
+# EXIT trap fires here: restores firewall, removes /etc/hosts entry and auth file.
+PART2
+
+# Transfer and execute the remote script
+scp ${SSH_OPTS} "${local_script}" "${BASTION_SSH_USER}@${BASTION_IP}:${REMOTE_D2M_SCRIPT}"
+ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "chmod +x '${REMOTE_D2M_SCRIPT}'"
+rm -f "${local_script}"
+
+echo "=== Executing remote D2M script on bastion ==="
+ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "${REMOTE_D2M_SCRIPT}"
+echo "Remote D2M script complete."
+
+# Save post-restore iptables state to artifacts for audit/debugging
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
-    "sudo iptables -L -n -v" > "${ARTIFACT_DIR}/bastion-iptables-post-restore.txt" 2>&1 || true
+    "sudo iptables -L -n -v && echo '---IPv6---' && sudo ip6tables -L -n -v" \
+    > "${ARTIFACT_DIR}/bastion-iptables-post-restore.txt" 2>&1 || true
 
 # ---------------------------------------------------------------------------
 # Copy IDMS/ITMS from bastion to SHARED_DIR
-# disk-to-mirror produces cluster-resources under the workspace's working-dir.
+# disk-to-mirror writes cluster-resources under the workspace working-dir.
 # The subsequent mirror-images-by-oc-mirror-conf-mirror step reads these files.
 # ---------------------------------------------------------------------------
 echo "=== Copying IDMS/ITMS from bastion to SHARED_DIR ==="
@@ -206,9 +318,8 @@ BASTION_CLUSTER_RESOURCES="${BASTION_WORKSPACE_PATH}/working-dir/cluster-resourc
 idms_remote="${BASTION_CLUSTER_RESOURCES}/idms-oc-mirror.yaml"
 idms_local="/tmp/idms-oc-mirror.yaml"
 
-# Verify idms was produced (fail clearly if disk-to-mirror did not generate it)
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
-    "test -s '${idms_remote}' || { echo 'ERROR: idms-oc-mirror.yaml not found at ${idms_remote} after disk-to-mirror'; ls -la '${BASTION_CLUSTER_RESOURCES}/' 2>/dev/null || true; exit 1; }"
+    "test -s '${idms_remote}' || { echo 'ERROR: idms-oc-mirror.yaml not found at ${idms_remote}'; ls -la '${BASTION_CLUSTER_RESOURCES}/' 2>/dev/null || true; exit 1; }"
 
 scp ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}:${idms_remote}" "${idms_local}"
 cp "${idms_local}" "${SHARED_DIR}/idms-oc-mirror.yaml"

@@ -121,17 +121,20 @@ popd
 
 run_command "'${oc_mirror_bin}' version --output=yaml"
 
-# Build combined pull secret (cluster pull-secret + mirror registry credentials)
-combined_pull_secret=$(mktemp)
-registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | tr -d '\n' | base64 -w 0)
-
 # private mirror registry host: <public_dns>:<port>
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
 
+# Build combined pull secret (cluster pull-secret + mirror registry credentials).
+# Disable tracing for this block — registry_creds is sensitive.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+combined_pull_secret=$(mktemp)
+registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | tr -d '\n' | base64 -w 0)
 cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c \
     'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' \
     > "${combined_pull_secret}"
+$WAS_TRACING && set -x
 KUBECONFIG="" oc registry login --to "${combined_pull_secret}"
 
 # Set up workspace and pull-secret for oc-mirror
