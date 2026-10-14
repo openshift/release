@@ -65,7 +65,7 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 API_IP=$(<"${SHARED_DIR}/API_IP")
 INGRESS_IP=$(<"${SHARED_DIR}/INGRESS_IP")
 
-# LB_HOSTS (multi-LB FIPs) when present; otherwise API_IP.
+# Multi-LB (#86644): api -> LB_HOSTS FIPs when present.
 API_IPS=()
 if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     while IFS= read -r ip || [[ -n "${ip}" ]]; do
@@ -73,6 +73,12 @@ if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
         API_IPS+=("${ip}")
     done < "${SHARED_DIR}/LB_HOSTS"
 fi
+
+# UserManaged LB: dnsrecords publishes api as LB_HOST; api-int stays on API_IP.
+if [[ "${#API_IPS[@]}" -eq 0 && "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
+    API_IPS+=("$(<"${SHARED_DIR}/LB_HOST")")
+fi
+
 if [[ "${#API_IPS[@]}" -eq 0 ]]; then
     API_IPS+=("${API_IP}")
 fi
