@@ -136,9 +136,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- always_run: false
-  as: e2e-aws-deployment
-  optional: true
+- as: e2e-aws-deployment
+  run_if_changed: ^(tests/e2e/(deployment|framework)/|pkg/controller/(metrics|compliancescan|profilebundle|common)/|pkg/apis/compliance/|config/|cmd/manager/|go\.(mod|sum)$|Makefile|Dockerfile\.ci$|main\.go$)
   steps:
     cluster_profile: aws-stackrox
     dependencies:
@@ -161,10 +160,33 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- always_run: false
-  as: e2e-aws-tls-scanner-5-0
+- as: e2e-aws-remediation
+  run_if_changed: ^(tests/e2e/(remediation|framework)/|pkg/controller/(complianceremediation|common)/|pkg/apis/compliance/)
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-remediation
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-tls-scanner-5-0
   optional: true
-  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  run_if_changed: ^(cmd/manager/(resultserver|resultcollector|tls)|pkg/controller/(resultserver|metrics|common)/|pkg/apis/compliance/v1alpha1/|config/|go\.(mod|sum)$|Makefile$|Dockerfile\.ci$|main\.go$)
   steps:
     cluster_profile: aws-stackrox
     dependencies:
@@ -375,10 +397,9 @@ tests:
       resources:
         requests:
           cpu: 100m
-- always_run: false
-  as: e2e-aws-tls-scanner
+- as: e2e-aws-tls-scanner
   optional: true
-  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  run_if_changed: ^(cmd/manager/(resultserver|resultcollector|tls)|pkg/controller/(resultserver|metrics|common)/|pkg/apis/compliance/v1alpha1/|config/|go\.(mod|sum)$|Makefile$|Dockerfile\.ci$|main\.go$)
   steps:
     cluster_profile: aws-stackrox
     dependencies:
