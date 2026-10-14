@@ -1,0 +1,45 @@
+base_images:
+  # baremetalds-e2e provisions the cluster via baremetalds-devscripts-setup,
+  # which runs from the dev-scripts image.
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+tests:
+- timeout: 8h0m0s
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      # Override the workflow's DEVSCRIPTS_CONFIG (must re-list IP_STACK). Dual-stack
+      # gives the cluster IPv4 egress for registry pulls, and VM_EXTRADISKS attaches
+      # extra virtio disks to every node VM so LVMS has a device to consume. On
+      # dev-scripts the extra disks appear as /dev/vda and /dev/vdb.
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=100G
+      # LVMS: build a default dynamic StorageClass (lvms-vg1) from /dev/vdb. Quay's
+      # managed Postgres/Clair/Redis PVCs need a default StorageClass, which the
+      # baremetalds dev-scripts cluster does not provide out of the box.
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_CLUSTER_DEVICE_PATH: /dev/vdb
+      LVM_CLUSTER_WIPE_DEVICE: "true"
+      REQUIRED_DEFAULT_STORAGECLASS: lvms-vg1
+    pre:
+    - chain: baremetalds-ofcir-pre
+    # Install LVMS and set lvms-vg1 as the default StorageClass before Quay deploys.
+    - ref: operatorhub-subscribe-lvm-operator
+    - ref: storage-create-lvm-cluster
+    - ref: storage-conf-storageclass-set-default-storageclass
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+    - chain: baremetalds-ofcir-post
+    # Dual-stack (IP_STACK=v4v6) so the cluster can pull operator-catalog images
+    # over IPv4; a v6-only cluster has no egress to quay.io/registry.redhat.io.
+    workflow: baremetalds-e2e-ovn-dualstack

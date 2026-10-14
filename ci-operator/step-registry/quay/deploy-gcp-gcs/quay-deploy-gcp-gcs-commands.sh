@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# On baremetalds (bare-metal) clusters the API and ingress routes
+# (*.apps.<cluster>.metalkube.org) are reachable only via the bastion squid
+# proxy. Source it when present so the Quay route calls below can connect; cloud
+# jobs have no such file and skip this (no-op).
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
 
 if [ "${MAP_TESTS}" = "true" ]; then
