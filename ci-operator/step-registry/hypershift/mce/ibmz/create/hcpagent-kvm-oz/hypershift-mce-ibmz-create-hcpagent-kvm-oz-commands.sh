@@ -210,11 +210,9 @@ for (( i=0; i<AGENT_NODE_COUNT; i++ )); do
   ${VIRSH} undefine "${NAME}" >/dev/null 2>&1 || true
   ${VIRSH} define "/tmp/${NAME}-install.xml"
   ${VIRSH} start "${NAME}"
-  # Redefine the domain so that the next start boots from disk. The running
-  # domain keeps its current UUID, so strip the UUID from the disk XML to avoid
-  # a "domain already exists" collision.
-  grep -v '<uuid>' "/tmp/${NAME}-disk.xml" > "/tmp/${NAME}-disk-nouuid.xml"
-  ${VIRSH} define "/tmp/${NAME}-disk-nouuid.xml"
+  # The disk XML is written above and will be defined once the guest shuts off
+  # after the installation reboot (step 6). Redefining while the domain is
+  # running always fails, even without a UUID.
 done
 printf '%s\n' "${GUEST_NAMES[@]}" > "${SHARED_DIR}/hcpagent-kvm-guests.txt"
 printf '%s\n' "${GUEST_IPS[@]}" > "${SHARED_DIR}/hcpagent-kvm-guest-ips.txt"
@@ -269,7 +267,9 @@ for (( attempt=1; attempt<=90; attempt++ )); do
       ADDED=$((ADDED + 1))
     fi
     if [[ "$(${VIRSH} domstate "${GUEST_NAMES[i]}")" == "shut off" ]]; then
-      echo "$(date) ${GUEST_NAMES[i]} is shut off after the installation, starting it from disk"
+      echo "$(date) ${GUEST_NAMES[i]} is shut off after the installation, redefining from disk XML and starting"
+      ${VIRSH} undefine "${GUEST_NAMES[i]}" >/dev/null 2>&1 || true
+      ${VIRSH} define "/tmp/${GUEST_NAMES[i]}-disk.xml"
       ${VIRSH} start "${GUEST_NAMES[i]}"
     fi
   done
