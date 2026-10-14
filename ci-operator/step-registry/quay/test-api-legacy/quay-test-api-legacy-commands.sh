@@ -23,11 +23,14 @@ set +x
 export CYPRESS_QUAY_USER=${QUAY_API_SUPERUSER}
 CYPRESS_QUAY_PASSWORD=$(set +o pipefail; LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 24)
 export CYPRESS_QUAY_PASSWORD
-body=$(jq -n --arg u "${CYPRESS_QUAY_USER}" --arg p "${CYPRESS_QUAY_PASSWORD}" \
-  '{username: $u, password: $p, email: ($u + "@example.com")}')
-code=$(curl -sk -o /tmp/create-user.json -w '%{http_code}' -X POST "${QUAY_ROUTE}/api/v1/user/" \
-  -H 'Content-Type: application/json' --data "${body}" || true)
-unset body
+# Quay's API rejects session POSTs without a CSRF token, so fetch one first.
+cookies=/tmp/quay-cookies.txt
+csrf=$(curl -sk -c "${cookies}" "${QUAY_ROUTE}/csrf_token" | jq -r '.csrf_token // empty' || true)
+code=$(jq -n '{username: env.CYPRESS_QUAY_USER, password: env.CYPRESS_QUAY_PASSWORD,
+  email: (env.CYPRESS_QUAY_USER + "@example.com")}' |
+  curl -sk -o /tmp/create-user.json -w '%{http_code}' -X POST "${QUAY_ROUTE}/api/v1/user/" \
+    -b "${cookies}" -H "X-CSRF-Token: ${csrf}" -H 'Content-Type: application/json' --data @- || true)
+rm -f "${cookies}"
 $WAS_TRACING && set -x
 if [[ "${code}" != "200" ]]; then
   echo "ERROR: creating Quay user ${CYPRESS_QUAY_USER} returned HTTP ${code}: $(cat /tmp/create-user.json 2>/dev/null)" >&2
