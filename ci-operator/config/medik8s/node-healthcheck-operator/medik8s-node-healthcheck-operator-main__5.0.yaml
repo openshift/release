@@ -48,10 +48,12 @@ images:
     to: source-upgrade-test-runner
   - dockerfile_literal: |
       FROM system-tests-builder AS go-builder
+      FROM docker.io/mikefarah/yq:4.53.2 AS yq
       FROM nested-podman
       USER 0
       RUN dnf install -y git make skopeo jq findutils tar gzip && dnf clean all
       COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      COPY --from=yq /usr/bin/yq /usr/local/bin/yq
       ENV GOROOT=/opt/app-root/src/go
       ENV PATH=/opt/app-root/src/go/bin:$PATH
     from: nested-podman
