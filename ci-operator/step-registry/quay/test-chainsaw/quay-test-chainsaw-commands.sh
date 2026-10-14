@@ -31,6 +31,7 @@ if [[ "${QUAY_OPERATOR_STS}" == "true" || "${CHAINSAW_SUITE}" == "sts" ]]; then
     STS_S3_BUCKET="$(cat "${SHARED_DIR}/STS_S3_BUCKET")" \
     STS_S3_REGION="$(cat "${SHARED_DIR}/STS_S3_REGION")" \
     STS_ROLE_ARN="$(cat "${SHARED_DIR}/STS_ROLE_ARN")" \
+    STS_SECOND_ROLE_ARN="$(cat "${SHARED_DIR}/STS_SECOND_ROLE_ARN")" \
     CHAINSAW_EXTRA_ARGS="--report-name junit_chainsaw_sts ${REPORT_ARGS} ${ASSERT_TIMEOUT}" || sts_rc=1
 fi
 
