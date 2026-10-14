@@ -75,6 +75,30 @@ get_stream() {
     echo 'Unable to read ART ImageStream; client diagnostics withheld to avoid exposing credentials' >&2
     exit 1
   fi
+  if ! jq_art '
+    .apiVersion == "image.openshift.io/v1" and .kind == "ImageStream" and
+    .metadata.name == "scos-5.1-art" and .metadata.namespace == "origin" and
+    (.metadata.uid | type == "string" and length > 0) and
+    (.metadata.resourceVersion | type == "string" and length > 0) and
+    (art_specs | has_both_tags)
+  ' -e "$workdir/current.json" > /dev/null; then
+    echo 'Missing or unexpected ART stream identity or tag cardinality' >&2
+    exit 1
+  fi
+}
+
+require_tag_identity() {
+  local file=$1 tag=$2
+  case "$tag" in stream-coreos|stream-coreos-extensions) ;; *) exit 1 ;; esac
+  if ! jq --arg tag "$tag" --arg uid "$(jq -r '.metadata.uid' "$workdir/baseline.json")" '
+    .apiVersion == "image.openshift.io/v1" and .kind == "ImageStreamTag" and
+    .metadata.name == ("scos-5.1-art:" + $tag) and .metadata.namespace == "origin" and
+    .metadata.uid == $uid and
+    (.metadata.resourceVersion | type == "string" and length > 0) and .tag.name == $tag
+  ' -e "$file" > /dev/null; then
+    echo 'Missing or unexpected ART tag identity; refusing publication' >&2
+    exit 1
+  fi
 }
 
 require_unchanged() {
@@ -115,52 +139,77 @@ mirror_images() {
 }
 
 verify_update_response() {
-  if ! jq_art '
-    def matches_request($expected):
+  local tag=$1
+  require_tag_identity "$workdir/tag-updated.json" "$tag"
+  if ! jq '
+    .tag as $actual | $desired[0].tag as $expected | $actual |
       .name == $expected.name and .from == $expected.from and
       (.reference // false) == false and
       .importPolicy.importMode == "PreserveOriginal" and
-      .referencePolicy.type == "Source";
-    art_specs as $actual |
-    ($actual | has_both_tags) and
-    all($desired[0][]; . as $expected | any($actual[]; matches_request($expected)))
-  ' -e --slurpfile desired "$workdir/desired.json" "$workdir/updated.json" > /dev/null; then
-    cp "$workdir/updated.json" "$workdir/current.json"
+      .referencePolicy.type == "Source"
+  ' -e --slurpfile desired "$workdir/update.json" "$workdir/tag-updated.json" > /dev/null; then
     diagnose 'ART update response does not match this build or its import policy'
     exit 1
   fi
-  if ! jq_art 'art_specs | has_both_tags and all(.[]; .generation > 0)' -e "$workdir/updated.json" > /dev/null; then
+  if ! jq '.tag.generation | type == "number" and . > 0' -e "$workdir/tag-updated.json" > /dev/null; then
     diagnose 'API did not assign import generations'
     exit 1
   fi
 }
 
 update_art_tags() {
-  local attempt update_exit error expected_conflict reason
+  local tag
+  for tag in stream-coreos stream-coreos-extensions; do
+    if [[ "$tag" == stream-coreos-extensions ]]; then
+      echo 'First ART tag updated; a subsequent failure can leave a partial publication (no rollback)' >&2
+    fi
+    update_art_tag "$tag"
+  done
+  cp "$workdir/baseline.json" "$workdir/updated.json"
+}
+
+update_art_tag() {
+  local tag=$1 attempt update_exit error expected_conflict reason conflict_prefix version
   for attempt in 1 2 3; do
+    get_stream
     require_unchanged "$workdir/baseline.json" 'Publication superseded before update; refusing to overwrite'
-    jq_art '
-      .spec.tags = ([.spec.tags[]? | select(.name | is_art_tag | not)] + $desired[0])
-    ' --slurpfile desired "$workdir/desired.json" "$workdir/current.json" > "$workdir/update.json"
-    if oc --request-timeout=10s -n origin replace -f "$workdir/update.json" -o json > "$workdir/updated.json" 2> "$workdir/replace.err"; then
-      verify_update_response
+    if ! oc --request-timeout=10s -n origin get imagestreamtag "scos-5.1-art:${tag}" -o json > "$workdir/tag.json" 2> "$workdir/get.err"; then
+      echo 'Unable to read existing ART tag; client diagnostics withheld' >&2
+      exit 1
+    fi
+    require_tag_identity "$workdir/tag.json" "$tag"
+    if ! cmp -s <(jq --arg tag "$tag" -S '.spec.tags[] | select(.name == $tag)' "$workdir/baseline.json") <(jq -S '.tag' "$workdir/tag.json"); then
+      diagnose 'Publication superseded before update; refusing to overwrite'
+      exit 1
+    fi
+    jq --arg tag "$tag" --arg version "$(jq -r '.metadata.resourceVersion' "$workdir/current.json")" --slurpfile desired "$workdir/desired.json" '
+      {apiVersion: "image.openshift.io/v1", kind: "ImageStreamTag",
+       metadata: {name: ("scos-5.1-art:" + $tag), namespace: "origin",
+         uid: .metadata.uid, resourceVersion: $version},
+       tag: ($desired[0][] | select(.name == $tag))}
+    ' "$workdir/tag.json" > "$workdir/update.json"
+    if oc --request-timeout=10s -n origin replace -f "$workdir/update.json" -o json > "$workdir/tag-updated.json" 2> "$workdir/replace.err"; then
+      verify_update_response "$tag"
+      jq --arg tag "$tag" --slurpfile response "$workdir/tag-updated.json" '
+        .spec.tags |= map(if .name == $tag then $response[0].tag else . end)
+      ' "$workdir/baseline.json" > "$workdir/next.json"
+      mv "$workdir/next.json" "$workdir/baseline.json"
       return
     else
       update_exit=$?
     fi
     error=$(cat "$workdir/replace.err")
     expected_conflict="Error from server (Conflict): error when replacing \"${workdir}/update.json\": Operation cannot be fulfilled on imagestreams.image.openshift.io \"scos-5.1-art\": the object has been modified; please apply your changes to the latest version and try again"
-    if [[ "$error" != "$expected_conflict" ]]; then
+    conflict_prefix="Error from server (Conflict): error when replacing \"${workdir}/update.json\": Operation cannot be fulfilled on imagestreamtags.image.openshift.io \"scos-5.1-art:${tag}\": another caller has updated the resource version to "
+    version=${error#"$conflict_prefix"}
+    if [[ "$error" != "$expected_conflict" ]] && ! { [[ "$version" =~ ^[0-9]+$ ]] && [[ "$error" == "${conflict_prefix}${version}" ]]; }; then
       reason=Unclassified
       case "$error" in
         'Error from server (Forbidden): '*) reason=Forbidden ;;
-        'Error from server (Invalid): '*|'The ImageStream "scos-5.1-art" is invalid: '*) reason=Invalid ;;
+        'Error from server (Invalid): '*|"The ImageStreamTag \"scos-5.1-art:${tag}\" is invalid: "*) reason=Invalid ;;
       esac
       diagnose "ART update failed (${reason}; exit ${update_exit}); outcome unconfirmed, not retrying or attributing to another writer"
       exit "$update_exit"
-    fi
-    if [[ "$attempt" != 3 ]]; then
-      get_stream
     fi
   done
   diagnose 'Unable to update ART imports after three optimistic attempts'
