@@ -88,6 +88,7 @@ echo "Pull secret transferred to bastion."
 # (same ISC as to-disk; oc-mirror needs it in disk-to-mirror mode to generate
 # the correct IDMS/ITMS cluster-resources)
 ISC_PATH="${BASTION_WORKSPACE_PATH}/image-set-config.yaml"
+# shellcheck disable=SC2087  # Intentionally unquoted: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} must expand client-side
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > '${ISC_PATH}'" <<EOF
 kind: ImageSetConfiguration
 apiVersion: mirror.openshift.io/v2alpha1
