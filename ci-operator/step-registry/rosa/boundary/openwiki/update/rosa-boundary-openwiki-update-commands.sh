@@ -7,7 +7,6 @@ branch=${TARGET_UPDATE_BRANCH:?}
 [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'Invalid OpenWiki repository.' >&2; exit 1; }
 git check-ref-format --branch "$base" >/dev/null
 git check-ref-format --branch "$branch" >/dev/null
-[[ "$base" != "$branch" ]] || { echo 'OpenWiki update branch must differ from the base branch.' >&2; exit 1; }
 
 if [[ ! -s "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
   echo 'Missing rosa-boundary/ci/gcp-vertex-sa-key credential.' >&2
@@ -29,30 +28,6 @@ export OPENWIKI_MODEL_ID=${TARGET_MODEL_ID:?}
 workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
 
-# Use the authenticated prepare step's full-history bundle. The model step
-# receives source, never GitHub App credentials, even for a private target.
-bundle_file="${SHARED_DIR}/openwiki-source.bundle"
-if [[ ! -s "$bundle_file" ]]; then
-  echo 'Missing prepared OpenWiki source bundle.' >&2
-  exit 1
-fi
-base_branch=$(cat "${SHARED_DIR}/openwiki-base-branch")
-if [[ "$base_branch" != "$base" && "$base_branch" != "$branch" ]]; then
-  echo 'Unexpected OpenWiki base branch.' >&2
-  exit 1
-fi
-git clone --branch "$base" "$bundle_file" "$workdir/repo"
-cd "$workdir/repo"
-git bundle verify "$bundle_file" >/dev/null
-# Preserve the canonical source URL for repository attribution, without auth.
-git remote set-url origin "https://github.com/${repo}.git"
-git config user.name 'OpenShift CI Bot'
-git config user.email 'ci-bot@redhat.com'
-git switch -c "$branch" "origin/${base_branch}"
-if [[ "$base_branch" != "$base" ]]; then
-  git merge --no-edit "origin/${base}"
-fi
-
 # Install tools only during this periodic. OpenWiki 0.7.1 needs Node >=22.22.0.
 case "$(uname -m)" in
   x86_64) node_arch=x64; node_sha=9aa8e9d2298ab68c600bd6fb86a6c13bce11a4eca1ba9b39d79fa021755d7c37 ;;
@@ -72,6 +47,22 @@ jq -er '.version' "$workdir/tools/lib/node_modules/openwiki/package.json" > "${S
 printf '%s\n' "$OPENWIKI_MODEL_ID" > "${SHARED_DIR}/openwiki-model-id"
 printf '%s\n' "$OPENWIKI_PROVIDER" > "${SHARED_DIR}/openwiki-provider"
 
+# Clone the prepared bundle so private source is available without passing
+# GitHub App credentials to the model container.
+base_branch=$(cat "${SHARED_DIR}/openwiki-base-branch")
+if [[ "$base_branch" != "$base" && "$base_branch" != "$branch" ]]; then
+  echo 'Unexpected OpenWiki base branch.' >&2
+  exit 1
+fi
+git clone --branch "$base" "${SHARED_DIR}/openwiki-source.bundle" "$workdir/repo"
+cd "$workdir/repo"
+git remote set-url origin "https://github.com/${repo}.git"
+git config user.name 'OpenShift CI Bot'
+git config user.email 'ci-bot@redhat.com'
+git switch -c "$branch" "origin/${base_branch}"
+if [[ "$base_branch" != "$base" ]]; then
+  git merge --no-edit "origin/${base}"
+fi
 export LANGCHAIN_TRACING_V2=false
 set +e
 openwiki code --update --print
