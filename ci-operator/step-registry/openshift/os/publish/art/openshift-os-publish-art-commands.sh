@@ -72,6 +72,11 @@ if [[ "$updated" != true ]]; then
   exit 1
 fi
 target_spec "$workdir/updated.json" > "$workdir/updated-tags.json"
+if ! jq -e --slurpfile desired "$workdir/desired.json" '. as $stream | all($desired[0][]; . as $expected | any($stream.spec.tags[]?; .name == $expected.name and .from == $expected.from and (.reference // false) == false and .importPolicy.importMode == "PreserveOriginal" and .referencePolicy.type == "Source"))' "$workdir/updated.json" > /dev/null; then
+  cp "$workdir/updated.json" "$workdir/current.json"
+  diagnose 'ART update response does not match this build or its import policy'
+  exit 1
+fi
 if ! jq -e --argjson tags "$tags" '[.spec.tags[]? | select(.name as $name | $tags | index($name))] | length == 2 and all(.[]; .generation > 0)' "$workdir/updated.json" > /dev/null; then
   diagnose 'API did not assign import generations'
   exit 1

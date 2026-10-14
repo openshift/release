@@ -20,7 +20,8 @@ controller import without an `imagestreamimports` request from this job. The
 existing promotion-quay-tagger account permits ImageStream get/update; no patch,
 additional RBAC, or direct image-import permission is needed.
 
-The response supplies the assigned spec generations. Polling requires the same
+The response must retain the requested build digests and import policies before
+its assigned spec generations are accepted. Polling requires the same
 stream UID and exact target specs, a nonempty imported image equal to the build
 digest, and matching status/spec generations for both tags in one snapshot.
 Current-generation import failure conditions fail immediately; pending imports

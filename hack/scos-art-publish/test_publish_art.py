@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline contract tests for the ART publisher; never contact a cluster."""
 
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -54,6 +55,10 @@ def mock_oc():
                 assert state["mirrors"] == 2
                 tag["generation"] = 11
             update["metadata"]["resourceVersion"] = "3"
+            if state["mode"] == "response-source":
+                update["spec"]["tags"][1]["from"]["name"] = "quay.io/other@sha256:" + "c" * 64
+            elif state["mode"] == "response-reference":
+                update["spec"]["tags"][1]["reference"] = True
             state["stream"] = update
             stream = update
             state["updated"] = True
@@ -182,6 +187,14 @@ class PublishArtTest(unittest.TestCase):
                 self.assertIn("superseded", result.stderr)
                 self.assertEqual(state["replaces"], 1)
 
+    def test_unexpected_update_response_rejected(self):
+        for mode in ("response-source", "response-reference"):
+            with self.subTest(mode=mode):
+                result, state = self.run_publisher(mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("does not match this build", result.stderr)
+                self.assertEqual(state["polls"], 0)
+
     def test_safe_conflict_retry(self):
         result, state = self.run_publisher("conflict")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -224,6 +237,19 @@ class PublishArtTest(unittest.TestCase):
         images = next(job for job in jobs if job["name"] == "branch-ci-openshift-os-master-okd-scos-images")
         self.assertIn("--target=[images]", images["spec"]["containers"][0]["args"])
         self.assertIn("--promote", images["spec"]["containers"][0]["args"])
+
+    def test_ci_postsubmit_yaml_validation(self):
+        spec = importlib.util.spec_from_file_location("yaml_validation", ROOT / "hack/validate-yaml-indentation.py")
+        validator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(validator)
+        path = "ci-operator/config/openshift/os/openshift-os-master__okd-scos.yaml"
+        config = yaml.safe_load((ROOT / path).read_text(encoding="utf-8"))
+        self.assertEqual(validator.validate_yaml_structure(path, config), [])
+        for value in (True, False):
+            self.assertEqual(validator.validate_yaml_structure(path, {"as": "publish-art", "postsubmit": value}), [])
+        for invalid in ({"as": "publish-art", "postsubmit": "true"}, {"postsubmit": True}):
+            self.assertTrue(validator.validate_yaml_structure(path, invalid))
+        self.assertTrue(validator.validate_yaml_structure("ci-operator/jobs/openshift/os/jobs.yaml", {"as": "publish-art", "postsubmit": True}))
 
 
 if __name__ == "__main__":

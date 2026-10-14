@@ -143,6 +143,9 @@ def validate_yaml_structure(file_path, data):
         }
 
         for key in data.keys():
+            if (key == 'postsubmit' and isinstance(data[key], bool)
+                    and 'as' in data and 'ci-operator/config/' in str(file_path)):
+                continue
             if key in common_typos:
                 errors.append(
                     f"{file_path}: Possible typo: '{key}' should be '{common_typos[key]}'?"
