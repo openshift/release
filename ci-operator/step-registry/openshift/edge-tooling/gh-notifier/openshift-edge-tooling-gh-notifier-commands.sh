@@ -66,4 +66,4 @@ bash -c "set -euo pipefail; ${GH_NOTIFIER_INVOKE}"
 # ---------------------------------------------------------------------------
 cp -f "./gh-notifier/pr-dashboard.html" "${ARTIFACT_DIR}/edge-tooling-pr-summary.html"
 echo "Copied ./gh-notifier/pr-dashboard.html to ${ARTIFACT_DIR}/edge-tooling-pr-summary.html (Spyglass + GCS)."
-
+sleep 5000
