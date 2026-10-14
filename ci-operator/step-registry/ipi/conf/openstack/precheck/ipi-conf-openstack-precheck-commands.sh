@@ -74,8 +74,9 @@ if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     done < "${SHARED_DIR}/LB_HOSTS"
 fi
 
-# UserManaged LB: dnsrecords publishes api as LB_HOST; api-int stays on API_IP.
-if [[ "${#API_IPS[@]}" -eq 0 && "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
+# Non-proxy single-LB externallb: api -> LB_HOST FIP.
+# Do not key off LB_HOST alone — proxy-externallb always writes it.
+if [[ "${#API_IPS[@]}" -eq 0 && "${CONFIG_TYPE:-}" == *"externallb"* && "${CONFIG_TYPE:-}" != *"proxy"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
     API_IPS+=("$(<"${SHARED_DIR}/LB_HOST")")
 fi
 

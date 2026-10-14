@@ -45,8 +45,8 @@ if [ -f "${SHARED_DIR}/API_IP" ]; then
 
   # Priority for api DNS:
   # 1) LB_HOSTS (multi-LB) when present
-  # 2) LB_HOST for externallb
-  # 3) API_IP (VIP)
+  # 2) LB_HOST for non-proxy single-LB externallb
+  # 3) API_IP (VIP) — including proxy-externallb (LB_HOST always exists there)
   # api-int always stays on API_IP.
   API_RECORD_VALUES=()
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOSTS" ]]; then
@@ -55,7 +55,7 @@ if [ -f "${SHARED_DIR}/API_IP" ]; then
       API_RECORD_VALUES+=("${ip}")
     done < "${SHARED_DIR}/LB_HOSTS"
   fi
-  if [[ "${#API_RECORD_VALUES[@]}" -eq 0 && "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
+  if [[ "${#API_RECORD_VALUES[@]}" -eq 0 && "${CONFIG_TYPE:-}" == *"externallb"* && "${CONFIG_TYPE:-}" != *"proxy"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
     API_RECORD_VALUES+=("$(<"${SHARED_DIR}/LB_HOST")")
   fi
   if [[ "${#API_RECORD_VALUES[@]}" -eq 0 ]]; then
