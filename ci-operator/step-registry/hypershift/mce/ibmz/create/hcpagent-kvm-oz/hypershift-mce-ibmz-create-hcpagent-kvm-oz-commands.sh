@@ -270,4 +270,17 @@ echo "$(date) Checking the compute nodes in the hosted control plane"
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" get nodes
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --for=condition=Ready node --all --timeout=15m
 
+# --- Step 8: Verify the guest ingress service ---
+# The agent guest router runs in HostNetwork mode and listens on port 80/443
+# directly on the node IP. Confirm here so HAProxy backends can be checked.
+echo "$(date) Checking guest ingress service"
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" get svc -n openshift-ingress
+
+# --- Step 9: Wait for all guest ClusterOperators to be Available ---
+# COs require compute nodes to be Ready before they can progress.
+echo "$(date) Waiting for all guest ClusterOperators to be Available"
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+  wait --for=condition=Available=True co --all --timeout=30m
+echo "$(date) All guest ClusterOperators are Available"
+
 echo "$(date) Successfully attached the KVM guests as agents to the hosted cluster ${HC_NAME}"
