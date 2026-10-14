@@ -14,6 +14,8 @@ set -o pipefail
 # with the rest of the Terraform stack on deprovision.
 
 QUAY_DB_AWS_RDS_TF_ARCHIVE="quay-db-aws-rds-terraform.tgz"
+QUAY_DB_AWS_RDS_CONFIG_ARCHIVE="quay-db-aws-rds-config.tgz"
+QUAY_DB_AWS_RDS_OUTPUTS_JSON="quay-db-aws-rds-outputs.json"
 QUAY_SUBNET_GROUP="quayprowcisubnetgroup$RANDOM"
 QUAY_SECURITY_GROUP="quayprowcisecuritygroup$RANDOM"
 
@@ -245,7 +247,38 @@ output "quaydb_password" {
 output "parameter_group_name" {
   value = aws_db_parameter_group.quay_scram.name
 }
+
+# Identifiers consumed by the deprovision step's identifier-based fallback
+# when the Terraform state archive is missing or unusable.
+output "quaydb_instance_identifier" {
+  value = aws_db_instance.quaydb.identifier
+}
+
+output "quaydb_subnet_ids" {
+  value = [aws_subnet.quayrds1.id, aws_subnet.quayrds2.id]
+}
+
+output "quaydb_sg_id" {
+  value = aws_security_group.quayrds.id
+}
+
+output "quaydb_vpc_id" {
+  value = aws_vpc.quayrds.id
+}
+
+output "quaydb_igw_id" {
+  value = aws_internet_gateway.quaydbigw.id
+}
 EOF
+
+# Persist the Terraform config before any apply runs: the deprovision step
+# uses it to rebuild state via terraform import when the main state archive
+# is missing or unusable, so resources can still be destroyed by their
+# persisted identifiers instead of leaking.
+config_archive_tmp="$(mktemp -d)/${QUAY_DB_AWS_RDS_CONFIG_ARCHIVE}"
+if (cd "${TF_RDS_DIR}" && tar -cvzf "${config_archive_tmp}" variables.tf create_aws_rds_postgresql.tf); then
+  cp -f "${config_archive_tmp}" "${SHARED_DIR}/" || true
+fi
 
 export TF_VAR_quay_subnet_group="${QUAY_SUBNET_GROUP}"
 export TF_VAR_quay_security_group="${QUAY_SECURITY_GROUP}"
@@ -277,6 +310,10 @@ fi
 
 QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$(terraform output -raw quaydb_address)
 echo "${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}" > "${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS"
+
+# Persist resource identifiers for the deprovision identifier fallback.
+# Filtered to ids only: the sensitive password output is never written.
+terraform output -json | jq '{instance_id: .quaydb_instance_identifier.value, subnet_ids: .quaydb_subnet_ids.value, sg_id: .quaydb_sg_id.value, vpc_id: .quaydb_vpc_id.value, igw_id: .quaydb_igw_id.value}' > "${SHARED_DIR}/${QUAY_DB_AWS_RDS_OUTPUTS_JSON}"
 echo "AWS RDS PostgreSQL provisioning completed"
 
 # Install PostgreSQL extensions in the database

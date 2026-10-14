@@ -7,8 +7,12 @@ set -o pipefail
 # Provision Azure Database for PostgreSQL Flexible Server for Quay.
 # Outputs database connection details and config fragment to SHARED_DIR.
 # Uses step-specific SHARED_DIR names so quay-deploy-azure-blob cannot overwrite
-# the DB Terraform state or resource-group identifier (deploy writes
-# SHARED_DIR/terraform.tgz and QUAY_AZURE_RESOURCE_GROUP = cluster RG).
+# the DB Terraform state (deploy writes SHARED_DIR/terraform.tgz). The server
+# is created in the OpenShift cluster's resource group - the same RG the
+# installer created and quay-deploy-azure-blob creates the storage account in -
+# so the database is co-located with the cluster and the installer's RG
+# deletion at teardown is a cleanup backstop. The RG itself is never created
+# or destroyed by this step's Terraform.
 
 QUAY_DB_AZURE_TF_ARCHIVE="quay-db-azure-postgres-terraform.tgz"
 
@@ -30,7 +34,33 @@ ARM_CLIENT_SECRET=$(jq -r .clientSecret "${AZURE_AUTH_LOCATION}")
 ARM_CLIENT_ID=$(jq -r .clientId "${AZURE_AUTH_LOCATION}")
 export ARM_SUBSCRIPTION_ID ARM_TENANT_ID ARM_CLIENT_SECRET ARM_CLIENT_ID
 
-QUAY_DB_AZURE_RESOURCE_GROUP="quayresourcegroup$RANDOM"
+# The cluster's resource group, discovered the same way quay-deploy-azure-blob
+# discovers it (infrastructure/cluster status). This co-locates the database
+# with the cluster - a hardcoded "East US" location put it in a different
+# region from the leased cluster, adding cross-region latency to every query.
+QUAY_DB_AZURE_RESOURCE_GROUP=$(oc get infrastructure cluster \
+  -o jsonpath='{.status.platformStatus.azure.resourceGroupName}' 2>/dev/null || true)
+if [[ -z "${QUAY_DB_AZURE_RESOURCE_GROUP}" ]]; then
+  echo "ERROR: could not determine the cluster's Azure resource group from" >&2
+  echo "       infrastructure/cluster .status.platformStatus.azure.resourceGroupName." >&2
+  exit 1
+fi
+# The Azure platformStatus has no region field (unlike AWS/GCP), so take the
+# region the same way ipi-conf-azure does - the leased quota slice's region in
+# LEASED_RESOURCE (e.g. "centralus") - falling back to the topology region
+# label on any node.
+CLUSTER_AZURE_REGION="${LEASED_RESOURCE:-}"
+if [[ -z "${CLUSTER_AZURE_REGION}" ]]; then
+  CLUSTER_AZURE_REGION=$(oc get nodes \
+    -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/region}' 2>/dev/null || true)
+fi
+if [[ -z "${CLUSTER_AZURE_REGION}" ]]; then
+  echo "ERROR: could not determine the cluster's Azure region from LEASED_RESOURCE" >&2
+  echo "       or the nodes' topology.kubernetes.io/region label." >&2
+  exit 1
+fi
+echo "Cluster resource group: ${QUAY_DB_AZURE_RESOURCE_GROUP}, region: ${CLUSTER_AZURE_REGION}"
+
 QUAY_DB_AZURE_SERVER="quaypostgresql$RANDOM"
 # Generate per-job database credentials: nothing static to rotate or leak.
 # Password is letters+digits only: upper+lower+digits meets the Flexible
@@ -65,7 +95,6 @@ variable "resource_group_name" {
 }
 
 variable "location" {
-  default = "East US"
 }
 
 variable "server_name" {
@@ -91,9 +120,11 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      # PostgreSQL 17 on Flexible Server requires azurerm >= 4.46.0; the 3.x
-      # schema rejects version "17" (expected one of 11-16).
-      version = ">= 4.46.0"
+      # Stay on the 4.x line: PostgreSQL 17 on Flexible Server needs >= 4.46,
+      # but the open-ended ">= 4.46.0" constraint resolved to azurerm 5.9.0,
+      # whose flexible-server create returns "ParameterOutOfRange: The value
+      # of the 'Version' should be in: []" (build 2110619773975924736).
+      version = "~> 4.46"
     }
   }
 }
@@ -102,23 +133,32 @@ provider "azurerm" {
   features {}
 }
 
-resource "azurerm_resource_group" "quay" {
-  name     = var.resource_group_name
-  location = var.location
-}
-
+# No azurerm_resource_group resource: the server goes into the OpenShift
+# cluster's pre-existing resource group, referenced by name only. Terraform
+# must never manage (and especially never destroy) that RG.
 resource "azurerm_postgresql_flexible_server" "quay" {
   name                   = var.server_name
-  resource_group_name    = azurerm_resource_group.quay.name
-  location               = azurerm_resource_group.quay.location
+  resource_group_name    = var.resource_group_name
+  location               = var.location
   version                = var.postgres_version
   administrator_login    = var.db_username
   administrator_password = var.db_password
-  sku_name               = "B_Standard_B1ms"
-  storage_mb             = 32768
+  # 4 vCPU / 16 GiB general purpose, matching the AWS (db.m5.xlarge) and GCP
+  # (db-custom-4-15360) lanes. The burstable B_Standard_B1ms (1 vCPU) is too
+  # small for the full Playwright e2e suite.
+  sku_name               = "GP_Standard_D4ds_v5"
+  # 1 TiB maps to the 3000-IOPS storage tier (512 GiB/2000, 2 TiB/5000) -
+  # parity with the AWS gp3 3000-IOPS baseline that passes; 32 GiB (~120
+  # IOPS) starved the suite on GCP (build 2110398453279363072: 2h15m e2e
+  # timeout on DB-bound pages).
+  storage_mb             = 1048576
   backup_retention_days  = 7
   geo_redundant_backup_enabled = false
-  zone                   = "1"
+  # No zone preference: not every leased region offers every zone for
+  # PostgreSQL Flexible Server (build 2112062658113966080: zone 1 rejected
+  # in northcentralus; westus2 has no PG zones at all). Unset lets Azure
+  # auto-assign a zone where available and is required in zonal regions-
+  # without-PG-zones; within-region latency is uniform for CI purposes.
 
   authentication {
     password_auth_enabled = true
@@ -172,14 +212,18 @@ output "db_password" {
 EOF
 
 export TF_VAR_resource_group_name="${QUAY_DB_AZURE_RESOURCE_GROUP}"
+export TF_VAR_location="${CLUSTER_AZURE_REGION}"
 export TF_VAR_server_name="${QUAY_DB_AZURE_SERVER}"
 export TF_VAR_db_name="${QUAY_AZURE_DB_NAME}"
 export TF_VAR_db_username="${QUAY_AZURE_DB_USERNAME}"
 export TF_VAR_db_password="${QUAY_AZURE_DB_PASSWORD}"
 
-# Persist DB-only identifiers. Never write QUAY_AZURE_RESOURCE_GROUP — that key
-# is overwritten by quay-deploy-azure-blob with the OpenShift cluster RG.
+# Persist DB-only identifiers. QUAY_DB_AZURE_RESOURCE_GROUP now holds the
+# cluster RG (same value quay-deploy-azure-blob later writes to its own
+# QUAY_AZURE_RESOURCE_GROUP key); keep the step-specific key so the two steps
+# stay decoupled.
 echo "${QUAY_DB_AZURE_RESOURCE_GROUP}" > "${SHARED_DIR}/QUAY_DB_AZURE_RESOURCE_GROUP"
+echo "${CLUSTER_AZURE_REGION}" > "${SHARED_DIR}/QUAY_DB_AZURE_REGION"
 echo "${QUAY_DB_AZURE_SERVER}" > "${SHARED_DIR}/QUAY_DB_AZURE_SERVER"
 
 echo "Initializing Terraform..."
