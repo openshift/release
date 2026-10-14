@@ -30,6 +30,33 @@ $WAS_TRACING && set -x || true
 
 # Clone rosa-hcp-e2e-test repository
 WORK_DIR=$(mktemp -d)
+export_harness_reports() {
+  local test_status=$?
+  trap - EXIT
+  set +e
+  local results_dir="${WORK_DIR}/rosa-hcp-e2e-test/test-results"
+  local artifact_root="${ARTIFACT_DIR}/harness-results"
+  local date_dir date_name report report_name destination
+  shopt -s nullglob
+  if [[ -d "${results_dir}" && ! -L "${results_dir}" && ! -L "${WORK_DIR}/rosa-hcp-e2e-test" && ! -L "${artifact_root}" ]]; then
+    for date_dir in "${results_dir}"/*; do
+      date_name=${date_dir##*/}
+      [[ -d "${date_dir}" && ! -L "${date_dir}" && "${date_name}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || continue
+      destination="${artifact_root}/${date_name}"
+      [[ ! -L "${destination}" ]] || continue
+      for report in "${date_dir}"/*; do
+        report_name=${report##*/}
+        [[ -f "${report}" && ! -L "${report}" && "${report_name}" =~ ^test-run(-[a-zA-Z0-9_-]+)?-[0-9]{8}_[0-9]{6}\.(json|html|xml)$ ]] || continue
+        [[ ! -L "${destination}/${report_name}" ]] || continue
+        if ! mkdir -p -- "${destination}" || ! cp --no-dereference -- "${report}" "${destination}/${report_name}"; then
+          echo "WARNING: could not persist a harness report" >&2
+        fi
+      done
+    done
+  fi
+  exit "${test_status}"
+}
+trap export_harness_reports EXIT
 echo "Cloning ${ROSA_HCP_E2E_REPO} (branch: ${ROSA_HCP_E2E_BRANCH})..."
 git clone --depth=1 --branch "${ROSA_HCP_E2E_BRANCH}" "${ROSA_HCP_E2E_REPO}" "${WORK_DIR}/rosa-hcp-e2e-test"
 cd "${WORK_DIR}/rosa-hcp-e2e-test"
