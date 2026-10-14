@@ -8,6 +8,12 @@ fi
 
 export KUBECONFIG=/etc/app-ci-kubeconfig/kubeconfig
 registry_config=/etc/push-secret/.dockerconfigjson
+for credential_file in "$KUBECONFIG" "$registry_config"; do
+  if [[ ! -f "$credential_file" || ! -r "$credential_file" || ! -s "$credential_file" ]]; then
+    echo "Required credential file is missing, unreadable or empty: ${credential_file}" >&2
+    exit 1
+  fi
+done
 workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
 tags='["stream-coreos","stream-coreos-extensions"]'

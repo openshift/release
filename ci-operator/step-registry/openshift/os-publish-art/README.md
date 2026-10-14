@@ -36,14 +36,26 @@ it is neither retried nor attributed to a superseding writer.
 A superseding writer, even for the same digest with a newer generation, fails
 the job rather than being credited or overwritten by a retry.
 
-Credentials are explicit cluster-synced bundles mounted read-only by the CI
+Credentials are explicit cluster-synced bundles mounted by the CI
 credential consumer: `ci/promotion-quay-tagger-kubeconfig` and
 `ci/registry-push-credentials-ci-central`. The latter already includes build13
 source-registry pull and QCI push credentials, as used by normal promotion.
 Only postsubmits may run this publisher; rehearsals are disabled.
 
-Run the offline contract tests without cluster access:
+These paths and dependency variables are not baked into the CLI image. The ref's
+credential declarations mount the bundles at `/etc/app-ci-kubeconfig` and
+`/etc/push-secret`; their expected keys are `kubeconfig` and `.dockerconfigjson`.
+The script exports `KUBECONFIG` and sets its local `registry_config` variable to
+those files, failing before any API or mirror operation if either is missing,
+unreadable or empty. Its `sources` array is built from `STREAM_COREOS_IMAGE` and
+`STREAM_COREOS_EXTENSIONS_IMAGE`, injected by ci-operator from the ref's image
+dependencies, not from pre-existing CLI-image environment variables.
 
-```sh
-python3 hack/scos-art-publish/test_publish_art.py
-```
+The write destination is `quay.io/openshift/ci`, matching normal ci-operator
+promotion (`api.QuayOpenShiftCIRepo`). Import pull specs use
+`quay-proxy.ci.openshift.org/openshift/ci` at the same immutable digest. The
+proxy is not assumed to support writes. The publisher uses the same existing
+credential bundles as normal promotion, but is a separate multi-stage pod;
+source configuration does not prove identical node placement, pod service
+account or runtime network reachability. Successful build13 registry access and
+controller imports require runtime validation, not an inference from these URLs.
