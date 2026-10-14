@@ -83,7 +83,7 @@ echo "$(date) Fixed NodePort for lease ${MGMT_CLUSTER_LEASE}: ${FIXED_NODEPORT}"
 HC_MANIFEST="/tmp/hcp-kubevirt-manifests.yaml"
 hcp create cluster kubevirt \
   --name ${HC_NAME} \
-  --node-pool-replicas 2 \
+  --node-pool-replicas 3 \
   --pull-secret "${PULL_SECRET_FILE}" \
   --namespace ${HC_NS} \
   --base-domain phc-cicd.cis.ibm.net \
@@ -162,7 +162,7 @@ echo "$(date) Sleep complete, proceeding to node readiness check"
 echo "$(date) Waiting for 2 worker nodes to join the guest cluster"
 
 VIRT_KC="${SHARED_DIR}/nested_kubeconfig"
-REQUIRED_NODES=2
+REQUIRED_NODES=3
 MAX_RETRIES=20
 
 # NodePort is now fixed — use FIXED_NODEPORT directly (no polling needed).
