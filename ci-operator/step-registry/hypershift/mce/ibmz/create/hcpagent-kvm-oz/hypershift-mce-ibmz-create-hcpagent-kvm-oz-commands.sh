@@ -80,6 +80,19 @@ function upload_volume () {
 upload_volume "${POOL_NAME}" "${KERNEL_NAME}" /tmp/agent-kernel
 upload_volume "${POOL_NAME}" "${INITRD_NAME}" /tmp/agent-initrd
 
+# Ensure the httpd pool exists — it may not be pre-configured on all LPARs.
+if ! ${VIRSH} pool-info "${HTTPD_POOL_NAME}" &>/dev/null; then
+  echo "$(date) Creating libvirt pool ${HTTPD_POOL_NAME} at ${LIBVIRT_IMAGE_PATH}"
+  ${VIRSH} pool-define-as \
+    --name "${HTTPD_POOL_NAME}" \
+    --type dir \
+    --target "${LIBVIRT_IMAGE_PATH}"
+  ${VIRSH} pool-autostart "${HTTPD_POOL_NAME}"
+  ${VIRSH} pool-start "${HTTPD_POOL_NAME}"
+else
+  echo "$(date) Pool ${HTTPD_POOL_NAME} already exists"
+fi
+
 # The rootfs is staged in the httpd pool and fetched over plain HTTP by the
 # guests, since the assisted image service route uses a cluster-internal certificate.
 # The volume is created from XML so that its mode is world readable.
