@@ -99,7 +99,7 @@ prune_aws_security_groups() {
 cleanup_aws() {
 	local ami_id aws_region aws_creds cm_data snapshot_id
 
-	if [[ "${IDENTITY_MODE:-cco}" == "sts" ]]; then
+	if [[ "${CREDENTIALS_MODE:-cco}" == "sts" ]]; then
 		# STS clusters do not have kube-system/aws-creds; use the CI profile credentials
 		export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
@@ -191,7 +191,7 @@ cleanup_azure() {
 	if [[ "${IS_ARO}" != "true" ]]; then
 		# STS mode: delete subscription-level role assignments saved during peerpods setup.
 		# These live outside the cluster resource group and survive cluster destroy.
-		if [[ "${IDENTITY_MODE:-cco}" == "sts" ]] && [[ -s "${SHARED_DIR}/osc-azure-role-assignment-ids" ]]; then
+		if [[ "${CREDENTIALS_MODE:-cco}" == "sts" ]] && [[ -s "${SHARED_DIR}/osc-azure-role-assignment-ids" ]]; then
 			local AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 			az login \
 				--service-principal \

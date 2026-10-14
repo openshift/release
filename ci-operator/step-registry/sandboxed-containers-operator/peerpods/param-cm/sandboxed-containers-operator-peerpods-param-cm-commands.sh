@@ -156,7 +156,7 @@ handle_aws() {
     local AWS_VPC_ID
     local INSTANCE_ID
 
-    case "${IDENTITY_MODE:-cco}" in
+    case "${CREDENTIALS_MODE:-cco}" in
         sts)
             echo "STS mode - creating IRSA role for OSC operator"
             export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -246,7 +246,7 @@ create_ssh_key() {
 }
 
 # Create OSC operator managed identity and federated credential for STS mode
-# This function is called only when IDENTITY_MODE=sts
+# This function is called only when CREDENTIALS_MODE=sts
 create_osc_managed_identity() {
     local OSC_IDENTITY_NAME="osc-${AZURE_RESOURCE_GROUP}"
     local OSC_IDENTITY_PRINCIPAL_ID
@@ -400,7 +400,7 @@ handle_azure() {
     az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
 
     # Get resource group based on identity mode
-    if [[ "${IDENTITY_MODE:-cco}" == "sts" ]]; then
+    if [[ "${CREDENTIALS_MODE:-cco}" == "sts" ]]; then
         # STS mode - resource group created by ccoctl
         if [[ -s "${SHARED_DIR}/resourcegroup_cluster" ]]; then
             AZURE_RESOURCE_GROUP=$(cat "${SHARED_DIR}/resourcegroup_cluster")
@@ -535,7 +535,7 @@ handle_azure() {
 EOF
 
     # Handle identity mode - create managed identity for STS or secret for manual mode
-    case "${IDENTITY_MODE:-cco}" in
+    case "${CREDENTIALS_MODE:-cco}" in
         sts)
             echo "STS mode - creating OSC operator managed identity and osc-identity ConfigMap"
             create_osc_managed_identity
@@ -553,7 +553,7 @@ EOF
             echo "CCO mode - no secret or managed identity needed (CCO manages credentials)"
             ;;
         *)
-            echo "ERROR: Invalid IDENTITY_MODE='${IDENTITY_MODE}'. Supported values: cco, manual, sts"
+            echo "ERROR: Invalid CREDENTIALS_MODE='${CREDENTIALS_MODE}'. Supported values: cco, manual, sts"
             exit 1
             ;;
     esac

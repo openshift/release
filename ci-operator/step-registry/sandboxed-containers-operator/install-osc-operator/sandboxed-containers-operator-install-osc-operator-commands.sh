@@ -12,7 +12,7 @@
 #   CATALOG_SOURCE_IMAGE      - Custom catalog image (optional)
 #   OSC_CHARTS_REPO               - Charts repo URL
 #   OSC_CHARTS_REF                - Charts git ref (default: main)
-#   IDENTITY_MODE                 - Credentials mode when peer-pods enabled (default: cco)
+#   CREDENTIALS_MODE                 - Credentials mode when peer-pods enabled (default: cco)
 #   ENABLEPEERPODS                - "true" to enable peer-pods (default: false)
 #   WORKLOAD_TO_TEST              - "kata", "peer-pods", or "coco" (default: kata)
 #   RUST_RUNTIME                  - "true" to use the Rust runtime (default: false)
@@ -38,7 +38,7 @@ if [[ -z "${CATALOG_SOURCE_IMAGE}" && -f "${SHARED_DIR}/catalog-source-image" ]]
 fi
 OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
-IDENTITY_MODE="${IDENTITY_MODE:-cco}"
+CREDENTIALS_MODE="${CREDENTIALS_MODE:-cco}"
 ENABLEPEERPODS=${ENABLEPEERPODS:-false}
 WORKLOAD_TO_TEST=${WORKLOAD_TO_TEST:-kata}
 USE_OLMV1=${USE_OLMV1:-false}
@@ -334,7 +334,7 @@ function render_osc_operator_chart() {
     helm_args+=("--set" "dev.enabled=false")
   fi
 
-  if [[ "${IDENTITY_MODE}" == "sts" ]]; then
+  if [[ "${CREDENTIALS_MODE}" == "sts" ]]; then
     local provider
     provider=$(get_cloud_provider)
 
@@ -506,7 +506,7 @@ function render_osc_operands_chart() {
 }
 
 function setup_sts_secrets() {
-  if [[ "${IDENTITY_MODE}" != "sts" ]]; then
+  if [[ "${CREDENTIALS_MODE}" != "sts" ]]; then
     return 0
   fi
 
@@ -705,7 +705,7 @@ function create_peer_pods_secret() {
     return 0
   fi
 
-  case "${IDENTITY_MODE}" in
+  case "${CREDENTIALS_MODE}" in
     cco)
       echo ">>> Identity mode: cco (Cloud Credential Operator handles credentials)"
       return 0
