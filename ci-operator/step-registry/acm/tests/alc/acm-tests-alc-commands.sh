@@ -45,8 +45,18 @@ CYPRESS_OC_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
 export CYPRESS_OC_CLUSTER_PASS
 
 # Playwright equivalents (required by start.sh after Cypress→Playwright migration)
-HUB_URL=$(oc whoami --show-console)
+# HUB_URL must be the API server URL (start.sh passes it to 'oc login --server').
+HUB_URL=$(oc whoami --show-server)
 export HUB_URL
+# Sanity-check: HUB_URL must point to the API server, not the web console.
+# start.sh passes HUB_URL to 'oc login --server'; a console URL would fail
+# with "HTML page instead of server URL".  Redact the full value to avoid
+# leaking cluster addresses in CI logs.
+if [[ "${HUB_URL}" == *"console"* ]]; then
+    echo "ERROR: HUB_URL appears to be a console URL, not an API server URL." >&2
+    echo "       Expected output of 'oc whoami --show-server', not '--show-console'." >&2
+    exit 1
+fi
 HUB_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
 export HUB_PASSWORD
 OC_CLUSTER_URL=$(oc whoami --show-server)
