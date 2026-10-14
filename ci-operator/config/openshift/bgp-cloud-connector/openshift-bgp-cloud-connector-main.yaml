@@ -1907,6 +1907,7 @@ tests:
             openshiftVersionId: openshiftNodePoolVersionId
             clusterName: clusterName
             nodePoolName: 'nodepool-1'
+            replicas: 3
             vmSize: vmSize
           }
         }
@@ -2001,10 +2002,10 @@ tests:
 
         echo "waiting for the nodes..."
         deadline=$((SECONDS + 1800))
-        until (( $(oc get nodes --no-headers 2>/dev/null | grep -c ' Ready ') >= 2 )); do
+        until (( $(oc get nodes --no-headers 2>/dev/null | grep -c ' Ready ') >= 3 )); do
           if (( SECONDS >= deadline )); then
             oc get nodes || true
-            echo "the node pool never reached two Ready nodes" >&2
+            echo "the node pool never reached three Ready nodes" >&2
             exit 1
           fi
           sleep 20
@@ -2021,7 +2022,7 @@ tests:
           empty.
         name: ARO_HCP_CLUSTER_VERSION
       - default: Standard_D8s_v5
-        documentation: VM size of the two worker nodes; the integration slot allows
+        documentation: VM size of the three worker nodes; the integration slot allows
           the Dsv6, Dsv5 and Dasv5 families.
         name: ARO_HCP_WORKER_VM_SIZE
       from: aro-hcp-e2e-tests
