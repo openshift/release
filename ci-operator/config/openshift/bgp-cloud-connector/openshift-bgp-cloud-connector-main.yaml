@@ -1716,28 +1716,29 @@ tests:
         rg="${cluster}"
         api_version=2025-12-23-preview
 
-        if [[ "$(az group exists --name "${rg}")" != true ]]; then
+        # Only a group confirmed absent means there is nothing to do; a
+        # query that fails says nothing either way, so the removals below
+        # are attempted.
+        if exists="$(az group exists --name "${rg}")" && [[ "${exists}" == false ]]; then
           echo "no group ${rg}, so nothing to delete"
           exit 0
         fi
 
-        cluster_id="$(az resource list --resource-group "${rg}" \
-          --resource-type Microsoft.RedHatOpenShift/hcpOpenShiftClusters --name "${cluster}" \
-          --query '[0].id' -o tsv)"
         # Every removal below is attempted whatever happened to the one
         # before it, and the step fails at the end if any of them did:
         # stopping at the first failure would leave the rest behind.
         failed=0
-        if [[ -n "${cluster_id}" ]]; then
-          echo "deleting cluster ${cluster}"
-          if az resource delete --ids "${cluster_id}" --api-version "${api_version}" --output none; then
-            echo "deleted cluster ${cluster}"
-          else
-            echo "could not delete cluster ${cluster}" >&2
-            failed=1
-          fi
+        # The cluster is named rather than looked up. The resource provider
+        # answers the delete of a cluster that does not exist with 204, so
+        # a failure here is a real one.
+        echo "deleting cluster ${cluster}"
+        if az resource delete --resource-group "${rg}" --name "${cluster}" \
+          --resource-type Microsoft.RedHatOpenShift/hcpOpenShiftClusters \
+          --api-version "${api_version}" --output none; then
+          echo "deleted cluster ${cluster}"
         else
-          echo "no cluster ${cluster} in ${rg}"
+          echo "could not delete cluster ${cluster}" >&2
+          failed=1
         fi
 
         echo "deleting group ${rg}"
