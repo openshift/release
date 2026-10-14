@@ -42,6 +42,7 @@ data:
   trusteeUrl: "${TRUSTEE_URL}"
   INITDATA: "${INITDATA}"
   enablePeerPods: "${ENABLEPEERPODS}"
+  credentialsMode: "${CREDENTIALS_MODE:-cco}"
   mustgatherimage: "${MUST_GATHER_IMAGE}"
   workloadImage: "${WORKLOAD_IMAGE}"
   installKataRPM: "false"
