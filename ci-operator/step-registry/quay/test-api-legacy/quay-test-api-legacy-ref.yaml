@@ -12,19 +12,22 @@ ref:
       memory: 2Gi
   timeout: 1h30m0s
   grace_period: 15m0s
-  credentials:
-  - collection: quay-tests
-    group: quay
-    mount_path: /var/run/quay-qe-quay-secret
   env:
   - name: QUAY_VERSION
     documentation: Quay X.Y under test, passed to the suite as CYPRESS_QUAY_VERSION.
+  - name: QUAY_API_SUPERUSER
+    default: quayapici
+    documentation: |-
+      Username the step creates and runs the suite as. It must be listed in
+      the deployed Quay's SUPER_USERS (QUAY_EXTRA_CONFIG of the deploy step).
   - name: API_LEGACY_SPECS
     default: "cypress/e2e/quay_api_testing_all.cy.js"
     documentation: Comma-separated Cypress specs under quay-api-tests to run.
   documentation: |-
     Run the quay-tests REST API Cypress suite (quay-api-tests, API_LEGACY_SPECS;
     the default spec targets the old UI, Quay < 3.16) against the Quay deployed
-    by a quay-deploy-* step (${SHARED_DIR}/quayroute). JUnit, videos and
-    screenshots go to ${ARTIFACT_DIR}. The step fails when Cypress fails or
-    the JUnit output reports zero tests.
+    by a quay-deploy-* step (${SHARED_DIR}/quayroute). The step creates the
+    QUAY_API_SUPERUSER account with a per-run random password and runs the
+    suite as that user. JUnit, videos and screenshots go to ${ARTIFACT_DIR}.
+    The step fails when the user cannot be created, Cypress fails, or the
+    JUnit output reports zero tests.
