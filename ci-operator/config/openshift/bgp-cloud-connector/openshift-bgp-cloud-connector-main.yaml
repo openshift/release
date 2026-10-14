@@ -2072,6 +2072,246 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: enable-frr
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # Both controllers watch FRRConfiguration and RouteAdvertisements
+        # from SetupWithManager, and CNO creates those two CRDs only in
+        # response to this patch. Without them the caches never sync, the
+        # manager exits after two minutes, and the CSV never installs.
+        # The operator applies this same patch itself as the first phase
+        # of reconcile, but it cannot stay alive long enough to do so;
+        # when that is fixed, this step comes out and the job proves the
+        # install a catalogue user actually performs.
+        oc patch network.operator.openshift.io cluster --type=merge \
+          -p '{"spec":{"additionalRoutingCapabilities":{"providers":["FRR"]},"defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+
+        deadline=$((SECONDS + 900))
+
+        for crd in frrconfigurations.frrk8s.metallb.io routeadvertisements.k8s.ovn.org; do
+          echo "waiting for crd/${crd}..."
+          until oc wait --for=condition=Established "crd/${crd}" --timeout=10s >/dev/null 2>&1; do
+            if (( SECONDS >= deadline )); then
+              oc get network.operator.openshift.io cluster -o yaml >&2
+              echo "timed out waiting for crd/${crd}" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+        done
+
+        # The rollout is what says CNO finished rather than that it
+        # started. Measured at about two minutes on 4.22.
+        echo "waiting for the frr-k8s rollout..."
+        until oc -n openshift-frr-k8s rollout status daemonset/frr-k8s --timeout=2m >/dev/null 2>&1; do
+          if (( SECONDS >= deadline )); then
+            oc -n openshift-frr-k8s get pods >&2
+            echo "timed out waiting for the frr-k8s daemonset" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+
+        oc -n openshift-frr-k8s get daemonset frr-k8s
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        # The customer's half on ARO HCP, as the day-2 workload identity
+        # process describes it: an identity for the operator, trusted for the
+        # operator's ServiceAccount on this cluster's issuer, holding Network
+        # Contributor, and handed to the operator through its Subscription. No
+        # platform identity is borrowed.
+        #
+        # The role is assigned over the cluster's group, which holds the vnet
+        # and the Route Server, and over the managed group, which holds the
+        # router nodes' interfaces and the load balancer they sit behind. Where
+        # the managed group carries the ARO HCP deny assignment, the interface
+        # write is refused whatever this role says; the suite then reports the
+        # refusal, naming the action and the deny assignment.
+        set -euo pipefail
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/aro-hcp-slot.env"
+        CLUSTER_PROFILE_DIR="${SELECTED_CLUSTER_PROFILE_DIR:-/var/run/aro-hcp-${VAULT_SECRET_PROFILE}}"
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        az login --service-principal \
+          --username "$(<"${CLUSTER_PROFILE_DIR}/client-id")" \
+          --password="$(<"${CLUSTER_PROFILE_DIR}/client-secret")" \
+          --tenant "$(<"${CLUSTER_PROFILE_DIR}/tenant")" --output none
+        az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+        subscription="$(az account show --query id -o tsv)"
+        tenant="$(<"${CLUSTER_PROFILE_DIR}/tenant")"
+
+        cluster="$(<"${SHARED_DIR}/cluster-name")"
+        rg="$(<"${SHARED_DIR}/resourcegroup")"
+        managed_rg="${rg}-managed"
+        rg_scope="/subscriptions/${subscription}/resourceGroups/${rg}"
+        managed_scope="/subscriptions/${subscription}/resourceGroups/${managed_rg}"
+        ns=openshift-bgp-cloud-connector
+        sa=openshift-bgp-cloud-connector-controller-manager
+        issuer="$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')"
+        echo "service account issuer: ${issuer}"
+
+        identity="${cluster}-bgp-cloud-connector"
+        az identity create -g "${rg}" -n "${identity}" --output none
+        client_id="$(az identity show -g "${rg}" -n "${identity}" --query clientId -o tsv)"
+        principal_id="$(az identity show -g "${rg}" -n "${identity}" --query principalId -o tsv)"
+        echo "${client_id}" >"${SHARED_DIR}/operator-client-id"
+        az identity federated-credential create -g "${rg}" --identity-name "${identity}" \
+          --name bgp-cloud-connector --issuer "${issuer}" \
+          --subject "system:serviceaccount:${ns}:${sa}" --audiences openshift --output none
+        echo "created ${identity}, trusted for ${ns}/${sa}"
+
+        # The CI principal is refused Microsoft.Authorization/roleDefinitions/write,
+        # so the identity holds the built-in Network Contributor, as in the ARO
+        # classic MIWI job, rather than a custom role with only the actions in
+        # the operator's CredentialsRequest.
+        role="Network Contributor"
+
+        # A new principal takes a while to replicate; an assignment made too
+        # soon fails with PrincipalNotFound.
+        for scope in "${rg_scope}" "${managed_scope}"; do
+          for attempt in $(seq 1 18); do
+            if az role assignment create --assignee-object-id "${principal_id}" \
+                 --assignee-principal-type ServicePrincipal --role "${role}" \
+                 --scope "${scope}" --output none 2>"${AZURE_CONFIG_DIR}/err"; then
+              echo "assigned ${role} over ${scope##*/}"
+              break
+            fi
+            if (( attempt == 18 )); then
+              echo "could not assign ${role} over ${scope##*/}:" >&2
+              redact <"${AZURE_CONFIG_DIR}/err" | head -5 >&2
+              exit 1
+            fi
+            sleep 20
+          done
+        done
+
+        oc -n "${ns}" get subscription.operators.coreos.com -o name | head -1 >"${AZURE_CONFIG_DIR}/sub"
+        subscription_object="$(<"${AZURE_CONFIG_DIR}/sub")"
+        oc -n "${ns}" patch "${subscription_object}" --type=merge -p "$(jq -nc \
+          --arg c "${client_id}" --arg t "${tenant}" --arg s "${subscription}" \
+          '{spec:{config:{env:[{name:"CLIENTID",value:$c},{name:"TENANTID",value:$t},{name:"SUBSCRIPTIONID",value:$s}]}}}')"
+        echo "handed the identity to the operator through ${subscription_object}"
+
+        # The customer path ends with the cloud credential operator writing the
+        # operator's secret from its CredentialsRequest. Whether CCO does that
+        # on a hosted cluster is one of the things this job exists to find out,
+        # so it is waited for and reported either way. If it does not come, the
+        # secret is written by hand with the same fields, so the suite still
+        # runs, and the log says which happened.
+        secret=bgp-cloud-connector-azure-credentials
+        deadline=$((SECONDS + 300))
+        until oc -n "${ns}" get secret "${secret}" >/dev/null 2>&1; do
+          if (( SECONDS >= deadline )); then
+            echo "CCO did not write ${ns}/${secret} within five minutes; writing it by hand"
+            oc -n "${ns}" get credentialsrequest.cloudcredential.openshift.io -A -o yaml 2>/dev/null \
+              | grep -E 'name:|azureClientID|conditions|message|reason' | redact || true
+            region="$(oc get nodes -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/region}')"
+            oc -n "${ns}" create secret generic "${secret}" \
+              --from-literal=azure_client_id="${client_id}" \
+              --from-literal=azure_tenant_id="${tenant}" \
+              --from-literal=azure_subscription_id="${subscription}" \
+              --from-literal=azure_region="${region}" \
+              --from-literal=azure_resourcegroup="${rg}" \
+              --from-literal=azure_federated_token_file=/var/run/secrets/openshift/serviceaccount/token
+            break
+          fi
+          sleep 10
+        done
+        oc -n "${ns}" get secret "${secret}" -o jsonpath='{.data}' | jq -r 'keys | "secret keys: " + join(" ")'
+        oc -n "${ns}" rollout status deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+      credentials:
+      - collection: hcm-aro
+        group: aro-hcp-int-rh
+        mount_path: /var/run/aro-hcp-int-rh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        # The Azure e2e suite and its estate scripts expect a classic cluster
+        # profile: osServicePrincipal.json in CLUSTER_PROFILE_DIR. ARO HCP's
+        # credentials come as separate files, so the same four fields are put
+        # where the scripts look. The file holds a secret and is never printed.
+        set -euo pipefail
+
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/aro-hcp-slot.env"
+        CLUSTER_PROFILE_DIR="${SELECTED_CLUSTER_PROFILE_DIR:-/var/run/aro-hcp-${VAULT_SECRET_PROFILE}}"
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        az login --service-principal \
+          --username "$(<"${CLUSTER_PROFILE_DIR}/client-id")" \
+          --password="$(<"${CLUSTER_PROFILE_DIR}/client-secret")" \
+          --tenant "$(<"${CLUSTER_PROFILE_DIR}/tenant")" --output none
+        az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+        subscription="$(az account show --query id -o tsv)"
+        tenant="$(<"${CLUSTER_PROFILE_DIR}/tenant")"
+
+        profile="$(mktemp -d)"
+        (umask 077; jq -n \
+          --arg c "$(<"${CLUSTER_PROFILE_DIR}/client-id")" \
+          --arg s "$(<"${CLUSTER_PROFILE_DIR}/client-secret")" \
+          --arg t "${tenant}" --arg sub "${subscription}" \
+          '{clientId: $c, clientSecret: $s, tenantId: $t, subscriptionId: $sub}' \
+          >"${profile}/osServicePrincipal.json")
+        export CLUSTER_PROFILE_DIR="${profile}"
+
+        # No kube-system/azure-credentials on a hosted cluster, so the suite
+        # writes interfaces as the identity the profile names, which here is
+        # the operator's own.
+        NETWORK_INTERFACE_CLIENT_ID="$(<"${SHARED_DIR}/operator-client-id")" hack/ci-e2e-azure.sh
+      credentials:
+      - collection: hcm-aro
+        group: aro-hcp-int-rh
+        mount_path: /var/run/aro-hcp-int-rh
+      from: e2e-runner
+      grace_period: 1h0m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
