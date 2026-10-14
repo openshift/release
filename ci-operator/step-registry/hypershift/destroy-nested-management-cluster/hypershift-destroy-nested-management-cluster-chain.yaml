@@ -393,7 +393,7 @@ chain:
           if ((format == "json" || (format == "text" && is_json_line(current_line))) && \
               json_direct_hash_value(current_line, current_token_start, token)) return 1
           prefix = tolower(substr(current_line, 1, current_token_start - 1))
-          if (!match(prefix, /(^|[{,[:space:]])[\"']?(git[-_]?commit|commit|revision|rev|commit[-_]?sha|sha1|sha256|digest)[\"']?[[:space:]]*:[[:space:]]*[\"' ]*((sha1|sha256):)?$/)) return 0
+          if (!match(prefix, /(^|[{,[:space:]])["']?(git[-_]?commit|commit|revision|rev|commit[-_]?sha|sha1|sha256|digest)["']?[[:space:]]*:[[:space:]]*["' ]*((sha1|sha256):)?$/)) return 0
           match_start = RSTART
           if (format == "yaml" || format == "json" || (format == "text" && is_json_line(current_line))) {
             context = quote_context(current_line, match_start, format == "text" ? "json" : format)
@@ -409,14 +409,14 @@ chain:
           search_from = 1
           while (search_from < start) {
             remaining = substr(prefix, search_from)
-            if (!match(remaining, /(^|[{,[:space:]\"'])image[\"' ]*[[:space:]]*[:=][[:space:]]*[\"' ]*/)) break
+            if (!match(remaining, /(^|[{,[:space:]"'])image["' ]*[[:space:]]*[:=][[:space:]]*["' ]*/)) break
             match_start = search_from + RSTART - 1
             match_length = RLENGTH
             value_start = match_start + match_length
             value_end = value_start
             while (value_end <= length(line)) {
               character = substr(line, value_end, 1)
-              if (character ~ /[\"'[:space:],;}]/) break
+              if (character ~ /["'[:space:],;}]/) break
               value_end++
             }
             candidate = tolower(substr(line, value_start, value_end - value_start))
@@ -443,14 +443,14 @@ chain:
         function is_source_path(line, start, token, suffix) {
           suffix = substr(line, start + length(token))
           return index(token, "/") > 0 && token ~ /^[[:alnum:]_.+-]+(\/[[:alnum:]_.+-]+)+$/ && \
-            suffix ~ /^\.[[:alpha:]][[:alnum:]]*([:[:space:],;}\"']|$)/
+            suffix ~ /^\.[[:alpha:]][[:alnum:]]*([:[:space:],;}"']|$)/
         }
         function is_mapping_key_token(line, start, token, suffix) {
           suffix = substr(line, start + length(token))
-          return suffix ~ /^[\"'[:space:]]*:/
+          return suffix ~ /^["'[:space:]]*:/
         }
         function is_base64_boundary(character) {
-          return character == "" || character ~ /[[:space:]\"'=:,;(){}\[\]]/
+          return character == "" || character ~ /[[:space:]"'=:,;(){}\[\]]/
         }
         # Handle base64-specific characters inside the token redactor rather
         # than applying a broad replacement before commit/digest recognition.
@@ -512,7 +512,7 @@ chain:
             end = authority
             while (end <= length(line)) {
               character = substr(line, end, 1)
-              if (character ~ /[[:space:]\/?#\"<>]/ || character == single_quote) break
+              if (character ~ /[[:space:]\/?#"<>]/ || character == single_quote) break
               end++
             }
             at = 0
@@ -784,7 +784,7 @@ chain:
               if (colon > 0) {
                 colon += pair_start - 1
                 key = trim(substr(object, pair_start, colon - pair_start))
-                gsub(/^[\"'[:space:]]+|[\"'[:space:]]+$/, "", key)
+                gsub(/^["'[:space:]]+|["'[:space:]]+$/, "", key)
                 value = substr(object, colon + 1, end - colon)
                 key = normalize_json_string(key)
                 if (tolower(key) == "name") name = normalize_json_string(unquote(value))

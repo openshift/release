@@ -364,7 +364,12 @@ artifact_dir="${run_dir}/artifacts"
   cd "${run_dir}"
   FIXTURE_DIR="${fixture_dir}" ARTIFACT_DIR="${artifact_dir}" PROW_JOB_ID=redaction-test \
     HYPERSHIFT_NAMESPACE=clusters CLOUD_PROVIDER=AWS bash "${command_file}"
-)
+) 2> "${run_dir}/stderr.log"
+# GNU awk can exit zero while warning about nonportable regex escapes once
+# per file. Check its diagnostics while allowing BSD tar's verbose stderr.
+if grep -Fq 'awk:' "${run_dir}/stderr.log"; then
+  fail "AWS sanitizer emitted awk diagnostics"
+fi
 
 archive="${artifact_dir}/artifacts.tar.gz"
 [[ -s "${archive}" ]] || fail "sanitized archive was not published"
@@ -528,7 +533,10 @@ azure_artifact_dir="${azure_run_dir}/artifacts"
   cd "${azure_run_dir}"
   FIXTURE_DIR="${fixture_dir}" ARTIFACT_DIR="${azure_artifact_dir}" PROW_JOB_ID=redaction-test \
     HYPERSHIFT_NAMESPACE=clusters CLOUD_PROVIDER=Azure bash "${command_file}"
-)
+) 2> "${azure_run_dir}/stderr.log"
+if grep -Fq 'awk:' "${azure_run_dir}/stderr.log"; then
+  fail "Azure sanitizer emitted awk diagnostics"
+fi
 azure_archive="${azure_artifact_dir}/artifacts.tar.gz"
 [[ -s "${azure_archive}" ]] || fail "Azure sanitized archive was not published"
 tar -tzf "${azure_archive}" > "${work_dir}/azure-archive-list.txt" || fail "Azure archive listing failed"
