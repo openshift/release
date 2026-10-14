@@ -463,6 +463,61 @@ else
   rm -f "/tmp/$INITRAMFS_FILENAME"
 fi
 
+: "${DOMAIN_NETWORK_MTU:?DOMAIN_NETWORK_MTU must be configured}"
+if [[ ! "${DOMAIN_NETWORK_MTU}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ERROR: DOMAIN_NETWORK_MTU must be a positive decimal integer" >&2
+  exit 1
+fi
+export DOMAIN_NETWORK_MTU
+echo "Requested ARM guest MTU: ${DOMAIN_NETWORK_MTU}"
+
+set_rendered_arm_nic_mtu() {
+  local xml=$1
+  local mac=$2
+  local matches actual tmp
+  export MTU_TARGET_MAC="${mac}"
+
+  # Handle either one interface object or an array of interfaces.
+  # Refuse missing/ambiguous MAC matches rather than modifying other NICs.
+  matches=$(yq-v4 -p=xml --xml-attribute-prefix='@' -oy '
+    [.domain.devices.interface] | flatten |
+    map(select(.mac."@address" == strenv(MTU_TARGET_MAC))) |
+    length
+  ' "${xml}")
+
+  if [[ "${matches}" != "1" ]]; then
+    echo "ERROR: Expected exactly one rendered ARM NIC matching the leased MAC" >&2
+    return 1
+  fi
+
+  tmp=$(mktemp "${xml}.mtu.XXXXXX")
+  if ! yq-v4 -p=xml -o=xml --xml-attribute-prefix='@' '
+    .domain.devices.interface = ([.domain.devices.interface] | flatten) |
+    (.domain.devices.interface[] |
+      select(.mac."@address" == strenv(MTU_TARGET_MAC)) |
+      .mtu."@size") = strenv(DOMAIN_NETWORK_MTU)
+  ' "${xml}" > "${tmp}"; then
+    rm -f "${tmp}"
+    echo "ERROR: Failed to set rendered ARM NIC MTU" >&2
+    return 1
+  fi
+
+  actual=$(yq-v4 -p=xml --xml-attribute-prefix='@' -oy '
+    [.domain.devices.interface] | flatten |
+    .[] | select(.mac."@address" == strenv(MTU_TARGET_MAC)) |
+    .mtu."@size"
+  ' "${tmp}")
+
+  if [[ "${actual}" != "${DOMAIN_NETWORK_MTU}" ]]; then
+    rm -f "${tmp}"
+    echo "ERROR: Rendered ARM NIC MTU does not match DOMAIN_NETWORK_MTU" >&2
+    return 1
+  fi
+
+  mv "${tmp}" "${xml}"
+  unset MTU_TARGET_MAC
+}
+
 # Provision additional compute nodes
 ADD_COMPUTE_COUNT=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".\"additional-compute\" | length" "${LEASE_CONF}")
 echo "Provisioning ${ADD_COMPUTE_COUNT} additional arm64 compute nodes..."
@@ -545,13 +600,14 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   export QCOW_NAME="${domain_qcow2_image_host_path##*/}"
 
   # Whitelist of variables substituted into templates — both naming conventions.
-  TEMPLATE_VARS='$DOMAIN_NAME $DOMAIN_UUID $DOMAIN_MEMORY $DOMAIN_VCPUS $HOST_PATH_KERNEL $HOST_PATH_INITRAMFS $DOMAIN_CMDLINE $DISK_SOURCE_PATH $MAC_ADDRESS $NETWORK_NAME $LEASED_RESOURCE $DOMAIN_MAC $BOOT_ARTIFACTS_PATH $KERNEL_NAME $INITRD_NAME $EXTRA_ARGS $QCOW_PATH $QCOW_NAME'
+  TEMPLATE_VARS='$DOMAIN_NAME $DOMAIN_UUID $DOMAIN_MEMORY $DOMAIN_VCPUS $HOST_PATH_KERNEL $HOST_PATH_INITRAMFS $DOMAIN_CMDLINE $DISK_SOURCE_PATH $MAC_ADDRESS $NETWORK_NAME $LEASED_RESOURCE $DOMAIN_MAC $BOOT_ARTIFACTS_PATH $KERNEL_NAME $INITRD_NAME $EXTRA_ARGS $QCOW_PATH $QCOW_NAME $DOMAIN_NETWORK_MTU'
 
   echo "Rendering install domain XML for ${node_name}..."
   domain_install_xml=$(mktemp --tmpdir domain-"${node_name}"-install.xml.XXXXX)
   set_arm_template_memory "${ARM64_INSTALL_TEMPLATE}"
   envsubst "${TEMPLATE_VARS}" \
     < "${ARM64_INSTALL_TEMPLATE}" > "${domain_install_xml}"
+  set_rendered_arm_nic_mtu "${domain_install_xml}" "${node_mac}"
 
   echo "Defining and starting install domain for ${node_name}..."
   CURRENT_INSTALL_DOMAIN="${node_name}"
@@ -578,6 +634,7 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
      .domain.on_reboot = "restart"' \
     "${raw_run_xml}" > "${domain_run_xml}"
   rm -f "${raw_run_xml}"
+  set_rendered_arm_nic_mtu "${domain_run_xml}" "${node_mac}"
 
   ${VIRSH_ADDITIONAL} define "${domain_run_xml}" --validate
   ${VIRSH_ADDITIONAL} start "${node_name}"
