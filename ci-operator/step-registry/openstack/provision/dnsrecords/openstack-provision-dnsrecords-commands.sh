@@ -56,7 +56,7 @@ if [ -f "${SHARED_DIR}/API_IP" ]; then
   else
     API_RECORD_TYPE="AAAA"
   fi
-  echo "Creating API DNS $API_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN"
+  echo "Creating API DNS $API_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN -> ${API_EXTERNAL_RECORD_IP}"
   jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "api.'${CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${API_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${API_EXTERNAL_RECORD_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api.json"
   cp "${TMP_DIR}/dns_api.json" "${SHARED_DIR}/dns_up.json"
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
