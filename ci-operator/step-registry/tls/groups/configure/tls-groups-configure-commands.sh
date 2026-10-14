@@ -12,6 +12,14 @@ fi
 TLS_GROUPS_FEATURE_GATE="${TLS_GROUPS_FEATURE_GATE:-TLSGroupPreferences}"
 TLS_GROUPS_LIST="${TLS_GROUPS:-SecP384r1MLKEM1024}"
 TLS_GROUPS_MIN_VERSION="${TLS_GROUPS_MIN_VERSION:-VersionTLS13}"
+TLS_GROUPS_TLS_ADHERENCE_POLICY="${TLS_GROUPS_TLS_ADHERENCE_POLICY:-}"
+case "${TLS_GROUPS_TLS_ADHERENCE_POLICY}" in
+""|LegacyAdheringComponentsOnly|StrictAllComponents) ;;
+*)
+  echo "Invalid TLS_GROUPS_TLS_ADHERENCE_POLICY='${TLS_GROUPS_TLS_ADHERENCE_POLICY}'"
+  exit 1
+  ;;
+esac
 if [[ "${TLS_GROUPS_MIN_VERSION}" != "VersionTLS13" ]]; then
   echo "TLS_GROUPS_MIN_VERSION must be VersionTLS13; Custom profile omits ciphers (TLS 1.3 suites are not configurable)"
   exit 1
@@ -95,6 +103,9 @@ ensure_tls_groups_feature_gate() {
 
 echo "Configuring APIServer Custom TLS profile with groups: ${TLS_GROUPS_LIST}"
 ensure_tls_groups_feature_gate
+if [[ -n "${TLS_GROUPS_TLS_ADHERENCE_POLICY}" ]]; then
+  wait_feature_observed "$(desired_cluster_version)" TLSAdherence
+fi
 
 # Build groups JSON array from comma-separated TLS_GROUPS.
 groups_json=$(printf '%s' "${TLS_GROUPS_LIST}" | jq -Rc 'split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length > 0))')
@@ -104,7 +115,7 @@ if [[ "$(echo "${groups_json}" | jq 'length')" -lt 1 ]]; then
 fi
 
 # TLS 1.3 cipher suites are not configurable on Custom profiles — omit ciphers.
-apiserver_patch=$(jq -nc --argjson groups "${groups_json}" --arg minver "${TLS_GROUPS_MIN_VERSION}" '
+apiserver_patch=$(jq -nc --argjson groups "${groups_json}" --arg minver "${TLS_GROUPS_MIN_VERSION}" --arg adherence "${TLS_GROUPS_TLS_ADHERENCE_POLICY}" '
   {
     spec: {
       tlsSecurityProfile: {
@@ -116,6 +127,7 @@ apiserver_patch=$(jq -nc --argjson groups "${groups_json}" --arg minver "${TLS_G
       }
     }
   }
+  | if $adherence != "" then .spec.tlsAdherence = $adherence else . end
 ')
 
 echo "Patching apiservers/cluster:"
@@ -137,3 +149,11 @@ if [[ "${observed_groups}" != "${groups_json}" ]]; then
 fi
 
 echo "APIServer Custom TLS profile configured with groups=${observed_groups}"
+if [[ -n "${TLS_GROUPS_TLS_ADHERENCE_POLICY}" ]]; then
+  observed_adherence=$(oc get apiserver/cluster -ojson | jq -r '.spec.tlsAdherence // empty')
+  if [[ "${observed_adherence}" != "${TLS_GROUPS_TLS_ADHERENCE_POLICY}" ]]; then
+    echo "Error: tlsAdherence is '${observed_adherence}', expected '${TLS_GROUPS_TLS_ADHERENCE_POLICY}'"
+    exit 1
+  fi
+  echo "APIServer TLS adherence verified: ${observed_adherence}"
+fi
