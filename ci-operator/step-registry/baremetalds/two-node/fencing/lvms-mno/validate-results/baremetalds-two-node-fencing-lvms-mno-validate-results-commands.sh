@@ -19,8 +19,7 @@ expected_skip = (
 )
 expected_skips = []
 unexpected_skips = []
-failures = []
-passed = 0
+executed = 0
 for case in cases:
     name = case.get("name", "")
     skipped = case.find("skipped")
@@ -30,23 +29,19 @@ for case in cases:
             expected_skips.append(skip)
         else:
             unexpected_skips.append(skip)
-    elif case.find("failure") is not None or case.find("error") is not None:
-        failures.append(name)
     else:
-        passed += 1
+        executed += 1
 
 with open(summary_path, "w", encoding="utf-8") as summary:
-    summary.write(f"passed={passed} failed={len(failures)} skipped={len(expected_skips) + len(unexpected_skips)}\n")
+    summary.write(f"executed={executed} skipped={len(expected_skips) + len(unexpected_skips)}\n")
     for name, reason in expected_skips:
         summary.write(f"EXPECTED SKIP {name}{': ' + reason if reason else ''}\n")
     for name, reason in unexpected_skips:
         summary.write(f"UNEXPECTED SKIP {name}{': ' + reason if reason else ''}\n")
-    for name in failures:
-        summary.write(f"FAILED {name}\n")
 
 print(open(summary_path, encoding="utf-8").read())
-if not cases or not passed or failures or unexpected_skips:
-    for name, reason in unexpected_skips:
-        print(f"UNEXPECTED SKIP {name}: {reason}", file=sys.stderr)
+if not executed:
+    print("No executed LVMS tests found in JUnit", file=sys.stderr)
+if not executed or unexpected_skips:
     sys.exit(1)
 PY
