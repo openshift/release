@@ -22,7 +22,14 @@ function queue() {
   shift
   local LIVE
   LIVE="$(jobs | wc -l)"
+  # Respect the absolute collection deadline while waiting for a free slot so
+  # the script always reaches the final wait (and artifact upload) before the
+  # entrypoint 2h step deadline (DPTP-5412).
   while [[ "${LIVE}" -ge 45 ]]; do
+    if (( SCRIPT_START > 0 && $(date +%s) - SCRIPT_START >= COLLECTOR_TIMEOUT )); then
+      echo "WARNING: collection deadline reached in queue(); skipping: ${*}" >&2
+      return
+    fi
     sleep 1
     LIVE="$(jobs | wc -l)"
   done
@@ -50,6 +57,13 @@ then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+# Record the absolute collection start time here — before any collection work —
+# so the deadline budget is measured from the same point the step clock starts.
+# COLLECTOR_TIMEOUT is the fraction of the 2h step deadline reserved for
+# collection; the remainder (~30 min) is left for artifact upload (DPTP-5412).
+SCRIPT_START=$(date +%s)
+COLLECTOR_TIMEOUT=$(( 90 * 60 ))  # 90 minutes
 
 echo "Gathering artifacts ..."
 mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds ${ARTIFACT_DIR}/inspect
@@ -765,16 +779,13 @@ script="$(
 )"
 queue ${ARTIFACT_DIR}/metrics/job_metrics.json oc --insecure-skip-tls-verify rsh -T -n openshift-monitoring -c thanos-query deploy/thanos-querier /bin/bash -c "${script}"
 
-# Wait for background collectors with a bounded timeout so the step does not
-# block the entrypoint 2h deadline and prevent artifact upload (DPTP-5412).
-# Collectors that exceed the timeout are killed; partial artifacts are preserved.
-COLLECTOR_TIMEOUT=$(( 90 * 60 ))  # 90 minutes — leaves ~30 min before the 2h step deadline
-collect_start=$(date +%s)
+# Wait for background collectors using the same absolute deadline as queue().
+# Collectors still running after COLLECTOR_TIMEOUT seconds (measured from
+# SCRIPT_START) are terminated so artifact upload can proceed (DPTP-5412).
 while true; do
   mapfile -t _running < <(jobs -rp 2>/dev/null)
   [[ ${#_running[@]} -eq 0 ]] && break
-  elapsed=$(( $(date +%s) - collect_start ))
-  if (( elapsed >= COLLECTOR_TIMEOUT )); then
+  if (( $(date +%s) - SCRIPT_START >= COLLECTOR_TIMEOUT )); then
     echo "WARNING: ${#_running[@]} background collector(s) still running after ${COLLECTOR_TIMEOUT}s; terminating to allow artifact upload" >&2
     kill "${_running[@]}" 2>/dev/null || true
     sleep 5
