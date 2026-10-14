@@ -586,7 +586,7 @@ def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
     assert "images" not in config
     (test,) = config["tests"]
     assert test["as"] == "aws-s3"
-    assert test["cron"] == "@weekly"
+    assert test["cron"] == "@daily"
     steps = test["steps"]
     assert steps["cluster_profile"] == "aws-quay-qe"
     assert not [key for key in steps["env"] if key.startswith("PLAYWRIGHT_")]
