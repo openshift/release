@@ -1724,18 +1724,31 @@ tests:
         cluster_id="$(az resource list --resource-group "${rg}" \
           --resource-type Microsoft.RedHatOpenShift/hcpOpenShiftClusters --name "${cluster}" \
           --query '[0].id' -o tsv)"
+        # Every removal below is attempted whatever happened to the one
+        # before it, and the step fails at the end if any of them did:
+        # stopping at the first failure would leave the rest behind.
+        failed=0
         if [[ -n "${cluster_id}" ]]; then
           echo "deleting cluster ${cluster}"
-          az resource delete --ids "${cluster_id}" --api-version "${api_version}" --output none
-          echo "deleted cluster ${cluster}"
+          if az resource delete --ids "${cluster_id}" --api-version "${api_version}" --output none; then
+            echo "deleted cluster ${cluster}"
+          else
+            echo "could not delete cluster ${cluster}" >&2
+            failed=1
+          fi
         else
           echo "no cluster ${cluster} in ${rg}"
         fi
 
         echo "deleting group ${rg}"
-        az group delete --name "${rg}" --yes --output none
-        echo "deleted group ${rg}"
+        if az group delete --name "${rg}" --yes --output none; then
+          echo "deleted group ${rg}"
+        else
+          echo "could not delete group ${rg}" >&2
+          failed=1
+        fi
         echo "managed group ${rg}-managed exists: $(az group exists --name "${rg}-managed")"
+        exit "${failed}"
       credentials:
       - collection: hcm-aro
         group: aro-hcp-int-rh
