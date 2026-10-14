@@ -13,6 +13,7 @@ managed_files:
     - quay-quay-redhat-3.18__aws-ocp414-e2e-install.yaml
     - quay-quay-redhat-3.18__gcp-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__azure-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.18__baremetal-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__libvirt-s390x-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.17__aws-ocp422-e2e-install.yaml
@@ -35,6 +36,16 @@ quay:
       - cron: daily
         source: nightly
         clouds: [aws,gcp,azure]
+        ocp: ["4.22"]
+        test: e2e-install
+      # Bare metal runs the full dev-scripts + LVMS + Quay stack on a single
+      # shared Equinix host (~2h end to end) and holds an ofcir lease for the
+      # whole time; weekly keeps the pool pressure and host churn reasonable.
+      # The -nightly job suffix refers to the payload source, not the cadence
+      # (same convention as the weekly libvirt s390x lane).
+      - cron: weekly
+        source: nightly
+        clouds: [baremetal]
         ocp: ["4.22"]
         test: e2e-install
       # Sibling of the daily row: same files, distinct as (e.g. aws-s3-rds-nightly).
