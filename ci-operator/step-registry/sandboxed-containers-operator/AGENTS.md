@@ -41,7 +41,7 @@ also contains install, gather, peerpods, IPI, and miscellaneous steps; run
 ```
 e2e/{azure,aro,aws}/…-e2e-{azure,aro,aws}-workflow.yaml   # top-level e2e scenarios
 pre/sandboxed-containers-operator-pre-chain.yaml           # install/setup
-test/sandboxed-containers-operator-test-chain.yaml         # shared test-phase chain (gate + openshift-extended-test)
+test/sandboxed-containers-operator-test-chain.yaml         # shared test-phase chain
 testsuites-gate/                                            # test-phase step; creates ${SHARED_DIR}/testsuites_gate
 testsuites/                                                 # POST-phase test suites (see testsuites/AGENTS.md)
 ```
@@ -94,11 +94,16 @@ make registry-metadata   # must complete with no "missing OWNERS file" errors
 ## Workflow Shape
 
 The `e2e-{azure,aro,aws}` workflows run `pre` (provision + install OSC) → `test`
-→ `post`. The `test` phase references the shared
-`sandboxed-containers-operator-test` chain, which runs the `testsuites-gate` step
-(creates `${SHARED_DIR}/testsuites_gate`) followed by `openshift-extended-test`.
-Keeping the test phase in one chain means test-phase changes are made once and
-apply to every workflow.
+→ `post`.
+
+The `test` phase references the shared `sandboxed-containers-operator-test`
+chain.  Keeping the test phase in one chain means test-phase changes are made
+once and apply to every workflow.
+
+This test chain should have a minimal test step (to be created), followed by the
+`testsuites-gate` step that creates `${SHARED_DIR}/testsuites_gate`.  If the pre
+or test phase fails, `testsuites_gate` is not created and the post testsuits
+should skip.
 
 The **first** post entry is the `sandboxed-containers-operator-testsuites` chain,
 followed by must-gather and deprovision. The workflows set
