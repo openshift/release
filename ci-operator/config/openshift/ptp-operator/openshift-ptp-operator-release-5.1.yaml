@@ -165,7 +165,21 @@ tests:
       cli: latest
       commands: |
         set -euo pipefail
-        help=$(oc exec -n openshift-ptp daemonset/linuxptp-daemon -c kube-rbac-proxy -- /usr/bin/kube-rbac-proxy --help 2>&1)
+        help=''
+        exec_succeeded=false
+        for _ in $(seq 1 30); do
+          if help=$(oc exec -n openshift-ptp daemonset/linuxptp-daemon -c kube-rbac-proxy -- /usr/bin/kube-rbac-proxy --help 2>&1); then
+            exec_succeeded=true
+            break
+          fi
+          echo "Waiting for a linuxptp-daemon pod that accepts exec: ${help}"
+          sleep 10
+        done
+        if [[ "${exec_succeeded}" != "true" ]]; then
+          echo "Unable to inspect kube-rbac-proxy command-line support."
+          oc get pods -n openshift-ptp -l app=linuxptp-daemon -o wide
+          exit 1
+        fi
         if ! grep -q -- '--tls-curve-preferences' <<< "${help}"; then
           echo "The installed kube-rbac-proxy image does not support TLS curve preferences."
           oc get daemonset linuxptp-daemon -n openshift-ptp -o jsonpath='{.spec.template.spec.containers[?(@.name=="kube-rbac-proxy")].image}{"\n"}'
