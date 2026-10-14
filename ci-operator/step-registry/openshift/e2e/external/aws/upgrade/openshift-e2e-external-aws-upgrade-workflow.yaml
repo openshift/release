@@ -1,0 +1,32 @@
+workflow:
+  as: openshift-e2e-external-aws-upgrade
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: platform-external-cluster-aws-pre
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather
+    - chain: platform-external-cluster-aws-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      PROVIDER_NAME: aws
+      PLATFORM_EXTERNAL_CCM_ENABLED: no
+      TEST_TYPE: upgrade-conformance
+      TEST_ARGS: '--disable-monitor=service-type-load-balancer-availability'
+  documentation: |-
+    The origin E2E workflow to validate upgrades of clusters installed on AWS with platform
+    type external: the cluster is installed from the initial release (release:initial, typically
+    the previous stable) and upgraded to the latest release (release:latest) while running the
+    upgrade-conformance suite.
+
+    Jobs using this workflow are non-gating periodics reported to
+    #forum-ocp-platform-external-ci on failure. They are intended to be classified in Sippy as
+    Platform "external-aws" and Installer "upi", and are intentionally not included in
+    Component Readiness default views (platform external is not part of the default variant
+    matrix). Note: until Sippy's variant registry learns the newer "-e2e-platform-external-aws"
+    job-name pattern, these jobs are grouped under Platform "aws"; a follow-up in openshift/sippy
+    is required to classify them as "external-aws" consistently with the e2e-external-aws jobs.
