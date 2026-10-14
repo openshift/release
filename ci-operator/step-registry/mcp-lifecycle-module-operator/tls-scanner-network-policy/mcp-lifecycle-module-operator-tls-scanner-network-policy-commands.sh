@@ -13,6 +13,16 @@ if [[ -z "$host_net_ns" ]]; then
   exit 1
 fi
 
+# Scope the policy to both operators' controller-manager pods, so pods without
+# their own NetworkPolicy aren't flipped into default-deny for the duration of
+# the scan. Fail loudly if the selector matches nothing, otherwise the policy is
+# a no-op and the scan silently returns to NO_TLS.
+cm_pods=$(oc -n "${OPERATOR_NAMESPACE}" get pods -l 'control-plane=controller-manager,app.kubernetes.io/name in (mcp-lifecycle-module-operator,mcp-lifecycle-operator)' -o name)
+if [[ -z "$cm_pods" ]]; then
+  echo "ERROR: podSelector matched no operator pods in ${OPERATOR_NAMESPACE}" >&2
+  exit 1
+fi
+
 oc apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -20,7 +30,15 @@ metadata:
   name: allow-tls-scanner-metrics
   namespace: ${OPERATOR_NAMESPACE}
 spec:
-  podSelector: {}
+  podSelector:
+    matchLabels:
+      control-plane: controller-manager
+    matchExpressions:
+    - key: app.kubernetes.io/name
+      operator: In
+      values:
+      - mcp-lifecycle-module-operator
+      - mcp-lifecycle-operator
   policyTypes:
   - Ingress
   ingress:
