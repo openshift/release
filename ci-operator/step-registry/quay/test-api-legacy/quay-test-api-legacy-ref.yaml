@@ -1,0 +1,30 @@
+ref:
+  as: quay-test-api-legacy
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-test-api-legacy-commands.sh
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+  timeout: 1h30m0s
+  grace_period: 15m0s
+  credentials:
+  - collection: quay-tests
+    group: quay
+    mount_path: /var/run/quay-qe-quay-secret
+  env:
+  - name: QUAY_VERSION
+    documentation: Quay X.Y under test, passed to the suite as CYPRESS_QUAY_VERSION.
+  - name: API_LEGACY_SPECS
+    default: "cypress/e2e/quay_api_testing_all.cy.js"
+    documentation: Comma-separated Cypress specs under quay-api-tests to run.
+  documentation: |-
+    Run the quay-tests REST API Cypress suite (quay-api-tests, API_LEGACY_SPECS;
+    the default spec targets the old UI, Quay < 3.16) against the Quay deployed
+    by a quay-deploy-* step (${SHARED_DIR}/quayroute). JUnit, videos and
+    screenshots go to ${ARTIFACT_DIR}. The step fails when Cypress fails or
+    the JUnit output reports zero tests.
