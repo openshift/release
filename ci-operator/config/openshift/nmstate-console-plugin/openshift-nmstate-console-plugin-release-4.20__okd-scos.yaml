@@ -1,0 +1,77 @@
+base_images:
+  ocp_builder_rhel-9-base-nodejs-openshift-4.22:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-nodejs-openshift-4.22
+  origin_scos-4.20_base-stream9:
+    name: scos-4.20
+    namespace: origin
+    tag: base-stream9
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v29
+images:
+  items:
+  - dockerfile_literal: |
+      FROM origin_scos-4.20_base-stream9
+      USER 0
+      RUN INSTALL_PKGS="nginx" && \
+          dnf install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
+          rpm -V $INSTALL_PKGS && \
+          dnf -y clean all --enablerepo='*' && rm -rf /var/cache/dnf/* && \
+          chown -R 1001:0 /var/lib/nginx /var/log/nginx /run && \
+          chmod -R ug+rwX /var/lib/nginx /var/log/nginx /run
+      RUN printf '%s\n' \
+          'error_log /dev/stderr warn;' \
+          'pid /tmp/nginx.pid;' \
+          'events { worker_connections 1024; }' \
+          'http {' \
+          '    include /etc/nginx/mime.types;' \
+          '    default_type application/octet-stream;' \
+          '    access_log /dev/stdout;' \
+          '    server {' \
+          '        listen 8080 default_server;' \
+          '        root /opt/app-root/src;' \
+          '        index index.html;' \
+          '    }' \
+          '}' > /etc/nginx/nginx.conf
+      EXPOSE 8080
+      USER 1001
+      ENTRYPOINT []
+      STOPSIGNAL SIGQUIT
+    from: origin_scos-4.20_base-stream9
+    to: nmstate-console-plugin-runtime
+  - dockerfile_path: Dockerfile
+    from: nmstate-console-plugin-runtime
+    inputs:
+      ocp_builder_rhel-9-base-nodejs-openshift-4.22:
+        as:
+        - build
+        - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.22
+    to: nmstate-console-plugin
+promotion:
+  to:
+  - excluded_images:
+    - nmstate-console-plugin-runtime
+    name: scos-4.20
+    namespace: origin
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: scos-4.20
+      namespace: origin
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 1000m
+      memory: 6Gi
+zz_generated_metadata:
+  branch: release-4.20
+  org: openshift
+  repo: nmstate-console-plugin
+  variant: okd-scos
