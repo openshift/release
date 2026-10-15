@@ -133,7 +133,17 @@ if [[ -z "${resolved_name}" || -z "${resolved_region:-${REGION}}" ]]; then
   exit 1
 fi
 
-if [[ "$(jq -r '.hypershift.enabled // false' <<<"${cluster_json}")" == "true" || "${HOSTED_CP}" == "true" ]]; then
+# An explicit OCM value for hypershift.enabled always wins: the default HOSTED_CP=true must
+# not publish topology=hcp for a classic cluster OCM reports as such (CodeRabbit review).
+# HOSTED_CP is consulted only when OCM does not report the field, matching its ref.yaml doc.
+# NB: jq's // operator treats false as falsy, so null has to be tested for explicitly to tell
+# an explicit OCM "false" apart from an absent field.
+hypershift_enabled=$(jq -r 'if .hypershift.enabled == null then "" else (.hypershift.enabled | tostring) end' <<<"${cluster_json}")
+if [[ "${hypershift_enabled}" == "true" ]]; then
+  topology="hcp"
+elif [[ "${hypershift_enabled}" == "false" ]]; then
+  topology="classic"
+elif [[ "${HOSTED_CP}" == "true" ]]; then
   topology="hcp"
 else
   topology="classic"
