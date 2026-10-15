@@ -8,6 +8,10 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 capture_health() {
   local phase="${1}" resource output
+  if [[ ! -f "${MC_KUBECONFIG}" ]]; then
+    echo "WARN: Cannot collect ${phase} health diagnostics without the MC kubeconfig" >&2
+    return 0
+  fi
   if [[ -z "${ARTIFACT_DIR:-}" ]] || ! mkdir -p "${ARTIFACT_DIR}/ho-health"; then
     echo "WARN: Cannot create ${phase} health diagnostics directory" >&2
     return 0

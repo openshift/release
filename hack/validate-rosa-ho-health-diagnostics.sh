@@ -81,7 +81,14 @@ for tool in oc ocm curl sleep; do ln -s mock "${TEST_ROOT}/bin/${tool}"; done
 run_step() {
   local step="${1}" mode="${2}" expected="${3}" actual=0
   export MODE="${mode}"
-  rm -rf "${ARTIFACT_DIR}"
+  if [[ "${mode}" == missing-kubeconfig ]]; then
+    rm -f "${SHARED_DIR}/hs-mc.kubeconfig"
+  else
+    printf 'mock-only' > "${SHARED_DIR}/hs-mc.kubeconfig"
+  fi
+  if [[ "${4:-}" != retain ]]; then
+    rm -rf "${ARTIFACT_DIR}"
+  fi
   if [[ "${mode}" == artifact-unavailable ]]; then
     printf 'not a directory' > "${ARTIFACT_DIR}"
   fi
@@ -158,6 +165,11 @@ grep -q 'RESULT: FAILED' "${TEST_ROOT}/output"
 grep -q 'WARN: Cannot create after-verification' "${TEST_ROOT}/output"
 echo 'PASS: unavailable artifact directory cannot mask readiness failure'
 
+run_step verify-hcp-health missing-kubeconfig 1
+grep -q 'WARN: Cannot collect after-verification health diagnostics without the MC kubeconfig' "${TEST_ROOT}/output"
+[[ ! -s "${CALLS}" ]]
+echo 'PASS: missing MC kubeconfig never falls back to another cluster context'
+
 run_step verify-hcp-health diagnostics-failure 1
 grep -q 'RESULT: FAILED' "${TEST_ROOT}/output"
 grep -q 'WARN: Cannot collect after-verification hostedclusters' "${TEST_ROOT}/output"
@@ -172,3 +184,18 @@ echo 'PASS: diagnostic failure does not alter readiness success'
 run_step verify-hcp-health healthy 0
 [[ -f "${ARTIFACT_DIR}/ho-health/after-verification-nodepools.json" ]]
 echo 'PASS: healthy verification also retains diagnostics'
+
+run_step deploy upgrade 0
+sha256sum "${ARTIFACT_DIR}"/ho-health/{before,after}-deploy-*.json > "${TEST_ROOT}/deploy-checksums"
+run_step verify-hcp-health not-ready 1 retain
+check_snapshot after-verification
+sha256sum --check "${TEST_ROOT}/deploy-checksums" > /dev/null
+[[ "$(find "${ARTIFACT_DIR}/ho-health" -type f | wc -l)" -eq 6 ]]
+echo 'PASS: failed verification adds artifacts without overwriting either deploy snapshot'
+
+run_step deploy upgrade 0
+sha256sum "${ARTIFACT_DIR}"/ho-health/{before,after}-deploy-*.json > "${TEST_ROOT}/deploy-checksums"
+run_step verify-hcp-health diagnostics-failure 1 retain
+sha256sum --check "${TEST_ROOT}/deploy-checksums" > /dev/null
+[[ "$(find "${ARTIFACT_DIR}/ho-health" -type f | wc -l)" -eq 4 ]]
+echo 'PASS: failed collection leaves earlier artifacts intact without partial JSON'
