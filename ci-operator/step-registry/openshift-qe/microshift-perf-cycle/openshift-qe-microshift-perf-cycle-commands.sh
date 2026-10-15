@@ -269,9 +269,9 @@ finalize_cycle() {
   [[ $cycle_finalized == false ]] || return 0
   cycle_finalized=true
   local capture_rc=$1
-  python3 - "$ARTIFACT_DIR" "$SHARED_DIR" "$ITERATIONS" "$capture_rc" "$node" "${BASH_SOURCE[0]}" "${MODEL:-R640}" <<'MANIFEST' || return
+  python3 - "$ARTIFACT_DIR" "$SHARED_DIR" "$ITERATIONS" "$capture_rc" "$node" "${BASH_SOURCE[0]}" <<'MANIFEST' || return
 import datetime,hashlib,json,pathlib,sys,tempfile
-root,shared,requested,rc,node,script,model=sys.argv[1:];root=pathlib.Path(root);shared=pathlib.Path(shared);requested=int(requested)
+root,shared,requested,rc,node,script=sys.argv[1:];root=pathlib.Path(root);shared=pathlib.Path(shared);requested=int(requested)
 artifact_errors=[]
 def problem(p,reason):
     artifact_errors.append({'path':str(p.relative_to(root)) if p.is_relative_to(root) else p.name,'reason':reason})
@@ -286,7 +286,9 @@ def read(p,default=None):
         problem(p,'unreadable or malformed JSON');return default
 pins=read(shared/'microshift-perf-tools.json',{});deployment=read(shared/'microshift-perf-deploy.json',{})
 install=read(shared/'microshift-perf-install-vars.json',{})
-iterations=[];environment={'hardware':model,'host':node};net_hashes=set()
+# Declared once by init (MODEL lowercased, platform BareMetal); unknown stays null, never inferred.
+dimensions={k:(install.get('perf_'+k) if isinstance(install.get('perf_'+k),str) and install.get('perf_'+k) else None) for k in ('hardware','platform')}
+iterations=[];environment={**dimensions,'host':node};net_hashes=set()
 for n in range(1,requested+1):
     directory=root/f'iteration-{n}';error_start=len(artifact_errors)
     status=read(directory/'status.json',{'status':'not-run'})
@@ -336,6 +338,7 @@ for name in ('microshift-perf-library.sh','microshift-perf-netperf.sh'):
     except OSError:problem(shared/name,'missing pipeline source')
 source+=pins.get('init_script_sha256','').encode()+deployment.get('deployment_script_sha256','').encode()
 manifest={'schema_version':1,'measurement_type':'report_cycle','status':'complete' if rc=='0' and not artifact_errors and all(i['status']=='complete' for i in iterations) else 'incomplete',
+          'hardware':dimensions['hardware'],'platform':dimensions['platform'],
           'cycle_id':pins.get('cycle_id'),'release':deployment.get('install_vars',{}).get('microshift_version','unknown'),
           'rc':install.get('perf_extra_metadata',{}).get('rc',''),'timestamp':datetime.datetime.now(datetime.timezone.utc).isoformat(),
           'environment':environment,'tool_pins':{

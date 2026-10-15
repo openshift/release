@@ -239,8 +239,15 @@ invalid iteration or an incomplete requested cycle.
 One- or two-iteration smoke runs are supported by ITERATIONS. Their capture may
 finish successfully, but the report acceptance contract still requires at least
 three valid iterations; an incomplete/insufficient report verdict on a smoke
-run is expected. The manifest records the MODEL selected for self-scheduling,
-so an explicitly selected alternative is not mislabeled R640.
+run is expected.
+
+Init records the self-scheduled MODEL once, lowercased, as the hardware class
+(`R640` -> `r640`) with `platform: BareMetal`, the go-commons value other
+perf-scale indexes use. Both are passed to every Ansible install as
+`perf_hardware`/`perf_platform`, so each measurement carries them, and they
+appear on the write probe and at the top level and in `environment` of the
+cycle manifest. An explicitly selected alternative model is therefore not
+mislabeled `r640`. Nothing is inferred from the CPU model.
 
 Per-iteration failure collection includes bounded MicroShift/CRI-O journals,
 pod container logs (system namespaces first), events, pod state, disk space, RPM identities and binary

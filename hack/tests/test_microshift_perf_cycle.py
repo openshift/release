@@ -229,6 +229,7 @@ class CycleTests(unittest.TestCase):  # pylint: disable=too-many-public-methods
             MICROSHIFT_PROMETHEUS_URL="",
             PULL_PULL_SHA="c" * 40,
             BUILD_FROM_PR="true",
+            MODEL="R640",
         )
         (self.root / "net-binary.py").write_text("""#!/usr/bin/env python3
 import json,os,pathlib,sys
@@ -413,7 +414,8 @@ print('fake native netperf')
             opener = mock.Mock()
             opener.open.return_value = Response(json.dumps(response))
             with mock.patch.dict(
-                os.environ, dict(self.env, PERF_DIR=str(p), CYCLE_ID="probe", ES_SECRETS_PATH=str(secret))
+                os.environ, dict(self.env, PERF_DIR=str(p), CYCLE_ID="probe", ES_SECRETS_PATH=str(secret),
+                                 PERF_HARDWARE="r640", PERF_PLATFORM="BareMetal")
             ), mock.patch("urllib.request.build_opener", return_value=opener):
                 # Execute the production block with network/inputs mocked above.
                 exec(compile(script, "probe", "exec"), {})  # pylint: disable=exec-used
@@ -423,6 +425,8 @@ print('fake native netperf')
             self.assertIn("microshift-perf-v1", body)
             self.assertNotIn("ripsaw-kube-burner", body)
             self.assertNotIn("k8s-netperf", body)
+            probe = json.loads(body.splitlines()[1])
+            self.assertEqual((probe["hardware"], probe["platform"]), ("r640", "BareMetal"))
 
     def test_system_pod_logs_prioritized(self):
         self.setup_cycle()
@@ -433,12 +437,25 @@ print('fake native netperf')
         self.assertEqual(logs[0][logs[0].index("-n") + 1], "openshift-dns")
 
     def test_manifest_records_selected_model(self):
+        self.env["MODEL"] = "R650"
         self.setup_cycle()
-        r = self.run_script(CYCLE, ITERATIONS="1", MODEL="R650")
+        handoff = json.loads((self.shared / "microshift-perf-install-vars.json").read_text())
+        self.assertEqual((handoff["perf_hardware"], handoff["perf_platform"]), ("r650", "BareMetal"))
+        # The cycle step no longer reads MODEL; init's declaration is the single source.
+        r = self.run_script(CYCLE, ITERATIONS="1", MODEL="R999")
         self.assertEqual(r.returncode, 0, r.stdout)
         j = json.loads((self.art / "cycle.json").read_text())
-        self.assertEqual(j["environment"]["hardware"], "R650")
+        self.assertEqual((j["hardware"], j["platform"]), ("r650", "BareMetal"))
+        self.assertEqual((j["environment"]["hardware"], j["environment"]["platform"]), ("r650", "BareMetal"))
         self.assertEqual(j["expected"]["min_iterations"], 3)
+
+    def test_invalid_model_fails_before_init_side_effects(self):
+        for model in ("", "R640 ", "R6/40", "-r640"):
+            with self.subTest(model=model):
+                r = self.run_script(INIT, MODEL=model)
+                self.assertNotEqual(r.returncode, 0, r.stdout)
+                self.assertIn("MODEL must be a QUADS model name", r.stdout)
+                self.assertFalse((self.shared / "microshift-perf-cycle-id").exists())
 
     def test_provenance_uses_deploy_handoff(self):
         self.setup_cycle()
@@ -777,7 +794,7 @@ print('fake native netperf')
         (directory / "measurements.ndjson").write_text('{"kernel":"test"}\n{partial\n')
         (directory / "netperf-sha256.txt").write_text("")
         script = CYCLE.read_text().split("<<'MANIFEST'", 1)[1].split("\n", 1)[1].split("\nMANIFEST", 1)[0]
-        with mock.patch("sys.argv", ["manifest", str(self.art), str(self.shared), "1", "1", "n.example", str(CYCLE), "R640"]):
+        with mock.patch("sys.argv", ["manifest", str(self.art), str(self.shared), "1", "1", "n.example", str(CYCLE)]):
             # Execute the production block with network/inputs mocked above.
             exec(compile(script, "manifest", "exec"), {})  # pylint: disable=exec-used
         manifest = json.loads((self.art / "cycle.json").read_text())
@@ -785,6 +802,7 @@ print('fake native netperf')
         self.assertEqual(manifest["iterations"][0]["status"], "invalid")
         self.assertGreaterEqual(len(manifest["artifact_errors"]), 5)
         self.assertEqual(manifest["environment"]["kernel"], "test")
+        self.assertEqual((manifest["hardware"], manifest["environment"]["hardware"]), ("r640", "r640"))
         self.assertFalse(list(self.art.glob(".cycle.json.*")))
 
     def test_upstream_wrapper_fixtures_are_unmodified(self):
