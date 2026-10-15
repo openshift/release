@@ -4,10 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Runs the OpenShift console UI tests for the OpenTelemetry operator (tests/e2e-otel-ui in the
-# MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH branch of openshift/open-telemetry-opentelemetry-operator).
-# The step fails when a test fails. The JUnit files, the Playwright
-# report, traces and screenshots are written to ARTIFACT_DIR.
+# Runs the OpenShift console UI tests for the OpenTelemetry operator (tests/e2e-otel-ui of the pull request
+# source, baked into the obs-ui-tests-runner image). The step fails when a test fails. The JUnit files, the
+# Playwright report, traces and screenshots are written to ARTIFACT_DIR.
 
 # Write a flat context file and the JUnit XMLs to SHARED_DIR so the qe-agent post-step can triage failures.
 # SHARED_DIR only supports flat files (no subdirectories), is limited to 1 MiB in total, and must not get
@@ -15,7 +14,7 @@ set -o pipefail
 # the artifacts of this step.
 function notify_qe_agent() {
     # The exit status of the step, before anything else runs: the step can fail before any JUnit file exists
-    # (a failed clone, a missing password file, the time limit killing Chainsaw).
+    # (a missing password file, the time limit killing Chainsaw).
     local rc=$?
     local has_failures=false
     grep -rqE --include='*.xml' '<(failure|error)[ >]' "${ARTIFACT_DIR}" 2>/dev/null && has_failures=true
@@ -39,21 +38,14 @@ function notify_qe_agent() {
 
     cat > "${SHARED_DIR}/qe-agent-context.json" <<EOF
 {
-  "step_script_ref": "distributed-tracing/tests/opentelemetry-ui/stage/distributed-tracing-tests-opentelemetry-ui-stage-commands.sh",
+  "step_script_ref": "distributed-tracing/tests/opentelemetry-ui/premerge/distributed-tracing-tests-opentelemetry-ui-premerge-commands.sh",
   "has_test_failures": ${has_failures},
-  "env": {
-    "MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH": "${MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH:-}"
-  }
+  "env": {}
 }
 EOF
     echo "QE agent context and ${i} JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures})"
 }
 trap notify_qe_agent EXIT
-
-if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH:-}" ]]; then
-  echo "ERROR: MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH is not set. Provide it via steps.env in the job config or via Gangway API pod_spec_options."
-  exit 1
-fi
 
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   # shellcheck disable=SC1091
@@ -82,8 +74,9 @@ BASE_URL="https://$(oc get route console -n openshift-console -o jsonpath='{.spe
 export BASE_URL
 echo "Console URL: ${BASE_URL}"
 
-# The tests are not part of the image: take them from the product branch under test.
-git clone --depth 1 --branch "${MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH}" https://github.com/openshift/open-telemetry-opentelemetry-operator.git /tmp/otel-tests
+# Copy the operator repository (the pull request source baked into the obs-ui-tests-runner image) to a writable
+# directory: npm ci and Playwright write into the test directory.
+cp -R /tmp/opentelemetry-operator /tmp/otel-tests
 cd /tmp/otel-tests
 
 # Step pods run as an arbitrary UID whose HOME may be "/": keep every cache in /tmp. Chromium and its libraries
