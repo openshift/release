@@ -4,8 +4,8 @@ ref:
   commands: openshift-evpn-gateway-appliance-image-ci-commands.sh
   credentials:
   - namespace: test-credentials
-    bundle: registry-pull-credentials
-    mount_path: /var/run/registry-pull-credentials
+    bundle: ci-pull-credentials
+    mount_path: /var/run/ci-pull-credentials
   nested_podman: true
   grace_period: 2h
   resources:
@@ -16,12 +16,14 @@ ref:
       memory: 4Gi
   env:
   - name: EVPN_APPLIANCE_PR
-    default: "6"
+    default: "16"
     documentation: |-
       GitHub pull request number to fetch from openshift/evpn-gateway-appliance.
-      Temporary until the Containerfile is on main; remove the fetch when presubmits clone the PR head.
+      Temporary until the Containerfiles are on main; remove the fetch when presubmits clone the PR head.
   documentation: >-
-    Fetches openshift/evpn-gateway-appliance pull request head and runs podman
-    build on image/rhel10/Containerfile. BOOTC_BASE stays on the public bootc
-    image. FRR and node-exporter come from the 4.22 CI imagestream, using the
-    mounted registry-pull-credentials file.
+    Fetches openshift/evpn-gateway-appliance pull request head and runs two
+    podman builds with context image/. The product image is
+    image/rhel10/Containerfile with BOOTC_BASE on the public bootc image.
+    image/Containerfile.nested-ci then caches the payload-images.yaml pins with
+    python3, using the mounted ci-pull-credentials file as registry-auth.
+    Both local images are saved as gzip tarballs in the job artifacts.
