@@ -1,0 +1,32 @@
+ref:
+  as: openshift-qe-microshift-netperf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  resources:
+    requests:
+      cpu: 100m
+      memory: 500Mi
+  commands: openshift-qe-microshift-netperf-commands.sh
+  env:
+  - name: NETPERF_VERSION
+    default: latest
+    documentation: Latest public release resolved once by init; the concrete tag is passed to the wrapper. Explicit tags remain pins.
+  - name: NETPERF_TIMEOUT_SECONDS
+    default: '7200'
+    documentation: Bound for network-perf-v2 full-run.yaml in seconds.
+  - name: MICROSHIFT_PROMETHEUS_URL
+    default: ''
+    documentation: Prometheus override; normally uses deploy handoff for the bastion.
+  - name: NETPERF_STAGE_ONLY
+    default: 'false'
+    documentation: Stage the ref runner in SHARED_DIR for cycle reuse without executing a workload.
+  timeout: 2h10m0s
+  grace_period: 4m0s
+  documentation: Run network-perf-v2 full-run.yaml on one MicroShift node using the pinned upstream k8s-netperf.
+    Requires the perf-init tool/ES handoff. Successful probes enable native and metadata ES upload using
+    wrapper defaults, matching openshift-qe-network-perf. The v0.1.43 native client does not verify TLS.
+    Always archives locally and preserves bounded partial results on EXIT/signals, with output redaction.
+    In stage-only mode publishes the runner for the perf cycle.
