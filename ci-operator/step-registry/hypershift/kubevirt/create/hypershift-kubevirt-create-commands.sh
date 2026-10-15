@@ -848,11 +848,13 @@ EOF
 
     ns="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
     NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
+    LOCALNET_BRIDGE="${LOCALNET_MULTI_BRIDGE:-br-ex}"
+    LOCALNET_PHYSNET="${LOCALNET_MULTI_PHYSNET:-physnet}"
     if [[ "${NETWORK_COUNT}" -lt 1 ]]; then
       echo "ERROR: LOCALNET_MULTI_NETWORK_COUNT must be at least 1"
       exit 1
     fi
-    echo "Setting up ${NETWORK_COUNT} localnet networks (no pod network)..."
+    echo "Setting up ${NETWORK_COUNT} localnet networks (no pod network, bridge=${LOCALNET_BRIDGE}, physnet=${LOCALNET_PHYSNET})..."
 
     # Discover OVN container names before first oc exec usage
     if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
@@ -874,12 +876,12 @@ EOF
       exit 1
     fi
 
-    # Add physnet2..physnetN bridge-mappings on all nodes.
-    # The default physnet:br-ex exists automatically. Additional bridge-mapping names
-    # (physnet2, physnet3, ...) are needed because OVN-K doesn't support multiple NADs
-    # with different configs on the same NetConf.Name. All map to the same physical bridge br-ex.
-    if [[ ${NETWORK_COUNT} -gt 1 ]]; then
-      echo "Adding physnet2..physnet${NETWORK_COUNT} bridge-mappings on all nodes..."
+    # Add bridge-mappings on all nodes when using multiple localnet networks or a
+    # custom bridge/physnet.  The default physnet:br-ex exists automatically; additional
+    # names (physnet2, physnet3, ...) are needed because OVN-K doesn't support multiple
+    # NADs with different configs on the same NetConf.Name.
+    if [[ ${NETWORK_COUNT} -gt 1 || "${LOCALNET_BRIDGE}" != "br-ex" || "${LOCALNET_PHYSNET}" != "physnet" ]]; then
+      echo "Configuring bridge-mappings on all nodes (physnet=${LOCALNET_PHYSNET}, bridge=${LOCALNET_BRIDGE})..."
       for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
         OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
           --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
@@ -893,9 +895,15 @@ EOF
           CURRENT_MAPPINGS="physnet:br-ex"
         fi
         NEW_MAPPINGS="${CURRENT_MAPPINGS}"
+        # Ensure the primary physnet mapping exists when using a custom bridge or physnet
+        PRIMARY_MAPPING="${LOCALNET_PHYSNET}:${LOCALNET_BRIDGE}"
+        if ! echo "${NEW_MAPPINGS}" | grep -q "${PRIMARY_MAPPING}"; then
+          NEW_MAPPINGS="${NEW_MAPPINGS},${PRIMARY_MAPPING}"
+        fi
         for i in $(seq 2 "${NETWORK_COUNT}"); do
-          if ! echo "${NEW_MAPPINGS}" | grep -q "physnet${i}:br-ex"; then
-            NEW_MAPPINGS="${NEW_MAPPINGS},physnet${i}:br-ex"
+          EXTRA_MAPPING="${LOCALNET_PHYSNET}${i}:${LOCALNET_BRIDGE}"
+          if ! echo "${NEW_MAPPINGS}" | grep -q "${EXTRA_MAPPING}"; then
+            NEW_MAPPINGS="${NEW_MAPPINGS},${EXTRA_MAPPING}"
           fi
         done
         if [[ "${NEW_MAPPINGS}" != "${CURRENT_MAPPINGS}" ]]; then
@@ -918,13 +926,13 @@ EOF
       done
     fi
 
-    # Create localnet NADs: localnet-1 uses physnet, localnet-2 uses physnet2, etc.
+    # Create localnet NADs: localnet-1 uses LOCALNET_PHYSNET, localnet-2 uses LOCALNET_PHYSNET2, etc.
     for i in $(seq 1 "${NETWORK_COUNT}"); do
       NAD_NAME="localnet-${i}"
       if [[ ${i} -eq 1 ]]; then
-        PHYSNET_NAME="physnet"
+        PHYSNET_NAME="${LOCALNET_PHYSNET}"
       else
-        PHYSNET_NAME="physnet${i}"
+        PHYSNET_NAME="${LOCALNET_PHYSNET}${i}"
       fi
       SUBNET="${SUBNETS[$((i-1))]}"
       EXCLUDE_SUBNETS_JSON=""
@@ -948,9 +956,9 @@ spec:
   }'
 EOF
       if [[ -n "${EXCLUDE_SUBNETS_JSON}" ]]; then
-        echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:br-ex, subnet ${SUBNET}, exclude ${LOCALNET_MULTI_EXCLUDE_SUBNETS})"
+        echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:${LOCALNET_BRIDGE}, subnet ${SUBNET}, exclude ${LOCALNET_MULTI_EXCLUDE_SUBNETS})"
       else
-        echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:br-ex, subnet ${SUBNET})"
+        echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:${LOCALNET_BRIDGE}, subnet ${SUBNET})"
       fi
     done
 
