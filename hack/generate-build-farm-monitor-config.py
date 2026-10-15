@@ -59,7 +59,7 @@ def monitor_entry(cluster_name: str, console_url: str) -> str:
     sub_component_slug: "{cluster_name}"
     prometheus_monitor:
       prometheus_location:
-        cluster: "app.ci"
+        cluster: "core-ci"
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
@@ -72,7 +72,11 @@ def monitor_entry(cluster_name: str, console_url: str) -> str:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-{cluster_name}"
+      job_names:
+        - "periodic-build-farm-canary-{cluster_name}"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -115,7 +119,7 @@ def mgmt_monitor_entry(cluster_name: str, console_url: str) -> str:
     sub_component_slug: "{cluster_name}"
     prometheus_monitor:
       prometheus_location:
-        cluster: "app.ci"
+        cluster: "core-ci"
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
