@@ -34,6 +34,11 @@ set -o errexit
 set -o pipefail
 
 readonly BUILD_NAME="sail-operator-ci-build"
+# All OCP resources (Secret, BuildConfig, Build) are created in this namespace
+# on the test cluster. Must be explicit: the step container runs on the build
+# cluster (api.ci) in a ci-op-* namespace, and oc --dry-run=client will embed
+# that namespace in generated YAML unless we override it here.
+readonly OCP_NAMESPACE="default"
 
 # --- Architecture detection ---
 # go env GOARCH reflects the native arch of the CI node (amd64 on standard nodes,
@@ -66,13 +71,16 @@ set +x
 QUAY_USERNAME=$(cat /tmp/secrets/username)
 QUAY_PASSWORD=$(cat /tmp/secrets/password)
 
-# Create or update the push secret in the current namespace
+# Create or update the push secret in OCP_NAMESPACE on the test cluster.
+# --namespace is explicit on both sides of the pipe so the generated YAML
+# carries the correct namespace (not the build cluster's ci-op-* namespace).
 oc create secret docker-registry sail-quay-push \
+  --namespace="${OCP_NAMESPACE}" \
   --docker-server=quay.io \
   --docker-username="${QUAY_USERNAME}" \
   --docker-password="${QUAY_PASSWORD}" \
   --docker-email=unused@ci.invalid \
-  --dry-run=client -o yaml | oc apply -f -
+  --dry-run=client -o yaml | oc apply -n "${OCP_NAMESPACE}" -f -
 $WAS_TRACING && set -x
 
 # --- Pre-compile the operator binary ---
@@ -98,13 +106,14 @@ echo "Binary built: ${BINARY_PATH}"
 #
 # Idempotent: if the BC already exists (e.g. a job retry in the same namespace),
 # patch its output target to the current COMPUTED_TAG so we don't push to a stale tag.
-if oc get "bc/${BUILD_NAME}" &>/dev/null; then
+if oc get -n "${OCP_NAMESPACE}" "bc/${BUILD_NAME}" &>/dev/null; then
   echo "BuildConfig ${BUILD_NAME} already exists; updating output target for this run."
-  oc patch "bc/${BUILD_NAME}" --type=merge -p \
+  oc patch -n "${OCP_NAMESPACE}" "bc/${BUILD_NAME}" --type=merge -p \
     "{\"spec\":{\"output\":{\"to\":{\"name\":\"${HUB}/sail-operator:${COMPUTED_TAG}\"}}}}"
 else
   echo "Creating BuildConfig: ${BUILD_NAME}"
   oc new-build \
+    --namespace="${OCP_NAMESPACE}" \
     --binary \
     --strategy=docker \
     --name="${BUILD_NAME}" \
@@ -114,31 +123,31 @@ else
 fi
 
 # Ensure the push secret is linked regardless of whether we just created the BC
-oc set build-secret --push "bc/${BUILD_NAME}" sail-quay-push
+oc set build-secret --push -n "${OCP_NAMESPACE}" "bc/${BUILD_NAME}" sail-quay-push
 
 # Pass TARGETARCH as a Docker build arg so the Dockerfile selects the correct
 # pre-compiled binary: ADD out/linux_${TARGETARCH}/sail-operator /sail-operator.
 # Without this, the Dockerfile defaults to amd64 and the ADD fails on arm64 nodes.
-oc patch "bc/${BUILD_NAME}" --type=merge -p \
+oc patch -n "${OCP_NAMESPACE}" "bc/${BUILD_NAME}" --type=merge -p \
   "{\"spec\":{\"strategy\":{\"dockerStrategy\":{\"buildArgs\":[{\"name\":\"TARGETARCH\",\"value\":\"${ARCH}\"}]}}}}"
 
 # Capture the next build number before starting so the post-start status check
 # can anchor to the specific Build object rather than using a label selector.
-NEXT_BUILD_NUM=$(( $(oc get "bc/${BUILD_NAME}" -o jsonpath='{.status.lastVersion}' 2>/dev/null || echo 0) + 1 ))
+NEXT_BUILD_NUM=$(( $(oc get -n "${OCP_NAMESPACE}" "bc/${BUILD_NAME}" -o jsonpath='{.status.lastVersion}' 2>/dev/null || echo 0) + 1 ))
 readonly NEXT_BUILD_NUM
 
 echo "Starting build from local source tree (will be ${BUILD_NAME}-${NEXT_BUILD_NUM})..."
-oc start-build "${BUILD_NAME}" --from-dir=. --follow
+oc start-build -n "${OCP_NAMESPACE}" "${BUILD_NAME}" --from-dir=. --follow
 
 # --- Verify completion ---
 # oc start-build --follow exits non-zero on build failure, but the explicit check
 # guards against edge cases (e.g. connection drops masking a Failed status).
 # Anchored to NEXT_BUILD_NUM to avoid picking up a previous successful build.
 readonly STARTED_BUILD="${BUILD_NAME}-${NEXT_BUILD_NUM}"
-BUILD_STATUS=$(oc get "build/${STARTED_BUILD}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+BUILD_STATUS=$(oc get -n "${OCP_NAMESPACE}" "build/${STARTED_BUILD}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
 if [[ "${BUILD_STATUS}" != "Complete" ]]; then
   echo "ERROR: Build ${STARTED_BUILD} ended with status '${BUILD_STATUS}' (expected 'Complete')." >&2
-  oc get "build/${STARTED_BUILD}" -o wide 2>/dev/null || true
+  oc get -n "${OCP_NAMESPACE}" "build/${STARTED_BUILD}" -o wide 2>/dev/null || true
   exit 1
 fi
 
