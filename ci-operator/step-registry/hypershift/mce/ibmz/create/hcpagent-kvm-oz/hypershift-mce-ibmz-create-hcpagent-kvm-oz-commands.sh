@@ -45,107 +45,61 @@ fi
 ${VIRSH} net-info "${NETWORK}" >/dev/null
 echo "$(date) Using libvirt network ${NETWORK} on ${HOSTNAME}"
 
-# --- Step 1: Download the PXE boot artifacts of the InfraEnv ---
+# --- Step 1: Download the discovery ISO from the InfraEnv ---
+# The ISO is self-contained (kernel + initrd + rootfs). No HTTP server needed.
 INFRAENV_JSON="$(oc get infraenv "${HC_NAME}" -n "${hcp_ns}" -o json)"
-KERNEL_URL="$(jq -r '.status.bootArtifacts.kernel // empty' <<< "${INFRAENV_JSON}")"
-INITRD_URL="$(jq -r '.status.bootArtifacts.initrd // empty' <<< "${INFRAENV_JSON}")"
-ROOTFS_URL="$(jq -r '.status.bootArtifacts.rootfs // empty' <<< "${INFRAENV_JSON}")"
-if [[ -z "${KERNEL_URL}" || -z "${INITRD_URL}" || -z "${ROOTFS_URL}" ]]; then
-  echo "InfraEnv ${HC_NAME} in ${hcp_ns} has incomplete bootArtifacts (kernel/initrd/rootfs)" >&2
+ISO_URL="$(jq -r '.status.isoDownloadURL // empty' <<< "${INFRAENV_JSON}")"
+if [[ -z "${ISO_URL}" ]]; then
+  echo "$(date) ERROR: InfraEnv ${HC_NAME} in ${hcp_ns} has no isoDownloadURL" >&2
   exit 1
 fi
+echo "$(date) Downloading the discovery ISO"
+curl -k -L --fail --output /tmp/agent-discovery.iso "${ISO_URL}"
+echo "$(date) ISO downloaded: $(wc -c < /tmp/agent-discovery.iso) bytes"
 
-echo "$(date) Downloading the kernel, initrd and rootfs"
-curl -k -L --fail --output /tmp/agent-kernel "${KERNEL_URL}"
-curl -k -L --fail --output /tmp/agent-initrd "${INITRD_URL}"
-curl -k -L --fail --output /tmp/agent-rootfs.img "${ROOTFS_URL}"
+# --- Step 2: Upload the ISO to the libvirt storage pool ---
+# Named with LEASED_RESOURCE so upi-libvirt-cleanup-post removes it.
+ISO_VOLUME="${LEASED_RESOURCE}-hcpagent-discovery.iso"
+${VIRSH} vol-delete "${ISO_VOLUME}" --pool "${POOL_NAME}" || true
+${VIRSH} vol-create-as \
+  --name "${ISO_VOLUME}" \
+  --pool "${POOL_NAME}" \
+  --format raw \
+  --capacity "$(wc -c < /tmp/agent-discovery.iso)"
+${VIRSH} -k 60 -K 5 vol-upload \
+  --vol "${ISO_VOLUME}" \
+  --pool "${POOL_NAME}" \
+  --file /tmp/agent-discovery.iso
+echo "$(date) Uploaded ISO as ${POOL_NAME}/${ISO_VOLUME}"
 
-# --- Step 2: Upload the artifacts to the libvirt host ---
-# Names contain ${LEASED_RESOURCE} so upi-libvirt-cleanup-post removes them.
-KERNEL_NAME="${LEASED_RESOURCE}-hcpagent-kernel"
-INITRD_NAME="${LEASED_RESOURCE}-hcpagent-initrd"
-ROOTFS_NAME="${LEASED_RESOURCE}-hcpagent-rootfs"
-
-# upload_volume <pool> <volume name> <local file>
-function upload_volume () {
-  ${VIRSH} vol-delete "$2" --pool "$1" || true
-  ${VIRSH} vol-create-as \
-    --name "$2" \
-    --pool "$1" \
-    --format raw \
-    --capacity "$(wc -c < "$3")"
-  ${VIRSH} -k 60 -K 5 vol-upload --vol "$2" --pool "$1" --file "$3"
-}
-
-upload_volume "${POOL_NAME}" "${KERNEL_NAME}" /tmp/agent-kernel
-upload_volume "${POOL_NAME}" "${INITRD_NAME}" /tmp/agent-initrd
-
-# Ensure the httpd pool exists — it may not be pre-configured on all LPARs.
-if ! ${VIRSH} pool-info "${HTTPD_POOL_NAME}" &>/dev/null; then
-  echo "$(date) Creating libvirt pool ${HTTPD_POOL_NAME} at ${LIBVIRT_IMAGE_PATH}"
-  ${VIRSH} pool-define-as \
-    --name "${HTTPD_POOL_NAME}" \
-    --type dir \
-    --target "${LIBVIRT_IMAGE_PATH}"
-  ${VIRSH} pool-autostart "${HTTPD_POOL_NAME}"
-  ${VIRSH} pool-start "${HTTPD_POOL_NAME}"
-else
-  echo "$(date) Pool ${HTTPD_POOL_NAME} already exists"
-fi
-
-# The rootfs is staged in the httpd pool and fetched over plain HTTP by the
-# guests, since the assisted image service route uses a cluster-internal certificate.
-# The volume is created from XML so that its mode is world readable.
-cat > /tmp/rootfs.xml <<EOF
-<volume>
-  <name>${ROOTFS_NAME}</name>
-  <capacity unit="bytes">$(wc -c < /tmp/agent-rootfs.img)</capacity>
-  <target>
-    <path>${ROOTFS_NAME}</path>
-    <permissions>
-      <mode>0644</mode>
-      <owner>0</owner>
-      <group>0</group>
-      <label>system_u:object_r:virt_image_t:s0</label>
-    </permissions>
-  </target>
-</volume>
-EOF
-${VIRSH} vol-delete "${ROOTFS_NAME}" --pool "${HTTPD_POOL_NAME}" || true
-${VIRSH} vol-create --file /tmp/rootfs.xml --pool "${HTTPD_POOL_NAME}"
-${VIRSH} -k 60 -K 5 vol-upload --vol "${ROOTFS_NAME}" --pool "${HTTPD_POOL_NAME}" --file /tmp/agent-rootfs.img
-
-if [[ -z "${HTTPD_PORT}" ]]; then
-  HTTPD_PORT="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".[\"httpd-port\"]" "${LEASE_CONF}" 2>/dev/null || true)"
-fi
-if [[ -z "${HTTPD_PORT}" || "${HTTPD_PORT}" == "null" ]]; then
-  echo "$(date) ERROR: HTTPD_PORT is not set and lease config has no httpd-port for ${LEASED_RESOURCE}." \
-       " Set HTTPD_PORT in the workflow env." >&2
-  exit 1
-fi
-ROOTFS_URL_HTTPD="http://${HOSTNAME}:${HTTPD_PORT}/${ROOTFS_NAME}"
-echo "$(date) Uploaded the boot artifacts, rootfs is served at ${ROOTFS_URL_HTTPD}"
-
-KERNEL_PATH="$(${VIRSH} vol-path --pool "${POOL_NAME}" "${KERNEL_NAME}")"
-INITRD_PATH="$(${VIRSH} vol-path --pool "${POOL_NAME}" "${INITRD_NAME}")"
-CMDLINE="rd.neednet=1 ip=dhcp coreos.live.rootfs_url=${ROOTFS_URL_HTTPD} random.trust_cpu=on ignition.firstboot ignition.platform.id=metal console=ttysclp0"
+ISO_PATH="$(${VIRSH} vol-path --pool "${POOL_NAME}" "${ISO_VOLUME}")"
 
 # Writes an s390x KVM domain XML.
 # $1 = domain name, $2 = mac address, $3 = output file, $4 = "install" or "disk"
-# "install" boots the kernel and initrd directly and powers off on reboot, so the
-# guest can be started again from the "disk" definition once the installation wrote RHCOS.
+# "install": boots cdrom first, powers off on reboot so we can redefine for disk boot.
+# "disk":    boots from the qcow2 disk only, no cdrom attached.
 function write_domain_xml () {
   local name=$1 mac=$2 xml=$3 mode=$4
-  local os_boot on_reboot
+  local cdrom_xml=""
+  local boot_xml=""
+  local on_reboot=""
+
   if [[ "${mode}" == "install" ]]; then
-    os_boot="<kernel>${KERNEL_PATH}</kernel>
-    <initrd>${INITRD_PATH}</initrd>
-    <cmdline>${CMDLINE}</cmdline>"
+    cdrom_xml="<disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      <source file='${ISO_PATH}'/>
+      <target dev='sda' bus='scsi'/>
+      <readonly/>
+      <boot order='1'/>
+    </disk>"
+    boot_xml=""
     on_reboot="destroy"
   else
-    os_boot="<boot dev='hd'/>"
+    cdrom_xml=""
+    boot_xml="<boot dev='hd'/>"
     on_reboot="restart"
   fi
+
   cat > "${xml}" <<EOF
 <domain type='kvm'>
   <name>${name}</name>
@@ -154,7 +108,7 @@ function write_domain_xml () {
   <vcpu placement='static'>${AGENT_GUEST_VCPUS}</vcpu>
   <os>
     <type arch='s390x' machine='s390-ccw-virtio'>hvm</type>
-    ${os_boot}
+    ${boot_xml}
   </os>
   <cpu mode='host-model'/>
   <clock offset='utc'/>
@@ -162,10 +116,13 @@ function write_domain_xml () {
   <on_reboot>${on_reboot}</on_reboot>
   <on_crash>destroy</on_crash>
   <devices>
+    <controller type='scsi' index='0' model='virtio-scsi'/>
+    ${cdrom_xml}
     <disk type='volume' device='disk'>
       <driver name='qemu' type='qcow2'/>
       <source pool='${POOL_NAME}' volume='${name}-volume'/>
       <target dev='vda' bus='virtio'/>
+      $([[ "${mode}" == "install" ]] && echo "<boot order='2'/>" || true)
     </disk>
     <interface type='network'>
       <mac address='${mac}'/>
@@ -180,16 +137,14 @@ function write_domain_xml () {
 EOF
 }
 
-# --- Step 3: Create and boot the KVM guests ---
+# --- Step 3: Create and boot the KVM guests from the ISO ---
 declare -a GUEST_NAMES=()
 declare -a GUEST_MACS=()
 declare -a GUEST_IPS=()
 
 for (( i=0; i<AGENT_NODE_COUNT; i++ )); do
   NAME="${LEASED_RESOURCE}-hcpagent-${i}"
-  # The MAC and IP are the ones reserved for compute[i] in the lease config. The
-  # libvirt network has a fixed DHCP entry for that MAC, so the guest always gets
-  # the same IP. leaseLookup fails when the lease has no compute[i] entry.
+  # Use the lease compute MACs so DHCP assigns the fixed IPs (.51, .52, ...)
   MAC="$(leaseLookup "compute[${i}].mac" | tr '[:upper:]' '[:lower:]')"
   IP="$(leaseLookup "compute[${i}].ip")"
   GUEST_NAMES+=("${NAME}")
@@ -205,17 +160,17 @@ for (( i=0; i<AGENT_NODE_COUNT; i++ )); do
     --capacity "${AGENT_GUEST_DISK_CAPACITY}"
 
   write_domain_xml "${NAME}" "${MAC}" "/tmp/${NAME}-install.xml" install
+  # Pre-write the disk XML; it will be defined after the install powers off.
   write_domain_xml "${NAME}" "${MAC}" "/tmp/${NAME}-disk.xml" disk
+
   ${VIRSH} destroy "${NAME}" >/dev/null 2>&1 || true
   ${VIRSH} undefine "${NAME}" >/dev/null 2>&1 || true
   ${VIRSH} define "/tmp/${NAME}-install.xml"
   ${VIRSH} start "${NAME}"
-  # The disk XML is written above and will be defined once the guest shuts off
-  # after the installation reboot (step 6). Redefining while the domain is
-  # running always fails, even without a UUID.
+  echo "$(date) Guest ${NAME} started, booting from ISO"
 done
 printf '%s\n' "${GUEST_NAMES[@]}" > "${SHARED_DIR}/hcpagent-kvm-guests.txt"
-printf '%s\n' "${GUEST_IPS[@]}" > "${SHARED_DIR}/hcpagent-kvm-guest-ips.txt"
+printf '%s\n' "${GUEST_IPS[@]}"   > "${SHARED_DIR}/hcpagent-kvm-guest-ips.txt"
 echo "$(date) KVM guest IPs: ${GUEST_IPS[*]}"
 
 # Prints the name of the Agent whose interface has the given MAC address.
@@ -256,8 +211,8 @@ oc -n "${HC_NS}" scale nodepool "${HC_NAME}" --replicas "${AGENT_NODE_COUNT}"
 echo "$(date) Approved the agents and scaled nodepool ${HC_NAME} to ${AGENT_NODE_COUNT}"
 
 # --- Step 6: Wait for installation to finish ---
-# After RHCOS is written to disk the guest powers off on reboot (install
-# definition). Start it again, now from the disk definition.
+# After RHCOS is written to disk the guest powers off (on_reboot=destroy in
+# the install definition). Undefine it, define the disk-only XML, then start.
 for (( attempt=1; attempt<=90; attempt++ )); do
   ADDED=0
   for (( i=0; i<AGENT_NODE_COUNT; i++ )); do
@@ -267,7 +222,7 @@ for (( attempt=1; attempt<=90; attempt++ )); do
       ADDED=$((ADDED + 1))
     fi
     if [[ "$(${VIRSH} domstate "${GUEST_NAMES[i]}")" == "shut off" ]]; then
-      echo "$(date) ${GUEST_NAMES[i]} is shut off after the installation, redefining from disk XML and starting"
+      echo "$(date) ${GUEST_NAMES[i]} is shut off after install, redefining from disk XML and starting"
       ${VIRSH} undefine "${GUEST_NAMES[i]}" >/dev/null 2>&1 || true
       ${VIRSH} define "/tmp/${GUEST_NAMES[i]}-disk.xml"
       ${VIRSH} start "${GUEST_NAMES[i]}"

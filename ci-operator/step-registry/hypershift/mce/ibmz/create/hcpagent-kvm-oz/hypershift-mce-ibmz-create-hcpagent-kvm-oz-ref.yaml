@@ -27,16 +27,7 @@ ref:
     documentation: Size of the root disk of each KVM guest.
   - name: POOL_NAME
     default: "multiarch-ci-pool"
-    documentation: Libvirt storage pool where the kernel, initrd and guest disks are created.
-  - name: LIBVIRT_IMAGE_PATH
-    default: "/var/lib/libvirt/openshift-images"
-    documentation: Directory on the libvirt host used as the target for newly created storage pools.
-  - name: HTTPD_POOL_NAME
-    default: "httpd"
-    documentation: Libvirt storage pool served over HTTP by the libvirt host. The rootfs is staged here. Created under LIBVIRT_IMAGE_PATH if it does not exist.
-  - name: HTTPD_PORT
-    default: ""
-    documentation: HTTP port serving HTTPD_POOL_NAME on the libvirt host. If empty, the httpd-port of the lease config is used.
+    documentation: Libvirt storage pool where the discovery ISO and guest disks are created.
   - name: GUEST_NETWORK
     default: ""
     documentation: |-
@@ -47,12 +38,12 @@ ref:
     default: "false"
     documentation: Must match the value used when the management cluster was created.
   documentation: |-
-    Creates KVM guests on the libvirt host of the leased resource, PXE boots them (direct
-    kernel and initrd boot) from the boot artifacts of the InfraEnv created by
-    hypershift-mce-ibmz-create-hcpagent-oz, and attaches them to the hosted cluster as agents.
-    The kernel and initrd are uploaded to the libvirt pool and the rootfs is staged in the
-    httpd pool, from where the guests fetch it over plain HTTP. The guests register as Agents,
-    are approved and the nodepool is scaled. After the installation the guests power off on
-    reboot and are started again from disk. The guests and volumes contain the leased
-    resource name in their names, so upi-libvirt-cleanup-post removes them.
+    Creates KVM guests on the libvirt host of the leased resource, boots them from the
+    discovery ISO of the InfraEnv created by hypershift-mce-ibmz-create-hcpagent-oz, and
+    attaches them to the hosted cluster as agents.
+    The ISO is downloaded from the InfraEnv isoDownloadURL and uploaded to the libvirt pool.
+    Guests boot from the ISO (virtio-scsi cdrom), register as Agents, are approved and the
+    nodepool is scaled. After the installation the guest powers off; it is then redefined
+    without the cdrom and started from disk. Guests and volumes contain the leased resource
+    name so upi-libvirt-cleanup-post removes them.
     Runs after hypershift-mce-ibmz-create-hcpagent-oz.
