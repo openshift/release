@@ -1,4 +1,20 @@
 base_images:
+  centos-stream10:
+    name: centos
+    namespace: openshift
+    tag: stream10
+  metallb-frr:
+    name: "4.22"
+    namespace: ocp
+    tag: metallb-frr
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  prometheus-node-exporter:
+    name: "4.22"
+    namespace: ocp
+    tag: prometheus-node-exporter
   ubi-python:
     name: ubi-python-312
     namespace: ocp
@@ -10,6 +26,12 @@ images:
   - dockerfile_path: Dockerfile.ci
     from: ubi-python
     to: ansible-test-runner
+  - dockerfile_literal: |
+      FROM nested-podman
+      USER 0
+      RUN dnf -y install skopeo openssh-clients && dnf clean all
+    from: nested-podman
+    to: evpn-vm-tools
 releases:
   latest:
     integration:
@@ -28,12 +50,15 @@ tests:
   container:
     from: ansible-test-runner
 - always_run: false
-  as: aws-vm-rhel10
+  as: aws-vm-e2e
+  capabilities:
+  - nested-podman
+  nested_podman: true
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_AMI: ami-0da467f007dfebd6b
-      EC2_INSTANCE_TYPE: c5n.metal
+      EC2_INSTANCE_TYPE: m6i.xlarge
       EC2_REGION: us-west-2
       REGION: us-west-2
     post:
@@ -41,19 +66,7 @@ tests:
     pre:
     - chain: openshift-image-based-infra-aws-ec2
     test:
-    - as: smoke
-      commands: |
-        set -euo pipefail
-        ip=$(cat "${SHARED_DIR}/public_address")
-        user=$(cat "${SHARED_DIR}/ssh_user")
-        ssh -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
-          -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-          "${user}@${ip}" 'cat /etc/os-release && sudo dnf install -y podman && podman version'
-      from: ansible-test-runner
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: openshift-evpn-gateway-appliance-aws-vm-e2e
 zz_generated_metadata:
   branch: main
   org: openshift

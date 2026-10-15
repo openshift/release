@@ -6,19 +6,20 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build12
-    context: ci/prow/aws-vm-rhel10
+    context: ci/prow/aws-vm-e2e
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.ci
     labels:
+      capability/nested-podman: nested-podman
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-evpn-gateway-appliance-main-aws-vm-rhel10
-    rerun_command: /test aws-vm-rhel10
+    name: pull-ci-openshift-evpn-gateway-appliance-main-aws-vm-e2e
+    rerun_command: /test aws-vm-e2e
     spec:
       containers:
       - args:
@@ -31,7 +32,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=aws-vm-rhel10
+        - --target=aws-vm-e2e
         command:
         - ci-operator
         env:
@@ -102,7 +103,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(aws-vm-rhel10|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(aws-vm-e2e|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

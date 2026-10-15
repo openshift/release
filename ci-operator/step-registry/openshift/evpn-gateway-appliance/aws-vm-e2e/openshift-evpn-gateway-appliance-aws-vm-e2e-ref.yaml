@@ -1,0 +1,42 @@
+ref:
+  as: openshift-evpn-gateway-appliance-aws-vm-e2e
+  from: evpn-vm-tools
+  commands: openshift-evpn-gateway-appliance-aws-vm-e2e-commands.sh
+  credentials:
+  - namespace: test-credentials
+    bundle: registry-pull-credentials
+    mount_path: /var/run/registry-pull-credentials
+  nested_podman: true
+  grace_period: 30m
+  dependencies:
+  - name: metallb-frr
+    env: FRR_IMAGE
+  - name: prometheus-node-exporter
+    env: NODE_EXPORTER_IMAGE
+  - name: centos-stream10
+    env: EE_BASE_IMAGE
+  resources:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  env:
+  - name: EVPN_APPLIANCE_PR
+    default: "22"
+    documentation: |-
+      GitHub pull request number to fetch from openshift/evpn-gateway-appliance.
+  - name: EVPN_APPLIANCE_REPO
+    default: https://github.com/openshift/evpn-gateway-appliance
+    documentation: Appliance repository the pull request is fetched from.
+  - name: APPLIANCE_BASE_IMAGE
+    default: quay.io/centos-bootc/centos-bootc:stream10
+    documentation: |-
+      Bootc base for the appliance image. Not mirrored in the CI registry (so not a
+      base_images dependency like the others); exported from public quay by run_remote.sh.
+  documentation: >-
+    Canary for the appliance PR's emulated EVPN e2e lane. In this nested-podman pod
+    it fetches the PR, builds the CI image from it (podman build Dockerfile.ci), and
+    runs the PR's test/e2e/run_remote.sh in remote mode against the EC2 VM, passing
+    that PR-built CI image as CI_IMAGE. FRR_IMAGE, NODE_EXPORTER_IMAGE and EE_BASE_IMAGE
+    come from the base_images dependencies; APPLIANCE_BASE_IMAGE from public quay.
