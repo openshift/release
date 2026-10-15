@@ -1,0 +1,27 @@
+ref:
+  as: tls-scanner-network-policy
+  from: cli
+  cli: latest
+  commands: tls-scanner-network-policy-commands.sh
+  env:
+  - name: SCAN_NAMESPACE
+    documentation: |-
+      Namespace to apply the test-scoped allow NetworkPolicy in (the namespace
+      holding the workload the TLS scanner must reach). Required.
+  - name: TLS_SCANNER_POD_SELECTOR
+    default: ""
+    documentation: |-
+      Optional label selector (oc -l syntax). When set, the step fails unless at
+      least one matching pod exists in SCAN_NAMESPACE; callers use it to assert a
+      specific workload (e.g. an operand controller-manager) is present before
+      scanning. Empty requires any pod.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 5m0s
+  documentation: |-
+    Applies a test-scoped, additive NetworkPolicy (allow-tls-scanner) that lets
+    the host-network TLS scanner reach pods in SCAN_NAMESPACE whose component
+    ingress NetworkPolicies would otherwise deny it. Scoped to SCAN_NAMESPACE,
+    torn down with it, and deliberately NOT part of product manifests.
