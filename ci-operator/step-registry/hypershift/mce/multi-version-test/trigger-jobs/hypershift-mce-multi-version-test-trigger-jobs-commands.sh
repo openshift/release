@@ -26,14 +26,14 @@ GANGWAY_API=${GANGWAY_API:-"https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com
 # Each MCE supports the latest three HostedCluster versions
 # The key is the MCE version and the value is the HostedCluster versions
 declare -A mce_to_guest=(
-    [5.0]="4.22 4.23 5.0"
+    [5.0]="4.21 4.22 5.0"
 )
 
 # Each MCE is available on the latest hub version and two versions back
 # The key is the hub version and the value is the MCE version
 declare -A hub_to_mce=(
+    [4.21]="5.0"
     [4.22]="5.0"
-    [4.23]="5.0"
     [5.0]="5.0"
 )
 
