@@ -11,6 +11,10 @@ AGENT_NAMESPACE=$(cat "$SHARED_DIR/nutanix_agent_namespace")
 RUN_LABEL_KEY=ci.openshift.io/hcp-agent-nutanix-run
 IMAGE_NAME="$INFRAENV_NAME.iso"
 WORK_DIR=/tmp/hcp-agent-nutanix
+if [[ ! "${NUTANIX_WORKERS:-}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "NUTANIX_WORKERS must be a positive integer."
+  exit 1
+fi
 if [[ -n "${AGENT_QE_INFRA_ANSIBLE_DIR:-}" ]]; then
   ANSIBLE_FILES_DIR=${AGENT_QE_INFRA_ANSIBLE_DIR}
 else
@@ -37,7 +41,10 @@ function gather_failure_diagnostics() {
 trap gather_failure_diagnostics EXIT
 
 mkdir -p "$WORK_DIR"
-printf '%s\n' "$CLUSTER_NAME-worker-0" "$CLUSTER_NAME-worker-1" "$CLUSTER_NAME-worker-2" > "$SHARED_DIR/hostnames.txt"
+: > "$SHARED_DIR/hostnames.txt"
+for ((worker_index = 0; worker_index < NUTANIX_WORKERS; worker_index++)); do
+  printf '%s\n' "$CLUSTER_NAME-worker-$worker_index" >> "$SHARED_DIR/hostnames.txt"
+done
 cp "$SHARED_DIR/hostnames.txt" "$SHARED_DIR/nutanix_worker_names"
 printf '%s\n' "$IMAGE_NAME" > "$SHARED_DIR/nutanix_image_name"
 : > "$SHARED_DIR/vm_uuids.txt"
@@ -101,8 +108,8 @@ if (( ansible_status != 0 )); then
 fi
 
 recover_recorded_ids
-if [[ $(wc -l < "$SHARED_DIR/vm_uuids.txt") -ne 3 || ! -s "$SHARED_DIR/image_uuid.txt" ]]; then
-  echo "Nutanix provisioning did not record exactly three worker UUIDs and one image UUID."
+if [[ $(wc -l < "$SHARED_DIR/vm_uuids.txt") -ne "$NUTANIX_WORKERS" || ! -s "$SHARED_DIR/image_uuid.txt" ]]; then
+  echo "Nutanix provisioning did not record exactly $NUTANIX_WORKERS worker UUIDs and one image UUID."
   exit 1
 fi
 
@@ -125,18 +132,18 @@ agents=""
 while (( SECONDS < agent_deadline )); do
   agents=$(matching_agents)
   agent_count=$(awk 'NF { count++ } END { print count + 0 }' <<<"$agents")
-  if (( agent_count > 3 )); then
-    echo "InfraEnv $INFRAENV_NAME selected $agent_count Agents; expected exactly three."
+  if (( agent_count > NUTANIX_WORKERS )); then
+    echo "InfraEnv $INFRAENV_NAME selected $agent_count Agents; expected exactly $NUTANIX_WORKERS."
     exit 1
   fi
-  if (( agent_count == 3 )); then
+  if (( agent_count == NUTANIX_WORKERS )); then
     break
   fi
-  echo "Waiting for three Agents associated with InfraEnv $INFRAENV_NAME; found $agent_count."
+  echo "Waiting for $NUTANIX_WORKERS Agents associated with InfraEnv $INFRAENV_NAME; found $agent_count."
   sleep 30
 done
-if [[ $(awk 'NF { count++ } END { print count + 0 }' <<<"$agents") -ne 3 ]]; then
-  echo "Timed out waiting for the three InfraEnv Agents."
+if [[ $(awk 'NF { count++ } END { print count + 0 }' <<<"$agents") -ne "$NUTANIX_WORKERS" ]]; then
+  echo "Timed out waiting for the $NUTANIX_WORKERS InfraEnv Agents."
   exit 1
 fi
 
@@ -170,14 +177,14 @@ while IFS=$'\t' read -r vm_name vm_uuid vm_mac; do
   printf '%s\t%s\t%s\t%s\n' "$matched_agent" "$agent_hostname" "$vm_name" "$vm_mac" >> "$map_file"
 done < "$SHARED_DIR/nutanix_worker_vms.tsv"
 
-if [[ "$mapped_count" -ne 3 ]]; then
-  echo "The run's three VM NICs did not map to three distinct Agents."
+if [[ "$mapped_count" -ne "$NUTANIX_WORKERS" ]]; then
+  echo "The run's $NUTANIX_WORKERS VM NICs did not map to $NUTANIX_WORKERS distinct Agents."
   exit 1
 fi
 
 selected_count=$(oc get agents -n "$AGENT_NAMESPACE" -l "$RUN_LABEL_KEY=$CLUSTER_NAME" --no-headers | wc -l)
-if [[ "$selected_count" -ne 3 ]]; then
-  echo "The run label matched $selected_count Agents; expected exactly three."
+if [[ "$selected_count" -ne "$NUTANIX_WORKERS" ]]; then
+  echo "The run label matched $selected_count Agents; expected exactly $NUTANIX_WORKERS."
   exit 1
 fi
 
@@ -188,7 +195,7 @@ for agent in $agents; do
   oc patch agent "$agent" -n "$AGENT_NAMESPACE" --type=merge -p '{"spec":{"approved":true}}'
 done
 
-oc scale nodepool "$CLUSTER_NAME" -n local-cluster --replicas=3
+oc scale nodepool "$CLUSTER_NAME" -n local-cluster --replicas="$NUTANIX_WORKERS"
 oc wait agents -n "$AGENT_NAMESPACE" -l "$RUN_LABEL_KEY=$CLUSTER_NAME" \
   --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=60m
 
@@ -198,18 +205,18 @@ while (( SECONDS < node_deadline )); do
   nodes_json=$(oc get nodes -o json)
   node_count=$(jq '.items | length' <<<"$nodes_json")
   ready_count=$(jq '[.items[] | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))] | length' <<<"$nodes_json")
-  if (( node_count > 3 )); then
-    echo "The HostedCluster has $node_count Nodes; expected exactly three."
+  if (( node_count > NUTANIX_WORKERS )); then
+    echo "The HostedCluster has $node_count Nodes; expected exactly $NUTANIX_WORKERS."
     exit 1
   fi
-  if (( node_count == 3 && ready_count == 3 )); then
+  if (( node_count == NUTANIX_WORKERS && ready_count == NUTANIX_WORKERS )); then
     break
   fi
-  echo "Waiting for three Ready HostedCluster Nodes; found $ready_count/$node_count."
+  echo "Waiting for $NUTANIX_WORKERS Ready HostedCluster Nodes; found $ready_count/$node_count."
   sleep 30
 done
-if [[ "$node_count" -ne 3 || "$ready_count" -ne 3 ]]; then
-  echo "Timed out waiting for all three HostedCluster worker Nodes to become Ready."
+if [[ "$node_count" -ne "$NUTANIX_WORKERS" || "$ready_count" -ne "$NUTANIX_WORKERS" ]]; then
+  echo "Timed out waiting for all $NUTANIX_WORKERS HostedCluster worker Nodes to become Ready."
   exit 1
 fi
 
@@ -224,4 +231,4 @@ for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
 done
 
 rm -f "$SHARED_DIR/hcp-agent-nutanix.iso"
-printf 'Provisioned three run-owned Nutanix workers; Agents joined and guest Nodes are Ready.\n'
+printf 'Provisioned %s run-owned Nutanix workers; Agents joined and guest Nodes are Ready.\n' "$NUTANIX_WORKERS"

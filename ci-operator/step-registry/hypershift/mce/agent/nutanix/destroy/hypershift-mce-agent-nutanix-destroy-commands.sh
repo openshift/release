@@ -93,7 +93,11 @@ fi
 [[ -f "$SHARED_DIR/image_uuid.txt" ]] || : > "$SHARED_DIR/image_uuid.txt"
 
 recorded_vm_count=$(awk '/^[0-9a-fA-F-]{36}$/ { count++ } END { print count + 0 }' "$SHARED_DIR/vm_uuids.txt")
-if [[ -s "$SHARED_DIR/nutanix_worker_names" ]] && (( recorded_vm_count < 3 )); then
+expected_vm_count=0
+if [[ -s "$SHARED_DIR/nutanix_worker_names" ]]; then
+  expected_vm_count=$(awk 'NF { count++ } END { print count + 0 }' "$SHARED_DIR/nutanix_worker_names")
+fi
+if (( recorded_vm_count < expected_vm_count )); then
   response=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
     -H 'Content-Type: application/json' -X POST "$NUTANIX_PC_URL/api/nutanix/v3/vms/list" \
     --data '{"kind":"vm","length":500}')
