@@ -252,6 +252,25 @@ EOF
 oc wait --timeout=5m --for=condition=DeploymentsHealthy agentserviceconfig agent
 echo "$(date) AgentServiceConfig is ready"
 
+# --- Debug dump helper — called on failure for easier diagnosis ---
+function dump_debug () {
+  echo "$(date) DEBUG: Management cluster state"
+  oc get no || true
+  oc get hc -A || true
+  oc describe hc -n "${HC_NS}" "${HC_NAME}" || true
+  oc get hc -n "${HC_NS}" "${HC_NAME}" \
+    -o jsonpath='{.status.conditions}' | jq . || true
+  echo "$(date) DEBUG: NodePool status"
+  oc get nodepool -A || true
+  oc describe nodepool -n "${HC_NS}" || true
+  echo "$(date) DEBUG: HCP control plane pods"
+  oc get po -n "${hcp_ns}" || true
+  echo "$(date) DEBUG: Events in control plane namespace"
+  oc get events -n "${hcp_ns}" --sort-by='.lastTimestamp' | tail -50 || true
+  echo "$(date) DEBUG: Agents"
+  oc get agents -n "${hcp_ns}" -o wide || true
+}
+
 # Creating agent hosted cluster manifests
 echo "$(date) Creating agent hosted cluster manifests"
 oc create ns "${HC_NS}" || true
@@ -274,10 +293,63 @@ hcp create cluster agent \
 
 echo "$(date) Rendered HCP agent manifests to ${HC_MANIFEST}"
 
+# --- Pre-patch spec.services[APIServer] → NodePort before applying ---
+# CPO reads this from the HostedCluster and creates the kube-apiserver Service
+# as NodePort:FIXED_NODEPORT from the start — no post-apply race with the reconciler.
+echo "$(date) Pre-patching HostedCluster spec.services[APIServer] → NodePort ${MGMT_HOST_IP}:${FIXED_NODEPORT}"
+python3 - "${HC_MANIFEST}" "${MGMT_HOST_IP}" "${FIXED_NODEPORT}" <<'PYEOF'
+import sys, re
+manifest_path  = sys.argv[1]
+mgmt_host_ip   = sys.argv[2]
+fixed_nodeport = int(sys.argv[3])
+
+with open(manifest_path) as f:
+    raw = f.read()
+
+docs = re.split(r'\n---[ \t]*\n', '\n' + raw)
+patched = []
+for doc in docs:
+    if not doc.strip() or doc.strip() == 'null':
+        continue
+    is_hc = (bool(re.search(r'^\s*kind:\s*HostedCluster\s*$', doc, re.MULTILINE)) and
+             bool(re.search(r'^\s*name:\s*\S+', doc, re.MULTILINE)))
+    if is_hc:
+        replacement = (
+            f'- service: APIServer\n'
+            f'    servicePublishingStrategy:\n'
+            f'      type: NodePort\n'
+            f'      nodePort:\n'
+            f'        address: {mgmt_host_ip}\n'
+            f'        port: {fixed_nodeport}'
+        )
+        doc = re.sub(
+            r'-\s*service:\s*APIServer\s*\n\s*servicePublishingStrategy:\s*\n\s*type:\s*\S+',
+            replacement,
+            doc,
+        )
+        print(f"  [patch] HostedCluster spec.services[APIServer] → NodePort {mgmt_host_ip}:{fixed_nodeport}",
+              file=sys.stderr)
+    patched.append(doc.strip('\n'))
+
+with open(manifest_path, 'w') as f:
+    f.write('\n---\n'.join(patched) + '\n')
+PYEOF
+
+echo "$(date) HostedCluster spec.services after patch:"
+python3 -c "
+import re, sys
+raw = open(sys.argv[1]).read()
+for doc in re.split(r'\n---[ \t]*\n', '\n' + raw):
+    if doc.strip() and re.search(r'kind:[ \t]*HostedCluster', doc):
+        m = re.search(r'services:.*', doc, re.DOTALL)
+        if m:
+            print(doc[m.start():m.start()+400])
+" "${HC_MANIFEST}" || true
+
 echo "$(date) Applying HCP agent manifests"
 oc apply -f "${HC_MANIFEST}"
 
-# --- Pin the kube-apiserver Service NodePort to FIXED_NODEPORT ---
+# --- Wait for kube-apiserver Service and verify it is NodePort:FIXED_NODEPORT ---
 KAPI_SVC_NS="${hcp_ns}"
 KAPI_SVC_NAME="kube-apiserver"
 
@@ -293,15 +365,36 @@ done
 
 if ! oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" &>/dev/null; then
   echo "$(date) ERROR: Service ${KAPI_SVC_NAME} did not appear within 10 minutes"
+  dump_debug
   exit 1
 fi
 
-echo "$(date) Patching ${KAPI_SVC_NAME} port[0].nodePort → ${FIXED_NODEPORT}"
-oc patch svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" --type=json \
-  -p "[{\"op\":\"replace\",\"path\":\"/spec/ports/0/nodePort\",\"value\":${FIXED_NODEPORT}}]"
-echo "$(date) NodePort pinned to ${FIXED_NODEPORT} on Service ${KAPI_SVC_NAME}"
+echo "$(date) DEBUG: kube-apiserver Service (full YAML):"
+oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" -o yaml || true
 
-oc wait --timeout=45m --for=condition=Available --namespace="${HC_NS}" hostedclusters.hypershift.openshift.io/"${HC_NAME}"
+SVC_TYPE=$(oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" \
+  -o jsonpath='{.spec.type}' 2>/dev/null || true)
+SVC_NODEPORT=$(oc get svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" \
+  -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || true)
+
+echo "$(date) kube-apiserver Service checks:"
+echo "  spec.type     = ${SVC_TYPE}     (want: NodePort)"
+echo "  spec.nodePort = ${SVC_NODEPORT} (want: ${FIXED_NODEPORT})"
+
+if [[ "${SVC_TYPE}" == "NodePort" && "${SVC_NODEPORT}" == "${FIXED_NODEPORT}" ]]; then
+  echo "$(date) ✓ kube-apiserver Service is NodePort:${FIXED_NODEPORT} — HAProxy on ${MGMT_HOST_IP} will forward correctly"
+else
+  echo "$(date) WARNING: Service not as expected — falling back to oc patch"
+  oc patch svc "${KAPI_SVC_NAME}" -n "${KAPI_SVC_NS}" --type=json \
+    -p "[{\"op\":\"replace\",\"path\":\"/spec/ports/0/nodePort\",\"value\":${FIXED_NODEPORT}}]"
+  echo "$(date) NodePort patched to ${FIXED_NODEPORT} on Service ${KAPI_SVC_NAME}"
+fi
+
+if ! oc wait --timeout=45m --for=condition=Available --namespace="${HC_NS}" hostedclusters.hypershift.openshift.io/"${HC_NAME}"; then
+  echo "$(date) ERROR: HostedCluster did not become Available within 45 minutes"
+  dump_debug
+  exit 1
+fi
 echo "$(date) Agent hosted cluster is available"
 
 # Applying InfraEnv
