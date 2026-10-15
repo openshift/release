@@ -91,7 +91,13 @@ EOF
 
 echo "Configure IPAddressPool in different network environments separately."
 if [[ $IP_STACK == "v4" ]]; then
-  METALLB_INGRESS_VIP="${NUTANIX_INGRESS_VIP:-192.168.111.30}"
+  if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+    set +x
+    METALLB_INGRESS_VIP=$(source "${SHARED_DIR}/nutanix_context.sh" && printf '%s' "${INGRESS_VIP:?}")
+    set -x
+  else
+    METALLB_INGRESS_VIP=192.168.111.30
+  fi
   oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool

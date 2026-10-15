@@ -3,12 +3,12 @@ workflow:
   documentation: |-
     Runs HyperShift conformance against an Agent HostedCluster whose NodePool workers are
     Nutanix VMs booted from the MCE InfraEnv discovery ISO. The existing baremetal-backed management
-    cluster and MCE setup remain unchanged; Nutanix VMs host only guest workers.
+    cluster and MCE setup remain unchanged; Nutanix VMs host only guest workers. The ingress VIP
+    is derived from the leased Nutanix subnet rather than supplied by the scheduling job.
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     pre:
-    - ref: hypershift-mce-agent-nutanix-preflight
     - chain: baremetalds-ofcir-pre
     - ref: enable-qe-catalogsource
     - ref: deploy-konflux-operator
@@ -42,7 +42,6 @@ workflow:
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
       IP_STACK: v4
-      NUTANIX_INGRESS_VIP: ""
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NUM_WORKERS=4
