@@ -222,6 +222,14 @@ for (( i=0; i<COMPUTE_COUNT_LEASE; i++ )); do
 EOF
 done
 
+for (( i=0; i<ADD_COMPUTE_COUNT_LEASE; i++ )); do
+  add_ip="$(leaseLookup "\"additional-compute\"[$i].ip")"
+  add_mac="$(leaseLookup "\"additional-compute\"[$i].mac")"
+  cat >> "${SHARED_DIR}/network.xml" << EOF
+      <host mac='${add_mac}' name='additional-compute-${i}.${BASE_URL}' ip='${add_ip}'/>
+EOF
+done
+
 cat >> "${SHARED_DIR}/network.xml" << EOF
     </dhcp>
   </ip>
