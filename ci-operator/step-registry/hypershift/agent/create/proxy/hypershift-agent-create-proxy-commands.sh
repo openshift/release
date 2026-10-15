@@ -20,11 +20,28 @@ for portfile in "${SHARED_DIR}"/hosted_*_port; do
 done
 echo "Extra hosted cluster service ports for squid: ${EXTRA_PORTS}"
 
+NUTANIX_PROXY=false
+if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  routes_json=$(oc get routes -A -o json)
+  hosts=$(jq -r '.items[] | select(.metadata.namespace == "multicluster-engine" or .metadata.namespace == "openshift-multicluster-engine") | select((((.metadata.name // "") + " " + (.spec.to.name // "")) | test("assisted.*(service|image)|service.*assisted"; "i"))) | .spec.host // empty' <<<"${routes_json}" | sort -u)
+  if [[ -z "${hosts}" ]]; then
+    echo "No Assisted Service route was discovered; refusing to broaden the Squid ACL."
+    exit 1
+  fi
+
+  printf '%s\n' "${hosts}" > "${SHARED_DIR}/nutanix_squid_allowed_hosts"
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/nutanix_squid_allowed_hosts" "root@${IP}:/tmp/nutanix_squid_allowed_hosts"
+  NUTANIX_PROXY=true
+fi
+
 # shellcheck disable=SC2087
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- ${EXTRA_PORTS} << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${NUTANIX_PROXY}" ${EXTRA_PORTS} << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 set -x
 
 # Collect extra ports passed as arguments
+NUTANIX_PROXY=$1
+shift
 EXTRA_PORTS=("$@")
 
 API_URL=$(yq -r ".clusters[0].cluster.server" nested_kubeconfig)
@@ -48,6 +65,24 @@ for port in "${EXTRA_PORTS[@]}"; do
     sed -i "s|^acl allowed_ssl_ports port.*|& $port|" $HOME/squid.conf
   fi
 done
+
+if [[ "${NUTANIX_PROXY}" == "true" ]]; then
+  if [[ ! -s /tmp/nutanix_squid_allowed_hosts ]]; then
+    echo "The Nutanix Squid destination list is missing."
+    exit 1
+  fi
+  while IFS= read -r host; do
+    [[ -n "${host}" ]] || continue
+    if [[ ! "${host}" =~ ^[A-Za-z0-9.-]+$ ]]; then
+      echo "Refusing invalid Squid destination ${host}"
+      exit 1
+    fi
+    if ! grep -Fq " ${host}" "$HOME/squid.conf"; then
+      sed -i "1 s|$| ${host}|" "$HOME/squid.conf" || exit 1
+    fi
+  done < /tmp/nutanix_squid_allowed_hosts
+  rm -f /tmp/nutanix_squid_allowed_hosts
+fi
 cat $HOME/squid.conf
 
 sudo setenforce 0
