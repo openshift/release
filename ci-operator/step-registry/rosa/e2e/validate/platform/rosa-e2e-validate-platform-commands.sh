@@ -10,6 +10,15 @@ log() {
   echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
 
+# Private clusters ship proxy-conf.sh (written by rosa-cluster-credentials-backplane)
+# so e2e.test reaches the backplane-routed MC/SC APIs through the corp proxy.
+# No-op for public clusters.
+if [[ -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  log "Private cluster detected, sourcing proxy configuration"
+  # shellcheck disable=SC1091
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # Platform plane validates from the management cluster kubeconfig produced by
 # rosa-backplane-login. Without it there is nothing to validate here.
 MC_KUBECONFIG_FILE="${SHARED_DIR}/mc-kubeconfig"
