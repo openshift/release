@@ -23,7 +23,7 @@ if [[ -s "$SHARED_DIR/nutanix_infraenv_name" && -s "$SHARED_DIR/nutanix_agent_na
   oc get infraenv "$INFRAENV_NAME" -n "$AGENT_NAMESPACE" -o json | jq '{metadata:{name:.metadata.name,namespace:.metadata.namespace,labels:.metadata.labels},spec:{cpuArchitecture:.spec.cpuArchitecture,pullSecretRef:.spec.pullSecretRef,proxy:.spec.proxy},status:{conditions:.status.conditions}}' > "$ARTIFACT_DIR/nutanix-infraenv.json" 2>&1 || true
 fi
 
-for file in nutanix_worker_names nutanix_worker_vms.tsv nutanix_agent_vm_mapping.tsv nutanix_lease_resource nutanix_squid_allowed_hosts; do
+for file in nutanix_worker_names nutanix_worker_vms.tsv nutanix_agent_vm_mapping.tsv nutanix_squid_allowed_hosts; do
   if [[ -s "$SHARED_DIR/$file" ]]; then
     cp "$SHARED_DIR/$file" "$ARTIFACT_DIR/$file"
   fi

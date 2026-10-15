@@ -7,38 +7,12 @@ if [[ "${IP_STACK:-v4}" != "v4" ]]; then
   exit 1
 fi
 
-source "${LEASE_PROXY_CLIENT_SH}"
-
-if [[ -z "${LEASE_PROXY_SERVER_URL:-}" ]]; then
-  echo "LEASE_PROXY_SERVER_URL is required to acquire the Nutanix quota-slice lease."
+if [[ -z "${NUTANIX_QUOTA_SLICE:-}" ]]; then
+  echo "NUTANIX_QUOTA_SLICE is required from the workflow lease."
   exit 1
 fi
 
-if [[ -s "${SHARED_DIR}/nutanix_lease_resource" ]]; then
-  echo "A Nutanix lease is already recorded for this run."
-  exit 1
-fi
-
-lease_handle=$(lease__acquire --type=nutanix-quota-slice --scope=step)
-lease_recorded=false
-function release_unrecorded_lease() {
-  if [[ "${lease_recorded}" != "true" && -n "${lease_handle:-}" ]]; then
-    lease__release --handle="${lease_handle}" || true
-  fi
-  rm -f "${lease_handle:-}" "${lease_handle:-}.lock"
-}
-trap release_unrecorded_lease EXIT
-lease_resource=$(lease__cat --handle="${lease_handle}" --format=plain)
-
-if [[ ! "${lease_resource}" =~ ^nutanix-segment-[0-9]+$ ]]; then
-  echo "The Nutanix lease returned an unexpected resource name: ${lease_resource}"
-  lease__release --handle="${lease_handle}" || true
-  exit 1
-fi
-
-printf '%s\n' "${lease_resource}" > "${SHARED_DIR}/nutanix_lease_resource"
-chmod 600 "${SHARED_DIR}/nutanix_lease_resource"
-lease_recorded=true
+lease_resource=${NUTANIX_QUOTA_SLICE}
 
 auth_file=/var/run/vault/nutanix/secrets.sh
 if [[ ! -r "${auth_file}" ]]; then
@@ -103,7 +77,6 @@ printf 'export SUBNET_NAME=%q\n' "${subnet_name}" >> "${context_tmp}"
 printf 'export SUBNET_IP=%q\n' "${subnet_ip}" >> "${context_tmp}"
 printf 'export INGRESS_VIP=%q\n' "${ingress_vip}" >> "${context_tmp}"
 printf 'export NUTANIX_PC_URL=%q\n' "${pc_url}" >> "${context_tmp}"
-printf 'export NUTANIX_LEASED_RESOURCE=%q\n' "${lease_resource}" >> "${context_tmp}"
 chmod 600 "${context_tmp}"
 mv "${context_tmp}" "${SHARED_DIR}/nutanix_context.sh"
 
