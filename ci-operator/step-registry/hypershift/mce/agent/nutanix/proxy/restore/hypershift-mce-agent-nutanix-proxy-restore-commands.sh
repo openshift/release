@@ -3,7 +3,6 @@
 set -euo pipefail
 
 original="${SHARED_DIR}/nutanix_squid_original.conf"
-trap 'status=$?; if (( status != 0 )); then printf "Nutanix Squid configuration restoration failed.\\n" >> "${SHARED_DIR}/nutanix_cleanup_failed"; fi' EXIT
 if [[ ! -s "${original}" ]]; then
   echo "No original Squid configuration was recorded; nothing to restore."
   exit 0

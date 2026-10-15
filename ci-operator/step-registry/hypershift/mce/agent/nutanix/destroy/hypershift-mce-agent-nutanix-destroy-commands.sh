@@ -6,7 +6,7 @@ set +x
 source "$LEASE_PROXY_CLIENT_SH"
 lease_file="$SHARED_DIR/nutanix_lease_resource"
 context_file="$SHARED_DIR/nutanix_context.sh"
-trap 'status=$?; if (( status != 0 )); then printf "Nutanix resource or lease cleanup failed.\\n" >> "$SHARED_DIR/nutanix_cleanup_failed"; else rm -f "$context_file"; fi' EXIT
+trap 'status=$?; if (( status == 0 )); then rm -f "$context_file"; fi' EXIT
 
 if [[ ! -s "$lease_file" ]]; then
   echo "No Nutanix lease was acquired."
