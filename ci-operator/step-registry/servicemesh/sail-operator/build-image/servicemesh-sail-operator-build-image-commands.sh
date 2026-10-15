@@ -131,23 +131,22 @@ oc set build-secret --push -n "${OCP_NAMESPACE}" "bc/${BUILD_NAME}" sail-quay-pu
 oc patch -n "${OCP_NAMESPACE}" "bc/${BUILD_NAME}" --type=merge -p \
   "{\"spec\":{\"strategy\":{\"dockerStrategy\":{\"buildArgs\":[{\"name\":\"TARGETARCH\",\"value\":\"${ARCH}\"}]}}}}"
 
-# Capture the next build number before starting so the post-start status check
-# can anchor to the specific Build object rather than using a label selector.
-NEXT_BUILD_NUM=$(( $(oc get -n "${OCP_NAMESPACE}" "bc/${BUILD_NAME}" -o jsonpath='{.status.lastVersion}' 2>/dev/null || echo 0) + 1 ))
-readonly NEXT_BUILD_NUM
+# Start the build and capture the exact Build reference (e.g. "build/sail-operator-ci-build-1").
+# Using --output=name avoids predicting the build number, so retries and any
+# concurrent builds on the same BC are handled correctly.
+echo "Starting build from local source tree..."
+STARTED_BUILD=$(oc start-build -n "${OCP_NAMESPACE}" "${BUILD_NAME}" --from-dir=. --output=name)
+readonly STARTED_BUILD
+echo "Build started: ${STARTED_BUILD}"
 
-echo "Starting build from local source tree (will be ${BUILD_NAME}-${NEXT_BUILD_NUM})..."
-oc start-build -n "${OCP_NAMESPACE}" "${BUILD_NAME}" --from-dir=. --follow
+# Stream build pod logs; blocks until the pod terminates.
+oc logs -n "${OCP_NAMESPACE}" -f "${STARTED_BUILD}" || true
 
-# --- Verify completion ---
-# oc start-build --follow exits non-zero on build failure, but the explicit check
-# guards against edge cases (e.g. connection drops masking a Failed status).
-# Anchored to NEXT_BUILD_NUM to avoid picking up a previous successful build.
-readonly STARTED_BUILD="${BUILD_NAME}-${NEXT_BUILD_NUM}"
-BUILD_STATUS=$(oc get -n "${OCP_NAMESPACE}" "build/${STARTED_BUILD}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+# --- Verify completion using the exact Build reference ---
+BUILD_STATUS=$(oc get -n "${OCP_NAMESPACE}" "${STARTED_BUILD}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
 if [[ "${BUILD_STATUS}" != "Complete" ]]; then
-  echo "ERROR: Build ${STARTED_BUILD} ended with status '${BUILD_STATUS}' (expected 'Complete')." >&2
-  oc get -n "${OCP_NAMESPACE}" "build/${STARTED_BUILD}" -o wide 2>/dev/null || true
+  echo "ERROR: ${STARTED_BUILD} ended with status '${BUILD_STATUS}' (expected 'Complete')." >&2
+  oc get -n "${OCP_NAMESPACE}" "${STARTED_BUILD}" -o wide 2>/dev/null || true
   exit 1
 fi
 

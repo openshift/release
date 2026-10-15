@@ -274,19 +274,6 @@ execute_local() {
   test_rc=$?
   echo "Test run (attempt ${attempt}) completed with exit code ${test_rc}"
 
-  if [[ "${test_rc}" -eq 137 ]]; then
-    collect_oom_debug_info
-  fi
-
-  if [ "${test_rc}" -ne 0 ] && [ "${OLM:-true}" = "true" ]; then
-    echo "=== OLM Diagnostic Information ==="
-    oc get pods -n sail-operator -o wide 2>/dev/null || true
-    oc get catalogsource -n sail-operator -o yaml 2>/dev/null || true
-    oc get subscription -n sail-operator -o yaml 2>/dev/null || true
-    oc get events -n sail-operator --sort-by='.lastTimestamp' 2>/dev/null || true
-    echo "=== End OLM Diagnostic ==="
-  fi
-
   # Artifacts are written directly to ARTIFACT_DIR by the test process; no oc cp needed.
   # Also check ./test_artifacts/ which some make targets use as the output directory.
   if [[ -d "./test_artifacts" ]]; then
