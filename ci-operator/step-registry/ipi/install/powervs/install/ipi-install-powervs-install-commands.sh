@@ -363,6 +363,91 @@ function init_ibmcloud() {
   export CLOUD_INSTANCE_ID
 }
 
+function update_subnet_nameservers() {
+  local install_pid=$1
+  local nameservers=${2:-"1.1.1.1"}
+  local timeout_seconds=1800  # 30 min timeout
+  local elapsed=0
+  local interval=1
+
+  echo "Starting PowerVS subnet watcher..."
+
+  # Resolve Infra ID from generated manifests
+  local infra_id=""
+  if [ -f "${SHARED_DIR}/install-config.yaml" ]; then
+    infra_id=$(yq-v4 eval '.metadata.name' "${SHARED_DIR}/install-config.yaml")
+  fi
+  if [ -z "${infra_id}" ] || [ "${infra_id}" == "null" ]; then
+    infra_id="${CLUSTER_NAME}"
+  fi
+  echo "Target cluster identifier: ${infra_id}"
+
+  # Poll until workspace is created and targeted
+  local workspace_crn=""
+  while [ ${elapsed} -lt ${timeout_seconds} ]; do
+    if ! kill -0 "${install_pid}" 2>/dev/null; then
+      echo "Installer process exited. Stopping subnet watcher."
+      return 0
+    fi
+
+    echo "Checking for PowerVS workspace (${elapsed}s elapsed)..."
+
+    # If service instance GUID was predefined:
+    if [ -n "${POWERVS_SERVICE_INSTANCE_ID:-}" ]; then
+      workspace_crn="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json 2>/dev/null | jq -r '.items[] | select((.type | contains("resource-instance")) and (.crn | contains("power-iaas"))) | .crn' | head -n 1)"
+    else
+      # If dynamically created by CAPI (${infra_id}-power-iaas or ${infra_id}-workspace)
+      workspace_crn="$(ibmcloud resource search "name:*${infra_id}*" --output json 2>/dev/null | jq -r '.items[] | select((.type | contains("resource-instance")) and (.crn | contains("power-iaas"))) | .crn' | head -n 1)"
+    fi
+
+    if [ -n "${workspace_crn}" ] && [ "${workspace_crn}" != "null" ]; then
+      echo "Found PowerVS workspace CRN: ${workspace_crn}"
+      ibmcloud pi workspace target "${workspace_crn}" >/dev/null 2>&1
+      break
+    fi
+
+    sleep ${interval}
+    elapsed=$((elapsed + interval))
+  done
+
+  # Poll until subnet/network is created in the workspace
+  local subnet_id=""
+  while [ ${elapsed} -lt ${timeout_seconds} ]; do
+    if ! kill -0 "${install_pid}" 2>/dev/null; then
+      echo "Installer process exited. Stopping subnet watcher."
+      return 0
+    fi
+
+    echo "Checking for PowerVS subnet in workspace (${elapsed}s elapsed)..."
+
+    # Check both standard PowerVS networks and DHCP subnets
+    subnet_id=$(ibmcloud pi subnet ls --json 2>/dev/null | jq -r '(.networks // .)[] | select(.name | test("DHCP"; "i")) | .networkID' | head -n 1)
+
+    if [ -n "${subnet_id}" ] && [ "${subnet_id}" != "null" ]; then
+      echo "Found PowerVS subnet ID: ${subnet_id}"
+      break
+    fi
+
+    sleep ${interval}
+    elapsed=$((elapsed + interval))
+  done
+
+  if [ -z "${subnet_id}" ] || [ "${subnet_id}" == "null" ]; then
+    echo "Subnet was not detected before timeout or installer completion."
+    return 1
+  fi
+
+  # Update the subnet with nameservers
+  echo "Updating subnet ${subnet_id} with nameservers: ${nameservers}..."
+  if ibmcloud pi subnet update "${subnet_id}" --dns-servers "${nameservers}"; then
+    echo "Subnet ${subnet_id} successfully updated with nameservers."
+  else
+    echo "Warning: Failed to update subnet ${subnet_id} nameservers."
+  fi
+
+  return 0
+}
+
 function check_resources() {
   #This function checks for any remaining DHCP leases/leftover/uncleaned resources and cleans them up before installing a new cluster
   echo "Check resource phase initiated"
@@ -965,8 +1050,17 @@ echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
 # Note: Redirect order matters - stdout first, then stderr to stdout, so both go through grep
 openshift-install --dir="${dir}" create cluster > >(grep --line-buffered -v 'password\|X-Auth-Token\|UserData:') 2>&1 &
 INSTALL_PID=$!
+
+# Launch the subnet watcher in background to update Nameserver entries
+update_subnet_nameservers "${INSTALL_PID}" "1.1.1.1,161.26.0.10" &
+WATCHER_PID=$!
+
 wait $INSTALL_PID
 ret=$?
+
+# Clean up watcher process if still running
+kill ${WATCHER_PID} 2>/dev/null || true
+
 echo "ret=${ret}"
 if [ ${ret} -gt 0 ]; then
   SKIP_WAIT_FOR=false
