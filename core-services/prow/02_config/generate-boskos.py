@@ -425,6 +425,11 @@ CONFIG = {
     'libvirt-s390x-vpn-arm64-quota-slice': {
         'libvirt-s390x-arm64-0-0': 1
     },
+    # Orange zone (OZ) VPN IPv6: additional 5th concurrent lease on lnxocp12 (LPAR12).
+    # vpn-oz keeps oz-1-0..oz-1-3; this profile adds vpn-ipv6-0-0 as new capacity.
+    'libvirt-s390x-vpn-ipv6-quota-slice': {
+        'libvirt-s390x-vpn-ipv6-0-0': 1
+    },
     'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-s390x-vpn-oz-quota-slice': {},
     'libvirt-s390x-vpn-hcp-quota-slice': {},
@@ -773,6 +778,9 @@ CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-3'] = 1
 # Z control-plane + compute on lnxocp11; day-2 workers on akvmocp03 / xkvmocp08.
 # GSM: arm64-0-0 ← oz-0-2; vpn-amd64-0-0 ← oz-0-3; vpn-amd64-0-1 ← oz-0-1.
 # vpn-oz retains oz-0-0 on lnxocp11.
+
+# IPv6 on OZ lnxocp12 (LPAR12): new 5th concurrent lease (vpn-oz keeps oz-1-0..oz-1-3).
+# GSM: libvirt-s390x-vpn-ipv6-0-0 hostname/IPs on lnxocp12.
 
 # Orange zone (OZ) kubevirt06 (0) + kubevirt07 (1), 1 HA + 1 SNO lease each
 for i in range(2):
