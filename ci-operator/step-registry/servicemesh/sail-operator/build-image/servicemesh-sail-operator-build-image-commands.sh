@@ -139,11 +139,24 @@ STARTED_BUILD=$(oc start-build -n "${OCP_NAMESPACE}" "${BUILD_NAME}" --from-dir=
 readonly STARTED_BUILD
 echo "Build started: ${STARTED_BUILD}"
 
-# Stream build pod logs; blocks until the pod terminates.
+# Stream build pod logs; returns when the build pod terminates.
+# Note: the Build API object may still show 'Running' briefly after the pod
+# exits while OpenShift updates the status — poll below to handle that lag.
 oc logs -n "${OCP_NAMESPACE}" -f "${STARTED_BUILD}" || true
 
-# --- Verify completion using the exact Build reference ---
-BUILD_STATUS=$(oc get -n "${OCP_NAMESPACE}" "${STARTED_BUILD}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+# --- Wait for terminal status, then verify ---
+# Poll up to 5 minutes (should settle within seconds in practice).
+BUILD_STATUS="Unknown"
+for _ in $(seq 1 60); do
+  BUILD_STATUS=$(oc get -n "${OCP_NAMESPACE}" "${STARTED_BUILD}" \
+    -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+  case "${BUILD_STATUS}" in
+    Complete|Failed|Error|Cancelled) break ;;
+  esac
+  echo "Build status: ${BUILD_STATUS} — waiting for terminal state..."
+  sleep 5
+done
+
 if [[ "${BUILD_STATUS}" != "Complete" ]]; then
   echo "ERROR: ${STARTED_BUILD} ended with status '${BUILD_STATUS}' (expected 'Complete')." >&2
   oc get -n "${OCP_NAMESPACE}" "${STARTED_BUILD}" -o wide 2>/dev/null || true
