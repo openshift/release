@@ -812,6 +812,30 @@ if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]] && [[ "$T5CI_JOB_TYPE" != "sno-ztp-c
     [ "$machines" -le "$nodes" ]
 fi
 
+# On SNO the sctp MachineConfig reboots the only node. If it is applied together with the
+# operators (as feature-deploy does), OLM bundle unpacking breaks during the reboot.
+# Apply it upfront and wait for the reboot to complete before deploying the other features.
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" || "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]] && [[ " $VALIDATIONS_FEATURES " == *" sctp "* ]]; then
+    echo "******** Pre-applying sctp MachineConfig on SNO"
+    sctp_mc=$(oc kustomize "feature-configs/${FEATURES_ENVIRONMENT}/sctp" | oc apply -o name -f - | grep machineconfig || true)
+    sctp_mc=${sctp_mc##*/}
+    if [[ -n "$sctp_mc" ]]; then
+        echo "Wait for MachineConfigPool master to roll out a rendered config including ${sctp_mc}"
+        sctp_rolled_out=false
+        for _ in $(seq 120); do
+            # status.configuration is only updated after all nodes run the new rendered config;
+            # errors are ignored since the API is unavailable while the node reboots
+            if oc get mcp master -o jsonpath='{.status.configuration.source[*].name}' 2>/dev/null | tr ' ' '\n' | grep -qx "${sctp_mc}" && \
+               [[ "$(oc get mcp master -o jsonpath='{.status.conditions[?(@.type=="Updated")].status}' 2>/dev/null)" == "True" ]]; then
+                sctp_rolled_out=true
+                break
+            fi
+            sleep 30
+        done
+        $sctp_rolled_out || echo "WARNING: ${sctp_mc} not rolled out to MachineConfigPool master after 60m"
+    fi
+fi
+
 echo "Wait for MachineConfigPools to finish updating (verifies node reboots are complete)"
 oc wait mcp --all --for='condition=UPDATED=True' --timeout=30m || echo "WARNING: not all MachineConfigPools have UPDATED=True after 30m"
 oc wait mcp --all --for='condition=UPDATING=False' --timeout=30m || echo "WARNING: some MachineConfigPools still UPDATING after 30m"
