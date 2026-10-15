@@ -262,9 +262,9 @@ else
     SNO_CLUSTER_API_PORT="6443"
 fi
 
-if [[ "$T5CI_VERSION" == "4.22" ]] || [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.0" ]] ; then
-    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.21"
-    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.21"
+if [[ "$T5CI_VERSION" == "5.0" ]] || [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.1" ]] ; then
+    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.22"
+    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.22"
 fi
 
 cat << EOF > ~/fetch-kubeconfig.yml
