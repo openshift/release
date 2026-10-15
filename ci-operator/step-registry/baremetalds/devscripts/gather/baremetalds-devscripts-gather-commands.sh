@@ -155,7 +155,7 @@ for node_name in "\${NODE_NAMES[@]}"
 do
   if [[ \$AGENT_MODE == true ]]; then
     node_ip=\$(awk -v name="\$node_name" '\$2 == name {print \$1; exit}' "\$OCP_DIR/hosts" 2>/dev/null) || node_ip=''
-    [[ -n \$node_ip ]] || echo "Agent inventory unavailable for \$node_name; not using DHCP"
+    [[ -n \$node_ip ]] || echo "Agent inventory unavailable for node entry; not using DHCP"
   else
     node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//host[@name='\$node_name']/@ip)" -)
   fi
@@ -169,7 +169,7 @@ if [[ \$AGENT_MODE == true ]]; then
     rendezvous_ip=\$(. agent/common.sh >/dev/null 2>&1 || exit; set +x; getRendezvousIP 2>/dev/null) || rendezvous_ip=''
   fi
   if [[ -n \$rendezvous_ip && " \${NODE_IPS[*]} " == *" \$rendezvous_ip "* ]]; then
-    echo "Agent rendezvous selected from retained helper/inventory: \$rendezvous_ip"
+    echo "Agent rendezvous selected from retained helper/inventory"
     ssh "\${INTERNAL_SSH_OPTS[@]}" "core@\$rendezvous_ip" TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap "\${NODE_IPS[@]}" &&
     scp "\${INTERNAL_SSH_OPTS[@]}" "core@\$(wrap_if_ipv6 "\$rendezvous_ip"):/tmp/log-bundle-bootstrap.tar.gz" /tmp/artifacts/log-bundle-bootstrap.tar.gz || true
   else
@@ -184,7 +184,7 @@ do
   if [[ \$AGENT_MODE == true ]]; then
     agent_status=0
     ssh "\${INTERNAL_SSH_OPTS[@]}" "core@\${NODE_IPS[\$n]}" 'command -v agent-gather >/dev/null || exit 127' || agent_status=\$?
-    echo "Agent collector availability \${NODE_NAMES[\$n]} \${NODE_IPS[\$n]} rc=\$agent_status (127: unavailable, 255: SSH failed)"
+    echo "Agent collector availability node \$n rc=\$agent_status (127: unavailable, 255: SSH failed)"
   fi
   HAS_PACEMAKER=\$(ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} sudo test -f /var/log/pacemaker/pacemaker.log && echo true || echo false)
   HAS_ETCD=\$(ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} sudo podman container exists etcd && echo true || echo false)
@@ -213,7 +213,11 @@ if [ "\$(cat logs/installer-status.txt)" == "0" ] ; then exit 0 ; fi
 # Collect sos report from each known node
 for NODE_IP in \${NODE_IPS[@]}; do
   [[ -n \$NODE_IP ]] || continue
-  echo "Fetching SOS report from \${NODE_IP}"
+  if \$AGENT_MODE; then
+    echo "Fetching agent node SOS report"
+  else
+    echo "Fetching SOS report from \${NODE_IP}"
+  fi
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo mkdir /run/artifacts &&
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
     sudo journalctl \| sudo dd of=/var/log/journal.log || true

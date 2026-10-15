@@ -6,6 +6,8 @@ heredocs with synthetic provisioning/SSH/SCP commands. The retained agent helper
 is represented by its rendezvous-address interface, not by a consumed manifest;
 fencing hostname and MAC identifiers share the same IP/hostname hosts fixture.
 No extra runtime helper is injected into the CI step.
+The driver's absence assertion self-checks reject forbidden synthetic targets
+and credentials, and fail on unreadable grep input rather than reporting PASS.
 
 Run the same driver in `registry.ci.openshift.org/ocp-kni/test:dev-scripts` for
 consumer-image evidence. Mocked transport checks are not a failed installation

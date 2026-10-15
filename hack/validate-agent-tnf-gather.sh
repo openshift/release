@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
+assert_absent() {
+  local status
+  if grep "$@"; then
+    echo 'Forbidden fixture content matched' >&2
+    return 1
+  else
+    status=$?
+    if [[ "${status}" == 1 ]]; then return 0; fi
+    return "${status}"
+  fi
+}
+
+if [[ "${1:-}" == --assert-absent ]]; then
+  shift
+  assert_absent "$@"
+  echo 'PASS: absence assertion'
+  exit 0
+fi
+
 repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 temporary=$(mktemp -d)
 trap 'rm -rf "${temporary}"' EXIT
@@ -8,6 +27,22 @@ original_path=${PATH}
 agent=${repository}/ci-operator/step-registry/agent/gather/agent-gather-commands.sh
 fallback=${repository}/ci-operator/step-registry/baremetalds/devscripts/gather/baremetalds-devscripts-gather-commands.sh
 cases=0
+
+for forbidden in 'core@192.168.111.20 ' 'core@192.168.111.21 ' 'core@192.168.111.2 ' net-dumpxml core@ synthetic-private; do
+  printf '%s\n' "${forbidden}" > "${temporary}/forbidden"
+  status=0
+  bash "${BASH_SOURCE[0]}" --assert-absent -Fq "${forbidden}" "${temporary}/forbidden" > "${temporary}/assertion-output" 2>&1 || status=$?
+  [[ "${status}" == 1 ]]
+  if grep -q PASS "${temporary}/assertion-output"; then exit 1; fi
+done
+printf 'clean\n' > "${temporary}/clean"
+bash "${BASH_SOURCE[0]}" --assert-absent -q forbidden "${temporary}/clean" > "${temporary}/assertion-output"
+grep -q PASS "${temporary}/assertion-output"
+status=0
+bash "${BASH_SOURCE[0]}" --assert-absent -q forbidden "${temporary}/missing" > "${temporary}/assertion-output" 2>&1 || status=$?
+[[ "${status}" == 2 ]]
+if grep -q PASS "${temporary}/assertion-output"; then exit 1; fi
+echo 'PASS: 8 fail-closed absence assertion checks (including grep read error)'
 
 prepare() {
   rm -rf "${temporary:?}"/*
@@ -33,10 +68,15 @@ NODE_IPS=()
 shopt -s nocasematch
 set -x
 EOF
-  printf 'wrap_if_ipv6() { if [[ "$1" == *:* ]]; then printf "[%%s]" "$1"; else printf "%%s" "$1"; fi; }\n' > "${temporary}/remote/dev-scripts/network.sh"
+  cat > "${temporary}/remote/dev-scripts/network.sh" <<'EOF'
+wrap_if_ipv6() { if [[ "$1" == *:* ]]; then printf "[%s]" "$1"; else printf "%s" "$1"; fi; }
+EOF
   touch "${temporary}/remote/dev-scripts/"{config_root.sh,utils.sh,ocp_install_env.sh}
   printf 'set -o pipefail\n' > "${temporary}/remote/dev-scripts/utils.sh"
-  printf 'set -euxo pipefail\ngetRendezvousIP() { cat "$FIXTURE_ROOT/rendezvous"; }\n' > "${temporary}/remote/dev-scripts/agent/common.sh"
+  cat > "${temporary}/remote/dev-scripts/agent/common.sh" <<'EOF'
+set -euxo pipefail
+getRendezvousIP() { cat "$FIXTURE_ROOT/rendezvous"; }
+EOF
   printf '192.168.111.80 master-0\n192.168.111.81 master-1\n' > "${temporary}/remote/dev-scripts/ocp/ostest/hosts"
   echo 192.168.111.80 > "${temporary}/rendezvous"
   echo 1 > "${temporary}/remote/dev-scripts/logs/installer-status.txt"
@@ -59,8 +99,10 @@ for identifier in hostname macAddress; do
   run_step "${fallback}" 0
   grep -q 'core@192.168.111.80' "${temporary}/calls"
   grep -q 'core@192.168.111.81' "${temporary}/calls"
-  ! grep -Eq 'net-dumpxml|core@192.168.111.(2|20|21) ' "${temporary}/calls"
+  assert_absent -Eq 'net-dumpxml|core@192.168.111.(2|20|21) ' "${temporary}/calls"
   grep -q 'Agent rendezvous selected' "${temporary}/output"
+  grep -q 'Fetching agent node SOS report' "${temporary}/output"
+  assert_absent -Eq 'Agent rendezvous selected.*192\.|Agent collector availability master-|Fetching SOS report from' "${temporary}/output"
 done
 for scenario in hostname macAddress unreachable; do
   prepare
@@ -88,7 +130,7 @@ for scenario in hostname macAddress unreachable; do
     /usr/bin/tar -xOzf "${ARTIFACT_DIR}/podman-etcd_master-${node}.tar.gz" "podman-etcd_master-${node}.log" | grep -Fq "synthetic etcd core@${address}"
     /usr/bin/tar -xOzf "${ARTIFACT_DIR}/journal_${address}.tar.gz" journal.log | grep -Fq "synthetic journal core@${address}"
   done
-  ! grep -Eq 'net-dumpxml|core@192.168.111.(2|20|21) ' "${temporary}/calls"
+  assert_absent -Eq 'net-dumpxml|core@192.168.111.(2|20|21) ' "${temporary}/calls"
 done
 prepare
 unset DEVSCRIPTS_GATHER_AGENT
@@ -96,12 +138,13 @@ run_step "${fallback}" 0
 grep -q net-dumpxml "${temporary}/calls"
 grep -q 'core@192.168.111.20' "${temporary}/calls"
 grep -q 'core@192.168.111.2 ' "${temporary}/calls"
+grep -q 'Fetching SOS report from 192.168.111.20' "${temporary}/output"
 for missing in empty absent; do
   prepare
   if [[ "${missing}" == empty ]]; then : > "${temporary}/remote/dev-scripts/ocp/ostest/hosts"; else rm "${temporary}/remote/dev-scripts/ocp/ostest/hosts"; fi
   run_step "${fallback}" 0
   grep -q 'Agent inventory unavailable' "${temporary}/output"
-  ! grep -q 'core@' "${temporary}/calls"
+  assert_absent -q 'core@' "${temporary}/calls"
   test -f "${ARTIFACT_DIR}/partial.tar.gz"
 done
 for metadata in missing unlisted; do
@@ -109,13 +152,13 @@ for metadata in missing unlisted; do
   if [[ "${metadata}" == missing ]]; then rm "${temporary}/remote/dev-scripts/agent/common.sh"; else echo 192.168.111.99 > "${temporary}/rendezvous"; fi
   run_step "${fallback}" 0
   grep -q 'Agent rendezvous unavailable' "${temporary}/output"
-  ! grep -q 'core@192.168.111.2 ' "${temporary}/calls"
+  assert_absent -q 'core@192.168.111.2 ' "${temporary}/calls"
 done
 for availability in 127 255; do
   prepare
   if [[ "${availability}" == 127 ]]; then export COLLECTOR_RC=127; else export UNREACHABLE=192.168.111.80; fi
   run_step "${fallback}" 0
-  grep -q "master-0 192.168.111.80 rc=${availability}" "${temporary}/output"
+  grep -q "Agent collector availability node 0 rc=${availability}" "${temporary}/output"
   grep -q 'core@192.168.111.81' "${temporary}/calls"
 done
 for status in 2 124 137 255; do
@@ -139,7 +182,7 @@ rm "${SHARED_DIR}/devscripts-logs-collected"
 printf 'password: synthetic-private\n' > "${temporary}/remote/dev-scripts/logs/setup.log"
 run_step "${fallback}" 0
 test -f "${ARTIFACT_DIR}/root/dev-scripts/logs/setup.log" || test -f "${ARTIFACT_DIR}/dev-scripts/logs/setup.log"
-! grep -R 'synthetic-private' "${ARTIFACT_DIR}"
+assert_absent -R 'synthetic-private' "${ARTIFACT_DIR}"
 for absent in agent installation; do
   prepare
   if [[ "${absent}" == agent ]]; then rm "${temporary}/remote/dev-scripts/agent-gather-master-0.tar.xz"; else rm "${temporary}/remote/dev-scripts/ocp/ostest/installation-logs.tar"; fi
