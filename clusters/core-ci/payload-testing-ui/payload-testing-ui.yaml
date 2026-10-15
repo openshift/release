@@ -1,0 +1,160 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: ci
+  name: payload-testing-ui
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: payload-testing-ui
+  labels:
+    app: pr-payload-tests
+    component: payload-testing-ui
+spec:
+  ports:
+  - name: ui
+    port: 8000
+    protocol: TCP
+    targetPort: ui
+  selector:
+    app: pr-payload-tests
+    component: payload-testing-ui
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  namespace: ci
+  name: payload-testing-ui-tls
+spec:
+  secretName: payload-testing-ui-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: cert-issuer
+  dnsNames:
+  - pr-payload-tests.ci.openshift.org
+---
+# Router must read the TLS secret referenced by externalCertificate.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: ci
+  name: payload-testing-ui-tls-secret-reader
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["payload-testing-ui-tls"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: ci
+  name: payload-testing-ui-tls-secret-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: payload-testing-ui-tls-secret-reader
+subjects:
+- kind: ServiceAccount
+  name: router
+  namespace: openshift-ingress
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  namespace: ci
+  name: payload-testing-ui
+  labels:
+    app: pr-payload-tests
+    component: payload-testing-ui
+  annotations:
+    haproxy.router.openshift.io/timeout: "90s"
+spec:
+  host: pr-payload-tests.ci.openshift.org
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+    externalCertificate:
+      name: payload-testing-ui-tls
+  port:
+    targetPort: ui
+  to:
+    kind: Service
+    name: payload-testing-ui
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: payload-testing-ui
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  labels:
+    app: pr-payload-tests
+    component: payload-testing-ui
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: pr-payload-tests
+      component: payload-testing-ui
+  template:
+    metadata:
+      labels:
+        app: pr-payload-tests
+        component: payload-testing-ui
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - payload-testing-ui
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: payload-testing-ui
+        resources:
+          requests:
+            memory: "1Gi"
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_payload-testing-ui_latest
+        imagePullPolicy: Always
+        args:
+        - --port=8000
+        - --kubeconfig=/etc/kubeconfig/sa.payload-testing-ui.app.ci.config
+        ports:
+        - name: ui
+          containerPort: 8000
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /etc/kubeconfig
+          readOnly: true
+      serviceAccountName: payload-testing-ui
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: payload-testing-ui

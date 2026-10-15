@@ -71,7 +71,7 @@ ADDITIONAL_ARG=""
 # default to the first cluster in the array, unless 4.17 or 4.18
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
     ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
-    if [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.0" ]]; then
+    if [[ "$T5CI_VERSION" == "5.1" ]] || [[ "$T5CI_VERSION" == "5.0" ]]; then
         ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
     fi
 else
