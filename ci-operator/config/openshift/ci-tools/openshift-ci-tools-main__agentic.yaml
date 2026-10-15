@@ -1,0 +1,91 @@
+base_images:
+  ci-tools-devcontainer:
+    name: ci-tools-devcontainer
+    namespace: ci
+    tag: latest
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM claude-ai-helpers AS ai-helpers
+      FROM nested-podman AS podman
+      FROM src AS source
+      FROM ci-tools-devcontainer
+      USER root
+      RUN dnf install -y podman fuse-overlayfs shadow-utils openssl python3-pip python3.12 python3.12-pip && dnf clean all
+      RUN usermod -g 0 vscode
+      COPY --from=podman /entrypoint.sh /entrypoint.sh
+      RUN setcap cap_setuid+ep /usr/bin/newuidmap && \
+          setcap cap_setgid+ep /usr/bin/newgidmap && \
+          touch /etc/subgid /etc/subuid && \
+          chmod -R g=u /etc/subuid /etc/subgid /etc/passwd /etc/group && \
+          chmod +rx /entrypoint.sh
+      COPY --from=source /go/src/github.com/openshift/ci-tools /workspace
+      RUN chgrp -R 0 /workspace && chmod -R g=u /workspace
+      COPY --from=ai-helpers /opt/ai-helpers /opt/ai-helpers
+      RUN mkdir -p /home/vscode/.claude/plugins
+      COPY --from=ai-helpers /home/claude/.claude/plugins/known_marketplaces.json /home/vscode/.claude/plugins/known_marketplaces.json
+      RUN chgrp -R 0 /opt/ai-helpers /home/vscode/.claude && chmod -R g=u /opt/ai-helpers /home/vscode/.claude
+      RUN python3.12 -m pip install --no-cache-dir agentic-ci==0.3.48
+      ENV BUILDAH_ISOLATION=chroot
+      USER vscode
+      WORKDIR /workspace
+      ENTRYPOINT ["/entrypoint.sh"]
+      CMD ["bash"]
+    from: ci-tools-devcontainer
+    inputs:
+      claude-ai-helpers:
+        as:
+        - claude-ai-helpers
+      nested-podman:
+        as:
+        - nested-podman
+      src:
+        as:
+        - src
+    to: agentic-dev
+  run_if_changed: ^(\.devcontainer/|hack/agentic_setup\.sh|\.agentic/)
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-jira-agent
+  capabilities:
+  - nested-podman
+  cron: '@yearly'
+  steps:
+    env:
+      ALLOWED_TOOLS: Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill
+        TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate TodoWrite ToolSearch
+      FORK_REPO: openshift-dptp/ci-tools
+      SETUP_SCRIPT: hack/agentic_setup.sh
+      UPSTREAM_REPO: openshift/ci-tools
+    workflow: openshift-agentic-dptp-jira-solver
+- as: periodic-pr-followup-agent
+  capabilities:
+  - nested-podman
+  cron: '@yearly'
+  steps:
+    env:
+      ALLOWED_TOOLS: Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill
+        TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate TodoWrite ToolSearch
+      FORK_REPO: openshift-dptp/ci-tools
+      SETUP_SCRIPT: hack/agentic_setup.sh
+      UPSTREAM_REPO: openshift/ci-tools
+    workflow: openshift-agentic-dptp-pr-followup
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: ci-tools
+  variant: agentic
