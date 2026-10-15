@@ -1,16 +1,26 @@
 #!/bin/bash
-# Temporary probe: build the appliance bootc image and the nested CI derivative
-# from a GitHub pull request head. Remove the pull fetch before openshift/release
-# merges this job config.
+# Temporary probe: build the appliance bootc image from a GitHub pull request
+# head, then write qcow2 and raw disks into the job artifacts.
+# Remove the pull fetch before openshift/release merges this job config.
 set -euo pipefail
 
 readonly EVPN_APPLIANCE_REPO="${EVPN_APPLIANCE_REPO:-https://github.com/openshift/evpn-gateway-appliance}"
-readonly EVPN_APPLIANCE_PR="${EVPN_APPLIANCE_PR:-16}"
+if [[ -z "${EVPN_APPLIANCE_PR:-}" ]]; then
+	EVPN_APPLIANCE_PR="${PULL_NUMBER:-}"
+fi
+if [[ -z "${EVPN_APPLIANCE_PR}" ]]; then
+	echo "image-ci: EVPN_APPLIANCE_PR or PULL_NUMBER is required" >&2
+	exit 1
+fi
+readonly EVPN_APPLIANCE_PR
 readonly WORKROOT="${WORKROOT:-/tmp/evpn-appliance-pr}"
 readonly APPLIANCE_TAG="${APPLIANCE_TAG:-localhost/evpn-appliance-rhel10:ci}"
 readonly IMAGE_TAG="${IMAGE_TAG:-localhost/evpn-appliance-rhel10:nested-ci}"
 # image/streams.yaml bootcImageCi. The Containerfile default is registry.redhat.io.
 readonly BOOTC_BASE="${BOOTC_BASE:-quay.io/centos-bootc/centos-bootc:stream10}"
+readonly BIB_IMAGE="${BIB_IMAGE:-quay.io/centos-bootc/bootc-image-builder:latest}"
+
+echo "image-ci: pull request ${EVPN_APPLIANCE_PR}"
 
 rm -rf "${WORKROOT}"
 mkdir -p "${WORKROOT}"
@@ -62,21 +72,44 @@ if ! command -v gzip >/dev/null; then
 	echo "image-ci: gzip is required to save images" >&2
 	exit 1
 fi
-save_image() {
-	local tag="$1"
-	local name="$2"
-	local dest="${artifacts}/${name}-${sha}.tar.gz"
-	local partial="${dest}.partial"
-	echo "image-ci: saving ${tag} to ${dest}"
+
+# bootc-image-builder --local resolves the tag in /var/lib/containers/storage.
+# This pod's store is rootless, so mount that graph root at the path the builder reads.
+store="$(podman info --format '{{.Store.GraphRoot}}')"
+
+build_disk() {
+	local kind="$1"
+	local filename="$2"
+	local out="${WORKROOT}/output-${kind}"
+	local disk dest partial
+	rm -rf "${out}"
+	mkdir -p "${out}"
+	echo "image-ci: building ${kind} from ${APPLIANCE_TAG}"
+	podman run --rm --privileged --pull=newer \
+		-v "${out}:/output" \
+		-v "${store}:/var/lib/containers/storage" \
+		"${BIB_IMAGE}" \
+		--type "${kind}" \
+		--local \
+		"${APPLIANCE_TAG}"
+	disk="$(find "${out}" -type f -name "${filename}" -print -quit)"
+	if [[ -z "${disk}" ]]; then
+		echo "image-ci: ${filename} missing under ${out}" >&2
+		find "${out}" -type f -print >&2 || true
+		return 1
+	fi
+	dest="${artifacts}/${filename}.gz"
+	partial="${dest}.partial"
+	echo "image-ci: compressing ${disk} to ${dest}"
 	rm -f "${partial}"
-	if ! podman save "${tag}" | gzip -1 > "${partial}"; then
+	if ! gzip --best -c "${disk}" > "${partial}"; then
 		rm -f "${partial}"
-		echo "image-ci: failed to save ${tag}" >&2
+		echo "image-ci: failed to compress ${disk}" >&2
 		return 1
 	fi
 	mv "${partial}" "${dest}"
 	echo "image-ci: saved ${dest} $(stat -c '%s' "${dest}")"
 }
-# Product first. bootc-image-builder consumes this archive. A later failure keeps it.
-save_image "${APPLIANCE_TAG}" "evpn-appliance-rhel10"
-save_image "${IMAGE_TAG}" "evpn-appliance-rhel10-nested-ci"
+
+build_disk qcow2 disk.qcow2
+build_disk raw disk.raw

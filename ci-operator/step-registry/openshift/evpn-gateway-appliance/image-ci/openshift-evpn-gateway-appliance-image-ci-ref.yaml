@@ -16,14 +16,16 @@ ref:
       memory: 4Gi
   env:
   - name: EVPN_APPLIANCE_PR
-    default: "16"
+    default: ""
     documentation: |-
       GitHub pull request number to fetch from openshift/evpn-gateway-appliance.
-      Temporary until the Containerfiles are on main; remove the fetch when presubmits clone the PR head.
+      Empty uses PULL_NUMBER from the job. Remove the fetch when presubmits clone the PR head.
   documentation: >-
-    Fetches openshift/evpn-gateway-appliance pull request head and runs two
-    podman builds with context image/. The product image is
+    Fetches the triggering openshift/evpn-gateway-appliance pull request and
+    runs two podman builds with context image/. The product image is
     image/rhel10/Containerfile with BOOTC_BASE on the public bootc image.
     image/Containerfile.nested-ci then caches the payload-images.yaml pins with
     python3, using the mounted ci-pull-credentials file as registry-auth.
-    Both local images are saved as gzip tarballs in the job artifacts.
+    bootc-image-builder then writes qcow2 and raw disks from the product image.
+    Those two disks are gzip --best compressed into the job artifacts. Nothing
+    is pushed to a registry.
