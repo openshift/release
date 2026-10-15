@@ -30,8 +30,19 @@ for file in "${PROJECT_DIR}"/artifacts/*; do
 done
 
 echo "Copy reports for reporter step"
-cp "${PROJECT_DIR}"/artifacts/report_*.xml "${SHARED_DIR}"/
-cp "${PROJECT_DIR}"/artifacts/junit_*.xml "${SHARED_DIR}"/
+cp "${PROJECT_DIR}"/artifacts/report_*.xml "${SHARED_DIR}"/ 2>/dev/null || true
+cp "${PROJECT_DIR}"/artifacts/polarion_*.xml "${SHARED_DIR}"/ 2>/dev/null || true
+cp "${PROJECT_DIR}"/artifacts/junit_*.xml "${SHARED_DIR}"/ 2>/dev/null || true
+for f in "${PROJECT_DIR}"/artifacts/*_suite_test.xml; do
+  [[ -f "$f" ]] || continue
+  python3 -c "
+import re, sys
+content = open(sys.argv[1]).read()
+content = re.sub(r'<system-err>.*?</system-err>', '', content, flags=re.DOTALL)
+content = re.sub(r'<system-out>.*?</system-out>', '', content, flags=re.DOTALL)
+open(sys.argv[2], 'w').write(content)
+" "$f" "${SHARED_DIR}/polarion_cnfgotests_$(basename "$f")"
+done
 
 mkdir "${ARTIFACT_DIR}/junit"
 for file in "${PROJECT_DIR}"/artifacts/*.xml; do

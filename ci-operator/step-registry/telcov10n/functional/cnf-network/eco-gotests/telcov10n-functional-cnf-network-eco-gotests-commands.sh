@@ -2,8 +2,17 @@
 set -e
 set -o pipefail
 
-ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
 PROJECT_DIR="/tmp"
+ECO_CI_CD_BASE="/eco-ci-cd"
+
+if [[ -n "${ECO_CI_CD_FORK_URL:-}" ]]; then
+  echo "Using eco-ci-cd fork: ${ECO_CI_CD_FORK_URL} branch: ${ECO_CI_CD_FORK_BRANCH:-main}"
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" "${ECO_CI_CD_FORK_URL}" /tmp/eco-ci-cd-fork
+  ln -s /eco-ci-cd/collections /tmp/eco-ci-cd-fork/collections
+  ECO_CI_CD_BASE="/tmp/eco-ci-cd-fork"
+fi
+
+ECO_CI_CD_INVENTORY_PATH="${ECO_CI_CD_BASE}/inventories/cnf"
 
 echo "Checking if the job should be skipped..."
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
@@ -70,7 +79,7 @@ echo "Show eco-gotests environment variables"
 echo "${ECO_GOTESTS_ENV_VARS}"
 
 echo "Setup test script"
-cd /eco-ci-cd
+cd "${ECO_CI_CD_BASE}"
 
 # shellcheck disable=SC2154
 ansible-playbook ./playbooks/deploy-run-eco-gotests.yaml -i ./inventories/cnf/switch-config.yaml \
@@ -91,7 +100,33 @@ ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=
 echo "Gather artifacts from bastion"
 # shellcheck disable=SC2154
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/eco_gotests/report/*.xml "${ARTIFACT_DIR}/junit_eco_gotests/"
+
 rm -rf "${PROJECT_DIR}/temp_ssh_key"
 
-echo "Store polarion report for reporter step"
-mv "${ARTIFACT_DIR}/junit_eco_gotests/report_testrun.xml" "${SHARED_DIR}/report_testrun.xml"
+# Combine per-suite ginkgo JUnit files into one "eco-gotests" XML and store
+# as polarion_eco_gotests.xml → goes to POLARION_REPORT_PATH → Data Router
+# shows ONE "eco-gotests" RP entry with ginkgo test names (test_id:XXXXX visible).
+# system-err/out are stripped to fit the 1 MiB SHARED_DIR secret limit.
+python3 - "${ARTIFACT_DIR}/junit_eco_gotests" "${SHARED_DIR}/polarion_eco_gotests.xml" << 'PYEOF'
+import re, sys, xml.etree.ElementTree as ET, glob, os
+src_dir, out_file = sys.argv[1], sys.argv[2]
+def strip(s):
+    s = re.sub(r'<system-err>.*?</system-err>', '', s, flags=re.DOTALL)
+    return re.sub(r'<system-out>.*?</system-out>', '', s, flags=re.DOTALL)
+root = ET.Element('testsuite', {'name': 'eco-gotests'})
+for f in sorted(glob.glob(os.path.join(src_dir, '*_junit.xml'))):
+    try:
+        tree = ET.fromstring(strip(open(f).read()))
+        for suite in ([tree] if tree.tag == 'testsuite' else list(tree)):
+            if suite.tag == 'testsuite':
+                for tc in suite.findall('testcase'):
+                    root.append(tc)
+    except ET.ParseError:
+        pass
+ET.ElementTree(root).write(out_file, encoding='unicode', xml_declaration=True)
+PYEOF
+
+echo "Stage eco-gotests reports on bastion for reporter step"
+ansible-playbook ./playbooks/cnf/stage-eco-gotests-junit-reports.yaml \
+  -i ./inventories/cnf/switch-config.yaml \
+  --extra-vars "src_dir=/tmp/eco_gotests/report shared_dir=${SHARED_DIR}"

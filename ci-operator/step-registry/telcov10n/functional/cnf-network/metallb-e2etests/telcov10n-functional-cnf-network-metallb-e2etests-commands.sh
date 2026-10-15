@@ -65,6 +65,6 @@ if [ ! -f "${ARTIFACT_DIR}/junit_metallb/junit-report.xml" ]; then
 fi
 
 echo "Store report for reporter step"
-cp "${ARTIFACT_DIR}/junit_metallb/junit-report.xml" "${SHARED_DIR}/junit_metallb_report.xml"
+cp "${ARTIFACT_DIR}/junit_metallb/junit-report.xml" "${SHARED_DIR}/polarion_metallb_report.xml"
 
 rm -f "${PROJECT_DIR}/temp_ssh_key"
