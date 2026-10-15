@@ -8,7 +8,8 @@ of modifying the shared Quay QE cluster.
 
 ## Job lifecycle
 
-The `e2e-sts` job in the Quay Operator `master__ocp-latest` configuration runs:
+The optional `e2e-sts` job in the Quay Operator `master__ocp-latest`
+configuration and the weekly Quay 5.0 job share this lifecycle:
 
 1. `ipi-aws-pre-manual-oidc-sts` creates an AWS cluster in CCO Manual mode,
    including a per-cluster OIDC provider and platform roles. The chain records
@@ -18,11 +19,13 @@ The `e2e-sts` job in the Quay Operator `master__ocp-latest` configuration runs:
    leased cluster account. The role trusts only
    `system:serviceaccount:<run-namespace>:sts-cco-quay-app` with audience
    `openshift` and grants access only to the run-owned bucket.
-3. `quay-sts-install` installs the PR-built Quay Operator bundle in
-   `openshift-operators` with AllNamespaces mode, adds the workload role as the
-   operator's `ROLEARN`, and waits for the updated deployment.
+3. The master presubmit uses `quay-sts-install` to install the PR-built
+   Operator bundle. The Quay 5.0 periodic instead enables the ART FBC floating
+   tag and uses `quay-sts-install-art` to install the `stable-5.0` Operator.
+   Both paths install in `openshift-operators` with AllNamespaces mode, add the
+   workload role as the operator's `ROLEARN`, and wait for the deployment.
 4. `quay-sts-test` verifies state and operator configuration, then invokes
-   `make test-e2e-sts` from the operator PR source. The Chainsaw test validates
+   `make test-e2e-sts` from the operator source checkout. The Chainsaw test validates
    the CredentialRequest and projected-token configuration and exercises Quay
    image push, pull, and repository mirroring.
 5. `ipi-aws-post-manual-oidc-sts` destroys the cluster and removes the OIDC and
@@ -31,7 +34,10 @@ The `e2e-sts` job in the Quay Operator `master__ocp-latest` configuration runs:
    deletes the run-owned role, bucket contents, and bucket.
 
 All cleanup actions run in the job's post phase. The existing Quay `e2e` and
-`e2e-upgrade` jobs are unchanged.
+`e2e-upgrade` jobs are unchanged. The weekly 5.0 periodic resolves
+`quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-5.0__v5.0__quay-rhel9-operator`
+to an immutable digest for each run, then uses the catalog's related images for
+the Quay 5.0 Operator and application.
 
 ## Credentials and isolation
 
@@ -56,9 +62,9 @@ kubeconfigs, or credential values.
 
 `quay-sts-tools` is built by the Quay Operator ci-operator configuration from
 UBI Python 3.11 with `boto3==1.35.99`; `cli: latest` supplies `oc` where needed.
-The test step runs from `src-oc`, which contains the PR source, Go, make, curl,
-base64, `oc`, and pinned crane v0.20.3 and gojq v0.12.17 binaries for the source
-Chainsaw test. The operator Makefile supplies Chainsaw.
+The test step runs from `src-oc-sts`, which contains the source under test, Go,
+make, curl, base64, `oc`, and pinned crane v0.20.3 and gojq v0.12.17 binaries for
+the source Chainsaw test. The operator Makefile supplies Chainsaw.
 
 Building `src-oc` requires access to the pinned Go module sources before cluster
 provisioning starts. The running job requires network access to the cluster API,
@@ -91,7 +97,7 @@ account after `SHARED_DIR` is discarded. Resources are named
 `quay-sts-run=<run-id>`; administrators must locate and delete leftovers
 manually.
 
-After this registration merges, a successful live `e2e-sts` Prow run against
-the Quay Operator feature PR is required before that feature merges. The live
-run proves IAM permissions, OLM/CCO reconciliation, image transfer, and complete
-post cleanup.
+A successful live `e2e-sts` Prow run proves IAM permissions, OLM/CCO
+reconciliation, image transfer, and complete post cleanup. Rehearse the Quay
+5.0 periodic repeatedly before enabling its weekly schedule because it follows
+the newest successful ART FBC build.
