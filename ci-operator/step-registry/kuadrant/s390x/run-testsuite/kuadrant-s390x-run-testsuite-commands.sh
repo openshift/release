@@ -1241,9 +1241,15 @@ if [[ -z \$fetched ]]; then
 fi
 test -f \$src/pyproject.toml || { echo 'checkout missing pyproject.toml'; exit 1; }
 git -C \$src log -1 --format='%H %ci %s' || true
-rm -rf /opt/workdir/kuadrant-testsuite
-mv \$src /opt/workdir/kuadrant-testsuite
-cd /opt/workdir/kuadrant-testsuite
+# Image WORKDIR inode is not removable by the non-root Job UID (rm -rf dest
+# can wipe contents then fail on the directory, leaving an empty tree).
+dest=/opt/workdir/kuadrant-testsuite
+echo \"overlaying into \$dest (keep directory inode)\"
+find \$dest -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+cp -a \$src/. \$dest/ || exit 1
+test -f \$dest/pyproject.toml || { echo 'overlay missing pyproject.toml'; ls -la \$dest; exit 1; }
+rm -rf \$src
+cd \$dest
 echo '=== poetry install for checked-out testsuite ==='
 poetry install --no-interaction --sync || poetry install --no-interaction || exit 1
 "
