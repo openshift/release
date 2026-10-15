@@ -1,0 +1,60 @@
+ref:
+  as: azure-il6-provision-subnets
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-provision-subnets-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+    documentation: |-
+      The pre-provisioned, permanent resource group holding the VNet. Referenced in install-config
+      ONLY as platform.azure.networkResourceGroupName.
+  - name: AZURE_IL6_VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+    documentation: |-
+      The pre-provisioned VNet to install into. This step adds subnets to it; it never creates or
+      deletes the VNet itself.
+  - name: AZURE_IL6_VNET_CIDR
+    default: "10.10.0.0/16"
+    documentation: |-
+      The VNet's address space, written to install-config as networking.machineNetwork[0].cidr.
+      Must match the real VNet -- the generic azure-provision-vnet default of 10.0.0.0/16 is wrong
+      for this environment.
+  - name: AZURE_IL6_CONTROL_PLANE_SUBNET_CIDR
+    default: "10.10.2.0/24"
+    documentation: |-
+      CIDR for the control-plane subnet created by this step. Must not overlap the emulator's own
+      public-subnet (10.10.0.0/24) or GatewaySubnet (10.10.1.0/24).
+  - name: AZURE_IL6_COMPUTE_SUBNET_CIDR
+    default: "10.10.3.0/24"
+    documentation: |-
+      CIDR for the compute subnet created by this step.
+  documentation: |-
+    Creates the control-plane and compute subnets for an Azure IL6 cluster INSIDE a pre-existing,
+    shared VNet, and emits the install-config patches that point the installer at them.
+
+    This exists instead of azure-provision-vnet because that step runs 'az network vnet create'
+    unconditionally, which would collide with the emulator-provisioned VNet.
+
+    Safety contract -- this step deliberately does NOT write any of:
+
+      ${SHARED_DIR}/resourcegroup          ${SHARED_DIR}/resourcegroup_cluster
+      ${SHARED_DIR}/resourcegroup_vnet     ${SHARED_DIR}/resourcegroup_nsg
+      ${SHARED_DIR}/resourcegroup_sa       ${SHARED_DIR}/resourcegroup_aks
+
+    azure-deprovision-resourcegroup deletes every resource group named in those files. Writing the
+    shared group's name into any of them -- which is the natural way to make downstream provisioning
+    steps work -- would destroy the emulator environment at teardown. Downstream steps are given the
+    group name through the AZURE_IL6_RESOURCE_GROUP env var instead.
+
+    Outputs:
+      ${SHARED_DIR}/customer_vnet_subnets.yaml  consumed by ipi-conf-azure-provisionednetwork
+      ${SHARED_DIR}/network_machinecidr.yaml    consumed by ipi-conf-azure-provisionednetwork
+      ${SHARED_DIR}/azure_il6_subnet_prefix     consumed by azure-il6-deprovision-resources
