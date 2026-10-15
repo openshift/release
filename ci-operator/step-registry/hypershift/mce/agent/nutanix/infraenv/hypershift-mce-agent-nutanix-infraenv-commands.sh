@@ -46,6 +46,8 @@ if [[ ! -s "${ssh_key_file}" ]]; then
   exit 1
 fi
 
+# TODO: Consider extracting this to a separate step to allow reuse in other workflows, also consider removing agentLabels to
+# simplify the step.
 hostedcluster_json=$(oc get hostedcluster "${CLUSTER_NAME}" -n local-cluster -o json)
 no_proxy=$(jq -r '["localhost", "127.0.0.1", "::1", ".svc", ".cluster.local", (.spec.networking.clusterNetwork[]?.cidr), (.spec.networking.serviceNetwork[]?.cidr), (.spec.networking.machineNetwork[]?.cidr)] | map(select(. != null and . != "")) | unique | join(",")' <<<"${hostedcluster_json}")
 hostedcluster_proxy=$(jq -n --arg http "${PROXY_URL}" --arg https "${PROXY_URL}" --arg no_proxy "${no_proxy}" \
