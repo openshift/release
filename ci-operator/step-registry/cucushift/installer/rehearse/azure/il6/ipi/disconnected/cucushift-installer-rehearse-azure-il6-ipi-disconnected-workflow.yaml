@@ -3,14 +3,18 @@ workflow:
   steps:
     pre:
       - chain: cucushift-installer-rehearse-azure-il6-ipi-disconnected-provision
-      - ref: cucushift-installer-reportportal-marker
     post:
       - chain: cucushift-installer-rehearse-azure-il6-ipi-disconnected-deprovision
-      - ref: send-results-to-reportportal
   documentation: |-
     Provisions and deprovisions a disconnected OpenShift cluster on an EMULATED Azure IL6
     environment (SHIFT / Applied Insight emulator), allowing job authors to inject their own
     end-to-end test logic.
+
+    Deliberately carries no ReportPortal steps. The consumer is a presubmit in the
+    openshift/installer config, not an openshift-tests-private periodic, and
+    send-results-to-reportportal needs the openshift-qe Vault collection to post results QE
+    reporting has no reason to receive. A later periodic that does want them can wrap this
+    workflow rather than this workflow assuming them.
 
     The cluster is installed into a pre-existing, permanent resource group and VNet that carry the
     IPsec tunnels to the emulator. All modifications should be made to the
