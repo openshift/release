@@ -14,8 +14,12 @@ scp "${SSHOPTS[@]}" "/tmp/hostedcluster_name" "root@${IP}:/home/hostedcluster_na
 
 # 192.168.111.30 points to the MetalLB ingress IPs configured in
 # the hypershift-agent-create-metallb step on dev-scripts default
-# external network (192.168.111.0/24).
-INGRESS_VIP="${NUTANIX_INGRESS_VIP:-192.168.111.30}"
+# external network (192.168.111.0/24). Fallback to the default if the
+INGRESS_VIP=192.168.111.30
+if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+  INGRESS_VIP=$(source "${SHARED_DIR}/nutanix_context.sh" && printf '%s' "${INGRESS_VIP:?}")
+fi
+
 ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${IP_STACK}" "${CLUSTER_NAME}" "${INGRESS_VIP}" << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 set -o nounset
 set -o errexit
