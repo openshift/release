@@ -57,10 +57,35 @@ nodepool_selector=$(jq -n --arg key "${RUN_LABEL_KEY}" --arg value "${CLUSTER_NA
 oc patch nodepool "${CLUSTER_NAME}" -n local-cluster --type=merge -p "${nodepool_selector}"
 
 infraenv=$(jq -n --arg name "${INFRAENV_NAME}" --arg namespace "${AGENT_NAMESPACE}" \
-  --arg run "${CLUSTER_NAME}" --arg ssh_key "$(<"${ssh_key_file}")" \
+  --arg key "${RUN_LABEL_KEY}" --arg run "${CLUSTER_NAME}" --arg ssh_key "$(<"${ssh_key_file}")" \
   --arg pull_secret "${PULL_SECRET_NAME}" \
   --arg proxy "${PROXY_URL}" --arg no_proxy "${no_proxy}" \
-  '{apiVersion:"agent-install.openshift.io/v1beta1",kind:"InfraEnv",metadata:{name:$name,namespace:$namespace,labels:{"ci.openshift.io/hcp-agent-nutanix-run":$run}},spec:{cpuArchitecture:"x86_64",pullSecretRef:{name:$pull_secret},sshAuthorizedKey:$ssh_key,agentLabels:{"ci.openshift.io/hcp-agent-nutanix-run":$run},proxy:{httpProxy:$proxy,httpsProxy:$proxy,noProxy:$no_proxy}}}')
+  '{
+    apiVersion: "agent-install.openshift.io/v1beta1",
+    kind: "InfraEnv",
+    metadata: {
+      name: $name,
+      namespace: $namespace,
+      labels: {
+        ($key): $run
+      }
+    },
+    spec: {
+      cpuArchitecture: "x86_64",
+      pullSecretRef: {
+        name: $pull_secret
+      },
+      sshAuthorizedKey: $ssh_key,
+      agentLabels: {
+        ($key): $run
+      },
+      proxy: {
+        httpProxy: $proxy,
+        httpsProxy: $proxy,
+        noProxy: $no_proxy
+      }
+    }
+  }')
 printf '%s\n' "${infraenv}" | oc apply -f -
 oc wait --namespace "${AGENT_NAMESPACE}" --for=condition=ImageCreated "infraenv/${INFRAENV_NAME}" --timeout=30m
 
