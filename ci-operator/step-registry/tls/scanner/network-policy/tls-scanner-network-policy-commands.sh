@@ -11,8 +11,10 @@ set -euo pipefail
 
 # Fail loudly if the host-network group label resolves to no namespace: the
 # policy would otherwise apply cleanly, match nothing, and silently drop the
-# scanner again.
-if [[ -z "$(oc get namespaces -l policy-group.network.openshift.io/host-network -o name)" ]]; then
+# scanner again. Capture first so `set -e` catches a real `oc` failure instead
+# of misreading an API/transport error as "nothing matched".
+host_network_ns=$(oc get namespaces -l policy-group.network.openshift.io/host-network -o name)
+if [[ -z "${host_network_ns}" ]]; then
   echo "ERROR: no namespace carries policy-group.network.openshift.io/host-network; host-network ingress rule would match nothing" >&2
   exit 1
 fi
@@ -25,7 +27,8 @@ selector_args=()
 if [[ -n "${TLS_SCANNER_POD_SELECTOR:-}" ]]; then
   selector_args=(-l "${TLS_SCANNER_POD_SELECTOR}")
 fi
-if [[ -z "$(oc -n "${SCAN_NAMESPACE}" get pods "${selector_args[@]}" -o name)" ]]; then
+scan_pods=$(oc -n "${SCAN_NAMESPACE}" get pods "${selector_args[@]}" -o name)
+if [[ -z "${scan_pods}" ]]; then
   echo "ERROR: no pods${TLS_SCANNER_POD_SELECTOR:+ matching '${TLS_SCANNER_POD_SELECTOR}'} found in ${SCAN_NAMESPACE}; nothing for the scanner to reach" >&2
   exit 1
 fi
