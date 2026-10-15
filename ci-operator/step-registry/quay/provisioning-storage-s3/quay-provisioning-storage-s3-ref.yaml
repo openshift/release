@@ -1,0 +1,39 @@
+ref:
+  as: quay-provisioning-storage-s3
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-provisioning-storage-s3-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: aws
+    mount_path: /var/run/quay-qe-aws-secret
+  env:
+  - name: QUAY_S3_REGION
+    default: "us-east-2"
+    documentation: AWS region the S3 bucket is created in and reported in the storage config.
+  - name: QUAY_S3_HOST
+    default: ""
+    documentation: |-
+      Optional explicit S3 endpoint host for the storage config. When empty the
+      step derives s3.<region>.amazonaws.com from QUAY_S3_REGION.
+  - name: QUAY_S3_STORAGE_PATH
+    default: "/quay"
+    documentation: Object storage path prefix Quay writes blobs under.
+  documentation: |-
+    Provision an AWS S3 bucket for Quay object storage and write a
+    backend-agnostic storage contract to ${SHARED_DIR}/quay-storage-config.yaml
+    (the S3Storage DISTRIBUTED_STORAGE_CONFIG block). The terraform state is
+    shared as ${SHARED_DIR}/terraform.tgz + ${SHARED_DIR}/QUAY_AWS_S3_BUCKET so
+    quay-deprovision can destroy the bucket. Pair with
+    quay-install-external-storage, which folds the contract into the
+    QuayRegistry config bundle. A sibling provision-storage-{gcs,azure} can write
+    the same contract file for other object-storage backends.
