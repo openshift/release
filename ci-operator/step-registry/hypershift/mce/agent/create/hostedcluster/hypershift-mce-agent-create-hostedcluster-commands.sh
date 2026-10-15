@@ -155,3 +155,33 @@ done
 echo "Cluster became available, creating kubeconfig"
 /tmp/${HYPERSHIFT_NAME} create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+if [[ "${HYPERSHIFT_USE_PROXY:-false}" == "true" ]]; then
+  source "${SHARED_DIR}/packet-conf.sh"
+  if [[ -z "${IP:-}" || -z "${PROXYPORT:-}" ]]; then
+    echo "The baremetal Squid proxy endpoint is not available in the shared job configuration."
+    exit 1
+  fi
+
+  proxy_url="http://${IP}:${PROXYPORT}"
+  no_proxy=$(
+    {
+      printf '%s\n' localhost 127.0.0.1 ::1 .svc .cluster.local
+      oc get hostedcluster "${CLUSTER_NAME}" -n local-cluster \
+        -o go-template='{{range .spec.networking.clusterNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}
+{{range .spec.networking.serviceNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}
+{{range .spec.networking.machineNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}'
+    } | sed '/^$/d' | LC_ALL=C sort -u | paste -sd, -
+  )
+  cat > "${SHARED_DIR}/hostedcluster-proxy.yaml" <<EOF
+spec:
+  configuration:
+    proxy:
+      httpProxy: "${proxy_url}"
+      httpsProxy: "${proxy_url}"
+      noProxy: "${no_proxy}"
+EOF
+  oc patch hostedcluster "${CLUSTER_NAME}" -n local-cluster --type=merge \
+    --patch-file="${SHARED_DIR}/hostedcluster-proxy.yaml"
+  printf '%s\n' "${no_proxy}" > "${SHARED_DIR}/hostedcluster_no_proxy"
+fi
