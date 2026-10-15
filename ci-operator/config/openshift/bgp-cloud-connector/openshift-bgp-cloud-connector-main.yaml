@@ -2235,32 +2235,22 @@ tests:
           '{spec:{config:{env:[{name:"CLIENTID",value:$c},{name:"TENANTID",value:$t},{name:"SUBSCRIPTIONID",value:$s}]}}}')"
         echo "handed the identity to the operator through ${subscription_object}"
 
-        # The customer path ends with the cloud credential operator writing the
-        # operator's secret from its CredentialsRequest. Whether CCO does that
-        # on a hosted cluster is one of the things this job exists to find out,
-        # so it is waited for and reported either way. If it does not come, the
-        # secret is written by hand with the same fields, so the suite still
-        # runs, and the log says which happened.
-        secret=bgp-cloud-connector-azure-credentials
+        # The operator authenticates as this identity straight from the
+        # Subscription's env. A hosted cluster runs no cloud credential
+        # operator, so nothing writes a secret from the operator's
+        # CredentialsRequest. OLM rewrites the deployment from the
+        # Subscription; wait for the identity to reach it, then for the new
+        # pod.
         deadline=$((SECONDS + 300))
-        until oc -n "${ns}" get secret "${secret}" >/dev/null 2>&1; do
+        until oc -n "${ns}" get deployment openshift-bgp-cloud-connector-controller-manager \
+                -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].env[?(@.name=="CLIENTID")].value}' \
+                | grep -q .; do
           if (( SECONDS >= deadline )); then
-            echo "CCO did not write ${ns}/${secret} within five minutes; writing it by hand"
-            oc -n "${ns}" get credentialsrequest.cloudcredential.openshift.io -A -o yaml 2>/dev/null \
-              | grep -E 'name:|azureClientID|conditions|message|reason' | redact || true
-            region="$(oc get nodes -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/region}')"
-            oc -n "${ns}" create secret generic "${secret}" \
-              --from-literal=azure_client_id="${client_id}" \
-              --from-literal=azure_tenant_id="${tenant}" \
-              --from-literal=azure_subscription_id="${subscription}" \
-              --from-literal=azure_region="${region}" \
-              --from-literal=azure_resourcegroup="${rg}" \
-              --from-literal=azure_federated_token_file=/var/run/secrets/openshift/serviceaccount/token
-            break
+            echo "the Subscription's identity never reached the deployment" >&2
+            exit 1
           fi
-          sleep 10
+          sleep 5
         done
-        oc -n "${ns}" get secret "${secret}" -o jsonpath='{.data}' | jq -r 'keys | "secret keys: " + join(" ")'
         oc -n "${ns}" rollout status deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
       credentials:
       - collection: hcm-aro
