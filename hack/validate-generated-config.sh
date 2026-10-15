@@ -29,7 +29,43 @@ ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/
 --known-infra-file infra-image-mirroring.yaml \
 --known-infra-file infra-periodics-origin-release-images.yaml
 
-python3 "${base_dir}/hack/generators/scos-art-publication.py" --release-root "${base_dir}" --jobs-root "${workdir}/ci-operator/jobs"
+bootstrap="$(cd "${base_dir}" && pwd)/hack/generators/scos-art-publication.patch"
+if [[ ! -f "${bootstrap}" ]]; then
+	bootstrap="${workdir}/publication.patch"
+	git -C "${base_dir}" -c safe.directory="$(cd "${base_dir}" && pwd)" show :hack/generators/scos-art-publication.patch > "${bootstrap}"
+fi
+if command -v python3 >/dev/null && [[ -f "${base_dir}/hack/generators/scos-art-publication.py" ]]; then
+	python3 "${base_dir}/hack/generators/scos-art-publication.py" --release-root "${base_dir}" --jobs-root "${workdir}/ci-operator/jobs" --bootstrap "${bootstrap}" --check-bootstrap
+else
+	for source in \
+		ci-operator/config/openshift/os/openshift-os-master__okd-scos.yaml \
+		ci-operator/step-registry/openshift/os-publish-art/openshift-os-publish-art-ref.yaml \
+		ci-operator/step-registry/openshift/os-publish-art/openshift-os-publish-art-commands.sh \
+		hack/generators/scos-art-publication.py; do
+		expected=$(awk -v source="${source}" '$1 == "#" && $2 == "source" && $4 == source {print $3}' "${bootstrap}")
+		if [[ ! "${expected}" =~ ^[a-f0-9]{64}$ ]]; then
+			echo "Missing or duplicate portable generation input: ${source}" >&2
+			exit 1
+		fi
+		if [[ -f "${base_dir}/${source}" ]]; then
+			actual=$(sha256sum < "${base_dir}/${source}")
+		else
+			actual=$(git -C "${base_dir}" -c safe.directory="$(cd "${base_dir}" && pwd)" show ":${source}" | sha256sum)
+		fi
+		if [[ "${actual%% *}" != "${expected}" ]]; then
+			echo "Stale portable generation input: ${source}; run make jobs" >&2
+			exit 1
+		fi
+	done
+	IFS=$'\t' read -r added removed target <<< "$(git apply --numstat "${bootstrap}")"
+	if [[ ! "${added}" =~ ^[0-9]+$ || ! "${removed}" =~ ^[0-9]+$ || "${target}" != openshift/os/openshift-os-master-postsubmits.yaml ]] ||
+		[[ $(git apply --numstat "${bootstrap}" | wc -l) != 1 ]]; then
+		echo 'Portable generation must change only the CoreOS postsubmit file' >&2
+		exit 1
+	fi
+	git -C "${workdir}/ci-operator/jobs" apply --check "${bootstrap}"
+	git -C "${workdir}/ci-operator/jobs" apply "${bootstrap}"
+fi
 
 if ! diff -Naupr "${ci_operator_dir}/jobs/" "${workdir}/ci-operator/jobs/"> "${workdir}/diff"; then
 	cat << EOF

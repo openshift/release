@@ -3,6 +3,8 @@
 
 import argparse
 import copy
+import difflib
+import hashlib
 import json
 from pathlib import Path
 
@@ -164,12 +166,13 @@ def merge_named(original, additional, key):
     return merged
 
 
-def generate(root, jobs_root):
+def generate(root, jobs_root, bootstrap=None, check_bootstrap=False):
     """Transform only the two explicitly named generated variant jobs."""
     path = jobs_root / "openshift/os/openshift-os-master-postsubmits.yaml"
     if not path.exists():
         return
-    document = yaml.safe_load(path.read_text())
+    original = path.read_text()
+    document = yaml.safe_load(original)
     jobs = document["postsubmits"]["openshift/os"]
     images = [job for job in jobs if job["name"] == JOB]
     publishers = [job for job in jobs if job["name"] == PUBLISHER]
@@ -217,6 +220,20 @@ def generate(root, jobs_root):
                                            publisher["spec"].get("volumes", []), "name")
     jobs.remove(publisher)
     write_jobs(path, document)
+    if bootstrap is not None:
+        sources = (CONFIG, STEP + "-ref.yaml", STEP + "-commands.sh",
+                   "hack/generators/scos-art-publication.py")
+        manifest = "".join("# source " + hashlib.sha256((root / source).read_bytes()).hexdigest()
+                           + " " + source + "\n" for source in sources)
+        relative = "openshift/os/openshift-os-master-postsubmits.yaml"
+        patch = manifest + "".join(difflib.unified_diff(
+            original.splitlines(keepends=True), path.read_text().splitlines(keepends=True),
+            fromfile="a/" + relative, tofile="b/" + relative))
+        if check_bootstrap:
+            if bootstrap.read_text() != patch:
+                raise ValueError("Regenerate the portable publication overlay with make jobs")
+        else:
+            bootstrap.write_text(patch)
 
 
 def generate_validation(jobs_root):
@@ -261,9 +278,12 @@ def generate_validation(jobs_root):
     generator = "./hack/generators/scos-art-publication.py"
     if generator not in checkout:
         checkout.append(generator)
+    bootstrap = "./hack/generators/scos-art-publication.patch"
+    if bootstrap not in checkout:
+        checkout.append(bootstrap)
     job["run_if_changed"] = (r"^(ci-operator/(config|jobs)/.*|"
                              r"ci-operator/step-registry/openshift/os-publish-art/.*|"
-                             r"hack/(generators/scos-art-publication\.py|validate-generated-config\.sh)|Makefile)$")
+                             r"hack/(generators/scos-art-publication\.(py|patch)|validate-generated-config\.sh)|Makefile)$")
     write_jobs(path, document)
 
 
@@ -272,6 +292,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--release-root", type=Path, required=True)
     parser.add_argument("--jobs-root", type=Path, required=True)
+    parser.add_argument("--bootstrap", type=Path)
+    parser.add_argument("--check-bootstrap", action="store_true")
     parser.add_argument("--selection", nargs=argparse.REMAINDER, default=[])
     arguments = parser.parse_args()
     selected = []
@@ -299,7 +321,13 @@ def main():
             repository = option.split("=", 1)[1]
         elif option == "--repo":
             repository = arguments.selection[index + 1]
-    for source_path, action in ((CONFIG, lambda: generate(arguments.release_root, arguments.jobs_root)),
+    def coreos():
+        if arguments.bootstrap is None:
+            generate(arguments.release_root, arguments.jobs_root)
+        else:
+            generate(arguments.release_root, arguments.jobs_root, arguments.bootstrap, arguments.check_bootstrap)
+
+    for source_path, action in ((CONFIG, coreos),
                                 (VALIDATION_CONFIG, lambda: generate_validation(arguments.jobs_root))):
         source = (arguments.release_root / source_path).resolve()
         if organization and source.parent.parent.name != organization:

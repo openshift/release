@@ -1,0 +1,418 @@
+# source 339f6674038b779be6ba8540bbed3a7811df22d80931253e3dbeaad0ee0516ca ci-operator/config/openshift/os/openshift-os-master__okd-scos.yaml
+# source 7323ef685211adc4f26dc5de16ef22783eaee1a688e8aedb4cdce4a99cf451af ci-operator/step-registry/openshift/os-publish-art/openshift-os-publish-art-ref.yaml
+# source 08538b6d2d3ce74c9f7729895d5df8e6c265a678ef8c21a846802b28753a7416 ci-operator/step-registry/openshift/os-publish-art/openshift-os-publish-art-commands.sh
+# source 6aa96c384b51c3a262a2747ea3b2fa2ed132b9556df5c7af2018781d747d25ce hack/generators/scos-art-publication.py
+--- a/openshift/os/openshift-os-master-postsubmits.yaml
++++ b/openshift/os/openshift-os-master-postsubmits.yaml
+@@ -81,81 +81,264 @@
+     spec:
+       containers:
+       - args:
+-        - --gcs-upload-secret=/secrets/gcs/service-account.json
+-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+-        - --promote
+-        - --report-credentials-file=/etc/report/credentials
+-        - --target=[images]
+-        - --variant=okd-scos
++        - '{"config":{"base_images":{"ocp_builder_stream":{"name":"builder","namespace":"ocp","tag":"stream10"},"stream-coreos-base":{"name":"stream-coreos-base","namespace":"coreos","tag":"10"}},"build_root":{"image_stream_tag":{"name":"coreos-assembler","namespace":"coreos","tag":"latest"}},"images":{"items":[{"build_args":[{"name":"OPENSHIFT_CI","value":"1"},{"name":"OPENSHIFT_VERSION","value":"5.1"},{"name":"YUM_REPO_NAMES","value":"c10s-baseos,c10s-appstream,c10s-sig-nfv,c10s-sig-cloud-okd,rhel-10.2-server-ose-5.1"},{"name":"STREAM_CLASS","value":"centos-10"}],"dockerfile_path":"Containerfile","inputs":{"stream-coreos-base":{"as":["${IMAGE_FROM}"]}},"to":"stream-coreos"},{"build_args":[{"name":"OPENSHIFT_CI","value":"1"},{"name":"YUM_REPO_NAMES","value":"c10s-baseos,c10s-appstream,c10s-sig-nfv,c10s-sig-cloud-okd,rhel-10.2-server-ose-5.1"},{"name":"EXTENSIONS_YUM_REPO_NAMES","value":"c10s-nfv"},{"name":"STREAM_CLASS","value":"centos-10"}],"dockerfile_path":"extensions/Containerfile","inputs":{"ocp_builder_stream":{"as":["registry.access.redhat.com/ubi9/ubi:latest"]},"stream-coreos":{"as":["${IMAGE_FROM}"]}},"to":"stream-coreos-extensions"}]},"promotion":{"to":[{"name":"scos-5.1","namespace":"origin"}]},"releases":{"latest":{"integration":{"include_built_images":true,"name":"scos-5.1","namespace":"origin"}}},"resources":{"*":{"requests":{"cpu":"100m","memory":"200Mi"}}},"tests":[{"as":"publish-art","disable_rehearsal":true,"literal_steps":{"test":[{"as":"openshift-os-publish-art","commands":"#!/usr/bin/env
++          bash\nset -euo pipefail\n\nexport KUBECONFIG=/etc/app-ci-kubeconfig/kubeconfig\nregistry_config=/etc/push-secret/.dockerconfigjson\n\nvalidate_inputs()
++          {\n  if [[ \"${JOB_TYPE:?}\" != postsubmit ]]; then\n    echo ''ART publication
++          is only permitted in postsubmits'' >&2\n    exit 1\n  fi\n  local credential_file
++          source\n  for credential_file in \"$KUBECONFIG\" \"$registry_config\"; do\n    if
++          [[ ! -f \"$credential_file\" || ! -r \"$credential_file\" || ! -s \"$credential_file\"
++          ]]; then\n      echo \"Required credential file is missing, unreadable or
++          empty: ${credential_file}\" >&2\n      exit 1\n    fi\n  done\n  sources=(\"${STREAM_COREOS_IMAGE:?}\"
++          \"${STREAM_COREOS_EXTENSIONS_IMAGE:?}\")\n  for source in \"${sources[@]}\";
++          do\n    if [[ ! \"$source\" =~ ^quay-proxy\\.ci\\.openshift\\.org/openshift/ci@sha256:[a-f0-9]{64}$
++          ]]; then\n      echo ''Expected an immutable build dependency, refusing
++          publication'' >&2\n      exit 1\n    fi\n  done\n}\n\nrequire_ci_promotion()
++          {\n  if ! oc --request-timeout=10s -n origin get imagestream scos-5.1 -o
++          json > \"$workdir/ci-current.json\" 2> \"$workdir/get.err\"; then\n    echo
++          ''Unable to verify normal CI promotion; client diagnostics withheld'' >&2\n    exit
++          1\n  fi\n  if ! jq_art ''\n    .apiVersion == \"image.openshift.io/v1\"
++          and .kind == \"ImageStream\" and\n    .metadata.name == \"scos-5.1\" and
++          .metadata.namespace == \"origin\" and\n    (.metadata.uid | type == \"string\"
++          and length > 0) and\n    (art_specs | has_both_tags) and\n    ([art_specs[].from.name]
++          == [$coreos, $extensions]) and\n    all(art_specs[];\n      .from.kind ==
++          \"DockerImage\" and .reference == true and\n      .referencePolicy.type
++          == \"Source\" and\n      (.generation | type == \"number\" and . > 0))\n  ''
++          -e --arg coreos \"${sources[0]}\" --arg extensions \"${sources[1]}\" \"$workdir/ci-current.json\"
++          > /dev/null; then\n    echo ''Normal CI promotion does not match both originating
++          build digests; refusing ART publication'' >&2\n    exit 1\n  fi\n  if [[
++          -f \"$workdir/ci-baseline.json\" ]]; then\n    if ! cmp -s <(jq_art ''[.metadata.uid,
++          art_specs]'' -S \"$workdir/ci-baseline.json\") <(jq_art ''[.metadata.uid,
++          art_specs]'' -S \"$workdir/ci-current.json\"); then\n      echo ''Normal
++          CI promotion was superseded; refusing ART publication success'' >&2\n      exit
++          1\n    fi\n  else\n    cp \"$workdir/ci-current.json\" \"$workdir/ci-baseline.json\"\n  fi\n}\n\nrequire_manifest_list()
++          {\n  local source=$1 digest\n  digest=${source##*@}\n  if ! oc image info
++          --registry-config=\"$registry_config\" --show-multiarch --filter-by-os=''linux/.*''
++          -o json \"$source\" > \"$workdir/image-info.out\" 2> \"$workdir/image-info.err\";
++          then\n    echo ''Unable to verify promoted manifest list; client diagnostics
++          withheld'' >&2\n    exit 1\n  fi\n  if ! jq --arg digest \"$digest\" ''\n    if
++          type == \"array\" then . else [.] end |\n    length > 0 and all(.[]; .listDigest
++          == $digest and\n      (.digest | type == \"string\" and test(\"^sha256:[a-f0-9]{64}$\"))
++          and\n      .digest == .contentDigest)\n  '' -e \"$workdir/image-info.out\"
++          > /dev/null; then\n    echo \"Promoted source is not the expected manifest
++          list at ${digest}\" >&2\n    exit 1\n  fi\n}\n\njq_art() {\n  local filter=$1\n  shift\n  jq
++          \"\n    def art_names: [\\\"stream-coreos\\\", \\\"stream-coreos-extensions\\\"];\n    def
++          is_art_tag: IN(art_names[]);\n    def art_specs:\n      [.spec.tags[]? |
++          select(.name | is_art_tag)] | sort_by(.name);\n    def has_both_tags:\n      (map(.name)
++          | sort) == (art_names | sort);\n    $filter\n  \" \"$@\"\n}\n\ndiagnose()
++          {\n  echo \"$1\" >&2\n  if [[ -s \"$workdir/current.json\" ]]; then\n    jq_art
++          ''\n      def digest:\n        if type == \"string\" then\n          split(\"@\")[-1]
++          | if test(\"^sha256:[a-f0-9]{64}$\") then . else null end\n        else
++          null end;\n      def generation: if type == \"number\" then . else null
++          end;\n      def reason:\n        if IN(\"RegistryUnavailable\", \"Unauthorized\",
++          \"NotFound\", \"InternalError\", \"ImportFailed\")\n        then . else
++          \"Other\" end;\n      {\n        spec: [art_specs[] | {\n          name,
++          digest: (.from.name | digest), generation: (.generation | generation)\n        }],\n        status:
++          [.status.tags[]? | select(.tag | is_art_tag) | {\n          tag,\n          latest:
++          [.items[:1][]? | {\n            digest: (.image | digest), generation: (.generation
++          | generation)\n          }],\n          conditions: [.conditions[]? | select(.type
++          == \"ImportSuccess\") | {\n            generation: (.generation | generation),\n            success:
++          (.status == \"True\"), reason: (.reason | reason)\n          }]\n        }]\n      }\n    ''
++          \"$workdir/current.json\" >&2\n  fi\n}\n\nget_stream() {\n  if ! oc --request-timeout=10s
++          -n origin get imagestream scos-5.1-art -o json > \"$workdir/current.json\"
++          2> \"$workdir/get.err\"; then\n    echo ''Unable to read ART ImageStream;
++          client diagnostics withheld to avoid exposing credentials'' >&2\n    exit
++          1\n  fi\n  if ! jq_art ''\n    .apiVersion == \"image.openshift.io/v1\"
++          and .kind == \"ImageStream\" and\n    .metadata.name == \"scos-5.1-art\"
++          and .metadata.namespace == \"origin\" and\n    (.metadata.uid | type ==
++          \"string\" and length > 0) and\n    (.metadata.resourceVersion | type ==
++          \"string\" and length > 0) and\n    (art_specs | has_both_tags)\n  '' -e
++          \"$workdir/current.json\" > /dev/null; then\n    echo ''Missing or unexpected
++          ART stream identity or tag cardinality'' >&2\n    exit 1\n  fi\n}\n\nrequire_tag_identity()
++          {\n  local file=$1 tag=$2\n  case \"$tag\" in stream-coreos|stream-coreos-extensions)
++          ;; *) exit 1 ;; esac\n  if ! jq --arg tag \"$tag\" --arg uid \"$(jq -r ''.metadata.uid''
++          \"$workdir/baseline.json\")\" ''\n    .apiVersion == \"image.openshift.io/v1\"
++          and .kind == \"ImageStreamTag\" and\n    .metadata.name == (\"scos-5.1-art:\"
++          + $tag) and .metadata.namespace == \"origin\" and\n    .metadata.uid ==
++          $uid and\n    (.metadata.resourceVersion | type == \"string\" and length
++          > 0) and .tag.name == $tag\n  '' -e \"$file\" > /dev/null; then\n    echo
++          ''Missing or unexpected ART tag identity; refusing publication'' >&2\n    exit
++          1\n  fi\n}\n\nrequire_unchanged() {\n  local previous=$1 message=$2\n  if
++          ! cmp -s <(jq_art ''art_specs'' -S \"$previous\") <(jq_art ''art_specs''
++          -S \"$workdir/current.json\") ||\n    [[ $(jq -r ''.metadata.uid'' \"$previous\")
++          != $(jq -r ''.metadata.uid'' \"$workdir/current.json\") ]]; then\n    diagnose
++          \"$message\"\n    exit 1\n  fi\n}\n\nmirror_images() {\n  require_ci_promotion\n  local
++          source\n  for source in \"${sources[@]}\"; do\n    require_manifest_list
++          \"$source\"\n  done\n  get_stream\n  cp \"$workdir/current.json\" \"$workdir/baseline.json\"\n  printf
++          ''[]'' > \"$workdir/desired.json\"\n  local index tag digest destination\n  for
++          index in 0 1; do\n    tag=$(jq_art \"art_names[${index}]\" -nr)\n    source=${sources[$index]}\n    digest=${source##*@}\n    destination=\"quay.io/openshift/ci:origin_scos-5.1-art_${tag}_${digest#sha256:}\"\n    if
++          ! oc image mirror --keep-manifest-list=true --registry-config=\"$registry_config\"
++          \"$source=$destination\" > \"$workdir/mirror.out\" 2> \"$workdir/mirror.err\";
++          then\n      echo \"ART mirror failed for ${tag} at ${digest}; client diagnostics
++          withheld to avoid exposing credentials\" >&2\n      exit 1\n    fi\n    jq
++          --arg name \"$tag\" --arg source \"quay-proxy.ci.openshift.org/openshift/ci@${digest}\"
++          ''\n      . + [{\n        name: $name,\n        from: {kind: \"DockerImage\",
++          name: $source},\n        reference: false,\n        generation: 0,\n        importPolicy:
++          {importMode: \"PreserveOriginal\"},\n        referencePolicy: {type: \"Source\"}\n      }]\n    ''
++          \"$workdir/desired.json\" > \"$workdir/next.json\"\n    mv \"$workdir/next.json\"
++          \"$workdir/desired.json\"\n  done\n}\n\nverify_update_response() {\n  local
++          tag=$1\n  require_tag_identity \"$workdir/tag-updated.json\" \"$tag\"\n  if
++          ! jq ''\n    .tag as $actual | $desired[0].tag as $expected | $actual |\n      .name
++          == $expected.name and .from == $expected.from and\n      (.reference //
++          false) == false and\n      .importPolicy.importMode == \"PreserveOriginal\"
++          and\n      .referencePolicy.type == \"Source\"\n  '' -e --slurpfile desired
++          \"$workdir/update.json\" \"$workdir/tag-updated.json\" > /dev/null; then\n    diagnose
++          ''ART update response does not match this build or its import policy''\n    exit
++          1\n  fi\n  if ! jq ''.tag.generation | type == \"number\" and . > 0'' -e
++          \"$workdir/tag-updated.json\" > /dev/null; then\n    diagnose ''API did
++          not assign import generations''\n    exit 1\n  fi\n}\n\nupdate_art_tags()
++          {\n  local tag\n  for tag in stream-coreos stream-coreos-extensions; do\n    if
++          [[ \"$tag\" == stream-coreos-extensions ]]; then\n      echo ''First ART
++          tag updated; a subsequent failure can leave a partial publication (no rollback)''
++          >&2\n    fi\n    update_art_tag \"$tag\"\n  done\n  cp \"$workdir/baseline.json\"
++          \"$workdir/updated.json\"\n}\n\nupdate_art_tag() {\n  local tag=$1 attempt
++          update_exit error expected_conflict reason conflict_prefix version\n  for
++          attempt in 1 2 3; do\n    require_ci_promotion\n    get_stream\n    require_unchanged
++          \"$workdir/baseline.json\" ''Publication superseded before update; refusing
++          to overwrite''\n    if ! oc --request-timeout=10s -n origin get imagestreamtag
++          \"scos-5.1-art:${tag}\" -o json > \"$workdir/tag.json\" 2> \"$workdir/get.err\";
++          then\n      echo ''Unable to read existing ART tag; client diagnostics withheld''
++          >&2\n      exit 1\n    fi\n    require_tag_identity \"$workdir/tag.json\"
++          \"$tag\"\n    if ! cmp -s <(jq --arg tag \"$tag\" -S ''.spec.tags[] | select(.name
++          == $tag)'' \"$workdir/baseline.json\") <(jq -S ''.tag'' \"$workdir/tag.json\");
++          then\n      diagnose ''Publication superseded before update; refusing to
++          overwrite''\n      exit 1\n    fi\n    jq --arg tag \"$tag\" --arg version
++          \"$(jq -r ''.metadata.resourceVersion'' \"$workdir/current.json\")\" --slurpfile
++          desired \"$workdir/desired.json\" ''\n      {apiVersion: \"image.openshift.io/v1\",
++          kind: \"ImageStreamTag\",\n       metadata: {name: (\"scos-5.1-art:\" +
++          $tag), namespace: \"origin\",\n         uid: .metadata.uid, resourceVersion:
++          $version},\n       tag: ($desired[0][] | select(.name == $tag))}\n    ''
++          \"$workdir/tag.json\" > \"$workdir/update.json\"\n    if oc --request-timeout=10s
++          -n origin replace -f \"$workdir/update.json\" -o json > \"$workdir/tag-updated.json\"
++          2> \"$workdir/replace.err\"; then\n      verify_update_response \"$tag\"\n      jq
++          --arg tag \"$tag\" --slurpfile response \"$workdir/tag-updated.json\" ''\n        .spec.tags
++          |= map(if .name == $tag then $response[0].tag else . end)\n      '' \"$workdir/baseline.json\"
++          > \"$workdir/next.json\"\n      mv \"$workdir/next.json\" \"$workdir/baseline.json\"\n      return\n    else\n      update_exit=$?\n    fi\n    error=$(cat
++          \"$workdir/replace.err\")\n    expected_conflict=\"Error from server (Conflict):
++          error when replacing \\\"${workdir}/update.json\\\": Operation cannot be
++          fulfilled on imagestreams.image.openshift.io \\\"scos-5.1-art\\\": the object
++          has been modified; please apply your changes to the latest version and try
++          again\"\n    conflict_prefix=\"Error from server (Conflict): error when
++          replacing \\\"${workdir}/update.json\\\": Operation cannot be fulfilled
++          on imagestreamtags.image.openshift.io \\\"scos-5.1-art:${tag}\\\": another
++          caller has updated the resource version to \"\n    version=${error#\"$conflict_prefix\"}\n    if
++          [[ \"$error\" != \"$expected_conflict\" ]] && ! { [[ \"$version\" =~ ^[0-9]+$
++          ]] && [[ \"$error\" == \"${conflict_prefix}${version}\" ]]; }; then\n      reason=Unclassified\n      case
++          \"$error\" in\n        ''Error from server (Forbidden): ''*) reason=Forbidden
++          ;;\n        ''Error from server (Invalid): ''*|\"The ImageStreamTag \\\"scos-5.1-art:${tag}\\\"
++          is invalid: \"*) reason=Invalid ;;\n      esac\n      diagnose \"ART update
++          failed (${reason}; exit ${update_exit}); outcome unconfirmed, not retrying
++          or attributing to another writer\"\n      exit \"$update_exit\"\n    fi\n  done\n  diagnose
++          ''Unable to update ART imports after three optimistic attempts''\n  exit
++          1\n}\n\nwait_for_imports() {\n  local attempt\n  for ((attempt = 0; attempt
++          < 60; attempt++)); do\n    require_ci_promotion\n    get_stream\n    require_unchanged
++          \"$workdir/updated.json\" ''Publication superseded while waiting for import''\n    if
++          jq_art ''\n      def import_failed($spec):\n        any(.status.tags[]?;\n          .tag
++          == $spec.name and any(.conditions[]?;\n            .type == \"ImportSuccess\"
++          and .status == \"False\" and\n            .generation == $spec.generation));\n      .
++          as $stream | any(art_specs[]; . as $spec | $stream | import_failed($spec))\n    ''
++          -e \"$workdir/current.json\" > /dev/null; then\n      diagnose ''ART image
++          import failed''\n      exit 1\n    fi\n    if jq_art ''\n      def import_complete($spec):\n        any(.status.tags[]?;\n          .tag
++          == $spec.name and\n          (.items[0].image // \"\") != \"\" and\n          .items[0].image
++          == ($spec.from.name | split(\"@\")[1]) and\n          .items[0].generation
++          == $spec.generation);\n      . as $stream | art_specs |\n      has_both_tags
++          and all(.[]; . as $spec | $stream | import_complete($spec))\n    '' -e \"$workdir/current.json\"
++          > /dev/null; then\n      require_ci_promotion\n      echo ''Both ART CoreOS
++          imports match this build and their current generations''\n      return\n    fi\n    sleep
++          5\n  done\n  diagnose ''Timed out waiting for ART CoreOS imports''\n  exit
++          1\n}\n\nvalidate_inputs\nworkdir=$(mktemp -d)\ntrap ''rm -rf \"$workdir\"''
++          EXIT\nmirror_images\nupdate_art_tags\nwait_for_imports\n","credentials":[{"bundle":"promotion-quay-tagger-kubeconfig","mount_path":"/etc/app-ci-kubeconfig","namespace":"ci"},{"bundle":"registry-push-credentials-ci-central","mount_path":"/etc/push-secret","namespace":"ci"}],"dependencies":[{"env":"STREAM_COREOS_IMAGE","name":"stream-coreos"},{"env":"STREAM_COREOS_EXTENSIONS_IMAGE","name":"stream-coreos-extensions"}],"documentation":"Publish
++          the images job''s two CoreOS manifest lists after successful normal\nCI
++          promotion. Use originating build digests, verify CI reference equality,\nupdate
++          only the two ART ImageStreamTags, and verify imports and generations.","from_image":{"name":"4.23","namespace":"ocp","tag":"cli"},"grace_period":"1m","resources":{"requests":{"cpu":"100m","memory":"200Mi"}},"timeout":"20m"}]},"postsubmit":true}],"zz_generated_metadata":{"branch":"master","org":"openshift","repo":"os","variant":"okd-scos"}},"images":["--gcs-upload-secret=/secrets/gcs/service-account.json","--image-import-pull-secret=/etc/pull-secret/.dockerconfigjson","--image-mirror-push-secret=/etc/push-secret/.dockerconfigjson","--promote","--report-credentials-file=/etc/report/credentials","--target=[images]","--variant=okd-scos"],"publisher":["--enable-secrets-store-csi-driver=true","--gcs-upload-secret=/secrets/gcs/service-account.json","--gsm-config=/etc/gsm-config/gsm-config.yaml","--gsm-credentials-file=/etc/gsm-credentials/key.json","--gsm-project-config=/etc/gsm-config/gsm-project-config.yaml","--image-import-pull-secret=/etc/pull-secret/.dockerconfigjson","--lease-server-credentials-file=/etc/boskos/credentials","--report-credentials-file=/etc/report/credentials","--secret-dir=/secrets/ci-pull-credentials","--target=publish-art","--variant=okd-scos"]}'
+         command:
+-        - ci-operator
+-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+-        imagePullPolicy: Always
+-        name: ""
+-        resources:
+-          requests:
+-            cpu: 10m
+-        volumeMounts:
+-        - mountPath: /secrets/gcs
+-          name: gcs-credentials
+-          readOnly: true
+-        - mountPath: /secrets/manifest-tool
+-          name: manifest-tool-local-pusher
+-          readOnly: true
+-        - mountPath: /etc/pull-secret
+-          name: pull-secret
+-          readOnly: true
+-        - mountPath: /etc/push-secret
+-          name: push-secret
+-          readOnly: true
+-        - mountPath: /etc/report
+-          name: result-aggregator
+-          readOnly: true
+-      serviceAccountName: ci-operator
+-      volumes:
+-      - name: manifest-tool-local-pusher
+-        secret:
+-          secretName: manifest-tool-local-pusher
+-      - name: pull-secret
+-        secret:
+-          secretName: registry-pull-credentials
+-      - name: push-secret
+-        secret:
+-          secretName: registry-push-credentials-ci-central
+-      - name: result-aggregator
+-        secret:
+-          secretName: result-aggregator
+-  - agent: kubernetes
+-    always_run: true
+-    branches:
+-    - ^master$
+-    decorate: true
+-    decoration_config:
+-      sparse_checkout_files:
+-      - Containerfile
+-      - extensions/Containerfile
+-    labels:
+-      ci-operator.openshift.io/variant: okd-scos
+-      ci.openshift.io/generator: prowgen
+-    max_concurrency: 1
+-    name: branch-ci-openshift-os-master-okd-scos-publish-art
+-    spec:
+-      containers:
+-      - args:
+-        - --enable-secrets-store-csi-driver=true
+-        - --gcs-upload-secret=/secrets/gcs/service-account.json
+-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+-        - --lease-server-credentials-file=/etc/boskos/credentials
+-        - --report-credentials-file=/etc/report/credentials
+-        - --secret-dir=/secrets/ci-pull-credentials
+-        - --target=publish-art
+-        - --variant=okd-scos
+-        command:
+-        - ci-operator
++        - python3
++        - -c
++        - |
++          import json
++          import os
++          from pathlib import Path
++          import re
++          import subprocess
++          import sys
++          import tempfile
++
++          def require(condition, message):
++              if not condition:
++                  raise ValueError(message)
++
++          def read_json(path):
++              require(path.is_file() and not path.is_symlink(), "Missing or unsafe handoff file")
++              return json.loads(path.read_text())
++
++          def build_digests(artifacts, job):
++              metadata = read_json(artifacts / "metadata.json")
++              refs = job["refs"]
++              require(metadata.get("pod") == job["prowjobid"] and
++                      metadata.get("repo") == "openshift/os" and
++                      metadata.get("repos") == {"openshift/os": refs["base_ref"] + ":" + refs["base_sha"]},
++                      "Handoff does not belong to this job and commit")
++              namespace = metadata.get("work-namespace", "")
++              require(re.fullmatch(r"ci-op-[a-z0-9-]+", namespace), "Invalid handoff namespace")
++              snapshot = read_json(artifacts / "build-resources/imagestreams.json")
++              require(snapshot.get("kind") == "ImageStreamList" and
++                      snapshot.get("apiVersion") == "image.openshift.io/v1", "Invalid stream snapshot")
++              streams = [stream for stream in snapshot["items"] if stream["metadata"]["name"] == "pipeline"]
++              require(len(streams) == 1, "Expected exactly one originating pipeline stream")
++              stream = streams[0]
++              require(stream["metadata"]["namespace"] == namespace and stream["metadata"].get("uid"),
++                      "Foreign pipeline stream")
++              digests = []
++              for tag in ("stream-coreos", "stream-coreos-extensions"):
++                  statuses = [entry for entry in stream["status"]["tags"] if entry["tag"] == tag]
++                  require(len(statuses) == 1 and statuses[0].get("items"), "Missing or duplicate build output")
++                  latest = statuses[0]["items"][0]
++                  digest = latest.get("image", "")
++                  require(re.fullmatch(r"sha256:[a-f0-9]{64}", digest), "Invalid build digest")
++                  require(latest.get("dockerImageReference", "").endswith("@" + digest),
++                          "Build digest and promotion source disagree")
++                  specs = [entry for entry in stream.get("spec", {}).get("tags", []) if entry["name"] == tag]
++                  require(len(specs) <= 1, "Duplicate build specification")
++                  if specs and specs[0].get("generation") is not None:
++                      require(specs[0]["generation"] == latest.get("generation"), "Pending build output")
++                  digests.append(digest)
++              return digests
++
++          def main():
++              payload = json.loads(sys.argv[1])
++              job = json.loads(os.environ["JOB_SPEC"])
++              refs = job.get("refs", {})
++              require(job.get("type") == "postsubmit" and
++                      job.get("job") == "branch-ci-openshift-os-master-okd-scos-images" and
++                      job.get("prowjobid") and not job.get("extra_refs") and not refs.get("pulls") and
++                      refs.get("org") == "openshift" and refs.get("repo") == "os" and
++                      refs.get("base_ref") == "master" and
++                      re.fullmatch(r"[a-f0-9]{40}", refs.get("base_sha", "")), "Unexpected originating job")
++              artifacts = Path(os.environ["ARTIFACTS"])
++              for relative in ("metadata.json", "build-resources", "art-publication"):
++                  require(not (artifacts / relative).exists() and not (artifacts / relative).is_symlink(),
++                          "Refusing stale or reused handoff artifacts")
++              with tempfile.TemporaryDirectory(prefix="scos-publication-") as temporary:
++                  config = Path(temporary) / "config.json"
++                  config.write_text(json.dumps(payload["config"]))
++                  result = subprocess.run(["ci-operator", "--config=" + str(config)] + payload["images"], check=False)
++                  if result.returncode:
++                      return result.returncode if result.returncode > 0 else 128 - result.returncode
++                  digests = build_digests(artifacts, job)
++                  frozen = {"prowjobid": job["prowjobid"], "base_sha": refs["base_sha"], "digests": digests}
++                  (Path(temporary) / "handoff.json").write_text(json.dumps(frozen))
++                  environment = dict(os.environ, ARTIFACTS=str(artifacts / "art-publication"))
++                  overrides = ["--dependency-override-param=" + name +
++                               "=quay-proxy.ci.openshift.org/openshift/ci@" + digest
++                               for name, digest in zip(("STREAM_COREOS_IMAGE", "STREAM_COREOS_EXTENSIONS_IMAGE"), digests)]
++                  result = subprocess.run(["ci-operator", "--config=" + str(config)] +
++                                          payload["publisher"] + ["--promote=false"] + overrides,
++                                          env=environment, check=False)
++                  return result.returncode if result.returncode >= 0 else 128 - result.returncode
++
++          try:
++              sys.exit(main())
++          except (ValueError, KeyError, TypeError, OSError, IndexError):
++              sys.exit("Ordered publication failed: invalid inputs or unavailable build handoff; no subsequent stage authorized")
+         env:
+         - name: HTTP_SERVER_IP
+           valueFrom:
+@@ -171,32 +354,47 @@
+           requests:
+             cpu: 10m
+         volumeMounts:
++        - mountPath: /secrets/gcs
++          name: gcs-credentials
++          readOnly: true
++        - mountPath: /secrets/manifest-tool
++          name: manifest-tool-local-pusher
++          readOnly: true
++        - mountPath: /etc/pull-secret
++          name: pull-secret
++          readOnly: true
++        - mountPath: /etc/push-secret
++          name: push-secret
++          readOnly: true
++        - mountPath: /etc/report
++          name: result-aggregator
++          readOnly: true
+         - mountPath: /etc/boskos
+           name: boskos
+           readOnly: true
+         - mountPath: /secrets/ci-pull-credentials
+           name: ci-pull-credentials
+           readOnly: true
+-        - mountPath: /secrets/gcs
+-          name: gcs-credentials
+-          readOnly: true
+         - mountPath: /etc/gsm-config
+           name: gsm-config
+           readOnly: true
+         - mountPath: /etc/gsm-credentials
+           name: gsm-sa-key
+           readOnly: true
+-        - mountPath: /secrets/manifest-tool
+-          name: manifest-tool-local-pusher
+-          readOnly: true
+-        - mountPath: /etc/pull-secret
+-          name: pull-secret
+-          readOnly: true
+-        - mountPath: /etc/report
+-          name: result-aggregator
+-          readOnly: true
+       serviceAccountName: ci-operator
+       volumes:
++      - name: manifest-tool-local-pusher
++        secret:
++          secretName: manifest-tool-local-pusher
++      - name: pull-secret
++        secret:
++          secretName: registry-pull-credentials
++      - name: push-secret
++        secret:
++          secretName: registry-push-credentials-ci-central
++      - name: result-aggregator
++        secret:
++          secretName: result-aggregator
+       - name: boskos
+         secret:
+           items:
+@@ -215,12 +413,3 @@
+           volumeAttributes:
+             secretProviderClass: ci-operator-sa-key-spc
+         name: gsm-sa-key
+-      - name: manifest-tool-local-pusher
+-        secret:
+-          secretName: manifest-tool-local-pusher
+-      - name: pull-secret
+-        secret:
+-          secretName: registry-pull-credentials
+-      - name: result-aggregator
+-        secret:
+-          secretName: result-aggregator
