@@ -23,7 +23,9 @@ function notify_qe_agent() {
   "env": {
     "OPERATOR_IMG": "${OPERATOR_IMG:-}",
     "OTEL_COLLECTOR_IMAGE": "${OTEL_COLLECTOR_IMAGE:-}",
-    "TARGETALLOCATOR_IMG": "${TARGETALLOCATOR_IMG:-}"
+    "TARGETALLOCATOR_IMG": "${TARGETALLOCATOR_IMG:-}",
+    "RUN_TESTS": "${RUN_TESTS:-}",
+    "SKIP_TESTS": "${SKIP_TESTS:-}"
   }
 }
 CONTEXT
@@ -34,9 +36,25 @@ trap notify_qe_agent EXIT
 OPERATOR_NAMESPACE="opentelemetry-operator-system"
 OPERATOR_DEPLOYMENT="opentelemetry-operator-controller-manager"
 WEBHOOK_DEPLOYMENT="opentelemetry-operator-webhook"
+# The full suite. Two directories run on their own, after everything else: tests/e2e-metadata-filters needs the
+# metadata filter variables set on the operator first, and tests/e2e-openshift-tls-profile changes the cluster-wide
+# TLS profile, which rolls out a MachineConfig update that disrupts any test running next to it, so it runs last.
+FULL_SUITE="tests/e2e tests/e2e-autoscale tests/e2e-crd-validations tests/e2e-openshift tests/e2e-instrumentation
+tests/e2e-pdb tests/e2e-otel tests/e2e-multi-instrumentation tests/e2e-targetallocator-cr tests/e2e-targetallocator
+tests/e2e-prometheuscr tests/e2e-sidecar tests/e2e-metadata-filters tests/e2e-openshift-tls-profile"
+METADATA_FILTERS_DIR="tests/e2e-metadata-filters"
+TLS_PROFILE_DIR="tests/e2e-openshift-tls-profile"
 
 if [[ -z "${OPERATOR_IMG:-}" || -z "${OTEL_COLLECTOR_IMAGE:-}" || -z "${TARGETALLOCATOR_IMG:-}" ]]; then
   echo "ERROR: OPERATOR_IMG, OTEL_COLLECTOR_IMAGE and TARGETALLOCATOR_IMG must be set. They are filled from the opentelemetry-operator-art, opentelemetry-collector and opentelemetry-target-allocator-art pipeline images."
+  exit 1
+fi
+if [[ -n "${RUN_TESTS:-}" && -n "${SKIP_TESTS:-}" ]]; then
+  echo "ERROR: RUN_TESTS and SKIP_TESTS cannot both be set. A job either names the tests to run or the tests to skip from the full suite."
+  exit 1
+fi
+if [[ -z "${RUN_TESTS:-}" && -z "${SKIP_TESTS:-}" ]]; then
+  echo "ERROR: neither RUN_TESTS nor SKIP_TESTS is set. A job names either the tests to run or the tests to skip from the full suite; a job config that sets neither is stale."
   exit 1
 fi
 echo "Operator image under test: ${OPERATOR_IMG}"
@@ -46,6 +64,70 @@ echo "Target allocator image under test: ${TARGETALLOCATOR_IMG}"
 # Copy the operator repository (the pull request source baked into the obs-tests-runner image) to a writable directory.
 cp -R /tmp/opentelemetry-operator /tmp/otel-tests
 cd /tmp/otel-tests
+
+# The tests to run: exactly RUN_TESTS, or the full suite minus SKIP_TESTS.
+if [[ -n "${RUN_TESTS:-}" ]]; then
+  echo "Running the tests of RUN_TESTS: ${RUN_TESTS}"
+  # shellcheck disable=SC2206 # RUN_TESTS is a space separated list
+  selected=(${RUN_TESTS})
+  for dir in "${selected[@]}"; do
+    if [[ ! -d "${dir}" ]]; then
+      echo "ERROR: the test directory ${dir} of RUN_TESTS does not exist in the repository."
+      exit 1
+    fi
+  done
+else
+  echo "Running the full suite: ${FULL_SUITE}"
+  # Remove the tests that cannot run on this OpenShift version, platform or architecture. Only paths under tests/
+  # without a ".." component are accepted, so that nothing outside tests/ can be removed; globs are expanded by the
+  # shell. The paths that exist and get removed are recorded, so that a suite directory removed as a whole (also
+  # through a glob) is told apart from one that never existed.
+  IFS=' ' read -ra SKIP_TEST_ARRAY <<< "${SKIP_TESTS}"
+  INVALID_TESTS=""
+  removed=()
+  for test in "${SKIP_TEST_ARRAY[@]}"; do
+    if [[ "${test}" != tests/* || "${test}" == *..* ]]; then
+      INVALID_TESTS+=" ${test}"
+      continue
+    fi
+    # shellcheck disable=SC2086 # the entry may be a glob
+    for path in ${test}; do
+      [[ -e "${path}" ]] && removed+=("${path}")
+    done
+  done
+  if [[ -n "${INVALID_TESTS}" ]]; then
+    echo "These test cases are not valid to be skipped:${INVALID_TESTS}"
+  fi
+  if [[ ${#removed[@]} -gt 0 ]]; then
+    echo "Skipping tests: ${removed[*]}"
+    rm -rf -- "${removed[@]}"
+  fi
+  # A suite directory that SKIP_TESTS removed as a whole is left out; a suite directory that does not exist on the
+  # branch is an error of the suite list, not something to skip silently.
+  selected=()
+  for dir in ${FULL_SUITE}; do
+    if [[ -d "${dir}" ]]; then
+      selected+=("${dir}")
+    elif [[ " ${removed[*]:-} " == *" ${dir} "* ]]; then
+      echo "Suite directory ${dir} skipped as a whole."
+    else
+      echo "ERROR: the suite directory ${dir} does not exist in the repository; update the full suite list in this step."
+      exit 1
+    fi
+  done
+fi
+
+# The metadata filters and the TLS profile tests run on their own after the rest, in that order (see FULL_SUITE).
+main_dirs=()
+run_metadata_filters=false
+run_tls_profile=false
+for dir in "${selected[@]}"; do
+  case "${dir}" in
+    "${METADATA_FILTERS_DIR}") run_metadata_filters=true ;;
+    "${TLS_PROFILE_DIR}") run_tls_profile=true ;;
+    *) main_dirs+=("${dir}") ;;
+  esac
+done
 
 # Enable user workload monitoring
 oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
@@ -70,91 +152,112 @@ for deployment in "${OPERATOR_DEPLOYMENT}" "${WEBHOOK_DEPLOYMENT}"; do
   fi
 done
 
-# Point the operator at the collector and target allocator images built in this CI run.
-# The product CSV (bundle/art.yaml) sets both variables on the manager and on the webhook deployment, so set both.
-# The env of each container is rebuilt without any existing entry of these variables, so the patch never creates
-# duplicates, whether or not the installed bundle already carries them.
-if ! CSV_NAME=$(oc get csv -n "${OPERATOR_NAMESPACE}" -o name | grep -m1 "opentelemetry-operator" | cut -d/ -f2); then
-  echo "ERROR: no opentelemetry-operator CSV found in namespace ${OPERATOR_NAMESPACE}."
-  exit 1
-fi
-PATCH=$(oc get csv "${CSV_NAME}" -n "${OPERATOR_NAMESPACE}" -o json | jq -c \
-  --arg manager "${OPERATOR_DEPLOYMENT}" \
-  --arg webhook "${WEBHOOK_DEPLOYMENT}" \
-  --arg collector "${OTEL_COLLECTOR_IMAGE}" \
-  --arg ta "${TARGETALLOCATOR_IMG}" '
-  [.spec.install.spec.deployments | to_entries[] | select(.value.name == $manager or .value.name == $webhook) |
-   {"op": "add",
-    "path": "/spec/install/spec/deployments/\(.key)/spec/template/spec/containers/0/env",
-    "value": (((.value.spec.template.spec.containers[0].env // [])
-               | map(select(.name != "RELATED_IMAGE_COLLECTOR" and .name != "RELATED_IMAGE_TARGET_ALLOCATOR")))
-              + [{"name": "RELATED_IMAGE_COLLECTOR", "value": $collector},
-                 {"name": "RELATED_IMAGE_TARGET_ALLOCATOR", "value": $ta}])}]')
-if [[ "$(jq length <<< "${PATCH}")" != "2" ]]; then
-  echo "ERROR: expected the ${OPERATOR_DEPLOYMENT} and ${WEBHOOK_DEPLOYMENT} deployments in the CSV ${CSV_NAME}."
-  exit 1
-fi
-oc -n "${OPERATOR_NAMESPACE}" patch csv "${CSV_NAME}" --type=json -p "${PATCH}"
-
-# Wait until OLM rolled out the patched deployments: each must carry exactly one entry of both variables with the
-# requested image, and must be Available.
-function has_expected_images() {
-  oc -n "${OPERATOR_NAMESPACE}" get deployment "$1" -o json | jq -e \
-    --arg collector "${OTEL_COLLECTOR_IMAGE}" \
-    --arg ta "${TARGETALLOCATOR_IMG}" '
-    .spec.template.spec.containers[0].env as $env
-    | ([$env[] | select(.name == "RELATED_IMAGE_COLLECTOR") | .value] == [$collector])
-      and ([$env[] | select(.name == "RELATED_IMAGE_TARGET_ALLOCATOR") | .value] == [$ta])' > /dev/null
-}
-for deployment in "${OPERATOR_DEPLOYMENT}" "${WEBHOOK_DEPLOYMENT}"; do
-  patched=false
-  for _ in $(seq 1 30); do
-    if has_expected_images "${deployment}"; then
-      patched=true
-      break
-    fi
-    sleep 10
+# Sets environment variables on the operator: set_operator_env NAME=VALUE [NAME=VALUE ...]
+# The product CSV (bundle/art.yaml) sets the RELATED_IMAGE_* variables on the manager and on the webhook deployment,
+# so both deployments are patched. The env of each container is rebuilt without any existing entry of the given
+# variables, so the patch never creates duplicates, whether or not the installed bundle already carries them.
+# Returns once OLM rolled out the patched deployments: each must carry exactly one entry of every variable with
+# the requested value, and must be Available.
+function set_operator_env() {
+  local names='[]' entries='[]' pair csv_name patch deployment patched
+  for pair in "$@"; do
+    names=$(jq -c --arg n "${pair%%=*}" '. + [$n]' <<< "${names}")
+    entries=$(jq -c --arg n "${pair%%=*}" --arg v "${pair#*=}" '. + [{"name": $n, "value": $v}]' <<< "${entries}")
   done
-  if [[ "${patched}" != "true" ]]; then
-    echo "ERROR: the deployment ${deployment} does not carry the collector and target allocator images under test."
+  echo "Setting the operator environment variables: $(jq -r 'map(.name) | join(" ")' <<< "${entries}")"
+
+  if ! csv_name=$(oc get csv -n "${OPERATOR_NAMESPACE}" -o name | grep -m1 "opentelemetry-operator" | cut -d/ -f2); then
+    echo "ERROR: no opentelemetry-operator CSV found in namespace ${OPERATOR_NAMESPACE}."
     exit 1
   fi
-  oc -n "${OPERATOR_NAMESPACE}" rollout status deployment "${deployment}" --timeout=5m
-  oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Available deployment "${deployment}" --timeout=5m
-done
+  patch=$(oc get csv "${csv_name}" -n "${OPERATOR_NAMESPACE}" -o json | jq -c \
+    --arg manager "${OPERATOR_DEPLOYMENT}" \
+    --arg webhook "${WEBHOOK_DEPLOYMENT}" \
+    --argjson names "${names}" \
+    --argjson entries "${entries}" '
+    [.spec.install.spec.deployments | to_entries[] | select(.value.name == $manager or .value.name == $webhook) |
+     {"op": "add",
+      "path": "/spec/install/spec/deployments/\(.key)/spec/template/spec/containers/0/env",
+      "value": (((.value.spec.template.spec.containers[0].env // [])
+                 | map(select(.name as $n | ($names | index($n)) == null)))
+                + $entries)}]')
+  if [[ "$(jq length <<< "${patch}")" != "2" ]]; then
+    echo "ERROR: expected the ${OPERATOR_DEPLOYMENT} and ${WEBHOOK_DEPLOYMENT} deployments in the CSV ${csv_name}."
+    exit 1
+  fi
+  oc -n "${OPERATOR_NAMESPACE}" patch csv "${csv_name}" --type=json -p "${patch}"
 
-# Determine OpenShift version and set sidecar selector: native sidecars are used from OpenShift 4.16.
+  for deployment in "${OPERATOR_DEPLOYMENT}" "${WEBHOOK_DEPLOYMENT}"; do
+    patched=false
+    for _ in $(seq 1 30); do
+      if oc -n "${OPERATOR_NAMESPACE}" get deployment "${deployment}" -o json | jq -e --argjson entries "${entries}" '
+        (.spec.template.spec.containers[0].env // []) as $env
+        | all($entries[]; . as $e | ([$env[] | select(.name == $e.name) | .value] == [$e.value]))' > /dev/null; then
+        patched=true
+        break
+      fi
+      sleep 10
+    done
+    if [[ "${patched}" != "true" ]]; then
+      echo "ERROR: the deployment ${deployment} does not carry the requested environment variables."
+      exit 1
+    fi
+    oc -n "${OPERATOR_NAMESPACE}" rollout status deployment "${deployment}" --timeout=5m
+    oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Available deployment "${deployment}" --timeout=5m
+  done
+}
+
+# Point the operator at the collector and target allocator images built in this CI run.
+set_operator_env "RELATED_IMAGE_COLLECTOR=${OTEL_COLLECTOR_IMAGE}" "RELATED_IMAGE_TARGET_ALLOCATOR=${TARGETALLOCATOR_IMG}"
+
+# The sidecar tests carry the label sidecar=native|legacy: native sidecars are used from OpenShift 4.16. The selector
+# keeps the variant of this OpenShift version and every test without the label.
 oc_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || true)
 oc_version_major=$(echo "$oc_version" | cut -d . -f 1)
 oc_version_minor=$(echo "$oc_version" | cut -d . -f 2)
-selector="sidecar=legacy"
+selector="sidecar!=native"
 if [[ -n "$oc_version_major" ]] && { [[ "$oc_version_major" -ge 5 ]] || { [[ "$oc_version_major" -eq 4 ]] && [[ "$oc_version_minor" -ge 16 ]]; }; }; then
-  selector="sidecar=native"
+  selector="sidecar!=legacy"
 fi
 
 any_errors=false
 
-# Execute the critical OpenTelemetry e2e tests
-# shellcheck disable=SC2086 # TEST_DIRS is a space separated list
-chainsaw test \
-  --quiet \
-  --report-name "junit_otel_e2e_pre_merge" \
-  --report-path "$ARTIFACT_DIR" \
-  --report-format "XML" \
-  --test-dir \
-  ${TEST_DIRS} || any_errors=true
-
-# Execute the sidecar tests with the version dependent selector
-if [[ -n "${SIDECAR_TEST_DIRS:-}" ]]; then
-  # shellcheck disable=SC2086 # SIDECAR_TEST_DIRS is a space separated list
+if [[ ${#main_dirs[@]} -gt 0 ]]; then
+  echo "=== Running: ${main_dirs[*]} (selector ${selector})"
   chainsaw test \
     --quiet \
-    --report-name "junit_otel_e2e_pre_merge_sidecar" \
+    --report-name "junit_otel_e2e" \
     --report-path "$ARTIFACT_DIR" \
     --report-format "XML" \
-    --selector "$selector" \
+    --selector "${selector}" \
     --test-dir \
-    ${SIDECAR_TEST_DIRS} || any_errors=true
+    "${main_dirs[@]}" || any_errors=true
+fi
+
+if [[ "${run_metadata_filters}" == "true" ]]; then
+  set_operator_env "ANNOTATIONS_FILTER=.*filter.out,config.*.gke.io.*" "LABELS_FILTER=.*filter.out"
+  echo "=== Running: ${METADATA_FILTERS_DIR} (selector ${selector})"
+  chainsaw test \
+    --quiet \
+    --report-name "junit_otel_e2e_metadata_filters" \
+    --report-path "$ARTIFACT_DIR" \
+    --report-format "XML" \
+    --selector "${selector}" \
+    --test-dir \
+    "${METADATA_FILTERS_DIR}" || any_errors=true
+fi
+
+# Last: the TLS profile tests change the cluster-wide TLS profile and wait for the MachineConfig rollout.
+if [[ "${run_tls_profile}" == "true" ]]; then
+  echo "=== Running: ${TLS_PROFILE_DIR} (selector ${selector})"
+  chainsaw test \
+    --quiet \
+    --report-name "junit_otel_e2e_tls_profile" \
+    --report-path "$ARTIFACT_DIR" \
+    --report-format "XML" \
+    --selector "${selector}" \
+    --test-dir \
+    "${TLS_PROFILE_DIR}" || any_errors=true
 fi
 
 if $any_errors; then
