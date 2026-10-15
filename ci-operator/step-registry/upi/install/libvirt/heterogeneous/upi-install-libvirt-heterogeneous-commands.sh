@@ -449,6 +449,8 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   echo "Rendering install domain XML for ${node_name}..."
   domain_install_xml=$(mktemp --tmpdir domain-"${node_name}"-install.xml.XXXXX)
   export DOMAIN_NAME="${node_name}"
+  DOMAIN_UUID="$(uuidgen)"
+  export DOMAIN_UUID
   export DOMAIN_MEMORY="${DOMAIN_MEMORY}"
   export DOMAIN_VCPUS="${DOMAIN_VCPUS}"
   export HOST_PATH_KERNEL="${HOST_PATH_KERNEL}"
@@ -470,6 +472,8 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
 
   echo "Install domain deleted. Defining persistent run domain for ${node_name} that boots from disk..."
   domain_run_xml=$(mktemp --tmpdir domain-"${node_name}"-run.xml.XXXXX)
+  DOMAIN_UUID="$(uuidgen)"
+  export DOMAIN_UUID
   envsubst < "${RUN_TEMPLATE}" > "${domain_run_xml}"
 
   ${VIRSH_ADDITIONAL} define "${domain_run_xml}" --validate
