@@ -256,11 +256,34 @@ oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
   --type=merge \
   -p '{"spec":{"endpointPublishingStrategy":{"type":"HostNetwork"}}}'
 
-# Wait for the router deployment to roll out with the new strategy
+# Wait for the router deployment to roll out with the new strategy.
+# Non-fatal — print full debug if it doesn't progress so we can diagnose.
 echo "$(date) Waiting for ingress router rollout"
-oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
-  rollout status deployment/router-default -n openshift-ingress --timeout=10m
-echo "$(date) Ingress router rollout complete"
+if ! oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+    rollout status deployment/router-default -n openshift-ingress --timeout=10m; then
+  echo "$(date) WARNING: router-default rollout did not complete — printing debug info"
+  echo "$(date) DEBUG: IngressController status"
+  oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+    get ingresscontroller default -n openshift-ingress-operator -o yaml || true
+  echo "$(date) DEBUG: router-default deployment"
+  oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+    describe deployment router-default -n openshift-ingress || true
+  echo "$(date) DEBUG: router pods"
+  oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+    get pods -n openshift-ingress -o wide || true
+  oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+    describe pods -n openshift-ingress || true
+  echo "$(date) DEBUG: openshift-ingress events"
+  oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+    get events -n openshift-ingress --sort-by='.lastTimestamp' | tail -30 || true
+  echo "$(date) DEBUG: compute node port usage (via management cluster)"
+  for ip in $(oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+      get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}'); do
+    echo "$(date) Node IP: ${ip}"
+  done
+else
+  echo "$(date) Ingress router rollout complete"
+fi
 
 # Confirm the router pod is running on the expected compute node IPs
 echo "$(date) Checking guest ingress service and router pods"
