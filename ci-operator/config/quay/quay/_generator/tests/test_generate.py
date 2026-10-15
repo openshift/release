@@ -1180,6 +1180,15 @@ def test_redhat_318_aws_fips_shares_aws_file() -> None:
     assert "FEATURE_FIPS" not in plain["env"]["QUAY_EXTRA_CONFIG"]
 
 
+def test_robot_api_tokens_only_on_quay_5() -> None:
+    results, _retired = generate_all()
+    for _group, filename, config in results:
+        enabled = "redhat-5." in filename
+        for test in config["tests"]:
+            extra = test["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()
+            assert ("FEATURE_ROBOT_API_TOKENS: true" in extra) == enabled, (filename, test["as"])
+
+
 def test_fips_rejects_non_bool() -> None:
     matrix = _matrix_with_job(
         {
