@@ -55,7 +55,7 @@ declare -A instance_type_supported_cc_type_dict=(
   [c2d-standard-4]="AMDEncryptedVirtualization Enabled"
   [c3d-standard-4]="AMDEncryptedVirtualization Enabled"
   [c3-standard-4]="IntelTrustedDomainExtensions"
-  [n2-standard-4]=""
+  [n4-standard-4]=""
 )
 
 declare -A instance_type_unsupported_cc_type_dict=(
@@ -63,7 +63,7 @@ declare -A instance_type_unsupported_cc_type_dict=(
   [c2d-standard-4]="IntelTrustedDomainExtensions AMDEncryptedVirtualizationNestedPaging"
   [c3d-standard-4]="IntelTrustedDomainExtensions AMDEncryptedVirtualizationNestedPaging"
   [c3-standard-4]="AMDEncryptedVirtualization AMDEncryptedVirtualizationNestedPaging Enabled"
-  [n2-standard-4]="AMDEncryptedVirtualization AMDEncryptedVirtualizationNestedPaging Enabled IntelTrustedDomainExtensions"
+  [n4-standard-4]="AMDEncryptedVirtualization AMDEncryptedVirtualizationNestedPaging Enabled IntelTrustedDomainExtensions"
 )
 
 function save_artifacts()
