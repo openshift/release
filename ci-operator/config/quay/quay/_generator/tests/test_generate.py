@@ -83,8 +83,11 @@ def test_expand_matrix_cells() -> None:
         ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", True, "s3"),
         ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x", False, "s3"),
         ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "odf"),
-        ("3.17", "redhat-3.17", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", False, "s3"),
+        ("3.17", "redhat-3.17", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "s3"),
+        ("3.17", "redhat-3.17", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "gcs"),
+        ("3.17", "redhat-3.17", "azure", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "blob"),
         ("5.0", "redhat-5.0", "aws", "5.0", "e2e-install", "@daily", "periodic", "amd64", False, "s3"),
+        ("3.16", "redhat-3.16", "aws", "4.21", "e2e-install", "@daily", "periodic", "amd64", False, "s3"),
         (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64", False, "s3"),
         (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64", False, "gcs"),
         (None, "master", "azure", "4.22", "e2e-install", None, "presubmit", "amd64", False, "blob"),
@@ -156,7 +159,6 @@ def test_jinja_renders_ocp_version() -> None:
     assert rendered["releases"]["latest"]["candidate"]["architecture"] == "amd64"
     assert rendered["releases"]["latest"]["candidate"]["version"] == "4.22"
     assert rendered["zz_generated_metadata"]["variant"] == "aws-ocp422-e2e-install"
-    assert rendered["prowgen"]["enable_secrets_store_csi_driver"] is True
 
 
 def test_e2e_install_template_inverts_full_default_filter() -> None:

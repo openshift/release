@@ -15,14 +15,8 @@ fi
 
 echo "Found ${#METADATA_FILES[@]} metadata file(s)"
 
-# --- Session metrics (cost, tokens) for BigQuery claude_session_metrics table ---
-SESSION_METRICS="${SHARED_DIR}/claude-session-metrics-autodl.json"
-if [[ -f "${SESSION_METRICS}" ]]; then
-    echo "Copying pre-computed session metrics autodl..."
-    cp "${SESSION_METRICS}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json"
-else
-    echo "Warning: No pre-computed session metrics found in SHARED_DIR"
-fi
+# Per-phase session cost is written by jira-solver and review-responder
+# into their own ARTIFACT_DIR (claude-session-metrics-<phase>-autodl.json).
 
 # --- Domain autodl for BigQuery jira_agent table ---
 echo "Generating domain autodl..."
@@ -39,6 +33,9 @@ for metadata_file in "${METADATA_FILES[@]}"; do
     PR_URL=$(echo "${METADATA}" | jq -r '.pr_url // ""')
     UPSTREAM_REPO=$(echo "${METADATA}" | jq -r '.upstream_repo')
     NUM_REVIEW_ROUNDS=$(echo "${METADATA}" | jq -r '.num_review_rounds // 0')
+    STARTED_AT=$(echo "${METADATA}" | jq -r '.started_at // ""')
+    PR_STATUS=$(echo "${METADATA}" | jq -r '.pr_status // ""')
+    MERGED_AT=$(echo "${METADATA}" | jq -r '.merged_at // ""')
 
     echo "Processing ${AGENT} metadata (phase: ${PHASE}, issue: ${ISSUE_KEY}, result: ${RESULT})"
 
@@ -50,6 +47,9 @@ for metadata_file in "${METADATA_FILES[@]}"; do
         --arg result "${RESULT}" \
         --arg upstream_repo "${UPSTREAM_REPO}" \
         --arg analyzed_at "${ANALYZED_AT}" \
+        --arg started_at "${STARTED_AT}" \
+        --arg pr_status "${PR_STATUS}" \
+        --arg merged_at "${MERGED_AT}" \
         --arg job_name "${JOB_NAME:-}" \
         --arg build_id "${BUILD_ID:-}" \
         '{
@@ -60,6 +60,9 @@ for metadata_file in "${METADATA_FILES[@]}"; do
           pr_url: $pr_url,
           result: $result,
           upstream_repo: $upstream_repo,
+          started_at: $started_at,
+          pr_status: $pr_status,
+          merged_at: $merged_at,
           analyzed_at: $analyzed_at,
           job_name: $job_name,
           build_id: $build_id
@@ -85,6 +88,9 @@ jq -n \
         pr_url: "string",
         result: "string",
         upstream_repo: "string",
+        started_at: "timestamp",
+        pr_status: "string",
+        merged_at: "timestamp",
         num_review_rounds: "integer",
         analyzed_at: "string",
         job_name: "string",

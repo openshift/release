@@ -400,6 +400,30 @@ PULL_METRICS_REDIS:
         db: 1
 EOF
 
+# Merge a config fragment into config.yaml with list-append semantics.
+# Validate first so a present-but-malformed fragment fails the step clearly
+# instead of corrupting config.yaml.
+function merge_config_fragment() {
+	local fragment="$1"
+	if ! yq e 'true' "${fragment}" >/dev/null 2>&1; then
+		echo "ERROR: ${fragment} is not valid YAML" >&2
+		exit 1
+	fi
+	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+}
+
+# Mailpit and OTel fragments merge before QUAY_EXTRA_CONFIG, so an explicit
+# override still wins. A missing fragment is a silent no-op.
+if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
+	echo "Merging Mailpit config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-mail-config.yaml"
+fi
+
+if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
+	echo "Merging Jaeger/OTel config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
+fi
+
 # Merge caller-provided extra config if set
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	echo "Merging extra Quay config into defaults..."

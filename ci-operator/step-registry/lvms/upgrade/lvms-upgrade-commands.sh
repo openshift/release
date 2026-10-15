@@ -7,37 +7,98 @@ declare -r LVMS_NAMESPACE=${LVMS_NAMESPACE:-"openshift-lvm-storage"}
 declare -r TARGET_LVMS_SOURCE=${TARGET_LVMS_SOURCE:-"lvm-catalogsource"}
 declare -r IDMS_NAME=${IDMS_NAME:-"lvm-operator-idms"}
 declare TARGET_LVM_INDEX_IMAGE=${TARGET_LVM_INDEX_IMAGE:-""}
+declare -r ZSTREAM_VERSION=${ZSTREAM_VERSION:-""}
+
+declare -r QUAY_REPO="redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog"
+declare -r QUAY_API="https://quay.io/api/v1"
 
 function get_target_version_from_channel() {
     local channel="${1}"
     echo "${channel}" | sed -E 's/^[a-z]+-//'
 }
 
+resolve_snapshot_to_digest() {
+	local snapshot="$1"
+
+	local version_prefix date_str time_str
+	version_prefix=$(echo "${snapshot}" | grep -oP 'lvm-operator-catalog-\d+-\d+')
+	date_str=$(echo "${snapshot}" | grep -oP '\d{8}(?=-\d{6}-)')
+	time_str=$(echo "${snapshot}" | grep -oP '(?<=\d{8}-)\d{6}')
+
+	if [[ -z "${version_prefix}" || -z "${date_str}" || -z "${time_str}" ]]; then
+		echo "Cannot parse snapshot name: ${snapshot}" >&2
+		return 1
+	fi
+
+	local snap_year snap_month snap_day snap_hour snap_min snap_sec snap_epoch
+	snap_year=${date_str:0:4}
+	snap_month=${date_str:4:2}
+	snap_day=${date_str:6:2}
+	snap_hour=${time_str:0:2}
+	snap_min=${time_str:2:2}
+	snap_sec=${time_str:4:2}
+	snap_epoch=$(date -d "${snap_year}-${snap_month}-${snap_day}T${snap_hour}:${snap_min}:${snap_sec}Z" +%s 2>/dev/null || echo 0)
+
+	local version_dot
+	version_dot=$(echo "${version_prefix}" | sed 's/lvm-operator-catalog-//; s/-/./')
+
+	local tags_json
+	tags_json=$(curl -sSL --connect-timeout 10 --max-time 30 \
+		"${QUAY_API}/repository/${QUAY_REPO}/tag/?limit=50&filter_tag_name=like:v${version_dot}-")
+
+	local result
+	result=$(echo "${tags_json}" | jq -r --arg snap_epoch "${snap_epoch}" --arg vpfx "v${version_dot}-" '
+		[.tags[]
+		 | select(.name | startswith($vpfx))
+		 | select(.name | test("^v[0-9]+\\.[0-9]+-[a-f0-9]{40}$"))
+		 | select(.last_modified != null and .last_modified != "")
+		 | .tag_epoch = (.last_modified | strptime("%a, %d %b %Y %H:%M:%S %z") | mktime)
+		 | .abs_delta = ((.tag_epoch - ($snap_epoch | tonumber)) | fabs)
+		] | sort_by(.abs_delta) | .[0] // empty |
+		[.name, .manifest_digest] | @tsv
+	')
+
+	if [[ -z "${result}" ]]; then
+		echo "No matching quay tag found for snapshot ${snapshot}" >&2
+		return 1
+	fi
+
+	local tag_name digest
+	tag_name=$(echo "${result}" | cut -f1)
+	digest=$(echo "${result}" | cut -f2)
+
+	echo "Resolved: ${snapshot} → ${tag_name} (${digest})" >&2
+	echo "${digest}"
+}
+
 function setup_target_catalogsource() {
-    local target_version
-    target_version=$(get_target_version_from_channel "${TARGET_LVMS_CHANNEL}")
+    if [[ -z "${ZSTREAM_VERSION}" ]]; then
+        # Default path: nightly upgrade jobs (no ZSTREAM_VERSION set)
+        local target_version
+        target_version=$(get_target_version_from_channel "${TARGET_LVMS_CHANNEL}")
 
-    if [[ -z "${TARGET_LVM_INDEX_IMAGE}" ]]; then
-        TARGET_LVM_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${target_version}"
-    fi
-
-    echo "Creating/updating CatalogSource '${TARGET_LVMS_SOURCE}' with target index image: ${TARGET_LVM_INDEX_IMAGE}"
-
-    local current_image
-    current_image=$(oc get catalogsource "${TARGET_LVMS_SOURCE}" -n openshift-marketplace -o jsonpath='{.spec.image}' 2>/dev/null || true)
-
-    if [[ -n "${current_image}" ]]; then
-        echo "Current CatalogSource image: ${current_image}"
-        echo "Patching to: ${TARGET_LVM_INDEX_IMAGE}"
-
-        if ! oc patch catalogsource "${TARGET_LVMS_SOURCE}" -n openshift-marketplace --type=merge \
-            -p "{\"spec\":{\"image\":\"${TARGET_LVM_INDEX_IMAGE}\"}}"; then
-            echo "ERROR: Failed to patch CatalogSource"
-            return 1
+        if [[ -z "${TARGET_LVM_INDEX_IMAGE}" ]]; then
+            # Default: production Konflux catalog for the target version.
+            TARGET_LVM_INDEX_IMAGE="quay.io/${QUAY_REPO}:v${target_version}"
         fi
-    else
-        echo "CatalogSource '${TARGET_LVMS_SOURCE}' not found, creating new one"
-        cat <<EOF | oc apply -f -
+
+        echo "Creating/updating CatalogSource '${TARGET_LVMS_SOURCE}' with target index image: ${TARGET_LVM_INDEX_IMAGE}"
+
+        local current_image
+        current_image=$(oc get catalogsource "${TARGET_LVMS_SOURCE}" -n openshift-marketplace -o jsonpath='{.spec.image}' 2>/dev/null || true)
+
+        if [[ -n "${current_image}" ]]; then
+            echo "Current CatalogSource image: ${current_image}"
+            echo "Patching to: ${TARGET_LVM_INDEX_IMAGE}"
+
+            if ! oc patch catalogsource "${TARGET_LVMS_SOURCE}" -n openshift-marketplace --type=merge \
+                -p "{\"spec\":{\"image\":\"${TARGET_LVM_INDEX_IMAGE}\"}}"; then
+                echo "ERROR: Failed to patch CatalogSource"
+                return 1
+            fi
+        else
+            echo "CatalogSource '${TARGET_LVMS_SOURCE}' not found, creating new one"
+            cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -52,6 +113,64 @@ spec:
     registryPoll:
       interval: 15m
 EOF
+        fi
+    else
+        # Z-stream presubmit: resolve catalog image from PR content
+        if [[ -n "${PULL_NUMBER:-}" ]]; then
+            echo "Resolving z-stream catalog image for version ${ZSTREAM_VERSION} from PR #${PULL_NUMBER}"
+
+            local catalog_prefix snapshot digest
+            catalog_prefix="lvm-operator-catalog-$(echo "${ZSTREAM_VERSION}" | tr '.' '-')"
+
+            local pr_files
+            pr_files=$(curl -sSL --connect-timeout 10 --max-time 30 \
+                "https://api.github.com/repos/openshift/lvm-operator/pulls/${PULL_NUMBER}/files")
+            snapshot=$(echo "${pr_files}" | jq -r \
+                '[.[] | select(.filename | contains("catalog")) | .patch // ""] | join("\n")' \
+                | grep -oP "(?<=snapshot: )${catalog_prefix}\S*" | head -1)
+
+            if [[ -n "${snapshot}" ]]; then
+                echo "Found snapshot: ${snapshot}"
+
+                digest=$(resolve_snapshot_to_digest "${snapshot}")
+                if [[ -n "${digest}" ]]; then
+                    TARGET_LVM_INDEX_IMAGE="quay.io/${QUAY_REPO}@${digest}"
+                    echo "Resolved z-stream catalog image: ${TARGET_LVM_INDEX_IMAGE}"
+                fi
+            fi
+        fi
+
+        # Fallback if snapshot resolution failed or PULL_NUMBER not available
+        if [[ -z "${TARGET_LVM_INDEX_IMAGE}" ]]; then
+            local target_version
+            target_version=$(echo "${ZSTREAM_VERSION}" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')
+            TARGET_LVM_INDEX_IMAGE="quay.io/${QUAY_REPO}:v${target_version}"
+            echo "Using production catalog for version ${ZSTREAM_VERSION}: ${TARGET_LVM_INDEX_IMAGE}"
+        fi
+
+        # Create or update catalogsource
+        if ! oc get catalogsource "${TARGET_LVMS_SOURCE}" -n openshift-marketplace &>/dev/null; then
+            echo "Creating CatalogSource '${TARGET_LVMS_SOURCE}' with image: ${TARGET_LVM_INDEX_IMAGE}"
+            cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${TARGET_LVMS_SOURCE}
+  namespace: openshift-marketplace
+spec:
+  displayName: LVM CatalogSource
+  image: ${TARGET_LVM_INDEX_IMAGE}
+  publisher: OpenShift LVM
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+        else
+            echo "CatalogSource '${TARGET_LVMS_SOURCE}' already exists; updating with image: ${TARGET_LVM_INDEX_IMAGE}"
+            oc patch catalogsource "${TARGET_LVMS_SOURCE}" -n openshift-marketplace --type=merge \
+                -p "{\"spec\":{\"image\":\"${TARGET_LVM_INDEX_IMAGE}\"}}"
+        fi
     fi
 
     echo "Waiting for CatalogSource to be ready..."
