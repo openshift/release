@@ -1175,11 +1175,11 @@ OVERLAY_TESTSUITE=true
 if [[ -z "${TESTSUITE_GIT_REF}" || "${TESTSUITE_GIT_REF}" == "none" ]]; then
   OVERLAY_TESTSUITE=false
 fi
-# Ignore UI only: the s390x testsuite image omits Playwright; collecting
-# singlecluster/ui still imports conftest and fails make with ModuleNotFoundError.
+# Ignore UI only: the s390x testsuite image omits Playwright (no s390x wheels).
+# Collecting singlecluster/ui still imports conftest and fails make.
 # Those UI tests are outside the 450-collected / 10-skip kuadrant suite.
 # Do not --ignore tracing or other suites — failures stay visible in JUnit.
-PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -vv --tb=short --ignore=testsuite/tests/singlecluster/ui"
+PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p no:playwright -p kuadrant_coredns_resolve -vv --tb=short --ignore=testsuite/tests/singlecluster/ui"
 
 # Normalize optional flags (default false when unset).
 RUN_SMOKE="${RUN_SMOKE:-true}"
@@ -1250,8 +1250,26 @@ cp -a \$src/. \$dest/ || exit 1
 test -f \$dest/pyproject.toml || { echo 'overlay missing pyproject.toml'; ls -la \$dest; exit 1; }
 rm -rf \$src
 cd \$dest
-echo '=== poetry install for checked-out testsuite ==='
-poetry install --no-interaction --sync || poetry install --no-interaction || exit 1
+echo '=== Drop playwright/pytest-playwright (no s390x wheels; UI is --ignore) ==='
+python3 - <<'PY' || true
+from pathlib import Path
+import re
+p = Path('pyproject.toml')
+t = p.read_text()
+t2 = re.sub(r'(?m)^pytest-playwright\s*=.*\n', '', t)
+t2 = re.sub(r'(?m)^playwright\s*=.*\n', '', t2)
+if t2 != t:
+    p.write_text(t2)
+    print('stripped playwright lines from pyproject.toml')
+else:
+    print('pyproject.toml already has no playwright lines')
+PY
+poetry remove --group main --no-interaction playwright pytest-playwright || true
+echo '=== poetry install for checked-out testsuite (no playwright) ==='
+if ! poetry lock --no-interaction; then
+  echo 'poetry lock failed; trying install anyway'
+fi
+poetry install --no-interaction --only main || poetry install --no-interaction --without dev || exit 1
 "
 fi
 CONTAINER_SCRIPT+="cd /opt/workdir/kuadrant-testsuite
