@@ -44,9 +44,14 @@ fi
 # Discover OVN container names from the first ovnkube-node pod.
 # ---------------------------------------------------------------------------
 namespace="openshift-ovn-kubernetes"
+
+# Wait for ovnkube-node pods to stabilize after MCP rollout, then verify
+# at least one is ready before probing container names.
+sleep 15
 oc wait pod -n "${namespace}" -l app=ovnkube-node --for=condition=Ready --timeout=5m
 
 first_ovn_pod=$(oc get pods -n "${namespace}" -l app=ovnkube-node \
+  --field-selector status.phase=Running \
   -o jsonpath='{.items[0].metadata.name}')
 containers=$(oc get pod -n "${namespace}" "${first_ovn_pod}" \
   -o jsonpath='{.spec.containers[*].name}')
@@ -85,12 +90,29 @@ echo "Net container: ${NET_CONTAINER}"
 # ---------------------------------------------------------------------------
 # On each node: discover the secondary NIC, create an OVS bridge, attach the
 # NIC, move the IP to the bridge, and add the bridge-mapping.
+# Iterate by node and look up the current ovnkube-node pod for each node to
+# avoid stale pod references after MCP rolling restarts.
 # ---------------------------------------------------------------------------
-readarray -t ovnkube_pods < <(oc get pods -n "${namespace}" -l app=ovnkube-node \
-  -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+readarray -t nodes < <(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
-for pod_name in "${ovnkube_pods[@]}"; do
-  node_name=$(oc get pod -n "${namespace}" "${pod_name}" -o jsonpath='{.spec.nodeName}')
+for node_name in "${nodes[@]}"; do
+  # Look up the current ovnkube-node pod on this node, with retry in case
+  # the pod is being replaced after MCP rollout.
+  pod_name=""
+  for attempt in 1 2 3 4 5; do
+    pod_name=$(oc get pods -n "${namespace}" -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node_name},status.phase=Running" \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    if [[ -n "${pod_name}" ]]; then
+      break
+    fi
+    echo "  waiting for ovnkube-node pod on ${node_name} (attempt ${attempt}/5)..."
+    sleep 10
+  done
+  if [[ -z "${pod_name}" ]]; then
+    echo "  WARNING: no running ovnkube-node pod found on ${node_name}, skipping"
+    continue
+  fi
   echo ""
   echo "=== ${node_name} (${pod_name}) ==="
 

@@ -357,7 +357,7 @@ localnet_multi_guest_renew_script() {
   inner_script="for dev in${renew_devices}; do "
   inner_script+="sudo nmcli device set \\\$dev ipv6.method disabled 2>/dev/null || true; "
   inner_script+="sudo nmcli device reapply \\\$dev 2>/dev/null || "
-  inner_script="{ sudo nmcli device disconnect \\\$dev 2>/dev/null; sudo nmcli device connect \\\$dev 2>/dev/null; }; "
+  inner_script+="{ sudo nmcli device disconnect \\\$dev 2>/dev/null; sudo nmcli device connect \\\$dev 2>/dev/null; }; "
   inner_script+="done; echo 'Default IPv4 route:'; ip route show default 2>/dev/null || echo '(none)'; "
   inner_script+="echo 'IPv6 global addresses:'; ip -6 addr show scope global 2>/dev/null || true"
   echo "${inner_script}"
@@ -587,22 +587,69 @@ renew_localnet_multi_dhcp_on_vmi_via_ssh() {
     return 1
   fi
 
-  echo "Forcing DHCP renewal on VMI ${vmi} (${vmi_ip}) via SSH pod on ${vmi_node}..."
+  echo "Fixing networking on VMI ${vmi} (${vmi_ip}) via SSH pod on ${vmi_node}..."
   renew_pod="dhcp-renew-${vmi##*-}"
   renew_devices=""
   for idx in $(seq "${network_count}" -1 1); do
     renew_devices="${renew_devices} enp${idx}s0"
   done
-  # Unquoted heredoc: escape inner-shell vars (e.g. \${VMI_IP}) so set -u does not
-  # expand them in the outer shell before oc apply.
-  # Use nmcli device reapply by interface name; initrd profiles are "Wired Connection"
-  # (not "Wired connection N") so connection-name toggles are unreliable.
+
+  # Build the remote fix script with a quoted heredoc (zero expansion), then
+  # substitute placeholders.  base64-encode the result and pass it as a pod
+  # env-var so no multi-level shell escaping is needed.
+  # The script: (1) disables IPv6 on localnet interfaces, (2) injects a
+  # static default route (immune to competing DHCP servers such as baremetal
+  # dnsmasq), and (3) installs a NM dispatcher so the route survives the MCD
+  # rpm-ostree rebase + reboot (OVS takes over enp1s0 → br-ex after rebase).
+  local fix_script fix_b64
+  fix_script=$(sed "s|__GW__|${LOCALNET_MULTI_PRIMARY_GATEWAY}|g; s|__DEVS__|${renew_devices}|g" <<'FIXEOF'
+#!/bin/bash
+set -e
+GW="__GW__"
+for dev in __DEVS__; do
+  sudo nmcli device set "$dev" ipv6.method disabled 2>/dev/null || true
+  sudo nmcli device reapply "$dev" 2>/dev/null || true
+done
+GW_DEV=""
+for cand in br-ex enp1s0; do
+  if ip addr show "$cand" 2>/dev/null | grep -q 'inet '; then
+    GW_DEV="$cand"; break
+  fi
+done
+if [ -z "$GW_DEV" ]; then
+  echo "ERROR: no interface with an IP address found for gateway route"
+  exit 1
+fi
+sudo ip route replace "$GW" dev "$GW_DEV" scope link 2>/dev/null || true
+sudo ip route replace default via "$GW" dev "$GW_DEV" 2>/dev/null || true
+cat > /tmp/disp.sh <<DISPSCRIPT
+#!/bin/bash
+for d in br-ex enp1s0; do
+  if ip addr show "\$d" 2>/dev/null | grep -q 'inet '; then
+    ip route replace $GW dev "\$d" scope link 2>/dev/null || true
+    ip route replace default via $GW dev "\$d" 2>/dev/null || true
+    break
+  fi
+done
+DISPSCRIPT
+sudo cp /tmp/disp.sh /etc/NetworkManager/dispatcher.d/99-localnet-gateway.sh
+sudo chmod 755 /etc/NetworkManager/dispatcher.d/99-localnet-gateway.sh
+echo "Default IPv4 route:"
+ip route show default 2>/dev/null || echo "(none)"
+FIXEOF
+  )
+  fix_b64=$(echo "${fix_script}" | base64 -w0)
+
+  # The SSH pod is attached to localnet-1 so it can reach the VMI on the
+  # localnet subnet (with attachDefaultNetwork=false the VMI has no pod network).
   if ! cat <<RENEW_EOF | oc apply -f -; then
 apiVersion: v1
 kind: Pod
 metadata:
   name: ${renew_pod}
   namespace: ${multi_ns}
+  annotations:
+    k8s.v1.cni.cncf.io/networks: localnet-1
 spec:
   nodeSelector:
     kubernetes.io/hostname: ${vmi_node}
@@ -618,6 +665,8 @@ spec:
     env:
     - name: VMI_IP
       value: "${vmi_ip}"
+    - name: FIX_SCRIPT_B64
+      value: "${fix_b64}"
     volumeMounts:
     - name: ssh-key
       mountPath: /ssh
@@ -632,11 +681,11 @@ spec:
         cp /ssh/id_ed25519 /tmp/key
       fi
       chmod 600 /tmp/key
+      echo "\${FIX_SCRIPT_B64}" | base64 -d > /tmp/fix.sh
       renew_ok=1
       for attempt in 1 2 3 4 5; do
         if ssh -i /tmp/key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-             -o ConnectTimeout=15 "core@\${VMI_IP}" \
-             "for dev in${renew_devices}; do sudo nmcli device set \\\$dev ipv6.method disabled 2>/dev/null || true; sudo nmcli device reapply \\\$dev 2>/dev/null || { sudo nmcli device disconnect \\\$dev 2>/dev/null; sudo nmcli device connect \\\$dev 2>/dev/null; }; done; echo Default IPv4 route:; ip route show default 2>/dev/null || echo '(none)'" 2>&1; then
+             -o ConnectTimeout=15 "core@\${VMI_IP}" bash < /tmp/fix.sh 2>&1; then
           renew_ok=0
           break
         fi
