@@ -4,6 +4,7 @@ set -o errexit -o nounset -o pipefail
 #
 #   SOURCE_OPERATOR       Required: nhc, sbr, snr, far, mdr, or nmo.
 #   ARTIFACT_DIR          Required: existing writable directory for logs/reports.
+#   BUILD_ID              Required: Prow run ID used to isolate temporary images.
 #   KUBECONFIG            Required: cluster credentials for oc and the Go tests.
 #   SYSTEM_TESTS_REF      Optional: test branch, tag, or commit SHA (default main).
 #   CONSOLE_PLUGIN_IMAGE  NHC only: digest-pinned console image (default in ref).
@@ -108,6 +109,8 @@ prepare_runtime() {
   test "$(podman info --format '{{.Store.ConfigFile}}')" = "$CONTAINERS_STORAGE_CONF"
 
   echo '==> Pull catalog base image before building the candidate'
+  # Match the default base image in the shared target's generated catalog Dockerfile.
+  # Pinning it requires changing medik8s/tools too, not just this pre-pull.
   podman pull quay.io/operator-framework/opm:latest
 }
 
@@ -162,7 +165,7 @@ build_candidate() {
   printf 'Candidate: %s; latest GA: %s\n' "$SOURCE_VERSION" "$PREVIOUS_VERSION"
 
   # Keep each job's temporary images separate; expire them after three hours.
-  prefix="ttl.sh/$SOURCE_OPERATOR-prow-$(date +%Y%m%d-%H%M%S)-${revision:0:7}"
+  prefix="ttl.sh/$SOURCE_OPERATOR-prow-${BUILD_ID}-${revision:0:7}"
   operator_tag="${prefix}:3h"
   bundle_tag="${prefix}-bundle:3h"
   catalog_tag="${prefix}-catalog:3h"
@@ -172,7 +175,7 @@ build_candidate() {
   case "$SOURCE_OPERATOR" in
     nhc)
       extra_build_args=(
-        # Only NHC's OCP CSV template has a docs-version placeholder.
+        # Only NHC's upstream Makefile replaces DOCS_RHWA_VERSION in its OCP CSV.
         DOCS_RHWA_VERSION=5.8
         "CONSOLE_PLUGIN_IMAGE=$CONSOLE_PLUGIN_IMAGE"
         "MUST_GATHER_IMAGE=$MUST_GATHER_IMAGE"

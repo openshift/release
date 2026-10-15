@@ -66,6 +66,7 @@ select_latest_build() {
   while true; do
     response="$(
       curl --fail --silent --show-error --max-time 60 \
+        --retry 3 --retry-delay 5 \
         "https://quay.io/api/v1/repository/$repository/tag/?onlyActiveTags=true&limit=100&page=$page"
     )"
     jq -e '
