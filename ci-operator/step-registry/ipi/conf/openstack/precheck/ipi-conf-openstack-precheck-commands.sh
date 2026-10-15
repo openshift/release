@@ -74,13 +74,17 @@ if [[ -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     done < "${SHARED_DIR}/LB_HOSTS"
 fi
 
-# Non-proxy single-LB externallb: api -> LB_HOST FIP.
+# Default ingress to VIP; non-proxy single-LB may override below.
+INGRESS_IPS=("${INGRESS_IP}")
+
+# Non-proxy single-LB externallb: api + ingress -> LB_HOST FIP.
 # Do not key off LB_HOST alone — proxy-externallb always writes it.
 # CONFIG_TYPE must be declared in this step's ref.yaml or it is unset here.
 if [[ "${#API_IPS[@]}" -eq 0 && "${CONFIG_TYPE:-}" == *"externallb"* && "${CONFIG_TYPE:-}" != *"proxy"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
     LB_HOST=$(<"${SHARED_DIR}/LB_HOST")
     API_IPS+=("${LB_HOST}")
-    echo "precheck: CONFIG_TYPE='${CONFIG_TYPE}' -> expecting api -> ${LB_HOST} (LB_HOST)"
+    INGRESS_IPS=("${LB_HOST}")
+    echo "precheck: CONFIG_TYPE='${CONFIG_TYPE}' -> expecting api + ingress.apps -> ${LB_HOST} (LB_HOST)"
 fi
 
 if [[ "${#API_IPS[@]}" -eq 0 ]]; then
@@ -88,7 +92,7 @@ if [[ "${#API_IPS[@]}" -eq 0 ]]; then
 fi
 
 verify_name "$CLUSTER_NAME" "api" "${API_IPS[@]}"
-verify_name "$CLUSTER_NAME" "ingress.apps" "$INGRESS_IP"
+verify_name "$CLUSTER_NAME" "ingress.apps" "${INGRESS_IPS[@]}"
 if [[ "${CONFIG_TYPE:-}" == *"externallb"* || -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     verify_name "$CLUSTER_NAME" "api-int" "${API_IP}"
 fi

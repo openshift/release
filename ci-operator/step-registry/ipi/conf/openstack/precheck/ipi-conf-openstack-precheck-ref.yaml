@@ -11,14 +11,14 @@ ref:
     - name: CONFIG_TYPE
       default: ""
       documentation: |-
-        Install topology variant. Must be declared here so ci-operator
-        injects the job/workflow value (otherwise it is unset in this step).
-        When the value contains externallb:
+        Install topology variant. Must be declared so ci-operator injects
+        the job/workflow value into this step.
         - LB_HOSTS present (multi-LB): api checked against those FIPs;
           api-int against the machines-net API VIP.
-        - non-proxy with LB_HOST: api checked against that FIP;
-          api-int against the machines-net API VIP.
-        - proxy-externallb: api stays on the API VIP (LB_HOST is ignored).
+        - Non-proxy externallb (contains externallb, not proxy) with
+          LB_HOST: api and ingress.apps checked against that FIP;
+          api-int against the API VIP.
+        - Otherwise api/ingress use API_IP/INGRESS_IP (VIPs).
     - name: WAIT_TIME
       default: "60"
       documentation: number of seconds to wait before trying.
@@ -27,6 +27,6 @@ ref:
       documentation: number of times to retry
   documentation: |-
     Verifies api/ingress (and api-int for externallb) DNS resolve to the
-    expected addresses from SHARED_DIR before install. For non-proxy
-    externallb, api is checked against LB_HOSTS or LB_HOST; proxy-externallb
-    and api-int still use the internal API VIP.
+    expected addresses from SHARED_DIR before install. Multi-LB uses
+    LB_HOSTS for api; non-proxy single-LB externallb uses LB_HOST for
+    api and ingress.apps; api-int and proxy-externallb stay on VIPs.
