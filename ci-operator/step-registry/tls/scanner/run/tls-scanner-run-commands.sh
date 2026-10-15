@@ -14,7 +14,6 @@ run_tls_scan() {
 
   # TLS Scanner - scans TLS configurations of all pods in the cluster
   local NAMESPACE="${SCANNER_NAMESPACE:-tls-scanner}"
-  local SCANNER_SERVICE_ACCOUNT="tls-scanner"
   local OWNS_NAMESPACE=true
   # When SCANNER_NAMESPACE is explicitly set, deploy into an existing namespace
   # (do not create/delete it). Check the variable itself, not the resolved value,
@@ -62,11 +61,6 @@ run_tls_scan() {
       SCANNER_ARGS="--all-pods --namespace-filter ${SCAN_NAMESPACE}"
   else
       SCANNER_ARGS="--all-pods"
-  fi
-
-  if [[ -n "${COMPONENT_FILTER:-}" ]]; then
-      SCANNER_ARGS="${SCANNER_ARGS} --component-filter ${COMPONENT_FILTER}"
-      echo "Component filter: ${COMPONENT_FILTER}"
   fi
 
   # Enable post-quantum cryptography checks when requested by the step ref.
@@ -150,19 +144,12 @@ run_tls_scan() {
   # after run_tls_scan returns and locals go out of scope.
   _CLEANUP_NAMESPACE="${NAMESPACE}"
   _CLEANUP_OWNS_NAMESPACE="${OWNS_NAMESPACE}"
-  _CLEANUP_SERVICE_ACCOUNT="${SCANNER_SERVICE_ACCOUNT}"
   cleanup() {
       echo "Cleaning up..."
-      oc adm policy remove-cluster-role-from-user cluster-admin \
-          -z "${_CLEANUP_SERVICE_ACCOUNT}" -n "${_CLEANUP_NAMESPACE}" || true
-      oc adm policy remove-scc-from-user privileged \
-          -z "${_CLEANUP_SERVICE_ACCOUNT}" -n "${_CLEANUP_NAMESPACE}" || true
       if [[ "${_CLEANUP_OWNS_NAMESPACE}" == "true" ]]; then
           oc delete namespace "${_CLEANUP_NAMESPACE}" --ignore-not-found --wait=false || true
       else
           oc delete pod/tls-scanner -n "${_CLEANUP_NAMESPACE}" --ignore-not-found --wait=false || true
-          oc delete serviceaccount "${_CLEANUP_SERVICE_ACCOUNT}" -n "${_CLEANUP_NAMESPACE}" \
-              --ignore-not-found --wait=false || true
       fi
   }
   trap cleanup EXIT
@@ -191,19 +178,13 @@ run_tls_scan() {
       runAsUser: 0"
   fi
 
-  oc create serviceaccount "${SCANNER_SERVICE_ACCOUNT}" -n "${NAMESPACE}" \
-      --dry-run=client -o yaml | oc apply -f -
-
-  # Grant cluster-admin to the dedicated scanner service account for full API access.
-  # The EXIT trap removes this grant even when scanning in an externally owned namespace.
-  oc adm policy add-cluster-role-to-user cluster-admin \
-      -z "${SCANNER_SERVICE_ACCOUNT}" -n "${NAMESPACE}"
+  # Grant cluster-admin to the default service account for full API access
+  oc adm policy add-cluster-role-to-user cluster-admin -z default -n "${NAMESPACE}"
 
   # Grant privileged SCC to the service account (required for hostNetwork/hostPID/privileged
   # container in host-mode scans).
   if [[ "${OWNS_NAMESPACE}" == "true" ]]; then
-      oc adm policy add-scc-to-user privileged \
-          -z "${SCANNER_SERVICE_ACCOUNT}" -n "${NAMESPACE}"
+      oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
   fi
 
   # Wait for RBAC/SCC changes to propagate before creating the pod
@@ -227,7 +208,7 @@ metadata:
     # management cluster API, which is the first thing tls-scanner does on startup.
     hypershift.openshift.io/need-management-kas-access: "true"
 spec:
-  serviceAccountName: ${SCANNER_SERVICE_ACCOUNT}
+  serviceAccountName: default
   restartPolicy: Never
   hostNetwork: ${HOST_NETWORK}
   hostPID: ${HOST_PID}
@@ -365,8 +346,8 @@ EOF
   echo "Artifacts saved to: ${SCANNER_ARTIFACT_DIR}"
   ls -la "${SCANNER_ARTIFACT_DIR}" || true
 
-  # Clean up after a successful scan too; the EXIT trap covers earlier failures.
-  cleanup
+  # Unregister the trap so it doesn't fire after the function returns (local
+  # variables NAMESPACE/OWNS_NAMESPACE would be unbound at that point).
   trap - EXIT
 }
 
