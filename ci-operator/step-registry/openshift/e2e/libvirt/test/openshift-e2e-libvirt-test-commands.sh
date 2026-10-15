@@ -32,11 +32,13 @@ function setup_test_args() {
 	esac
 
 	# Escape [Monitor:audit-log-analyzer] API LBs follow /readyz of kube-apiserver
-	# and stop sending requests before server shutdowns for external clients on IBM Z and Power.
-	# This disables the whole audit-log-analyzer monitor (no per-test monitor skip exists).
+	# and stop sending requests before server shutdowns for external clients on IBM Z/Power libvirt.
+	# openshift-tests only supports disabling whole monitors (--disable-monitor=<name>); there is no
+	# per-assertion skip inside audit-log-analyzer (assertion is emitted from origin's
+	# EvaluateTestsFromConstructedIntervals). Scoped to libvirt only (not powervs/powervc).
 	# Revert once https://issues.redhat.com/browse/OCPBUGS-95188 is resolved.
 	case "${CLUSTER_TYPE}" in
-	libvirt-s390x*|libvirt-ppc64le*|power-s2s*|powervs*|powervc*)
+	libvirt-s390x*|libvirt-ppc64le*|power-s2s*)
 		TEST_ARGS="${TEST_ARGS:-} --disable-monitor=audit-log-analyzer"
 		;;
 	esac
