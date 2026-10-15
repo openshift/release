@@ -3,31 +3,25 @@
 set -euo pipefail
 set +x
 
-source "$LEASE_PROXY_CLIENT_SH"
-lease_file="$SHARED_DIR/nutanix_lease_resource"
 context_file="$SHARED_DIR/nutanix_context.sh"
 trap 'status=$?; if (( status == 0 )); then rm -f "$context_file"; fi' EXIT
 
-if [[ ! -s "$lease_file" ]]; then
-  echo "No Nutanix lease was acquired."
-  exit 0
+if [[ -z "${NUTANIX_QUOTA_SLICE:-}" ]]; then
+  echo "NUTANIX_QUOTA_SLICE is required from the workflow lease."
+  exit 1
 fi
-lease_resource=$(cat "$lease_file")
+lease_resource=${NUTANIX_QUOTA_SLICE}
 
 if [[ ! -s "$context_file" ]]; then
   if [[ -s "$SHARED_DIR/nutanix_worker_names" || -s "$SHARED_DIR/nutanix_image_name" || -s "$SHARED_DIR/nutanix_infraenv_name" ]]; then
-    echo "Nutanix resources may exist but the private Nutanix context is unavailable; retaining lease $lease_resource."
+    echo "Nutanix resources may exist but the private Nutanix context is unavailable; cleanup cannot be verified for $lease_resource."
     exit 1
   fi
-  lease__release --names="$lease_resource"
-  rm -f "$lease_file"
   exit 0
 fi
 
 source "$context_file"
 if [[ ! -s "$SHARED_DIR/cluster-name" ]]; then
-  lease__release --names="$lease_resource"
-  rm -f "$lease_file"
   exit 0
 fi
 CLUSTER_NAME=$(cat "$SHARED_DIR/cluster-name")
@@ -197,7 +191,7 @@ function wait_for_uuid_absent() {
 while IFS= read -r uuid; do
   [[ -n "$uuid" ]] || continue
   if [[ ! "$uuid" =~ ^[0-9a-fA-F-]{36}$ ]] || ! wait_for_uuid_absent vms "$uuid"; then
-    echo "Nutanix VM UUID $uuid is still present or its deletion could not be verified; retaining lease $lease_resource."
+    echo "Nutanix VM UUID $uuid is still present or its deletion could not be verified for lease $lease_resource."
     exit 1
   fi
 done < "$SHARED_DIR/vm_uuids.txt"
@@ -205,18 +199,17 @@ done < "$SHARED_DIR/vm_uuids.txt"
 if [[ -s "$SHARED_DIR/image_uuid.txt" ]]; then
   image_uuid=$(cat "$SHARED_DIR/image_uuid.txt")
   if [[ ! "$image_uuid" =~ ^[0-9a-fA-F-]{36}$ ]] || ! wait_for_uuid_absent images "$image_uuid"; then
-    echo "Nutanix image UUID $image_uuid is still present or its deletion could not be verified; retaining lease $lease_resource."
+    echo "Nutanix image UUID $image_uuid is still present or its deletion could not be verified for lease $lease_resource."
     exit 1
   fi
 fi
 
 if [[ "$management_cleanup_failed" == "true" ]]; then
-  echo "Nutanix resources are gone, but run-owned management resources remain or could not be verified; retaining lease $lease_resource."
+  echo "Nutanix resources are gone, but run-owned management resources remain or could not be verified for lease $lease_resource."
   exit 1
 fi
 
-lease__release --names="$lease_resource"
-rm -f "$lease_file" "$SHARED_DIR/nutanix_context.sh" "$SHARED_DIR/nutanix_pull_secret_created"
+rm -f "$SHARED_DIR/nutanix_context.sh" "$SHARED_DIR/nutanix_pull_secret_created"
 rm -f "$SHARED_DIR/hcp-agent-nutanix.iso"
 rm -rf /tmp/hcp-agent-nutanix
-printf "Deleted this run's Nutanix resources and released lease %s.\n" "$lease_resource"
+printf "Deleted this run's Nutanix resources for lease %s; CI-operator releases the lease after the workflow.\n" "$lease_resource"
