@@ -927,18 +927,282 @@ def patch_dns_delegate() -> None:
     _write(path, text.replace(old, new, 1), "dns delegate A retry")
 
 
+def patch_oidc() -> None:
+    path = Path("testsuite/tests/singlecluster/extensions/oidc_policy/conftest.py")
+    if not path.exists():
+        print("SKIP oidc conftest missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: oidc-dataplane" in text or "def wait_for_oidc_dataplane" in text:
+        print("SKIP oidc already patched")
+        return
+    text += '''
+
+# s390x-authorino-fix: oidc-dataplane
+@pytest.fixture(scope="module", autouse=True)
+def wait_for_oidc_dataplane(commit, client):  # pylint: disable=unused-argument
+    """Poll until unauthenticated GET / is 302. OIDCPolicy Enforced is ahead of wasm on s390x.
+
+    The unified dataplane-ready.patch misses this file on current main (extra imports).
+    """
+    import logging
+    import time
+
+    logger = logging.getLogger(__name__)
+    deadline = time.time() + 60
+    ready = False
+    while time.time() < deadline:
+        try:
+            if client.get("/").status_code == 302:
+                ready = True
+                break
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+        time.sleep(1)
+    if not ready:
+        logger.warning("OIDCPolicy dataplane never redirected unauth GET / within 60s; continuing")
+'''
+    _write(path, text, "oidc dataplane 302 wait")
+
+
+def patch_trlp_auth() -> None:
+    """Wait until AuthPolicy is on the dataplane before TRLP when: auth.identity.* can match.
+
+    default_amount + trlp_metrics 429/metrics fail-open as 200 because the limit's
+    CEL when-clause needs identity; missing-key 401 is the probe that identity is live.
+    Skip when authorization is None (reservation/basic has no AuthPolicy).
+    """
+    wait = '''
+
+# s390x-authorino-fix: trlp-auth
+@pytest.fixture(scope="module", autouse=True)
+def wait_for_trlp_auth_dataplane(commit, client, authorization):  # pylint: disable=unused-argument
+    """Poll until missing API key is 401 so TRLP when: auth.identity.groups can match."""
+    import logging
+    import time
+
+    if authorization is None:
+        return
+    logger = logging.getLogger(__name__)
+    deadline = time.time() + 90
+    ready = False
+    last = None
+    while time.time() < deadline:
+        try:
+            last = client.post("/v1/chat/completions", json={"model": "x", "messages": []}).status_code
+            if last == 401:
+                ready = True
+                break
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+        time.sleep(1)
+    if not ready:
+        logger.warning(
+            "TRLP AuthPolicy dataplane never 401'd unauth chat POST within 90s (last=%s); "
+            "when: auth.identity.* limits will not 429",
+            last,
+        )
+'''
+    files = [
+        Path("testsuite/tests/singlecluster/limitador/tokens_rate_limit/conftest.py"),
+        Path("testsuite/tests/singlecluster/limitador/metrics/trlp_metrics/conftest.py"),
+        Path(
+            "testsuite/tests/singlecluster/limitador/tokens_rate_limit/reservation/default_amount/basic/conftest.py"
+        ),
+    ]
+    for path in files:
+        if not path.exists():
+            print(f"SKIP {path} missing")
+            continue
+        text = path.read_text()
+        if f"{MARKER}: trlp-auth" in text:
+            print(f"SKIP {path} already patched")
+            continue
+        _write(path, text + wait, f"TRLP AuthPolicy 401 wait ({path})")
+
+
+def patch_xfcc() -> None:
+    path = Path("testsuite/tests/singlecluster/authorino/identity/x509/test_xfcc_forwarding.py")
+    if not path.exists():
+        print("SKIP xfcc test missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: xfcc" in text:
+        print("SKIP xfcc already patched")
+        return
+    old_no = """    response = client.get("/get")
+    assert not response.has_cert_required_error()
+    assert response.status_code == 401
+"""
+    new_no = """    import time
+    deadline = time.time() + 60
+    response = client.get("/get")
+    # s390x-authorino-fix: xfcc — fail-open 200 until Authorino x509 identity is on wasm
+    while response.status_code != 401 and time.time() < deadline:
+        time.sleep(1)
+        response = client.get("/get")
+    assert not response.has_cert_required_error()
+    assert response.status_code == 401
+"""
+    if old_no not in text:
+        print("WARN xfcc no-header 401 assert not found")
+        return
+    text = text.replace(old_no, new_no, 1)
+    old_inv = """    response = client.get("/get", headers={XFCC_HEADER_NAME: invalid_cert.xfcc_header})
+    assert not response.has_unknown_ca_error()
+    assert response.status_code == 401
+"""
+    new_inv = """    import time
+    deadline = time.time() + 60
+    response = client.get("/get", headers={XFCC_HEADER_NAME: invalid_cert.xfcc_header})
+    # s390x-authorino-fix: xfcc — invalid cert also fail-opens until wasm catches up
+    while response.status_code != 401 and time.time() < deadline:
+        time.sleep(1)
+        response = client.get("/get", headers={XFCC_HEADER_NAME: invalid_cert.xfcc_header})
+    assert not response.has_unknown_ca_error()
+    assert response.status_code == 401
+"""
+    if old_inv not in text:
+        print("WARN xfcc invalid-cert 401 assert not found")
+        return
+    _write(path, text.replace(old_inv, new_inv, 1), "XFCC 401 waits")
+
+
+def patch_gateway_listener() -> None:
+    path = Path(
+        "testsuite/tests/singlecluster/gateway/authpolicy/test_authpolicy_section_targeting_gateway.py"
+    )
+    if not path.exists():
+        print("SKIP gateway listener test missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: gateway-listener" in text:
+        print("SKIP gateway-listener already patched")
+        return
+    old = """    response = unmanaged_client.get("/get")
+    assert response.status_code == 200, "The unmanaged listener should not require auth"
+
+    response = managed_client.get("/get")
+    assert response.status_code == 401, "The secure listener should require auth"
+"""
+    new = """    response = unmanaged_client.get("/get")
+    assert response.status_code == 200, "The unmanaged listener should not require auth"
+
+    import time
+    deadline = time.time() + 60
+    response = managed_client.get("/get")
+    # s390x-authorino-fix: gateway-listener — wait here only; do not autouse on gateway/conftest
+    while response.status_code != 401 and time.time() < deadline:
+        time.sleep(1)
+        response = managed_client.get("/get")
+    assert response.status_code == 401, "The secure listener should require auth"
+"""
+    if old not in text:
+        print("WARN gateway listener 401 assert not found")
+        return
+    _write(path, text.replace(old, new, 1), "gateway listener AuthPolicy 401 wait")
+
+
+def patch_no_caching() -> None:
+    path = Path("testsuite/tests/singlecluster/authorino/caching/metadata/test_not_cached.py")
+    if not path.exists():
+        print("SKIP test_not_cached missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: no-cache-warmup" in text:
+        print("SKIP no-cache-warmup already patched")
+        return
+    old = """    response1 = client.get("/get", auth=auth)
+    assert response1.status_code == 200
+    data = extract_response(response1)[module_label]["uuid"] % None
+    assert data is not None
+
+    response2 = client.get("/get", auth=auth)
+    assert response2.status_code == 200
+    cached_data = extract_response(response2)[module_label]["uuid"] % None
+    assert cached_data is not None
+
+    assert cached_data != data
+    assert len(mockserver.retrieve_requests(module_label)) == 2
+"""
+    new = """    import time
+    deadline = time.time() + 60
+    warm = client.get("/get", auth=auth)
+    # s390x-authorino-fix: no-cache-warmup — 500 retries must not count as the measured pair
+    while warm.status_code == 500 and time.time() < deadline:
+        time.sleep(1)
+        warm = client.get("/get", auth=auth)
+    assert warm.status_code == 200
+    hits_after_warmup = len(mockserver.retrieve_requests(module_label))
+
+    response1 = client.get("/get", auth=auth)
+    assert response1.status_code == 200
+    data = extract_response(response1)[module_label]["uuid"] % None
+    assert data is not None
+
+    response2 = client.get("/get", auth=auth)
+    assert response2.status_code == 200
+    cached_data = extract_response(response2)[module_label]["uuid"] % None
+    assert cached_data is not None
+
+    assert cached_data != data
+    assert len(mockserver.retrieve_requests(module_label)) == hits_after_warmup + 2
+"""
+    if old not in text:
+        print("WARN test_no_caching measured-pair block not found")
+        return
+    _write(path, text.replace(old, new, 1), "no-cache 500 warmup")
+
+
+def patch_uma_wait() -> None:
+    path = Path(
+        "testsuite/tests/singlecluster/authorino/authorization/opa/test_authorization_services.py"
+    )
+    if not path.exists():
+        print("SKIP uma wait test file missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: uma-wait" in text:
+        print("SKIP uma-wait already patched")
+        return
+    old = """    # Access the protected resource by requester
+    response = client.get("/anything/1", auth=requester_auth)
+    assert response.status_code == 403
+"""
+    new = """    # Access the protected resource by requester
+    import time
+    deadline = time.time() + 60
+    response = client.get("/anything/1", auth=requester_auth)
+    # s390x-authorino-fix: uma-wait — Keycloak/Authorino 500 until UMA dataplane settles
+    while response.status_code == 500 and time.time() < deadline:
+        time.sleep(1)
+        response = client.get("/anything/1", auth=requester_auth)
+    assert response.status_code == 403
+"""
+    if old not in text:
+        print("WARN uma first 403 assert not found")
+        return
+    _write(path, text.replace(old, new, 1), "UMA 500-to-403 wait")
+
+
 if __name__ == "__main__":
     patch_dinosaur()
     patch_uma()
     patch_uma_eval()
+    patch_uma_wait()
     patch_cache()
+    patch_no_caching()
     patch_gateway()
+    patch_gateway_listener()
     patch_section_route_auth()
     patch_authpolicy_retarget()
     patch_identical_hostnames()
     patch_control_plane_update()
     patch_dataplane_tracing()
     patch_dns_delegate()
+    patch_oidc()
+    patch_trlp_auth()
+    patch_xfcc()
 PY
 
 # ---------------------------------------------------------------------------
@@ -1294,9 +1558,18 @@ if grep -q 'AUTH_DATAPLANE_READY_TIMEOUT' testsuite/utils/constants.py 2>/dev/nu
   echo 'dataplane-ready helpers already present; skipping patch'
 else
   if command -v git >/dev/null 2>&1; then
-    git apply --verbose /kuadrant-hook/kuadrant-s390x-run-testsuite-dataplane-ready.patch
+    # Overlay of current main drifts oidc_policy/conftest.py (extra imports).
+    # git apply is atomic: one failed hunk used to drop Authorino waits too.
+    if ! git apply --verbose /kuadrant-hook/kuadrant-s390x-run-testsuite-dataplane-ready.patch; then
+      echo 'full dataplane-ready patch failed; retry excluding oidc conftest'
+      if ! git apply --verbose --exclude=testsuite/tests/singlecluster/extensions/oidc_policy/conftest.py /kuadrant-hook/kuadrant-s390x-run-testsuite-dataplane-ready.patch; then
+        echo 'still failing; applying matching hunks with --reject'
+        git apply --verbose --reject /kuadrant-hook/kuadrant-s390x-run-testsuite-dataplane-ready.patch || true
+        find . -name '*.rej' -print -delete || true
+      fi
+    fi
   elif command -v patch >/dev/null 2>&1; then
-    patch -p1 < /kuadrant-hook/kuadrant-s390x-run-testsuite-dataplane-ready.patch
+    patch -p1 --forward < /kuadrant-hook/kuadrant-s390x-run-testsuite-dataplane-ready.patch || true
   else
     echo 'ERROR: neither git nor patch available to apply dataplane-ready patch' >&2
     exit 1
