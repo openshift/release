@@ -245,14 +245,30 @@ echo "$(date) Checking the compute nodes in the hosted control plane"
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" get nodes
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --for=condition=Ready node --all --timeout=15m
 
-# --- Step 8: Verify the guest ingress service ---
-# The agent guest router runs in HostNetwork mode and listens on port 80/443
-# directly on the node IP. Confirm here so HAProxy backends can be checked.
-echo "$(date) Checking guest ingress service"
+# --- Step 8: Patch IngressController to HostNetwork publishing strategy ---
+# By default the agent hosted cluster creates the router as ClusterIP (Private),
+# which means the router pod is not reachable from outside the cluster.
+# HostNetwork binds the router pod directly to port 80/443 on the compute node IP,
+# which is what the HAProxy backends (192.168.<subnet>.51:80/443) expect.
+echo "$(date) Patching IngressController default → HostNetwork publishing strategy"
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+  patch ingresscontroller default -n openshift-ingress-operator \
+  --type=merge \
+  -p '{"spec":{"endpointPublishingStrategy":{"type":"HostNetwork"}}}'
+
+# Wait for the router deployment to roll out with the new strategy
+echo "$(date) Waiting for ingress router rollout"
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+  rollout status deployment/router-default -n openshift-ingress --timeout=10m
+echo "$(date) Ingress router rollout complete"
+
+# Confirm the router pod is running on the expected compute node IPs
+echo "$(date) Checking guest ingress service and router pods"
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" get svc -n openshift-ingress
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" get pods -n openshift-ingress -o wide
 
 # --- Step 9: Wait for all guest ClusterOperators to be Available ---
-# COs require compute nodes to be Ready before they can progress.
+# COs require compute nodes to be Ready and ingress to be healthy before progressing.
 echo "$(date) Waiting for all guest ClusterOperators to be Available"
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
   wait --for=condition=Available=True co --all --timeout=30m
