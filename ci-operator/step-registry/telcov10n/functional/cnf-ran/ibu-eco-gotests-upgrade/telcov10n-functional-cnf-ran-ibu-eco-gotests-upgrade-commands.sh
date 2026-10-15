@@ -121,7 +121,7 @@ ansible-playbook playbooks/deploy-run-eco-gotests.yaml \
   -i "${CNF_INVENTORY_PATH}/switch-config.yaml" \
   --extra-vars "kubeconfig=${TARGET_SPOKE_KUBECONFIG}" \
   --extra-vars "features=${ECO_GOTESTS_FEATURES}" \
-  --extra-vars "labels='!no-container&&(!ValidateSeedReferences)'" \
+  --extra-vars '{"labels": "\"!no-container&&(!ValidateSeedReferences)\""}' \
   --extra-vars 'eco_worker_label=""' \
   --extra-vars 'eco_cnf_core_net_switch_user=""' \
   --extra-vars 'eco_cnf_core_net_switch_pass=""' \
