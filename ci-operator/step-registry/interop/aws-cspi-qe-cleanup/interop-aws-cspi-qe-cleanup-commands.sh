@@ -41,13 +41,10 @@ for region in "${REGIONS[@]}"; do
 done
 
 # ============================================================
-# IAM Role and Instance Profile Cleanup (Global – run once)
+# Shared Setup: AWS CLI and age threshold
 # ============================================================
-# cleanleaked cascades IAM cleanup from VPC/OIDC deletion but does NOT
-# independently enumerate standalone IAM roles/profiles. Orphaned roles
-# from failed deprovisioning accumulate and can hit the 1000-role AWS
-# quota. This section finds roles/profiles created by the OCP IPI
-# installer (by suffix) and removes stale ones directly.
+# The Route 53 and IAM cleanup phases below both need the AWS CLI and
+# a parsed age threshold. Install and configure them once here.
 
 echo ""
 echo "=== Installing AWS CLI v2 ==="
@@ -56,17 +53,302 @@ cd /tmp && unzip -q awscliv2.zip && ./aws/install --bin-dir /tmp/aws-bin --insta
 export PATH="/tmp/aws-bin:${PATH}"
 aws --version
 
-# IAM is a global service; use us-east-1 for the API endpoint
+# Route 53 and IAM are global services; use us-east-1 for the API endpoint
 export AWS_DEFAULT_REGION="us-east-1"
 
 # Parse CLEANUP_MIN_AGE (e.g. "24h") into hours for age comparison
 MIN_AGE_HOURS=$(echo "${CLEANUP_MIN_AGE}" | sed -n 's/^\([0-9]*\)h$/\1/p')
 if [[ -z "${MIN_AGE_HOURS}" ]]; then
-  echo "ERROR: CLEANUP_MIN_AGE='${CLEANUP_MIN_AGE}' must be '<N>h' for IAM cleanup" >&2
+  echo "ERROR: CLEANUP_MIN_AGE='${CLEANUP_MIN_AGE}' must be '<N>h' for Route 53/IAM cleanup" >&2
   exit 1
 fi
 CUTOFF_EPOCH=$(date -d "${MIN_AGE_HOURS} hours ago" +%s)
 echo "Age threshold: ${MIN_AGE_HOURS}h (cutoff: $(date -d "@${CUTOFF_EPOCH}" -u +%Y-%m-%dT%H:%M:%SZ))"
+
+# ============================================================
+# Route 53 Hosted Zone Cleanup (Global – run once)
+# ============================================================
+# cleanleaked scans VPCs to find leaked infra but does NOT independently
+# enumerate or clean Route 53 hosted zones. Orphaned zones from failed
+# IPI installs (where the VPC was never created or was already destroyed)
+# are invisible to cleanleaked and accumulate toward the
+# MAX_HOSTED_ZONES_BY_OWNER quota. This section finds and removes them.
+
+echo ""
+echo "=== Phase 1.5: Route 53 Hosted Zone Cleanup ==="
+
+# Write a python3 helper for JSON processing (creating change batches for
+# Route 53 record deletion). The Route 53 API requires a JSON change-batch
+# payload; python3 (available on RHEL 9) handles the transformation.
+cat > /tmp/r53_make_batches.py << 'PYEOF'
+"""Create Route 53 change batches for record deletion.
+
+Reads list-resource-record-sets JSON from stdin.
+Args: <zone_name> <output_file>
+Prints the number of records to delete to stdout.
+Writes change batch JSON (one per line, max 1000 changes each) to output_file.
+"""
+import json, sys
+
+zone_name = sys.argv[1]
+batches_file = sys.argv[2]
+
+data = json.load(sys.stdin)
+# Keep only the apex NS and SOA records; everything else must be deleted
+# before the hosted zone itself can be removed.
+records = [r for r in data.get('ResourceRecordSets', [])
+           if not (r['Type'] in ('NS', 'SOA') and r['Name'] == zone_name)]
+if not records:
+    print(0)
+    sys.exit(0)
+
+with open(batches_file, 'w') as f:
+    for i in range(0, len(records), 1000):
+        batch = {'Changes': [{'Action': 'DELETE', 'ResourceRecordSet': r}
+                             for r in records[i:i+1000]]}
+        f.write(json.dumps(batch) + '\n')
+print(len(records))
+PYEOF
+
+R53_SKIP_REASON=""
+if ! command -v python3 &>/dev/null; then
+  R53_SKIP_REASON="python3 not available (required for JSON processing)"
+fi
+
+ZONES_DELETED=0
+ZONES_SKIPPED_YOUNG=0
+ZONES_SKIPPED_APEX=0
+ZONES_SKIPPED_NOT_SUBDOMAIN=0
+ZONES_ERRORS=0
+
+if [[ -n "${R53_SKIP_REASON}" ]]; then
+  echo "WARNING: ${R53_SKIP_REASON}. Skipping Route 53 hosted zone cleanup."
+else
+
+# --- Determine the base domain for identifying CI-created cluster zones ---
+if [[ -n "${CLEANUP_BASE_DOMAIN:-}" ]]; then
+  BASE_DOMAIN="${CLEANUP_BASE_DOMAIN}"
+  # Ensure trailing dot (Route 53 zone names always end with a dot)
+  [[ "${BASE_DOMAIN}" != *. ]] && BASE_DOMAIN="${BASE_DOMAIN}."
+  echo "Using configured base domain: ${BASE_DOMAIN}"
+else
+  echo "Auto-detecting base domain from hosted zones..."
+  # Collect all public zone names into an array
+  mapfile -t ALL_ZONE_NAMES < <(aws route53 list-hosted-zones \
+    --query 'HostedZones[].Name' \
+    --output text 2>/dev/null | tr '\t' '\n' | sort)
+
+  # The apex zone is the one with the most other zones as subdomains
+  BASE_DOMAIN=""
+  BEST_COUNT=0
+  for candidate in "${ALL_ZONE_NAMES[@]}"; do
+    count=0
+    for other in "${ALL_ZONE_NAMES[@]}"; do
+      if [[ "${other}" != "${candidate}" && "${other}" == *".${candidate}" ]]; then
+        ((count++)) || true
+      fi
+    done
+    if (( count > BEST_COUNT )); then
+      BEST_COUNT=${count}
+      BASE_DOMAIN="${candidate}"
+    fi
+  done
+
+  if [[ -z "${BASE_DOMAIN}" ]]; then
+    echo "WARNING: Could not auto-detect base domain. Skipping Route 53 cleanup."
+    echo "Set CLEANUP_BASE_DOMAIN to specify the base domain explicitly."
+  else
+    echo "Auto-detected base domain: ${BASE_DOMAIN} (${BEST_COUNT} subdomain zone(s) found)"
+  fi
+fi
+
+if [[ -n "${BASE_DOMAIN}" ]]; then
+
+  # --- Age check: query CloudTrail for recently-created zones ---
+  # Route 53 does not expose hosted zone creation timestamps. We query
+  # CloudTrail management events (retained 90 days) to find zones created
+  # within CLEANUP_MIN_AGE. Zones not found in CloudTrail are older than
+  # 90 days and clearly past any reasonable threshold.
+  echo "Querying CloudTrail for recently-created hosted zones..."
+  RECENT_ZONE_IDS_FILE=$(mktemp)
+  CT_NEXT_TOKEN=""
+  CT_FAILED="false"
+  while true; do
+    CT_ARGS=(
+      --region us-east-1
+      --lookup-attributes "AttributeKey=EventName,AttributeValue=CreateHostedZone"
+      --start-time "$(date -d "@${CUTOFF_EPOCH}" -u +%Y-%m-%dT%H:%M:%SZ)"
+      --end-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      --max-results 50
+      --output json
+    )
+    [[ -n "${CT_NEXT_TOKEN}" ]] && CT_ARGS+=(--next-token "${CT_NEXT_TOKEN}")
+
+    CT_RESULT=$(aws cloudtrail lookup-events "${CT_ARGS[@]}" 2>/dev/null) || {
+      echo "WARNING: CloudTrail query failed (missing permissions or service issue)."
+      echo "         Route 53 zone deletion will be skipped for this run."
+      CT_FAILED="true"
+      break
+    }
+
+    # Extract hosted zone IDs from the CloudTrail events
+    python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+for event in data.get('Events', []):
+    for resource in event.get('Resources', []):
+        if resource.get('ResourceType') == 'AWS::Route53::HostedZone':
+            rn = resource.get('ResourceName', '')
+            if rn:
+                print(rn)
+" <<< "${CT_RESULT}" >> "${RECENT_ZONE_IDS_FILE}" 2>/dev/null || {
+      echo "WARNING: Failed to extract zone IDs from CloudTrail events."
+      echo "         Route 53 zone deletion will be skipped for this run."
+      CT_FAILED="true"
+      break
+    }
+
+    # Check for pagination
+    CT_NEXT_TOKEN=$(python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+print(data.get('NextToken', ''))
+" <<< "${CT_RESULT}" 2>/dev/null) || {
+      echo "WARNING: Failed to parse CloudTrail pagination token."
+      echo "         Route 53 zone deletion will be skipped for this run."
+      CT_FAILED="true"
+      break
+    }
+    [[ -z "${CT_NEXT_TOKEN}" ]] && break
+  done
+  sort -u -o "${RECENT_ZONE_IDS_FILE}" "${RECENT_ZONE_IDS_FILE}" 2>/dev/null || true
+  if [[ "${CT_FAILED}" != "true" ]]; then
+    YOUNG_ZONE_COUNT=$(wc -l < "${RECENT_ZONE_IDS_FILE}" 2>/dev/null | tr -d ' ')
+    echo "Found ${YOUNG_ZONE_COUNT} recently-created zone(s) to protect"
+  fi
+
+  # --- Enumerate and process all public hosted zones ---
+  echo ""
+  echo "Enumerating hosted zones..."
+  ZONE_DATA=$(aws route53 list-hosted-zones \
+    --query 'HostedZones[].[Id,Name]' \
+    --output text 2>/dev/null) || ZONE_DATA=""
+
+  TOTAL_ZONES=0
+  [[ -n "${ZONE_DATA}" ]] && TOTAL_ZONES=$(echo "${ZONE_DATA}" | wc -l | tr -d ' ')
+  echo "Found ${TOTAL_ZONES} hosted zone(s)"
+
+  if [[ "${CT_FAILED}" == "true" ]]; then
+    echo "WARNING: CloudTrail data unavailable — skipping Route 53 zone deletion for this run."
+    echo "  ${TOTAL_ZONES} zone(s) found but cannot verify age; no zones will be deleted."
+  else
+
+  while IFS=$'\t' read -r zone_id zone_name; do
+    [[ -z "${zone_id}" ]] && continue
+
+    # Safety: NEVER delete the apex/base domain zone
+    if [[ "${zone_name}" == "${BASE_DOMAIN}" ]]; then
+      echo "  SKIP (apex zone): ${zone_name}"
+      ((ZONES_SKIPPED_APEX++)) || true
+      continue
+    fi
+
+    # Only process zones that are subdomains of the base domain
+    if [[ "${zone_name}" != *".${BASE_DOMAIN}" ]]; then
+      ((ZONES_SKIPPED_NOT_SUBDOMAIN++)) || true
+      continue
+    fi
+
+    # Strip /hostedzone/ prefix for CloudTrail ID comparison
+    zone_id_short="${zone_id#/hostedzone/}"
+
+    # Age check: skip zones created within CLEANUP_MIN_AGE
+    if [[ "${CT_FAILED}" != "true" ]] && \
+       grep -qF "${zone_id_short}" "${RECENT_ZONE_IDS_FILE}" 2>/dev/null; then
+      echo "  SKIP (young): ${zone_name} (created within ${MIN_AGE_HOURS}h)"
+      ((ZONES_SKIPPED_YOUNG++)) || true
+      continue
+    fi
+
+    echo "  DELETE: ${zone_name} (zone ID: ${zone_id_short})"
+
+    # Step 1: Delete all resource records except apex NS/SOA
+    # (Route 53 requires a zone to contain only its apex NS and SOA
+    # records before the zone itself can be deleted)
+    R53_RECORDS_FILE=$(mktemp)
+    R53_BATCHES_FILE=$(mktemp)
+
+    if ! aws route53 list-resource-record-sets \
+      --hosted-zone-id "${zone_id}" \
+      --output json > "${R53_RECORDS_FILE}" 2>/dev/null; then
+      echo "    ERROR: Failed to list records for ${zone_name}"
+      ((ZONES_ERRORS++)) || true
+      rm -f "${R53_RECORDS_FILE}" "${R53_BATCHES_FILE}"
+      continue
+    fi
+
+    NUM_RECORDS=0
+    NUM_RECORDS=$(python3 /tmp/r53_make_batches.py "${zone_name}" \
+      "${R53_BATCHES_FILE}" < "${R53_RECORDS_FILE}" 2>/dev/null) || {
+      echo "    ERROR: Failed to process records for ${zone_name}"
+      ((ZONES_ERRORS++)) || true
+      rm -f "${R53_RECORDS_FILE}" "${R53_BATCHES_FILE}"
+      continue
+    }
+    rm -f "${R53_RECORDS_FILE}"
+
+    if (( NUM_RECORDS > 0 )); then
+      echo "    Deleting ${NUM_RECORDS} resource record(s)"
+      BATCH_OK="true"
+      while IFS= read -r batch; do
+        [[ -z "${batch}" ]] && continue
+        if ! aws route53 change-resource-record-sets \
+          --hosted-zone-id "${zone_id}" \
+          --change-batch "${batch}" >/dev/null 2>&1; then
+          echo "    ERROR: Failed to delete records from ${zone_name}"
+          BATCH_OK="false"
+          break
+        fi
+      done < "${R53_BATCHES_FILE}"
+      rm -f "${R53_BATCHES_FILE}"
+
+      if [[ "${BATCH_OK}" != "true" ]]; then
+        ((ZONES_ERRORS++)) || true
+        continue
+      fi
+    else
+      rm -f "${R53_BATCHES_FILE}"
+    fi
+
+    # Step 2: Delete the hosted zone
+    if aws route53 delete-hosted-zone --id "${zone_id}" >/dev/null 2>&1; then
+      echo "    Zone deleted successfully"
+      ((ZONES_DELETED++)) || true
+    else
+      echo "    ERROR: Failed to delete zone ${zone_name}"
+      ((ZONES_ERRORS++)) || true
+    fi
+
+  done <<< "${ZONE_DATA}"
+
+  fi  # CT_FAILED check
+
+  rm -f "${RECENT_ZONE_IDS_FILE}"
+fi  # [[ -n "${BASE_DOMAIN}" ]]
+
+fi  # R53_SKIP_REASON check
+
+echo ""
+echo "Route 53 Hosted Zones: deleted=${ZONES_DELETED} skipped-young=${ZONES_SKIPPED_YOUNG} skipped-apex=${ZONES_SKIPPED_APEX} skipped-other=${ZONES_SKIPPED_NOT_SUBDOMAIN} errors=${ZONES_ERRORS}"
+
+# ============================================================
+# IAM Role and Instance Profile Cleanup (Global – run once)
+# ============================================================
+# cleanleaked cascades IAM cleanup from VPC/OIDC deletion but does NOT
+# independently enumerate standalone IAM roles/profiles. Orphaned roles
+# from failed deprovisioning accumulate and can hit the 1000-role AWS
+# quota. This section finds roles/profiles created by the OCP IPI
+# installer (by suffix) and removes stale ones directly.
 
 # ---- IAM Roles ----
 echo ""

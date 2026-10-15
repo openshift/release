@@ -21,12 +21,27 @@ ref:
     documentation: |-
       Minimum age of leaked resources before they are eligible for deletion.
       Resources younger than this threshold are skipped.
+  - name: CLEANUP_BASE_DOMAIN
+    default: "cspilp.interop.ccitredhat.com"
+    documentation: |-
+      The base DNS domain for the AWS account (e.g. "cspilp.interop.ccitredhat.com").
+      Route 53 hosted zones that are subdomains of this domain are candidates for
+      cleanup. If empty (default), the base domain is auto-detected by finding the
+      hosted zone that has the most other zones as subdomains.
   documentation: |-
     Cleans up leaked AWS resources from the aws-cspi-qe account.
 
     Phase 1 (per-region): Uses the cleanleaked tool from openshift/hypershift
-    to scan and delete leaked Route53 hosted zones, VPCs, and associated
-    infrastructure older than CLEANUP_MIN_AGE.
+    to scan and delete leaked VPCs and associated infrastructure older than
+    CLEANUP_MIN_AGE.
+
+    Phase 1.5 (global): Enumerates Route 53 hosted zones that are subdomains
+    of CLEANUP_BASE_DOMAIN (or the auto-detected base domain). Zones older
+    than CLEANUP_MIN_AGE (checked via CloudTrail) are cleaned up: all
+    non-NS/SOA records are deleted, then the zone itself is removed. The
+    apex/base domain zone is never deleted. This prevents orphaned zones
+    from failed IPI installs from accumulating toward the
+    MAX_HOSTED_ZONES_BY_OWNER quota.
 
     Phase 2 (global): Enumerates IAM roles (-master-role/-worker-role suffixes)
     and instance profiles (-master-profile/-worker-profile suffixes) created by
