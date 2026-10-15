@@ -1,0 +1,36 @@
+ref:
+  as: interop-aws-cspi-qe-cleanup
+  from_image:
+    namespace: openshift
+    name: release
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+  grace_period: 5m0s
+  commands: interop-aws-cspi-qe-cleanup-commands.sh
+  timeout: 90m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  env:
+  - name: CLEANUP_REGIONS
+    default: us-east-1,us-east-2
+    documentation: |-
+      Comma-separated list of AWS regions to scan and clean up leaked resources in.
+  - name: CLEANUP_MIN_AGE
+    default: 24h
+    documentation: |-
+      Minimum age of leaked resources before they are eligible for deletion.
+      Resources younger than this threshold are skipped.
+  documentation: |-
+    Cleans up leaked AWS resources from the aws-cspi-qe account.
+
+    Phase 1 (per-region): Uses the cleanleaked tool from openshift/hypershift
+    to scan and delete leaked Route53 hosted zones, VPCs, and associated
+    infrastructure older than CLEANUP_MIN_AGE.
+
+    Phase 2 (global): Enumerates IAM roles (-master-role/-worker-role suffixes)
+    and instance profiles (-master-profile/-worker-profile suffixes) created by
+    the OCP IPI installer. Stale resources older than CLEANUP_MIN_AGE that carry
+    a kubernetes.io/cluster tag are cleaned up (policies detached, profiles
+    emptied, then deleted). This prevents orphaned roles from accumulating
+    toward the 1000-role AWS account quota.

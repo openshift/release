@@ -588,6 +588,9 @@ checkout_submodules(){
 
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
+# Build operator bundles for the OpenShift version under test.
+export OPERATOR_VERSION="${T5CI_VERSION}"
+
 # Set go version
 if [[ "$T5CI_VERSION" == "4.12" ]]; then
     source $HOME/golang-1.19
@@ -648,16 +651,39 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "5.1" ]]; then
-    export CNF_BRANCH="master"
-    # Let operator test submodules use their default main branches.
-    unset TARGET_RELEASE
-    export CNF_TESTS_IMAGE="cnf-tests:4.22"
-else
-    export CNF_BRANCH="release-${T5CI_VERSION}"
-    # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
+export CNF_BRANCH="release-${T5CI_VERSION}"
+
+
+if git ls-remote --exit-code --heads "${CNF_REPO}" \
+    "refs/heads/${CNF_BRANCH}" >/dev/null; then
+    echo "Using ${CNF_BRANCH}"
     export TARGET_RELEASE=$CNF_BRANCH
-    export CNF_TESTS_IMAGE="cnf-tests:4.21"
+    export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
+else
+    branch_status=$?
+    case "${branch_status}" in
+        2)
+            echo "${CNF_BRANCH} is absent; selecting master"
+            export CNF_BRANCH="master"
+            unset TARGET_RELEASE
+            export CNF_TESTS_IMAGE="cnf-tests:5.0"
+            ;;
+        *)
+            echo "Using the old logic"
+            if [[ "$T5CI_VERSION" == "5.1" ]]; then
+                echo "Because $T5CI_VERSION = 5.1 using master"
+                # Let operator test submodules use their default main branches.
+                export CNF_BRANCH="master"
+                unset TARGET_RELEASE
+                export CNF_TESTS_IMAGE="cnf-tests:5.0"
+            else
+                echo "Because $T5CI_VERSION != 5.1 using $CNF_BRANCH"
+                # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
+                export TARGET_RELEASE=$CNF_BRANCH
+                export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
+            fi
+            ;;
+    esac
 fi
 
 CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}

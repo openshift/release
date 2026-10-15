@@ -44,4 +44,4 @@ export ARO_HCP_CLOUD="dev"
 export DEPLOY_ENV="${VAULT_SECRET_PROFILE}"
 export REGION="${LOCATION}"
 
-./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml" --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" --max-concurrency 100
+./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml" --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" --max-concurrency "${ARO_HCP_MAX_CONCURRENCY}"

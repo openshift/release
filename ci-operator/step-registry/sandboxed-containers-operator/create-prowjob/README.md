@@ -71,7 +71,6 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 | `PROW_RUN_TYPE`            | `candidate`              | Prow job run type                                                           | `candidate` or `release` |
 | `SLEEP_DURATION`           | `0h`                     | Time to keep cluster alive after tests.  For manual testing.                | 0-12 followed by 'h'     |
 | `TEST_RELEASE_TYPE`        | `Pre-GA`                 | Release type for testing                                                    | `Pre-GA` or `GA`         |
-| `TEST_TIMEOUT`             | `90`                     | Test timeout in minutes                                                     | Numeric value            |
 
 ### Pre-GA vs GA Configuration
 
@@ -117,13 +116,12 @@ OCP_VERSION=4.19 \
 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
-#### Custom Regions and Timeouts
+#### Custom Regions and Sleep Duration
 ```bash
 # Extended testing with custom regions
 AWS_REGION_OVERRIDE=us-west-2 \
 CUSTOM_AZURE_REGION=westus2 \
 SLEEP_DURATION=2h \
-TEST_TIMEOUT=120 \
 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
