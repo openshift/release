@@ -17,7 +17,7 @@ prepare() {
   done
   export PATH=${temporary}/bin:${original_path} SHARED_DIR=${temporary}/shared ARTIFACT_DIR=${temporary}/artifacts NAMESPACE=fixture
   export DEVSCRIPTS_GATHER_AGENT=true
-  unset REMOTE_RC MAKE_RC SCP_RC COLLECTOR_RC UNREACHABLE REAL_TIMEOUT MAKE_SLEEP COLLECTION_SLEEP HANG_AGENT_PATTERN
+  unset REMOTE_RC MAKE_RC SCP_RC COLLECTOR_RC UNREACHABLE REAL_TIMEOUT MAKE_SLEEP COLLECTION_SLEEP HANG_AGENT_PATTERN NODE_LOGS
   printf 'IP=203.0.113.1\nSSHOPTS=()\n' > "${SHARED_DIR}/packet-conf.sh"
   touch "${SHARED_DIR}/server-ip" "${SHARED_DIR}/devscripts-logs-collected"
   cat > "${temporary}/remote/dev-scripts/common.sh" <<'EOF'
@@ -30,10 +30,13 @@ WORKER_HOSTNAME_FORMAT=worker-%d
 BOOTSTRAP_PROVISIONING_IP=192.168.111.2
 BAREMETAL_NETWORK_NAME=ostestbm
 NODE_IPS=()
+shopt -s nocasematch
+set -x
 EOF
   printf 'wrap_if_ipv6() { if [[ "$1" == *:* ]]; then printf "[%%s]" "$1"; else printf "%%s" "$1"; fi; }\n' > "${temporary}/remote/dev-scripts/network.sh"
   touch "${temporary}/remote/dev-scripts/"{config_root.sh,utils.sh,ocp_install_env.sh}
-  printf 'getRendezvousIP() { cat "$FIXTURE_ROOT/rendezvous"; }\n' > "${temporary}/remote/dev-scripts/agent/common.sh"
+  printf 'set -o pipefail\n' > "${temporary}/remote/dev-scripts/utils.sh"
+  printf 'set -euxo pipefail\ngetRendezvousIP() { cat "$FIXTURE_ROOT/rendezvous"; }\n' > "${temporary}/remote/dev-scripts/agent/common.sh"
   printf '192.168.111.80 master-0\n192.168.111.81 master-1\n' > "${temporary}/remote/dev-scripts/ocp/ostest/hosts"
   echo 192.168.111.80 > "${temporary}/rendezvous"
   echo 1 > "${temporary}/remote/dev-scripts/logs/installer-status.txt"
@@ -58,6 +61,34 @@ for identifier in hostname macAddress; do
   grep -q 'core@192.168.111.81' "${temporary}/calls"
   ! grep -Eq 'net-dumpxml|core@192.168.111.(2|20|21) ' "${temporary}/calls"
   grep -q 'Agent rendezvous selected' "${temporary}/output"
+done
+for scenario in hostname macAddress unreachable; do
+  prepare
+  unreachable=none
+  if [[ "${scenario}" == unreachable ]]; then unreachable=192.168.111.80; else export FENCING_CREDENTIAL_IDENTIFIER=${scenario}; fi
+  export NODE_LOGS=true UNREACHABLE=${unreachable}
+  rm "${temporary}/remote/tmp/artifacts/partial.tar.gz"
+  run_step "${fallback}" 0
+  for node in 0 1; do
+    address=192.168.111.$((80 + node))
+    if [[ "${address}" == "${unreachable}" ]]; then
+      test ! -f "${ARTIFACT_DIR}/journal_${address}.tar.gz"
+      test ! -f "${ARTIFACT_DIR}/pacemaker_master-${node}.tar.gz"
+      continue
+    fi
+    grep -Fq "core@${address} sudo cat /var/log/pacemaker/pacemaker.log" "${temporary}/calls"
+    grep -Fq "core@${address} sudo podman logs etcd" "${temporary}/calls"
+    grep -Fq "core@${address} sudo journalctl | sudo dd of=/var/log/journal.log" "${temporary}/calls"
+    grep -Fq "core@${address} sudo tar -czf /run/artifacts/journal_${address}.tar.gz" "${temporary}/calls"
+    grep -Eq "^scp .*core@${address}:/run/artifacts/\\*.tar" "${temporary}/calls"
+    pacemaker=$(/usr/bin/tar -xOzf "${ARTIFACT_DIR}/pacemaker_master-${node}.tar.gz" "pacemaker_master-${node}.log")
+    [[ "${pacemaker}" == *"synthetic pacemaker core@${address}"* ]]
+    [[ "${pacemaker}" == *'name="password" value="REDACTED" name="passwd" value="REDACTED" name="username" value="REDACTED"'* ]]
+    [[ "${pacemaker}" != *fixture-* ]]
+    /usr/bin/tar -xOzf "${ARTIFACT_DIR}/podman-etcd_master-${node}.tar.gz" "podman-etcd_master-${node}.log" | grep -Fq "synthetic etcd core@${address}"
+    /usr/bin/tar -xOzf "${ARTIFACT_DIR}/journal_${address}.tar.gz" journal.log | grep -Fq "synthetic journal core@${address}"
+  done
+  ! grep -Eq 'net-dumpxml|core@192.168.111.(2|20|21) ' "${temporary}/calls"
 done
 prepare
 unset DEVSCRIPTS_GATHER_AGENT

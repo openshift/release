@@ -25,6 +25,7 @@ case "${command_name}" in
     if [[ "${address}" == root@* && "$1" == bash ]]; then
       script=$(cat)
       script=${script//\/tmp\//${FIXTURE_ROOT}/remote/tmp/}
+      script=${script//-C \/tmp /-C ${FIXTURE_ROOT}/remote/tmp }
       script=${script//\/root\/dev-scripts/${FIXTURE_ROOT}/remote/dev-scripts}
       printf '%s\n' "${script}" >> "${FIXTURE_ROOT}/rendered.sh"
       [[ "${REMOTE_RC:-0}" == 0 ]] || exit "${REMOTE_RC}"
@@ -36,8 +37,22 @@ case "${command_name}" in
     fi
     [[ "${address}" != "core@${UNREACHABLE:-none}" ]] || exit 255
     if [[ "$*" == *'command -v agent-gather'* ]]; then exit "${COLLECTOR_RC:-0}"; fi
-    if [[ "$*" == *'test -f'* || "$*" == *'container exists etcd'* ]]; then exit 1; fi
-    echo 'synthetic journal diagnostic'
+    if [[ "$*" == *'test -f'* || "$*" == *'container exists etcd'* ]]; then
+      [[ "${NODE_LOGS:-false}" == true ]]
+      exit
+    fi
+    if [[ "$*" == *'cat /var/log/pacemaker/pacemaker.log'* ]]; then
+      printf 'synthetic pacemaker %s name="password" value="fixture-password" name="passwd" value="fixture-passwd" name="username" value="fixture-user"\n' "${address}"
+    elif [[ "$*" == *'podman logs etcd'* ]]; then
+      printf 'synthetic etcd %s\n' "${address}"
+    elif [[ "$*" == *'sudo tar -czf /run/artifacts/journal_'* ]]; then
+      node_dir=${FIXTURE_ROOT}/nodes/${address#core@}
+      mkdir -p "${node_dir}/artifacts"
+      printf 'synthetic journal %s\n' "${address}" > "${node_dir}/journal.log"
+      /usr/bin/tar -czf "${node_dir}/artifacts/journal_${address#core@}.tar.gz" -C "${node_dir}" journal.log
+    else
+      echo 'synthetic journal diagnostic'
+    fi
     ;;
   scp)
     [[ "${SCP_RC:-0}" == 0 ]] || exit "${SCP_RC}"
@@ -45,9 +60,15 @@ case "${command_name}" in
     while [[ "$1" == -o ]]; do shift 2; done
     source_path=${1#*:}
     destination=${!#}
-    [[ "$1" == root@* ]] || exit 1
-    source_path=${source_path/#\/tmp\//${FIXTURE_ROOT}/remote/tmp/}
-    source_path=${source_path//\/root\/dev-scripts/${FIXTURE_ROOT}/remote/dev-scripts}
+    if [[ "$1" == core@* ]]; then
+      address=${1%%:*}
+      [[ "${address}" != "core@${UNREACHABLE:-none}" ]] || exit 255
+      source_path=${source_path/#\/run\//${FIXTURE_ROOT}/nodes/${address#core@}/}
+    else
+      [[ "$1" == root@* ]] || exit 1
+      source_path=${source_path/#\/tmp\//${FIXTURE_ROOT}/remote/tmp/}
+      source_path=${source_path//\/root\/dev-scripts/${FIXTURE_ROOT}/remote/dev-scripts}
+    fi
     found=false
     shopt -s nullglob
     for file in ${source_path}; do cp "${file}" "${destination}"; found=true; done
@@ -65,6 +86,7 @@ case "${command_name}" in
   xmllint) if [[ "$*" == *master-1* ]]; then echo 192.168.111.21; else echo 192.168.111.20; fi ;;
   tar)
     if [[ "$*" == *'-xzf -'* ]]; then exec /usr/bin/tar "$@"; fi
+    if [[ "$*" == *'pacemaker_'* || "$*" == *'podman-etcd_'* ]]; then exec /usr/bin/tar "$@"; fi
     target=''
     for argument in "$@"; do [[ "${argument}" != *.tar* ]] || target=${argument}; done
     [[ -n "${target}" ]] || exit 0
