@@ -1,20 +1,5 @@
 ---
 apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: pipeline-controller-agentic-state
-  namespace: ci
-  labels:
-    app: prow
-    component: pipeline-controller
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 20Gi
----
-apiVersion: v1
 kind: Service
 metadata:
   name: pipeline-controller
@@ -119,9 +104,8 @@ spec:
             - --github-graphql-endpoint=http://ghproxy/graphql
             - --config-file=/var/repo/release/core-services/pipeline-controller/config.yaml
             - --lgtm-config-file=/var/repo/release/core-services/pipeline-controller/lgtm-config.yaml
-            # Requires a controller image with agentic selection support.
+            # Trust Chai comments during the agentic handoff.
             - --agentic-trusted-author=redhat-chai-bot
-            - --agentic-state-dir=/var/lib/pipeline-controller/agentic
             - --hmac-secret-file=/etc/webhook/hmac.yaml
             - --endpoint=/
           env:
@@ -157,8 +141,6 @@ spec:
             - name: hmac
               mountPath: /etc/webhook
               readOnly: true
-            - name: agentic-state
-              mountPath: /var/lib/pipeline-controller
         - name: git-sync
           command:
             - /git-sync
@@ -229,6 +211,3 @@ spec:
         - name: config-sparse-checkout
           configMap:
             name: prow-config-sparse-checkout
-        - name: agentic-state
-          persistentVolumeClaim:
-            claimName: pipeline-controller-agentic-state

@@ -351,6 +351,7 @@ CONFIG = {
     'aro-hcp-prod-shard1-slot': {},
     'aro-hcp-prod-testtenant-slot': {},
     'aro-hcp-stg-shard0-slot': {},
+    'aro-hcp-stg-westus3-shard0-slot': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
     'aro-hcp-arm-helper-sp-dev': {},
@@ -451,15 +452,6 @@ CONFIG = {
     'openstack-hwoffload-quota-slice': {
         'default': 3,
     },
-    'openstack-nerc-dev-quota-slice': {
-        'default': 1,
-    },
-    'openstack-rhoso-quota-slice': {
-        'serval71.lab.eng.tlv2.redhat.com': 1,
-    },
-    'openstack-rhos-ci-quota-slice': {
-        'default': 1,
-    },
     'openstack-nfv-quota-slice': {
         'default': 4,
     },
@@ -504,7 +496,7 @@ CONFIG = {
         'default': 30,
     },
     'hypershift-aks-quota-slice': {
-        'default': 20,
+        'default': 30,
     },
     'hypershift-azure-quota-slice': {
         'default': 20,
@@ -559,6 +551,9 @@ CONFIG = {
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
+    },
+    'ibmcloud-quay-quota-slice': {
+        'us-east': 4,
     },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
@@ -674,6 +669,12 @@ CONFIG = {
         'us-west-1': 5,
         'us-west-2': 5,
     },
+    'aws-edge-hw-accel-quota-slice': {
+        'us-east-1': 15,
+        'us-east-2': 15,
+        'us-west-1': 15,
+        'us-west-2': 15,
+    },
     'rh-openshift-ecosystem-quota-slice': {
         'us-east-1': 10,
         'us-east-2': 10,
@@ -751,7 +752,9 @@ del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
 for i in range(4):
     for j in range(4):
         CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-{}-{}'.format(i, j)] = 1
-# Move lnxocp14 slots 2-3 from vpn-oz to the HCP VPN profile (same lease names / host)
+# Move lnxocp14 slots 0-3 from vpn-oz to the HCP VPN profile (same lease names / host)
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-0']
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-1']
 del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-2']
 del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-3']
 # Reserve lnxocp11 slots from vpn-oz for heterogeneous VPN profiles
@@ -760,7 +763,9 @@ del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-1']
 del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-2']
 del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-3']
 
-# HCP on OZ lnxocp14: reuse former vpn-oz leases oz-3-2 and oz-3-3
+# HCP on OZ lnxocp14 (dedicated): reuse former vpn-oz leases oz-3-0 through oz-3-3
+CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-0'] = 1
+CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-1'] = 1
 CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-2'] = 1
 CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-3'] = 1
 
@@ -876,6 +881,8 @@ for i in range(4):
     CONFIG['aro-hcp-prod-testtenant-slot']['aro-hcp-prod-testtenant-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-stg-westus3-shard0-slot']['aro-hcp-stg-westus3-shard0-slot-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
     CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1

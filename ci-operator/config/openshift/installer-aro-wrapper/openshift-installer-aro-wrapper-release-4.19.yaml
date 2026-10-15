@@ -1,3 +1,8 @@
+base_images:
+  ubi9-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
     name: builder
@@ -6,13 +11,16 @@ build_root:
 images:
   items:
   - dockerfile_path: Dockerfile.aro
+    from: ubi9-minimal
+    inputs:
+      src:
+        as:
+        - ${BUILDER_REGISTRY}/${BUILDER_REPOSITORY}:${BUILDER_TAG}
     to: azure-installer-aro-wrapper
 promotion:
   to:
   - name: "4.19"
     namespace: ocp
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     integration:

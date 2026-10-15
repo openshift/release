@@ -17,10 +17,10 @@ if [[ ! -x "/usr/bin/test-e2e" ]]; then
 fi
 
 # Verify required SHARED_DIR files exist
-for f in api-endpoint oidc-endpoint customer-project-id; do
+for f in api-endpoint oidc-endpoint customer-project-id region; do
   if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
     echo "ERROR: ${f} not found or empty in SHARED_DIR"
-    echo "The gcp-hcp-tf-provision step must write this file"
+    echo "A workflow pre-step must write this file"
     exit 1
   fi
 done
@@ -34,41 +34,62 @@ fi
 echo "Configuring gcphcpctl with the WIF credential..."
 export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 
-# The Ginkgo binary reads these values from SHARED_DIR, but the standalone
-# gcphcpctl readiness probe uses the CLI's environment-based configuration.
+# Record the WIF service account for the optional authorization bootstrap.
+# The INT job skips bootstrap and uses this identity for Platform API requests.
+# The WIF auth step also uses it to construct wif-cred.json.
+WIF_CONFIG="${CLUSTER_PROFILE_DIR}/wif-config.json"
+if [[ ! -r "${WIF_CONFIG}" ]]; then
+  echo "ERROR: WIF configuration not found or unreadable: ${WIF_CONFIG}"
+  exit 1
+fi
+WIF_SERVICE_ACCOUNT_EMAIL=$(jq -r '.service_account // empty' "${WIF_CONFIG}")
+if [[ ! "${WIF_SERVICE_ACCOUNT_EMAIL}" =~ ^[^@[:space:]]+@[^@[:space:]]+$ ]]; then
+  echo "ERROR: .service_account is missing or invalid in ${WIF_CONFIG}"
+  exit 1
+fi
+printf '%s\n' "${WIF_SERVICE_ACCOUNT_EMAIL}" > "${SHARED_DIR}/platform-api-subject-email"
+if [[ ! -s "${SHARED_DIR}/platform-api-subject-email" ]]; then
+  echo "ERROR: Failed to write the Platform API subject identity"
+  exit 1
+fi
+
+# The Ginkgo binary reads its configuration from SHARED_DIR. Keep these values
+# available as environment configuration for gcphcpctl calls made by the test.
 GCPHCPCTL_API_ENDPOINT="$(cat "${SHARED_DIR}/api-endpoint")"
 GCPHCPCTL_PROJECT="$(cat "${SHARED_DIR}/customer-project-id")"
-export GCPHCPCTL_API_ENDPOINT GCPHCPCTL_PROJECT
+GCPHCPCTL_REGION="$(cat "${SHARED_DIR}/region")"
+export GCPHCPCTL_API_ENDPOINT GCPHCPCTL_PROJECT GCPHCPCTL_REGION
 
-# Wait for the authenticated Gecko API path to be ready before starting the
-# lifecycle test. ArgoCD sync only confirms that manifests were applied; it
-# does not guarantee that the API gateway/backend can serve requests yet.
-wait_for_gcphcp_api() {
+# Wait for the unauthenticated platform API readiness endpoint before starting
+# the lifecycle test. Authentication is bootstrapped by the Ginkgo test before
+# any authenticated lifecycle request is made.
+wait_for_platform_api() {
   local max_attempts="${GCPHCPCTL_API_MAX_ATTEMPTS:-40}"
   local wait_seconds="${GCPHCPCTL_API_WAIT_SECONDS:-30}"
   local attempt=1
-  local output=""
+  local http_code
+
+  if [[ ! "${max_attempts}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: GCPHCPCTL_API_MAX_ATTEMPTS must be a positive integer"
+    return 1
+  fi
 
   echo ""
-  echo "=== Waiting for authenticated gcphcpctl API readiness ==="
-  echo "Polling cluster list (up to ${max_attempts} attempts, ${wait_seconds}s apart)..."
+  echo "=== Waiting for platform API readiness ==="
+  echo "Polling /readyz (up to ${max_attempts} attempts, ${wait_seconds}s apart)..."
 
   while (( attempt <= max_attempts )); do
-    if output="$(gcphcpctl cluster list 2>&1)"; then
-      echo "✓ gcphcpctl API is ready (attempt ${attempt})"
-      if [[ -n "${output}" ]]; then
-        echo "${output}"
-      fi
+    if http_code="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+      --max-time 15 "${GCPHCPCTL_API_ENDPOINT}/readyz")" \
+      && [[ "${http_code}" =~ ^2[0-9][0-9]$ ]]; then
+      echo "✓ Platform API is ready (attempt ${attempt})"
       return 0
     fi
 
-    echo "⚠ gcphcpctl API is not ready yet (attempt ${attempt}/${max_attempts})"
-    if [[ -n "${output}" ]]; then
-      echo "${output}"
-    fi
+    echo "⚠ Platform API is not ready yet (attempt ${attempt}/${max_attempts})"
 
     if (( attempt == max_attempts )); then
-      echo "ERROR: gcphcpctl API did not become ready after ${max_attempts} attempts"
+      echo "ERROR: Platform API did not become ready after ${max_attempts} attempts"
       return 1
     fi
 
@@ -77,23 +98,37 @@ wait_for_gcphcp_api() {
   done
 }
 
-if ! wait_for_gcphcp_api; then
+if ! wait_for_platform_api; then
   echo ""
   echo "=== gcphcpctl API readiness diagnostics ==="
-  echo "API endpoint: $(cat "${SHARED_DIR}/api-endpoint")"
-  echo "Customer project: $(cat "${SHARED_DIR}/customer-project-id")"
+  echo "Configured customer project: $(cat "${SHARED_DIR}/customer-project-id")"
   echo "DNS lookup:"
   getent hosts "$(sed -E 's#https?://([^/]+)/?.*#\1#' "${SHARED_DIR}/api-endpoint")" || true
   exit 1
 fi
 
 echo "Configuration:"
-echo "  API endpoint:       $(cat "${SHARED_DIR}/api-endpoint")"
-echo "  OIDC endpoint:      $(cat "${SHARED_DIR}/oidc-endpoint")"
+if [[ -s "${SHARED_DIR}/api-endpoint" ]]; then
+  echo "  API endpoint:       $(cat "${SHARED_DIR}/api-endpoint")"
+fi
+if [[ -s "${SHARED_DIR}/oidc-endpoint" ]]; then
+  echo "  OIDC endpoint:      $(cat "${SHARED_DIR}/oidc-endpoint")"
+fi
 echo "  Customer project:   $(cat "${SHARED_DIR}/customer-project-id")"
 echo "  HC version:         ${HC_VERSION:-5.0.0-ec.6}"
 echo "  Channel group:      ${HC_CHANNEL_GROUP:-candidate}"
 echo ""
+
+# A persistent customer project is authorized once outside CI. Verify that
+# access before --setup-infra can create customer-project IAM and networking.
+if [[ "${GCPHCPCTL_AUTHZ_BOOTSTRAP:-true}" == "false" ]]; then
+  echo "Checking pre-provisioned customer API access..."
+  if ! /usr/bin/gcphcpctl cluster list -o json > /dev/null; then
+    echo "ERROR: Cannot list clusters in the customer project through the Platform API"
+    echo "Verify one-time customer namespace activation and a cluster-admin RoleBinding for the WIF identity outside this job"
+    exit 1
+  fi
+fi
 
 # The Ginkgo test reads SHARED_DIR files directly via resolveConfig().
 # GCPHCPCTL_PATH points to the binary baked into the test image.

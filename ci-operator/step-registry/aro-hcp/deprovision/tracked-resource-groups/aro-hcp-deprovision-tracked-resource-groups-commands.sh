@@ -4,9 +4,9 @@ set -o pipefail
 set -o errexit
 set -o xtrace
 
-if ! compgen -G "${SHARED_DIR}/tracked-resource-group_*" > /dev/null; then
-    printf 'No tracked resource group files found, nothing to clean up.\n'
-    exit 0
+if [[ -z "${BUILD_ID:-}" || "${BUILD_ID}" =~ ^[[:space:]]*$ ]]; then
+    printf 'ERROR: BUILD_ID must be non-blank for resource group cleanup.\n' >&2
+    exit 1
 fi
 
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
@@ -21,16 +21,17 @@ export AZURE_TOKEN_CREDENTIALS=prod
 
 # Resolve CUSTOMER_SUBSCRIPTION from the slot env file or vault profile
 env_file="${SHARED_DIR:-}/aro-hcp-slot.env"
-if [[ -z "${CUSTOMER_SUBSCRIPTION:-}" ]] && [[ -f "${env_file}" ]]; then
+if [[ -f "${env_file}" ]]; then
   # shellcheck disable=SC1090
   source "${env_file}"
 fi
 export CUSTOMER_SUBSCRIPTION="${CUSTOMER_SUBSCRIPTION:-$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")}"
+export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 set -o xtrace
 
-cmd=(./test/aro-hcp-tests cleanup resource-groups --tracked --shared-dir "${SHARED_DIR}")
+cmd=(./test/aro-hcp-tests cleanup resource-groups --tracked --shared-dir "${SHARED_DIR}" --job-id "${BUILD_ID}")
 
 # Add FPA credentials if available (needed for SAL deletion in no-rp mode)
 FPA_CLIENT_ID_FILE="${CLUSTER_PROFILE_DIR}/first-party-app-client-id"

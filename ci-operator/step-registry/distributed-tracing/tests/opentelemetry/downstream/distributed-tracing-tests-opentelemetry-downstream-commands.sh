@@ -34,7 +34,7 @@ if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH:-}" ]]; then
   exit 1
 fi
 
-git clone https://github.com/os-observability/opentelemetry-operator.git /tmp/otel-tests
+git clone https://github.com/openshift/open-telemetry-opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests
 git checkout "${MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH}"
 

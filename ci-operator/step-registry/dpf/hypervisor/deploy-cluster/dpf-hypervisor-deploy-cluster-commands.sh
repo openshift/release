@@ -3,6 +3,28 @@ set -euo pipefail
 
 export PATH="/cli:${PATH}"
 
+# A workflow can require an exact version handoff. Validate it before touching
+# the hypervisor, independently of the workflow that supplied the request.
+REQUESTED_DPF_OPENSHIFT_VERSION=""
+if [[ -f "${SHARED_DIR}/dpf-openshift-version" ]]; then
+  DPF_OPENSHIFT_VERSION="$(tr -d '[:space:]' < "${SHARED_DIR}/dpf-openshift-version")"
+  if [[ -z "${DPF_OPENSHIFT_VERSION}" ]]; then
+    echo "ERROR: ${SHARED_DIR}/dpf-openshift-version is empty"
+    exit 1
+  fi
+  if [[ ! "${DPF_OPENSHIFT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9][A-Za-z0-9._-]*)?$ ]]; then
+    echo "ERROR: invalid OpenShift version '${DPF_OPENSHIFT_VERSION}'"
+    exit 1
+  fi
+  export DPF_OPENSHIFT_VERSION
+  REQUESTED_DPF_OPENSHIFT_VERSION="${DPF_OPENSHIFT_VERSION}"
+  DPF_SKIP_CI_PAYLOAD=true
+  echo "Using OpenShift version ${DPF_OPENSHIFT_VERSION} from shared dir"
+elif [[ "${DPF_REQUIRE_SHARED_OPENSHIFT_VERSION:-false}" == "true" ]]; then
+  echo "ERROR: workflow requires ${SHARED_DIR}/dpf-openshift-version"
+  exit 1
+fi
+
 echo "Checking access to SHARED_DIR ..."
 echo "Testing SHARED_DIR" > ${SHARED_DIR}/testing.txt
 ls -ltra ${SHARED_DIR}
@@ -204,14 +226,17 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
   env; \
   set -a; \
   source env.user_${CLUSTER_NAME}; \
+  if [[ -n '${REQUESTED_DPF_OPENSHIFT_VERSION}' ]]; then \
+    export DPF_OPENSHIFT_VERSION='${REQUESTED_DPF_OPENSHIFT_VERSION}'; \
+    export PAYLOAD_URL=''; \
+  fi; \
   if [[ -n \"\${DPF_OPENSHIFT_VERSION:-}\" ]]; then \
     export OPENSHIFT_VERSION=\"\${DPF_OPENSHIFT_VERSION}\"; \
   fi; \
   env; \
   set +a; \
   make generate-env; \
-  ls -ltra .env; \
-  cat .env"; then
+  ls -ltra .env"; then
   echo ".env file from sourced env.user_${CLUSTER_NAME} was generated successfully"
 else
   echo "ERROR: Failed to generate .env file from sourced env.user_${CLUSTER_NAME} file"
@@ -254,7 +279,12 @@ if [[ -f "${SHARED_DIR}/dpf-hcp-provisioner-operator-override" ]]; then
 fi
 
 echo "Copying .env from hypervisor to artifacts..."
-scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env ${ARTIFACT_DIR}/.env || echo "WARNING: Failed to copy .env to artifacts"
+if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env /tmp/.env.full 2>/dev/null; then
+  sed -E '/^WORKER_[0-9]+_NAME=/!{ /^WORKER_[0-9]+_/d }' /tmp/.env.full > "${ARTIFACT_DIR}/.env"
+  rm -f /tmp/.env.full
+else
+  echo "WARNING: Failed to copy .env to artifacts"
+fi
 
 
 # SSH session to hypervisor

@@ -1,0 +1,29 @@
+workflow:
+  as: gcp-hcp-e2e-on-demand
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: gcp-hcp-update-environment-status
+    - ref: hypershift-gcp-wif-auth
+    - ref: gcp-hcp-on-demand-config
+    test:
+    - ref: gcp-hcp-verify-hc-lifecycle
+    post:
+    - ref: gcp-hcp-cleanup-on-demand
+    - ref: gcp-hcp-finalize-environment-status
+  documentation: |-
+    Runs the HC lifecycle test against an existing long-running GCP HCP
+    environment. WIF authenticates the job; the config step supplies the
+    environment's API, OIDC, region, and customer project details. The CI
+    identity must be authorized for the persistent customer project outside
+    this workflow. Before the first INT run, activate the customer namespace
+    once through the regional activate-project workflow and grant the WIF
+    identity cluster-admin through the public API. The INT job itself does
+    not invoke the regional workflow.
+    On ordinary test failure, Ginkgo captures diagnostics and cleans test
+    resources. If the test process ends before cleanup finishes, the post
+    step uses recorded test resource names for a bounded fallback cleanup in
+    the customer project. This workflow does not gather or preserve failed HCs.
+    Periodic runs publish a separate HC lifecycle status on the active sector
+    promotion commit captured before the test. Requested presubmits
+    run the lifecycle test without changing deployed-commit statuses.

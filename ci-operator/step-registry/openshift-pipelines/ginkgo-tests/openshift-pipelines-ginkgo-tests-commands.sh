@@ -100,6 +100,7 @@ for pkg in "${pkgs[@]}"; do
     fi
 
     if ! ginkgo run \
+        --flake-attempts=2 \
         --label-filter="${GINKGO_LABEL_FILTER}" \
         --timeout="${GINKGO_TIMEOUT}" \
         --junit-report="${ARTIFACT_DIR}/${report}" \

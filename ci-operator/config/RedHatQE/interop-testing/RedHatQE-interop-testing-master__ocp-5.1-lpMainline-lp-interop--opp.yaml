@@ -1,4 +1,8 @@
 base_images:
+  acmqe-grc-test:
+    name: "2.17"
+    namespace: acm-qe
+    tag: acmqe-grc-test
   clc-ui-e2e:
     name: "2.17"
     namespace: acm-qe
@@ -7,6 +11,10 @@ base_images:
     name: "5.1"
     namespace: ocp
     tag: cli
+  console-e2e:
+    name: main
+    namespace: acm-qe
+    tag: console-e2e
   fetch-managed-clusters:
     name: autotest
     namespace: acm-qe
@@ -56,8 +64,6 @@ images:
           && rm -f openshift-client-linux.tar.gz /tmp/checksum.txt
       USER 1001
     to: acs-smoke-runner
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -111,6 +117,9 @@ tests:
     post:
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
+    - ref: mce-must-gather
+    - ref: interop-opp-must-gather-acs
+    - ref: interop-opp-must-gather-odf
     - ref: acm-inspector
     - ref: acm-tests-clc-destroy
     - ref: gather-aws-console
@@ -137,6 +146,9 @@ tests:
     - ref: acm-opp-app
     - ref: interop-tests-opp-quay-smoke
     - ref: interop-opp-skip-ratio-gate
+    - ref: acm-tests-alc
+    - ref: acm-tests-grc
+    - ref: acm-tests-clc-create
 - as: cr--full-stack--vsphere
   capabilities:
   - intranet
@@ -178,6 +190,8 @@ tests:
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
     - ref: mce-must-gather
+    - ref: interop-opp-must-gather-acs
+    - ref: interop-opp-must-gather-odf
     - chain: ipi-vsphere-post
     - ref: interop-opp-scrub-vsphere-creds
     - ref: mpiit-data-router-reporter
@@ -195,6 +209,8 @@ tests:
     - ref: interop-opp-wait-mcp
     - ref: acm-opp-app
     - ref: interop-opp-skip-ratio-gate
+    - ref: acm-tests-alc
+    - ref: acm-tests-grc
     workflow: acm-ipi-vsphere
 - as: full-stack--fips--aws
   capabilities:
@@ -236,6 +252,9 @@ tests:
     post:
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
+    - ref: mce-must-gather
+    - ref: interop-opp-must-gather-acs
+    - ref: interop-opp-must-gather-odf
     - ref: acm-inspector
     - ref: acm-tests-clc-destroy
     - ref: gather-aws-console
@@ -260,6 +279,9 @@ tests:
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
     - ref: interop-tests-opp-quay-smoke
+    - ref: acm-tests-alc
+    - ref: acm-tests-grc
+    - ref: acm-tests-clc-create
 zz_generated_metadata:
   branch: master
   org: RedHatQE

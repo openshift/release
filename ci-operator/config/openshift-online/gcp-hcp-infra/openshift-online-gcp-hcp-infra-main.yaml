@@ -9,7 +9,6 @@ build_root:
     name: gcp-hcp-infra-base
     namespace: ci
     tag: latest
-  use_build_cache: true
 images:
   items:
   - context_dir: test
@@ -29,7 +28,6 @@ promotion:
     tag: latest
 prowgen:
   disable_sparse_checkout: true
-  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 releases:
@@ -137,6 +135,24 @@ tests:
   steps:
     cluster_profile: platform-gcp
     workflow: gcp-hcp-e2e
+- always_run: false
+  as: e2e-hostedcluster-int
+  cron: 0 3,15 * * 1-5
+  presubmit: true
+  steps:
+    cluster_profile: platform-gcp
+    env:
+      E2E_STATUS_CONTEXT: e2e/hostedcluster-int
+      E2E_STATUS_TARGETS: '[{"branch":"environment/sector-integration-main","contexts":["Terraform
+        Cloud/hp-platform-engineering/repo-id-ZPRY7TkFRLq4VMVP","ArgoCD/root-app-int-reg-us-c1-nkcw-gke","ArgoCD/root-app-int-mgt-us-c1-yjiv-gke"]}]'
+      E2E_TARGET_API_ENDPOINT: https://platform-api-us-central1-nkcw.int.gcp-hcp.devshift.net
+      E2E_TARGET_CUSTOMER_PROJECT_ID: int-ci-cust-us-c1
+      E2E_TARGET_ENV: integration
+      E2E_TARGET_OIDC_ENDPOINT: https://oidc.int-reg-us-c1-nkcw.int.gcp-hcp.devshift.net
+      E2E_TARGET_REGION: us-central1
+      GCPHCPCTL_AUTHZ_BOOTSTRAP: "false"
+      HC_CLEANUP_ON_FAILURE: "true"
+    workflow: gcp-hcp-e2e-on-demand
 - as: generate-bin
   postsubmit: true
   steps:

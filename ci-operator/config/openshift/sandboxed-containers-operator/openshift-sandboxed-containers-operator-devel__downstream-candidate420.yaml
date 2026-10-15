@@ -1,8 +1,4 @@
 base_images:
-  tests-private:
-    name: tests-private
-    namespace: ci
-    tag: "4.22"
   upi-installer:
     name: "4.20"
     namespace: ocp
@@ -14,7 +10,6 @@ build_root:
     tag: rhel-9-golang-1.26-openshift-4.23
 prowgen:
   disable_sparse_checkout: true
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -50,16 +45,13 @@ tests:
       CUSTOM_AZURE_REGION: eastus
       ENABLE_MUST_GATHER: "false"
       INITDATA: ""
-      INSTALL_KATA_RPM: "false"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 4.1.0-1.rhaos4.20.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       SLEEP_DURATION: 0h
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*Kata Author.*C00102
-      TEST_TIMEOUT: "90"
       TESTS_KATA_UPSTREAM_ENABLE: "true"
       TESTS_OSC_ENABLE: "true"
       TRUSTEE_URL: ""
@@ -89,17 +81,14 @@ tests:
       ENABLE_MUST_GATHER: "false"
       ENABLEPEERPODS: "true"
       INITDATA: ""
-      INSTALL_KATA_RPM: "false"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 4.1.0-1.rhaos4.20.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*Kata Author.*C00102
-      TEST_TIMEOUT: "90"
       TESTS_CAA_ENABLE: "true"
       TESTS_OSC_ENABLE: "true"
       TRUSTEE_URL: ""
@@ -126,24 +115,54 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
       CATALOG_SOURCE_NAME: brew-catalog
-      CUSTOM_AZURE_REGION: eastus
+      CUSTOM_AZURE_REGION: westus
       ENABLE_MUST_GATHER: "false"
       ENABLEPEERPODS: "true"
       INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      KATA_RPM_VERSION: 4.1.0-1.rhaos4.20.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*run and verify cosigned pod
-      TEST_TIMEOUT: "90"
+      TESTS_CAA_ENABLE: "true"
+      TESTS_CAA_PROFILE: coco
       TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:latest
       TRUSTEE_INSTALL: "true"
       WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-azure
+  timeout: 24h0m0s
+- as: azure-ipi-kata-disconnected
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#kata-ocp-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
+      {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_MUST_GATHER: "false"
+      EXTRA_IMAGES_TO_MIRROR: quay.io/openshift/origin-hello-openshift:latest,registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest,quay.io/prometheus/busybox:latest
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: ""
+      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
+      OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
+      OSC_INSTALL: "true"
+      SLEEP_DURATION: 0h
+      TEST_RELEASE_TYPE: GA
+      TESTS_KATA_UPSTREAM_ENABLE: "true"
+      TESTS_KATA_UPSTREAM_PROFILE: k8s-configmap.bats
+    workflow: sandboxed-containers-operator-e2e-azure-isolation-restricted-proxy-mirror
   timeout: 24h0m0s
 - as: aro-ipi-peerpods
   capabilities:
@@ -177,10 +196,7 @@ tests:
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*Kata Author.*C00102
-      TEST_TIMEOUT: "90"
       TESTS_OSC_ENABLE: "true"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: peer-pods
@@ -217,10 +233,7 @@ tests:
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*run and verify cosigned pod
-      TEST_TIMEOUT: "90"
       TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:latest
       TRUSTEE_INSTALL: "true"
       WORKLOAD_TO_TEST: coco
@@ -249,19 +262,15 @@ tests:
       ENABLE_MUST_GATHER: "false"
       ENABLEPEERPODS: "true"
       INITDATA: ""
-      INSTALL_KATA_RPM: "false"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 4.1.0-1.rhaos4.20.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*Kata Author.*C00102
-      TEST_TIMEOUT: "90"
       TESTS_CAA_ENABLE: "true"
-      TESTS_CAA_PROVIDER: aws
       TESTS_OSC_ENABLE: "true"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: peer-pods

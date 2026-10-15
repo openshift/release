@@ -66,6 +66,25 @@ cp -r _output/ ../_output
 # download prometheus script
 wget -N https://raw.githubusercontent.com/kiali/kiali/${KIALI_VERSION}/hack/use-openshift-prometheus.sh -O _output/kiali/hack/use-openshift-prometheus.sh
 chmod +x _output/kiali/hack/use-openshift-prometheus.sh
+# ensure-openshift-istio-proxies-podmonitor.sh exists only in Kiali >= 2.33
+helper_path="_output/kiali/hack/istio/ensure-openshift-istio-proxies-podmonitor.sh"
+helper_url="https://raw.githubusercontent.com/kiali/kiali/${KIALI_VERSION}/hack/istio/ensure-openshift-istio-proxies-podmonitor.sh"
+mkdir -p _output/kiali/hack/istio
+http_code=$(curl -sS -L -o "${helper_path}" -w "%{http_code}" "${helper_url}") || {
+  echo "ERROR: failed to download ${helper_path}"
+  rm -f "${helper_path}"
+  exit 1
+}
+if [[ "${http_code}" == "200" ]]; then
+  chmod +x "${helper_path}"
+elif [[ "${http_code}" == "404" ]]; then
+  echo "=== ensure-openshift-istio-proxies-podmonitor.sh not available (Kiali < 2.33); skipping"
+  rm -f "${helper_path}"
+else
+  echo "ERROR: failed to download ${helper_path} (HTTP ${http_code})"
+  rm -f "${helper_path}"
+  exit 1
+fi
 
 # remove v from ISTIO version if there is any
 [[ $ISTIO_SAMPLE_APP_VERSION == v* ]] && ISTIO_SAMPLE_APP_VERSION="${ISTIO_SAMPLE_APP_VERSION#v}" || ISTIO_SAMPLE_APP_VERSION="$ISTIO_SAMPLE_APP_VERSION"

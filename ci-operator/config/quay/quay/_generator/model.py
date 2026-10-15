@@ -21,11 +21,18 @@ STORAGE_BY_CLOUD = {
     "azure": "blob",
     "libvirt": "s3",
 }
+# Storage values a cloud accepts beyond its STORAGE_BY_CLOUD default.
+EXTRA_STORAGE_BY_CLOUD: dict[str, set[str]] = {
+    "aws": {"odf"},
+}
 DEPLOY_REF_BY_CLOUD = {
     "aws": "quay-deploy-aws-s3",
     "gcp": "quay-deploy-gcp-gcs",
     "azure": "quay-deploy-azure-blob",
     "libvirt": "quay-deploy-aws-s3",
+}
+DEPLOY_REF_BY_STORAGE = {
+    "odf": "quay-deploy-odf",
 }
 # No rhel-9-release-golang-1.25-openshift-<ocp> build root tag exists for older OCP (e.g. 4.14).
 # The build root only builds the Playwright runner image, so older clusters reuse it.
@@ -54,6 +61,7 @@ class Cell:
     run_if_changed: str | None = None
     skip_if_only_changed: str | None = None
     fips: bool = False
+    storage_override: str | None = None
 
     @property
     def quay_version_dashed(self) -> str:
@@ -78,6 +86,8 @@ class Cell:
 
     @property
     def storage(self) -> str:
+        if self.storage_override is not None:
+            return self.storage_override
         try:
             return STORAGE_BY_CLOUD[self.cloud]
         except KeyError as exc:
@@ -85,6 +95,8 @@ class Cell:
 
     @property
     def deploy_ref(self) -> str:
+        if self.storage_override in DEPLOY_REF_BY_STORAGE:
+            return DEPLOY_REF_BY_STORAGE[self.storage_override]
         try:
             return DEPLOY_REF_BY_CLOUD[self.cloud]
         except KeyError as exc:
