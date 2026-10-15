@@ -422,6 +422,8 @@ fi
 if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
 	echo "Merging Jaeger/OTel config fragment into defaults..."
 	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
+fi
+
 # Unmanaged DB fragments from quay-database-intg-* steps. At most one should
 # exist; the first match wins.
 DATABASE_CONFIG_FRAGMENT=""
