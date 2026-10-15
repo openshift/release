@@ -278,12 +278,15 @@ oc create ns "${hcp_ns}" || true
 mkdir -p /tmp/hc-manifests
 
 HC_MANIFEST="/tmp/hc-manifests/cluster-agent.yaml"
+# --api-server-address is intentionally omitted. The NodePort pre-patch below sets
+# address: MGMT_HOST_IP (10.0.1.15) directly in spec.services[APIServer], so CPO
+# advertises the LPAR IP as the API server address. Agents reach the API server via
+# https://10.0.1.15:FIXED_NODEPORT without any DNS resolution required.
 hcp create cluster agent \
   --name=${HC_NAME} \
   --pull-secret="${PULL_SECRET_FILE}" \
   --agent-namespace=${hcp_ns} \
   --base-domain=${BASE_DOMAIN} \
-  --api-server-address=api.${HC_NAME}.${BASE_DOMAIN} \
   --ssh-key=${ssh_key_file} \
   --control-plane-availability-policy SingleReplica \
   --infra-availability-policy SingleReplica \
