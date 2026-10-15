@@ -1,0 +1,72 @@
+workflow:
+  as: hypershift-kubevirt-baremetalds-secondary-localnet-conformance
+  documentation: |-
+    Bare-metal dual-stack management cluster with a KubeVirt hosted cluster
+    whose single localnet network is bridged to a secondary interface
+    (created by baremetalds-devscripts-conf-extranetwork) instead of the
+    primary br-ex.  VMs use ATTACH_DEFAULT_NETWORK=localnet-multi with
+    LOCALNET_MULTI_NETWORK_COUNT=1.  The secondary OVS bridge isolates
+    guest traffic from the management network, avoiding the IPv6 dual-stack
+    issues present on br-ex.
+  steps:
+    env:
+      DEBUG_WAIT_TIMEOUT: "0"
+      ATTACH_DEFAULT_NETWORK: localnet-multi
+      LOCALNET_MULTI_NETWORK_COUNT: "1"
+      LOCALNET_MULTI_PHYSNET: physnet-localnet
+      LOCALNET_MULTI_BRIDGE: br-localnet
+      LOCALNET_MULTI_SUBNETS: "192.168.221.128/25"
+      LOCALNET_MULTI_PRIMARY_GATEWAY: "192.168.221.1"
+      LOCALNET_MULTI_PRIMARY_DNS: "192.168.111.1"
+      LOCALNET_SECONDARY_SUBNET: "192.168.221.0/24"
+      LOCALNET_SECONDARY_BRIDGE: br-localnet
+      LOCALNET_SECONDARY_PHYSNET: physnet-localnet
+      LOCALNET_SECONDARY_ENABLE_FORWARDING: "true"
+      HYPERSHIFT_NODE_COUNT: "3"
+      HYPERSHIFT_NODE_MEMORY: "16"
+      CLUSTERTYPE: host_384gb_el9
+      METALLB_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      REDHAT_OPERATORS_INDEX_TAG: v4.20
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      LVM_SUB_TARGET_NAMESPACES: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      ETCD_STORAGE_CLASS: lvms-vg1
+      ENABLE_ICSP: "true"
+      CLOUD_PROVIDER: "kubevirt"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      IP_STACK: v4v6
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="extranet"
+        EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=3
+        WORKER_VCPU=32
+        WORKER_MEMORY=65536
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=256G
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+    pre:
+    - ref: baremetalds-devscripts-conf-extranetwork
+    - chain: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-provision
+    - chain: hypershift-kubevirt-baremetalds-lvm
+    - chain: hypershift-kubevirt-baremetalds-odf
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - ref: hypershift-install
+    - ref: hypershift-agent-create-config-dns
+    - ref: hypershift-kubevirt-localnet-secondary-bridge
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-kubevirt-baremetalds-proxy
+    - ref: hypershift-kubevirt-health-check
+    test:
+    - chain: hypershift-conformance
+    post:
+    - ref: hypershift-kubevirt-debug-wait
+      optional_on_success: true
+      best_effort: true
+    - chain: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-kubevirt-hypershift-deprovision
