@@ -68,13 +68,22 @@ fi
 
 if [ -f "${SHARED_DIR}/INGRESS_IP" ]; then
   INGRESS_IP=$(<"${SHARED_DIR}"/INGRESS_IP)
-  if [[ "${INGRESS_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+  INGRESS_EXTERNAL_RECORD_IP="${INGRESS_IP}"
+  # Non-proxy externallb: ingress traffic reaches the cluster through the LB
+  # bastion FIP, same as api. Without this, *.apps points at the private VIP
+  # which is unreachable from CI test pods.
+  if [[ "${CONFIG_TYPE:-}" == *"externallb"* && "${CONFIG_TYPE:-}" != *"proxy"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
+    INGRESS_EXTERNAL_RECORD_IP=$(<"${SHARED_DIR}"/LB_HOST)
+  fi
+
+  if [[ "${INGRESS_EXTERNAL_RECORD_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     INGRESS_RECORD_TYPE="A"
   else
     INGRESS_RECORD_TYPE="AAAA"
   fi
-  echo "Creating INGRESS DNS $INGRESS_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN"
-  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "*.apps.'${CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${INGRESS_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${INGRESS_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_ingress.json"
+  echo "Creating INGRESS DNS $INGRESS_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN -> ${INGRESS_EXTERNAL_RECORD_IP}"
+  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "*.apps.'${CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${INGRESS_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${INGRESS_EXTERNAL_RECORD_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_ingress.json"
   cp "${TMP_DIR}/dns_ingress.json" "${SHARED_DIR}/dns_up.json"
 fi
 

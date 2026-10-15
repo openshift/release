@@ -53,15 +53,17 @@ declare -A ipmap=(
     ["ingress.apps"]=$INGRESS_IP
 )
 
-# Match dnsrecords: only non-proxy externallb publishes api as LB_HOST.
-# proxy-externallb keeps api -> API_IP (VIP); do not key off LB_HOST alone
+# Match dnsrecords: only non-proxy externallb publishes api+ingress as LB_HOST.
+# proxy-externallb keeps api/ingress -> VIPs; do not key off LB_HOST alone
 # because bastionproxy always writes it for proxy jobs too.
 # CONFIG_TYPE must be declared in this step's ref.yaml or it is unset here.
 if [[ "${CONFIG_TYPE:-}" == *"externallb"* && "${CONFIG_TYPE:-}" != *"proxy"* && -f "${SHARED_DIR}/LB_HOST" ]]; then
-    ipmap["api"]=$(<"${SHARED_DIR}/LB_HOST")
-    echo "precheck: CONFIG_TYPE='${CONFIG_TYPE}' -> expecting api -> ${ipmap[api]} (LB_HOST)"
+    LB_HOST=$(<"${SHARED_DIR}/LB_HOST")
+    ipmap["api"]="${LB_HOST}"
+    ipmap["ingress.apps"]="${LB_HOST}"
+    echo "precheck: CONFIG_TYPE='${CONFIG_TYPE}' -> expecting api + ingress.apps -> ${LB_HOST} (LB_HOST)"
 else
-    echo "precheck: CONFIG_TYPE='${CONFIG_TYPE:-}' -> expecting api -> ${API_IP} (API_IP)"
+    echo "precheck: CONFIG_TYPE='${CONFIG_TYPE:-}' -> expecting api -> ${API_IP}, ingress.apps -> ${INGRESS_IP}"
 fi
 
 if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
