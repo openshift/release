@@ -1,8 +1,11 @@
 workflow:
   as: hypershift-gcp-gke-e2e-v2
   documentation: |-
-    The HyperShift GCP GKE e2e-v2 workflow provisions a GKE cluster,
-    creates a GCP hosted cluster, runs Ginkgo v2 tests, and cleans up.
+    The HyperShift GCP GKE e2e-v2 workflow provisions a GKE management cluster,
+    installs the HyperShift operator, creates GCP guest clusters via the
+    create-guests binary (driven by platform config), and runs the v2 test
+    suite via run-tests. Each test group produces a separate JUnit XML entry
+    for Sippy.
 
     Pre phase:
     1. hypershift-gcp-wif-auth: Write WIF credential config to SHARED_DIR
@@ -12,14 +15,16 @@ workflow:
     5. hypershift-install: Install the HyperShift operator
     6. hypershift-gcp-control-plane-setup: Configure GCP Workload Identity for PSC and ExternalDNS
     7. hypershift-gcp-hosted-cluster-setup: Create WIF and network infrastructure
-    8. hypershift-gcp-create: Create GCP HostedCluster and wait for rollout
+    8. hypershift-resolve-nodepool-releases: Resolve n-1..n-4 OCP release images for NodePool skew tests
+    9. hypershift-write-test-plan: Optionally write a test plan to SHARED_DIR
+    10. hypershift-gcp-create-guests: Create GCP guest clusters and wait for rollout
 
     Test phase:
-    1. hypershift-e2e-v2: Run Ginkgo v2 tests against the hosted cluster
+    1. hypershift-gcp-run-e2e-v2: Run the v2 Ginkgo test suites against the guest clusters
 
     Post phase:
-    1. hypershift-dump: Collect HyperShift artifacts for debugging
-    2. hypershift-gcp-destroy: Destroy the GCP HostedCluster
+    1. hypershift-gcp-dump-guests: Collect HyperShift artifacts for debugging
+    2. hypershift-gcp-destroy-guests: Destroy the GCP HostedClusters
     3. hypershift-gcp-gke-deprovision: Delete GKE cluster and GCP projects
   steps:
     allow_best_effort_post_steps: true
@@ -31,17 +36,20 @@ workflow:
     - ref: hypershift-install
     - ref: hypershift-gcp-control-plane-setup
     - ref: hypershift-gcp-hosted-cluster-setup
-    - chain: hypershift-gcp-create
+    - ref: hypershift-resolve-nodepool-releases
+    - ref: hypershift-write-test-plan
+    - chain: hypershift-gcp-create-guests
     test:
-    - chain: hypershift-e2e-v2
+    - chain: hypershift-gcp-run-e2e-v2
     post:
-    - chain: hypershift-dump
-    - chain: hypershift-gcp-destroy
+    - chain: hypershift-gcp-dump-guests
+    - chain: hypershift-gcp-destroy-guests
     - ref: hypershift-gcp-gke-deprovision
     env:
       CLOUD_PROVIDER: "GCP"
       GKE_REGION: "us-central1"
       GKE_RELEASE_CHANNEL: "stable"
+      HYPERSHIFT_PLATFORM: "gcp"
       TECH_PREVIEW_NO_UPGRADE: "true"
       HYPERSHIFT_GCP_CI_PROJECT: "gcp-hcp-hypershift-ci"
       HYPERSHIFT_GCP_CI_DNS_ZONE: "hypershift-ci-gcp-hcp-openshiftapps-com"
