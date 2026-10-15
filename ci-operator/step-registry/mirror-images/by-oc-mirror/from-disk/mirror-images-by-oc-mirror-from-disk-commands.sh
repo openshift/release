@@ -145,10 +145,19 @@ echo "VPC IPv6 CIDR: ${VPC_IPV6_CIDR:-none}"
 # ---------------------------------------------------------------------------
 REMOTE_D2M_SCRIPT="/tmp/oc-mirror-d2m.sh"
 
+# Read the signature-ignore decision made by the to-disk step.
+# oc-mirror re-validates signatures from the archive during disk-to-mirror, so
+# the same flag must be passed in both phases for unsigned nightly/CI payloads.
+IGNORE_RELEASE_SIGNATURE="false"
+if [[ -f "${SHARED_DIR}/oc-mirror-ignore-release-signature" ]]; then
+    IGNORE_RELEASE_SIGNATURE=$(cat "${SHARED_DIR}/oc-mirror-ignore-release-signature")
+fi
+echo "IGNORE_RELEASE_SIGNATURE=${IGNORE_RELEASE_SIGNATURE}"
+
 # Write the remote script to a local temp file so we can use normal heredoc
 # quoting: double-quoted lines interpolate client-side vars; single-quoted
-# heredoc delimiters (<<'__REMOTE__') mean everything inside is literal bash
-# for the bastion.  We use a Python one-liner to assemble the two parts.
+# heredoc delimiters (<<'PART2') mean everything inside is literal bash
+# for the bastion.
 local_script=$(mktemp)
 
 # Part 1: values that must be set from the client side
@@ -164,6 +173,7 @@ ISC_PATH="${ISC_PATH}"
 BASTION_WORKSPACE_PATH="${BASTION_WORKSPACE_PATH}"
 VPC_IPV4_CIDR="${VPC_IPV4_CIDR}"
 VPC_IPV6_CIDR="${VPC_IPV6_CIDR}"
+IGNORE_RELEASE_SIGNATURE="${IGNORE_RELEASE_SIGNATURE}"
 
 PART1
 
@@ -284,10 +294,20 @@ echo "=== Running oc-mirror disk-to-mirror ==="
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-${HOME}/run}"
 export REGISTRY_AUTH_PREFERENCE=podman
 
+# ref OCPBUGS-56009: apply --ignore-release-signature when the to-disk step
+# determined the payload is unsigned (e.g. nightly/CI builds).
+# --ignore-release-signature is release-specific; it does not suppress
+# signature checks for other image types such as operator bundles.
+OC_MIRROR_EXTRA_FLAGS=""
+if [[ "${IGNORE_RELEASE_SIGNATURE}" == "true" ]]; then
+    OC_MIRROR_EXTRA_FLAGS="--ignore-release-signature"
+    echo "Applying --ignore-release-signature (payload is unsigned)"
+fi
+
 /tmp/oc-mirror -c "${ISC_PATH}" \
     --from "file://${BASTION_WORKSPACE_PATH}" \
     "docker://${MIRROR_REGISTRY_HOST}" \
-    --dest-tls-verify=false --v2
+    --dest-tls-verify=false --v2 ${OC_MIRROR_EXTRA_FLAGS}
 
 echo "=== oc-mirror disk-to-mirror complete ==="
 # EXIT trap fires here: restores firewall, removes /etc/hosts entry and auth file.

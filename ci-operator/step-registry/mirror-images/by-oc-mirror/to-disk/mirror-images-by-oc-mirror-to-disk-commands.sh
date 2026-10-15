@@ -161,9 +161,15 @@ EOF
 mirrorCmd="${oc_mirror_bin} -c ${image_set_config} file://${oc_mirror_workspace} --v2"
 
 # ref OCPBUGS-56009: payloads >= 4.19 that are unsigned need --ignore-release-signature
+# Record the decision in SHARED_DIR so the from-disk step can apply the same
+# flag to disk-to-mirror (oc-mirror re-validates signatures from the archive).
+IGNORE_RELEASE_SIGNATURE="false"
 if ! isPreVersion "4.19" && ! check_signed "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" ; then
     mirrorCmd="${mirrorCmd} --ignore-release-signature"
+    IGNORE_RELEASE_SIGNATURE="true"
 fi
+echo "${IGNORE_RELEASE_SIGNATURE}" > "${SHARED_DIR}/oc-mirror-ignore-release-signature"
+echo "IGNORE_RELEASE_SIGNATURE=${IGNORE_RELEASE_SIGNATURE}"
 
 echo "=== Running mirror-to-disk (Phase 1) ==="
 run_command "${mirrorCmd}"
