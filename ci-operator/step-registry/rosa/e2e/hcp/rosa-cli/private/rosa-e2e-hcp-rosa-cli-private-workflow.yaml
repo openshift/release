@@ -3,31 +3,9 @@ workflow:
   steps:
     env:
       CHANNEL_GROUP: stable
-      HOSTED_CP: "true"
-      STS: "true"
       REPLICAS: "3"
-      # Private cluster specifics: private API, private default ingress, BYO VPC.
-      ENABLE_BYOVPC: "true"
-      PRIVATE: "true"
-      PRIVATE_LINK: "true"
     pre:
-      - ref: aws-provision-vpc-shared
-      - ref: aws-provision-tags-for-byo-vpc-ocm-pre
-      - chain: rosa-sts-oidc-config-create
-      - ref: rosa-cluster-provision
-      - ref: rosa-cluster-wait-ready-cluster
-      - ref: rosa-cluster-notify-error
-      # The cluster API is only reachable via backplane from here on. This step
-      # writes ${SHARED_DIR}/kubeconfig and ${SHARED_DIR}/proxy-conf.sh, which the
-      # subsequent oc-based steps consume. It replaces the rosa-conf-idp-htpasswd
-      # step of the public rosa-CLI head chain, which cannot reach a private API.
-      - ref: rosa-cluster-credentials-backplane
-      - ref: rosa-cluster-wait-ready-operators
-      # Publish the SHARED_DIR contract (cluster-metadata.json); cluster-id and
-      # kubeconfig were written by the steps above. This is what makes this a
-      # rosa-CLI "head" of the provision x validate matrix (ROSAENG-67583).
-      - ref: rosa-e2e-rosa-cli-publish-contract
-      - ref: aws-provision-tags-for-byo-vpc
+      - chain: rosa-e2e-hcp-rosa-cli-private-provision
       - ref: rosa-cluster-wait-ready-hosted-cp
       - ref: rosa-cluster-wait-ready-nodes
       # Platform-plane access: bp-kubeconfig / mc-kubeconfig / sc-kubeconfig via
@@ -59,13 +37,11 @@ workflow:
     tail, end to end.
 
     This workflow provisions a ROSA HCP private cluster (private API, private
-    default ingress, BYO VPC) with the rosa CLI, publishing the SHARED_DIR
-    provisioner-to-validator contract (cluster-id, kubeconfig,
-    cluster-metadata.json) via rosa-e2e-rosa-cli-publish-contract. It differs from
-    the public rosa-e2e-hcp-rosa-cli-provision chain in one step: the cluster API
-    is not reachable from the build farm, so rosa-cluster-credentials-backplane
-    replaces the rosa-conf-idp-htpasswd login (it also writes proxy-conf.sh so
-    downstream steps route through the corp proxy).
+    default ingress, BYO VPC) via the rosa-e2e-hcp-rosa-cli-private-provision
+    chain — the PrivateLink variant of the rosa-CLI head, which publishes the
+    SHARED_DIR provisioner-to-validator contract (cluster-id, kubeconfig,
+    cluster-metadata.json). See that chain for the one step it differs from the
+    public rosa-e2e-hcp-rosa-cli-provision chain.
 
     rosa-backplane-login then adds bp-kubeconfig (customer plane) and
     mc-kubeconfig / sc-kubeconfig (platform plane), and the validation tail runs
