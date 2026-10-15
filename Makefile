@@ -101,7 +101,19 @@ jobs:  ci-operator-checkconfig
 	$(MAKE) sanitize-prow-jobs
 	#$(MAKE) tide-config-manager-verified
 
-ci-operator-checkconfig: 
+ci-operator-checkconfig:
+	@set -euo pipefail; \
+	ref=upstream/main; \
+	if ! git rev-parse --verify "$$ref" >/dev/null 2>&1; then ref=main; fi; \
+	if git rev-parse --verify "$$ref" >/dev/null 2>&1; then \
+	  for base in "$$ref" HEAD; do \
+	    if git diff -U0 "$$base" -- ci-operator/config 2>/dev/null | grep -qE '^\+[[:space:]]+cluster:'; then \
+	      echo "ERROR: ci-operator/config must not set cluster:; use capabilities for dispatch." >&2; \
+	      git diff -U0 "$$base" -- ci-operator/config 2>/dev/null | awk '/^+++ b\//{sub(/^+++ b\//,"");f=$$0} /^\+[[:space:]]+cluster:/{print f ": " $$0}' >&2; \
+	      exit 1; \
+	    fi; \
+	  done; \
+	fi
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry/cluster-profiles:/ci-operator/step-registry/cluster-profiles$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/cluster-pools:/core-services/cluster-pools$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest --config-dir /ci-operator/config --registry /ci-operator/step-registry --cluster-profiles-config /ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml --cluster-claim-owners-config /core-services/cluster-pools/_config.yaml
 .PHONY: ci-operator-checkconfig
