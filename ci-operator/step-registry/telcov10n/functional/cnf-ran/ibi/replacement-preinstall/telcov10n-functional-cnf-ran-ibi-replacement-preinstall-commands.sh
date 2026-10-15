@@ -185,8 +185,7 @@ verify_http_and_dns() {
     --private-key "${TEMP_DIR}/ssh-key" \
     --extra-vars "ibi_http_subdir=${HTTP_SUBDIR} eco_gotests_image=quay.io/ocp-edge-qe/eco-gotests:latest" \
     --extra-vars "replacement_host=${IBI_REPLACEMENT_HOST} replacement_ip=${IBI_REPLACEMENT_IP}" \
-    -m ansible.builtin.shell -a '
-set -eu
+    -m ansible.builtin.shell -a 'set -eu
 resolved=$(podman run --rm --pull=never --net=host \
   --userns=keep-id:uid=1000,gid=1000 \
   -v "{{ http_store_path | default("/opt/http_store/data") }}/{{ ibi_http_subdir }}:/ibi-http:rw,z" \
