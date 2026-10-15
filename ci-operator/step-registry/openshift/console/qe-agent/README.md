@@ -37,8 +37,18 @@ The regular job fetches the driver and skill from `openshift/release` main and
 verifies each file against its reviewed SHA-256 in the Console job config.
 This allows activation immediately after merge even if GitHub creates a squash
 commit. A checksum mismatch stops the agent before model invocation; update
-both pins with any deliberate driver or skill change. A release PR rehearsal
-still uses that PR's immutable head SHA, with the same checksum checks.
+both pins with any deliberate driver or skill change. The focused tests compare
+the pins with the committed files. A stale pin makes the agent stop with a
+skipped result instead of silently running different code. A release PR
+rehearsal still uses that PR's immutable head SHA, with the same checksum
+checks.
+
+The post-step uses the same per-job `console-tests` image as the e2e step so it
+can rerun the tested source with its Playwright dependencies. Changing the ref
+to `from_image` would replace that image; a separate tool image would need an
+additional build and a way to combine it with the per-job test image. This
+pilot retains the checksum-verified download within the Console config and
+step-registry scope.
 
 The main job is marked rehearseable, so an `openshift/release` PR can run
 `/pj-rehearse pull-ci-openshift-console-main-e2e-gcp-console`. A rehearsal

@@ -66,7 +66,7 @@ compile(source, sys.argv[2], 'exec')
 pathlib.Path(sys.argv[2]).write_bytes(source)
 PY
 then
-  bootstrap_failure "pinned Console agent driver is unavailable"
+  bootstrap_failure "reviewed Console agent driver could not be fetched or failed SHA-256 verification"
   exit 0
 fi
 

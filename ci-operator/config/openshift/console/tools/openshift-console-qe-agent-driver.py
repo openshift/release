@@ -82,9 +82,17 @@ def allowed_candidate_file(path):
             or path == 'frontend/e2e/setup/login-helper.ts')
 
 
+def history_suite_key(spec):
+    for prefix in ('frontend/e2e/tests/', 'e2e/tests/'):
+        if spec.startswith(prefix):
+            return spec[len(prefix):]
+    return spec
+
+
 def selected_tests(context, history):
     tests = context.get('failed_tests', []) + context.get('flaked_tests', [])
-    rates = {entry['suite']: entry.get('flake_rate', 0) for entry in history.get('suites', [])}
+    rates = {history_suite_key(entry['suite']): entry.get('flake_rate', 0)
+             for entry in history.get('suites', [])}
     selected = []
     for test in tests:
         if not isinstance(test, dict) or not all(isinstance(test.get(k), str) and test.get(k)
@@ -98,7 +106,7 @@ def selected_tests(context, history):
             selected.append(test)
     failed_keys = {same_test(test) for test in context.get('failed_tests', [])
                    if isinstance(test, dict)}
-    selected.sort(key=lambda test: (rates.get(test['spec'], 0),
+    selected.sort(key=lambda test: (rates.get(history_suite_key(test['spec']), 0),
                                     same_test(test) in failed_keys), reverse=True)
     return selected[:3]
 
@@ -232,8 +240,8 @@ def original_context():
         if len(context[key]) > 20:
             context[key] = context[key][:20]
             context['truncated'] = True
-    context['has_test_failures'] = bool(context['failed_tests'] and completion is None or
-                                        isinstance(completion, dict) and completion.get('passed') is False)
+    step_failed = isinstance(completion, dict) and completion.get('passed') is False
+    context['has_test_failures'] = bool(context['failed_tests']) or step_failed
     payload = json.dumps(context)
     while len(payload.encode()) > 65536:
         context['truncated'] = True

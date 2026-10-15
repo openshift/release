@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import types
@@ -16,9 +17,20 @@ from unittest import mock
 REPO = Path(__file__).resolve().parents[5]
 DRIVER = REPO / 'ci-operator/config/openshift/console/tools/openshift-console-qe-agent-driver.py'
 WRAPPER = REPO / 'ci-operator/step-registry/openshift/console/qe-agent/openshift-console-qe-agent-commands.sh'
+SKILL = REPO / 'ci-operator/step-registry/openshift/console/qe-agent/SKILL.md'
+CONSOLE_CONFIG = REPO / 'ci-operator/config/openshift/console/openshift-console-main.yaml'
 
 
 class WrapperTests(unittest.TestCase):
+    def test_main_job_hashes_match_reviewed_driver_and_skill(self):
+        config = CONSOLE_CONFIG.read_text()
+        for name, path in (('CONSOLE_FLAKE_DRIVER_SHA256', DRIVER),
+                           ('CONSOLE_FLAKE_SKILL_SHA256', SKILL)):
+            with self.subTest(name=name):
+                match = re.search(rf'^\s+{name}: ([0-9a-f]{{64}})$', config, re.MULTILINE)
+                self.assertIsNotNone(match)
+                self.assertEqual(match.group(1), hashlib.sha256(path.read_bytes()).hexdigest())
+
     def test_disabled_wrapper_does_not_start_driver(self):
         with tempfile.TemporaryDirectory() as folder:
             env = {**os.environ, 'ARTIFACT_DIR': folder,
@@ -133,9 +145,10 @@ urllib.request.urlopen = lambda *_args, **_kwargs: open(os.environ['TEST_DRIVER_
                                         capture_output=True, text=True, check=True)
                 self.assertEqual((root / 'started').exists(), should_start, result.stderr)
                 if not should_start:
-                    self.assertEqual(json.loads((Path(env['ARTIFACT_DIR']) /
-                                                 'console-flake-result.json').read_text())
-                                     ['verification_status'], 'skipped')
+                    payload = json.loads((Path(env['ARTIFACT_DIR']) /
+                                          'console-flake-result.json').read_text())
+                    self.assertEqual(payload['verification_status'], 'skipped')
+                    self.assertIn('SHA-256 verification', payload['reason'])
 
     def test_successful_job_exits_zero_when_ci_shell_uses_errexit(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -325,6 +338,17 @@ class DriverTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.driver.test_source_path('../setup/../../other.setup.ts')
 
+    def test_history_matches_junit_spec_with_source_prefix(self):
+        failed = {'spec': 'console/app/debug-pod.spec.ts', 'project': 'console',
+                  'name': 'debug pod'}
+        flaked = {'spec': 'frontend/e2e/tests/console/example.spec.ts',
+                  'project': 'console', 'name': 'intermittent test'}
+        context = {'failed_tests': [failed], 'flaked_tests': [flaked]}
+        history = {'suites': [{'suite': 'console/example.spec.ts', 'flake_rate': 0.5}]}
+        self.assertEqual(self.driver.selected_tests(context, history), [flaked, failed])
+        history['suites'][0]['suite'] = 'e2e/tests/console/example.spec.ts'
+        self.assertEqual(self.driver.selected_tests(context, history), [flaked, failed])
+
     def test_setup_rerun_matches_original_junit_identity(self):
         setup = {'spec': '../setup/knative.setup.ts', 'project': 'knative-setup',
                  'name': 'install operator'}
@@ -462,6 +486,21 @@ hostname="knative-setup"><testcase name="install operator"/></testsuite></testsu
         self.assertIsNone(context['test_exit_code'])
         self.assertEqual(context['report_status'], 'parsed')
         self.assertIn('locator was absent', context['failed_tests'][0]['message'])
+
+    def test_failed_junit_is_investigated_when_completion_lacks_boolean_passed(self):
+        env = {'JOB_NAME': 'pull-ci-openshift-console-main-e2e-gcp-console',
+               'BUILD_ID': '123', 'PULL_NUMBER': '4', 'JOB_SPEC': '{}'}
+        xml = '''<testsuite name="console/example.spec.ts" hostname="console">
+<testcase name="a"><failure message="timed out"/></testcase></testsuite>'''
+        for completion in ('{}', '{"passed": null}', '{"passed": "false"}'):
+            with self.subTest(completion=completion), mock.patch.dict(os.environ, env):
+                with mock.patch.dict(self.driver.original_context.__globals__, {
+                        'git': lambda *_args, **_kwargs: types.SimpleNamespace(stdout=b'a' * 40),
+                        'get_limited': lambda url, *_args: completion if url.endswith('finished.json') else xml}):
+                    context = self.driver.original_context()
+            self.assertTrue(context['has_test_failures'])
+            self.assertEqual(len(context['failed_tests']), 1)
+            self.assertEqual(context['report_status'], 'parsed')
 
     def test_malformed_junit_keeps_failure_incomplete(self):
         env = {'JOB_NAME': 'pull-ci-openshift-console-main-e2e-gcp-console',
