@@ -203,14 +203,14 @@ configure_claude
 
 # Use the edge-tooling source pre-installed in the image
 # SRC_DIR="${EDGE_TOOLING_DIR}"
-SRC_DIR="$(mktemp -d microshift-ci-XXXXX)"
+SRC_DIR="$(mktemp -d "$(pwd)/microshift-ci-XXXXX")"
 PLUGIN_DIR="${SRC_DIR}/plugins/microshift-ci"
 cd "${SRC_DIR}"
 
 #########################################
 #    TODO: Remove Temp scaffolding
 #########################################
-git clone --depth 1 -b ushift-7435-retire-create-bugs --single-branch git@github.com:copejon/edge-tooling.git .
+git clone --depth 1 -b ushift-7435-retire-create-bugs --single-branch https://github.com/copejon/edge-tooling.git .
 
 
 # Close duplicate rebase PRs before running the analysis to prevent them
