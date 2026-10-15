@@ -24,17 +24,20 @@ if [[ -z "${IP:-}" || -z "${PROXYPORT:-}" ]]; then
 fi
 
 PROXY_URL="http://${IP}:${PROXYPORT}"
+temp_dir=$(mktemp -d)
+trap 'rm -rf -- "${temp_dir}"' EXIT
 
 oc get namespace "${AGENT_NAMESPACE}" >/dev/null 2>&1 || oc create namespace "${AGENT_NAMESPACE}"
 if ! oc get secret "${PULL_SECRET_NAME}" -n "${AGENT_NAMESPACE}" >/dev/null 2>&1; then
-  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-  chmod 600 /tmp/.dockerconfigjson
+  oc extract secret/pull-secret -n openshift-config --to="${temp_dir}" --confirm
+  chmod 600 "${temp_dir}/.dockerconfigjson"
   oc create secret generic "${PULL_SECRET_NAME}" -n "${AGENT_NAMESPACE}" \
-    --from-file=.dockerconfigjson=/tmp/.dockerconfigjson --type=kubernetes.io/dockerconfigjson \
-    --dry-run=client -o json | jq --arg key "${RUN_LABEL_KEY}" --arg run "${CLUSTER_NAME}" \
-      '.metadata.labels = ((.metadata.labels // {}) + {($key): $run})' | oc apply -f -
+    --from-file=.dockerconfigjson="${temp_dir}/.dockerconfigjson" --type=kubernetes.io/dockerconfigjson \
+    --dry-run=client -o yaml > "${temp_dir}/pull-secret.yaml"
+  oc label --local -f "${temp_dir}/pull-secret.yaml" \
+    "${RUN_LABEL_KEY}=${CLUSTER_NAME}" -o yaml > "${temp_dir}/labeled-pull-secret.yaml"
+  oc apply -f "${temp_dir}/labeled-pull-secret.yaml"
   touch "${SHARED_DIR}/nutanix_pull_secret_created"
-  rm -f /tmp/.dockerconfigjson
 fi
 
 ssh_key_file="${SHARED_DIR}/id_rsa.pub"
@@ -46,52 +49,49 @@ if [[ ! -s "${ssh_key_file}" ]]; then
   exit 1
 fi
 
-# TODO: Consider extracting this to a separate step to allow reuse in other workflows, also consider removing agentLabels to
-# simplify the step.
-hostedcluster_json=$(oc get hostedcluster "${CLUSTER_NAME}" -n local-cluster -o json)
-no_proxy=$(jq -r '["localhost", "127.0.0.1", "::1", ".svc", ".cluster.local", (.spec.networking.clusterNetwork[]?.cidr), (.spec.networking.serviceNetwork[]?.cidr), (.spec.networking.machineNetwork[]?.cidr)] | map(select(. != null and . != "")) | unique | join(",")' <<<"${hostedcluster_json}")
-hostedcluster_proxy=$(jq -n --arg http "${PROXY_URL}" --arg https "${PROXY_URL}" --arg no_proxy "${no_proxy}" \
-  '{spec:{configuration:{proxy:{httpProxy:$http,httpsProxy:$https,noProxy:$no_proxy}}}}')
-oc patch hostedcluster "${CLUSTER_NAME}" -n local-cluster --type=merge -p "${hostedcluster_proxy}"
+if [[ ! -s "${SHARED_DIR}/hostedcluster_no_proxy" ]]; then
+  echo "The HostedCluster proxy configuration is not available in the shared job configuration."
+  exit 1
+fi
+no_proxy=$(<"${SHARED_DIR}/hostedcluster_no_proxy")
 
-nodepool_selector=$(jq -n --arg key "${RUN_LABEL_KEY}" --arg value "${CLUSTER_NAME}" \
-  '{spec:{replicas:0,platform:{agent:{agentLabelSelector:{matchLabels:{($key):$value}}}}}}')
-oc patch nodepool "${CLUSTER_NAME}" -n local-cluster --type=merge -p "${nodepool_selector}"
+cat > "${temp_dir}/nodepool-selector.yaml" <<EOF
+spec:
+  replicas: 0
+  platform:
+    agent:
+      agentLabelSelector:
+        matchLabels:
+          ${RUN_LABEL_KEY}: "${CLUSTER_NAME}"
+EOF
+oc patch nodepool "${CLUSTER_NAME}" -n local-cluster --type=merge \
+  --patch-file="${temp_dir}/nodepool-selector.yaml"
 
-infraenv=$(jq -n --arg name "${INFRAENV_NAME}" --arg namespace "${AGENT_NAMESPACE}" \
-  --arg key "${RUN_LABEL_KEY}" --arg run "${CLUSTER_NAME}" --arg ssh_key "$(<"${ssh_key_file}")" \
-  --arg pull_secret "${PULL_SECRET_NAME}" \
-  --arg proxy "${PROXY_URL}" --arg no_proxy "${no_proxy}" \
-  '{
-    apiVersion: "agent-install.openshift.io/v1beta1",
-    kind: "InfraEnv",
-    metadata: {
-      name: $name,
-      namespace: $namespace,
-      labels: {
-        ($key): $run
-      }
-    },
-    spec: {
-      cpuArchitecture: "x86_64",
-      pullSecretRef: {
-        name: $pull_secret
-      },
-      sshAuthorizedKey: $ssh_key,
-      agentLabels: {
-        ($key): $run
-      },
-      proxy: {
-        httpProxy: $proxy,
-        httpsProxy: $proxy,
-        noProxy: $no_proxy
-      }
-    }
-  }')
-printf '%s\n' "${infraenv}" | oc apply -f -
+cat > "${temp_dir}/infraenv.yaml" <<EOF
+apiVersion: agent-install.openshift.io/v1beta1
+kind: InfraEnv
+metadata:
+  name: "${INFRAENV_NAME}"
+  namespace: "${AGENT_NAMESPACE}"
+  labels:
+    ${RUN_LABEL_KEY}: "${CLUSTER_NAME}"
+spec:
+  cpuArchitecture: x86_64
+  pullSecretRef:
+    name: "${PULL_SECRET_NAME}"
+  sshAuthorizedKey: |-
+$(sed 's/^/    /' "${ssh_key_file}")
+  agentLabels:
+    ${RUN_LABEL_KEY}: "${CLUSTER_NAME}"
+  proxy:
+    httpProxy: "${PROXY_URL}"
+    httpsProxy: "${PROXY_URL}"
+    noProxy: "${no_proxy}"
+EOF
+oc apply -f "${temp_dir}/infraenv.yaml"
 oc wait --namespace "${AGENT_NAMESPACE}" --for=condition=ImageCreated "infraenv/${INFRAENV_NAME}" --timeout=30m
 
-iso_url=$(oc get infraenv "${INFRAENV_NAME}" -n "${AGENT_NAMESPACE}" -o jsonpath='{.status.isoDownloadURL}')
+iso_url=$(oc get infraenv "${INFRAENV_NAME}" -n "${AGENT_NAMESPACE}" -o go-template='{{with .status.isoDownloadURL}}{{.}}{{end}}')
 if [[ -z "${iso_url}" ]]; then
   echo "InfraEnv ${INFRAENV_NAME} has no ISO download URL."
   exit 1
