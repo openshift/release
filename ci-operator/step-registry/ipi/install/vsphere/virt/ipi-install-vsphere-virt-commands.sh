@@ -107,6 +107,9 @@ installer_bin=$(which openshift-install)
 VIRT_IMAGE=$("${installer_bin}" coreos print-stream-json | jq -r '.architectures.x86_64.images.kubevirt.image')
 echo ${VIRT_IMAGE}
 
+# Disable tracing due to secret content in the virtctl arguments below
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
 IGNITION_DATA=$(oc get secret worker-user-data -n openshift-machine-api -o json --kubeconfig=${CLUSTER_KUBECONFIG} | jq -r '.data.userData')
 
 echo "$(date -u --rfc-3339=seconds) - Generating virtual machine yaml"
@@ -114,6 +117,8 @@ for (( i=0; i<${BM_COUNT}; i++ )); do
   echo "$(date -u --rfc-3339=seconds) - Generating ${VM_NAME}-${i}"
   virtctl create vm --name "${VM_NAME}-${i}" --instancetype ci-baremetal --volume-import type:registry,url:docker://${VIRT_IMAGE},size:60Gi,pullmethod:node --cloud-init configdrive --cloud-init-user-data ${IGNITION_DATA} --run-strategy=Manual -n ${VM_NAMESPACE} >> "${SHARED_DIR}/vm.yaml"
 done
+# Restore previous tracing state
+$WAS_TRACING && set -x
 
 # Create namespace if it does not exist (it will exist if multiple jobs run in same namespace)
 if [[ "$(oc get ns ${VM_NAMESPACE} --ignore-not-found --kubeconfig="${VIRT_KUBECONFIG}")" == "" ]]; then

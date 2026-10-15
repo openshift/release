@@ -549,6 +549,12 @@ vcenter_count=0
 
 log "building local variables and failure domains"
 
+# Disable tracing for the remainder of this script: vCenter credentials are
+# sourced and expanded into platformSpec/govc.sh and bash -x would print them
+# into the build log.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+
 # Iterate through each lease and generate the failure domain and vcenters information
 for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
   # Skip the LEASE_single copy to avoid double-processing — the original named file
@@ -680,6 +686,10 @@ fi
 
 log "Creating govc.sh file..."
 cat >>"${SHARED_DIR}/govc.sh" <<EOF
+# Suspend xtrace while this file is sourced: it exports credentials and
+# bash -x would print the expanded values into the build log.
+[[ \$- == *x* ]] && _GOVC_WAS_TRACING=true || _GOVC_WAS_TRACING=false
+set +x
 $(cat /tmp/envvars)
 export LEASE_PATH=${SHARED_DIR}/LEASE_single.json
 export NETWORK_PATH=${SHARED_DIR}/NETWORK_single.json
@@ -691,6 +701,7 @@ export GOVC_USERNAME="${pool_usernames[${GOVC_URL}]}"
 export GOVC_PASSWORD='${pool_passwords[${GOVC_URL}]}'
 export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 export SSL_CERT_FILE=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
+if \$_GOVC_WAS_TRACING; then set -x; fi
 EOF
 
 log "Creating vsphere_context.sh file..."
@@ -743,6 +754,10 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
 
     log "Creating govc_${pool_filename}.sh for pool ${pool_name}"
     cat >"${SHARED_DIR}/govc_${pool_filename}.sh" <<EOF
+# Suspend xtrace while this file is sourced: it exports credentials and
+# bash -x would print the expanded values into the build log.
+[[ \$- == *x* ]] && _GOVC_WAS_TRACING=true || _GOVC_WAS_TRACING=false
+set +x
 $(cat /tmp/envvars_pool)
 export LEASE_PATH=${_leaseJSON}
 export POOL_NAME=${pool_name}
@@ -754,6 +769,7 @@ export GOVC_USERNAME="${pool_usernames[${vsphere_url}]}"
 export GOVC_PASSWORD='${pool_passwords[${vsphere_url}]}'
 export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 export SSL_CERT_FILE=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
+if \$_GOVC_WAS_TRACING; then set -x; fi
 EOF
   done
 done

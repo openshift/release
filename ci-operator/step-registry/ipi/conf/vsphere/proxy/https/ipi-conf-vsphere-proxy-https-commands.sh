@@ -3,12 +3,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Disable tracing due to proxy credential handling
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
 proxy_creds=$(< /var/run/vault/vsphere/proxy_creds)
 proxy_ip=$(< /var/run/vault/vsphere/proxy_ip_vmc)
 additional_ca="/var/run/vault/vsphere/client_ca.crt"
 
 http_proxy_url="http://${proxy_creds}@${proxy_ip}:3128"
 https_proxy_url="https://${proxy_creds}@${proxy_ip}:3130"
+# Restore previous tracing state
+$WAS_TRACING && set -x
 
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 proxy:
