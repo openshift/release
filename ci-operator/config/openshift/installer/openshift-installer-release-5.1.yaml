@@ -869,11 +869,33 @@ tests:
         on_bastion 'echo "vCPU: $(nproc)"; free -h; echo; ip -brief addr; echo; cat /etc/resolv.conf' || true
 
         echo
-        echo "=== 3/5 bastion -> internet (the mirror pulls from quay.io over this path) ==="
-        if on_bastion "curl -sS --connect-timeout 20 -o /dev/null -w 'quay.io HTTP %{http_code}\n' https://quay.io/v2/"; then
-            echo "OK: the bastion has internet egress."
+        echo "=== 3/5 bastion -> internet (the mirror pulls release images over this path) ==="
+        # Resolve from the CI pod, which has ordinary DNS, so that a name-resolution failure on
+        # the bastion can be told apart from a missing route. These are very different problems
+        # and the plain curl failure does not distinguish them.
+        probe_host="quay.io"
+        probe_ip="$(getent hosts "${probe_host}" | awk '{print $1}' | head -1)"
+
+        if on_bastion "curl -sS --connect-timeout 20 -o /dev/null -w '${probe_host} HTTP %{http_code}\n' https://${probe_host}/v2/"; then
+            echo "OK: the bastion resolves public names and has internet egress."
+        elif [[ -n "${probe_ip}" ]] && on_bastion "curl -sSk --connect-timeout 20 --resolve ${probe_host}:443:${probe_ip} -o /dev/null -w '${probe_host} via ${probe_ip}: HTTP %{http_code}\n' https://${probe_host}/v2/"; then
+            fail "the bastion ROUTES to the internet but cannot RESOLVE public names."
+            echo "  The VNet's custom DNS servers serve the IL6 namespace only, and setting them"
+            echo "  replaces Azure's resolver for every NIC in the VNet. Anything that pulls by"
+            echo "  hostname -- the mirror registry, 'oc adm release mirror' -- fails here, at"
+            echo "  name resolution, not at the network layer."
+            if on_bastion "timeout 5 bash -c 'cat < /dev/null > /dev/tcp/168.63.129.16/53'"; then
+                echo "  Azure platform DNS 168.63.129.16 IS reachable from the bastion, so a"
+                echo "  split-horizon resolver on the bastion (*.microsoft.scloud -> the VNet DNS"
+                echo "  servers, everything else -> 168.63.129.16) would fix this with no"
+                echo "  emulator-side change."
+            else
+                echo "  Azure platform DNS 168.63.129.16 is NOT reachable either, so the fix has"
+                echo "  to come from the emulator side: public forwarding on the VNet DNS servers."
+            fi
         else
-            fail "the bastion cannot reach quay.io; mirroring will not work."
+            fail "the bastion has no internet egress at all -- this is not just DNS."
+            echo "  Check the VNet route table and any UDR the emulator applies to the bastion subnet."
         fi
 
         echo
