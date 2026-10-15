@@ -5,6 +5,11 @@ chain:
   - ref: kueue-operator-disconnected-install
   - as: run-sdk
     commands: |      
+      if test -s "${SHARED_DIR}/api_hosts_entry" && ! getent hosts "$(awk '{print $2}' "${SHARED_DIR}/api_hosts_entry")" >/dev/null 2>&1; then
+        echo "Cluster API unresolvable; applying fallback hosts entry:"
+        cat "${SHARED_DIR}/api_hosts_entry" >> /etc/hosts
+      fi
+
       # Configure authentication for mirror registry by reusing saved auth
       export HOME="${HOME:-/tmp/home}"
       export XDG_RUNTIME_DIR="${HOME}/run"
