@@ -3,24 +3,148 @@ chain:
   steps:
   - ref: kueue-operator-disconnected-compute
   - ref: kueue-operator-disconnected-install
+  - ref: wait
+    env:
+    - name: TIMEOUT
+      default: "+5h"
+    - name: PR_ONLY
+      default: "true"
   - as: run-sdk
-    commands: |      
-      # Configure authentication for mirror registry by reusing saved auth
-      export HOME="${HOME:-/tmp/home}"
-      export XDG_RUNTIME_DIR="${HOME}/run"
-      mkdir -p "${XDG_RUNTIME_DIR}/containers"
-      
-      if test -f "${SHARED_DIR}/containers-auth.json"; then
-          echo "Reusing authentication file from catalog step..."
-          cp "${SHARED_DIR}/containers-auth.json" "${XDG_RUNTIME_DIR}/containers/auth.json"
-          echo "Authentication configured successfully"
-      fi
-      
+    cli: latest
+    commands: |
+      # Run everything on the BASTION — its VPC DNS always resolves the cluster
+      # API (the build-farm DNS intermittently does not). The step pod only
+      # reads SHARED_DIR files and copies them; zero build-farm API calls.
       source "${SHARED_DIR}/env"
       echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-      export REGISTRY_AUTH_FILE="${XDG_RUNTIME_DIR}/containers/auth.json"
-      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator --skip-tls-verify --verbose --security-context-config restricted "$BUNDLE_IMAGE"
-    from: operator-sdk
+
+      SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
+      BASTION_IP=""
+      if [[ -s "${SHARED_DIR}/bastion_public_address" ]]; then
+          BASTION_IP=$(<"${SHARED_DIR}/bastion_public_address")
+      elif [[ -s "${SHARED_DIR}/bastion_private_address" ]]; then
+          BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
+      fi
+      BASTION_SSH_USER="core"
+      if [[ -s "${SHARED_DIR}/bastion_ssh_user" ]]; then
+          BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
+      fi
+      ssh_options="-o UserKnownHostsFile=/dev/null -o IdentityFile=${SSH_PRIV_KEY_PATH} -o StrictHostKeyChecking=no -o ConnectTimeout=30"
+
+      # SSH needs a passwd entry for the randomly generated step UID
+      if ! whoami &>/dev/null && [[ -w /etc/passwd ]]; then
+          echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+      fi
+
+      # operator-sdk is downloaded from its GitHub release (same pattern as
+      # kueue-operator-test-upgrade-install-bundle): the operator-sdk CI image
+      # has no ssh, the upi-installer image has ssh but no operator-sdk, and
+      # SHARED_DIR is secret-backed with a ~3 MiB cap — so the binary cannot
+      # come from the image or travel between step pods. It streams to the
+      # bastion over ssh instead. A plain registry+v1 bundle image cannot be
+      # used directly as a CatalogSource (no entrypoint — run 21: the catalog
+      # pod crashlooped with "no command specified"); operator-sdk provides
+      # the bundle-serving machinery.
+      echo "Downloading operator-sdk..."
+      OPERATOR_SDK_BIN=/tmp/operator-sdk
+      curl -sLo "${OPERATOR_SDK_BIN}" --fail --retry 3 --max-time 300 \
+          "https://github.com/operator-framework/operator-sdk/releases/download/v1.39.2/operator-sdk_linux_amd64"
+      if [[ "$(head -c 4 "${OPERATOR_SDK_BIN}" | od -An -tx1 | tr -d ' \n')" != "7f454c46" ]]; then
+          echo "ERROR: operator-sdk download failed (not a valid ELF):"
+          ls -la "${OPERATOR_SDK_BIN}" || true
+          head -c 300 "${OPERATOR_SDK_BIN}" || true
+          exit 1
+      fi
+      SDK_SHA256=$(sha256sum "${OPERATOR_SDK_BIN}" | awk '{print $1}')
+      echo "operator-sdk downloaded: $(stat -c%s "${OPERATOR_SDK_BIN}") bytes, sha256 ${SDK_SHA256:0:16}..."
+      chmod +x "${OPERATOR_SDK_BIN}"
+
+      # Copy prerequisites to the bastion (ssh + cat, no scp dependency)
+      echo "Copying kubeconfig, oc, operator-sdk, IDMS/ITMS, and auth to the bastion (${BASTION_SSH_USER}@${BASTION_IP})..."
+      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/kubeconfig" < "${KUBECONFIG}"
+      OC_BIN=$(which oc)
+      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/oc" < "${OC_BIN}"
+      # The binary goes to the bastion's HOME, not /tmp — run 23 saw /tmp/operator-sdk
+      # exec fail with EACCES while /tmp/oc (same copy path) exec'd fine; HOME is the
+      # canonical exec-allowed location on RHCOS and is not tmpfs.
+      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > \${HOME}/operator-sdk" < "${OPERATOR_SDK_BIN}"
+      REMOTE_SHA256=$(ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "sha256sum \${HOME}/operator-sdk" | awk '{print $1}')
+      echo "operator-sdk on bastion: sha256 ${REMOTE_SHA256:0:16}..."
+      if [[ "${REMOTE_SHA256}" != "${SDK_SHA256}" ]]; then
+          echo "ERROR: operator-sdk copy to bastion corrupted (sha256 mismatch)"
+          exit 1
+      fi
+      if test -f "${SHARED_DIR}/containers-auth.json"; then
+          ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/containers-auth.json" < "${SHARED_DIR}/containers-auth.json"
+      fi
+      if test -f "${SHARED_DIR}/kueue-idms.yaml"; then
+          ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/kueue-idms.yaml" < "${SHARED_DIR}/kueue-idms.yaml"
+      fi
+      if test -f "${SHARED_DIR}/kueue-itms.yaml"; then
+          ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/kueue-itms.yaml" < "${SHARED_DIR}/kueue-itms.yaml"
+      fi
+
+      # Apply mirror policies, create namespace, and install the operator —
+      # all on the bastion where the cluster API is always reachable
+      echo "Running installation on the bastion..."
+      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "
+          chmod +x /tmp/oc
+          export KUBECONFIG=/tmp/kubeconfig
+
+          # Apply the image mirror policies prepared by the install step
+          if test -f /tmp/kueue-idms.yaml; then
+              /tmp/oc apply -f /tmp/kueue-idms.yaml
+          fi
+          if test -f /tmp/kueue-itms.yaml; then
+              /tmp/oc apply -f /tmp/kueue-itms.yaml
+          fi
+
+          # Create and label the namespace for the operator installation
+          /tmp/oc create namespace openshift-kueue-operator || true
+          /tmp/oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+          # workaround for OLM pod not running with restricted PSA (openshift-* namespace pattern)
+          /tmp/oc label --overwrite ns openshift-kueue-operator security.openshift.io/scc.podSecurityLabelSync=true
+
+          # Wait for the MachineConfigPool rollout triggered by the mirror policies
+          echo 'Waiting for the MachineConfigPool to finish rollout...'
+          /tmp/oc wait mcp --all --for=condition=Updating --timeout=5m || true
+          /tmp/oc wait mcp --all --for=condition=Updated --timeout=20m || true
+
+          # Install the operator — operator-sdk provides the bundle-serving
+          # machinery (a plain bundle image cannot be a CatalogSource)
+          if test -f /tmp/containers-auth.json; then
+              export REGISTRY_AUTH_FILE=/tmp/containers-auth.json
+          fi
+          echo 'operator-sdk canary:'
+          ls -laZ \"\${HOME}/operator-sdk\" /tmp/oc 2>&1 || true
+          mount | grep -E 'on /tmp |on \${HOME} ' || true
+          if ! \"\${HOME}/operator-sdk\" version; then
+              echo '=== operator-sdk does not execute on the bastion'
+              exit 1
+          fi
+          if ! \"\${HOME}/operator-sdk\" run bundle --timeout=10m -n openshift-kueue-operator --skip-tls-verify --security-context-config restricted '${BUNDLE_IMAGE}'; then
+              echo '=== run bundle failed; dumping OLM state for diagnostics'
+              /tmp/oc get catalogsource,subscription,operatorgroup,installplan -A 2>&1 | grep -i kueue || true
+              /tmp/oc get csv -A 2>&1 | grep -i kueue || true
+              /tmp/oc get pods -n openshift-marketplace 2>&1 | grep -i kueue || true
+              exit 1
+          fi
+
+          echo 'Waiting for the operator CSV to succeed...'
+          for i in \$(seq 1 40); do
+              if /tmp/oc get csv -n openshift-kueue-operator -o name 2>/dev/null | grep -q kueue-operator; then break; fi
+              sleep 15
+          done
+          /tmp/oc wait csv -n openshift-kueue-operator --for=condition=Succeeded --timeout=15m
+
+          echo 'Waiting for the operator deployment to become available...'
+          for i in \$(seq 1 20); do
+              if /tmp/oc get deployment -n openshift-kueue-operator -o name 2>/dev/null | grep -q .; then break; fi
+              sleep 15
+          done
+          /tmp/oc wait --for=condition=Available deployment -n openshift-kueue-operator --timeout=10m
+      "
+    from: upi-installer
     resources:
       requests:
         cpu: 200m

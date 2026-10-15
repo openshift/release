@@ -40,9 +40,8 @@ function configure_host_pull_secret () {
     mirror_registry_path="/var/run/vault/mirror-registry/registry_creds"
     mirror_registry_auth=$(head -n 1 "$mirror_registry_path" | base64 -w 0)
     
-    echo "Appending the pull secrets to Podman auth configuration file '${XDG_RUNTIME_DIR}/containers/auth.json'..."
-    oc extract secret/pull-secret -n openshift-config --confirm --to ${TMP_DIR}
-    jq --argjson a "{\"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$mirror_registry_auth\"}}" '.auths |= . + $a' "${TMP_DIR}/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
+    echo "Building Podman auth from the cluster profile pull secret (no cluster API required)..."
+    jq --argjson a "{\"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$mirror_registry_auth\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > ${XDG_RUNTIME_DIR}/containers/auth.json
     
     # Save auth file to SHARED_DIR for reuse by other steps
     echo "Saving auth file to SHARED_DIR for reuse by other steps..."
@@ -119,8 +118,8 @@ EOF
     echo "[$(timestamp)] Mirroring the images to the mirror registry..."
     run_command "./oc-mirror --v2 --config=${TMP_DIR}/imageset.yaml --workspace=file://${TMP_DIR} docker://${MIRROR_REGISTRY_HOST} --log-level=info --retry-times=5 --src-tls-verify=false --dest-tls-verify=false"
 
-    echo "[$(timestamp)] Setting up image mirroring for disconnected environment..."
-    run_command "oc apply -f - <<EOF
+    echo "[$(timestamp)] Saving image mirror policies to SHARED_DIR (applied by run_sdk)..."
+    cat > "${SHARED_DIR}/kueue-idms.yaml" <<EOF
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
 metadata:
@@ -136,10 +135,8 @@ spec:
     - mirrors:
         - ${MIRROR_REGISTRY_HOST}/redhat-user-workloads/kueue-operator-tenant/${MUST_GATHER_COMPONENT}
       source: registry.redhat.io/kueue/kueue-must-gather-rhel9
-
 EOF
-
-oc apply -f - <<EOF
+    cat > "${SHARED_DIR}/kueue-itms.yaml" <<EOF
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
 metadata:
@@ -161,13 +158,7 @@ spec:
     - mirrors:
         - ${MIRROR_REGISTRY_HOST}/prometheus/busybox
       source: quay.io/prometheus/busybox
-
-EOF"
-
-    echo "[$(timestamp)] Waiting for the MachineConfigPool to finish rollout..."
-    oc wait mcp --all --for=condition=Updating --timeout=5m || true
-    oc wait mcp --all --for=condition=Updated --timeout=20m || true
-    echo "[$(timestamp)] Rollout progress completed"
+EOF
 }
 
 timestamp
@@ -178,6 +169,10 @@ if test -s "${SHARED_DIR}/env" ; then
     source "${SHARED_DIR}/env"
 fi
 
+# NOTE: this step intentionally does not contact the cluster API.
+# Image mirror policies and namespace setup are saved to SHARED_DIR and
+# applied by run_sdk, so build-farm DNS outages cannot affect this step.
+
 export TMP_DIR=/tmp/mirror-operators
 export OC_MIRROR_OUTPUT_DIR="${TMP_DIR}/working-dir/cluster-resources"
 export XDG_RUNTIME_DIR="${TMP_DIR}/run"
@@ -187,17 +182,42 @@ cd "$TMP_DIR"
 check_mirror_registry
 configure_host_pull_secret
 install_oc_mirror
-echo "[$(timestamp)] === Mirroring catalog and operator images ==="  
+echo "[$(timestamp)] === Mirroring catalog and operator images ==="
 mirror_catalog_and_operator
 echo "[$(timestamp)] Image mirroring completed for disconnected environment"
 
+# Capture the cluster API endpoint by resolving it ON the bastion: the bastion's
+# VPC resolver is independent of the build-farm DNS, which intermittently returns
+# NXDOMAIN for live clusters' API names. Saved for the /etc/hosts fallback used
+# by run-sdk and e2e-kueue.
+API_HOST=$(awk '/server: https:/ { sub(/.*server: https:\/\//, ""); sub(/:.*/, ""); print; exit }' "${SHARED_DIR}/kubeconfig") || true
+BASTION_IP=""
+if [[ -s "${SHARED_DIR}/bastion_public_address" ]]; then
+    BASTION_IP=$(<"${SHARED_DIR}/bastion_public_address")
+elif [[ -s "${SHARED_DIR}/bastion_private_address" ]]; then
+    BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
+fi
+if [[ -n "${API_HOST}" ]] && [[ -n "${BASTION_IP}" ]]; then
+    # SSH needs a passwd entry for the randomly generated step UID
+    if ! whoami &>/dev/null && [[ -w /etc/passwd ]]; then
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    fi
+    BASTION_SSH_USER="core"
+    if [[ -s "${SHARED_DIR}/bastion_ssh_user" ]]; then
+        BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
+    fi
+    SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
+    echo "Resolving ${API_HOST} on the bastion (${BASTION_SSH_USER}@${BASTION_IP})..."
+    BASTION_OUT=$(ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no -o ConnectTimeout=30 "${BASTION_SSH_USER}@${BASTION_IP}" "getent hosts ${API_HOST}" 2>/dev/null) || true
+    API_IP=$(echo "${BASTION_OUT}" | awk 'NR==1 {print $1}')
+    if [[ -n "${API_IP}" ]]; then
+        echo "${API_IP} ${API_HOST}" > "${SHARED_DIR}/api_hosts_entry"
+        echo "Saved API endpoint for DNS fallback (bastion resolver): ${API_IP} ${API_HOST}"
+    else
+        echo "WARNING: could not resolve ${API_HOST} on the bastion; DNS fallback entry not saved"
+    fi
+else
+    echo "WARNING: bastion address or API hostname unavailable; DNS fallback entry not saved"
+fi
 
-# Create and label the namespace for the operator installation.
-echo "[$(timestamp)] Creating and labeling namespace for kueue operator..."
-oc create namespace openshift-kueue-operator || true
-oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
-
-# workaround for OLM pod not running with restricted PSA (openshift-* namespace pattern)
-oc label --overwrite ns openshift-kueue-operator security.openshift.io/scc.podSecurityLabelSync=true
-
-echo "[$(timestamp)] Catalog step completed successfully!"
+echo "[$(timestamp)] Catalog step completed successfully (cluster API not required)."

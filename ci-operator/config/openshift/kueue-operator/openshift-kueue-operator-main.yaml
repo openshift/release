@@ -61,12 +61,11 @@ operator:
 prowgen:
   disable_sparse_checkout: true
 releases:
-  amd64-4-23-latest:
-    candidate:
-      architecture: amd64
-      product: ocp
-      stream: nightly
-      version: "4.23"
+  amd64-4-22-stable:
+    release:
+      channel: stable
+      image: quay.io/openshift-release-dev/ocp-release:4.22.18-x86_64
+      version: "4.22.18"
   arm64-4-22-latest:
     candidate:
       architecture: arm64
@@ -748,7 +747,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:amd64-4-23-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:amd64-4-22-stable
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
       CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.20
@@ -761,18 +760,7 @@ tests:
     - as: kueue-must-gather-disconnected
       cli: latest
       commands: |
-        if [[ ! -f "${SHARED_DIR}/env" ]]; then
-          echo "Skipping Kueue must-gather: image configuration is unavailable."
-          exit 0
-        fi
         source "${SHARED_DIR}/env"
-        if [[ -z "${MUST_GATHER_IMAGE:-}" ]]; then
-          echo "Skipping Kueue must-gather: must-gather image was not configured."
-          exit 0
-        fi
-        if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
-          source "${SHARED_DIR}/proxy-conf.sh"
-        fi
         export MUST_GATHER_IMAGE
         echo "Running must-gather to gather diagnostics..."
         mkdir -p ${ARTIFACT_DIR:-must-gather}/must-gather
@@ -784,23 +772,15 @@ tests:
           memory: 500Mi
     - as: kueue-cleanup-disconnected
       cli: latest
-      commands: |
-        if [[ ! -f "${SHARED_DIR}/install-status.txt" ]] || [[ "$(< "${SHARED_DIR}/install-status.txt")" != "0" ]]; then
-          echo "Skipping Kueue cleanup: cluster installation did not succeed."
-          exit 0
-        fi
-        if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
-          source "${SHARED_DIR}/proxy-conf.sh"
-        fi
-        make undeploy-ocp
+      commands: make undeploy-ocp
       from: kueue-operator-src
       resources:
         requests:
           cpu: 300m
           memory: 500Mi
-    - chain: gather-core-dump
     - chain: ipi-aws-post-disconnected
     test:
+    - ref: kueue-operator-disconnected-endpoint
     - chain: cert-manager-install
     - chain: jobset-install
     - chain: leader-worker-set-install
@@ -808,8 +788,75 @@ tests:
     - as: e2e-kueue
       cli: latest
       commands: |
+        # CI DNS flake: the build-farm resolver intermittently returns NXDOMAIN
+        # for the cluster API name (seconds up to ~30 minutes). Probe with oc
+        # (same Go resolver as the tests; getent is unusable in step pods).
+        # Don't start the suite while it is down, and retry once after recovery.
+        for i in $(seq 1 60); do oc whoami >/dev/null 2>&1 && break; sleep 30; done
+        oc whoami >/dev/null 2>&1 || { echo "Cluster API unresolvable at e2e start"; exit 1; }
         export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
-        make test-e2e
+        if make test-e2e; then
+          exit 0
+        fi
+        echo "e2e failed; waiting up to 45m for the cluster API to become resolvable again"
+        for i in $(seq 1 90); do oc whoami >/dev/null 2>&1 && break; sleep 30; done
+        if oc whoami >/dev/null 2>&1; then
+          echo "Cluster API recovered; retrying e2e once"
+          make test-e2e
+        else
+          echo "Cluster API still unresolvable after 45m; giving up"
+          exit 1
+        fi
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: openshift-e2e-aws-disconnected
+- as: test-e2e-disconnected-aws
+  optional: true
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    test:
+    - chain: cert-manager-install
+    - chain: jobset-install
+    - chain: leader-worker-set-install
+    - ref: kueue-operator-mirror-images
+    - chain: kueue-operator-disconnected
+    - as: e2e-kueue
+      cli: latest
+      commands: |
+        # CI DNS flake: the build-farm resolver intermittently returns NXDOMAIN
+        # for the cluster API name (seconds up to ~30 minutes). Probe with oc
+        # (same Go resolver as the tests; getent is unusable in step pods).
+        # Don't start the suite while it is down, and retry once after recovery.
+        for i in $(seq 1 60); do oc whoami >/dev/null 2>&1 && break; sleep 30; done
+        oc whoami >/dev/null 2>&1 || { echo "Cluster API unresolvable at e2e start"; exit 1; }
+        export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+        if make test-e2e; then
+          exit 0
+        fi
+        echo "e2e failed; waiting up to 45m for the cluster API to become resolvable again"
+        for i in $(seq 1 90); do oc whoami >/dev/null 2>&1 && break; sleep 30; done
+        if oc whoami >/dev/null 2>&1; then
+          echo "Cluster API recovered; retrying e2e once"
+          make test-e2e
+        else
+          echo "Cluster API still unresolvable after 45m; giving up"
+          exit 1
+        fi
       from: kueue-operator-src
       resources:
         requests:
