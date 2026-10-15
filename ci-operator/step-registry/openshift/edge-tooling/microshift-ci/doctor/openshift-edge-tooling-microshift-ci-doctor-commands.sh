@@ -202,6 +202,10 @@ load_secrets
 configure_claude
 
 # Use the edge-tooling source pre-installed in the image
+# TODO: Remove this once the ci-doctor-json-data-model branch is merged into main
+cd /tmp
+git clone https://github.com/redhat-chai-bot/openshift-eng_edge-tooling.git -b ci-doctor-json-data-model
+EDGE_TOOLING_DIR="/tmp/openshift-eng_edge-tooling"
 SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/microshift-ci"
 cd "${SRC_DIR}"
@@ -220,7 +224,7 @@ echo "Automatic closing of duplicate rebase PRs completed"
 # Run the deterministic doctor pipeline.
 echo "Running CI doctor pipeline..."
 python3 "${PLUGIN_DIR}/scripts/run-doctor.py" \
-    --releases "${RELEASE_VERSIONS}" \
+    --releases "5.0" \
     --workdir "${WORKDIR}" \
     --model "${CLAUDE_MODEL}" \
     --pull-requests \
