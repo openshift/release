@@ -80,16 +80,20 @@ fi
 
 cd /eco-ci-cd
 
+if [ "${SKIP_DEPLOY:-false}" = "true" ]; then
+  echo "SKIP_DEPLOY=true — skipping hub deployment, reusing existing cluster"
+  touch "${SHARED_DIR}/skip_infra.txt"
+else
+  echo "Running deploy-ocp-sno for ${CLUSTER_NAME} (version=${VERSION}) arch=${ARCH}"
+  EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true release_age_max_days=${MULTISTAGE_PARAM_OVERRIDE_RELEASE_AGE_MAX_DAYS} arch=${ARCH}"
+  if [ "${DISABLE_INSIGHTS}" = "true" ]; then
+    EXTRA_VARS="${EXTRA_VARS} disable_insights=true"
+  fi
 
-echo "Running deploy-ocp-sno for ${CLUSTER_NAME} (version=${VERSION}) arch=${ARCH}"
-EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true release_age_max_days=${MULTISTAGE_PARAM_OVERRIDE_RELEASE_AGE_MAX_DAYS} arch=${ARCH}"
-if [ "${DISABLE_INSIGHTS}" = "true" ]; then
-  EXTRA_VARS="${EXTRA_VARS} disable_insights=true"
+  ansible-playbook ./playbooks/deploy-ocp-sno.yml \
+    -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "${EXTRA_VARS}"
 fi
-
-ansible-playbook ./playbooks/deploy-ocp-sno.yml \
-  -i ./inventories/ocp-deployment/build-inventory.py \
-  --extra-vars "${EXTRA_VARS}"
 
 echo "Copying inventory to SHARED_DIR"
 cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
