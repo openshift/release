@@ -65,11 +65,11 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]]; then
 fi
 
 # Validate required lease fields and static topology
-HOSTNAME_PRIMARY="$(leaseLookup 'hostname')"
-HOSTNAME_ADDITIONAL="$(leaseLookup 'hostname-additional')"
+leaseLookup 'hostname' > /dev/null
+leaseLookup 'hostname-additional' > /dev/null
 SUBNET="$(leaseLookup 'subnet')"
-HTTPD_IP="$(leaseLookup 'httpd-ip')"
-HTTPD_PORT="$(leaseLookup 'httpd-port')"
+leaseLookup 'httpd-ip' > /dev/null
+leaseLookup 'httpd-port' > /dev/null
 
 # Node count validation
 CP_COUNT=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".\"control-plane\" | length" "${LEASE_CONF}")

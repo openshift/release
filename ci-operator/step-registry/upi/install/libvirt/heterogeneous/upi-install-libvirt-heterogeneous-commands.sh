@@ -83,7 +83,7 @@ HOSTNAME_PRIMARY="$(leaseLookup 'hostname')"
 HOSTNAME_ADDITIONAL="$(leaseLookup 'hostname-additional')"
 HTTPD_IP="$(leaseLookup 'httpd-ip')"
 HTTPD_PORT="$(leaseLookup 'httpd-port')"
-SUBNET="$(leaseLookup 'subnet')"
+leaseLookup 'subnet' > /dev/null
 
 ADDITIONAL_PORT="${ADDITIONAL_LIBVIRT_PORT:-16509}"
 if [[ ! "${ADDITIONAL_PORT}" =~ ^[0-9]+$ ]]; then
@@ -226,7 +226,7 @@ function approve_csrs() {
 
       for csr_name in ${pending_csrs}; do
         [[ -z "${csr_name}" ]] && continue
-        local signer_name requester node_subject
+        local signer_name requester
         signer_name=$(echo "${raw_csrs}" | yq-v4 -oy ".items[] | select(.metadata.name == \"${csr_name}\") | .spec.signerName" 2>/dev/null || true)
         requester=$(echo "${raw_csrs}" | yq-v4 -oy ".items[] | select(.metadata.name == \"${csr_name}\") | .spec.username" 2>/dev/null || true)
 
@@ -663,7 +663,7 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
     # Verify the specific node exists, matches arm64 architecture, and is Ready
     NODE_LINE=$(oc get nodes --no-headers 2>/dev/null | grep -E "^${target_node_name}(\.[a-zA-Z0-9.-]+)?\s+" || true)
     if [[ -n "${NODE_LINE}" ]] && echo "${NODE_LINE}" | grep -qw "Ready"; then
-      NODE_ARCH=$(oc get node $(echo "${NODE_LINE}" | awk '{print $1}') -o jsonpath='{.status.nodeInfo.architecture}' 2>/dev/null || true)
+      NODE_ARCH=$(oc get node "$(echo "${NODE_LINE}" | awk '{print $1}')" -o jsonpath='{.status.nodeInfo.architecture}' 2>/dev/null || true)
       if [[ "${NODE_ARCH}" == "arm64" ]]; then
         echo "Node ${target_node_name} successfully joined and is Ready with architecture arm64."
         node_ready=true
