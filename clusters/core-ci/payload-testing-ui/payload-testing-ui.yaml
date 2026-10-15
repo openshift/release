@@ -22,6 +22,45 @@ spec:
     app: pr-payload-tests
     component: payload-testing-ui
 ---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  namespace: ci
+  name: payload-testing-ui-tls
+spec:
+  secretName: payload-testing-ui-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: cert-issuer
+  dnsNames:
+  - pr-payload-tests.ci.openshift.org
+---
+# Router must read the TLS secret referenced by externalCertificate.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: ci
+  name: payload-testing-ui-tls-secret-reader
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["payload-testing-ui-tls"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: ci
+  name: payload-testing-ui-tls-secret-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: payload-testing-ui-tls-secret-reader
+subjects:
+- kind: ServiceAccount
+  name: router
+  namespace: openshift-ingress
+---
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -30,10 +69,15 @@ metadata:
   labels:
     app: pr-payload-tests
     component: payload-testing-ui
+  annotations:
+    haproxy.router.openshift.io/timeout: "90s"
 spec:
+  host: pr-payload-tests.ci.openshift.org
   tls:
     insecureEdgeTerminationPolicy: Redirect
     termination: edge
+    externalCertificate:
+      name: payload-testing-ui-tls
   port:
     targetPort: ui
   to:
