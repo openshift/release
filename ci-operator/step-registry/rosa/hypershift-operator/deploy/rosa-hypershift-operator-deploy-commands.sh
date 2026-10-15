@@ -6,6 +6,32 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+capture_health() {
+  local phase="${1}" resource output
+  if [[ -z "${ARTIFACT_DIR:-}" ]] || ! mkdir -p "${ARTIFACT_DIR}/ho-health"; then
+    echo "WARN: Cannot create ${phase} health diagnostics directory" >&2
+    return 0
+  fi
+  for resource in hostedclusters nodepools; do
+    output="${ARTIFACT_DIR}/ho-health/${phase}-${resource}.json"
+    if KUBECONFIG="${MC_KUBECONFIG}" oc get "${resource}" -A -o json --request-timeout=15s \
+      | jq --arg captured_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg phase "${phase}" \
+        '{capturedAt: $captured_at, phase: $phase, items: [.items[] | {
+          apiVersion, kind, metadata: {name: .metadata.name, namespace: .metadata.namespace,
+            generation: .metadata.generation},
+          conditions: [.status.conditions[]? | {type, status, reason, message,
+            lastTransitionTime, observedGeneration}]}]}' > "${output}.tmp"; then
+      if ! mv "${output}.tmp" "${output}"; then
+        echo "WARN: Cannot save ${phase} ${resource} health diagnostics" >&2
+      fi
+    else
+      echo "WARN: Cannot collect ${phase} ${resource} health diagnostics" >&2
+      rm -f "${output}.tmp" || true
+    fi
+  done
+  return 0
+}
+
 read_profile_file() {
   local file="${1}"
   if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
@@ -60,6 +86,15 @@ MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 ocm get "/api/clusters_mgmt/v1/clusters/${MC_CLUSTER_ID}/credentials" | jq -r .kubeconfig > "${MC_KUBECONFIG}"
 echo "${MC_NAME}" > "${SHARED_DIR}/mc-cluster-name"
 echo "${MC_CLUSTER_ID}" > "${SHARED_DIR}/mc-cluster-id"
+
+capture_health_on_exit() {
+  local exit_status=$?
+  capture_health after-deploy
+  exit "${exit_status}"
+}
+
+capture_health before-deploy
+trap capture_health_on_exit EXIT
 
 # Check if the MC is locked by a PR test job
 EXISTING_LOCK=$(KUBECONFIG="${MC_KUBECONFIG}" oc get configmap ho-deploy-lock -n hypershift -o jsonpath='{.data.job}' 2>/dev/null || true)

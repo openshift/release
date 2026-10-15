@@ -6,7 +6,40 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+capture_health() {
+  local phase="${1}" resource output
+  if [[ -z "${ARTIFACT_DIR:-}" ]] || ! mkdir -p "${ARTIFACT_DIR}/ho-health"; then
+    echo "WARN: Cannot create ${phase} health diagnostics directory" >&2
+    return 0
+  fi
+  for resource in hostedclusters nodepools; do
+    output="${ARTIFACT_DIR}/ho-health/${phase}-${resource}.json"
+    if KUBECONFIG="${MC_KUBECONFIG}" oc get "${resource}" -A -o json --request-timeout=15s \
+      | jq --arg captured_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg phase "${phase}" \
+        '{capturedAt: $captured_at, phase: $phase, items: [.items[] | {
+          apiVersion, kind, metadata: {name: .metadata.name, namespace: .metadata.namespace,
+            generation: .metadata.generation},
+          conditions: [.status.conditions[]? | {type, status, reason, message,
+            lastTransitionTime, observedGeneration}]}]}' > "${output}.tmp"; then
+      if ! mv "${output}.tmp" "${output}"; then
+        echo "WARN: Cannot save ${phase} ${resource} health diagnostics" >&2
+      fi
+    else
+      echo "WARN: Cannot collect ${phase} ${resource} health diagnostics" >&2
+      rm -f "${output}.tmp" || true
+    fi
+  done
+  return 0
+}
+
 MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+capture_health_on_exit() {
+  local exit_status=$?
+  capture_health after-verification
+  exit "${exit_status}"
+}
+
+trap capture_health_on_exit EXIT
 
 if [[ ! -f "${MC_KUBECONFIG}" ]]; then
   echo "No MC kubeconfig found at ${MC_KUBECONFIG}, cannot verify HCP health"
