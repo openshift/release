@@ -1,0 +1,64 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-oz
+  documentation: |-
+    Workflow that provisions an ephemeral OpenShift management cluster on a libvirt
+    OZ host and deploys a HyperShift KubeVirt hosted cluster on top of it. Both the
+    HCP control plane pods and the KubeVirt worker VMs run on the same management
+    cluster — there is no separate external infrastructure cluster.
+    MCE, the virt operator, HPP, and MetalLB are installed on the management cluster
+    before the hosted cluster is created.
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      CONTROL_COUNT: "3"
+      COMPUTE_COUNT: "2"
+      CNV_SUBSCRIPTION_SOURCE: 'redhat-operators'
+      # Sizes apply to the libvirt mgmt cluster VMs only (nested topology; no ext-infra).
+      # Bumped toward #84152 rehearsals (resource pressure on nested HCP was observed).
+      DOMAIN_MEMORY: "73356"
+      DOMAIN_VCPUS: "24"
+      VOLUME_CAPACITY: "200G"  # 200 GB root disk per mgmt cluster VM
+      # Guest apps are served via HyperShift baseDomainPassthrough on mgmt ingress.
+      # Skip monitor/alert noise and known KubeVirt/Hypershift flakes (aligned with
+      # hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt + #84152 rehearsals).
+      SKIP_MONITOR_TEST: "true"
+      TEST_SKIPS: >-
+        etcd leader changes are not excessive\|
+        Kubectl client Simple pod should support exec through an HTTP proxy\|
+        Managed cluster should have no crashlooping recycler pods over four minutes\|
+        PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted\|
+        CSI Mock volume expansion CSI Volume expansion\|
+        Services should have session affinity timeout work for NodePort service\|
+        Services should be able to switch session affinity for NodePort service\|
+        Services should have session affinity work for NodePort service\|
+        Managed cluster should report ready nodes the entire duration of the test run \[Late\]\[apigroup:monitoring.coreos.com\]\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured \[Early\]\[apigroup:config.openshift.io\]\|
+        Alerts shouldn't exceed the series limit of total series sent via telemetry from each cluster\|
+        services when running openshift cluster on KubeVirt virtual machines should allow connections to pods from infra cluster pod via LoadBalancer service across different guest nodes\|
+        services when running openshift cluster on KubeVirt virtual machines should allow connections to pods from infra cluster pod via NodePort across different infra nodes\|
+        \[sig-kubevirt\] migration when running openshift cluster on KubeVirt virtual machines and live migrate hosted control plane workers \[Early\] should maintain node readiness \[Suite:openshift/conformance/parallel\]\|
+        \[sig-network\] Services should be rejected for evicted pods\|
+        \[sig-api-machinery\] OpenAPIV3 should round trip OpenAPI V3 for all built-in group versions\|
+        Metrics should report short attach times\|
+        Metrics should report short mount times
+    pre:
+    # ── Management cluster (SNO: 3 control, 0 compute) ───────────────────
+    - chain: hypershift-mce-ibmz-create-s390xmgmt-oz
+
+    # ── Operator installs ─────────────────────────────────────────────────
+    # MCE, virt, HPP, MetalLB on mgmt cluster (default $KUBECONFIG → mgmt)
+    - chain: hypershift-mce-ibmz-install-operators-mgmt
+
+    # ── KubeVirt hosted cluster on the management cluster ─────────────────
+    - ref: hypershift-mce-ibmz-create-hcpvirt-oz
+
+    test:
+    # Gate guest API on the *next* CI pod/VPN before long conformance (#84152 RCA).
+    - chain: hypershift-mce-ibmz-test
+    - chain: hypershift-conformance
+
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
