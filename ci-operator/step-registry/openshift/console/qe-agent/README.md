@@ -76,7 +76,11 @@ or disabled agent uses no model budget.
 Artifacts in the post-step's `ARTIFACT_DIR` are
 `console-flake-analysis.md`, `console-flake-result.json`, optional
 `console-flake-fix.patch`, `console-flake-evidence/`, `qe-agent-usage.json`,
-`qe-agent-commands.log`, and `claude-session-metrics-autodl.json`. Experimental
+`qe-agent-commands.log`, and `claude-session-metrics-autodl.json`. Whenever the
+step writes an analysis or result, it also writes
+`custom-link-console-flake.html` for the Prow Spyglass HTML lens. The page
+links to the analysis, result JSON, full artifact directory, and a candidate
+patch when present, including runs with no fix or incomplete verification. Experimental
 reruns are not published as JUnit files, so they cannot affect Prow or the
 dashboard's historical counts. Credentials and full model transcripts are not
 uploaded. The audit log records tool commands, file paths, and search patterns

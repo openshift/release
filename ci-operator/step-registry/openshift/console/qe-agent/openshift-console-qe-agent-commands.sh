@@ -10,7 +10,55 @@ fi
 export CONSOLE_AGENT_RUNROOT
 CONSOLE_AGENT_RUNROOT="$(mktemp -d)"
 export CONSOLE_AGENT_METRICS_PATH="${ARTIFACT_DIR}/claude-session-metrics-autodl.json"
-trap 'rm -rf "${CONSOLE_AGENT_RUNROOT}"' EXIT
+_spyglass_written=false
+
+write_spyglass_link() {
+  local analysis="${ARTIFACT_DIR}/console-flake-analysis.md"
+  local result="${ARTIFACT_DIR}/console-flake-result.json"
+  local patch="${ARTIFACT_DIR}/console-flake-fix.patch"
+  local report="${ARTIFACT_DIR}/custom-link-console-flake.html"
+  [[ -f "${analysis}" || -f "${result}" ]] || return 0
+
+  local job="${JOB_NAME:-}" build="${BUILD_ID:-}" pull="${PULL_NUMBER:-}"
+  local repository="" base=""
+  if [[ "${job}" =~ ^rehearse-([0-9]+)-pull-ci-openshift-console-main-e2e-gcp-console$ ]]; then
+    repository=openshift_release
+    pull="${BASH_REMATCH[1]}"
+  elif [[ "${job}" == pull-ci-openshift-console-main-e2e-gcp-console ]]; then
+    repository=openshift_console
+    if [[ ! "${pull}" =~ ^[0-9]+$ ]]; then
+      pull="$(jq -er '.refs.pulls[0].number | tostring | select(test("^[0-9]+$"))' <<< "${JOB_SPEC:-}" 2>/dev/null)" || pull=""
+    fi
+  fi
+  if [[ -n "${repository}" && "${pull}" =~ ^[0-9]+$ && "${build}" =~ ^[0-9]+$ ]]; then
+    base="https://gcs.ci.openshift.org/gcs/test-platform-results-public/pr-logs/pull/${repository}/${pull}/${job}/${build}/artifacts/e2e-gcp-console/openshift-console-qe-agent/artifacts"
+  fi
+
+  {
+    printf '%s\n' '<!doctype html>' '<html lang="en"><head><meta charset="utf-8"><title>Console QE Agent results</title><style>body { color: black; background: white; font-family: sans-serif; }</style></head><body>'
+    printf '%s\n' '<p>Agent output is available for this job. Review the analysis and verification status before applying any proposed change.</p>'
+    if [[ -n "${base}" ]]; then
+      printf '%s\n' '<ul>'
+      [[ -f "${analysis}" ]] && printf '<li><a href="%s/console-flake-analysis.md" target="_blank" rel="noopener noreferrer">Root cause analysis</a></li>\n' "${base}"
+      [[ -f "${result}" ]] && printf '<li><a href="%s/console-flake-result.json" target="_blank" rel="noopener noreferrer">Result and verification status</a></li>\n' "${base}"
+      [[ -s "${patch}" ]] && printf '<li><a href="%s/console-flake-fix.patch" target="_blank" rel="noopener noreferrer">Candidate patch</a></li>\n' "${base}"
+      printf '<li><a href="%s/" target="_blank" rel="noopener noreferrer">All agent artifacts</a></li>\n' "${base}"
+      printf '%s\n' '</ul>'
+    else
+      printf '%s\n' '<p>Open the openshift-console-qe-agent artifacts folder for console-flake-analysis.md and console-flake-result.json.</p>'
+    fi
+    printf '%s\n' '</body></html>'
+  } > "${report}" || return 1
+  _spyglass_written=true
+}
+
+cleanup() {
+  if [[ "${_spyglass_written}" != true ]]; then
+    write_spyglass_link || true
+  fi
+  rm -rf "${CONSOLE_AGENT_RUNROOT}"
+}
+trap cleanup EXIT
 
 bootstrap_failure() {
   mkdir -p "${ARTIFACT_DIR}"
@@ -19,6 +67,7 @@ bootstrap_failure() {
   jq -n --arg job "${JOB_NAME:-}" --arg build "${BUILD_ID:-}" --arg reason "$1" \
     '{schema_version: 1, job_name: $job, build_id: $build, classification: [], verification_status: "skipped", verified_runs: 0, targets: [], patch: null, reason: $reason}' \
     > "${ARTIFACT_DIR}/console-flake-result.json"
+  write_spyglass_link || true
   echo "Console QE Agent: $1" >&2
   echo "No verified fix proposal produced."
 }
@@ -74,6 +123,7 @@ _driver_source="$(cat "${CONSOLE_AGENT_RUNROOT}/driver.py")"
 _driver_digest="$(sha256sum "${CONSOLE_AGENT_RUNROOT}/driver.py")"
 
 if ! python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" init; then
+  write_spyglass_link || true
   python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" finalize || true
   exit 0
 fi
@@ -130,5 +180,6 @@ if python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" prepare; then
     python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" verify || true
   fi
 fi
+write_spyglass_link || true
 python3 "${CONSOLE_AGENT_RUNROOT}/driver.py" finalize || true
 exit 0

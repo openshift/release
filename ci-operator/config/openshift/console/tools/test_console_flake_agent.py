@@ -52,6 +52,25 @@ class WrapperTests(unittest.TestCase):
             self.assertEqual(payload['job_name'], 'example-job')
             self.assertNotIn('PROPOSED SOLUTION', result.stdout)
 
+    def test_spyglass_link_shows_reports_without_a_fix(self):
+        with tempfile.TemporaryDirectory() as folder:
+            env = {**os.environ, 'ARTIFACT_DIR': folder,
+                   'JOB_NAME': 'pull-ci-openshift-console-main-e2e-gcp-console',
+                   'BUILD_ID': '123', 'PULL_NUMBER': '17301',
+                   'CONSOLE_FLAKE_AGENT_ENABLED': 'true',
+                   'CONSOLE_FLAKE_SKILL_REVISION': ''}
+            subprocess.run(['bash', str(WRAPPER)], env=env,
+                           capture_output=True, text=True, check=True)
+            report = (Path(folder) / 'custom-link-console-flake.html').read_text()
+            base = ('https://gcs.ci.openshift.org/gcs/test-platform-results-public/'
+                    'pr-logs/pull/openshift_console/17301/' + env['JOB_NAME'] +
+                    '/123/artifacts/e2e-gcp-console/openshift-console-qe-agent/artifacts')
+            self.assertIn(base + '/console-flake-analysis.md', report)
+            self.assertIn(base + '/console-flake-result.json', report)
+            self.assertIn(base + '/"', report)
+            self.assertNotIn('/console-flake-fix.patch', report)
+            self.assertIn('Review the analysis and verification status', report)
+
     def test_rehearsal_mode_does_not_run_in_the_normal_job(self):
         with tempfile.TemporaryDirectory() as folder:
             env = {**os.environ, 'ARTIFACT_DIR': folder,
@@ -75,6 +94,7 @@ class WrapperTests(unittest.TestCase):
             env = {**os.environ, 'PATH': str(bin_dir) + os.pathsep + os.environ['PATH'],
                    'TEST_PYTHON_ARGS': str(root / 'python-args'),
                    'ARTIFACT_DIR': str(artifacts), 'CONSOLE_FLAKE_AGENT_ENABLED': 'true',
+                   'BUILD_ID': '123',
                    'CONSOLE_FLAKE_SKILL_REVISION': 'main',
                    'JOB_NAME': 'rehearse-98765-pull-ci-openshift-console-main-e2e-gcp-console',
                    'JOB_SPEC': json.dumps({'refs': {'org': 'openshift', 'repo': 'release',
@@ -87,6 +107,9 @@ class WrapperTests(unittest.TestCase):
             self.assertIn('openshift-console-qe-agent-driver.py', args)
             self.assertEqual(json.loads((artifacts / 'console-flake-result.json').read_text())
                              ['verification_status'], 'skipped')
+            self.assertIn('/pr-logs/pull/openshift_release/98765/' + env['JOB_NAME'] +
+                          '/123/artifacts/e2e-gcp-console/openshift-console-qe-agent/artifacts/',
+                          (artifacts / 'custom-link-console-flake.html').read_text())
             self.assertNotIn('PROPOSED SOLUTION', result.stdout)
 
     def test_regular_job_fetches_hash_pinned_main_driver(self):
@@ -198,6 +221,10 @@ case "$2" in
   init)
     mkdir -p "$ARTIFACT_DIR/console-flake-evidence"
     printf '{}\\n' > "$CONSOLE_AGENT_RUNROOT/console-flake-context.json"
+    printf 'analysis\\n' > "$ARTIFACT_DIR/console-flake-analysis.md"
+    printf '{}\\n' > "$ARTIFACT_DIR/console-flake-result.json"
+    printf 'candidate\\n' > "$ARTIFACT_DIR/console-flake-fix.patch"
+    printf 'model supplied HTML\\n' > "$ARTIFACT_DIR/custom-link-console-flake.html"
     ;;
   prepare)
     mkdir -p "$CONSOLE_AGENT_RUNROOT/agent"
@@ -208,6 +235,7 @@ case "$2" in
     printf '{}\\n' > "$CONSOLE_AGENT_RUNROOT/model-settings.json"
     ;;
   finalize)
+    test -s "$ARTIFACT_DIR/custom-link-console-flake.html" || exit 1
     printf 'done\\n' > "$TEST_MARKER"
     ;;
 esac
@@ -235,12 +263,17 @@ printf 'SHARED_DIR=%s\\nKUBECONFIG=%s\\nBRIDGE_KUBEADMIN_PASSWORD=%s\\n' \\
                    'BRIDGE_KUBEADMIN_PASSWORD': 'private-password',
                    'CONSOLE_FLAKE_AGENT_ENABLED': 'rehearsal',
                    'JOB_NAME': 'rehearse-98765-pull-ci-openshift-console-main-e2e-gcp-console',
+                   'BUILD_ID': '123',
                    'JOB_SPEC': json.dumps({'refs': {'org': 'openshift', 'repo': 'release',
                                                     'pulls': [{'number': 98765, 'sha': 'a' * 40}]}})}
             result = subprocess.run(['bash', str(WRAPPER)], env=env,
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((root / 'finalized').is_file())
+            self.assertIn('/console-flake-fix.patch',
+                          (root / 'artifacts/custom-link-console-flake.html').read_text())
+            self.assertNotIn('model supplied HTML',
+                             (root / 'artifacts/custom-link-console-flake.html').read_text())
             self.assertTrue((root / 'model-args').is_file(), result.stdout + result.stderr)
             args = (root / 'model-args').read_text().splitlines()
             self.assertIn('--restricted', args)
