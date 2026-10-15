@@ -1,0 +1,38 @@
+ref:
+  as: quay-operator-upgrade-install-source
+  cli: latest
+  from: cli
+  commands: quay-operator-upgrade-install-source-commands.sh
+  timeout: 30m
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: QUAY_UPGRADE_SOURCE_CATALOG_IMAGE
+    default: ""
+    documentation: "Required immutable n-1 Quay catalog pullspec: image@sha256:<64 hex>."
+  - name: QUAY_UPGRADE_SOURCE_CHANNEL
+    default: ""
+    documentation: Required source (n-1) Quay operator subscription channel.
+  - name: QUAY_UPGRADE_SOURCE_CATALOG_NAME
+    default: quay-upgrade-source
+    documentation: Name for the source CatalogSource created by this step.
+  - name: QUAY_UPGRADE_CATALOG_NAMESPACE
+    default: openshift-marketplace
+    documentation: Namespace in which source and target CatalogSources are created.
+  - name: QUAY_UPGRADE_OPERATOR_NAMESPACE
+    default: openshift-operators
+    documentation: Namespace containing the Quay Subscription and CSVs.
+  - name: QUAY_UPGRADE_SUBSCRIPTION_NAME
+    default: quay-operator
+    documentation: Name for the Quay Subscription managed by this step.
+  - name: QUAY_UPGRADE_CATALOG_TIMEOUT
+    default: 10m
+    documentation: Bounded wait for catalog readiness and source CSV success.
+  documentation: |-
+    Creates an explicitly parameterized, immutable n-1 CatalogSource and installs
+    the Quay operator from its requested channel. Invalid or missing source
+    identity fails before mutation; the installedCSV and exact source identity
+    are written to SHARED_DIR for the upgrade step.
