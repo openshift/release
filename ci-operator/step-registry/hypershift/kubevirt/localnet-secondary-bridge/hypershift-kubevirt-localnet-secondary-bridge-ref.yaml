@@ -1,0 +1,37 @@
+ref:
+  as: hypershift-kubevirt-localnet-secondary-bridge
+  from: cli
+  grace_period: 1m0s
+  timeout: 30m0s
+  env:
+    - name: LOCALNET_SECONDARY_SUBNET
+      documentation: |-
+        IPv4 subnet of the extra network whose interface should be placed on the
+        secondary OVS bridge (e.g. 192.168.221.0/24). The step discovers the
+        matching NIC on each node by IP prefix.
+    - name: LOCALNET_SECONDARY_BRIDGE
+      default: "br-localnet"
+      documentation: "Name of the OVS bridge to create on the secondary interface."
+    - name: LOCALNET_SECONDARY_PHYSNET
+      default: "physnet-localnet"
+      documentation: |-
+        OVN physnet name added to the bridge-mapping on each node. Pass the same
+        value as LOCALNET_MULTI_PHYSNET in the hypershift-kubevirt-create step so
+        that the localnet NAD maps to this bridge.
+    - name: LOCALNET_SECONDARY_ENABLE_FORWARDING
+      default: "true"
+      documentation: |-
+        When true, patch network.operator to set ipForwarding=Global so management
+        nodes forward traffic between the secondary network and the primary network.
+  commands: hypershift-kubevirt-localnet-secondary-bridge-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Create an OVS bridge on each management-cluster node's secondary interface
+    (provisioned by baremetalds-devscripts-conf-extranetwork), add the
+    corresponding OVN bridge-mapping, and optionally enable global IP
+    forwarding. Run this step after cluster installation but before
+    hypershift-kubevirt-create so that localnet NADs can reference the
+    secondary bridge.
