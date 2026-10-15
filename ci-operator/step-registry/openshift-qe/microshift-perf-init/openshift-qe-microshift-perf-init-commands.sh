@@ -9,6 +9,11 @@ for var in COLD_WINDOW WARM_WINDOW SETTLE_SECONDS SWEEP_SLEEP SWEEP_CLEANUP_TIME
   [[ $value =~ ^[1-9][0-9]*$ ]] || { echo "$var must be positive integer seconds"; exit 1; }
 done
 [[ $PERF_ES_INDEX =~ ^[a-z0-9][a-z0-9_.-]*$ && $KUBE_BURNER_ES_INDEX =~ ^[a-z0-9][a-z0-9_.-]*$ ]] || exit 1
+# Machine class for comparisons: the self-sched QUADS model, lowercased (R640 -> r640). Self-sched
+# hosts are bare metal; platform uses the go-commons spelling every perf-scale index shares.
+[[ ${MODEL} =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo 'MODEL must be a QUADS model name'; exit 1; }
+perf_hardware=${MODEL,,}
+perf_platform=BareMetal
 for tool in git curl jq python3 tar timeout uuidgen; do
   command -v "$tool" >/dev/null || { echo "ERROR: missing required tool $tool"; exit 1; }
 done
@@ -93,7 +98,7 @@ tar -xzf "$perf_dir/kube-burner.tar.gz" -C "$perf_dir" kube-burner-ocp
 chmod +x "$perf_dir/kube-burner-ocp"
 # One bounded write probe, no retries. Only CI executes this; local validation uses fakes.
 # A receipt in our dedicated index proves its write capability without adding foreign native-tool documents.
-export PERF_DIR="${SHARED_DIR}" CYCLE_ID="$cycle_id"
+export PERF_DIR="${SHARED_DIR}" CYCLE_ID="$cycle_id" PERF_HARDWARE="$perf_hardware" PERF_PLATFORM="$perf_platform"
 if ! timeout -k 2 20 python3 - <<'PROBE'
 import base64, datetime, json, os, pathlib, urllib.parse, urllib.request
 p=pathlib.Path(os.environ['PERF_DIR']); s=pathlib.Path(os.environ['ES_SECRETS_PATH'])
@@ -115,7 +120,7 @@ try:
     indexes=[os.environ['PERF_ES_INDEX']]
     for index in dict.fromkeys(indexes):
         body+=json.dumps({'create':{'_index':index,'_id':'microshift-ci-probe-'+os.environ['CYCLE_ID']}})+'\n'
-        body+=json.dumps({'metricName':'microshiftPerfCIProbe','uuid':os.environ['CYCLE_ID'],'timestamp':datetime.datetime.now(datetime.timezone.utc).isoformat()})+'\n'
+        body+=json.dumps({'metricName':'microshiftPerfCIProbe','uuid':os.environ['CYCLE_ID'],'hardware':os.environ['PERF_HARDWARE'],'platform':os.environ['PERF_PLATFORM'],'timestamp':datetime.datetime.now(datetime.timezone.utc).isoformat()})+'\n'
     req=urllib.request.Request(endpoint+'/_bulk',data=body.encode(),headers={'Content-Type':'application/x-ndjson','Authorization':'Basic '+base64.b64encode((username+':'+password).encode()).decode()},method='POST')
     with urllib.request.build_opener(NoRedirect()).open(req,timeout=5) as response: result=json.load(response)
     items=result.get('items',[])
@@ -228,10 +233,10 @@ prepare_tools() {
 LIBRARY
 # Allocate identities and the result directory before the full deployment, so iteration 1 is captured once.
 jq -n --arg cycle "$cycle_id" --arg rc "${PERF_RC:-${PULL_PULL_SHA:-${MICROSHIFT_VERSION:-}}}" \
-  --arg index "$PERF_ES_INDEX" --argjson es "$(cat "${SHARED_DIR}/microshift-perf-es-status.json")" \
+  --arg index "$PERF_ES_INDEX" --arg hardware "$perf_hardware" --arg platform "$perf_platform" --argjson es "$(cat "${SHARED_DIR}/microshift-perf-es-status.json")" \
   '{results_dir:("/tmp/microshift-perf-"+$cycle+"/iteration-1/ansible"),perf_run_id:($cycle+"-i1"),
     perf_extra_metadata:{cycle_id:$cycle,iteration:"1",rc:$rc,kube_burner_uuid:($cycle+"-i1"),netperf_uuid:($cycle+"-i1-net")},
-    perf_es_index:$index}' > "${SHARED_DIR}/microshift-perf-install-vars.json"
+    perf_es_index:$index,perf_hardware:$hardware,perf_platform:$platform}' > "${SHARED_DIR}/microshift-perf-install-vars.json"
 # Credentials are transferred separately and never appear in this archived provenance.
 jq -n --arg cycle "$cycle_id" --arg e2e_repo "$E2E_REPO" --arg profile_repo "$METRICS_PROFILE_REPO" --arg e2e "$(git -C "$perf_dir/e2e" rev-parse HEAD)" \
   --arg profile "$(git -C "$perf_dir/profile" rev-parse HEAD)" --arg kb "$KUBE_BURNER_VERSION" --arg net "$NETPERF_VERSION" --arg kb_tag "$kube_burner_release_tag" \
