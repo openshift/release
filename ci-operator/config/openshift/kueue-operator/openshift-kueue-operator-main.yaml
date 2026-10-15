@@ -761,7 +761,18 @@ tests:
     - as: kueue-must-gather-disconnected
       cli: latest
       commands: |
+        if [[ ! -f "${SHARED_DIR}/env" ]]; then
+          echo "Skipping Kueue must-gather: image configuration is unavailable."
+          exit 0
+        fi
         source "${SHARED_DIR}/env"
+        if [[ -z "${MUST_GATHER_IMAGE:-}" ]]; then
+          echo "Skipping Kueue must-gather: must-gather image was not configured."
+          exit 0
+        fi
+        if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
         export MUST_GATHER_IMAGE
         echo "Running must-gather to gather diagnostics..."
         mkdir -p ${ARTIFACT_DIR:-must-gather}/must-gather
@@ -773,12 +784,22 @@ tests:
           memory: 500Mi
     - as: kueue-cleanup-disconnected
       cli: latest
-      commands: make undeploy-ocp
+      commands: |
+        if [[ ! -f "${SHARED_DIR}/install-status.txt" ]] || [[ "$(< "${SHARED_DIR}/install-status.txt")" != "0" ]]; then
+          echo "Skipping Kueue cleanup: cluster installation did not succeed."
+          exit 0
+        fi
+        if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        make undeploy-ocp
       from: kueue-operator-src
       resources:
         requests:
           cpu: 300m
           memory: 500Mi
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
     test:
     - chain: cert-manager-install
     - chain: jobset-install
