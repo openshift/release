@@ -12,16 +12,16 @@ if [[ -z "${JOB_SPEC:-}" ]]; then
 fi
 
 # An ordinary presubmit tests its own source checkout against an already
-# deployed INT environment. A pj-rehearse run of this specific periodic job
-# also tests that environment, and must exercise the status publication path.
-if ! jq -e --arg periodic_job "periodic-ci-openshift-online-gcp-hcp-infra-main-e2e-hostedcluster-int" '
+# deployed environment. A pj-rehearse run of an HC periodic job also tests
+# that environment, and must exercise the status publication path.
+if ! jq -e --arg periodic_job_prefix "periodic-ci-openshift-online-gcp-hcp-infra-main-e2e-hostedcluster-" '
   . as $job |
   $job.type == "periodic" or
   ($job.type == "presubmit" and
    $job.refs.org == "openshift" and
    $job.refs.repo == "release" and
    ($job.refs.pulls | length) == 1 and
-   $job.job == ("rehearse-" + ($job.refs.pulls[0].number | tostring) + "-" + $periodic_job))
+   ($job.job | test("^rehearse-" + ($job.refs.pulls[0].number | tostring) + "-" + $periodic_job_prefix + "(int|stg)$")))
 ' <<<"${JOB_SPEC}" >/dev/null; then
   touch "${skip_path}"
   echo "Skipping deployed-commit status for an ordinary presubmit"
@@ -54,14 +54,19 @@ if ! jq -e '
   type == "array" and length > 0 and
   ((map(.branch) | unique | length) == length) and
   all(.[];
-    (.branch | type) == "string" and
-    (.branch | test("^environment/(global|sector)-[a-z0-9-]+$")) and
-    (.contexts | type) == "array" and
-    (.contexts | length) > 0 and
-    all(.contexts[]; type == "string" and length > 0)
+    . as $target |
+    ($target.contexts // []) as $contexts |
+    ($target.check_runs // []) as $check_runs |
+    ($target.branch | type) == "string" and
+    ($target.branch | test("^environment/(global|sector)-[a-z0-9-]+$")) and
+    ($contexts | type) == "array" and
+    all($contexts[]; type == "string" and length > 0) and
+    ($check_runs | type) == "array" and
+    all($check_runs[]; type == "string" and length > 0) and
+    (($contexts | length) + ($check_runs | length) > 0)
   )
 ' <<<"${E2E_STATUS_TARGETS:-}" >/dev/null; then
-  echo "ERROR: E2E_STATUS_TARGETS must list unique promotion branches and deployment contexts" >&2
+  echo "ERROR: E2E_STATUS_TARGETS must list unique promotion branches and deployment statuses or check runs" >&2
   exit 1
 fi
 
@@ -84,11 +89,12 @@ readonly target_url="https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID
 resolved='[]'
 while IFS= read -r target; do
   branch="$(jq -r '.branch' <<<"${target}")"
-  contexts="$(jq -c '.contexts' <<<"${target}")"
+  contexts="$(jq -c '.contexts // []' <<<"${target}")"
+  check_runs="$(jq -c '.check_runs // []' <<<"${target}")"
   sha="$(branch_sha "${branch}")"
   resolved="$(jq -cn --argjson targets "${resolved}" --arg branch "${branch}" \
-    --arg sha "${sha}" --argjson contexts "${contexts}" \
-    '$targets + [{branch: $branch, sha: $sha, contexts: $contexts}]')"
+    --arg sha "${sha}" --argjson contexts "${contexts}" --argjson check_runs "${check_runs}" \
+    '$targets + [{branch: $branch, sha: $sha, contexts: $contexts, check_runs: $check_runs}]')"
 done < <(jq -c '.[]' <<<"${E2E_STATUS_TARGETS}")
 
 # Record every target before posting. If any status POST or deployment check
@@ -119,18 +125,38 @@ while IFS= read -r target; do
   branch="$(jq -r '.branch' <<<"${target}")"
   sha="$(jq -r '.sha' <<<"${target}")"
   contexts="$(jq -c '.contexts' <<<"${target}")"
+  check_runs="$(jq -c '.check_runs' <<<"${target}")"
   while true; do
     if [[ "$(branch_sha "${branch}")" != "${sha}" ]]; then
       echo "ERROR: ${branch} advanced before the lifecycle test started" >&2
       exit 1
     fi
-    status_response="$(github_get "${api}/commits/${sha}/status?per_page=100")"
-    missing="$(jq -r --argjson contexts "${contexts}" '
-      (.statuses // []) as $statuses |
-      $contexts[] as $wanted |
-      ([$statuses[] | select(.context == $wanted)] | sort_by(.id) | last | .state) as $state |
-      select($state != "success") | $wanted
-    ' <<<"${status_response}")"
+    missing=""
+    if [[ "${contexts}" != "[]" ]]; then
+      status_response="$(github_get "${api}/commits/${sha}/status?per_page=100")"
+      missing="$(jq -r --argjson contexts "${contexts}" '
+        (.statuses // []) as $statuses |
+        $contexts[] as $wanted |
+        ([$statuses[] | select(.context == $wanted)] | sort_by(.id) | last | .state) as $state |
+        select($state != "success") | $wanted
+      ' <<<"${status_response}")"
+    fi
+    if [[ "${check_runs}" != "[]" ]]; then
+      missing_checks=""
+      while IFS= read -r check_name; do
+        encoded_check_name="$(jq -nr --arg name "${check_name}" '$name | @uri')"
+        checks_response="$(github_get "${api}/commits/${sha}/check-runs?check_name=${encoded_check_name}&per_page=100")"
+        conclusion="$(jq -r --arg wanted "${check_name}" '
+          ([(.check_runs // [])[] | select(.name == $wanted)] | sort_by(.id) | last | .conclusion) // ""
+        ' <<<"${checks_response}")"
+        if [[ "${conclusion}" != "success" ]]; then
+          missing_checks="${missing_checks}${missing_checks:+$'\n'}${check_name}"
+        fi
+      done < <(jq -r '.[]' <<<"${check_runs}")
+      if [[ -n "${missing_checks}" ]]; then
+        missing="${missing}${missing:+$'\n'}${missing_checks}"
+      fi
+    fi
     if [[ -z "${missing}" ]]; then
       if [[ "$(branch_sha "${branch}")" != "${sha}" ]]; then
         echo "ERROR: ${branch} advanced before the lifecycle test started" >&2

@@ -17,7 +17,9 @@ if [[ ! -s "${targets_path}" ]] || ! jq -e '
   (.targets | length) > 0 and
   all(.targets[]; (.branch | type) == "string" and
     (.sha | test("^[0-9a-f]{40}$")) and
-    (.contexts | type) == "array")
+    (.contexts | type) == "array" and
+    (.check_runs | type) == "array" and
+    ((.contexts | length) + (.check_runs | length) > 0))
 ' "${targets_path}" >/dev/null; then
   echo "ERROR: captured environment status targets are missing or invalid" >&2
   exit 1
@@ -55,22 +57,49 @@ if [[ -e "${tests_passed_path}" ]]; then
     branch="$(jq -r '.branch' <<<"${target}")"
     sha="$(jq -r '.sha' <<<"${target}")"
     contexts="$(jq -c '.contexts' <<<"${target}")"
+    check_runs="$(jq -c '.check_runs' <<<"${target}")"
     if ! current_sha="$(branch_sha "${branch}")" || [[ "${current_sha}" != "${sha}" ]]; then
       echo "Deployment branch ${branch} changed during the lifecycle test" >&2
       state=failure
       break
     fi
-    if ! status_response="$(github_get "${api}/commits/${sha}/status?per_page=100")"; then
-      echo "Could not verify deployment statuses on ${branch}@${sha}" >&2
-      state=failure
-      break
+    missing=""
+    if [[ "${contexts}" != "[]" ]]; then
+      if ! status_response="$(github_get "${api}/commits/${sha}/status?per_page=100")"; then
+        echo "Could not verify deployment statuses on ${branch}@${sha}" >&2
+        state=failure
+        break
+      fi
+      missing="$(jq -r --argjson contexts "${contexts}" '
+        (.statuses // []) as $statuses |
+        $contexts[] as $wanted |
+        ([$statuses[] | select(.context == $wanted)] | sort_by(.id) | last | .state) as $status_state |
+        select($status_state != "success") | $wanted
+      ' <<<"${status_response}")"
     fi
-    missing="$(jq -r --argjson contexts "${contexts}" '
-      (.statuses // []) as $statuses |
-      $contexts[] as $wanted |
-      ([$statuses[] | select(.context == $wanted)] | sort_by(.id) | last | .state) as $status_state |
-      select($status_state != "success") | $wanted
-    ' <<<"${status_response}")"
+    if [[ "${check_runs}" != "[]" ]]; then
+      missing_checks=""
+      while IFS= read -r check_name; do
+        encoded_check_name="$(jq -nr --arg name "${check_name}" '$name | @uri')"
+        if ! checks_response="$(github_get "${api}/commits/${sha}/check-runs?check_name=${encoded_check_name}&per_page=100")"; then
+          echo "Could not verify ${check_name} on ${branch}@${sha}" >&2
+          state=failure
+          break
+        fi
+        conclusion="$(jq -r --arg wanted "${check_name}" '
+          ([(.check_runs // [])[] | select(.name == $wanted)] | sort_by(.id) | last | .conclusion) // ""
+        ' <<<"${checks_response}")"
+        if [[ "${conclusion}" != "success" ]]; then
+          missing_checks="${missing_checks}${missing_checks:+$'\n'}${check_name}"
+        fi
+      done < <(jq -r '.[]' <<<"${check_runs}")
+      if [[ "${state}" == "failure" ]]; then
+        break
+      fi
+      if [[ -n "${missing_checks}" ]]; then
+        missing="${missing}${missing:+$'\n'}${missing_checks}"
+      fi
+    fi
     if [[ -n "${missing}" ]]; then
       echo "Deployment checks changed during the lifecycle test on ${branch}@${sha}:" >&2
       echo "${missing}" >&2
