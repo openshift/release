@@ -420,13 +420,6 @@ fi
 ADD_COMPUTE_COUNT=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".\"additional-compute\" | length" "${LEASE_CONF}")
 echo "Provisioning ${ADD_COMPUTE_COUNT} additional ${ADDITIONAL_WORKER_ARCHITECTURE} compute nodes..."
 
-# Read the additional bridge name written by the network step
-if [[ ! -f "${SHARED_DIR}/arm-bridge-name" ]]; then
-  echo "ERROR: ${SHARED_DIR}/arm-bridge-name not found; network step may not have run"
-  exit 1
-fi
-ARM_BRIDGE_NAME="$(< "${SHARED_DIR}/arm-bridge-name")"
-
 for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   node_name="${LEASED_RESOURCE}-additional-compute-${idx}"
   node_ip="$(leaseLookup "\"additional-compute\"[$idx].ip")"
@@ -465,7 +458,6 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   export DOMAIN_CMDLINE="${domain_cmdline}"
   export DISK_SOURCE_PATH="${domain_qcow2_image_host_path}"
   export MAC_ADDRESS="${node_mac}"
-  export ARM_BRIDGE_NAME
 
   # Template evaluation using envsubst and yq-v4 validation
   envsubst < "${INSTALL_TEMPLATE}" > "${domain_install_xml}"
