@@ -5,10 +5,19 @@ tests:
       BASE_DOMAIN_RESOURCE_GROUP: os4-common
       COMPUTE_NODE_TYPE: Standard_D8as_v7
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D8as_v7
+      # Azure IPI installs intermittently fail in the bootstrap phase when a
+      # control-plane VM never becomes available (control-plane-machine-set
+      # "Missing 1 available replica(s)"). Have the installer collect
+      # bootstrap/master node journald logs on failure so the cause is
+      # visible in the log bundle instead of an opaque timeout.
+      OPENSHIFT_INSTALL_GATHER_BOOTSTRAP: "true"
       QUAY_STORAGE_PROVIDER: azure
     post:
     - ref: quay-gather-jaeger-traces
     - ref: quay-gather
     - ref: quay-deprovision
+{%- if database_deprovision_ref %}
+    - ref: "{{ database_deprovision_ref }}"
+{%- endif %}
     - chain: ipi-azure-post
     workflow: ipi-azure
