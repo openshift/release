@@ -176,6 +176,7 @@ function make_up_ansible_playbook {
         ansible.builtin.shell: |
           mkdir -pv {{ _remote_telco_ran_integration_repo }}
           podman run --rm -ti \
+              --pids-limit=-1 \
               \
               -e KUBECONFIG={{ _remote_kubeconfig }} \
               -e SCRIPTS_DIR="{{ _remote_telco_ran_integration_repo }}/scripts" \
