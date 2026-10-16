@@ -1,0 +1,33 @@
+ref:
+  as: quay-deploy-openldap
+  cli: latest
+  from_image:
+    name: quay-test-omr
+    namespace: ci
+    tag: latest
+  commands: quay-deploy-openldap-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  grace_period: 10m0s
+  documentation: |-
+    Deploy an OpenLDAP server into the Quay namespace, seeded with the Playwright
+    e2e LDAP fixtures: users admin_ldap, testuser_ldap and readonly_ldap (password
+    "password") under ou=users,dc=example,dc=com, and group
+    cn=test_ldap_group,ou=groups whose members also carry the group DN in
+    employeeType for Quay team sync. The root DN is cn=Manager,dc=example,dc=com
+    with a random password kept in the openldap Secret. After a preflight bind and
+    group search through the Service, writes the Quay LDAP config fragment to
+    ${SHARED_DIR}/quay-auth-config.yaml (removed at start, so it only exists when
+    the preflight passed) for the deploy steps to merge into config.yaml; a copy
+    with LDAP_ADMIN_PASSWD redacted goes to ARTIFACT_DIR.
+  env:
+  - name: QUAYNAMESPACE
+    default: "quay-enterprise"
+    documentation: Namespace where Quay (and OpenLDAP) are deployed.
+  - name: OPENLDAP_IMAGE
+    default: "quay.io/openshifttest/ldap:multiarch"
+    documentation: |-
+      OpenLDAP container image. Must honor OPENLDAP_ROOT_PASSWORD with the
+      cn=Manager,dc=example,dc=com root DN when run as root.
