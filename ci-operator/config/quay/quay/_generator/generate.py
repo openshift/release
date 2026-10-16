@@ -62,7 +62,7 @@ OCP_CHANNELS = ("stable", "candidate")
 # The one kind each scenario test runs as.
 SCENARIO_KIND_BY_TEST = {"standalone-ha": "periodic"}
 # Job keys a scenario test ignores, so the matrix must not set them.
-SCENARIO_REJECTED_KEYS = ("storage", "fips", "database", "sts", "arches")
+SCENARIO_REJECTED_KEYS = ("storage", "fips", "dualstack", "database", "sts", "arches")
 VARIANT_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 CRON_ALIASES = {
     "daily": "@daily",
@@ -87,6 +87,7 @@ JOB_KEYS = {
     "run_if_changed",
     "skip_if_only_changed",
     "fips",
+    "dualstack",
     "storage",
     "upgrade_from",
     "ocp_channel",
@@ -407,6 +408,8 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                     raise ValueError(f"{where}.storage must be 'odf' for test e2e-chainsaw")
                 if job.get("fips"):
                     raise ValueError(f"{where}.fips is not supported for test e2e-chainsaw")
+                if job.get("dualstack"):
+                    raise ValueError(f"{where}.dualstack is not supported for test e2e-chainsaw")
                 storage = "odf"
             if storage is not None:
                 for cloud in clouds:
@@ -425,6 +428,9 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             if sts is not None and not ({"aws", "aws-metal"} & set(clouds)):
                 raise ValueError(f"{where}.sts is only valid when clouds include aws or aws-metal")
             database = _job_bool_field(job, "database", where) or False
+            dualstack = _job_bool_field(job, "dualstack", where) or False
+            if dualstack and clouds != ["aws"]:
+                raise ValueError(f"{where}.dualstack is only valid for clouds: [aws]")
             cron_raw = job.get("cron")
             source_raw = job.get("source")
             if kind == "periodic":
@@ -460,6 +466,8 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             else:
                 if fips:
                     raise ValueError(f"{where}.fips is only valid for kind: periodic")
+                if dualstack:
+                    raise ValueError(f"{where}.dualstack is only valid for kind: periodic")
                 if cron_raw is not None:
                     raise ValueError(f"{where} presubmit job must not set cron")
                 cron = None
@@ -496,6 +504,9 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                 # upgrade.yaml.j2 renders no FIPS cluster, so the flag would be silently dropped.
                 if fips:
                     raise ValueError(f"{where}.fips is not supported for test: upgrade")
+                # upgrade.yaml.j2 renders no dual-stack cluster either.
+                if dualstack:
+                    raise ValueError(f"{where}.dualstack is not supported for test: upgrade")
                 if any(cloud != "aws" for cloud in clouds) or storage not in (None, "s3"):
                     raise ValueError(
                         f"{where} test 'upgrade' supports only aws with s3 storage, "
@@ -535,6 +546,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         skip_if_only_changed=skip_if_only_changed,
                         fips=fips,
                         sts=cloud in ("aws", "aws-metal") and sts is not False,
+                        dualstack=dualstack,
                         storage_override=storage,
                         upgrade_from=upgrade_from,
                         database=database,
