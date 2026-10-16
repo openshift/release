@@ -8,7 +8,7 @@ set -euo pipefail
 # ${SHARED_DIR}/quay-storage-config.yaml with its own DISTRIBUTED_STORAGE_CONFIG
 # driver block, leaving install-quay-external-storage unchanged.
 #
-# Security (CLAUDE.md): this script runs without `set -x`, so the AWS keys read
+# This script runs without `set -x`, so the AWS keys read
 # below and written into the contract file are never traced into CI logs. The
 # keys live only in ${SHARED_DIR} (inter-step channel), never echoed to stdout.
 

@@ -33,13 +33,12 @@ ref:
     documentation: |-
       Optional explicit git ref (branch, tag, or commit SHA) for the Playwright
       tests. When set it overrides everything else, and the step fails if it
-      cannot be cloned. When empty (the default), the step uses the ref
-      auto-derived from the deployed Quay app image
-      (${SHARED_DIR}/playwright_git_ref, written by the deploy step: the
-      upstream vX.Y.Z tag matching the image's version label, or the
-      redhat-X.Y branch when no such tag exists); if that is absent, or is
-      present but not fetchable from PLAYWRIGHT_GIT_REPO, it falls back to
-      PLAYWRIGHT_GIT_FALLBACK_BRANCH with a warning.
+      cannot be cloned. When empty (the default), the step clones the upstream
+      commit recorded in the deployed quay-app image's labels
+      (io.openshift.build.commit.id, then vcs-ref, then
+      org.opencontainers.image.revision; the first fetchable from
+      PLAYWRIGHT_GIT_REPO wins). When none is fetchable, PLAYWRIGHT_REF_MODE
+      decides what happens.
   - name: PLAYWRIGHT_PHASE
     default: ""
     documentation: |-
@@ -67,10 +66,9 @@ ref:
   - name: PLAYWRIGHT_GIT_FALLBACK_BRANCH
     default: "redhat-3.18"
     documentation: |-
-      Last-resort branch cloned when neither PLAYWRIGHT_GIT_BRANCH nor a usable
-      auto-derived ref is available, so the run still executes (with a warning)
-      rather than hard-failing. Also used when an auto-derived ref exists but
-      cannot be fetched from PLAYWRIGHT_GIT_REPO.
+      Last-resort branch in PLAYWRIGHT_REF_MODE "derived", cloned when the
+      image yields no usable version label or its derived ref cannot be
+      fetched from PLAYWRIGHT_GIT_REPO. Unused in "strict".
   - name: PLAYWRIGHT_REQUIRE_EXPLICIT_REF
     default: "false"
     documentation: |-
@@ -78,12 +76,6 @@ ref:
       are both explicitly set (unless PLAYWRIGHT_USE_IMAGE_TESTS is "true").
       This lets an upgrade job pin each phase to the intended product version
       rather than use a derived or fallback branch.
-  - name: PLAYWRIGHT_CREDENTIALS_SOURCE
-    default: "mounted-secret"
-    documentation: |-
-      "mounted-secret" reads the existing quay-tests credential mount.
-      "shared-admin" reads admin credentials written by quay-create-admin-user
-      to SHARED_DIR for a self-contained temporary Quay deployment.
   - name: PLAYWRIGHT_ARTIFACT_SUBDIR
     default: ""
     documentation: |-

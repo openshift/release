@@ -16,7 +16,7 @@ set -euo pipefail
 # Each fragment is written to SHARED_DIR by its own quay-provisioning-*/quay-
 # deploy-* step and is a silent no-op when that step did not run.
 #
-# Security (CLAUDE.md): runs without `set -x`; the storage contract carries the
+# Runs without `set -x`: the storage contract carries the
 # object-storage secret key and the builder config carries the Quay password and
 # builder SA token, so both are folded into config.yaml by redirect/append only,
 # never echoed, and the config bundle lives in a Secret.

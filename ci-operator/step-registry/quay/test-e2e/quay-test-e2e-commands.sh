@@ -22,30 +22,12 @@ if [[ -z "${QUAY_ROUTE}" ]]; then
 fi
 echo "Quay route: ${QUAY_ROUTE}"
 
-# Read credentials. The normal path preserves the existing mounted-secret
-# behavior; the shared-admin path supports the self-contained upgrade scaffold.
+# Read credentials
 # Disable tracing due to password handling
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
-PLAYWRIGHT_CREDENTIALS_SOURCE="${PLAYWRIGHT_CREDENTIALS_SOURCE:-mounted-secret}"
-case "${PLAYWRIGHT_CREDENTIALS_SOURCE}" in
-  mounted-secret)
-    QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-    QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-    ;;
-  shared-admin)
-    if [[ ! -s "${SHARED_DIR}/quay-admin-username" || ! -s "${SHARED_DIR}/quay-admin-password" ]]; then
-      echo "ERROR: shared-admin credentials are not present in SHARED_DIR" >&2
-      exit 1
-    fi
-    QUAY_USERNAME=$(cat "${SHARED_DIR}/quay-admin-username")
-    QUAY_PASSWORD=$(cat "${SHARED_DIR}/quay-admin-password")
-    ;;
-  *)
-    echo "ERROR: PLAYWRIGHT_CREDENTIALS_SOURCE must be mounted-secret or shared-admin" >&2
-    exit 1
-    ;;
-esac
+QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 $WAS_TRACING && set -x
 
 # Configure Playwright environment
@@ -137,19 +119,6 @@ fi
 if [[ "${PLAYWRIGHT_REQUIRE_EXPLICIT_REF}" == "true" && -z "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
   echo "ERROR: PLAYWRIGHT_GIT_BRANCH must be explicitly set when PLAYWRIGHT_REQUIRE_EXPLICIT_REF=true" >&2
   exit 1
-fi
-export PLAYWRIGHT_REF_IS_DERIVED=false
-if [[ -n "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
-  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_BRANCH}"
-  echo "Using explicitly configured Playwright ref: ${PLAYWRIGHT_GIT_REF}"
-elif [[ -s "${SHARED_DIR}/playwright_git_ref" ]]; then
-  PLAYWRIGHT_GIT_REF="$(cat "${SHARED_DIR}/playwright_git_ref")"
-  export PLAYWRIGHT_REF_IS_DERIVED=true
-  echo "Using Playwright ref auto-derived from the deployed image: ${PLAYWRIGHT_GIT_REF}"
-else
-  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
-  echo "WARNING: no explicit PLAYWRIGHT_GIT_BRANCH and no derived ref in SHARED_DIR;" >&2
-  echo "         falling back to branch ${PLAYWRIGHT_GIT_REF}" >&2
 fi
 
 clone_playwright_sources() {
@@ -462,13 +431,6 @@ function stopJaegerPortForward {
   JAEGER_PF_PID=""
 }
 
-# Playwright call logs and traces carry request auth (Authorization, X-CSRF-Token,
-# the _csrf_token session cookie, secret-named JSON keys), and leaktk/gcs-filter
-# replaces any artifact that matches with a 76-byte notice. Swap just the values
-# for fixed placeholders; ANSI codes and JSON escapes around them survive.
-# The header is written Authorizatio[n] on purpose: ci-operator embeds this script
-# in pods.json, and the plain header-plus-colon literal matches the scanner's rule.
-# stdin -> stdout, line-buffered so the live log keeps streaming.
 # Public GCS prefix under which this job's per-step artifacts land once the job
 # finishes (Prow's gcsuploader pushes the whole artifact tree at job end, not
 # per step). Used to compose artifact URLs for custom-link cards and pointer
@@ -484,6 +446,13 @@ function gcs_job_artifacts_prefix() {
   echo "${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}"
 }
 
+# Playwright call logs and traces carry request auth (Authorization, X-CSRF-Token,
+# the _csrf_token session cookie, secret-named JSON keys), and leaktk/gcs-filter
+# replaces any artifact that matches with a 76-byte notice. Swap just the values
+# for fixed placeholders; ANSI codes and JSON escapes around them survive.
+# The header is written Authorizatio[n] on purpose: ci-operator embeds this script
+# in pods.json, and the plain header-plus-colon literal matches the scanner's rule.
+# stdin -> stdout, line-buffered so the live log keeps streaming.
 function scrub_playwright_secrets {
   local -
   set +x
@@ -779,7 +748,7 @@ function copyArtifacts {
 <head>
 <meta charset="utf-8">
 <title>${spyglass_title}</title>
-<meta name="description" content="Links for triaging ${spyglass_title}">
+<meta name="description" content="Links for triaging the Quay e2e run">
 <style>
 body { margin: 0; font: 14px/1.4 Roboto, "Helvetica Neue", Arial, sans-serif; color: #151515; }
 main { padding: 12px 18px 16px; }
@@ -992,250 +961,6 @@ else
   echo "ERROR: ${PREFLIGHT_MESSAGE}" >&2
   exit 1
 fi
-
-# --- pin the route hostname in /etc/hosts -----------------------------------
-# The preflight above proves the route is healthy, but the QE clusters' DNS
-# path (pod resolver -> CoreDNS -> upstream -> Route53) randomly stalls for ten
-# seconds or more, and the suite's raw API client hardcodes a 10s request
-# timeout: one stalled lookup mid-test aborts a phase that was otherwise
-# passing (rehearsal 2109587954446897152 lost PUT /api/v1/organization/.../team
-# outright and spent 10018ms resolving GET /config, while every request that
-# reached Quay was answered in under 50ms). Kubernetes mounts /etc/hosts
-# writable in every pod, so pinning the route hostname to the load-balancer IP
-# that just served the healthy preflight probes removes name resolution from
-# the request path for everything that follows -- node fetch, the Playwright
-# browsers, image pushes.
-#
-# Best effort, like the warmup below, so it cannot change the outcome of a
-# lane that would pass: the pin is an address that provably served the route
-# seconds ago, it is verified with a fresh probe through /etc/hosts and rolled
-# back on any doubt, an unwritable /etc/hosts only warns, and
-# QUAY_PIN_ROUTE_HOSTS=0 opts out. A pinned IP going bad mid-run is the same
-# failure class the stall-prone resolver already produces randomly. The LB
-# address of a cluster's default route does not change while the cluster
-# lives, so the pin stays valid across a Quay pod rollout such as the operator
-# channel upgrade. QUAY_HOSTS_FILE redirects the target file for local dry
-# runs of this step.
-function pin_route_hosts() {
-  local enabled="${QUAY_PIN_ROUTE_HOSTS:-1}"
-  [[ "${enabled}" =~ ^[0-9]+$ ]] || enabled=1
-  if [[ "${enabled}" -eq 0 ]]; then
-    echo "Route hosts pinning disabled (QUAY_PIN_ROUTE_HOSTS=0)."
-    return 0
-  fi
-  local hosts_file="${QUAY_HOSTS_FILE:-/etc/hosts}"
-  local log="${ARTIFACT_DIR}/hosts-pin.jsonl"
-  # Separate declaration and assignment (SC2155): the timestamp must not mask
-  # a failed date the way a combined local assignment would.
-  local ts
-  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-  # Ask the route itself for the address to pin: %{remote_ip} is the IP curl
-  # just used for this 200, i.e. an address proven to serve the route right
-  # now -- a fresher and stronger guarantee than any DNS answer could give.
-  local probe_exit=0 probe
-  probe="$(LC_ALL=C curl -sk -m 15 -o /dev/null \
-    -w '%{remote_ip} %{http_code} %{time_starttransfer}' \
-    "${DISCOVERY_URL}" 2>/dev/null)" || probe_exit=$?
-  local pin_ip pin_code pin_ttfb
-  read -r pin_ip pin_code pin_ttfb <<<"${probe}"
-  if [[ "${probe_exit}" -ne 0 || "${pin_code}" != "200" || -z "${pin_ip}" ]]; then
-    echo "WARNING: route hosts pinning skipped: post-gate probe did not answer (curl exit ${probe_exit}, HTTP ${pin_code:-none}); continuing with cluster DNS." >&2
-    printf '{"timestamp":"%s","outcome":"skipped","probe_curl_exit":%s,"probe_http_status":"%s"}\n' \
-      "${ts}" "${probe_exit}" "${pin_code:-000}" >>"${log}"
-    return 0
-  fi
-
-  # Take over the hostname idempotently: drop any line that maps QUAY_HOST
-  # (ours from an earlier call, or a foreign one) and append the fresh pin.
-  # /etc/hosts is a bind-mounted file, so sed -i's rename would fail with
-  # EBUSY; rewriting with cat > keeps the inode, and a /tmp backup enables
-  # rollback.
-  local backup rewritten wrote=false
-  backup="$(mktemp)"
-  rewritten="$(mktemp)"
-  cp "${hosts_file}" "${backup}" 2>/dev/null || true
-  if awk -v h="${QUAY_HOST}" '{drop=0; for(i=1;i<=NF;i++) if($i==h) drop=1; if(!drop) print}' \
-       "${hosts_file}" >"${rewritten}" 2>/dev/null \
-     && cat "${rewritten}" >"${hosts_file}" 2>/dev/null \
-     && printf '%s %s # pinned by quay-test-e2e\n' "${pin_ip}" "${QUAY_HOST}" >>"${hosts_file}" 2>/dev/null; then
-    wrote=true
-  fi
-  if [[ "${wrote}" != true ]]; then
-    cat "${backup}" >"${hosts_file}" 2>/dev/null || true
-    echo "WARNING: route hosts pinning skipped: ${hosts_file} is not writable; continuing with cluster DNS." >&2
-    printf '{"timestamp":"%s","outcome":"skipped-unwritable","host":"%s","ip":"%s","hosts_file":"%s"}\n' \
-      "${ts}" "${QUAY_HOST}" "${pin_ip}" "${hosts_file}" >>"${log}"
-    rm -f "${backup}" "${rewritten}"
-    return 0
-  fi
-
-  # Verify the pin end-to-end before trusting it: this probe now resolves
-  # through /etc/hosts, so a 200 from the pinned IP proves the pin is in
-  # effect and serving. Any doubt rolls the file back and the lane runs
-  # exactly as it would have without pinning.
-  local verify_exit=0 verify
-  verify="$(LC_ALL=C curl -sk -m 15 -o /dev/null \
-    -w '%{remote_ip} %{http_code} %{time_starttransfer}' \
-    "${DISCOVERY_URL}" 2>/dev/null)" || verify_exit=$?
-  local verify_ip verify_code verify_ttfb outcome="pinned"
-  read -r verify_ip verify_code verify_ttfb <<<"${verify}"
-  if [[ "${verify_exit}" -ne 0 || "${verify_code}" != "200" || "${verify_ip}" != "${pin_ip}" ]]; then
-    cat "${backup}" >"${hosts_file}" 2>/dev/null || true
-    outcome="rolled-back"
-    echo "WARNING: route hosts pin rolled back: verification probe got HTTP ${verify_code:-none} from ${verify_ip:-none} (curl exit ${verify_exit}); continuing with cluster DNS." >&2
-  else
-    echo "Route hosts pin: ${QUAY_HOST} -> ${pin_ip} (verified HTTP ${verify_code} in ${verify_ttfb:-0}s); suite traffic bypasses cluster DNS for this host."
-  fi
-  printf '{"timestamp":"%s","outcome":"%s","host":"%s","ip":"%s","probe_http_status":"%s","probe_ttfb":%s,"verify_http_status":"%s","verify_ttfb":%s}\n' \
-    "${ts}" "${outcome}" "${QUAY_HOST}" "${pin_ip}" "${pin_code}" "${pin_ttfb:-0}" "${verify_code:-000}" "${verify_ttfb:-0}" >>"${log}"
-  rm -f "${backup}" "${rewritten}"
-  return 0
-}
-# Same guard as the warmup: pinning must never be able to fail a lane.
-pin_route_hosts || echo "WARNING: route hosts pinning errored; continuing." >&2
-
-# --- authenticated API warmup ------------------------------------------------
-# The discovery preflight above proves the route answers an unauthenticated
-# GET, but the suite's global setup begins with POST /api/v1/signin: the first
-# DB-backed request of the run (session creation plus password verify). On
-# freshly (re)started Quay pods -- most notably the pods the operator channel
-# upgrade rolls out -- that first request can outlast the suite's short
-# apiRequestContext timeout, aborting global setup before a single test runs
-# and failing the whole phase (see the from-317 rehearsal failures). Sign in
-# once here, retrying only transient-looking failures, so global setup always
-# hits a warm endpoint.
-#
-# Best effort by construction, so it cannot change the outcome of a lane that
-# would pass: every failure path only warns and returns 0. A 2xx/3xx/4xx answer
-# counts as warm (a 4xx is a credentials question, which is global setup's
-# business, and is never retried, so a wrong password cannot become a burst of
-# signin attempts); only timeouts, transport errors and 5xx retry, within
-# QUAY_API_WARMUP_BUDGET_SECONDS (default 120, 0 disables the warmup entirely).
-# On a healthy lane the whole warmup is one csrf GET plus one signin POST, well
-# under a second. Per-attempt status codes and timings land in
-# api-warmup.jsonl; no credential, cookie or response body is ever logged.
-function api_warmup() {
-  local budget="${QUAY_API_WARMUP_BUDGET_SECONDS:-120}"
-  [[ "${budget}" =~ ^[0-9]+$ ]] || budget=120
-  if [[ "${budget}" -eq 0 ]]; then
-    echo "API warmup disabled (QUAY_API_WARMUP_BUDGET_SECONDS=0)."
-    return 0
-  fi
-  # Bash xtrace prints expanded values, so every command that expands the
-  # password or the parsed csrf token must run untraced (the same reason the
-  # credentials are read under set +x at the top of this script). warm_tracing
-  # remembers whether to restore tracing afterwards; when the step itself runs
-  # untraced it stays off throughout.
-  local warm_tracing=false
-  [[ $- == *x* ]] && warm_tracing=true || warm_tracing=false
-  # No signin credentials at hand (a lane that provisions its own users): the
-  # discovery probe above is all the warming that can be done. The guard
-  # expands the password, so it runs untraced.
-  local have_credentials=true
-  if [[ "${warm_tracing}" == true ]]; then set +x; fi
-  if [[ -z "${QUAY_USERNAME:-}" || -z "${QUAY_PASSWORD:-}" ]]; then
-    have_credentials=false
-  fi
-  if [[ "${warm_tracing}" == true ]]; then set -x; fi
-  if [[ "${have_credentials}" == false ]]; then
-    echo "API warmup skipped: no signin credentials available."
-    return 0
-  fi
-
-  local log="${ARTIFACT_DIR}/api-warmup.jsonl"
-  local deadline=$(( $(date +%s) + budget ))
-  local attempt=0 outcome="no-answer"
-  local csrf_metrics="" csrf_exit=0 csrf_code="" csrf_token="" csrf_ok=false
-  local signin_metrics="" signin_exit=0 signin_code="" signin_ttfb=""
-  # The cookie jar, the csrf body and the signin body (it carries the password)
-  # are temp files, never artifacts: only status codes and timings are logged.
-  local cookie_jar csrf_body signin_body
-  cookie_jar="$(mktemp)"
-  csrf_body="$(mktemp)"
-  signin_body="$(mktemp)"
-
-  while [[ "$(date +%s)" -lt "${deadline}" ]]; do
-    attempt=$(( attempt + 1 ))
-
-    # 1) CSRF token: the unauthenticated GET that also sets the _csrf_token
-    #    cookie the signin POST must send back. Nothing here is secret, so it
-    #    stays traced like the preflight probes it mirrors.
-    csrf_exit=0
-    csrf_metrics="$(LC_ALL=C curl -sk -m 15 -c "${cookie_jar}" -o "${csrf_body}" \
-      -w '%{http_code} %{time_starttransfer}' "${QUAY_ROUTE}/csrf_token" 2>/dev/null)" || csrf_exit=$?
-    read -r csrf_code _ <<<"${csrf_metrics:-000 0}"
-    # The parsed csrf token is a session credential, and bash prints expanded
-    # values under xtrace, so parse, assign and emptiness-check it untraced;
-    # only the boolean decision is visible to the trace.
-    if [[ "${warm_tracing}" == true ]]; then set +x; fi
-    csrf_ok=false
-    if [[ "${csrf_exit}" -eq 0 && "${csrf_code}" == "200" ]]; then
-      csrf_token="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String(d.csrf_token||""))' "${csrf_body}" 2>/dev/null || true)"
-      [[ -n "${csrf_token}" ]] && csrf_ok=true || csrf_ok=false
-    fi
-    if [[ "${warm_tracing}" == true ]]; then set -x; fi
-    if [[ "${csrf_ok}" != true ]]; then
-      printf '{"timestamp":"%s","attempt":%s,"endpoint":"csrf_token","curl_exit":%s,"http_status":"%s"}\n' \
-        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${attempt}" "${csrf_exit}" "${csrf_code:-000}" >>"${log}"
-      sleep 5
-      continue
-    fi
-
-    # 2) Signin: the request this warmup exists for. The whole exchange runs in
-    #    a subshell with tracing off: the body file holds the password, the
-    #    header a session-scoped CSRF token, and neither may reach the build
-    #    log even if a later command errors. The credentials were exported at
-    #    the top of this script, so node reads them from the inherited
-    #    environment -- no secret is ever part of a command line. The signin
-    #    response (a session token) goes to /dev/null; only curl's -w status
-    #    and timing escape the subshell, into a variable.
-    signin_exit=0
-    signin_metrics="$(
-      set +x
-      node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({username: process.env.QUAY_USERNAME, password: process.env.QUAY_PASSWORD}))' "${signin_body}" || exit 90
-      LC_ALL=C curl -sk -m 30 -b "${cookie_jar}" \
-        -H "X-CSRF-Token: ${csrf_token}" -H 'content-type: application/json' \
-        --data @"${signin_body}" -o /dev/null \
-        -w '%{http_code} %{time_starttransfer}' "${QUAY_ROUTE}/api/v1/signin" 2>/dev/null
-    )" || signin_exit=$?
-    read -r signin_code signin_ttfb <<<"${signin_metrics:-000 0}"
-
-    if [[ "${signin_exit}" -eq 0 && "${signin_code}" =~ ^[23] ]]; then
-      outcome="warm"
-    elif [[ "${signin_exit}" -eq 0 && "${signin_code}" =~ ^[4] ]]; then
-      # The endpoint answered, so it is warm; whether these credentials are
-      # the right ones is global setup's question, not this warmup's.
-      outcome="warm-auth-rejected"
-    else
-      outcome="no-answer"
-    fi
-    printf '{"timestamp":"%s","attempt":%s,"endpoint":"signin","curl_exit":%s,"http_status":"%s","time_starttransfer":%s,"outcome":"%s"}\n' \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${attempt}" "${signin_exit}" "${signin_code:-000}" "${signin_ttfb:-0}" "${outcome}" >>"${log}"
-    if [[ "${outcome}" != "no-answer" ]]; then
-      break
-    fi
-    sleep 5
-  done
-
-  rm -f "${cookie_jar}" "${csrf_body}" "${signin_body}"
-  case "${outcome}" in
-    warm)
-      echo "API warmup: signin answered HTTP ${signin_code} on attempt ${attempt}; global setup starts on a warm endpoint."
-      ;;
-    warm-auth-rejected)
-      echo "API warmup: signin endpoint answered HTTP ${signin_code} (auth rejected); treating as warm, global setup will authenticate."
-      ;;
-    *)
-      echo "WARNING: API warmup got no signin answer within ${budget}s; continuing anyway (global setup may still succeed). Per-attempt evidence in api-warmup.jsonl." >&2
-      ;;
-  esac
-  return 0
-}
-# The || guard makes the warmup unable to take a lane down even if the function
-# itself errors (mktemp, node, ...): the Playwright suite stays the authority on
-# every failure that matters.
-api_warmup || echo "WARNING: API warmup errored; continuing." >&2
 
 # Tests excluded from the run come entirely from PLAYWRIGHT_GREP_INVERT, set in the
 # ci-operator config (steps.env) for this test. Keeping the exclusion list in the
