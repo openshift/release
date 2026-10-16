@@ -16,7 +16,12 @@ managed_files:
     - quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__libvirt-s390x-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.17__aws-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.17__gcp-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.17__azure-ocp422-e2e-install.yaml
     - quay-quay-redhat-5.0__aws-ocp50-e2e-install.yaml
+    - quay-quay-redhat-5.0__gcp-ocp50-e2e-install.yaml
+    - quay-quay-redhat-5.0__azure-ocp50-e2e-install.yaml
+    - quay-quay-redhat-3.16__aws-ocp421-e2e-install.yaml
   retired: []
 
 quay:
@@ -64,17 +69,37 @@ quay:
         storage: odf
   - branch: redhat-3.17
     jobs:
-      - cron: weekly
+      - cron: daily
+        source: nightly
+        clouds: [aws,gcp,azure]
+        ocp: ["4.22"]
+        test: e2e-install
+      - cron: daily
         source: nightly
         clouds: [aws]
         ocp: ["4.22"]
         test: e2e-install
+        storage: odf
   - branch: redhat-5.0
     jobs:
       - cron: daily
         source: nightly
+        clouds: [aws,gcp,azure]
+        ocp: ["5.0"]
+        test: e2e-install
+      - cron: weekly
+        source: nightly
         clouds: [aws]
         ocp: ["5.0"]
+        test: e2e-install
+        fips: true
+  # newest OCP with a quay-3.16 ART nightly FBC (there is no v4.22 one)
+  - branch: redhat-3.16
+    jobs:
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.21"]
         test: e2e-install
   - branch: master
     layout: base

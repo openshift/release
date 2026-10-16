@@ -1,5 +1,191 @@
 periodics:
 - agent: kubernetes
+  cluster: build12
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: agentic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-main-agentic-periodic-jira-agent
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --target=periodic-jira-agent
+      - --variant=agentic
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build12
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: agentic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-main-agentic-periodic-pr-followup-agent
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --target=periodic-pr-followup-agent
+      - --variant=agentic
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: build03
   cron: 16 6 25 */12 *
   decorate: true
@@ -287003,7 +287189,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
-  cron: 0 0 1 1 *
+  cron: 00 01 */1 * 1-5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -287207,7 +287393,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
-  cron: 0 0 1 1 *
+  cron: 00 04 */1 * 5,6,0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -287309,7 +287495,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
-  cron: 0 6 * * 0,2,4
+  cron: 0 8 * * 0,2,4
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -362009,7 +362195,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
-  cron: 0 0 1 1 *
+  cron: 00 09 */1 * 1-5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -362213,7 +362399,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
-  cron: 10 14 */1 * 1-5
+  cron: 10 14 */1 * 5,6,0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -362315,7 +362501,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
-  cron: 0 0 * * 1,3,5
+  cron: 0 0 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -362344,108 +362530,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-telco5g-ptp
-      - --variant=nightly-5.0
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build10
-  cron: 0 6 * * 1,3,5
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
-  labels:
-    capability/intranet: intranet
-    ci-operator.openshift.io/variant: nightly-5.0
-    ci.openshift.io/generator: prowgen
-    ci.openshift.io/no-builds: "true"
-    job-release: "5.0"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.0-e2e-telco5g-ptp-upstream
-  spec:
-    containers:
-    - args:
-      - --enable-secrets-store-csi-driver=true
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-telco5g-ptp-upstream
       - --variant=nightly-5.0
       command:
       - ci-operator
@@ -395280,7 +395364,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
-  cron: 0 0 1 1 *
+  cron: 00 17 */1 * 1-5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -395484,7 +395568,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
-  cron: 00 20 */1 * 1-5
+  cron: 00 20 */1 * 5,6,0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -395586,7 +395670,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
-  cron: 0 0 * * 6
+  cron: 0 0 * * 1,3,5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -395688,7 +395772,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
-  cron: 0 6 * * 6
+  cron: 0 8 * * 1,3,5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -415506,7 +415590,7 @@ periodics:
         secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 2 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -415617,7 +415701,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 8 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -415839,7 +415923,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 14 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -415950,7 +416034,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 14 * * 0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -416061,7 +416145,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 2 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -416172,7 +416256,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 2 * * 0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -416283,7 +416367,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 2 * * 0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -416394,7 +416478,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 8 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -416505,7 +416589,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 8 * * 0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -417435,7 +417519,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 14 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -417546,7 +417630,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 1 * * 1
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -417657,7 +417741,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 8 * * 0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -417768,7 +417852,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 14 * * 0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -417879,7 +417963,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: '@weekly'
+  cron: 0 1 * * 1
   decorate: true
   decoration_config:
     skip_cloning: true
