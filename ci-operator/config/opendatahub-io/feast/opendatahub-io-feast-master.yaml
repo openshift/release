@@ -25,7 +25,7 @@ releases:
     release:
       architecture: multi
       channel: stable
-      version: "4.18"
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -39,8 +39,9 @@ tests:
     cluster_profile: aws-opendatahub
     env:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
       HYPERSHIFT_AWS_REGION: us-west-2
-      HYPERSHIFT_NODE_COUNT: "1"
+      HYPERSHIFT_NODE_COUNT: "3"
       PQC_CHECK: "true"
       SCAN_NAMESPACE: feast-operator-system,test-ns-feast,test-ns-remote-registry
       SCANNER_CPU_LIMIT: "2"
@@ -51,12 +52,59 @@ tests:
     - as: run-tests
       cli: latest
       commands: |
+        # TEMPORARY DEBUG: time the registry's Kubernetes auth check for the remote pod's token
+        cat > /tmp/auth_timing.py <<'PY'
+        import os, time, asyncio
+        from kubernetes import client, config
+        from feast.permissions.auth.kubernetes_token_parser import KubernetesTokenParser
+        config.load_incluster_config()
+        rbac = client.RbacAuthorizationV1Api()
+        t = time.time(); crbs = rbac.list_cluster_role_binding().items
+        print(f"list ClusterRoleBindings: {len(crbs)} in {time.time()-t:.2f}s", flush=True)
+        t = time.time()
+        for c in crbs[:20]:
+            rbac.read_cluster_role(name=c.role_ref.name)
+        print(f"20 x read_cluster_role: {time.time()-t:.2f}s", flush=True)
+        p = KubernetesTokenParser()
+        for i in range(2):
+            t = time.time(); u = asyncio.run(p.user_details_from_access_token(os.environ["T"]))
+            print(f"full auth check #{i}: {time.time()-t:.2f}s user={u.username}", flush=True)
+        PY
+
+        # TEMPORARY DEBUG: record the remote-registry pod state while the tests run
+        (
+          set +e
+          D="${ARTIFACT_DIR}/remote-registry-debug"
+          mkdir -p "${D}"
+          while true; do
+            ts=$(date -u +%H%M%S)
+            if oc get ns test-ns-remote-registry >/dev/null 2>&1; then
+              { oc get pods,deploy -n test-ns-remote-registry -o wide; oc get events -n test-ns-remote-registry --sort-by=.lastTimestamp; } > "${D}/state-${ts}.txt" 2>&1
+              oc describe pods -n test-ns-remote-registry > "${D}/describe-${ts}.txt" 2>&1
+              oc logs -n test-ns-remote-registry deploy/feast-simple-feast-remote-setup --all-containers --prefix --timestamps --tail=300 > "${D}/logs-${ts}.txt" 2>&1
+              oc logs -n test-ns-feast deploy/feast-simple-feast-setup -c registry --timestamps --tail=300 > "${D}/registry-server-${ts}.txt" 2>&1
+              if [ -z "${timed:-}" ] && oc get sa feast-simple-feast-remote-setup -n test-ns-remote-registry >/dev/null 2>&1; then
+                timed=1
+                (
+                  TOKEN=$(oc create token feast-simple-feast-remote-setup -n test-ns-remote-registry)
+                  echo "### auth timing started at $(date -u +%H:%M:%S)"
+                  oc exec -i -n test-ns-feast deploy/feast-simple-feast-setup -c registry -- env T="${TOKEN}" python - < /tmp/auth_timing.py
+                  echo "### finished at $(date -u +%H:%M:%S)"
+                ) > "${D}/auth-timing.txt" 2>&1 &
+              fi
+            fi
+            sleep 30
+          done
+        ) &
+
         export RUN_ON_OPENSHIFT_CI=true
+        # TEMPORARY: use the ODH feature server image built from Dockerfile (Feast 0.67.0 from PyPI), like Konflux
+        PYPI_FEATURE_SERVER_IMAGE=quay.io/opendatahub/feature-server@sha256:e6de2d645ad6a2f1235f85793aea598926433479972e7b7c7387efe9c37903c5
         cd infra/feast-operator
-        make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+        make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${PYPI_FEATURE_SERVER_IMAGE}
         oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
         make test-e2e
-        make undeploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+        make undeploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${PYPI_FEATURE_SERVER_IMAGE}
 
         make test-previous-version
         oc delete deployment feast-operator-controller-manager -n feast-operator-system
