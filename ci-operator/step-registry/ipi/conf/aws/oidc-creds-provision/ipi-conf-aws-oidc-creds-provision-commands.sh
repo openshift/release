@@ -115,10 +115,40 @@ spec:
     apiVersion: cloudcredential.openshift.io/v1
     kind: AWSProviderSpec
     statementEntries:
-    - action:
-      - elasticfilesystem:*
-      effect: Allow
-      resource: '*'
+    # https://github.com/openshift/aws-efs-csi-driver/blob/master/docs/iam-policy-example.json
+    - effect: Allow
+      action:
+      - elasticfilesystem:DescribeAccessPoints
+      - elasticfilesystem:DescribeFileSystems
+      - elasticfilesystem:DescribeMountTargets
+      - s3files:ListAccessPoints
+      - s3files:ListFileSystems
+      - ec2:DescribeAvailabilityZones # for one-zone volumes
+      resource: "*"
+    - effect: Allow
+      action:
+      - elasticfilesystem:CreateAccessPoint
+      - s3files:CreateAccessPoint
+      resource: "*"
+      policyCondition:
+        StringLike:
+          "aws:RequestTag/efs.csi.aws.com/cluster": "true"
+    - effect: Allow
+      action:
+      - elasticfilesystem:TagResource
+      - s3files:TagResource
+      resource: "*"
+      policyCondition:
+        StringLike:
+          "aws:ResourceTag/efs.csi.aws.com/cluster": "true"
+    - effect: Allow
+      action:
+      - elasticfilesystem:DeleteAccessPoint
+      - s3files:DeleteAccessPoint
+      resource: "*"
+      policyCondition:
+        StringEquals:
+          "aws:ResourceTag/efs.csi.aws.com/cluster": "true"
   secretRef:
     name: aws-efs-cloud-credentials
     namespace: openshift-cluster-csi-drivers
