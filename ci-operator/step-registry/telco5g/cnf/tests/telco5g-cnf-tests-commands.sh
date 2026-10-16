@@ -912,4 +912,14 @@ set +x
 set -e
 
 [[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-cnf-tests"
+if [[ ${val_status} -ne 0 ]]; then
+    echo "Final result: validations failed"
+    echo "Final result: job failed"
+    exit ${val_status}
+fi
+if [[ ${status} -ne 0 ]]; then
+    echo "Final result: tests failed"
+    echo "Final result: job failed"
+    exit 0
+fi
 exit ${status}
