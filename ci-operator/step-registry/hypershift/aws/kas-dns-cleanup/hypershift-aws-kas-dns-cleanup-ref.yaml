@@ -1,0 +1,20 @@
+ref:
+  as: hypershift-aws-kas-dns-cleanup
+  from: upi-installer
+  timeout: 15m0s
+  grace_period: 5m
+  commands: hypershift-aws-kas-dns-cleanup-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Deletes the Route53 CNAME record created by hypershift-aws-kas-dns-update for the
+    custom kube-apiserver DNS name recorded in ${SHARED_DIR}/kas_dns_name.
+
+    The zone and the exact record set to delete are read from
+    ${SHARED_DIR}/kas_dns_zone_id and ${SHARED_DIR}/kas_dns_delete_batch.json, both
+    written by hypershift-aws-kas-dns-update.
+
+    The step is a no-op when no record was created, and never fails the job: a leftover
+    record is reported but does not mask the result of the tests.
