@@ -41,13 +41,19 @@ generate_jwt() {
 
 generate_token() {
     local installation_id=$1
-    local jwt token
+    local repository=${2:-}
+    local jwt token request='{}'
     jwt=$(generate_jwt 600)
+    if [[ -n "${repository}" ]]; then
+        request=$(jq -n --arg repository "${repository}" '{repositories: [$repository]}') || return 1
+    fi
 
     token=$(curl -sf --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5 \
         -X POST \
         -H "Authorization: Bearer ${jwt}" \
         -H "Accept: application/vnd.github+json" \
+        -H "Content-Type: application/json" \
+        --data "${request}" \
         "https://api.github.com/app/installations/${installation_id}/access_tokens" \
         | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
 
@@ -60,7 +66,7 @@ generate_token() {
 # mapping succeeds, so a mid-loop failure leaves existing files and exports as-is.
 refresh_github_tokens() {
     local outputs_file="${SHARED_DIR}/github-app-token-outputs"
-    local pairs pair id_file output_name id_path installation_id token tmpdir
+    local pairs pair id_file output_name id_path installation_id token tmpdir repository
     local was_tracing=false
     local -a staged=()
 
@@ -105,7 +111,19 @@ refresh_github_tokens() {
 
         [[ $- == *x* ]] && was_tracing=true || was_tracing=false
         set +x
-        token=$(generate_token "${installation_id}") || token=""
+        repository=""
+        if [[ "${AGENT_HARNESS:-}" == codex ]]; then
+            case "${output_name}" in
+                gh-fork-token) repository="${FORK_REPO##*/}" ;;
+                gh-upstream-token) repository="${UPSTREAM_REPO##*/}" ;;
+                *)
+                    echo "ERROR: Cannot scope token for ${output_name}." >&2
+                    rm -rf "${tmpdir}"
+                    return 1
+                    ;;
+            esac
+        fi
+        token=$(generate_token "${installation_id}" "${repository}") || token=""
         if [[ -z "${token}" ]]; then
             ${was_tracing} && set -x
             echo "ERROR: Failed to generate token for ${id_file}." >&2
