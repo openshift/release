@@ -1,0 +1,57 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibi-replacement-preinstall
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibi-replacement-preinstall-commands.sh
+  timeout: 5h
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: IBI_REPLACEMENT_PREINSTALL_ENABLED
+    default: "false"
+    documentation: Enable replacement preinstall after Deployment Types. Failure blocks subsequent tests.
+  - name: IBI_REPLACEMENT_HOST
+    default: ""
+    documentation: Expected replacement hostname; must match both seed ClusterInstances before cleanup.
+  - name: IBI_REPLACEMENT_MAC
+    default: ""
+    documentation: Expected replacement boot MAC; restricts old seed hardware cleanup.
+  - name: IBI_REPLACEMENT_IP
+    default: ""
+    documentation: Expected IPv4 address resolved by the test container before cleanup.
+  - name: CLUSTER_NAME
+    default: "kni-qe-127"
+    documentation: Seed hub whose bastion prepares the replacement hardware.
+  - name: SEED_SPOKE_CLUSTER
+    default: "helix81"
+    documentation: Former seed spoke name; must match the seed-generation steps.
+  - name: VERSION
+    default: "4.20"
+    documentation: Release family used for Git paths and locating the generated seed image.
+  - name: MIRROR_REGISTRY
+    default: "disconnected.registry.local:5000"
+    documentation: Seed bastion registry containing the generated seed image.
+  - name: ZTP_GIT_REPO
+    default: "https://gitlab.cee.redhat.com/telcov10n/ztp-site-configs-ci.git"
+    documentation: GitLab repository containing the seed ClusterInstance and replacement preinstall template.
+  - name: ZTP_GIT_BRANCH
+    default: "main"
+    documentation: Git branch containing the seed manifests.
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-all
+    mount_path: /var/group_variables/common/all
+  documentation: |-
+    Prepare the former seed server as replacement hardware before IBBF.
+    Restore seed inventory, verify and pin the existing seed image, prepare
+    ibi-preinstall.yml with a dedicated HTTP directory, and validate input,
+    container DNS, and HTTP access before releasing old seed resources.
+    Delete the seed ClusterInstance normally and wait for hardware release.
+    Run preinstall on the seed bastion, collect reports, and preserve failure.
+    Use the original quay.io/ocp-edge-qe/eco-gotests:latest image, matching
+    target preinstall. No service timeout or polling changes are applied.
