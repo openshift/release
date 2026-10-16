@@ -221,7 +221,11 @@ print(data.get('NextToken', ''))
     }
     [[ -z "${CT_NEXT_TOKEN}" ]] && break
   done
-  sort -u -o "${RECENT_ZONE_IDS_FILE}" "${RECENT_ZONE_IDS_FILE}" 2>/dev/null || true
+  sort -u -o "${RECENT_ZONE_IDS_FILE}" "${RECENT_ZONE_IDS_FILE}" 2>/dev/null || {
+    echo "WARNING: Failed to deduplicate recent zone IDs."
+    echo "         Route 53 zone deletion will be skipped for this run."
+    CT_FAILED="true"
+  }
   if [[ "${CT_FAILED}" != "true" ]]; then
     YOUNG_ZONE_COUNT=$(wc -l < "${RECENT_ZONE_IDS_FILE}" 2>/dev/null | tr -d ' ')
     echo "Found ${YOUNG_ZONE_COUNT} recently-created zone(s) to protect"
@@ -263,8 +267,7 @@ print(data.get('NextToken', ''))
     zone_id_short="${zone_id#/hostedzone/}"
 
     # Age check: skip zones created within CLEANUP_MIN_AGE
-    if [[ "${CT_FAILED}" != "true" ]] && \
-       grep -qF "${zone_id_short}" "${RECENT_ZONE_IDS_FILE}" 2>/dev/null; then
+    if grep -qF "${zone_id_short}" "${RECENT_ZONE_IDS_FILE}" 2>/dev/null; then
       echo "  SKIP (young): ${zone_name} (created within ${MIN_AGE_HOURS}h)"
       ((ZONES_SKIPPED_YOUNG++)) || true
       continue
