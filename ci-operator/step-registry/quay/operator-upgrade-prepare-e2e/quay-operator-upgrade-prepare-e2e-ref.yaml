@@ -1,0 +1,38 @@
+ref:
+  as: quay-operator-upgrade-prepare-e2e
+  cli: latest
+  from: cli
+  commands: quay-operator-upgrade-prepare-e2e-commands.sh
+  # Required whenever commands.sh uses trap (ROUTER_CA cleanup on EXIT).
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: QUAY_UPGRADE_QUAY_NAMESPACE
+    default: quay
+    documentation: Namespace containing the QuayRegistry installed by the example workflow.
+  - name: QUAY_UPGRADE_QUAY_REGISTRY
+    default: quay
+    documentation: Name of the QuayRegistry installed by the example workflow.
+  - name: QUAY_UPGRADE_READINESS_TIMEOUT
+    default: 15m
+    documentation: |-
+      Bounded wait covering QuayRegistry Available, quay-app Deployment ready
+      replicas, and consecutive healthy HTTP probes against the registry route.
+  - name: QUAY_UPGRADE_ROUTE_READY_SAMPLES
+    default: "5"
+    documentation: Consecutive HTTP 200 responses required from the selected route probe path.
+  - name: QUAY_UPGRADE_ROUTE_PROBE_INTERVAL_SECONDS
+    default: "5"
+    documentation: Sleep between route probe attempts.
+  documentation: |-
+    Waits for the source-version QuayRegistry to be Available with a registry
+    endpoint, confirms quay-app Deployment replicas are ready, then probes the
+    registry route until it accepts traffic. Probe path selection tries /status
+    first (accepted only when the body looks like Quay status/health JSON), then
+    falls back to the documented /health/instance (also /health and
+    /api/v1/discovery). Writes the endpoint to SHARED_DIR/quayroute for
+    quay-test-e2e consumers and records per-attempt evidence in
+    ARTIFACT_DIR/route-readiness.jsonl.

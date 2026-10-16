@@ -59,7 +59,31 @@ def _phase0_cell(**kwargs: Any) -> Cell:
 def test_expand_matrix_cells() -> None:
     matrix = yaml.safe_load((GENERATOR_DIR / "matrix.yaml.in").read_text())
     cells = expand_cells(matrix)
-    cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "amd64")
+    # The upgrade lane is also redhat-3.18/amd64, so pin this lookup to the
+    # e2e-install cells (upstream's matrix has only one redhat-3.18/amd64 cell).
+    cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "amd64" and c.test == "e2e-install")
+    assert cell.filename == PHASE0_NAME
+    assert cell.arch == "amd64"
+    assert cell.as_name is None
+    assert cell.test_as == "aws-s3-nightly"
+    assert "PLAYWRIGHT_GREP_INVERT" not in cell.env
+
+    arm_cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "arm64")
+    assert arm_cell.filename == "quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml"
+    assert arm_cell.test_as == "aws-s3-nightly"
+
+    master_cell = next(c for c in cells if c.branch == "master")
+    assert master_cell.filename == MASTER_NAME
+    assert master_cell.test_as == "aws-s3"
+    assert master_cell.always_run is False
+    assert master_cell.optional is True
+    assert master_cell.quay_version is None
+    assert "QUAY_EXTRA_CONFIG" not in cell.env
+
+    upgrade_cell = next(c for c in cells if c.test == "upgrade")
+    assert upgrade_cell.filename == "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml"
+    assert upgrade_cell.upgrade_from == "3.17"
+    assert upgrade_cell.test_as == "from-317"
     assert cell.filename == PHASE0_NAME
     assert cell.arch == "amd64"
     assert cell.as_name is None
@@ -343,6 +367,102 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     post_refs = [step.get("ref") or step.get("chain") for step in test["steps"]["post"]]
     assert post_refs[-1] == "upi-libvirt-cleanup-post"
     assert "ipi-aws-post" not in post_refs
+
+
+def test_upgrade_requires_upgrade_from() -> None:
+    matrix = _matrix_with_job(
+        {"cron": "weekly", "source": "nightly", "clouds": ["aws"], "ocp": ["4.22"], "test": "upgrade"}
+    )
+    with pytest.raises(ValueError, match="requires upgrade_from"):
+        expand_cells(matrix)
+
+
+def test_upgrade_from_only_valid_for_upgrade() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "upgrade_from": "3.17",
+        }
+    )
+    with pytest.raises(ValueError, match="upgrade_from is only valid for test: upgrade"):
+        expand_cells(matrix)
+
+
+def test_upgrade_edge_is_derived_from_versions() -> None:
+    # A different n-1 must derive a different source channel / n-1 branch / job name,
+    # with the target derived from quay_version (the branch) — nothing hand-set.
+    cell = _phase0_cell(test="upgrade", upgrade_from="3.16")
+    assert cell.test_as == "from-316"
+    config = build_config(cell, GENERATOR_DIR / "templates")
+    env = config["tests"][0]["steps"]["env"]
+    assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.16"
+    assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
+    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
+    assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.16"
+
+
+def test_redhat_318_aws_upgrade_cell() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    filename = "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml"
+    assert filename in by_name
+    config = by_name[filename]
+    assert config["zz_generated_metadata"]["variant"] == "aws-ocp422-s3-upgrade"
+
+    # Upgrade runs on a STABLE OCP release, not a nightly candidate payload.
+    assert config["releases"]["latest"] == {
+        "release": {"architecture": "amd64", "channel": "stable", "version": "4.22"}
+    }
+    assert "candidate" not in config["releases"]["latest"]
+
+    test = config["tests"][0]
+    assert test["as"] == "from-317"
+    assert test["cron"] == "@weekly"
+    # The upgrade lane spans cluster install, n-1 seed, channel upgrade and the
+    # full functional suite on top; it needs a larger budget than e2e-install.
+    assert test["timeout"] == "6h0m0s"
+    assert test["steps"]["cluster_profile"] == "aws-quay-qe"
+    assert test["steps"]["workflow"] == "ipi-aws"
+    assert test["steps"]["allow_best_effort_post_steps"] is True
+
+    env = test["steps"]["env"]
+    # The upgrade lane drives the channel move itself; it must NOT pin a single
+    # operator channel (no upgrade step declares QUAY_OPERATOR_CHANNEL).
+    assert "QUAY_OPERATOR_CHANNEL" not in env
+    assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.17"
+    assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
+    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
+    assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.17"
+    assert env["PLAYWRIGHT_WORKERS"] == "4"
+    assert env["QUAYNAMESPACE"] == "quay"
+    # ART FBC env still comes from the nightly source layer.
+    assert env["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
+
+    # The upgrade phase order must be: install n-1 -> upgrade -> seed/verify/
+    # functional Playwright phases -> report gate.
+    steps = test["steps"]["test"]
+    refs = [s.get("ref") or s.get("chain") for s in steps]
+    assert refs == [
+        "merge-stage-registry-credentials",
+        "quay-enable-catalogsource-art",
+        "quay-operator-upgrade-install-source",
+        "quay-provisioning-tls",
+        "quay-provisioning-builder",
+        "quay-deploy-mailpit",
+        "quay-deploy-jaeger",
+        "quay-provisioning-storage-s3",
+        "quay-install-external-storage",
+        "quay-operator-upgrade-prepare-e2e",
+        "quay-operator-upgrade-seed",
+        "quay-operator-upgrade-channel",
+        "quay-operator-upgrade-verify",
+        "quay-operator-upgrade-functional",
+        "quay-operator-upgrade-report",
+    ]
 
 
 def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
