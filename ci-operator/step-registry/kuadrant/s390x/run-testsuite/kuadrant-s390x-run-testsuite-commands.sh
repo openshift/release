@@ -989,7 +989,18 @@ def wait_for_trlp_auth_dataplane(commit, client, authorization):  # pylint: disa
     last = None
     while time.time() < deadline:
         try:
-            last = client.post("/v1/chat/completions", json={"model": "x", "messages": []}).status_code
+            # Same body as test_trlp.basic_request. Dummy {"model":"x"} 404'd on
+            # llm-sim for 90s while a real chat POST fail-opened 200.
+            last = client.post(
+                "/v1/chat/completions",
+                json={
+                    "model": "meta-llama/Llama-3.1-8B-Instruct",
+                    "messages": [{"role": "user", "content": "What is Kubernetes?"}],
+                    "stream": False,
+                    "usage": True,
+                    "max_tokens": 15,
+                },
+            ).status_code
             if last == 401:
                 ready = True
                 break
@@ -1019,6 +1030,134 @@ def wait_for_trlp_auth_dataplane(commit, client, authorization):  # pylint: disa
             print(f"SKIP {path} already patched")
             continue
         _write(path, text + wait, f"TRLP AuthPolicy 401 wait ({path})")
+
+
+def patch_trlp_15_compat() -> None:
+    """RHCL 1.5.0-rc2: no RFC 0021 reservation wasm, no streaming TRLP.
+
+    testsuite main writes reservation.amount and stream:true; 1.5 Check/Report
+    only counts usage.total_tokens on non-stream JSON. Drop reservation so the
+    operator programs a normal token limit; run streaming tests as non-stream.
+    """
+    trlp = Path("testsuite/kuadrant/policy/token_rate_limit.py")
+    if trlp.exists():
+        text = trlp.read_text()
+        if f"{MARKER}: trlp-noreserve" in text:
+            print("SKIP set_reservation already patched")
+        else:
+            old = '''    @modify
+    def set_reservation(self, name: str, reservation: Reservation):
+        """Sets token reservation config on an existing limit"""
+        self.model.spec["limits"][name]["reservation"] = asdict(reservation)
+'''
+            new = '''    @modify
+    def set_reservation(self, name: str, reservation: Reservation):
+        """RHCL 1.5.0-rc2 has no RFC 0021 Reserve/Commit; keep Check/Report limits."""
+        # s390x-authorino-fix: trlp-noreserve
+        return
+'''
+            if old not in text:
+                print("WARN set_reservation block not found")
+            else:
+                _write(trlp, text.replace(old, new, 1), "TRLP set_reservation no-op (1.5 Check/Report)")
+
+    init = Path("testsuite/tests/singlecluster/limitador/tokens_rate_limit/__init__.py")
+    if init.exists():
+        text = init.read_text()
+        if f"{MARKER}: trlp-nostream" not in text:
+            old_req = '''    "stream": True,  # enable streaming
+    "usage": True,  # ensures `usage.total_tokens` is returned in the response
+    "stream_options": {"include_usage": True},
+'''
+            new_req = '''    "stream": False,  # s390x-authorino-fix: trlp-nostream — RHCL 1.5 TRLP is non-streaming only
+    "usage": True,  # ensures `usage.total_tokens` is returned in the response
+'''
+            if old_req in text:
+                text = text.replace(old_req, new_req, 1)
+                _write(init, text, "TRLP STREAMING_REQUEST stream=false")
+            else:
+                print("WARN STREAMING_REQUEST stream:True block not found")
+        else:
+            print("SKIP STREAMING_REQUEST already patched")
+
+    parse_old = '''def parse_streaming_usage(response):
+    """Parse the streaming response and return the `usage` object from the last JSON chunk"""
+    raw = response.text.strip().splitlines()
+    json_lines = [line.removeprefix("data: ").strip() for line in raw if line.startswith("data: {")]
+    assert json_lines, f"No JSON chunks found in streaming response:\\n{response.text}"
+    last_json = json.loads(json_lines[-1])
+    usage = last_json.get("usage")
+    assert usage and all(
+        k in usage for k in ("total_tokens", "prompt_tokens", "completion_tokens")
+    ), f"Missing or invalid usage in streaming response: {last_json}"
+    return usage
+'''
+    parse_new = '''def parse_streaming_usage(response):
+    """Parse usage from SSE, or from a JSON body (RHCL 1.5 has no streaming TRLP)."""
+    # s390x-authorino-fix: trlp-nostream
+    raw = response.text.strip().splitlines()
+    json_lines = [line.removeprefix("data: ").strip() for line in raw if line.startswith("data: {")]
+    if not json_lines:
+        body = response.json()
+        usage = body.get("usage") if isinstance(body, dict) else None
+        assert usage and all(
+            k in usage for k in ("total_tokens", "prompt_tokens", "completion_tokens")
+        ), f"Missing or invalid usage in non-stream response: {body}"
+        return usage
+    last_json = json.loads(json_lines[-1])
+    usage = last_json.get("usage")
+    assert usage and all(
+        k in usage for k in ("total_tokens", "prompt_tokens", "completion_tokens")
+    ), f"Missing or invalid usage in streaming response: {last_json}"
+    return usage
+'''
+    stream_files = [
+        init,
+        Path("testsuite/tests/singlecluster/limitador/metrics/trlp_metrics/test_trlp_metrics_stream.py"),
+        Path(
+            "testsuite/tests/singlecluster/limitador/tokens_rate_limit/reservation/basic/test_reservation_streaming.py"
+        ),
+        Path(
+            "testsuite/tests/singlecluster/limitador/tokens_rate_limit/reservation/default_amount/basic/test_trlp_streaming.py"
+        ),
+        Path(
+            "testsuite/tests/singlecluster/limitador/tokens_rate_limit/reservation/default_amount/multiple_iterations/test_multiple_trlp_stream_iterations.py"
+        ),
+    ]
+    for path in stream_files:
+        if not path.exists():
+            print(f"SKIP {path} missing")
+            continue
+        text = path.read_text()
+        if f"{MARKER}: trlp-nostream" in text and "if not json_lines" in text:
+            print(f"SKIP {path} parse already patched")
+            continue
+        if parse_old not in text:
+            # __init__.py already uses the imported helper; metrics has its own copy
+            if "def parse_streaming_usage" not in text:
+                continue
+            print(f"WARN {path} parse_streaming_usage block not found")
+            continue
+        _write(path, text.replace(parse_old, parse_new, 1), f"TRLP parse_streaming_usage JSON fallback ({path.name})")
+
+    metrics = Path("testsuite/tests/singlecluster/limitador/metrics/trlp_metrics/test_trlp_metrics_stream.py")
+    if metrics.exists():
+        text = metrics.read_text()
+        old_m = '''    "stream": True,
+    "usage": True,
+    "stream_options": {"include_usage": True},
+    "max_tokens": 50,
+'''
+        new_m = '''    "stream": False,  # s390x-authorino-fix: trlp-nostream — RHCL 1.5 TRLP is non-streaming only
+    "usage": True,
+    "max_tokens": 50,
+'''
+        if old_m in text:
+            _write(metrics, text.replace(old_m, new_m, 1), "TRLPmetrics streaming_request stream=false")
+        elif f"{MARKER}: trlp-nostream" in text:
+            print("SKIP metrics streaming_request already patched")
+        else:
+            print("WARN metrics streaming_request block not found")
 
 
 def patch_xfcc() -> None:
@@ -1202,6 +1341,7 @@ if __name__ == "__main__":
     patch_dns_delegate()
     patch_oidc()
     patch_trlp_auth()
+    patch_trlp_15_compat()
     patch_xfcc()
 PY
 
