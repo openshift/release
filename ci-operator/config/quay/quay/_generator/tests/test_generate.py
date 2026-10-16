@@ -87,6 +87,7 @@ def test_expand_matrix_cells() -> None:
         ("3.17", "redhat-3.17", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "gcs"),
         ("3.17", "redhat-3.17", "azure", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "blob"),
         ("3.17", "redhat-3.17", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "odf"),
+        ("3.17", "redhat-3.17", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", True, "s3"),
         ("5.0", "redhat-5.0", "aws", "5.0", "e2e-install", "@daily", "periodic", "amd64", False, "s3"),
         ("5.0", "redhat-5.0", "gcp", "5.0", "e2e-install", "@daily", "periodic", "amd64", False, "gcs"),
         ("5.0", "redhat-5.0", "azure", "5.0", "e2e-install", "@daily", "periodic", "amd64", False, "blob"),
@@ -1164,10 +1165,14 @@ def test_master_arm64_variant_without_promotion(tmp_path: Path) -> None:
     }
 
 
-def test_redhat_318_aws_fips_shares_aws_file() -> None:
+@pytest.mark.parametrize(
+    "filename",
+    [PHASE0_NAME, "quay-quay-redhat-3.17__aws-ocp422-e2e-install.yaml"],
+)
+def test_aws_fips_shares_aws_file(filename: str) -> None:
     results, _retired = generate_all()
-    by_name = {filename: config for _group, filename, config in results}
-    tests = {test["as"]: test for test in by_name[PHASE0_NAME]["tests"]}
+    by_name = {name: config for _group, name, config in results}
+    tests = {test["as"]: test for test in by_name[filename]["tests"]}
     assert set(tests) == {"aws-s3-nightly", "aws-s3-nightly-fips", "aws-odf-nightly"}
 
     fips = tests["aws-s3-nightly-fips"]
