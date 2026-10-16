@@ -1,0 +1,25 @@
+ref:
+  as: hypershift-mce-agent-nutanix-destroy
+  from_image:
+    namespace: ci
+    name: agent-qe-base
+    tag: latest
+  commands: hypershift-mce-agent-nutanix-destroy-commands.sh
+  credentials:
+  - collection: cluster-secrets-nutanix
+    group: cluster-profile
+    mount_path: /var/run/vault/nutanix
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 45m0s
+  grace_period: 15m0s
+  env:
+  - name: AGENT_NAMESPACE
+    default: hypershift-agents
+    documentation: Agent namespace used by the HostedCluster.
+  - name: AGENT_QE_INFRA_ANSIBLE_DIR
+    default: ""
+    documentation: Optional path to agent-qe-infra/ansible-files when its extra ref uses a non-default location.
+  documentation: Deletes only UUIDs recorded for this run and verifies they are gone. CI-operator releases the Nutanix lease when the workflow ends, even if cleanup fails.

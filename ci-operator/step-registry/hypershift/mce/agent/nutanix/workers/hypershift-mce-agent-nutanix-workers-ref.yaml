@@ -1,0 +1,33 @@
+ref:
+  as: hypershift-mce-agent-nutanix-workers
+  from_image:
+    namespace: ci
+    name: agent-qe-base
+    tag: latest
+  commands: hypershift-mce-agent-nutanix-workers-commands.sh
+  credentials:
+  - collection: cluster-secrets-nutanix
+    group: cluster-profile
+    mount_path: /var/run/vault/nutanix
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 240m0s
+  grace_period: 10m0s
+  env:
+  - name: NUTANIX_WORKERS
+    default: "3"
+    documentation: Number of Nutanix worker VMs and Agents to create and wait for.
+  - name: AGENT_QE_INFRA_ANSIBLE_DIR
+    default: "/ansible-files"
+    documentation: >-
+      Optional path to agent-qe-infra/ansible-files. By default the extra ref is expected at
+      $GOPATH/src/github.com/openshift-eng/agent-qe-infra/ansible-files.
+  - name: AGENT_NAMESPACE
+    default: hypershift-agents
+    documentation: Agent namespace used by the HostedCluster.
+  documentation: >-
+    Uploads the InfraEnv discovery ISO and creates NUTANIX_WORKERS fixed-size Nutanix worker VMs using
+    the existing upload_image and provision_vm roles. It approves only the run-labeled Agents,
+    scales the NodePool from zero to NUTANIX_WORKERS, and waits for Ready guest Nodes and worker-to-proxy TCP.
