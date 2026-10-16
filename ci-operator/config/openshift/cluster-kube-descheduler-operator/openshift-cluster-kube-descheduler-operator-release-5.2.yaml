@@ -108,6 +108,25 @@ tests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-operator-serial-stage-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: cluster-kube-descheduler-operator
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/cluster-kube-descheduler-operator-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: cluster-kube-descheduler-operator
+      FIPS_ENABLED: "true"
+      INDEX_IMAGE: ""
+      TEST_SUITE: openshift/cluster-kube-descheduler-operator/operator/serial
+    test:
+    - ref: fips-check
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: optional-operators-enable-index-catalog
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-5.2
   org: openshift
