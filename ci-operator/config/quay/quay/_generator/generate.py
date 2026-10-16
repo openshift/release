@@ -407,11 +407,16 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             if test == "upgrade":
                 if not upgrade_from:
                     raise ValueError(f"{where} test 'upgrade' requires upgrade_from (the n-1 version)")
+                if not re.match(r"^\d+\.\d+$", upgrade_from):
+                    raise ValueError(f"{where} upgrade_from must look like 'X.Y', got {upgrade_from!r}")
                 if quay_version is None:
                     raise ValueError(
                         f"{where} test 'upgrade' requires a quay_version-bearing branch; "
                         f"branch {branch!r} has none"
                     )
+                # upgrade.yaml.j2 renders no FIPS cluster, so the flag would be silently dropped.
+                if fips:
+                    raise ValueError(f"{where}.fips is not supported for test: upgrade")
             elif upgrade_from is not None:
                 raise ValueError(f"{where} upgrade_from is only valid for test: upgrade")
             as_name = _job_as_name(job, where)

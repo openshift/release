@@ -59,8 +59,7 @@ def _phase0_cell(**kwargs: Any) -> Cell:
 def test_expand_matrix_cells() -> None:
     matrix = yaml.safe_load((GENERATOR_DIR / "matrix.yaml.in").read_text())
     cells = expand_cells(matrix)
-    # The upgrade lane is also redhat-3.18/amd64, so pin this lookup to the
-    # e2e-install cells (upstream's matrix has only one redhat-3.18/amd64 cell).
+    # The upgrade lane is also redhat-3.18/amd64, so pin this lookup to e2e-install.
     cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "amd64" and c.test == "e2e-install")
     assert cell.filename == PHASE0_NAME
     assert cell.arch == "amd64"
@@ -84,23 +83,6 @@ def test_expand_matrix_cells() -> None:
     assert upgrade_cell.filename == "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml"
     assert upgrade_cell.upgrade_from == "3.17"
     assert upgrade_cell.test_as == "from-317"
-    assert cell.filename == PHASE0_NAME
-    assert cell.arch == "amd64"
-    assert cell.as_name is None
-    assert cell.test_as == "aws-s3-nightly"
-    assert "PLAYWRIGHT_GREP_INVERT" not in cell.env
-
-    arm_cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "arm64")
-    assert arm_cell.filename == "quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml"
-    assert arm_cell.test_as == "aws-s3-nightly"
-
-    master_cell = next(c for c in cells if c.branch == "master")
-    assert master_cell.filename == MASTER_NAME
-    assert master_cell.test_as == "aws-s3"
-    assert master_cell.always_run is False
-    assert master_cell.optional is True
-    assert master_cell.quay_version is None
-    assert "QUAY_EXTRA_CONFIG" not in cell.env
 
 
 def test_job_names_have_no_trailing_arch_suffix() -> None:
@@ -377,6 +359,37 @@ def test_upgrade_requires_upgrade_from() -> None:
         expand_cells(matrix)
 
 
+def test_upgrade_from_must_be_x_y() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "upgrade",
+            "upgrade_from": "v3.17",
+        }
+    )
+    with pytest.raises(ValueError, match="upgrade_from must look like 'X.Y'"):
+        expand_cells(matrix)
+
+
+def test_upgrade_rejects_fips() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "upgrade",
+            "upgrade_from": "3.17",
+            "fips": True,
+        }
+    )
+    with pytest.raises(ValueError, match="fips is not supported for test: upgrade"):
+        expand_cells(matrix)
+
+
 def test_upgrade_from_only_valid_for_upgrade() -> None:
     matrix = _matrix_with_job(
         {
@@ -441,9 +454,14 @@ def test_redhat_318_aws_upgrade_cell() -> None:
     assert env["QUAYNAMESPACE"] == "quay"
     # ART FBC env still comes from the nightly source layer.
     assert env["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
+    # The functional phase reuses the e2e-install quarantine, which must also drop
+    # the specs the seed and verify phases already ran.
+    e2e_env = by_name[PHASE0_NAME]["tests"][0]["steps"]["env"]
+    assert env["PLAYWRIGHT_GREP_INVERT"] == e2e_env["PLAYWRIGHT_GREP_INVERT"]
+    assert {"@upgrade-seed", "@upgrade-verify"} <= set(env["PLAYWRIGHT_GREP_INVERT"].split("|"))
 
-    # The upgrade phase order must be: install n-1 -> upgrade -> seed/verify/
-    # functional Playwright phases -> report gate.
+    # The upgrade phase order must be: install n-1 -> seed -> channel upgrade ->
+    # verify/functional Playwright phases -> report gate.
     steps = test["steps"]["test"]
     refs = [s.get("ref") or s.get("chain") for s in steps]
     assert refs == [
