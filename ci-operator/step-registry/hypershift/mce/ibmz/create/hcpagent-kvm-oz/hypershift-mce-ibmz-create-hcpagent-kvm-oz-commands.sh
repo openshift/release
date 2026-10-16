@@ -368,6 +368,21 @@ EOF
   # entries into the ingress-operator pod so it resolves canary/console hostnames
   # directly to the router pod's node IP (HostNetwork, port 443 on compute node).
   # The HostedCluster is already paused so CPO won't restart the pod.
+  # Wait for the router pod to be Running before fetching its hostIP.
+  echo "$(date) Waiting for router pod to be Running before /etc/hosts injection"
+  for i in {1..30}; do
+    ROUTER_POD_STATUS=$(oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+      get pod -n openshift-ingress \
+      -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default \
+      -o jsonpath='{.items[0].status.phase}' 2>/dev/null || true)
+    if [[ "${ROUTER_POD_STATUS}" == "Running" ]]; then
+      echo "$(date) Router pod is Running (attempt ${i})"
+      break
+    fi
+    echo "$(date) Router pod phase: ${ROUTER_POD_STATUS:-unknown}, waiting 10s... (${i}/30)"
+    sleep 10
+  done
+
   ROUTER_NODE_IP=$(oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
     get pod -n openshift-ingress \
     -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default \
@@ -375,18 +390,37 @@ EOF
 
   if [[ -n "${ROUTER_NODE_IP}" ]]; then
     echo "$(date) Router pod is running on node IP: ${ROUTER_NODE_IP}"
-    echo "$(date) Injecting /etc/hosts entries into ingress-operator pod"
-    oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
-      /bin/sh -c "echo '${ROUTER_NODE_IP} canary-openshift-ingress-canary.${APPS_DOMAIN}' >> /etc/hosts"
-    oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
-      /bin/sh -c "echo '${ROUTER_NODE_IP} console-openshift-console.${APPS_DOMAIN}' >> /etc/hosts"
-    oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
-      /bin/sh -c "echo '${ROUTER_NODE_IP} oauth-openshift.${APPS_DOMAIN}' >> /etc/hosts"
-    echo "$(date) /etc/hosts after injection:"
+    echo "$(date) Injecting /etc/hosts entries into ingress-operator pod via nsenter"
+    # /etc/hosts is read-only for non-root containers — use nsenter via the management
+    # cluster node to write into the pod's mount namespace as root, or use tee with
+    # nsenter. Simplest approach: patch the ingress-operator deployment with
+    # hostAliases so Kubernetes injects the entries into /etc/hosts automatically.
+    export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+    oc patch deploy/ingress-operator -n "${CP_NS}" --type=merge -p "{
+      \"spec\": {
+        \"template\": {
+          \"spec\": {
+            \"hostAliases\": [
+              {
+                \"ip\": \"${ROUTER_NODE_IP}\",
+                \"hostnames\": [
+                  \"canary-openshift-ingress-canary.${APPS_DOMAIN}\",
+                  \"console-openshift-console.${APPS_DOMAIN}\",
+                  \"oauth-openshift.${APPS_DOMAIN}\"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }"
+    echo "$(date) Waiting for ingress-operator rollout with hostAliases"
+    oc rollout status deploy/ingress-operator -n "${CP_NS}" --timeout=120s || true
+    echo "$(date) /etc/hosts in ingress-operator pod after hostAliases:"
     oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
       cat /etc/hosts || true
   else
-    echo "$(date) WARNING: could not determine router pod node IP — skipping /etc/hosts injection"
+    echo "$(date) WARNING: could not determine router pod node IP — skipping hostAliases injection"
   fi
 
   CANARY_URL="https://canary-openshift-ingress-canary.${APPS_DOMAIN}"
