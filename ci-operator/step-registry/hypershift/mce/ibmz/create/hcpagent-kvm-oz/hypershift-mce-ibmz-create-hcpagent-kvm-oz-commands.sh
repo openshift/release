@@ -290,11 +290,127 @@ echo "$(date) Checking guest ingress service and router pods"
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" get svc -n openshift-ingress
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" get pods -n openshift-ingress -o wide
 
+# --- Step 8b: Create externalIPs Service to expose *.apps on the lease free IP ---
+# The free IP (192.168.<subnet>.55) per lease is already in global DNS as *.apps target.
+# kube-proxy on the compute nodes programs iptables to NAT traffic arriving at that IP
+# to the router pod — no MetalLB or load balancer controller required.
+# Management cluster nodes (192.168.<subnet>.11/12/13) are on the same subnet as the
+# compute nodes (.51/.52), so they can ARP for .55 and reach the router directly.
+NODE_IP_GUEST=$(oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+  get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+if   [[ "${NODE_IP_GUEST}" == 192.168.126.* ]]; then APPS_EXTERNAL_IP=192.168.126.55
+elif [[ "${NODE_IP_GUEST}" == 192.168.1.* ]];   then APPS_EXTERNAL_IP=192.168.1.55
+elif [[ "${NODE_IP_GUEST}" == 192.168.2.* ]];   then APPS_EXTERNAL_IP=192.168.2.55
+elif [[ "${NODE_IP_GUEST}" == 192.168.3.* ]];   then APPS_EXTERNAL_IP=192.168.3.55
+else
+  echo "$(date) WARNING: could not derive APPS_EXTERNAL_IP from node IP ${NODE_IP_GUEST}, skipping externalIPs service"
+  APPS_EXTERNAL_IP=""
+fi
+
+BASE_DOMAIN="phc-cicd.cis.ibm.net"
+APPS_DOMAIN="apps.${HC_NAME}.${BASE_DOMAIN}"
+CP_NS="${HC_NS}-${HC_NAME}"
+
+if [[ -n "${APPS_EXTERNAL_IP}" ]]; then
+  echo "$(date) Creating externalIPs Service router-external in openshift-ingress (IP: ${APPS_EXTERNAL_IP})"
+  oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: router-external
+  namespace: openshift-ingress
+spec:
+  type: ClusterIP
+  externalIPs:
+    - ${APPS_EXTERNAL_IP}
+  selector:
+    ingresscontroller.operator.openshift.io/deployment-ingresscontroller: default
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  - name: https
+    port: 443
+    targetPort: 443
+EOF
+  echo "$(date) router-external Service created with externalIP ${APPS_EXTERNAL_IP}"
+
+  # --- Step 8c: Set NO_PROXY on ingress-operator so canary bypasses konnectivity ---
+  # The ingress-operator canary check dials *.apps via konnectivity by default.
+  # Adding the externalIP and apps domain to NO_PROXY makes it dial directly,
+  # which succeeds because the management cluster nodes are on the same subnet.
+  # CPO reconciles and resets NO_PROXY, so we pause the HostedCluster afterwards.
+  echo "$(date) Setting ingress-operator NO_PROXY to bypass konnectivity for ${APPS_DOMAIN}"
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  oc set env deploy/ingress-operator -n "${CP_NS}" -c ingress-operator \
+    "NO_PROXY=kube-apiserver,${APPS_EXTERNAL_IP},.${APPS_DOMAIN},${BASE_DOMAIN},127.0.0.1,localhost"
+
+  echo "$(date) Pausing HostedCluster ${HC_NS}/${HC_NAME} to prevent CPO from resetting NO_PROXY"
+  oc patch hostedcluster "${HC_NAME}" -n "${HC_NS}" --type=merge \
+    -p '{"spec":{"pausedUntil":"true"}}'
+  echo "$(date) HostedCluster paused"
+
+  # Confirm NO_PROXY still set after pause
+  NOPROXY_CUR=$(oc get deploy ingress-operator -n "${CP_NS}" \
+    -o jsonpath='{.spec.template.spec.containers[?(@.name=="ingress-operator")].env[?(@.name=="NO_PROXY")].value}' || true)
+  echo "$(date) ingress-operator NO_PROXY=${NOPROXY_CUR}"
+  if [[ "${NOPROXY_CUR}" != *"${APPS_EXTERNAL_IP}"* ]]; then
+    echo "$(date) WARNING: NO_PROXY missing ${APPS_EXTERNAL_IP} after pause — re-applying"
+    oc set env deploy/ingress-operator -n "${CP_NS}" -c ingress-operator \
+      "NO_PROXY=kube-apiserver,${APPS_EXTERNAL_IP},.${APPS_DOMAIN},${BASE_DOMAIN},127.0.0.1,localhost"
+  fi
+
+  oc rollout status deploy/ingress-operator -n "${CP_NS}" --timeout=120s || true
+
+  # Wait for canary to pass
+  echo "$(date) Waiting for CanaryChecksSucceeding on default IngressController"
+  CANARY_WAIT=300
+  CANARY_ELAPSED=0
+  while [[ ${CANARY_ELAPSED} -lt ${CANARY_WAIT} ]]; do
+    CANARY_STATUS=$(oc get ingresscontroller default -n openshift-ingress-operator \
+      --kubeconfig "${SHARED_DIR}/nested_kubeconfig" \
+      -o jsonpath='{.status.conditions[?(@.type=="CanaryChecksSucceeding")].status}' 2>/dev/null || true)
+    if [[ "${CANARY_STATUS}" == "True" ]]; then
+      echo "$(date) CanaryChecksSucceeding=True"
+      break
+    fi
+    echo "$(date) CanaryChecksSucceeding=${CANARY_STATUS:-unknown} (${CANARY_ELAPSED}s/${CANARY_WAIT}s)"
+    sleep 30
+    CANARY_ELAPSED=$((CANARY_ELAPSED + 30))
+  done
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
+
 # --- Step 9: Wait for all guest ClusterOperators to be Available ---
 # COs require compute nodes to be Ready and ingress to be healthy before progressing.
 echo "$(date) Waiting for all guest ClusterOperators to be Available"
-oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
-  wait --for=condition=Available=True co --all --timeout=30m
-echo "$(date) All guest ClusterOperators are Available"
 
+CO_MAX_WAIT=1800
+CO_INTERVAL=30
+CO_ELAPSED=0
+UNAVAILABLE=""
+
+while [[ ${CO_ELAPSED} -lt ${CO_MAX_WAIT} ]]; do
+  UNAVAILABLE=$(oc get co --kubeconfig "${SHARED_DIR}/nested_kubeconfig" --no-headers 2>/dev/null \
+    | awk '{print $3}' | grep -v "^True$" || true)
+  if [[ -z "${UNAVAILABLE}" ]]; then
+    echo "$(date) All ClusterOperators are Available=True"
+    break
+  fi
+  echo "$(date) ClusterOperators not yet healthy (${CO_ELAPSED}s elapsed):"
+  oc get co --kubeconfig "${SHARED_DIR}/nested_kubeconfig" --no-headers 2>/dev/null || true
+  sleep ${CO_INTERVAL}
+  CO_ELAPSED=$((CO_ELAPSED + CO_INTERVAL))
+done
+
+if [[ -n "${UNAVAILABLE}" ]]; then
+  echo "$(date) ERROR: Some ClusterOperators are not Available after ${CO_MAX_WAIT}s"
+  oc get co --kubeconfig "${SHARED_DIR}/nested_kubeconfig" || true
+  oc get co --kubeconfig "${SHARED_DIR}/nested_kubeconfig" -o yaml || true
+  oc get pods -A --kubeconfig "${SHARED_DIR}/nested_kubeconfig" \
+    --field-selector=status.phase!=Running,status.phase!=Succeeded 2>/dev/null || true
+  exit 1
+fi
+
+echo "$(date) All guest ClusterOperators are Available"
 echo "$(date) Successfully attached the KVM guests as agents to the hosted cluster ${HC_NAME}"
