@@ -390,6 +390,37 @@ def test_upgrade_rejects_fips() -> None:
         expand_cells(matrix)
 
 
+def test_upgrade_rejects_non_aws_cloud() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["gcp"],
+            "ocp": ["4.22"],
+            "test": "upgrade",
+            "upgrade_from": "3.17",
+        }
+    )
+    with pytest.raises(ValueError, match="supports only aws with s3 storage"):
+        expand_cells(matrix)
+
+
+def test_upgrade_rejects_non_s3_storage() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "upgrade",
+            "upgrade_from": "3.17",
+            "storage": "odf",
+        }
+    )
+    with pytest.raises(ValueError, match="supports only aws with s3 storage"):
+        expand_cells(matrix)
+
+
 def test_upgrade_from_only_valid_for_upgrade() -> None:
     matrix = _matrix_with_job(
         {

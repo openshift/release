@@ -417,6 +417,11 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                 # upgrade.yaml.j2 renders no FIPS cluster, so the flag would be silently dropped.
                 if fips:
                     raise ValueError(f"{where}.fips is not supported for test: upgrade")
+                if any(cloud != "aws" for cloud in clouds) or storage not in (None, "s3"):
+                    raise ValueError(
+                        f"{where} test 'upgrade' supports only aws with s3 storage, "
+                        f"got clouds {clouds!r}, storage {storage!r}"
+                    )
             elif upgrade_from is not None:
                 raise ValueError(f"{where} upgrade_from is only valid for test: upgrade")
             as_name = _job_as_name(job, where)

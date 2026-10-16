@@ -1123,6 +1123,9 @@ popd
 #     phase-unique flat name (ci-operator does not persist SHARED_DIR
 #     subdirectories) for the merging phase to pick up.
 # Best-effort: report plumbing must never fail the phase.
+# SHARED_DIR persists as a 1MiB Secret; assumes the base64 overhead counts
+# against that cap, so raw files stay under ~700KiB (x4/3 < 1MiB).
+UPGRADE_BLOB_SHARED_BUDGET=$((700 * 1024))
 local_blob=""
 if [[ "${PLAYWRIGHT_EXPORT_BLOB}" == "true" ]]; then
   blob_tag="${PLAYWRIGHT_ARTIFACT_SUBDIR:-${PLAYWRIGHT_STEP_NAME:-phase}}"
@@ -1131,7 +1134,13 @@ if [[ "${PLAYWRIGHT_EXPORT_BLOB}" == "true" ]]; then
     if [[ "${PLAYWRIGHT_MERGE_BLOBS:-false}" == "true" ]]; then
       local_blob="${z}"
     elif [[ -n "${SHARED_DIR:-}" ]]; then
-      cp "${z}" "${SHARED_DIR}/quay-upgrade-blob-${blob_tag}.zip" || true
+      blob_bytes="$(stat -c %s "${z}" 2>/dev/null || echo 0)"
+      shared_bytes="$(du -sb "${SHARED_DIR}" 2>/dev/null | cut -f1 || echo 0)"
+      if (( blob_bytes + shared_bytes > UPGRADE_BLOB_SHARED_BUDGET )); then
+        echo "WARNING: ${blob_tag} blob (${blob_bytes}B) plus SHARED_DIR (${shared_bytes}B) exceeds ${UPGRADE_BLOB_SHARED_BUDGET}B; not exporting it to the combined report." >&2
+      else
+        cp "${z}" "${SHARED_DIR}/quay-upgrade-blob-${blob_tag}.zip" || true
+      fi
     fi
     break
   done

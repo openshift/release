@@ -18,7 +18,7 @@ set -euo pipefail
 #
 # Runs without `set -x`: the storage contract carries the
 # object-storage secret key and the builder config carries the Quay password and
-# builder SA token, so both are folded into config.yaml by redirect/append only,
+# builder SA token, so both are folded into config.yaml by redirect/merge only,
 # never echoed, and the config bundle lives in a Secret.
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}/quay-install-external-storage"
@@ -155,7 +155,7 @@ oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
 # quay-provisioning-{tls,builder} steps have already written the cert/key,
-# build-cluster CA, and builder config to SHARED_DIR. Fold the builder config into
+# build-cluster CA, and builder config to SHARED_DIR. Merge the builder config into
 # the bundle (after the extra-config merge, so it is not stripped) and hand the
 # operator the unmanaged cert material. Do not echo config_builder.yaml: it carries
 # the Quay password and builder SA token. (This script runs without set -x.)
@@ -170,7 +170,7 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
     fi
   done
   TLS_MANAGED="false"
-  cat "${SHARED_DIR}/config_builder.yaml" >>config.yaml
+  merge_config_fragment "${SHARED_DIR}/config_builder.yaml"
 
   # quay-provisioning-builder leaves "BUILDER_CONTAINER_IMAGE: from-csv"; fill it
   # from the installed operator CSV's RELATED_IMAGE_COMPONENT_BUILDER so the builder
