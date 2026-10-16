@@ -836,22 +836,42 @@ wait_for_vault_pod_created() {
 wait_for_vault_pod_running() {
   local namespace="$1"
   local pod_name="$2"
+  local previous_pod_uid="${3:-}"
+  local deadline=$((SECONDS + 600))
+  local remaining request_timeout pod_state pod_uid deletion_timestamp phase
 
-  wait_for_vault_pod_created "${namespace}" "${pod_name}" || return 1
+  echo "Waiting for a non-terminating Vault pod ${pod_name} to reach Running..."
+  while (( SECONDS < deadline )); do
+    remaining=$((deadline - SECONDS))
+    if (( remaining <= 0 )); then
+      break
+    fi
+    request_timeout=10
+    if (( remaining < request_timeout )); then
+      request_timeout="${remaining}"
+    fi
+    if ! pod_state=$(oc get "pod/${pod_name}" -n "${namespace}" --ignore-not-found \
+      --request-timeout="${request_timeout}s" \
+      -o jsonpath='{.metadata.uid}{"|"}{.metadata.deletionTimestamp}{"|"}{.status.phase}'); then
+      echo "Unable to get Vault pod ${pod_name}"
+      break
+    fi
+    IFS='|' read -r pod_uid deletion_timestamp phase <<< "${pod_state}"
+    if [[ -n "${pod_uid}" && "${pod_uid}" != "${previous_pod_uid}" && -z "${deletion_timestamp}" && "${phase}" == Running ]]; then
+      return 0
+    fi
+    remaining=$((deadline - SECONDS))
+    if (( remaining <= 0 )); then
+      break
+    fi
+    if (( remaining > 5 )); then
+      remaining=5
+    fi
+    sleep "${remaining}"
+  done
 
-  # WaitForFirstConsumer storage binds once the pod is scheduled to a node.
-  if ! oc wait --for=condition=PodScheduled "pod/${pod_name}" -n "${namespace}" --timeout=10m; then
-    echo "Vault pod ${pod_name} was not scheduled"
-    oc describe "pod/${pod_name}" -n "${namespace}" || true
-    oc get events -n "${namespace}" --field-selector "involvedObject.name=${pod_name}" --sort-by='.lastTimestamp' || true
-    return 1
-  fi
-
-  if oc wait --for=jsonpath='{.status.phase}'=Running "pod/${pod_name}" -n "${namespace}" --timeout=10m; then
-    return 0
-  fi
-
-  echo "Vault pod did not reach Running phase"
+  echo "Vault pod did not reach Running phase (last observed state: ${pod_state:-missing}, timeout: 10m)"
+  describe_vault_workload "${namespace}" "${pod_name}"
   oc get "pod/${pod_name}" -n "${namespace}" -o wide || true
   oc describe "pod/${pod_name}" -n "${namespace}" || true
   oc get events -n "${namespace}" --field-selector "involvedObject.name=${pod_name}" --sort-by='.lastTimestamp' || true
@@ -891,18 +911,19 @@ wait_for_vault_data_volume() {
   local namespace="$1"
   local pod_name="$2"
   local vault_storage_class="$3"
+  local previous_pod_uid="${4:-}"
 
   wait_until "pvc data-${pod_name}" 60 5 oc get "pvc/data-${pod_name}" -n "${namespace}"
 
   if [[ -n "${vault_storage_class}" ]]; then
     wait_for_vault_data_pvc_bound "${namespace}" "${pod_name}" || return 1
     echo "Waiting for Vault pod to be Running..."
-    wait_for_vault_pod_running "${namespace}" "${pod_name}"
+    wait_for_vault_pod_running "${namespace}" "${pod_name}" "${previous_pod_uid}"
     return $?
   fi
 
   echo "Waiting for Vault pod to schedule (WaitForFirstConsumer PVC binding)..."
-  wait_for_vault_pod_running "${namespace}" "${pod_name}" || return 1
+  wait_for_vault_pod_running "${namespace}" "${pod_name}" "${previous_pod_uid}" || return 1
 
   if ! oc wait --for=jsonpath='{.status.phase}'=Bound "pvc/data-${pod_name}" -n "${namespace}" --timeout=2m; then
     echo "Warning: PVC data-${pod_name} is not Bound after pod reached Running"
@@ -1095,8 +1116,12 @@ EOF
   # Helm references the serving cert before the service is annotated. Mark the volume
   # optional so the StatefulSet pod is created and can act as the WaitForFirstConsumer
   # for cloud PVCs, then restart once the service-CA certificate is present.
+  wait_for_vault_pod_created "${namespace}" "${pod_name}" || exit 1
+  local previous_pod_uid
+  previous_pod_uid=$(oc get "pod/${pod_name}" -n "${namespace}" \
+    --request-timeout=10s -o jsonpath='{.metadata.uid}') || exit 1
   restart_vault_statefulset "${namespace}" "${release_name}"
-  wait_for_vault_data_volume "${namespace}" "${pod_name}" "${vault_storage_class}" || exit 1
+  wait_for_vault_data_volume "${namespace}" "${pod_name}" "${vault_storage_class}" "${previous_pod_uid}" || exit 1
 
   echo "Initializing and unsealing Vault..."
   initialize_or_unseal_vault "${namespace}" "${pod_name}"
