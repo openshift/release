@@ -51,6 +51,10 @@ typeset destKubeconfig=""
 # Temp file for JUnit records (PASS/FAIL\tname\telapsed\t[msg]).
 typeset -r junitFile="${TMPDIR:-/tmp}/hub-spoke-cclm-junit-$$.tsv"
 
+# JUnit <testsuite>/<testcase classname>; prefixed with LP_IO__CR_COMP_NAME (when set) so
+# Component Readiness can match this suite against a registered interop prefix.
+typeset junitSuiteName="${LP_IO__CR_COMP_NAME:+${LP_IO__CR_COMP_NAME}--}hub-spoke-cclm-migration"
+
 # MgmtOc ” run oc against the ACM hub, which is always the MTV management plane.
 # The hub hosts Plans, Migrations, Providers, and Maps regardless of which clusters are
 # the actual migration endpoints (hubspoke or spokespoke).
@@ -716,12 +720,12 @@ WriteJunit() {
 
     {
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
-        printf '<testsuite name="hub-spoke-cclm-migration" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
-            "${total}" "${failures}" "${totalTime}"
+        printf '<testsuite name="%s" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
+            "${junitSuiteName}" "${total}" "${failures}" "${totalTime}"
         while IFS=$'\t' read -r status name elapsed failMsg; do
             typeset escapedName; escapedName="$(XmlEscape "${name}")"
-            printf '  <testcase name="%s" classname="hub-spoke-cclm-migration" time="%d">\n' \
-                "${escapedName}" "${elapsed}"
+            printf '  <testcase name="%s" classname="%s" time="%d">\n' \
+                "${escapedName}" "${junitSuiteName}" "${elapsed}"
             if [[ "${status}" == 'FAIL' ]]; then
                 typeset escapedMsg; escapedMsg="$(XmlEscape "${failMsg}")"
                 printf '    <failure message="%s">%s</failure>\n' \
