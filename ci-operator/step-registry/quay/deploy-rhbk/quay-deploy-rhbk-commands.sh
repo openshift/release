@@ -419,6 +419,8 @@ SOMEOIDC_LOGIN_CONFIG:
   SERVICE_NAME: Keycloak
   OIDC_SERVER: ${ISSUER}/
   CLIENT_ID: quay-ui
+  # Config validation requires CLIENT_SECRET; PUBLIC_CLIENT omits it from the code exchange.
+  CLIENT_SECRET: unused-public-client
   LOGIN_SCOPES:
   - openid
   - profile
