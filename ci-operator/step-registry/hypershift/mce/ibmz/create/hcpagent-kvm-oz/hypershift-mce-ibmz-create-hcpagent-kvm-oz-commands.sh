@@ -362,18 +362,39 @@ EOF
 
   oc rollout status deploy/ingress-operator -n "${CP_NS}" --timeout=120s || true
 
-  # Verify the canary URL is directly reachable from inside the ingress-operator pod.
-  # This confirms the externalIP + NO_PROXY path works before waiting on the condition.
+  # --- Option 3: Inject /etc/hosts into ingress-operator pod ---
+  # externalIPs kube-proxy NAT only works within the guest cluster — management cluster
+  # nodes can't reach 192.168.<subnet>.55 from outside. Instead we inject /etc/hosts
+  # entries into the ingress-operator pod so it resolves canary/console hostnames
+  # directly to the router pod's node IP (HostNetwork, port 443 on compute node).
+  # The HostedCluster is already paused so CPO won't restart the pod.
+  ROUTER_NODE_IP=$(oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+    get pod -n openshift-ingress \
+    -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default \
+    -o jsonpath='{.items[0].status.hostIP}' 2>/dev/null || true)
+
+  if [[ -n "${ROUTER_NODE_IP}" ]]; then
+    echo "$(date) Router pod is running on node IP: ${ROUTER_NODE_IP}"
+    echo "$(date) Injecting /etc/hosts entries into ingress-operator pod"
+    oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
+      /bin/sh -c "echo '${ROUTER_NODE_IP} canary-openshift-ingress-canary.${APPS_DOMAIN}' >> /etc/hosts"
+    oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
+      /bin/sh -c "echo '${ROUTER_NODE_IP} console-openshift-console.${APPS_DOMAIN}' >> /etc/hosts"
+    oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
+      /bin/sh -c "echo '${ROUTER_NODE_IP} oauth-openshift.${APPS_DOMAIN}' >> /etc/hosts"
+    echo "$(date) /etc/hosts after injection:"
+    oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
+      cat /etc/hosts || true
+  else
+    echo "$(date) WARNING: could not determine router pod node IP — skipping /etc/hosts injection"
+  fi
+
   CANARY_URL="https://canary-openshift-ingress-canary.${APPS_DOMAIN}"
+
+  # Verify the canary URL is directly reachable from inside the ingress-operator pod.
   echo "$(date) Verifying canary URL from ingress-operator pod: ${CANARY_URL}"
   oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
     curl -vk --connect-timeout 10 "${CANARY_URL}" || true
-
-  # Also verify direct curl to the externalIP to confirm kube-proxy NAT is working
-  echo "$(date) Verifying direct curl to externalIP ${APPS_EXTERNAL_IP}:443"
-  oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
-    curl -vk --connect-timeout 10 --resolve "canary-openshift-ingress-canary.${APPS_DOMAIN}:443:${APPS_EXTERNAL_IP}" \
-    "${CANARY_URL}" || true
 
   # Wait for canary to pass — extended to 600s to allow ingress-operator restart cycle
   echo "$(date) Waiting for CanaryChecksSucceeding on default IngressController"
