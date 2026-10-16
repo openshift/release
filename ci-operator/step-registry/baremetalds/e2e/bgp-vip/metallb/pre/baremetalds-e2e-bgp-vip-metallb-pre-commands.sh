@@ -142,8 +142,59 @@ oc rollout status -n metallb-system deploy/controller --timeout=10m
 oc rollout status -n metallb-system ds/speaker --timeout=10m
 
 # --- BGP objects: peer with the existing ToR; frr-k8s must merge this into
-#     the neighbor already declared by the bgp-vip FRRConfiguration
-oc apply -f - <<'YAML'
+#     the neighbor already declared by the bgp-vip FRRConfiguration.
+#     The merge is only accepted when every session-level attribute matches
+#     the existing neighbor (password, ebgp-multihop, timers, BFD) — frr-k8s
+#     rejects "multiple passwords" / "conflicting ebgp-multihop" otherwise
+#     and MetalLB then produces no FRRConfiguration at all. Read them from
+#     the bgp-vip FRRConfiguration instead of hardcoding the dev-scripts
+#     defaults, so the lane follows whatever the ToR peer is configured with.
+bgp_vip_neighbor() {
+  # $1 = neighbor address, $2 = jsonpath field
+  oc get frrconfiguration -n openshift-frr-k8s bgp-vip \
+    -o jsonpath="{.spec.bgp.routers[0].neighbors[?(@.address=='$1')].$2}"
+}
+require_bgp_vip_neighbor() {
+  # a jsonpath filter that matches nothing is silent and exits 0; without this
+  # check a missing neighbor would yield a bare BGPPeer, which is exactly the
+  # merge failure this step is meant to avoid
+  if [ -z "$(bgp_vip_neighbor "$1" address)" ]; then
+    echo "bgp-vip FRRConfiguration has no neighbor $1; cannot mirror its session attributes" >&2
+    # list only the neighbor addresses: the full object carries the password
+    echo "neighbors present:" >&2
+    oc get frrconfiguration -n openshift-frr-k8s bgp-vip \
+      -o jsonpath='{range .spec.bgp.routers[*].neighbors[*]}{.address}{"\n"}{end}' >&2 || true
+    exit 1
+  fi
+}
+peer_spec() {
+  # emit the BGPPeer spec fields that must mirror the bgp-vip neighbor $1
+  local addr=$1 v
+  # the password is a secret-shaped value: encode it as a JSON string (a
+  # valid YAML double-quoted scalar) so quotes/backslashes cannot break or
+  # alter it
+  v=$(bgp_vip_neighbor "$addr" password);      [ -n "$v" ] && echo "  password: $(jq -Rn --arg v "$v" '$v')"
+  v=$(bgp_vip_neighbor "$addr" ebgpMultiHop);  [ -n "$v" ] && echo "  ebgpMultiHop: $v"
+  v=$(bgp_vip_neighbor "$addr" holdTime);      [ -n "$v" ] && echo "  holdTime: $v"
+  v=$(bgp_vip_neighbor "$addr" keepaliveTime); [ -n "$v" ] && echo "  keepaliveTime: $v"
+  # bfdProfile is deliberately not mirrored: it would need a MetalLB
+  # BFDProfile object of the same name, and frr-k8s keeps the bgp-vip side's
+  # BFD on the merged neighbor anyway (verified: BFD stays Up at the ToR).
+  v=$(bgp_vip_neighbor "$addr" port);          [ -n "$v" ] && echo "  peerPort: $v"
+  return 0
+}
+oc get frrconfiguration -n openshift-frr-k8s bgp-vip >/dev/null
+require_bgp_vip_neighbor 192.168.111.1
+# the v6 ToR neighbor only exists on dual-stack clusters; the tor-v6 BGPPeer
+# below is still created on single-stack (harmless surplus), just without
+# mirrored attributes because there is nothing to merge into
+if [[ "$(oc get network.config cluster -o jsonpath='{.status.clusterNetwork[*].cidr}')" == *:* ]]; then
+  require_bgp_vip_neighbor fd2e:6f44:5dd8:c956::1
+fi
+# the expansions below put the password into the manifest; keep it out of the
+# traced job log
+set +x
+oc apply -f - <<YAML
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
@@ -166,6 +217,7 @@ spec:
   peerAddress: 192.168.111.1
   peerASN: 64513
   myASN: 64512
+$(peer_spec 192.168.111.1)
 ---
 apiVersion: metallb.io/v1beta2
 kind: BGPPeer
@@ -176,6 +228,7 @@ spec:
   peerAddress: fd2e:6f44:5dd8:c956::1
   peerASN: 64513
   myASN: 64512
+$(peer_spec fd2e:6f44:5dd8:c956::1)
 ---
 apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
@@ -186,6 +239,7 @@ spec:
   ipAddressPools:
   - bgp-vip-lane-pool
 YAML
+set -x
 
 # --- LoadBalancer workload the verify step curls
 oc create deployment lb-echo -n default --image=registry.k8s.io/e2e-test-images/agnhost:2.53 \
