@@ -184,3 +184,155 @@ echo ""
 echo "Secondary localnet bridge setup complete"
 echo "  bridge:  ${LOCALNET_SECONDARY_BRIDGE}"
 echo "  physnet: ${LOCALNET_SECONDARY_PHYSNET}"
+
+# ---------------------------------------------------------------------------
+# When LOCALNET_SECONDARY_DNSMASQ_ENABLED=true, deploy dnsmasq on br-localnet
+# on each management node to provide DHCP to guest VMs.
+#
+# With subnet-less NADs (LOCALNET_MULTI_DHCP_MODE=external in the create step),
+# KubeVirt does not run its internal DHCP server because the pod interface has
+# no IP. An external DHCP source is required. Each node runs its own dnsmasq
+# instance with a partitioned DHCP range to avoid IP conflicts on the shared L2
+# segment (all nodes' secondary NICs share the same libvirt network).
+# ---------------------------------------------------------------------------
+if [[ "${LOCALNET_SECONDARY_DNSMASQ_ENABLED:-false}" == "true" ]]; then
+  echo ""
+  echo "Setting up dnsmasq on ${LOCALNET_SECONDARY_BRIDGE} on each node..."
+
+  DNSMASQ_GATEWAY="${LOCALNET_SECONDARY_DNSMASQ_GATEWAY:?required when DNSMASQ_ENABLED=true}"
+  DNSMASQ_DNS="${LOCALNET_SECONDARY_DNSMASQ_DNS:?required when DNSMASQ_ENABLED=true}"
+  DNSMASQ_RANGE_START="${LOCALNET_SECONDARY_DNSMASQ_RANGE_START:?required when DNSMASQ_ENABLED=true}"
+  DNSMASQ_RANGE_END="${LOCALNET_SECONDARY_DNSMASQ_RANGE_END:?required when DNSMASQ_ENABLED=true}"
+
+  ip_to_int() {
+    local IFS='.'
+    read -r a b c d <<< "$1"
+    echo $(( a * 16777216 + b * 65536 + c * 256 + d ))
+  }
+  int_to_ip() {
+    local n=$1
+    echo "$(( (n >> 24) & 255 )).$(( (n >> 16) & 255 )).$(( (n >> 8) & 255 )).$(( n & 255 ))"
+  }
+
+  start_int=$(ip_to_int "${DNSMASQ_RANGE_START}")
+  end_int=$(ip_to_int "${DNSMASQ_RANGE_END}")
+  node_count=${#nodes[@]}
+  total_ips=$(( end_int - start_int + 1 ))
+  range_per_node=$(( total_ips / node_count ))
+
+  echo "  DHCP gateway:    ${DNSMASQ_GATEWAY}"
+  echo "  DHCP DNS:        ${DNSMASQ_DNS}"
+  echo "  DHCP pool:       ${DNSMASQ_RANGE_START} - ${DNSMASQ_RANGE_END} (${total_ips} IPs)"
+  echo "  Nodes:           ${node_count} (${range_per_node} IPs/node)"
+
+  # Base64-encoded setup script run inside chroot /host on each node.
+  # Configures dnsmasq as a systemd service that provides DHCP-only (port=0)
+  # on the secondary OVS bridge.
+  dnsmasq_setup_b64=$(base64 -w0 <<'DNSMASQ_SCRIPT_EOF'
+#!/bin/bash
+set -euo pipefail
+bridge="$1"
+range_start="$2"
+range_end="$3"
+gateway="$4"
+dns_server="$5"
+conf="/etc/dnsmasq.d/localnet-secondary.conf"
+pidfile="/run/localnet-secondary-dnsmasq.pid"
+unit="/etc/systemd/system/localnet-secondary-dnsmasq.service"
+
+if ! ip link show "${bridge}" &>/dev/null; then
+  echo "Bridge ${bridge} not present on this node; skipping dnsmasq"
+  exit 0
+fi
+
+mkdir -p /etc/dnsmasq.d
+cat > "${conf}" <<CONF
+# DHCP-only server for KubeVirt guest VMs on the secondary localnet bridge.
+# DNS is disabled (port=0) — VMs use the DNS server from dhcp-option 6.
+interface=${bridge}
+bind-interfaces
+port=0
+dhcp-range=${range_start},${range_end},255.255.255.0,12h
+dhcp-option=3,${gateway}
+dhcp-option=6,${dns_server}
+log-dhcp
+CONF
+
+cat > "${unit}" <<UNIT
+[Unit]
+Description=Localnet secondary bridge DHCP on ${bridge}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+PIDFile=${pidfile}
+ExecStart=/usr/sbin/dnsmasq --conf-file=${conf} --pid-file=${pidfile}
+ExecStop=/bin/kill -s TERM \$MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+/usr/sbin/dnsmasq --test --conf-file="${conf}"
+
+systemctl stop localnet-secondary-dnsmasq.service 2>/dev/null || true
+pkill -f "localnet-secondary.conf" 2>/dev/null || true
+rm -f "${pidfile}"
+systemctl reset-failed localnet-secondary-dnsmasq.service 2>/dev/null || true
+
+systemctl daemon-reload
+systemctl enable --now localnet-secondary-dnsmasq.service
+
+if ! systemctl is-active --quiet localnet-secondary-dnsmasq.service; then
+  echo "localnet-secondary-dnsmasq.service failed to start"
+  systemctl status localnet-secondary-dnsmasq.service --no-pager || true
+  journalctl -u localnet-secondary-dnsmasq.service -n 20 --no-pager || true
+  exit 1
+fi
+
+if ! ss -ulnp | grep -q ":67 "; then
+  echo "dnsmasq is not listening for DHCP on port 67"
+  journalctl -u localnet-secondary-dnsmasq.service -n 20 --no-pager || true
+  exit 1
+fi
+
+echo "dnsmasq configured on ${bridge} (DHCP ${range_start}-${range_end}, gw=${gateway}, dns=${dns_server})"
+DNSMASQ_SCRIPT_EOF
+  )
+
+  node_index=0
+  for node_name in "${nodes[@]}"; do
+    node_start_int=$(( start_int + node_index * range_per_node ))
+    if [[ ${node_index} -eq $((node_count - 1)) ]]; then
+      node_end_int=${end_int}
+    else
+      node_end_int=$(( node_start_int + range_per_node - 1 ))
+    fi
+    node_start=$(int_to_ip ${node_start_int})
+    node_end=$(int_to_ip ${node_end_int})
+
+    echo "  ${node_name}: DHCP range ${node_start} - ${node_end}"
+
+    dnsmasq_ok=false
+    for attempt in 1 2 3; do
+      if oc debug "node/${node_name}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${dnsmasq_setup_b64}' | base64 -d | bash -s -- '${LOCALNET_SECONDARY_BRIDGE}' '${node_start}' '${node_end}' '${DNSMASQ_GATEWAY}' '${DNSMASQ_DNS}'"
+      then
+        echo "  ${node_name}: dnsmasq configured"
+        dnsmasq_ok=true
+        break
+      fi
+      echo "  ${node_name}: oc debug failed (attempt ${attempt}/3), retrying in 10s..." >&2
+      sleep 10
+    done
+    if [[ "${dnsmasq_ok}" != "true" ]]; then
+      echo "ERROR: dnsmasq configuration failed on ${node_name}" >&2
+      exit 1
+    fi
+
+    node_index=$((node_index + 1))
+  done
+  echo "dnsmasq setup complete on all ${node_count} nodes"
+fi
