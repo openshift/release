@@ -63,7 +63,9 @@ get_artifacts_url() {
   local job_prefix
   local artifacts_path
   if [ -n "${PULL_NUMBER:-}" ]; then
-    job_prefix="pull-ci-redhat-developer-rhdh-${RELEASE_BRANCH_NAME}"
+    local pr_base_ref
+    pr_base_ref=$(jq -r '.refs.base_ref' <<< "${JOB_SPEC}")
+    job_prefix="pull-ci-redhat-developer-rhdh-${pr_base_ref}"
     artifacts_path="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
   else
     job_prefix="periodic-ci-redhat-developer-rhdh-${RELEASE_BRANCH_NAME}"
