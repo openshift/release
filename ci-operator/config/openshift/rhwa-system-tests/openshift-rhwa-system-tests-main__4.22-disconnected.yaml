@@ -22,6 +22,11 @@ resources:
     requests:
       cpu: 500m
       memory: 1000Mi
+test_binary_build_commands: |
+  export GOMODCACHE=/go/pkg/mod
+  export GOFLAGS=-mod=readonly
+  make deps-download ginkgo
+  chmod -R a+rX "$GOMODCACHE" ./bin
 tests:
 - always_run: false
   as: e2e-far-aws-disconnected
@@ -61,11 +66,15 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        export GOMODCACHE=/go/pkg/mod
+        export GOCACHE=/tmp/system-tests-go-build-cache
+        export GOFLAGS=-mod=readonly
+        mkdir -p "$GOCACHE"
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
-      from: src
+      from: test-bin
       resources:
         requests:
           cpu: 100m
@@ -109,11 +118,15 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        export GOMODCACHE=/go/pkg/mod
+        export GOCACHE=/tmp/system-tests-go-build-cache
+        export GOFLAGS=-mod=readonly
+        mkdir -p "$GOCACHE"
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
-      from: src
+      from: test-bin
       resources:
         requests:
           cpu: 100m
@@ -159,12 +172,16 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        export GOMODCACHE=/go/pkg/mod
+        export GOCACHE=/tmp/system-tests-go-build-cache
+        export GOFLAGS=-mod=readonly
+        mkdir -p "$GOCACHE"
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: ECO_TEST_VERBOSE
-      from: src
+      from: test-bin
       resources:
         requests:
           cpu: 100m
@@ -209,12 +226,16 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        export GOMODCACHE=/go/pkg/mod
+        export GOCACHE=/tmp/system-tests-go-build-cache
+        export GOFLAGS=-mod=readonly
+        mkdir -p "$GOCACHE"
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: ECO_TEST_VERBOSE
-      from: src
+      from: test-bin
       resources:
         requests:
           cpu: 100m
@@ -259,12 +280,16 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        export GOMODCACHE=/go/pkg/mod
+        export GOCACHE=/tmp/system-tests-go-build-cache
+        export GOFLAGS=-mod=readonly
+        mkdir -p "$GOCACHE"
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
       - name: ECO_TEST_LABELS
-      from: src
+      from: test-bin
       resources:
         requests:
           cpu: 100m
@@ -308,12 +333,16 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        export GOMODCACHE=/go/pkg/mod
+        export GOCACHE=/tmp/system-tests-go-build-cache
+        export GOFLAGS=-mod=readonly
+        mkdir -p "$GOCACHE"
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
       - name: ECO_TEST_LABELS
-      from: src
+      from: test-bin
       resources:
         requests:
           cpu: 100m
@@ -361,12 +390,16 @@ tests:
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
         [[ -f "${SHARED_DIR}/injector_image" ]] && export SBR_INJECTOR_IMAGE=$(cat "${SHARED_DIR}/injector_image")
         [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat "${SHARED_DIR}/sbr_watchdog_debug_image")
+        export GOMODCACHE=/go/pkg/mod
+        export GOCACHE=/tmp/system-tests-go-build-cache
+        export GOFLAGS=-mod=readonly
+        mkdir -p "$GOCACHE"
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: SBR_STORAGE_CLASS
-      from: src
+      from: test-bin
       resources:
         requests:
           cpu: 100m
@@ -413,12 +446,16 @@ tests:
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
         [[ -f "${SHARED_DIR}/injector_image" ]] && export SBR_INJECTOR_IMAGE=$(cat "${SHARED_DIR}/injector_image")
         [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat "${SHARED_DIR}/sbr_watchdog_debug_image")
+        export GOMODCACHE=/go/pkg/mod
+        export GOCACHE=/tmp/system-tests-go-build-cache
+        export GOFLAGS=-mod=readonly
+        mkdir -p "$GOCACHE"
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: SBR_STORAGE_CLASS
-      from: src
+      from: test-bin
       resources:
         requests:
           cpu: 100m
@@ -463,12 +500,16 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        export GOMODCACHE=/go/pkg/mod
+        export GOCACHE=/tmp/system-tests-go-build-cache
+        export GOFLAGS=-mod=readonly
+        mkdir -p "$GOCACHE"
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
       - name: ECO_TEST_LABELS
-      from: src
+      from: test-bin
       resources:
         requests:
           cpu: 100m
@@ -512,12 +553,16 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        export GOMODCACHE=/go/pkg/mod
+        export GOCACHE=/tmp/system-tests-go-build-cache
+        export GOFLAGS=-mod=readonly
+        mkdir -p "$GOCACHE"
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
       - name: ECO_TEST_LABELS
-      from: src
+      from: test-bin
       resources:
         requests:
           cpu: 100m

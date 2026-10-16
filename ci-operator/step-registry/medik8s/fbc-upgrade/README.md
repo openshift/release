@@ -9,6 +9,15 @@ tests. Set it to a branch, tag, or commit SHA to select a different test revisio
 or pin a reproducible run. The actual SHA is saved in `system-tests-commit.txt`.
 An unavailable ref fails the checkout rather than falling back to `main`.
 
+After checkout, refs with `deps-download` prepare the pinned modules and versioned
+Ginkgo executable using `make deps-download ginkgo`, then run in readonly module
+mode. Older refs use `go mod download` and `go mod verify` and keep their existing
+build mode and tool installation, including vendoring where present. Preparation
+needs access to the configured Go proxy and checksum service, or a complete cache
+for the selected ref. The runner uses its writable temporary `GOMODCACHE` for
+module source and `GOCACHE` for compiled packages; neither cache changes the
+selected ref or disables checksum verification.
+
 By default, each FBC job discovers the newest complete public main-branch RHWA
 FBC build on Quay and reads its matching IDMS, operator version, and controller.
 The chosen catalog digest and image expectations are recorded for that run.
