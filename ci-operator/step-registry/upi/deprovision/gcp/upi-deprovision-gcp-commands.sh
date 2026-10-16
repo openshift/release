@@ -58,13 +58,20 @@ echo "[DEBUG] current OCP version: '${ocp_version}'"
 popd
 
 echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
-if version_ge "${ocp_version}" "4.12"; then
+# gcloud 5xx does not support Python 3.6 (RHEL8). The upi-installer image moves to
+# RHEL9 from 4.16 on. 4.15 and older must stay on the 447.
+if version_ge "${ocp_version}" "4.16"; then
   GCLOUD_SDK_VERSION="563"
+elif version_ge "${ocp_version}" "4.12"; then
+  GCLOUD_SDK_VERSION="447"
 else
   GCLOUD_SDK_VERSION="256"
 fi
-gcloud version
-if ! gcloud version | grep -q "Google Cloud SDK ${GCLOUD_SDK_VERSION}"; then
+# The preinstalled gcloud may be unusable, so capture its output rather than letting a failing
+# 'gcloud version' abort the step before the expected version can be installed.
+installed_gcloud="$(gcloud version 2>&1 || true)"
+echo "${installed_gcloud}"
+if ! grep -q "Google Cloud SDK ${GCLOUD_SDK_VERSION}" <<< "${installed_gcloud}"; then
   GCLOUD_TAR="google-cloud-sdk-${GCLOUD_SDK_VERSION}.0.0-linux-x86_64.tar.gz"
   GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
   echo "$(date -u --rfc-3339=seconds) - gcloud expected version not installed: installing from $GCLOUD_URL"
@@ -74,9 +81,9 @@ if ! gcloud version | grep -q "Google Cloud SDK ${GCLOUD_SDK_VERSION}"; then
   export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
   popd
 fi
-gcloud version
 echo "$(date -u --rfc-3339=seconds) - Unset env var 'CLOUDSDK_PYTHON', use gcloud bundled-python3-unix instead"
 unset CLOUDSDK_PYTHON
+gcloud version
 
 if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.json" ]]; then
   echo "Activating XPN service-account..."
