@@ -25,6 +25,9 @@ images:
       FROM nested-podman
       USER 0
       RUN dnf install -y git make skopeo jq findutils tar gzip gettext && dnf clean all
+      # OpenShift assigns an arbitrary UID; keep /etc/passwd group-writable so the
+      # e2e step can register that UID (required by OpenSSH client).
+      RUN chmod g=u /etc/passwd
       COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
       COPY --from=operator-sdk /usr/local/bin/operator-sdk /usr/local/bin/operator-sdk
       ENV GOROOT=/opt/app-root/src/go
@@ -299,6 +302,16 @@ tests:
 
         : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
         exec > >(tee "$ARTIFACT_DIR/e2e-test.log") 2>&1
+
+        # Same pattern as ssh-bastion: OpenSSH requires the random OpenShift UID in /etc/passwd.
+        if ! whoami &> /dev/null; then
+          if [[ -w /etc/passwd ]]; then
+            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+          else
+            echo "/etc/passwd is not writeable, and user matching this uid is not found."
+            exit 1
+          fi
+        fi
 
         export GOPATH=/tmp/nhc-go
         export GOMODCACHE="$GOPATH/pkg/mod"
