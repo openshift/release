@@ -59,7 +59,7 @@ def monitor_entry(cluster_name: str, console_url: str) -> str:
     sub_component_slug: "{cluster_name}"
     prometheus_monitor:
       prometheus_location:
-        cluster: "core-ci"
+        cluster: "app.ci"
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
@@ -119,7 +119,7 @@ def mgmt_monitor_entry(cluster_name: str, console_url: str) -> str:
     sub_component_slug: "{cluster_name}"
     prometheus_monitor:
       prometheus_location:
-        cluster: "core-ci"
+        cluster: "app.ci"
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
@@ -160,7 +160,7 @@ def dash_entry(cluster_name: str) -> str:
         description: "Build cluster {cluster_name}"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
 """
@@ -173,7 +173,7 @@ def mgmt_dash_entry(cluster_name: str) -> str:
         description: "Management cluster {cluster_name}"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
 """
