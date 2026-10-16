@@ -30,6 +30,19 @@ trap '_opp_cleanup' EXIT
 
 echo ">>> PHASE: initialization"
 
+# --- vSphere vCenter certificate: add to system CA trust store (if mounted) ---
+# PR #86183 mounted the Vault cert but did not update the CA trust store,
+# causing curl SSL errors (exit 60) during post-test JUnit processing.
+_vsphere_cert="/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate"
+if [[ -f "${_vsphere_cert}" ]]; then
+    echo ">>> Adding vSphere vCenter certificate to system CA trust store"
+    if cp "${_vsphere_cert}" /etc/pki/ca-trust/source/anchors/vsphere-vcenter.crt && update-ca-trust extract; then
+        echo ">>> CA trust store updated"
+    else
+        echo "WARNING: Failed to update CA trust store — curl may fail with SSL errors"
+    fi
+fi
+
 CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.version}')
 OCP_MAJOR_MINOR=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1,2)
 OCP_VERSION="${OCP_MAJOR_MINOR}"
@@ -81,9 +94,15 @@ _propagate_junit() {
 if [ "${MAP_TESTS}" = "true" ]; then
     # Avoid conflicts with the older versioned yq from the image:
     # Write /tmp/bin/yq as a tiny script (#!/bin/sh; exit 1), so yq --version fails and ExitTrap EnsureReqs downloads latest yq (replacing the stub).
-    eval "$(
-        curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-    )"
+    set +e
+    _et_ppp_src="$(curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh)"
+    _curl_rc=$?
+    set -e
+    if [[ ${_curl_rc} -eq 0 && -n "${_et_ppp_src}" ]]; then
+        eval "${_et_ppp_src}"
+    else
+        echo "WARNING: Failed to download ExitTrap--PostProcessPrep.sh (curl exit ${_curl_rc}) — JUnit post-processing unavailable"
+    fi
     trap '
         _opp_cleanup
         cleanup
@@ -91,8 +110,13 @@ if [ "${MAP_TESTS}" = "true" ]; then
         mkdir -p /tmp/bin
         printf "%s\n" "#!/bin/sh" "exit 1" > /tmp/bin/yq && chmod +x /tmp/bin/yq
         PATH="/tmp/bin:${PATH}"
-        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-            ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
+        if type -t ExitTrap--PostProcessPrep &>/dev/null; then
+            LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+                ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml || \
+                echo "WARNING: ExitTrap--PostProcessPrep failed (exit $?) — test results not affected"
+        else
+            echo "WARNING: ExitTrap--PostProcessPrep unavailable — skipping JUnit post-processing"
+        fi
     ' EXIT
 else
     trap '_opp_cleanup; cleanup; _propagate_junit' EXIT
