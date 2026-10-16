@@ -4,85 +4,78 @@ set -euo pipefail
 
 WORK_DIR="$(mktemp -d)"
 
-echo "Cloning rosa-hyperfleet at ref ${ROSA_REGIONAL_PLATFORM_REF}..."
-git clone --depth 1 --branch "${ROSA_REGIONAL_PLATFORM_REF}" \
-  https://github.com/openshift-online/rosa-hyperfleet.git "${WORK_DIR}/platform"
+# Resolve which rosa-hyperfleet repo + branch to provision from. The ephemeral
+# provider deploys REPOSITORY_URL/REPOSITORY_BRANCH from GitHub, so on a
+# rosa-hyperfleet PR this is the PR's head branch (on its fork, if any); for
+# any other job it is ROSA_REGIONAL_PLATFORM_REF of openshift-online/rosa-hyperfleet.
+if [[ "${REPO_NAME:-}" == "rosa-hyperfleet" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+  REPOSITORY_URL="$(curl -sSf --retry 5 \
+    "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" \
+    | jq -r '.head.repo.clone_url')"
+  REPOSITORY_BRANCH="${PULL_HEAD_REF}"
+else
+  REPOSITORY_URL="https://github.com/openshift-online/rosa-hyperfleet.git"
+  REPOSITORY_BRANCH="${ROSA_REGIONAL_PLATFORM_REF}"
+fi
+export REPOSITORY_URL REPOSITORY_BRANCH
+
+echo "Cloning ${REPOSITORY_URL} at ref ${REPOSITORY_BRANCH}..."
+git clone --depth 1 --branch "${REPOSITORY_BRANCH}" "${REPOSITORY_URL}" "${WORK_DIR}/platform"
 cd "${WORK_DIR}/platform"
 
-# Pin the exact commit SHA so e2e and teardown use the same code
+# Pin the source and exact commit SHA so e2e and teardown use the same code
 PINNED_SHA="$(git rev-parse HEAD)"
-echo "${PINNED_SHA}" > "${SHARED_DIR}/rosa-hyperfleet-sha"
-echo "Pinned rosa-hyperfleet at ${PINNED_SHA}"
+if [[ -n "${PULL_PULL_SHA:-}" ]] && [[ "${REPO_NAME:-}" == "rosa-hyperfleet" ]] && [[ "${PINNED_SHA}" != "${PULL_PULL_SHA}" ]]; then
+  echo "ERROR: ${REPOSITORY_BRANCH} moved to ${PINNED_SHA} after this job started at ${PULL_PULL_SHA}; /retest" >&2
+  exit 1
+fi
+declare -p REPOSITORY_URL REPOSITORY_BRANCH PINNED_SHA > "${SHARED_DIR}/rosa-hyperfleet-source.env"
+echo "Pinned ${REPOSITORY_URL}@${REPOSITORY_BRANCH} at ${PINNED_SHA}"
+
+# Write one override file per ROSA_REGIONAL_COMPONENTS entry that has a
+# target, with IMAGE_REPO/IMAGE_TAG replaced by the image the image-push step
+# pushed for that entry's repo (listed in SHARED_DIR/component-images).
+# Prints one "<target>:<override-file>" line per override.
+write_overrides() {
+  python3 <<'PYEOF'
+import os, sys, yaml
+shared = os.environ["SHARED_DIR"]
+pushed = {}
+pushed_file = os.path.join(shared, "component-images")
+if os.path.exists(pushed_file):
+    with open(pushed_file) as f:
+        for line in f:
+            repo, _, tag = line.strip().rpartition(":")
+            pushed[repo] = tag
+components = yaml.safe_load(os.environ["ROSA_REGIONAL_COMPONENTS"]) or []
+for i, c in enumerate(components):
+    repo = c.get("repo", "")
+    if c.get("image") and repo not in pushed:
+        sys.exit(f"ERROR: no image was pushed for {c['image']} -> {repo or '(no repo)'}; see the image-push step")
+    if "target" not in c or "override" not in c:
+        continue
+    text = yaml.safe_dump(c["override"], default_flow_style=False)
+    if repo:
+        text = text.replace("IMAGE_REPO", repo)
+    if repo in pushed:
+        text = text.replace("IMAGE_TAG", pushed[repo])
+    path = os.path.join(shared, f"component-override-{i}.yaml")
+    with open(path, "w") as f:
+        f.write(text)
+    print(f"{c['target']}:{path}")
+PYEOF
+}
 
 OVERRIDE_ARGS=()
-
-# Build override file if an override YAML template is provided
-if [[ -n "${ROSA_REGIONAL_HELM_OVERRIDE_YAML:-}" ]] && [[ -n "${ROSA_REGIONAL_HELM_VALUES_FILE:-}" ]]; then
-  OVERRIDE_YAML="${SHARED_DIR}/provision-override.yaml"
-
-  # Start with the template
-  echo "${ROSA_REGIONAL_HELM_OVERRIDE_YAML}" > "${OVERRIDE_YAML}"
-
-  # Replace image placeholders if the image-push step produced an override
-  OVERRIDE_IMAGE_FILE="${SHARED_DIR}/component-image-override"
-  if [[ -r "${OVERRIDE_IMAGE_FILE}" ]]; then
-    OVERRIDE_IMAGE="$(cat "${OVERRIDE_IMAGE_FILE}")"
-    OVERRIDE_REPO="${OVERRIDE_IMAGE%%:*}"
-    OVERRIDE_TAG="${OVERRIDE_IMAGE##*:}"
-
-    echo "Applying image override:"
-    echo "  Image: ${OVERRIDE_REPO}:${OVERRIDE_TAG}"
-
-    sed -i "s|IMAGE_REPO|${OVERRIDE_REPO}|g; s|IMAGE_TAG|${OVERRIDE_TAG}|g" "${OVERRIDE_YAML}"
-  fi
-
-  echo "Override target: ${ROSA_REGIONAL_HELM_VALUES_FILE}"
-  echo "Override YAML:"
-  cat "${OVERRIDE_YAML}"
-
-  OVERRIDE_ARGS+=(--provision-override-file "${ROSA_REGIONAL_HELM_VALUES_FILE}:${OVERRIDE_YAML}")
-fi
-
-# Process extra components from ROSA_REGIONAL_EXTRA_COMPONENTS (YAML list)
-if [[ -n "${ROSA_REGIONAL_EXTRA_COMPONENTS:-}" ]]; then
-  # Build a map of repo -> tag from pushed extra component images
-  declare -A EXTRA_TAGS=()
-  if [[ -r "${SHARED_DIR}/extra-component-images" ]]; then
-    while IFS= read -r line; do
-      r="${line%%:*}"
-      t="${line##*:}"
-      EXTRA_TAGS["${r}"]="${t}"
-    done < "${SHARED_DIR}/extra-component-images"
-  fi
-
-  python3 << 'PYEOF'
-import yaml, os
-components = yaml.safe_load(os.environ['ROSA_REGIONAL_EXTRA_COMPONENTS'])
-shared = os.environ['SHARED_DIR']
-with open(os.path.join(shared, 'extra-override-args.txt'), 'w') as af:
-    for i, entry in enumerate(components):
-        if 'target' not in entry or 'override' not in entry:
-            continue
-        path = os.path.join(shared, f'extra-override-{i}.yaml')
-        with open(path, 'w') as f:
-            yaml.dump(entry['override'], f, default_flow_style=False)
-        af.write(f"{entry.get('repo', '')}|{entry['target']}:{path}\n")
-        print(f"Extra component {i}: {entry['target']}")
-PYEOF
-
-  while IFS='|' read -r repo target_and_path; do
-    override_file="${target_and_path#*:}"
-    if [[ -n "${repo}" ]]; then
-      sed -i "s|IMAGE_REPO|${repo}|g" "${override_file}"
-      extra_tag="${EXTRA_TAGS[${repo}]:-}"
-      if [[ -n "${extra_tag}" ]]; then
-        sed -i "s|IMAGE_TAG|${extra_tag}|g" "${override_file}"
-      fi
-    fi
-    echo "Extra component override:"
-    cat "${override_file}"
-    OVERRIDE_ARGS+=(--provision-override-file "${target_and_path}")
-  done < "${SHARED_DIR}/extra-override-args.txt"
+if [[ -n "${ROSA_REGIONAL_COMPONENTS:-}" ]]; then
+  OVERRIDE_LIST="$(write_overrides)"
+  mapfile -t OVERRIDES <<< "${OVERRIDE_LIST}"
+  for override in "${OVERRIDES[@]}"; do
+    [[ -n "${override}" ]] || continue
+    echo "Override for ${override%%:*}:"
+    cat "${override#*:}"
+    OVERRIDE_ARGS+=(--provision-override-file "${override}")
+  done
 fi
 
 echo "Starting ephemeral provisioning..."

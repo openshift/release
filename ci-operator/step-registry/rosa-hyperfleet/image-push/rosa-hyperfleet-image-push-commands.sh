@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+if [[ -z "${ROSA_REGIONAL_COMPONENTS:-}" ]]; then
+  echo "ROSA_REGIONAL_COMPONENTS is not set, nothing to push."
+  exit 0
+fi
+
 AUTHFILE="/var/run/quay-push-credentials/.dockerconfigjson"
 if [[ ! -r "${AUTHFILE}" ]]; then
   echo "ERROR: ${AUTHFILE} not found or not readable" >&2
@@ -36,28 +41,25 @@ push_image() {
   echo "Image pushed successfully: ${dest}"
 }
 
-# Push primary component image
-if [[ -n "${CI_COMPONENT_IMAGE:-}" ]] && [[ -n "${ROSA_REGIONAL_QUAY_DEST_REPO:-}" ]]; then
-  push_image "${CI_COMPONENT_IMAGE}" "${ROSA_REGIONAL_QUAY_DEST_REPO}"
-  echo "${ROSA_REGIONAL_QUAY_DEST_REPO}:${TAG}" > "${SHARED_DIR}/component-image-override"
-fi
-
-# Push extra component images from ROSA_REGIONAL_EXTRA_COMPONENTS
-if [[ -n "${ROSA_REGIONAL_EXTRA_COMPONENTS:-}" ]]; then
-  env_name=""
-  while IFS= read -r line; do
-    if [[ "$line" =~ ^-[[:space:]]+image:[[:space:]]*(.*) ]]; then
-      env_name="${BASH_REMATCH[1]}"
-    elif [[ -n "$env_name" && "$line" =~ ^[[:space:]]+repo:[[:space:]]*(.*) ]]; then
-      repo="${BASH_REMATCH[1]}"
-      src="${!env_name:-}"
-      if [[ -z "${src}" ]]; then
-        echo "WARNING: ${env_name} is not set, skipping"
-      else
-        push_image "${src}" "${repo}"
-        echo "${repo}:${TAG}" >> "${SHARED_DIR}/extra-component-images"
-      fi
-      env_name=""
+# Push the images listed in ROSA_REGIONAL_COMPONENTS. Each entry's
+# "image" names the env var (a CI_IMAGE_N dependency) holding the source
+# pullspec and "repo" the quay.io destination. Entries must start with
+# "image:"; the provision step also fails on any entry left unpushed.
+env_name=""
+while IFS= read -r line; do
+  if [[ "$line" =~ ^-[[:space:]]+image:[[:space:]]*(.*) ]]; then
+    env_name="${BASH_REMATCH[1]}"
+  elif [[ -z "$env_name" && "$line" =~ ^-?[[:space:]]+repo: ]]; then
+    echo "ERROR: ROSA_REGIONAL_COMPONENTS entries must start with 'image:' (found '${line}')" >&2
+    exit 1
+  elif [[ -n "$env_name" && "$line" =~ ^[[:space:]]+repo:[[:space:]]*(.*) ]]; then
+    repo="${BASH_REMATCH[1]}"
+    if [[ ! "${env_name}" =~ ^CI_IMAGE_[1-8]$ ]] || [[ -z "${!env_name:-}" ]]; then
+      echo "ERROR: image: ${env_name} must be one of CI_IMAGE_1..CI_IMAGE_8, mapped in steps.dependencies" >&2
+      exit 1
     fi
-  done <<< "${ROSA_REGIONAL_EXTRA_COMPONENTS}"
-fi
+    push_image "${!env_name}" "${repo}"
+    echo "${repo}:${TAG}" >> "${SHARED_DIR}/component-images"
+    env_name=""
+  fi
+done <<< "${ROSA_REGIONAL_COMPONENTS}"
