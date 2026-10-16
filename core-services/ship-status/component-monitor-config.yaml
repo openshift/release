@@ -69,12 +69,11 @@ components:
     sub_component_slug: "horologium"
     prometheus_monitor:
       prometheus_location:
-        cluster: "core-ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
-        - query: "(max by (namespace, deployment) (kube_deployment_spec_replicas{namespace=\"ci\",deployment=\"horologium\"}) > 0) and on (namespace, deployment) (max by (namespace, deployment) (kube_deployment_status_replicas_available{namespace=\"ci\",deployment=\"horologium\"}) >= max by (namespace, deployment) (kube_deployment_spec_replicas{namespace=\"ci\",deployment=\"horologium\"}))"
-          failure_query: "max by (namespace, deployment) (kube_deployment_status_replicas_available{namespace=\"ci\",deployment=\"horologium\"})"
+        - query: "max(up{job=\"horologium\"}) > 0"
           duration: "5m"
           step: "30s"
           severity: "Down"
