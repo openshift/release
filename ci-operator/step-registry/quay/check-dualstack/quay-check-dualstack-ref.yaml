@@ -1,0 +1,26 @@
+ref:
+  as: quay-check-dualstack
+  cli: latest
+  from_image:
+    name: quay-deploy-tools
+    namespace: ci
+    tag: latest
+  commands: quay-check-dualstack-commands.sh
+  timeout: 15m0s
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Fail unless the deployed Quay serves over IPv6 on an IPv6-primary
+    dual-stack cluster (IP_FAMILY=DualStackIPv6Primary): the cluster service
+    network lists IPv6 first and also IPv4, the quay-app Service has an IPv6
+    ClusterIP, its EndpointSlices carry ready IPv6 addresses, every quay-app pod
+    has one IPv4 and one IPv6 pod IP, and /health/instance answers over the
+    Service's IPv6 address from inside the cluster. Run after the deploy step
+    and before the e2e tests.
+  env:
+  - name: QUAYNAMESPACE
+    default: "quay-enterprise"
+    documentation: Namespace where Quay is deployed.
