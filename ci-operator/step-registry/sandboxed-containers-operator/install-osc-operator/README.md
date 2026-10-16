@@ -34,6 +34,14 @@ do not need it.
 | `WORKLOAD_TO_TEST` | `kata` | Workload type: kata, peer-pods, or coco |
 | `OSC_NAMESPACE` | `openshift-sandboxed-containers-operator` | Target namespace |
 
+## PodVM Image Build Logs
+
+With `ENABLEPEERPODS=true` the operator builds the pod VM image in the
+`osc-podvm-image-creation` Job and deletes that Job as soon as the build ends,
+taking its logs with it. While KataConfig reconciles, the step therefore
+snapshots the build logs to `podvm-image-creation.log` in the job artifacts and
+prints where to find them, whether or not KataConfig becomes ready.
+
 ## Prerequisites
 
 This step expects the following to be available (created by earlier steps in the chain):
