@@ -49,9 +49,20 @@ echo "Target architecture: ${ARCH}"
 
 # --- Tag derivation ---
 # Suffix the tag with the arch so amd64 and arm64 jobs push to separate images.
-# BUILD_ID is always set by Prow and is unique per job run.
+#
+# For presubmit (PR) jobs, use the first 8 chars of PULL_PULL_SHA to match the
+# tag that common-operator-integ-suite.sh computes internally. If we use BUILD_ID
+# instead, the test suite deploys a different tag than the one we pushed and the
+# operator pod fails to pull the image.
+# For periodic/postsubmit jobs (no PULL_NUMBER), fall back to BUILD_ID which is
+# always unique per run.
 if [[ -n "${PULL_NUMBER:-}" ]]; then
-  COMPUTED_TAG="pr-${PULL_NUMBER}-${BUILD_ID}-${ARCH}"
+  if [[ -z "${PULL_PULL_SHA:-}" ]]; then
+    echo "ERROR: PULL_PULL_SHA is not set for a presubmit job. Cannot compute PR image tag." >&2
+    exit 1
+  fi
+  COMMIT_HASH="${PULL_PULL_SHA:0:8}"
+  COMPUTED_TAG="pr-${PULL_NUMBER}-${COMMIT_HASH}-${ARCH}"
 else
   COMPUTED_TAG="${BUILD_ID}-${ARCH}"
 fi
