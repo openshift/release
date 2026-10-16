@@ -17,9 +17,10 @@ ref:
        Spyglass. If the pointer is missing (that phase crashed early), it falls
        back to merging the small seed/verify blobs that did fit in SHARED_DIR.
     2. Gate: the best-effort Playwright phases (seed/verify/functional) each write
-       their result to SHARED_DIR/quay-upgrade-results/<phase>.rc and exit 0 so the
-       chain keeps running and every phase publishes its own report. This step reads
-       those markers and exits non-zero if ANY phase had test failures, turning the
-       job RED while still having run the complete set of phases. Non-test steps
-       (operator install, storage install, the OLM upgrade, provisioning) are not
-       best-effort and still abort the job directly on failure.
+       their result to the flat file SHARED_DIR/quay-upgrade-result-<phase>.rc and
+       exit 0 so the chain keeps running and every phase publishes its own report.
+       This step reads those markers and exits non-zero if ANY phase had test
+       failures, or if no phase wrote a marker, turning the job RED while still
+       having run the complete set of phases. Non-test steps (operator install,
+       storage install, the OLM upgrade, provisioning) are not best-effort and
+       still abort the job directly on failure.

@@ -8,8 +8,9 @@
 #      public GCS URL in SHARED_DIR. If that pointer is missing, fall back to
 #      merging the small seed/verify blobs that did fit in SHARED_DIR.
 #   2. Gate the job: exit non-zero if any best-effort Playwright phase recorded a
-#      test failure, so the job turns RED even though each phase exited 0 (which is
-#      what let every phase run and publish its own report).
+#      test failure, or if none recorded a result, so the job turns RED even
+#      though each phase exited 0 (which is what let every phase run and publish
+#      its own report).
 #
 # Intentionally NOT `set -e`: a hiccup while merging reports must never stop the
 # gate from running. No tracing (set -x) and no secret handling here.
@@ -145,7 +146,8 @@ rc=0
 shopt -s nullglob
 markers=("${SHARED}"/quay-upgrade-result-*.rc)
 if (( ${#markers[@]} == 0 )); then
-  echo "WARNING: no phase result markers in ${SHARED}; nothing to gate on."
+  echo "ERROR: no phase result markers in ${SHARED}; no Playwright phase reported a result." >&2
+  rc=1
 else
   echo "Playwright upgrade phase results:"
   for f in "${markers[@]}"; do
@@ -162,7 +164,7 @@ else
 fi
 
 if (( rc != 0 )); then
-  echo "ERROR: one or more Playwright upgrade phases had test failures; failing the job." >&2
+  echo "ERROR: the Playwright upgrade gate failed (see above); failing the job." >&2
 else
   echo "All Playwright upgrade phases passed."
 fi
