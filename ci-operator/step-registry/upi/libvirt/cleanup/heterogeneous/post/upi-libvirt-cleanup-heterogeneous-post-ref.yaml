@@ -1,0 +1,35 @@
+ref:
+  as: upi-libvirt-cleanup-heterogeneous-post
+  from: libvirt-installer
+  grace_period: 10m
+  commands: upi-libvirt-cleanup-heterogeneous-post-commands.sh
+  env:
+  - name: POOL_NAME
+    default: "multiarch-ci-pool"
+  - name: HTTPD_POOL_NAME
+    default: "httpd"
+  - name: ADDITIONAL_POOL_NAME
+    default: "multiarch-ci-pool"
+    documentation: "Pool name on the additional worker hypervisor"
+  - name: ADDITIONAL_LIBVIRT_PORT
+    default: "16509"
+    documentation: "Libvirt port on the additional worker bastion/hypervisor route"
+  - name: VXLAN_ADDITIONAL_BRIDGE
+    default: ""
+    documentation: |-
+      Optional fallback for the infra-owned additional-host bridge name when the
+      lease record does not contain vxlan.additional-bridge.
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 300Mi
+  dnsConfig:
+    nameservers:
+    - 172.30.38.188
+    searches:
+    - "bastion-z.svc.cluster.local"
+    - "bastion-ppc64le-libvirt.svc.cluster.local"
+  documentation: |-
+    Post-cleanup step for heterogeneous libvirt clusters covering both primary (s390x) and additional (arm64) hypervisors.
+    Removes ARM domains (with --nvram for UEFI), job-owned ARM libvirt network wrapper, then removes the primary libvirt network.
+    Infra owns the host bridges, VXLAN endpoints, and NetworkManager connections; this step does not touch them.

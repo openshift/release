@@ -1,0 +1,25 @@
+workflow:
+  as: openshift-e2e-libvirt-heterogeneous-vpn
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-heterogeneous-pre
+    - chain: upi-conf-libvirt-heterogeneous
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt-heterogeneous
+    test:
+    - chain: openshift-e2e-libvirt-test
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-heterogeneous-post
+    dnsConfig:
+      nameservers:
+      - 172.30.38.188
+      searches:
+      - "bastion-z.svc.cluster.local"
+      - "bastion-ppc64le-libvirt.svc.cluster.local"
+  documentation: |-
+    This workflow provisions an ephemeral heterogeneous OpenShift cluster with an s390x control plane
+    and arm64 additional worker using the lease-aware VPN cluster profile and hypervisors.
