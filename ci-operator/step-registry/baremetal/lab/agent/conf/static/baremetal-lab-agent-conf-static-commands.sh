@@ -4,8 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
-
+RENDEZVOUS_IP=$(yq -r -o=j -I=0 "$( [[ ${ipv4_enabled:-false} == true ]] && echo '.[0].ip' || echo '.[0].ipv6' )" \
+  "${SHARED_DIR}/hosts.yaml")
+INTERNAL_SERVER_IP="$( [[ ${ipv4_enabled:-false} == true ]] && echo "${INTERNAL_NET_IP}" || echo "${INTERNAL_NET_IPV6}" )"
 day2_arch="$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
 
 # Create an agent-config file containing only the minimum required configuration
@@ -66,41 +67,55 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         dhcp: false
         address:
             - ip: ${ip}
-              prefix-length: ${INTERNAL_NET_CIDR##*/}
+              prefix-length: ${INTERNAL_NET_CIDR}
       ipv6:
         enabled: ${ipv6_enabled}
+        dhcp: false
+        address:
+            - ip: ${ipv6}
+              prefix-length: ${INTERNAL_NET_CIDR_IPV6}
 "
-
-# Workaround: Comment out this code until OCPBUGS-34849 is fixed
   # split the ipi_disabled_ifaces semi-comma separated list into an array
-#  IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
-#  for iface in "${ipi_disabled_ifaces[@]}"; do
-#    # Take care of the indentation when adding the disabled interfaces to the above yaml
-#    ADAPTED_YAML+="
-#    - name: ${iface}
-#      type: ethernet
-#      state: up
-#      ipv4:
-#        enabled: false
-#        dhcp: false
-#      ipv6:
-#        enabled: false
-#        dhcp: false
-#    "
-#  done
+  IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
+  for iface in "${ipi_disabled_ifaces[@]}"; do
+    # Take care of the indentation when adding the disabled interfaces to the above yaml
+    ADAPTED_YAML+="
+    - name: ${iface}
+      type: ethernet
+      state: up
+      ipv4:
+        enabled: false
+        dhcp: false
+      ipv6:
+        enabled: false
+        dhcp: false
+    "
+  done
 
   # Take care of the indentation when adding the dns and routes to the above yaml
   ADAPTED_YAML+="
     dns-resolver:
           config:
             server:
-              - ${INTERNAL_NET_IP}
+              - ${INTERNAL_SERVER_IP}
     routes:
       config:
+  "
+  if [[ ${ipv4_enabled:-false} == true ]]; then
+      ADAPTED_YAML+="
         - destination: 0.0.0.0/0
           next-hop-address: ${INTERNAL_NET_IP}
           next-hop-interface: ${baremetal_iface}
   "
+  fi
+
+  if [[ ${ipv6_enabled:-false} == true ]]; then
+      ADAPTED_YAML+="
+        - destination: ::/0
+          next-hop-address: ${INTERNAL_NET_IPV6}
+          next-hop-interface: ${baremetal_iface}
+  "
+  fi
   # Patch agent-config.yaml or nodes-config.yaml if host used for day2 by adding the given host to the hosts list
   CONFIG_FILE=agent-config.yaml
   if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
