@@ -39,7 +39,7 @@ if [[ -f "${_vsphere_cert}" ]]; then
     if cp "${_vsphere_cert}" /etc/pki/ca-trust/source/anchors/vsphere-vcenter.crt && update-ca-trust extract; then
         echo ">>> CA trust store updated"
     else
-        echo "WARNING: Failed to update CA trust store — curl may fail with SSL errors"
+        echo "WARNING: Failed to update CA trust store (exit $?) — curl may fail with SSL errors"
     fi
 fi
 
