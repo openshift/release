@@ -26,7 +26,7 @@ _junit_start=$(date +%s)
 _junit_emitted=0
 _jrc=0  # initialized here, assigned inside trap string
 _junit_emit() {
-  # Emit a JUnit XML result for the ODF upgrade step and propagate to SHARED_DIR/junit.
+  # Emit a JUnit XML result for the ODF upgrade step and propagate to SHARED_DIR.
   (( _junit_emitted )) && return 0
   _junit_emitted=1
   local _jr=${1:-0}
@@ -49,8 +49,7 @@ _junit_emit() {
 </testsuite>
 JUNITEOF
   if [[ -n "${SHARED_DIR:-}" ]]; then
-    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    cp "${_jf}" "${SHARED_DIR}/" 2>/dev/null || true
   fi
 }
 

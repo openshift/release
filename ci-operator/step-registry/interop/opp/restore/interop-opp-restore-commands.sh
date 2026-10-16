@@ -110,9 +110,8 @@ CollectExitArtifacts() {
 
 # shellcheck disable=SC2317
 _propagate_junit () {
-    # Copy all JUnit XML files from ARTIFACT_DIR into SHARED_DIR/junit for aggregation.
-    mkdir -p "${SHARED_DIR}/junit"
-    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+    # Copy all JUnit XML files from ARTIFACT_DIR into SHARED_DIR for aggregation.
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/" \; 2>/dev/null || true
 }
 
 trap '_opp_cleanup; CollectExitArtifacts; _propagate_junit' EXIT
