@@ -483,7 +483,7 @@ spec:
   - kind: quay
     managed: true
   - kind: mirror
-    managed: true
+    managed: ${QUAY_MIRROR_MANAGED}
   - kind: clair
     managed: true
   - kind: tls
