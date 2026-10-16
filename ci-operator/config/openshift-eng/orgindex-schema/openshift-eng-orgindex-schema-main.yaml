@@ -13,9 +13,12 @@ images:
     to: tests-image
   - dockerfile_literal: |
       FROM src
-      # Install the package + dev tools resolved to the LOWEST allowed direct
-      # versions (e.g. pydantic==2.7) so the declared floors are actually tested.
-      RUN python3.12 -m pip install uv && uv pip install --system --resolution lowest-direct '.[dev]'
+      # A py3.12 venv with the package + dev tools resolved to the LOWEST allowed
+      # direct versions (e.g. pydantic==2.7), so the declared floors are tested.
+      # A venv (not --system) avoids resolving against the base image's py3.9.
+      RUN python3.12 -m pip install uv \
+          && uv venv --python python3.12 /opt/min \
+          && uv pip install --python /opt/min/bin/python --resolution lowest-direct '.[dev]'
     from: src
     to: tests-image-min
 resources:
@@ -60,8 +63,8 @@ tests:
 - as: minimum-versions
   commands: |
     export HOME=/tmp
-    # Floors are baked into tests-image-min at build time; just run the suite.
-    python3.12 -m pytest
+    # Floors are baked into the /opt/min venv at build time; just run the suite.
+    /opt/min/bin/python -m pytest
   container:
     from: tests-image-min
 - as: lock-check
