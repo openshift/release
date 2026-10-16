@@ -62,6 +62,7 @@ tests:
       OPERATOR_NAMESPACE: opendatahub
       PQC_CHECK: "true"
       SCAN_NAMESPACE: opendatahub,trustyai-tls-scan
+      SCANNER_NAMESPACE: opendatahub
       TENANT_NAMESPACE: trustyai-tls-scan
     test:
     - as: deploy-and-prepare-scan
@@ -73,8 +74,12 @@ tests:
         export GOFLAGS=''
 
         # Makefile deploy/manifest-gen invoke kubectl; cli image only ships oc.
+        # Use a writable dir: step pods often run as non-root and cannot write
+        # to /usr/local/bin.
         if ! command -v kubectl >/dev/null 2>&1; then
-          ln -s "$(command -v oc)" /usr/local/bin/kubectl
+          mkdir -p /tmp/bin
+          ln -sf "$(command -v oc)" /tmp/bin/kubectl
+          export PATH="/tmp/bin:${PATH}"
         fi
 
         make manifest-gen \
