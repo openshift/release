@@ -24,9 +24,7 @@ set -euo pipefail
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}/quay-install-external-storage"
 mkdir -p "${ARTIFACT_DIR}"
 
-YQ_TMPDIR=""
-cleanup() { [[ -n "${YQ_TMPDIR}" ]] && rm -rf "${YQ_TMPDIR}" || true; }
-trap cleanup EXIT
+command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
 
 NAMESPACE="${QUAYNAMESPACE:-quay}"
 REGISTRY="${QUAY_REGISTRY_NAME:-quay}"
@@ -97,23 +95,16 @@ FEATURE_OTEL_TRACING: false
 EOF
 cat "${STORAGE_FRAGMENT}" >>config.yaml
 
-# Fetch yq once into a private temp dir, used to merge config fragments and to
-# strip operator-managed keys.
-YQ_TMPDIR="$(mktemp -d)"
-YQ="${YQ_TMPDIR}/yq"
-curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-  -o "${YQ}" && chmod +x "${YQ}"
-
 # Merge a config fragment into config.yaml with list-append semantics ('*+'),
 # validating first so a present-but-malformed fragment fails clearly instead of
 # corrupting config.yaml.
 merge_config_fragment() {
   local fragment="$1"
-  if ! "${YQ}" e 'true' "${fragment}" >/dev/null 2>&1; then
+  if ! yq e 'true' "${fragment}" >/dev/null 2>&1; then
     echo "ERROR: ${fragment} is not valid YAML" >&2
     exit 1
   fi
-  "${YQ}" eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+  yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
 # Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG, so
@@ -137,7 +128,7 @@ fi
 
 # Strip field-group keys for components this CR keeps managed. The operator
 # injects those values; leaving them in configBundleSecret blocks rollout.
-"${YQ}" -i '
+yq -i '
   del(
     .FEATURE_SECURITY_SCANNER,
     .FEATURE_SECURITY_NOTIFICATIONS,

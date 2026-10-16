@@ -112,7 +112,7 @@ target_minor="${TARGET_CHANNEL##*-}"
 echo "Pre-upgrade QuayRegistry currentVersion: ${pre_version:-<none>}; target minor: ${target_minor}"
 
 if oc get catalogsource -n "${CATALOG_NS}" "${TARGET_CATALOG}" >/dev/null 2>&1; then
-  owner="$(oc get catalogsource -n "${CATALOG_NS}" "${TARGET_CATALOG}" -o jsonpath='{.metadata.labels.quay-operator-upgrade\\.openshift\\.io/managed}' 2>/dev/null || true)"
+  owner="$(oc get catalogsource -n "${CATALOG_NS}" "${TARGET_CATALOG}" -o jsonpath='{.metadata.labels.quay-operator-upgrade\.openshift\.io/managed}' 2>/dev/null || true)"
   [[ "${owner}" == true ]] || fail "CatalogSource ${CATALOG_NS}/${TARGET_CATALOG} exists but is not owned by this step"
 fi
 
@@ -157,7 +157,7 @@ while (( $(date +%s) < deadline )); do
   # pre-upgrade version) so a still-Available n-1 registry cannot pass early.
   if [[ "${available}" == True && -n "${images}" \
         && -n "${current_version}" && "${current_version}" != "${pre_version}" \
-        && "${current_version}" == *"${target_minor}"* ]]; then
+        && ( "${current_version}" == "${target_minor}" || "${current_version}" == "${target_minor}".* ) ]]; then
     ready=true
     while IFS='=' read -r deployment image; do
       [[ -n "${deployment}" && -n "${image}" ]] || { ready=false; break; }
@@ -170,7 +170,8 @@ while (( $(date +%s) < deadline )); do
   sleep 15
 done
 [[ "${available:-}" == True && -n "${images:-}" && "${ready:-false}" == true \
-   && "${current_version:-}" != "${pre_version:-}" && "${current_version:-}" == *"${target_minor}"* ]] \
+   && "${current_version:-}" != "${pre_version:-}" \
+   && ( "${current_version:-}" == "${target_minor}" || "${current_version:-}" == "${target_minor}".* ) ]] \
   || fail "QuayRegistry did not reach target version ${target_minor} (currentVersion=${current_version:-<none>}, was ${pre_version:-<none>}) with quay-app ready within ${UPGRADE_TIMEOUT}"
 app_images >"${ARTIFACT_DIR}/quay-app-images-after.txt"
 

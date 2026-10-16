@@ -62,7 +62,7 @@ wait_catalog() {
 oc get namespace "${CATALOG_NS}" >/dev/null
 oc get namespace "${OPERATOR_NS}" >/dev/null
 if oc get catalogsource -n "${CATALOG_NS}" "${SOURCE_CATALOG}" >/dev/null 2>&1; then
-  owner="$(oc get catalogsource -n "${CATALOG_NS}" "${SOURCE_CATALOG}" -o jsonpath='{.metadata.labels.quay-operator-upgrade\\.openshift\\.io/managed}' 2>/dev/null || true)"
+  owner="$(oc get catalogsource -n "${CATALOG_NS}" "${SOURCE_CATALOG}" -o jsonpath='{.metadata.labels.quay-operator-upgrade\.openshift\.io/managed}' 2>/dev/null || true)"
   [[ "${owner}" == true ]] || fail "CatalogSource ${CATALOG_NS}/${SOURCE_CATALOG} exists but is not owned by this step"
 fi
 if oc get subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" >/dev/null 2>&1; then
