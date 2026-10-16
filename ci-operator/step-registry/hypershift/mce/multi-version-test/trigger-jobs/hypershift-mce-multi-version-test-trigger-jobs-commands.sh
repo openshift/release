@@ -93,9 +93,10 @@ function wait_for_jobs() {
     local current_time
     local scheduling_started_at
     local scheduling_elapsed
+    local scheduling_hour
     start_time=$(date +%s)
     local -A scheduling_started=()
-    local -A scheduling_warning_logged=()
+    local -A scheduling_warning_hour=()
 
     cp "$job_list_file" /tmp/job_list_pending
 
@@ -150,16 +151,17 @@ function wait_for_jobs() {
                 fi
                 scheduling_started_at=${scheduling_started[$job_id]}
                 scheduling_elapsed=$(( current_time - scheduling_started_at ))
-                if (( scheduling_elapsed >= 3600 )) && [[ -z "${scheduling_warning_logged[$job_id]:-}" ]]; then
+                scheduling_hour=$(( scheduling_elapsed / 3600 ))
+                if (( scheduling_hour > ${scheduling_warning_hour[$job_id]:-0} )); then
                     echo "WARNING: Job ${job_id} (${prefix}) has been in SCHEDULING state for ${scheduling_elapsed}s; it may be stuck."
-                    scheduling_warning_logged["$job_id"]=1
+                    scheduling_warning_hour["$job_id"]=$scheduling_hour
                 fi
                 echo "$line" >> /tmp/job_list_next_pending
             elif [ "$job_status" == "PENDING" ] || [ "$job_status" == "TRIGGERED" ]; then
-                unset 'scheduling_started[$job_id]' 'scheduling_warning_logged[$job_id]'
+                unset 'scheduling_started[$job_id]' 'scheduling_warning_hour[$job_id]'
                 echo "$line" >> /tmp/job_list_next_pending
             else
-                unset 'scheduling_started[$job_id]' 'scheduling_warning_logged[$job_id]'
+                unset 'scheduling_started[$job_id]' 'scheduling_warning_hour[$job_id]'
                 echo "${prefix}, JOB_URL=${job_url}, JOB_STATUS=${job_status}" >> "${SHARED_DIR}/job_list"
             fi
         done < /tmp/job_list_pending
