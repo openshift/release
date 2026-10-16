@@ -7,7 +7,7 @@ local alerts = (import 'prometheus.libsonnet').prometheusAlerts;
 		"name": "ci-alerts",
 		"namespace": "ci-monitoring",
 		"labels": {
-			"app.kubernetes.io/managed-by": "custom-thanos-operator"
+			"app.kubernetes.io/managed-by": "thanos-operator"
 		}
 	},
 	"spec": alerts
