@@ -362,9 +362,22 @@ EOF
 
   oc rollout status deploy/ingress-operator -n "${CP_NS}" --timeout=120s || true
 
-  # Wait for canary to pass
+  # Verify the canary URL is directly reachable from inside the ingress-operator pod.
+  # This confirms the externalIP + NO_PROXY path works before waiting on the condition.
+  CANARY_URL="https://canary-openshift-ingress-canary.${APPS_DOMAIN}"
+  echo "$(date) Verifying canary URL from ingress-operator pod: ${CANARY_URL}"
+  oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
+    curl -vk --connect-timeout 10 "${CANARY_URL}" || true
+
+  # Also verify direct curl to the externalIP to confirm kube-proxy NAT is working
+  echo "$(date) Verifying direct curl to externalIP ${APPS_EXTERNAL_IP}:443"
+  oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
+    curl -vk --connect-timeout 10 --resolve "canary-openshift-ingress-canary.${APPS_DOMAIN}:443:${APPS_EXTERNAL_IP}" \
+    "${CANARY_URL}" || true
+
+  # Wait for canary to pass — extended to 600s to allow ingress-operator restart cycle
   echo "$(date) Waiting for CanaryChecksSucceeding on default IngressController"
-  CANARY_WAIT=300
+  CANARY_WAIT=600
   CANARY_ELAPSED=0
   while [[ ${CANARY_ELAPSED} -lt ${CANARY_WAIT} ]]; do
     CANARY_STATUS=$(oc get ingresscontroller default -n openshift-ingress-operator \
@@ -375,9 +388,23 @@ EOF
       break
     fi
     echo "$(date) CanaryChecksSucceeding=${CANARY_STATUS:-unknown} (${CANARY_ELAPSED}s/${CANARY_WAIT}s)"
+    # Print ingress-operator NO_PROXY every 2 minutes to detect CPO resets
+    if (( CANARY_ELAPSED % 120 == 0 && CANARY_ELAPSED > 0 )); then
+      NOPROXY_CHECK=$(oc get deploy ingress-operator -n "${CP_NS}" \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="ingress-operator")].env[?(@.name=="NO_PROXY")].value}' || true)
+      echo "$(date) ingress-operator NO_PROXY check: ${NOPROXY_CHECK}"
+    fi
     sleep 30
     CANARY_ELAPSED=$((CANARY_ELAPSED + 30))
   done
+
+  if [[ "${CANARY_STATUS}" != "True" ]]; then
+    echo "$(date) WARNING: CanaryChecksSucceeding did not reach True after ${CANARY_WAIT}s — printing debug"
+    oc get ingresscontroller default -n openshift-ingress-operator \
+      --kubeconfig "${SHARED_DIR}/nested_kubeconfig" -o yaml || true
+    oc get events -n openshift-ingress --kubeconfig "${SHARED_DIR}/nested_kubeconfig" \
+      --sort-by='.lastTimestamp' | tail -20 || true
+  fi
   export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 fi
 
